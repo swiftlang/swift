@@ -267,8 +267,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
 
   unsigned countInherits(ExtensionDecl *ED) {
     SmallVector<TypeLoc, 4> Results;
-    getInheritedForPrinting(
-        ED, [&](const Decl *D) { return Options.shouldPrint(D); }, Results);
+    getInheritedForPrinting(ED, Options, Results);
     return Results.size();
   }
 

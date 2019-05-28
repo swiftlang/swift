@@ -213,21 +213,21 @@ public extension Differentiable {
 
 public extension Differentiable {
   @inlinable
-  func valueWithPullback<R : Differentiable>(
+  func valueWithPullback<R>(
     in f: @differentiable (Self) -> R
   ) -> (value: R, pullback: (R.TangentVector) -> TangentVector) {
     return Builtin.autodiffApply_vjp_arity1(f, self)
   }
 
   @inlinable
-  func pullback<R : Differentiable>(
+  func pullback<R>(
     in f: @differentiable (Self) -> R
   ) -> (R.TangentVector) -> TangentVector {
     return Builtin.autodiffApply_vjp_arity1(f, self).1
   }
 
   @inlinable
-  func gradient<R : Differentiable>(
+  func gradient<R>(
     in f: @differentiable (Self) -> R
   ) -> TangentVector
     where R : FloatingPoint, R.TangentVector == R {
@@ -235,7 +235,7 @@ public extension Differentiable {
   }
 
   @inlinable
-  func valueWithGradient<R : Differentiable>(
+  func valueWithGradient<R>(
     in f: @differentiable (Self) -> R
   ) -> (value: R, gradient: TangentVector)
     where R : FloatingPoint, R.TangentVector == R {
@@ -244,7 +244,7 @@ public extension Differentiable {
   }
 
   @inlinable
-  func valueWithPullback<T : Differentiable, R : Differentiable>(
+  func valueWithPullback<T, R>(
     at x: T, in f: @differentiable (Self, T) -> R
   ) -> (value: R,
         pullback: (R.TangentVector) -> (TangentVector, T.TangentVector)) {
@@ -252,14 +252,14 @@ public extension Differentiable {
   }
 
   @inlinable
-  func pullback<T : Differentiable, R : Differentiable>(
+  func pullback<T, R>(
     at x: T, in f: @differentiable (Self, T) -> R
   ) -> (R.TangentVector) -> (TangentVector, T.TangentVector) {
     return Builtin.autodiffApply_vjp_arity2(f, self, x).1
   }
 
   @inlinable
-  func gradient<T : Differentiable, R : Differentiable>(
+  func gradient<T, R>(
     at x: T, in f: @differentiable (Self, T) -> R
   ) -> (TangentVector, T.TangentVector)
     where R : FloatingPoint, R.TangentVector == R {
@@ -267,7 +267,7 @@ public extension Differentiable {
   }
 
   @inlinable
-  func valueWithGradient<T : Differentiable, R : Differentiable>(
+  func valueWithGradient<T, R>(
     at x: T, in f: @differentiable (Self, T) -> R
   ) -> (value: R, gradient: (TangentVector, T.TangentVector))
     where R : FloatingPoint, R.TangentVector == R {
@@ -285,8 +285,7 @@ public extension Differentiable {
 @inlinable
 public func valueWithPullback<T, R>(
   at x: T, in f: @differentiable (T) -> R
-) -> (value: R, pullback: (R.TangentVector) -> T.TangentVector)
-  where T : Differentiable, R : Differentiable {
+) -> (value: R, pullback: (R.TangentVector) -> T.TangentVector) {
   return Builtin.autodiffApply_vjp(f, x)
 }
 
@@ -294,8 +293,7 @@ public func valueWithPullback<T, R>(
 public func valueWithPullback<T, U, R>(
   at x: T, _ y: U, in f: @differentiable (T, U) -> R
 ) -> (value: R,
-      pullback: (R.TangentVector) -> (T.TangentVector, U.TangentVector))
-  where T : Differentiable, U : Differentiable, R : Differentiable {
+      pullback: (R.TangentVector) -> (T.TangentVector, U.TangentVector)) {
   return Builtin.autodiffApply_vjp_arity2(f, x, y)
 }
 
@@ -304,9 +302,7 @@ public func valueWithPullback<T, U, V, R>(
   at x: T, _ y: U, _ z: V, in f: @differentiable (T, U, V) -> R
 ) -> (value: R,
       pullback: (R.TangentVector)
-        -> (T.TangentVector, U.TangentVector, V.TangentVector))
-  where T : Differentiable, U : Differentiable, V : Differentiable,
-        R : Differentiable {
+        -> (T.TangentVector, U.TangentVector, V.TangentVector)) {
   return Builtin.autodiffApply_vjp_arity3(f, x, y, z)
 }
 
@@ -315,16 +311,14 @@ public func valueWithPullback<T, U, V, R>(
 @inlinable
 public func pullback<T, R>(
   at x: T, in f: @differentiable (T) -> R
-) -> (R.TangentVector) -> T.TangentVector
-  where T : Differentiable, R : Differentiable {
+) -> (R.TangentVector) -> T.TangentVector {
   return Builtin.autodiffApply_vjp(f, x).1
 }
 
 @inlinable
 public func pullback<T, U, R>(
   at x: T, _ y: U, in f: @differentiable (T, U) -> R
-) -> (R.TangentVector) -> (T.TangentVector, U.TangentVector)
-  where T : Differentiable, U : Differentiable, R : Differentiable {
+) -> (R.TangentVector) -> (T.TangentVector, U.TangentVector) {
   return Builtin.autodiffApply_vjp_arity2(f, x, y).1
 }
 
@@ -332,9 +326,7 @@ public func pullback<T, U, R>(
 public func pullback<T, U, V, R>(
   at x: T, _ y: U, _ z: V, in f: @differentiable (T, U, V) -> R
 ) -> (R.TangentVector)
-    -> (T.TangentVector, U.TangentVector, V.TangentVector)
-  where T : Differentiable, U : Differentiable, V : Differentiable,
-        R : Differentiable {
+    -> (T.TangentVector, U.TangentVector, V.TangentVector) {
   return Builtin.autodiffApply_vjp_arity3(f, x, y, z).1
 }
 
@@ -344,8 +336,7 @@ public func pullback<T, U, V, R>(
 public func valueWithGradient<T, R>(
   at x: T, in f: @differentiable (T) -> R
 ) -> (value: R, gradient: T.TangentVector)
-  where T : Differentiable, R : FloatingPoint & Differentiable,
-        R.TangentVector == R {
+  where R : FloatingPoint, R.TangentVector == R {
   let (y, pullback) = valueWithPullback(at: x, in: f)
   return (y, pullback(R(1)))
 }
@@ -354,8 +345,7 @@ public func valueWithGradient<T, R>(
 public func valueWithGradient<T, U, R>(
   at x: T, _ y: U, in f: @differentiable (T, U) -> R
 ) -> (value: R, gradient: (T.TangentVector, U.TangentVector))
-  where T : Differentiable, U : Differentiable,
-        R : FloatingPoint & Differentiable, R.TangentVector == R {
+  where R : FloatingPoint, R.TangentVector == R {
   let (y, pullback) = valueWithPullback(at: x, y, in: f)
   return (y, pullback(R(1)))
 }
@@ -365,8 +355,7 @@ public func valueWithGradient<T, U, V, R>(
   at x: T, _ y: U, _ z: V, in f: @differentiable (T, U, V) -> R
 ) -> (value: R,
       gradient: (T.TangentVector, U.TangentVector, V.TangentVector))
-  where T : Differentiable, U : Differentiable, V : Differentiable,
-        R : FloatingPoint & Differentiable, R.TangentVector == R {
+  where R : FloatingPoint, R.TangentVector == R {
   let (y, pullback) = valueWithPullback(at: x, y, z, in: f)
   return (y, pullback(R(1)))
 }
@@ -377,8 +366,7 @@ public func valueWithGradient<T, U, V, R>(
 public func valueWithGradient<T, R>(
   of f: @escaping @differentiable (T) -> R
 ) -> (T) -> (value: R, gradient: T.TangentVector)
-  where T : Differentiable, R : FloatingPoint & Differentiable,
-        R.TangentVector == R {
+  where R : FloatingPoint, R.TangentVector == R {
   return { x in valueWithGradient(at: x, in: f) }
 }
 
@@ -386,9 +374,7 @@ public func valueWithGradient<T, R>(
 public func valueWithGradient<T, U, R>(
   of f: @escaping @differentiable (T, U) -> R
 ) -> (T, U) -> (value: R, gradient: (T.TangentVector, U.TangentVector))
-  where T : Differentiable, U : Differentiable,
-        R : FloatingPoint & Differentiable,
-        R.TangentVector == R {
+  where R : FloatingPoint, R.TangentVector == R {
   return { x, y in valueWithGradient(at: x, y, in: f) }
 }
 
@@ -398,9 +384,7 @@ public func valueWithGradient<T, U, V, R>(
 ) -> (T, U, V)
     -> (value: R,
         gradient: (T.TangentVector, U.TangentVector, V.TangentVector))
-  where T : Differentiable, U : Differentiable, V : Differentiable,
-        R : FloatingPoint & Differentiable,
-        R.TangentVector == R {
+  where R : FloatingPoint, R.TangentVector == R {
   return { x, y, z in valueWithGradient(at: x, y, z, in: f) }
 }
 
@@ -410,8 +394,7 @@ public func valueWithGradient<T, U, V, R>(
 public func gradient<T, R>(
   at x: T, in f: @differentiable (T) -> R
 ) -> T.TangentVector
-  where T : Differentiable, R : FloatingPoint & Differentiable,
-        R.TangentVector == R {
+  where R : FloatingPoint, R.TangentVector == R {
   return pullback(at: x, in: f)(R(1))
 }
 
@@ -419,8 +402,7 @@ public func gradient<T, R>(
 public func gradient<T, U, R>(
   at x: T, _ y: U, in f: @differentiable (T, U) -> R
 ) -> (T.TangentVector, U.TangentVector)
-  where T : Differentiable, U : Differentiable,
-        R : FloatingPoint & Differentiable, R.TangentVector == R {
+  where R : FloatingPoint, R.TangentVector == R {
   return pullback(at: x, y, in: f)(R(1))
 }
 
@@ -428,8 +410,7 @@ public func gradient<T, U, R>(
 public func gradient<T, U, V, R>(
   at x: T, _ y: U, _ z: V, in f: @differentiable (T, U, V) -> R
 ) -> (T.TangentVector, U.TangentVector, V.TangentVector)
-  where T : Differentiable, U : Differentiable, V : Differentiable,
-        R : FloatingPoint & Differentiable, R.TangentVector == R {
+  where R : FloatingPoint, R.TangentVector == R {
   return pullback(at: x, y, z, in: f)(R(1))
 }
 
@@ -439,8 +420,7 @@ public func gradient<T, U, V, R>(
 public func gradient<T, R>(
   of f: @escaping @differentiable (T) -> R
 ) -> (T) -> T.TangentVector
-  where T : Differentiable, R : FloatingPoint & Differentiable,
-        R.TangentVector == R {
+  where R : FloatingPoint, R.TangentVector == R {
   return { x in gradient(at: x, in: f) }
 }
 
@@ -448,9 +428,7 @@ public func gradient<T, R>(
 public func gradient<T, U, R>(
   of f: @escaping @differentiable (T, U) -> R
 ) -> (T, U) -> (T.TangentVector, U.TangentVector)
-  where T : Differentiable, U : Differentiable,
-        R : FloatingPoint & Differentiable,
-        R.TangentVector == R {
+  where R : FloatingPoint, R.TangentVector == R {
   return { x, y in gradient(at: x, y, in: f) }
 }
 
@@ -458,9 +436,7 @@ public func gradient<T, U, R>(
 public func gradient<T, U, V, R>(
   of f: @escaping @differentiable (T, U, V) -> R
 ) -> (T, U, V) -> (T.TangentVector, U.TangentVector, V.TangentVector)
-  where T : Differentiable, U : Differentiable, V : Differentiable,
-        R : FloatingPoint & Differentiable,
-        R.TangentVector == R {
+  where R : FloatingPoint, R.TangentVector == R {
   return { x, y, z in gradient(at: x, y, z, in: f) }
 }
 

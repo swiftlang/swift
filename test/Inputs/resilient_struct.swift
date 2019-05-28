@@ -78,7 +78,9 @@ public struct ResilientDouble {
   }
 }
 
-public class Referent {}
+public class Referent {
+  public init() {}
+}
 
 public struct ResilientWeakRef {
   public weak var ref: Referent?
@@ -90,6 +92,8 @@ public struct ResilientWeakRef {
 
 public struct ResilientRef {
   public var r: Referent
+
+  public init(r: Referent) { self.r = r }
 }
 
 public struct ResilientWithInternalField {

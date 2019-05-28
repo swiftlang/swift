@@ -455,6 +455,8 @@ def enable_app_extension : Flag<["-"], "application-extension">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Restrict code to those available for App Extensions">;
 
+def libc : Separate<["-"], "libc">, HelpText<"libc runtime library to use">;
+
 // Linker options
 
 def linker_option_Group : OptionGroup<"<linker-specific options>">;
@@ -840,6 +842,11 @@ def enable_testing : Flag<["-"], "enable-testing">,
 def enable_private_imports : Flag<["-"], "enable-private-imports">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
   HelpText<"Allows this module's internal and private API to be accessed">;
+
+def enable_cxx_interop :
+  Flag<["-"], "enable-cxx-interop">,
+  HelpText<"Enable C++ interop code generation and config directives">,
+  Flags<[FrontendOption]>;
 
 def sanitize_EQ : CommaJoined<["-"], "sanitize=">,
   Flags<[FrontendOption, NoInteractiveOption]>, MetaVarName<"<check>">,

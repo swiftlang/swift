@@ -313,7 +313,7 @@ public:
   Pattern *visitExprPattern(ExprPattern *P) {
     if (P->isResolved())
       return P;
-    
+
     // Try to convert to a pattern.
     Pattern *exprAsPattern = visit(P->getSubExpr());
     // If we failed, keep the ExprPattern as is.
@@ -1292,9 +1292,6 @@ recur:
 
     auto castType = IP->getCastTypeLoc().getType();
 
-    // Make sure we use any bridged NSError-related conformances.
-    useBridgedNSErrorConformances(dc, castType);
-
     // Determine whether we have an imbalance in the number of optionals.
     SmallVector<Type, 2> inputTypeOptionals;
     type->lookThroughAllOptionalTypes(inputTypeOptionals);
@@ -1438,6 +1435,10 @@ recur:
           }
         }
       }
+
+      if (!elt)
+        return true;
+
       enumTy = type;
     } else {
       // Check if the explicitly-written enum type matches the type we're

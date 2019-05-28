@@ -57,6 +57,8 @@ enum class FixKind : uint8_t {
 
   /// Introduce a '&' to take the address of an lvalue.
   AddressOf,
+  /// Remove extraneous use of `&`.
+  RemoveAddressOf,
 
   /// Replace a coercion ('as') with a forced checked cast ('as!').
   CoerceToCheckedCast,
@@ -147,6 +149,10 @@ enum class FixKind : uint8_t {
   /// Allow an invalid reference to a member declaration as part
   /// of a key path component.
   AllowInvalidRefInKeyPath,
+
+  /// Remove `return` or default last expression of single expression
+  /// function to `Void` to conform to expected result type.
+  RemoveReturn,
 };
 
 class ConstraintFix {
@@ -357,13 +363,19 @@ private:
 
 /// Add a new conformance to the type to satisfy a requirement.
 class MissingConformance final : public ConstraintFix {
-  Type NonConformingType;
-  ProtocolDecl *Protocol;
+  // Determines whether given protocol type comes from the context e.g.
+  // assignment destination or argument comparison.
+  bool IsContextual;
 
-  MissingConformance(ConstraintSystem &cs, Type type, ProtocolDecl *protocol,
-                     ConstraintLocator *locator)
+  Type NonConformingType;
+  // This could either be a protocol or protocol composition.
+  Type ProtocolType;
+
+  MissingConformance(ConstraintSystem &cs, bool isContextual, Type type,
+                     Type protocolType, ConstraintLocator *locator)
       : ConstraintFix(cs, FixKind::AddConformance, locator),
-        NonConformingType(type), Protocol(protocol) {}
+        IsContextual(isContextual), NonConformingType(type),
+        ProtocolType(protocolType) {}
 
 public:
   std::string getName() const override {
@@ -372,13 +384,17 @@ public:
 
   bool diagnose(Expr *root, bool asNote = false) const override;
 
-  static MissingConformance *create(ConstraintSystem &cs, Type type,
-                                    ProtocolDecl *protocol,
-                                    ConstraintLocator *locator);
+  static MissingConformance *forRequirement(ConstraintSystem &cs, Type type,
+                                            Type protocolType,
+                                            ConstraintLocator *locator);
+
+  static MissingConformance *forContextual(ConstraintSystem &cs, Type type,
+                                           Type protocolType,
+                                           ConstraintLocator *locator);
 
   Type getNonConformingType() { return NonConformingType; }
 
-  ProtocolDecl *getProtocol() { return Protocol; }
+  Type getProtocolType() { return ProtocolType; }
 };
 
 /// Skip same-type generic requirement constraint,
@@ -851,6 +867,50 @@ private:
   static AllowInvalidRefInKeyPath *create(ConstraintSystem &cs, RefKind kind,
                                           ValueDecl *member,
                                           ConstraintLocator *locator);
+};
+
+class RemoveAddressOf final : public ConstraintFix {
+  RemoveAddressOf(ConstraintSystem &cs, ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::RemoveAddressOf, locator) {}
+
+public:
+  std::string getName() const override {
+    return "remove extraneous use of `&`";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static RemoveAddressOf *create(ConstraintSystem &cs,
+                                 ConstraintLocator *locator);
+};
+
+class RemoveReturn final : public ConstraintFix {
+  RemoveReturn(ConstraintSystem &cs, ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::RemoveReturn, locator) {}
+
+public:
+  std::string getName() const override { return "remove or omit return type"; }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static RemoveReturn *create(ConstraintSystem &cs, ConstraintLocator *locator);
+};
+
+class CollectionElementContextualMismatch final : public ContextualMismatch {
+  CollectionElementContextualMismatch(ConstraintSystem &cs, Type srcType,
+                                      Type dstType, ConstraintLocator *locator)
+      : ContextualMismatch(cs, srcType, dstType, locator) {}
+
+public:
+  std::string getName() const override {
+    return "fix collection element contextual mismatch";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static CollectionElementContextualMismatch *
+  create(ConstraintSystem &cs, Type srcType, Type dstType,
+         ConstraintLocator *locator);
 };
 
 } // end namespace constraints

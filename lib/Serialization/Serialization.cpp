@@ -24,6 +24,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/PropertyDelegates.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/RawComment.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -834,6 +835,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(input_block, MODULE_FLAGS);
   BLOCK_RECORD(input_block, SEARCH_PATH);
   BLOCK_RECORD(input_block, FILE_DEPENDENCY);
+  BLOCK_RECORD(input_block, DEPENDENCY_DIRECTORY);
   BLOCK_RECORD(input_block, PARSEABLE_INTERFACE_PATH);
 
   BLOCK(DECLS_AND_TYPES_BLOCK);
@@ -1065,6 +1067,7 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
   input_block::ImportedHeaderContentsLayout ImportedHeaderContents(Out);
   input_block::SearchPathLayout SearchPath(Out);
   input_block::FileDependencyLayout FileDependency(Out);
+  input_block::DependencyDirectoryLayout DependencyDirectory(Out);
   input_block::ParseableInterfaceLayout ParseableInterface(Out);
 
   if (options.SerializeOptionsForDebugging) {
@@ -1078,13 +1081,24 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
       SearchPath.emit(ScratchRecord, /*framework=*/false, /*system=*/false, path);
   }
 
+  // Note: We're not using StringMap here because we don't need to own the
+  // strings.
+  llvm::DenseMap<StringRef, unsigned> dependencyDirectories;
   for (auto const &dep : options.Dependencies) {
+    StringRef directoryName = llvm::sys::path::parent_path(dep.getPath());
+    unsigned &dependencyDirectoryIndex = dependencyDirectories[directoryName];
+    if (!dependencyDirectoryIndex) {
+      // This name must be newly-added. Give it a new ID (and skip 0).
+      dependencyDirectoryIndex = dependencyDirectories.size();
+      DependencyDirectory.emit(ScratchRecord, directoryName);
+    }
     FileDependency.emit(ScratchRecord,
                         dep.getSize(),
                         getRawModTimeOrHash(dep),
                         dep.isHashBased(),
                         dep.isSDKRelative(),
-                        dep.getPath());
+                        dependencyDirectoryIndex,
+                        llvm::sys::path::filename(dep.getPath()));
   }
 
   if (!options.ParseableInterface.empty())
@@ -2720,22 +2734,39 @@ void Serializer::writeForeignErrorConvention(const ForeignErrorConvention &fec){
 /// - \p decl is declared in an extension of a type that depends on
 ///   \p problemContext
 static bool contextDependsOn(const NominalTypeDecl *decl,
-                             const ModuleDecl *problemModule) {
-  return decl->getParentModule() == problemModule;
+                             const DeclContext *problemContext) {
+  SmallPtrSet<const ExtensionDecl *, 8> seenExtensionDCs;
+
+  const DeclContext *dc = decl;
+  do {
+    if (dc == problemContext)
+      return true;
+
+    if (auto *extension = dyn_cast<ExtensionDecl>(dc)) {
+      if (extension->isChildContextOf(problemContext))
+        return true;
+
+      // Avoid cycles when Left.Nested depends on Right.Nested somehow.
+      bool isNewlySeen = seenExtensionDCs.insert(extension).second;
+      if (!isNewlySeen)
+        break;
+      dc = extension->getSelfNominalTypeDecl();
+
+    } else {
+      dc = dc->getParent();
+    }
+  } while (dc);
+
+  return false;
 }
 
 static void collectDependenciesFromType(llvm::SmallSetVector<Type, 4> &seen,
                                         Type ty,
-                                        const ModuleDecl *excluding) {
+                                        const DeclContext *excluding) {
   ty.visit([&](Type next) {
     auto *nominal = next->getAnyNominal();
     if (!nominal)
       return;
-    // FIXME: Types in the same module are still important for enums. It's
-    // possible an enum element has a payload that references a type declaration
-    // from the same module that can't be imported (for whatever reason).
-    // However, we need a more robust handling of deserialization dependencies
-    // that can handle circularities. rdar://problem/32359173
     if (contextDependsOn(nominal, excluding))
       return;
     seen.insert(nominal->getDeclaredInterfaceType());
@@ -2745,7 +2776,7 @@ static void collectDependenciesFromType(llvm::SmallSetVector<Type, 4> &seen,
 static void
 collectDependenciesFromRequirement(llvm::SmallSetVector<Type, 4> &seen,
                                    const Requirement &req,
-                                   const ModuleDecl *excluding) {
+                                   const DeclContext *excluding) {
   collectDependenciesFromType(seen, req.getFirstType(), excluding);
   if (req.getKind() != RequirementKind::Layout)
     collectDependenciesFromType(seen, req.getSecondType(), excluding);
@@ -3151,11 +3182,19 @@ void Serializer::writeDecl(const Decl *D) {
     auto conformances = theStruct->getLocalConformances(
                           ConformanceLookupKind::All, nullptr);
 
-    SmallVector<TypeID, 4> inheritedTypes;
+    SmallVector<TypeID, 4> inheritedAndDependencyTypes;
     for (auto inherited : theStruct->getInherited()) {
       assert(!inherited.getType()->hasArchetype());
-      inheritedTypes.push_back(addTypeRef(inherited.getType()));
+      inheritedAndDependencyTypes.push_back(addTypeRef(inherited.getType()));
     }
+
+    llvm::SmallSetVector<Type, 4> dependencyTypes;
+    for (Requirement req : theStruct->getGenericRequirements()) {
+      collectDependenciesFromRequirement(dependencyTypes, req,
+                                         /*excluding*/nullptr);
+    }
+    for (Type ty : dependencyTypes)
+      inheritedAndDependencyTypes.push_back(addTypeRef(ty));
 
     uint8_t rawAccessLevel =
       getRawStableAccessLevel(theStruct->getFormalAccess());
@@ -3170,7 +3209,8 @@ void Serializer::writeDecl(const Decl *D) {
                                             theStruct->getGenericEnvironment()),
                              rawAccessLevel,
                              conformances.size(),
-                             inheritedTypes);
+                             theStruct->getInherited().size(),
+                             inheritedAndDependencyTypes);
 
 
     writeGenericParams(theStruct->getGenericParams());
@@ -3198,6 +3238,11 @@ void Serializer::writeDecl(const Decl *D) {
     for (const EnumElementDecl *nextElt : theEnum->getAllElements()) {
       if (!nextElt->hasAssociatedValues())
         continue;
+      // FIXME: Types in the same module are still important for enums. It's
+      // possible an enum element has a payload that references a type
+      // declaration from the same module that can't be imported (for whatever
+      // reason). However, we need a more robust handling of deserialization
+      // dependencies that can handle circularities. rdar://problem/32359173
       collectDependenciesFromType(dependencyTypes,
                                   nextElt->getArgumentInterfaceType(),
                                   /*excluding*/theEnum->getParentModule());
@@ -3240,13 +3285,30 @@ void Serializer::writeDecl(const Decl *D) {
     auto contextID = addDeclContextRef(theClass->getDeclContext());
 
     auto conformances = theClass->getLocalConformances(
-                          ConformanceLookupKind::All, nullptr);
+                          ConformanceLookupKind::NonInherited, nullptr);
 
-    SmallVector<TypeID, 4> inheritedTypes;
+    SmallVector<TypeID, 4> inheritedAndDependencyTypes;
     for (auto inherited : theClass->getInherited()) {
       assert(!inherited.getType()->hasArchetype());
-      inheritedTypes.push_back(addTypeRef(inherited.getType()));
+      inheritedAndDependencyTypes.push_back(addTypeRef(inherited.getType()));
     }
+
+    llvm::SmallSetVector<Type, 4> dependencyTypes;
+    if (theClass->hasSuperclass()) {
+      // FIXME: Nested types can still be a problem here: it's possible that (for
+      // whatever reason) they won't be able to be deserialized, in which case
+      // we'll be in trouble forming the actual superclass type. However, we
+      // need a more robust handling of deserialization dependencies that can
+      // handle circularities. rdar://problem/50835214
+      collectDependenciesFromType(dependencyTypes, theClass->getSuperclass(),
+                                  /*excluding*/theClass);
+    }
+    for (Requirement req : theClass->getGenericRequirements()) {
+      collectDependenciesFromRequirement(dependencyTypes, req,
+                                         /*excluding*/nullptr);
+    }
+    for (Type ty : dependencyTypes)
+      inheritedAndDependencyTypes.push_back(addTypeRef(ty));
 
     uint8_t rawAccessLevel =
       getRawStableAccessLevel(theClass->getFormalAccess());
@@ -3268,7 +3330,8 @@ void Serializer::writeDecl(const Decl *D) {
                             addTypeRef(theClass->getSuperclass()),
                             rawAccessLevel,
                             conformances.size(),
-                            inheritedTypes);
+                            theClass->getInherited().size(),
+                            inheritedAndDependencyTypes);
 
     writeGenericParams(theClass->getGenericParams());
     writeMembers(id, theClass->getMembers(), true);
@@ -3307,6 +3370,7 @@ void Serializer::writeDecl(const Decl *D) {
                                rawAccessLevel,
                                inherited);
 
+    const_cast<ProtocolDecl*>(proto)->createGenericParamsIfMissing();
     writeGenericParams(proto->getGenericParams());
     writeGenericRequirements(
       proto->getRequirementSignature(), DeclTypeAbbrCodes);
@@ -3328,12 +3392,23 @@ void Serializer::writeDecl(const Decl *D) {
       rawSetterAccessLevel =
         getRawStableAccessLevel(var->getSetterFormalAccess());
 
+    unsigned numBackingProperties = 0;
     Type ty = var->getInterfaceType();
-    SmallVector<TypeID, 2> accessorsAndDependencies;
+    SmallVector<TypeID, 2> arrayFields;
     for (auto accessor : accessors.Decls)
-      accessorsAndDependencies.push_back(addDeclRef(accessor));
+      arrayFields.push_back(addDeclRef(accessor));
+    if (auto backingInfo = var->getPropertyDelegateBackingPropertyInfo()) {
+      if (backingInfo.backingVar) {
+        ++numBackingProperties;
+        arrayFields.push_back(addDeclRef(backingInfo.backingVar));
+      }
+      if (backingInfo.storageDelegateVar) {
+        ++numBackingProperties;
+        arrayFields.push_back(addDeclRef(backingInfo.storageDelegateVar));
+      }
+    }
     for (Type dependency : collectDependenciesFromType(ty->getCanonicalType()))
-      accessorsAndDependencies.push_back(addTypeRef(dependency));
+      arrayFields.push_back(addTypeRef(dependency));
 
     unsigned abbrCode = DeclTypeAbbrCodes[VarLayout::Code];
     VarLayout::emitRecord(Out, ScratchRecord, abbrCode,
@@ -3355,7 +3430,8 @@ void Serializer::writeDecl(const Decl *D) {
                           addDeclRef(var->getOverriddenDecl()),
                           rawAccessLevel, rawSetterAccessLevel,
                           addDeclRef(var->getOpaqueResultTypeDecl()),
-                          accessorsAndDependencies);
+                          numBackingProperties,
+                          arrayFields);
     break;
   }
 

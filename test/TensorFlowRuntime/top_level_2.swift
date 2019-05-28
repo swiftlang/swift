@@ -5,11 +5,7 @@
 // lib/Sema/PlaygroundTransform.cpp generates calls into.
 
 import TensorFlow
-#if TPU
-import TensorFlowUnittestTPU
-#else
 import TensorFlowUnittest
-#endif
 import StdlibUnittest
 
 var TopLevelTests = TestSuite("TopLevel")
@@ -22,7 +18,7 @@ func SR8405() {
   expectNearlyEqualWithScalarTensor(1.0, g)
 }
 
-TopLevelTests.testCPUOrGPU("TopLevel") {
+TopLevelTests.testAllBackends("TopLevel") {
   SR8405()
 }
 

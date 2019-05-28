@@ -385,17 +385,16 @@ AutoDiffIndexSubset *AutoDiffIndexSubset::adding(unsigned index,
   assert(index < getCapacity());
   if (contains(index))
     return const_cast<AutoDiffIndexSubset *>(this);
-  SmallVector<unsigned, 8> newIndices;
-  newIndices.reserve(capacity + 1);
+  SmallBitVector newIndices(capacity);
   bool inserted = false;
   for (auto curIndex : getIndices()) {
     if (!inserted && curIndex > index) {
-      newIndices.push_back(index);
+      newIndices.set(index);
       inserted = true;
     }
-    newIndices.push_back(curIndex);
+    newIndices.set(curIndex);
   }
-  return get(ctx, capacity, newIndices);
+  return get(ctx, newIndices);
 }
 
 AutoDiffIndexSubset *AutoDiffIndexSubset::extendingCapacity(
@@ -403,10 +402,10 @@ AutoDiffIndexSubset *AutoDiffIndexSubset::extendingCapacity(
   assert(newCapacity >= capacity);
   if (newCapacity == capacity)
     return const_cast<AutoDiffIndexSubset *>(this);
-  SmallVector<unsigned, 8> indices;
+  SmallBitVector indices(newCapacity);
   for (auto index : getIndices())
-    indices.push_back(index);
-  return AutoDiffIndexSubset::get(ctx, newCapacity, indices);
+    indices.set(index);
+  return AutoDiffIndexSubset::get(ctx, indices);
 }
 
 int AutoDiffIndexSubset::findNext(int startIndex) const {

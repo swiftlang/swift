@@ -221,6 +221,5 @@ func rdar46459603() {
   // expected-error@-1 {{binary operator '==' cannot be applied to operands of type 'Dictionary<String, E>.Values' and '[E]'}}
   // expected-note@-2  {{expected an argument list of type '(Self, Self)'}}
   _ = [arr.values] == [[e]]
-  // expected-error@-1 {{binary operator '==' cannot be applied to operands of type '[Dictionary<String, E>.Values]' and '[[E]]'}}
-  // expected-note@-2  {{expected an argument list of type '(Self, Self)'}}
+  // expected-error@-1 {{protocol type 'Any' cannot conform to 'Equatable' because only concrete types can conform to protocols}}
 }

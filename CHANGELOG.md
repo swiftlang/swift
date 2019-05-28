@@ -26,6 +26,28 @@ CHANGELOG
 Swift Next
 ----------
 
+* [SR-8974][]:
+
+  Duplicate tuple element labels are no longer allowed, because it leads
+  to incorrect behavior. For example:
+
+  ```
+  let dupLabels: (foo: Int, foo: Int) = (foo: 1, foo: 2)
+
+  enum Foo { case bar(x: Int, x: Int) }
+  let f: Foo = .bar(x: 0, x: 1)
+  ```
+
+  will now be diagnosed as an error. 
+
+  Note: You can still use duplicate labels when declaring functions and
+  subscripts, as long as the internal labels are different. For example:
+
+  ```
+  func foo(bar x: Int, bar y: Int) {}
+  subscript(a x: Int, a y: Int) -> Int {}
+  ```
+
 * [SR-6118][]:
 
   Subscripts can now declare default arguments:
@@ -197,7 +219,9 @@ Swift 5.1
   }
   ```
 
-* `weak` and `unowned` stored properties no longer inhibit the
+* [SR-9827][]:
+
+  `weak` and `unowned` stored properties no longer inhibit the
    automatic synthesis of `Equatable` or `Hashable` conformance.
 
 * [SR-2688][]:
@@ -7694,4 +7718,6 @@ Swift 1.0
 [SR-7799]: <https://bugs.swift.org/browse/SR-7799>
 [SR-8109]: <https://bugs.swift.org/browse/SR-8109>
 [SR-8546]: <https://bugs.swift.org/browse/SR-8546>
+[SR-8974]: <https://bugs.swift.org/browse/SR-8974>
 [SR-9043]: <https://bugs.swift.org/browse/SR-9043>
+[SR-9827]: <https://bugs.swift.org/browse/SR-9827>

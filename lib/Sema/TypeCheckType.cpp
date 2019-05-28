@@ -228,8 +228,13 @@ Type TypeResolution::resolveDependentMemberType(
   auto lazyResolver = ctx.getLazyResolver();
   if (lazyResolver)
     lazyResolver->resolveDeclSignature(concrete);
-  if (!concrete->hasInterfaceType())
+  if (!concrete->hasInterfaceType()) {
+    ctx.Diags.diagnose(ref->getIdLoc(), diag::recursive_decl_reference,
+                       concrete->getDescriptiveKind(), concrete->getName());
+    concrete->diagnose(diag::kind_declared_here,
+                       DescriptiveDeclKind::Type);
     return ErrorType::get(ctx);
+  }
 
   // Make sure that base type didn't get replaced along the way.
   assert(baseTy->isTypeParameter());
@@ -2528,6 +2533,8 @@ Type TypeResolver::resolveOpaqueReturnType(TypeRepr *repr,
   auto definingDeclNode = demangle.demangleSymbol(mangledName);
   if (!definingDeclNode)
     return Type();
+  if (definingDeclNode->getKind() == Node::Kind::Global)
+    definingDeclNode = definingDeclNode->getChild(0);
   ASTBuilder builder(Context);
   builder.Resolver = resolution.Resolver;
   auto opaqueNode =
@@ -3222,7 +3229,10 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
                                     TypeResolutionOptions options) {
   SmallVector<TupleTypeElt, 8> elements;
   elements.reserve(repr->getNumElements());
-  
+
+  llvm::SmallDenseSet<Identifier> seenEltNames;
+  seenEltNames.reserve(repr->getNumElements());
+
   auto elementOptions = options;
   if (!repr->isParenType()) {
     elementOptions = elementOptions.withoutContext(true);
@@ -3237,6 +3247,7 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
   }
 
   bool hadError = false;
+  bool foundDupLabel = false;
   for (unsigned i = 0, end = repr->getNumElements(); i != end; ++i) {
     auto *tyR = repr->getElementType(i);
 
@@ -3244,7 +3255,18 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
     if (!ty || ty->hasError())
       hadError = true;
 
-    elements.emplace_back(ty, repr->getElementName(i), ParameterTypeFlags());
+    auto eltName = repr->getElementName(i);
+
+    elements.emplace_back(ty, eltName, ParameterTypeFlags());
+
+    if (eltName.empty())
+      continue;
+
+    if (seenEltNames.count(eltName) == 1) {
+      foundDupLabel = true;
+    }
+
+    seenEltNames.insert(eltName);
   }
 
   if (hadError)
@@ -3261,6 +3283,11 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
     }
 
     elements[0] = TupleTypeElt(elements[0].getType());
+  }
+
+  // Tuples with duplicate element labels are not permitted
+  if (foundDupLabel) {
+    diagnose(repr->getLoc(), diag::tuple_duplicate_label);
   }
 
   return TupleType::get(elements, Context);

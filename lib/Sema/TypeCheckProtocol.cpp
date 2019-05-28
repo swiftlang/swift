@@ -731,7 +731,7 @@ static Optional<RequirementMatch> findMissingGenericRequirementForSolutionFix(
     auto missingConform = (MissingConformance *)fix;
     requirementKind = RequirementKind::Conformance;
     type = missingConform->getNonConformingType();
-    missingType = missingConform->getProtocol()->getDeclaredType();
+    missingType = missingConform->getProtocolType();
     break;
   }
   case FixKind::SkipSameTypeRequirement: {
@@ -1149,7 +1149,7 @@ bool WitnessChecker::findBestWitness(
       if (!clangModule)
         continue;
 
-      DeclContext *overlay = clangModule->getAdapterModule();
+      DeclContext *overlay = clangModule->getOverlayModule();
       if (!overlay)
         continue;
 
@@ -3511,11 +3511,6 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
     abort();
   }
 
-  if (!Proto->isRequirementSignatureComputed()) {
-    Conformance->setInvalid();
-    return ResolveWitnessResult::Missing;
-  }
-
   // Look for a member type with the same name as the associated type.
   auto candidates = TC.lookupMemberType(DC, Adoptee, assocType->getName(),
                                         NameLookupFlags::ProtocolMembers);
@@ -3665,11 +3660,6 @@ void ConformanceChecker::addUsedConformances(ProtocolConformance *conformance) {
 void ConformanceChecker::ensureRequirementsAreSatisfied(
                                                      bool failUnsubstituted) {
   auto proto = Conformance->getProtocol();
-  // Some other problem stopped the signature being computed.
-  if (!proto->isRequirementSignatureComputed()) {
-    Conformance->setInvalid();
-    return;
-  }
 
   if (CheckedRequirementSignature)
     return;
@@ -3724,7 +3714,7 @@ void ConformanceChecker::ensureRequirementsAreSatisfied(
             conformanceBeingChecked->getLoc(),
             diag::conformance_from_implementation_only_module,
             rootConformance->getType(),
-            rootConformance->getProtocol()->getName(), M->getName());
+            rootConformance->getProtocol()->getName(), 0, M->getName());
       } else {
         ctx.Diags.diagnose(
             conformanceBeingChecked->getLoc(),
@@ -4343,55 +4333,6 @@ TypeChecker::LookUpConformance::operator()(
                          (ConformanceCheckFlags::Used|
                           ConformanceCheckFlags::InExpression|
                           ConformanceCheckFlags::SkipConditionalRequirements));
-}
-
-void TypeChecker::useBridgedNSErrorConformances(DeclContext *dc, Type type) {
-  auto errorProto = Context.getProtocol(KnownProtocolKind::Error);
-  auto bridgedStoredNSError = Context.getProtocol(
-                                    KnownProtocolKind::BridgedStoredNSError);
-  auto errorCodeProto = Context.getProtocol(
-                              KnownProtocolKind::ErrorCodeProtocol);
-  auto rawProto = Context.getProtocol(
-                        KnownProtocolKind::RawRepresentable);
-
-  if (!errorProto || !bridgedStoredNSError || !errorCodeProto || !rawProto)
-    return;
-
-  // The NSError: Error conformance.
-  if (auto nsError = Context.getNSErrorDecl()) {
-    validateDecl(nsError);
-    (void)conformsToProtocol(nsError->TypeDecl::getDeclaredInterfaceType(),
-                             errorProto, dc, ConformanceCheckFlags::Used);
-  }
-
-  // _BridgedStoredNSError.
-  auto conformance = conformsToProtocol(type, bridgedStoredNSError, dc,
-                                        ConformanceCheckFlags::Used);
-  if (conformance && conformance->isConcrete()) {
-    // Hack: If we've used a conformance to the _BridgedStoredNSError
-    // protocol, also use the RawRepresentable and _ErrorCodeProtocol
-    // conformances on the Code associated type witness.
-    if (auto codeType = ProtocolConformanceRef::getTypeWitnessByName(
-                          type, *conformance, Context.Id_Code, this)) {
-      (void)conformsToProtocol(codeType, errorCodeProto, dc,
-                               ConformanceCheckFlags::Used);
-      (void)conformsToProtocol(codeType, rawProto, dc,
-                               ConformanceCheckFlags::Used);
-    }
-  }
-
-  // _ErrorCodeProtocol.
-  conformance =
-  conformsToProtocol(type, errorCodeProto, dc,
-                     (ConformanceCheckFlags::SuppressDependencyTracking|
-                      ConformanceCheckFlags::Used));
-  if (conformance && conformance->isConcrete()) {
-    if (Type errorType = ProtocolConformanceRef::getTypeWitnessByName(
-          type, *conformance, Context.Id_ErrorType, this)) {
-      (void)conformsToProtocol(errorType, bridgedStoredNSError, dc,
-                               ConformanceCheckFlags::Used);
-    }
-  }
 }
 
 void TypeChecker::checkConformance(NormalProtocolConformance *conformance) {
@@ -5725,7 +5666,7 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
       diagnose(defaultedAssocType, diag::assoc_type_default_here,
                assocType->getFullName(), defaultAssocType)
         .highlight(
-          defaultedAssocType->getDefaultDefinitionLoc().getSourceRange());
+          defaultedAssocType->getDefaultDefinitionTypeRepr()->getSourceRange());
 
       continue;
     }
@@ -5740,8 +5681,7 @@ Type TypeChecker::getWitnessType(Type type, ProtocolDecl *protocol,
                                  ProtocolConformanceRef conformance,
                                  Identifier name,
                                  Diag<> brokenProtocolDiag) {
-  Type ty = ProtocolConformanceRef::getTypeWitnessByName(type, conformance,
-                                                         name, this);
+  Type ty = conformance.getTypeWitnessByName(type, name);
   if (!ty &&
       !(conformance.isConcrete() && conformance.getConcrete()->isInvalid()))
     diagnose(protocol->getLoc(), brokenProtocolDiag);

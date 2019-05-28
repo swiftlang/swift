@@ -518,7 +518,12 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
       });
 
   } else {
-    invocationArgStrs.insert(invocationArgStrs.end(), {"-x", "c", "-std=gnu11"});
+    bool EnableCXXInterop = LangOpts.EnableCXXInterop;
+    invocationArgStrs.insert(invocationArgStrs.end(), {
+        "-x",
+        EnableCXXInterop ? "c++" : "c",
+        EnableCXXInterop ? "-std=c++17" : "-std=gnu11"
+    });
   }
 
   // Set C language options.
@@ -650,7 +655,9 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
     invocationArgStrs.back().append(moduleCachePath);
   }
 
-  if (!importerOpts.DisableModulesValidateSystemHeaders) {
+  if (importerOpts.DisableModulesValidateSystemHeaders) {
+    invocationArgStrs.push_back("-fno-modules-validate-system-headers");
+  } else {
     invocationArgStrs.push_back("-fmodules-validate-system-headers");
   }
 
@@ -1508,9 +1515,22 @@ ClangImporter::emitBridgingPCH(StringRef headerPath,
   return false;
 }
 
+void ClangImporter::collectVisibleTopLevelModuleNames(
+    SmallVectorImpl<Identifier> &names) const {
+  SmallVector<clang::Module *, 32> Modules;
+  Impl.getClangPreprocessor().getHeaderSearchInfo().collectAllModules(Modules);
+  for (auto &M : Modules) {
+    if (!M->isAvailable())
+      continue;
+
+    names.push_back(
+        Impl.SwiftContext.getIdentifier(M->getTopLevelModuleName()));
+  }
+}
+
 void ClangImporter::collectSubModuleNames(
     ArrayRef<std::pair<Identifier, SourceLoc>> path,
-    std::vector<std::string> &names) {
+    std::vector<std::string> &names) const {
   auto &clangHeaderSearch = Impl.getClangPreprocessor().getHeaderSearchInfo();
 
   // Look up the top-level module first.
@@ -1641,13 +1661,12 @@ ModuleDecl *ClangImporter::loadModule(
   if (!clangModule)
     return nullptr;
 
-  return Impl.finishLoadingClangModule(clangModule,
-                                       /*preferAdapter=*/false);
+  return Impl.finishLoadingClangModule(clangModule, /*preferOverlay=*/false);
 }
 
 ModuleDecl *ClangImporter::Implementation::finishLoadingClangModule(
     const clang::Module *clangModule,
-    bool findAdapter) {
+    bool findOverlay) {
   assert(clangModule);
 
   // Bump the generation count.
@@ -1659,7 +1678,7 @@ ModuleDecl *ClangImporter::Implementation::finishLoadingClangModule(
   if ((wrapperUnit = cacheEntry.getPointer())) {
     result = wrapperUnit->getParentModule();
     if (!cacheEntry.getInt()) {
-      // Force load adapter modules for all imported modules.
+      // Force load overlays for all imported modules.
       // FIXME: This forces the creation of wrapper modules for all imports as
       // well, and may do unnecessary work.
       cacheEntry.setInt(true);
@@ -1671,6 +1690,7 @@ ModuleDecl *ClangImporter::Implementation::finishLoadingClangModule(
     // but that's not correct for submodules.
     Identifier name = SwiftContext.getIdentifier((*clangModule).Name);
     result = ModuleDecl::create(name, SwiftContext);
+    result->setIsSystemModule(clangModule->IsSystem);
     // Silence error messages about testably importing a Clang module.
     result->setTestingEnabled();
     result->setHasResolvedImports();
@@ -1680,7 +1700,7 @@ ModuleDecl *ClangImporter::Implementation::finishLoadingClangModule(
     result->addFile(*wrapperUnit);
     cacheEntry.setPointerAndInt(wrapperUnit, true);
 
-    // Force load adapter modules for all imported modules.
+    // Force load overlays for all imported modules.
     // FIXME: This forces the creation of wrapper modules for all imports as
     // well, and may do unnecessary work.
     result->forAllVisibleModules({}, [](ModuleDecl::ImportedModule import) {});
@@ -1694,9 +1714,9 @@ ModuleDecl *ClangImporter::Implementation::finishLoadingClangModule(
       loaded = result;
   }
 
-  if (findAdapter)
-    if (ModuleDecl *adapter = wrapperUnit->getAdapterModule())
-      result = adapter;
+  if (findOverlay)
+    if (ModuleDecl *overlay = wrapperUnit->getOverlayModule())
+      result = overlay;
 
   return result;
 }
@@ -1716,7 +1736,7 @@ void ClangImporter::Implementation::handleDeferredImports()
   }
   PCHImportedSubmodules.clear();
   for (const clang::Module *M : ImportedHeaderExports)
-    (void)finishLoadingClangModule(M, /*preferAdapter=*/true);
+    (void)finishLoadingClangModule(M, /*preferOverlay=*/true);
 }
 
 ModuleDecl *ClangImporter::getImportedHeaderModule() const {
@@ -1815,7 +1835,7 @@ ClangImporter::Implementation::Implementation(ASTContext &ctx,
       InferImportAsMember(opts.InferImportAsMember),
       DisableSwiftBridgeAttr(opts.DisableSwiftBridgeAttr),
       BridgingHeaderExplicitlyRequested(!opts.BridgingHeader.empty()),
-      DisableAdapterModules(opts.DisableAdapterModules),
+      DisableOverlayModules(opts.DisableOverlayModules),
       IsReadingBridgingPCH(false),
       CurrentVersion(ImportNameVersion::fromOptions(ctx.LangOpts)),
       BridgingHeaderLookupTable(new SwiftLookupTable(nullptr)),
@@ -1837,6 +1857,7 @@ ClangModuleUnit *ClangImporter::Implementation::getWrapperForModule(
   // FIXME: Handle hierarchical names better.
   Identifier name = SwiftContext.getIdentifier(underlying->Name);
   auto wrapper = ModuleDecl::create(name, SwiftContext);
+  wrapper->setIsSystemModule(underlying->IsSystem);
   // Silence error messages about testably importing a Clang module.
   wrapper->setTestingEnabled();
   wrapper->setHasResolvedImports();
@@ -2240,9 +2261,10 @@ public:
     assert(CMU);
   }
 
-  void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
+  void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason,
+                 DynamicLookupInfo dynamicLookupInfo) override {
     if (isVisibleFromModule(ModuleFilter, VD))
-      NextConsumer.foundDecl(VD, Reason);
+      NextConsumer.foundDecl(VD, Reason, dynamicLookupInfo);
   }
 };
 
@@ -2257,9 +2279,10 @@ public:
     assert(CMU);
   }
 
-  void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
+  void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason,
+                 DynamicLookupInfo dynamicLookupInfo) override {
     if (isDeclaredInModule(ModuleFilter, VD))
-      NextConsumer.foundDecl(VD, Reason);
+      NextConsumer.foundDecl(VD, Reason, dynamicLookupInfo);
   }
 };
 
@@ -2322,9 +2345,10 @@ public:
                               topLevelModule->Name == "CoreServices");
   }
 
-  void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
+  void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason,
+                 DynamicLookupInfo dynamicLookupInfo) override {
     if (!shouldDiscard(VD))
-      NextConsumer.foundDecl(VD, Reason);
+      NextConsumer.foundDecl(VD, Reason, dynamicLookupInfo);
   }
 };
 
@@ -2566,7 +2590,8 @@ public:
   explicit VectorDeclPtrConsumer(SmallVectorImpl<Decl *> &Decls)
     : Results(Decls) {}
 
-  void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
+  void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason,
+                 DynamicLookupInfo) override {
     Results.push_back(VD);
   }
 };
@@ -3178,40 +3203,40 @@ StringRef ClangModuleUnit::getExportedModuleName() const {
   return getParentModule()->getName().str();
 }
 
-ModuleDecl *ClangModuleUnit::getAdapterModule() const {
+ModuleDecl *ClangModuleUnit::getOverlayModule() const {
   if (!clangModule)
     return nullptr;
 
-  if (owner.DisableAdapterModules)
+  if (owner.DisableOverlayModules)
     return nullptr;
 
   if (!isTopLevel()) {
     // FIXME: Is this correct for submodules?
     auto topLevel = clangModule->getTopLevelModule();
     auto wrapper = owner.getWrapperForModule(topLevel);
-    return wrapper->getAdapterModule();
+    return wrapper->getOverlayModule();
   }
 
-  if (!adapterModule.getInt()) {
+  if (!overlayModule.getInt()) {
     // FIXME: Include proper source location.
     ModuleDecl *M = getParentModule();
     ASTContext &Ctx = M->getASTContext();
-    auto adapter = Ctx.getModule(ModuleDecl::AccessPathTy({M->getName(),
-                                                       SourceLoc()}));
-    if (adapter == M) {
-      adapter = nullptr;
+    auto overlay = Ctx.getModule(ModuleDecl::AccessPathTy({M->getName(),
+                                                           SourceLoc()}));
+    if (overlay == M) {
+      overlay = nullptr;
     } else {
       auto &sharedModuleRef = Ctx.LoadedModules[M->getName()];
-      assert(!sharedModuleRef || sharedModuleRef == adapter ||
+      assert(!sharedModuleRef || sharedModuleRef == overlay ||
              sharedModuleRef == M);
-      sharedModuleRef = adapter;
+      sharedModuleRef = overlay;
     }
 
     auto mutableThis = const_cast<ClangModuleUnit *>(this);
-    mutableThis->adapterModule.setPointerAndInt(adapter, true);
+    mutableThis->overlayModule.setPointerAndInt(overlay, true);
   }
 
-  return adapterModule.getPointer();
+  return overlayModule.getPointer();
 }
 
 void ClangModuleUnit::getImportedModules(
@@ -3257,11 +3282,11 @@ void ClangModuleUnit::getImportedModules(
     }
   }
 
-  auto topLevelAdapter = getAdapterModule();
+  auto topLevelOverlay = getOverlayModule();
   for (auto importMod : imported) {
     auto wrapper = owner.getWrapperForModule(importMod);
 
-    auto actualMod = wrapper->getAdapterModule();
+    auto actualMod = wrapper->getOverlayModule();
     if (!actualMod) {
       // HACK: Deal with imports of submodules by importing the top-level module
       // as well.
@@ -3274,11 +3299,11 @@ void ClangModuleUnit::getImportedModules(
         }
       }
       actualMod = wrapper->getParentModule();
-    } else if (actualMod == topLevelAdapter) {
+    } else if (actualMod == topLevelOverlay) {
       actualMod = wrapper->getParentModule();
     }
 
-    assert(actualMod && "Missing imported adapter module");
+    assert(actualMod && "Missing imported overlay");
     imports.push_back({ModuleDecl::AccessPathTy(), actualMod});
   }
 }
@@ -3297,7 +3322,7 @@ void ClangModuleUnit::getImportedModulesForLookup(
 
   SmallVector<clang::Module *, 8> imported;
   const clang::Module *topLevel;
-  ModuleDecl *topLevelAdapter = getAdapterModule();
+  ModuleDecl *topLevelOverlay = getOverlayModule();
   if (!clangModule) {
     // This is the special "imported headers" module.
     imported.append(owner.ImportedHeaderExports.begin(),
@@ -3329,7 +3354,7 @@ void ClangModuleUnit::getImportedModulesForLookup(
       // Don't continue looking through submodules of modules that have
       // overlays. The overlay might shadow things.
       auto wrapper = owner.getWrapperForModule(nextTopLevel);
-      if (wrapper->getAdapterModule())
+      if (wrapper->getOverlayModule())
         continue;
     }
 
@@ -3348,11 +3373,11 @@ void ClangModuleUnit::getImportedModulesForLookup(
   for (auto importMod : topLevelImported) {
     auto wrapper = owner.getWrapperForModule(importMod);
 
-    auto actualMod = wrapper->getAdapterModule();
-    if (!actualMod || actualMod == topLevelAdapter)
+    auto actualMod = wrapper->getOverlayModule();
+    if (!actualMod || actualMod == topLevelOverlay)
       actualMod = wrapper->getParentModule();
 
-    assert(actualMod && "Missing imported adapter module");
+    assert(actualMod && "Missing imported overlay");
     imports.push_back({ModuleDecl::AccessPathTy(), actualMod});
   }
 
@@ -3541,14 +3566,16 @@ void ClangImporter::Implementation::lookupObjCMembers(
       // FIXME: If we didn't need to check alternate decls here, we could avoid
       // importing the member at all by checking importedName ahead of time.
       if (decl->getFullName().matchesRef(name)) {
-        consumer.foundDecl(decl, DeclVisibilityKind::DynamicLookup);
+        consumer.foundDecl(decl, DeclVisibilityKind::DynamicLookup,
+                           DynamicLookupInfo::AnyObject);
       }
 
       // Check for an alternate declaration; if its name matches,
       // report it.
       for (auto alternate : getAlternateDecls(decl)) {
         if (alternate->getFullName().matchesRef(name)) {
-          consumer.foundDecl(alternate, DeclVisibilityKind::DynamicLookup);
+          consumer.foundDecl(alternate, DeclVisibilityKind::DynamicLookup,
+                             DynamicLookupInfo::AnyObject);
         }
       }
       return true;
@@ -3739,7 +3766,7 @@ bool ClangImporter::isInOverlayModuleForImportedModule(
     return false;
 
   auto overlayModule = overlayDC->getParentModule();
-  if (overlayModule == importedClangModuleUnit->getAdapterModule())
+  if (overlayModule == importedClangModuleUnit->getOverlayModule())
     return true;
 
   // Is this a private module that's re-exported to the public (overlay) name?

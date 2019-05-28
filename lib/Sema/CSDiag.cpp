@@ -173,17 +173,26 @@ void constraints::simplifyLocator(Expr *&anchor,
       continue;
 
     case ConstraintLocator::NamedTupleElement:
-    case ConstraintLocator::TupleElement:
+    case ConstraintLocator::TupleElement: {
       // Extract tuple element.
+      unsigned index = path[0].getValue();
       if (auto tupleExpr = dyn_cast<TupleExpr>(anchor)) {
-        unsigned index = path[0].getValue();
         if (index < tupleExpr->getNumElements()) {
           anchor = tupleExpr->getElement(index);
           path = path.slice(1);
           continue;
         }
       }
+
+      if (auto *CE = dyn_cast<CollectionExpr>(anchor)) {
+        if (index < CE->getNumElements()) {
+          anchor = CE->getElement(index);
+          path = path.slice(1);
+          continue;
+        }
+      }
       break;
+    }
 
     case ConstraintLocator::ApplyArgToParam:
       // Extract tuple element.
@@ -858,9 +867,8 @@ bool FailureDiagnosis::diagnoseGeneralOverloadFailure(Constraint *constraint) {
   if (constraint->getKind() == ConstraintKind::Disjunction) {
     for (auto elt : constraint->getNestedConstraints()) {
       if (elt->getKind() != ConstraintKind::BindOverload) continue;
-      if (!elt->getOverloadChoice().isDecl()) continue;
-      auto candidate = elt->getOverloadChoice().getDecl();
-      diagnose(candidate, diag::found_candidate);
+      if (auto *candidate = elt->getOverloadChoice().getDeclOrNull())
+        diagnose(candidate, diag::found_candidate);
     }
   }
 
@@ -1731,8 +1739,8 @@ static Type isRawRepresentable(Type fromType, const ConstraintSystem &CS) {
   if (!conformance)
     return Type();
 
-  Type rawTy = ProtocolConformanceRef::getTypeWitnessByName(
-      fromType, *conformance, CS.getASTContext().Id_RawValue, &CS.TC);
+  Type rawTy = conformance->getTypeWitnessByName(
+      fromType, CS.getASTContext().Id_RawValue);
   return rawTy;
 }
 
@@ -1994,34 +2002,9 @@ bool FailureDiagnosis::diagnoseNonEscapingParameterToEscaping(
   if (!srcFT || !dstFT || !srcFT->isNoEscape() || dstFT->isNoEscape())
     return false;
 
-  // Pick a specific diagnostic for the specific use
-  auto paramDecl = cast<ParamDecl>(declRef->getDecl());
-  switch (dstPurpose) {
-  case CTP_CallArgument:
-    CS.TC.diagnose(declRef->getLoc(), diag::passing_noescape_to_escaping,
-                   paramDecl->getName());
-    break;
-  case CTP_AssignSource:
-    CS.TC.diagnose(declRef->getLoc(), diag::assigning_noescape_to_escaping,
-                   paramDecl->getName());
-    break;
-
-  default:
-    CS.TC.diagnose(declRef->getLoc(), diag::general_noescape_to_escaping,
-                   paramDecl->getName());
-    break;
-  }
-
-  // Give a note and fixit
-  InFlightDiagnostic note = CS.TC.diagnose(
-      paramDecl->getLoc(), diag::noescape_parameter, paramDecl->getName());
-
-  if (!paramDecl->isAutoClosure()) {
-    note.fixItInsert(paramDecl->getTypeLoc().getSourceRange().Start,
-                     "@escaping ");
-  } // TODO: add in a fixit for autoclosure
-
-  return true;
+  NoEscapeFuncToTypeConversionFailure failure(
+      expr, CS, CS.getConstraintLocator(expr), dstType);
+  return failure.diagnoseAsError();
 }
 
 bool FailureDiagnosis::diagnoseContextualConversionError(
@@ -2069,7 +2052,6 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
   // system had a contextual type specified, we use it - it will have a purpose
   // indicator which allows us to give a very "to the point" diagnostic.
   Diag<Type, Type> diagID;
-  Diag<Type, Type> diagIDProtocol;
   Diag<Type> nilDiag;
   std::function<void(void)> nilFollowup;
 
@@ -2086,7 +2068,6 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
                      "contextual type");
   case CTP_Initialization:
     diagID = diag::cannot_convert_initializer_value;
-    diagIDProtocol = diag::cannot_convert_initializer_value_protocol;
     nilDiag = diag::cannot_convert_initializer_value_nil;
     nilFollowup = [this] {
       TypeRepr *patternTR = CS.getContextualTypeLoc().getTypeRepr();
@@ -2112,7 +2093,6 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
     }
 
     diagID = diag::cannot_convert_to_return_type;
-    diagIDProtocol = diag::cannot_convert_to_return_type_protocol;
     nilDiag = diag::cannot_convert_to_return_type_nil;
     break;
   case CTP_ThrowStmt: {
@@ -2135,9 +2115,9 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
                                     ConformanceCheckFlags::InExpression)) {
         Type errorCodeType = CS.getType(expr);
         Type errorType =
-          ProtocolConformanceRef::getTypeWitnessByName(errorCodeType, *conformance,
-                                                       TC.Context.Id_ErrorType,
-                                                       &TC)->getCanonicalType();
+          conformance->getTypeWitnessByName(errorCodeType,
+                                            TC.Context.Id_ErrorType)
+            ->getCanonicalType();
         if (errorType) {
           auto diag = diagnose(expr->getLoc(), diag::cannot_throw_error_code,
                                errorCodeType, errorType);
@@ -2160,12 +2140,10 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
 
   case CTP_EnumCaseRawValue:
     diagID = diag::cannot_convert_raw_initializer_value;
-    diagIDProtocol = diag::cannot_convert_raw_initializer_value;
     nilDiag = diag::cannot_convert_raw_initializer_value_nil;
     break;
   case CTP_DefaultParameter:
     diagID = diag::cannot_convert_default_arg_value;
-    diagIDProtocol = diag::cannot_convert_default_arg_value_protocol;
     nilDiag = diag::cannot_convert_default_arg_value_nil;
     break;
 
@@ -2185,42 +2163,34 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
     return true;
   case CTP_YieldByValue:
     diagID = diag::cannot_convert_yield_value;
-    diagIDProtocol = diag::cannot_convert_yield_value_protocol;
     nilDiag = diag::cannot_convert_yield_value_nil;
     break;
   case CTP_CallArgument:
     diagID = diag::cannot_convert_argument_value;
-    diagIDProtocol = diag::cannot_convert_argument_value_protocol;
     nilDiag = diag::cannot_convert_argument_value_nil;
     break;
   case CTP_ClosureResult:
     diagID = diag::cannot_convert_closure_result;
-    diagIDProtocol = diag::cannot_convert_closure_result_protocol;
     nilDiag = diag::cannot_convert_closure_result_nil;
     break;
   case CTP_ArrayElement:
     diagID = diag::cannot_convert_array_element;
-    diagIDProtocol = diag::cannot_convert_array_element_protocol;
     nilDiag = diag::cannot_convert_array_element_nil;
     break;
   case CTP_DictionaryKey:
     diagID = diag::cannot_convert_dict_key;
-    diagIDProtocol = diag::cannot_convert_dict_key_protocol;
     nilDiag = diag::cannot_convert_dict_key_nil;
     break;
   case CTP_DictionaryValue:
     diagID = diag::cannot_convert_dict_value;
-    diagIDProtocol = diag::cannot_convert_dict_value_protocol;
     nilDiag = diag::cannot_convert_dict_value_nil;
     break;
   case CTP_CoerceOperand:
     diagID = diag::cannot_convert_coerce;
-    diagIDProtocol = diag::cannot_convert_coerce_protocol;
     nilDiag = diag::cannot_convert_coerce_nil;
     break;
   case CTP_AssignSource:
     diagID = diag::cannot_convert_assign;
-    diagIDProtocol = diag::cannot_convert_assign_protocol;
     nilDiag = diag::cannot_convert_assign_nil;
     break;
   }
@@ -2332,10 +2302,13 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
 
   // When complaining about conversion to a protocol type, complain about
   // conformance instead of "conversion".
-  if (contextualType->is<ProtocolType>() ||
-      contextualType->is<ProtocolCompositionType>())
-    diagID = diagIDProtocol;
-  
+  if (contextualType->isExistentialType()) {
+    MissingContextualConformanceFailure failure(
+        expr, CS, CTP, exprType, contextualType,
+        CS.getConstraintLocator(expr, ConstraintLocator::ContextualType));
+    return failure.diagnoseAsError();
+  }
+
   // Try to simplify irrelevant details of function types.  For example, if
   // someone passes a "() -> Float" function to a "() throws -> Int"
   // parameter, then uttering the "throws" may confuse them into thinking that
@@ -4679,7 +4652,11 @@ static bool isViableOverloadSet(const CalleeCandidateInfo &CCI,
   for (unsigned i = 0; i < CCI.size(); ++i) {
     auto &&cand = CCI[i];
     auto funcDecl = dyn_cast_or_null<AbstractFunctionDecl>(cand.getDecl());
-    if (!funcDecl)
+
+    // If we don't have a func decl or we haven't resolved its parameters,
+    // continue. The latter case can occur with `type(of:)`, which is introduced
+    // as a type variable.
+    if (!funcDecl || !cand.hasParameters())
       continue;
 
     auto params = cand.getParameters();
@@ -6282,9 +6259,8 @@ bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {
         = CS.TC.conformsToProtocol(contextualType, ALC, CS.DC,
                                    ConformanceCheckFlags::InExpression)) {
     Type contextualElementType =
-        ProtocolConformanceRef::getTypeWitnessByName(
-            contextualType, *Conformance,
-            CS.getASTContext().Id_ArrayLiteralElement, &CS.TC)
+        Conformance->getTypeWitnessByName(
+          contextualType, CS.getASTContext().Id_ArrayLiteralElement)
             ->getDesugaredType();
 
     // Type check each of the subexpressions in place, passing down the contextual
@@ -6372,13 +6348,13 @@ bool FailureDiagnosis::visitDictionaryExpr(DictionaryExpr *E) {
     }
 
     contextualKeyType =
-        ProtocolConformanceRef::getTypeWitnessByName(
-            contextualType, *Conformance, CS.getASTContext().Id_Key, &CS.TC)
+        Conformance->getTypeWitnessByName(
+          contextualType, CS.getASTContext().Id_Key)
             ->getDesugaredType();
 
     contextualValueType =
-        ProtocolConformanceRef::getTypeWitnessByName(
-            contextualType, *Conformance, CS.getASTContext().Id_Value, &CS.TC)
+        Conformance->getTypeWitnessByName(
+          contextualType, CS.getASTContext().Id_Value)
             ->getDesugaredType();
 
     assert(contextualKeyType && contextualValueType &&

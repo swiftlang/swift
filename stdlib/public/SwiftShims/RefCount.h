@@ -21,7 +21,7 @@ typedef struct {
   __swift_uintptr_t refCounts SWIFT_ATTRIBUTE_UNAVAILABLE;
 } InlineRefCountsPlaceholder;
 
-#if !defined(__cplusplus)
+#if defined(__swift__)
 
 typedef InlineRefCountsPlaceholder InlineRefCounts;
 

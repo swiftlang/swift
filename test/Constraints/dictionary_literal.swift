@@ -19,13 +19,13 @@ func useDict<K, V>(_ d: MyDictionary<K,V>) {}
 useDictStringInt(["Hello" : 1])
 useDictStringInt(["Hello" : 1, "World" : 2])
 useDictStringInt(["Hello" : 1, "World" : 2.5])
-// expected-error@-1 {{cannot convert value of type 'Double' to expected dictionary value type 'Int'}}
+// expected-error@-1 {{cannot convert value of type 'Double' to expected dictionary value type 'DictStringInt.Value' (aka 'Int')}}
 useDictStringInt([4.5 : 2])
-// expected-error@-1 {{cannot convert value of type 'Double' to expected dictionary key type 'String'}}
+// expected-error@-1 {{cannot convert value of type 'Double' to expected dictionary key type 'DictStringInt.Key' (aka 'String')}}
 useDictStringInt([nil : 2])
 // expected-error@-1 {{'nil' is not compatible with expected dictionary key type 'String'}}
 useDictStringInt([7 : 1, "World" : 2])
-// expected-error@-1 {{cannot convert value of type 'Int' to expected dictionary key type 'String'}}
+// expected-error@-1 {{cannot convert value of type 'Int' to expected dictionary key type 'DictStringInt.Key' (aka 'String')}}
 useDictStringInt(["Hello" : nil])
 // expected-error@-1 {{'nil' is not compatible with expected dictionary value type 'Int'}}
 

@@ -70,6 +70,11 @@ class SkipNonTransparentFunctions : public DelayedParsingCallbacks {
 
 } // unnamed namespace
 
+void SourceLoader::collectVisibleTopLevelModuleNames(
+    SmallVectorImpl<Identifier> &names) const {
+  // TODO: Implement?
+}
+
 bool SourceLoader::canImportModule(std::pair<Identifier, SourceLoc> ID) {
   // Search the memory buffers to see if we can find this file on disk.
   FileOrError inputFileOrError = findModule(Ctx, ID.first.str(),

@@ -16,57 +16,6 @@
 
 import CTensorFlow
 
-/// A protocol representing types that can be mapped to `Array<CTensorHandle>`.
-///
-/// This protocol is defined separately from `TensorGroup` in order for the
-/// number of tensors to be determined at runtime. For example,
-/// `[Tensor<Float>]` may have an unknown number of elements at compile time.
-///
-/// This protocol can be derived automatically for structs whose stored
-/// properties all conform to the `TensorGroup` protocol. It cannot be derived
-/// automatically for structs whose properties all conform to
-/// `TensorArrayProtocol` due to the constructor requirement (i.e., in such
-/// cases it would be impossible to know how to break down `count` among the
-/// stored properties).
-public protocol TensorArrayProtocol {
-  /// Writes the tensor handles to `address`, which must be allocated
-  /// with enough capacity to hold `_tensorHandleCount` handles. The tensor
-  /// handles written to `address` are borrowed: this container still
-  /// owns them.
-  func _unpackTensorHandles(into address: UnsafeMutablePointer<CTensorHandle>?)
-
-  var _tensorHandleCount: Int32 { get }
-  var _typeList: [TensorDataType] { get }
-
-  init(_owning tensorHandles: UnsafePointer<CTensorHandle>?, count: Int)
-}
-
-/// A protocol representing types that can be mapped to and from
-/// `Array<CTensorHandle>`.
-///
-/// When a `TensorGroup` is used as an argument to a tensor operation, it is
-/// passed as an argument list whose elements are the tensor fields of the type.
-///
-/// When a `TensorGroup` is returned as a result of a tensor operation, it is
-/// initialized with its tensor fields set to the tensor operation's tensor
-/// results.
-public protocol TensorGroup : TensorArrayProtocol {
-  /// The types of the tensor stored properties in this type.
-  static var _typeList: [TensorDataType] { get }
-
-  /// An array of `nil`s with the same number of elements as `_outputTypeList`.
-  /// The `nil` represents unknown shape.
-  // TODO: This is a protocol requirement so that conformances can provide
-  // custom const-evaluable implementations. When the const-evaluator is
-  // powerful enough to evaluate the default implementation, remove this
-  // requirement.
-  static var _unknownShapeList: [TensorShape?] { get }
-
-  /// Initializes a value of this type, taking ownership of the
-  /// `_tensorHandleCount` tensors starting at address `tensorHandles`.
-  init(_owning tensorHandles: UnsafePointer<CTensorHandle>?)
-}
-
 public extension TensorGroup {
   /// The number of tensor fields in this type.
   static var _tensorHandleCount: Int32 { return Int32(Self._typeList.count) }
@@ -107,7 +56,7 @@ extension TensorHandle : TensorGroup {
     address!.initialize(to: _cTensorHandle)
   }
 
-  public convenience init(_owning tensorHandles: UnsafePointer<CTensorHandle>?) {
+  public init(_owning tensorHandles: UnsafePointer<CTensorHandle>?) {
     self.init(_owning: tensorHandles!.pointee)
   }
 }
@@ -128,7 +77,7 @@ extension ResourceHandle : TensorGroup {
     address!.initialize(to: _cTensorHandle)
   }
 
-  public convenience init(_owning tensorHandles: UnsafePointer<CTensorHandle>?) {
+  public init(_owning tensorHandles: UnsafePointer<CTensorHandle>?) {
     self.init(owning: tensorHandles!.pointee)
   }
 }
@@ -149,7 +98,7 @@ extension VariantHandle : TensorGroup {
     address!.initialize(to: _cTensorHandle)
   }
 
-  public convenience init(_owning tensorHandles: UnsafePointer<CTensorHandle>?) {
+  public init(_owning tensorHandles: UnsafePointer<CTensorHandle>?) {
     self.init(owning: tensorHandles!.pointee)
   }
 }

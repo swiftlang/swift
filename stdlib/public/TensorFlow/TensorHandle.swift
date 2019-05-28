@@ -16,48 +16,61 @@
 
 import CTensorFlow
 
-/// `_AnyTensorHandle` is the scalar-agnostic base type for `TensorHandle`, used
-/// specifically for low-level, type-erased passings of Swift-level tensor
-/// handles in the compiler.
-@_fixed_layout // required because the compiler accesses _cTensorHandle directly.
-public class _AnyTensorHandle {
-  /// The underlying `TFE_TensorHandle *`.
-  ///
-  /// - Note: The compiler knows that `_AnyTensorHandle` has a single stored
-  /// property, and assumes that this is it. Changing the design of
-  /// `TensorHandle` will require tweaking the compiler.
-  public let _cTensorHandle: CTensorHandle
+/// This protocol abstracts the underlying representation of a tensor. Any type
+/// that conforms to this protocol can be used as a `TensorHandle` in the
+/// `TensorFlow` library, as it much provide a way to convert the underlying tensor
+/// handle into a `ConcreteTensorHandle`, which wraps a `TFE_TensorHandle *`
+/// TODO(https://bugs.swift.org/browse/TF-527): This is defined as a class-bound
+// protocol to workaround bug TF-527. When it is fixed, we should remove `: class`.
+public protocol _AnyTensorHandle : class {
+  var _tfeTensorHandle: TFETensorHandle { get }
+}
 
-  /// Private initializer from a `CTensorHandle`. Should only be called from
-  /// `TensorHandle<Scalar>.init`.
-  fileprivate init(base: CTensorHandle) {
-    self._cTensorHandle = base
+extension _AnyTensorHandle {
+  /// The underlying `TFE_TensorHandle *`.
+  public var _cTensorHandle: CTensorHandle {
+    return _tfeTensorHandle._cTensorHandle
   }
 }
 
-/// `TensorHandle` is the type used by ops. It includes a `Scalar` type, which 
-/// compiler internals use to determine the datatypes of parameters when they 
-/// are extracted into a tensor program.
-@_fixed_layout // required because the compiler accesses _cTensorHandle directly.
-public final class TensorHandle<Scalar> : _AnyTensorHandle
-  where Scalar : _TensorFlowDataTypeCompatible {
-  public init(_owning cTensorHandle: CTensorHandle) {
-    super.init(base: cTensorHandle)
-  }
+/// Class wrapping a C pointer to a TensorHandle.  This class owns the
+/// TensorHandle and is responsible for destroying it.
+public class TFETensorHandle : _AnyTensorHandle {
+  public let _cTensorHandle: CTensorHandle
 
-  @usableFromInline
-  convenience init(copyingFromCTensor cTensor: CTensor) {
-    let status = TF_NewStatus()
-    let cTensorHandle = TFE_NewTensorHandle(cTensor, status)
-    checkOk(status)
-    self.init(_owning: cTensorHandle!)
-    TF_DeleteStatus(status)
+  public var _tfeTensorHandle: TFETensorHandle { return self }
+
+  public init(_owning base: CTensorHandle) {
+    self._cTensorHandle = base
   }
 
   deinit {
     debugLog("De-initializing TensorHandle.")
     TFE_DeleteTensorHandle(_cTensorHandle)
     debugLog("Returning from deinit of TensorHandle.")
+  }
+}
+
+/// `TensorHandle` is the type used by ops. It includes a `Scalar` type, which
+/// compiler internals can use to determine the datatypes of parameters when
+/// they are extracted into a tensor program.
+public struct TensorHandle<Scalar>
+  where Scalar : _TensorFlowDataTypeCompatible {
+  let handle: _AnyTensorHandle
+
+  public var _cTensorHandle: CTensorHandle { handle._cTensorHandle }
+  
+  public init(_owning cTensorHandle: CTensorHandle) {
+    self.handle = TFETensorHandle(_owning: cTensorHandle)
+  }
+
+  @usableFromInline
+  init(copyingFromCTensor cTensor: CTensor) {
+    let status = TF_NewStatus()
+    let cTensorHandle = TFE_NewTensorHandle(cTensor, status)
+    checkOk(status)
+    self.init(_owning: cTensorHandle!)
+    TF_DeleteStatus(status)
   }
 
   /// Create a `TensorHandle` with a closure that initializes the underlying
@@ -71,7 +84,7 @@ public final class TensorHandle<Scalar> : _AnyTensorHandle
   /// `bufferInitializer` receives a buffer with exactly `byteCount` bytes of
   /// capacity. `bufferInitializer` must initialize the entire buffer.
   @usableFromInline
-  convenience init(
+  init(
     shape: [Int],
     byteCount: Int,
     bufferInitializer: (UnsafeMutableRawPointer) -> Void
@@ -104,7 +117,7 @@ extension TensorHandle where Scalar : TensorFlowScalar {
   /// must initialize the entire buffer, with contiguous scalars in row-major
   /// order.
   @usableFromInline
-  convenience init(
+  init(
     shape: [Int],
     scalarsInitializer: (UnsafeMutablePointer<Scalar>) -> Void
   ) {
@@ -148,30 +161,28 @@ internal extension ShapedArray where Scalar : _TensorFlowDataTypeCompatible {
 
 /// `ResourceHandle` is the type used by ops to represent TensorFlow "resource" 
 /// values.
-public final class ResourceHandle : _AnyTensorHandle {
+public struct ResourceHandle {
+  let handle: _AnyTensorHandle
+
+  @usableFromInline
+  var _cTensorHandle: CTensorHandle { handle._cTensorHandle }
+  
   @usableFromInline
   init(owning cTensorHandle: CTensorHandle) {
-    super.init(base: cTensorHandle)
-  }
-
-  deinit {
-    debugLog("De-initializing TensorHandle.")
-    TFE_DeleteTensorHandle(_cTensorHandle)
-    debugLog("Returning from deinit of ResourceHandle.")
+    self.handle = TFETensorHandle(_owning: cTensorHandle)
   }
 }
 
 /// `VariantHandle` is the type used by ops to represent TensorFlow "variant"
 /// values.
-public final class VariantHandle : _AnyTensorHandle {
+public struct VariantHandle {
+  let handle: _AnyTensorHandle
+  
+  @usableFromInline
+  var _cTensorHandle: CTensorHandle { handle._cTensorHandle }
+  
   @usableFromInline
   init(owning cTensorHandle: CTensorHandle) {
-    super.init(base: cTensorHandle)
-  }
-
-  deinit {
-    debugLog("De-initializing TensorHandle.")
-    TFE_DeleteTensorHandle(_cTensorHandle)
-    debugLog("Returning from deinit of VariantHandle.")
+    self.handle = TFETensorHandle(_owning: cTensorHandle)
   }
 }

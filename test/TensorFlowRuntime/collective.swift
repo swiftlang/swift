@@ -4,11 +4,7 @@
 // Tests on collective ops, as a building block for data/model parallel programs.
 
 import TensorFlow
-#if TPU
-import TensorFlowUnittestTPU
-#else
 import TensorFlowUnittest
-#endif
 import StdlibUnittest
 
 var CollectiveTests = TestSuite("Collective")
@@ -19,7 +15,6 @@ CollectiveTests.testAllBackends("ConfigTest") {
   expectEqual(3, _RuntimeConfig.cpuDeviceCount)
 }
 
-// TODO: Probably should be disabled for TPU execution.
 CollectiveTests.testAllBackends("SingletonGroup") {
   let x = Tensor<Float>(1.0)
   let t = Raw.collectiveReduce(x, groupSize: 1, groupKey: 1, instanceKey: 1,

@@ -1494,6 +1494,12 @@ ASTMangler::getSpecialManglingContext(const ValueDecl *decl,
     }
   }
 
+  // Importer-synthesized types should always be mangled in the
+  // ClangImporterContext, even if an __attribute__((swift_name())) nests them
+  // inside a Swift type syntactically.
+  if (decl->getAttrs().hasAttribute<ClangImporterSynthesizedTypeAttr>())
+    return ASTMangler::ClangImporterContext;
+
   return None;
 }
 
@@ -2614,6 +2620,20 @@ void ASTMangler::appendConcreteProtocolConformance(
         auto conformanceAccessPath =
           CurGenericSignature->getConformanceAccessPath(type, proto);
         appendDependentProtocolConformance(conformanceAccessPath);
+      } else if (auto opaqueType = canType->getAs<OpaqueTypeArchetypeType>()) {
+        GenericSignature *opaqueSignature = opaqueType->getBoundSignature();
+        GenericTypeParamType *opaqueTypeParam = opaqueSignature->getGenericParams().back();
+        ConformanceAccessPath conformanceAccessPath =
+            opaqueSignature->getConformanceAccessPath(opaqueTypeParam, proto);
+
+        // Append the conformance access path with the signature of the opaque type.
+        CanGenericSignature savedSignature = CurGenericSignature;
+        CurGenericSignature = opaqueSignature->getCanonicalSignature();
+        appendDependentProtocolConformance(conformanceAccessPath);
+        CurGenericSignature = savedSignature;
+
+        appendType(canType);
+        appendOperator("HO");
       } else {
         auto conditionalConf = module->lookupConformance(canType, proto);
         appendConcreteProtocolConformance(conditionalConf->getConcrete());
@@ -2665,4 +2685,11 @@ void ASTMangler::appendOpParamForLayoutConstraint(LayoutConstraint layout) {
                           Index(layout->getAlignmentInBits()));
     break;
   }
+}
+
+std::string ASTMangler::mangleOpaqueTypeDescriptor(const OpaqueTypeDecl *decl) {
+  beginMangling();
+  appendOpaqueDeclName(decl);
+  appendOperator("MQ");
+  return finalize();
 }

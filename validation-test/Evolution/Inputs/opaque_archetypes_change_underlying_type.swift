@@ -19,6 +19,7 @@ public struct Pair : P {
 }
 #endif
 
+@available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
 public func resilientFunction() -> some P {
 #if BEFORE
   return Int(5)
@@ -27,10 +28,12 @@ public func resilientFunction() -> some P {
 #endif
 }
 
+@available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
 public func expectedResult() -> Int {
   return resilientFunction().getValue()
 }
 
+@available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
 public func expectedSize() -> Int {
   return MemoryLayout.size(ofValue: resilientFunction())
 }
@@ -39,6 +42,7 @@ public func expectedSize() -> Int {
 public struct Container {
   public init() {}
 
+  @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
   public var property : some P {
     get {
 #if BEFORE
@@ -49,10 +53,12 @@ public struct Container {
     }
   }
 
+  @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
   public func expectedResult() -> Int {
     return property.getValue()
   }
 
+  @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
   public func expectedSize() -> Int {
     return MemoryLayout.size(ofValue: property)
   }

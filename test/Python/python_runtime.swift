@@ -6,6 +6,9 @@
 import Python
 import StdlibUnittest
 
+var PythonRuntimeTestSuite = TestSuite("PythonRuntime")
+PythonLibrary.useVersion(2, 7)
+
 /// The gc module is an interface to the Python garbage collector.
 let gc = Python.import("gc")
 /// The tracemalloc module is a debug tool to trace memory blocks allocated by
@@ -33,14 +36,16 @@ extension TestSuite {
   }
 }
 
-var PythonRuntimeTestSuite = TestSuite("PythonRuntime")
-PythonLibrary.useVersion(2, 7)
-
 PythonRuntimeTestSuite.testWithLeakChecking("CheckVersion") {
   expectEqual("2.7.", String(Python.version)!.prefix(4))
   let versionInfo = Python.versionInfo
   expectEqual(2, versionInfo.major)
   expectEqual(7, versionInfo.minor)
+
+  expectCrash(executing: {
+    // Expect crash when setting version if any Python symbols are already loaded.
+    PythonLibrary.useVersion(2, 7)
+  })
 }
 
 // Python.repr() in lists produces some static values that stay referenced for

@@ -22,6 +22,7 @@
 // RUN: echo 'import SystemDependencies' | %target-swift-frontend -typecheck - -I %S -sdk %t/mock-sdk -module-cache-path %t/MCP-system -emit-dependencies-path %t/dummy.d -track-system-dependencies
 // RUN: test -f %t/MCP-system/SystemDependencies*.swiftmodule
 // RUN: %FileCheck -check-prefix CHECK %s < %t/dummy.d
+// RUN: llvm-bcanalyzer -dump %t/MCP-system/SystemDependencies*.swiftmodule | %FileCheck -check-prefix CHECK-DUMP %s
 // RUN: %{python} %S/Inputs/make-old.py %t/MCP-system/SystemDependencies*.swiftmodule
 
 // Baseline: running the same command again doesn't rebuild the cached module.
@@ -41,6 +42,14 @@
 
 // NEGATIVE-NOT: SomeCModule.h
 // CHECK: SomeCModule.h
+
+// CHECK-DUMP-NOT: usr{{[/\\]}}include
+// CHECK-DUMP: DEPENDENCY_DIRECTORY{{.+}}'usr{{[/\\]}}include'
+// CHECK-DUMP-NEXT: FILE_DEPENDENCY{{.+}}'module.modulemap'
+// CHECK-DUMP-NOT: FILE_DEPENDENCY{{.+}}'SomeCModule.h'
+// CHECK-DUMP: FILE_DEPENDENCY{{.+}}'SomeCModule.h'
+// CHECK-DUMP-NOT: usr{{[/\\]}}include
+
 // MODULECACHE-COUNT-2: SystemDependencies-{{[^ ]+}}.swiftmodule
 
 import SomeCModule

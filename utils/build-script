@@ -349,6 +349,7 @@ class BuildScriptInvocation(object):
             'build_indexstoredb',
             'build_sourcekitlsp',
             'build_toolchainbenchmarks',
+            'tsan_libdispatch_test',
         ]
         has_target_needing_toolchain = \
             bool(sum(getattr(args, x) for x in targets_needing_toolchain))
@@ -530,11 +531,12 @@ class BuildScriptInvocation(object):
                 "can't find source directory for ninja "
                 "(tried %s)" % (self.workspace.source_dir("ninja")))
 
-        ninja_build = products.Ninja(
+        ninja_build = products.Ninja.new_builder(
             args=self.args,
             toolchain=self.toolchain,
-            source_dir=self.workspace.source_dir("ninja"),
-            build_dir=self.workspace.build_dir("build", "ninja"))
+            workspace=self.workspace,
+            host=StdlibDeploymentTarget.get_target_for_name(
+                self.args.host_target))
         ninja_build.build()
         self.toolchain.ninja = ninja_build.ninja_bin_path
 
@@ -1032,6 +1034,8 @@ class BuildScriptInvocation(object):
             product_classes.append(products.SourceKitLSP)
         if self.args.build_toolchainbenchmarks:
             product_classes.append(products.Benchmarks)
+        if self.args.tsan_libdispatch_test:
+            product_classes.append(products.TSanLibDispatch)
         return product_classes
 
     def execute(self):

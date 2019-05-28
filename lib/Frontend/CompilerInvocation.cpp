@@ -470,6 +470,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     TargetArg = A->getValue();
   }
 
+  Opts.EnableCXXInterop |= Args.hasArg(OPT_enable_cxx_interop);
   Opts.EnableObjCInterop =
       Args.hasFlag(OPT_enable_objc_interop, OPT_disable_objc_interop,
                    Target.isOSDarwin());
@@ -558,7 +559,7 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
 
   Opts.DisableModulesValidateSystemHeaders |= Args.hasArg(OPT_disable_modules_validate_system_headers);
 
-  Opts.DisableAdapterModules |= Args.hasArg(OPT_emit_imported_modules);
+  Opts.DisableOverlayModules |= Args.hasArg(OPT_emit_imported_modules);
 
   if (const Arg *A = Args.getLastArg(OPT_pch_output_dir)) {
     Opts.PrecompiledHeaderOutputDir = A->getValue();

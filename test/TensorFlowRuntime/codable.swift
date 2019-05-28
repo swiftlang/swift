@@ -4,11 +4,7 @@
 
 import TensorFlow
 import Foundation
-#if TPU
-import TensorFlowUnittestTPU
-#else
 import TensorFlowUnittest
-#endif
 import StdlibUnittest
 
 var CodableTests = TestSuite("TensorFlowCodable")

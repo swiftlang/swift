@@ -268,10 +268,6 @@ public:
   /// formal evaluation scope.
   ManagedValue formalAccessCopy(SILGenFunction &SGF, SILLocation loc);
 
-  /// Store a copy of this value with independent ownership into the given
-  /// uninitialized address.
-  void copyInto(SILGenFunction &SGF, SILValue dest, SILLocation loc);
-
   /// This is the same operation as 'copy', but works on +0 values that don't
   /// have cleanups.  It returns a +1 value with one.
   ManagedValue copyUnmanaged(SILGenFunction &SGF, SILLocation loc);
@@ -333,7 +329,15 @@ public:
   /// \param loc - the AST location to associate with emitted instructions.
   /// \param address - the address to assign to.
   void assignInto(SILGenFunction &SGF, SILLocation loc, SILValue address);
-  
+
+  /// Store a copy of this value with independent ownership into the given
+  /// uninitialized address.
+  void copyInto(SILGenFunction &SGF, SILLocation loc, SILValue dest);
+
+  /// Store a copy of this value with independent ownership into the given
+  /// initialization \p dest.
+  void copyInto(SILGenFunction &SGF, SILLocation loc, Initialization *dest);
+
   explicit operator bool() const {
     // "InContext" is not considered false.
     return bool(getValue()) || valueAndFlag.getInt();

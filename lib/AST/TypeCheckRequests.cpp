@@ -285,6 +285,47 @@ void IsDynamicRequest::cacheResult(bool value) const {
 }
 
 //----------------------------------------------------------------------------//
+// RequirementSignatureRequest computation.
+//----------------------------------------------------------------------------//
+
+void RequirementSignatureRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  auto decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::circular_reference);
+}
+
+void RequirementSignatureRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  auto decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::circular_reference_through);
+}
+
+Optional<ArrayRef<Requirement>> RequirementSignatureRequest::getCachedResult() const {
+  auto proto = std::get<0>(getStorage());
+  if (proto->isRequirementSignatureComputed())
+    return proto->getCachedRequirementSignature();
+
+  return None;
+}
+
+void RequirementSignatureRequest::cacheResult(ArrayRef<Requirement> value) const {
+  auto proto = std::get<0>(getStorage());
+  proto->setRequirementSignature(value);
+}
+
+//----------------------------------------------------------------------------//
+// DefaultDefinitionTypeRequest computation.
+//----------------------------------------------------------------------------//
+
+void DefaultDefinitionTypeRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  auto decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::circular_reference);
+}
+
+void DefaultDefinitionTypeRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  auto decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::circular_reference_through);
+}
+
+//----------------------------------------------------------------------------//
 // Requirement computation.
 //----------------------------------------------------------------------------//
 

@@ -41,7 +41,7 @@ namespace  {
     None,
     DumpSDK,
     DumpSwiftModules,
-    CompareSDKs,
+    MigratorGen,
     DiagnoseSDKs,
     // The following two are for testing purposes
     DeserializeDiffItems,
@@ -141,9 +141,9 @@ Action(llvm::cl::desc("Mode:"), llvm::cl::init(ActionType::None),
           clEnumValN(ActionType::DumpSwiftModules,
                      "dump-swift",
                      "dump swift modules in SDK"),
-          clEnumValN(ActionType::CompareSDKs,
-                     "compare-sdk",
-                     "Compare SDK content in JSON file"),
+          clEnumValN(ActionType::MigratorGen,
+                     "generate-migration-script",
+                     "Compare SDK content in JSON file and generate migration script"),
           clEnumValN(ActionType::DiagnoseSDKs,
                      "diagnose-sdk",
                      "Diagnose SDK content in JSON file"),
@@ -951,6 +951,8 @@ class PrunePass : public MatchedNodeListener, public SDKTreeDiffPass {
   SDKContext &Ctx;
   UpdatedNodesMap &UpdateMap;
   llvm::StringSet<> ProtocolReqWhitelist;
+  SDKNodeRoot *LeftRoot;
+  SDKNodeRoot *RightRoot;
 
   static void printSpaces(llvm::raw_ostream &OS, SDKNode *N) {
     assert(N);
@@ -1028,6 +1030,12 @@ public:
         auto *TD = Conf->getNominalTypeDecl();
         if (TD->isProtocol()) {
           TD->emitDiag(diag::conformance_added, Conf->getName());
+        } else {
+          // Adding conformance to an existing type can be ABI breaking.
+          if (Ctx.checkingABI() &&
+              !LeftRoot->getDescendantsByUsr(Conf->getUsr()).empty()) {
+            TD->emitDiag(diag::existing_conformance_added, Conf->getName());
+          }
         }
       }
 
@@ -1128,6 +1136,8 @@ public:
   }
 
   void pass(NodePtr Left, NodePtr Right) override {
+    LeftRoot = Left->getAs<SDKNodeRoot>();
+    RightRoot = Right->getAs<SDKNodeRoot>();
     foundMatch(Left, Right, NodeMatchReason::Root);
   }
 };
@@ -1932,10 +1942,9 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
     return;
   }
   case NodeAnnotation::Rename: {
-    auto *Count = UpdateMap.findUpdateCounterpart(Node)->getAs<SDKNodeDecl>();
     Node->emitDiag(diag::renamed_decl,
-        Ctx.buffer((Twine(getDeclKindStr(Count->getDeclKind())) + " " +
-          Count->getFullyQualifiedName()).str()));
+        Ctx.buffer((Twine(getDeclKindStr(Node->getDeclKind())) + " " +
+          Node->getAnnotateComment(NodeAnnotation::RenameNewName)).str()));
     return;
   }
   default:
@@ -2119,9 +2128,10 @@ static void populateAliasChanges(NodeMap &AliasMap, DiffVector &AllItems,
   }
 }
 
-static int compareSDKs(StringRef LeftPath, StringRef RightPath,
-                       StringRef DiffPath,
-                       llvm::StringSet<> &IgnoredRemoveUsrs, CheckerOptions Opts) {
+static int generateMigrationScript(StringRef LeftPath, StringRef RightPath,
+                                   StringRef DiffPath,
+                                   llvm::StringSet<> &IgnoredRemoveUsrs,
+                                   CheckerOptions Opts) {
   if (!fs::exists(LeftPath)) {
     llvm::errs() << LeftPath << " does not exist\n";
     return 1;
@@ -2258,6 +2268,10 @@ static int prepareForDump(const char *Main,
 
   if (!options::Triple.empty())
     InitInvok.setTargetTriple(options::Triple);
+
+  // Ensure the tool works on linux properly
+  InitInvok.getLangOptions().EnableObjCInterop =
+    InitInvok.getLangOptions().Target.isOSDarwin();
   InitInvok.getClangImporterOptions().ModuleCachePath =
   options::ModuleCachePath;
 
@@ -2382,7 +2396,7 @@ int main(int argc, char *argv[]) {
   case ActionType::DumpSDK:
     return (prepareForDump(argv[0], InitInvok, Modules)) ? 1 :
       dumpSDKContent(InitInvok, Modules, options::OutputFile, Opts);
-  case ActionType::CompareSDKs:
+  case ActionType::MigratorGen:
   case ActionType::DiagnoseSDKs: {
     if (options::SDKJsonPaths.size() != 2) {
       llvm::errs() << "Only two SDK versions can be compared\n";
@@ -2394,9 +2408,10 @@ int main(int argc, char *argv[]) {
       if (readFileLineByLine(options::ProtReqWhiteList, protocolWhitelist))
           return 1;
     }
-    if (options::Action == ActionType::CompareSDKs)
-      return compareSDKs(options::SDKJsonPaths[0], options::SDKJsonPaths[1],
-                         options::OutputFile, IgnoredUsrs, Opts);
+    if (options::Action == ActionType::MigratorGen)
+      return generateMigrationScript(options::SDKJsonPaths[0],
+                                     options::SDKJsonPaths[1],
+                                     options::OutputFile, IgnoredUsrs, Opts);
     else
       return diagnoseModuleChange(options::SDKJsonPaths[0],
                                   options::SDKJsonPaths[1],

@@ -455,7 +455,7 @@ func _vjpRsqrt<T : TensorFlowFloatingPoint>(
   _ x: Tensor<T>
 ) -> (Tensor<T>, (Tensor<T>) -> Tensor<T>) {
   let value = rsqrt(x)
-  return (value, { v in -v / 2 * value })
+  return (value, { v in -v / (2 * pow(x, 3 / 2))})
 }
 
 @inlinable
@@ -634,4 +634,26 @@ func _vjpRelu<T : TensorFlowFloatingPoint>(
   _ x: Tensor<T>
 ) -> (Tensor<T>, (Tensor<T>) -> Tensor<T>) {
   return (relu(x), { v in Tensor(x .> 0) * v })
+}
+
+//===----------------------------------------------------------------------===//
+// Broadcasting
+//===----------------------------------------------------------------------===//
+
+extension Tensor where Scalar : TensorFlowFloatingPoint {
+  @inlinable
+  func _vjpBroadcast(
+    toShape shape: Tensor<Int32>
+  ) -> (Tensor, (Tensor) -> Tensor) {
+    return (broadcast(toShape: shape), { [origShape = shapeTensor] v in
+      v.unbroadcast(toShape: origShape)
+    })
+  }
+
+  @inlinable
+  func _vjpUnbroadcast(to shape: TensorShape) -> (Tensor, (Tensor) -> Tensor) {
+    return (unbroadcast(to: shape), { [origShape = shapeTensor] v in
+      v.broadcast(toShape: origShape)
+    })
+  }
 }

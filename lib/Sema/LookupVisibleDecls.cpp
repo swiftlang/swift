@@ -274,7 +274,8 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
         : ChainedConsumer(ChainedConsumer), LS(LS), CurrDC(CurrDC),
           TypeResolver(TypeResolver) {}
 
-    void foundDecl(ValueDecl *D, DeclVisibilityKind Reason) override {
+    void foundDecl(ValueDecl *D, DeclVisibilityKind Reason,
+                   DynamicLookupInfo) override {
       // If the declaration has an override, name lookup will also have found
       // the overridden method.  Skip this declaration, because we prefer the
       // overridden method.
@@ -362,7 +363,8 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
       }
 
       if (isDeclVisibleInLookupMode(D, LS, CurrDC, TypeResolver))
-        ChainedConsumer.foundDecl(D, DeclVisibilityKind::DynamicLookup);
+        ChainedConsumer.foundDecl(D, DeclVisibilityKind::DynamicLookup,
+                                  DynamicLookupInfo::AnyObject);
     }
   };
 
@@ -635,40 +637,19 @@ static void lookupVisibleMemberDeclsImpl(
   } while (1);
 }
 
-static void lookupVisibleDynamicMemberLookupDecls(
-    Type baseType, VisibleDeclConsumer &consumer, const DeclContext *dc,
-    LookupState LS, DeclVisibilityKind reason, LazyResolver *typeResolver,
-    GenericSignatureBuilder *GSB, VisitedSet &visited) {
+swift::DynamicLookupInfo::DynamicLookupInfo(
+    SubscriptDecl *subscript, Type baseType,
+    DeclVisibilityKind originalVisibility)
+    : kind(KeyPathDynamicMember) {
+  keypath.subscript = subscript;
+  keypath.baseType = baseType;
+  keypath.originalVisibility = originalVisibility;
+}
 
-  assert(hasDynamicMemberLookupAttribute(baseType));
-  auto &ctx = dc->getASTContext();
-
-  // Lookup the `subscript(dynamicMember:)` methods in this type.
-  auto subscriptName =
-      DeclName(ctx, DeclBaseName::createSubscript(), ctx.Id_dynamicMember);
-
-  SmallVector<ValueDecl *, 2> subscripts;
-  dc->lookupQualified(baseType, subscriptName, NL_QualifiedDefault,
-                      typeResolver, subscripts);
-
-  for (ValueDecl *VD : subscripts) {
-    auto *subscript = dyn_cast<SubscriptDecl>(VD);
-    if (!subscript)
-      continue;
-
-    auto rootType = getRootTypeOfKeypathDynamicMember(subscript, dc);
-    if (!rootType)
-      continue;
-
-    auto subs =
-        baseType->getMemberSubstitutionMap(dc->getParentModule(), subscript);
-    auto memberType = rootType->subst(subs);
-    if (!memberType || !memberType->mayHaveMembers())
-      continue;
-
-    lookupVisibleMemberDeclsImpl(memberType, consumer, dc, LS, reason,
-                                 typeResolver, GSB, visited);
-  }
+const DynamicLookupInfo::KeyPathDynamicMemberInfo &
+swift::DynamicLookupInfo::getKeyPathDynamicMember() const {
+  assert(kind == KeyPathDynamicMember);
+  return keypath;
 }
 
 namespace {
@@ -676,9 +657,11 @@ namespace {
 struct FoundDeclTy {
   ValueDecl *D;
   DeclVisibilityKind Reason;
+  DynamicLookupInfo dynamicLookupInfo;
 
-  FoundDeclTy(ValueDecl *D, DeclVisibilityKind Reason)
-      : D(D), Reason(Reason) {}
+  FoundDeclTy(ValueDecl *D, DeclVisibilityKind Reason,
+              DynamicLookupInfo dynamicLookupInfo)
+      : D(D), Reason(Reason), dynamicLookupInfo(dynamicLookupInfo) {}
 
   friend bool operator==(const FoundDeclTy &LHS, const FoundDeclTy &RHS) {
     // If this ever changes - e.g. to include Reason - be sure to also update
@@ -693,12 +676,13 @@ namespace llvm {
 
 template <> struct DenseMapInfo<FoundDeclTy> {
   static inline FoundDeclTy getEmptyKey() {
-    return FoundDeclTy{nullptr, DeclVisibilityKind::LocalVariable};
+    return FoundDeclTy{nullptr, DeclVisibilityKind::LocalVariable, {}};
   }
 
   static inline FoundDeclTy getTombstoneKey() {
     return FoundDeclTy{reinterpret_cast<ValueDecl *>(0x1),
-                       DeclVisibilityKind::LocalVariable};
+                       DeclVisibilityKind::LocalVariable,
+                       {}};
   }
 
   static unsigned getHashValue(const FoundDeclTy &Val) {
@@ -749,13 +733,13 @@ public:
     assert(DC && BaseTy);
   }
 
-  void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
-    // SWIFT_ENABLE_TENSORFLOW
-    // Suppress "sequenced" as a result, because it crashes completions.
-    // TODO(TF-315): Fix properly and then remove this.
+  void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason,
+                 DynamicLookupInfo dynamicLookupInfo) override {
+   // SWIFT_ENABLE_TENSORFLOW
+   // Suppress "sequenced" as a result, because it crashes completions.
+   // TODO(TF-315): Fix properly and then remove this.
     if (isa<FuncDecl>(VD) && cast<FuncDecl>(VD)->getName().str() == "sequenced")
       return;
-
     if (!AllFoundDecls.insert(VD).second)
       return;
 
@@ -764,7 +748,7 @@ public:
     if (!isa<AbstractFunctionDecl>(VD) &&
         !isa<AbstractStorageDecl>(VD) &&
         !isa<AssociatedTypeDecl>(VD)) {
-      DeclsToReport.insert(FoundDeclTy(VD, Reason));
+      DeclsToReport.insert(FoundDeclTy(VD, Reason, dynamicLookupInfo));
       return;
     }
 
@@ -774,7 +758,7 @@ public:
 
     if (VD->isInvalid()) {
       FoundDecls[VD->getBaseName()].insert(VD);
-      DeclsToReport.insert(FoundDeclTy(VD, Reason));
+      DeclsToReport.insert(FoundDeclTy(VD, Reason, dynamicLookupInfo));
       return;
     }
     auto &PossiblyConflicting = FoundDecls[VD->getBaseName()];
@@ -790,11 +774,11 @@ public:
           PossiblyConflicting.insert(VD);
 
           bool Erased = DeclsToReport.remove(
-              FoundDeclTy(CurrentVD, DeclVisibilityKind::LocalVariable));
+              FoundDeclTy(CurrentVD, DeclVisibilityKind::LocalVariable, {}));
           assert(Erased);
           (void)Erased;
 
-          DeclsToReport.insert(FoundDeclTy(VD, Reason));
+          DeclsToReport.insert(FoundDeclTy(VD, Reason, dynamicLookupInfo));
           return;
         }
         CurrentVD = CurrentVD->getOverriddenDecl();
@@ -812,8 +796,8 @@ public:
     //
     // If the member is a free function and not a member of a type,
     // don't substitute either.
-    bool shouldSubst = (!BaseTy->isAnyObject() &&
-                        !BaseTy->hasTypeVariable() &&
+    bool shouldSubst = (Reason != DeclVisibilityKind::DynamicLookup &&
+                        !BaseTy->isAnyObject() && !BaseTy->hasTypeVariable() &&
                         (BaseTy->getNominalOrBoundGenericNominal() ||
                          BaseTy->is<ArchetypeType>()) &&
                         VD->getDeclContext()->isTypeContext());
@@ -822,7 +806,7 @@ public:
     // Hack; we shouldn't be filtering at this level anyway.
     if (!VD->hasInterfaceType()) {
       FoundDecls[VD->getBaseName()].insert(VD);
-      DeclsToReport.insert(FoundDeclTy(VD, Reason));
+      DeclsToReport.insert(FoundDeclTy(VD, Reason, dynamicLookupInfo));
       return;
     }
 
@@ -864,33 +848,154 @@ public:
           PossiblyConflicting.insert(VD);
 
           bool Erased = DeclsToReport.remove(
-              FoundDeclTy(OtherVD, DeclVisibilityKind::LocalVariable));
+              FoundDeclTy(OtherVD, DeclVisibilityKind::LocalVariable, {}));
           assert(Erased);
           (void)Erased;
 
-          DeclsToReport.insert(FoundDeclTy(VD, Reason));
+          DeclsToReport.insert(FoundDeclTy(VD, Reason, dynamicLookupInfo));
         }
         return;
       }
     }
 
     PossiblyConflicting.insert(VD);
-    DeclsToReport.insert(FoundDeclTy(VD, Reason));
+    DeclsToReport.insert(FoundDeclTy(VD, Reason, dynamicLookupInfo));
+  }
+
+  bool seenBaseName(DeclBaseName name) {
+    return FoundDecls.find(name) != FoundDecls.end();
   }
 };
 
-struct ShadowedKeyPathMembers : public VisibleDeclConsumer {
+struct KeyPathDynamicMemberConsumer : public VisibleDeclConsumer {
   VisibleDeclConsumer &consumer;
-  llvm::DenseSet<DeclBaseName> &seen;
-  ShadowedKeyPathMembers(VisibleDeclConsumer &consumer, llvm::DenseSet<DeclBaseName> &knownMembers) : consumer(consumer), seen(knownMembers) {}
-  void foundDecl(ValueDecl *VD, DeclVisibilityKind reason) override {
+  std::function<bool(DeclBaseName)> seenStaticBaseName;
+  llvm::DenseSet<DeclBaseName> seen;
+
+  SubscriptDecl *currentSubscript = nullptr;
+  Type currentBaseType = Type();
+
+  KeyPathDynamicMemberConsumer(VisibleDeclConsumer &consumer,
+                               std::function<bool(DeclBaseName)> seenBaseName)
+      : consumer(consumer), seenStaticBaseName(std::move(seenBaseName)) {}
+
+  bool checkShadowed(ValueDecl *VD) {
+    // Dynamic lookup members are only visible if they are not shadowed by
+    // other members.
+    return !isa<SubscriptDecl>(VD) && seen.insert(VD->getBaseName()).second &&
+           !seenStaticBaseName(VD->getBaseName());
+  }
+
+  void foundDecl(ValueDecl *VD, DeclVisibilityKind reason,
+                 DynamicLookupInfo dynamicLookupInfo) override {
+    assert(dynamicLookupInfo.getKind() !=
+           DynamicLookupInfo::KeyPathDynamicMember);
+
+    // Only variables and subscripts are allowed in a keypath.
+    if (!isa<AbstractStorageDecl>(VD))
+      return;
+
     // Dynamic lookup members are only visible if they are not shadowed by
     // non-dynamic members.
-    if (seen.count(VD->getBaseName()) == 0)
-      consumer.foundDecl(VD, reason);
+    if (checkShadowed(VD))
+      consumer.foundDecl(VD, DeclVisibilityKind::DynamicLookup,
+                         {currentSubscript, currentBaseType, reason});
   }
-};  
+
+  struct SubscriptChange {
+    KeyPathDynamicMemberConsumer &consumer;
+    SubscriptDecl *oldSubscript;
+    Type oldBaseType;
+
+    SubscriptChange(KeyPathDynamicMemberConsumer &consumer,
+                    SubscriptDecl *newSubscript, Type newBaseType)
+        : consumer(consumer), oldSubscript(newSubscript),
+          oldBaseType(newBaseType) {
+      std::swap(consumer.currentSubscript, oldSubscript);
+      std::swap(consumer.currentBaseType, oldBaseType);
+    }
+    ~SubscriptChange() {
+      consumer.currentSubscript = oldSubscript;
+      consumer.currentBaseType = oldBaseType;
+    }
+  };
+};
 } // end anonymous namespace
+
+static void lookupVisibleDynamicMemberLookupDecls(
+    Type baseType, KeyPathDynamicMemberConsumer &consumer,
+    const DeclContext *dc, LookupState LS, DeclVisibilityKind reason,
+    LazyResolver *typeResolver, GenericSignatureBuilder *GSB,
+    VisitedSet &visited, llvm::DenseSet<TypeBase *> &seenDynamicLookup);
+
+/// Enumerates all members of \c baseType, including both directly visible and
+/// members visible by keypath dynamic member lookup.
+///
+/// \note This is an implementation detail of \c lookupVisibleMemberDecls and
+/// exists to create the correct recursion for dynamic member lookup.
+static void lookupVisibleMemberAndDynamicMemberDecls(
+    Type baseType, VisibleDeclConsumer &consumer,
+    KeyPathDynamicMemberConsumer &dynamicMemberConsumer, const DeclContext *DC,
+    LookupState LS, DeclVisibilityKind reason, LazyResolver *typeResolver,
+    GenericSignatureBuilder *GSB, VisitedSet &visited,
+    llvm::DenseSet<TypeBase *> &seenDynamicLookup) {
+  lookupVisibleMemberDeclsImpl(baseType, consumer, DC, LS, reason, typeResolver,
+                               GSB, visited);
+  lookupVisibleDynamicMemberLookupDecls(baseType, dynamicMemberConsumer, DC, LS,
+                                        reason, typeResolver, GSB, visited,
+                                        seenDynamicLookup);
+}
+
+/// Enumerates all keypath dynamic members of \c baseType, as seen from the
+/// context \c dc.
+///
+/// If \c baseType is \c @dynamicMemberLookup, this looks up any keypath
+/// dynamic member subscripts and looks up the members of the keypath's root
+/// type.
+static void lookupVisibleDynamicMemberLookupDecls(
+    Type baseType, KeyPathDynamicMemberConsumer &consumer,
+    const DeclContext *dc, LookupState LS, DeclVisibilityKind reason,
+    LazyResolver *typeResolver, GenericSignatureBuilder *GSB,
+    VisitedSet &visited, llvm::DenseSet<TypeBase *> &seenDynamicLookup) {
+  if (!seenDynamicLookup.insert(baseType.getPointer()).second)
+    return;
+
+  if (!hasDynamicMemberLookupAttribute(baseType))
+    return;
+
+  auto &ctx = dc->getASTContext();
+
+  // Lookup the `subscript(dynamicMember:)` methods in this type.
+  auto subscriptName =
+      DeclName(ctx, DeclBaseName::createSubscript(), ctx.Id_dynamicMember);
+
+  SmallVector<ValueDecl *, 2> subscripts;
+  dc->lookupQualified(baseType, subscriptName, NL_QualifiedDefault,
+                      typeResolver, subscripts);
+
+  for (ValueDecl *VD : subscripts) {
+    auto *subscript = dyn_cast<SubscriptDecl>(VD);
+    if (!subscript)
+      continue;
+
+    auto rootType = getRootTypeOfKeypathDynamicMember(subscript, dc);
+    if (!rootType)
+      continue;
+
+    auto subs =
+        baseType->getMemberSubstitutionMap(dc->getParentModule(), subscript);
+    auto memberType = rootType->subst(subs);
+    if (!memberType || !memberType->mayHaveMembers())
+      continue;
+
+    KeyPathDynamicMemberConsumer::SubscriptChange(consumer, subscript,
+                                                  baseType);
+
+    lookupVisibleMemberAndDynamicMemberDecls(memberType, consumer, consumer, dc,
+                                             LS, reason, typeResolver, GSB,
+                                             visited, seenDynamicLookup);
+  }
+}
 
 /// Enumerate all members in \c BaseTy (including members of extensions,
 /// superclasses and implemented protocols), as seen from the context \c CurrDC.
@@ -903,23 +1008,20 @@ static void lookupVisibleMemberDecls(
     LookupState LS, DeclVisibilityKind Reason, LazyResolver *TypeResolver,
     GenericSignatureBuilder *GSB) {
   OverrideFilteringConsumer overrideConsumer(BaseTy, CurrDC, TypeResolver);
-  VisitedSet Visited;
-  lookupVisibleMemberDeclsImpl(BaseTy, overrideConsumer, CurrDC, LS, Reason,
-                               TypeResolver, GSB, Visited);
+  KeyPathDynamicMemberConsumer dynamicConsumer(
+      Consumer,
+      [&](DeclBaseName name) { return overrideConsumer.seenBaseName(name); });
 
-  if (hasDynamicMemberLookupAttribute(BaseTy)) {
-    llvm::DenseSet<DeclBaseName> knownMembers;
-    for (auto &kv : overrideConsumer.FoundDecls) {
-      knownMembers.insert(kv.first);
-    }
-    ShadowedKeyPathMembers dynamicConsumer(overrideConsumer, knownMembers);
-    lookupVisibleDynamicMemberLookupDecls(BaseTy, dynamicConsumer, CurrDC, LS,
-                                          Reason, TypeResolver, GSB, Visited);
-  }
+  VisitedSet Visited;
+  llvm::DenseSet<TypeBase *> seenDynamicLookup;
+  lookupVisibleMemberAndDynamicMemberDecls(
+      BaseTy, overrideConsumer, dynamicConsumer, CurrDC, LS, Reason,
+      TypeResolver, GSB, Visited, seenDynamicLookup);
 
   // Report the declarations we found to the real consumer.
   for (const auto &DeclAndReason : overrideConsumer.DeclsToReport)
-    Consumer.foundDecl(DeclAndReason.D, DeclAndReason.Reason);
+    Consumer.foundDecl(DeclAndReason.D, DeclAndReason.Reason,
+                       DeclAndReason.dynamicLookupInfo);
 }
 
 static void lookupVisibleDeclsImpl(VisibleDeclConsumer &Consumer,
@@ -1119,9 +1221,10 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
                   VisibleDeclConsumer &Consumer)
         : SM(SM), Loc(Loc), Consumer(Consumer) {}
 
-    void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) {
+    void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason,
+                   DynamicLookupInfo dynamicLookupInfo) override {
       if (isUsableValue(VD, Reason))
-        Consumer.foundDecl(VD, Reason);
+        Consumer.foundDecl(VD, Reason, dynamicLookupInfo);
     }
   } LocalConsumer(DC->getASTContext().SourceMgr, Loc, Consumer);
 

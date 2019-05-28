@@ -972,7 +972,7 @@ public extension Tensor {
                   vjp: _vjpReplacing where Scalar : TensorFlowFloatingPoint)
   func replacing(with other: Tensor,
                  where mask: Tensor<Bool>) -> Tensor {
-    return Raw.select(condition: mask, t: self, e: other)
+    return Raw.select(condition: mask, t: other, e: self)
   }
 }
 
@@ -1600,18 +1600,23 @@ public extension Tensor {
 
 public extension Tensor {
   @inlinable
+  @differentiable(wrt: self, vjp: _vjpBroadcast(toShape:)
+                  where Scalar : TensorFlowFloatingPoint)
   func broadcast(toShape shape: Tensor<Int32>) -> Tensor {
     return Raw.broadcastTo(self, shape: shape)
   }
 
   @inlinable
+  @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
   func broadcast(to shape: TensorShape) -> Tensor {
-    return broadcast(toShape: Tensor<Int32>(shape.dimensions.map(Int32.init)))
+    return broadcast(
+      toShape: Tensor<Int32>({ shape.dimensions.map(Int32.init) }()))
   }
 
   /// Broadcast to the same shape as the specified `Tensor`.
   /// - Precondition: The specified shape must be compatible for broadcasting.
   @inlinable
+  @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
   func broadcast<OtherScalar>(like other: Tensor<OtherScalar>) -> Tensor {
     return broadcast(toShape: other.shapeTensor)
   }
@@ -1619,25 +1624,47 @@ public extension Tensor {
 
 public extension Tensor where Scalar : Numeric {
   @inlinable
+  @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
   func unbroadcast(toShape otherShape: Tensor<Int32>) -> Tensor {
-    let rankDiff = (rankTensor - otherShape.scalarCountTensor).rankLifted()
-    let ones: Tensor<Int32> = Raw.fill(dims: rankDiff, value: Tensor<Int32>(1))
-    let paddedShape = ones ++ otherShape
-    let nonEqualIndices = paddedShape .!= shapeTensor
-    let broadcastIndices = Raw.where_(nonEqualIndices).flattened()
-    let unbroadcasted: Tensor = Raw.sum(
-      self, reductionIndices: Tensor<Int32>(broadcastIndices), keepDims: false)
-    return Raw.reshape(unbroadcasted, shape: otherShape)
+    // TODO: Simplify this once differentiating control flow is supported.
+    return unbroadcast(to: {
+      precondition(otherShape.rank == 1)
+      return TensorShape(otherShape.scalars.map(Int.init))
+    }())
   }
 
   @inlinable
+  @differentiable(wrt: self where Scalar : TensorFlowFloatingPoint)
   func unbroadcast<OtherScalar>(like other: Tensor<OtherScalar>) -> Tensor {
     return unbroadcast(toShape: other.shapeTensor)
   }
 
   @inlinable
+  @differentiable(wrt: self, vjp: _vjpUnbroadcast(to:)
+                  where Scalar : TensorFlowFloatingPoint)
   func unbroadcast(to shape: TensorShape) -> Tensor {
-    return unbroadcast(toShape: Tensor<Int32>(shape.dimensions.map(Int32.init)))
+    let dimensions = self.shape.dimensions
+    var otherDimensions = shape.dimensions
+    let rankDifference = dimensions.count - otherDimensions.count
+    precondition(rankDifference >= 0, """
+        The rank of 'self' must be greater than or equal to the number of \
+        dimensions in the destination shape
+        """)
+    if rankDifference > 0 {
+      otherDimensions.insert(
+        contentsOf: repeatElement(1, count: rankDifference),
+        at: 0
+      )
+    }
+    assert(dimensions.count == otherDimensions.count)
+    var axes: [Int] = []
+    axes.reserveCapacity(dimensions.count)
+    for (i, (dim, otherDim)) in zip(dimensions, otherDimensions).enumerated() {
+      if dim == otherDim { continue }
+      if otherDim == 1 { axes.append(i); continue }
+      preconditionFailure("Cannot unbroadcast \(self.shape) to \(shape)")
+    }
+    return sum(alongAxes: axes).reshaped(to: shape)
   }
 
   @inlinable

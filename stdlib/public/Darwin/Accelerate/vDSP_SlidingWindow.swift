@@ -17,7 +17,7 @@ extension vDSP {
     /// - Parameter source: Single-precision input vector.
     /// - Parameter windowLength: The number of consecutive elements to sum.
     /// - Returns: Single-precision output vector.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func slidingWindowSum<U>(_ vector: U,
                                            usingWindowLength windowLength: Int) -> [Float]
@@ -45,7 +45,7 @@ extension vDSP {
     /// - Parameter source: Single-precision input vector.
     /// - Parameter windowLength: The number of consecutive elements to sum.
     /// - Parameter result: Single-precision output vector.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func slidingWindowSum<U, V>(_ vector: U,
                                               usingWindowLength windowLength: Int,
@@ -75,7 +75,7 @@ extension vDSP {
     /// - Parameter source: Single-precision input vector.
     /// - Parameter windowLength: The number of consecutive elements to sum.
     /// - Returns: Single-precision output vector.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func slidingWindowSum<U>(_ vector: U,
                                            usingWindowLength windowLength: Int) -> [Double]
@@ -103,7 +103,7 @@ extension vDSP {
     /// - Parameter source: Double-precision input vector.
     /// - Parameter windowLength: The number of consecutive elements to sum.
     /// - Parameter result: Double-precision output vector.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func slidingWindowSum<U, V>(_ vector: U,
                                               usingWindowLength windowLength: Int,

@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -emit-sil -verify %s
 
 //===----------------------------------------------------------------------===//
-// Top-level (before primal/adjoint synthesis)
+// Top-level (before VJP/adjoint synthesis)
 //===----------------------------------------------------------------------===//
 
 // expected-note @+1 {{opaque non-'@differentiable' function is not differentiable}}

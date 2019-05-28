@@ -139,6 +139,11 @@ namespace swift {
     /// configuration options.
     bool EnableObjCInterop = true;
 
+    /// Enable C++ interop code generation and build configuration
+    /// options.
+    /// FIXME: Disabled by default until this is fully baked.
+    bool EnableCXXInterop = false;
+
     /// On Darwin platforms, use the pre-stable ABI's mark bit for Swift
     /// classes instead of the stable ABI's bit. This is needed when
     /// targeting OSes prior to macOS 10.14.4 and iOS 12.2, where
@@ -299,7 +304,7 @@ namespace swift {
     
     /// Enable the experimental opaque result types feature.
     bool EnableOpaqueResultTypes = true;
-
+    
     /// To mimic existing system, set to false.
     /// To experiment with including file-private and private dependency info,
     /// set to true.

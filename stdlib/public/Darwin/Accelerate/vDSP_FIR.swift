@@ -18,7 +18,7 @@ extension vDSP {
     /// - Parameter decimationFactor: The integer factor by which to divide the sampling rate.
     /// - Parameter filter: Filter to use during the downsampling operation.
     /// - Returns: Single-precision output vector.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func downsample<T, U>(_ source: U,
                                         decimationFactor: Int,
@@ -51,7 +51,7 @@ extension vDSP {
     /// - Parameter decimationFactor: The integer factor by which to divide the sampling rate.
     /// - Parameter filter: Filter to use during the downsampling operation.
     /// - Parameter result: Single-precision output vector.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func downsample<T, U, V>(_ source: U,
                                            decimationFactor: Int,
@@ -91,7 +91,7 @@ extension vDSP {
     /// - Parameter decimationFactor: The integer factor by which to divide the sampling rate.
     /// - Parameter filter: Filter to use during the downsampling operation.
     /// - Returns: Double-precision output vector.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func downsample<T, U>(_ source: U,
                                         decimationFactor: Int,
@@ -123,7 +123,7 @@ extension vDSP {
     /// - Parameter decimationFactor: The integer factor by which to divide the sampling rate.
     /// - Parameter filter: Filter to use during the downsampling operation.
     /// - Parameter result: Double-precision output vector.
-    @inline(__always)
+    @inlinable
     @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func downsample<T, U, V>(_ source: U,
                                            decimationFactor: Int,

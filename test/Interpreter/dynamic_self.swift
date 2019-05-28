@@ -46,10 +46,6 @@ class C : P, CP {
     print("Allocating C")
   }
 
-  deinit {
-    print("Destroying C")
-  }
-
   func f() -> Self {
     print("C.f()")
     return self
@@ -80,7 +76,6 @@ print("C() as non-class existential")
 // CHECK-NEXT: Between calls
 // CHECK-NEXT: C.g()
 // CHECK-NEXT: After second call
-// CHECK-NEXT: Destroying C
 callDynamicSelfExistential(C())
 
 // CHECK-NEXT: C() as class existential
@@ -91,7 +86,6 @@ print("C() as class existential")
 // CHECK-NEXT: Between calls
 // CHECK-NEXT: C.g()
 // CHECK-NEXT: After second call
-// CHECK-NEXT: Destroying C
 callDynamicSelfClassExistential(C())
 
 print("-------------------------------")

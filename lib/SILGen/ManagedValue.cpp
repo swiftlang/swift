@@ -57,8 +57,8 @@ ManagedValue ManagedValue::formalAccessCopy(SILGenFunction &SGF,
 
 /// Store a copy of this value with independent ownership into the given
 /// uninitialized address.
-void ManagedValue::copyInto(SILGenFunction &SGF, SILValue dest,
-                            SILLocation loc) {
+void ManagedValue::copyInto(SILGenFunction &SGF, SILLocation loc,
+                            SILValue dest) {
   auto &lowering = SGF.getTypeLowering(getType());
   if (lowering.isAddressOnly() && SGF.silConv.useLoweredAddresses()) {
     SGF.B.createCopyAddr(loc, getValue(), dest, IsNotTake, IsInitialization);
@@ -67,6 +67,12 @@ void ManagedValue::copyInto(SILGenFunction &SGF, SILValue dest,
 
   SILValue copy = lowering.emitCopyValue(SGF.B, loc, getValue());
   lowering.emitStoreOfCopy(SGF.B, loc, copy, dest, IsInitialization);
+}
+
+void ManagedValue::copyInto(SILGenFunction &SGF, SILLocation loc,
+                            Initialization *dest) {
+  dest->copyOrInitValueInto(SGF, loc, *this, /*isInit*/ false);
+  dest->finishInitialization(SGF);
 }
 
 /// This is the same operation as 'copy', but works on +0 values that don't
