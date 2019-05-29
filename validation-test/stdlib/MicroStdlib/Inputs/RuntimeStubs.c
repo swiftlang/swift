@@ -17,3 +17,4 @@ void swift_storeEnumTagSinglePayloadGeneric(void) {}
 void swift_retain(){}
 void swift_allocBox(){}
 void swift_getWitnessTable(void) {}
+void swift_getObjCClassMetadata(void) {}
