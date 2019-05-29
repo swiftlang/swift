@@ -4664,19 +4664,16 @@ public:
 class EditorPlaceholderExpr : public Expr {
   Identifier Placeholder;
   SourceLoc Loc;
-  SourceLoc TrailingAngleBracketLoc;
   TypeLoc PlaceholderTy;
   TypeRepr *ExpansionTyR;
   Expr *SemanticExpr;
 
 public:
   EditorPlaceholderExpr(Identifier Placeholder, SourceLoc Loc,
-                        SourceLoc TrailingAngleBracketLoc,
                         TypeLoc PlaceholderTy,
                         TypeRepr *ExpansionTyR)
     : Expr(ExprKind::EditorPlaceholder, /*Implicit=*/false),
       Placeholder(Placeholder), Loc(Loc),
-      TrailingAngleBracketLoc(TrailingAngleBracketLoc),
       PlaceholderTy(PlaceholderTy),
       ExpansionTyR(ExpansionTyR),
       SemanticExpr(nullptr) {
@@ -4687,7 +4684,7 @@ public:
   TypeLoc &getTypeLoc() { return PlaceholderTy; }
   TypeLoc getTypeLoc() const { return PlaceholderTy; }
   SourceLoc getTrailingAngleBracketLoc() const {
-    return TrailingAngleBracketLoc;
+    return Loc.getAdvancedLoc(Placeholder.getLength() - 1);
   }
 
   /// The TypeRepr to be considered for placeholder expansion.
