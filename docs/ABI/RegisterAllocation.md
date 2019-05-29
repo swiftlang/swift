@@ -7,7 +7,7 @@ From Swift 5, the calling convention register allocation for 64 architectures is
 | Context register (self) | x20 | r13 |
 | Error return register | x21 | r12 |
 | Struct return pointer | x8 | rax |
-| Float call arguments | d0 - d7 | xmm0 - xmm7 |
-| Integer call arguments | x0 - x7 | rdi, rsi, rdx, rcx, r8, r9 |
+| Float call arguments | d0 … d7 | xmm0 … xmm7 |
+| Integer call arguments | x0 … x7 | rdi, rsi, rdx, rcx, r8, r9 |
 | Float return | d0, d1 | xmm0, xmm1 |
-| Integer return | x1, x2 | rax, rbx |
+| Integer return | x0 … x3 | rax, rdx, rcx, r8 |
