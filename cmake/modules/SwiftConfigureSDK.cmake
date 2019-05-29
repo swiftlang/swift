@@ -51,6 +51,9 @@ function(_report_sdk prefix)
     message(STATUS "  Triple name: ${SWIFT_SDK_${prefix}_TRIPLE_NAME}")
   endif()
   message(STATUS "  Architectures: ${SWIFT_SDK_${prefix}_ARCHITECTURES}")
+  if(SWIFT_SDK_${prefix}_MODULE_ARCHITECTURES)
+    message(STATUS "  Module Architectures: ${SWIFT_SDK_${prefix}_MODULE_ARCHITECTURES}")
+  endif()
   if(NOT prefix IN_LIST SWIFT_APPLE_PLATFORMS)
     if(SWIFT_BUILD_STDLIB)
       foreach(arch ${SWIFT_SDK_${prefix}_ARCHITECTURES})
@@ -150,6 +153,11 @@ macro(configure_sdk_darwin
       "${SWIFT_DARWIN_SUPPORTED_ARCHS}"   # rhs
       SWIFT_SDK_${prefix}_ARCHITECTURES)  # result
   endif()
+
+  list_intersect(
+    "${SWIFT_DARWIN_MODULE_ARCHS}"            # lhs
+    "${architectures}"                        # rhs
+    SWIFT_SDK_${prefix}_MODULE_ARCHITECTURES) # result
 
   # Configure variables for _all_ architectures even if we aren't "building"
   # them because they aren't supported.
