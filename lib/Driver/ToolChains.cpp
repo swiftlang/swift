@@ -1121,6 +1121,9 @@ ToolChain::constructInvocation(const ArchiveJobAction &job,
       case llvm::Triple::Darwin:
         Arguments.push_back("--format=darwin");
         break;
+      case llvm::Triple::FreeBSD:
+        Arguments.push_back("--format=bsd");
+        break;
       case llvm::Triple::Linux:
         Arguments.push_back("--format=gnu");
         break;
