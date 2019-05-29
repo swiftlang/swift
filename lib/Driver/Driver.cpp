@@ -1959,12 +1959,10 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
   if (OI.shouldLink() && !AllLinkerInputs.empty()) {
     JobAction *LinkAction = nullptr;
 
-    if (OI.LinkAction == LinkKind::StaticLibrary) {
+    if (OI.LinkAction == LinkKind::StaticLibrary)
       LinkAction = C.createAction<ArchiveJobAction>(AllLinkerInputs,
                                                     OI.LinkAction);
-                                                  
-      llvm::errs() << "LinkAction is an ArchiveJobAction\n";
-    } else
+    else
       LinkAction = C.createAction<LinkJobAction>(AllLinkerInputs,
                                                  OI.LinkAction);
 

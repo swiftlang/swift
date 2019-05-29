@@ -1101,14 +1101,12 @@ ToolChain::constructInvocation(const ArchiveJobAction &job,
       isLLVMAR = true;
     }
 
-    // Look for binutils in the toolchain folder.
-    Arguments.push_back("-B");
-    Arguments.push_back(context.Args.MakeArgString(A->getValue()));
   }
   if (AR == nullptr) {
-    if (auto pathAR = llvm::sys::findProgramByName("llvm-ar", None))
+    if (auto pathAR = llvm::sys::findProgramByName("llvm-ar", None)) {
       AR = context.Args.MakeArgString(pathAR.get());
       isLLVMAR = true;
+    }
   }
   if (AR == nullptr) {
     if (auto pathAR = llvm::sys::findProgramByName("ar", None))
