@@ -73,7 +73,13 @@ set(SWIFT_DARWIN_SUPPORTED_ARCHS "" CACHE STRING
   "Space-separated list of architectures to configure on Darwin platforms. \
 If left empty all default architectures are configured.")
 
+set(SWIFT_DARWIN_MODULE_ARCHS "" CACHE STRING
+  "Space-separated list of architectures to configure Swift module-only \
+targets on Darwin platforms. These targets are in addition to the full \
+library targets.")
+
 separate_arguments(SWIFT_DARWIN_SUPPORTED_ARCHS)
+separate_arguments(SWIFT_DARWIN_MODULE_ARCHS)
 
 
 # -----------------------------------------------------------------------------
