@@ -15,6 +15,12 @@ set(SWIFT_STDLIB_BUILD_TYPE "Release" CACHE STRING
 set_property(CACHE SWIFT_STDLIB_BUILD_TYPE PROPERTY
     STRINGS "Debug" "RelWithDebInfo" "Release" "MinSizeRel")
 
+set(SWIFT_DARWIN_SUPPORTED_ARCHS "" CACHE STRING
+  "Space-separated list of architectures to configure on Darwin platforms. \
+If left empty all default architectures are configured.")
+
+separate_arguments(SWIFT_DARWIN_SUPPORTED_ARCHS)
+
 # Only happens if it's called from a top-level cmake invocation.
 set(BUILD_STANDALONE TRUE)
 set(SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES "SHARED")
