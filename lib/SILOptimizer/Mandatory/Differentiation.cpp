@@ -786,7 +786,7 @@ void DifferentiationInvoker::print(llvm::raw_ostream &os) const {
 // subsitution map and in the given module.
 static bool checkRequirementsSatisfied(
     ArrayRef<Requirement> requirements, SubstitutionMap substMap,
-    ModuleDecl *swiftModule) {
+    SILFunction *original, ModuleDecl *swiftModule) {
   if (requirements.empty())
     return true;
   // Jointly iterate through associated function requirements/conformances.
@@ -831,10 +831,27 @@ static bool checkRequirementsSatisfied(
           continue;
         }
       }
+      Optional<ProtocolConformanceRef> conformance;
+      // FIXME terrible hack: If LHS is a dependent member, try to resolve it
+      // using the `Self` type, assuming the first replacement type is `Self`.
+      if (auto depMemType = firstType->getAs<DependentMemberType>()) {
+        if (original->hasSelfParam() &&
+            !substMap.getReplacementTypes().empty()) {
+          if (auto substType = depMemType->substBaseType(
+                  substMap.getReplacementTypes().front(),
+                  LookUpConformanceInModule(swiftModule))) {
+            firstType = substType;
+          }
+        }
+        conformance = swiftModule->conformsToProtocol(firstType, protocol);
+      }
       // Otherwise, try to look up conformance in substitution maps.
-      auto isConformanceMet = substMap.lookupConformance(
-          firstType->getCanonicalType(), protocol);
-      if (!isConformanceMet)
+      else {
+        conformance = substMap.lookupConformance(
+            firstType->getCanonicalType(), protocol);
+      }
+        
+      if (!conformance)
         unsatisfiedRequirements.push_back(req);
       continue;
     }
@@ -2008,7 +2025,7 @@ static SubstitutionMap getSubstitutionMap(
 /// Returns `None` on failure, signifying that a diagnostic has been emitted.
 ///
 /// Creates new differentiation tasks, if necessary, using `invoker` as the
-/// invoker. Calls `taskCallback` for all newly-created tasks (but may also call
+/// invoker calls `taskCallback` for all newly-created tasks (but may also call
 /// `taskCallback` for already-existing tasks), so that the caller can make sure
 /// that the task actually gets executed.
 ///
@@ -2111,7 +2128,7 @@ emitAssociatedFunctionReference(
     // TODO(TF-482): Change `lookupMinimalDifferentiableAttr`.
     if (!checkRequirementsSatisfied(
             minimalAttr->getRequirements(),
-            substMap, context.getModule().getSwiftModule())) {
+            substMap, originalFn, context.getModule().getSwiftModule())) {
       context.emitNondifferentiabilityError(original, invoker,
           diag::autodiff_function_assoc_func_requirements_unmet);
       return None;
