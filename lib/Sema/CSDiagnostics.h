@@ -1265,7 +1265,7 @@ public:
 
   bool diagnoseAsError() override;
 
-  void diagnoseParameter(GenericTypeParamType *GP) const;
+  bool diagnoseParameter(GenericTypeParamType *GP) const;
 
 private:
   void emitGenericSignatureNote() const;

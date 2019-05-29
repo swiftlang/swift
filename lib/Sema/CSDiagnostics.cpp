@@ -2895,12 +2895,23 @@ bool MissingGenericArgumentsFailure::hasLoc(GenericTypeParamType *GP) const {
 }
 
 bool MissingGenericArgumentsFailure::diagnoseAsError() {
+  bool diagnosed = false;
   for (auto *GP : Parameters)
-    diagnoseParameter(GP);
+    diagnosed |= diagnoseParameter(GP);
+
+  if (!diagnosed)
+    return false;
 
   auto *DC = getDeclContext();
   if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
-    emitDiagnostic(AFD, diag::note_call_to_func, AFD->getFullName());
+    if (isa<ConstructorDecl>(AFD)) {
+      emitDiagnostic(AFD, diag::note_call_to_initializer);
+    } else {
+      emitDiagnostic(AFD,
+                     AFD->isOperator() ? diag::note_call_to_operator
+                                       : diag::note_call_to_func,
+                     AFD->getFullName());
+    }
     return true;
   }
 
@@ -2908,8 +2919,22 @@ bool MissingGenericArgumentsFailure::diagnoseAsError() {
   return true;
 }
 
-void MissingGenericArgumentsFailure::diagnoseParameter(
+bool MissingGenericArgumentsFailure::diagnoseParameter(
     GenericTypeParamType *GP) const {
+  auto &cs = getConstraintSystem();
+
+  auto *locator = getLocator();
+  // Type variables associated with missing generic parameters are
+  // going to be completely cut off from the rest of constraint system,
+  // that's why we'd get two fixes in this case which is not ideal.
+  if (locator->isForContextualType() &&
+      llvm::count_if(cs.DefaultedConstraints,
+                     [&GP](const ConstraintLocator *locator) {
+                       return locator->getGenericParameter() == GP;
+                     }) > 1) {
+    return false;
+  }
+
   if (auto *CE = dyn_cast<ExplicitCastExpr>(getRawAnchor())) {
     auto castTo = getType(CE->getCastTypeLoc());
     auto *NTD = castTo->getAnyNominal();
@@ -2919,20 +2944,32 @@ void MissingGenericArgumentsFailure::diagnoseParameter(
     emitDiagnostic(getLoc(), diag::unbound_generic_parameter, GP);
   }
 
+  if (!hasLoc(GP))
+    return true;
+
+  Type baseType;
   auto *DC = getDeclContext();
-  if (DC->isTypeContext() && hasLoc(GP)) {
-    auto *base = DC->getSelfNominalTypeDecl();
-    emitDiagnostic(GP->getDecl(), diag::archetype_declared_in_type, GP,
-                   base->getDeclaredType());
+
+  if (auto *NTD =
+          dyn_cast_or_null<NominalTypeDecl>(DC->getSelfNominalTypeDecl())) {
+    baseType = NTD->getDeclaredType();
+  } else if (auto *TAD = dyn_cast<TypeAliasDecl>(DC)) {
+    baseType = TAD->getUnboundGenericType();
+  } else {
+    baseType = DC->getDeclaredInterfaceType();
   }
+
+  if (!baseType)
+    return true;
+
+  emitDiagnostic(GP->getDecl(), diag::archetype_declared_in_type, GP, baseType);
+  return true;
 }
 
 void MissingGenericArgumentsFailure::emitGenericSignatureNote() const {
   auto &cs = getConstraintSystem();
   auto &TC = getTypeChecker();
   auto *paramDC = getDeclContext();
-
-  assert(paramDC->isTypeContext());
 
   auto *GTD = dyn_cast<GenericTypeDecl>(paramDC);
   if (!GTD || !BaseType)
@@ -2947,9 +2984,8 @@ void MissingGenericArgumentsFailure::emitGenericSignatureNote() const {
 
   llvm::SmallDenseMap<GenericTypeParamDecl *, Type> params;
   for (auto *typeVar : cs.getTypeVariables()) {
-    if (auto *locator = typeVar->getImpl().getLocator()) {
-      if (auto *GPD = getParamDecl(locator))
-        params[GPD] = resolveType(typeVar);
+    if (auto *GP = typeVar->getImpl().getGenericParameter()) {
+      params[GP->getDecl()] = resolveType(typeVar);
     }
   }
 
