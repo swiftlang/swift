@@ -121,11 +121,11 @@ extension TF_508_Struct : Differentiable
   typealias AllDifferentiableVariables = TF_508_Struct
 }
 
-let a = TF_508_Struct<Float>()
-func foo(x: TF_508_Struct<Float>, y: TF_508_Struct<Float>)
+let TF_508_inst = TF_508_Struct<Float>()
+func TF_508_func(x: TF_508_Struct<Float>, y: TF_508_Struct<Float>)
   -> TF_508_Struct<Float> {
   return x + y
 }
-let backprop1 = pullback(at: a, a, in: foo)
+let TF_508_bp = pullback(at: TF_508_inst, TF_508_inst, in: TF_508_func)
 
 // TODO: add more tests.
