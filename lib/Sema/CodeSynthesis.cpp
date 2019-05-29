@@ -2025,7 +2025,9 @@ void swift::maybeAddAccessorsToStorage(AbstractStorageDecl *storage) {
     return;
 
   // Implicit properties don't get accessors.
-  if (storage->isImplicit())
+  if (storage->isImplicit() &&
+      !(isa<VarDecl>(storage) &&
+        cast<VarDecl>(storage)->getOriginalDelegatedProperty()))
     return;
 
   if (!dc->isTypeContext()) {
