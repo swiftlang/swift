@@ -79,7 +79,7 @@ struct TF_440<T : Differentiable> {
   }
 }
 
-// Tests TF-508 (Hack)
+// Tests TF-508
 protocol TF_508_Protocol {
   associatedtype Scalar: BinaryFloatingPoint
 }
