@@ -65,6 +65,13 @@ option(SWIFT_ENABLE_PARSEABLE_MODULE_INTERFACES
 set(SWIFT_STDLIB_BUILD_TYPE "${CMAKE_BUILD_TYPE}" CACHE STRING
   "Build type for the Swift standard library and SDK overlays.")
 
+set(SWIFT_DARWIN_SUPPORTED_ARCHS "" CACHE STRING
+  "Space-separated list of architectures to configure on Darwin platforms. \
+If left empty all default architectures are configured.")
+
+separate_arguments(SWIFT_DARWIN_SUPPORTED_ARCHS)
+
+
 # -----------------------------------------------------------------------------
 # Constants
 
