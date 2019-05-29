@@ -1244,14 +1244,11 @@ class MissingGenericArgumentsFailure final : public FailureDiagnostic {
 public:
   MissingGenericArgumentsFailure(Expr *root, ConstraintSystem &cs,
                                  TypeRepr *baseType,
-                                 ArrayRef<TypeVariableType *> missingParams,
+                                 ArrayRef<GenericTypeParamType *> missingParams,
                                  ConstraintLocator *locator)
       : FailureDiagnostic(root, cs, locator), BaseType(baseType) {
     assert(!missingParams.empty());
-    llvm::transform(missingParams, std::back_inserter(Parameters),
-                    [](const TypeVariableType *GP) {
-                      return GP->getImpl().getGenericParameter();
-                    });
+    Parameters.append(missingParams.begin(), missingParams.end());
   }
 
   SourceLoc getLoc() const;

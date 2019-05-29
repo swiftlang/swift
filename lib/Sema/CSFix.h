@@ -153,6 +153,11 @@ enum class FixKind : uint8_t {
   /// Remove `return` or default last expression of single expression
   /// function to `Void` to conform to expected result type.
   RemoveReturn,
+
+  /// Generic parameters could not be inferred and have to be explicitly
+  /// specified in the source. This fix groups all of the missing arguments
+  /// associated with single declaration.
+  ExplicitlySpecifyGenericArguments,
 };
 
 class ConstraintFix {
@@ -915,6 +920,53 @@ public:
   static CollectionElementContextualMismatch *
   create(ConstraintSystem &cs, Type srcType, Type dstType,
          ConstraintLocator *locator);
+};
+
+class ExplicitlySpecifyGenericArguments final : public ConstraintFix {
+  using Anchor = llvm::PointerUnion<ConstraintLocator *, TypeRepr *>;
+
+  llvm::SmallDenseMap<Anchor, llvm::SmallVector<GenericTypeParamType *, 4>>
+      Parameters;
+
+  ExplicitlySpecifyGenericArguments(ConstraintSystem &cs,
+                                    ArrayRef<GenericTypeParamType *> params,
+                                    ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::ExplicitlySpecifyGenericArguments, locator) {
+    assert(!params.empty());
+    Parameters[locator].append(params.begin(), params.end());
+  }
+
+  ExplicitlySpecifyGenericArguments(
+      ConstraintSystem &cs,
+      llvm::SmallDenseMap<TypeRepr *,
+                          llvm::SmallVector<GenericTypeParamType *, 4>> &params,
+      ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::ExplicitlySpecifyGenericArguments, locator) {
+    assert(!params.empty());
+    for (const auto &elt : params) {
+      Parameters.insert(elt);
+    }
+  }
+
+public:
+  std::string getName() const override {
+    return "default missing generic argument to `Any`";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static ExplicitlySpecifyGenericArguments *
+  create(ConstraintSystem &cs, ArrayRef<GenericTypeParamType *> params,
+         ConstraintLocator *locator);
+
+private:
+  /// Retrieve representative locations for given generic prameters
+  /// rooted at the given anchor.
+  ///
+  /// \returns true if all of the parameters have been covered.
+  static bool findArgumentLocations(
+      Expr *anchor, ArrayRef<GenericTypeParamType *> genericParams,
+      llvm::function_ref<void(TypeRepr *, GenericTypeParamType *)> callback);
 };
 
 } // end namespace constraints

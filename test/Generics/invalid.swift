@@ -23,7 +23,7 @@ struct Lunch<T> {
   }
 }
 
-class Deli<Spices> {
+class Deli<Spices> { // expected-note {{'Spices' declared as parameter to type 'Deli'}}
 
   class Pepperoni {}
   struct Sausage {}
@@ -79,7 +79,8 @@ func badDiagnostic2() {
 func takesAny(_ a: Any) {}
 
 func badDiagnostic3() {
-  takesAny(Deli.self) // expected-error {{argument type 'Deli<_>.Type' does not conform to expected type 'Any'}}
+  takesAny(Deli.self) // expected-error {{generic parameter 'Spices' could not be inferred}}
+  // expected-note@-1 {{explicitly specify the generic arguments to fix this issue}} {{16-16=<Any>}}
 }
 
 // Crash with missing nested type inside concrete type

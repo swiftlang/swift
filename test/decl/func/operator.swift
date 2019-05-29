@@ -390,7 +390,8 @@ func testPostfixOperatorOnTuple<A, B>(a: A, b: B) {
   _ = (§)foo
   // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
   // expected-error@-2 {{generic parameter 'T' could not be inferred}}
-  // expected-warning@-3 {{expression of type '(A, (B, B), A)' is unused}}
+  // expected-error@-3 {{generic parameter 'U' could not be inferred}}
+  // expected-warning@-4 {{expression of type '(A, (B, B), A)' is unused}}
   _ = (§)(foo)
   _ = (a, (b, b), a)§
   _ = (§)(a, (b, b), a) // expected-error {{operator function '§' expects a single parameter of type '(T, (U, U), T)'}}
