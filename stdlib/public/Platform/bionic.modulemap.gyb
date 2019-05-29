@@ -27,6 +27,7 @@ module SwiftGlibc [system] {
 
   // C standard library
   module C {
+    module features {
       header "${GLIBC_INCLUDE_PATH}/features.h"
       export *
     }
