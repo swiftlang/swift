@@ -1836,10 +1836,12 @@ function(add_swift_target_library name)
       list(APPEND swiftlib_link_flags_all "-Wl,-z,defs")
     endif()
 
-    # For each architecture supported by this SDK
     set(sdk_supported_archs
       ${SWIFT_SDK_${sdk}_ARCHITECTURES}
       ${SWIFT_SDK_${sdk}_MODULE_ARCHITECTURES})
+    list(REMOVE_DUPLICATES sdk_supported_archs)
+
+    # For each architecture supported by this SDK
     foreach(arch ${sdk_supported_archs})
       # Configure variables for this subdirectory.
       set(VARIANT_SUFFIX "-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
