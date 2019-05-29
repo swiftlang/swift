@@ -1237,17 +1237,16 @@ ConstraintSystem::getTypeOfMemberReference(
   // Figure out the instance type used for the base.
   Type baseObjTy = getFixedTypeRecursive(baseTy, /*wantRValue=*/true);
 
-  bool isInstance = true;
-  if (auto baseMeta = baseObjTy->getAs<AnyMetatypeType>()) {
-    baseObjTy = baseMeta->getInstanceType();
-    isInstance = false;
-  }
-
   // If the base is a module type, just use the type of the decl.
   if (baseObjTy->is<ModuleType>()) {
     return getTypeOfReference(value, functionRefKind, locator, useDC);
   }
 
+  // Check to see if the self parameter is applied, in which case we'll want to
+  // strip it off later.
+  auto hasAppliedSelf = doesDeclRefApplyCurriedSelf(baseObjTy, value);
+
+  baseObjTy = baseObjTy->getMetatypeInstanceType();
   FunctionType::Param baseObjParam(baseObjTy);
 
   if (auto *typeDecl = dyn_cast<TypeDecl>(value)) {
@@ -1273,10 +1272,9 @@ ConstraintSystem::getTypeOfMemberReference(
   Type openedType;
   OpenedTypeMap localReplacements;
   auto &replacements = replacementsPtr ? *replacementsPtr : localReplacements;
-  bool isCurriedInstanceReference = value->isInstanceMember() && !isInstance;
-  unsigned numRemovedArgumentLabels =
-    getNumRemovedArgumentLabels(TC, value, isCurriedInstanceReference,
-                                functionRefKind);
+  unsigned numRemovedArgumentLabels = getNumRemovedArgumentLabels(
+      TC, value, /*isCurriedInstanceReference*/ !hasAppliedSelf,
+      functionRefKind);
 
   AnyFunctionType *funcType;
 
@@ -1315,10 +1313,11 @@ ConstraintSystem::getTypeOfMemberReference(
 
     auto selfTy = outerDC->getSelfInterfaceType();
 
-    // If self is a value type and the base type is an lvalue, wrap it in an
+    // If this is a reference to an instance member that applies self,
+    // where self is a value type and the base type is an lvalue, wrap it in an
     // inout type.
     auto selfFlags = ParameterTypeFlags();
-    if (isInstance &&
+    if (value->isInstanceMember() && hasAppliedSelf &&
         !outerDC->getDeclaredInterfaceType()->hasReferenceSemantics() &&
         baseTy->is<LValueType>() &&
         !selfTy->hasError())
@@ -1397,7 +1396,7 @@ ConstraintSystem::getTypeOfMemberReference(
 
   // Compute the type of the reference.
   Type type;
-  if (!value->isInstanceMember() || isInstance) {
+  if (hasAppliedSelf) {
     // For a static member referenced through a metatype or an instance
     // member referenced through an instance, strip off the 'self'.
     type = openedFnType->getResult();

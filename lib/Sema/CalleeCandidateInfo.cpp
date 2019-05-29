@@ -273,9 +273,8 @@ CalleeCandidateInfo::ClosenessResultTy CalleeCandidateInfo::evaluateCloseness(
     return {CC_GeneralMismatch, {}};
 
   auto candArgs = candidate.getParameters();
-  SmallBitVector candDefaultMap =
-    computeDefaultMap(candArgs, candidate.getDecl(), candidate.skipCurriedSelf);
-  
+  auto candDefaultMap = candidate.getDefaultMap(candArgs);
+
   struct OurListener : public MatchCallArgumentListener {
     CandidateCloseness result = CC_ExactMatch;
   public:

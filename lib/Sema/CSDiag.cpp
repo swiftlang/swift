@@ -2668,10 +2668,8 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
     // If we have a candidate function around, compute the position of its
     // default arguments.
     SmallBitVector defaultMap(params.size());
-    if (!candidates.empty()) {
-      defaultMap = computeDefaultMap(params, candidates[0].getDecl(),
-                                     candidates[0].skipCurriedSelf);
-    }
+    if (!candidates.empty())
+      defaultMap = candidates[0].getDefaultMap(params);
 
     // Form a set of call arguments, using a dummy type (Void), because the
     // argument/parameter matching code doesn't need it.
@@ -3554,9 +3552,7 @@ diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI, Expr *fnExpr,
     return false;
 
   auto params = candidate.getParameters();
-
-  SmallBitVector defaultMap =
-    computeDefaultMap(params, candidate.getDecl(), candidate.skipCurriedSelf);
+  auto defaultMap = candidate.getDefaultMap(params);
   auto args = decomposeArgType(CCI.CS.getType(argExpr), argLabels);
 
   // Check the case where a raw-representable type is constructed from an
@@ -4203,8 +4199,7 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
     return false;
 
   auto params = candidate.getParameters();
-  SmallBitVector defaultMap =
-    computeDefaultMap(params, candidate.getDecl(), candidate.skipCurriedSelf);
+  auto defaultMap = candidate.getDefaultMap(params);
   auto args = decomposeArgType(CS.getType(argExpr), argLabels);
 
   SmallVector<ParamBinding, 4> bindings;
@@ -4677,7 +4672,7 @@ static bool isViableOverloadSet(const CalleeCandidateInfo &CCI,
       return true;
     };
 
-    auto defaultMap = computeDefaultMap(params, funcDecl, cand.skipCurriedSelf);
+    auto defaultMap = cand.getDefaultMap(params);
     InputMatcher IM(params, defaultMap);
     auto result = IM.match(numArgs, pairMatcher);
     if (result == InputMatcher::IM_Succeeded)

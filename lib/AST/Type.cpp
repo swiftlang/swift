@@ -740,20 +740,19 @@ swift::computeDefaultMap(ArrayRef<AnyFunctionType::Param> params,
   if (!paramOwner)
     return resultVector;
 
+  // If the decl has a curried self, but we're not allowed to skip it, return
+  // the zeroed default map.
+  if (paramOwner->hasCurriedSelf() && !skipCurriedSelf)
+    return resultVector;
+
   // Find the corresponding parameter list.
   const ParameterList *paramList = nullptr;
   if (auto *func = dyn_cast<AbstractFunctionDecl>(paramOwner)) {
-    if (func->hasImplicitSelfDecl()) {
-      if (skipCurriedSelf)
-        paramList = func->getParameters();
-    } else if (!skipCurriedSelf)
-      paramList = func->getParameters();
+    paramList = func->getParameters();
   } else if (auto *subscript = dyn_cast<SubscriptDecl>(paramOwner)) {
-    if (skipCurriedSelf)
-      paramList = subscript->getIndices();
+    paramList = subscript->getIndices();
   } else if (auto *enumElement = dyn_cast<EnumElementDecl>(paramOwner)) {
-    if (skipCurriedSelf)
-      paramList = enumElement->getParameterList();
+    paramList = enumElement->getParameterList();
   }
 
   // No parameter list means no default arguments - hand back the zeroed

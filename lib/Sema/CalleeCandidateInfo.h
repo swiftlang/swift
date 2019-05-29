@@ -116,6 +116,19 @@ namespace swift {
       assert(hasParameters());
       return getFunctionType()->getParams();
     }
+
+    SmallBitVector getDefaultMap(ArrayRef<AnyFunctionType::Param> params) const {
+      auto *decl = getDecl();
+
+      // FIXME: Subscript interface types don't have curried self parameters,
+      // however CalleeCandidateInfo curries them with self. Therefore if we're
+      // not supposed to skip the curried self parameter of a subscript,
+      // return the zero default map.
+      if (decl && isa<SubscriptDecl>(decl) && !skipCurriedSelf)
+        return SmallBitVector(params.size());
+
+      return computeDefaultMap(params, decl, skipCurriedSelf);
+    }
     
     /// Given a function candidate with an uncurry level, return the parameter
     /// type at the specified uncurry level.  If there is an error getting to

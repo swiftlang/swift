@@ -682,7 +682,7 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
         };
 
         auto defaultMap = computeDefaultMap(
-            params2, decl2, decl2->getDeclContext()->isTypeContext());
+            params2, decl2, decl2->hasCurriedSelf());
         auto params2ForMatching = params2;
         if (compareTrailingClosureParamsSeparately) {
           --numParams1;
