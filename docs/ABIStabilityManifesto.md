@@ -337,6 +337,22 @@ Having the call context register be callee-saved is advantageous. It keeps the r
 
 Throwing functions communicate error values to their callers through the *error* register on some platforms. The error register holds a pointer to the error value if an error occurred, otherwise 0. The caller of a throwing function is expected to quickly check for 0 before continuing on with non-error code, otherwise branching to code to handle or propagate the error. Using a callee-saved register for the error register enables free conversion from non-throwing to throwing functions, which is required to honor the subtyping relationship.
 
+### Register Allocations
+
+From Swift 5, the register allocation for 64 architectures is as follows:
+
+| Register Purpose | ARM64 | x86_64 |
+| ------------- |:-------------:| ----- |
+| Context register (self) | x20 | r13 |
+| Error return register | x21 | r12 |
+| Struct return pointer | x8 | rax |
+| Float call arguments | d0 - d7 | xmm0 - xmm7 |
+| Integer call arguments | x0 - x7 | rdi, rsi, rdx, rcx, r8, r9 |
+| Float return | d0, d1 | xmm0, xmm1 |
+| Integer return | x1, x2 | rax, rbx |
+
+For more detail consult the specifications linked at the end of this document.
+
 ### <a name="function-signature-lowering"></a>Function Signature Lowering
 
 Function signature lowering is the mapping of a function's source-language type, which includes formal parameters and results, all the way down to a physical convention, which dictates what values are stored in what registers and what values to pass on the stack.
