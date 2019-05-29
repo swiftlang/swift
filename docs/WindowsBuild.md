@@ -158,10 +158,10 @@ cmake -G Ninja^
  -DLLVM_DIR=S:\b\llvm\lib\cmake\llvm^
  -DClang_DIR=S:\b\llvm\lib\cmake\clang^
  -DSWIFT_PATH_TO_LIBDISPATCH_SOURCE="S:\swift-corelibs-libdispatch"^
- -DSWIFT_WINDOWS_x86_64_ICU_UC_INCLUDE="S:/thirdparty/icu4c-63_1-Win64-MSVC2017/include"^
- -DSWIFT_WINDOWS_x86_64_ICU_UC="S:/thirdparty/icu4c-63_1-Win64-MSVC2017/lib64/icuuc.lib"^
- -DSWIFT_WINDOWS_x86_64_ICU_I18N_INCLUDE="S:/thirdparty/icu4c-63_1-Win64-MSVC2017/include"^
- -DSWIFT_WINDOWS_x86_64_ICU_I18N="S:/thirdparty/icu4c-63_1-Win64-MSVC2017/lib64/icuin.lib"^
+ -DSWIFT_WINDOWS_x86_64_ICU_UC_INCLUDE="S:/thirdparty/icu4c-64_2-Win64-MSVC2017/include"^
+ -DSWIFT_WINDOWS_x86_64_ICU_UC="S:/thirdparty/icu4c-64_2-Win64-MSVC2017/lib64/icuuc.lib"^
+ -DSWIFT_WINDOWS_x86_64_ICU_I18N_INCLUDE="S:/thirdparty/icu4c-64_2-Win64-MSVC2017/include"^
+ -DSWIFT_WINDOWS_x86_64_ICU_I18N="S:/thirdparty/icu4c-64_2-Win64-MSVC2017/lib64/icuin.lib"^
  -DCMAKE_INSTALL_PREFIX="C:\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr"^
  -DPYTHON_EXECUTABLE=C:\Python27\python.exe^
  S:\swift
@@ -258,7 +258,7 @@ cmake -G Ninja^
   -DCURL_LIBRARY="S:/curl/builds/libcurl-vc15-x64-release-static-ipv6-sspi-winssl/lib/libcurl_a.lib"^
   -DCURL_INCLUDE_DIR="S:/curl/builds/libcurl-vc15-x64-release-static-ipv6-sspi-winssl/include"^
   -DENABLE_TESTING=NO^
-  -DICU_ROOT="S:/thirdparty/icu4c-63_1-Win64-MSVC2017"^
+  -DICU_ROOT="S:/thirdparty/icu4c-64_2-Win64-MSVC2017"^
   -DLIBXML2_LIBRARY="S:/libxml2/win32/bin.msvc/libxml2_a.lib"^
   -DLIBXML2_INCLUDE_DIR="S:/libxml2/include"^
   -DFOUNDATION_PATH_TO_LIBDISPATCH_SOURCE=S:\swift-corelibs-libdispatch^
@@ -312,7 +312,7 @@ cmake -G Ninja^
   -DCURL_LIBRARY="S:/curl/builds/libcurl-vc15-x64-release-static-ipv6-sspi-winssl/lib/libcurl_a.lib"^
   -DCURL_INCLUDE_DIR="S:/curl/builds/libcurl-vc15-x64-release-static-ipv6-sspi-winssl/include"^
   -DENABLE_TESTING=YES^
-  -DICU_ROOT="S:/thirdparty/icu4c-63_1-Win64-MSVC2017"^
+  -DICU_ROOT="S:/thirdparty/icu4c-64_2-Win64-MSVC2017"^
   -DLIBXML2_LIBRARY="S:/libxml2/win32/bin.msvc/libxml2_a.lib"^
   -DLIBXML2_INCLUDE_DIR="S:/libxml2/include"^
   -DFOUNDATION_PATH_TO_LIBDISPATCH_SOURCE=S:\swift-corelibs-libdispatch^
