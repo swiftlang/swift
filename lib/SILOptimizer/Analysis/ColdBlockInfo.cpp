@@ -81,7 +81,7 @@ ColdBlockInfo::BranchHint ColdBlockInfo::getBranchHint(SILValue Cond,
   if (!AI)
     return BranchHint::None;
 
-  if (auto *F = AI->getReferencedFunction()) {
+  if (auto *F = AI->getReferencedFunctionOrNull()) {
     if (F->hasSemanticsAttrs()) {
       if (F->hasSemanticsAttr("branchhint")) {
         // A "branchint" model takes a Bool expected value as the second

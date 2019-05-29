@@ -89,7 +89,7 @@ bool Devirtualizer::devirtualizeAppliesInFunction(SILFunction &F,
   while (!NewApplies.empty()) {
     auto Apply = NewApplies.pop_back_val();
 
-    auto *CalleeFn = Apply.getReferencedFunction();
+    auto *CalleeFn = Apply.getInitiallyReferencedFunction();
     assert(CalleeFn && "Expected devirtualized callee!");
 
     // We need to ensure that we link after devirtualizing in order to pull in
