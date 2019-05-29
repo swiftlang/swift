@@ -26,6 +26,7 @@ add_custom_target("copy_apinotes" ALL
     COMMENT "Copying API notes to ${output_dir}"
     SOURCES "${sources}")
 
+add_dependencies(compiler copy_apinotes)
 swift_install_in_component(DIRECTORY "${output_dir}"
                            DESTINATION "lib/swift/"
                            COMPONENT compiler)
