@@ -135,6 +135,7 @@ KEY_BOOL(HasDidset, hasDidset)
 KEY_BOOL(HasWillset, hasWillset)
 KEY_BOOL(ReqNewWitnessTableEntry, reqNewWitnessTableEntry)
 KEY_BOOL(IsABIPlaceholder, isABIPlaceholder)
+KEY_BOOL(IsExternal, isExternal)
 
 KEY(kind)
 
@@ -148,6 +149,11 @@ KEY_STRING(EnumRawTypeName, enumRawTypeName)
 KEY_STRING(GenericSig, genericSig)
 KEY_STRING(FuncSelfKind, funcSelfKind)
 KEY_STRING(ParamValueOwnership, paramValueOwnership)
+KEY_STRING(IntromacOS, intro_Macosx)
+KEY_STRING(IntroiOS, intro_iOS)
+KEY_STRING(IntrotvOS, intro_tvOS)
+KEY_STRING(IntrowatchOS, intro_watchOS)
+KEY_STRING(Introswift, intro_swift)
 
 KEY_STRING_ARR(SuperclassNames, superclassNames)
 

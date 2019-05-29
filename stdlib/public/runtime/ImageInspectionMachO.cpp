@@ -41,6 +41,7 @@ constexpr const char TypeMetadataRecordSection[] = "__swift5_types";
 /// The Mach-O section name for the section containing dynamic replacements.
 /// This lives within SEG_TEXT.
 constexpr const char DynamicReplacementSection[] = "__swift5_replace";
+constexpr const char DynamicReplacementSomeSection[] = "__swift5_replac2";
 
 constexpr const char TextSegment[] = SEG_TEXT;
 
@@ -72,6 +73,36 @@ void addImageCallback(const mach_header *mh, intptr_t vmaddr_slide) {
   CONSUME_BLOCK(section, size);
 }
 
+template <const char *SEGMENT_NAME, const char *SECTION_NAME,
+          const char *SEGMENT_NAME2, const char *SECTION_NAME2,
+          void CONSUME_BLOCK(const void *start, uintptr_t size,
+                             const void *start2, uintptr_t size2)>
+void addImageCallback2Sections(const mach_header *mh, intptr_t vmaddr_slide) {
+#if __POINTER_WIDTH__ == 64
+  assert(mh->magic == MH_MAGIC_64 && "loaded non-64-bit image?!");
+#endif
+
+  // Look for a section.
+  unsigned long size;
+  const uint8_t *section =
+  getsectiondata(reinterpret_cast<const mach_header_platform *>(mh),
+                 SEGMENT_NAME, SECTION_NAME,
+                 &size);
+
+  if (!section)
+    return;
+
+  // Look for another section.
+  unsigned long size2;
+  const uint8_t *section2 =
+  getsectiondata(reinterpret_cast<const mach_header_platform *>(mh),
+                 SEGMENT_NAME2, SECTION_NAME2,
+                 &size2);
+  if (!section2)
+    size2 = 0;
+
+  CONSUME_BLOCK(section, size, section2, size2);
+}
 } // end anonymous namespace
 
 void swift::initializeProtocolLookup() {
@@ -93,8 +124,9 @@ void swift::initializeTypeMetadataRecordLookup() {
 
 void swift::initializeDynamicReplacementLookup() {
   _dyld_register_func_for_add_image(
-      addImageCallback<TextSegment, DynamicReplacementSection,
-                       addImageDynamicReplacementBlockCallback>);
+      addImageCallback2Sections<TextSegment, DynamicReplacementSection,
+                                TextSegment, DynamicReplacementSomeSection,
+                                addImageDynamicReplacementBlockCallback>);
 }
 
 int swift::lookupSymbol(const void *address, SymbolInfo *info) {

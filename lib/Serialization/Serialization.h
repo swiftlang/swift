@@ -66,6 +66,10 @@ public:
 };
 
 class Serializer : public SerializerBase {
+  class DeclSerializer;
+  friend class DeclSerializer;
+  class TypeSerializer;
+  friend class TypeSerializer;
 public:
   /// Stores a declaration or a type to be written to the AST file.
   ///
@@ -337,18 +341,6 @@ private:
   /// modules and its source files.
   void writeInputBlock(const SerializationOptions &options);
 
-  void writeParameterList(const ParameterList *PL);
-
-  /// Writes the given pattern, recursively.
-  void writePattern(const Pattern *pattern, DeclContext *owningDC);
-
-  /// Writes a generic parameter list, if non-null.
-  void writeGenericParams(const GenericParamList *genericParams);
-
-  /// Writes the body text of the provided funciton, if the function is
-  /// inlinable and has body text.
-  void writeInlinableBodyTextIfNeeded(const AbstractFunctionDecl *decl);
-
   /// Writes a list of protocol conformances.
   void writeConformances(ArrayRef<ProtocolConformanceRef> conformances,
                          const std::array<unsigned, 256> &abbrCodes);
@@ -356,20 +348,6 @@ private:
   /// Writes a list of protocol conformances.
   void writeConformances(ArrayRef<ProtocolConformance*> conformances,
                          const std::array<unsigned, 256> &abbrCodes);
-
-  /// Writes an array of members for a decl context.
-  ///
-  /// \param parentID The DeclID of the context.
-  /// \param members The decls within the context.
-  /// \param isClass True if the context could be a class context (class,
-  ///        class extension, or protocol).
-  void writeMembers(DeclID parentID, DeclRange members, bool isClass);
-
-  /// Write a default witness table for a protocol.
-  ///
-  /// \param proto The protocol.
-  void writeDefaultWitnessTable(const ProtocolDecl *proto,
-                                const std::array<unsigned, 256> &abbrCodes);
 
   /// Check if a decl is cross-referenced.
   bool isDeclXRef(const Decl *D) const;
@@ -379,12 +357,6 @@ private:
 
   /// Writes a reference to a decl in another module.
   void writeCrossReference(const Decl *D);
-
-  /// Writes out a declaration attribute.
-  void writeDeclAttribute(const DeclAttribute *DA);
-
-  /// Writes out a foreign error convention.
-  void writeForeignErrorConvention(const ForeignErrorConvention &fec);
 
   /// Writes the given decl.
   void writeDecl(const Decl *D);
