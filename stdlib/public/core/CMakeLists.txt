@@ -62,6 +62,7 @@ set(SWIFTLIB_ESSENTIAL
   Equatable.swift
   ErrorType.swift
   Filter.swift
+  FixedArray.swift
   FlatMap.swift
   Flatten.swift
   FloatingPoint.swift
@@ -185,7 +186,6 @@ set(SWIFTLIB_ESSENTIAL
 set(SWIFTLIB_ESSENTIAL_GYB_SOURCES
   AtomicInt.swift.gyb
   Codable.swift.gyb
-  FixedArray.swift.gyb
   FloatingPointParsing.swift.gyb
   FloatingPointTypes.swift.gyb
   IntegerTypes.swift.gyb
