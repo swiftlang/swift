@@ -2,6 +2,10 @@ protocol Q {
   associatedtype T
 }
 
+struct AlsoConforms<T> : Q {}
+
+func takesQ<T : Q>(_: T) {}
+
 protocol P : Q {
   associatedtype U
 }
