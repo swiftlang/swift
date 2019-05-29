@@ -142,17 +142,12 @@ struct HasDefaultInit {
 
 struct DelegateWithAccessors {
   @Wrapper
-  var x: Int {
-    // CHECK-LABEL: sil hidden [ossa] @$s18property_delegates21DelegateWithAccessorsV1xSivg
-    // CHECK-NOT: return
-    // CHECK: integer_literal $Builtin.IntLiteral, 42
-    return 42
+  var x: Int
 
-    // Synthesized setter
-    // CHECK-LABEL: sil hidden [transparent] [ossa] @$s18property_delegates21DelegateWithAccessorsV1xSivs : $@convention(method) (Int, @inout DelegateWithAccessors) -> ()
-    // CHECK-NOT: return
-    // CHECK: struct_element_addr {{%.*}} : $*DelegateWithAccessors, #DelegateWithAccessors.$x
-  }
+  // Synthesized setter
+  // CHECK-LABEL: sil hidden [transparent] [ossa] @$s18property_delegates21DelegateWithAccessorsV1xSivs : $@convention(method) (Int, @inout DelegateWithAccessors) -> ()
+  // CHECK-NOT: return
+  // CHECK: struct_element_addr {{%.*}} : $*DelegateWithAccessors, #DelegateWithAccessors.$x
 
   mutating func test() {
     x = 17

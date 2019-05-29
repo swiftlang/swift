@@ -322,25 +322,9 @@ func testBackingStore<T>(bs: BackingStore<T>) {
 // Explicitly-specified accessors
 // ---------------------------------------------------------------------------
 struct DelegateWithAccessors {
-  @Wrapper
+  @Wrapper  // expected-error{{property delegate cannot be applied to a computed property}}
   var x: Int {
-    return $x.value * 2
-  }
-
-  @WrapperWithInitialValue
-  var y: Int {
-    get {
-      return $y.value
-    }
-
-    set {
-      $y.value = newValue / 2
-    }
-  }
-
-  mutating func test() {
-    x = y
-    y = x
+    return 17
   }
 }
 
@@ -520,24 +504,13 @@ class Box<Value> {
 struct UseBox {
   @Box
   var x = 17
-
-  @Box
-  var y: Int {
-    get { return $y.value }
-    set { }
-  }
 }
 
 func testBox(ub: UseBox) {
   _ = ub.x
   ub.x = 5 // expected-error{{cannot assign to property: 'x' is a get-only property}}
 
-  _ = ub.y
-  ub.y = 20 // expected-error{{cannot assign to property: 'ub' is a 'let' constant}}
-
   var mutableUB = ub
-  _ = mutableUB.y
-  mutableUB.y = 20
   mutableUB = ub
 }
 
