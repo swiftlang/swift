@@ -169,6 +169,13 @@ class Superclass {
   var x: Int = 0
 }
 
+class SubclassOfClassWithDelegates: ClassWithDelegates {
+  override var x: Int {
+    get { return $x.value }
+    set { $x.value = newValue }
+  }
+}
+
 class SubclassWithDelegate: Superclass {
   @Wrapper(value: 17)
   override var x: Int { get { return 0 } set { } } // expected-error{{property 'x' with attached delegate cannot override another property}}
@@ -593,7 +600,7 @@ struct NoDefaultInitializerStruct { // expected-note{{'init(x:)' declared here}}
 
 class DefaultInitializerClass {
   @Wrapper(value: true)
-  final var x
+  var x
 
   @WrapperWithInitialValue
   final var y: Int = 10
