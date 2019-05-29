@@ -159,6 +159,13 @@ macro(configure_sdk_darwin
     "${architectures}"                        # rhs
     SWIFT_SDK_${prefix}_MODULE_ARCHITECTURES) # result
 
+  # Ensure the architectures and module-only architectures lists are mutually
+  # exclusive.
+  list_subtract(
+    "${SWIFT_SDK_${prefix}_MODULE_ARCHITECTURES}" # lhs
+    "${SWIFT_SDK_${prefix}_ARCHITECTURES}"        # rhs
+    SWIFT_SDK_${prefix}_MODULE_ARCHITECTURES)     # result
+
   # Configure variables for _all_ architectures even if we aren't "building"
   # them because they aren't supported.
   foreach(arch ${architectures})
