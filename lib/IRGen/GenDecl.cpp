@@ -1612,12 +1612,12 @@ getIRLinkage(const UniversalLinkageInfo &info, SILLinkage linkage,
             llvm::GlobalValue::VISIBILITY##Visibility,                         \
             llvm::GlobalValue::DLL_STORAGE##StorageClass}
 
+  bool useDLLStorage = info.UseDLLStorage && !isStaticLibrary;
+
   // Use protected visibility for public symbols we define on ELF.  ld.so
   // doesn't support relative relocations at load time, which interferes with
   // our metadata formats.  Default visibility should suffice for other object
   // formats.
-  bool useDLLStorage = info.UseDLLStorage && !isStaticLibrary;
-
   llvm::GlobalValue::VisibilityTypes PublicDefinitionVisibility =
       info.IsELFObject ? llvm::GlobalValue::ProtectedVisibility
                        : llvm::GlobalValue::DefaultVisibility;
