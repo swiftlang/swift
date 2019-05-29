@@ -1869,8 +1869,7 @@ namespace {
                            TypeResolutionOptions options);
     // SWIFT_ENABLE_TENSORFLOW
     Type resolveSILDifferentiableFunctionType(
-        SILDifferentiableFunctionTypeRepr *repr, TypeResolutionOptions options,
-        DifferentiabilityRepresentationKind reprKind, unsigned maxOrder);
+        SILDifferentiableFunctionTypeRepr *repr, TypeResolutionOptions options);
 
     Type buildMetatypeType(MetatypeTypeRepr *repr,
                            Type instanceType,
@@ -1964,8 +1963,8 @@ Type TypeResolver::resolveType(TypeRepr *repr, TypeResolutionOptions options) {
 
   // SWIFT_ENABLE_TENSORFLOW
   case TypeReprKind::SILDifferentiableFunction:
-    llvm_unreachable("SILDifferentiableFunction is always attributed with "
-                     "'@sil_differentiable'");
+    return resolveSILDifferentiableFunctionType(
+        cast<SILDifferentiableFunctionTypeRepr>(repr), options);
 
   case TypeReprKind::Array:
     return resolveArrayType(cast<ArrayTypeRepr>(repr), options);
@@ -2153,25 +2152,9 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
                              TAK_callee_guaranteed,
                              TAK_noescape,
                              TAK_yield_once,
-                             TAK_yield_many,
-                             // SWIFT_ENABLE_TENSORFLOW
-                             TAK_sil_differentiable}) {
+                             TAK_yield_many}) {
       checkUnsupportedAttr(silOnlyAttr);
     }
-  }
-
-  // SWIFT_ENABLE_TENSORFLOW
-  if (attrs.has(TAK_sil_differentiable)) {
-    auto *diffFnTy = dyn_cast<SILDifferentiableFunctionTypeRepr>(repr);
-    if (!diffFnTy) {
-      diagnose(attrs.getLoc(TAK_sil_differentiable),
-               diag::sil_differentiable_attr_not_applicable);
-      return Type();
-    }
-    auto reprKindAndOrder =
-        attrs.getDifferentiabilityRepresentationKindAndOrder();
-    return resolveSILDifferentiableFunctionType(
-        diffFnTy, options, reprKindAndOrder.first, reprKindAndOrder.second);
   }
 
   // Other function representation attributes are not normally supported at
@@ -2744,8 +2727,7 @@ Type TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
 }
 
 Type TypeResolver::resolveSILDifferentiableFunctionType(
-    SILDifferentiableFunctionTypeRepr *repr, TypeResolutionOptions options,
-    DifferentiabilityRepresentationKind reprKind, unsigned maxOrder) {
+    SILDifferentiableFunctionTypeRepr *repr, TypeResolutionOptions options) {
   // Resolve generic params using the function's generic environment, if it
   // has one.
   Optional<TypeResolution> resolveSILFunctionGenericParams;
@@ -2793,7 +2775,7 @@ Type TypeResolver::resolveSILDifferentiableFunctionType(
           return nullptr;
       };
 
-  switch (reprKind) {
+  switch (repr->getRepresentationKind()) {
   case DifferentiabilityRepresentationKind::Normal: {
     auto *differentialTypeRepr =
         checkAndDiagnoseInvalidField(repr->getDifferential(), "differential:");
@@ -2839,7 +2821,8 @@ Type TypeResolver::resolveSILDifferentiableFunctionType(
     }
 
     return SILDifferentiableFunctionType::get(
-        Context, maxOrder, DifferentiabilityRepresentationKind::Normal,
+        Context, repr->getMaxOrder(),
+        DifferentiabilityRepresentationKind::Normal,
         genericSig, parameterIndices, resultIndices,
         originalSILFnType->getWithoutDifferentiability(),
         CanSILFunctionType(differentialSILFnType),

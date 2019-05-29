@@ -1389,13 +1389,15 @@ bool SILParser::parseSILType(SILType &Result,
     ->walk(HandleSILGenericParamsWalker(P.Context, &P.SF));
   
   // Save the top-level function generic environment if there was one.
-  if (auto fnType = dyn_cast<FunctionTypeRepr>(TyR.get()))
+  if (auto fnType = dyn_cast<FunctionTypeRepr>(TyR.get())) {
     if (auto env = fnType->getGenericEnvironment())
       ParsedGenericEnv = env;
+  }
   // SWIFT_ENABLE_TENSORFLOW
-  if (auto diffFnType = dyn_cast<SILDifferentiableFunctionTypeRepr>(TyR.get()))
+  else if (auto diffFnType = dyn_cast<SILDifferentiableFunctionTypeRepr>(TyR.get())) {
     if (auto env = diffFnType->getGenericEnvironment())
       ParsedGenericEnv = env;
+  }
 
   // Apply attributes to the type.
   TypeLoc Ty = P.applyAttributeToType(TyR.get(), attrs, specifier, specifierLoc);
@@ -2891,6 +2893,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     unsigned order = 1;
     bool useNewSILDiffFuncType = false;
     SILType type;
+    SmallVector<SILValue, 16> associatedFunctions;
     // Parse optional `[sil_differentiable]`.
     if (P.Tok.is(tok::l_square) &&
         P.peekToken().is(tok::identifier) &&
@@ -2951,10 +2954,8 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
                  diag::sil_inst_autodiff_expected_function_type_operand);
       return true;
     }
-    SmallVector<SILValue, 16> associatedFunctions;
     // Parse optional destination type `as <type>`.
-    if (P.Tok.is(tok::identifier) && P.Tok.getText() == "as") {
-      P.consumeToken(tok::identifier);
+    if (P.consumeIf(tok::kw_as)) {
       if (parseSILType(type))
         return true;
     }

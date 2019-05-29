@@ -1167,6 +1167,7 @@ public:
     }
     *this << "[order " << adfi->getDifferentiationOrder() << "] ";
     *this << getIDAndType(adfi->getOriginalFunction());
+    *this << " as " << adfi->getType() << ' ';
     if (!adfi->getAssociatedFunctions().empty()) {
       *this << " with ";
       interleave(range(1, adfi->getDifferentiationOrder() + 1),

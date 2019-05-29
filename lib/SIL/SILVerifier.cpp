@@ -1478,13 +1478,12 @@ public:
     // Special case for the future 'sil_differentiable' mode. When full
     // migration is done, the default mode will be this mode.
     if (adfi->usesNewSILDiffFuncType()) {
-      auto destTy = adfi->getOriginalFunction()->getType()
-          .getAs<SILDifferentiableFunctionType>();
+      auto destTy = adfi->getType().getAs<SILDifferentiableFunctionType>();
       require(destTy,
-              "The original function must have a '@sil_differentiable' type");
+              "The destination type must be a 'sil_differentiable' type");
       require(destTy->getParameterIndices() == adfi->getParameterIndices(),
               "Parameter indices must be equal");
-      require(destTy->getMaxOrder() == adfi->getDifferentiationOrder(),
+      require(destTy->getMaxOrder() == (int)adfi->getDifferentiationOrder(),
               "Differentiation order must be equal");
       // TODO(rxwei): Add more checks.
       return;

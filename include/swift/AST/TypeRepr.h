@@ -1175,6 +1175,8 @@ inline bool TypeRepr::isSimple() const {
 // SWIFT_ENABLE_TENSORFLOW
 class SILDifferentiableFunctionTypeRepr final : public TypeRepr {
   GenericParamList *GenericParams;
+  DifferentiabilityRepresentationKind reprKind;
+  int maxOrder;
   GenericEnvironment *GenericEnv = nullptr;
   TypeRepr *Original;
   TypeRepr *Differential;
@@ -1184,13 +1186,14 @@ class SILDifferentiableFunctionTypeRepr final : public TypeRepr {
 
 public:
   SILDifferentiableFunctionTypeRepr(
-      GenericParamList *genericParams, TypeRepr *original,
-      TypeRepr *differential, TypeRepr *pullback, TypeRepr *transpose,
-      SourceRange braces)
+      GenericParamList *genericParams,
+      DifferentiabilityRepresentationKind reprKind, int maxOrder,
+      TypeRepr *original, TypeRepr *differential, TypeRepr *pullback,
+      TypeRepr *transpose, SourceRange braces)
       : TypeRepr(TypeReprKind::SILDifferentiableFunction),
-        GenericParams(genericParams), Original(original),
-        Differential(differential), Pullback(pullback), Transpose(transpose),
-        Braces(braces) {}
+        GenericParams(genericParams), reprKind(reprKind), maxOrder(maxOrder),
+        Original(original), Differential(differential), Pullback(pullback),
+        Transpose(transpose), Braces(braces) {}
 
   GenericParamList *getGenericParams() const { return GenericParams; };
   GenericEnvironment *getGenericEnvironment() const { return GenericEnv; };
@@ -1198,6 +1201,10 @@ public:
     assert(GenericEnv == nullptr);
     GenericEnv = env;
   }
+  DifferentiabilityRepresentationKind getRepresentationKind() const {
+    return reprKind;
+  }
+  int getMaxOrder() const { return maxOrder; }
   TypeRepr *getOriginal() const { return Original; }
   TypeRepr *getDifferential() const { return Differential; }
   TypeRepr *getPullback() const { return Pullback; }

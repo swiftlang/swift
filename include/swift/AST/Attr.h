@@ -68,10 +68,6 @@ public:
   Optional<StringRef> convention = None;
   Optional<StringRef> conventionWitnessMethodProtocol = None;
 
-  // SWIFT_ENABLE_TENSORFLOW
-  Optional<std::pair<DifferentiabilityRepresentationKind, unsigned>>
-      differentiabilityReprKindAndOrder = None;
-
   // For an opened existential type, the known ID.
   Optional<UUID> OpenedID;
   
@@ -129,15 +125,6 @@ public:
   
   bool hasConvention() const { return convention.hasValue(); }
   StringRef getConvention() const { return *convention; }
-
-  // SWIFT_ENABLE_TENSORFLOW
-  bool hasDifferentiabilityRepresentationKindAndOrder() const {
-    return differentiabilityReprKindAndOrder.hasValue();
-  }
-  std::pair<DifferentiabilityRepresentationKind, unsigned>
-  getDifferentiabilityRepresentationKindAndOrder() const {
-    return *differentiabilityReprKindAndOrder;
-  }
 
   bool hasOwnership() const {
     return getOwnership() != ReferenceOwnership::Strong;

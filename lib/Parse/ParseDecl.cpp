@@ -2335,39 +2335,6 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
                        LPLoc);
   }
 
-  // SWIFT_ENABLE_TENSORFLOW
-  DifferentiabilityRepresentationKind differentiabilityReprKind;
-  unsigned maxDifferentiabilityOrder;
-  if (attr == TAK_sil_differentiable) {
-    SourceLoc LPLoc;
-    if (!consumeIfNotAtStartOfLine(tok::l_paren)) {
-      if (!justChecking)
-        diagnose(Tok, diag::sil_differentiable_attribute_expected_lparen);
-      return true;
-    }
-    SourceLoc parenParamLoc;
-    if (Tok.is(tok::identifier) && Tok.getText() == "linear") {
-      consumeToken(tok::identifier);
-      differentiabilityReprKind = DifferentiabilityRepresentationKind::Linear;
-      maxDifferentiabilityOrder = -1;
-    } else {
-      differentiabilityReprKind = DifferentiabilityRepresentationKind::Normal;
-      if (parseUnsignedInteger(
-        maxDifferentiabilityOrder, parenParamLoc,
-        diag::sil_differentiable_attribute_expected_max_order)) {
-        return true;
-      }
-    }
-    // Parse the ')'.  We can't use parseMatchingToken if we're in
-    // just-checking mode.
-    if (justChecking && Tok.isNot(tok::r_paren))
-      return true;
-    SourceLoc RPLoc;
-    parseMatchingToken(tok::r_paren, RPLoc,
-                       diag::convention_attribute_expected_rparen,
-                       LPLoc);
-  }
-
   // In just-checking mode, we only need to consume the tokens, and we don't
   // want to do any other analysis.
   if (justChecking)
@@ -2461,13 +2428,6 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
   case TAK_convention:
     Attributes.convention = conventionName;
     Attributes.conventionWitnessMethodProtocol = witnessMethodProtocol;
-    break;
-
-  // SWIFT_ENABLE_TENSORFLOW
-  // @sil_differentiable attribute.
-  case TAK_sil_differentiable:
-    Attributes.differentiabilityReprKindAndOrder =
-        {differentiabilityReprKind, maxDifferentiabilityOrder};
     break;
 
   case TAK__opaqueReturnTypeOf: {

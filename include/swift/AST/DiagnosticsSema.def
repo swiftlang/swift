@@ -3796,17 +3796,20 @@ ERROR(sil_metatype_multiple_reprs,none,
 // SWIFT_ENABLE_TENSORFLOW
 // @sil_differentiable types
 ERROR(sil_differentiable_attr_not_applicable,none,
-      "'@sil_differentiable' is not applicable to this type", ())
+      "'sil_differentiable' is not applicable to this type", ())
 ERROR(sil_differentiable_required_original_function_field,none,
-      "an original function type field is required in a '@sil_differentiable'", ())
+      "an original function type field is required in a 'sil_differentiable'",
+      ())
 ERROR(sil_differentiable_required_field,none,
-      "a '%0' function type field is required in a '@sil_differentiable'", (StringRef))
+      "a '%0' function type field is required in a 'sil_differentiable'",
+      (StringRef))
 ERROR(sil_differentiable_fields_must_be_function_type,none,
-      "fields in a '@sil_differentiable' type must be function types", ())
+      "fields in a 'sil_differentiable' type must be function types", ())
 ERROR(sil_differentiable_invalid_field,none,
-      "invalid field for the specified '@sil_differentiable' representation kind", ())
+      "invalid field for the specified '@sil_differentiable' representation "
+      "kind", ())
 ERROR(sil_differentiable_field_cannot_be_generic,none,
-      "'@sil_differentiable' field type cannot be generic", ())
+      "'sil_differentiable' field type cannot be generic", ())
 
 //------------------------------------------------------------------------------
 // MARK: @objc and @nonobjc

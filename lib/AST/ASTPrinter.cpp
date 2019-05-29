@@ -4073,7 +4073,7 @@ public:
 
   // SWIFT_ENABLE_TENSORFLOW
   void visitSILDifferentiableFunctionType(SILDifferentiableFunctionType *T) {
-    Printer << "@sil_differentiable(";
+    Printer << "sil_differentiable(";
     switch (T->getRepresentationKind()) {
     case DifferentiabilityRepresentationKind::Linear:
       Printer << "linear) {";

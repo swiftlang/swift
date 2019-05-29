@@ -1395,13 +1395,14 @@ ERROR(convention_attribute_witness_method_expected_protocol,none,
 
 // sil_differentiable
 ERROR(sil_differentiable_attribute_expected_lparen,none,
-      "expected '(' after 'sil_differentiable' attribute", ())
+      "expected '(' after 'sil_differentiable'", ())
 ERROR(sil_differentiable_attribute_expected_max_order,none,
-      "expected a max differentiation order in 'sil_differentiable' attribute", ())
+      "expected a max differentiation order in 'sil_differentiable(...)'", ())
 ERROR(sil_differentiable_attribute_expected_rparen,none,
-      "expected ')' after convention name for 'sil_differentiable' attribute", ())
+      "expected ')' after the representation kind or order for "
+      "'sil_differentiable'", ())
 ERROR(sil_differentiable_attribute_expected_lbrace,none,
-      "expected '{' in a '@sil_differentiable' type", ())
+      "expected '{' in a 'sil_differentiable' type", ())
 ERROR(sil_differentiable_attribute_expected_differential,none,
       "expected 'differential:'", ())
 ERROR(sil_differentiable_attribute_expected_pullback,none,
@@ -1409,7 +1410,7 @@ ERROR(sil_differentiable_attribute_expected_pullback,none,
 ERROR(sil_differentiable_attribute_expected_transpose,none,
       "expected 'transpose:' ", ())
 ERROR(sil_differentiable_attribute_expected_rbrace,none,
-      "expected '}' to end '@sil_differentiable' type", ())
+      "expected '}' to end a 'sil_differentiable' type", ())
 
 // objc
 ERROR(attr_objc_missing_colon,none,

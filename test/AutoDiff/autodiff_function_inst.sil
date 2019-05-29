@@ -56,9 +56,9 @@ bb0:
 // CHECK:   [[EXTRACTED_ORIG:%.*]] = autodiff_function_extract [original] [[DIFFED_FOO]] : $@differentiable @convention(thin) (Float) -> Float
 // CHECK:   return [[UNDIFFED_FOO]] : $@differentiable @convention(thin) (Float) -> Float
 
-sil @make_new_diff_func : $@convention(thin) () -> @sil_differentiable(1) {@convention(thin) (Float) -> Float, differential: (Float) -> Float, pullback: (Float) -> Float} {
+sil @make_new_diff_func : $@convention(thin) () -> sil_differentiable(1) {@convention(thin) (Float) -> Float, differential: (Float) -> Float, pullback: (Float) -> Float} {
 bb0:
   %orig = function_ref @foo : $@convention(thin) (Float) -> Float
-  %diffedFunc = autodiff_function [sil_differentiable] [wrt 0] [order 1] %orig : $@convention(thin) (Float) -> Float as $@sil_differentiable(1) {@convention(thin) (Float) -> Float, differential: (Float) -> Float, pullback: (Float) -> Float}
-  return %diffFunc : $@sil_differentiable(1) {@convention(thin) (Float) -> Float, differential: (Float) -> Float, pullback: (Float) -> Float}
+  %diffedFunc = autodiff_function [sil_differentiable] [wrt 0] [order 1] %orig : $@convention(thin) (Float) -> Float as $sil_differentiable(1) {@convention(thin) (Float) -> Float, differential: (Float) -> Float, pullback: (Float) -> Float}
+  return %diffedFunc : $sil_differentiable(1) {@convention(thin) (Float) -> Float, differential: (Float) -> Float, pullback: (Float) -> Float}
 }
