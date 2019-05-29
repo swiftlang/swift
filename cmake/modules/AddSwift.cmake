@@ -2042,12 +2042,22 @@ function(add_swift_target_library name)
         endforeach()
       endif()
 
-      swift_is_installing_component("${SWIFTLIB_INSTALL_IN_COMPONENT}" is_installing)
-      if(NOT is_installing)
-        set_property(GLOBAL APPEND PROPERTY SWIFT_BUILDTREE_EXPORTS ${VARIANT_NAME})
-      else()
-        set_property(GLOBAL APPEND PROPERTY SWIFT_EXPORTS ${VARIANT_NAME})
-      endif()
+      swift_is_installing_component(
+        "${SWIFTLIB_INSTALL_IN_COMPONENT}"
+        is_installing)
+
+      # Add the arch-specific library targets to the global exports.
+      foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
+        set(_variant_name "${name}-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
+
+        if(is_installing)
+          set_property(GLOBAL APPEND
+            PROPERTY SWIFT_EXPORTS ${_variant_name})
+        else()
+          set_property(GLOBAL APPEND
+            PROPERTY SWIFT_BUILDTREE_EXPORTS ${_variant_name})
+        endif()
+      endforeach()
 
       # If we built static variants of the library, create a lipo target for
       # them.
