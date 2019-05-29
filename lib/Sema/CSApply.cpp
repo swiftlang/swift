@@ -3707,7 +3707,7 @@ namespace {
         Expr *sub = expr->getSubExpr();
 
         cs.setExprTypes(sub);
-        if (tc.convertToType(sub, toType, cs.DC))
+        if (tc.convertToType(sub, toType, cs))
           return nullptr;
         cs.cacheExprTypes(sub);
 
