@@ -757,8 +757,10 @@ swift::computeDefaultMap(ArrayRef<AnyFunctionType::Param> params,
 
   // No parameter list means no default arguments - hand back the zeroed
   // bitvector.
-  if (!paramList)
+  if (!paramList) {
+    assert(!paramOwner->hasParameterList());
     return resultVector;
+  }
 
   switch (params.size()) {
   case 0:

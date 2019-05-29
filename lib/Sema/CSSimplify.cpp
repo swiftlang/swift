@@ -144,18 +144,8 @@ bool constraints::areConservativelyCompatibleArgumentLabels(
     return true;
   }
 
-
-  const AnyFunctionType *fTy;
-
-  if (auto fn = dyn_cast<AbstractFunctionDecl>(decl)) {
-    fTy = fn->getInterfaceType()->castTo<AnyFunctionType>();
-  } else if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
-    fTy = subscript->getInterfaceType()->castTo<AnyFunctionType>();
-  } else if (auto enumElement = dyn_cast<EnumElementDecl>(decl)) {
-    fTy = enumElement->getInterfaceType()->castTo<AnyFunctionType>();
-  } else {
+  if (!decl->hasParameterList())
     return true;
-  }
 
   SmallVector<AnyFunctionType::Param, 8> argInfos;
   for (auto argLabel : labels) {

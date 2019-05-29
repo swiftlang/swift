@@ -2698,6 +2698,12 @@ public:
   /// curried self parameter.
   bool hasCurriedSelf() const;
 
+  /// Returns true if the declaration has a parameter list associated with it.
+  ///
+  /// Note that not all declarations with function interface types have
+  /// parameter lists, for example an enum element without associated values.
+  bool hasParameterList() const;
+
   /// Get the decl for this value's opaque result type, if it has one.
   OpaqueTypeDecl *getOpaqueResultTypeDecl() const;
 
@@ -7150,6 +7156,12 @@ inline bool ValueDecl::hasCurriedSelf() const {
   if (isa<EnumElementDecl>(this))
     return true;
   return false;
+}
+
+inline bool ValueDecl::hasParameterList() const {
+  if (auto *eed = dyn_cast<EnumElementDecl>(this))
+    return eed->hasAssociatedValues();
+  return isa<AbstractFunctionDecl>(this) || isa<SubscriptDecl>(this);
 }
 
 inline bool Decl::isPotentiallyOverridable() const {
