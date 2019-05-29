@@ -520,6 +520,30 @@ extension LazyTensorOperation : TFTensorOperation {
 }
 
 
+extension LazyTensorOperation {
+  static public func makeSymbolic(_ input: _AnyTensorHandle) -> LazyTensor {
+    return LazyTensor(_materialized: input._tfeTensorHandle)
+  }
+
+  static public func makeSymbolic<Scalar: TensorFlowScalar>(_ input: Tensor<Scalar>) -> Tensor<Scalar> {
+    return Tensor(
+      handle: TensorHandle<Scalar>(handle: makeSymbolic(input.handle.handle)))
+  }
+
+  static public func makeSymbolic(_ input: StringTensor) -> StringTensor {
+    return StringTensor(
+      handle: TensorHandle<String>(handle: makeSymbolic(input.handle.handle)))
+  }
+
+  static public func makeSymbolic(_ input: VariantHandle) -> VariantHandle {
+    return VariantHandle(handle: makeSymbolic(input.handle))
+  }
+
+  static public func makeSymbolic(_ input: ResourceHandle) -> ResourceHandle {
+    return ResourceHandle(handle: makeSymbolic(input.handle))
+  }
+}
+
 extension LazyTensorOperation.Attribute : CustomStringConvertible {
   public var description: String {
     switch self {
