@@ -377,8 +377,8 @@ protocol ExpressibleByDogLiteral {}
 struct Kitten : ExpressibleByCatLiteral {}
 struct Puppy : ExpressibleByDogLiteral {}
 
-struct Claws<A: ExpressibleByCatLiteral> { // expected-note {{'A' declared as parameter to type 'Claws'}}
-  struct Fangs<B: ExpressibleByDogLiteral> { }
+struct Claws<A: ExpressibleByCatLiteral> {
+  struct Fangs<B: ExpressibleByDogLiteral> { } // expected-note {{where 'B' = 'NotADog'}}
 }
 
 struct NotADog {}
@@ -401,9 +401,8 @@ func test() {
   // expected-error@-1 {{cannot convert value of type 'Claws<_>.Fangs<_>' to specified type 'Claws.Fangs<Puppy>'}}
   let _: Claws.Fangs<NotADog> = something()
   // expected-error@-1 {{generic parameter 'T' could not be inferred}} // FIXME: bad diagnostic
-  _ = Claws.Fangs<NotADog>()
-  // expected-error@-1 {{generic parameter 'A' could not be inferred}}
-  // expected-note@-2 {{explicitly specify the generic arguments to fix this issue}}
+  _ = Claws.Fangs<NotADog>() // TODO(diagnostics): There should be two errors here - "cannot infer A" and "NotADog conformance to ExpressibleByDogLiteral"
+  // expected-error@-1 {{referencing initializer 'init()' on 'Claws.Fangs' requires that 'NotADog' conform to 'ExpressibleByDogLiteral'}}
 }
 
 // https://bugs.swift.org/browse/SR-4379
