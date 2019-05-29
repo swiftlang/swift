@@ -253,3 +253,25 @@ struct UseStatic {
   // CHECK: sil hidden [transparent] [ossa] @$s18property_delegates9UseStaticV12staticWibbleSaySiGvsZ
   @Lazy static var staticWibble = [1, 2, 3]
 }
+
+extension WrapperWithInitialValue {
+  func test() { }
+}
+
+class ClassUsingWrapper {
+  @WrapperWithInitialValue var x = 0
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s18property_delegates21testClassUsingWrapper1cyAA0deF0C_tF : $@convention(thin) (@guaranteed ClassUsingWrapper) -> ()
+func testClassUsingWrapper(c: ClassUsingWrapper) {
+  // CHECK: class_method [[GETTER:%.*]] : $ClassUsingWrapper, #ClassUsingWrapper.$x!getter.1
+  c.$x.test()
+}
+
+// CHECK-LABEL: sil_vtable ClassUsingWrapper {
+// CHECK:  #ClassUsingWrapper.x!getter.1: (ClassUsingWrapper) -> () -> Int : @$s18property_delegates17ClassUsingWrapperC1xSivg   // ClassUsingWrapper.x.getter
+// CHECK:  #ClassUsingWrapper.x!setter.1: (ClassUsingWrapper) -> (Int) -> () : @$s18property_delegates17ClassUsingWrapperC1xSivs // ClassUsingWrapper.x.setter
+// CHECK:  #ClassUsingWrapper.x!modify.1: (ClassUsingWrapper) -> () -> () : @$s18property_delegates17ClassUsingWrapperC1xSivM    // ClassUsingWrapper.x.modify
+// CHECK:  #ClassUsingWrapper.$x!getter.1: (ClassUsingWrapper) -> () -> WrapperWithInitialValue<Int> : @$s18property_delegates17ClassUsingWrapperC2$xAA0E16WithInitialValueVySiGvg       // ClassUsingWrapper.$x.getter
+// CHECK:  #ClassUsingWrapper.$x!setter.1: (ClassUsingWrapper) -> (WrapperWithInitialValue<Int>) -> () : @$s18property_delegates17ClassUsingWrapperC2$xAA0E16WithInitialValueVySiGvs     // ClassUsingWrapper.$x.setter
+// CHECK:  #ClassUsingWrapper.$x!modify.1: (ClassUsingWrapper) -> () -> () : @$s18property_delegates17ClassUsingWrapperC2$xAA0E16WithInitialValueVySiGvM // ClassUsingWrapper.$x.modify
