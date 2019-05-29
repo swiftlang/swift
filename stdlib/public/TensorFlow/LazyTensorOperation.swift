@@ -3,7 +3,7 @@ import CTensorFlow
 /// The `TF_Tensor *` type.
 typealias CTFTensor = OpaquePointer
 
-public class LazyTensor : _AnyTensorHandle {
+public class LazyTensor : _AnyTensorHandle, Equatable {
   enum Handle {
     // Bool indicates if this was a result of materialization.
     case conc(TFETensorHandle, Bool)
@@ -111,15 +111,58 @@ public class LazyTensor : _AnyTensorHandle {
   }
 }
 
-public class LazyTensorOperation : TensorOperation {
+
+public func ==(lhs: LazyTensor, rhs: LazyTensor) -> Bool {
+  switch (lhs.handle, rhs.handle) {
+  case let (LazyTensor.Handle.conc(l), LazyTensor.Handle.conc(r)): do {
+      return l == r
+    }
+  case let (
+      LazyTensor.Handle.sym(l, lIndex, _),
+      LazyTensor.Handle.sym(r, rIndex, _)): do {
+      return lIndex == rIndex && l == r
+    }
+  default: return false
+  }
+}
+
+extension TFETensorHandle : Equatable {
+  public static func eagerEqual(
+    _ lhs: TFETensorHandle, _ rhs: TFETensorHandle, _ dtype: TensorDataType) -> Bool {
+    let op = TFE_Op("Equal", 1)
+    op.updateAttribute("T", dtype)
+    op.addInput(lhs)
+    op.addInput(rhs)
+    let result: Tensor<Bool> =  op.execute(Int(1))
+    return result.scalarized()
+  }
+
+  public static func eagerEqual(_ lhs: TFETensorHandle, _ rhs: TFETensorHandle) -> Bool {
+    let lDtype: TF_DataType = TFE_TensorHandleDataType(lhs._cTensorHandle)
+    let rDtype: TF_DataType = TFE_TensorHandleDataType(rhs._cTensorHandle)
+    if lDtype != rDtype { return false }
+    switch lDtype {
+    case TF_RESOURCE, TF_VARIANT:
+      return lhs._cTensorHandle == rhs._cTensorHandle
+    default:
+      return eagerEqual(lhs, rhs, TensorDataType(lDtype))
+    }
+  }
+}
+
+public func ==(lhs: TFETensorHandle, rhs: TFETensorHandle) -> Bool {
+  return TFETensorHandle.eagerEqual(lhs, rhs)
+}
+
+public class LazyTensorOperation : TensorOperation, Equatable {
   public typealias TensorValueHandle = LazyTensor
 
-  enum Input {
+  enum Input : Equatable {
     case single(LazyTensor)
     case list([LazyTensor])
   }
 
-  enum Attribute {
+  enum Attribute : Equatable {
     case BoolValue(Bool)
     case IntValue(Int)
     case FloatValue(Float)
@@ -217,6 +260,11 @@ public class LazyTensorOperation : TensorOperation {
   public func updateAttribute(_ name: String, _ value: [String]) {
     attrs[name] = Attribute.StringArray(value)
   }
+}
+
+public func ==(lhs: LazyTensorOperation, rhs: LazyTensorOperation) -> Bool {
+  return (lhs.outputCount == rhs.outputCount &&
+    lhs.inputs == rhs.inputs && lhs.attrs == rhs.attrs)
 }
 
 extension LazyTensorOperation : TFTensorOperation {
@@ -518,7 +566,6 @@ extension LazyTensorOperation : TFTensorOperation {
     return result
   }
 }
-
 
 extension LazyTensorOperation {
   static public func makeSymbolic(_ input: _AnyTensorHandle) -> LazyTensor {
