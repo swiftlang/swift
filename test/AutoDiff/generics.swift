@@ -57,25 +57,75 @@ struct SupervisedTrainer<Model : Layer> {
 }
 
 // Tests TF-440.
-struct TF_440_Input<Input: Differentiable, State: Differentiable>: Differentiable {
-    var input: Input
-    var state: State
+struct TF_440_Input<Input: Differentiable, State: Differentiable>
+  : Differentiable {
+  var input: Input
+  var state: State
 }
 struct TF_440<T : Differentiable> {
-    @differentiable
-    func applied(to input: TF_440_Input<Float, Float>) -> Float {
-        return input.state
-    }
+  @differentiable
+  func applied(to input: TF_440_Input<Float, Float>) -> Float {
+    return input.state
+  }
 
-    @differentiable
-    func applied(to input: TF_440_Input<T, Float>) -> Float {
-        return input.state
-    }
+  @differentiable
+  func applied(to input: TF_440_Input<T, Float>) -> Float {
+    return input.state
+  }
 
-    @differentiable
-    func applied(to input: TF_440_Input<T, Float>) -> T {
-        return input.input
-    }
+  @differentiable
+  func applied(to input: TF_440_Input<T, Float>) -> T {
+    return input.input
+  }
 }
+
+// Tests TF-508 (Hack)
+protocol TF_508_Protocol {
+  associatedtype Scalar: BinaryFloatingPoint
+}
+
+extension TF_508_Protocol {
+  @differentiable(vjp: _vjpAdd(lhs:rhs:)
+    where Self : Differentiable,
+          Scalar : Differentiable,
+          TangentVector : TF_508_Protocol)
+  static func +(lhs: Self, rhs: Self) -> Self {
+    return lhs
+  }
+  
+  static var zero: Self {
+    fatalError()
+  }
+  
+  static func - (lhs: Self, rhs: Self) -> Self {
+    fatalError()
+  }
+}
+
+extension TF_508_Protocol
+  where Self : Differentiable,
+        Scalar : Differentiable,
+        TangentVector : TF_508_Protocol {
+  static func _vjpAdd(lhs: Self, rhs: Self)
+    -> (Self, (TangentVector) -> (TangentVector, TangentVector)) {
+    return (lhs, { ($0, $0) })
+  }
+}
+
+struct TF_508_Struct<Scalar: BinaryFloatingPoint>
+  : TF_508_Protocol & AdditiveArithmetic {}
+
+extension TF_508_Struct : Differentiable
+  where Scalar : Differentiable {
+  typealias TangentVector = TF_508_Struct
+  typealias AllDifferentiableVariables = TF_508_Struct
+}
+
+let a = TF_508_Struct<Float>()
+func foo(x: TF_508_Struct<Float>, y: TF_508_Struct<Float>)
+  -> TF_508_Struct<Float> {
+  return x + y
+}
+let backprop1 = pullback(at: a, a, in: foo)
 
 // TODO: add more tests.

@@ -2025,7 +2025,7 @@ static SubstitutionMap getSubstitutionMap(
 /// Returns `None` on failure, signifying that a diagnostic has been emitted.
 ///
 /// Creates new differentiation tasks, if necessary, using `invoker` as the
-/// invoker calls `taskCallback` for all newly-created tasks (but may also call
+/// invoker. Calls `taskCallback` for all newly-created tasks (but may also call
 /// `taskCallback` for already-existing tasks), so that the caller can make sure
 /// that the task actually gets executed.
 ///
