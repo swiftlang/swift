@@ -88,7 +88,7 @@ extension TF_508_Protocol {
   @differentiable(vjp: _vjpAdd(lhs:rhs:)
     where Self : Differentiable,
           Scalar : Differentiable,
-          TangentVector : TF_508_Protocol)
+          Self.TangentVector : TF_508_Protocol)
   static func +(lhs: Self, rhs: Self) -> Self {
     return lhs
   }
