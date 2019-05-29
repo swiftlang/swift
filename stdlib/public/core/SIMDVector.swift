@@ -779,7 +779,7 @@ extension SIMD where Scalar: FixedWidthInteger {
 
 //  Implementations of floating-point operations. These should eventually all
 //  be replaced with @_semantics to lower directly to vector IR nodes.
-extension SIMD where Scalar: FloatingPoint {
+extension SIMD where Scalar : FloatingPoint {
   @_transparent
   // SWIFT_ENABLE_TENSORFLOW
   @differentiable(vjp: _vjpAdd(lhs:rhs:)
@@ -1282,6 +1282,15 @@ extension SIMD where Scalar: FloatingPoint {
     return lhs / Self(repeating: rhs)
   }
   
+//  @_transparent
+//  public static func +=(lhs: inout Self, rhs: Self) {
+//    lhs = lhs + rhs
+//  }
+//
+//  @_transparent
+//  public static func -=(lhs: inout Self, rhs: Self) {
+//    lhs = lhs - rhs
+//  }
   @_transparent
   public static func *=(lhs: inout Self, rhs: Self) {
     lhs = lhs * rhs
@@ -1292,6 +1301,10 @@ extension SIMD where Scalar: FloatingPoint {
     lhs = lhs / rhs
   }
   
+//  @_transparent
+//  public static func *=(lhs: inout Self, rhs: Scalar) {
+//    lhs = lhs * rhs
+//  }
   @_transparent
   public static func +=(lhs: inout Self, rhs: Scalar) {
     lhs = lhs + rhs
