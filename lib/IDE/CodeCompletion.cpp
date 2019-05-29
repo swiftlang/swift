@@ -1457,9 +1457,8 @@ protocolForLiteralKind(CodeCompletionLiteralKind kind) {
 /// that is of type () -> ().
 static bool hasTrivialTrailingClosure(const FuncDecl *FD,
                                       AnyFunctionType *funcType) {
-  SmallBitVector defaultMap =
-    computeDefaultMap(funcType->getParams(), FD,
-                      /*level*/ FD->isInstanceMember() ? 1 : 0);
+  auto defaultMap = computeDefaultMap(funcType->getParams(), FD,
+                                      /*skipCurriedSelf*/ FD->hasCurriedSelf());
 
   if (defaultMap.size() - defaultMap.count() == 1) {
     auto param = funcType->getParams().back();
