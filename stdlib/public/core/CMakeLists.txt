@@ -127,7 +127,6 @@ set(SWIFTLIB_ESSENTIAL
   ShadowProtocols.swift
   Shims.swift
   Slice.swift
-  SmallBuffer.swift
   SmallString.swift
   Sort.swift
   StaticString.swift
