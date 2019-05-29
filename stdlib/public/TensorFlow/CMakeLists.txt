@@ -32,7 +32,6 @@ list(APPEND swift_stdlib_compile_flags "-DCOMPILING_TENSORFLOW_MODULE")
 
 set(SOURCES
   ArrayOps.swift
-  CompilerRuntime.swift
   CompositeMath.swift
   DataTypes.swift
   Execution.swift
@@ -48,8 +47,7 @@ set(SOURCES
   TensorHandle.swift
   TensorProtocol.swift
   TensorShape.swift
-  Threading.swift
-  Utilities.swift)
+  Threading.swift)
 
 set(GYB_SOURCES
   ExecuteOp.swift.gyb)
