@@ -3339,7 +3339,7 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc,
   // Attempt to solve the constraint system.
   SmallVector<Solution, 4> viable;
   if ((cs.solve(expr, viable) || viable.size() != 1) &&
-    cs.salvage(viable, expr)) {
+     cs.salvage(viable, expr)) {
     return true;
   }
 

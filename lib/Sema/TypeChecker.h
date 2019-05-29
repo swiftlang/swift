@@ -1549,7 +1549,7 @@ public:
   /// \returns true if an error occurred, false otherwise.
   bool convertToType(Expr *&expr, Type type, DeclContext *dc,
                      Optional<Pattern*> typeFromPattern = None);
-    
+
   /// Coerce the given expression to materializable type, if it
   /// isn't already.
   Expr *coerceToRValue(Expr *expr,
