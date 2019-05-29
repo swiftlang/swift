@@ -936,7 +936,8 @@ ASTUnitRef ASTProducer::createASTUnit(SwiftASTManager::Implementation &MgrImpl,
 
   Invocation.getLangOptions().CollectParsedToken = true;
 
-  if (CompIns.setup(Invocation, InvokRef->Impl.Opts.FileSystem)) {
+  CompIns.getSourceMgr().setFileSystem(InvokRef->Impl.Opts.FileSystem);
+  if (CompIns.setup(Invocation)) {
     // FIXME: Report the diagnostic.
     LOG_WARN_FUNC("Compilation setup failed!!!");
     Error = "compilation setup failed";

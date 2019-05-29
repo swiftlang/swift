@@ -185,7 +185,8 @@ static bool swiftCodeCompleteImpl(
   // FIXME: We need to be passing the buffers from the open documents.
   // It is not a huge problem in practice because Xcode auto-saves constantly.
 
-  if (CI.setup(Invocation, FileSystem)) {
+  CI.getSourceMgr().setFileSystem(FileSystem);
+  if (CI.setup(Invocation)) {
     // FIXME: error?
     return true;
   }
