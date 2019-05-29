@@ -145,6 +145,7 @@ struct CheckerOptions {
   bool AbortOnModuleLoadFailure;
   bool PrintModule;
   bool SwiftOnly;
+  bool SkipOSCheck;
   StringRef LocationFilter;
 };
 
