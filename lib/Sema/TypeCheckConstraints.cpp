@@ -2868,7 +2868,8 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
       SequenceType = solution.simplifyType(SequenceType);
 
       // Perform any necessary conversions of the sequence (e.g. [T]! -> [T]).
-      if (solution.coerceToType(expr, SequenceType, cs.getConstraintLocator(expr))) {
+      expr = solution.coerceToType(expr, SequenceType, cs.getConstraintLocator(expr));
+      if (!expr) {
         return nullptr;
       }
 
