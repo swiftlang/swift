@@ -343,6 +343,12 @@ AttachedPropertyDelegateRequest::evaluate(Evaluator &evaluator,
       }
     }
 
+    // Properties with delegates must not declare a getter or setter.
+    if (!var->hasStorage()) {
+      ctx.Diags.diagnose(attr->getLocation(), diag::property_delegate_computed);
+      return nullptr;
+    }
+
     return mutableAttr;
   }
 
