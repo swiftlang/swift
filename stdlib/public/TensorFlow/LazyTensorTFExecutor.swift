@@ -124,7 +124,7 @@ class TFFunctionBuilder {
     let graph = graphDescription.graph
     let eagerContext = _TFCGetGlobalEagerContext()
     let inputs = graphDescription.inputs
-    let outputs = graphDescription.tfOutputs
+    let outputs = graphDescription.outputs
     let tracedGraphFn = graphDescription.graphNodes.withUnsafeBufferPointer {
       operations -> CTFFunction in
       let base = operations.baseAddress
@@ -153,13 +153,11 @@ class TFFunctionBuilder {
     }
     TFE_ContextAddFunction(eagerContext, tracedGraphFn, status)
 
-    let outputGroups = graphDescription.outputs.map { $0.outputCount }
-
     return FunctionDescription(
       name: tracedFunctionName,
       function: tracedGraphFn,
       outputCount: outputs.count,
-      outputGroups: outputGroups
+      outputGroups: graphDescription.outputGroups
     )
   }
 
@@ -197,16 +195,14 @@ class TFFunctionBuilder {
     checkOk(status)
     TF_DeleteFunction(function.function)
   }
-
 }
 
 class TFGraphDescription {
   var inputs: [TF_Output] = []
   var inputValues: [TFETensorHandle] = []
   var graphNodes: [CTFOperation?] = []
-  var outputs: [LazyTensorOperation] = []
-  var tfOutputs: [TF_Output] = []
-
+  var outputs: [TF_Output] = []
+  var outputGroups: [Int] = []
 
   var graph: CTFGraph { graphBuilder.graph }
   var tfFunction: TFFunctionBuilder.FunctionDescription {
@@ -216,90 +212,44 @@ class TFGraphDescription {
 
   private var graphBuilder = TFGraphBuilder()
 
-  init(_ lazyOp: LazyTensorOperation) {
-    // LazyTensor.onLiveOperations { let _ = formGraphNode($0) }
-    let _ = formGraphNode(lazyOp)
-    // graphNodes = graphNodesCache.map { $0.value }
-    tfOutputs = []
-    for output in outputs {
-      let graphNode = formGraphNode(output)
-      tfOutputs += Array((0..<output.outputCount).map {
-          TF_Output(oper: graphNode, index: Int32($0)) })
-    }
-    graphNodesCache.removeAll()
-  }
-
-  private var graphNodesCache: [ObjectIdentifier: CTFOperation?] = [:]
-
-  private func updateCacheAndGraphNodes(
-    _ id: ObjectIdentifier, _ node: CTFOperation) {
-    graphNodesCache[id] = node
-    graphNodes.append(node)
-  }
-
-  private func formTFOutput(_ conc: TFETensorHandle, asConst: Bool) -> TF_Output {
-    let id = ObjectIdentifier(conc)
-    if let graphNode = graphNodesCache[id] {
-      return TF_Output(oper: graphNode, index: 0)
-    }
-
-    if asConst {
-      let result = graphBuilder.newTFConstNode(conc)
-      updateCacheAndGraphNodes(id, result.oper)
-      return result
-    } else {
-      let dtype = TensorDataType(TFE_TensorHandleDataType(conc._cTensorHandle))
-      let dtypeAttr = LazyTensorOperation.Attribute.TensorDataTypeValue(dtype)
-      let placeHolder = graphBuilder.newTFGraphNode(
-        name: "Placeholder",
-        attrs: ["dtype": dtypeAttr],
-        inputs: [])
-
-      let result = TF_Output(oper: placeHolder!, index: 0)
-      inputs.append(result)
-      inputValues.append(conc)
-      updateCacheAndGraphNodes(id, placeHolder!)
-      return result
-    }
-  }
-
-  private func formTFOutput(_ lazyHandle: LazyTensor) -> TF_Output {
-    switch lazyHandle.handle {
-      case LazyTensor.Handle.conc(let h, let materialized):
-        return formTFOutput(h, asConst: !materialized)
-      case LazyTensor.Handle.sym(let lazyOp, let index, _): do {
-        if let outputs = lazyOp.outputs {
-          return formTFOutput(outputs[index], asConst: false)
-        } else {
-          return TF_Output(oper: formGraphNode(lazyOp), index: Int32(index))
+  init(_ desc: LazyTraceDescription) {
+    var graphNodesCache: [ObjectIdentifier: CTFOperation?] = [:]
+    for op in desc.operations {
+      let opInputs = op.inputs.map { input -> TFGraphBuilder.Input in
+        switch input {
+        case LazyTensorOperation.Input.single(let h):
+          return TFGraphBuilder.Input.single(formTFOutput(h, graphNodesCache))
+        case LazyTensorOperation.Input.list(let elements):
+          return TFGraphBuilder.Input.list(elements.map {
+              formTFOutput($0, graphNodesCache) })
         }
       }
+      let graphNode = graphBuilder.newTFGraphNode(
+        name: op.name, attrs: op.attrs, inputs: opInputs)
+      let id = ObjectIdentifier(op)
+      graphNodesCache[id] = graphNode
+      graphNodes.append(graphNode)
+    }
+    self.inputs = desc.inputs.map {
+      TF_Output(oper: graphNodesCache[ObjectIdentifier($0)]!, index: 0)
+    }
+    self.inputValues = desc.inputValues
+    for output in desc.outputs {
+      let graphNode = graphNodesCache[ObjectIdentifier(output)]!
+      outputGroups.append(output.outputCount)
+      outputs += Array((0..<output.outputCount).map {
+          TF_Output(oper: graphNode, index: Int32($0)) })
     }
   }
 
-  private func tfGraphBuilderInput(
-    _ input: LazyTensorOperation.Input) -> TFGraphBuilder.Input {
-    switch input {
-      case LazyTensorOperation.Input.single(let h):
-        return TFGraphBuilder.Input.single(formTFOutput(h))
-      case LazyTensorOperation.Input.list(let elements):
-        return TFGraphBuilder.Input.list(elements.map { formTFOutput($0) })
+  private func formTFOutput(
+    _ lazyHandle: LazyTensor,
+    _ graphNodesCache: [ObjectIdentifier: CTFOperation?]) -> TF_Output {
+    if case let LazyTensor.Handle.sym(lazyOp, index, _) = lazyHandle.handle {
+      let id = ObjectIdentifier(lazyOp)
+      return TF_Output(oper: graphNodesCache[id]!, index: Int32(index))
     }
-  }
-
-  private func formGraphNode(_ lazyOp: LazyTensorOperation) -> CTFOperation? {
-    let id = ObjectIdentifier(lazyOp)
-    if let graphNode = graphNodesCache[id] {
-      return graphNode
-    }
-
-    if LazyTensor.isLive(lazyOp) { outputs.append(lazyOp) }
-
-    let inputs = lazyOp.inputs.map { tfGraphBuilderInput($0) }
-    let graphNode = graphBuilder.newTFGraphNode(
-      name: lazyOp.name, attrs: lazyOp.attrs, inputs: inputs)
-    updateCacheAndGraphNodes(id, graphNode!)
-    return graphNode
+    assert(false, "Should only have symbolic inputs.")
   }
 }
 
@@ -309,6 +259,7 @@ class LazyTraceDescription {
   var inputValues: [TFETensorHandle] = []
   var operations: [LazyTensorOperation] = []
   var outputs: [LazyTensorOperation] = []
+  var originalOutputs: [LazyTensorOperation] = []
 
   /// A status object to pass to TF graph building operations.
   private let status: CTFStatus = TF_NewStatus()
@@ -325,6 +276,10 @@ class LazyTraceDescription {
 
   func debugPrint() {
     print("Trace")
+    print("Input Values (\(inputValues.count)):")
+    for input in inputValues {
+      print("  \(input)")
+    }
     print("Inputs (\(inputs.count)):")
     for input in inputs {
       print("  \(input)")
@@ -426,7 +381,10 @@ class LazyTraceDescription {
     newLazyOp.inputs = lazyOp.inputs.map { maybePromotedInput($0) }
     updateCacheAndOperations(id, newLazyOp)
 
-    if LazyTensor.isLive(lazyOp) { outputs.append(newLazyOp) }
+    if LazyTensor.isLive(lazyOp) {
+      outputs.append(newLazyOp)
+      originalOutputs.append(lazyOp)
+    }
 
     return newLazyOp
   }
@@ -479,7 +437,7 @@ extension LazyTensorOperation {
     lazyDescription.debugPrint()
 
     LazyTensorOperation.materializationCallback("lazy")
-    let graphDescription = TFGraphDescription(lazyOp)
+    let graphDescription = TFGraphDescription(lazyDescription)
     LazyTensorOperation.materializationCallback("graphdesc")
     let function = graphDescription.tfFunction
     LazyTensorOperation.materializationCallback("tffunction")
@@ -488,7 +446,7 @@ extension LazyTensorOperation {
 
     // Slice up the outputs to various lazy tensors
     var start: Int = 0
-    for lazyOp in graphDescription.outputs {
+    for lazyOp in lazyDescription.originalOutputs {
       let end = start + lazyOp.outputCount
       lazyOp.outputs = Array(allOutputs[start..<end])
       start = end
