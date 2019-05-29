@@ -3363,12 +3363,11 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc,
   // TODO: need to add kind arg?
   // Construct a constraint system from this expression.
   ConstraintSystem cs(*this, dc, ConstraintSystemFlags::AllowFixes);
-
   // If there is a type that we're expected to convert to, add the conversion
   // constraint.
   cs.addConstraint(ConstraintKind::Conversion, expr->getType(), type,
                    cs.getConstraintLocator(expr));
-    
+
   if (getLangOpts().DebugConstraintSolver) {
     auto &log = Context.TypeCheckerDebug->getStream();
     log << "---Initial constraints for the given expression---\n";
