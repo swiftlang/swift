@@ -627,3 +627,30 @@ func rdar_50467583_and_50909555() {
     s[1] // expected-error {{static member 'subscript' cannot be used on instance of type 'S'}} {{5-6=S}}
   }
 }
+
+// SR-9396 (rdar://problem/46427500) - Nonsensical error message related to constrained extensions
+struct SR_9396<A, B> {}
+
+extension SR_9396 where A == Bool {  // expected-note {{where 'A' = 'Int'}}
+  func foo() {}
+}
+
+func test_sr_9396(_ s: SR_9396<Int, Double>) {
+  s.foo() // expected-error {{referencing instance method 'foo()' on 'SR_9396' requires the types 'Int' and 'Bool' be equivalent}}
+}
+
+// rdar://problem/34770265 - Better diagnostic needed for constrained extension method call
+extension Dictionary where Key == String { // expected-note {{where 'Key' = 'Int'}}
+  func rdar_34770265_key() {}
+}
+
+extension Dictionary where Value == String { // expected-note {{where 'Value' = 'Int'}}
+  func rdar_34770265_val() {}
+}
+
+func test_34770265(_ dict: [Int: Int]) {
+  dict.rdar_34770265_key()
+  // expected-error@-1 {{referencing instance method 'rdar_34770265_key()' on 'Dictionary' requires the types 'Int' and 'String' be equivalent}}
+  dict.rdar_34770265_val()
+  // expected-error@-1 {{referencing instance method 'rdar_34770265_val()' on 'Dictionary' requires the types 'Int' and 'String' be equivalent}}
+}

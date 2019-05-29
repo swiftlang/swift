@@ -4391,10 +4391,7 @@ public:
       auto Proto = Conformance->getProtocol();
       if (!Proto->isAccessibleFrom(CurrDeclContext))
         continue;
-      for (auto Member : Proto->getMembers()) {
-        auto *ATD = dyn_cast<AssociatedTypeDecl>(Member);
-        if (!ATD)
-          continue;
+      for (auto *ATD : Proto->getAssociatedTypeMembers()) {
         // FIXME: Also exclude the type alias that has already been specified.
         if (!Conformance->hasTypeWitness(ATD) ||
             ATD->hasDefaultDefinitionType())

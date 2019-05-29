@@ -2735,6 +2735,10 @@ void TypeChecker::addImplicitDynamicAttribute(Decl *D) {
     // Don't add dynamic to functions with a cdecl.
     if (FD->getAttrs().hasAttribute<CDeclAttr>())
       return;
+    // Don't add dynamic to local function definitions.
+    if (!FD->getDeclContext()->isTypeContext() &&
+        FD->getDeclContext()->isLocalContext())
+      return;
   }
 
   // Don't add dynamic if accessor is inlinable or tranparent.

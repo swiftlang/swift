@@ -4484,13 +4484,16 @@ static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
     // We need the superclass vtable layout as well.
     TC.requestSuperclassLayout(CD);
 
-    auto useConformance = [&](ProtocolDecl *protocol) {
+    auto forceConformance = [&](ProtocolDecl *protocol) {
       if (auto ref = TC.conformsToProtocol(
             CD->getDeclaredInterfaceType(), protocol, CD,
             ConformanceCheckFlags::SkipConditionalRequirements,
             SourceLoc())) {
-        if (ref->getConcrete()->getDeclContext() == CD)
-          TC.markConformanceUsed(*ref, CD);
+        auto conformance = ref->getConcrete();
+        if (conformance->getDeclContext() == CD &&
+            conformance->getState() == ProtocolConformanceState::Incomplete) {
+          TC.checkConformance(conformance->getRootNormalConformance());
+        }
       }
     };
 
@@ -4499,9 +4502,9 @@ static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
     //
     // FIXME: Generalize this to other protocols for which
     // we can derive conformances.
-    useConformance(TC.Context.getProtocol(KnownProtocolKind::Decodable));
-    useConformance(TC.Context.getProtocol(KnownProtocolKind::Encodable));
-    useConformance(TC.Context.getProtocol(KnownProtocolKind::Hashable));
+    forceConformance(TC.Context.getProtocol(KnownProtocolKind::Decodable));
+    forceConformance(TC.Context.getProtocol(KnownProtocolKind::Encodable));
+    forceConformance(TC.Context.getProtocol(KnownProtocolKind::Hashable));
   }
 
   // validateDeclForNameLookup will not trigger an immediate full
@@ -5480,7 +5483,6 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
       validateDecl(classDecl);
       if (auto ctor = createDesignatedInitOverride(
                         *this, classDecl, superclassCtor, kind)) {
-        Context.addSynthesizedDecl(ctor);
         classDecl->addMember(ctor);
       }
     }
@@ -5522,9 +5524,7 @@ void TypeChecker::synthesizeMemberForLookup(NominalTypeDecl *target,
     auto targetType = target->getDeclaredInterfaceType();
     if (auto ref = conformsToProtocol(
                         targetType, protocol, target,
-                        (ConformanceCheckFlags::Used|
-                         ConformanceCheckFlags::SkipConditionalRequirements),
-                         SourceLoc())) {
+                        ConformanceCheckFlags::SkipConditionalRequirements)) {
       if (auto *conformance = dyn_cast<NormalProtocolConformance>(
             ref->getConcrete()->getRootConformance())) {
         if (conformance->getState() == ProtocolConformanceState::Incomplete) {
@@ -5657,11 +5657,14 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
   // Add the constructor.
   decl->addMember(ctor);
 
-  // Create an empty body for the default constructor. The type-check of the
-  // constructor body will introduce default initializations of the members.
-  ctor->setBody(BraceStmt::create(Context, SourceLoc(), { }, SourceLoc()));
+  // Create an empty body for the default constructor.
+  SmallVector<ASTNode, 1> stmts;
+  stmts.push_back(new (Context) ReturnStmt(decl->getLoc(), nullptr));
+  ctor->setBody(BraceStmt::create(Context, SourceLoc(), stmts, SourceLoc()));
+  ctor->setBodyTypeCheckedIfPresent();
 
-  // Make sure we type check the constructor later.
+  // FIXME: This is still needed so that DI can check captures for
+  // initializer expressions. Rethink that completely.
   Context.addSynthesizedDecl(ctor);
 }
 

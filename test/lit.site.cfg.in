@@ -112,6 +112,9 @@ else:
     # even if SWIFT_ENABLE_GOLD_LINKER isn't set, we cannot use BFD for Android
     config.android_linker_name = "gold"
 
+if '@SWIFT_INCLUDE_TOOLS@' == 'TRUE':
+    config.available_features.add('swift_tools_extra')
+
 # Let the main config do the real work.
 if config.test_exec_root is None:
     config.test_exec_root = os.path.dirname(os.path.realpath(__file__))

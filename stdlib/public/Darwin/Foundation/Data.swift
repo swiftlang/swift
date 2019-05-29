@@ -639,7 +639,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         @inlinable // This is @inlinable as a convenience initializer.
         init(_ srcBuffer: UnsafeRawBufferPointer) {
             self.init(count: srcBuffer.count)
-            if srcBuffer.count > 0 {
+            if !srcBuffer.isEmpty {
                 Swift.withUnsafeMutableBytes(of: &bytes) { dstBuffer in
                     dstBuffer.baseAddress?.copyMemory(from: srcBuffer.baseAddress!, byteCount: srcBuffer.count)
                 }
@@ -688,7 +688,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
                 return Int(length)
             }
             set(newValue) {
-                precondition(newValue <= MemoryLayout<Buffer>.size)
+                assert(newValue <= MemoryLayout<Buffer>.size)
                 length = UInt8(newValue)
             }
         }
@@ -729,7 +729,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
 
         @inlinable // This is @inlinable as trivially computable.
         mutating func append(contentsOf buffer: UnsafeRawBufferPointer) {
-            guard buffer.count > 0 else { return }
+            guard !buffer.isEmpty else { return }
             assert(count + buffer.count <= MemoryLayout<Buffer>.size)
             let cnt = count
             _ = Swift.withUnsafeMutableBytes(of: &bytes) { rawBuffer in
@@ -777,7 +777,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             assert(subrange.upperBound <= MemoryLayout<Buffer>.size)
             assert(count - (subrange.upperBound - subrange.lowerBound) + replacementLength <= MemoryLayout<Buffer>.size)
             precondition(subrange.lowerBound <= length, "index \(subrange.lowerBound) is out of bounds of 0..<\(length)")
-            precondition(subrange.upperBound <= length, "index \(subrange.lowerBound) is out of bounds of 0..<\(length)")
+            precondition(subrange.upperBound <= length, "index \(subrange.upperBound) is out of bounds of 0..<\(length)")
             let currentLength = count
             let resultingLength = currentLength - (subrange.upperBound - subrange.lowerBound) + replacementLength
             let shift = resultingLength - currentLength
@@ -1270,7 +1270,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
 
         @inlinable // This is @inlinable as a trivial initializer.
         init(_ buffer: UnsafeRawBufferPointer) {
-            if buffer.count == 0 {
+            if buffer.isEmpty {
                 self = .empty
             } else if InlineData.canStore(count: buffer.count) {
                 self = .inline(InlineData(buffer))
@@ -1283,7 +1283,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
 
         @inlinable // This is @inlinable as a trivial initializer.
         init(_ buffer: UnsafeRawBufferPointer, owner: AnyObject) {
-            if buffer.count == 0 {
+            if buffer.isEmpty {
                 self = .empty
             } else if InlineData.canStore(count: buffer.count) {
                 self = .inline(InlineData(buffer))
@@ -2188,7 +2188,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     
     @inlinable // This is @inlinable as trivially forwarding.
     internal func _copyBytesHelper(to pointer: UnsafeMutableRawPointer, from range: Range<Int>) {
-        if range.upperBound - range.lowerBound == 0 { return }
+        if range.isEmpty { return }
         _representation.copyBytes(to: pointer, from: range)
     }
     
@@ -2313,7 +2313,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     }
     
     public mutating func append(_ other: Data) {
-        guard other.count > 0 else { return }
+        guard !other.isEmpty else { return }
         other.withUnsafeBytes { (buffer: UnsafeRawBufferPointer) in
             _representation.append(contentsOf: buffer)
         }

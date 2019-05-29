@@ -39,22 +39,28 @@ function(get_test_dependencies SDK result_var_name)
     list(APPEND deps SwiftUnitTests)
   endif()
 
-  set(deps_binaries
+  set(deps_binaries)
+
+  if (SWIFT_INCLUDE_TOOLS)
+    list(APPEND deps_binaries
       swift swift-ide-test swift-syntax-test sil-opt swift-llvm-opt swift-demangle
       sil-func-extractor sil-llvm-gen sil-nm sil-passpipeline-dumper
       lldb-moduleimport-test swift-reflection-dump swift-remoteast-test
       swift-api-digester swift-refactor swift-demangle-yamldump)
+
+    if(SWIFT_BUILD_SYNTAXPARSERLIB)
+      list(APPEND deps_binaries swift-syntax-parser-test)
+    endif()
+    if(SWIFT_BUILD_SOURCEKIT)
+      list(APPEND deps_binaries sourcekitd-test complete-test)
+    endif()
+  endif()
+
   if(NOT SWIFT_BUILT_STANDALONE)
     list(APPEND deps_binaries FileCheck arcmt-test c-arcmt-test c-index-test
          clang llc llvm-cov llvm-dwarfdump llvm-link llvm-as llvm-dis
          llvm-bcanalyzer llvm-nm llvm-readobj llvm-profdata count not
          llvm-strings dsymutil)
-  endif()
-  if(SWIFT_BUILD_SYNTAXPARSERLIB)
-    list(APPEND deps_binaries swift-syntax-parser-test)
-  endif()
-  if(SWIFT_BUILD_SOURCEKIT)
-    list(APPEND deps_binaries sourcekitd-test complete-test)
   endif()
 
   if(("${SDK}" STREQUAL "IOS") OR
@@ -136,6 +142,7 @@ set(profdata_merge_worker
 set(TEST_MODES
     optimize_none optimize optimize_unchecked optimize_size
     optimize_none_with_implicit_dynamic
+    optimize_with_implicit_dynamic
     only_executable only_non_executable
 )
 set(TEST_SUBSETS

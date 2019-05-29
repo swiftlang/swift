@@ -751,6 +751,14 @@ static Optional<RequirementMatch> findMissingGenericRequirementForSolutionFix(
   Type selfTy = proto->getSelfInterfaceType().subst(reqSubMap);
   if (type->isEqual(selfTy)) {
     type = conformance->getType();
+
+    // e.g. `extension P where Self == C { func foo() { ... } }`
+    // and `C` doesn't actually conform to `P`.
+    if (type->isEqual(missingType)) {
+      requirementKind = RequirementKind::Conformance;
+      missingType = proto->getDeclaredType();
+    }
+
     if (auto agt = type->getAs<AnyGenericType>())
       type = agt->getDecl()->getDeclaredInterfaceType();
     return missingRequirementMatch(type);
@@ -1818,8 +1826,7 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
     auto InheritedConformance =
     TC.conformsToProtocol(
                         T, InheritedProto, DC,
-                        (ConformanceCheckFlags::Used|
-                         ConformanceCheckFlags::SkipConditionalRequirements),
+                        ConformanceCheckFlags::SkipConditionalRequirements,
                         ComplainLoc);
     if (!InheritedConformance || !InheritedConformance->isConcrete()) {
       // Recursive call already diagnosed this problem, but tack on a note
@@ -3594,33 +3601,6 @@ static void recordConformanceDependency(DeclContext *DC,
                          DC->isCascadingContextForLookup(InExpression));
 }
 
-void ConformanceChecker::addUsedConformances(
-    ProtocolConformance *conformance,
-    llvm::SmallPtrSetImpl<ProtocolConformance *> &visited) {
-  // This deduplication cannot be implemented by just checking UsedConformance,
-  // because conformances can be added to UsedConformances outside this
-  // function, meaning their type witness conformances may not be tracked.
-  if (!visited.insert(conformance).second)
-    return;
-
-  if (auto normalConf = dyn_cast<NormalProtocolConformance>(
-        conformance->getRootConformance())) {;
-    if (normalConf->isIncomplete())
-      TC.UsedConformances.insert(normalConf);
-
-    // Mark each conformance in the signature as used.
-    for (auto sigConformance : normalConf->getSignatureConformances()) {
-      if (sigConformance.isConcrete())
-        addUsedConformances(sigConformance.getConcrete(), visited);
-    }
-  }
-}
-
-void ConformanceChecker::addUsedConformances(ProtocolConformance *conformance) {
-  llvm::SmallPtrSet<ProtocolConformance *, 8> visited;
-  addUsedConformances(conformance, visited);
-}
-
 void ConformanceChecker::ensureRequirementsAreSatisfied(
                                                      bool failUnsubstituted) {
   auto proto = Conformance->getProtocol();
@@ -3744,7 +3724,7 @@ void ConformanceChecker::ensureRequirementsAreSatisfied(
       proto->getRequirementSignature(),
       QuerySubstitutionMap{substitutions},
       TypeChecker::LookUpConformance(DC),
-      ConformanceCheckFlags::Used, &listener);
+      None, &listener);
 
   switch (result) {
   case RequirementCheckResult::Success:
@@ -3994,9 +3974,6 @@ void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
   // Diagnose missing value witnesses later.
   SWIFT_DEFER { diagnoseMissingWitnesses(Kind); };
 
-  // Ensure the associated type conformances are used.
-  addUsedConformances(Conformance);
-
   // Check non-type requirements.
   resolveValueWitnesses();
 
@@ -4202,12 +4179,6 @@ Optional<ProtocolConformanceRef> TypeChecker::conformsToProtocol(
     recordDependency();
   }
 
-  // If we're using this conformance, note that.
-  if (options.contains(ConformanceCheckFlags::Used)) {
-    if (auto lazyResolver = DC->getASTContext().getLazyResolver())
-      lazyResolver->markConformanceUsed(*lookupResult, DC);
-  }
-
   auto condReqs = lookupResult->getConditionalRequirementsIfAvailable();
   // If we have a conditional requirements that
   // we need to check, do so now.
@@ -4269,19 +4240,6 @@ ModuleDecl::conformsToProtocol(Type sourceTy, ProtocolDecl *targetProtocol) {
   return TypeChecker::conformsToProtocol(sourceTy, targetProtocol, this, flags);
 }
 
-void TypeChecker::markConformanceUsed(ProtocolConformanceRef conformance,
-                                      DeclContext *dc) {
-  if (conformance.isAbstract()) return;
-
-  if (auto normalConformance =
-        dyn_cast<NormalProtocolConformance>(
-          conformance.getConcrete()->getRootConformance())) {;
-    // Make sure that the type checker completes this conformance.
-    if (normalConformance->isIncomplete())
-      UsedConformances.insert(normalConformance);
-  }
-}
-
 Optional<ProtocolConformanceRef>
 TypeChecker::LookUpConformance::operator()(
                                        CanType dependentType,
@@ -4294,9 +4252,8 @@ TypeChecker::LookUpConformance::operator()(
                          conformingReplacementType,
                          conformedProtocol,
                          dc,
-                         (ConformanceCheckFlags::Used|
-                          ConformanceCheckFlags::InExpression|
-                          ConformanceCheckFlags::SkipConditionalRequirements));
+                         ConformanceCheckFlags::InExpression|
+                         ConformanceCheckFlags::SkipConditionalRequirements);
 }
 
 void TypeChecker::checkConformance(NormalProtocolConformance *conformance) {
@@ -5588,8 +5545,7 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
     auto requirementProto =
       req.getSecondType()->castTo<ProtocolType>()->getDecl();
     auto conformance = conformsToProtocol(defaultAssocTypeInContext,
-                                          requirementProto, proto,
-                                          ConformanceCheckFlags::Used);
+                                          requirementProto, proto, None);
     if (!conformance) {
       // Diagnose the lack of a conformance. This is potentially an ABI
       // incompatibility.
