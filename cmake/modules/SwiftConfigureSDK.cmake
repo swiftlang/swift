@@ -141,9 +141,18 @@ macro(configure_sdk_darwin
   set(SWIFT_SDK_${prefix}_LIB_SUBDIR "${xcrun_name}")
   set(SWIFT_SDK_${prefix}_VERSION_MIN_NAME "${version_min_name}")
   set(SWIFT_SDK_${prefix}_TRIPLE_NAME "${triple_name}")
-  set(SWIFT_SDK_${prefix}_ARCHITECTURES "${architectures}")
   set(SWIFT_SDK_${prefix}_OBJECT_FORMAT "MACHO")
 
+  set(SWIFT_SDK_${prefix}_ARCHITECTURES ${architectures})
+  if(SWIFT_DARWIN_SUPPORTED_ARCHS)
+    list_intersect(
+      "${architectures}"                  # lhs
+      "${SWIFT_DARWIN_SUPPORTED_ARCHS}"   # rhs
+      SWIFT_SDK_${prefix}_ARCHITECTURES)  # result
+  endif()
+
+  # Configure variables for _all_ architectures even if we aren't "building"
+  # them because they aren't supported.
   foreach(arch ${architectures})
     # On Darwin, all archs share the same SDK path.
     set(SWIFT_SDK_${prefix}_ARCH_${arch}_PATH "${SWIFT_SDK_${prefix}_PATH}")

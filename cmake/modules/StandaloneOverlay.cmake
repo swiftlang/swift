@@ -69,6 +69,13 @@ set_property(CACHE SWIFT_STDLIB_BUILD_TYPE PROPERTY
   STRINGS
     "Debug" "RelWithDebInfo" "Release" "MinSizeRel")
 
+set(SWIFT_DARWIN_SUPPORTED_ARCHS "" CACHE STRING
+  "Space-separated list of architectures to configure on Darwin platforms. \
+If left empty all default architectures are configured.")
+
+separate_arguments(SWIFT_DARWIN_SUPPORTED_ARCHS)
+
+
 # -----------------------------------------------------------------------------
 # Constants
 
