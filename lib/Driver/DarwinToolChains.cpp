@@ -285,8 +285,7 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
     Arguments.push_back("-dylib");
     break;
   case LinkKind::StaticLibrary:
-    Arguments.push_back(".a");
-    break;
+    llvm_unreachable("invalid link kind");
   }
 
   assert(Triple.isOSDarwin());

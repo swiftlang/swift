@@ -1079,6 +1079,73 @@ ToolChain::constructInvocation(const LinkJobAction &job,
   llvm_unreachable("linking not implemented for this toolchain");
 }
 
+ToolChain::InvocationInfo
+ToolChain::constructInvocation(const ArchiveJobAction &job,
+                               const JobContext &context) const {
+   assert(context.Output.getPrimaryOutputType() == file_types::TY_Image &&
+         "Invalid linker output type.");
+  assert(job.getKind() == LinkKind::StaticLibrary);
+
+  ArgStringList Arguments;
+
+  // Configure the toolchain.
+  bool isLLVMAR = false;
+  const char *AR = nullptr;
+  if (const Arg *A = context.Args.getLastArg(options::OPT_tools_directory)) {
+    StringRef toolchainPath(A->getValue());
+
+    // If there is an llvm-ar in the toolchain folder, use that instead.
+    if (auto toolchainAR =
+            llvm::sys::findProgramByName("llvm-ar", {toolchainPath})) {
+      AR = context.Args.MakeArgString(toolchainAR.get());
+      isLLVMAR = true;
+    }
+
+    // Look for binutils in the toolchain folder.
+    Arguments.push_back("-B");
+    Arguments.push_back(context.Args.MakeArgString(A->getValue()));
+  }
+  if (AR == nullptr) {
+    if (auto pathAR = llvm::sys::findProgramByName("llvm-ar", None))
+      AR = context.Args.MakeArgString(pathAR.get());
+      isLLVMAR = true;
+  }
+  if (AR == nullptr) {
+    if (auto pathAR = llvm::sys::findProgramByName("ar", None))
+      AR = context.Args.MakeArgString(pathAR.get());
+  }
+
+  assert(AR &&
+         "neither ar nor llvm-ar was not found in the toolchain directory or system path.");
+
+  if (isLLVMAR) {
+    switch (getTriple().getOS()) {
+      case llvm::Triple::Darwin:
+        Arguments.push_back("--format=darwin");
+        break;
+      case llvm::Triple::Linux:
+        Arguments.push_back("--format=gnu");
+        break;
+      default:
+        break;
+    }
+  }
+
+  Arguments.push_back("crs");
+
+  Arguments.push_back(
+      context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
+
+  addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
+                         file_types::TY_Object);
+  addInputsOfType(Arguments, context.InputActions, file_types::TY_Object);
+
+  InvocationInfo II{AR, Arguments};
+  II.allowsResponseFiles = true;
+
+  return II;
+}
+
 void ToolChain::addPathEnvironmentVariableIfNeeded(
     Job::EnvironmentVector &env, const char *name, const char *separator,
     options::ID optionID, const ArgList &args, StringRef extraEntry) const {

@@ -131,8 +131,7 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
     Arguments.push_back("-shared");
     break;
   case LinkKind::StaticLibrary:
-    // Nothing extra needed.
-    break;
+    llvm_unreachable("invalid link kind");
   }
 
   // Select the linker to use.

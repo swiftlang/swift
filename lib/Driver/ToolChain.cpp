@@ -100,6 +100,7 @@ std::unique_ptr<Job> ToolChain::constructJob(
       CASE(MergeModuleJob)
       CASE(ModuleWrapJob)
       CASE(LinkJob)
+      CASE(ArchiveJob)
       CASE(GenerateDSYMJob)
       CASE(VerifyDebugInfoJob)
       CASE(GeneratePCHJob)

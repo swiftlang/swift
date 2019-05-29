@@ -29,6 +29,7 @@ const char *Action::getClassName(Kind AC) {
   case Kind::AutolinkExtractJob:  return "swift-autolink-extract";
   case Kind::REPLJob:  return "repl";
   case Kind::LinkJob:  return "link";
+  case Kind::ArchiveJob:  return "archive";
   case Kind::GenerateDSYMJob:  return "generate-dSYM";
   case Kind::VerifyDebugInfoJob:  return "verify-debug-info";
   case Kind::GeneratePCHJob:  return "generate-pch";
@@ -56,6 +57,8 @@ void AutolinkExtractJobAction::anchor() {}
 void REPLJobAction::anchor() {}
 
 void LinkJobAction::anchor() {}
+
+void ArchiveJobAction::anchor() {}
 
 void GenerateDSYMJobAction::anchor() {}
 
