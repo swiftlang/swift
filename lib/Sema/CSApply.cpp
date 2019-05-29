@@ -3707,8 +3707,9 @@ namespace {
         Expr *sub = expr->getSubExpr();
 
         cs.setExprTypes(sub);
-        if (tc.convertToType(sub, toType, cs))
-          return nullptr;
+
+        sub = coerceToType(sub, toType, cs.getConstraintLocator(sub));
+
         cs.cacheExprTypes(sub);
 
         expr->setSubExpr(sub);

@@ -3318,46 +3318,6 @@ Expr *TypeChecker::coerceToRValue(Expr *expr,
   return expr;
 }
 
-bool TypeChecker::convertToType(Expr *&expr, Type type, constraints::ConstraintSystem& cs,
-                                Optional<Pattern*> typeFromPattern) {
-    // Attempt to solve the constraint system.
-    SmallVector<Solution, 4> viable;
-    if ((cs.solve(expr, viable) || viable.size() != 1) &&
-      cs.salvage(viable, expr)) {
-      return true;
-    }
-    
-    auto &solution = viable[0];
-    if (getLangOpts().DebugConstraintSolver) {
-      auto &log = Context.TypeCheckerDebug->getStream();
-      log << "---Solution---\n";
-      solution.dump(log);
-    }
-    
-    cs.cacheExprTypes(expr);
-    
-    // Perform the conversion.
-    Expr *result = solution.coerceToType(expr, type,
-                                         cs.getConstraintLocator(expr),
-                                         /*ignoreTopLevelInjection*/false,
-                                         typeFromPattern);
-    if (!result) {
-      return true;
-    }
-    
-    cs.setExprTypes(expr);
-    
-    if (getLangOpts().DebugConstraintSolver) {
-      auto &log = Context.TypeCheckerDebug->getStream();
-      log << "---Type-checked expression---\n";
-      result->dump(log);
-      log << "\n";
-    }
-    
-    expr = result;
-    return false;
-}
-
 bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc,
                                 Optional<Pattern*> typeFromPattern) {
   // TODO: need to add kind arg?
@@ -3375,8 +3335,43 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc,
     log << "\n";
     cs.print(log);
   }
-    
-  return convertToType(expr, type, cs, typeFromPattern);
+
+  // Attempt to solve the constraint system.
+  SmallVector<Solution, 4> viable;
+  if ((cs.solve(expr, viable) || viable.size() != 1) &&
+    cs.salvage(viable, expr)) {
+    return true;
+  }
+
+  auto &solution = viable[0];
+  if (getLangOpts().DebugConstraintSolver) {
+    auto &log = Context.TypeCheckerDebug->getStream();
+    log << "---Solution---\n";
+    solution.dump(log);
+  }
+
+  cs.cacheExprTypes(expr);
+
+  // Perform the conversion.
+  Expr *result = solution.coerceToType(expr, type,
+                                       cs.getConstraintLocator(expr),
+                                       /*ignoreTopLevelInjection*/false,
+                                       typeFromPattern);
+  if (!result) {
+    return true;
+  }
+
+  cs.setExprTypes(expr);
+
+  if (getLangOpts().DebugConstraintSolver) {
+    auto &log = Context.TypeCheckerDebug->getStream();
+    log << "---Type-checked expression---\n";
+    result->dump(log);
+    log << "\n";
+  }
+
+  expr = result;
+  return false;
 }
 
 //===----------------------------------------------------------------------===//

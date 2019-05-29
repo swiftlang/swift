@@ -1549,16 +1549,6 @@ public:
   /// \returns true if an error occurred, false otherwise.
   bool convertToType(Expr *&expr, Type type, DeclContext *dc,
                      Optional<Pattern*> typeFromPattern = None);
-
-  /// Convert the given expression to the given type.
-  ///
-  /// \param expr The expression, which will be updated in place.
-  /// \param type The type to convert to.
-  /// \param cs The constraint system that will be used to the conversion.
-  ///
-  /// \returns true if an error occurred, false otherwise.
-  bool convertToType(Expr *&expr, Type type, constraints::ConstraintSystem& cs,
-                     Optional<Pattern*> typeFromPattern = None);
     
   /// Coerce the given expression to materializable type, if it
   /// isn't already.
