@@ -182,6 +182,8 @@ class HostSpecificConfiguration(object):
             if test:
                 if test_host_only:
                     suffix = "-only_non_executable"
+                elif args.only_executable_test:
+                    suffix = "-only_executable"
                 else:
                     suffix = ""
                 subset_suffix = ""
@@ -730,6 +732,8 @@ class BuildScriptInvocation(object):
             impl_args += ["--long-test"]
         if args.stress_test:
             impl_args += ["--stress-test"]
+        if args.only_executable_test:
+            impl_args += ["--only-executable-test"]
         if not args.benchmark:
             impl_args += ["--skip-test-benchmarks"]
         if not args.test_optimized:
