@@ -3323,15 +3323,15 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, constraints::ConstraintS
     // Attempt to solve the constraint system.
     SmallVector<Solution, 4> viable;
     if ((cs.solve(expr, viable) || viable.size() != 1) &&
-        cs.salvage(viable, expr)) {
-        return true;
+      cs.salvage(viable, expr)) {
+      return true;
     }
     
     auto &solution = viable[0];
     if (getLangOpts().DebugConstraintSolver) {
-        auto &log = Context.TypeCheckerDebug->getStream();
-        log << "---Solution---\n";
-        solution.dump(log);
+      auto &log = Context.TypeCheckerDebug->getStream();
+      log << "---Solution---\n";
+      solution.dump(log);
     }
     
     cs.cacheExprTypes(expr);
@@ -3342,16 +3342,16 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, constraints::ConstraintS
                                          /*ignoreTopLevelInjection*/false,
                                          typeFromPattern);
     if (!result) {
-        return true;
+      return true;
     }
     
     cs.setExprTypes(expr);
     
     if (getLangOpts().DebugConstraintSolver) {
-        auto &log = Context.TypeCheckerDebug->getStream();
-        log << "---Type-checked expression---\n";
-        result->dump(log);
-        log << "\n";
+      auto &log = Context.TypeCheckerDebug->getStream();
+      log << "---Type-checked expression---\n";
+      result->dump(log);
+      log << "\n";
     }
     
     expr = result;
@@ -3370,11 +3370,11 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc,
                    cs.getConstraintLocator(expr));
     
   if (getLangOpts().DebugConstraintSolver) {
-        auto &log = Context.TypeCheckerDebug->getStream();
-        log << "---Initial constraints for the given expression---\n";
-        expr->dump(log);
-        log << "\n";
-        cs.print(log);
+    auto &log = Context.TypeCheckerDebug->getStream();
+    log << "---Initial constraints for the given expression---\n";
+    expr->dump(log);
+    log << "\n";
+    cs.print(log);
   }
     
   return convertToType(expr, type, cs, typeFromPattern);
