@@ -52,8 +52,7 @@ static bool allAssociatedValuesConformToProtocol(DeclContext *DC,
     for (auto param : *PL) {
       auto type = param->getInterfaceType();
       if (!TypeChecker::conformsToProtocol(DC->mapTypeIntoContext(type),
-                                           protocol, DC,
-                                           ConformanceCheckFlags::Used)) {
+                                           protocol, DC, None)) {
         return false;
       }
     }
@@ -81,8 +80,7 @@ static bool allStoredPropertiesConformToProtocol(DeclContext *DC,
     auto type = propertyDecl->getValueInterfaceType();
 
     if (!TypeChecker::conformsToProtocol(DC->mapTypeIntoContext(type),
-                                         protocol, DC,
-                                         ConformanceCheckFlags::Used)) {
+                                         protocol, DC, None)) {
       return false;
     }
   }

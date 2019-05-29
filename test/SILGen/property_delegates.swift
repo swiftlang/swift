@@ -163,7 +163,7 @@ func consumeOldValue(_: Int) { }
 func consumeNewValue(_: Int) { }
 
 struct DelegateWithDidSetWillSet {
-  // CHECK-LABEL: sil hidden [ossa] @$s18property_delegates022DelegateWithDidSetW
+  // CHECK-LABEL: sil hidden [ossa] @$s18property_delegates022DelegateWithDidSetWillF0V1xSivs
   // CHECK: function_ref @$s18property_delegates022DelegateWithDidSetWillF0V1xSivw
   // CHECK: struct_element_addr {{%.*}} : $*DelegateWithDidSetWillSet, #DelegateWithDidSetWillSet.$x
   // CHECK-NEXT: struct_element_addr {{%.*}} : $*Wrapper<Int>, #Wrapper.value

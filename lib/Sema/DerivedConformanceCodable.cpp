@@ -89,9 +89,8 @@ static CodableConformanceType typeConformsToCodable(TypeChecker &tc,
     return typeConformsToCodable(tc, context, target->getOptionalObjectType(),
                                  false, proto);
 
-  return tc.conformsToProtocol(target, proto, context,
-                               ConformanceCheckFlags::Used) ? Conforms
-                                                            : DoesNotConform;
+  return tc.conformsToProtocol(target, proto, context, None) ? Conforms
+                                                             : DoesNotConform;
 }
 
 /// Returns whether the given variable conforms to the given {En,De}codable
@@ -282,7 +281,7 @@ static CodingKeysValidity hasValidCodingKeysEnum(DerivedConformance &derived) {
   auto *codingKeyProto = C.getProtocol(KnownProtocolKind::CodingKey);
   if (!tc.conformsToProtocol(codingKeysType, codingKeyProto,
                              derived.getConformanceContext(),
-                             ConformanceCheckFlags::Used)) {
+                             None)) {
     // If CodingKeys is a typealias which doesn't point to a valid nominal type,
     // codingKeysTypeDecl will be nullptr here. In that case, we need to warn on
     // the location of the usage, since there isn't an underlying type to
@@ -1069,8 +1068,7 @@ static bool canSynthesize(DerivedConformance &derived, ValueDecl *requirement) {
     if (auto *superclassDecl = classDecl->getSuperclassDecl()) {
       DeclName memberName;
       auto superType = superclassDecl->getDeclaredInterfaceType();
-      if (tc.conformsToProtocol(superType, proto, superclassDecl,
-                                ConformanceCheckFlags::Used)) {
+      if (tc.conformsToProtocol(superType, proto, superclassDecl, None)) {
         // super.init(from:) must be accessible.
         memberName = cast<ConstructorDecl>(requirement)->getFullName();
       } else {

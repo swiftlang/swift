@@ -394,7 +394,7 @@ extension FlattenCollection: Collection {
   }
 
   @inlinable // lazy-performance
-  public subscript(bounds: Range<Index>) -> SubSequence {
+  public subscript(bounds: Range<Index>) -> Slice<FlattenCollection<Base>> {
     return Slice(base: self, bounds: bounds)
   }
 }
