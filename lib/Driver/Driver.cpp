@@ -1373,14 +1373,13 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
       break;
 
     case options::OPT_emit_library:
-      if (OI.LinkAction != LinkKind::StaticLibrary)
-        OI.LinkAction = LinkKind::DynamicLibrary;
+      OI.LinkAction = Args.hasArg(options::OPT_static_library) ?
+                      LinkKind::StaticLibrary :
+                      LinkKind::DynamicLibrary;
       OI.CompilerOutputType = file_types::TY_Object;
       break;
 
-    case options::OPT_emit_archive:
-      OI.LinkAction = LinkKind::StaticLibrary;
-      OI.CompilerOutputType = file_types::TY_Object;
+    case options::OPT_static_library:
       break;
 
     case options::OPT_emit_object:
