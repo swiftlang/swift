@@ -130,7 +130,7 @@ public class LazyTensorOperation : TensorOperation {
     case FloatArray([Float])
     case DoubleArray([Double])
     case StringArray([String])
-    case ConstTensor(CTFTensor)
+    case ConstTensor(TFETensorHandle)
     case TensorDataTypeValue(TensorDataType)
   }
 

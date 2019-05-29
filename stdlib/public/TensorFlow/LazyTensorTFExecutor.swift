@@ -54,7 +54,9 @@ class TFGraphBuilder {
         }
       }
       case LazyTensorOperation.Attribute.ConstTensor(let value): do {
-        TF_SetAttrTensor(desc, name, value, status)
+        let cTensor = TFE_TensorHandleResolve(value._cTensorHandle, status)
+        checkOk(status)
+        TF_SetAttrTensor(desc, name, cTensor!, status)
       }
       default:
         assert(false, "Unhandled attribute \(name):\(attrValue)")
@@ -314,11 +316,9 @@ class LazyTraceDescription {
     let result = LazyTensorOperation("Const", 1)
     let dtype = TensorDataType(TFE_TensorHandleDataType(cTensorHandle))
     let dtypeAttr = LazyTensorOperation.Attribute.TensorDataTypeValue(dtype)
-    let cTensor = TFE_TensorHandleResolve(cTensorHandle, status)
-    checkOk(status)
     result.attrs = [
       "dtype": dtypeAttr,
-      "value": LazyTensorOperation.Attribute.ConstTensor(cTensor!)]
+      "value": LazyTensorOperation.Attribute.ConstTensor(conc)]
     updateCacheAndOperations(ObjectIdentifier(conc), result)
     return LazyTensor(_lazy: result, index: 0)
   }
