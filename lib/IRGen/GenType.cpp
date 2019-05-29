@@ -294,7 +294,10 @@ FixedTypeInfo::getSpareBitFixedExtraInhabitantValue(IRGenModule &IGM,
     spareIndex = (index >> occupiedBitCount) + 1;
   }
 
-  return interleaveSpareBits(IGM, SpareBits, bits, spareIndex, occupiedIndex);
+  APInt mask = SpareBits.asAPInt().zextOrTrunc(bits);
+  APInt v = scatterBits(mask, spareIndex);
+  v |= scatterBits(~mask, occupiedIndex);
+  return v;
 }
 
 llvm::Value *
@@ -328,7 +331,7 @@ FixedTypeInfo::getSpareBitExtraInhabitantIndex(IRGenFunction &IGF,
   // Gather the occupied bits.
   auto OccupiedBits = SpareBits;
   OccupiedBits.flipAll();
-  llvm::Value *idx = emitGatherSpareBits(IGF, OccupiedBits, val, 0, 31);
+  llvm::Value *idx = emitGatherBits(IGF, OccupiedBits.asAPInt(), val, 0, 31);
   
   // See if spare bits fit into the 31 bits of the index.
   unsigned numSpareBits = SpareBits.count();
@@ -336,7 +339,7 @@ FixedTypeInfo::getSpareBitExtraInhabitantIndex(IRGenFunction &IGF,
   if (numOccupiedBits < 31) {
     // Gather the spare bits.
     llvm::Value *spareIdx
-      = emitGatherSpareBits(IGF, SpareBits, val, numOccupiedBits, 31);
+      = emitGatherBits(IGF, SpareBits.asAPInt(), val, numOccupiedBits, 31);
     // Unbias by subtracting one.
 
     uint64_t shifted = static_cast<uint64_t>(1) << numOccupiedBits;
@@ -830,13 +833,13 @@ FixedTypeInfo::storeSpareBitExtraInhabitant(IRGenFunction &IGF,
   }
   
   // Scatter the occupied bits.
-  auto OccupiedBits = SpareBits;
-  OccupiedBits.flipAll();
-  llvm::Value *occupied = emitScatterSpareBits(IGF, OccupiedBits,
-                                               occupiedIndex, 0);
+  auto OccupiedBits = ~SpareBits.asAPInt();
+  llvm::Value *occupied = emitScatterBits(IGF, OccupiedBits,
+                                          occupiedIndex, 0);
   
   // Scatter the spare bits.
-  llvm::Value *spare = emitScatterSpareBits(IGF, SpareBits, spareIndex, 0);
+  llvm::Value *spare = emitScatterBits(IGF, SpareBits.asAPInt(),
+                                       spareIndex, 0);
   
   // Combine the values and store to the destination.
   llvm::Value *inhabitant = IGF.Builder.CreateOr(occupied, spare);

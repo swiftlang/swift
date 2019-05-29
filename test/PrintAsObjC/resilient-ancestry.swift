@@ -10,11 +10,9 @@
 // RUN: %FileCheck %s --check-prefix=NO-STUBS < %t/resilient.h
 // RUN: %check-in-clang %t/resilient.h -I %t
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck %s -module-name resilient -emit-objc-header-path %t/resilient.h -I %t -enable-library-evolution -enable-resilient-objc-class-stubs
-// RUN: %FileCheck %s < %t/resilient.h
-// RUN: %check-in-clang %t/resilient.h -I %t
-
 // REQUIRES: objc_interop
+
+// See also resilient-ancestry.swift, for the stable ABI deployment target test.
 
 import Foundation
 import resilient_objc_class

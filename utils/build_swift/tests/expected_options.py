@@ -161,6 +161,7 @@ EXPECTED_DEFAULTS = {
     'tsan_libdispatch_test': False,
     'long_test': False,
     'lto_type': None,
+    'dump_config': False,
     'show_sdks': False,
     'skip_build': False,
     'stdlib_deployment_targets': None,
@@ -397,9 +398,11 @@ EXPECTED_OPTIONS = [
     SetOption('-s', dest='test_optimize_for_size', value=True),
     SetOption('-y', dest='test_optimize_none_implicit_dynamic', value=True),
     SetOption('-t', dest='test', value=True),
+    SetOption('-a', dest='assertions', value=True),
 
     # FIXME: Convert these options to set_false actions
     SetOption('--no-assertions', dest='assertions', value=False),
+    SetOption('-A', dest='assertions', value=False),
     SetOption('--no-lldb-assertions', dest='lldb_assertions', value=False),
     SetOption('--no-llvm-assertions', dest='llvm_assertions', value=False),
     SetOption('--no-llbuild-assertions',
@@ -414,6 +417,7 @@ EXPECTED_OPTIONS = [
     SetTrueOption('--benchmark'),
     SetTrueOption('--clean'),
     SetTrueOption('--dry-run'),
+    SetTrueOption('--dump-config'),
     SetTrueOption('--disable-guaranteed-normal-arguments'),
     SetTrueOption('--enable-stdlibcore-exclusivity-checking'),
     SetTrueOption('--force-optimized-typechecker'),

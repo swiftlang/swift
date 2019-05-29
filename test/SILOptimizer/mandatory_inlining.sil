@@ -1200,3 +1200,143 @@ bb0(%0: $C):
   %tuple = tuple()
   return %tuple : $()
 }
+
+// CHECK-LABEL: sil @test_apply_pai_in_loop : $@convention(thin) (@guaranteed C) ->  () {
+// CHECK: bb0([[ARG:%.*]] : $C):
+// CHECK-NEXT:   strong_retain [[ARG]]
+// CHECK-NEXT:   strong_retain [[ARG]]
+// CHECK-NEXT:   br bb1
+//
+// CHECK: bb1:
+// CHECK-NEXT:   cond_br undef, bb2, bb3
+//
+// CHECK: bb2:
+// CHECK-NEXT: function_ref use_c
+// CHECK-NEXT: [[FUNC:%.*]] = function_ref @use_c
+// CHECK-NEXT: apply [[FUNC]]([[ARG]])
+// CHECK-NEXT: tuple
+// CHECK-NEXT: br bb1
+//
+// CHECK: bb3:
+// CHECK-NEXT: strong_release [[ARG]]
+// CHECK-NEXT: strong_release [[ARG]]
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+// CHECK-NEXT: } // end sil function 'test_apply_pai_in_loop'
+sil @test_apply_pai_in_loop : $@convention(thin) (@guaranteed C) ->  () {
+bb0(%0: $C):
+  strong_retain %0 : $C
+  %closure_fun = function_ref @guaranteed_closure_func : $@convention(thin) (@guaranteed C) -> ()
+  %closure = partial_apply [callee_guaranteed] %closure_fun(%0) : $@convention(thin) (@guaranteed C) -> ()
+  br bb1
+
+bb1:
+  cond_br undef, bb2, bb3
+
+bb2:
+  apply %closure() : $@callee_guaranteed () -> ()
+  br bb1
+
+bb3:
+  strong_release %0: $C
+  %tuple = tuple()
+  return %tuple : $()
+}
+
+// CHECK-LABEL: sil @test_apply_pai_in_loop_with_diamond : $@convention(thin) (@guaranteed C) ->  () {
+// CHECK: bb0([[ARG:%.*]] : $C):
+// CHECK-NEXT:   strong_retain [[ARG]]
+// CHECK-NEXT:   strong_retain [[ARG]]
+// CHECK-NEXT:   strong_retain [[ARG]]
+// CHECK-NEXT:   cond_br undef, bb1, bb4
+//
+// CHECK: bb1:
+// CHECK-NEXT: function_ref use_c
+// CHECK-NEXT: [[FUNC:%.*]] = function_ref @use_c
+// CHECK-NEXT: apply [[FUNC]]([[ARG]])
+// CHECK-NEXT: tuple
+// CHECK-NEXT: cond_br undef, bb2, bb3
+//
+// CHECK: bb2:
+// CHECK-NEXT: function_ref use_c
+// CHECK-NEXT: [[FUNC:%.*]] = function_ref @use_c
+// CHECK-NEXT: apply [[FUNC]]([[ARG]])
+// CHECK-NEXT: tuple
+// CHECK-NEXT: br bb1
+//
+// CHECK: bb3:
+// CHECK-NEXT: br bb1
+//
+// CHECK: bb4:
+// CHECK-NEXT: strong_release [[ARG]]
+// CHECK-NEXT: strong_release [[ARG]]
+// CHECK-NEXT: strong_release [[ARG]]
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+// CHECK-NEXT: } // end sil function 'test_apply_pai_in_loop_with_diamond'
+sil @test_apply_pai_in_loop_with_diamond : $@convention(thin) (@guaranteed C) ->  () {
+bb0(%0: $C):
+  strong_retain %0 : $C
+  %closure_fun = function_ref @guaranteed_closure_func : $@convention(thin) (@guaranteed C) -> ()
+  %closure = partial_apply [callee_guaranteed] %closure_fun(%0) : $@convention(thin) (@guaranteed C) -> ()
+  cond_br undef, bb2, bb5
+
+bb2:
+  apply %closure() : $@callee_guaranteed () -> ()
+  cond_br undef, bb3, bb4
+
+bb3:
+  apply %closure() : $@callee_guaranteed () -> ()
+  br bb2
+
+bb4:
+  br bb2
+
+bb5:
+  strong_release %0: $C
+  %tuple = tuple()
+  return %tuple : $()
+}
+
+// CHECK-LABEL: sil @test_apply_pai_in_diamond : $@convention(thin) (@guaranteed C) ->  () {
+// CHECK: bb0([[ARG:%.*]] : $C):
+// CHECK-NEXT:   strong_retain [[ARG]]
+// CHECK-NEXT:   strong_retain [[ARG]]
+// CHECK-NEXT:   cond_br undef, bb1, bb2
+//
+// CHECK: bb1:
+// CHECK-NEXT: strong_release [[ARG]]
+// CHECK-NEXT: br bb3
+//
+// CHECK: bb2:
+// CHECK-NEXT: function_ref use_c
+// CHECK-NEXT: [[FUNC:%.*]] = function_ref @use_c
+// CHECK-NEXT: apply [[FUNC]]([[ARG]])
+// CHECK-NEXT: tuple
+// CHECK-NEXT: strong_release [[ARG]]
+// CHECK-NEXT: br bb3
+//
+// CHECK: bb3:
+// CHECK-NEXT: strong_release [[ARG]]
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+// CHECK-NEXT: } // end sil function 'test_apply_pai_in_diamond'
+sil @test_apply_pai_in_diamond : $@convention(thin) (@guaranteed C) ->  () {
+bb0(%0: $C):
+  strong_retain %0 : $C
+  %closure_fun = function_ref @guaranteed_closure_func : $@convention(thin) (@guaranteed C) -> ()
+  %closure = partial_apply [callee_guaranteed] %closure_fun(%0) : $@convention(thin) (@guaranteed C) -> ()
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  apply %closure() : $@callee_guaranteed () -> ()
+  br bb3
+
+bb3:
+  strong_release %0: $C
+  %tuple = tuple()
+  return %tuple : $()
+}
