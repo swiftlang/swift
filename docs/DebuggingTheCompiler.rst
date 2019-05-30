@@ -457,6 +457,44 @@ One can also use shell regex to visit multiple files in the same directory. Exam
 
     clang-tidy -p=$PATH_TO_BUILD/swift-macosx-x86_64/compile_commands.json $FULL_PATH_TO_DIR/*.cpp
 
+Identifying an optimizer bug
+----------------------------
+
+If a compiled executable is crashing when built with optimizations, but not
+crashing when built with -Onone, it's most likely one of the SIL optimizations
+which causes the miscompile.
+
+Currently there is no tool to automatically identify the bad optimization, but
+it's quite easy to do this manually:
+
+1. Find the offending optimization with bisecting:
+
+  a. Add the compiler option ``-Xllvm -sil-opt-pass-count=<n>``, where ``<n>``
+     is the number of optimizations to run.
+  b. Bisect: find n where the executable crashes, but does not crash with n-1.
+     Note that n can be quite large, e.g. > 100000 (just try
+     n = 10, 100, 1000, 10000, etc. to find an upper bound).
+  c. Add another option ``-Xllvm -sil-print-pass-name``. The output can be
+     large, so it's best to redirect stderr to a file (``2> output``).
+     In the output search for the last pass before ``stage Address Lowering``.
+     It should be the ``Run #<n-1>``. This line tells you the name of the bad
+     optimization pass and on which function it run.
+
+2. Get the SIL before and after the bad optimization.
+
+  a. Add the compiler options
+     ``-Xllvm -sil-print-all -Xllvm -sil-print-only-function='<function>'``
+     where ``<function>`` is the function name (including the preceding ``$``).
+     For example:
+     ``-Xllvm -sil-print-all -Xllvm -sil-print-only-function='$s4test6testityS2iF'``.
+     Again, the output can be large, so it's best to redirect stderr to a file.
+  b. From the output, copy the SIL of the function *before* the bad
+     run into a separate file and the SIL *after* the bad run into a file.
+  c. Compare both SIL files and try to figure out what the optimization pass
+     did wrong. To simplify the comparison, it's sometimes helpful to replace
+     all SIL values (e.g. ``%27``) with a constant string (e.g. ``%x``).
+
+
 Debugging Swift Executables
 ===========================
 
