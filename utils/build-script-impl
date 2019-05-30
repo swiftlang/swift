@@ -1247,10 +1247,6 @@ if [[ "${ENABLE_TENSORFLOW}" ]]; then
         echo "Couldn't find TensorFlow source directory."
         exit 1
     fi
-    if [[ "${TENSORFLOW_SWIFT_BINDINGS}" && ! -d "${TENSORFLOW_SWIFT_BINDINGS}" ]]; then
-        echo "Invalid TensorFlow Swift bindings repository specified."
-        exit 1
-    fi
     if [[ "${TENSORFLOW_SWIFT_APIS}" && ! -d "${TENSORFLOW_SWIFT_APIS}" ]]; then
         echo "Invalid TensorFlow high-level APIs repository specified."
         exit 1
@@ -2598,16 +2594,6 @@ for host in "${ALL_HOSTS[@]}"; do
                         )
                     fi
 
-                    # Handle TensorFlow Swift bindings file.
-                    if [[ ! "${TENSORFLOW_SWIFT_BINDINGS}" && -d "${TENSORFLOW_SWIFT_BINDINGS_DIR}" ]] ; then
-                        TENSORFLOW_SWIFT_BINDINGS="${TENSORFLOW_SWIFT_BINDINGS_DIR}"
-                    fi
-                    if [[ "${TENSORFLOW_SWIFT_BINDINGS}" ]] ; then
-                        cmake_options=(
-                            "${cmake_options[@]}"
-                            -DTENSORFLOW_SWIFT_BINDINGS:PATH="${TENSORFLOW_SWIFT_BINDINGS}"
-                        )
-                    fi
                     # Handle TensorFlow high-level APIs repository.
                     if [[ ! "${TENSORFLOW_SWIFT_APIS}" && -d "${TENSORFLOW_SWIFT_APIS_DIR}" ]] ; then
                         TENSORFLOW_SWIFT_APIS="${TENSORFLOW_SWIFT_APIS_DIR}"
