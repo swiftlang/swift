@@ -87,6 +87,10 @@ void ConformingMethodListCallbacks::doneParsing() {
   if (!T || T->is<ErrorType>() || T->is<UnresolvedType>())
     return;
 
+  T = T->getRValueType();
+  if (T->hasArchetype())
+    T = T->mapTypeOutOfContext();
+
   llvm::MapVector<ProtocolDecl*, StringRef> expectedProtocols;
   resolveProtocolNames(CurDeclContext, ExpectedTypeNames, expectedProtocols);
 
