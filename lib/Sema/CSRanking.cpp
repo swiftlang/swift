@@ -472,10 +472,11 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
       Type type2 = decl2->getInterfaceType();
 
       // Add curried 'self' types if necessary.
-      if (!decl1->hasCurriedSelf()) {
+      if (!decl1->hasCurriedSelf())
         type1 = type1->addCurriedSelfType(outerDC1);
+
+      if (!decl2->hasCurriedSelf())
         type2 = type2->addCurriedSelfType(outerDC2);
-      }
 
       // Construct a constraint system to compare the two declarations.
       ConstraintSystem cs(tc, dc, ConstraintSystemOptions());
@@ -594,14 +595,14 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
       }
 
       bool fewerEffectiveParameters = false;
-      if (!decl1->hasParameterList()) {
-        // If the decl doesn't have a parameter list, simply check whether the
-        // first type is a subtype of the second.
+      if (!decl1->hasParameterList() && !decl2->hasParameterList()) {
+        // If neither decl has a parameter list, simply check whether the first
+        // type is a subtype of the second.
         cs.addConstraint(ConstraintKind::Subtype,
                          openedType1,
                          openedType2,
                          locator);
-      } else {
+      } else if (decl1->hasParameterList() && decl2->hasParameterList()) {
         // Otherwise, check whether the first function type's input is a subtype
         // of the second type's inputs, i.e., can we forward the arguments?
         auto funcTy1 = openedType1->castTo<FunctionType>();
