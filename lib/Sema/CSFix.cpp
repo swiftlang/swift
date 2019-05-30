@@ -544,106 +544,16 @@ CollectionElementContextualMismatch::create(ConstraintSystem &cs, Type srcType,
 bool ExplicitlySpecifyGenericArguments::diagnose(Expr *root,
                                                  bool asNote) const {
   auto &cs = getConstraintSystem();
-
-  bool diagnosed = false;
-  for (const auto &paramsPerAnchor : Parameters) {
-    auto anchor = paramsPerAnchor.first;
-    ArrayRef<GenericTypeParamType *> missingParameters = paramsPerAnchor.second;
-    MissingGenericArgumentsFailure failure(root, cs,
-                                           anchor.dyn_cast<TypeRepr *>(),
-                                           missingParameters, getLocator());
-    diagnosed |= failure.diagnose(asNote);
-  }
-
-  return diagnosed;
+  MissingGenericArgumentsFailure failure(root, cs, getParameters(),
+                                         getLocator());
+  return failure.diagnose(asNote);
 }
 
 ExplicitlySpecifyGenericArguments *ExplicitlySpecifyGenericArguments::create(
     ConstraintSystem &cs, ArrayRef<GenericTypeParamType *> params,
     ConstraintLocator *locator) {
-  llvm::SmallDenseMap<TypeRepr *, llvm::SmallVector<GenericTypeParamType *, 4>>
-      typeBasedParams;
-
-  if (findArgumentLocations(locator->getAnchor(), params,
-                            [&](TypeRepr *base, GenericTypeParamType *GP) {
-                              typeBasedParams[base].push_back(GP);
-                            }))
-    return new (cs.getAllocator())
-        ExplicitlySpecifyGenericArguments(cs, typeBasedParams, locator);
-
-  return new (cs.getAllocator())
-      ExplicitlySpecifyGenericArguments(cs, params, locator);
-}
-
-bool ExplicitlySpecifyGenericArguments::findArgumentLocations(
-    Expr *anchor, ArrayRef<GenericTypeParamType *> genericParams,
-    llvm::function_ref<void(TypeRepr *, GenericTypeParamType *)> callback) {
-  using Callback = llvm::function_ref<void(TypeRepr *, GenericTypeParamType *)>;
-
-  if (!anchor)
-    return false;
-
-  TypeLoc typeLoc;
-  if (auto *TE = dyn_cast<TypeExpr>(anchor))
-    typeLoc = TE->getTypeLoc();
-  else if (auto *ECE = dyn_cast<ExplicitCastExpr>(anchor))
-    typeLoc = ECE->getCastTypeLoc();
-
-  if (!typeLoc.hasLocation())
-    return false;
-
-  llvm::SmallVector<GenericTypeParamType *, 4> params(genericParams.begin(),
-                                                      genericParams.end());
-
-  struct AssociateMissingParams : public ASTWalker {
-    llvm::SmallVectorImpl<GenericTypeParamType *> &Params;
-    Callback Fn;
-
-    AssociateMissingParams(SmallVectorImpl<GenericTypeParamType *> &params,
-                           Callback callback)
-        : Params(params), Fn(callback) {}
-
-    bool walkToTypeReprPre(TypeRepr *T) override {
-      if (Params.empty())
-        return false;
-
-      auto *ident = dyn_cast<ComponentIdentTypeRepr>(T);
-      if (!ident)
-        return true;
-
-      auto *decl = dyn_cast_or_null<GenericTypeDecl>(ident->getBoundDecl());
-      if (!decl)
-        return true;
-
-      auto *paramList = decl->getGenericParams();
-      if (!paramList)
-        return true;
-
-      // There could a situation like `S<S>()`, so we need to be
-      // careful not to point at first `S` because it has all of
-      // its generic parameters specified.
-      if (auto *generic = dyn_cast<GenericIdentTypeRepr>(ident)) {
-        if (paramList->size() == generic->getNumGenericArgs())
-          return true;
-      }
-
-      for (auto *candidate : paramList->getParams()) {
-        auto result =
-            llvm::find_if(Params, [&](const GenericTypeParamType *param) {
-              return candidate == param->getDecl();
-            });
-
-        if (result != Params.end()) {
-          Fn(ident, *result);
-          Params.erase(result);
-        }
-      }
-
-      // Keep walking.
-      return true;
-    }
-  } paramAssociator(params, callback);
-
-  typeLoc.getTypeRepr()->walk(paramAssociator);
-  return params.empty();
+  unsigned size = totalSizeToAlloc<GenericTypeParamType *>(params.size());
+  void *mem = cs.getAllocator().Allocate(
+      size, alignof(ExplicitlySpecifyGenericArguments));
+  return new (mem) ExplicitlySpecifyGenericArguments(cs, params, locator);
 }

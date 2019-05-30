@@ -1238,20 +1238,18 @@ private:
 /// _ = S()
 /// ```
 class MissingGenericArgumentsFailure final : public FailureDiagnostic {
-  TypeRepr *BaseType;
+  using Anchor = llvm::PointerUnion<TypeRepr *, Expr *>;
+
   SmallVector<GenericTypeParamType *, 4> Parameters;
 
 public:
   MissingGenericArgumentsFailure(Expr *root, ConstraintSystem &cs,
-                                 TypeRepr *baseType,
                                  ArrayRef<GenericTypeParamType *> missingParams,
                                  ConstraintLocator *locator)
-      : FailureDiagnostic(root, cs, locator), BaseType(baseType) {
+      : FailureDiagnostic(root, cs, locator) {
     assert(!missingParams.empty());
     Parameters.append(missingParams.begin(), missingParams.end());
   }
-
-  SourceLoc getLoc() const;
 
   bool hasLoc(GenericTypeParamType *GP) const;
 
@@ -1262,10 +1260,19 @@ public:
 
   bool diagnoseAsError() override;
 
-  bool diagnoseParameter(GenericTypeParamType *GP) const;
+  bool diagnoseForAnchor(Anchor anchor,
+                         ArrayRef<GenericTypeParamType *> params) const;
+
+  bool diagnoseParameter(Anchor anchor, GenericTypeParamType *GP) const;
 
 private:
-  void emitGenericSignatureNote() const;
+  void emitGenericSignatureNote(Anchor anchor) const;
+
+  /// Retrieve representative locations for associated generic prameters.
+  ///
+  /// \returns true if all of the parameters have been covered.
+  bool findArgumentLocations(
+      llvm::function_ref<void(TypeRepr *, GenericTypeParamType *)> callback);
 };
 
 } // end namespace constraints

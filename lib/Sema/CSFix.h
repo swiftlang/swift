@@ -922,35 +922,31 @@ public:
          ConstraintLocator *locator);
 };
 
-class ExplicitlySpecifyGenericArguments final : public ConstraintFix {
-  using Anchor = llvm::PointerUnion<ConstraintLocator *, TypeRepr *>;
+class ExplicitlySpecifyGenericArguments final
+    : public ConstraintFix,
+      private llvm::TrailingObjects<ExplicitlySpecifyGenericArguments,
+                                    GenericTypeParamType *> {
+  friend TrailingObjects;
 
-  llvm::SmallDenseMap<Anchor, llvm::SmallVector<GenericTypeParamType *, 4>>
-      Parameters;
+  unsigned NumMissingParams;
 
   ExplicitlySpecifyGenericArguments(ConstraintSystem &cs,
                                     ArrayRef<GenericTypeParamType *> params,
                                     ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::ExplicitlySpecifyGenericArguments, locator) {
+      : ConstraintFix(cs, FixKind::ExplicitlySpecifyGenericArguments, locator),
+        NumMissingParams(params.size()) {
     assert(!params.empty());
-    Parameters[locator].append(params.begin(), params.end());
-  }
-
-  ExplicitlySpecifyGenericArguments(
-      ConstraintSystem &cs,
-      llvm::SmallDenseMap<TypeRepr *,
-                          llvm::SmallVector<GenericTypeParamType *, 4>> &params,
-      ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::ExplicitlySpecifyGenericArguments, locator) {
-    assert(!params.empty());
-    for (const auto &elt : params) {
-      Parameters.insert(elt);
-    }
+    std::uninitialized_copy(params.begin(), params.end(),
+                            getParametersBuf().begin());
   }
 
 public:
   std::string getName() const override {
-    return "default missing generic argument to `Any`";
+    return "default missing generic arguments to `Any`";
+  }
+
+  ArrayRef<GenericTypeParamType *> getParameters() const {
+    return {getTrailingObjects<GenericTypeParamType *>(), NumMissingParams};
   }
 
   bool diagnose(Expr *root, bool asNote = false) const override;
@@ -960,13 +956,9 @@ public:
          ConstraintLocator *locator);
 
 private:
-  /// Retrieve representative locations for given generic prameters
-  /// rooted at the given anchor.
-  ///
-  /// \returns true if all of the parameters have been covered.
-  static bool findArgumentLocations(
-      Expr *anchor, ArrayRef<GenericTypeParamType *> genericParams,
-      llvm::function_ref<void(TypeRepr *, GenericTypeParamType *)> callback);
+  MutableArrayRef<GenericTypeParamType *> getParametersBuf() {
+    return {getTrailingObjects<GenericTypeParamType *>(), NumMissingParams};
+  }
 };
 
 } // end namespace constraints
