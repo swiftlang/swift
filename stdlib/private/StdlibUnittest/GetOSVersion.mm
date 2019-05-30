@@ -18,21 +18,21 @@
 SWIFT_CC(swift) SWIFT_RUNTIME_LIBRARY_VISIBILITY extern "C"
 const char *
 getSystemVersionPlistProperty(const char *PropertyName) {
-  // This function is implemented in Objective-C because Swift does not support
-  // failing initializers.
-  if (!PropertyName)
-    return nullptr;
+  @autoreleasepool {
+    // This function is implemented in Objective-C because Swift does not support
+    // failing initializers.
+    if (!PropertyName)
+      return nullptr;
 
-  NSDictionary *SystemVersion =
-      [NSDictionary dictionaryWithContentsOfFile:
-                        @"/System/Library/CoreServices/SystemVersion.plist"];
-  if (!SystemVersion)
-    return nullptr;
-  NSString *PropertyNameString = [NSString stringWithUTF8String:PropertyName];
-  const char *Result = strdup([SystemVersion[PropertyNameString] UTF8String]);
-  [PropertyNameString release];
-  [SystemVersion release];
-  return Result;
+    NSDictionary *SystemVersion =
+        [NSDictionary dictionaryWithContentsOfFile:
+                            @"/System/Library/CoreServices/SystemVersion.plist"];
+    if (!SystemVersion)
+      return nullptr;
+    NSString *PropertyNameString = [NSString stringWithUTF8String:PropertyName];
+    const char *Result = strdup([SystemVersion[PropertyNameString] UTF8String]);
+    return Result;
+  }
 }
 #endif
 

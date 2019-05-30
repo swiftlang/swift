@@ -1718,7 +1718,9 @@ func _getSystemVersionPlistPropertyImpl(
 
 func _getSystemVersionPlistProperty(_ propertyName: String) -> String? {
   let cs = _getSystemVersionPlistPropertyImpl(propertyName)
-  return cs.map(String.init(cString:))
+  let str = cs.map(String.init(cString:))
+  free(UnsafeMutableRawPointer(mutating: cs))
+  return str
 }
 #endif
 
