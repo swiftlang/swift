@@ -296,7 +296,6 @@ KNOWN_SETTINGS=(
     tensorflow-host-include-dir        ""        "Path to host TensorFlow headers"
     tensorflow-target-include-dir      ""        "Path to target Tensorflow headers"
     tensorflow-target-lib-dir          ""        "Path to target TensorFlow libraries"
-    tensorflow-swift-bindings          ""        "Path to TensorFlow Swift bindings repository"
     tensorflow-swift-apis              ""        "Path to TensorFlow deep learning library repository"
 )
 
@@ -1236,7 +1235,6 @@ LIBCXX_SOURCE_DIR="${WORKSPACE}/libcxx"
 PLAYGROUNDSUPPORT_SOURCE_DIR="${WORKSPACE}/swift-xcode-playground-support"
 # SWIFT_ENABLE_TENSORFLOW
 TENSORFLOW_SOURCE_DIR="${WORKSPACE}/tensorflow"
-TENSORFLOW_SWIFT_BINDINGS_DIR="${WORKSPACE}/tensorflow-swift-bindings"
 TENSORFLOW_SWIFT_APIS_DIR="${WORKSPACE}/tensorflow-swift-apis"
 
 if [[ ! "${SKIP_BUILD_PLAYGROUNDSUPPORT}" && ! -d ${PLAYGROUNDSUPPORT_SOURCE_DIR} ]]; then
@@ -1247,10 +1245,6 @@ fi
 if [[ "${ENABLE_TENSORFLOW}" ]]; then
     if [[ ! "${SKIP_BUILD_TENSORFLOW}" && ! -d "${TENSORFLOW_SOURCE_DIR}" ]]; then
         echo "Couldn't find TensorFlow source directory."
-        exit 1
-    fi
-    if [[ "${TENSORFLOW_SWIFT_BINDINGS}" && ! -d "${TENSORFLOW_SWIFT_BINDINGS}" ]]; then
-        echo "Invalid TensorFlow Swift bindings repository specified."
         exit 1
     fi
     if [[ "${TENSORFLOW_SWIFT_APIS}" && ! -d "${TENSORFLOW_SWIFT_APIS}" ]]; then
@@ -2600,16 +2594,6 @@ for host in "${ALL_HOSTS[@]}"; do
                         )
                     fi
 
-                    # Handle TensorFlow Swift bindings file.
-                    if [[ ! "${TENSORFLOW_SWIFT_BINDINGS}" && -d "${TENSORFLOW_SWIFT_BINDINGS_DIR}" ]] ; then
-                        TENSORFLOW_SWIFT_BINDINGS="${TENSORFLOW_SWIFT_BINDINGS_DIR}"
-                    fi
-                    if [[ "${TENSORFLOW_SWIFT_BINDINGS}" ]] ; then
-                        cmake_options=(
-                            "${cmake_options[@]}"
-                            -DTENSORFLOW_SWIFT_BINDINGS:PATH="${TENSORFLOW_SWIFT_BINDINGS}"
-                        )
-                    fi
                     # Handle TensorFlow high-level APIs repository.
                     if [[ ! "${TENSORFLOW_SWIFT_APIS}" && -d "${TENSORFLOW_SWIFT_APIS_DIR}" ]] ; then
                         TENSORFLOW_SWIFT_APIS="${TENSORFLOW_SWIFT_APIS_DIR}"

@@ -258,9 +258,9 @@ TensorADTests.testAllBackends("Side effects") {
   expectEqual(Tensor(48), gradient(at: Tensor(4), in: bar))
 }
 
-TensorADTests.testAllBackends("broadcast(toShape:)") {
+TensorADTests.testAllBackends("broadcasted(toShape:)") {
   func foo(tensor: Tensor<Float>, shape: Tensor<Int32>) -> Tensor<Float> {
-    tensor.broadcast(toShape: shape)
+    tensor.broadcasted(toShape: shape)
   }
 
   var inputTensor: Tensor<Float>
@@ -336,9 +336,9 @@ TensorADTests.testAllBackends("broadcast(toShape:)") {
   expectEqual(expected, pb(inputTensor))
 }
 
-TensorADTests.testAllBackends("unbroadcast(toShape:") {
+TensorADTests.testAllBackends("unbroadcasted(toShape:") {
   func foo(tensor: Tensor<Float>, shape: Tensor<Int32>) -> Tensor<Float> {
-    tensor.unbroadcast(toShape: shape)
+    tensor.unbroadcasted(toShape: shape)
   }
 
   var inputTensor: Tensor<Float>
