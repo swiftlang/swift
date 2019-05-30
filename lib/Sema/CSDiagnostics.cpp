@@ -1978,7 +1978,7 @@ bool InvalidMemberRefOnExistential::diagnoseAsError() {
   }
 
   emitDiagnostic(getAnchor()->getLoc(),
-                 diag::could_not_use_member_on_existential, getBaseType()->getRValueType(),
+                 diag::could_not_use_member_on_existential, getBaseType(),
                  getName())
       .highlight(nameLoc.getSourceRange())
       .highlight(baseExpr->getSourceRange());

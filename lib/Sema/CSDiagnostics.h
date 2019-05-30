@@ -765,13 +765,13 @@ public:
 class InvalidMemberRefFailure : public FailureDiagnostic {
   Type BaseType;
   DeclName Name;
-  
+
 public:
   InvalidMemberRefFailure(Expr *root, ConstraintSystem &cs, Type baseType,
                           DeclName memberName, ConstraintLocator *locator)
-          : FailureDiagnostic(root, cs, locator),
-            BaseType(baseType), Name(memberName) {}
-            
+      : FailureDiagnostic(root, cs, locator), BaseType(baseType->getRValueType()),
+        Name(memberName) {}
+
 protected:
   Type getBaseType() const { return BaseType; }
   DeclName getName() const { return Name; }
@@ -815,9 +815,8 @@ private:
 /// ```
 class InvalidMemberRefOnExistential final : public InvalidMemberRefFailure {
 public:
-  InvalidMemberRefOnExistential(Expr *root, ConstraintSystem &cs,
-                                Type baseType, DeclName memberName,
-                                ConstraintLocator *locator)
+  InvalidMemberRefOnExistential(Expr *root, ConstraintSystem &cs, Type baseType,
+                                DeclName memberName, ConstraintLocator *locator)
       : InvalidMemberRefFailure(root, cs, baseType, memberName, locator) {}
 
   bool diagnoseAsError() override;

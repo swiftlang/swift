@@ -603,8 +603,8 @@ class AllowMemberRefOnExistential final : public ConstraintFix {
   DeclName Name;
 
   AllowMemberRefOnExistential(ConstraintSystem &cs, Type baseType,
-                          DeclName memberName, ValueDecl *member,
-                          ConstraintLocator *locator)
+                              DeclName memberName, ValueDecl *member,
+                              ConstraintLocator *locator)
       : ConstraintFix(cs, FixKind::AllowMemberRefOnExistential, locator),
         BaseType(baseType), Name(memberName) {}
 
@@ -618,9 +618,10 @@ public:
 
   bool diagnose(Expr *root, bool asNote = false) const override;
 
-  static AllowMemberRefOnExistential *create(ConstraintSystem &cs, Type baseType,
-                                         ValueDecl *member, DeclName memberName,
-                                         ConstraintLocator *locator);
+  static AllowMemberRefOnExistential *create(ConstraintSystem &cs,
+                                             Type baseType, ValueDecl *member,
+                                             DeclName memberName,
+                                             ConstraintLocator *locator);
 };
 
 class AllowTypeOrInstanceMember final : public ConstraintFix {

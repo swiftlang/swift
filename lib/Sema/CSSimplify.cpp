@@ -4531,8 +4531,8 @@ fixMemberRef(ConstraintSystem &cs, Type baseTy,
 
     case MemberLookupResult::UR_UnavailableInExistential: {
       return choice.isDecl()
-                 ? AllowMemberRefOnExistential::create(cs, baseTy, choice.getDecl(),
-                                                   memberName, locator)
+                 ? AllowMemberRefOnExistential::create(
+                       cs, baseTy, choice.getDecl(), memberName, locator)
                  : nullptr;
     }
 

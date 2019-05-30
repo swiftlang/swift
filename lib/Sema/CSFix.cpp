@@ -285,8 +285,8 @@ DefineMemberBasedOnUse::create(ConstraintSystem &cs, Type baseType,
 
 AllowMemberRefOnExistential *
 AllowMemberRefOnExistential::create(ConstraintSystem &cs, Type baseType,
-                                ValueDecl *member, DeclName memberName,
-                                ConstraintLocator *locator) {
+                                    ValueDecl *member, DeclName memberName,
+                                    ConstraintLocator *locator) {
   return new (cs.getAllocator())
       AllowMemberRefOnExistential(cs, baseType, memberName, member, locator);
 }
