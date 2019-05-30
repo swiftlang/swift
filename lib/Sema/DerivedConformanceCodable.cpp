@@ -135,6 +135,14 @@ static CodableConformanceType varConformsToCodable(TypeChecker &tc,
                                isIUO, proto);
 }
 
+/// Retrieve the variable name for the purposes of encoding/decoding.
+static Identifier getVarNameForCoding(VarDecl *var) {
+  if (auto originalVar = var->getOriginalDelegatedProperty())
+    return originalVar->getName();
+
+  return var->getName();
+}
+
 /// Validates the given CodingKeys enum decl by ensuring its cases are a 1-to-1
 /// match with the stored vars of the given type.
 ///
@@ -161,7 +169,7 @@ static bool validateCodingKeysEnum(DerivedConformance &derived,
     if (varDecl->getAttrs().hasAttribute<LazyAttr>())
       continue;
 
-    properties[varDecl->getName()] = varDecl;
+    properties[getVarNameForCoding(varDecl)] = varDecl;
   }
 
   bool propertiesAreValid = true;
@@ -364,7 +372,8 @@ static EnumDecl *synthesizeCodingKeysEnum(DerivedConformance &derived) {
     switch (conformance) {
       case Conforms:
       {
-        auto *elt = new (C) EnumElementDecl(SourceLoc(), varDecl->getName(),
+        auto *elt = new (C) EnumElementDecl(SourceLoc(),
+                                            getVarNameForCoding(varDecl),
                                             nullptr, SourceLoc(), nullptr,
                                             enumDecl);
         elt->setImplicit();
@@ -517,6 +526,11 @@ lookupVarDeclForCodingKeysCase(DeclContext *conformanceDC,
                                NominalTypeDecl *targetDecl) {
   for (auto decl : targetDecl->lookupDirect(DeclName(elt->getName()))) {
     if (auto *vd = dyn_cast<VarDecl>(decl)) {
+      // If we found a property with an attached delegate, retrieve the
+      // backing property.
+      if (auto backingVar = vd->getPropertyDelegateBackingProperty())
+        vd = backingVar;
+
       if (!vd->isStatic()) {
         // This is the VarDecl we're looking for.
 
