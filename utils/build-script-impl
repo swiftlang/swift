@@ -296,7 +296,6 @@ KNOWN_SETTINGS=(
     tensorflow-host-include-dir        ""        "Path to host TensorFlow headers"
     tensorflow-target-include-dir      ""        "Path to target Tensorflow headers"
     tensorflow-target-lib-dir          ""        "Path to target TensorFlow libraries"
-    tensorflow-swift-bindings          ""        "Path to TensorFlow Swift bindings repository"
     tensorflow-swift-apis              ""        "Path to TensorFlow deep learning library repository"
 )
 
@@ -1236,7 +1235,6 @@ LIBCXX_SOURCE_DIR="${WORKSPACE}/libcxx"
 PLAYGROUNDSUPPORT_SOURCE_DIR="${WORKSPACE}/swift-xcode-playground-support"
 # SWIFT_ENABLE_TENSORFLOW
 TENSORFLOW_SOURCE_DIR="${WORKSPACE}/tensorflow"
-TENSORFLOW_SWIFT_BINDINGS_DIR="${WORKSPACE}/tensorflow-swift-bindings"
 TENSORFLOW_SWIFT_APIS_DIR="${WORKSPACE}/tensorflow-swift-apis"
 
 if [[ ! "${SKIP_BUILD_PLAYGROUNDSUPPORT}" && ! -d ${PLAYGROUNDSUPPORT_SOURCE_DIR} ]]; then

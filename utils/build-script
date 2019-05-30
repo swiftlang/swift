@@ -393,12 +393,6 @@ class BuildScriptInvocation(object):
                     "--tensorflow-host-include-dir (to use custom TensorFlow "
                     "headers/libraries); please pick one")
 
-            if args.tensorflow_swift_bindings is not None and \
-               not os.path.isdir(args.tensorflow_swift_bindings):
-                diagnostics.fatal(
-                    "invalid repository specified for --tensorflow-swift-bindings "
-                    "(was '{}')".format(args.tensorflow_swift_bindings))
-
             if args.tensorflow_swift_apis is not None:
                 if not os.path.isdir(args.tensorflow_swift_apis):
                     diagnostics.fatal(

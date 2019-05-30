@@ -1040,9 +1040,6 @@ def create_argument_parser():
            default=None,
            help='Path to a directory containing TensorFlow headers. '
                 'Used for linking Swift programs.')
-    option('--tensorflow-swift-bindings', store_path,
-           default=None,
-           help='Path to a TensorFlow Swift bindings repository.')
     option('--tensorflow-swift-apis', store_path,
            default=None,
            help='Path to a TensorFlow deep learning library repository.')
