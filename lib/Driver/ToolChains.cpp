@@ -208,7 +208,7 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_warnings_as_errors);
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_coverage_EQ);
-  inputArgs.AddLastArg(arguments, options::OPT_static_library);
+  inputArgs.AddLastArg(arguments, options::OPT_static);
   inputArgs.AddLastArg(arguments, options::OPT_swift_version);
   inputArgs.AddLastArg(arguments, options::OPT_enforce_exclusivity_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_stats_output_dir);
@@ -1084,7 +1084,6 @@ ToolChain::constructInvocation(const ArchiveJobAction &job,
                                const JobContext &context) const {
    assert(context.Output.getPrimaryOutputType() == file_types::TY_Image &&
          "Invalid linker output type.");
-  assert(job.getKind() == LinkKind::StaticLibrary);
 
   ArgStringList Arguments;
 
@@ -1118,17 +1117,17 @@ ToolChain::constructInvocation(const ArchiveJobAction &job,
 
   if (isLLVMAR) {
     switch (getTriple().getOS()) {
-      case llvm::Triple::Darwin:
-        Arguments.push_back("--format=darwin");
-        break;
-      case llvm::Triple::FreeBSD:
-        Arguments.push_back("--format=bsd");
-        break;
-      case llvm::Triple::Linux:
-        Arguments.push_back("--format=gnu");
-        break;
-      default:
-        break;
+    case llvm::Triple::Darwin:
+      Arguments.push_back("--format=darwin");
+      break;
+    case llvm::Triple::FreeBSD:
+      Arguments.push_back("--format=bsd");
+      break;
+    case llvm::Triple::Linux:
+      Arguments.push_back("--format=gnu");
+      break;
+    default:
+      break;
     }
   }
 

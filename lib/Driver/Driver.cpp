@@ -1368,18 +1368,20 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
 
     switch (OutputModeArg->getOption().getID()) {
     case options::OPT_emit_executable:
+      assert(!Args.hasArg(options::OPT_static) &&
+             "-static may not be used with -emit-executable.");
       OI.LinkAction = LinkKind::Executable;
       OI.CompilerOutputType = file_types::TY_Object;
       break;
 
     case options::OPT_emit_library:
-      OI.LinkAction = Args.hasArg(options::OPT_static_library) ?
+      OI.LinkAction = Args.hasArg(options::OPT_static) ?
                       LinkKind::StaticLibrary :
                       LinkKind::DynamicLibrary;
       OI.CompilerOutputType = file_types::TY_Object;
       break;
 
-    case options::OPT_static_library:
+    case options::OPT_static:
       break;
 
     case options::OPT_emit_object:
@@ -1959,12 +1961,13 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
   if (OI.shouldLink() && !AllLinkerInputs.empty()) {
     JobAction *LinkAction = nullptr;
 
-    if (OI.LinkAction == LinkKind::StaticLibrary)
+    if (OI.LinkAction == LinkKind::StaticLibrary) {
       LinkAction = C.createAction<ArchiveJobAction>(AllLinkerInputs,
                                                     OI.LinkAction);
-    else
+    } else {
       LinkAction = C.createAction<LinkJobAction>(AllLinkerInputs,
                                                  OI.LinkAction);
+    }
 
     // On ELF platforms there's no built in autolinking mechanism, so we
     // pull the info we need from the .o files directly and pass them as an

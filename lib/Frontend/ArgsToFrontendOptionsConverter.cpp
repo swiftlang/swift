@@ -73,7 +73,7 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.EnablePrivateImports |= Args.hasArg(OPT_enable_private_imports);
   Opts.EnableLibraryEvolution |= Args.hasArg(OPT_enable_library_evolution);
   
-  Opts.IsStaticLibrary |= Args.hasArg(OPT_static_library);
+  Opts.IsStaticLibrary |= Args.hasArg(OPT_static);
 
   // FIXME: Remove this flag
   Opts.EnableLibraryEvolution |= Args.hasArg(OPT_enable_resilience);

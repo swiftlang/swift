@@ -333,8 +333,6 @@ public:
     assert(K == LinkKind::StaticLibrary);
   }
 
-  LinkKind getKind() const { return LinkKind::StaticLibrary; }
-
   static bool classof(const Action *A) {
     return A->getKind() == Action::Kind::ArchiveJob;
   }
