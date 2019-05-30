@@ -4531,7 +4531,7 @@ fixMemberRef(ConstraintSystem &cs, Type baseTy,
 
     case MemberLookupResult::UR_UnavailableInExistential: {
       return choice.isDecl()
-                 ? AllowProtocolTypeMember::create(cs, baseTy, choice.getDecl(),
+                 ? AllowMemberRefOnExistential::create(cs, baseTy, choice.getDecl(),
                                                    memberName, locator)
                  : nullptr;
     }
@@ -6643,7 +6643,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::RelabelArguments:
   case FixKind::RemoveUnwrap:
   case FixKind::DefineMemberBasedOnUse:
-  case FixKind::AllowProtocolTypeMember:
+  case FixKind::AllowMemberRefOnExistential:
   case FixKind::AllowTypeOrInstanceMember:
   case FixKind::AllowInvalidPartialApplication:
   case FixKind::AllowInvalidInitRef:

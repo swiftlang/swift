@@ -762,6 +762,21 @@ public:
   bool diagnoseAsNote() override;
 };
 
+class InvalidMemberRefFailure : public FailureDiagnostic {
+  Type BaseType;
+  DeclName Name;
+  
+public:
+  InvalidMemberRefFailure(Expr *root, ConstraintSystem &cs, Type baseType,
+                          DeclName memberName, ConstraintLocator *locator)
+          : FailureDiagnostic(root, cs, locator),
+            BaseType(baseType), Name(memberName) {}
+            
+protected:
+  Type getBaseType() const { return BaseType; }
+  DeclName getName() const { return Name; }
+};
+
 /// Diagnose situations when member referenced by name is missing
 /// from the associated base type, e.g.
 ///
@@ -771,15 +786,11 @@ public:
 ///   let _: Int = s.foo(1, 2) // expected type is `(Int, Int) -> Int`
 /// }
 /// ```
-class MissingMemberFailure : public FailureDiagnostic {
-  Type BaseType;
-  DeclName Name;
-
+class MissingMemberFailure final : public InvalidMemberRefFailure {
 public:
   MissingMemberFailure(Expr *root, ConstraintSystem &cs, Type baseType,
                        DeclName memberName, ConstraintLocator *locator)
-      : FailureDiagnostic(root, cs, locator), BaseType(baseType),
-        Name(memberName) {}
+      : InvalidMemberRefFailure(root, cs, baseType, memberName, locator) {}
 
   bool diagnoseAsError() override;
 
@@ -787,10 +798,6 @@ private:
   static DeclName findCorrectEnumCaseName(Type Ty,
                                           TypoCorrectionResults &corrections,
                                           DeclName memberName);
-
-protected:
-  Type getBaseType() const { return BaseType; }
-  DeclName getName() const { return Name; }
 };
 
 /// Diagnose cases where a member only accessible on generic constraints
@@ -806,12 +813,12 @@ protected:
 ///   p.foo
 /// }
 /// ```
-class AllowProtocolTypeMemberFailure final : public MissingMemberFailure {
+class InvalidMemberRefOnExistential final : public InvalidMemberRefFailure {
 public:
-  AllowProtocolTypeMemberFailure(Expr *root, ConstraintSystem &cs,
-                                 Type baseType, DeclName memberName,
-                                 ConstraintLocator *locator)
-      : MissingMemberFailure(root, cs, baseType, memberName, locator) {}
+  InvalidMemberRefOnExistential(Expr *root, ConstraintSystem &cs,
+                                Type baseType, DeclName memberName,
+                                ConstraintLocator *locator)
+      : InvalidMemberRefFailure(root, cs, baseType, memberName, locator) {}
 
   bool diagnoseAsError() override;
 };

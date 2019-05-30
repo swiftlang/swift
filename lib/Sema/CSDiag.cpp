@@ -757,8 +757,8 @@ void FailureDiagnosis::diagnoseUnviableLookupResults(
       break;
 
     case MemberLookupResult::UR_UnavailableInExistential: {
-      AllowProtocolTypeMemberFailure failure(baseExpr, CS, instanceTy, memberName,
-                                             CS.getConstraintLocator(E));
+      InvalidMemberRefOnExistential failure(baseExpr, CS, instanceTy, memberName,
+                                            CS.getConstraintLocator(E));
       failure.diagnoseAsError();
       return;
     }

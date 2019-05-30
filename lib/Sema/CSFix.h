@@ -128,7 +128,7 @@ enum class FixKind : uint8_t {
   /// Allow an invalid member access on a value of protocol type as if
   /// that protocol type were a generic constraint requiring conformance
   /// to that protocol.
-  AllowProtocolTypeMember,
+  AllowMemberRefOnExistential,
 
   /// If there are fewer arguments than parameters, let's fix that up
   /// by adding new arguments to the list represented as type variables.
@@ -598,14 +598,14 @@ public:
                                         ConstraintLocator *locator);
 };
 
-class AllowProtocolTypeMember final : public ConstraintFix {
+class AllowMemberRefOnExistential final : public ConstraintFix {
   Type BaseType;
   DeclName Name;
 
-  AllowProtocolTypeMember(ConstraintSystem &cs, Type baseType,
+  AllowMemberRefOnExistential(ConstraintSystem &cs, Type baseType,
                           DeclName memberName, ValueDecl *member,
                           ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::AllowProtocolTypeMember, locator),
+      : ConstraintFix(cs, FixKind::AllowMemberRefOnExistential, locator),
         BaseType(baseType), Name(memberName) {}
 
 public:
@@ -618,7 +618,7 @@ public:
 
   bool diagnose(Expr *root, bool asNote = false) const override;
 
-  static AllowProtocolTypeMember *create(ConstraintSystem &cs, Type baseType,
+  static AllowMemberRefOnExistential *create(ConstraintSystem &cs, Type baseType,
                                          ValueDecl *member, DeclName memberName,
                                          ConstraintLocator *locator);
 };

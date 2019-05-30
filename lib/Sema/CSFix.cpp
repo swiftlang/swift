@@ -283,17 +283,17 @@ DefineMemberBasedOnUse::create(ConstraintSystem &cs, Type baseType,
       DefineMemberBasedOnUse(cs, baseType, member, locator);
 }
 
-AllowProtocolTypeMember *
-AllowProtocolTypeMember::create(ConstraintSystem &cs, Type baseType,
+AllowMemberRefOnExistential *
+AllowMemberRefOnExistential::create(ConstraintSystem &cs, Type baseType,
                                 ValueDecl *member, DeclName memberName,
                                 ConstraintLocator *locator) {
   return new (cs.getAllocator())
-      AllowProtocolTypeMember(cs, baseType, memberName, member, locator);
+      AllowMemberRefOnExistential(cs, baseType, memberName, member, locator);
 }
 
-bool AllowProtocolTypeMember::diagnose(Expr *root, bool asNote) const {
-  auto failure = AllowProtocolTypeMemberFailure(root, getConstraintSystem(),
-                                                BaseType, Name, getLocator());
+bool AllowMemberRefOnExistential::diagnose(Expr *root, bool asNote) const {
+  auto failure = InvalidMemberRefOnExistential(root, getConstraintSystem(),
+                                               BaseType, Name, getLocator());
   return failure.diagnose(asNote);
 }
 
