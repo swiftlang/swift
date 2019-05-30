@@ -5,7 +5,7 @@
 //
 // NOTE: This file contains a mini high-level machine learning library. If you
 // need to test other things from the `tensorflow/swift-apis` (aka.
-// `DeepLearning`) library, please **copy** their definitions here instead of
+// `TensorFlow`) library, please **copy** their definitions here instead of
 // using those APIs directly. This helps avoid circular dependencies.
 
 import TensorFlow

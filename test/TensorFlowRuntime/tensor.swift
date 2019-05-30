@@ -693,28 +693,28 @@ TensorTests.testAllBackends("ReshapeTensor") {
   expectEqual([1, 3, 1, 2, 1], result.shape)
 }
 
-TensorTests.testAllBackends("BroadcastTensor") {
+TensorTests.testAllBackends("BroadcastedTensor") {
   // 1 -> 2 x 3 x 4
   let one = Tensor<Float>(1)
   var target = Tensor<Float>(repeating: 0.0, shape: [2, 3, 4])
-  let broadcasted = one.broadcast(like: target)
+  let broadcasted = one.broadcasted(like: target)
   expectEqual(Tensor(repeating: 1, shape: [2, 3, 4]), broadcasted)
   target .= Tensor(repeating: 1, shape: [1, 3, 1])
   expectEqual(Tensor(repeating: 1, shape: [2, 3, 4]), target)
 }
 
-TensorTests.testAllBackends("Unbroadcast1") {
+TensorTests.testAllBackends("Unbroadcasted1") {
   let x = Tensor<Float>(repeating: 1, shape: [2, 3, 4, 5])
   let y = Tensor<Float>(repeating: 1, shape: [4, 5])
-  let z = x.unbroadcast(like: y)
+  let z = x.unbroadcasted(like: y)
   expectEqual(ShapedArray<Float>(repeating: 6, shape: [4, 5]),
               z.array)
 }
 
-TensorTests.testAllBackends("Unbroadcast2") {
+TensorTests.testAllBackends("Unbroadcasted2") {
   let x = Tensor<Float>(repeating: 1, shape: [2, 3, 4, 5])
   let y = Tensor<Float>(repeating: 1, shape: [3, 1, 5])
-  let z = x.unbroadcast(like: y)
+  let z = x.unbroadcasted(like: y)
   expectEqual(ShapedArray<Float>(repeating: 8, shape: [3, 1, 5]),
               z.array)
 }
