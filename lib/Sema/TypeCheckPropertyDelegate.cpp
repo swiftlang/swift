@@ -265,7 +265,8 @@ AttachedPropertyDelegateRequest::evaluate(Evaluator &evaluator,
 
     // If the declaration came from a module file, we've already done all of
     // the semantic checking required.
-    if (!dc->getParentSourceFile())
+    auto sourceFile = dc->getParentSourceFile();
+    if (!sourceFile)
       return mutableAttr;
 
     // Check various restrictions on which properties can have delegates
@@ -344,7 +345,7 @@ AttachedPropertyDelegateRequest::evaluate(Evaluator &evaluator,
     }
 
     // Properties with delegates must not declare a getter or setter.
-    if (!var->hasStorage()) {
+    if (!var->hasStorage() && sourceFile->Kind != SourceFileKind::Interface) {
       ctx.Diags.diagnose(attr->getLocation(), diag::property_delegate_computed);
       return nullptr;
     }
