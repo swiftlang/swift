@@ -3235,7 +3235,8 @@ public:
     // This instruction is active. Determine the appropriate differentiation
     // strategy, and use it.
     auto *structDecl = sei->getStructDecl();
-    if (structDecl->getAttrs().hasAttribute<FieldwiseDifferentiableAttr>()) {
+    if (structDecl->getEffectiveAccess() <= AccessLevel::Internal
+        || structDecl->getAttrs().hasAttribute<FieldwiseDifferentiableAttr>()) {
       strategies[sei] = StructExtractDifferentiationStrategy::Fieldwise;
       SILClonerWithScopes::visitStructExtractInst(sei);
       return;

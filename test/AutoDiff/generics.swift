@@ -128,4 +128,16 @@ func TF_508_func(x: TF_508_Struct<Float>, y: TF_508_Struct<Float>)
 }
 let TF_508_bp = pullback(at: TF_508_inst, TF_508_inst, in: TF_508_func)
 
+// TF-523
+struct A : Differentiable & AdditiveArithmetic {
+  var a: Float = 1
+  typealias TangentVector = A
+  typealias AllDifferentiableVariables = A
+}
+
+@differentiable
+func f(_ x: A) -> Float {
+  return x.a * 2
+}
+
 // TODO: add more tests.
