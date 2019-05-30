@@ -263,7 +263,7 @@ public class LazyTensorOperation : TensorOperation, Equatable {
 }
 
 public func ==(lhs: LazyTensorOperation, rhs: LazyTensorOperation) -> Bool {
-  return (lhs.outputCount == rhs.outputCount &&
+  return (lhs.name == rhs.name && lhs.outputCount == rhs.outputCount &&
     lhs.inputs == rhs.inputs && lhs.attrs == rhs.attrs)
 }
 
