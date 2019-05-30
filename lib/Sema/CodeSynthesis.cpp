@@ -27,7 +27,7 @@
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
-#include "swift/AST/PropertyDelegates.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Defer.h"
@@ -345,6 +345,26 @@ static void maybeMarkTransparent(AccessorDecl *accessor, ASTContext &ctx) {
   if (accessor->hasForcedStaticDispatch())
     return;
 
+  if (accessor->getAccessorKind() == AccessorKind::Get ||
+      accessor->getAccessorKind() == AccessorKind::Set) {
+
+    // Getters/setters for a property with a wrapper are not @_transparent if
+    // the backing variable has more-restrictive access than the original
+    // property. The same goes for its storage wrapper.
+    if (auto var = dyn_cast<VarDecl>(accessor->getStorage())) {
+      if (auto backingVar = var->getPropertyWrapperBackingProperty()) {
+        if (backingVar->getFormalAccess() < var->getFormalAccess())
+          return;
+      }
+
+      if (auto original = var->getOriginalWrappedProperty(
+              PropertyWrapperSynthesizedPropertyKind::StorageWrapper)) {
+        if (var->getFormalAccess() < original->getFormalAccess())
+          return;
+      }
+    }
+  }
+
   accessor->getAttrs().add(new (ctx) TransparentAttr(IsImplicit));
 }
 
@@ -539,12 +559,12 @@ namespace {
     Implementation,
     /// We're referencing the superclass's implementation of the storage.
     Super,
-    /// We're referencing the backing property for a property with a delegate
+    /// We're referencing the backing property for a property with a wrapper
     /// through the 'value' property.
-    Delegate,
-    /// We're referencing the backing property for a property with a delegate
-    /// through the 'storage' property.
-    DelegateStorage,
+    Wrapper,
+    /// We're referencing the backing property for a property with a wrapper
+    /// through the 'wrapperValue' property.
+    WrapperStorage,
   };
 } // end anonymous namespace
 
@@ -598,20 +618,20 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
     }
     break;
 
-  case TargetImpl::Delegate: {
+  case TargetImpl::Wrapper: {
     auto var = cast<VarDecl>(accessor->getStorage());
-    storage = var->getPropertyDelegateBackingProperty();
-    underlyingVar = var->getAttachedPropertyDelegateTypeInfo().valueVar;
+    storage = var->getPropertyWrapperBackingProperty();
+    underlyingVar = var->getAttachedPropertyWrapperTypeInfo().valueVar;
     semantics = AccessSemantics::DirectToStorage;
     selfAccessKind = SelfAccessorKind::Peer;
     break;
   }
 
-  case TargetImpl::DelegateStorage: {
+  case TargetImpl::WrapperStorage: {
     auto var =
-      cast<VarDecl>(accessor->getStorage())->getOriginalDelegatedProperty();
-    storage = var->getPropertyDelegateBackingProperty();
-    underlyingVar = var->getAttachedPropertyDelegateTypeInfo().delegateValueVar;
+      cast<VarDecl>(accessor->getStorage())->getOriginalWrappedProperty();
+    storage = var->getPropertyWrapperBackingProperty();
+    underlyingVar = var->getAttachedPropertyWrapperTypeInfo().wrapperValueVar;
     assert(underlyingVar);
     semantics = AccessSemantics::DirectToStorage;
     selfAccessKind = SelfAccessorKind::Peer;
@@ -788,7 +808,7 @@ static bool isSynthesizedComputedProperty(AbstractStorageDecl *storage) {
   return (storage->getAttrs().hasAttribute<LazyAttr>() ||
           storage->getAttrs().hasAttribute<NSManagedAttr>() ||
           (isa<VarDecl>(storage) &&
-           cast<VarDecl>(storage)->getAttachedPropertyDelegate()));
+           cast<VarDecl>(storage)->getAttachedPropertyWrapper()));
 }
 
 /// Synthesize the body of a trivial getter.  For a non-member vardecl or one
@@ -800,8 +820,8 @@ static void synthesizeTrivialGetterBody(AccessorDecl *getter,
                                         ASTContext &ctx) {
   auto storage = getter->getStorage();
   assert(!isSynthesizedComputedProperty(storage) ||
-         target == TargetImpl::Delegate ||
-         target == TargetImpl::DelegateStorage);
+         target == TargetImpl::Wrapper ||
+         target == TargetImpl::WrapperStorage);
 
   SourceLoc loc = storage->getLoc();
 
@@ -849,11 +869,11 @@ static void synthesizeReadCoroutineGetterBody(AccessorDecl *getter,
   synthesizeTrivialGetterBody(getter, TargetImpl::Implementation, ctx);
 }
 
-/// Synthesize the body of a getter for a property delegate, which
-/// delegates to the delegate's unwrap property.
-static void synthesizePropertyDelegateGetterBody(AccessorDecl *getter,
+/// Synthesize the body of a getter for a property wrapper, which
+/// delegates to the wrapper's "value" property.
+static void synthesizePropertyWrapperGetterBody(AccessorDecl *getter,
                                                  ASTContext &ctx) {
-  synthesizeTrivialGetterBody(getter, TargetImpl::Delegate, ctx);
+  synthesizeTrivialGetterBody(getter, TargetImpl::Wrapper, ctx);
 }
 
 /// Synthesize the body of a setter which just stores to the given storage
@@ -886,11 +906,11 @@ static void synthesizeTrivialSetterBody(AccessorDecl *setter,
                                          storage, ctx);
 }
 
-/// Synthesize the body of a setter for a property delegate, which
-/// delegates to the delegate's unwrap property.
-static void synthesizePropertyDelegateSetterBody(AccessorDecl *setter,
+/// Synthesize the body of a setter for a property wrapper, which
+/// delegates to the wrapper's "value" property.
+static void synthesizePropertyWrapperSetterBody(AccessorDecl *setter,
                                                  ASTContext &ctx) {
-  synthesizeTrivialSetterBodyWithStorage(setter, TargetImpl::Delegate,
+  synthesizeTrivialSetterBodyWithStorage(setter, TargetImpl::Wrapper,
                                          setter->getStorage(), ctx);
 }
 
@@ -1459,10 +1479,10 @@ void swift::completeLazyVarImplementation(VarDecl *VD) {
 }
 
 /// Synthesize a computed property `$foo` for a property with an attached
-/// delegate that has a `delegateValue` property.
-static VarDecl *synthesizePropertyDelegateStorageDelegateProperty(
-    ASTContext &ctx, VarDecl *var, Type delegateType,
-    VarDecl *delegateVarVar) {
+/// wrapper that has a `wrapperValue` property.
+static VarDecl *synthesizePropertyWrapperStorageWrapperProperty(
+    ASTContext &ctx, VarDecl *var, Type wrapperType,
+    VarDecl *wrapperVar) {
   // Compute the name of the storage type.
   SmallString<64> nameBuf;
   nameBuf = "$";
@@ -1470,9 +1490,9 @@ static VarDecl *synthesizePropertyDelegateStorageDelegateProperty(
   Identifier name = ctx.getIdentifier(nameBuf);
 
   // Determine the type of the property.
-  Type propertyType = delegateType->getTypeOfMember(
-      var->getModuleContext(), delegateVarVar,
-      delegateVarVar->getValueInterfaceType());
+  Type propertyType = wrapperType->getTypeOfMember(
+      var->getModuleContext(), wrapperVar,
+      wrapperVar->getValueInterfaceType());
   Type propertyInterfaceType = propertyType->mapTypeOutOfContext();
 
   // Form the property.
@@ -1485,7 +1505,7 @@ static VarDecl *synthesizePropertyDelegateStorageDelegateProperty(
   property->setInterfaceType(propertyInterfaceType);
   property->setType(propertyType);
   property->setImplicit();
-  property->setOriginalDelegatedProperty(var);
+  property->setOriginalWrappedProperty(var);
   addMemberToContextIfNeeded(property, dc, var);
 
   // Create the pattern binding declaration for the property.
@@ -1509,8 +1529,8 @@ static VarDecl *synthesizePropertyDelegateStorageDelegateProperty(
   property->overwriteSetterAccess(setterAccess);
 
   // Add the accessors we need.
-  bool hasSetter = delegateVarVar->isSettable(nullptr) &&
-      delegateVarVar->isSetterAccessibleFrom(var->getInnermostDeclContext());
+  bool hasSetter = wrapperVar->isSettable(nullptr) &&
+      wrapperVar->isSetterAccessibleFrom(var->getInnermostDeclContext());
   addGetterToStorage(property, ctx);
   if (hasSetter) {
     addSetterToStorage(property, ctx);
@@ -1523,7 +1543,7 @@ static VarDecl *synthesizePropertyDelegateStorageDelegateProperty(
   return property;
 }
 
-static void typeCheckSynthesizedDelegateInitializer(
+static void typeCheckSynthesizedWrapperInitializer(
     PatternBindingDecl *pbd, VarDecl *backingVar, PatternBindingDecl *parentPBD,
     Expr *&initializer) {
   DeclContext *dc = pbd->getDeclContext();
@@ -1537,25 +1557,25 @@ static void typeCheckSynthesizedDelegateInitializer(
             pbd->getPatternEntryForVarDecl(backingVar).getInitContext())) {
     tc.contextualizeInitializer(initializerContext, initializer);
   }
-  tc.checkPropertyDelegateErrorHandling(pbd, initializer);
+  tc.checkPropertyWrapperErrorHandling(pbd, initializer);
 }
 
-llvm::Expected<PropertyDelegateBackingPropertyInfo>
-PropertyDelegateBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
+llvm::Expected<PropertyWrapperBackingPropertyInfo>
+PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
                                                      VarDecl *var) const {
   // Determine the type of the backing property.
-  auto delegateType = var->getPropertyDelegateBackingPropertyType();
-  if (!delegateType)
-    return PropertyDelegateBackingPropertyInfo();
+  auto wrapperType = var->getPropertyWrapperBackingPropertyType();
+  if (!wrapperType)
+    return PropertyWrapperBackingPropertyInfo();
 
-  auto delegateInfo = var->getAttachedPropertyDelegateTypeInfo();
-  if (!delegateInfo)
-    return PropertyDelegateBackingPropertyInfo();
+  auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo();
+  if (!wrapperInfo)
+    return PropertyWrapperBackingPropertyInfo();
 
   // Compute the name of the storage type.
   ASTContext &ctx = var->getASTContext();
   SmallString<64> nameBuf;
-  if (delegateInfo.delegateValueVar)
+  if (wrapperInfo.wrapperValueVar)
     nameBuf = "$$";
   else
     nameBuf = "$";
@@ -1563,9 +1583,9 @@ PropertyDelegateBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
   Identifier name = ctx.getIdentifier(nameBuf);
 
   // Determine the type of the storage.
-  bool isInvalid = delegateType->hasError();
+  bool isInvalid = wrapperType->hasError();
   auto dc = var->getDeclContext();
-  Type storageInterfaceType = delegateType;
+  Type storageInterfaceType = wrapperType;
 
   Type storageType =
       var->getDeclContext()->mapTypeIntoContext(storageInterfaceType);
@@ -1585,7 +1605,7 @@ PropertyDelegateBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
   backingVar->setImplicit();
   if (isInvalid)
     backingVar->setInvalid();
-  backingVar->setOriginalDelegatedProperty(var);
+  backingVar->setOriginalWrappedProperty(var);
   addMemberToContextIfNeeded(backingVar, dc, var);
 
   // Create the pattern binding declaration for the backing property.
@@ -1613,10 +1633,11 @@ PropertyDelegateBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
   if (dc->getSelfClassDecl())
     makeFinal(ctx, backingVar);
 
-  // When there is a `delegateValue`, lower the access of the
+  // When there is a `wrapperValue`, lower the access of the backing
+  // storage to 'private'.
   AccessLevel defaultAccess =
-      delegateInfo.delegateValueVar ? AccessLevel::Private
-                                    : AccessLevel::Internal;
+      wrapperInfo.wrapperValueVar ? AccessLevel::Private
+                                  : AccessLevel::Internal;
 
   // Determine the access level for the backing property.
   AccessLevel access =
@@ -1632,31 +1653,31 @@ PropertyDelegateBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
   if (Expr *init = parentPBD->getInit(patternNumber)) {
     pbd->setInit(0, init);
     pbd->setInitializerChecked(0);
-    originalInitialValue = findOriginalPropertyDelegateInitialValue(var, init);
+    originalInitialValue = findOriginalPropertyWrapperInitialValue(var, init);
   } else if (!parentPBD->isInitialized(patternNumber) &&
-             delegateInfo.defaultInit) {
+             wrapperInfo.defaultInit) {
     // FIXME: Record this expression somewhere so that DI can perform the
     // initialization itself.
     auto typeExpr = TypeExpr::createImplicit(storageType, ctx);
     Expr *initializer = CallExpr::createImplicit(ctx, typeExpr, {}, { });
-    typeCheckSynthesizedDelegateInitializer(pbd, backingVar, parentPBD,
-                                            initializer);
+    typeCheckSynthesizedWrapperInitializer(pbd, backingVar, parentPBD,
+                                           initializer);
     pbd->setInit(0, initializer);
     pbd->setInitializerChecked(0);
   }
 
-  // If there is a storage delegate property (delegateVar) in the delegate,
+  // If there is a storage wrapper property (wrapperValue) in the wrapper,
   // synthesize a computed property for '$foo'.
   VarDecl *storageVar = nullptr;
-  if (delegateInfo.delegateValueVar) {
-    storageVar = synthesizePropertyDelegateStorageDelegateProperty(
-        ctx, var, storageType, delegateInfo.delegateValueVar);
+  if (wrapperInfo.wrapperValueVar) {
+    storageVar = synthesizePropertyWrapperStorageWrapperProperty(
+        ctx, var, storageType, wrapperInfo.wrapperValueVar);
   }
 
-  // Get the property delegate information.
-  if (!delegateInfo.initialValueInit) {
+  // Get the property wrapper information.
+  if (!wrapperInfo.initialValueInit) {
     assert(!originalInitialValue);
-    return PropertyDelegateBackingPropertyInfo(
+    return PropertyWrapperBackingPropertyInfo(
         backingVar, storageVar, nullptr, nullptr, nullptr);
   }
 
@@ -1669,22 +1690,22 @@ PropertyDelegateBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
   Expr *initializer =
       CallExpr::createImplicit(ctx, typeExpr, {origValue},
                                {ctx.Id_initialValue});
-  typeCheckSynthesizedDelegateInitializer(pbd, backingVar, parentPBD,
-                                          initializer);
+  typeCheckSynthesizedWrapperInitializer(pbd, backingVar, parentPBD,
+                                         initializer);
 
-  return PropertyDelegateBackingPropertyInfo(
+  return PropertyWrapperBackingPropertyInfo(
       backingVar, storageVar, originalInitialValue, initializer, origValue);
 }
 
 static bool wouldBeCircularSynthesis(AbstractStorageDecl *storage,
                                      AccessorKind kind) {
-  // All property delegate accessors are non-circular.
+  // All property wrapper accessors are non-circular.
   if (auto var = dyn_cast<VarDecl>(storage)) {
-    if (var->getAttachedPropertyDelegate())
+    if (var->getAttachedPropertyWrapper())
       return false;
 
-    if (var->getOriginalDelegatedProperty(
-            PropertyDelegateSynthesizedPropertyKind::StorageDelegate))
+    if (var->getOriginalWrappedProperty(
+            PropertyWrapperSynthesizedPropertyKind::StorageWrapper))
       return false;
   }
 
@@ -1765,17 +1786,17 @@ static void maybeAddAccessorsToLazyVariable(VarDecl *var, ASTContext &ctx) {
   addExpectedOpaqueAccessorsToStorage(var, ctx);
 }
 
-static void maybeAddAccessorsForPropertyDelegate(VarDecl *var,
+static void maybeAddAccessorsForPropertyWrapper(VarDecl *var,
                                                  ASTContext &ctx) {
-  auto backingVar = var->getPropertyDelegateBackingProperty();
+  auto backingVar = var->getPropertyWrapperBackingProperty();
   if (!backingVar || backingVar->isInvalid())
     return;
 
-  auto valueVar = var->getAttachedPropertyDelegateTypeInfo().valueVar;
+  auto valueVar = var->getAttachedPropertyWrapperTypeInfo().valueVar;
   assert(valueVar && "Cannot fail when the backing var is valid");
 
   auto parentSF = var->getDeclContext()->getParentSourceFile();
-  bool delegateSetterIsUsable =
+  bool wrapperSetterIsUsable =
     var->getSetter() ||
     (parentSF &&
      parentSF->Kind != SourceFileKind::Interface &&
@@ -1787,12 +1808,12 @@ static void maybeAddAccessorsForPropertyDelegate(VarDecl *var,
     addGetterToStorage(var, ctx);
   }
 
-  if (delegateSetterIsUsable)
+  if (wrapperSetterIsUsable)
     var->overwriteImplInfo(StorageImplInfo::getMutableComputed());
   else
     var->overwriteImplInfo(StorageImplInfo::getImmutableComputed());
 
-  if (!var->getSetter() && delegateSetterIsUsable) {
+  if (!var->getSetter() && wrapperSetterIsUsable) {
     addSetterToStorage(var, ctx);
   }
 
@@ -1814,10 +1835,10 @@ void swift::maybeAddAccessorsToStorage(AbstractStorageDecl *storage) {
     return;
   }
 
-  // Property delegates require backing storage.
+  // property wrappers require backing storage.
   if (auto var = dyn_cast<VarDecl>(storage)) {
-    if (var->getAttachedPropertyDelegate()) {
-      maybeAddAccessorsForPropertyDelegate(var, ctx);
+    if (var->getAttachedPropertyWrapper()) {
+      maybeAddAccessorsForPropertyWrapper(var, ctx);
       return;
     }
   }
@@ -1831,7 +1852,7 @@ void swift::maybeAddAccessorsToStorage(AbstractStorageDecl *storage) {
   // Implicit properties don't get accessors.
   if (storage->isImplicit() &&
       !(isa<VarDecl>(storage) &&
-        cast<VarDecl>(storage)->getOriginalDelegatedProperty()))
+        cast<VarDecl>(storage)->getOriginalWrappedProperty()))
     return;
 
   if (!dc->isTypeContext()) {
@@ -1903,16 +1924,16 @@ static void synthesizeGetterBody(AccessorDecl *getter,
                                  ASTContext &ctx) {
   auto storage = getter->getStorage();
 
-  // Synthesize the getter for a property delegate.
+  // Synthesize the getter for a property wrapper.
   if (auto var = dyn_cast<VarDecl>(storage)) {
-    if (var->getAttachedPropertyDelegate()) {
-      synthesizePropertyDelegateGetterBody(getter, ctx);
+    if (var->getAttachedPropertyWrapper()) {
+      synthesizePropertyWrapperGetterBody(getter, ctx);
       return;
     }
 
-    if (var->getOriginalDelegatedProperty(
-            PropertyDelegateSynthesizedPropertyKind::StorageDelegate)) {
-      synthesizeTrivialGetterBody(getter, TargetImpl::DelegateStorage, ctx);
+    if (var->getOriginalWrappedProperty(
+            PropertyWrapperSynthesizedPropertyKind::StorageWrapper)) {
+      synthesizeTrivialGetterBody(getter, TargetImpl::WrapperStorage, ctx);
       return;
     }
   }
@@ -1949,26 +1970,26 @@ static void synthesizeSetterBody(AccessorDecl *setter,
                                  ASTContext &ctx) {
   auto storage = setter->getStorage();
 
-  // Synthesize the setter for a property delegate.
+  // Synthesize the setter for a property wrapper.
   if (auto var = dyn_cast<VarDecl>(storage)) {
-    if (var->getAttachedPropertyDelegate()) {
+    if (var->getAttachedPropertyWrapper()) {
       if (var->getAccessor(AccessorKind::WillSet) ||
           var->getAccessor(AccessorKind::DidSet)) {
-        synthesizeObservedSetterBody(setter, TargetImpl::Delegate, ctx);
+        synthesizeObservedSetterBody(setter, TargetImpl::Wrapper, ctx);
         return;
       }
 
-      synthesizePropertyDelegateSetterBody(setter, ctx);
+      synthesizePropertyWrapperSetterBody(setter, ctx);
       return;
     }
 
-    // Synthesize a getter for the storage delegate property of a property
-    // with an attached delegate.
-    if (auto original = var->getOriginalDelegatedProperty(
-            PropertyDelegateSynthesizedPropertyKind::StorageDelegate)) {
-      auto backingVar = original->getPropertyDelegateBackingProperty();
+    // Synthesize a getter for the storage wrapper property of a property
+    // with an attached wrapper.
+    if (auto original = var->getOriginalWrappedProperty(
+            PropertyWrapperSynthesizedPropertyKind::StorageWrapper)) {
+      auto backingVar = original->getPropertyWrapperBackingProperty();
       synthesizeTrivialSetterBodyWithStorage(setter,
-                                             TargetImpl::DelegateStorage,
+                                             TargetImpl::WrapperStorage,
                                              backingVar, ctx);
       return;
     }
@@ -2074,7 +2095,7 @@ static void maybeAddMemberwiseDefaultArg(ParamDecl *arg, VarDecl *var,
 
   // If there's a backing storage property, the memberwise initializer
   // will be in terms of that.
-  VarDecl *backingStorageVar = var->getPropertyDelegateBackingProperty();
+  VarDecl *backingStorageVar = var->getPropertyWrapperBackingProperty();
 
   // Set the default value to the variable. When we emit this in silgen
   // we're going to call the variable's initializer expression.
@@ -2125,13 +2146,13 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
         // moved later.
         varInterfaceType = OptionalType::get(varInterfaceType);
       } else if (Type backingPropertyType =
-                     var->getPropertyDelegateBackingPropertyType()) {
-        // For a property that has a delegate, writing the initializer
+                     var->getPropertyWrapperBackingPropertyType()) {
+        // For a property that has a wrapper, writing the initializer
         // with an '=' implies that the memberwise initializer should also
         // accept a value of the original property type. Otherwise, the
         // memberwise initializer will be in terms of the backing storage
         // type.
-        if (!var->isPropertyDelegateInitializedWithInitialValue()) {
+        if (!var->isPropertyWrapperInitializedWithInitialValue()) {
           varInterfaceType = backingPropertyType;
         }
       }

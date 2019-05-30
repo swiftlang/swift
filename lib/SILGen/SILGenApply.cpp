@@ -5490,14 +5490,14 @@ RValue SILGenFunction::emitApplyAllocatingInitializer(SILLocation loc,
   return result;
 }
 
-RValue SILGenFunction::emitApplyPropertyDelegateAllocator(SILLocation loc,
+RValue SILGenFunction::emitApplyPropertyWrapperAllocator(SILLocation loc,
                                                           SubstitutionMap subs,
                                                           SILDeclRef ctorRef,
-                                                          Type delegateTy,
+                                                          Type wrapperTy,
                                                     CanAnyFunctionType funcTy) {
   Callee callee = Callee::forDirect(*this, ctorRef, subs, loc);
 
-  MetatypeType *MTty = MetatypeType::get(delegateTy);
+  MetatypeType *MTty = MetatypeType::get(wrapperTy);
   auto metatypeVal = B.createMetatype(loc, getLoweredType(MTty));
   ManagedValue mtManagedVal = ManagedValue::forUnmanaged(metatypeVal);
   RValue metatypeRVal(*this, loc, MTty->getCanonicalType(), mtManagedVal);

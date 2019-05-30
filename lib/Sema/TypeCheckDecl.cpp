@@ -33,7 +33,7 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PrettyStackTrace.h"
-#include "swift/AST/PropertyDelegates.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/TypeWalker.h"
@@ -1888,15 +1888,15 @@ static bool computeIsGetterMutating(TypeChecker &TC,
            !storage->isStatic();
   }
 
-  // If we have an attached property delegate, the getter is mutating if
-  // the "value" property of the delegate type is mutating and we're in
+  // If we have an attached property wrapper, the getter is mutating if
+  // the "value" property of the wrapper type is mutating and we're in
   // a context that has value semantics.
   if (auto var = dyn_cast<VarDecl>(storage)) {
-    if (auto delegateInfo = var->getAttachedPropertyDelegateTypeInfo()) {
-      if (delegateInfo.valueVar &&
+    if (auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo()) {
+      if (wrapperInfo.valueVar &&
           (!storage->getGetter() || storage->getGetter()->isImplicit())) {
-        TC.validateDecl(delegateInfo.valueVar);
-        return delegateInfo.valueVar->isGetterMutating() &&
+        TC.validateDecl(wrapperInfo.valueVar);
+        return wrapperInfo.valueVar->isGetterMutating() &&
             var->isInstanceMember() &&
             doesContextHaveValueSemantics(var->getDeclContext());
       }
@@ -1923,15 +1923,15 @@ static bool computeIsGetterMutating(TypeChecker &TC,
 
 static bool computeIsSetterMutating(TypeChecker &TC,
                                     AbstractStorageDecl *storage) {
-  // If we have an attached property delegate, the setter is mutating if
-  // the "value" property of the delegate type is mutating and we're in
+  // If we have an attached property wrapper, the setter is mutating if
+  // the "value" property of the wrapper type is mutating and we're in
   // a context that has value semantics.
   if (auto var = dyn_cast<VarDecl>(storage)) {
-    if (auto delegateInfo = var->getAttachedPropertyDelegateTypeInfo()) {
-      if (delegateInfo.valueVar &&
+    if (auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo()) {
+      if (wrapperInfo.valueVar &&
           (!storage->getSetter() || storage->getSetter()->isImplicit())) {
-        TC.validateDecl(delegateInfo.valueVar);
-        return delegateInfo.valueVar->isSetterMutating() &&
+        TC.validateDecl(wrapperInfo.valueVar);
+        return wrapperInfo.valueVar->isSetterMutating() &&
             var->isInstanceMember() &&
             doesContextHaveValueSemantics(var->getDeclContext());
       }
@@ -2400,11 +2400,11 @@ public:
         // If we entered an initializer context, contextualize any
         // auto-closures we might have created.
         // Note that we don't contextualize the initializer for a property
-        // with a delegate, because the initializer will have been subsumed
+        // with a wrapper, because the initializer will have been subsumed
         // by the backing storage property.
         if (!DC->isLocalContext() &&
             !(PBD->getSingleVar() &&
-              PBD->getSingleVar()->getAttachedPropertyDelegate())) {
+              PBD->getSingleVar()->getAttachedPropertyWrapper())) {
           auto *initContext = cast_or_null<PatternBindingInitializer>(
               entry.getInitContext());
           if (initContext) {
@@ -4306,7 +4306,7 @@ static bool shouldValidateMemberDuringFinalization(NominalTypeDecl *nominal,
        !cast<VarDecl>(VD)->isStatic() &&
        (cast<VarDecl>(VD)->hasStorage() ||
         VD->getAttrs().hasAttribute<LazyAttr>() ||
-        cast<VarDecl>(VD)->getAttachedPropertyDelegate())))
+        cast<VarDecl>(VD)->getAttachedPropertyWrapper())))
     return true;
 
   // For classes, we need to validate properties and functions,
@@ -4403,10 +4403,10 @@ static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
       completeLazyVarImplementation(prop);
     }
 
-    // Ensure that we create the backing variable for a property delegate.
-    if (prop->getAttachedPropertyDelegate()) {
+    // Ensure that we create the backing variable for a property wrapper.
+    if (prop->getAttachedPropertyWrapper()) {
       finalizeAbstractStorageDecl(TC, prop);
-      (void)prop->getPropertyDelegateBackingProperty();
+      (void)prop->getPropertyWrapperBackingProperty();
     }
   }
 
@@ -4930,7 +4930,7 @@ static void diagnoseClassWithoutInitializers(TypeChecker &tc,
     if (!computedBackingToOriginalVars) {
       for (auto member : classDecl->getMembers()) {
         if (auto var = dyn_cast<VarDecl>(member)) {
-          if (auto backingVar = var->getPropertyDelegateBackingProperty()) {
+          if (auto backingVar = var->getPropertyWrapperBackingProperty()) {
             backingToOriginalVars[backingVar] = var;
           }
         }
@@ -5221,16 +5221,16 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
       }
 
       if (auto var = dyn_cast<VarDecl>(member)) {
-        // If this variable has a property delegate, go validate it to ensure
+        // If this variable has a property wrapper, go validate it to ensure
         // that we create the backing storage property.
-        if (auto backingVar = var->getPropertyDelegateBackingProperty()) {
+        if (auto backingVar = var->getPropertyWrapperBackingProperty()) {
           validateDecl(var);
           maybeAddAccessorsToStorage(var);
 
           backingStorageVars.insert(backingVar);
         }
 
-        // Ignore the backing storage for properties with attached delegates.
+        // Ignore the backing storage for properties with attached wrappers.
         if (backingStorageVars.count(var) > 0)
           continue;
 

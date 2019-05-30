@@ -24,7 +24,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrettyStackTrace.h"
-#include "swift/AST/PropertyDelegates.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/RawComment.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -3364,14 +3364,14 @@ void Serializer::writeDecl(const Decl *D) {
     SmallVector<TypeID, 2> arrayFields;
     for (auto accessor : accessors.Decls)
       arrayFields.push_back(addDeclRef(accessor));
-    if (auto backingInfo = var->getPropertyDelegateBackingPropertyInfo()) {
+    if (auto backingInfo = var->getPropertyWrapperBackingPropertyInfo()) {
       if (backingInfo.backingVar) {
         ++numBackingProperties;
         arrayFields.push_back(addDeclRef(backingInfo.backingVar));
       }
-      if (backingInfo.storageDelegateVar) {
+      if (backingInfo.storageWrapperVar) {
         ++numBackingProperties;
-        arrayFields.push_back(addDeclRef(backingInfo.storageDelegateVar));
+        arrayFields.push_back(addDeclRef(backingInfo.storageWrapperVar));
       }
     }
     for (Type dependency : collectDependenciesFromType(ty->getCanonicalType()))

@@ -3771,14 +3771,14 @@ public:
   }
 };
 
-/// AssignByDelegateInst - Represents an abstract assignment via a delegate,
+/// AssignByWrapperInst - Represents an abstract assignment via a wrapper,
 /// which may either be an initialization or a store sequence.  This is only
 /// valid in Raw SIL.
-class AssignByDelegateInst
-    : public AssignInstBase<SILInstructionKind::AssignByDelegateInst, 4> {
+class AssignByWrapperInst
+    : public AssignInstBase<SILInstructionKind::AssignByWrapperInst, 4> {
   friend SILBuilder;
 
-  AssignByDelegateInst(SILDebugLocation DebugLoc, SILValue Src, SILValue Dest,
+  AssignByWrapperInst(SILDebugLocation DebugLoc, SILValue Src, SILValue Dest,
                        SILValue Initializer, SILValue Setter,
                        AssignOwnershipQualifier Qualifier =
                          AssignOwnershipQualifier::Unknown);
@@ -3790,10 +3790,10 @@ public:
 
   AssignOwnershipQualifier getOwnershipQualifier() const {
     return AssignOwnershipQualifier(
-      SILInstruction::Bits.AssignByDelegateInst.OwnershipQualifier);
+      SILInstruction::Bits.AssignByWrapperInst.OwnershipQualifier);
   }
   void setOwnershipQualifier(AssignOwnershipQualifier qualifier) {
-    SILInstruction::Bits.AssignByDelegateInst.OwnershipQualifier = unsigned(qualifier);
+    SILInstruction::Bits.AssignByWrapperInst.OwnershipQualifier = unsigned(qualifier);
   }
 };
 

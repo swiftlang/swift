@@ -1709,7 +1709,7 @@ void TypeChecker::checkEnumElementErrorHandling(EnumElementDecl *elt) {
   }
 }
 
-void TypeChecker::checkPropertyDelegateErrorHandling(
+void TypeChecker::checkPropertyWrapperErrorHandling(
     PatternBindingDecl *binding, Expr *expr) {
   CheckErrorCoverage checker(*this, Context::forPatternBinding(binding));
   expr->walk(checker);

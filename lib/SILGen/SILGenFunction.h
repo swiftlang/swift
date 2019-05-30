@@ -1475,10 +1475,10 @@ public:
                                         RValue &&args, Type overriddenSelfType,
                                         SGFContext ctx);
 
-  RValue emitApplyPropertyDelegateAllocator(SILLocation loc,
+  RValue emitApplyPropertyWrapperAllocator(SILLocation loc,
                                             SubstitutionMap subs,
                                             SILDeclRef ctorRef,
-                                            Type delegateTy,
+                                            Type wrapperTy,
                                             CanAnyFunctionType funcTy);
 
   CleanupHandle emitBeginApply(SILLocation loc, ManagedValue fn,

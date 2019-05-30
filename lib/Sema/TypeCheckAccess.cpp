@@ -522,8 +522,8 @@ public:
       highlightOffendingType(TC, diag, complainRepr);
     });
 
-    // Check the property delegate type.
-    if (auto attr = anyVar->getAttachedPropertyDelegate()) {
+    // Check the property wrapper type.
+    if (auto attr = anyVar->getAttachedPropertyWrapper()) {
       checkTypeAccess(attr->getTypeLoc(), anyVar,
                       /*mayBeInferred=*/false,
                       [&](AccessScope typeAccessScope,
@@ -536,7 +536,7 @@ public:
         auto anyVarAccess =
             isExplicit ? anyVar->getFormalAccess()
                        : typeAccessScope.requiredAccessForDiagnostics();
-        auto diag = anyVar->diagnose(diag::property_delegate_type_access,
+        auto diag = anyVar->diagnose(diag::property_wrapper_type_access,
                                      anyVar->isLet(),
                                      isTypeContext,
                                      isExplicit,
@@ -1133,7 +1133,7 @@ public:
       highlightOffendingType(TC, diag, complainRepr);
     });
 
-    if (auto attr = anyVar->getAttachedPropertyDelegate()) {
+    if (auto attr = anyVar->getAttachedPropertyWrapper()) {
       checkTypeAccess(attr->getTypeLoc(),
                       fixedLayoutStructContext ? fixedLayoutStructContext
                                                : anyVar,
@@ -1142,7 +1142,7 @@ public:
                           const TypeRepr *complainRepr,
                           DowngradeToWarning downgradeToWarning) {
         auto diag = anyVar->diagnose(
-            diag::property_delegate_type_not_usable_from_inline,
+            diag::property_wrapper_type_not_usable_from_inline,
             anyVar->isLet(), isTypeContext);
         highlightOffendingType(TC, diag, complainRepr);
       });
