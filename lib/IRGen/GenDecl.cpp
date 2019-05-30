@@ -449,6 +449,26 @@ void IRGenModule::emitSourceFile(SourceFile &SF) {
 
   if (ObjCInterop)
     this->addLinkLibrary(LinkLibrary("objc", LibraryKind::Library));
+  
+  // FIXME: It'd be better to have the driver invocation or build system that
+  // executes the linker introduce these compatibility libraries, since at
+  // that point we know whether we're building an executable, which is the only
+  // place where the compatibility libraries take effect. For the benefit of
+  // build systems that build Swift code, but don't use Swift to drive
+  // the linker, we can also use autolinking to pull in the compatibility
+  // libraries. This may however cause the library to get pulled in in
+  // situations where it isn't useful, such as for dylibs, though this is
+  // harmless aside from code size.
+  if (!IRGen.Opts.UseJIT) {
+    if (auto compatibilityVersion
+          = IRGen.Opts.AutolinkRuntimeCompatibilityLibraryVersion) {
+      if (*compatibilityVersion <= llvm::VersionTuple(5, 0)) {
+        this->addLinkLibrary(LinkLibrary("swiftCompatibility50",
+                                         LibraryKind::Library,
+                                         /*forceLoad*/ true));
+      }
+    }
+  }
 }
 
 /// Collect elements of an already-existing global list with the given
