@@ -771,7 +771,7 @@ public:
 ///   let _: Int = s.foo(1, 2) // expected type is `(Int, Int) -> Int`
 /// }
 /// ```
-class MissingMemberFailure final : public FailureDiagnostic {
+class MissingMemberFailure : public FailureDiagnostic {
   Type BaseType;
   DeclName Name;
 
@@ -787,6 +787,10 @@ private:
   static DeclName findCorrectEnumCaseName(Type Ty,
                                           TypoCorrectionResults &corrections,
                                           DeclName memberName);
+
+protected:
+  Type getBaseType() const { return BaseType; }
+  DeclName getName() const { return Name; }
 };
 
 /// Diagnose cases where a member only accessible on generic constraints
@@ -797,29 +801,19 @@ private:
 /// protocol P {
 ///   var foo: Self { get }
 /// }
-/// 
+///
 /// func bar<X : P>(p: X) {
 ///   p.foo
 /// }
 /// ```
-class AllowProtocolTypeMemberFailure final : public FailureDiagnostic {
-  Type BaseType;
-  ValueDecl *Member;
-  DeclName Name;
-  
-  public:
-    AllowProtocolTypeMemberFailure(Expr *root, ConstraintSystem &cs,
-                                   Type baseType, ValueDecl *member, DeclName memberName,
-                                   ConstraintLocator *locator)
-            : FailureDiagnostic(root, cs, locator), BaseType(baseType),
-              Member(member), Name(memberName) {}
-  
-    bool diagnoseAsError() override;
-    
-  private:
-    Type getBaseType() const { return BaseType; }
-    ValueDecl *getMember() const { return Member; }
-    DeclName getName() const { return Name; }
+class AllowProtocolTypeMemberFailure final : public MissingMemberFailure {
+public:
+  AllowProtocolTypeMemberFailure(Expr *root, ConstraintSystem &cs,
+                                 Type baseType, DeclName memberName,
+                                 ConstraintLocator *locator)
+      : MissingMemberFailure(root, cs, baseType, memberName, locator) {}
+
+  bool diagnoseAsError() override;
 };
 
 /// Diagnose situations when we use an instance member on a type

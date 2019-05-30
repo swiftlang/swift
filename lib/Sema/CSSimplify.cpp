@@ -4528,12 +4528,12 @@ fixMemberRef(ConstraintSystem &cs, Type baseTy,
     case MemberLookupResult::UR_Inaccessible:
       assert(choice.isDecl());
       return AllowInaccessibleMember::create(cs, choice.getDecl(), locator);
-      
+
     case MemberLookupResult::UR_UnavailableInExistential: {
       return choice.isDecl()
-             ? AllowProtocolTypeMember::create(
-                    cs, baseTy, choice.getDecl(), memberName, locator)
-             : nullptr;
+                 ? AllowProtocolTypeMember::create(cs, baseTy, choice.getDecl(),
+                                                   memberName, locator)
+                 : nullptr;
     }
 
     case MemberLookupResult::UR_MutatingMemberOnRValue:

@@ -1963,7 +1963,7 @@ bool MissingMemberFailure::diagnoseAsError() {
 
 bool AllowProtocolTypeMemberFailure::diagnoseAsError() {
   auto *anchor = getRawAnchor();
-  
+
   Expr *baseExpr = getAnchor();
   DeclNameLoc nameLoc;
   if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchor)) {
@@ -1976,10 +1976,10 @@ bool AllowProtocolTypeMemberFailure::diagnoseAsError() {
   } else if (auto *call = dyn_cast<CallExpr>(anchor)) {
     baseExpr = call->getFn();
   }
-  
+
   emitDiagnostic(getAnchor()->getLoc(),
-                  diag::could_not_use_member_on_existential,
-                  getBaseType(), getName())
+                 diag::could_not_use_member_on_existential, getBaseType(),
+                 getName())
       .highlight(nameLoc.getSourceRange())
       .highlight(baseExpr->getSourceRange());
   return true;

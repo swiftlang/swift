@@ -6667,7 +6667,7 @@ bool FailureDiagnosis::diagnoseMemberFailures(
       locator = simplifyLocator(CS, locator, memberRange);
 
     BaseLoc = baseExpr->getLoc();
-    NameLoc =   DeclNameLoc(memberRange.Start);
+    NameLoc = DeclNameLoc(memberRange.Start);
 
     // Retypecheck the anchor type, which is the base of the member expression.
     baseExpr =

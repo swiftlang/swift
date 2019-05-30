@@ -285,14 +285,15 @@ DefineMemberBasedOnUse::create(ConstraintSystem &cs, Type baseType,
 
 AllowProtocolTypeMember *
 AllowProtocolTypeMember::create(ConstraintSystem &cs, Type baseType,
-                                ValueDecl *member, DeclName memberName, ConstraintLocator *locator) {
+                                ValueDecl *member, DeclName memberName,
+                                ConstraintLocator *locator) {
   return new (cs.getAllocator())
       AllowProtocolTypeMember(cs, baseType, memberName, member, locator);
 }
 
 bool AllowProtocolTypeMember::diagnose(Expr *root, bool asNote) const {
   auto failure = AllowProtocolTypeMemberFailure(root, getConstraintSystem(),
-                                                BaseType, Member, Name, getLocator());
+                                                BaseType, Name, getLocator());
   return failure.diagnose(asNote);
 }
 
