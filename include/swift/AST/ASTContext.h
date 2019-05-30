@@ -109,8 +109,8 @@ namespace swift {
   class VarDecl;
   class UnifiedStatsReporter;
   // SWIFT_ENABLE_TENSORFLOW
+  class AutoDiffIndexSubset;
   class VectorSpace;
-  class AutoDiffParameterIndices;
   class DifferentiableAttr;
 
   enum class KnownProtocolKind : uint8_t;
@@ -282,8 +282,9 @@ public:
   /// Cache of `@differentiable` attributes keyed by parameter indices. This
   /// helps us diagnose multiple `@differentiable`s that are with respect to the
   /// same set of parameters.
-  llvm::DenseMap<std::pair<Decl *, AutoDiffParameterIndices *>,
-                 DifferentiableAttr *> DifferentiableAttrs;
+  llvm::DenseMap<std::pair<Decl *, AutoDiffIndexSubset *>,
+                 DifferentiableAttr *>
+      DifferentiableAttrs;
 
 private:
   /// The current generation number, which reflects the number of

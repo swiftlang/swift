@@ -4438,7 +4438,7 @@ Optional<VectorSpace> TypeBase::getAutoDiffAssociatedTangentSpace(
 }
 
 AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
-    AutoDiffParameterIndices *indices, unsigned resultIndex,
+    AutoDiffIndexSubset *indices, unsigned resultIndex,
     unsigned differentiationOrder, AutoDiffAssociatedFunctionKind kind,
     LookupConformanceFn lookupConformance,
     GenericSignature *whereClauseGenSig, bool makeSelfParamFirst) {
@@ -4457,8 +4457,15 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
   auto &ctx = getASTContext();
 
   SmallVector<Type, 8> wrtParamTypes;
-  indices->getSubsetParameterTypes(
-      this, wrtParamTypes, /*reverseCurryLevels*/ !makeSelfParamFirst);
+  if (makeSelfParamFirst || !getResult()->is<AnyFunctionType>()) {
+    autodiff::getSubsetParameterTypes(indices, this, wrtParamTypes);
+  } else {
+    auto resultFnType = getResult()->castTo<AnyFunctionType>();
+    autodiff::getSubsetParameterTypes(indices, resultFnType, wrtParamTypes);
+    assert(getNumParams() == 1); // The self parameter.
+    autodiff::getSubsetParameterTypes(AutoDiffIndexSubset::get(ctx, 1, {1}),
+                                      this, wrtParamTypes);
+  }
 
   // Unwrap curry levels. At most, two parameter lists are necessary, for
   // curried method types with a `(Self)` parameter list.

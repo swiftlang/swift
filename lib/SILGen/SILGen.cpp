@@ -819,8 +819,8 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
         auto *silDiffAttr = std::get<1>(pair);
         // Compute autodiff indices.
         auto paramIndices = diffAttr->getParameterIndices();
-        auto loweredParamIndices = paramIndices->getLowered(
-            getASTContext(),
+        auto loweredParamIndices = autodiff::getLoweredParameterIndices(
+            paramIndices,
             AFD->getInterfaceType()->castTo<AnyFunctionType>());
         SILAutoDiffIndices indices(/*source*/ 0, loweredParamIndices);
         assert(silDiffAttr->getIndices() == indices &&

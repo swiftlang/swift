@@ -3082,7 +3082,7 @@ public:
   /// The resulting function will preserve all `ExtInfo` of the original
   /// function, including `@differentiable`.
   AnyFunctionType *getAutoDiffAssociatedFunctionType(
-      AutoDiffParameterIndices *indices, unsigned resultIndex,
+      AutoDiffIndexSubset *indices, unsigned resultIndex,
       unsigned differentiationOrder, AutoDiffAssociatedFunctionKind kind,
       LookupConformanceFn lookupConformance,
       GenericSignature *whereClauseGenericSignature = nullptr,

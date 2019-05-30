@@ -333,7 +333,7 @@ static void printShortFormAvailable(ArrayRef<const DeclAttribute *> Attrs,
 // Returns the differentiation parameters clause string for the given function,
 // parameter indices, and parsed parameters.
 static std::string getDifferentiationParametersClauseString(
-    const AbstractFunctionDecl *function, AutoDiffParameterIndices *indices,
+    const AbstractFunctionDecl *function, AutoDiffIndexSubset *indices,
     ArrayRef<ParsedAutoDiffParameter> parsedParams,
     ModuleDecl *prettyPrintInModule = nullptr) {
   auto *functionType = function->getInterfaceType()->eraseDynamicSelfType()
@@ -346,7 +346,7 @@ static std::string getDifferentiationParametersClauseString(
   // string.
   if (prettyPrintInModule) {
     auto parameterCount =
-        indices ? indices->parameters.count() : parsedParams.size();
+        indices ? indices->getCapacity() : parsedParams.size();
     auto inferredParametersCount =
         AutoDiffParameterIndicesBuilder::inferParameters(
             functionType, prettyPrintInModule).count();
@@ -357,9 +357,9 @@ static std::string getDifferentiationParametersClauseString(
   std::string result;
   llvm::raw_string_ostream printer(result);
 
-  // Use parameters from `AutoDiffParameterIndices`, if specified.
+  // Use parameter indices from `AutoDiffIndexSubset`, if specified.
   if (indices) {
-    SmallBitVector parameters(indices->parameters);
+    auto parameters = indices->getBitVector();
     auto parameterCount = parameters.count();
     printer << "wrt: ";
     if (parameterCount > 1)
@@ -1332,7 +1332,7 @@ DifferentiableAttr::DifferentiableAttr(ASTContext &context, bool implicit,
 
 DifferentiableAttr::DifferentiableAttr(ASTContext &context, bool implicit,
                                        SourceLoc atLoc, SourceRange baseRange,
-                                       AutoDiffParameterIndices *indices,
+                                       AutoDiffIndexSubset *indices,
                                        Optional<DeclNameWithLoc> jvp,
                                        Optional<DeclNameWithLoc> vjp,
                                        ArrayRef<Requirement> requirements)
@@ -1358,7 +1358,7 @@ DifferentiableAttr::create(ASTContext &context, bool implicit,
 DifferentiableAttr *
 DifferentiableAttr::create(ASTContext &context, bool implicit,
                            SourceLoc atLoc, SourceRange baseRange,
-                           AutoDiffParameterIndices *indices,
+                           AutoDiffIndexSubset *indices,
                            Optional<DeclNameWithLoc> jvp,
                            Optional<DeclNameWithLoc> vjp,
                            ArrayRef<Requirement> requirements) {
@@ -1406,7 +1406,7 @@ DifferentiatingAttr::DifferentiatingAttr(
 
 DifferentiatingAttr::DifferentiatingAttr(
     ASTContext &context, bool implicit, SourceLoc atLoc, SourceRange baseRange,
-    DeclNameWithLoc original, AutoDiffParameterIndices *indices)
+    DeclNameWithLoc original, AutoDiffIndexSubset *indices)
     : DeclAttribute(DAK_Differentiating, atLoc, baseRange, implicit),
     Original(std::move(original)), ParameterIndices(indices) {}
 
@@ -1425,7 +1425,7 @@ DifferentiatingAttr *
 DifferentiatingAttr::create(ASTContext &context, bool implicit,
                             SourceLoc atLoc, SourceRange baseRange,
                             DeclNameWithLoc original,
-                            AutoDiffParameterIndices *indices) {
+                            AutoDiffIndexSubset *indices) {
   void *mem = context.Allocate(sizeof(DifferentiatingAttr),
                                alignof(DifferentiatingAttr));
   return new (mem) DifferentiatingAttr(context, implicit, atLoc, baseRange,

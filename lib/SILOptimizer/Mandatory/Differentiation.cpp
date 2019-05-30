@@ -2241,9 +2241,10 @@ emitAssociatedFunctionReference(
 
     // Check that the requirement indices are the same as the desired indices.
     auto *requirementParameterIndices = diffAttr->getParameterIndices();
-    auto loweredRequirementIndices = requirementParameterIndices->getLowered(
-        context.getASTContext(),
-        requirementDecl->getInterfaceType()->castTo<AnyFunctionType>());
+    auto loweredRequirementIndices =
+        autodiff::getLoweredParameterIndices(
+            requirementParameterIndices,
+            requirementDecl->getInterfaceType()->castTo<AnyFunctionType>());
     SILAutoDiffIndices requirementIndices(/*source*/ 0,
                                           loweredRequirementIndices);
 

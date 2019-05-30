@@ -4154,7 +4154,7 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         llvm::SmallBitVector parametersBitVector(parameters.size());
         for (unsigned i : indices(parameters))
           parametersBitVector[i] = parameters[i];
-        auto *indices = AutoDiffParameterIndices::get(parametersBitVector, ctx);
+        auto *indices = AutoDiffIndexSubset::get(ctx, parametersBitVector);
 
         MF.readGenericRequirements(requirements, MF.DeclTypeCursor);
 

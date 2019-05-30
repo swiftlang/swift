@@ -2539,8 +2539,8 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       auto paramIndices = attr->getParameterIndices();
       assert(paramIndices && "Checked parameter indices must be resolved");
       SmallVector<bool, 4> indices;
-      for (unsigned i : swift::indices(paramIndices->parameters))
-        indices.push_back(paramIndices->parameters[i]);
+      for (unsigned i : range(paramIndices->getCapacity()))
+        indices.push_back(paramIndices->contains(i));
 
       DifferentiableDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(),

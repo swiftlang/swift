@@ -1600,7 +1600,7 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
       } else if (Id.str() == "jvp" || Id.str() == "vjp") {
         AutoDiffAssociatedFunctionKind kind;
         unsigned differentiationOrder;
-        AutoDiffParameterIndices *parameterIndices = nullptr;
+        AutoDiffIndexSubset *parameterIndices = nullptr;
 
         if (Id.str() == "jvp")
           kind = AutoDiffAssociatedFunctionKind::JVP;
@@ -1623,7 +1623,7 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
           return true;
         }
 
-        parameterIndices = AutoDiffParameterIndices::create(
+        parameterIndices = AutoDiffIndexSubset::getFromString(
             SILMod.getASTContext(), P.Tok.getText());
         if (!parameterIndices) {
           P.diagnose(P.Tok, diag::malformed_autodiff_parameter_indices);

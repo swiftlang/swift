@@ -392,9 +392,6 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   /// A cache of tangent spaces per type.
   llvm::DenseMap<CanType, Optional<VectorSpace>> VectorSpaces;
 
-  /// For uniquifying `AutoDiffParameterIndices` allocations.
-  llvm::FoldingSet<AutoDiffParameterIndices> AutoDiffParameterIndicesSet;
-
   /// For uniquifying `AutoDiffIndexSubset` allocations.
   llvm::FoldingSet<AutoDiffIndexSubset> AutoDiffIndexSubsets;
 
@@ -4549,31 +4546,6 @@ void VarDecl::setOriginalDelegatedProperty(VarDecl *originalProperty) {
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-AutoDiffParameterIndices *
-AutoDiffParameterIndices::get(llvm::SmallBitVector indices, ASTContext &C) {
-  auto &foldingSet = C.getImpl().AutoDiffParameterIndicesSet;
-
-  llvm::FoldingSetNodeID id;
-  id.AddInteger(indices.size());
-  for (unsigned setBit : indices.set_bits())
-    id.AddInteger(setBit);
-
-  void *insertPos;
-  auto *existing = foldingSet.FindNodeOrInsertPos(id, insertPos);
-  if (existing)
-    return existing;
-
-  // TODO(SR-9290): Note that the AutoDiffParameterIndices' destructor never
-  // gets called, which causes a small memory leak in the case that the
-  // SmallBitVector decides to allocate some heap space.
-  void *mem = C.Allocate(sizeof(AutoDiffParameterIndices),
-                         alignof(AutoDiffParameterIndices));
-  auto *newNode = ::new (mem) AutoDiffParameterIndices(indices);
-  foldingSet.InsertNode(newNode, insertPos);
-
-  return newNode;
-}
-
 AutoDiffIndexSubset *
 AutoDiffIndexSubset::get(ASTContext &ctx, const SmallBitVector &indices) {
   auto &foldingSet = ctx.getImpl().AutoDiffIndexSubsets;
@@ -4598,11 +4570,9 @@ AutoDiffIndexSubset::get(ASTContext &ctx, const SmallBitVector &indices) {
 AutoDiffAssociatedFunctionIdentifier *
 AutoDiffAssociatedFunctionIdentifier::get(
     AutoDiffAssociatedFunctionKind kind, unsigned differentiationOrder,
-    AutoDiffParameterIndices *parameterIndices, ASTContext &C) {
+    AutoDiffIndexSubset *parameterIndices, ASTContext &C) {
   assert(parameterIndices);
-
   auto &foldingSet = C.getImpl().AutoDiffAssociatedFunctionIdentifiers;
-
   llvm::FoldingSetNodeID id;
   id.AddInteger((unsigned)kind);
   id.AddInteger(differentiationOrder);

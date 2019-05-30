@@ -90,9 +90,8 @@ void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
       auto paramIndices = A->getParameterIndices();
       if (!paramIndices)
         continue;
-      auto loweredParamIndices = paramIndices->getLowered(
-          F->getASTContext(),
-          decl->getInterfaceType()->castTo<AnyFunctionType>());
+      auto loweredParamIndices = autodiff::getLoweredParameterIndices(
+          paramIndices, decl->getInterfaceType()->castTo<AnyFunctionType>());
       SILAutoDiffIndices indices(/*source*/ 0, loweredParamIndices);
       auto silDiffAttr = SILDifferentiableAttr::create(
           M, indices, A->getRequirements(), M.allocateCopy(jvpName),

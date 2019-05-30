@@ -1,4 +1,4 @@
-//===--- SILAutoDiffIndices.cpp - Tests SILAutoDiffIndices ----------------===//
+//===----------------- SILAutoDiffIndexSubsetTests.cpp --------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -157,4 +157,72 @@ TEST(AutoDiffIndexSubset, Insertion) {
             AutoDiffIndexSubset::get(ctx.Ctx, 5, {0, 1, 2, 4}));
   EXPECT_EQ(indices1->adding(3, ctx.Ctx),
             AutoDiffIndexSubset::get(ctx.Ctx, 5, {0, 2, 3, 4}));
+}
+
+TEST(AutoDiffIndexSubset, Lowering) {
+  TestContext testCtx;
+  auto &C = testCtx.Ctx;
+  EXPECT_EQ(
+      autodiff::getLoweredParameterIndices(
+          AutoDiffIndexSubset::get(C, 1, {0}),
+          FunctionType::get({
+              FunctionType::Param(
+                  TupleType::get({C.TheAnyType, C.TheAnyType}, C))},
+              C.TheEmptyTupleType)),
+      AutoDiffIndexSubset::get(C, 2, {0, 1}));
+  EXPECT_EQ(
+      autodiff::getLoweredParameterIndices(
+          AutoDiffIndexSubset::get(C, 2, {1}),
+          FunctionType::get({
+              FunctionType::Param(C.TheEmptyTupleType),
+              FunctionType::Param(
+                  TupleType::get({C.TheAnyType, C.TheAnyType}, C))},
+                                 C.TheEmptyTupleType)),
+      AutoDiffIndexSubset::get(C, 2, {0, 1}));
+  EXPECT_EQ(
+    autodiff::getLoweredParameterIndices(
+      AutoDiffIndexSubset::get(C, 2, {1}),
+      FunctionType::get({
+          FunctionType::Param(C.TheAnyType),
+          FunctionType::Param(
+            TupleType::get({C.TheAnyType, C.TheAnyType}, C))},
+        C.TheEmptyTupleType)),
+    AutoDiffIndexSubset::get(C, 3, {1, 2}));
+  EXPECT_EQ(
+    autodiff::getLoweredParameterIndices(
+      AutoDiffIndexSubset::get(C, 2, {0, 1}),
+      FunctionType::get({
+          FunctionType::Param(C.TheAnyType),
+          FunctionType::Param(
+            TupleType::get({C.TheAnyType, C.TheAnyType}, C))},
+        C.TheEmptyTupleType)),
+    AutoDiffIndexSubset::get(C, 3, {0, 1, 2}));
+  EXPECT_EQ(
+    autodiff::getLoweredParameterIndices(
+      AutoDiffIndexSubset::get(C, 4, {0, 1, 3}),
+      FunctionType::get({
+          FunctionType::Param(C.TheAnyType),
+          FunctionType::Param(
+            TupleType::get({C.TheAnyType, C.TheAnyType}, C)),
+          FunctionType::Param(
+            TupleType::get({C.TheAnyType, C.TheAnyType}, C)),
+          FunctionType::Param(C.TheAnyType)},
+        C.TheEmptyTupleType)),
+    AutoDiffIndexSubset::get(C, 6, {0, 1, 2, 5}));
+  // Method (T) -> ((T, T), (T, T), T) -> ()
+  EXPECT_EQ(
+    autodiff::getLoweredParameterIndices(
+      AutoDiffIndexSubset::get(C, 4, {0, 2, 3}),
+      FunctionType::get(
+          {FunctionType::Param(C.TheAnyType)},
+          FunctionType::get({
+              FunctionType::Param(
+                  TupleType::get({C.TheAnyType, C.TheAnyType}, C)),
+              FunctionType::Param(
+                  TupleType::get({C.TheAnyType, C.TheAnyType}, C)),
+              FunctionType::Param(C.TheAnyType)},
+              C.TheEmptyTupleType)->withExtInfo(
+                  FunctionType::ExtInfo().withSILRepresentation(
+                  SILFunctionTypeRepresentation::Method)))),
+    AutoDiffIndexSubset::get(C, 6, {0, 1, 4, 5}));
 }

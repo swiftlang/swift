@@ -2722,7 +2722,7 @@ static bool checkFunctionSignature(
 // - If parsed parameters are empty, infer parameter indices.
 // - Otherwise, build parameter indices from parsed parameters.
 // The attribute name/location are used in diagnostics.
-static AutoDiffParameterIndices *computeDifferentiationParameters(
+static AutoDiffIndexSubset *computeDifferentiationParameters(
     TypeChecker &TC, ArrayRef<ParsedAutoDiffParameter> parsedWrtParams,
     AbstractFunctionDecl *function, GenericEnvironment *derivativeGenEnv,
     StringRef attrName, SourceLoc attrLoc
@@ -2769,7 +2769,7 @@ static AutoDiffParameterIndices *computeDifferentiationParameters(
   if (parsedWrtParams.empty()) {
     return AutoDiffParameterIndicesBuilder::inferParameters(
         functionType, function->getModuleContext())
-        .build(TC.Context);
+            .build(TC.Context);
   }
 
   // Otherwise, build parameter indices from parsed differentiation parameters.
@@ -2827,7 +2827,7 @@ static AutoDiffParameterIndices *computeDifferentiationParameters(
 // The parsed differentiation parameters and attribute location are used in
 // diagnostics.
 static bool checkDifferentiationParameters(
-    TypeChecker &TC, AutoDiffParameterIndices *indices,
+    TypeChecker &TC, AutoDiffIndexSubset *indices,
     AnyFunctionType *functionType, GenericEnvironment *derivativeGenEnv,
     ModuleDecl *module, ArrayRef<ParsedAutoDiffParameter> parsedWrtParams,
     SourceLoc attrLoc) {
@@ -2840,7 +2840,7 @@ static bool checkDifferentiationParameters(
 
   // Check that differentiation parameters have allowed types.
   SmallVector<Type, 4> wrtParamTypes;
-  indices->getSubsetParameterTypes(functionType, wrtParamTypes);
+  autodiff::getSubsetParameterTypes(indices, functionType, wrtParamTypes);
   for (unsigned i : range(wrtParamTypes.size())) {
     auto wrtParamType = wrtParamTypes[i];
     if (derivativeGenEnv) {
@@ -3011,7 +3011,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   auto parsedWrtParams = attr->getParsedParameters();
   // Get checked wrt param indices.
   // This is defined only for compiler-synthesized attributes.
-  AutoDiffParameterIndices *checkedWrtParamIndices =
+  AutoDiffIndexSubset *checkedWrtParamIndices =
       attr->getParameterIndices();
 
   // Returns true if a type conforms to `Differentiable`.
@@ -3325,7 +3325,7 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
   attr->setOriginalFunction(originalFn);
 
   // Get checked wrt param indices.
-  AutoDiffParameterIndices *checkedWrtParamIndices =
+  AutoDiffIndexSubset *checkedWrtParamIndices =
       attr->getParameterIndices();
 
   // Get the parsed wrt param indices, which have not yet been checked.
@@ -3358,8 +3358,8 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
 
   // Gather differentiation parameters.
   SmallVector<Type, 4> wrtParamTypes;
-  checkedWrtParamIndices->getSubsetParameterTypes(
-      originalFnType, wrtParamTypes);
+  autodiff::getSubsetParameterTypes(checkedWrtParamIndices, originalFnType,
+                                    wrtParamTypes);
 
   auto diffParamElts =
       map<SmallVector<TupleTypeElt, 4>>(wrtParamTypes, [&](Type paramType) {
