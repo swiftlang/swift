@@ -754,8 +754,15 @@ void FailureDiagnosis::diagnoseUnviableLookupResults(
     case MemberLookupResult::UR_WritableKeyPathOnReadOnlyMember:
     case MemberLookupResult::UR_ReferenceWritableKeyPathOnMutatingMember:
     case MemberLookupResult::UR_KeyPathWithAnyObjectRootType:
-    case MemberLookupResult::UR_UnavailableInExistential:
       break;
+
+    case MemberLookupResult::UR_UnavailableInExistential: {
+      AllowProtocolTypeMemberFailure failure(baseExpr, CS, instanceTy, memberName,
+                                             CS.getConstraintLocator(E));
+      failure.diagnoseAsError();
+      return;
+    }
+
     case MemberLookupResult::UR_InstanceMemberOnType:
     case MemberLookupResult::UR_TypeMemberOnInstance: {
       auto locatorKind = isa<SubscriptExpr>(E)
