@@ -171,8 +171,8 @@ class Superclass {
 
 class SubclassOfClassWithWrappers: ClassWithWrappers {
   override var x: Int {
-    get { return $x.value }
-    set { $x.value = newValue }
+    get { return super.x }
+    set { super.x = newValue }
   }
 }
 
@@ -503,7 +503,7 @@ class Box<Value> {
 
 struct UseBox {
   @Box
-  var x = 17
+  var x = 17 // expected-note{{'$x' declared here}}
 }
 
 func testBox(ub: UseBox) {
@@ -512,6 +512,10 @@ func testBox(ub: UseBox) {
 
   var mutableUB = ub
   mutableUB = ub
+}
+
+func backingVarIsPrivate(ub: UseBox) {
+  _ = ub.$x // expected-error{{'$x' is inaccessible due to 'private' protection level}}
 }
 
 // ---------------------------------------------------------------------------
@@ -626,6 +630,7 @@ extension Wrapper {
 
 struct TestStorageRef {
   @WrapperWithStorageRef var x: Int // expected-note{{'$$x' declared here}}
+  // expected-note@-1{{'$x' declared here}}
 
   init(x: Int) {
     self.$$x = WrapperWithStorageRef(value: x)
@@ -643,7 +648,7 @@ struct TestStorageRef {
 }
 
 func testStorageRef(tsr: TestStorageRef) {
-  let _: Wrapper = tsr.$x
+  let _: Wrapper = tsr.$x // expected-error{{'$x' is inaccessible due to 'private' protection level}}
   _ = tsr.$$x // expected-error{{'$$x' is inaccessible due to 'private' protection level}}
 }
 
