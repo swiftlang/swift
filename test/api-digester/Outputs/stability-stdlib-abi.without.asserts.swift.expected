@@ -10,35 +10,14 @@ Constructor __SwiftNativeNSData.init(coder:) is a new API without @available att
 Constructor __SwiftNativeNSDictionary.init(coder:) is a new API without @available attribute
 Constructor __SwiftNativeNSSet.init(coder:) is a new API without @available attribute
 
-// Should be fine, only included in stdlib when assertion is enabled.
-Func _collectReferencesInsideObject(_:) is a new API without @available attribute
-
 Func _cos(_:) has been removed
 Func _exp(_:) has been removed
 Func _exp2(_:) has been removed
-
-// Should be fine, only included in stdlib when assertion is enabled.
-Func _loadDestroyTLSCounter() is a new API without @available attribute
 
 Func _log(_:) has been removed
 Func _log10(_:) has been removed
 Func _log2(_:) has been removed
 
-// Should be fine, only included in stdlib when assertion is enabled.
-Func _measureRuntimeFunctionCountersDiffs(objects:_:) is a new API without @available attribute
-
 Func _nearbyint(_:) has been removed
 Func _rint(_:) has been removed
 Func _sin(_:) has been removed
-
-// Should be fine, only included in stdlib when assertion is enabled.
-Protocol _RuntimeFunctionCountersStats is a new API without @available attribute
-
-// Should be fine, only included in stdlib when assertion is enabled.
-Struct _GlobalRuntimeFunctionCountersState is a new API without @available attribute
-
-// Should be fine, only included in stdlib when assertion is enabled.
-Struct _ObjectRuntimeFunctionCountersState is a new API without @available attribute
-
-// Should be fine, only included in stdlib when assertion is enabled.
-Struct _RuntimeFunctionCounters is a new API without @available attribute
