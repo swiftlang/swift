@@ -1182,6 +1182,11 @@ extension SIMD where Scalar: FixedWidthInteger {
 extension SIMD where Scalar: FloatingPoint {
   
   @_transparent
+  @differentiable(vjp: _vjpNegate(rhs:)
+    where Self: Differentiable,
+          Self.TangentVector: SIMD,
+          Scalar : BinaryFloatingPoint,
+          Self.TangentVector.Scalar : BinaryFloatingPoint)
   public static prefix func -(rhs: Self) -> Self {
     return 0 - rhs
   }
@@ -1506,8 +1511,16 @@ extension SIMD
   static func _vjpSubtract(
     lhs: Self, rhs: Self
   ) -> (Self, (TangentVector) -> (TangentVector, TangentVector)) {
-    return (lhs - rhs, { (v: TangentVector) in
+    return (lhs - rhs, { v in
       return (v, -v)
+    })
+  }
+  
+  @inlinable
+  static func _vjpNegate(rhs: Self)
+  -> (Self, (TangentVector) -> (TangentVector)) {
+    return (-rhs, { v in
+      return -v
     })
   }
 }

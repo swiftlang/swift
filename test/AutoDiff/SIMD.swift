@@ -10,37 +10,34 @@ import Glibc
 
 var SIMDTests = TestSuite("SIMD")
 
-typealias FloatArrayGrad = SIMD4<Float>.CotangentVector
-
 SIMDTests.test("Addition") {
   let a = SIMD4<Float>(1,2,3,4)
-  // let aGrad = FloatArrayGrad(1,2,3,4)
 
-  // let foo = { (x: SIMD4<Float>) -> SIMD4<Float> in
-	//   return x
-  // }
-  // let backprop = pullback(at: a, in: foo)
+  let foo1 = { (x: SIMD4<Float>) -> SIMD4<Float> in
+    return x
+  }
+  let bp1 = pullback(at: a, in: foo1)
+  expectEqual(a, bp1(a))
 
-  let foo1 = { (x: SIMD4<Float>, y: SIMD4<Float>) -> SIMD4<Float> in
+  let foo2 = { (x: SIMD4<Float>, y: SIMD4<Float>) -> SIMD4<Float> in
     return x + y
   }
-  let backprop1 = pullback(at: a, a, in: foo1)
-  // expectEqual((aGrad, aGrad), backprop(FloatArrayGrad(1,2,3,4)))
-
-  // let foo1 = { (x: SIMD4<Float>, y: SIMD4<Float>) -> SIMD4<Float> in
-  //   return x + y
-  // }
-  // expectEqual(SIMD4<Float>(arrayLiteral: 1, 2, 3, 4), gradient(at: a, a, in: foo1))
-//   let foo2 = { (x: SIMD4<Float>, y: Float) -> Float in
-//     return -x * y
-//   }
-//   expectEqual((-4, -3), gradient(at: 3, 4, in: foo2))
-//   let foo3 = { (x: Float, y: SIMD4<Float>) -> Float in
-//     return -x + y
-//   }
-//   expectEqual((-1, 1), gradient(at: 3, 4, in: foo3))
+  let bp2 = pullback(at: a, a, in: foo2)
+  expectEqual((a, a), bp2(a))
+  
+  let foo3 = { (x: SIMD4<Float>, y: Float) -> SIMD4<Float> in
+    return -x * y
+  }
+  let bp3 = pullback(at: a, 5, in: foo3)
+  expectEqual((a, 1), bp3(a))
+  
+  let foo4 = { (x: Float, y: SIMD4<Float>) -> SIMD4<Float> in
+    return -x + y
+  }
+  let bp4 = pullback(at: 5, a, in: foo4)
+  expectEqual((1, a), bp4(a))
 }
-/*
+
 SIMDTests.test("Fanout") {
   let foo1 = { (x: Float) -> Float in
      x - x
@@ -190,7 +187,7 @@ SIMDTests.test("StructMemberwiseInitializer") {
   let 𝛁foo = pullback(at: Float(4), in: { input -> Foo in
     let foo = Foo(stored: input)
     return foo + foo
-  })(Foo.CotangentVector(stored: 1))
+  })(Foo.TangentVector(stored: 1))
   expectEqual(2, 𝛁foo)
 
   let 𝛁computed = gradient(at: Float(4)) { input -> Float in
@@ -219,7 +216,7 @@ SIMDTests.test("StructMemberwiseInitializer") {
   let 𝛁custom = pullback(at: Float(4), in: { input -> Custom in
     let foo = Custom(x: input)
     return foo + foo
-  })(Custom.CotangentVector(x: 1))
+  })(Custom.TangentVector(x: 1))
   expectEqual(2, 𝛁custom)
 }
 
@@ -243,7 +240,7 @@ SIMDTests.test("StructConstantStoredProperty") {
     let model = TF_319(x: 10)
     return model.applied(to: input)
   }
-  expectEqual(TF_319.CotangentVector(x: 6),
+  expectEqual(TF_319.TangentVector(x: 6),
               gradient(at: TF_319(x: 10), in: { $0.applied(to: 3) }))
   expectEqual(20, gradient(at: 3, in: testStructInit))
 }
@@ -287,7 +284,7 @@ SIMDTests.test("StructSideEffects") {
     }
   }
   let model = Add(bias: 1)
-  expectEqual(Add.CotangentVector(bias: 1), gradient(at: model) { m in m.applied(to: 1) })
+  expectEqual(Add.TangentVector(bias: 1), gradient(at: model) { m in m.applied(to: 1) })
 }
 
 SIMDTests.test("StructGeneric") {
@@ -300,7 +297,7 @@ SIMDTests.test("StructGeneric") {
   let 𝛁generic = pullback(at: Float(3), in: { input -> Generic<Float> in
     var generic = Generic(x: input, y: input, z: input)
     return generic
-  })(Generic<Float>.CotangentVector(x: 1, y: 1, z: 1))
+  })(Generic<Float>.TangentVector(x: 1, y: 1, z: 1))
   expectEqual(3, 𝛁generic)
 
   func fifthPower(_ input: Float) -> Float {
@@ -324,5 +321,5 @@ SIMDTests.test("SubsetIndices") {
   }
   expectEqual(4, gradWRTNonDiff { x, y in x + Float(y) })
 }
-*/
+
 runAllTests()
