@@ -2101,7 +2101,7 @@ namespace {
         // Otherwise, create a new type variable.
         auto ty = Type();
         if (!var->hasNonPatternBindingInit() &&
-            !var->getAttachedPropertyDelegate()) {
+            !var->getAttachedPropertyWrapper()) {
           if (auto boundExpr = locator.trySimplifyToExpr()) {
             if (!boundExpr->isSemanticallyInOutExpr())
               ty = CS.getType(boundExpr)->getRValueType();

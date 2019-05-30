@@ -1961,7 +1961,7 @@ public:
             "Store operand type and dest type mismatch");
   }
 
-  void checkAssignByDelegateInst(AssignByDelegateInst *AI) {
+  void checkAssignByWrapperInst(AssignByWrapperInst *AI) {
     SILValue Src = AI->getSrc(), Dest = AI->getDest();
     require(AI->getModule().getStage() == SILStage::Raw,
             "assign instruction can only exist in raw SIL");

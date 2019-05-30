@@ -114,6 +114,7 @@ IDENTIFIER(WinSDK)
 IDENTIFIER(with)
 IDENTIFIER(withArguments)
 IDENTIFIER(withKeywordArguments)
+IDENTIFIER(wrapperValue)
 
 // Kinds of layout constraints
 IDENTIFIER_WITH_NAME(UnknownLayout, "_UnknownLayout")

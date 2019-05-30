@@ -1,4 +1,4 @@
-//===--- PropertyDelegates.h - Property Delegate ASTs -----------*- C++ -*-===//
+//===--- PropertyWrappers.h - Property Wrapper ASTs -----------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,12 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines helper types for property delegates.
+// This file defines helper types for property wrappers.
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_AST_PROPERTY_DELEGATES_H
-#define SWIFT_AST_PROPERTY_DELEGATES_H
+#ifndef SWIFT_AST_PROPERTY_WRAPPERS_H
+#define SWIFT_AST_PROPERTY_WRAPPERS_H
 
 namespace llvm {
   class raw_ostream;
@@ -29,52 +29,52 @@ class Expr;
 class VarDecl;
 class OpaqueValueExpr;
 
-/// Describes a property delegate type.
-struct PropertyDelegateTypeInfo {
-  /// The property through to which access that uses this delegate type is
-  /// delegated.
+/// Describes a property wrapper type.
+struct PropertyWrapperTypeInfo {
+  /// The property through which access that uses this wrapper type is
+  /// directed.
   VarDecl *valueVar = nullptr;
 
   /// The initializer init(initialValue:) that will be called when the
-  /// initializing the property delegate type from a value of the property type.
+  /// initializing the property wrapper type from a value of the property type.
   ///
   /// This initializer is optional, but if present will be used for the `=`
   /// initialization syntax.
   ConstructorDecl *initialValueInit = nullptr;
 
   /// The initializer `init()` that will be called to default-initialize a
-  /// value with an attached property delegate.
+  /// value with an attached property wrapper.
   ConstructorDecl *defaultInit = nullptr;
 
-  /// The property through which the delegate value ($foo) will be accessed,
+  /// The property through which the wrapper value ($foo) will be accessed,
   /// hiding the underlying storage completely.
   ///
   /// This property is optional. If present, a computed property for `$foo`
   /// will be created that redirects to this property.
-  VarDecl *delegateValueVar = nullptr;
+  VarDecl *wrapperValueVar = nullptr;
 
-  /// Whether this is a valid property delegate.
+  /// Whether this is a valid property wrapper.
   bool isValid() const {
     return valueVar != nullptr;
   }
 
   explicit operator bool() const { return isValid(); }
 
-  friend bool operator==(const PropertyDelegateTypeInfo &lhs,
-                         const PropertyDelegateTypeInfo &rhs) {
+  friend bool operator==(const PropertyWrapperTypeInfo &lhs,
+                         const PropertyWrapperTypeInfo &rhs) {
     return lhs.valueVar == rhs.valueVar &&
         lhs.initialValueInit == rhs.initialValueInit;
   }
 };
 
-/// Describes the backing property of a property that has an attached delegate.
-struct PropertyDelegateBackingPropertyInfo {
+/// Describes the backing property of a property that has an attached wrapper.
+struct PropertyWrapperBackingPropertyInfo {
   /// The backing property.
   VarDecl *backingVar = nullptr;
 
-  /// The storage delegate property, if any. When present, this takes the name
+  /// The storage wrapper property, if any. When present, this takes the name
   /// '$foo' from `backingVar`.
-  VarDecl *storageDelegateVar = nullptr;
+  VarDecl *storageWrapperVar = nullptr;
 
   /// When the original default value is specified in terms of an '='
   /// initializer on the initial property, e.g.,
@@ -96,27 +96,27 @@ struct PropertyDelegateBackingPropertyInfo {
   /// is used as a stand-in for a value of the original property's type.
   OpaqueValueExpr *underlyingValue = nullptr;
 
-  PropertyDelegateBackingPropertyInfo() { }
+  PropertyWrapperBackingPropertyInfo() { }
   
-  PropertyDelegateBackingPropertyInfo(VarDecl *backingVar,
-                                      VarDecl *storageDelegateVar,
+  PropertyWrapperBackingPropertyInfo(VarDecl *backingVar,
+                                      VarDecl *storageWrapperVar,
                                       Expr *originalInitialValue,
                                       Expr *initializeFromOriginal,
                                       OpaqueValueExpr *underlyingValue)
-    : backingVar(backingVar), storageDelegateVar(storageDelegateVar),
+    : backingVar(backingVar), storageWrapperVar(storageWrapperVar),
       originalInitialValue(originalInitialValue),
       initializeFromOriginal(initializeFromOriginal),
       underlyingValue(underlyingValue) { }
 
-  /// Whether this is a valid property delegate.
+  /// Whether this is a valid property wrapper.
   bool isValid() const {
     return backingVar != nullptr;
   }
 
   explicit operator bool() const { return isValid(); }
 
-  friend bool operator==(const PropertyDelegateBackingPropertyInfo &lhs,
-                         const PropertyDelegateBackingPropertyInfo &rhs) {
+  friend bool operator==(const PropertyWrapperBackingPropertyInfo &lhs,
+                         const PropertyWrapperBackingPropertyInfo &rhs) {
     // FIXME: Can't currently compare expressions.
     return lhs.backingVar == rhs.backingVar;
   }
@@ -124,16 +124,16 @@ struct PropertyDelegateBackingPropertyInfo {
 
 void simple_display(
     llvm::raw_ostream &out,
-    const PropertyDelegateTypeInfo &propertyDelegate);
+    const PropertyWrapperTypeInfo &propertyWrapper);
 
 void simple_display(
     llvm::raw_ostream &out,
-    const PropertyDelegateBackingPropertyInfo &backingInfo);
+    const PropertyWrapperBackingPropertyInfo &backingInfo);
 
 /// Given the initializer for the given property with an attached property
-/// delegate, dig out the original initialization expression.
-Expr *findOriginalPropertyDelegateInitialValue(VarDecl *var, Expr *init);
+/// wrapper, dig out the original initialization expression.
+Expr *findOriginalPropertyWrapperInitialValue(VarDecl *var, Expr *init);
 
 } // end namespace swift
 
-#endif // SWIFT_AST_PROPERTY_DELEGATES_H
+#endif // SWIFT_AST_PROPERTY_WRAPPERS_H

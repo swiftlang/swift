@@ -3,8 +3,8 @@
 // Directly printing the type-checked AST
 // RUN: %target-swift-ide-test -print-ast-typechecked -source-filename %s | %FileCheck %s
 
-@_propertyDelegate
-struct Delegate<Value> {
+@_propertyWrapper
+struct Wrapper<Value> {
   var _stored: Value?
 
   var value: Value {
@@ -32,24 +32,24 @@ struct Delegate<Value> {
 
 func foo() -> Int { return 17 }
 
-// CHECK: struct HasDelegates {
-struct HasDelegates {
-  // CHECK: @Delegate var x: Int {
+// CHECK: struct HasWrappers {
+struct HasWrappers {
+  // CHECK: @Wrapper var x: Int {
   // CHECK-NEXT:  get
-  // CHECK: var $x: Delegate<Int>
-  @Delegate(closure: foo)
+  // CHECK: var $x: Wrapper<Int>
+  @Wrapper(closure: foo)
   var x: Int
 
-  @Delegate
+  @Wrapper
   var y = true
 
-  @Delegate
+  @Wrapper
   var z: String
 
   // Memberwise initializer.
-  // CHECK: init(x: Delegate<Int> = Delegate(closure: foo), y: Bool = true, z: String = Delegate())
+  // CHECK: init(x: Wrapper<Int> = Wrapper(closure: foo), y: Bool = true, z: String = Wrapper())
 }
 
 func trigger() {
-  _ = HasDelegates(y: false)
+  _ = HasWrappers(y: false)
 }
