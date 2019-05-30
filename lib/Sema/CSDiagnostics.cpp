@@ -1978,7 +1978,7 @@ bool AllowProtocolTypeMemberFailure::diagnoseAsError() {
   }
 
   emitDiagnostic(getAnchor()->getLoc(),
-                 diag::could_not_use_member_on_existential, getBaseType(),
+                 diag::could_not_use_member_on_existential, getBaseType()->getRValueType(),
                  getName())
       .highlight(nameLoc.getSourceRange())
       .highlight(baseExpr->getSourceRange());
