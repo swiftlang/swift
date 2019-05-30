@@ -111,7 +111,6 @@ class TFGraphBuilder {
 
 class TFFunctionBuilder {
   struct FunctionDescription {
-    let name: String
     let function: CTFFunction
     let outputCount: Int
     let outputGroups: [Int]
@@ -131,7 +130,7 @@ class TFFunctionBuilder {
       operations -> CTFFunction in
       let base = operations.baseAddress
       let tracedGraphFn = TF_GraphToFunction(graph, tracedFunctionName,
-        /*append_hash_to_fn_name*/ 0,
+        /*append_hash_to_fn_name*/ 1,
         /*num_opers*/ Int32(operations.count),
         /*opers*/ base,
         /*numinputs*/ Int32(inputs.count),
@@ -156,7 +155,6 @@ class TFFunctionBuilder {
     TFE_ContextAddFunction(eagerContext, tracedGraphFn, status)
 
     return FunctionDescription(
-      name: tracedFunctionName,
       function: tracedGraphFn,
       outputCount: outputs.count,
       outputGroups: graphDescription.outputGroups
@@ -167,7 +165,8 @@ class TFFunctionBuilder {
     _ function: FunctionDescription,
     _ inputs: [TFETensorHandle]) -> [TFETensorHandle] {
     let eagerContext = _TFCGetGlobalEagerContext()
-    let eagerOp: CTFEOp! = TFE_NewOp(eagerContext, function.name, status)
+    let fname = TF_FunctionName(function.function)!
+    let eagerOp: CTFEOp! = TFE_NewOp(eagerContext, fname, status)
     defer { TFE_DeleteOp(eagerOp) }
     checkOk(status)
 
@@ -193,7 +192,8 @@ class TFFunctionBuilder {
 
   static func removeFunction(_ function: FunctionDescription) {
     let eagerContext = _TFCGetGlobalEagerContext()
-    TFE_ContextRemoveFunction(eagerContext, function.name, status)
+    let fname = TF_FunctionName(function.function)!
+    TFE_ContextRemoveFunction(eagerContext, fname, status)
     checkOk(status)
     TF_DeleteFunction(function.function)
   }
@@ -271,7 +271,8 @@ class LazyTraceDescription {
 
   var tfFunction: TFFunctionBuilder.FunctionDescription {
     let graphDescription = TFGraphDescription(self)
-    return graphDescription.tfFunction
+    let function = graphDescription.tfFunction
+    return function
   }
 
   func signature() -> String {
@@ -447,7 +448,9 @@ extension LazyTensorOperation {
 
     LazyTensorOperation.materializationCallback("lazy")
     let lazyDescription = LazyTraceDescription(lazyOp)
-    lazyDescription.debugPrint()
+    if _RuntimeConfig.printsDebugLog {
+      lazyDescription.debugPrint()
+    }
     LazyTensorOperation.materializationCallback("graphdesc")
     let function = lazyDescription.tfFunction
     LazyTensorOperation.materializationCallback("tffunction")
@@ -466,6 +469,6 @@ extension LazyTensorOperation {
     // to the LazyTensorOperations..
     LazyTensor.onAllOperations { $0.maybeMaterializeInputs() }
     // Cleanup
-    TFFunctionBuilder.removeFunction(function)
+    // TFFunctionBuilder.removeFunction(function)
   }
 }
