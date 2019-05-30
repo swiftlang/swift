@@ -263,17 +263,10 @@ class LazyTraceDescription {
   var outputs: [LazyTensorOperation] = []
   var originalOutputs: [LazyTensorOperation] = []
 
-  /// A status object to pass to TF graph building operations.
-  private let status: CTFStatus = TF_NewStatus()
-
   init(_ lazyOp: LazyTensorOperation) {
     // LazyTensor.onLiveOperations { let _ = collectLazyOp($0) }
     let _ = collectLazyOp(lazyOp)
     lazyOpsCache.removeAll()
-  }
-
-  deinit {
-    TF_DeleteStatus(status)
   }
 
   func debugPrint() {
