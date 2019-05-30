@@ -269,6 +269,11 @@ class LazyTraceDescription {
     lazyOpsCache.removeAll()
   }
 
+  var tfFunction: TFFunctionBuilder.FunctionDescription {
+    let graphDescription = TFGraphDescription(self)
+    return graphDescription.tfFunction
+  }
+
   func debugPrint() {
     print("Trace")
     print("Input Values (\(inputValues.count)):")
@@ -426,15 +431,14 @@ extension LazyTensorOperation {
 
 
   private static func materializeLiveTensors(_ lazyOp: LazyTensorOperation) {
-    let lazyDescription = LazyTraceDescription(lazyOp)
-    lazyDescription.debugPrint()
 
     LazyTensorOperation.materializationCallback("lazy")
-    let graphDescription = TFGraphDescription(lazyDescription)
+    let lazyDescription = LazyTraceDescription(lazyOp)
+    lazyDescription.debugPrint()
     LazyTensorOperation.materializationCallback("graphdesc")
-    let function = graphDescription.tfFunction
+    let function = lazyDescription.tfFunction
     LazyTensorOperation.materializationCallback("tffunction")
-    let allOutputs = TFFunctionBuilder.execute(function, graphDescription.inputValues)
+    let allOutputs = TFFunctionBuilder.execute(function, lazyDescription.inputValues)
     LazyTensorOperation.materializationCallback("execute")
 
     // Slice up the outputs to various lazy tensors
