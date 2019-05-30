@@ -274,8 +274,21 @@ class LazyTraceDescription {
     return graphDescription.tfFunction
   }
 
+  func signature() -> String {
+    let inputsDesc = inputs.map { input -> String in
+      let dtypeAttr = input.attrs["dtype"]!
+      return "\(input.nameDescription()):\(dtypeAttr)"
+    }
+    let inputDesc = inputsDesc.joined(separator: ",")
+    let outputsDesc = outputs.map { output -> String in
+      return "\(output.nameDescription())"
+    }
+    let outputDesc = outputsDesc.joined(separator: ",")
+    return "lazyTrace_\(operations.count)(\(inputDesc)) -> (\(outputDesc))"
+  }
+
   func debugPrint() {
-    print("Trace")
+    print("\(signature())")
     print("Input Values (\(inputValues.count)):")
     for input in inputValues {
       print("  \(input)")
