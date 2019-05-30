@@ -858,8 +858,8 @@ StructDecl *ASTContext::getTensorDataTypeDecl() const {
     return getImpl().TensorDataTypeDecl;
 
   // See if the TensorFlow module was imported.  If not, return null.
-	auto tfModule = getLoadedModule(Id_TensorFlow);
-	if (!tfModule)
+  auto tfModule = getLoadedModule(Id_TensorFlow);
+  if (!tfModule)
     return nullptr;
 
   SmallVector<ValueDecl *, 1> results;
