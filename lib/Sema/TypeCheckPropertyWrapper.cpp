@@ -1,4 +1,4 @@
-//===--- TypeCheckPropertyDelegate.cpp - Property Delegates ---------------===//
+//===--- TypeCheckPropertyWrapper.cpp - property wrappers ---------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file implements semantic analysis for property delegates.
+// This file implements semantic analysis for property wrappers.
 //
 //===----------------------------------------------------------------------===//
 #include "TypeChecker.h"
@@ -20,11 +20,11 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/NameLookupRequests.h"
-#include "swift/AST/PropertyDelegates.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/TypeCheckRequests.h"
 using namespace swift;
 
-/// Find the named property in a property delegate to which access will
+/// Find the named property in a property wrapper to which access will
 /// be delegated.
 static VarDecl *findValueProperty(ASTContext &ctx, NominalTypeDecl *nominal,
                                   Identifier name, bool allowMissing) {
@@ -46,7 +46,7 @@ static VarDecl *findValueProperty(ASTContext &ctx, NominalTypeDecl *nominal,
   switch (vars.size()) {
   case 0:
     if (!allowMissing) {
-      nominal->diagnose(diag::property_delegate_no_value_property,
+      nominal->diagnose(diag::property_wrapper_no_value_property,
                         nominal->getDeclaredType(), name);
     }
     return nullptr;
@@ -55,7 +55,7 @@ static VarDecl *findValueProperty(ASTContext &ctx, NominalTypeDecl *nominal,
     break;
 
   default:
-    nominal->diagnose(diag::property_delegate_ambiguous_value_property,
+    nominal->diagnose(diag::property_wrapper_ambiguous_value_property,
                       nominal->getDeclaredType(), name);
     for (auto var : vars) {
       var->diagnose(diag::kind_declname_declared_here,
@@ -67,7 +67,7 @@ static VarDecl *findValueProperty(ASTContext &ctx, NominalTypeDecl *nominal,
   // The property must be as accessible as the nominal type.
   VarDecl *var = vars.front();
   if (var->getFormalAccess() < nominal->getFormalAccess()) {
-    var->diagnose(diag::property_delegate_type_requirement_not_accessible,
+    var->diagnose(diag::property_wrapper_type_requirement_not_accessible,
                   var->getFormalAccess(), var->getDescriptiveKind(),
                   var->getFullName(), nominal->getDeclaredType(),
                   nominal->getFormalAccess());
@@ -78,7 +78,7 @@ static VarDecl *findValueProperty(ASTContext &ctx, NominalTypeDecl *nominal,
 }
 
 /// Determine whether we have a suitable init(initialValue:) within a property
-/// delegate type.
+/// wrapper type.
 static ConstructorDecl *findInitialValueInit(ASTContext &ctx,
                                              NominalTypeDecl *nominal,
                                              VarDecl *valueVar) {
@@ -104,7 +104,7 @@ static ConstructorDecl *findInitialValueInit(ASTContext &ctx,
 
   default:
     // Diagnose ambiguous init(initialValue:) initializers.
-    nominal->diagnose(diag::property_delegate_ambiguous_initial_value_init,
+    nominal->diagnose(diag::property_wrapper_ambiguous_initial_value_init,
                       nominal->getDeclaredType());
     for (auto init : initialValueInitializers) {
       init->diagnose(diag::kind_declname_declared_here,
@@ -116,7 +116,7 @@ static ConstructorDecl *findInitialValueInit(ASTContext &ctx,
   // 'init(initialValue:)' must be as accessible as the nominal type.
   auto init = initialValueInitializers.front();
   if (init->getFormalAccess() < nominal->getFormalAccess()) {
-    init->diagnose(diag::property_delegate_type_requirement_not_accessible,
+    init->diagnose(diag::property_wrapper_type_requirement_not_accessible,
                      init->getFormalAccess(), init->getDescriptiveKind(),
                      init->getFullName(), nominal->getDeclaredType(),
                      nominal->getFormalAccess());
@@ -152,7 +152,7 @@ static ConstructorDecl *findInitialValueInit(ASTContext &ctx,
   // The parameter type must be the same as the type of `valueVar` or an
   // autoclosure thereof.
   if (!paramType->isEqual(valueVarType)) {
-    init->diagnose(diag::property_delegate_wrong_initial_value_init, paramType,
+    init->diagnose(diag::property_wrapper_wrong_initial_value_init, paramType,
                    valueVarType);
     valueVar->diagnose(diag::decl_declared_here, valueVar->getFullName());
     return nullptr;
@@ -160,7 +160,7 @@ static ConstructorDecl *findInitialValueInit(ASTContext &ctx,
 
   // The initializer must not be failable.
   if (init->getFailability() != OTK_None) {
-    init->diagnose(diag::property_delegate_failable_init, initName);
+    init->diagnose(diag::property_wrapper_failable_init, initName);
     return nullptr;
   }
 
@@ -168,7 +168,7 @@ static ConstructorDecl *findInitialValueInit(ASTContext &ctx,
 }
 
 /// Determine whether we have a suitable init() within a property
-/// delegate type.
+/// wrapper type.
 static ConstructorDecl *findDefaultInit(ASTContext &ctx,
                                         NominalTypeDecl *nominal) {
   SmallVector<ConstructorDecl *, 2> defaultValueInitializers;
@@ -193,7 +193,7 @@ static ConstructorDecl *findDefaultInit(ASTContext &ctx,
 
   default:
     // Diagnose ambiguous init() initializers.
-    nominal->diagnose(diag::property_delegate_ambiguous_default_value_init,
+    nominal->diagnose(diag::property_wrapper_ambiguous_default_value_init,
                       nominal->getDeclaredType());
     for (auto init : defaultValueInitializers) {
       init->diagnose(diag::kind_declname_declared_here,
@@ -205,7 +205,7 @@ static ConstructorDecl *findDefaultInit(ASTContext &ctx,
   // 'init()' must be as accessible as the nominal type.
   auto init = defaultValueInitializers.front();
   if (init->getFormalAccess() < nominal->getFormalAccess()) {
-    init->diagnose(diag::property_delegate_type_requirement_not_accessible,
+    init->diagnose(diag::property_wrapper_type_requirement_not_accessible,
                      init->getFormalAccess(), init->getDescriptiveKind(),
                      init->getFullName(), nominal->getDeclaredType(),
                      nominal->getFormalAccess());
@@ -214,41 +214,41 @@ static ConstructorDecl *findDefaultInit(ASTContext &ctx,
 
   // The initializer must not be failable.
   if (init->getFailability() != OTK_None) {
-    init->diagnose(diag::property_delegate_failable_init, initName);
+    init->diagnose(diag::property_wrapper_failable_init, initName);
     return nullptr;
   }
 
   return init;
 }
 
-llvm::Expected<PropertyDelegateTypeInfo>
-PropertyDelegateTypeInfoRequest::evaluate(
+llvm::Expected<PropertyWrapperTypeInfo>
+PropertyWrapperTypeInfoRequest::evaluate(
     Evaluator &eval, NominalTypeDecl *nominal) const {
-  // We must have the @_propertyDelegate attribute to continue.
-  if (!nominal->getAttrs().hasAttribute<PropertyDelegateAttr>()) {
-    return PropertyDelegateTypeInfo();
+  // We must have the @_propertyWrapper attribute to continue.
+  if (!nominal->getAttrs().hasAttribute<PropertyWrapperAttr>()) {
+    return PropertyWrapperTypeInfo();
   }
 
-  // Look for a non-static property named "value" in the property delegate
+  // Look for a non-static property named "value" in the property wrapper
   // type.
   ASTContext &ctx = nominal->getASTContext();
   auto valueVar =
       findValueProperty(ctx, nominal, ctx.Id_value, /*allowMissing=*/false);
   if (!valueVar)
-    return PropertyDelegateTypeInfo();
+    return PropertyWrapperTypeInfo();
 
-  PropertyDelegateTypeInfo result;
+  PropertyWrapperTypeInfo result;
   result.valueVar = valueVar;
   result.initialValueInit = findInitialValueInit(ctx, nominal, valueVar);
   result.defaultInit = findDefaultInit(ctx, nominal);
-  result.delegateValueVar =
-    findValueProperty(ctx, nominal, ctx.Id_delegateValue, /*allowMissing=*/true);
+  result.wrapperValueVar =
+    findValueProperty(ctx, nominal, ctx.Id_wrapperValue, /*allowMissing=*/true);
 
   return result;
 }
 
 llvm::Expected<CustomAttr *>
-AttachedPropertyDelegateRequest::evaluate(Evaluator &evaluator,
+AttachedPropertyWrapperRequest::evaluate(Evaluator &evaluator,
                                           VarDecl *var) const {
   ASTContext &ctx = var->getASTContext();
   auto dc = var->getDeclContext();
@@ -258,9 +258,9 @@ AttachedPropertyDelegateRequest::evaluate(Evaluator &evaluator,
     auto nominal = evaluateOrDefault(
       ctx.evaluator, CustomAttrNominalRequest{mutableAttr, dc}, nullptr);
 
-    // If we didn't find a nominal type with a @_propertyDelegate attribute,
+    // If we didn't find a nominal type with a @_propertyWrapper attribute,
     // skip this custom attribute.
-    if (!nominal || !nominal->getAttrs().hasAttribute<PropertyDelegateAttr>())
+    if (!nominal || !nominal->getAttrs().hasAttribute<PropertyWrapperAttr>())
       continue;
 
     // If the declaration came from a module file, we've already done all of
@@ -269,12 +269,12 @@ AttachedPropertyDelegateRequest::evaluate(Evaluator &evaluator,
     if (!sourceFile)
       return mutableAttr;
 
-    // Check various restrictions on which properties can have delegates
+    // Check various restrictions on which properties can have wrappers
     // attached to them.
 
-    // Local properties do not yet support delegates.
+    // Local properties do not yet support wrappers.
     if (var->getDeclContext()->isLocalContext()) {
-      ctx.Diags.diagnose(attr->getLocation(), diag::property_delegate_local);
+      ctx.Diags.diagnose(attr->getLocation(), diag::property_wrapper_local);
       return nullptr;
     }
 
@@ -282,13 +282,13 @@ AttachedPropertyDelegateRequest::evaluate(Evaluator &evaluator,
     auto binding = var->getParentPatternBinding();
     if (!binding || binding->getSingleVar() != var) {
       ctx.Diags.diagnose(attr->getLocation(),
-                         diag::property_delegate_not_single_var);
+                         diag::property_wrapper_not_single_var);
       return nullptr;
     }
 
-    // A property delegate cannot be attached to a 'let'.
+    // A property wrapper cannot be attached to a 'let'.
     if (var->isLet()) {
-      ctx.Diags.diagnose(attr->getLocation(), diag::property_delegate_let);
+      ctx.Diags.diagnose(attr->getLocation(), diag::property_wrapper_let);
       return nullptr;
     }
 
@@ -310,12 +310,12 @@ AttachedPropertyDelegateRequest::evaluate(Evaluator &evaluator,
         auto attr = var->getAttrs().getAttribute<ReferenceOwnershipAttr>();
         whichKind = 2 + static_cast<unsigned>(attr->get());
       }
-      var->diagnose(diag::property_with_delegate_conflict_attribute,
+      var->diagnose(diag::property_with_wrapper_conflict_attribute,
                     var->getFullName(), whichKind);
       return nullptr;
     }
 
-    // A property with a delegate cannot be declared in a protocol, enum, or
+    // A property with a wrapper cannot be declared in a protocol, enum, or
     // an extension.
     if (isa<ProtocolDecl>(dc) ||
         (isa<ExtensionDecl>(dc) && var->isInstanceMember()) ||
@@ -327,26 +327,26 @@ AttachedPropertyDelegateRequest::evaluate(Evaluator &evaluator,
         whichKind = 1;
       else
         whichKind = 2;
-      var->diagnose(diag::property_with_delegate_in_bad_context,
+      var->diagnose(diag::property_with_wrapper_in_bad_context,
                     var->getFullName(), whichKind)
         .highlight(attr->getRange());
 
       return nullptr;
     }
 
-    // Properties with delegates must not override another property.
+    // Properties with wrappers must not override another property.
     if (auto classDecl = dyn_cast<ClassDecl>(dc)) {
       if (auto overrideAttr = var->getAttrs().getAttribute<OverrideAttr>()) {
-        var->diagnose(diag::property_with_delegate_overrides,
+        var->diagnose(diag::property_with_wrapper_overrides,
                       var->getFullName())
           .highlight(attr->getRange());
         return nullptr;
       }
     }
 
-    // Properties with delegates must not declare a getter or setter.
+    // Properties with wrappers must not declare a getter or setter.
     if (!var->hasStorage() && sourceFile->Kind != SourceFileKind::Interface) {
-      ctx.Diags.diagnose(attr->getLocation(), diag::property_delegate_computed);
+      ctx.Diags.diagnose(attr->getLocation(), diag::property_wrapper_computed);
       return nullptr;
     }
 
@@ -357,15 +357,15 @@ AttachedPropertyDelegateRequest::evaluate(Evaluator &evaluator,
 }
 
 llvm::Expected<Type>
-AttachedPropertyDelegateTypeRequest::evaluate(Evaluator &evaluator,
+AttachedPropertyWrapperTypeRequest::evaluate(Evaluator &evaluator,
                                               VarDecl *var) const {
-  // Find the custom attribute for the attached property delegate.
+  // Find the custom attribute for the attached property wrapper.
   llvm::Expected<CustomAttr *> customAttrVal =
-      evaluator(AttachedPropertyDelegateRequest{var});
+      evaluator(AttachedPropertyWrapperRequest{var});
   if (!customAttrVal)
     return customAttrVal.takeError();
 
-  // If there isn't an attached property delegate, we're done.
+  // If there isn't an attached property wrapper, we're done.
   auto customAttr = *customAttrVal;
   if (!customAttr)
     return Type();
@@ -390,10 +390,10 @@ AttachedPropertyDelegateTypeRequest::evaluate(Evaluator &evaluator,
 }
 
 llvm::Expected<Type>
-PropertyDelegateBackingPropertyTypeRequest::evaluate(
+PropertyWrapperBackingPropertyTypeRequest::evaluate(
                                     Evaluator &evaluator, VarDecl *var) const {
   llvm::Expected<Type> rawTypeResult =
-    evaluator(AttachedPropertyDelegateTypeRequest{var});
+    evaluator(AttachedPropertyWrapperTypeRequest{var});
   if (!rawTypeResult)
     return rawTypeResult;
 
@@ -409,7 +409,7 @@ PropertyDelegateBackingPropertyTypeRequest::evaluate(
     return Type();
 
   // If there's an initializer of some sort, checking it will determine the
-  // property delegate type.
+  // property wrapper type.
   unsigned index = binding->getPatternEntryIndexForVarDecl(var);
   ASTContext &ctx = var->getASTContext();
   TypeChecker &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
@@ -418,48 +418,48 @@ PropertyDelegateBackingPropertyTypeRequest::evaluate(
     if (!binding->isInitializerChecked(index))
       tc.typeCheckPatternBinding(binding, index);
 
-    Type type = ctx.getSideCachedPropertyDelegateBackingPropertyType(var);
+    Type type = ctx.getSideCachedPropertyWrapperBackingPropertyType(var);
     assert(type || ctx.Diags.hadAnyError());
     return type;
   }
 
-  // Compose the type of property delegate with the type of the property.
+  // Compose the type of property wrapper with the type of the property.
 
   // We expect an unbound generic type here that refers to a single-parameter
   // generic type.
-  auto delegateAttr = var->getAttachedPropertyDelegate();
+  auto wrapperAttr = var->getAttachedPropertyWrapper();
   auto nominal = rawType->getAnyNominal();
   auto unboundGeneric = rawType->getAs<UnboundGenericType>();
   if (!unboundGeneric ||
       unboundGeneric->getDecl() != nominal ||
       !nominal->getGenericParams() ||
       nominal->getGenericParams()->size() != 1) {
-    ctx.Diags.diagnose(delegateAttr->getLocation(),
-                       diag::property_delegate_incompatible_unbound,
+    ctx.Diags.diagnose(wrapperAttr->getLocation(),
+                       diag::property_wrapper_incompatible_unbound,
                        rawType)
-      .highlight(delegateAttr->getTypeLoc().getSourceRange());
+      .highlight(wrapperAttr->getTypeLoc().getSourceRange());
     return Type();
   }
 
-  // Compute the type of the property to plug in to the delegate type.
+  // Compute the type of the property to plug in to the wrapper type.
   tc.validateDecl(var);
   Type propertyType = var->getType();
 
   // Form the specialized type.
-  Type delegateType = tc.applyUnboundGenericArguments(
-      unboundGeneric, nominal, delegateAttr->getLocation(),
+  Type wrapperType = tc.applyUnboundGenericArguments(
+      unboundGeneric, nominal, wrapperAttr->getLocation(),
       TypeResolution::forContextual(var->getDeclContext()), { propertyType });
 
   // Make sure no unbound types remain; this could happen if there are outer
   // unbound types that weren't resolved by the application of the property
   // type.
-  if (delegateType->hasUnboundGenericType()) {
-    ctx.Diags.diagnose(delegateAttr->getLocation(),
-                       diag::property_delegate_incompatible_unbound,
-                       delegateType)
-      .highlight(delegateAttr->getTypeLoc().getSourceRange());
+  if (wrapperType->hasUnboundGenericType()) {
+    ctx.Diags.diagnose(wrapperAttr->getLocation(),
+                       diag::property_wrapper_incompatible_unbound,
+                       wrapperType)
+      .highlight(wrapperAttr->getTypeLoc().getSourceRange());
     return Type();
   }
 
-  return delegateType->mapTypeOutOfContext();
+  return wrapperType->mapTypeOutOfContext();
 }

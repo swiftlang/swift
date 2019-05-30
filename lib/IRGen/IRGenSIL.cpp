@@ -933,8 +933,8 @@ public:
   void visitAssignInst(AssignInst *i) {
     llvm_unreachable("assign is not valid in canonical SIL");
   }
-  void visitAssignByDelegateInst(AssignByDelegateInst *i) {
-    llvm_unreachable("assign_by_delegate is not valid in canonical SIL");
+  void visitAssignByWrapperInst(AssignByWrapperInst *i) {
+    llvm_unreachable("assign_by_wrapper is not valid in canonical SIL");
   }
   void visitMarkUninitializedInst(MarkUninitializedInst *i) {
     llvm_unreachable("mark_uninitialized is not valid in canonical SIL");

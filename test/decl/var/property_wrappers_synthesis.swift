@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -typecheck -dump-ast %s | %FileCheck %s
 
-@_propertyDelegate
+@_propertyWrapper
 struct Wrapper<T> {
   var value: T
 

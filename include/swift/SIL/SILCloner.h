@@ -1211,10 +1211,10 @@ void SILCloner<ImplClass>::visitAssignInst(AssignInst *Inst) {
 }
 
 template <typename ImplClass>
-void SILCloner<ImplClass>::visitAssignByDelegateInst(AssignByDelegateInst *Inst) {
+void SILCloner<ImplClass>::visitAssignByWrapperInst(AssignByWrapperInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(
-      Inst, getBuilder().createAssignByDelegate(getOpLocation(Inst->getLoc()),
+      Inst, getBuilder().createAssignByWrapper(getOpLocation(Inst->getLoc()),
                                       getOpValue(Inst->getSrc()),
                                       getOpValue(Inst->getDest()),
                                       getOpValue(Inst->getInitializer()),

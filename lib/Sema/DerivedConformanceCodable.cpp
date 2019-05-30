@@ -137,7 +137,7 @@ static CodableConformanceType varConformsToCodable(TypeChecker &tc,
 
 /// Retrieve the variable name for the purposes of encoding/decoding.
 static Identifier getVarNameForCoding(VarDecl *var) {
-  if (auto originalVar = var->getOriginalDelegatedProperty())
+  if (auto originalVar = var->getOriginalWrappedProperty())
     return originalVar->getName();
 
   return var->getName();
@@ -526,9 +526,9 @@ lookupVarDeclForCodingKeysCase(DeclContext *conformanceDC,
                                NominalTypeDecl *targetDecl) {
   for (auto decl : targetDecl->lookupDirect(DeclName(elt->getName()))) {
     if (auto *vd = dyn_cast<VarDecl>(decl)) {
-      // If we found a property with an attached delegate, retrieve the
+      // If we found a property with an attached wrapper, retrieve the
       // backing property.
-      if (auto backingVar = vd->getPropertyDelegateBackingProperty())
+      if (auto backingVar = vd->getPropertyWrapperBackingProperty())
         vd = backingVar;
 
       if (!vd->isStatic()) {

@@ -1,14 +1,14 @@
 // RUN: %target-typecheck-verify-swift -swift-version 5
 
 // ---------------------------------------------------------------------------
-// Property delegate type definitions
+// Property wrapper type definitions
 // ---------------------------------------------------------------------------
-@_propertyDelegate
+@_propertyWrapper
 struct Wrapper<T> {
   var value: T
 }
 
-@_propertyDelegate
+@_propertyWrapper
 struct WrapperWithInitialValue<T> {
   var value: T
 
@@ -17,7 +17,7 @@ struct WrapperWithInitialValue<T> {
   }
 }
 
-@_propertyDelegate
+@_propertyWrapper
 struct WrapperAcceptingAutoclosure<T> {
   private let fn: () -> T
 
@@ -34,39 +34,39 @@ struct WrapperAcceptingAutoclosure<T> {
   }
 }
 
-@_propertyDelegate
+@_propertyWrapper
 struct MissingValue<T> { }
-// expected-error@-1{{property delegate type 'MissingValue' does not contain a non-static property named 'value'}}
+// expected-error@-1{{property wrapper type 'MissingValue' does not contain a non-static property named 'value'}}
 
-@_propertyDelegate
+@_propertyWrapper
 struct StaticValue {
   static var value: Int = 17
 }
-// expected-error@-3{{property delegate type 'StaticValue' does not contain a non-static property named 'value'}}
+// expected-error@-3{{property wrapper type 'StaticValue' does not contain a non-static property named 'value'}}
 
 
-// expected-error@+1{{'@_propertyDelegate' attribute cannot be applied to this declaration}}
-@_propertyDelegate
-protocol CannotBeADelegate {
+// expected-error@+1{{'@_propertyWrapper' attribute cannot be applied to this declaration}}
+@_propertyWrapper
+protocol CannotBeAWrapper {
   associatedtype Value
   var value: Value { get set }
 }
 
-@_propertyDelegate
-struct NonVisibleValueDelegate<Value> {
-  private var value: Value // expected-error{{private property 'value' cannot have more restrictive access than its enclosing property delegate type 'NonVisibleValueDelegate' (which is internal)}}
+@_propertyWrapper
+struct NonVisibleValueWrapper<Value> {
+  private var value: Value // expected-error{{private property 'value' cannot have more restrictive access than its enclosing property wrapper type 'NonVisibleValueWrapper' (which is internal)}}
 }
 
-@_propertyDelegate
-struct NonVisibleInitDelegate<Value> {
+@_propertyWrapper
+struct NonVisibleInitWrapper<Value> {
   var value: Value
 
-  private init(initialValue: Value) { // expected-error{{private initializer 'init(initialValue:)' cannot have more restrictive access than its enclosing property delegate type 'NonVisibleInitDelegate' (which is internal)}}
+  private init(initialValue: Value) { // expected-error{{private initializer 'init(initialValue:)' cannot have more restrictive access than its enclosing property wrapper type 'NonVisibleInitWrapper' (which is internal)}}
     self.value = initialValue
   }
 }
 
-@_propertyDelegate
+@_propertyWrapper
 struct InitialValueTypeMismatch<Value> {
   var value: Value // expected-note{{'value' declared here}}
 
@@ -75,8 +75,8 @@ struct InitialValueTypeMismatch<Value> {
   }
 }
 
-@_propertyDelegate
-struct MultipleInitialValues<Value> { // expected-error{{property delegate type 'MultipleInitialValues' has multiple initial-value initializers}}
+@_propertyWrapper
+struct MultipleInitialValues<Value> { // expected-error{{property wrapper type 'MultipleInitialValues' has multiple initial-value initializers}}
   var value: Value? = nil
 
   init(initialValue: Int) { // expected-note{{initializer 'init(initialValue:)' declared here}}
@@ -86,7 +86,7 @@ struct MultipleInitialValues<Value> { // expected-error{{property delegate type 
   }
 }
 
-@_propertyDelegate
+@_propertyWrapper
 struct InitialValueFailable<Value> {
   var value: Value
 
@@ -95,7 +95,7 @@ struct InitialValueFailable<Value> {
   }
 }
 
-@_propertyDelegate
+@_propertyWrapper
 struct InitialValueFailableIUO<Value> {
   var value: Value
 
@@ -105,24 +105,24 @@ struct InitialValueFailableIUO<Value> {
 }
 
 // ---------------------------------------------------------------------------
-// Property delegate type definitions
+// Property wrapper type definitions
 // ---------------------------------------------------------------------------
-@_propertyDelegate
-struct _lowercaseDelegate<T> { // expected-error{{property delegate type name must start with an uppercase letter}}
+@_propertyWrapper
+struct _lowercaseWrapper<T> { // expected-error{{property wrapper type name must start with an uppercase letter}}
   var value: T
 }
 
-@_propertyDelegate
-struct _UppercaseDelegate<T> {
+@_propertyWrapper
+struct _UppercaseWrapper<T> {
   var value: T
 }
 
 // ---------------------------------------------------------------------------
-// Limitations on where property delegates can be used
+// Limitations on where property wrappers can be used
 // ---------------------------------------------------------------------------
 
 func testLocalContext() {
-  @WrapperWithInitialValue // expected-error{{property delegates are not yet supported on local properties}}
+  @WrapperWithInitialValue // expected-error{{property wrappers are not yet supported on local properties}}
   var x = 17
   x = 42
   _ = x
@@ -132,7 +132,7 @@ enum SomeEnum {
   case foo
 
   @Wrapper(value: 17)
-  var bar: Int // expected-error{{property 'bar' declared inside an enum cannot have a delegate}}
+  var bar: Int // expected-error{{property 'bar' declared inside an enum cannot have a wrapper}}
   // expected-error@-1{{enums must not contain stored properties}}
 
   @Wrapper(value: 17)
@@ -141,26 +141,26 @@ enum SomeEnum {
 
 protocol SomeProtocol {
   @Wrapper(value: 17)
-  var bar: Int // expected-error{{property 'bar' declared inside a protocol cannot have a delegate}}
+  var bar: Int // expected-error{{property 'bar' declared inside a protocol cannot have a wrapper}}
   // expected-error@-1{{property in protocol must have explicit { get } or { get set } specifier}}
 
   @Wrapper(value: 17)
-  static var x: Int // expected-error{{property 'x' declared inside a protocol cannot have a delegate}}
+  static var x: Int // expected-error{{property 'x' declared inside a protocol cannot have a wrapper}}
   // expected-error@-1{{property in protocol must have explicit { get } or { get set } specifier}}
 }
 
-struct HasDelegate { }
+struct HasWrapper { }
 
-extension HasDelegate {
+extension HasWrapper {
   @Wrapper(value: 17)
-  var inExt: Int // expected-error{{property 'inExt' declared inside an extension cannot have a delegate}}
+  var inExt: Int // expected-error{{property 'inExt' declared inside an extension cannot have a wrapper}}
   // expected-error@-1{{extensions must not contain stored properties}}
 
   @Wrapper(value: 17)
   static var x: Int
 }
 
-class ClassWithDelegates {
+class ClassWithWrappers {
   @Wrapper(value: 17)
   var x: Int
 }
@@ -169,35 +169,35 @@ class Superclass {
   var x: Int = 0
 }
 
-class SubclassOfClassWithDelegates: ClassWithDelegates {
+class SubclassOfClassWithWrappers: ClassWithWrappers {
   override var x: Int {
     get { return $x.value }
     set { $x.value = newValue }
   }
 }
 
-class SubclassWithDelegate: Superclass {
+class SubclassWithWrapper: Superclass {
   @Wrapper(value: 17)
-  override var x: Int { get { return 0 } set { } } // expected-error{{property 'x' with attached delegate cannot override another property}}
+  override var x: Int { get { return 0 } set { } } // expected-error{{property 'x' with attached wrapper cannot override another property}}
 }
 
 class C { }
 
 struct BadCombinations {
   @WrapperWithInitialValue
-  lazy var x: C = C() // expected-error{{property 'x' with a delegate cannot also be lazy}}
+  lazy var x: C = C() // expected-error{{property 'x' with a wrapper cannot also be lazy}}
   @Wrapper
-  weak var y: C? // expected-error{{property 'y' with a delegate cannot also be weak}}
+  weak var y: C? // expected-error{{property 'y' with a wrapper cannot also be weak}}
   @Wrapper
-  unowned var z: C // expected-error{{property 'z' with a delegate cannot also be unowned}}
+  unowned var z: C // expected-error{{property 'z' with a wrapper cannot also be unowned}}
 }
 
-struct MultipleDelegates {
-  @Wrapper(value: 17) // expected-error{{only one property delegate can be attached to a given property}}
-  @WrapperWithInitialValue // expected-note{{previous property delegate specified here}}
+struct MultipleWrappers {
+  @Wrapper(value: 17) // expected-error{{only one property wrapper can be attached to a given property}}
+  @WrapperWithInitialValue // expected-note{{previous property wrapper specified here}}
   var x: Int = 17
 
-  @WrapperWithInitialValue // expected-error 2{{property delegate can only apply to a single variable}}
+  @WrapperWithInitialValue // expected-error 2{{property wrapper can only apply to a single variable}}
   var (y, z) = (1, 2)
 }
 
@@ -213,7 +213,7 @@ struct Initialization {
   var x2: Double
 
   @Wrapper(value: 17)
-  var x3 = 42 // expected-error{{property 'x3' with attached delegate cannot initialize both the delegate type and the property}}
+  var x3 = 42 // expected-error{{property 'x3' with attached wrapper cannot initialize both the wrapper type and the property}}
 
   @Wrapper(value: 17)
   var x4
@@ -233,19 +233,19 @@ struct Initialization {
 }
 
 // ---------------------------------------------------------------------------
-// Delegate type formation
+// Wrapper type formation
 // ---------------------------------------------------------------------------
-@_propertyDelegate
+@_propertyWrapper
 struct IntWrapper {
   var value: Int
 }
 
-@_propertyDelegate
+@_propertyWrapper
 struct WrapperForHashable<T: Hashable> {
   var value: T
 }
 
-@_propertyDelegate
+@_propertyWrapper
 struct WrapperWithTwoParams<T, U> {
   var value: (T, U)
 }
@@ -262,35 +262,35 @@ struct UseWrappersWithDifferentForm {
   @WrapperForHashable
   var yOkay: Int
 
-  @WrapperWithTwoParams // expected-error{{property delegate type 'WrapperWithTwoParams' must either specify all generic arguments or require only a single generic argument}}
+  @WrapperWithTwoParams // expected-error{{property wrapper type 'WrapperWithTwoParams' must either specify all generic arguments or require only a single generic argument}}
   var z: Int
 
-  @HasNestedDelegate.NestedDelegate // expected-error{{property delegate type 'HasNestedDelegate.NestedDelegate<Int>' must either specify all generic arguments or require only a single generic argument}}
+  @HasNestedWrapper.NestedWrapper // expected-error{{property wrapper type 'HasNestedWrapper.NestedWrapper<Int>' must either specify all generic arguments or require only a single generic argument}}
   var w: Int
 
-  @HasNestedDelegate<Double>.NestedDelegate
+  @HasNestedWrapper<Double>.NestedWrapper
   var wOkay: Int
 }
 
 
 // ---------------------------------------------------------------------------
-// Nested delegates
+// Nested wrappers
 // ---------------------------------------------------------------------------
-struct HasNestedDelegate<T> {
-  @_propertyDelegate
-  struct NestedDelegate<U> {
+struct HasNestedWrapper<T> {
+  @_propertyWrapper
+  struct NestedWrapper<U> {
     var value: U
     init(initialValue: U) {
       self.value = initialValue
     }
   }
 
-  @NestedDelegate
+  @NestedWrapper
   var y: [T] = []
 }
 
-struct UsesNestedDelegate<V> {
-  @HasNestedDelegate<V>.NestedDelegate
+struct UsesNestedWrapper<V> {
+  @HasNestedWrapper<V>.NestedWrapper
   var y: [V]
 }
 
@@ -321,8 +321,8 @@ func testBackingStore<T>(bs: BackingStore<T>) {
 // ---------------------------------------------------------------------------
 // Explicitly-specified accessors
 // ---------------------------------------------------------------------------
-struct DelegateWithAccessors {
-  @Wrapper  // expected-error{{property delegate cannot be applied to a computed property}}
+struct WrapperWithAccessors {
+  @Wrapper  // expected-error{{property wrapper cannot be applied to a computed property}}
   var x: Int {
     return 17
   }
@@ -358,8 +358,8 @@ struct UseWillSetDidSet {
 // ---------------------------------------------------------------------------
 // Mutating/nonmutating
 // ---------------------------------------------------------------------------
-@_propertyDelegate
-struct DelegateWithNonMutatingSetter<Value> {
+@_propertyWrapper
+struct WrapperWithNonMutatingSetter<Value> {
   class Box {
     var value: Value
     init(value: Value) {
@@ -379,8 +379,8 @@ struct DelegateWithNonMutatingSetter<Value> {
   }
 }
 
-@_propertyDelegate
-struct DelegateWithMutatingGetter<Value> {
+@_propertyWrapper
+struct WrapperWithMutatingGetter<Value> {
   var readCount = 0
   var writeCount = 0
   var stored: Value
@@ -401,8 +401,8 @@ struct DelegateWithMutatingGetter<Value> {
   }
 }
 
-@_propertyDelegate
-class ClassDelegate<Value> {
+@_propertyWrapper
+class ClassWrapper<Value> {
   var value: Value
 
   init(initialValue: Value) {
@@ -410,22 +410,22 @@ class ClassDelegate<Value> {
   }
 }
 
-struct UseMutatingnessDelegates {
-  @DelegateWithNonMutatingSetter
+struct UseMutatingnessWrappers {
+  @WrapperWithNonMutatingSetter
   var x = true
 
-  @DelegateWithMutatingGetter
+  @WrapperWithMutatingGetter
   var y = 17
 
-  @DelegateWithNonMutatingSetter // expected-error{{property delegate can only be applied to a 'var'}}
+  @WrapperWithNonMutatingSetter // expected-error{{property wrapper can only be applied to a 'var'}}
   let z = 3.14159 // expected-note 2{{change 'let' to 'var' to make it mutable}}
 
-  @ClassDelegate
+  @ClassWrapper
   var w = "Hello"
 }
 
 func testMutatingness() {
-  var mutable = UseMutatingnessDelegates()
+  var mutable = UseMutatingnessWrappers()
 
   _ = mutable.x
   mutable.x = false
@@ -439,7 +439,7 @@ func testMutatingness() {
   _ = mutable.w
   mutable.w = "Goodbye"
 
-  let nonmutable = UseMutatingnessDelegates() // expected-note 2{{change 'let' to 'var' to make it mutable}}
+  let nonmutable = UseMutatingnessWrappers() // expected-note 2{{change 'let' to 'var' to make it mutable}}
 
   // Okay due to nonmutating setter
   _ = nonmutable.x
@@ -459,40 +459,40 @@ func testMutatingness() {
 // ---------------------------------------------------------------------------
 // Access control
 // ---------------------------------------------------------------------------
-struct HasPrivateDelegate<T> {
-  @_propertyDelegate
-  private struct PrivateDelegate<U> { // expected-note{{type declared here}}
+struct HasPrivateWrapper<T> {
+  @_propertyWrapper
+  private struct PrivateWrapper<U> { // expected-note{{type declared here}}
     var value: U
     init(initialValue: U) {
       self.value = initialValue
     }
   }
 
-  @PrivateDelegate
+  @PrivateWrapper
   var y: [T] = []
-  // expected-error@-1{{property must be declared private because its property delegate type uses a private type}}
+  // expected-error@-1{{property must be declared private because its property wrapper type uses a private type}}
 
   // Okay to reference private entities from a private property
-  @PrivateDelegate
+  @PrivateWrapper
   private var z: [T]
 }
 
-public struct HasUsableFromInlineDelegate<T> {
-  @_propertyDelegate
-  struct InternalDelegate<U> { // expected-note{{type declared here}}
+public struct HasUsableFromInlineWrapper<T> {
+  @_propertyWrapper
+  struct InternalWrapper<U> { // expected-note{{type declared here}}
     var value: U
     init(initialValue: U) {
       self.value = initialValue
     }
   }
 
-  @InternalDelegate
+  @InternalWrapper
   @usableFromInline
   var y: [T] = []
-  // expected-error@-1{{property delegate type referenced from a '@usableFromInline' property must be '@usableFromInline' or public}}
+  // expected-error@-1{{property wrapper type referenced from a '@usableFromInline' property must be '@usableFromInline' or public}}
 }
 
-@_propertyDelegate
+@_propertyWrapper
 class Box<Value> {
   private(set) var value: Value
 
@@ -611,11 +611,11 @@ func testDefaultedPrivateMemberwiseLets() {
 // ---------------------------------------------------------------------------
 // Storage references
 // ---------------------------------------------------------------------------
-@_propertyDelegate
+@_propertyWrapper
 struct WrapperWithStorageRef<T> {
   var value: T
 
-  var delegateValue: Wrapper<T> {
+  var wrapperValue: Wrapper<T> {
     return Wrapper(value: value)
   }
 }
@@ -647,9 +647,9 @@ func testStorageRef(tsr: TestStorageRef) {
   _ = tsr.$$x // expected-error{{'$$x' is inaccessible due to 'private' protection level}}
 }
 
-// rdar://problem/50873275 - crash when using wrapper with delegateValue in
+// rdar://problem/50873275 - crash when using wrapper with wrapperValue in
 // generic type.
-@_propertyDelegate
+@_propertyWrapper
 struct InitialValueWrapperWithStorageRef<T> {
   var value: T
 
@@ -657,7 +657,7 @@ struct InitialValueWrapperWithStorageRef<T> {
     value = initialValue
   }
 
-  var delegateValue: Wrapper<T> {
+  var wrapperValue: Wrapper<T> {
     return Wrapper(value: value)
   }
 }
@@ -670,9 +670,9 @@ struct TestGenericStorageRef<T> {
 // ---------------------------------------------------------------------------
 // Misc. semantic issues
 // ---------------------------------------------------------------------------
-@_propertyDelegate
+@_propertyWrapper
 struct BrokenLazy { }
-// expected-error@-1{{property delegate type 'BrokenLazy' does not contain a non-static property named 'value'}}
+// expected-error@-1{{property wrapper type 'BrokenLazy' does not contain a non-static property named 'value'}}
 // expected-note@-2{{'BrokenLazy' declared here}}
 
 struct S {
@@ -696,7 +696,7 @@ struct UsesExplicitClosures {
 // ---------------------------------------------------------------------------
 
 // rdar://problem/50822051 - compiler assertion / hang
-@_propertyDelegate
+@_propertyWrapper
 struct PD<Value> {
   var value: Value
 
@@ -706,6 +706,6 @@ struct PD<Value> {
 }
 
 struct TestPD {
-  @PD(a: "foo") var foo: Int = 42 // expected-error{{property 'foo' with attached delegate cannot initialize both the delegate type and the property}}
+  @PD(a: "foo") var foo: Int = 42 // expected-error{{property 'foo' with attached wrapper cannot initialize both the wrapper type and the property}}
   // expected-error@-1{{missing argument for parameter 'initialValue' in call}}
 }

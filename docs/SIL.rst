@@ -2333,15 +2333,15 @@ with a sequence that also correctly destroys the current value.
 This instruction is only valid in Raw SIL and is rewritten as appropriate
 by the definitive initialization pass.
 
-assign_by_delegate
+assign_by_wrapper
 ``````````````````
 ::
 
-  sil-instruction ::= 'assign_by_delegate' sil-operand 'to' sil-operand ',' 'init' sil-operand ',' 'set' sil-operand
+  sil-instruction ::= 'assign_by_wrapper' sil-operand 'to' sil-operand ',' 'init' sil-operand ',' 'set' sil-operand
 
-  assign_by_delegate %0 : $S to %1 : $*T, init %2 : $F, set %3 : $G
+  assign_by_wrapper %0 : $S to %1 : $*T, init %2 : $F, set %3 : $G
   // $S can be a value or address type
-  // $T must be the type of a property delegate.
+  // $T must be the type of a property wrapper.
   // $F must be a function type, taking $S as a single argument and returning $T
   // $G must be a function type, taking $S as a single argument and with not return value
 

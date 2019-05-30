@@ -1,6 +1,6 @@
 // RUN: %target-swift-ide-test -print-indexed-symbols -source-filename %s | %FileCheck -check-prefix=CHECK %s
 
-@_propertyDelegate
+@_propertyWrapper
 public struct Wrapper<T> {
   public var value: T
 
@@ -15,7 +15,7 @@ public struct Wrapper<T> {
 
 var globalInt: Int { return 17 }
 
-public struct HasDelegates {
+public struct HasWrappers {
   @Wrapper
   public var x: Int = globalInt
 
@@ -27,12 +27,12 @@ public struct HasDelegates {
 }
 
 func useMemberwiseInits(i: Int) {
-  _ = HasDelegates(x: i)
-  _ = HasDelegates(y: Wrapper(initialValue: i))
+  _ = HasWrappers(x: i)
+  _ = HasWrappers(y: Wrapper(initialValue: i))
 }
 
 // CHECK: 19:4 | struct/Swift | Wrapper | s:14swift_ide_test7WrapperV | Ref | rel: 0
-// CHECK: 20:14 | instance-property/Swift | x | s:14swift_ide_test12HasDelegatesV1xSivp | Def,RelChild | rel: 1
+// CHECK: 20:14 | instance-property/Swift | x | s:14swift_ide_test11HasWrappersV1xSivp | Def,RelChild | rel: 1
 // CHECK: 20:23 | variable/Swift | globalInt | s:14swift_ide_test9globalIntSivp | Ref,Read | rel: 0
 
 // CHECK: 22:4 | struct/Swift | Wrapper | s:14swift_ide_test7WrapperV | Ref | rel: 0

@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 #include "TypeChecker.h"
 #include "TypeCheckType.h"
-#include "swift/AST/PropertyDelegates.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"

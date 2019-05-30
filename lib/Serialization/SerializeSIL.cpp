@@ -1710,7 +1710,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
                   addValueRef(operand));
     break;
   }
-  case SILInstructionKind::AssignByDelegateInst:
+  case SILInstructionKind::AssignByWrapperInst:
     llvm_unreachable("not supported");
   case SILInstructionKind::BindMemoryInst: {
     auto *BI = cast<BindMemoryInst>(&SI);
