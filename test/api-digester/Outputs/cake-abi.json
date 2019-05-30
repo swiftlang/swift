@@ -1035,6 +1035,10 @@
           "moduleName": "cake",
           "genericSig": "<τ_0_0 where τ_0_0 : PSuper>",
           "isABIPlaceholder": true,
+          "intro_Macosx": "9999",
+          "intro_iOS": "9999",
+          "intro_tvOS": "9999",
+          "intro_watchOS": "9999",
           "funcSelfKind": "NonMutating"
         }
       ],
