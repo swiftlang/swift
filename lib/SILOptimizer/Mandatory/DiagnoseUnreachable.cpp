@@ -529,15 +529,20 @@ static bool simplifyBlocksWithCallsToNoReturn(SILBasicBlock &BB,
       // Diagnose the unreachable code within the same block as the call to
       // noreturn.
       if (isUserCode(CurrentInst) && !DiagnosedUnreachableCode) {
-        if (NoReturnCall->getLoc().is<RegularLocation>()) {
-          if (!NoReturnCall->getLoc().isASTNode<ExplicitCastExpr>()) {
-            diagnose(BB.getModule().getASTContext(),
-                     CurrentInst->getLoc().getSourceLoc(),
-                     diag::unreachable_code);
-            diagnose(BB.getModule().getASTContext(),
-                     NoReturnCall->getLoc().getSourceLoc(),
-                     diag::call_to_noreturn_note);
-            DiagnosedUnreachableCode = true;
+        // If we have an instruction that is an end_borrow, ignore it. This
+        // happens when passing a guaranteed argument through generic code paths
+        // to no return functions.
+        if (!isa<EndBorrowInst>(CurrentInst)) {
+          if (NoReturnCall->getLoc().is<RegularLocation>()) {
+            if (!NoReturnCall->getLoc().isASTNode<ExplicitCastExpr>()) {
+              diagnose(BB.getModule().getASTContext(),
+                       CurrentInst->getLoc().getSourceLoc(),
+                       diag::unreachable_code);
+              diagnose(BB.getModule().getASTContext(),
+                       NoReturnCall->getLoc().getSourceLoc(),
+                       diag::call_to_noreturn_note);
+              DiagnosedUnreachableCode = true;
+            }
           }
         }
       }

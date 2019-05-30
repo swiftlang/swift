@@ -300,6 +300,10 @@ def create_argument_parser():
     option(['-n', '--dry-run'], store_true,
            help='print the commands that would be executed, but do not '
                 'execute them')
+    option('--dump-config', toggle_true,
+           help='instead of building, write JSON to stdout containing '
+                'various values used to build in this configuration')
+
     option('--legacy-impl', store_true('legacy_impl'),
            help='use legacy implementation')
 
@@ -676,12 +680,12 @@ def create_argument_parser():
         set_defaults(assertions=True)
 
         # TODO: Convert to store_true
-        option('--assertions', store,
+        option(['-a', '--assertions'], store,
                const=True,
                help='enable assertions in all projects')
 
         # TODO: Convert to store_false
-        option('--no-assertions', store('assertions'),
+        option(['-A', '--no-assertions'], store('assertions'),
                const=False,
                help='disable assertions in all projects')
 

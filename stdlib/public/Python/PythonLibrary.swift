@@ -30,6 +30,7 @@ import WinSDK
 public struct PythonLibrary {
   private static let shared = PythonLibrary()
   private static let pythonLegacySymbolName = "PyString_AsString"
+  private static var librarySymbolsLoaded = false
 
   private let pythonLibraryHandle: UnsafeMutableRawPointer
   private let isLegacyPython: Bool
@@ -51,6 +52,7 @@ public struct PythonLibrary {
       PythonLibrary.log(
         "Loaded legacy Python library, using legacy symbols...")
     }
+    PythonLibrary.librarySymbolsLoaded = true
   }
 
   static func loadSymbol(
@@ -82,9 +84,13 @@ public struct PythonLibrary {
   }
 }
 
-// Methods of `PythonLibrary` required to set a given the Python version.
+// Methods of `PythonLibrary` required to set a given Python version.
 public extension PythonLibrary {
   static func useVersion(_ major: Int, _ minor: Int? = nil) {
+    precondition(!librarySymbolsLoaded, """
+      Error: \(#function) should not be called after any Python library \
+      has already been loaded.
+      """)
     let version = PythonVersion(major: major, minor: minor)
     PythonLibrary.Environment.version.set(version.versionString)
   }
