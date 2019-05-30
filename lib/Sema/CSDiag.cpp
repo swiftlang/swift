@@ -754,12 +754,8 @@ void FailureDiagnosis::diagnoseUnviableLookupResults(
     case MemberLookupResult::UR_WritableKeyPathOnReadOnlyMember:
     case MemberLookupResult::UR_ReferenceWritableKeyPathOnMutatingMember:
     case MemberLookupResult::UR_KeyPathWithAnyObjectRootType:
-      break;
     case MemberLookupResult::UR_UnavailableInExistential:
-      diagnose(loc, diag::could_not_use_member_on_existential,
-               instanceTy, memberName)
-        .highlight(baseRange).highlight(nameLoc.getSourceRange());
-      return;
+      break;
     case MemberLookupResult::UR_InstanceMemberOnType:
     case MemberLookupResult::UR_TypeMemberOnInstance: {
       auto locatorKind = isa<SubscriptExpr>(E)
@@ -6671,7 +6667,7 @@ bool FailureDiagnosis::diagnoseMemberFailures(
       locator = simplifyLocator(CS, locator, memberRange);
 
     BaseLoc = baseExpr->getLoc();
-    NameLoc = DeclNameLoc(memberRange.Start);
+    NameLoc =   DeclNameLoc(memberRange.Start);
 
     // Retypecheck the anchor type, which is the base of the member expression.
     baseExpr =

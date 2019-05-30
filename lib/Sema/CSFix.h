@@ -124,6 +124,11 @@ enum class FixKind : uint8_t {
   /// derived (rather than an arbitrary value of metatype type) or the
   /// referenced constructor must be required.
   AllowInvalidInitRef,
+  
+  /// Allow an invalid member access on a value of protocol type as if
+  /// that protocol type were a generic constraint requiring conformance
+  /// to that protocol.
+  AllowProtocolTypeMember,
 
   /// If there are fewer arguments than parameters, let's fix that up
   /// by adding new arguments to the list represented as type variables.
@@ -591,6 +596,32 @@ public:
   static DefineMemberBasedOnUse *create(ConstraintSystem &cs, Type baseType,
                                         DeclName member,
                                         ConstraintLocator *locator);
+};
+
+class AllowProtocolTypeMember final : public ConstraintFix {
+  Type BaseType;
+  ValueDecl *Member;
+  DeclName Name;
+  
+  AllowProtocolTypeMember(ConstraintSystem &cs, Type baseType,
+                          DeclName memberName, ValueDecl *member,
+                          ConstraintLocator *locator)
+          : ConstraintFix(cs, FixKind::AllowProtocolTypeMember,
+                          locator), BaseType(baseType), Member(member), Name(memberName) {}
+  
+  public:
+    std::string getName() const override {
+      llvm::SmallVector<char, 16> scratch;
+      auto memberName = Name.getString(scratch);
+      return "allow access to invalid member '" + memberName.str() +
+            "' on value of protocol type";
+    }
+    
+    bool diagnose(Expr *root, bool asNote = false) const override;
+    
+    static AllowProtocolTypeMember *create(ConstraintSystem &cs,
+                                           Type baseType, ValueDecl *member, DeclName memberName,
+                                           ConstraintLocator *locator);
 };
 	
 class AllowTypeOrInstanceMember final : public ConstraintFix {

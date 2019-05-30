@@ -789,6 +789,39 @@ private:
                                           DeclName memberName);
 };
 
+/// Diagnose cases where a member only accessible on generic constraints
+/// requiring conformance to a protocol is used on a value of the
+/// existential protocol type e.g.
+///
+/// ```swift
+/// protocol P {
+///   var foo: Self { get }
+/// }
+/// 
+/// func bar<X : P>(p: X) {
+///   p.foo
+/// }
+/// ```
+class AllowProtocolTypeMemberFailure final : public FailureDiagnostic {
+  Type BaseType;
+  ValueDecl *Member;
+  DeclName Name;
+  
+  public:
+    AllowProtocolTypeMemberFailure(Expr *root, ConstraintSystem &cs,
+                                   Type baseType, ValueDecl *member, DeclName memberName,
+                                   ConstraintLocator *locator)
+            : FailureDiagnostic(root, cs, locator), BaseType(baseType),
+              Member(member), Name(memberName) {}
+  
+    bool diagnoseAsError() override;
+    
+  private:
+    Type getBaseType() const { return BaseType; }
+    ValueDecl *getMember() const { return Member; }
+    DeclName getName() const { return Name; }
+};
+
 /// Diagnose situations when we use an instance member on a type
 /// or a type member on an instance
 ///
