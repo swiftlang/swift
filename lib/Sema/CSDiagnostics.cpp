@@ -3004,25 +3004,29 @@ void MissingGenericArgumentsFailure::emitGenericSignatureNote(
 
   llvm::SmallDenseMap<GenericTypeParamDecl *, Type> params;
   for (auto *typeVar : cs.getTypeVariables()) {
-    if (auto *GP = typeVar->getImpl().getGenericParameter()) {
-      params[GP->getDecl()] = resolveType(typeVar);
-    }
+    auto *GP = typeVar->getImpl().getGenericParameter();
+    if (!GP)
+      continue;
+
+    auto type = resolveType(typeVar);
+    // This could happen if the diagnostic is used by CSDiag.
+    if (type->is<TypeVariableType>())
+      continue;
+
+    // If this is one of the defaulted parameter types, attempt
+    // to emit placeholder for it instead of `Any`.
+    if (llvm::any_of(cs.DefaultedConstraints,
+                     [&](const ConstraintLocator *locator) {
+                       return GP->getDecl() == getParamDecl(locator);
+                     }))
+      continue;
+
+    params[GP->getDecl()] = type;
   }
 
   auto getPreferredType = [&](const GenericTypeParamDecl *GP) -> Type {
     auto type = params.find(GP);
-    assert(type != params.end());
-
-    // If this is one of the defaulted parameter types, attempt
-    // to emit placeholder for it instead of `Any`.
-    if (std::any_of(cs.DefaultedConstraints.begin(),
-                    cs.DefaultedConstraints.end(),
-                    [&](const ConstraintLocator *locator) {
-                      return GP == getParamDecl(locator);
-                    }))
-      return Type();
-
-    return type->second;
+    return (type == params.end()) ? Type() : type->second;
   };
 
   SmallString<64> paramsAsString;
