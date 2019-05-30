@@ -3814,7 +3814,8 @@ public:
     AdjointValue *buf = reinterpret_cast<AdjointValue *>(allocator.Allocate(
         elements.size() * sizeof(AdjointValue), alignof(AdjointValue)));
     MutableArrayRef<AdjointValue> elementsCopy(buf, elements.size());
-    std::copy(elements.begin(), elements.end(), elementsCopy.begin());
+    std::uninitialized_copy(elements.begin(), elements.end(),
+                            elementsCopy.begin());
     return new (allocator.Allocate<AdjointValueBase>())
         AdjointValueBase(type, elementsCopy);
   }
@@ -3909,7 +3910,7 @@ private:
 
   /// Mapping from original basic blocks to a mapping from original values to
   /// their corresponding adjoint values.
-  DenseMap<SILBasicBlock *, DenseMap<SILValue, AdjointValue>> valueMap;
+  DenseMap<std::pair<SILBasicBlock *, SILValue>, AdjointValue> valueMap;
 
   /// Mapping from original buffers to their corresponding adjoint buffers.
   DenseMap<SILValue, ValueWithCleanup> bufferMap;
@@ -4082,7 +4083,7 @@ private:
   bool hasAdjointValue(SILBasicBlock *origBB, SILValue originalValue) const {
     assert(origBB->getParent() == &getOriginal());
     assert(originalValue->getType().isObject());
-    return valueMap.lookup(origBB).count(originalValue);
+    return valueMap.count({origBB, originalValue});
   }
 
   /// Initializes an original value's corresponding adjoint value. Its adjoint
@@ -4090,7 +4091,8 @@ private:
   void initializeAdjointValue(SILBasicBlock *origBB, SILValue originalValue,
                               AdjointValue adjointValue) {
     assert(origBB->getParent() == &getOriginal());
-    auto insertion = valueMap[origBB].try_emplace(originalValue, adjointValue);
+    auto insertion =
+        valueMap.try_emplace({origBB, originalValue}, adjointValue);
     assert(insertion.second && "Adjoint value inserted before");
   }
 
@@ -4103,8 +4105,8 @@ private:
     assert(origBB->getParent() == &getOriginal());
     assert(originalValue->getType().isObject());
     assert(originalValue->getFunction() == &getOriginal());
-    auto insertion = valueMap[origBB].try_emplace(
-        originalValue, makeZeroAdjointValue(
+    auto insertion = valueMap.try_emplace(
+        {origBB, originalValue}, makeZeroAdjointValue(
             getRemappedTangentType(originalValue->getType())));
     auto it = insertion.first;
     return it->getSecond();
@@ -4127,7 +4129,7 @@ private:
                tanSpace->getCanonicalType()));
 #endif
     auto insertion =
-        valueMap[origBB].try_emplace(originalValue, newAdjointValue);
+        valueMap.try_emplace({origBB, originalValue}, newAdjointValue);
     auto inserted = insertion.second;
     if (inserted)
       return;
@@ -4135,7 +4137,7 @@ private:
     // adjoint.
     auto it = insertion.first;
     auto &&existingValue = it->getSecond();
-    valueMap[origBB].erase(it);
+    valueMap.erase(it);
     initializeAdjointValue(origBB, originalValue,
         accumulateAdjointsDirect(existingValue, newAdjointValue));
   }
