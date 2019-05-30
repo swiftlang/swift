@@ -52,6 +52,9 @@ STATISTIC(DeadAllocRefEliminated,
 STATISTIC(DeadAllocStackEliminated,
           "number of AllocStack instructions removed");
 
+STATISTIC(DeadKeyPathEliminated,
+          "number of keypath instructions removed");
+
 STATISTIC(DeadAllocApplyEliminated,
           "number of allocating Apply instructions removed");
 
@@ -206,6 +209,9 @@ static bool canZapInstruction(SILInstruction *Inst, bool acceptRefCountInsts,
     return acceptRefCountInsts;
 
   if (isa<InjectEnumAddrInst>(Inst))
+    return true;
+
+  if (isa<KeyPathInst>(Inst))
     return true;
 
   // We know that the destructor has no side effects so we can remove the
@@ -643,17 +649,20 @@ class DeadObjectElimination : public SILFunctionTransform {
   llvm::SmallVector<SILInstruction*, 16> Allocations;
 
   void collectAllocations(SILFunction &Fn) {
-    for (auto &BB : Fn)
+    for (auto &BB : Fn) {
       for (auto &II : BB) {
-        if (isa<AllocationInst>(&II))
+        if (isa<AllocationInst>(&II) ||
+            isAllocatingApply(&II) ||
+            isa<KeyPathInst>(&II)) {
           Allocations.push_back(&II);
-        else if (isAllocatingApply(&II))
-          Allocations.push_back(&II);
+        }
       }
+    }
   }
 
   bool processAllocRef(AllocRefInst *ARI);
   bool processAllocStack(AllocStackInst *ASI);
+  bool processKeyPath(KeyPathInst *KPI);
   bool processAllocBox(AllocBoxInst *ABI){ return false;}
   bool processAllocApply(ApplyInst *AI, DeadEndBlocks &DEBlocks);
 
@@ -668,6 +677,8 @@ class DeadObjectElimination : public SILFunctionTransform {
         Changed |= processAllocRef(A);
       else if (auto *A = dyn_cast<AllocStackInst>(II))
         Changed |= processAllocStack(A);
+      else if (auto *KPI = dyn_cast<KeyPathInst>(II))
+        Changed |= processKeyPath(KPI);
       else if (auto *A = dyn_cast<AllocBoxInst>(II))
         Changed |= processAllocBox(A);
       else if (auto *A = dyn_cast<ApplyInst>(II))
@@ -746,6 +757,30 @@ bool DeadObjectElimination::processAllocStack(AllocStackInst *ASI) {
   LLVM_DEBUG(llvm::dbgs() << "    Success! Eliminating alloc_stack.\n");
 
   ++DeadAllocStackEliminated;
+  return true;
+}
+
+bool DeadObjectElimination::processKeyPath(KeyPathInst *KPI) {
+  UserList UsersToRemove;
+  if (hasUnremovableUsers(KPI, UsersToRemove, /*acceptRefCountInsts=*/ true,
+      /*onlyAcceptTrivialStores*/ false)) {
+    LLVM_DEBUG(llvm::dbgs() << "    Found a use that cannot be zapped...\n");
+    return false;
+  }
+
+  // For simplicity just bail if the keypath has a non-trivial operands.
+  // TODO: don't bail but insert compensating destroys for such operands.
+  for (const Operand &Op : KPI->getAllOperands()) {
+    if (!Op.get()->getType().isTrivial(*KPI->getFunction()))
+      return false;
+  }
+
+  // Remove the keypath and all of its users.
+  removeInstructions(
+    ArrayRef<SILInstruction*>(UsersToRemove.begin(), UsersToRemove.end()));
+  LLVM_DEBUG(llvm::dbgs() << "    Success! Eliminating keypath.\n");
+
+  ++DeadKeyPathEliminated;
   return true;
 }
 

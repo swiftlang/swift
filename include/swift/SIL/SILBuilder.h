@@ -1966,11 +1966,7 @@ public:
                           SILType destTy, SILBasicBlock *successBB,
                           SILBasicBlock *failureBB,
                           ProfileCounter Target1Count = ProfileCounter(),
-                          ProfileCounter Target2Count = ProfileCounter()) {
-    return insertTerminator(CheckedCastBranchInst::create(
-        getSILDebugLocation(Loc), isExact, op, destTy, successBB, failureBB,
-        getFunction(), C.OpenedArchetypes, Target1Count, Target2Count));
-  }
+                          ProfileCounter Target2Count = ProfileCounter());
 
   CheckedCastValueBranchInst *
   createCheckedCastValueBranch(SILLocation Loc, SILValue op, SILType destTy,

@@ -622,10 +622,14 @@ static DiagnosticKind toDiagnosticKind(DiagnosticState::Behavior behavior) {
   llvm_unreachable("Unhandled DiagnosticKind in switch.");
 }
 
-/// A special option only for compiler writers that causes Diagnostics to assert
-/// when a failure diagnostic is emitted. Intended for use in the debugger.
+// A special option only for compiler writers that causes Diagnostics to assert
+// when a failure diagnostic is emitted. Intended for use in the debugger.
 llvm::cl::opt<bool> AssertOnError("swift-diagnostics-assert-on-error",
                                   llvm::cl::init(false));
+// A special option only for compiler writers that causes Diagnostics to assert
+// when a warning diagnostic is emitted. Intended for use in the debugger.
+llvm::cl::opt<bool> AssertOnWarning("swift-diagnostics-assert-on-warning",
+                                    llvm::cl::init(false));
 
 DiagnosticState::Behavior DiagnosticState::determineBehavior(DiagID id) {
   auto set = [this](DiagnosticState::Behavior lvl) {
@@ -637,6 +641,8 @@ DiagnosticState::Behavior DiagnosticState::determineBehavior(DiagID id) {
     }
 
     assert((!AssertOnError || !anyErrorOccurred) && "We emitted an error?!");
+    assert((!AssertOnWarning || (lvl != Behavior::Warning)) &&
+           "We emitted a warning?!");
     previousBehavior = lvl;
     return lvl;
   };

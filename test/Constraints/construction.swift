@@ -209,3 +209,14 @@ func rdar_45535925() {
     // expected-error@-1 {{'bar' is inaccessible due to 'private' protection level}}
   }
 }
+
+// rdar://problem/50668864
+func rdar_50668864() {
+  struct Foo {
+    init(anchors: [Int]) {
+      // TODO: This would be improved when argument conversions are diagnosed via new diagnostic framework,
+      // actual problem here is that `[Int]` cannot be converted to function type represented by a closure.
+      self = .init { _ in [] } // expected-error {{type of expression is ambiguous without more context}}
+    }
+  }
+}

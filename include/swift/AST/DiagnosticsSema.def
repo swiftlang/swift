@@ -4114,17 +4114,9 @@ ERROR(borrowed_on_objc_protocol_requirement,none,
 // MARK: dynamic
 //------------------------------------------------------------------------------
 
-ERROR(dynamic_not_in_class,none,
-      "only members of classes may be dynamic", ())
-ERROR(dynamic_with_nonobjc,none,
-      "a declaration cannot be both '@nonobjc' and 'dynamic'",
-      ())
 ERROR(dynamic_with_transparent,none,
       "a declaration cannot be both '@_tranparent' and 'dynamic'",
       ())
-ERROR(dynamic_requires_objc,none,
-      "'dynamic' %0 %1 must also be '@objc'",
-      (DescriptiveDeclKind, DeclName))
 
 //------------------------------------------------------------------------------
 // MARK: @_dynamicReplacement(for:)

@@ -595,6 +595,12 @@ ParserResult<IfConfigDecl> Parser::parseIfConfig(
     Expr *Condition = nullptr;
     bool isActive = false;
 
+    if (!Tok.isAtStartOfLine() && isElse && Tok.is(tok::kw_if)) {
+      diagnose(Tok, diag::unexpected_if_following_else_compilation_directive)
+          .fixItReplace(SourceRange(ClauseLoc, consumeToken()), "#elseif");
+      isElse = false;
+    }
+
     // Parse the condition.  Evaluate it to determine the active
     // clause unless we're doing a parse-only pass.
     if (isElse) {

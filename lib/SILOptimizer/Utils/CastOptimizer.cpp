@@ -271,7 +271,7 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
   // Now emit the a cast from the casted ObjC object into a target type.
   // This is done by means of calling _forceBridgeFromObjectiveC or
   // _conditionallyBridgeFromObjectiveC_bridgeable from the Target type.
-  auto *funcRef = Builder.createFunctionRef(Loc, bridgingFunc);
+  auto *funcRef = Builder.createFunctionRefFor(Loc, bridgingFunc);
   SubstitutionMap subMap = lookupBridgeToObjCProtocolSubs(mod, target);
 
   auto MetaTy = MetatypeType::get(target, MetatypeRepresentation::Thick);
@@ -323,11 +323,12 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
   case CastConsumptionKind::TakeAlways:
     Builder.createReleaseValue(Loc, srcOp, Builder.getDefaultAtomicity());
     break;
-  case CastConsumptionKind::TakeOnSuccess:
+  case CastConsumptionKind::TakeOnSuccess: {
     // Insert a release in the success BB.
-    Builder.setInsertionPoint(SuccessBB->begin());
-    Builder.createReleaseValue(Loc, srcOp, Builder.getDefaultAtomicity());
+    SILBuilderWithScope SuccessBuilder(SuccessBB->begin());
+    SuccessBuilder.emitDestroyValueOperation(Loc, srcOp);
     break;
+  }
   case CastConsumptionKind::BorrowAlways:
     llvm_unreachable("checked_cast_addr_br never has BorrowAlways");
   case CastConsumptionKind::CopyOnSuccess:
@@ -588,7 +589,7 @@ CastOptimizer::optimizeBridgedSwiftToObjCCast(SILDynamicCastInst dynamicCast) {
   }
 
   SILBuilderWithScope Builder(Inst, builderContext);
-  auto FnRef = Builder.createFunctionRef(Loc, bridgedFunc);
+  auto FnRef = Builder.createFunctionRefFor(Loc, bridgedFunc);
   auto ParamTypes = SubstFnTy.castTo<SILFunctionType>()->getParameters();
   if (Src->getType().isAddress() && !substConv.isSILIndirect(ParamTypes[0])) {
     // Create load
@@ -1198,10 +1199,19 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
   auto replaceCastHelper = [](SILBuilderWithScope &B,
                               SILDynamicCastInst dynamicCast,
                               MetatypeInst *mi) -> SILInstruction * {
+    // Make sure that the failure block has the new metatype type for
+    // its default argument as required when we are in ossa
+    // mode. Without ossa, failure blocks do not have args, so we do
+    // not need to do anything.
+    auto *fBlock = dynamicCast.getFailureBlock();
+    if (B.hasOwnership()) {
+      fBlock->replacePhiArgumentAndReplaceAllUses(0, mi->getType(),
+                                                  ValueOwnershipKind::Any);
+    }
     return B.createCheckedCastBranch(
         dynamicCast.getLocation(), false /*isExact*/, mi,
         dynamicCast.getLoweredTargetType(), dynamicCast.getSuccessBlock(),
-        dynamicCast.getFailureBlock(), *dynamicCast.getSuccessBlockCount(),
+        fBlock, *dynamicCast.getSuccessBlockCount(),
         *dynamicCast.getFailureBlockCount());
   };
 

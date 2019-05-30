@@ -187,6 +187,8 @@ public:
   DiagnosticEngine &getDiags() {
     return Diags;
   }
+  StringRef getPlatformIntroVersion(Decl *D, PlatformKind Kind);
+  StringRef getLanguageIntroVersion(Decl *D);
   bool isEqual(const SDKNode &Left, const SDKNode &Right);
   bool checkingABI() const { return Opts.ABI; }
   AccessLevel getAccessLevel(const ValueDecl *VD) const;
@@ -285,6 +287,14 @@ public:
   }
 };
 
+struct PlatformIntroVersion {
+  StringRef macos;
+  StringRef ios;
+  StringRef tvos;
+  StringRef watchos;
+  StringRef swift;
+};
+
 class SDKNodeDecl: public SDKNode {
   DeclKind DKind;
   StringRef Usr;
@@ -302,6 +312,7 @@ class SDKNodeDecl: public SDKNode {
   uint8_t ReferenceOwnership;
   StringRef GenericSig;
   Optional<uint8_t> FixedBinaryOrder;
+  PlatformIntroVersion introVersions;
 
 protected:
   SDKNodeDecl(SDKNodeInitInfo Info, SDKNodeKind Kind);
@@ -458,6 +469,9 @@ class SDKNodeDeclType: public SDKNodeDecl {
   std::vector<StringRef> SuperclassNames;
   std::vector<SDKNode*> Conformances;
   StringRef EnumRawTypeName;
+  // Check whether the type declaration is pulled from an external module so we
+  // can incorporate extensions in the interested module.
+  bool IsExternal;
 public:
   SDKNodeDeclType(SDKNodeInitInfo Info);
   static bool classof(const SDKNode *N);
@@ -466,6 +480,7 @@ public:
   void addConformance(SDKNode *Conf);
   ArrayRef<SDKNode*> getConformances() const { return Conformances; }
   NodeVector getConformances() { return Conformances; }
+  bool isExternal() const { return IsExternal; }
   StringRef getSuperClassName() const {
     return SuperclassNames.empty() ? StringRef() : SuperclassNames.front();
   };
