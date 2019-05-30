@@ -798,6 +798,13 @@ void ASTScopeImpl::forEachSpecializeAttrInSourceOrder(
     fn(specializeAttr);
 }
 
+AbstractPatternEntryScope::AbstractPatternEntryScope(
+  PatternBindingDecl *declBeingScoped, unsigned entryIndex)
+: decl(declBeingScoped), patternEntryIndex(entryIndex) {
+  assert(entryIndex < declBeingScoped->getPatternList().size() &&
+         "out of bounds");
+}
+
 void AbstractPatternEntryScope::addVarDeclScopesAndTheirAccessors(
     ASTScopeImpl *parent) const {
   getPatternEntry().getPattern()->forEachVariable([&](VarDecl *var) {
@@ -946,13 +953,6 @@ void *DeferredNodes::operator new(size_t bytes, const ASTContext &ctx,
 
 #pragma mark creation methods
 
-AbstractPatternEntryScope::AbstractPatternEntryScope(
-    PatternBindingDecl *declBeingScoped, unsigned entryIndex)
-    : decl(declBeingScoped), patternEntryIndex(entryIndex) {
-  assert(entryIndex < declBeingScoped->getPatternList().size() &&
-         "out of bounds");
-}
-
 template <typename ScopeClass, typename... Args>
 ASTScopeImpl *ASTScopeImpl::createSubtree(Args... args) {
   DeferredNodes noDeferrals(__FILE__, __LINE__, *this, nullptr);
@@ -979,10 +979,7 @@ ASTScopeImpl *
 ASTScopeImpl::createSubtreeWithDeferrals2D(DeferredNodes &deferred,
                                            Args... args) {
   const Portion *portion = new (getASTContext()) PortionT();
-  auto *child = new (getASTContext()) ScopeClass(portion, args...);
-  addChild(child);
-  child->expandMeAndCreateScopesForDeferredNodes(deferred);
-  return child;
+  return createSubtreeWithDeferrals<ScopeClass>(deferred, portion, args...);
 }
 
 #pragma mark DeferredNodes definitions
