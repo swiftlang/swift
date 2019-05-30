@@ -13,9 +13,7 @@ CaseIterableTests.test("Simple Enums") {
   }
 
   expectEqual(SimpleEnum.allCases.count, 3)
-  expectTrue(SimpleEnum.allCases[0] == .bar)
-  expectTrue(SimpleEnum.allCases[1] == .baz)
-  expectTrue(SimpleEnum.allCases[2] == .quux)
+  expectEqual(SimpleEnum.allCases, [.bar, .baz, .quux])
 }
 
 runAllTests()
