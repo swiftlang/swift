@@ -14,35 +14,26 @@
 //
 //===----------------------------------------------------------------------===//
 
-%{
-  # The sizes to generate code for.
-  sizes = [2, 4, 8, 16]
-}%
-
-% for N in sizes:
-
-internal struct _FixedArray${N}<T> {
+internal struct _FixedArray16<T> {
   // ABI TODO: This makes assumptions about tuple layout in the ABI, namely that
   // they are laid out contiguously and individually addressable (i.e. strided).
   //
   internal var storage: (
-    // A ${N}-wide tuple of type T
-% for i in range(0, N-1):
-    T,
-% end
-    T
+    // A 16-wide tuple of type T
+    T, T, T, T, T, T, T, T,
+    T, T, T, T, T, T, T, T
   )
 
   var _count: Int8
 }
 
-extension _FixedArray${N} {
+extension _FixedArray16 {
   internal static var capacity: Int {
-    @inline(__always) get { return ${N} }
+    @inline(__always) get { return 16 }
   }
 
   internal var capacity: Int {
-    @inline(__always) get { return ${N} }
+    @inline(__always) get { return 16 }
   }
 
   internal var count: Int {
@@ -51,7 +42,7 @@ extension _FixedArray${N} {
   }
 }
 
-extension _FixedArray${N} : RandomAccessCollection, MutableCollection {
+extension _FixedArray16 : RandomAccessCollection, MutableCollection {
   internal typealias Index = Int
 
   internal var startIndex : Index {
@@ -70,7 +61,7 @@ extension _FixedArray${N} : RandomAccessCollection, MutableCollection {
       let res: T = withUnsafeBytes(of: storage) {
         (rawPtr : UnsafeRawBufferPointer) -> T in
         let stride = MemoryLayout<T>.stride
-        _internalInvariant(rawPtr.count == ${N}*stride, "layout mismatch?")
+        _internalInvariant(rawPtr.count == 16*stride, "layout mismatch?")
         let bufPtr = UnsafeBufferPointer(
           start: rawPtr.baseAddress!.assumingMemoryBound(to: T.self),
           count: count)
@@ -98,7 +89,7 @@ extension _FixedArray${N} : RandomAccessCollection, MutableCollection {
   }
 }
 
-extension _FixedArray${N} {
+extension _FixedArray16 {
   internal mutating func append(_ newElement: T) {
     _internalInvariant(count < capacity)
     _count += 1
@@ -106,15 +97,13 @@ extension _FixedArray${N} {
   }
 }
 
-extension _FixedArray${N} where T : ExpressibleByIntegerLiteral {
+extension _FixedArray16 where T : ExpressibleByIntegerLiteral {
   @inline(__always)
   internal init(count: Int) {
-    _internalInvariant(count >= 0 && count <= _FixedArray${N}.capacity)
+    _internalInvariant(count >= 0 && count <= _FixedArray16.capacity)
     self.storage = (
-% for i in range(0, N-1):
-    0,
-% end
-    0
+      0, 0, 0, 0, 0, 0, 0, 0,
+      0, 0, 0, 0, 0, 0, 0, 0
     )
     self._count = Int8(truncatingIfNeeded: count)
   }
@@ -126,17 +115,17 @@ extension _FixedArray${N} where T : ExpressibleByIntegerLiteral {
 
   @inline(__always)
   internal init(allZeros: ()) {
-    self.init(count: ${N})
+    self.init(count: 16)
   }
 }
 
-extension _FixedArray${N} {
+extension _FixedArray16 {
   internal mutating func withUnsafeMutableBufferPointer<R>(
     _ body: (UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R {
     let count = self.count // for exclusive access
     return try withUnsafeMutableBytes(of: &storage) { rawBuffer in
-      _internalInvariant(rawBuffer.count == ${N}*MemoryLayout<T>.stride,
+      _internalInvariant(rawBuffer.count == 16*MemoryLayout<T>.stride,
         "layout mismatch?")
       let buffer = UnsafeMutableBufferPointer<Element>(
         start: rawBuffer.baseAddress._unsafelyUnwrappedUnchecked
@@ -151,7 +140,7 @@ extension _FixedArray${N} {
   ) rethrows -> R {
     let count = self.count // for exclusive access
     return try withUnsafeBytes(of: &storage) { rawBuffer in
-      _internalInvariant(rawBuffer.count == ${N}*MemoryLayout<T>.stride,
+      _internalInvariant(rawBuffer.count == 16*MemoryLayout<T>.stride,
         "layout mismatch?")
       let buffer = UnsafeBufferPointer<Element>(
         start: rawBuffer.baseAddress._unsafelyUnwrappedUnchecked
@@ -161,9 +150,3 @@ extension _FixedArray${N} {
     }
   }
 }
-
-% end
-
-// ${'Local Variables'}:
-// eval: (read-only-mode 1)
-// End:
