@@ -6,6 +6,7 @@ cake1: Protocol P3 has generic signature change from <Self : cake.P1, Self : cak
 /* RawRepresentable Changes */
 
 /* Removed Decls */
+Swift: Extension Int has been removed
 cake1: Accessor GlobalVarChangedToLet.Set() has been removed
 cake1: Accessor RemoveSetters.Value.Set() has been removed
 cake1: AssociatedType RequiementChanges.removedType has been removed
