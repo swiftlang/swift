@@ -169,6 +169,13 @@ class Superclass {
   var x: Int = 0
 }
 
+class SubclassOfClassWithDelegates: ClassWithDelegates {
+  override var x: Int {
+    get { return $x.value }
+    set { $x.value = newValue }
+  }
+}
+
 class SubclassWithDelegate: Superclass {
   @Wrapper(value: 17)
   override var x: Int { get { return 0 } set { } } // expected-error{{property 'x' with attached delegate cannot override another property}}
@@ -315,25 +322,9 @@ func testBackingStore<T>(bs: BackingStore<T>) {
 // Explicitly-specified accessors
 // ---------------------------------------------------------------------------
 struct DelegateWithAccessors {
-  @Wrapper
+  @Wrapper  // expected-error{{property delegate cannot be applied to a computed property}}
   var x: Int {
-    return $x.value * 2
-  }
-
-  @WrapperWithInitialValue
-  var y: Int {
-    get {
-      return $y.value
-    }
-
-    set {
-      $y.value = newValue / 2
-    }
-  }
-
-  mutating func test() {
-    x = y
-    y = x
+    return 17
   }
 }
 
@@ -513,24 +504,13 @@ class Box<Value> {
 struct UseBox {
   @Box
   var x = 17
-
-  @Box
-  var y: Int {
-    get { return $y.value }
-    set { }
-  }
 }
 
 func testBox(ub: UseBox) {
   _ = ub.x
   ub.x = 5 // expected-error{{cannot assign to property: 'x' is a get-only property}}
 
-  _ = ub.y
-  ub.y = 20 // expected-error{{cannot assign to property: 'ub' is a 'let' constant}}
-
   var mutableUB = ub
-  _ = mutableUB.y
-  mutableUB.y = 20
   mutableUB = ub
 }
 
@@ -593,7 +573,7 @@ struct NoDefaultInitializerStruct { // expected-note{{'init(x:)' declared here}}
 
 class DefaultInitializerClass {
   @Wrapper(value: true)
-  final var x
+  var x
 
   @WrapperWithInitialValue
   final var y: Int = 10
