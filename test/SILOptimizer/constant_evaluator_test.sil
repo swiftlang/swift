@@ -1076,3 +1076,70 @@ bb0:
   %9 = apply %8(%6) : $@convention(method) (@guaranteed String) -> @owned String
   return %9 : $String
 } // CHECK: Returns string: "%%%%%%a%% %%%%b%%"
+
+// Tests for Ownership SIL.
+
+// CHECK-LABEL: @interpretDestructureInt64
+sil [ossa] @interpretDestructureInt64 : $@convention(thin) () -> Builtin.Int64 {
+  %1 = integer_literal $Builtin.Int64, 12
+  %2 = struct $Int64 (%1 : $Builtin.Int64)
+  %3 = destructure_struct %2 : $Int64
+  return %3 : $Builtin.Int64
+} // CHECK: Returns int: 12
+
+struct IntPair {
+  var first: Builtin.Int64
+  var second: Builtin.Int64
+}
+
+// CHECK-LABEL: @interpretIntPairStruct
+sil [ossa] @interpretIntPairStruct : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 17
+  %1 = integer_literal $Builtin.Int64, 34
+  %2 = struct $IntPair (%0: $Builtin.Int64, %1: $Builtin.Int64)
+  (%3, %4) = destructure_struct %2 : $IntPair
+  return %4 : $Builtin.Int64
+} // CHECK: Returns int: 34
+
+sil [ossa] @constructCustomStructOSSA : $@convention(thin) () -> CustomStruct {
+bb0:
+  %1 = integer_literal $Builtin.Int64, 11
+  %2 = struct $Int64 (%1 : $Builtin.Int64)
+  %3 = integer_literal $Builtin.Int64, 12
+  %4 = struct $Int64 (%3 : $Builtin.Int64)
+  %6 = integer_literal $Builtin.Int64, 13
+  %7 = struct $Int64 (%6 : $Builtin.Int64)
+  %8 = integer_literal $Builtin.Int1, 0
+  %9 = struct $Bool (%8 : $Builtin.Int1)
+
+  %10 = struct $InnerStruct (%7 : $Int64, %9 : $Bool)
+  %11 = tuple (%2 : $Int64, %4 : $Int64)
+  %12 = struct $CustomStruct (%11 : $(Int64, Int64), %10 : $InnerStruct)
+  return %12 : $CustomStruct
+}
+
+// CHECK-LABEL: @interpretCustomStructOSSA
+sil [ossa] @interpretCustomStructOSSA : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %1 = function_ref @constructCustomStructOSSA : $@convention(thin) () -> CustomStruct
+  %2 = apply %1() : $@convention(thin) () -> CustomStruct
+  (%3, %4) = destructure_struct %2 : $CustomStruct
+  (%5, %6) = destructure_tuple %3 : $(Int64, Int64)
+  (%7, %8) = destructure_struct %4 : $InnerStruct
+  %9 = destructure_struct %5 : $Int64
+  %10 = destructure_struct %6 : $Int64
+  %11 = destructure_struct %7 : $Int64
+  %12 = destructure_struct %8 : $Bool
+  cond_fail %12 : $Builtin.Int1
+
+  %13 = integer_literal $Builtin.Int1, -1
+  %14 = builtin "sadd_with_overflow_Int64"(%9 : $Builtin.Int64, %10 : $Builtin.Int64, %13 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  (%15, %16) = destructure_tuple %14 : $(Builtin.Int64, Builtin.Int1)
+  cond_fail %16 : $Builtin.Int1
+
+  %17 = builtin "sadd_with_overflow_Int64"(%15 : $Builtin.Int64, %11 : $Builtin.Int64, %13 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  (%18, %19) = destructure_tuple %17 : $(Builtin.Int64, Builtin.Int1)
+  cond_fail %19 : $Builtin.Int1
+  return %18 : $Builtin.Int64
+} // CHECK: Returns int: 36
