@@ -129,14 +129,14 @@ func TF_508_func(x: TF_508_Struct<Float>, y: TF_508_Struct<Float>)
 let TF_508_bp = pullback(at: TF_508_inst, TF_508_inst, in: TF_508_func)
 
 // TF-523
-struct A : Differentiable & AdditiveArithmetic {
+struct TF_523_Struct : Differentiable & AdditiveArithmetic {
   var a: Float = 1
-  typealias TangentVector = A
-  typealias AllDifferentiableVariables = A
+  typealias TangentVector = TF_523_Struct
+  typealias AllDifferentiableVariables = TF_523_Struct
 }
 
 @differentiable
-func f(_ x: A) -> Float {
+func TF_523_f(_ x: TF_523_Struct) -> Float {
   return x.a * 2
 }
 
