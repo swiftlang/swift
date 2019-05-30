@@ -184,7 +184,6 @@ set(SWIFTLIB_ESSENTIAL
   StringGraphemeBreaking.swift # ORDER DEPENDENCY: Must follow UTF16.swift
   ValidUTF8Buffer.swift
   WriteBackMutableSlice.swift
-  HackyTensorflowMigrationSupport.swift
   MigrationSupport.swift)
 
 set(SWIFTLIB_ESSENTIAL_GYB_SOURCES

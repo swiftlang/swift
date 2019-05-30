@@ -809,19 +809,62 @@ CanType ASTContext::getAnyObjectType() const {
 
 // SWIFT_ENABLE_TENSORFLOW
 
-/// Retrieve the decl for TensorDataType.
+/// Retrieve the decl for TensorFlow.TensorHandle iff the TensorFlow module has
+/// been imported.  Otherwise, this returns null.
+ClassDecl *ASTContext::getTensorHandleDecl() const {
+  if (getImpl().TensorHandleDecl)
+    return getImpl().TensorHandleDecl;
+
+  // See if the TensorFlow module was imported.  If not, return null.
+  auto tfModule = getLoadedModule(Id_TensorFlow);
+  if (!tfModule)
+    return nullptr;
+
+  SmallVector<ValueDecl *, 1> results;
+  tfModule->lookupValue({ }, getIdentifier("TensorHandle"),
+                        NLKind::UnqualifiedLookup, results);
+
+  for (auto result : results)
+    if (auto CD = dyn_cast<ClassDecl>(result))
+      return getImpl().TensorHandleDecl = CD;
+  return nullptr;
+}
+
+/// Retrieve the decl for TensorFlow.TensorShape iff the TensorFlow module has
+/// been imported.  Otherwise, this returns null.
+StructDecl *ASTContext::getTensorShapeDecl() const {
+  if (getImpl().TensorShapeDecl)
+    return getImpl().TensorShapeDecl;
+
+  // See if the TensorFlow module was imported.  If not, return null.
+  auto tfModule = getLoadedModule(Id_TensorFlow);
+  if (!tfModule)
+    return nullptr;
+
+  SmallVector<ValueDecl *, 1> results;
+  tfModule->lookupValue({}, getIdentifier("TensorShape"),
+                        NLKind::UnqualifiedLookup, results);
+
+  for (auto result : results)
+    if (auto CD = dyn_cast<StructDecl>(result))
+      return getImpl().TensorShapeDecl = CD;
+  return nullptr;
+}
+
+/// Retrieve the decl for TensorFlow.TensorDataType iff the TensorFlow module has
+/// been imported.  Otherwise, this returns null.
 StructDecl *ASTContext::getTensorDataTypeDecl() const {
   if (getImpl().TensorDataTypeDecl)
     return getImpl().TensorDataTypeDecl;
 
-  // See if the Stdlib module was imported.  If not, return null.
-  auto stdlibModule = getStdlibModule();
-  if (!stdlibModule)
+  // See if the TensorFlow module was imported.  If not, return null.
+	auto tfModule = getLoadedModule(Id_TensorFlow);
+	if (!tfModule)
     return nullptr;
 
   SmallVector<ValueDecl *, 1> results;
-  stdlibModule->lookupValue({}, getIdentifier("TensorDataType"),
-                            NLKind::UnqualifiedLookup, results);
+  tfModule->lookupValue({}, getIdentifier("TensorDataType"),
+                        NLKind::UnqualifiedLookup, results);
 
   for (auto result : results)
     if (auto CD = dyn_cast<StructDecl>(result))
@@ -905,6 +948,10 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   // SWIFT_ENABLE_TENSORFLOW
   case KnownProtocolKind::TensorArrayProtocol:
   case KnownProtocolKind::TensorGroup:
+  case KnownProtocolKind::TensorFlowDataTypeCompatible:
+  case KnownProtocolKind::TensorProtocol:
+    M = getLoadedModule(Id_TensorFlow);
+    break;
   default:
     M = getStdlibModule();
     break;

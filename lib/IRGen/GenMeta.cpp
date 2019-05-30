@@ -4211,6 +4211,8 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::KeyPathIterable:
   case KnownProtocolKind::TensorArrayProtocol:
   case KnownProtocolKind::TensorGroup:
+  case KnownProtocolKind::TensorFlowDataTypeCompatible:
+	case KnownProtocolKind::TensorProtocol:
   case KnownProtocolKind::VectorNumeric:
   case KnownProtocolKind::Differentiable:
     return SpecialProtocol::None;

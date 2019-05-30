@@ -176,9 +176,6 @@
   "AutoDiff": [
     "AutoDiff.swift",
   ],
-  "HackyTensorflowMigrationSupport": [
-    "HackyTensorflowMigrationSupport.swift",
-  ],
   "Optional": [
     "Optional.swift"
   ],
