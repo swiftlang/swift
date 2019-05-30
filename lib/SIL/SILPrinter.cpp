@@ -1309,7 +1309,7 @@ public:
     *this << getIDAndType(AI->getDest());
   }
 
-  void visitAssignByDelegateInst(AssignByDelegateInst *AI) {
+  void visitAssignByWrapperInst(AssignByWrapperInst *AI) {
     *this << getIDAndType(AI->getSrc()) << " to ";
     printAssignOwnershipQualifier(AI->getOwnershipQualifier());
     *this << getIDAndType(AI->getDest())

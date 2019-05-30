@@ -978,7 +978,7 @@ void LifetimeChecker::handleStoreUse(unsigned UseID) {
       addr = copyAddr->getDest();
     else if (auto *assign = dyn_cast<AssignInst>(inst))
       addr = assign->getDest();
-    else if (auto *assign = dyn_cast<AssignByDelegateInst>(inst))
+    else if (auto *assign = dyn_cast<AssignByWrapperInst>(inst))
       addr = assign->getDest();
     else
       return false;
@@ -1824,7 +1824,7 @@ void LifetimeChecker::handleSelfInitUse(unsigned UseID) {
     assert(TheMemory.NumElements == 1 && "delegating inits have a single elt");
 
     // Lower Assign instructions if needed.
-    if (isa<AssignInst>(Use.Inst) || isa<AssignByDelegateInst>(Use.Inst))
+    if (isa<AssignInst>(Use.Inst) || isa<AssignByWrapperInst>(Use.Inst))
       NeedsUpdateForInitState.push_back(UseID);
   } else {
     // super.init also requires that all ivars are initialized before the
@@ -1900,7 +1900,7 @@ void LifetimeChecker::updateInstructionForInitState(DIMemoryUse &Use) {
 
     return;
   }
-  if (auto *AI = dyn_cast<AssignByDelegateInst>(Inst)) {
+  if (auto *AI = dyn_cast<AssignByWrapperInst>(Inst)) {
     // Remove this instruction from our data structures, since we will be
     // removing it.
     Use.Inst = nullptr;

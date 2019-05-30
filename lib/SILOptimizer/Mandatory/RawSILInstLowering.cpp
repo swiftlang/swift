@@ -91,8 +91,8 @@ static void lowerAssignInstruction(SILBuilderWithScope &b, AssignInst *inst) {
   inst->eraseFromParent();
 }
 
-static void lowerAssignByDelegateInstruction(SILBuilderWithScope &b,
-                                             AssignByDelegateInst *inst,
+static void lowerAssignByWrapperInstruction(SILBuilderWithScope &b,
+                                             AssignByWrapperInst *inst,
                             SmallVectorImpl<BeginAccessInst *> &accessMarkers) {
   LLVM_DEBUG(llvm::dbgs() << "  *** Lowering [isInit="
              << unsigned(inst->getOwnershipQualifier())
@@ -143,7 +143,7 @@ static void lowerAssignByDelegateInstruction(SILBuilderWithScope &b,
       break;
     }
     case AssignOwnershipQualifier::Reinit:
-      llvm_unreachable("wrong qualifier for assign_by_delegate");
+      llvm_unreachable("wrong qualifier for assign_by_wrapper");
   }
   switch (srcConvention) {
     case SILArgumentConvention::Indirect_In_Guaranteed:
@@ -216,9 +216,9 @@ static bool lowerRawSILOperations(SILFunction &fn) {
         continue;
       }
 
-      if (auto *ai = dyn_cast<AssignByDelegateInst>(inst)) {
+      if (auto *ai = dyn_cast<AssignByWrapperInst>(inst)) {
         SILBuilderWithScope b(ai);
-        lowerAssignByDelegateInstruction(b, ai, accessMarkers);
+        lowerAssignByWrapperInstruction(b, ai, accessMarkers);
         changed = true;
         continue;
       }
