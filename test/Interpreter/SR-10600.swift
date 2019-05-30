@@ -1,5 +1,7 @@
 // RUN: %target-run-simple-swift | %FileCheck %s
 
+// REQUIRES: executable_test
+
 public class BaseView { }
 public class GenericView<T>: BaseView { }
 public class FinalView: GenericView<ContentForTheView> { }
