@@ -118,7 +118,6 @@ IDENTIFIER(withArguments)
 IDENTIFIER(withKeywordArguments)
 
 // SWIFT_ENABLE_TENSORFLOW
-IDENTIFIER(TensorFlow)
 // KeyPathIterable
 IDENTIFIER(AllKeyPaths)
 IDENTIFIER(allKeyPaths)

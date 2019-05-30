@@ -266,10 +266,16 @@ static Expr *buildDynamicMemberLookupIndexExpr(StringRef name, SourceLoc loc,
                                                DeclContext *dc,
                                                ConstraintSystem &cs) {
   auto &ctx = cs.TC.Context;
+
+  auto *stringDecl = ctx.getStringDecl();
+  auto stringType = stringDecl->getDeclaredType();
+
   // Build and type check the string literal index value to the specific
   // string type expected by the subscript.
-  Expr *nameExpr = new (ctx) StringLiteralExpr(name, loc, /*implicit*/true);
-  (void)cs.TC.typeCheckExpression(nameExpr, dc);
+  auto *nameExpr = new (ctx) StringLiteralExpr(name, loc, /*implicit*/true);
+  nameExpr->setBuiltinInitializer(ctx.getStringBuiltinInitDecl(stringDecl));
+  nameExpr->setType(stringType);
+
   cs.cacheExprTypes(nameExpr);
   return nameExpr;
 }

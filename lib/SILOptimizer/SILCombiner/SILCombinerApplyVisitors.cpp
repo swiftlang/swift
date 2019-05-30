@@ -30,9 +30,12 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/Statistic.h"
 
 using namespace swift;
 using namespace swift::PatternMatch;
+
+STATISTIC(NumOptimizedKeypaths, "Number of optimized keypath instructions");
 
 /// Remove pointless reabstraction thunk closures.
 ///   partial_apply %reabstraction_thunk_typeAtoB(
@@ -554,6 +557,189 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
              AI.getSubstCalleeType()->getAllResultsType() &&
          "Function types should be the same");
   return NAI;
+}
+
+/// Ends the begin_access "scope" if a begin_access was inserted for optimizing
+/// a keypath pattern.
+static void insertEndAccess(BeginAccessInst *&beginAccess, bool isModify,
+                            SILBuilder &builder) {
+  if (beginAccess) {
+    builder.createEndAccess(beginAccess->getLoc(), beginAccess,
+                            /*aborted*/ false);
+    if (isModify)
+      beginAccess->setAccessKind(SILAccessKind::Modify);
+    beginAccess = nullptr;
+  }
+}
+
+/// Creates the projection pattern for a keypath instruction.
+///
+/// Currently only the StoredProperty pattern is handled.
+/// TODO: handle other patterns, like getters/setters, optional chaining, etc.
+///
+/// Returns false if \p keyPath is not a keypath instruction or if there is any
+/// other reason why the optimization cannot be done.
+static SILValue createKeypathProjections(SILValue keyPath, SILValue root,
+                                         SILLocation loc,
+                                         BeginAccessInst *&beginAccess,
+                                         SILBuilder &builder) {
+  if (auto *upCast = dyn_cast<UpcastInst>(keyPath))
+    keyPath = upCast->getOperand();
+
+  // Is it a keypath instruction at all?
+  auto *kpInst = dyn_cast<KeyPathInst>(keyPath);
+  if (!kpInst || !kpInst->hasPattern())
+    return SILValue();
+
+  auto components = kpInst->getPattern()->getComponents();
+
+  // Check if the keypath only contains patterns which we support.
+  for (const KeyPathPatternComponent &comp : components) {
+    if (comp.getKind() != KeyPathPatternComponent::Kind::StoredProperty)
+      return SILValue();
+  }
+
+  SILValue addr = root;
+  for (const KeyPathPatternComponent &comp : components) {
+    assert(comp.getKind() == KeyPathPatternComponent::Kind::StoredProperty);
+    VarDecl *storedProperty = comp.getStoredPropertyDecl();
+    SILValue elementAddr;
+    if (addr->getType().getStructOrBoundGenericStruct()) {
+      addr = builder.createStructElementAddr(loc, addr, storedProperty);
+    } else if (addr->getType().getClassOrBoundGenericClass()) {
+      LoadInst *Ref = builder.createLoad(loc, addr,
+                                         LoadOwnershipQualifier::Unqualified);
+      insertEndAccess(beginAccess, /*isModify*/ false, builder);
+      addr = builder.createRefElementAddr(loc, Ref, storedProperty);
+
+      // Class members need access enforcement.
+      if (builder.getModule().getOptions().EnforceExclusivityDynamic) {
+        beginAccess = builder.createBeginAccess(loc, addr, SILAccessKind::Read,
+                                                SILAccessEnforcement::Dynamic,
+                                                /*noNestedConflict*/ false,
+                                                /*fromBuiltin*/ false);
+        addr = beginAccess;
+      }
+    } else {
+      // This should never happen, as a stored-property pattern can only be
+      // applied to classes and structs. But to be safe - and future prove -
+      // let's handle this case and bail.
+      insertEndAccess(beginAccess, /*isModify*/ false, builder);
+      return SILValue();
+    }
+  }
+  return addr;
+}
+
+/// Try to optimize a keypath application with an apply instruction.
+///
+/// Replaces (simplified SIL):
+///   %kp = keypath ...
+///   apply %keypath_runtime_function(%addr, %kp, %root_object)
+/// with:
+///   %addr = struct_element_addr/ref_element_addr %root_object
+///   ...
+///   load/store %addr
+bool SILCombiner::tryOptimizeKeypath(ApplyInst *AI) {
+  SILFunction *callee = AI->getReferencedFunction();
+  if (!callee)
+    return false;
+
+  if (AI->getNumArguments() != 3)
+    return false;
+
+  SILValue keyPath, rootAddr, valueAddr;
+  bool isModify = false;
+  if (callee->getName() == "swift_setAtWritableKeyPath" ||
+      callee->getName() == "swift_setAtReferenceWritableKeyPath") {
+    keyPath = AI->getArgument(1);
+    rootAddr = AI->getArgument(0);
+    valueAddr = AI->getArgument(2);
+    isModify = true;
+  } else if (callee->getName() == "swift_getAtKeyPath") {
+    keyPath = AI->getArgument(2);
+    rootAddr = AI->getArgument(1);
+    valueAddr = AI->getArgument(0);
+  } else {
+    return false;
+  }
+
+  BeginAccessInst *beginAccess = nullptr;
+  SILValue projectedAddr = createKeypathProjections(keyPath, rootAddr,
+                                                    AI->getLoc(), beginAccess,
+                                                    Builder);
+  if (!projectedAddr)
+    return false;
+
+  if (isModify) {
+    Builder.createCopyAddr(AI->getLoc(), valueAddr, projectedAddr,
+                           IsTake, IsNotInitialization);
+  } else {
+    Builder.createCopyAddr(AI->getLoc(), projectedAddr, valueAddr,
+                           IsNotTake, IsInitialization);
+  }
+  insertEndAccess(beginAccess, isModify, Builder);
+  eraseInstFromFunction(*AI);
+  ++NumOptimizedKeypaths;
+  return true;
+}
+
+/// Try to optimize a keypath application with an apply instruction.
+///
+/// Replaces (simplified SIL):
+///   %kp = keypath ...
+///   %inout_addr = begin_apply %keypath_runtime_function(%kp, %root_object)
+///   // use %inout_addr
+///   end_apply
+/// with:
+///   %addr = struct_element_addr/ref_element_addr %root_object
+///   // use %inout_addr
+bool SILCombiner::tryOptimizeInoutKeypath(BeginApplyInst *AI) {
+  SILFunction *callee = AI->getReferencedFunction();
+  if (!callee)
+    return false;
+
+  if (AI->getNumArguments() != 2)
+    return false;
+
+  SILValue keyPath = AI->getArgument(1);
+  SILValue rootAddr = AI->getArgument(0);
+  bool isModify = false;
+  if (callee->getName() == "swift_modifyAtWritableKeyPath" ||
+      callee->getName() == "swift_modifyAtReferenceWritableKeyPath") {
+    isModify = true;
+  } else if (callee->getName() != "swift_readAtKeyPath") {
+    return false;
+  }
+
+  SILInstructionResultArray yields = AI->getYieldedValues();
+  if (yields.size() != 1)
+    return false;
+
+  SILValue valueAddr = yields[0];
+  Operand *AIUse = AI->getTokenResult()->getSingleUse();
+  if (!AIUse)
+    return false;
+  EndApplyInst *endApply = dyn_cast<EndApplyInst>(AIUse->getUser());
+  if (!endApply)
+    return false;
+
+  BeginAccessInst *beginAccess = nullptr;
+  SILValue projectedAddr = createKeypathProjections(keyPath, rootAddr,
+                                                    AI->getLoc(), beginAccess,
+                                                    Builder);
+  if (!projectedAddr)
+    return false;
+
+  // Replace the projected address.
+  valueAddr->replaceAllUsesWith(projectedAddr);
+
+  Builder.setInsertionPoint(endApply);
+  insertEndAccess(beginAccess, isModify, Builder);
+  eraseInstFromFunction(*endApply);
+  eraseInstFromFunction(*AI);
+  ++NumOptimizedKeypaths;
+  return true;
 }
 
 bool
@@ -1184,7 +1370,11 @@ static bool knowHowToEmitReferenceCountInsts(ApplyInst *Call) {
   if (Call->getNumArguments() != 1)
     return false;
 
-  FunctionRefInst *FRI = cast<FunctionRefInst>(Call->getCallee());
+  // FIXME: We could handle dynamic_function_ref instructions here because the
+  // code only looks at the function type.
+  FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(Call->getCallee());
+  if (!FRI)
+    return false;
   SILFunction *F = FRI->getReferencedFunction();
   auto FnTy = F->getLoweredFunctionType();
 
@@ -1335,6 +1525,9 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
   if (auto *CFI = dyn_cast<ConvertFunctionInst>(AI->getCallee()))
     return optimizeApplyOfConvertFunctionInst(AI, CFI);
 
+  if (tryOptimizeKeypath(AI))
+    return nullptr;
+
   // Optimize readonly functions with no meaningful users.
   SILFunction *SF = AI->getReferencedFunction();
   if (SF && SF->getEffectsKind() < EffectsKind::ReleaseNone) {
@@ -1398,6 +1591,12 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
                                       "convertFromObjectiveC"))
     return nullptr;
 
+  return nullptr;
+}
+
+SILInstruction *SILCombiner::visitBeginApplyInst(BeginApplyInst *BAI) {
+  if (tryOptimizeInoutKeypath(BAI))
+    return nullptr;
   return nullptr;
 }
 

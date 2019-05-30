@@ -677,7 +677,6 @@ public:
     return IsDynamicallyReplaceable_t(IsDynamicReplaceable);
   }
   void setIsDynamic(IsDynamicallyReplaceable_t value = IsDynamic) {
-    assert(IsDynamicReplaceable == IsNotDynamic && "already set");
     IsDynamicReplaceable = value;
     assert(!Transparent || !IsDynamicReplaceable);
   }

@@ -191,9 +191,6 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
 #define FUNC_DECL(Name, Id) FuncDecl *Get##Name = nullptr;
 #include "swift/AST/KnownDecls.def"
   
-  /// Swift.Bool.init(_builtinBooleanLiteral:)
-  ConstructorDecl *BoolBuiltinInitDecl = nullptr;
-  
   /// func ==(Int, Int) -> Bool
   FuncDecl *EqualIntDecl = nullptr;
 
@@ -284,6 +281,10 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   /// A mapping from the backing storage of a property that has a delegate
   /// to the original property with the delegate.
   llvm::DenseMap<const VarDecl *, VarDecl *> OriginalDelegatedProperties;
+
+  /// The builtin initializer witness for a literal. Used when building
+  /// LiteralExprs in fully-checked AST.
+  llvm::DenseMap<const NominalTypeDecl *, ConcreteDeclRef> BuiltinInitWitness;
 
   /// Structure that captures data that is segregated into different
   /// arenas.
@@ -807,62 +808,20 @@ CanType ASTContext::getAnyObjectType() const {
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-/// Retrieve the decl for TensorFlow.TensorHandle iff the TensorFlow module has
-/// been imported.  Otherwise, this returns null.
-ClassDecl *ASTContext::getTensorHandleDecl() const {
-  if (getImpl().TensorHandleDecl)
-    return getImpl().TensorHandleDecl;
 
-  // See if the TensorFlow module was imported.  If not, return null.
-  auto tfModule = getLoadedModule(Id_TensorFlow);
-  if (!tfModule)
-    return nullptr;
-
-  SmallVector<ValueDecl *, 1> results;
-  tfModule->lookupValue({ }, getIdentifier("TensorHandle"),
-                        NLKind::UnqualifiedLookup, results);
-
-  for (auto result : results)
-    if (auto CD = dyn_cast<ClassDecl>(result))
-      return getImpl().TensorHandleDecl = CD;
-  return nullptr;
-}
-
-/// Retrieve the decl for TensorFlow.TensorShape iff the TensorFlow module has
-/// been imported.  Otherwise, this returns null.
-StructDecl *ASTContext::getTensorShapeDecl() const {
-  if (getImpl().TensorShapeDecl)
-    return getImpl().TensorShapeDecl;
-
-  // See if the TensorFlow module was imported.  If not, return null.
-  auto tfModule = getLoadedModule(Id_TensorFlow);
-  if (!tfModule)
-    return nullptr;
-
-  SmallVector<ValueDecl *, 1> results;
-  tfModule->lookupValue({}, getIdentifier("TensorShape"),
-                        NLKind::UnqualifiedLookup, results);
-
-  for (auto result : results)
-    if (auto CD = dyn_cast<StructDecl>(result))
-      return getImpl().TensorShapeDecl = CD;
-  return nullptr;
-}
-
-/// Retrieve the decl for TensorFlow.TensorDataType iff the TensorFlow module has
-/// been imported.  Otherwise, this returns null.
+/// Retrieve the decl for TensorDataType.
 StructDecl *ASTContext::getTensorDataTypeDecl() const {
   if (getImpl().TensorDataTypeDecl)
     return getImpl().TensorDataTypeDecl;
 
-  // See if the TensorFlow module was imported.  If not, return null.
-  auto tfModule = getLoadedModule(Id_TensorFlow);
-  if (!tfModule)
+  // See if the Stdlib module was imported.  If not, return null.
+  auto stdlibModule = getStdlibModule();
+  if (!stdlibModule)
     return nullptr;
 
   SmallVector<ValueDecl *, 1> results;
-  tfModule->lookupValue({}, getIdentifier("TensorDataType"),
-                        NLKind::UnqualifiedLookup, results);
+  stdlibModule->lookupValue({}, getIdentifier("TensorDataType"),
+                            NLKind::UnqualifiedLookup, results);
 
   for (auto result : results)
     if (auto CD = dyn_cast<StructDecl>(result))
@@ -946,10 +905,6 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   // SWIFT_ENABLE_TENSORFLOW
   case KnownProtocolKind::TensorArrayProtocol:
   case KnownProtocolKind::TensorGroup:
-  case KnownProtocolKind::TensorFlowDataTypeCompatible:
-  case KnownProtocolKind::TensorProtocol:
-    M = getLoadedModule(Id_TensorFlow);
-    break;
   default:
     M = getStdlibModule();
     break;
@@ -1056,27 +1011,80 @@ lookupOperatorFunc(const ASTContext &ctx, StringRef oper, Type contextType,
   return nullptr;
 }
 
-ConstructorDecl *ASTContext::getBoolBuiltinInitDecl() const {
-  if (getImpl().BoolBuiltinInitDecl)
-    return getImpl().BoolBuiltinInitDecl;
-
-  if (!getBoolDecl())
-    return nullptr;
-
-  DeclName initName(*const_cast<ASTContext *>(this),
-                    DeclBaseName::createConstructor(),
+ConcreteDeclRef ASTContext::getBoolBuiltinInitDecl() const {
+  auto fn = [&](ASTContext &ctx) {
+    return DeclName(ctx, DeclBaseName::createConstructor(),
                     { Id_builtinBooleanLiteral });
-  auto members = getBoolDecl()->lookupDirect(initName);
+  };
+  auto builtinProtocolKind =
+    KnownProtocolKind::ExpressibleByBuiltinBooleanLiteral;
+  return getBuiltinInitDecl(getBoolDecl(), builtinProtocolKind, fn);
+}
 
-  if (members.size() != 1)
-    return nullptr;
+ConcreteDeclRef
+ASTContext::getIntBuiltinInitDecl(NominalTypeDecl *intDecl) const {
+  auto fn = [&](ASTContext &ctx) {
+    return DeclName(ctx, DeclBaseName::createConstructor(),
+                    { Id_builtinIntegerLiteral });
+  };
+  auto builtinProtocolKind =
+    KnownProtocolKind::ExpressibleByBuiltinIntegerLiteral;
+  return getBuiltinInitDecl(intDecl, builtinProtocolKind, fn);
+}
 
-  if (auto init = dyn_cast<ConstructorDecl>(members[0])) {
-    getImpl().BoolBuiltinInitDecl = init;
-    return init;
+ConcreteDeclRef
+ASTContext::getFloatBuiltinInitDecl(NominalTypeDecl *floatDecl) const {
+  auto fn = [&](ASTContext &ctx) {
+    return DeclName(ctx, DeclBaseName::createConstructor(),
+                    { Id_builtinFloatLiteral });
+  };
+
+  auto builtinProtocolKind =
+    KnownProtocolKind::ExpressibleByBuiltinFloatLiteral;
+  return getBuiltinInitDecl(floatDecl, builtinProtocolKind, fn);
+}
+
+ConcreteDeclRef
+ASTContext::getStringBuiltinInitDecl(NominalTypeDecl *stringDecl) const {
+  auto fn = [&](ASTContext &ctx) {
+    return DeclName(ctx, DeclBaseName::createConstructor(),
+                    { Id_builtinStringLiteral,
+                      getIdentifier("utf8CodeUnitCount"),
+                      getIdentifier("isASCII") });
+  };
+
+  auto builtinProtocolKind =
+    KnownProtocolKind::ExpressibleByBuiltinStringLiteral;
+  return getBuiltinInitDecl(stringDecl, builtinProtocolKind, fn);
+}
+
+ConcreteDeclRef
+ASTContext::getBuiltinInitDecl(NominalTypeDecl *decl,
+                               KnownProtocolKind builtinProtocolKind,
+               llvm::function_ref<DeclName (ASTContext &ctx)> initName) const {
+  auto &witness = getImpl().BuiltinInitWitness[decl];
+  if (witness)
+    return witness;
+
+  auto type = decl->getDeclaredType();
+  auto builtinProtocol = getProtocol(builtinProtocolKind);
+  auto builtinConformance = getStdlibModule()->lookupConformance(
+      type, builtinProtocol);
+  if (!builtinConformance) {
+    assert(false && "Missing required conformance");
+    witness = ConcreteDeclRef();
+    return witness;
   }
 
-  return nullptr;
+  auto *ctx = const_cast<ASTContext *>(this);
+  witness = builtinConformance->getWitnessByName(type, initName(*ctx));
+  if (!witness) {
+    assert(false && "Missing required witness");
+    witness = ConcreteDeclRef();
+    return witness;
+  }
+
+  return witness;
 }
 
 FuncDecl *ASTContext::getEqualIntDecl() const {
@@ -4567,21 +4575,13 @@ AutoDiffParameterIndices::get(llvm::SmallBitVector indices, ASTContext &C) {
 }
 
 AutoDiffIndexSubset *
-AutoDiffIndexSubset::get(ASTContext &ctx, unsigned capacity,
-                         ArrayRef<unsigned> indices) {
+AutoDiffIndexSubset::get(ASTContext &ctx, const SmallBitVector &indices) {
   auto &foldingSet = ctx.getImpl().AutoDiffIndexSubsets;
   llvm::FoldingSetNodeID id;
+  unsigned capacity = indices.size();
   id.AddInteger(capacity);
-#ifndef NDEBUG
-  int last = -1;
-#endif
-  for (unsigned index : indices) {
-#ifndef NDEBUG
-    assert((int)index > last && "Indices must be ascending");
-    last = (int)index;
-#endif
+  for (unsigned index : indices.set_bits())
     id.AddInteger(index);
-  }
   void *insertPos = nullptr;
   auto *existing = foldingSet.FindNodeOrInsertPos(id, insertPos);
   if (existing)
@@ -4590,7 +4590,7 @@ AutoDiffIndexSubset::get(ASTContext &ctx, unsigned capacity,
       getNumBitWordsNeededForCapacity(capacity);
   auto *buf = reinterpret_cast<AutoDiffIndexSubset *>(
       ctx.Allocate(sizeToAlloc, alignof(AutoDiffIndexSubset)));
-  auto *newNode = new (buf) AutoDiffIndexSubset(capacity, indices);
+  auto *newNode = new (buf) AutoDiffIndexSubset(indices);
   foldingSet.InsertNode(newNode, insertPos);
   return newNode;
 }

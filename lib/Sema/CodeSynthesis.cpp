@@ -1796,7 +1796,7 @@ PropertyDelegateBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
   VarDecl *storageVar = nullptr;
   if (delegateInfo.delegateValueVar) {
     storageVar = synthesizePropertyDelegateStorageDelegateProperty(
-        ctx, var, delegateType, delegateInfo.delegateValueVar);
+        ctx, var, storageType, delegateInfo.delegateValueVar);
   }
 
   // Get the property delegate information.
@@ -2340,11 +2340,21 @@ static void synthesizeStubBody(AbstractFunctionDecl *fn, void *) {
     return;
   }
 
+  auto *staticStringDecl = ctx.getStaticStringDecl();
+  auto staticStringType = staticStringDecl->getDeclaredType();
+  auto staticStringInit = ctx.getStringBuiltinInitDecl(staticStringDecl);
+
+  auto *uintDecl = ctx.getUIntDecl();
+  auto uintType = uintDecl->getDeclaredType();
+  auto uintInit = ctx.getIntBuiltinInitDecl(uintDecl);
+
   // Create a call to Swift._unimplementedInitializer
   auto loc = classDecl->getLoc();
   Expr *ref = new (ctx) DeclRefExpr(unimplementedInitDecl,
                                    DeclNameLoc(loc),
                                    /*Implicit=*/true);
+  ref->setType(unimplementedInitDecl->getInterfaceType()
+                                    ->removeArgumentLabels(1));
 
   llvm::SmallString<64> buffer;
   StringRef fullClassName = ctx.AllocateCopy(
@@ -2352,14 +2362,42 @@ static void synthesizeStubBody(AbstractFunctionDecl *fn, void *) {
                                "." +
                                classDecl->getName().str()).toStringRef(buffer));
 
-  Expr *className = new (ctx) StringLiteralExpr(fullClassName, loc,
+  auto *className = new (ctx) StringLiteralExpr(fullClassName, loc,
                                                 /*Implicit=*/true);
-  Expr *call = CallExpr::createImplicit(ctx, ref, { className },
-                                        { ctx.Id_className });
-  ctor->setBody(BraceStmt::create(ctx, SourceLoc(),
-                                  ASTNode(call),
-                                  SourceLoc(),
+  className->setBuiltinInitializer(staticStringInit);
+  assert(isa<ConstructorDecl>(className->getBuiltinInitializer().getDecl()));
+  className->setType(staticStringType);
+
+  auto *initName = new (ctx) MagicIdentifierLiteralExpr(
+    MagicIdentifierLiteralExpr::Function, loc, /*Implicit=*/true);
+  initName->setType(staticStringType);
+  initName->setBuiltinInitializer(staticStringInit);
+
+  auto *file = new (ctx) MagicIdentifierLiteralExpr(
+    MagicIdentifierLiteralExpr::File, loc, /*Implicit=*/true);
+  file->setType(staticStringType);
+  file->setBuiltinInitializer(staticStringInit);
+
+  auto *line = new (ctx) MagicIdentifierLiteralExpr(
+    MagicIdentifierLiteralExpr::Line, loc, /*Implicit=*/true);
+  line->setType(uintType);
+  line->setBuiltinInitializer(uintInit);
+
+  auto *column = new (ctx) MagicIdentifierLiteralExpr(
+    MagicIdentifierLiteralExpr::Column, loc, /*Implicit=*/true);
+  column->setType(uintType);
+  column->setBuiltinInitializer(uintInit);
+
+  Expr *call = CallExpr::createImplicit(
+      ctx, ref, { className, initName, file, line, column }, {});
+  call->setType(ctx.getNeverType());
+
+  SmallVector<ASTNode, 2> stmts;
+  stmts.push_back(call);
+  stmts.push_back(new (ctx) ReturnStmt(SourceLoc(), /*Result=*/nullptr));
+  ctor->setBody(BraceStmt::create(ctx, SourceLoc(), stmts, SourceLoc(),
                                   /*implicit=*/true));
+  ctor->setBodyTypeCheckedIfPresent();
 }
 
 static std::tuple<GenericEnvironment *, GenericParamList *, SubstitutionMap>

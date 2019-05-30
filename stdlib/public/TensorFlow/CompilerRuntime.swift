@@ -652,6 +652,15 @@ public final class _ExecutionContext {
   }
 }
 
+extension _ExecutionContext {
+  // The execution mode is effectively encoded in the TensorOperation.
+  // We can use this to switch between different execution modes.
+  // TODO: Can we interop between modes?
+  public static func makeOp(_ name: String, _ nOutputs: Int) -> TFTensorOperation {
+    return TFE_Op(name, nOutputs)
+  }
+}
+
 // Elements in `outputs` can come from two sources:
 // a) Symbolic tensors produced by tensor ops, and added as trace graph nodes.
 // b) Concrete tensors produced by host code (e.g. Tensor(1.0)).

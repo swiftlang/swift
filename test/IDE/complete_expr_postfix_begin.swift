@@ -128,10 +128,10 @@ typealias FooTypealias = Int
 // COMMON-DAG: Decl[Struct]/OtherModule[Swift]:    Int32[#Int32#]{{; name=.+$}}
 // COMMON-DAG: Decl[Struct]/OtherModule[Swift]:    Int64[#Int64#]{{; name=.+$}}
 // COMMON-DAG: Decl[Struct]/OtherModule[Swift]:      Bool[#Bool#]{{; name=.+$}}
-// COMMON-DAG: Keyword[#function]/None: #function[#String#]{{; name=.+$}}
-// COMMON-DAG: Keyword[#file]/None: #file[#String#]{{; name=.+$}}
-// COMMON-DAG: Keyword[#line]/None: #line[#Int#]{{; name=.+$}}
-// COMMON-DAG: Keyword[#column]/None: #column[#Int#]{{; name=.+$}}
+// COMMON-DAG: Keyword[#function]/None{{(/TypeRelation\[Identical\])?}}: #function[#String#]{{; name=.+$}}
+// COMMON-DAG: Keyword[#file]/None{{(/TypeRelation\[Identical\])?}}: #file[#String#]{{; name=.+$}}
+// COMMON-DAG: Keyword[#line]/None{{(/TypeRelation\[Identical\])?}}: #line[#Int#]{{; name=.+$}}
+// COMMON-DAG: Keyword[#column]/None{{(/TypeRelation\[Identical\])?}}: #column[#Int#]{{; name=.+$}}
 // COMMON: End completions
 
 // NO_SELF-NOT: {{[[:<:]][Ss]elf[[:>:]]}}

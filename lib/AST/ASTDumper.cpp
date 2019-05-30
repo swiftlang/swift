@@ -1930,7 +1930,19 @@ public:
   }
   void visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E) {
     printCommon(E, "interpolated_string_literal_expr");
-    PrintWithColorRAII(OS, LiteralValueColor) << " literal_capacity=" 
+    
+    // Print the trailing quote location
+    if (auto Ty = GetTypeOfExpr(E)) {
+      auto &Ctx = Ty->getASTContext();
+      auto TQL = E->getTrailingQuoteLoc();
+      if (TQL.isValid()) {
+        PrintWithColorRAII(OS, LocationColor) << " trailing_quote_loc=";
+        TQL.print(PrintWithColorRAII(OS, LocationColor).getOS(),
+                  Ctx.SourceMgr);
+      }
+    }
+    PrintWithColorRAII(OS, LiteralValueColor)
+      << " literal_capacity="
       << E->getLiteralCapacity() << " interpolation_count="
       << E->getInterpolationCount() << '\n';
     printRec(E->getAppendingExpr());

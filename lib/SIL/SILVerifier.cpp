@@ -1714,7 +1714,7 @@ public:
               "[dynamic_replacement_for:...] function");
     } else if (isa<DynamicFunctionRefInst>(FRI))
       require(RefF->isDynamicallyReplaceable(),
-              "dynamic_function_ref cannot reference a "
+              "dynamic_function_ref must reference a "
               "[dynamically_replaceable] function");
 
     // In canonical SIL, direct reference to a shared_external declaration

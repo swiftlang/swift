@@ -284,17 +284,19 @@ DefineMemberBasedOnUse::create(ConstraintSystem &cs, Type baseType,
 }
 
 bool AllowTypeOrInstanceMember::diagnose(Expr *root, bool asNote) const {
-  auto failure = AllowTypeOrInstanceMemberFailure(root, getConstraintSystem(),
-                                                  BaseType, Name, getLocator());
+  auto failure = AllowTypeOrInstanceMemberFailure(
+      root, getConstraintSystem(), BaseType, Member, UsedName, getLocator());
   return failure.diagnose(asNote);
 }
 
-AllowTypeOrInstanceMember *AllowTypeOrInstanceMember::create(ConstraintSystem &cs,
-                                                             Type baseType,
-                                                             DeclName member,
-                                                             ConstraintLocator *locator) {
-  return new (cs.getAllocator()) AllowTypeOrInstanceMember(cs, baseType, member, locator);
+AllowTypeOrInstanceMember *
+AllowTypeOrInstanceMember::create(ConstraintSystem &cs, Type baseType,
+                                  ValueDecl *member, DeclName usedName,
+                                  ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowTypeOrInstanceMember(cs, baseType, member, usedName, locator);
 }
+
 bool AllowInvalidPartialApplication::diagnose(Expr *root, bool asNote) const {
   auto failure = PartialApplicationFailure(root, isWarning(),
                                            getConstraintSystem(), getLocator());
