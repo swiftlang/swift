@@ -5506,9 +5506,9 @@ RValue SILGenFunction::emitApplyPropertyWrapperAllocator(SILLocation loc,
   FormalEvaluationScope writebacks(*this);
   CallEmission emission(*this, std::move(callee), std::move(writebacks));
 
-  AnyFunctionType::Param selfParam((Type(MTty)), Identifier(),
-                                   ParameterTypeFlags());
-  emission.addSelfParam(loc, std::move(ArgSrc), selfParam, funcTy.getResult());
+  CallSite callSite(loc, std::move(ArgSrc), false, funcTy);
+
+  emission.addCallSite(std::move(callSite));
 
   RValue RV = emission.apply();
   return RV;

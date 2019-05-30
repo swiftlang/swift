@@ -1125,11 +1125,6 @@ ERROR(mutating_invalid_classes,none,
 ERROR(nominal_type_not_attribute,none,
       "%0 %1 cannot be used as an attribute", (DescriptiveDeclKind, DeclName))
 
-ERROR(mutating_invalid_global_scope,none, "%0 is only valid on methods",
-      (SelfAccessKind))
-ERROR(mutating_invalid_classes,none, "%0 isn't valid on methods in "
-      "classes or class-bound protocols", (SelfAccessKind))
-
 ERROR(functions_mutating_and_not,none,
       "method must not be declared both "
       "%select{nonmutating|mutating|__consuming}0 and "

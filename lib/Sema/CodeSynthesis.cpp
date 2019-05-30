@@ -312,17 +312,17 @@ static void maybeMarkTransparent(AccessorDecl *accessor, ASTContext &ctx) {
       accessor->getAccessorKind() == AccessorKind::Set)
     return;
 
-  // Getters/setters for a property with a delegate are not @_transparent if
+  // Getters/setters for a property with a wrapper are not @_transparent if
   // the backing variable has more-restrictive access than the original
-  // property. The same goes for its storage delegate.
+  // property. The same goes for its storage wrapper.
   if (auto var = dyn_cast<VarDecl>(accessor->getStorage())) {
-    if (auto backingVar = var->getPropertyDelegateBackingProperty()) {
+    if (auto backingVar = var->getPropertyWrapperBackingProperty()) {
       if (backingVar->getFormalAccess() < var->getFormalAccess())
         return;
     }
 
-    if (auto original = var->getOriginalDelegatedProperty(
-            PropertyDelegateSynthesizedPropertyKind::StorageDelegate)) {
+    if (auto original = var->getOriginalWrappedProperty(
+            PropertyWrapperSynthesizedPropertyKind::StorageWrapper)) {
       if (var->getFormalAccess() < original->getFormalAccess())
         return;
     }
