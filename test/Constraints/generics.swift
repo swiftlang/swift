@@ -747,3 +747,14 @@ func sr_7003() {
   // expected-error@-1 {{generic parameter 'T' could not be inferred}}
   // expected-note@-2 {{explicitly specify the generic arguments to fix this issue}} {{17-17=<Any>}}
 }
+
+func test_generic_subscript_with_missing_arg() {
+  struct S<T> {
+    subscript<U>(_: T) -> S<U> { fatalError() }
+    // expected-note@-1 {{in call to 'subscript(_:)'}}
+  }
+
+  func test(_ s: S<Int>) {
+    _ = s[0] // expected-error {{generic parameter 'U' could not be inferred}}
+  }
+}

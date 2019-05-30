@@ -2918,6 +2918,11 @@ bool MissingGenericArgumentsFailure::diagnoseForAnchor(
     return false;
 
   auto *DC = getDeclContext();
+  if (auto *SD = dyn_cast<SubscriptDecl>(DC)) {
+    emitDiagnostic(SD, diag::note_call_to_subscript, SD->getFullName());
+    return true;
+  }
+
   if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
     if (isa<ConstructorDecl>(AFD)) {
       emitDiagnostic(AFD, diag::note_call_to_initializer);
@@ -2974,11 +2979,8 @@ bool MissingGenericArgumentsFailure::diagnoseParameter(
   } else if (auto *TAD = dyn_cast<TypeAliasDecl>(DC)) {
     baseTyForNote = TAD->getUnboundGenericType();
   } else {
-    baseTyForNote = DC->getDeclaredInterfaceType();
-  }
-
-  if (!baseTyForNote)
     return true;
+  }
 
   emitDiagnostic(GP->getDecl(), diag::archetype_declared_in_type, GP,
                  baseTyForNote);
