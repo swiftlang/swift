@@ -13,7 +13,7 @@
 
 /// A sequence whose elements consist of the initial consecutive elements of
 /// some base sequence that satisfy a given predicate.
-@_fixed_layout // lazy-performance
+@frozen // lazy-performance
 public struct LazyPrefixWhileSequence<Base: Sequence> {
   public typealias Element = Base.Element
   
@@ -37,7 +37,7 @@ extension LazyPrefixWhileSequence {
   /// This is the associated iterator for the `LazyPrefixWhileSequence`,
   /// `LazyPrefixWhileCollection`, and `LazyPrefixWhileBidirectionalCollection`
   /// types.
-  @_fixed_layout // lazy-performance
+  @frozen // lazy-performance
   public struct Iterator {
     public typealias Element = Base.Element
 
@@ -112,7 +112,7 @@ public typealias LazyPrefixWhileCollection<T: Collection> = LazyPrefixWhileSeque
 extension LazyPrefixWhileCollection {
   /// A position in the base collection of a `LazyPrefixWhileCollection` or the
   /// end of that collection.
-  @_frozen // lazy-performance
+  @frozen // lazy-performance
   @usableFromInline
   internal enum _IndexRepresentation {
     case index(Base.Index)
@@ -121,7 +121,7 @@ extension LazyPrefixWhileCollection {
   
   /// A position in a `LazyPrefixWhileCollection` or
   /// `LazyPrefixWhileBidirectionalCollection` instance.
-  @_fixed_layout // lazy-performance
+  @frozen // lazy-performance
   public struct Index {
     /// The position corresponding to `self` in the underlying collection.
     @usableFromInline // lazy-performance

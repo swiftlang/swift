@@ -7,8 +7,8 @@
 // CHECK: @_effects(readnone) public func illiterate(){{$}}
 @_effects(readnone) public func illiterate() {}
 
-// CHECK-LABEL: @_fixed_layout public struct Point {
-@_fixed_layout public struct Point {
+// CHECK-LABEL: @frozen public struct Point {
+@frozen public struct Point {
   // CHECK-NEXT: public var x: Int
   public var x: Int
   // CHECK-NEXT: public var y: Int

@@ -65,7 +65,7 @@
 ///     }
 ///     // Prints "15.0"
 ///     // Prints "20.0"
-@_fixed_layout
+@frozen
 public struct IndexingIterator<Elements : Collection> {
   @usableFromInline
   internal let _elements: Elements

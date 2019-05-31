@@ -1,7 +1,7 @@
 
 public typealias Int = Builtin.Int32
 
-@_fixed_layout
+@frozen
 public struct Container<V> {
   @inlinable
   @inline(never)

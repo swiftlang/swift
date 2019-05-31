@@ -2712,7 +2712,7 @@ namespace {
           errorWrapper->setAddedImplicitInitializers();
           errorWrapper->setAccess(AccessLevel::Public);
           errorWrapper->getAttrs().add(
-            new (Impl.SwiftContext) FixedLayoutAttr(/*IsImplicit*/true));
+            new (Impl.SwiftContext) FrozenAttr(/*IsImplicit*/true));
 
           StringRef nameForMangling;
           ClangImporterSynthesizedTypeAttr::Kind relatedEntityKind;

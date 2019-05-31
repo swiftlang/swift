@@ -360,7 +360,7 @@ enum MyNever {}
 func ~= (_ : MyNever, _ : MyNever) -> Bool { return true }
 func myFatalError() -> MyNever { fatalError() }
 
-@_frozen public enum UninhabitedT4<A> {
+@frozen public enum UninhabitedT4<A> {
   case x(A)
 }
 
@@ -786,7 +786,7 @@ public enum NonExhaustivePayload {
   case a(Int), b(Bool)
 }
 
-@_frozen public enum TemporalProxy {
+@frozen public enum TemporalProxy {
   case seconds(Int)
   case milliseconds(Int)
   case microseconds(Int)

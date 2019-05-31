@@ -52,7 +52,7 @@ public class MyCls {
 // CHECK-LABEL: sil non_abi [transparent] [serialized] [ossa] @$s19inlinable_attribute15HasInitializersV1xSivpfi : $@convention(thin) () -> Int
 // CHECK-LABEL: sil non_abi [transparent] [serialized] [ossa] @$s19inlinable_attribute15HasInitializersV1ySivpfi : $@convention(thin) () -> Int
 
-@_fixed_layout
+@frozen
 public struct HasInitializers {
   public let x = 1234
   internal let y = 4321

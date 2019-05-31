@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 extension Unicode {
   /// The result of attempting to parse a `T` from some input.
-  @_frozen
+  @frozen
   public enum ParseResult<T> {
   /// A `T` was parsed successfully
   case valid(T)

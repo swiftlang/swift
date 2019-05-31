@@ -35,7 +35,7 @@ public class C5 {
   public dynamic func dy_foo() {}
 }
 
-@_fixed_layout
+@frozen
 public struct C6 {}
 
 public enum IceKind {}
@@ -48,7 +48,7 @@ public extension P1 {
   func P1Constraint() {}
 }
 
-@_fixed_layout
+@frozen
 public struct fixedLayoutStruct {
   public var a = 1
   public func OKChange() {}
@@ -60,13 +60,13 @@ public struct fixedLayoutStruct {
 }
 
 @usableFromInline
-@_fixed_layout
+@frozen
 struct fixedLayoutStruct2 {
   public var NoLongerWithFixedBinaryOrder: Int { return 1 }
   public var BecomeFixedBinaryOrder = 1
 }
 
-@_frozen
+@frozen
 public enum FrozenKind {
   case Unchanged
   case Rigid
