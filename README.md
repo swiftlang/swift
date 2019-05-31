@@ -72,7 +72,7 @@ several hours. Naturally, incremental builds are much faster.
 macOS, Ubuntu Linux LTS, and the latest Ubuntu Linux release are the current
 supported host development operating systems.
 
-Please make sure you use Python 2.x. Python 3.x is not supported currently.
+Please make sure you use Python 2.x and your path setting is appropriate. Python 3.x is not supported currently.
 
 #### macOS
 
@@ -161,8 +161,6 @@ For documentation of all available arguments, as well as additional usage
 information, see the inline help:
 
     utils/build-script -h
-
-**Note:**  If you get an error when using Anaconda, you should temporarily set a path to Python 2 to be higher priority, or change PythonInterp to Python2 and PYTHON_EXECUTABLE to Python2_EXECUTABLE in the build system.
 
 #### Xcode
 
