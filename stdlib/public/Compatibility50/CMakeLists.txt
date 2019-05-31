@@ -7,4 +7,4 @@ add_swift_target_library(swiftCompatibility50 TARGET_LIBRARY STATIC
   C_COMPILE_FLAGS ${swift_runtime_library_compile_flags}
   LINK_FLAGS ${swift_runtime_linker_flags}
   TARGET_SDKS ${SWIFT_APPLE_PLATFORMS}
-  INSTALL_IN_COMPONENT stdlib)
+  INSTALL_IN_COMPONENT compiler)
