@@ -40,7 +40,6 @@ namespace  {
   enum class ActionType {
     None,
     DumpSDK,
-    DumpSwiftModules,
     MigratorGen,
     DiagnoseSDKs,
     // The following two are for testing purposes
@@ -144,9 +143,6 @@ Action(llvm::cl::desc("Mode:"), llvm::cl::init(ActionType::None),
           clEnumValN(ActionType::DumpSDK,
                      "dump-sdk",
                      "Dump SDK content to JSON file"),
-          clEnumValN(ActionType::DumpSwiftModules,
-                     "dump-swift",
-                     "dump swift modules in SDK"),
           clEnumValN(ActionType::MigratorGen,
                      "generate-migration-script",
                      "Compare SDK content in JSON file and generate migration script"),
@@ -2404,9 +2400,6 @@ int main(int argc, char *argv[]) {
   for (auto Name : options::ApisPrintUsrs)
     PrintApis.push_back(Name);
   switch (options::Action) {
-  case ActionType::DumpSwiftModules:
-    return (prepareForDump(argv[0], InitInvok, Modules)) ? 1 :
-      dumpSwiftModules(InitInvok, Modules, options::OutputFile, PrintApis, Opts);
   case ActionType::DumpSDK:
     return (prepareForDump(argv[0], InitInvok, Modules)) ? 1 :
       dumpSDKContent(InitInvok, Modules, options::OutputFile, Opts);

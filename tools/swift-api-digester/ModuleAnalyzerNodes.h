@@ -150,6 +150,7 @@ struct CheckerOptions {
 };
 
 class SDKContext {
+  CompilerInstance CI;
   llvm::StringSet<> TextData;
   llvm::BumpPtrAllocator Allocator;
   SourceManager SourceMgr;
@@ -188,6 +189,7 @@ public:
   DiagnosticEngine &getDiags() {
     return Diags;
   }
+  CompilerInstance &getCompilerInstance() { return CI; }
   StringRef getPlatformIntroVersion(Decl *D, PlatformKind Kind);
   StringRef getLanguageIntroVersion(Decl *D);
   bool isEqual(const SDKNode &Left, const SDKNode &Right);
@@ -683,6 +685,7 @@ public:
 
   // Serialize the content of all roots to a given file using JSON format.
   void serialize(StringRef Filename);
+  static void serialize(StringRef Filename, SDKNode *Root);
 
   // After collecting decls, either from imported modules or from a previously
   // serialized JSON file, using this function to get the root of the SDK.
@@ -722,6 +725,11 @@ int dumpSwiftModules(const CompilerInvocation &InitInvok,
                      StringRef OutputDir,
                      const std::vector<std::string> PrintApis,
                      CheckerOptions Opts);
+
+SDKNodeRoot *getSDKNodeRoot(SDKContext &SDKCtx,
+                            const CompilerInvocation &InitInvok,
+                            const llvm::StringSet<> &ModuleNames,
+                            CheckerOptions Opts);
 
 int dumpSDKContent(const CompilerInvocation &InitInvok,
                    const llvm::StringSet<> &ModuleNames,

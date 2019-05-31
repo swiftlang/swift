@@ -1917,12 +1917,6 @@ struct ArrayTraits<ArrayRef<StringRef>> {
 } // namespace swift
 
 namespace  {// Anonymous namespace.
-// Serialize a forest of SDKNode trees to the given stream.
-static void emitSDKNodeRoot(llvm::raw_ostream &os, SDKNode *&Root) {
-  json::Output yout(os);
-  yout << Root;
-}
-
 // Deserialize an SDKNode tree.
 std::pair<std::unique_ptr<llvm::MemoryBuffer>, SDKNode*>
 static parseJsonEmit(SDKContext &Ctx, StringRef FileName) {
@@ -1948,18 +1942,6 @@ static parseJsonEmit(SDKContext &Ctx, StringRef FileName) {
   }
   return {std::move(FileBufOrErr.get()), Result};
 }
-
-static std::string getDumpFilePath(StringRef OutputDir, StringRef FileName) {
-  std::string Path = OutputDir;
-  Path += "/";
-  Path += FileName;
-  int Suffix = 0;
-  auto ConstructPath = [&]() {
-    return Path + (Suffix == 0 ? "" : std::to_string(Suffix)) + ".js";
-  };
-  for (; fs::exists(ConstructPath()); Suffix ++);
-  return ConstructPath();
-}
 } // End of anonymous namespace
 
 // Construct all roots vector from a given file where a forest was
@@ -1971,81 +1953,32 @@ void SwiftDeclCollector::deSerialize(StringRef Filename) {
 }
 
 // Serialize the content of all roots to a given file using JSON format.
-void SwiftDeclCollector::serialize(StringRef Filename) {
+void SwiftDeclCollector::serialize(StringRef Filename, SDKNode *Root) {
   std::error_code EC;
   llvm::raw_fd_ostream fs(Filename, EC, llvm::sys::fs::F_None);
-  emitSDKNodeRoot(fs, RootNode);
+  json::Output yout(fs);
+  yout << Root;
 }
 
-int swift::ide::api::dumpSwiftModules(const CompilerInvocation &InitInvok,
-                                      const llvm::StringSet<> &ModuleNames,
-                                      StringRef OutputDir,
-                                      const std::vector<std::string> PrintApis,
-                                      CheckerOptions Opts) {
-  if (!fs::exists(OutputDir)) {
-    llvm::errs() << "Output directory '" << OutputDir << "' does not exist.\n";
-    return 1;
-  }
+// Serialize the content of all roots to a given file using JSON format.
+void SwiftDeclCollector::serialize(StringRef Filename) {
+  SwiftDeclCollector::serialize(Filename, RootNode);
+}
 
-  std::vector<ModuleDecl*> Modules;
+SDKNodeRoot*
+swift::ide::api::getSDKNodeRoot(SDKContext &SDKCtx,
+                                 const CompilerInvocation &InitInvok,
+                                 const llvm::StringSet<> &ModuleNames,
+                                 CheckerOptions Opts) {
   CompilerInvocation Invocation(InitInvok);
-  CompilerInstance CI;
+
+  CompilerInstance &CI = SDKCtx.getCompilerInstance();
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);
   if (CI.setup(Invocation)) {
     llvm::errs() << "Failed to setup the compiler instance\n";
-    return 1;
-  }
-
-  auto &Context = CI.getASTContext();
-
-  for (auto &Entry : ModuleNames) {
-    StringRef Name = Entry.first();
-    if (Opts.Verbose)
-      llvm::errs() << "Loading module: " << Name << "...\n";
-    auto *M = Context.getModuleByName(Name);
-    if (!M) {
-      if (Opts.Verbose)
-        llvm::errs() << "Failed to load module: " << Name << '\n';
-      if (Opts.AbortOnModuleLoadFailure)
-        return 1;
-    }
-    Modules.push_back(M);
-  }
-
-  PrintingDiagnosticConsumer PDC;
-  SDKContext Ctx(Opts);
-  Ctx.getDiags().addConsumer(PDC);
-
-  for (auto M : Modules) {
-    SwiftDeclCollector Collector(Ctx);
-    SmallVector<Decl*, 256> Decls;
-    M->getTopLevelDecls(Decls);
-    for (auto D : Decls) {
-      if (auto VD = dyn_cast<ValueDecl>(D))
-        Collector.foundDecl(VD, DeclVisibilityKind::VisibleAtTopLevel);
-    }
-    std::string Path = getDumpFilePath(OutputDir, M->getName().str());
-    Collector.serialize(Path);
-    if (Opts.Verbose)
-      llvm::errs() << "Dumped to "<< Path << "\n";
-  }
-  return 0;
-}
-
-int swift::ide::api::dumpSDKContent(const CompilerInvocation &InitInvok,
-                                    const llvm::StringSet<> &ModuleNames,
-                                    StringRef OutputFile, CheckerOptions Opts) {
-  CompilerInvocation Invocation(InitInvok);
-
-  CompilerInstance CI;
-  // Display diagnostics to stderr.
-  PrintingDiagnosticConsumer PrintDiags;
-  CI.addDiagnosticConsumer(&PrintDiags);
-  if (CI.setup(Invocation)) {
-    llvm::errs() << "Failed to setup the compiler instance\n";
-    return 1;
+    return nullptr;
   }
 
   auto &Ctx = CI.getASTContext();
@@ -2055,7 +1988,7 @@ int swift::ide::api::dumpSDKContent(const CompilerInvocation &InitInvok,
   auto *Stdlib = Ctx.getStdlibModule(/*loadIfAbsent=*/true);
   if (!Stdlib) {
     llvm::errs() << "Failed to load Swift stdlib\n";
-    return 1;
+    return nullptr;
   }
 
   std::vector<ModuleDecl *> Modules;
@@ -2067,19 +2000,29 @@ int swift::ide::api::dumpSDKContent(const CompilerInvocation &InitInvok,
     if (!M) {
       llvm::errs() << "Failed to load module: " << Name << '\n';
       if (Opts.AbortOnModuleLoadFailure)
-        return 1;
+        return nullptr;
     } else {
       Modules.push_back(M);
     }
   }
   if (Opts.Verbose)
     llvm::errs() << "Scanning symbols...\n";
-  SDKContext SDKCtx(Opts);
+
   SwiftDeclCollector Collector(SDKCtx);
   Collector.lookupVisibleDecls(Modules);
+  return Collector.getSDKRoot();
+}
+
+int swift::ide::api::dumpSDKContent(const CompilerInvocation &InitInvok,
+                                    const llvm::StringSet<> &ModuleNames,
+                                    StringRef OutputFile, CheckerOptions Opts) {
+  SDKContext SDKCtx(Opts);
+  SDKNode *Root = getSDKNodeRoot(SDKCtx, InitInvok, ModuleNames, Opts);
+  if (!Root)
+    return 1;
   if (Opts.Verbose)
     llvm::errs() << "Dumping SDK...\n";
-  Collector.serialize(OutputFile);
+  SwiftDeclCollector::serialize(OutputFile, Root);
   if (Opts.Verbose)
     llvm::errs() << "Dumped to "<< OutputFile << "\n";
   return 0;
