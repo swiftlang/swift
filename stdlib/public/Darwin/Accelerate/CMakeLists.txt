@@ -28,6 +28,7 @@ add_swift_target_library(swiftAccelerate ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES
   vDSP_Geometry.swift
   vDSP_Integration.swift
   vDSP_Interpolation.swift
+  vDSP_MergeSwapGatherCompress.swift
   vDSP_PolarRectangularConversion.swift
   vDSP_PolynomialEvaluation.swift
   vDSP_RecursiveFilters.swift

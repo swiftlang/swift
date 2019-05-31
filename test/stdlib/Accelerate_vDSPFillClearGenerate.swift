@@ -642,6 +642,120 @@ if #available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *) {
         expectTrue(resultTwo.elementsEqual(returnedResult.secondOutput))
         expectEqual(start, start2)
     }
+    
+    Accelerate_vDSPFillClearGenerateTests.test("vDSP/LinearInterpolateValuesWithIndicesSingle") {
+        let values: [Float] =  [10, -10, 30, -30, 100, 0, -10, 99.9, 999.9, -1]
+        let indices: [Float] = [0, 100, 256, 301, 400, 409, 487, 816, 901, 1023]
+        
+        let returnedResult = vDSP.linearInterpolate(values: values,
+                                                    atIndices: indices)
+        
+        var result = [Float](repeating: -1,
+                             count: 1024)
+        
+        vDSP.linearInterpolate(values: values,
+                               atIndices: indices,
+                               result: &result)
+        
+        var legacyResult = [Float](repeating: 0,
+                                   count: 1024)
+        
+        vDSP_vgenp(values, 1,
+                   indices, 1,
+                   &legacyResult, 1,
+                   1024, 10)
+        
+        expectTrue(result.elementsEqual(returnedResult))
+        expectTrue(result.elementsEqual(legacyResult))
+    }
+    
+    Accelerate_vDSPFillClearGenerateTests.test("vDSP/LinearInterpolateValuesWithIndicesDouble") {
+        let values: [Double] =  [10, -10, 30, -30, 100, 0, -10, 99.9, 999.9, -1]
+        let indices: [Double] = [0, 100, 256, 301, 400, 409, 487, 816, 901, 1023]
+        
+        let returnedResult = vDSP.linearInterpolate(values: values,
+                                                    atIndices: indices)
+        
+        var result = [Double](repeating: -1,
+                              count: 1024)
+        
+        vDSP.linearInterpolate(values: values,
+                               atIndices: indices,
+                               result: &result)
+        
+        var legacyResult = [Double](repeating: 0,
+                                    count: 1024)
+        
+        vDSP_vgenpD(values, 1,
+                    indices, 1,
+                    &legacyResult, 1,
+                    1024, 10)
+        
+        expectTrue(result.elementsEqual(returnedResult))
+        expectTrue(result.elementsEqual(legacyResult))
+    }
+    
+    Accelerate_vDSPFillClearGenerateTests.test("vDSP/LinearInterpolateLookupTableSingle") {
+        let lookupTable: [Float] =  [10, -10, 30, -30, 100, 0, -10, 99.9, 999.9, -1]
+        let offsets = Accelerate.vDSP.ramp(in: Float(0)...Float(9), count: 1024)
+        
+        let returnedResult = vDSP.linearInterpolate(lookupTable: lookupTable,
+                                                    withOffsets: offsets,
+                                                    scale: 2.5,
+                                                    baseOffset: -1)
+        
+        var result = [Float](repeating: -1,
+                             count: 1024)
+        
+        vDSP.linearInterpolate(lookupTable: lookupTable,
+                               withOffsets: offsets,
+                               scale: 2.5,
+                               baseOffset: -1,
+                               result: &result)
+        
+        var legacyResult = [Float](repeating: 0,
+                                   count: 1024)
+        
+        vDSP_vtabi(offsets, 1,
+                   [2.5],
+                   [-1],
+                   lookupTable, 10,
+                   &legacyResult, 1, 1024)
+        
+        expectTrue(result.elementsEqual(returnedResult))
+        expectTrue(result.elementsEqual(legacyResult))
+    }
+    
+    Accelerate_vDSPFillClearGenerateTests.test("vDSP/LinearInterpolateLookupTableDouble") {
+        let lookupTable: [Double] =  [10, -10, 30, -30, 100, 0, -10, 99.9, 999.9, -1]
+        let offsets = Accelerate.vDSP.ramp(in: Double(0)...Double(9), count: 1024)
+        
+        let returnedResult = vDSP.linearInterpolate(lookupTable: lookupTable,
+                                                    withOffsets: offsets,
+                                                    scale: 2.5,
+                                                    baseOffset: -1)
+        
+        var result = [Double](repeating: -1,
+                              count: 1024)
+        
+        vDSP.linearInterpolate(lookupTable: lookupTable,
+                               withOffsets: offsets,
+                               scale: 2.5,
+                               baseOffset: -1,
+                               result: &result)
+        
+        var legacyResult = [Double](repeating: 0,
+                                    count: 1024)
+        
+        vDSP_vtabiD(offsets, 1,
+                    [2.5],
+                    [-1],
+                    lookupTable, 10,
+                    &legacyResult, 1, 1024)
+        
+        expectTrue(result.elementsEqual(returnedResult))
+        expectTrue(result.elementsEqual(legacyResult))
+    }
 }
 
 runAllTests()
