@@ -108,7 +108,7 @@ struct InitialValueFailableIUO<Value> {
 // Property wrapper type definitions
 // ---------------------------------------------------------------------------
 @_propertyWrapper
-struct _lowercaseWrapper<T> { // expected-error{{property wrapper type name must start with an uppercase letter}}
+struct _lowercaseWrapper<T> {
   var value: T
 }
 
