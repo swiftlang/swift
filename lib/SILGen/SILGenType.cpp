@@ -138,8 +138,10 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
       IsBare, IsNotTransparent, IsNotSerialized, IsNotDynamic);
   thunk->setDebugScope(new (M) SILDebugScope(loc, thunk));
 
+  PrettyStackTraceSILFunction trace("generating vtable thunk", thunk);
+
   SILGenFunction(*this, *thunk, theClass)
-    .emitVTableThunk(derived, implFn, basePattern,
+    .emitVTableThunk(base, derived, implFn, basePattern,
                      overrideInfo.LoweredType,
                      derivedInfo.LoweredType);
   emitLazyConformancesForFunction(thunk);
