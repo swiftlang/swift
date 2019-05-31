@@ -1,4 +1,4 @@
-// swift-tools-version: 4.0
+// swift-compiler-version: Swift 4.0
 // swift-module-flags: 
 
 // RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
