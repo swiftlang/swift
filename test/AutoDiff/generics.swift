@@ -79,53 +79,64 @@ struct TF_440<T : Differentiable> {
   }
 }
 
-// Tests TF-508
-protocol TF_508_Protocol {
-  associatedtype Scalar: BinaryFloatingPoint
+// Tests TF-508: differentiation requirements with dependent member types.
+protocol TF_508_Proto {
+  associatedtype Scalar
 }
-
-extension TF_508_Protocol {
-  @differentiable(vjp: _vjpAdd(lhs:rhs:)
-    where Self : Differentiable,
-          Scalar : Differentiable,
-          Self.TangentVector : TF_508_Protocol)
+extension TF_508_Proto where Scalar : FloatingPoint {
+  @differentiable(
+    vjp: vjpAdd
+    where Self : Differentiable, Scalar : Differentiable,
+          // Conformance requirement with dependent member type.
+          Self.TangentVector : TF_508_Proto
+  )
   static func +(lhs: Self, rhs: Self) -> Self {
     return lhs
   }
-  
-  static var zero: Self {
-    fatalError()
+
+  @differentiable(
+    vjp: vjpSubtract
+    where Self : Differentiable, Scalar : Differentiable,
+          // Same-type requirement with dependent member type.
+          Self.TangentVector == Float
+  )
+  static func -(lhs: Self, rhs: Self) -> Self {
+    return lhs
   }
-  
-  static func - (lhs: Self, rhs: Self) -> Self {
-    fatalError()
+}
+extension TF_508_Proto where Self : Differentiable,
+                             Scalar : FloatingPoint & Differentiable,
+                             Self.TangentVector : TF_508_Proto {
+  static func vjpAdd(lhs: Self, rhs: Self)
+      -> (Self, (TangentVector) -> (TangentVector, TangentVector)) {
+    return (lhs, { v in (v, v) })
+  }
+}
+extension TF_508_Proto where Self : Differentiable,
+                             Scalar : FloatingPoint & Differentiable,
+                             Self.TangentVector == Float {
+  static func vjpSubtract(lhs: Self, rhs: Self)
+      -> (Self, (TangentVector) -> (TangentVector, TangentVector)) {
+    return (lhs, { v in (v, v) })
   }
 }
 
-extension TF_508_Protocol
-  where Self : Differentiable,
-        Scalar : Differentiable,
-        TangentVector : TF_508_Protocol {
-  static func _vjpAdd(lhs: Self, rhs: Self)
-    -> (Self, (TangentVector) -> (TangentVector, TangentVector)) {
-    return (lhs, { ($0, $0) })
-  }
-}
-
-struct TF_508_Struct<Scalar: BinaryFloatingPoint>
-  : TF_508_Protocol & AdditiveArithmetic {}
-
-extension TF_508_Struct : Differentiable
-  where Scalar : Differentiable {
+struct TF_508_Struct<Scalar : AdditiveArithmetic>
+  : TF_508_Proto, AdditiveArithmetic {}
+extension TF_508_Struct : Differentiable where Scalar : Differentiable {
   typealias TangentVector = TF_508_Struct
-  typealias AllDifferentiableVariables = TF_508_Struct
 }
 
-let TF_508_inst = TF_508_Struct<Float>()
-func TF_508_func(x: TF_508_Struct<Float>, y: TF_508_Struct<Float>)
-  -> TF_508_Struct<Float> {
-  return x + y
+func TF_508() {
+  let x = TF_508_Struct<Float>()
+  // Test conformance requirement with dependent member type.
+  _ = pullback(at: x, in: { (x: TF_508_Struct<Float>) -> TF_508_Struct<Float> in
+    return x + x
+  })
+  // Test same-type requirement with dependent member type.
+  _ = pullback(at: x, in: { (x: TF_508_Struct<Float>) -> TF_508_Struct<Float> in
+    return x - x
+  })
 }
-let TF_508_bp = pullback(at: TF_508_inst, TF_508_inst, in: TF_508_func)
 
 // TODO: add more tests.
