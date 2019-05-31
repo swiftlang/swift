@@ -60,7 +60,10 @@ class ScopeCreator {
   /// The last scope to "adopt" deferred nodes.
   /// When adding \c Decls to a scope tree that have been created since the tree
   /// was originally built, add them as children of this scope.
-  ASTSourceFileImpl *lastAdopter;
+  ASTSourceFileImpl *_lastAdopter;
+  
+  /// When copying for "withoutDeferrals" this reference refers to the original _lastAdopter
+  ASTSourceFileImpl *&lastAdopter;
   
   /// Be robust against AST mutatations in flight:
   llvm::DenseSet<ClosureExpr*> alreadyHandledClosures;
@@ -71,10 +74,9 @@ public:
   static SourceFileScope *createScopeTreeFor(SourceFile *);
 
   ScopeCreator(SourceFile *SF) ctx(SF->getASTContext()),
-      sourceFileScope(constructScope<SourceFileScope>(SF)),
-      lastAdopter(sourceFileScope) {
-        sourceFileScope->setScopeCreator(*this);
-      }
+      sourceFileScope(constructScope<SourceFileScope>(SF, this)),
+      _lastAdopter(sourceFileScope),
+      lastAdopter(lastAdopter) {}
 
   ~ScopeCreator() {
     assert(empty() && "Should have consumed all deferred nodes");
@@ -82,10 +84,15 @@ public:
   ScopeCreator(const ScopeCreator &) = delete;  // ensure no copies
   ScopeCreator(const ScopeCreator &&) = delete; // ensure no moves
   
+  /// Get a half-copy of me for passing down the tree with its own deferred nodes
   ScopeCreator withoutDeferrals() {
-#error unimp
+    return new (ctx) ScopeCreator(*this);
   }
-
+private:
+  ScopeCreator(ScopeCreator& sc) explicit
+  : sourceFileScope(sc.sourceFileScope), lastAdopter(sc.lastAdopter), alreadyHandledClosures(sc.alreadyHandledClosures), ctx(sc.ctx) {}
+public:
+  
   template <typename Scope, typename... Args>
   static ASTScopeImpl *constructScope(Args... args) {
     return new (ctx) Scope(args...);
@@ -382,23 +389,11 @@ public:
 
 
 #pragma mark Scope tree creation and extension
-up to here next three -- put creator in ASTScope, rename creator to tree
 ASTScope *ASTScope::createScopeTreeFor(SourceFile *SF) {
-  ScopeCreator scopeCreator(SF);
+  ScopeCreator scopeCreßator(SF);
   scopeCreator.addAnyNewDeclsToTree();
-  auto *sfs = ScopeCreator::createScopeTreeFor(SF);
-  return new (SF->getASTContext()) ASTScope(scopeCreator.sourceFileScope);
+  return sourceFileScope;
 }
-
-ASTScope *ScopeCreator::createScopeTreeFor(SourceFile *SF) {
-  ScopeCreator scopeCreator(SF);
-  scopeCreator.addAnyNewDeclsToTree();
-  return scopeCreator.sourceFileScope;
-}
-up to here
-ASTSourceFileScope::ASTSourceFileScope(SourceFile *SF)
-    : SF(SF), deferred(new (SF->getASTContext())
-                           DeferredNodes(__FILE__, __LINE__, *this, SF)) {}
 
 #pragma mark ASTVisitorForScopeCreation
 

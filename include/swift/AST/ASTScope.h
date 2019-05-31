@@ -393,10 +393,11 @@ protected:
 class ASTSourceFileScope final : public ASTScopeImpl {
 public:
   SourceFile *const SF;
-  ScopeCreator *const deferred;
+  ScopeCreator *const scopeCreator;
 
  
-  ASTSourceFileScope(SourceFile *SF);
+  ASTSourceFileScope(SourceFile *SF, ScopeCreator *scopeCreator)
+  : SF(SF), scopeCreator(scopeCreator) {}
 
   std::string getClassName() const override;
   SourceRange getChildlessSourceRange() const override;
