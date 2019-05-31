@@ -156,7 +156,7 @@ protected:
   NullablePtr<const ASTScopeImpl> getParent() const { return parent; }
 
   const Children &getChildren() const { return storedChildren; }
-  void addChild(ASTScopeImpl *child, ASTContext&);
+  void addChild(ASTScopeImpl *child, ASTContext &);
 
 private:
   NullablePtr<ASTScopeImpl> getPriorSibling() const;
@@ -236,10 +236,6 @@ protected:
   /// expandScope me, sending deferred nodes to my descendants.
   virtual void expandMe(ScopeCreator &);
 
-
-
-
-
 public:
   // Some nodes (VarDecls and Accessors) are created directly from
   // pattern scope code and should neither be deferred nor should
@@ -248,11 +244,8 @@ public:
   // screened out because they are expressions.
   static bool isCreatedDirectly(const ASTNode n);
 
- 
   virtual NullablePtr<AbstractStorageDecl>
   getEnclosingAbstractStorageDecl() const;
-
- 
 
 #pragma mark - - creation queries
 protected:
@@ -395,9 +388,8 @@ public:
   SourceFile *const SF;
   ScopeCreator *const scopeCreator;
 
- 
   ASTSourceFileScope(SourceFile *SF, ScopeCreator *scopeCreator)
-  : SF(SF), scopeCreator(scopeCreator) {}
+      : SF(SF), scopeCreator(scopeCreator) {}
 
   std::string getClassName() const override;
   SourceRange getChildlessSourceRange() const override;
@@ -539,7 +531,7 @@ public:
     return nullptr;
   }
 
-  virtual void createBodyScope(ASTScopeImpl *leaf, ScopeCreator&) {}
+  virtual void createBodyScope(ASTScopeImpl *leaf, ScopeCreator &) {}
 
 protected:
   void printSpecifics(llvm::raw_ostream &out) const override;
@@ -580,7 +572,7 @@ public:
   SourceRange getBraces() const override;
   NullablePtr<const ASTScopeImpl> getLookupLimitForDecl() const override;
 
-  void createBodyScope(ASTScopeImpl *leaf, ScopeCreator&) override;
+  void createBodyScope(ASTScopeImpl *leaf, ScopeCreator &) override;
   ASTScopeImpl *createTrailingWhereClauseScope(ASTScopeImpl *parent) override;
 };
 
@@ -599,7 +591,7 @@ public:
   std::string declKindName() const override { return "Extension"; }
   SourceRange getBraces() const override;
   ASTScopeImpl *createTrailingWhereClauseScope(ASTScopeImpl *parent) override;
-  void createBodyScope(ASTScopeImpl *leaf, ScopeCreator&) override;
+  void createBodyScope(ASTScopeImpl *leaf, ScopeCreator &) override;
   NullablePtr<Decl> getDecl() const override { return decl; }
 };
 
@@ -842,7 +834,8 @@ public:
 
   const PatternBindingEntry &getPatternEntry() const;
   Pattern *getPattern() const;
-  void addVarDeclScopesAndTheirAccessors(ASTScopeImpl *parent, ScopeCreator&) const;
+  void addVarDeclScopesAndTheirAccessors(ASTScopeImpl *parent,
+                                         ScopeCreator &) const;
 
 protected:
   void printSpecifics(llvm::raw_ostream &out) const override;
@@ -924,7 +917,7 @@ public:
   NullablePtr<const void> addressForPrinting() const override {
     return getContainingStatement();
   }
-  virtual void createSubtreeForCondition(ScopeCreator&);
+  virtual void createSubtreeForCondition(ScopeCreator &);
   virtual void createSubtreeForNextConditionalClause(ScopeCreator &) = 0;
   virtual void createSubtreeForAfterClauses(ScopeCreator &) = 0;
   SourceLoc startLocAccordingToCondition() const;
@@ -979,7 +972,7 @@ public:
       : GuardConditionalClauseScope(stmt, index) {}
 
   bool isGuardContinuationConditionalClause() const override;
-  void createSubtreeForCondition(ScopeCreator&) override;
+  void createSubtreeForCondition(ScopeCreator &) override;
   SourceRange getChildlessSourceRange() const override;
   void createSubtreeForNextConditionalClause(ScopeCreator &) override;
   std::string getClassName() const override;
