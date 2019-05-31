@@ -59,7 +59,7 @@ const ASTScopeImpl *ASTScopeImpl::findStartingScopeForLookup(
 
   auto *const fileScope = sourceFile->getScope()->impl;
   // Parser may have added decls to source file, since previous lookup
-  fileScope->addAnyNewDeclsToTree();
+  fileScope->creationState->addAnyNewDeclsToTree();
   if (name.isOperator())
     return fileScope; // operators always at file scope
 

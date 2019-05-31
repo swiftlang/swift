@@ -34,19 +34,17 @@ using namespace swift;
 namespace swift {
 namespace ast_scope {
 
-#pragma mark DeferredNodes
+#pragma mark ScopeCreationState
 
-/// \c SourceFiles and \c BraceStmts have \c Decls and \c ASTNodes in them that
-/// must be scoped in distant descendants.
-/// As scopes are created, pass down the \c ASTNodes in enclosing \c Decls
-/// that really need to be in subscopes.
-///
-/// Because parsing and lookup (typechecking) are interleaved for some files,
-/// we need to be able to resume scope tree creation. \c DeferredNodes also
-/// helps with this by remembering the \c lastAdopter.
+class ScopeCreationState {
 
-class DeferredNodes final {
-  /// The nodes that must be passed down to deeper levels in the scope tree.
+  /// \c SourceFiles and \c BraceStmts have \c Decls and \c ASTNodes in them
+  /// that must be scoped in distant descendants. As scopes are created, pass
+  /// down the \c ASTNodes in enclosing \c Decls that really need to be in
+  /// subscopes.
+  ///
+  ///  /// The nodes that must be passed down to deeper levels in the scope
+  ///  tree.
   /// In reverse order!
   std::vector<ASTNode> nodesInReverse;
 
@@ -55,29 +53,94 @@ class DeferredNodes final {
   /// lookup, create scopes for any \c Decls beyond this number.
   int numberOfDeclsAlreadyProcessed = 0;
 
+  ASTSourceFileScope *sourceFileScope;
+
   /// The last scope to "adopt" deferred nodes.
   /// When adding \c Decls to a scope tree that have been created since the tree
   /// was originally built, add them as children of this scope.
-  NullablePtr<ASTScopeImpl> lastAdopter;
+  ASTSourceFileImpl *lastAdopter;
 
-#ifndef NDEBUG
-  /// Information about how this object was created for debugging.
-  const char *const file;
-  const int line;
-  const ASTScopeImpl &creator;
-  const void *const forWhat;
-#endif
+  ASTContext &ctx;
 
 public:
-  /// \param file is the .cpp file where this object is created in the compiler
-  /// \paran line is the  line in the compiler where created
-  /// \param creator is the scope object for which it is created
-  /// \param forWhat is typically a Decl for which it is created
-  DeferredNodes(const char *file, int line, const ASTScopeImpl &creator,
-                const void *forWhat);
-  ~DeferredNodes();
-  DeferredNodes(const DeferredNodes &) = delete;  // ensure no copies
-  DeferredNodes(const DeferredNodes &&) = delete; // ensure no moves
+  static createScopeTreeFor(SourceFile *);
+  SourceFileScope *const sourceFileScope;
+
+public:
+  ScopeCreationState(SourceFile *SF) ctx(SF->getASTContext()),
+      sourceFileScope(createScope<SourceFileScope>(SF)),
+      lastAdopter(sourceFileScope) {}
+
+  ~ScopeCreationState();
+  ScopeCreationState(const DeferredNodes &) = delete;  // ensure no copies
+  ScopeCreationState(const DeferredNodes &&) = delete; // ensure no moves
+
+  template <typename Scope, typename... Args>
+  static ASTScopeImpl *createScope(Args... args) {
+    return new (ctx) Scope(args...);
+  }
+
+  void addAnyNewDeclsToTree() {
+    pushSourceFileDecls(sourceFileScope->SF->Decls);
+    addChildScopesForAnyRemainingDeferredNodesTo(lastAdopter);
+  }
+
+protected:
+  /// Create and expandScope scopes for any deferred nodes, adding those scopes
+  /// as children of the receiver.
+
+  addChildScopesForAnyRemainingDeferredNodesTo(ASTScopeImpl *parent) {
+    parent->clearCachedSourceRangesOfAncestors();
+    createScopeForNextDeferredNode(parent);
+    parent->cacheSourceRangesOfAncestors();
+  }
+
+public:
+  /// For each deferred node, create scopes as needed and add those scopes as
+  /// children of the argument.
+  void createScopeForNextDeferredNode(ASTScopeImpl *parent) {
+    setLastAdopter(parent); // in case we come back here later after adding
+    // more Decls to the SourceFile
+    while (!empty()) {
+      Optional<ASTNode> node = popNextDeferredNodeForAdoptionBy(this);
+      if (!node)
+        return;
+      if (auto declToScope = node->dyn_cast<Decl *>())
+        createScopeFor(declToScope, parent);
+      else if (auto stmtToScope = node->dyn_cast<Stmt *>())
+        createScopeFor(stmtToScope, parent);
+      else if (auto exprToScope = node->dyn_cast<Expr *>())
+        createScopeFor(exprToScope, parent);
+      else
+        llvm_unreachable("Impossible case");
+    }
+  }
+  template <typename StmtOrExpr>
+  void createScopeFor(StmtOrExpr *se, ASTScopeImpl *parent) {
+#error UP TO HERE UP TO SCOPECREATOR
+    if (se)
+      ScopeCreator().visit(se, this, deferred); // Implicit declarations don't
+                                                // have source information for
+                                                // name lookup.
+  }
+  void createScopeFor(Decl *d, ASTScopeImpl *parent) {
+    // Have also seen the following in an AST:
+    // Given
+    //  func testInvalidKeyPathComponents() {
+    //    let _ = \.{return 0} // expected-error* {{}}
+    //  }
+    //  class X {
+    //    class var a: Int { return 1 }
+    //  }
+    // Get:
+    //  (pattern_binding_decl range=[test.swift:2:3 - line:2:3]
+    //   (pattern_typed implicit type='<<error type>>'
+    //     (pattern_named '_')))
+    // so test the SourceRange
+    if (d && !d->isImplicit() &&
+        (!isa<PatternBindingDecl>(d) || d->getStartLoc() != d->getEndLoc()))
+      ScopeCreator().visit(d, this, deferred);
+  }
 
   bool empty() const;
 
@@ -108,28 +171,36 @@ public:
     return Mem;
   }
 };
+
+#pragma mark DeferredNodes
+
+///
+/// Because parsing and lookup (typechecking) are interleaved for some files,
+/// we need to be able to resume scope tree creation. \c DeferredNodes also
+/// helps with this by remembering the \c lastAdopter.
+
+class DeferredNodes final {};
 } // ast_scope
 } // namespace swift
 using namespace ast_scope;
 
 #pragma mark Scope tree creation and extension
 
-ASTSourceFileScope::ASTSourceFileScope(SourceFile *SF)
-    : SF(SF), deferred(new (SF->getASTContext())
-                           DeferredNodes(__FILE__, __LINE__, *this, SF)) {}
+ASTScope *ASTScope::createScopeTreeFor(SourceFile *SF) {
+  auto *sfs = ASTSourceFileScope::createScopeTreeFor(SF);
+  return new (SF->getASTContext()) ASTScope(sfs);
+}
 
-ASTSourceFileScope *ASTSourceFileScope::createScopeTreeFor(SourceFile *SF) {
+ASTSourceFileScope *ScopeCreationState : createScopeTreeFor(SourceFile *SF) {
   auto *sfScope = new (SF->getASTContext()) ASTSourceFileScope(SF);
-  sfScope->addAnyNewDeclsToTree();
+  ScopeCreationState s(sfScope);
+  s.addAnyNewDeclsToTree();
   return sfScope;
 }
 
-void ASTSourceFileScope::addAnyNewDeclsToTree() {
-  deferred->pushSourceFileDecls(SF->Decls);
-  auto lastAdopter = deferred->getLastAdopter();
-  auto *adopter = lastAdopter ? lastAdopter.get() : this;
-  adopter->addChildScopesForAnyRemainingDeferredNodes(*deferred);
-}
+ASTSourceFileScope::ASTSourceFileScope(SourceFile *SF)
+    : SF(SF), deferred(new (SF->getASTContext())
+                           DeferredNodes(__FILE__, __LINE__, *this, SF)) {}
 
 #pragma mark ScopeCreator
 
@@ -239,7 +310,7 @@ public:
     p->createSubtreeWithDeferrals<GuardStmtScope>(deferred, e);
   }
   void visitDoStmt(DoStmt *ds, ASTScopeImpl *p, DeferredNodes &deferred) {
-    p->dispatchAndCreateIfNeeded(ds->getBody(), deferred);
+    creationState.createScopeFor(ds->getBody(), p);
   }
   void visitTopLevelCodeDecl(TopLevelCodeDecl *d, ASTScopeImpl *p,
                              DeferredNodes &deferred) {
@@ -254,7 +325,7 @@ public:
 
   void visitYieldStmt(YieldStmt *ys, ASTScopeImpl *p, DeferredNodes &deferred) {
     deferred.pushAllNecessaryNodes(ys->getYields());
-    p->dispatchAndCreateAll(deferred);
+    creattionState.createScopeForNextDeferredNode(p);
   }
   void visitDeferStmt(DeferStmt *ds, ASTScopeImpl *p, DeferredNodes &deferred) {
     visitFuncDecl(ds->getTempDecl(), p, deferred);
@@ -307,53 +378,7 @@ public:
 } // namespace ast_scope
 } // namespace swift
 
-#pragma mark dispatch-and-create
 
-void ASTScopeImpl::dispatchAndCreateAll(DeferredNodes &deferred) {
-  deferred.setLastAdopter(this); // in case we come back here later after adding
-                                 // more Decls to the SourceFile
-  while (!deferred.empty()) {
-    Optional<ASTNode> node = deferred.popNextDeferredNodeForAdoptionBy(this);
-    if (!node)
-      return;
-    if (auto declToScope = node->dyn_cast<Decl *>())
-      dispatchAndCreateIfNeeded(declToScope, deferred);
-    else if (auto stmtToScope = node->dyn_cast<Stmt *>())
-      dispatchAndCreateIfNeeded(stmtToScope, deferred);
-    else if (auto exprToScope = node->dyn_cast<Expr *>())
-      dispatchAndCreateIfNeeded(exprToScope, deferred);
-    else
-      llvm_unreachable("Impossible case");
-  }
-}
-
-template <typename StmtExpr>
-void ASTScopeImpl::dispatchAndCreateIfNeeded(StmtExpr *se,
-                                             DeferredNodes &deferred) {
-  if (se)
-    ScopeCreator().visit(se, this, deferred);
-}
-
-void ASTScopeImpl::dispatchAndCreateIfNeeded(Decl *d, DeferredNodes &deferred) {
-  // Implicit declarations don't have source information for name lookup.
-
-  // Have also seen the following in an AST:
-  // Given
-  //  func testInvalidKeyPathComponents() {
-  //    let _ = \.{return 0} // expected-error* {{}}
-  //  }
-  //  class X {
-  //    class var a: Int { return 1 }
-  //  }
-  // Get:
-  //  (pattern_binding_decl range=[test.swift:2:3 - line:2:3]
-  //   (pattern_typed implicit type='<<error type>>'
-  //     (pattern_named '_')))
-  // so test the SourceRange
-  if (d && !d->isImplicit() &&
-      (!isa<PatternBindingDecl>(d) || d->getStartLoc() != d->getEndLoc()))
-    ScopeCreator().visit(d, this, deferred);
-}
 
 #pragma mark creation helpers
 
@@ -398,7 +423,7 @@ void ASTScopeImpl::createRestOfNestedPatternScopes(
     unsigned entryIndex) {
   if (entryIndex >= patternBinding->getPatternList().size()) {
     // no more entries, create the scopes inside the pattern use
-    dispatchAndCreateAll(deferred);
+    creationState.createScopeForNextDeferredNode(this);
     return;
   }
   // When PatternEntryDeclScope expands, it will create a PatternEntryUseScope
@@ -435,15 +460,9 @@ void ASTScopeImpl::addChild(ASTScopeImpl *child) {
 void ASTScopeImpl::expandMeAndCreateScopesForDeferredNodes(
     DeferredNodes &deferred) {
   expandMe(deferred);
-  addChildScopesForAnyRemainingDeferredNodes(deferred);
+  creationState->addChildScopesForAnyRemainingDeferredNodesTo(this);
 }
 
-void ASTScopeImpl::addChildScopesForAnyRemainingDeferredNodes(
-    DeferredNodes &deferred) {
-  clearCachedSourceRangesOfAncestors();
-  dispatchAndCreateAll(deferred);
-  cacheSourceRangesOfAncestors();
-}
 
 #pragma mark specific implementations of expansion
 
@@ -542,19 +561,19 @@ void IfStmtScope::expandMe(DeferredNodes &deferred) {
   if (!stmt->getCond().empty())
     createSubtree<IfConditionalClauseScope>(stmt, 0);
   else
-    dispatchAndCreateIfNeeded(stmt->getThenStmt(), deferred);
+    creationState.createScopeFor(stmt->getThenStmt(), this);
 
   // Add the 'else' branch, if needed.
-  dispatchAndCreateIfNeeded(stmt->getElseStmt(), deferred);
+  creationState.createScopeFor(stmt->getElseStmt(), this);
 }
 
 void RepeatWhileScope::expandMe(DeferredNodes &deferred) {
-  dispatchAndCreateIfNeeded(stmt->getBody(), deferred);
+  creationState.createScopeFor(stmt->getBody(), this);
   ScopeCreator().visitExpr(stmt->getCond(), this, deferred);
 }
 
 void DoCatchStmtScope::expandMe(DeferredNodes &deferred) {
-  dispatchAndCreateIfNeeded(stmt->getBody(), deferred);
+  creationState.createScopeFor(stmt->getBody(), this);
 
   for (auto catchClause : stmt->getCatches())
     ScopeCreator().visitCatchStmt(catchClause, this, deferred);
@@ -581,7 +600,7 @@ void ForEachPatternScope::expandMe(DeferredNodes &deferred) {
 
 void CatchStmtScope::expandMe(DeferredNodes &deferred) {
   ScopeCreator().visitExpr(stmt->getGuardExpr(), this, deferred);
-  dispatchAndCreateIfNeeded(stmt->getBody(), deferred);
+  creationState.createScopeFor(stmt->getBody(), this);
 }
 
 void CaseStmtScope::expandMe(DeferredNodes &deferred) {
@@ -589,7 +608,7 @@ void CaseStmtScope::expandMe(DeferredNodes &deferred) {
     ScopeCreator().visitExpr(caseItem.getGuardExpr(), this, deferred);
 
   // Add a child for the case body.
-  dispatchAndCreateIfNeeded(stmt->getBody(), deferred);
+  creationState.createScopeFor(stmt->getBody(), this);
 }
 
 void GuardStmtScope::expandMe(DeferredNodes &deferred) {
@@ -597,7 +616,7 @@ void GuardStmtScope::expandMe(DeferredNodes &deferred) {
   createSubtree<GuardConditionalClauseScope>(stmt, 0);
 
   // Add a child for the 'guard' body, which always exits.
-  dispatchAndCreateIfNeeded(stmt->getBody(), deferred);
+  creationState.createScopeFor(stmt->getBody(), this);
 
   // Add a child to describe the guard condition for the continuation.
   createSubtreeWithDeferrals<GuardContinuationScope>(deferred, stmt, 0);
@@ -605,7 +624,7 @@ void GuardStmtScope::expandMe(DeferredNodes &deferred) {
 
 void BraceStmtScope::expandMe(DeferredNodes &deferred) {
   deferred.pushAllNecessaryNodes(stmt->getElements());
-  dispatchAndCreateAll(deferred);
+  creationState.createScopeForNextDeferredNode(this);
 }
 
 void VarDeclScope::expandMe(DeferredNodes &deferred) {
@@ -690,7 +709,7 @@ void IterableTypeBodyPortion::expandScope(GTXScope *scope,
                                           DeferredNodes &deferred) const {
   if (auto *idc = scope->getIterableDeclContext().getPtrOrNull())
     for (auto member : idc->getMembers())
-      scope->dispatchAndCreateIfNeeded(member, deferred);
+      creationState.createScopeFor(member, scope);
 }
 
 #pragma mark createBodyScope
@@ -876,11 +895,11 @@ void GuardContinuationScope::createSubtreeForNextConditionalClause(
 
 void WhileConditionalClauseScope::createSubtreeForAfterClauses(
     DeferredNodes &deferred) {
-  dispatchAndCreateIfNeeded(stmt->getBody(), deferred);
+  creationState.createScopeFor(stmt->getBody(), this);
 }
 void IfConditionalClauseScope::createSubtreeForAfterClauses(
     DeferredNodes &deferred) {
-  dispatchAndCreateIfNeeded(stmt->getThenStmt(), deferred);
+  creationState.createScopeFor(stmt->getThenStmt(), this);
 }
 
 void GuardConditionalClauseScope::createSubtreeForAfterClauses(
@@ -892,7 +911,7 @@ void GuardConditionalClauseScope::createSubtreeForAfterClauses(
   // condition.
   // The scope *after* the guard statement must include any deferred nodes
   // so that any let vars in the guard are in scope.
-  dispatchAndCreateAll(deferred);
+  creationState.createScopeForNextDeferredNode(this);
 }
 
 // Following must be after uses to ensure templates get instantiated

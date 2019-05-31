@@ -37,10 +37,6 @@ using namespace ast_scope;
 
 #pragma mark ASTScope
 
-ASTScope *ASTScope::createScopeTreeFor(SourceFile *SF) {
-  auto *sfs = ASTSourceFileScope::createScopeTreeFor(SF);
-  return new (SF->getASTContext()) ASTScope(sfs);
-}
 
 Optional<bool> ASTScope::unqualifiedLookup(
     SourceFile *SF, DeclName name, SourceLoc loc,

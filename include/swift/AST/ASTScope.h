@@ -237,20 +237,6 @@ protected:
   /// expandScope me, sending deferred nodes to my descendants.
   virtual void expandMe(DeferredNodes &);
 
-public:
-  /// Create and expandScope scopes for any deferred nodes, adding those scopes
-  /// as children of the receiver.
-  void addChildScopesForAnyRemainingDeferredNodes(DeferredNodes &);
-
-#pragma mark - - dispatchAndCreate
-protected:
-  /// For each deferred node, create scopes as needed and add those scopes as
-  /// children of the receiver.
-  void dispatchAndCreateAll(DeferredNodes &);
-
-  template <typename StmtExpr>
-  void dispatchAndCreateIfNeeded(StmtExpr *, DeferredNodes &);
-  void dispatchAndCreateIfNeeded(Decl *, DeferredNodes &);
 
 #pragma mark - - creation helpers
 public:
@@ -483,8 +469,6 @@ public:
   }
 
   const SourceFile *getSourceFile() const override;
-  static ASTSourceFileScope *createScopeTreeFor(SourceFile *);
-  void addAnyNewDeclsToTree();
   llvm::DenseSet<ClosureExpr *> &getAlreadyHandledClosures() override;
   NullablePtr<const void> addressForPrinting() const override { return SF; }
 
