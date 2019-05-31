@@ -2887,6 +2887,9 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
 
   AbstractFunctionDecl *original = dyn_cast<AbstractFunctionDecl>(D);
   if (auto *asd = dyn_cast<AbstractStorageDecl>(D)) {
+    if (asd->getImplInfo().isSimpleStored()) {
+      diagnoseAndRemoveAttr(attr, diag::differentiable_attr_stored_prop_unsupported);
+    }
     // When used directly on a storage decl (stored/computed property or
     // subscript), the getter is currently inferred to be `@differentiable`.
     // TODO(TF-129): Infer setter to also be `@differentiable` after

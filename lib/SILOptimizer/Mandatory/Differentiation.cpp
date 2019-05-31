@@ -3234,8 +3234,13 @@ public:
     }
     // This instruction is active. Determine the appropriate differentiation
     // strategy, and use it.
+    // Find the corresponding getter.
+    auto *getterDecl = sei->getField()->getGetter();
+    assert(getterDecl);
+    auto *getterFn = getModule().lookUpFunction(
+        SILDeclRef(getterDecl, SILDeclRef::Kind::Func));
     auto *structDecl = sei->getStructDecl();
-    if (structDecl->getEffectiveAccess() <= AccessLevel::Internal ||
+    if (!getterFn ||
         structDecl->getAttrs().hasAttribute<FieldwiseDifferentiableAttr>()) {
       strategies[sei] = StructExtractDifferentiationStrategy::Fieldwise;
       SILClonerWithScopes::visitStructExtractInst(sei);
@@ -3243,18 +3248,8 @@ public:
     }
     // The FieldwiseProductSpace strategy is not appropriate, so use the Getter
     // strategy.
+    assert(getterFn);
     strategies[sei] = StructExtractDifferentiationStrategy::Getter;
-    // Find the corresponding getter and its VJP.
-    auto *getterDecl = sei->getField()->getGetter();
-    assert(getterDecl);
-    auto *getterFn = getModule().lookUpFunction(
-        SILDeclRef(getterDecl, SILDeclRef::Kind::Func));
-    if (!getterFn) {
-      context.emitNondifferentiabilityError(
-          sei, invoker, diag::autodiff_property_not_differentiable);
-      errorOccurred = true;
-      return;
-    }
     SILAutoDiffIndices indices(/*source*/ 0,
         AutoDiffIndexSubset::getDefault(getASTContext(), 1, true));
     auto *attr = context.lookUpDifferentiableAttr(getterFn, indices);
@@ -3304,8 +3299,13 @@ public:
     }
     // This instruction is active. Determine the appropriate differentiation
     // strategy, and use it.
+    // Find the corresponding getter.
+    auto *getterDecl = seai->getField()->getGetter();
+    assert(getterDecl);
+    auto *getterFn = getModule().lookUpFunction(
+        SILDeclRef(getterDecl, SILDeclRef::Kind::Func));
     auto *structDecl = seai->getStructDecl();
-    if (structDecl->getEffectiveAccess() <= AccessLevel::Internal ||
+    if (!getterFn ||
         structDecl->getAttrs().hasAttribute<FieldwiseDifferentiableAttr>()) {
       strategies[seai] = StructExtractDifferentiationStrategy::Fieldwise;
       SILClonerWithScopes::visitStructElementAddrInst(seai);
@@ -3313,18 +3313,8 @@ public:
     }
     // The FieldwiseProductSpace strategy is not appropriate, so use the Getter
     // strategy.
+    assert(getterFn);
     strategies[seai] = StructExtractDifferentiationStrategy::Getter;
-    // Find the corresponding getter and its VJP.
-    auto *getterDecl = seai->getField()->getGetter();
-    assert(getterDecl);
-    auto *getterFn = getModule().lookUpFunction(
-        SILDeclRef(getterDecl, SILDeclRef::Kind::Func));
-    if (!getterFn) {
-      context.emitNondifferentiabilityError(
-          seai, invoker, diag::autodiff_property_not_differentiable);
-      errorOccurred = true;
-      return;
-    }
     SILAutoDiffIndices indices(/*source*/ 0,
         AutoDiffIndexSubset::getDefault(getASTContext(), 1, true));
     auto *attr = context.lookUpDifferentiableAttr(getterFn, indices);
