@@ -1844,7 +1844,7 @@ bool MissingMemberFailure::diagnoseAsError() {
   if (!anchor || !baseExpr)
     return false;
 
-  if (auto *typeVar = BaseType->getAs<TypeVariableType>()) {
+  if (auto *typeVar = getBaseType()->getAs<TypeVariableType>()) {
     auto &CS = getConstraintSystem();
     auto *memberLoc = typeVar->getImpl().getLocator();
     // Don't try to diagnose anything besides first missing
@@ -1856,7 +1856,7 @@ bool MissingMemberFailure::diagnoseAsError() {
       return false;
   }
 
-  auto baseType = resolveType(BaseType)->getWithoutSpecifierType();
+  auto baseType = resolveType(getBaseType())->getWithoutSpecifierType();
 
   DeclNameLoc nameLoc(anchor->getStartLoc());
   if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchor)) {
@@ -1876,22 +1876,22 @@ bool MissingMemberFailure::diagnoseAsError() {
     if (baseType->is<TupleType>())
       diagnostic = diag::could_not_find_tuple_member;
 
-    emitDiagnostic(anchor->getLoc(), diagnostic, baseType, Name)
+    emitDiagnostic(anchor->getLoc(), diagnostic, baseType, getName())
         .highlight(baseExpr->getSourceRange())
         .highlight(nameLoc.getSourceRange());
   };
 
-  TypoCorrectionResults corrections(TC, Name, nameLoc);
+  TypoCorrectionResults corrections(TC, getName(), nameLoc);
   auto tryTypoCorrection = [&] {
     TC.performTypoCorrection(getDC(), DeclRefKind::Ordinary, baseType,
                              defaultMemberLookupOptions, corrections);
   };
 
-  if (Name.getBaseName().getKind() == DeclBaseName::Kind::Subscript) {
+  if (getName().getBaseName().getKind() == DeclBaseName::Kind::Subscript) {
     emitDiagnostic(anchor->getLoc(), diag::could_not_find_value_subscript,
                    baseType)
         .highlight(baseExpr->getSourceRange());
-  } else if (Name.getBaseName() == "deinit") {
+  } else if (getName().getBaseName() == "deinit") {
     // Specialised diagnostic if trying to access deinitialisers
     emitDiagnostic(anchor->getLoc(), diag::destructor_not_accessible)
         .highlight(baseExpr->getSourceRange());
@@ -1900,9 +1900,9 @@ bool MissingMemberFailure::diagnoseAsError() {
     tryTypoCorrection();
 
     if (DeclName rightName =
-            findCorrectEnumCaseName(instanceTy, corrections, Name)) {
+            findCorrectEnumCaseName(instanceTy, corrections, getName())) {
       emitDiagnostic(anchor->getLoc(), diag::could_not_find_enum_case,
-                     instanceTy, Name, rightName)
+                     instanceTy, getName(), rightName)
           .fixItReplace(nameLoc.getBaseNameLoc(),
                         rightName.getBaseIdentifier().str());
       return true;
@@ -1911,7 +1911,7 @@ bool MissingMemberFailure::diagnoseAsError() {
     if (auto correction = corrections.claimUniqueCorrection()) {
       auto diagnostic = emitDiagnostic(
           anchor->getLoc(), diag::could_not_find_type_member_corrected,
-          instanceTy, Name, correction->CorrectedName);
+          instanceTy, getName(), correction->CorrectedName);
       diagnostic.highlight(baseExpr->getSourceRange())
           .highlight(nameLoc.getSourceRange());
       correction->addFixits(diagnostic);
@@ -1920,14 +1920,14 @@ bool MissingMemberFailure::diagnoseAsError() {
     }
   } else if (auto moduleTy = baseType->getAs<ModuleType>()) {
     emitDiagnostic(baseExpr->getLoc(), diag::no_member_of_module,
-                   moduleTy->getModule()->getName(), Name)
+                   moduleTy->getModule()->getName(), getName())
         .highlight(baseExpr->getSourceRange())
         .highlight(nameLoc.getSourceRange());
     return true;
   } else {
     // Check for a few common cases that can cause missing members.
     auto *ED = baseType->getEnumOrBoundGenericEnum();
-    if (ED && Name.isSimpleName("rawValue")) {
+    if (ED && getName().isSimpleName("rawValue")) {
       auto loc = ED->getNameLoc();
       if (loc.isValid()) {
         emitBasicError(baseType);
@@ -1947,7 +1947,7 @@ bool MissingMemberFailure::diagnoseAsError() {
     if (auto correction = corrections.claimUniqueCorrection()) {
       auto diagnostic = emitDiagnostic(
           anchor->getLoc(), diag::could_not_find_value_member_corrected,
-          baseType, Name, correction->CorrectedName);
+          baseType, getName(), correction->CorrectedName);
       diagnostic.highlight(baseExpr->getSourceRange())
           .highlight(nameLoc.getSourceRange());
       correction->addFixits(diagnostic);
@@ -1958,6 +1958,30 @@ bool MissingMemberFailure::diagnoseAsError() {
 
   // Note all the correction candidates.
   corrections.noteAllCandidates();
+  return true;
+}
+
+bool InvalidMemberRefOnExistential::diagnoseAsError() {
+  auto *anchor = getRawAnchor();
+
+  Expr *baseExpr = getAnchor();
+  DeclNameLoc nameLoc;
+  if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchor)) {
+    baseExpr = UDE->getBase();
+    nameLoc = UDE->getNameLoc();
+  } else if (auto *UME = dyn_cast<UnresolvedMemberExpr>(anchor)) {
+    nameLoc = UME->getNameLoc();
+  } else if (auto *SE = dyn_cast<SubscriptExpr>(anchor)) {
+    baseExpr = SE->getBase();
+  } else if (auto *call = dyn_cast<CallExpr>(anchor)) {
+    baseExpr = call->getFn();
+  }
+
+  emitDiagnostic(getAnchor()->getLoc(),
+                 diag::could_not_use_member_on_existential, getBaseType(),
+                 getName())
+      .highlight(nameLoc.getSourceRange())
+      .highlight(baseExpr->getSourceRange());
   return true;
 }
 

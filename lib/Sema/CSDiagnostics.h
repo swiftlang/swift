@@ -762,6 +762,21 @@ public:
   bool diagnoseAsNote() override;
 };
 
+class InvalidMemberRefFailure : public FailureDiagnostic {
+  Type BaseType;
+  DeclName Name;
+
+public:
+  InvalidMemberRefFailure(Expr *root, ConstraintSystem &cs, Type baseType,
+                          DeclName memberName, ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator), BaseType(baseType->getRValueType()),
+        Name(memberName) {}
+
+protected:
+  Type getBaseType() const { return BaseType; }
+  DeclName getName() const { return Name; }
+};
+
 /// Diagnose situations when member referenced by name is missing
 /// from the associated base type, e.g.
 ///
@@ -771,15 +786,11 @@ public:
 ///   let _: Int = s.foo(1, 2) // expected type is `(Int, Int) -> Int`
 /// }
 /// ```
-class MissingMemberFailure final : public FailureDiagnostic {
-  Type BaseType;
-  DeclName Name;
-
+class MissingMemberFailure final : public InvalidMemberRefFailure {
 public:
   MissingMemberFailure(Expr *root, ConstraintSystem &cs, Type baseType,
                        DeclName memberName, ConstraintLocator *locator)
-      : FailureDiagnostic(root, cs, locator), BaseType(baseType),
-        Name(memberName) {}
+      : InvalidMemberRefFailure(root, cs, baseType, memberName, locator) {}
 
   bool diagnoseAsError() override;
 
@@ -787,6 +798,28 @@ private:
   static DeclName findCorrectEnumCaseName(Type Ty,
                                           TypoCorrectionResults &corrections,
                                           DeclName memberName);
+};
+
+/// Diagnose cases where a member only accessible on generic constraints
+/// requiring conformance to a protocol is used on a value of the
+/// existential protocol type e.g.
+///
+/// ```swift
+/// protocol P {
+///   var foo: Self { get }
+/// }
+///
+/// func bar<X : P>(p: X) {
+///   p.foo
+/// }
+/// ```
+class InvalidMemberRefOnExistential final : public InvalidMemberRefFailure {
+public:
+  InvalidMemberRefOnExistential(Expr *root, ConstraintSystem &cs, Type baseType,
+                                DeclName memberName, ConstraintLocator *locator)
+      : InvalidMemberRefFailure(root, cs, baseType, memberName, locator) {}
+
+  bool diagnoseAsError() override;
 };
 
 /// Diagnose situations when we use an instance member on a type

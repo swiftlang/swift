@@ -755,11 +755,14 @@ void FailureDiagnosis::diagnoseUnviableLookupResults(
     case MemberLookupResult::UR_ReferenceWritableKeyPathOnMutatingMember:
     case MemberLookupResult::UR_KeyPathWithAnyObjectRootType:
       break;
-    case MemberLookupResult::UR_UnavailableInExistential:
-      diagnose(loc, diag::could_not_use_member_on_existential,
-               instanceTy, memberName)
-        .highlight(baseRange).highlight(nameLoc.getSourceRange());
+
+    case MemberLookupResult::UR_UnavailableInExistential: {
+      InvalidMemberRefOnExistential failure(
+          baseExpr, CS, instanceTy, memberName, CS.getConstraintLocator(E));
+      failure.diagnoseAsError();
       return;
+    }
+
     case MemberLookupResult::UR_InstanceMemberOnType:
     case MemberLookupResult::UR_TypeMemberOnInstance: {
       auto locatorKind = isa<SubscriptExpr>(E)
