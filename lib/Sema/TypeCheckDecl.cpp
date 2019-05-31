@@ -5438,6 +5438,15 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
       if (classDecl->hasClangNode())
         continue;
 
+      // If the superclass initializer is not accessible from the derived
+      // class, don't synthesize an override, since we cannot reference the
+      // superclass initializer's method descriptor at all.
+      //
+      // FIXME: This should be checked earlier as part of calculating
+      // canInheritInitializers.
+      if (!superclassCtor->isAccessibleFrom(classDecl))
+        continue;
+
       // Diagnose a missing override of a required initializer.
       if (superclassCtor->isRequired() && !canInheritInitializers) {
         diagnoseMissingRequiredInitializer(*this, classDecl, superclassCtor);
@@ -5469,14 +5478,6 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
       auto kind = canInheritInitializers
                     ? DesignatedInitKind::Chaining
                     : DesignatedInitKind::Stub;
-
-      // If the superclass initializer is not accessible from the derived
-      // class, we cannot chain to 'super.init' either -- create a stub.
-      if (!superclassCtor->isAccessibleFrom(classDecl)) {
-        assert(!superclassCtor->isRequired() &&
-               "required initializer less visible than the class?");
-        kind = DesignatedInitKind::Stub;
-      }
 
       // We have a designated initializer. Create an override of it.
       // FIXME: Validation makes sure we get a generic signature here.
