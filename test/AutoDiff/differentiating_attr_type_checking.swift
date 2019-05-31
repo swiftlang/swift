@@ -298,7 +298,7 @@ func vjpConsistent(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
 
 // Test usage of `@differentiable` on a stored property
 struct PropertyDiff : Differentiable & AdditiveArithmetic {
-	// expected-error @+1 {{Stored properties cannot be marked with '@differentiable'}}
+    // expected-error @+1 {{stored properties cannot be marked with '@differentiable'}}
     @differentiable(vjp: vjpPropertyA)
     var a: Float = 1
     typealias TangentVector = PropertyDiff
