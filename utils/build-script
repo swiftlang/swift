@@ -509,8 +509,8 @@ class BuildScriptInvocation(object):
             impl_args += ["--skip-test-optimized"]
         if not args.test_optimize_for_size:
             impl_args += ["--skip-test-optimize-for-size"]
-        if not args.test_optimize_none_implicit_dynamic:
-            impl_args += ["--skip-test-optimize-none-implicit-dynamic"]
+        if not args.test_optimize_none_with_implicit_dynamic:
+            impl_args += ["--skip-test-optimize-none-with-implicit-dynamic"]
         if args.build_libparser_only:
             impl_args += ["--build-libparser-only"]
         if args.android:
