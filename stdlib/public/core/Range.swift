@@ -125,7 +125,7 @@ extension RangeExpression {
 /// `Stride` types, they cannot be used as the bounds of a countable range. If
 /// you need to iterate over consecutive floating-point values, see the
 /// `stride(from:to:by:)` function.
-@_fixed_layout
+@frozen
 public struct Range<Bound : Comparable> {
   /// The range's lower bound.
   ///
@@ -449,7 +449,7 @@ extension Range: Encodable where Bound: Encodable {
 ///     let numbers = [10, 20, 30, 40, 50, 60, 70]
 ///     print(numbers[..<3])
 ///     // Prints "[10, 20, 30]"
-@_fixed_layout
+@frozen
 public struct PartialRangeUpTo<Bound: Comparable> {
   public let upperBound: Bound
   
@@ -505,7 +505,7 @@ extension PartialRangeUpTo: Encodable where Bound: Encodable {
 ///     let numbers = [10, 20, 30, 40, 50, 60, 70]
 ///     print(numbers[...3])
 ///     // Prints "[10, 20, 30, 40]"
-@_fixed_layout
+@frozen
 public struct PartialRangeThrough<Bound: Comparable> {  
   public let upperBound: Bound
   
@@ -620,7 +620,7 @@ extension PartialRangeThrough: Encodable where Bound: Encodable {
 /// `Bound`. For example, iterating over an instance of
 /// `PartialRangeFrom<Int>` traps when the sequence's next value would be
 /// above `Int.max`.
-@_fixed_layout
+@frozen
 public struct PartialRangeFrom<Bound: Comparable> {
   public let lowerBound: Bound
 
@@ -647,7 +647,7 @@ extension PartialRangeFrom: Sequence
   public typealias Element = Bound
 
   /// The iterator for a `PartialRangeFrom` instance.
-  @_fixed_layout
+  @frozen
   public struct Iterator: IteratorProtocol {
     @usableFromInline
     internal var _current: Bound
@@ -827,7 +827,7 @@ extension Comparable {
 ///     let word2 = "grisly"
 ///     let changes = countLetterChanges(word1[...], word2[...])
 ///     // changes == 2
-@_frozen // namespace
+@frozen // namespace
 public enum UnboundedRange_ {
   // FIXME: replace this with a computed var named `...` when the language makes
   // that possible.

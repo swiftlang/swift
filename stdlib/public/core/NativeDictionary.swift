@@ -13,7 +13,7 @@
 /// A wrapper around __RawDictionaryStorage that provides most of the
 /// implementation of Dictionary.
 @usableFromInline
-@_fixed_layout
+@frozen
 internal struct _NativeDictionary<Key: Hashable, Value> {
   @usableFromInline
   internal typealias Element = (key: Key, value: Value)
@@ -777,7 +777,7 @@ extension _NativeDictionary { // High-level operations
 
 extension _NativeDictionary: Sequence {
   @usableFromInline
-  @_fixed_layout
+  @frozen
   internal struct Iterator {
     // The iterator is iterating over a frozen view of the collection state, so
     // it keeps its own reference to the dictionary.

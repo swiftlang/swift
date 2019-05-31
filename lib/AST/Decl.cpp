@@ -1506,7 +1506,8 @@ bool VarDecl::isInitExposedToClients() const {
   if (!parent) return false;
   if (!hasInitialValue()) return false;
   if (isStatic()) return false;
-  return parent->getAttrs().hasAttribute<FixedLayoutAttr>();
+  return parent->getAttrs().hasAttribute<FrozenAttr>() ||
+         parent->getAttrs().hasAttribute<FixedLayoutAttr>();
 }
 
 /// Check whether the given type representation will be
@@ -3136,7 +3137,7 @@ bool NominalTypeDecl::isFormallyResilient() const {
                             /*treatUsableFromInlineAsPublic=*/true).isPublic())
     return false;
 
-  // Check for an explicit @_fixed_layout or @_frozen attribute.
+  // Check for an explicit @_fixed_layout or @frozen attribute.
   if (getAttrs().hasAttribute<FixedLayoutAttr>() ||
       getAttrs().hasAttribute<FrozenAttr>()) {
     return false;

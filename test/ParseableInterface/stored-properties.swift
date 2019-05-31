@@ -74,8 +74,8 @@ public struct HasStoredProperties {
 // COMMON: }
 }
 
-// COMMON: @_fixed_layout public struct BagOfVariables {
-@_fixed_layout
+// COMMON: @frozen public struct BagOfVariables {
+@frozen
 public struct BagOfVariables {
   // COMMON: public let a: [[INT]] = 0
   public let a: Int = 0
@@ -92,8 +92,8 @@ public struct BagOfVariables {
 // COMMON: }
 }
 
-// COMMON: @_fixed_layout public struct HasStoredPropertiesFixedLayout {
-@_fixed_layout
+// COMMON: @frozen public struct HasStoredPropertiesFixedLayout {
+@frozen
 public struct HasStoredPropertiesFixedLayout {
   // COMMON: public var simpleStoredMutable: [[BAGOFVARIABLES:.*BagOfVariables]]
   public var simpleStoredMutable: BagOfVariables

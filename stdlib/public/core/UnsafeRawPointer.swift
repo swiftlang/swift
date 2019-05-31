@@ -168,7 +168,7 @@
 ///       var number = 5
 ///       let numberPointer = UnsafeRawPointer(&number)
 ///       // Accessing 'numberPointer' is undefined behavior.
-@_fixed_layout
+@frozen
 public struct UnsafeRawPointer: _Pointer {
   
   public typealias Pointee = UInt8
@@ -520,7 +520,7 @@ extension UnsafeRawPointer: Strideable {
 ///       var number = 5
 ///       let numberPointer = UnsafeMutableRawPointer(&number)
 ///       // Accessing 'numberPointer' is undefined behavior.
-@_fixed_layout
+@frozen
 public struct UnsafeMutableRawPointer: _Pointer {
   
   public typealias Pointee = UInt8

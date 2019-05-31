@@ -25,7 +25,7 @@
 ///     func crashAndBurn() -> Never {
 ///         fatalError("Something very, very bad happened")
 ///     }
-@_frozen
+@frozen
 public enum Never {}
 
 extension Never: Error {}
