@@ -31,12 +31,14 @@
 #include <algorithm>
 
 using namespace swift;
+using namespace ast_scope;
+
 namespace swift {
 namespace ast_scope {
 
-#pragma mark ScopeCreationState
+#pragma mark ScopeCreator
 
-class ScopeCreationState {
+class ScopeCreator {
 
   /// \c SourceFiles and \c BraceStmts have \c Decls and \c ASTNodes in them
   /// that must be scoped in distant descendants. As scopes are created, pass
@@ -67,16 +69,18 @@ public:
   SourceFileScope *const sourceFileScope;
 
 public:
-  ScopeCreationState(SourceFile *SF) ctx(SF->getASTContext()),
-      sourceFileScope(createScope<SourceFileScope>(SF)),
+  ScopeCreator(SourceFile *SF) ctx(SF->getASTContext()),
+      sourceFileScope(constructScope<SourceFileScope>(SF)),
       lastAdopter(sourceFileScope) {}
 
-  ~ScopeCreationState();
-  ScopeCreationState(const DeferredNodes &) = delete;  // ensure no copies
-  ScopeCreationState(const DeferredNodes &&) = delete; // ensure no moves
+  ~ScopeCreator();
+  ScopeCreator(const DeferredNodes &) = delete;  // ensure no copies
+  ScopeCreator(const DeferredNodes &&) = delete; // ensure no moves
+  
+  ScopeCreator withoutDeferrals();
 
   template <typename Scope, typename... Args>
-  static ASTScopeImpl *createScope(Args... args) {
+  static ASTScopeImpl *constructScope(Args... args) {
     return new (ctx) Scope(args...);
   }
 
@@ -115,32 +119,57 @@ public:
         llvm_unreachable("Impossible case");
     }
   }
+  
+  template <typename StmtOrExprOrDecl>
+  void createScopeFor(StmtOrExprOrDecl *, ASTScopeImpl *parent);
+
   template <typename StmtOrExpr>
-  void createScopeFor(StmtOrExpr *se, ASTScopeImpl *parent) {
-#error UP TO HERE UP TO SCOPECREATOR
-    if (se)
-      ScopeCreator().visit(se, this, deferred); // Implicit declarations don't
-                                                // have source information for
-                                                // name lookup.
+  bool shouldCreateScope(StmtOrExpr *se) const {
+    return se;
   }
-  void createScopeFor(Decl *d, ASTScopeImpl *parent) {
+
+  bool shouldCreateScope(Decl *) const {
+    if (!d)
+      return false;
+    // Implicit declarations don't have source information for name lookup.
+    if (d->isImplicit())
+      return false;
     // Have also seen the following in an AST:
-    // Given
+    // Source::
+    //
     //  func testInvalidKeyPathComponents() {
     //    let _ = \.{return 0} // expected-error* {{}}
     //  }
     //  class X {
     //    class var a: Int { return 1 }
     //  }
-    // Get:
+    //
+    // AST:
     //  (pattern_binding_decl range=[test.swift:2:3 - line:2:3]
     //   (pattern_typed implicit type='<<error type>>'
     //     (pattern_named '_')))
-    // so test the SourceRange
-    if (d && !d->isImplicit() &&
-        (!isa<PatternBindingDecl>(d) || d->getStartLoc() != d->getEndLoc()))
-      ScopeCreator().visit(d, this, deferred);
+    //
+    // So test the SourceRange
+    if (d->getStartLoc() == d->getEndLoc())
+      return false;
+    return true;
   }
+  
+template <typename Scope, typename... Args>
+  ASTScopeImpl* createSubtree(ASTScope* parent, Args... args) {
+    auto *child = constructScope<Scope>(args);
+    parent->addChild(child);
+    child->expandMeAndCreateScopesFromDeferredNodes(*this);
+    return child;
+  }
+  
+  template <typename Scope, typename Portion, typename... Args>
+  ASTScopeImpl* createSubtree2D(ASTScope* parent, Args... args) {
+    const Portion *portion = new (ctx) Portion();
+    return createSubtree(parent, portion, args...);
+  }
+  
+  
 
   bool empty() const;
 
@@ -172,17 +201,7 @@ public:
   }
 };
 
-#pragma mark DeferredNodes
 
-///
-/// Because parsing and lookup (typechecking) are interleaved for some files,
-/// we need to be able to resume scope tree creation. \c DeferredNodes also
-/// helps with this by remembering the \c lastAdopter.
-
-class DeferredNodes final {};
-} // ast_scope
-} // namespace swift
-using namespace ast_scope;
 
 #pragma mark Scope tree creation and extension
 
@@ -191,9 +210,9 @@ ASTScope *ASTScope::createScopeTreeFor(SourceFile *SF) {
   return new (SF->getASTContext()) ASTScope(sfs);
 }
 
-ASTSourceFileScope *ScopeCreationState : createScopeTreeFor(SourceFile *SF) {
+ASTSourceFileScope *ScopeCreator : createScopeTreeFor(SourceFile *SF) {
   auto *sfScope = new (SF->getASTContext()) ASTSourceFileScope(SF);
-  ScopeCreationState s(sfScope);
+  ScopeCreator s(sfScope);
   s.addAnyNewDeclsToTree();
   return sfScope;
 }
@@ -202,14 +221,14 @@ ASTSourceFileScope::ASTSourceFileScope(SourceFile *SF)
     : SF(SF), deferred(new (SF->getASTContext())
                            DeferredNodes(__FILE__, __LINE__, *this, SF)) {}
 
-#pragma mark ScopeCreator
+#pragma mark ASTVisitorForScopeCreation
 
 namespace swift {
 namespace ast_scope {
 
-class ScopeCreator
-    : public ASTVisitor<ScopeCreator, void, void, void, void, void, void,
-                        ASTScopeImpl *, DeferredNodes &> {
+class ASTVisitorForScopeCreation
+    : public ASTVisitor<ASTVisitorForScopeCreation, void, void, void, void, void, void,
+                        ASTScopeImpl *, ScopeCreator &> {
 public:
 
 #pragma mark ASTNodes that do not create scopes
@@ -219,7 +238,7 @@ public:
   // accesses such a definition must resolve as being IN the scope.
 
 #define VISIT_AND_IGNORE(What)                                                 \
-  void visit##What(What *w, ASTScopeImpl *p, DeferredNodes &) {                \
+  void visit##What(What *w, ASTScopeImpl *p, ScopeCreator &) {                \
     p->widenSourceRangeForIgnoredASTNode(w);                                   \
   }
 
@@ -256,10 +275,10 @@ public:
 #pragma mark simple creation ignoring deferred nodes
 
 #define VISIT_AND_CREATE(What, ScopeClass)                                     \
-  void visit##What(What *w, ASTScopeImpl *p, DeferredNodes &) {                \
-    p->createSubtree<ScopeClass>(w);                                           \
+void visit##What(What *w, ASTScopeImpl *p, ScopeCreator &scopeCreator) { \
+         scopeCreator.withoutDeferrals().createSubtree<ScopeClass>(p, w); \
   }
-
+UP TO HERE
   VISIT_AND_CREATE(SubscriptDecl, SubscriptDeclScope)
   VISIT_AND_CREATE(IfStmt, IfStmtScope)
   VISIT_AND_CREATE(RepeatWhileStmt, RepeatWhileScope)
@@ -284,8 +303,9 @@ public:
 #pragma mark 2D simple creation (ignoring deferred nodes)
 
 #define VISIT_AND_CREATE_WHOLE_PORTION(What, WhatScope)                        \
-  void visit##What(What *w, ASTScopeImpl *p, DeferredNodes &) {                \
-    p->createSubtree2D<WhatScope, GTXWholePortion>(w);                         \
+  void visit##What(What *w, ASTScopeImpl *p, ScopeCreator &scopeCreator) {                \
+UP TO HERE \
+    scopeCreator.withoutDeferrals.createSubtree2D<WhatScope, GTXWholePortion>(p, w);                         \
   }
 
   VISIT_AND_CREATE_WHOLE_PORTION(ExtensionDecl, ExtensionScope)
@@ -296,9 +316,10 @@ public:
   VISIT_AND_CREATE_WHOLE_PORTION(OpaqueTypeDecl, OpaqueTypeScope)
 #undef VISIT_AND_CREATE_WHOLE_PORTION
 
-  void visitProtocolDecl(ProtocolDecl *e, ASTScopeImpl *p, DeferredNodes &) {
+  void visitProtocolDecl(ProtocolDecl *e, ASTScopeImpl *p, ScopeCreator &scopeCreator) {
     e->createGenericParamsIfMissing();
-    p->createSubtree2D<NominalTypeScope, GTXWholePortion>(e);
+    UP TO HERE
+    scopeCreator.withoutDeferrals.createSubtree2D<NominalTypeScope, GTXWholePortion>(p. e);
   }
 
 #pragma mark simple creation with deferred nodes
@@ -306,42 +327,42 @@ public:
   // Each of the following creates a new scope, so that nodes which were parsed
   // after them need to be placed in scopes BELOW them in the tree. So pass down
   // the deferred nodes.
-  void visitGuardStmt(GuardStmt *e, ASTScopeImpl *p, DeferredNodes &deferred) {
-    p->createSubtreeWithDeferrals<GuardStmtScope>(deferred, e);
+  void visitGuardStmt(GuardStmt *e, ASTScopeImpl *p, ScopeCreator &scopeCreator) {
+    scopeCreator.createSubtree<GuardStmtScope>(p, e);
   }
-  void visitDoStmt(DoStmt *ds, ASTScopeImpl *p, DeferredNodes &deferred) {
+  void visitDoStmt(DoStmt *ds, ASTScopeImpl *p, ScopeCreator &scopeCreator) {
     creationState.createScopeFor(ds->getBody(), p);
   }
   void visitTopLevelCodeDecl(TopLevelCodeDecl *d, ASTScopeImpl *p,
-                             DeferredNodes &deferred) {
-    p->createSubtreeWithDeferrals<TopLevelCodeScope>(deferred, d);
+                             ScopeCreator &scopeCreator) {
+    scopeCreator.createSubtree<TopLevelCodeScope>(p, d);
   }
 
 #pragma mark special-case creation
 
-  void visitSourceFile(SourceFile *, ASTScopeImpl *, DeferredNodes &) {
+  void visitSourceFile(SourceFile *, ASTScopeImpl *, ScopeCreator &) {
     llvm_unreachable("SourceFiles are orphans.");
   }
 
-  void visitYieldStmt(YieldStmt *ys, ASTScopeImpl *p, DeferredNodes &deferred) {
-    deferred.pushAllNecessaryNodes(ys->getYields());
+  void visitYieldStmt(YieldStmt *ys, ASTScopeImpl *p, ScopeCreator &scopeCreator) {
+    scopeCreator.pushAllNecessaryNodes(ys->getYields());
     creattionState.createScopeForNextDeferredNode(p);
   }
-  void visitDeferStmt(DeferStmt *ds, ASTScopeImpl *p, DeferredNodes &deferred) {
-    visitFuncDecl(ds->getTempDecl(), p, deferred);
+  void visitDeferStmt(DeferStmt *ds, ASTScopeImpl *p, ScopeCreator &scopeCreator) {
+    visitFuncDecl(ds->getTempDecl(), p, scopeCreator);
   }
 
-  void visitBraceStmt(BraceStmt *bs, ASTScopeImpl *p, DeferredNodes &deferred) {
+  void visitBraceStmt(BraceStmt *bs, ASTScopeImpl *p, ScopeCreator &scopeCreator) {
     if (p->areDeferredNodesInANewScope())
-      p->createSubtreeWithDeferrals<BraceStmtScope>(deferred, bs);
+      scopeCreator.createSubtree<BraceStmtScope>(p, bs);
     else
-      p->createSubtree<BraceStmtScope>(bs);
+      scopeCreator.withoutDeferrals().createSubtree<BraceStmtScope>(p, bs);
   }
 
   void visitPatternBindingDecl(PatternBindingDecl *patternBinding,
-                               ASTScopeImpl *p, DeferredNodes &deferred) {
+                               ASTScopeImpl *p, ScopeCreator &scopeCreator) {
     p->createAttachedPropertyDelegateScope(patternBinding);
-    // deferred will contain any nodes that need to be put into subscopes.
+    // scopeCreator will contain any nodes that need to be put into subscopes.
     // In a type decl body, there won't be any.
     // The comment for \c AbstractPatternEntryScope.
     const bool isInTypeDecl =
@@ -351,24 +372,24 @@ public:
       p->createScopesForPatternBindingInATypeDecl(patternBinding);
     else
       p->createScopesForPatternBindingInAFunction(patternBinding,
-                                                       deferred);
+                                                       scopeCreator);
   }
 
   void visitReturnStmt(ReturnStmt *rs, ASTScopeImpl *p,
-                       DeferredNodes &deferred) {
+                       ScopeCreator &scopeCreator) {
     if (rs->hasResult())
-      visitExpr(rs->getResult(), p, deferred);
+      visitExpr(rs->getResult(), p, scopeCreator);
   }
 
-  void visitWhileStmt(WhileStmt *ws, ASTScopeImpl *p, DeferredNodes &deferred) {
+  void visitWhileStmt(WhileStmt *ws, ASTScopeImpl *p, ScopeCreator &scopeCreator) {
     if (ws->getCond().empty()) {
-      visit(ws->getBody(), p, deferred);
+      visit(ws->getBody(), p, scopeCreator);
       return;
     }
-    p->createSubtree<WhileConditionalClauseScope>(ws, 0);
+    scopeCreator.withoutDeferrals().createSubtree<WhileConditionalClauseScope>(p, ws, 0);
   }
 
-  void visitExpr(Expr *expr, ASTScopeImpl *p, DeferredNodes &deferred) {
+  void visitExpr(Expr *expr, ASTScopeImpl *p, ScopeCreator &scopeCreator) {
     if (!expr)
       return;
     p->widenSourceRangeForIgnoredASTNode(expr);
@@ -377,6 +398,12 @@ public:
 };
 } // namespace ast_scope
 } // namespace swift
+
+// This definition is way down here so it can call into ASTVisitorForScopeCreation
+template <typename StmtOrExprOrDecl>
+void ScopeCreator::createScopeFor(StmtOrExprOrDecl *sed, ASTScopeImpl *parent) {
+  ASTVisitorForScopeCreation().visit(sed, parent, *this);
+}
 
 
 
@@ -391,7 +418,7 @@ void ASTScopeImpl::createAttachedPropertyDelegateScope(
   patternBinding->getPattern(0)->forEachVariable([&](VarDecl * vd) {
     // assume all same as first
     if (hasCustomAttribute(vd))
-      createSubtree<AttachedPropertyDelegateScope>(vd);
+      scopeCreator.withoutDeferrals().createSubtree<AttachedPropertyDelegateScope>(this, vd);
   });
 }
 
@@ -401,25 +428,25 @@ void ASTScopeImpl::createScopesForPatternBindingInATypeDecl(
 }
 
 void ASTScopeImpl::createScopesForPatternBindingInAFunction(
-    PatternBindingDecl *patternBinding, DeferredNodes &deferred) {
-  createNestedPatternScopes(patternBinding, deferred);
+    PatternBindingDecl *patternBinding, DeferredNodes &scopeCreator) {
+  createNestedPatternScopes(patternBinding, scopeCreator);
 }
 
 void ASTScopeImpl::createSiblingPatternScopes(
     PatternBindingDecl *patternBinding) {
   for (auto entryIndex : range(patternBinding->getNumPatternEntries()))
     if (!patternBinding->getPattern(entryIndex)->isImplicit()) {
-      createSubtree<PatternEntryDeclScope>(patternBinding, entryIndex);
+      scopeCreator.withoutDeferrals().createSubtree<PatternEntryDeclScope>(this, patternBinding, entryIndex);
     }
 }
 
 void ASTScopeImpl::createNestedPatternScopes(PatternBindingDecl *patternBinding,
-                                             DeferredNodes &deferred) {
-  createRestOfNestedPatternScopes(patternBinding, deferred, 0);
+                                             DeferredNodes &scopeCreator) {
+  createRestOfNestedPatternScopes(patternBinding, scopeCreator, 0);
 }
 
 void ASTScopeImpl::createRestOfNestedPatternScopes(
-    PatternBindingDecl *patternBinding, DeferredNodes &deferred,
+    PatternBindingDecl *patternBinding, DeferredNodes &scopeCreator,
     unsigned entryIndex) {
   if (entryIndex >= patternBinding->getPatternList().size()) {
     // no more entries, create the scopes inside the pattern use
@@ -428,7 +455,7 @@ void ASTScopeImpl::createRestOfNestedPatternScopes(
   }
   // When PatternEntryDeclScope expands, it will create a PatternEntryUseScope
   // which will call createRestOfNestedPatternScopes when it expands.
-  createSubtreeWithDeferrals<PatternEntryDeclScope>(deferred, patternBinding,
+  scopeCreator.createSubtree<PatternEntryDeclScope>(this, patternBinding,
                                                     entryIndex);
 }
 
@@ -440,7 +467,7 @@ ASTScopeImpl::createGenericParamScopes(Decl *parameterizedDecl,
     return this;
   auto *s = this;
   for (unsigned i : indices(generics->getParams()))
-    s = s->createSubtree<GenericParamScope>(parameterizedDecl, generics, i);
+    s = scopeCreator.withoutDeferrals().createSubtree<GenericParamScope>(s, parameterizedDecl, generics, i);
   return s;
 }
 
@@ -458,7 +485,7 @@ void ASTScopeImpl::addChild(ASTScopeImpl *child) {
 #pragma mark expanding
 
 void ASTScopeImpl::expandMeAndCreateScopesForDeferredNodes(
-    DeferredNodes &deferred) {
+    ScopeCreator &scopeCreator) {
   expandMe(deferred);
   creationState->addChildScopesForAnyRemainingDeferredNodesTo(this);
 }
@@ -469,7 +496,7 @@ void ASTScopeImpl::expandMeAndCreateScopesForDeferredNodes(
 // Many kinds of scopes do not expandScope into subscopes
 void ASTScopeImpl::expandMe(DeferredNodes &) { dontExpand(); }
 
-void ASTSourceFileScope::expandMe(DeferredNodes &deferred) {
+void ASTSourceFileScope::expandMe(ScopeCreator &scopeCreator) {
   llvm_unreachable("get expanded from addAnyNewDeclsToTree");
 }
 
@@ -478,7 +505,7 @@ void ASTSourceFileScope::expandMe(DeferredNodes &deferred) {
 void AbstractFunctionDeclScope::expandMe(DeferredNodes &) {
   // Create scopes for specialize attributes
   forEachSpecializeAttrInSourceOrder(decl, [&](SpecializeAttr *specializeAttr) {
-    createSubtree<SpecializeAttributeScope>(specializeAttr, decl);
+    scopeCreator.withoutDeferrals().createSubtree<SpecializeAttributeScope>(this, specializeAttr, decl);
   });
 
   // Create scopes for generic and ordinary parameters.
@@ -488,25 +515,25 @@ void AbstractFunctionDeclScope::expandMe(DeferredNodes &) {
   if (!isa<AccessorDecl>(decl)) {
     leaf = createGenericParamScopes(decl, decl->getGenericParams());
     if (!decl->isImplicit()) {
-      leaf = leaf->createSubtree<AbstractFunctionParamsScope>(
+      leaf = scopeCreator.withoutDeferrals().createSubtree<AbstractFunctionParamsScope>(leaf,
           decl->getParameters(), nullptr);
     }
   }
   // Create scope for the body.
   if (decl->getBody()) {
     if (decl->getDeclContext()->isTypeContext())
-      leaf->createSubtree<MethodBodyScope>(decl);
+      scopeCreator.withoutDeferrals().createSubtree<MethodBodyScope>(leaf, decl);
     else
-      leaf->createSubtree<PureFunctionBodyScope>(decl);
+      scopeCreator.withoutDeferrals().createSubtree<PureFunctionBodyScope>(leaf, decl);
   }
 }
 
-void AbstractFunctionBodyScope::expandMe(DeferredNodes &deferred) {
+void AbstractFunctionBodyScope::expandMe(ScopeCreator &scopeCreator) {
   BraceStmt *braceStmt = decl->getBody();
-  ScopeCreator().visitBraceStmt(braceStmt, this, deferred);
+  ASTVisitorForScopeCreation().visitBraceStmt(braceStmt, this, scopeCreator);
 }
 
-void PatternEntryDeclScope::expandMe(DeferredNodes &deferred) {
+void PatternEntryDeclScope::expandMe(ScopeCreator &scopeCreator) {
   auto patternEntry = getPatternEntry();
   // Create a child for the initializer, if present.
   // Cannot trust the source range given in the ASTScopeImpl for the end of the
@@ -516,50 +543,50 @@ void PatternEntryDeclScope::expandMe(DeferredNodes &deferred) {
   if (patternEntry.getInitAsWritten() &&
       patternEntry.getInitAsWritten()->getSourceRange().isValid()) {
     auto *initializer =
-        createSubtree<PatternEntryInitializerScope>(decl, patternEntryIndex);
+        scopeCreator.withoutDeferrals().createSubtree<PatternEntryInitializerScope>(this, decl, patternEntryIndex);
     initializerEnd = initializer->getSourceRange().End;
   }
   // If there are no uses of the declararations, add the accessors immediately.
-  if (deferred.empty())
+  if (scopeCreator.empty())
     addVarDeclScopesAndTheirAccessors(this);
   else
     // Note: the accessors will follow the pattern binding.
-    createSubtreeWithDeferrals<PatternEntryUseScope>(
-        deferred, decl, patternEntryIndex, initializerEnd);
+    scopeCreator.createSubtree<PatternEntryUseScope>(
+        this, decl, patternEntryIndex, initializerEnd);
 }
 
 void PatternEntryInitializerScope::expandMe(DeferredNodes &) {
   DeferredNodes noDeferrals(__FILE__, __LINE__, *this, this);
   // Create a child for the initializer expression.
-  ScopeCreator().visitExpr(getPatternEntry().getInitAsWritten(), this,
+  ASTVisitorForScopeCreation().visitExpr(getPatternEntry().getInitAsWritten(), this,
                            noDeferrals);
 }
 
-void PatternEntryUseScope::expandMe(DeferredNodes &deferred) {
+void PatternEntryUseScope::expandMe(ScopeCreator &scopeCreator) {
   // Add accessors for the variables in this pattern.
   addVarDeclScopesAndTheirAccessors(this);
   // Create a child for the next pattern binding.
-  createRestOfNestedPatternScopes(decl, deferred, patternEntryIndex + 1);
+  createRestOfNestedPatternScopes(decl, scopeCreator, patternEntryIndex + 1);
 }
 
-void ConditionalClauseScope::expandMe(DeferredNodes &deferred) {
+void ConditionalClauseScope::expandMe(ScopeCreator &scopeCreator) {
   // If this is a boolean conditional not in a guard continuation, add a
   // child for the expression.
   createSubtreeForCondition();
   // If there's another conditional clause, add it as the child.
   if (index + 1 < getContainingStatement()->getCond().size())
-    createSubtreeForNextConditionalClause(deferred);
+    createSubtreeForNextConditionalClause(scopeCreator);
   else {
     // There aren't any additional conditional clauses. Add the appropriate
     // nested scope based on the kind of statement.
-    createSubtreeForAfterClauses(deferred);
+    createSubtreeForAfterClauses(scopeCreator);
   }
 }
 
-void IfStmtScope::expandMe(DeferredNodes &deferred) {
+void IfStmtScope::expandMe(ScopeCreator &scopeCreator) {
   // The first conditional clause or, failing that, the 'then' clause.
   if (!stmt->getCond().empty())
-    createSubtree<IfConditionalClauseScope>(stmt, 0);
+    scopeCreator.withoutDeferrals().createSubtree<IfConditionalClauseScope>(this, stmt, 0);
   else
     creationState.createScopeFor(stmt->getThenStmt(), this);
 
@@ -567,85 +594,85 @@ void IfStmtScope::expandMe(DeferredNodes &deferred) {
   creationState.createScopeFor(stmt->getElseStmt(), this);
 }
 
-void RepeatWhileScope::expandMe(DeferredNodes &deferred) {
+void RepeatWhileScope::expandMe(ScopeCreator &scopeCreator) {
   creationState.createScopeFor(stmt->getBody(), this);
-  ScopeCreator().visitExpr(stmt->getCond(), this, deferred);
+  ASTVisitorForScopeCreation().visitExpr(stmt->getCond(), this, scopeCreator);
 }
 
-void DoCatchStmtScope::expandMe(DeferredNodes &deferred) {
+void DoCatchStmtScope::expandMe(ScopeCreator &scopeCreator) {
   creationState.createScopeFor(stmt->getBody(), this);
 
   for (auto catchClause : stmt->getCatches())
-    ScopeCreator().visitCatchStmt(catchClause, this, deferred);
+    ASTVisitorForScopeCreation().visitCatchStmt(catchClause, this, scopeCreator);
 }
 
-void SwitchStmtScope::expandMe(DeferredNodes &deferred) {
-  ScopeCreator().visitExpr(stmt->getSubjectExpr(), this, deferred);
+void SwitchStmtScope::expandMe(ScopeCreator &scopeCreator) {
+  ASTVisitorForScopeCreation().visitExpr(stmt->getSubjectExpr(), this, scopeCreator);
 
   for (auto caseStmt : stmt->getCases())
-    createSubtree<CaseStmtScope>(caseStmt);
+    scopeCreator.withoutDeferrals().createSubtree<CaseStmtScope>(this, caseStmt);
 }
 
-void ForEachStmtScope::expandMe(DeferredNodes &deferred) {
-  ScopeCreator().visitExpr(stmt->getSequence(), this, deferred);
+void ForEachStmtScope::expandMe(ScopeCreator &scopeCreator) {
+  ASTVisitorForScopeCreation().visitExpr(stmt->getSequence(), this, scopeCreator);
 
   // Add a child describing the scope of the pattern.
-  createSubtree<ForEachPatternScope>(stmt);
+  scopeCreator.withoutDeferrals().createSubtree<ForEachPatternScope>(this, stmt);
 }
 
-void ForEachPatternScope::expandMe(DeferredNodes &deferred) {
-  ScopeCreator().visitExpr(stmt->getWhere(), this, deferred);
-  ScopeCreator().visitBraceStmt(stmt->getBody(), this, deferred);
+void ForEachPatternScope::expandMe(ScopeCreator &scopeCreator) {
+  ASTVisitorForScopeCreation().visitExpr(stmt->getWhere(), this, scopeCreator);
+  ASTVisitorForScopeCreation().visitBraceStmt(stmt->getBody(), this, scopeCreator);
 }
 
-void CatchStmtScope::expandMe(DeferredNodes &deferred) {
-  ScopeCreator().visitExpr(stmt->getGuardExpr(), this, deferred);
+void CatchStmtScope::expandMe(ScopeCreator &scopeCreator) {
+  ASTVisitorForScopeCreation().visitExpr(stmt->getGuardExpr(), this, scopeCreator);
   creationState.createScopeFor(stmt->getBody(), this);
 }
 
-void CaseStmtScope::expandMe(DeferredNodes &deferred) {
+void CaseStmtScope::expandMe(ScopeCreator &scopeCreator) {
   for (auto &caseItem : stmt->getMutableCaseLabelItems())
-    ScopeCreator().visitExpr(caseItem.getGuardExpr(), this, deferred);
+    ASTVisitorForScopeCreation().visitExpr(caseItem.getGuardExpr(), this, scopeCreator);
 
   // Add a child for the case body.
   creationState.createScopeFor(stmt->getBody(), this);
 }
 
-void GuardStmtScope::expandMe(DeferredNodes &deferred) {
+void GuardStmtScope::expandMe(ScopeCreator &scopeCreator) {
   // Add a child to describe the guard condition.
-  createSubtree<GuardConditionalClauseScope>(stmt, 0);
+  scopeCreator.withoutDeferrals().createSubtree<GuardConditionalClauseScope>(this, stmt, 0);
 
   // Add a child for the 'guard' body, which always exits.
   creationState.createScopeFor(stmt->getBody(), this);
 
   // Add a child to describe the guard condition for the continuation.
-  createSubtreeWithDeferrals<GuardContinuationScope>(deferred, stmt, 0);
+  scopeCreator.createSubtree<GuardContinuationScope>(this, stmt, 0);
 }
 
-void BraceStmtScope::expandMe(DeferredNodes &deferred) {
-  deferred.pushAllNecessaryNodes(stmt->getElements());
+void BraceStmtScope::expandMe(ScopeCreator &scopeCreator) {
+  scopeCreator.pushAllNecessaryNodes(stmt->getElements());
   creationState.createScopeForNextDeferredNode(this);
 }
 
-void VarDeclScope::expandMe(DeferredNodes &deferred) {
-  assert(deferred.empty() && "Decls needing this var go into the PatternEntryUseScope, not here");
-  addChildrenForAllExplicitAccessors(decl, deferred);
+void VarDeclScope::expandMe(ScopeCreator &scopeCreator) {
+  assert(scopeCreator.empty() && "Decls needing this var go into the PatternEntryUseScope, not here");
+  addChildrenForAllExplicitAccessors(decl, scopeCreator);
 }
 
-void SubscriptDeclScope::expandMe(DeferredNodes &deferred) {
+void SubscriptDeclScope::expandMe(ScopeCreator &scopeCreator) {
   auto *sub = decl;
   auto *leaf = createGenericParamScopes(sub, sub->getGenericParams());
-  auto *params = leaf->createSubtree<AbstractFunctionParamsScope>(
+  auto *params = scopeCreator.withoutDeferrals().createSubtree<AbstractFunctionParamsScope>(leaf,
       sub->getIndices(), sub->getGetter());
-  params->addChildrenForAllExplicitAccessors(sub, deferred);
+  params->addChildrenForAllExplicitAccessors(sub, scopeCreator);
 }
 
 void WholeClosureScope::expandMe(DeferredNodes &) {
   if (auto *cl = captureList.getPtrOrNull())
-    createSubtree<CaptureListScope>(cl);
+    scopeCreator.withoutDeferrals().createSubtree<CaptureListScope>(this, cl);
   if (closureExpr->getInLoc().isValid())
-    createSubtree<ClosureParametersScope>(captureList, closureExpr);
-  createSubtree<ClosureBodyScope>(captureList, closureExpr);
+    scopeCreator.withoutDeferrals().createSubtree<ClosureParametersScope>(this, captureList, closureExpr);
+  scopeCreator.withoutDeferrals().createSubtree<ClosureBodyScope>(this, captureList, closureExpr);
 }
 
 void CaptureListScope::expandMe(DeferredNodes &) {
@@ -661,37 +688,37 @@ void CaptureListScope::expandMe(DeferredNodes &) {
 }
 
 void ClosureBodyScope::expandMe(DeferredNodes &) {
-  createSubtree<BraceStmtScope>(closureExpr->getBody());
+  scopeCreator.withoutDeferrals().createSubtree<BraceStmtScope>(this, closureExpr->getBody());
 }
 
-void TopLevelCodeScope::expandMe(DeferredNodes &deferred) {
-  createSubtreeWithDeferrals<BraceStmtScope>(deferred, decl->getBody());
-  assert(deferred.empty() &&
+void TopLevelCodeScope::expandMe(ScopeCreator &scopeCreator) {
+  scopeCreator.createSubtree<BraceStmtScope>(this, decl->getBody());
+  assert(scopeCreator.empty() &&
          "a top level code scope should snarf up all the deferred nodes");
 }
 
-void AbstractFunctionParamsScope::expandMe(DeferredNodes &deferred) {
+void AbstractFunctionParamsScope::expandMe(ScopeCreator &scopeCreator) {
   // Each initializer for a function parameter is its own, sibling, scope.
   // Unlike generic parameters or pattern initializers, it cannot refer to a
   // previous parameter.
   for (ParamDecl *pd : params->getArray()) {
     if (pd->getDefaultValue())
-      createSubtree<DefaultArgumentInitializerScope>(pd);
+      scopeCreator.withoutDeferrals().createSubtree<DefaultArgumentInitializerScope>(this, pd);
   }
 }
 
-void DefaultArgumentInitializerScope::expandMe(DeferredNodes &deferred) {
+void DefaultArgumentInitializerScope::expandMe(ScopeCreator &scopeCreator) {
   auto *initExpr = decl->getDefaultValue();
   assert(initExpr);
-  ScopeCreator().visitExpr(initExpr, this, deferred);
+  ASTVisitorForScopeCreation().visitExpr(initExpr, this, scopeCreator);
 }
 
-void GTXScope::expandMe(DeferredNodes &deferred) {
-  portion->expandScope(this, deferred);
+void GTXScope::expandMe(ScopeCreator &scopeCreator) {
+  portion->expandScope(this, scopeCreator);
 }
 
 void GTXWholePortion::expandScope(GTXScope *scope,
-                                  DeferredNodes &deferred) const {
+                                  ScopeCreator &scopeCreator) const {
   // Prevent circular request bugs caused by illegal input and
   // doing lookups that getExtendedNominal in the midst of getExtendedNominal.
   if (scope->shouldHaveABody() && !scope->doesDeclHaveABody())
@@ -706,7 +733,7 @@ void GTXWholePortion::expandScope(GTXScope *scope,
 }
 
 void IterableTypeBodyPortion::expandScope(GTXScope *scope,
-                                          DeferredNodes &deferred) const {
+                                          ScopeCreator &scopeCreator) const {
   if (auto *idc = scope->getIterableDeclContext().getPtrOrNull())
     for (auto member : idc->getMembers())
       creationState.createScopeFor(member, scope);
@@ -715,25 +742,25 @@ void IterableTypeBodyPortion::expandScope(GTXScope *scope,
 #pragma mark createBodyScope
 
 void ExtensionScope::createBodyScope(ASTScopeImpl *leaf) {
-  leaf->createSubtree2D<ExtensionScope, IterableTypeBodyPortion>(decl);
+  scopeCreator.withoutDeferrals.createSubtree2D<ExtensionScope, IterableTypeBodyPortion>(leaf, decl);
 }
 void NominalTypeScope::createBodyScope(ASTScopeImpl *leaf) {
-  leaf->createSubtree2D<NominalTypeScope, IterableTypeBodyPortion>(decl);
+  scopeCreator.withoutDeferrals.createSubtree2D<NominalTypeScope, IterableTypeBodyPortion>(leaf, decl);
 }
 
 #pragma mark createTrailingWhereClauseScope
 
 ASTScopeImpl *
 ExtensionScope::createTrailingWhereClauseScope(ASTScopeImpl *parent) {
-  return parent->createSubtree2D<ExtensionScope, GTXWherePortion>(decl);
+  return scopeCreator.withoutDeferrals.createSubtree2D<ExtensionScope, GTXWherePortion>(parent, decl);
 }
 ASTScopeImpl *
 NominalTypeScope::createTrailingWhereClauseScope(ASTScopeImpl *parent) {
-  return parent->createSubtree2D<NominalTypeScope, GTXWherePortion>(decl);
+  return scopeCreator.withoutDeferrals.createSubtree2D<NominalTypeScope, GTXWherePortion>(scopeCreator, decl);
 }
 ASTScopeImpl *
 TypeAliasScope::createTrailingWhereClauseScope(ASTScopeImpl *parent) {
-  return parent->createSubtree2D<TypeAliasScope, GTXWherePortion>(decl);
+  return scopeCreator.withoutDeferrals.createSubtree2D<TypeAliasScope, GTXWherePortion>(parent, decl);
 }
 
 #pragma mark misc
@@ -829,7 +856,7 @@ void AbstractPatternEntryScope::addVarDeclScopesAndTheirAccessors(
   getPatternEntry().getPattern()->forEachVariable([&](VarDecl *var) {
     const bool hasAccessors = var->getBracesRange().isValid();
     if (hasAccessors && !var->isImplicit())
-      parent->createSubtree<VarDeclScope>(var);
+      scopeCreator.withoutDeferrals().createSubtree<VarDeclScope>(parent, var);
   });
 }
 
@@ -841,14 +868,14 @@ bool ASTScopeImpl::isCreatedDirectly(const ASTNode n) {
 }
 
 void ASTScopeImpl::addChildrenForAllExplicitAccessors(AbstractStorageDecl *asd,
-                                                      DeferredNodes &deferred) {
+                                                      ScopeCreator &scopeCreator) {
   for (auto accessor : asd->getAllAccessors()) {
     if (!accessor->isImplicit() && accessor->getStartLoc().isValid()) {
       // Accessors are always nested within their abstract storage declaration.
       // The nesting may not be immediate, because subscripts may have
       // intervening scopes for generics.
       if (getEnclosingAbstractStorageDecl() == accessor->getStorage())
-        ScopeCreator().visitAbstractFunctionDecl(accessor, this, deferred);
+        ASTVisitorForScopeCreation().visitAbstractFunctionDecl(accessor, this, scopeCreator);
     }
   }
 }
@@ -860,11 +887,11 @@ void ConditionalClauseScope::createSubtreeForCondition() {
   case StmtConditionElement::CK_Availability:
     return;
   case StmtConditionElement::CK_Boolean:
-    ScopeCreator().visitExpr(cond.getBoolean(), this, noDeferrals);
+    ASTVisitorForScopeCreation().visitExpr(cond.getBoolean(), this, noDeferrals);
     return;
   case StmtConditionElement::CK_PatternBinding:
-    createSubtree<StatementConditionElementPatternScope>(cond.getPattern());
-    ScopeCreator().visitExpr(cond.getInitializer(), this, noDeferrals);
+    scopeCreator.withoutDeferrals().createSubtree<StatementConditionElementPatternScope>(parent, cond.getPattern());
+    ASTVisitorForScopeCreation().visitExpr(cond.getInitializer(), this, noDeferrals);
     return;
   }
 }
@@ -874,36 +901,36 @@ void GuardContinuationScope::createSubtreeForCondition() {
 }
 
 void WhileConditionalClauseScope::createSubtreeForNextConditionalClause(
-    DeferredNodes &deferred) {
-  createSubtreeWithDeferrals<WhileConditionalClauseScope>(deferred, stmt,
+    ScopeCreator &scopeCreator) {
+  scopeCreator.createSubtree<WhileConditionalClauseScope>(this, stmt,
                                                           index + 1);
 }
 void IfConditionalClauseScope::createSubtreeForNextConditionalClause(
-    DeferredNodes &deferred) {
-  createSubtreeWithDeferrals<IfConditionalClauseScope>(deferred, stmt,
+    ScopeCreator &scopeCreator) {
+  scopeCreator.createSubtree<IfConditionalClauseScope>(this, stmt,
                                                        index + 1);
 }
 void GuardConditionalClauseScope::createSubtreeForNextConditionalClause(
-    DeferredNodes &deferred) {
-  createSubtreeWithDeferrals<GuardConditionalClauseScope>(deferred, stmt,
+    ScopeCreator &scopeCreator) {
+  scopeCreator.createSubtree<GuardConditionalClauseScope>(this, stmt,
                                                           index + 1);
 }
 void GuardContinuationScope::createSubtreeForNextConditionalClause(
-    DeferredNodes &deferred) {
-  createSubtreeWithDeferrals<GuardContinuationScope>(deferred, stmt, index + 1);
+    ScopeCreator &scopeCreator) {
+  scopeCreator.createSubtree<GuardContinuationScope>(this, stmt, index + 1);
 }
 
 void WhileConditionalClauseScope::createSubtreeForAfterClauses(
-    DeferredNodes &deferred) {
+    ScopeCreator &scopeCreator) {
   creationState.createScopeFor(stmt->getBody(), this);
 }
 void IfConditionalClauseScope::createSubtreeForAfterClauses(
-    DeferredNodes &deferred) {
+    ScopeCreator &scopeCreator) {
   creationState.createScopeFor(stmt->getThenStmt(), this);
 }
 
 void GuardConditionalClauseScope::createSubtreeForAfterClauses(
-    DeferredNodes &deferred) {
+    ScopeCreator &scopeCreator) {
   // There aren't any additional conditional clauses. Add the appropriate
   // nested scope based on the kind of statement.
 
@@ -947,7 +974,7 @@ void ASTScopeImpl::addChildrenForCapturesAndClosuresIn(Expr *expr) {
   // Use the ASTWalker to find buried captures and closures
   forEachUniqueClosureIn(expr, [&](NullablePtr<CaptureListExpr> captureList,
                                    ClosureExpr *closureExpr) {
-    createSubtree<WholeClosureScope>(captureList, closureExpr);
+    scopeCreator.withoutDeferrals().createSubtree<WholeClosureScope>(parent, captureList, closureExpr);
   });
 }
 
@@ -970,36 +997,6 @@ void *DeferredNodes::operator new(size_t bytes, const ASTContext &ctx,
   return ctx.Allocate(bytes, alignment);
 }
 
-#pragma mark creation methods
-
-template <typename ScopeClass, typename... Args>
-ASTScopeImpl *ASTScopeImpl::createSubtree(Args... args) {
-  DeferredNodes noDeferrals(__FILE__, __LINE__, *this, nullptr);
-  return createSubtreeWithDeferrals<ScopeClass>(noDeferrals, args...);
-}
-
-template <typename ScopeClass, typename... Args>
-ASTScopeImpl *ASTScopeImpl::createSubtreeWithDeferrals(DeferredNodes &deferred,
-                                                       Args... args) {
-  auto *child = new (getASTContext()) ScopeClass(args...);
-  addChild(child);
-  child->expandMeAndCreateScopesForDeferredNodes(deferred);
-  return child;
-}
-
-template <typename ScopeClass, typename PortionT, typename... Args>
-ASTScopeImpl *ASTScopeImpl::createSubtree2D(Args... args) {
-  DeferredNodes noDeferrals(__FILE__, __LINE__, *this, nullptr);
-  return createSubtreeWithDeferrals2D<ScopeClass, PortionT>(noDeferrals, args...);
-}
-
-template <typename ScopeClass, typename PortionT, typename... Args>
-ASTScopeImpl *
-ASTScopeImpl::createSubtreeWithDeferrals2D(DeferredNodes &deferred,
-                                           Args... args) {
-  const Portion *portion = new (getASTContext()) PortionT();
-  return createSubtreeWithDeferrals<ScopeClass>(deferred, portion, args...);
-}
 
 #pragma mark DeferredNodes definitions
 

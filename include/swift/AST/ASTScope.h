@@ -95,7 +95,7 @@ class DeferredNodes;
 /// -dump-scope-maps expanded
 /// \endcode
 class ASTScopeImpl {
-  friend class ScopeCreator;
+  friend class ASTVisitorForScopeCreation;
   friend class Portion;
   friend class GTXWholePortion;
   friend class NomExtDeclPortion;
