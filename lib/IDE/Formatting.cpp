@@ -456,7 +456,9 @@ public:
     auto AtCursorExpr = Cursor->getAsExpr();
     if (AtExprEnd && AtCursorExpr && (isa<ParenExpr>(AtCursorExpr) ||
                                       isa<TupleExpr>(AtCursorExpr))) {
-      if (isa<CallExpr>(AtExprEnd)) {
+      if (isa<CallExpr>(AtExprEnd) ||
+          isa<ArrayExpr>(AtExprEnd) ||
+          isa<DictionaryExpr>(AtExprEnd)) {
         if (exprEndAtLine(AtExprEnd, Line) &&
             exprEndAtLine(AtCursorExpr, Line)) {
           return false;
