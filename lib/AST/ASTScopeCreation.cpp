@@ -60,11 +60,11 @@ class ScopeCreator {
   /// The last scope to "adopt" deferred nodes.
   /// When adding \c Decls to a scope tree that have been created since the tree
   /// was originally built, add them as children of this scope.
-  ASTSourceFileImpl *_lastAdopter;
+  ASTScopeImpl *_lastAdopter;
 
   /// When copying for "withoutDeferrals" this reference refers to the original
   /// _lastAdopter
-  ASTSourceFileImpl *&lastAdopter;
+  ASTScopeImpl *&lastAdopter;
 
   /// Be robust against AST mutatations in flight:
   llvm::DenseSet<ClosureExpr *> alreadyHandledClosures;
@@ -72,11 +72,12 @@ class ScopeCreator {
   ASTContext &ctx;
 
 public:
-  static SourceFileScope *createScopeTreeFor(SourceFile *);
 
-  ScopeCreator(SourceFile *SF) ctx(SF->getASTContext()),
-      sourceFileScope(constructScope<SourceFileScope>(SF, this)),
-      _lastAdopter(sourceFileScope), lastAdopter(lastAdopter) {}
+  ScopeCreator(SourceFile *SF)
+  : ctx(SF->getASTContext()),
+      sourceFileScope(constructScope<ASTSourceFileScope>(SF, this)),
+      _lastAdopter(sourceFileScope),
+        lastAdopter(lastAdopter) {}
 
   ~ScopeCreator() {
     assert(empty() && "Should have consumed all deferred nodes");
@@ -89,7 +90,7 @@ public:
   ScopeCreator withoutDeferrals() { return new (ctx) ScopeCreator(*this); }
 
 private:
-  ScopeCreator(ScopeCreator &sc) explicit
+  explicit ScopeCreator(ScopeCreator &sc)
       : sourceFileScope(sc.sourceFileScope),
         lastAdopter(sc.lastAdopter),
         alreadyHandledClosures(sc.alreadyHandledClosures),
@@ -97,7 +98,7 @@ private:
 
 public:
   template <typename Scope, typename... Args>
-  static ASTScopeImpl *constructScope(Args... args) {
+  static Scope *constructScope(Args... args) {
     return new (ctx) Scope(args...);
   }
 
@@ -110,7 +111,7 @@ protected:
   /// Create and expandScope scopes for any deferred nodes, adding those scopes
   /// as children of the receiver.
 
-  addChildScopesForAnyRemainingDeferredNodesTo(ASTScopeImpl *parent) {
+  void addChildScopesForAnyRemainingDeferredNodesTo(ASTScopeImpl *parent) {
     parent->clearCachedSourceRangesOfAncestors();
     createScopeForNextDeferredNode(parent);
     parent->cacheSourceRangesOfAncestors();
@@ -406,7 +407,7 @@ public:
 
 #pragma mark Scope tree creation and extension
 ASTScope *ASTScope::createScopeTreeFor(SourceFile *SF) {
-  ScopeCreator scopeCreßator(SF);
+  ScopeCreator scopeCreator(SF);
   scopeCreator.addAnyNewDeclsToTree();
   return sourceFileScope;
 }
