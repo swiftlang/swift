@@ -2735,6 +2735,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
                                   wrapperNominal->getFullName());
         return;
       }
+      wrapperAttr->setSemanticInit(initializer);
 
       // Note that we have applied to property wrapper, so we can adjust
       // the initializer type later.

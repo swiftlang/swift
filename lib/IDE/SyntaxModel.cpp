@@ -1026,7 +1026,7 @@ bool ModelASTWalker::handleSpecialDeclAttribute(const DeclAttribute *D,
                                                 ArrayRef<Token> Toks) {
   if (!D)
     return false;
-  if (isa<AvailableAttr>(D)) {
+  if (isa<AvailableAttr>(D) || isa<CustomAttr>(D)) {
     unsigned I = 0;
     for (; I < TokenNodes.size(); ++ I) {
       auto Node = TokenNodes[I];
