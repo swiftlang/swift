@@ -16,7 +16,7 @@
 /// Because `_UnsafeBitset` implements a flat bit vector, it isn't suitable for
 /// holding arbitrarily large integers. The maximal element a bitset can store
 /// is fixed at its initialization.
-@_fixed_layout
+@frozen
 @usableFromInline // @testable
 internal struct _UnsafeBitset {
   @usableFromInline
@@ -146,7 +146,7 @@ extension _UnsafeBitset: Sequence {
   }
 
   @usableFromInline
-  @_fixed_layout
+  @frozen
   internal struct Iterator: IteratorProtocol {
     @usableFromInline
     internal let bitset: _UnsafeBitset
@@ -182,7 +182,7 @@ extension _UnsafeBitset: Sequence {
 ////////////////////////////////////////////////////////////////////////////////
 
 extension _UnsafeBitset {
-  @_fixed_layout
+  @frozen
   @usableFromInline
   internal struct Word {
     @usableFromInline

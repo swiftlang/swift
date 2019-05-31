@@ -292,7 +292,7 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
 // classes, so it was renamed. The old names must not be used in the new
 // runtime.
 @usableFromInline
-@_fixed_layout
+@frozen
 internal struct __CocoaSet {
   @usableFromInline
   internal let object: AnyObject
@@ -411,7 +411,7 @@ extension __CocoaSet: _SetBuffer {
 }
 
 extension __CocoaSet {
-  @_fixed_layout
+  @frozen
   @usableFromInline
   internal struct Index {
     internal var _storage: Builtin.BridgeObject

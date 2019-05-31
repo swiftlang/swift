@@ -93,7 +93,7 @@ StructLayout::StructLayout(IRGenModule &IGM,
 
   assert(typeToFill == nullptr || Ty == typeToFill);
 
-  // If the struct is not @_fixed_layout, it will have a dynamic
+  // If the struct is not @frozen, it will have a dynamic
   // layout outside of its resilience domain.
   if (decl) {
     if (IGM.isResilient(decl, ResilienceExpansion::Minimal))

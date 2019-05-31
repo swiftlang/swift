@@ -9,7 +9,7 @@ public func getVersion() -> Int {
 
 #if BEFORE
 
-@_fixed_layout
+@frozen
 public struct AddInitializer {
   public var x: Int
 
@@ -23,7 +23,7 @@ public struct AddInitializer {
 
 #else
 
-@_fixed_layout
+@frozen
 public struct AddInitializer {
   public var x: Int = 0
 

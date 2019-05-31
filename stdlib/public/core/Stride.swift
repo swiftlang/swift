@@ -203,7 +203,7 @@ extension Strideable where Self : FloatingPoint, Self == Stride {
 }
 
 /// An iterator for a `StrideTo` instance.
-@_fixed_layout
+@frozen
 public struct StrideToIterator<Element : Strideable> {
   @usableFromInline
   internal let _start: Element
@@ -246,7 +246,7 @@ extension StrideToIterator: IteratorProtocol {
 /// A sequence of values formed by striding over a half-open interval.
 ///
 /// Use the `stride(from:to:by:)` function to create `StrideTo` instances.
-@_fixed_layout
+@frozen
 public struct StrideTo<Element : Strideable> {
   @usableFromInline
   internal let _start: Element
@@ -404,7 +404,7 @@ public func stride<T>(
 }
 
 /// An iterator for a `StrideThrough` instance.
-@_fixed_layout
+@frozen
 public struct StrideThroughIterator<Element : Strideable> {
   @usableFromInline
   internal let _start: Element
@@ -458,7 +458,7 @@ extension StrideThroughIterator: IteratorProtocol {
 ///
 /// Use the `stride(from:through:by:)` function to create `StrideThrough` 
 /// instances.
-@_fixed_layout
+@frozen
 public struct StrideThrough<Element: Strideable> {
   @usableFromInline
   internal let _start: Element

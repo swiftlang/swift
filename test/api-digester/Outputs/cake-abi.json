@@ -134,7 +134,7 @@
       "usr": "s:4cake2S1V",
       "moduleName": "cake",
       "declAttributes": [
-        "FixedLayout"
+        "Frozen"
       ],
       "conformances": [
         {
@@ -838,7 +838,7 @@
       "usr": "s:4cake17fixedLayoutStructV",
       "moduleName": "cake",
       "declAttributes": [
-        "FixedLayout"
+        "Frozen"
       ]
     },
     {
@@ -1292,7 +1292,7 @@
       "usr": "s:Si",
       "moduleName": "Swift",
       "declAttributes": [
-        "FixedLayout"
+        "Frozen"
       ],
       "conformances": [
         {
