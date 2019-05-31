@@ -377,7 +377,7 @@ protocol ExpressibleByDogLiteral {}
 struct Kitten : ExpressibleByCatLiteral {}
 struct Puppy : ExpressibleByDogLiteral {}
 
-struct Claws<A: ExpressibleByCatLiteral> {
+struct Claws<A: ExpressibleByCatLiteral> { // expected-note 3 {{'A' declared as parameter to type 'Claws'}}
   struct Fangs<B: ExpressibleByDogLiteral> { } // expected-note {{where 'B' = 'NotADog'}}
 }
 
@@ -387,7 +387,7 @@ func pets<T>(fur: T) -> Claws<Kitten>.Fangs<T> {
   return Claws<Kitten>.Fangs<T>()
 }
 
-func something<T>() -> T { // expected-note {{in call to function 'something()'}}
+func something<T>() -> T {
   while true {}
 }
 
@@ -398,11 +398,14 @@ func test() {
   let _: Claws.Fangs<Puppy> = pets(fur: Puppy())
   let _: Claws.Fangs<Puppy> = Claws<Kitten>.Fangs()
   let _: Claws.Fangs<Puppy> = Claws.Fangs()
-  // expected-error@-1 {{cannot convert value of type 'Claws<_>.Fangs<_>' to specified type 'Claws.Fangs<Puppy>'}}
+  // expected-error@-1 {{generic parameter 'A' could not be inferred}}
+  // expected-note@-2 {{explicitly specify the generic arguments to fix this issue}} {{36-36=<<#A: ExpressibleByCatLiteral#>>}}
   let _: Claws.Fangs<NotADog> = something()
-  // expected-error@-1 {{generic parameter 'T' could not be inferred}} // FIXME: bad diagnostic
-  _ = Claws.Fangs<NotADog>() // TODO(diagnostics): There should be two errors here - "cannot infer A" and "NotADog conformance to ExpressibleByDogLiteral"
-  // expected-error@-1 {{referencing initializer 'init()' on 'Claws.Fangs' requires that 'NotADog' conform to 'ExpressibleByDogLiteral'}}
+  // expected-error@-1 {{generic parameter 'A' could not be inferred}}
+  _ = Claws.Fangs<NotADog>()
+  // expected-error@-1 {{generic parameter 'A' could not be inferred}}
+  // expected-error@-2 {{referencing initializer 'init()' on 'Claws.Fangs' requires that 'NotADog' conform to 'ExpressibleByDogLiteral'}}
+  // expected-note@-3 {{explicitly specify the generic arguments to fix this issue}} {{12-12=<<#A: ExpressibleByCatLiteral#>>}}
 }
 
 // https://bugs.swift.org/browse/SR-4379
