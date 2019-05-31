@@ -22,6 +22,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/Types.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/SILArgument.h"
@@ -1768,6 +1769,15 @@ static CanAnyFunctionType getStoredPropertyInitializerInterfaceType(
   CanType resultTy =
     VD->getParentPattern()->getType()->mapTypeOutOfContext()
           ->getCanonicalType();
+
+  // If this is the backing storage for a property with an attached
+  // wrapper that was initialized with '=', the stored property initializer
+  // will be in terms of the original property's type.
+  if (auto originalProperty = VD->getOriginalWrappedProperty()) {
+    if (originalProperty->isPropertyWrapperInitializedWithInitialValue())
+      resultTy = originalProperty->getValueInterfaceType()->getCanonicalType();
+  }
+
   auto sig = TC.getEffectiveGenericSignature(DC);
 
   return CanAnyFunctionType::get(sig, {}, resultTy);
@@ -2101,6 +2111,7 @@ CaptureInfo
 TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
   // First, bail out if there are no local captures at all.
   if (!fn.getCaptureInfo().hasLocalCaptures() &&
+      !fn.getCaptureInfo().hasOpaqueValueCapture() &&
       !fn.getCaptureInfo().hasDynamicSelfCapture()) {
     CaptureInfo info;
     info.setGenericParamCaptures(
@@ -2123,7 +2134,8 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
 
   bool capturesGenericParams = false;
   DynamicSelfType *capturesDynamicSelf = nullptr;
-  
+  OpaqueValueExpr *capturesOpaqueValue = nullptr;
+
   std::function<void (AnyFunctionRef)> collectFunctionCaptures
   = [&](AnyFunctionRef curFn) {
     if (!visitedFunctions.insert(curFn).second)
@@ -2133,6 +2145,8 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
       capturesGenericParams = true;
     if (curFn.getCaptureInfo().hasDynamicSelfCapture())
       capturesDynamicSelf = curFn.getCaptureInfo().getDynamicSelfType();
+    if (curFn.getCaptureInfo().hasOpaqueValueCapture())
+      capturesOpaqueValue = curFn.getCaptureInfo().getOpaqueValue();
 
     SmallVector<CapturedValue, 4> localCaptures;
     curFn.getCaptureInfo().getLocalCaptures(localCaptures);
@@ -2247,6 +2261,11 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
     resultingCaptures.push_back(capturePair.second);
   }
 
+  // If we captured an opaque value, add it.
+  if (capturesOpaqueValue) {
+    resultingCaptures.push_back(CapturedValue(capturesOpaqueValue, 0));
+  }
+
   // If we captured the dynamic 'Self' type and we have a 'self' value also,
   // add it as the final capture. Otherwise, add a fake hidden capture for
   // the dynamic 'Self' metatype.
@@ -2263,6 +2282,7 @@ TypeConverter::getLoweredLocalCaptures(AnyFunctionRef fn) {
   auto &cachedCaptures = inserted.first->second;
   cachedCaptures.setGenericParamCaptures(capturesGenericParams);
   cachedCaptures.setDynamicSelfType(capturesDynamicSelf);
+  cachedCaptures.setOpaqueValue(capturesOpaqueValue);
   cachedCaptures.setCaptures(Context.AllocateCopy(resultingCaptures));
   
   return cachedCaptures;

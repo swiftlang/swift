@@ -27,8 +27,10 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeCheckerDebugConsumer.h"
@@ -2565,21 +2567,43 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
 
   /// Type checking listener for pattern binding initializers.
   class BindingListener : public ExprTypeCheckListener {
+    TypeChecker &tc;
     Pattern *&pattern;
     Expr *&initializer;
 
     /// The locator we're using.
     ConstraintLocator *Locator;
 
+    /// The context in which we are performing type checking.
+    DeclContext *dc;
+
     /// The type of the initializer.
     Type initType;
 
-  public:
-    explicit BindingListener(Pattern *&pattern, Expr *&initializer)
-      : pattern(pattern), initializer(initializer),
-        Locator(nullptr) { }
+    /// Whether we applied a property wrapper to the initializer expression.
+    PropertyWrapperTypeInfo appliedPropertyWrapper;
 
-    Type getInitType() const { return initType; }
+  public:
+    explicit BindingListener(TypeChecker &tc, Pattern *&pattern,
+                             Expr *&initializer, DeclContext *dc)
+      : tc(tc), pattern(pattern), initializer(initializer),
+        Locator(nullptr), dc(dc) {
+      maybeApplyPropertyWrapper();
+    }
+
+    /// Retrieve the type to which the pattern should be coerced.
+    Type getPatternInitType() const {
+      if (!appliedPropertyWrapper || initType->hasError() ||
+          initType->is<TypeVariableType>())
+        return initType;
+
+      // We applied a property wrapper, so dig the pattern initialization
+      // type out of the value property of the wrapper.
+      return initType->getTypeOfMember(
+          dc->getParentModule(),
+          appliedPropertyWrapper.valueVar,
+          appliedPropertyWrapper.valueVar->getValueInterfaceType());
+    }
 
     bool builtConstraints(ConstraintSystem &cs, Expr *expr) override {
       assert(!expr->isSemanticallyInOutExpr());
@@ -2589,13 +2613,27 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
           cs.getConstraintLocator(expr, ConstraintLocator::ContextualType);
 
       // Collect constraints from the pattern.
-      initType = cs.generateConstraints(pattern, Locator);
-      if (!initType)
+      Type patternType = cs.generateConstraints(pattern, Locator);
+      if (!patternType)
         return true;
 
-      // Add a conversion constraint between the types.
-      cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
-                       initType, Locator, /*isFavored*/true);
+      if (appliedPropertyWrapper) {
+        // When we have applied a property wrapper, the initializer type
+        // is the initialization of the property wrapper instance.
+        initType = cs.getType(expr);
+
+        // Add a conversion constraint between the pattern type and the
+        // property wrapper's "value" type.
+        cs.addConstraint(ConstraintKind::Conversion, patternType,
+                         getPatternInitType(), Locator, /*isFavored*/true);
+      } else {
+        // The initializer type is the type of the pattern.
+        initType = patternType;
+
+        // Add a conversion constraint between the types.
+        cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
+                         patternType, Locator, /*isFavored*/true);
+      }
 
       // The expression has been pre-checked; save it in case we fail later.
       initializer = expr;
@@ -2620,13 +2658,97 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
 
       assert(solution.getConstraintSystem().getType(expr)->isEqual(initType));
 
+      // Record the property wrapper type and note that the initializer has
+      // been subsumed by the backing property.
+      if (appliedPropertyWrapper) {
+        auto var = pattern->getSingleVar();
+        var->getParentPatternBinding()->setInitializerSubsumed(0);
+        tc.Context.setSideCachedPropertyWrapperBackingPropertyType(
+            var, initType->mapTypeOutOfContext());
+
+        // Record the semantic initializer.
+        var->getAttachedPropertyWrapper()->setSemanticInit(expr);
+      }
+
       initializer = expr;
       return expr;
     }
+
+  private:
+    // If the pattern contains a single variable that has an attached
+    // property wrapper, set up the initializer expression to initialize
+    // the backing storage.
+    void maybeApplyPropertyWrapper() {
+      auto singleVar = pattern->getSingleVar();
+      if (!singleVar)
+        return;
+
+      auto wrapperAttr = singleVar->getAttachedPropertyWrapper();
+      if (!wrapperAttr)
+        return;
+
+      auto wrapperNominal = evaluateOrDefault(
+          tc.Context.evaluator, CustomAttrNominalRequest{wrapperAttr, dc},
+          nullptr);
+      if (!wrapperNominal)
+        return;
+
+      auto wrapperInfo = wrapperNominal->getPropertyWrapperTypeInfo();
+      if (!wrapperInfo)
+        return;
+
+      Type wrapperType = singleVar->getAttachedPropertyWrapperType();
+      if (!wrapperType)
+        return;
+
+      // If the property wrapper is directly initialized, form the
+      // call.
+      auto &ctx = singleVar->getASTContext();
+      auto typeExpr =
+          TypeExpr::createImplicitHack(wrapperAttr->getTypeLoc().getLoc(),
+                                       Type(wrapperType), ctx);
+      if (wrapperAttr->getArg() != nullptr) {
+        if (initializer) {
+          singleVar->diagnose(diag::property_wrapper_and_normal_init,
+                              singleVar->getFullName())
+            .highlight(wrapperAttr->getRange())
+            .highlight(initializer->getSourceRange());
+        }
+
+        initializer = CallExpr::create(
+            ctx, typeExpr, wrapperAttr->getArg(),
+            wrapperAttr->getArgumentLabels(),
+            wrapperAttr->getArgumentLabelLocs(), /*hasTrailingClosure=*/false,
+            /*implicit=*/false);
+      } else if (wrapperInfo.initialValueInit) {
+        // FIXME: we want to use the initialValueInit we found.
+        assert(initializer);
+        initializer = CallExpr::createImplicit(
+            ctx, typeExpr, {initializer}, {ctx.Id_initialValue});
+      } else {
+        singleVar->diagnose(diag::property_wrapper_init_without_initial_value,
+                            singleVar->getFullName(), wrapperType)
+          .highlight(initializer->getSourceRange());
+        ctx.Diags.diagnose(wrapperAttr->getLocation(),
+                           diag::property_wrapper_direct_init)
+          .fixItInsertAfter(initializer->getSourceRange().End,
+                            "(<# initializer args #>)");
+        wrapperNominal->diagnose(diag::kind_declname_declared_here,
+                                  wrapperNominal->getDescriptiveKind(),
+                                  wrapperNominal->getFullName());
+        return;
+      }
+
+      // Note that we have applied to property wrapper, so we can adjust
+      // the initializer type later.
+      appliedPropertyWrapper = wrapperInfo;
+    }
+
   };
 
-  assert(initializer && "type-checking an uninitialized binding?");
-  BindingListener listener(pattern, initializer);
+  BindingListener listener(*this, pattern, initializer, DC);
+  if (!initializer)
+    return true;
 
   TypeLoc contextualType;
   auto contextualPurpose = CTP_Unused;
@@ -2667,7 +2789,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
     // FIXME: initTy should be the same as resultTy; now that typeCheckExpression()
     // returns a Type and not bool, we should be able to simplify the listener
     // implementation here.
-    auto initTy = listener.getInitType();
+    auto initTy = listener.getPatternInitType();
     if (initTy->hasDependentMember())
       return true;
 
@@ -2708,11 +2830,6 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
   Pattern *pattern = PBD->getPattern(patternNumber);
   Expr *init = PBD->getInit(patternNumber);
 
-  if (!init) {
-    PBD->setInvalid();
-    return true;
-  }
-
   // Enter an initializer context if necessary.
   PatternBindingInitializer *initContext = nullptr;
   DeclContext *DC = PBD->getDeclContext();
@@ -2723,6 +2840,11 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
   }
 
   bool hadError = typeCheckBinding(pattern, init, DC);
+  if (!init) {
+    PBD->setInvalid();
+    return true;
+  }
+
   PBD->setPattern(patternNumber, pattern, initContext);
   PBD->setInit(patternNumber, init);
 

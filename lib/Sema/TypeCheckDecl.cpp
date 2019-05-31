@@ -33,6 +33,7 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/TypeWalker.h"
@@ -970,11 +971,12 @@ static void validatePatternBindingEntry(TypeChecker &tc,
   // even though the PBD is inside a TopLevelCodeDecl.
   TypeResolutionOptions options(TypeResolverContext::PatternBindingDecl);
 
-  if (binding->getInit(entryNumber)) {
+  if (binding->isInitialized(entryNumber)) {
     // If we have an initializer, we can also have unknown types.
     options |= TypeResolutionFlags::AllowUnspecifiedTypes;
     options |= TypeResolutionFlags::AllowUnboundGenerics;
   }
+
   if (tc.typeCheckPattern(pattern, binding->getDeclContext(), options)) {
     setBoundVarsTypeError(pattern, tc.Context);
     binding->setInvalid();
@@ -1886,6 +1888,21 @@ static bool computeIsGetterMutating(TypeChecker &TC,
            !storage->isStatic();
   }
 
+  // If we have an attached property wrapper, the getter is mutating if
+  // the "value" property of the wrapper type is mutating and we're in
+  // a context that has value semantics.
+  if (auto var = dyn_cast<VarDecl>(storage)) {
+    if (auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo()) {
+      if (wrapperInfo.valueVar &&
+          (!storage->getGetter() || storage->getGetter()->isImplicit())) {
+        TC.validateDecl(wrapperInfo.valueVar);
+        return wrapperInfo.valueVar->isGetterMutating() &&
+            var->isInstanceMember() &&
+            doesContextHaveValueSemantics(var->getDeclContext());
+      }
+    }
+  }
+
   switch (storage->getReadImpl()) {
   case ReadImplKind::Stored:
     return false;
@@ -1906,6 +1923,21 @@ static bool computeIsGetterMutating(TypeChecker &TC,
 
 static bool computeIsSetterMutating(TypeChecker &TC,
                                     AbstractStorageDecl *storage) {
+  // If we have an attached property wrapper, the setter is mutating if
+  // the "value" property of the wrapper type is mutating and we're in
+  // a context that has value semantics.
+  if (auto var = dyn_cast<VarDecl>(storage)) {
+    if (auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo()) {
+      if (wrapperInfo.valueVar &&
+          (!storage->getSetter() || storage->getSetter()->isImplicit())) {
+        TC.validateDecl(wrapperInfo.valueVar);
+        return wrapperInfo.valueVar->isSetterMutating() &&
+            var->isInstanceMember() &&
+            doesContextHaveValueSemantics(var->getDeclContext());
+      }
+    }
+  }
+
   auto impl = storage->getImplInfo();
   switch (impl.getWriteImpl()) {
   case WriteImplKind::Immutable:
@@ -2112,12 +2144,12 @@ public:
       // Static stored properties are allowed, with restrictions
       // enforced below.
       if (isa<EnumDecl>(VD->getDeclContext()) &&
-          !VD->isStatic()) {
+          !VD->isStatic() && !VD->isInvalid()) {
         // Enums can only have computed properties.
         TC.diagnose(VD->getLoc(), diag::enum_stored_property);
         VD->markInvalid();
       } else if (isa<ExtensionDecl>(VD->getDeclContext()) &&
-                 !VD->isStatic() &&
+                 !VD->isStatic() && !VD->isInvalid() &&
                  !VD->getAttrs().getAttribute<DynamicReplacementAttr>()) {
         TC.diagnose(VD->getLoc(), diag::extension_stored_property);
         VD->markInvalid();
@@ -2220,7 +2252,7 @@ public:
       // If we have a type but no initializer, check whether the type is
       // default-initializable. If so, do it.
       if (PBD->getPattern(i)->hasType() &&
-          !PBD->getInit(i) &&
+          !PBD->isInitialized(i) &&
           PBD->getPattern(i)->hasStorage() &&
           !PBD->getPattern(i)->getType()->hasError()) {
 
@@ -2253,7 +2285,7 @@ public:
         }
       }
 
-      if (PBD->getInit(i)) {
+      if (PBD->isInitialized(i)) {
         // Add the attribute that preserves the "has an initializer" value across
         // module generation, as required for TBDGen.
         PBD->getPattern(i)->forEachVariable([&](VarDecl *VD) {
@@ -2277,7 +2309,7 @@ public:
     for (unsigned i = 0, e = PBD->getNumPatternEntries(); i != e; ++i) {
       auto entry = PBD->getPatternList()[i];
     
-      if (entry.getInit() || isInSILMode) continue;
+      if (entry.isInitialized() || isInSILMode) continue;
       
       entry.getPattern()->forEachVariable([&](VarDecl *var) {
         // If the variable has no storage, it never needs an initializer.
@@ -2348,7 +2380,7 @@ public:
 
     // If the initializers in the PBD aren't checked yet, do so now.
     for (unsigned i = 0, e = PBD->getNumPatternEntries(); i != e; ++i) {
-      if (!PBD->getInit(i))
+      if (!PBD->isInitialized(i))
         continue;
 
       if (!PBD->isInitializerChecked(i))
@@ -2367,7 +2399,12 @@ public:
 
         // If we entered an initializer context, contextualize any
         // auto-closures we might have created.
-        if (!DC->isLocalContext()) {
+        // Note that we don't contextualize the initializer for a property
+        // with a wrapper, because the initializer will have been subsumed
+        // by the backing storage property.
+        if (!DC->isLocalContext() &&
+            !(PBD->getSingleVar() &&
+              PBD->getSingleVar()->getAttachedPropertyWrapper())) {
           auto *initContext = cast_or_null<PatternBindingInitializer>(
               entry.getInitContext());
           if (initContext) {
@@ -4268,7 +4305,8 @@ static bool shouldValidateMemberDuringFinalization(NominalTypeDecl *nominal,
       (isa<VarDecl>(VD) &&
        !cast<VarDecl>(VD)->isStatic() &&
        (cast<VarDecl>(VD)->hasStorage() ||
-        VD->getAttrs().hasAttribute<LazyAttr>())))
+        VD->getAttrs().hasAttribute<LazyAttr>() ||
+        cast<VarDecl>(VD)->getAttachedPropertyWrapper())))
     return true;
 
   // For classes, we need to validate properties and functions,
@@ -4363,6 +4401,12 @@ static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
         (!prop->getGetter() || !prop->getGetter()->hasBody())) {
       finalizeAbstractStorageDecl(TC, prop);
       completeLazyVarImplementation(prop);
+    }
+
+    // Ensure that we create the backing variable for a property wrapper.
+    if (prop->getAttachedPropertyWrapper()) {
+      finalizeAbstractStorageDecl(TC, prop);
+      (void)prop->getPropertyWrapperBackingProperty();
     }
   }
 
@@ -4877,6 +4921,31 @@ static void diagnoseClassWithoutInitializers(TypeChecker &tc,
     }
   }
 
+  // Lazily construct a mapping from backing storage properties to the
+  // declared properties.
+  bool computedBackingToOriginalVars = false;
+  llvm::SmallDenseMap<VarDecl *, VarDecl *> backingToOriginalVars;
+  auto getOriginalVar = [&](VarDecl *var) -> VarDecl * {
+    // If we haven't computed the mapping yet, do so now.
+    if (!computedBackingToOriginalVars) {
+      for (auto member : classDecl->getMembers()) {
+        if (auto var = dyn_cast<VarDecl>(member)) {
+          if (auto backingVar = var->getPropertyWrapperBackingProperty()) {
+            backingToOriginalVars[backingVar] = var;
+          }
+        }
+      }
+
+      computedBackingToOriginalVars = true;
+    }
+
+    auto known = backingToOriginalVars.find(var);
+    if (known == backingToOriginalVars.end())
+      return nullptr;
+
+    return known->second;
+  };
+
   for (auto member : classDecl->getMembers()) {
     auto pbd = dyn_cast<PatternBindingDecl>(member);
     if (!pbd)
@@ -4887,11 +4956,18 @@ static void diagnoseClassWithoutInitializers(TypeChecker &tc,
       continue;
    
     for (auto entry : pbd->getPatternList()) {
-      if (entry.getInit()) continue;
+      if (entry.isInitialized()) continue;
       
       SmallVector<VarDecl *, 4> vars;
       entry.getPattern()->collectVariables(vars);
       if (vars.empty()) continue;
+
+      // Replace the variables we found with the originals for diagnostic
+      // purposes.
+      for (auto &var : vars) {
+        if (auto originalVar = getOriginalVar(var))
+          var = originalVar;
+      }
 
       auto varLoc = vars[0]->getLoc();
       
@@ -5085,7 +5161,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   if (isa<StructDecl>(decl)) {
     for (auto member : decl->getMembers()) {
       if (auto var = dyn_cast<VarDecl>(member)) {
-        if (!isMemberwiseInitialized(var))
+        if (!var->isMemberwiseInitialized(/*preferDeclaredProperties=*/true))
           continue;
 
         validateDecl(var);
@@ -5122,6 +5198,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
     }
 
   } else {
+    SmallPtrSet<VarDecl *, 4> backingStorageVars;
     for (auto member : decl->getMembers()) {
       if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
         // Initializers that were synthesized to fulfill derived conformances
@@ -5144,11 +5221,24 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
       }
 
       if (auto var = dyn_cast<VarDecl>(member)) {
-        if (isMemberwiseInitialized(var)) {
+        // If this variable has a property wrapper, go validate it to ensure
+        // that we create the backing storage property.
+        if (auto backingVar = var->getPropertyWrapperBackingProperty()) {
+          validateDecl(var);
+          maybeAddAccessorsToStorage(var);
+
+          backingStorageVars.insert(backingVar);
+        }
+
+        // Ignore the backing storage for properties with attached wrappers.
+        if (backingStorageVars.count(var) > 0)
+          continue;
+
+        if (var->isMemberwiseInitialized(/*preferDeclaredProperties=*/true)) {
           // Initialized 'let' properties have storage, but don't get an argument
           // to the memberwise initializer since they already have an initial
           // value that cannot be overridden.
-          if (var->isLet() && var->getParentInitializer()) {
+          if (var->isLet() && var->isParentInitialized()) {
           
             // We cannot handle properties like:
             //   let (a,b) = (1,2)
@@ -5173,9 +5263,9 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
       // synthesize an initial value (e.g. for an optional) then we suppress
       // generation of the default initializer.
       if (auto pbd = dyn_cast<PatternBindingDecl>(member)) {
-        if (pbd->hasStorage() && !pbd->isStatic() && !pbd->isImplicit())
+        if (pbd->hasStorage() && !pbd->isStatic()) {
           for (auto entry : pbd->getPatternList()) {
-            if (entry.getInit()) continue;
+            if (entry.isInitialized()) continue;
 
             // If one of the bound variables is @NSManaged, go ahead no matter
             // what.
@@ -5190,6 +5280,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
             if (CheckDefaultInitializer && !pbd->isDefaultInitializable())
               SuppressDefaultInitializer = true;
           }
+        }
         continue;
       }
     }

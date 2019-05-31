@@ -641,6 +641,7 @@ namespace {
         continue;
 
       if (!decl->getAttrs().isUnavailable(CS.getASTContext()) &&
+          !decl->getAttrs().hasAttribute<DisfavoredOverloadAttr>() &&
           isFavored(decl, overloadType)) {
         // If we might need to roll back the favored constraints, keep
         // track of those we are favoring.
@@ -2069,9 +2070,12 @@ namespace {
         // will avoid exponential typecheck behavior in the case of
         // tuples, nested arrays, and dictionary literals.
         //
+        // FIXME: This should be handled in the solver, not here.
+        //
         // Otherwise, create a new type variable.
         auto ty = Type();
-        if (!var->hasNonPatternBindingInit()) {
+        if (!var->hasNonPatternBindingInit() &&
+            !var->getAttachedPropertyWrapper()) {
           if (auto boundExpr = locator.trySimplifyToExpr()) {
             if (!boundExpr->isSemanticallyInOutExpr())
               ty = CS.getType(boundExpr)->getRValueType();
@@ -2455,6 +2459,7 @@ namespace {
     }
 
     Type visitOpaqueValueExpr(OpaqueValueExpr *expr) {
+      assert(expr->isPlaceholder() && "Already type checked");
       return expr->getType();
     }
 
@@ -3226,7 +3231,7 @@ namespace {
             expr = value->second;
             continue;
           } else {
-            assert(eraseOpenExistentialsOnly &&
+            assert((eraseOpenExistentialsOnly || OVE->isPlaceholder()) &&
                    "Didn't see this OVE in a containing OpenExistentialExpr?");
             // NOTE: In 'eraseOpenExistentialsOnly' mode, ASTWalker may walk
             // into other kind of expressions holding OVE.

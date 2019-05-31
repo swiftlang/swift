@@ -50,6 +50,26 @@ using namespace swift;
 
 #define DEBUG_TYPE "TypeCheckStmt"
 
+#ifndef NDEBUG
+/// Determine whether the given context is for the backing property of a
+/// property wrapper.
+static bool isPropertyWrapperBackingInitContext(DeclContext *dc) {
+  auto initContext = dyn_cast<Initializer>(dc);
+  if (!initContext) return false;
+
+  auto patternInitContext = dyn_cast<PatternBindingInitializer>(initContext);
+  if (!patternInitContext) return false;
+
+  auto binding = patternInitContext->getBinding();
+  if (!binding) return false;
+
+  auto singleVar = binding->getSingleVar();
+  if (!singleVar) return false;
+
+  return singleVar->getOriginalWrappedProperty() != nullptr;
+}
+#endif
+
 namespace {
   class ContextualizeClosures : public ASTWalker {
     DeclContext *ParentDC;
@@ -117,8 +137,9 @@ namespace {
               ParentDC->getContextKind() != DeclContextKind::TopLevelCodeDecl) {
             // If a closure is nested within an auto closure, we'll need to update
             // its parent to the auto closure parent.
-            assert(ParentDC->getContextKind() ==
-                   DeclContextKind::AbstractClosureExpr &&
+            assert((ParentDC->getContextKind() ==
+                      DeclContextKind::AbstractClosureExpr ||
+                    isPropertyWrapperBackingInitContext(ParentDC)) &&
                    "Incorrect parent decl context for closure");
             CE->setParent(ParentDC);
           }

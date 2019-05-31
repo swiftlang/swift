@@ -22,6 +22,7 @@
 #include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/FunctionRefKind.h"
 #include "swift/AST/ProtocolConformanceRef.h"
+#include "swift/AST/TrailingCallArguments.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/TypeRepr.h"
@@ -375,6 +376,10 @@ protected:
     NumElements : 32
   );
 
+  SWIFT_INLINE_BITFIELD(OpaqueValueExpr, Expr, 1,
+    IsPlaceholder : 1
+  );
+
   } Bits;
 
 private:
@@ -567,105 +572,6 @@ public:
   void *operator new(size_t Bytes, void *Mem) { 
     assert(Mem); 
     return Mem; 
-  }
-};
-
-/// Helper class to capture trailing call argument labels and related
-/// information, for expression nodes that involve argument labels, trailing
-/// closures, etc.
-template<typename Derived>
-class TrailingCallArguments
-    : private llvm::TrailingObjects<Derived, Identifier, SourceLoc> {
-  // We need to friend TrailingObjects twice here to work around an MSVC bug.
-  // If we have two functions of the same name with the parameter
-  // typename TrailingObjectsIdentifier::template OverloadToken<T> where T is
-  // different for each function, then MSVC reports a "member function already
-  // defined or declared" error, which is incorrect.
-  using TrailingObjectsIdentifier = llvm::TrailingObjects<Derived, Identifier>;
-  friend TrailingObjectsIdentifier;
-
-  using TrailingObjects = llvm::TrailingObjects<Derived, Identifier, SourceLoc>;
-  friend TrailingObjects;
-
-  Derived &asDerived() {
-    return *static_cast<Derived *>(this);
-  }
-
-  const Derived &asDerived() const {
-    return *static_cast<const Derived *>(this);
-  }
-
-  size_t numTrailingObjects(
-      typename TrailingObjectsIdentifier::template OverloadToken<Identifier>)
-      const {
-    return asDerived().getNumArguments();
-  }
-
-  size_t numTrailingObjects(
-      typename TrailingObjectsIdentifier::template OverloadToken<SourceLoc>)
-      const {
-    return asDerived().hasArgumentLabelLocs() ? asDerived().getNumArguments()
-                                              : 0;
-  }
-
-  /// Retrieve the buffer containing the argument labels.
-  MutableArrayRef<Identifier> getArgumentLabelsBuffer() {
-    return { this->template getTrailingObjects<Identifier>(),
-             asDerived().getNumArguments() };
-  }
-
-  /// Retrieve the buffer containing the argument label locations.
-  MutableArrayRef<SourceLoc> getArgumentLabelLocsBuffer() {
-    if (!asDerived().hasArgumentLabelLocs())
-      return { };
-    
-    return { this->template getTrailingObjects<SourceLoc>(),
-             asDerived().getNumArguments() };
-  }
-
-protected:
-  /// Determine the total size to allocate.
-  static size_t totalSizeToAlloc(ArrayRef<Identifier> argLabels,
-                                 ArrayRef<SourceLoc> argLabelLocs,
-                                 bool hasTrailingClosure) {
-    return TrailingObjects::template totalSizeToAlloc<Identifier, SourceLoc>(
-        argLabels.size(), argLabelLocs.size());
-  }
-
-  /// Initialize the actual call arguments.
-  void initializeCallArguments(ArrayRef<Identifier> argLabels,
-                               ArrayRef<SourceLoc> argLabelLocs,
-                               bool hasTrailingClosure) {
-    if (!argLabels.empty()) {
-      std::uninitialized_copy(argLabels.begin(), argLabels.end(),
-                              this->template getTrailingObjects<Identifier>());
-    }
-    
-    if (!argLabelLocs.empty())
-      std::uninitialized_copy(argLabelLocs.begin(), argLabelLocs.end(),
-                              this->template getTrailingObjects<SourceLoc>());
-  }
-
-public:
-  /// Retrieve the argument labels provided at the call site.
-  ArrayRef<Identifier> getArgumentLabels() const {
-    return { this->template getTrailingObjects<Identifier>(),
-             asDerived().getNumArguments() };
-  }
-
-  /// Retrieve the buffer containing the argument label locations.
-  ArrayRef<SourceLoc> getArgumentLabelLocs() const {
-    if (!asDerived().hasArgumentLabelLocs())
-      return { };
-    
-    return { this->template getTrailingObjects<SourceLoc>(),
-             asDerived().getNumArguments() };
-  }
-
-  /// Retrieve the location of the ith argument label.
-  SourceLoc getArgumentLabelLoc(unsigned i) const {
-    auto locs = getArgumentLabelLocs();
-    return i < locs.size() ? locs[i] : SourceLoc();
   }
 };
 
@@ -4043,8 +3949,15 @@ class OpaqueValueExpr : public Expr {
   SourceLoc Loc;
 
 public:
-  explicit OpaqueValueExpr(SourceLoc Loc, Type Ty)
-    : Expr(ExprKind::OpaqueValue, /*Implicit=*/true, Ty), Loc(Loc) { }
+  explicit OpaqueValueExpr(SourceLoc Loc, Type Ty, bool isPlaceholder = false)
+    : Expr(ExprKind::OpaqueValue, /*Implicit=*/true, Ty), Loc(Loc) {
+    Bits.OpaqueValueExpr.IsPlaceholder = isPlaceholder;
+  }
+
+  /// Whether this opaque value expression represents a placeholder that
+  /// is injected before type checking to act as a placeholder for some
+  /// value to be specified later.
+  bool isPlaceholder() const { return Bits.OpaqueValueExpr.IsPlaceholder; }
 
   SourceRange getSourceRange() const { return Loc; }
   
@@ -5464,7 +5377,27 @@ inline const SourceLoc *CollectionExpr::getTrailingSourceLocs() const {
 }
 
 #undef SWIFT_FORWARD_SOURCE_LOCS_TO
-  
+
+/// Pack the argument information into a single argument, to match the
+/// representation expected by the AST.
+///
+/// \param argLabels The argument labels, which might be updated by this
+/// function.
+///
+/// \param argLabelLocs The argument label locations, which might be updated by
+/// this function.
+Expr *packSingleArgument(ASTContext &ctx, SourceLoc lParenLoc,
+                         ArrayRef<Expr *> args,
+                         ArrayRef<Identifier> &argLabels,
+                         ArrayRef<SourceLoc> &argLabelLocs,
+                         SourceLoc rParenLoc,
+                         Expr *trailingClosure, bool implicit,
+                         SmallVectorImpl<Identifier> &argLabelsScratch,
+                         SmallVectorImpl<SourceLoc> &argLabelLocsScratch,
+                         llvm::function_ref<Type(const Expr *)> getType =
+                              [](const Expr *E) -> Type {
+                                return E->getType();
+                              });
 } // end namespace swift
 
 #endif

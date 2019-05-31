@@ -1090,7 +1090,7 @@ ERROR(c_function_pointer_from_generic_function,none,
 ERROR(c_function_pointer_from_function_with_context,none,
       "a C function pointer cannot be formed from a "
       "%select{local function|closure}0 that captures "
-      "%select{context|generic parameters|dynamic Self type}1",
+      "%select{context|generic parameters|dynamic Self type|<<error>}1",
       (bool, unsigned))
 ERROR(invalid_autoclosure_forwarding,none,
       "add () to forward @autoclosure parameter", ())
@@ -1122,6 +1122,8 @@ ERROR(mutating_invalid_global_scope,none,
 ERROR(mutating_invalid_classes,none,
       "'%select{nonmutating|mutating|__consuming}0' isn't valid on methods in "
       "classes or class-bound protocols", (bool))
+ERROR(nominal_type_not_attribute,none,
+      "%0 %1 cannot be used as an attribute", (DescriptiveDeclKind, DeclName))
 
 ERROR(functions_mutating_and_not,none,
       "method must not be declared both "
@@ -4335,6 +4337,93 @@ WARNING(hashvalue_implementation,none,
         "'Hashable.hashValue' is deprecated as a protocol requirement; "
         "conform type %0 to 'Hashable' by implementing 'hash(into:)' instead",
         (Type))
+
+//------------------------------------------------------------------------------
+// MARK: property wrapper diagnostics
+//------------------------------------------------------------------------------
+ERROR(property_wrapper_no_value_property, none,
+  "property wrapper type %0 does not contain a non-static property "
+  "named %1", (Type, Identifier))
+ERROR(property_wrapper_ambiguous_value_property, none,
+  "property wrapper type %0 has multiple non-static properties "
+  "named %1", (Type, Identifier))
+ERROR(property_wrapper_wrong_initial_value_init, none,
+      "'init(initialValue:)' parameter type (%0) must be the same as its "
+      "'value' property type (%1) or an @autoclosure thereof", (Type, Type))
+ERROR(property_wrapper_failable_init, none,
+      "%0 cannot be failable", (DeclName))
+ERROR(property_wrapper_ambiguous_initial_value_init, none,
+  "property wrapper type %0 has multiple initial-value initializers", (Type))
+ERROR(property_wrapper_ambiguous_default_value_init, none,
+  "property wrapper type %0 has multiple default-value initializers", (Type))
+ERROR(property_wrapper_type_requirement_not_accessible,none,
+      "%select{private|fileprivate|internal|public|open}0 %1 %2 cannot have "
+      "more restrictive access than its enclosing property wrapper type %3 "
+      "(which is %select{private|fileprivate|internal|public|open}4)",
+      (AccessLevel, DescriptiveDeclKind, DeclName, Type, AccessLevel))
+ERROR(property_wrapper_reserved_name,none,
+      "property wrapper type name must start with an uppercase letter", ())
+
+ERROR(property_wrapper_attribute_not_on_property, none,
+      "property wrapper attribute %0 can only be applied to a property",
+      (DeclName))
+
+ERROR(property_wrapper_multiple,none,
+      "only one property wrapper can be attached to a given property", ())
+NOTE(previous_property_wrapper_here,none,
+      "previous property wrapper specified here", ())
+
+ERROR(property_wrapper_local,none,
+      "property wrappers are not yet supported on local properties", ())
+ERROR(property_wrapper_let, none,
+      "property wrapper can only be applied to a 'var'",
+      ())
+ERROR(property_wrapper_computed, none,
+      "property wrapper cannot be applied to a computed property",
+      ())
+
+ERROR(property_with_wrapper_conflict_attribute,none,
+      "property %0 with a wrapper cannot also be "
+      "%select{lazy|@NSCopying|@NSManaged|weak|unowned|unmanaged}1",
+      (DeclName, int))
+ERROR(property_wrapper_not_single_var, none,
+      "property wrapper can only apply to a single variable", ())
+ERROR(property_with_wrapper_in_bad_context,none,
+      "%select{|non-static |non-static }1property %0 declared inside "
+      "%select{a protocol|an extension|an enum}1 cannot have a wrapper",
+      (DeclName, int))
+ERROR(property_with_wrapper_overrides,none,
+      "property %0 with attached wrapper cannot override another property",
+      (DeclName))
+
+ERROR(property_wrapper_and_normal_init,none,
+      "property %0 with attached wrapper cannot initialize both the "
+      "wrapper type and the property", (DeclName))
+ERROR(property_wrapper_init_without_initial_value, none,
+      "initializing property %0 with wrapper %1 that lacks "
+      "an 'init(initialValue:)' initializer", (DeclName, Type))
+NOTE(property_wrapper_direct_init,none,
+     "initialize the property wrapper type directly with "
+     "'(...') on the attribute", ())
+
+ERROR(property_wrapper_incompatible_unbound, none,
+      "property wrapper type %0 must either specify all generic arguments "
+      "or require only a single generic argument", (Type))
+
+ERROR(property_wrapper_type_access,none,
+      "%select{%select{variable|constant}0|property}1 "
+      "%select{must be declared %select{"
+      "%select{private|fileprivate|internal|%error|%error}3|private or fileprivate}4"
+      "|cannot be declared "
+      "%select{in this context|fileprivate|internal|public|open}3}2 "
+      "because its property wrapper type uses "
+      "%select{a private|a fileprivate|an internal|%error|%error}5 type",
+      (bool, bool, bool, AccessLevel, bool, AccessLevel))
+ERROR(property_wrapper_type_not_usable_from_inline,none,
+      "property wrapper type referenced from a '@usableFromInline' "
+      "%select{%select{variable|constant}0|property}1 "
+      "must be '@usableFromInline' or public",
+      (bool, bool))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

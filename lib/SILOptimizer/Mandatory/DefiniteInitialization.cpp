@@ -978,6 +978,8 @@ void LifetimeChecker::handleStoreUse(unsigned UseID) {
       addr = copyAddr->getDest();
     else if (auto *assign = dyn_cast<AssignInst>(inst))
       addr = assign->getDest();
+    else if (auto *assign = dyn_cast<AssignByWrapperInst>(inst))
+      addr = assign->getDest();
     else
       return false;
 
@@ -1822,7 +1824,7 @@ void LifetimeChecker::handleSelfInitUse(unsigned UseID) {
     assert(TheMemory.NumElements == 1 && "delegating inits have a single elt");
 
     // Lower Assign instructions if needed.
-    if (isa<AssignInst>(Use.Inst))
+    if (isa<AssignInst>(Use.Inst) || isa<AssignByWrapperInst>(Use.Inst))
       NeedsUpdateForInitState.push_back(UseID);
   } else {
     // super.init also requires that all ivars are initialized before the
@@ -1894,6 +1896,24 @@ void LifetimeChecker::updateInstructionForInitState(DIMemoryUse &Use) {
       AI->setOwnershipQualifier((InitKind == IsInitialization
                                 ? AssignOwnershipQualifier::Init
                                 : AssignOwnershipQualifier::Reassign));
+    }
+
+    return;
+  }
+  if (auto *AI = dyn_cast<AssignByWrapperInst>(Inst)) {
+    // Remove this instruction from our data structures, since we will be
+    // removing it.
+    Use.Inst = nullptr;
+    NonLoadUses.erase(Inst);
+
+    if (TheMemory.isClassInitSelf() &&
+        Use.Kind == DIUseKind::SelfInit) {
+      assert(InitKind == IsInitialization);
+      AI->setOwnershipQualifier(AssignOwnershipQualifier::Reinit);
+    } else {
+      AI->setOwnershipQualifier((InitKind == IsInitialization
+                                 ? AssignOwnershipQualifier::Init
+                                 : AssignOwnershipQualifier::Reassign));
     }
 
     return;

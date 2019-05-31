@@ -842,6 +842,16 @@ public:
                                  Qualifier));
   }
 
+  AssignByWrapperInst *createAssignByWrapper(SILLocation Loc,
+                                               SILValue Src, SILValue Dest,
+                                               SILValue Initializer,
+                                               SILValue Setter,
+                                          AssignOwnershipQualifier Qualifier) {
+    return insert(new (getModule())
+                  AssignByWrapperInst(getSILDebugLocation(Loc), Src, Dest,
+                                       Initializer, Setter, Qualifier));
+  }
+
   StoreBorrowInst *createStoreBorrow(SILLocation Loc, SILValue Src,
                                      SILValue DestAddr) {
     return insert(new (getModule())

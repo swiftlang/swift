@@ -19,14 +19,18 @@
 #include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "clang/Basic/CharInfo.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
@@ -124,6 +128,9 @@ public:
   IGNORED_ATTR(WeakLinked)
   IGNORED_ATTR(DynamicReplacement)
   IGNORED_ATTR(PrivateImport)
+  IGNORED_ATTR(Custom)
+  IGNORED_ATTR(PropertyWrapper)
+  IGNORED_ATTR(DisfavoredOverload)
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
@@ -716,6 +723,25 @@ void TypeChecker::checkDeclAttributesEarly(Decl *D) {
   }
 }
 
+/// Determine whether the given string is an attribute name that is
+/// reserved for the implementation.
+static bool isReservedAttributeName(StringRef name) {
+  for (unsigned i : indices(name)) {
+    if (name[i] == '_')
+      continue;
+
+    // First character is lowercase; reserved.
+    if (clang::isLowercase(name[i]))
+      return true;
+
+    // Everything else is reserved.
+    return false;
+  }
+
+  // All underscores is reserved.
+  return true;
+}
+
 namespace {
 class AttributeChecker : public AttributeVisitor<AttributeChecker> {
   TypeChecker &TC;
@@ -785,6 +811,7 @@ public:
     IGNORED_ATTR(Transparent)
     IGNORED_ATTR(WarnUnqualifiedAccess)
     IGNORED_ATTR(WeakLinked)
+    IGNORED_ATTR(DisfavoredOverload)
 #undef IGNORED_ATTR
 
   void visitAvailableAttr(AvailableAttr *attr);
@@ -835,6 +862,8 @@ public:
   void visitFrozenAttr(FrozenAttr *attr);
 
   void visitNonOverrideAttr(NonOverrideAttr *attr);
+  void visitCustomAttr(CustomAttr *attr);
+  void visitPropertyWrapperAttr(PropertyWrapperAttr *attr);
 };
 } // end anonymous namespace
 
@@ -2455,9 +2484,81 @@ void AttributeChecker::visitNonOverrideAttr(NonOverrideAttr *attr) {
   }
 }
 
+
 void TypeChecker::checkParameterAttributes(ParameterList *params) {
   for (auto param: *params) {
     checkDeclAttributes(param);
+  }
+}
+
+void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
+  auto dc = D->getInnermostDeclContext();
+
+  // Figure out which nominal declaration this custom attribute refers to.
+  auto nominal = evaluateOrDefault(
+    TC.Context.evaluator, CustomAttrNominalRequest{attr, dc}, nullptr);
+
+  // If there is no nominal type with this name, complain about this being
+  // an unknown attribute.
+  if (!nominal) {
+    std::string typeName;
+    if (auto typeRepr = attr->getTypeLoc().getTypeRepr()) {
+      llvm::raw_string_ostream out(typeName);
+      typeRepr->print(out);
+    } else {
+      typeName = attr->getTypeLoc().getType().getString();
+    }
+
+    TC.diagnose(attr->getLocation(), diag::unknown_attribute,
+                typeName);
+    attr->setInvalid();
+    return;
+  }
+
+  // If the nominal type is a property wrapper type, we can be delegating
+  // through a property.
+  if (nominal->getPropertyWrapperTypeInfo()) {
+    // property wrappers can only be applied to variables
+    if (!isa<VarDecl>(D) || isa<ParamDecl>(D)) {
+      TC.diagnose(attr->getLocation(),
+                  diag::property_wrapper_attribute_not_on_property,
+                  nominal->getFullName());
+      attr->setInvalid();
+      return;
+    }
+
+    // If this attribute isn't the one that attached a property wrapper to
+    // this property, complain.
+    auto var = cast<VarDecl>(D);
+    if (auto attached = var->getAttachedPropertyWrapper()) {
+      if (attached != attr) {
+        TC.diagnose(attr->getLocation(), diag::property_wrapper_multiple);
+        TC.diagnose(attached->getLocation(),
+                    diag::previous_property_wrapper_here);
+        return;
+      }
+    }
+
+    return;
+  }
+
+  TC.diagnose(attr->getLocation(), diag::nominal_type_not_attribute,
+              nominal->getDescriptiveKind(), nominal->getFullName());
+  nominal->diagnose(diag::decl_declared_here, nominal->getFullName());
+  attr->setInvalid();
+}
+
+void AttributeChecker::visitPropertyWrapperAttr(PropertyWrapperAttr *attr) {
+  auto nominal = dyn_cast<NominalTypeDecl>(D);
+  if (!nominal)
+    return;
+
+  // Force checking of the property wrapper type.
+  (void)nominal->getPropertyWrapperTypeInfo();
+
+  // Make sure the name isn't reserved.
+  if (isReservedAttributeName(nominal->getName().str())) {
+    nominal->diagnose(diag::property_wrapper_reserved_name);
   }
 }
 

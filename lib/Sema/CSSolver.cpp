@@ -1970,6 +1970,9 @@ static Constraint *tryOptimizeGenericDisjunction(
     if (!AFD || !AFD->isGeneric())
       return false;
 
+    if (AFD->getAttrs().hasAttribute<DisfavoredOverloadAttr>())
+      return false;
+
     auto funcType = AFD->getInterfaceType();
     auto hasAnyOrOptional = funcType.findIf([](Type type) -> bool {
       if (type->getOptionalObjectType())

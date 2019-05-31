@@ -22,8 +22,10 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ResilienceExpansion.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/Timer.h"
 #include "swift/ClangImporter/ClangModule.h"
@@ -944,7 +946,7 @@ static bool requiresIVarInitialization(SILGenModule &SGM, ClassDecl *cd) {
     if (!pbd) continue;
 
     for (auto entry : pbd->getPatternList())
-      if (entry.getNonLazyInit())
+      if (entry.getExecutableInit())
         return true;
   }
 
@@ -1113,7 +1115,16 @@ emitStoredPropertyInitialization(PatternBindingDecl *pbd, unsigned i) {
   auto *var = pbdEntry.getAnchoringVarDecl();
   auto *init = pbdEntry.getInit();
   auto *initDC = pbdEntry.getInitContext();
-  assert(!pbdEntry.isInitializerLazy());
+  assert(!pbdEntry.isInitializerSubsumed());
+
+  // If this is the backing storage for a property with an attached wrapper
+  // that was initialized with `=`, use that expression as the initializer.
+  if (auto originalProperty = var->getOriginalWrappedProperty()) {
+    auto wrapperInfo =
+        originalProperty->getPropertyWrapperBackingPropertyInfo();
+    if (wrapperInfo.originalInitialValue)
+      init = wrapperInfo.originalInitialValue;
+  }
 
   SILDeclRef constant(var, SILDeclRef::Kind::StoredPropertyInitializer);
   emitOrDelayFunction(*this, constant,
@@ -1279,7 +1290,7 @@ void SILGenModule::emitObjCDestructorThunk(DestructorDecl *destructor) {
 void SILGenModule::visitPatternBindingDecl(PatternBindingDecl *pd) {
   assert(!TopLevelSGF && "script mode PBDs should be in TopLevelCodeDecls");
   for (unsigned i = 0, e = pd->getNumPatternEntries(); i != e; ++i)
-    if (pd->getNonLazyInit(i))
+    if (pd->getExecutableInit(i))
       emitGlobalInitialization(pd, i);
 }
 

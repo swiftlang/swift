@@ -1103,14 +1103,14 @@ ERROR(invalid_postfix_operator,none,
 
 ERROR(expected_member_name,PointsToFirstBadToken,
       "expected member name following '.'", ())
-ERROR(expected_dollar_numeric,none,
-      "expected numeric value following '$'", ())
 ERROR(dollar_numeric_too_large,none,
       "numeric value following '$' is too large", ())
 ERROR(numeric_literal_numeric_member,none,
       "expected named member of numeric literal", ())
 ERROR(standalone_dollar_identifier,none,
      "'$' is not an identifier; use backticks to escape it", ())
+ERROR(dollar_identifier_decl,none,
+     "cannot declare entity %0 with a '$' prefix", (Identifier))
 
 ERROR(anon_closure_arg_not_in_closure,none,
       "anonymous closure argument not contained in a closure", ())

@@ -285,6 +285,10 @@ protected:
                         NumAssignOwnershipQualifierBits,
     OwnershipQualifier : NumAssignOwnershipQualifierBits
   );
+  SWIFT_INLINE_BITFIELD(AssignByWrapperInst, NonValueInstruction,
+                        NumAssignOwnershipQualifierBits,
+    OwnershipQualifier : NumAssignOwnershipQualifierBits
+  );
 
   SWIFT_INLINE_BITFIELD(UncheckedOwnershipConversionInst,SingleValueInstruction,
                         NumVOKindBits,

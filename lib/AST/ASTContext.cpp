@@ -31,6 +31,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/RawComment.h"
 #include "swift/AST/SubstitutionMap.h"
@@ -283,6 +284,13 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   /// KnownProtocolKind.
   llvm::DenseMap<SourceFile *, std::array<Type, NumKnownProtocols>>
       DefaultTypeRequestCaches;
+
+  /// Mapping from property declarations to the backing variable types.
+  llvm::DenseMap<const VarDecl *, Type> PropertyWrapperBackingVarTypes;
+
+  /// A mapping from the backing storage of a property that has a wrapper
+  /// to the original property with the wrapper.
+  llvm::DenseMap<const VarDecl *, VarDecl *> OriginalWrappedProperties;
 
   /// Structure that captures data that is segregated into different
   /// arenas.
@@ -5227,4 +5235,44 @@ LayoutConstraint LayoutConstraint::getLayoutConstraint(LayoutConstraintKind Kind
 Type &ASTContext::getDefaultTypeRequestCache(SourceFile *SF,
                                              KnownProtocolKind kind) {
   return getImpl().DefaultTypeRequestCaches[SF][size_t(kind)];
+}
+
+Type ASTContext::getSideCachedPropertyWrapperBackingPropertyType(
+    VarDecl *var) const {
+  return getImpl().PropertyWrapperBackingVarTypes[var];
+}
+
+void ASTContext::setSideCachedPropertyWrapperBackingPropertyType(
+    VarDecl *var, Type type) {
+  assert(!getImpl().PropertyWrapperBackingVarTypes[var] ||
+         getImpl().PropertyWrapperBackingVarTypes[var]->isEqual(type));
+  getImpl().PropertyWrapperBackingVarTypes[var] = type;
+}
+
+VarDecl *VarDecl::getOriginalWrappedProperty(
+    Optional<PropertyWrapperSynthesizedPropertyKind> kind) const {
+  if (!Bits.VarDecl.IsPropertyWrapperBackingProperty)
+    return nullptr;
+
+  ASTContext &ctx = getASTContext();
+  assert(ctx.getImpl().OriginalWrappedProperties.count(this) > 0);
+  auto original = ctx.getImpl().OriginalWrappedProperties[this];
+  if (!kind)
+    return original;
+
+  auto wrapperInfo = original->getPropertyWrapperBackingPropertyInfo();
+  switch (*kind) {
+  case PropertyWrapperSynthesizedPropertyKind::Backing:
+    return this == wrapperInfo.backingVar ? original : nullptr;
+
+  case PropertyWrapperSynthesizedPropertyKind::StorageWrapper:
+    return this == wrapperInfo.storageWrapperVar ? original : nullptr;
+  }
+}
+
+void VarDecl::setOriginalWrappedProperty(VarDecl *originalProperty) {
+  Bits.VarDecl.IsPropertyWrapperBackingProperty = true;
+  ASTContext &ctx = getASTContext();
+  assert(ctx.getImpl().OriginalWrappedProperties.count(this) == 0);
+  ctx.getImpl().OriginalWrappedProperties[this] = originalProperty;
 }

@@ -813,9 +813,20 @@ StringRef swift::getSILAccessEnforcementName(SILAccessEnforcement enforcement) {
 }
 
 AssignInst::AssignInst(SILDebugLocation Loc, SILValue Src, SILValue Dest,
-                       AssignOwnershipQualifier Qualifier)
-    : InstructionBase(Loc), Operands(this, Src, Dest) {
+                       AssignOwnershipQualifier Qualifier) :
+    AssignInstBase(Loc, Src, Dest) {
   SILInstruction::Bits.AssignInst.OwnershipQualifier = unsigned(Qualifier);
+}
+
+AssignByWrapperInst::AssignByWrapperInst(SILDebugLocation Loc,
+                                           SILValue Src, SILValue Dest,
+                                           SILValue Initializer,
+                                           SILValue Setter,
+                                          AssignOwnershipQualifier Qualifier) :
+    AssignInstBase(Loc, Src, Dest, Initializer, Setter) {
+  assert(Initializer->getType().is<SILFunctionType>());
+  SILInstruction::Bits.AssignByWrapperInst.OwnershipQualifier =
+      unsigned(Qualifier);
 }
 
 MarkFunctionEscapeInst *

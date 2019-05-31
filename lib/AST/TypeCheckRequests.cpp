@@ -14,6 +14,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
@@ -511,4 +512,117 @@ bool DefaultTypeRequest::getPerformLocalLookup(const KnownProtocolKind knownProt
       
     default: return false;
   }
+}
+
+bool PropertyWrapperTypeInfoRequest::isCached() const {
+  auto nominal = std::get<0>(getStorage());
+  return nominal->getAttrs().hasAttribute<PropertyWrapperAttr>();;
+}
+
+void PropertyWrapperTypeInfoRequest::diagnoseCycle(
+    DiagnosticEngine &diags) const {
+  std::get<0>(getStorage())->diagnose(diag::circular_reference);
+}
+
+void PropertyWrapperTypeInfoRequest::noteCycleStep(
+    DiagnosticEngine &diags) const {
+  std::get<0>(getStorage())->diagnose(diag::circular_reference_through);
+}
+
+bool AttachedPropertyWrapperRequest::isCached() const {
+  auto var = std::get<0>(getStorage());
+  return !var->getAttrs().isEmpty();
+}
+
+void AttachedPropertyWrapperRequest::diagnoseCycle(
+    DiagnosticEngine &diags) const {
+  std::get<0>(getStorage())->diagnose(diag::circular_reference);
+}
+
+void AttachedPropertyWrapperRequest::noteCycleStep(
+    DiagnosticEngine &diags) const {
+  std::get<0>(getStorage())->diagnose(diag::circular_reference_through);
+}
+
+bool AttachedPropertyWrapperTypeRequest::isCached() const {
+  auto var = std::get<0>(getStorage());
+  return !var->getAttrs().isEmpty();
+}
+
+void AttachedPropertyWrapperTypeRequest::diagnoseCycle(
+    DiagnosticEngine &diags) const {
+  std::get<0>(getStorage())->diagnose(diag::circular_reference);
+}
+
+void AttachedPropertyWrapperTypeRequest::noteCycleStep(
+    DiagnosticEngine &diags) const {
+  std::get<0>(getStorage())->diagnose(diag::circular_reference_through);
+}
+
+bool PropertyWrapperBackingPropertyTypeRequest::isCached() const {
+  auto var = std::get<0>(getStorage());
+  return !var->getAttrs().isEmpty();
+}
+
+void PropertyWrapperBackingPropertyTypeRequest::diagnoseCycle(
+    DiagnosticEngine &diags) const {
+  std::get<0>(getStorage())->diagnose(diag::circular_reference);
+}
+
+void PropertyWrapperBackingPropertyTypeRequest::noteCycleStep(
+    DiagnosticEngine &diags) const {
+  std::get<0>(getStorage())->diagnose(diag::circular_reference_through);
+}
+bool PropertyWrapperBackingPropertyInfoRequest::isCached() const {
+  auto var = std::get<0>(getStorage());
+  return !var->getAttrs().isEmpty();
+}
+
+void PropertyWrapperBackingPropertyInfoRequest::diagnoseCycle(
+    DiagnosticEngine &diags) const {
+  std::get<0>(getStorage())->diagnose(diag::circular_reference);
+}
+
+void PropertyWrapperBackingPropertyInfoRequest::noteCycleStep(
+    DiagnosticEngine &diags) const {
+  std::get<0>(getStorage())->diagnose(diag::circular_reference_through);
+}
+
+void swift::simple_display(
+    llvm::raw_ostream &out, const PropertyWrapperTypeInfo &propertyWrapper) {
+  out << "{ ";
+  if (propertyWrapper.valueVar)
+    out << propertyWrapper.valueVar->printRef();
+  else
+    out << "null";
+  out << ", ";
+  if (propertyWrapper.initialValueInit)
+    out << propertyWrapper.initialValueInit->printRef();
+  else
+    out << "null";
+  out << " }";
+}
+
+void swift::simple_display(
+    llvm::raw_ostream &out,
+    const PropertyWrapperBackingPropertyInfo &backingInfo) {
+  out << "{ ";
+  if (backingInfo.backingVar)
+    backingInfo.backingVar->dumpRef(out);
+  out << " }";
+}
+
+
+template<>
+bool swift::AnyValue::Holder<Type>::equals(const HolderBase &other) const {
+  assert(typeID == other.typeID && "Caller should match type IDs");
+  return value.getPointer() ==
+  static_cast<const Holder<Type> &>(other).value.getPointer();
+}
+
+void swift::simple_display(llvm::raw_ostream &out, const Type &type) {
+  if (type)
+    type.print(out);
+  else
+    out << "null";
 }

@@ -142,6 +142,14 @@ static CodableConformanceType varConformsToCodable(TypeChecker &tc,
   return typeConformsToCodable(tc, context, varDecl->getType(), isIUO, proto);
 }
 
+/// Retrieve the variable name for the purposes of encoding/decoding.
+static Identifier getVarNameForCoding(VarDecl *var) {
+  if (auto originalVar = var->getOriginalWrappedProperty())
+    return originalVar->getName();
+
+  return var->getName();
+}
+
 /// Validates the given CodingKeys enum decl by ensuring its cases are a 1-to-1
 /// match with the stored vars of the given type.
 ///
@@ -168,7 +176,7 @@ static bool validateCodingKeysEnum(DerivedConformance &derived,
     if (varDecl->getAttrs().hasAttribute<LazyAttr>())
       continue;
 
-    properties[varDecl->getName()] = varDecl;
+    properties[getVarNameForCoding(varDecl)] = varDecl;
   }
 
   bool propertiesAreValid = true;
@@ -223,7 +231,7 @@ static bool validateCodingKeysEnum(DerivedConformance &derived,
           continue;
       }
 
-      if (varDecl->getParentInitializer())
+      if (varDecl->isParentInitialized())
         continue;
 
       // The var was not default initializable, and did not have an explicit
@@ -371,7 +379,8 @@ static EnumDecl *synthesizeCodingKeysEnum(DerivedConformance &derived) {
     switch (conformance) {
       case Conforms:
       {
-        auto *elt = new (C) EnumElementDecl(SourceLoc(), varDecl->getName(),
+        auto *elt = new (C) EnumElementDecl(SourceLoc(),
+                                            getVarNameForCoding(varDecl),
                                             nullptr, SourceLoc(), nullptr,
                                             enumDecl);
         elt->setImplicit();
@@ -526,6 +535,11 @@ lookupVarDeclForCodingKeysCase(DeclContext *conformanceDC,
 
   for (auto decl : targetDecl->lookupDirect(DeclName(elt->getName()))) {
     if (auto *vd = dyn_cast<VarDecl>(decl)) {
+      // If we found a property with an attached wrapper, retrieve the
+      // backing property.
+      if (auto backingVar = vd->getPropertyWrapperBackingProperty())
+        vd = backingVar;
+
       if (!vd->isStatic()) {
         // This is the VarDecl we're looking for.
 
@@ -870,7 +884,7 @@ static void deriveBodyDecodable_init(AbstractFunctionDecl *initDecl, void *) {
           lookupVarDeclForCodingKeysCase(conformanceDC, elt, targetDecl);
 
       // Don't output a decode statement for a var let with a default value.
-      if (varDecl->isLet() && varDecl->getParentInitializer() != nullptr)
+      if (varDecl->isLet() && varDecl->isParentInitialized())
         continue;
 
       auto methodName =

@@ -444,6 +444,8 @@ enum ScoreKind {
   SK_Fix,
   /// A reference to an @unavailable declaration.
   SK_Unavailable,
+  /// A use of a disfavored overload.
+  SK_DisfavoredOverload,
   /// An implicit force of an implicitly unwrapped optional value.
   SK_ForceUnchecked,
   /// A user-defined conversion.

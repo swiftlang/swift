@@ -20,6 +20,7 @@
 #include "SILGenFunctionBuilder.h"
 #include "Scope.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILProfiler.h"
 #include "swift/SIL/SILUndef.h"
@@ -192,6 +193,13 @@ void SILGenFunction::emitCaptures(SILLocation loc,
 
       SILValue value = B.createMetatype(loc, dynamicSILType);
       capturedArgs.push_back(ManagedValue::forUnmanaged(value));
+      continue;
+    }
+
+    if (capture.isOpaqueValue()) {
+      OpaqueValueExpr *opaqueValue = capture.getOpaqueValue();
+      capturedArgs.push_back(
+          emitRValueAsSingleValue(opaqueValue).ensurePlusOne(*this, loc));
       continue;
     }
 
@@ -648,14 +656,27 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, VarDecl *var) {
   auto decl = function.getAbstractFunctionDecl();
   auto *dc = decl->getInnermostDeclContext();
   auto interfaceType = var->getValueInterfaceType();
+  auto varType = var->getType();
+
+  // If this is the backing storage for a property with an attached
+  // wrapper that was initialized with '=', the stored property initializer
+  // will be in terms of the original property's type.
+  if (auto originalProperty = var->getOriginalWrappedProperty()) {
+    if (originalProperty->isPropertyWrapperInitializedWithInitialValue()) {
+      interfaceType = originalProperty->getValueInterfaceType();
+      varType = originalProperty->getType();
+    }
+  }
+
   emitProlog(/*paramList*/ nullptr, /*selfParam*/ nullptr, interfaceType, dc,
              false);
-  prepareEpilog(var->getType(), false, CleanupLocation::get(loc));
+  prepareEpilog(varType, false, CleanupLocation::get(loc));
 
   auto pbd = var->getParentPatternBinding();
   auto entry = pbd->getPatternEntryForVarDecl(var);
   auto subs = getForwardingSubstitutionMap();
-  auto resultType = decl->mapTypeIntoContext(interfaceType)->getCanonicalType();
+  auto contextualType = dc->mapTypeIntoContext(interfaceType);
+  auto resultType = contextualType->getCanonicalType();
   auto origResultType = AbstractionPattern(resultType);
 
   SmallVector<SILValue, 4> directResults;

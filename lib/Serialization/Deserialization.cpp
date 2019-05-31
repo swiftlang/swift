@@ -22,7 +22,9 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Serialization/BCReadingExtras.h"
@@ -2706,13 +2708,13 @@ public:
     DeclContextID contextID;
     bool isImplicit, isObjC, isStatic, hasNonPatternBindingInit;
     bool isGetterMutating, isSetterMutating;
-    unsigned rawSpecifier, numAccessors;
+    unsigned rawSpecifier, numAccessors, numBackingProperties;
     uint8_t readImpl, writeImpl, readWriteImpl, opaqueReadOwnership;
     uint8_t rawAccessLevel, rawSetterAccessLevel;
     TypeID interfaceTypeID;
     ModuleFile::AccessorRecord accessors;
     DeclID overriddenID, opaqueReturnTypeID;
-    ArrayRef<uint64_t> accessorAndDependencyIDs;
+    ArrayRef<uint64_t> arrayFieldIDs;
 
     decls_block::VarLayout::readRecord(scratch, nameID, contextID,
                                        isImplicit, isObjC, isStatic, rawSpecifier,
@@ -2725,7 +2727,8 @@ public:
                                        overriddenID,
                                        rawAccessLevel, rawSetterAccessLevel,
                                        opaqueReturnTypeID,
-                                       accessorAndDependencyIDs);
+                                       numBackingProperties,
+                                       arrayFieldIDs);
 
     Identifier name = MF.getIdentifier(nameID);
 
@@ -2735,13 +2738,17 @@ public:
       return llvm::make_error<OverrideError>(name);
     }
 
-    // Exctract the accessor IDs.
-    for (DeclID accessorID : accessorAndDependencyIDs.slice(0, numAccessors)) {
+    // Extract the accessor IDs.
+    for (DeclID accessorID : arrayFieldIDs.slice(0, numAccessors)) {
       accessors.IDs.push_back(accessorID);
     }
-    accessorAndDependencyIDs = accessorAndDependencyIDs.slice(numAccessors);
+    arrayFieldIDs = arrayFieldIDs.slice(numAccessors);
 
-    for (TypeID dependencyID : accessorAndDependencyIDs) {
+    // Extract the backing property IDs.
+    auto backingPropertyIDs = arrayFieldIDs.slice(0, numBackingProperties);
+    arrayFieldIDs = arrayFieldIDs.slice(numBackingProperties);
+
+    for (TypeID dependencyID : arrayFieldIDs) {
       auto dependency = MF.getTypeChecked(dependencyID);
       if (!dependency) {
         // Stored properties in classes still impact class object layout because
@@ -2829,7 +2836,28 @@ public:
       var->setOpaqueResultTypeDecl(
                          cast<OpaqueTypeDecl>(MF.getDecl(opaqueReturnTypeID)));
     }
-    
+
+    // If there are any backing properties, record the
+    if (numBackingProperties > 0) {
+      VarDecl *backingVar = cast<VarDecl>(MF.getDecl(backingPropertyIDs[0]));
+      VarDecl *storageWrapperVar = nullptr;
+      if (numBackingProperties > 1) {
+        storageWrapperVar = cast<VarDecl>(MF.getDecl(backingPropertyIDs[1]));
+      }
+
+      PropertyWrapperBackingPropertyInfo info(
+          backingVar, storageWrapperVar, nullptr, nullptr, nullptr);
+      ctx.evaluator.cacheOutput(
+          PropertyWrapperBackingPropertyInfoRequest{var}, std::move(info));
+      ctx.evaluator.cacheOutput(
+          PropertyWrapperBackingPropertyTypeRequest{var},
+          backingVar->getInterfaceType());
+      backingVar->setOriginalWrappedProperty(var);
+
+      if (storageWrapperVar)
+        storageWrapperVar->setOriginalWrappedProperty(var);
+    }
+
     return var;
   }
 
@@ -4160,6 +4188,24 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         Attr = DynamicReplacementAttr::create(
             ctx, DeclName(ctx, baseName, ArrayRef<Identifier>(pieces)),
             cast<AbstractFunctionDecl>(*replacedFunDecl));
+        break;
+      }
+
+      case decls_block::Custom_DECL_ATTR: {
+        bool isImplicit;
+        TypeID typeID;
+        serialization::decls_block::CustomDeclAttrLayout::readRecord(
+          scratch, isImplicit, typeID);
+
+        Expected<Type> deserialized = MF.getTypeChecked(typeID);
+        if (!deserialized) {
+          MF.fatal(deserialized.takeError());
+          break;
+        }
+
+        Attr = CustomAttr::create(ctx, SourceLoc(),
+                                  TypeLoc::withoutLoc(deserialized.get()),
+                                  isImplicit);
         break;
       }
 

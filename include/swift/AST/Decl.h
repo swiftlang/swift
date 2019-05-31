@@ -78,6 +78,8 @@ namespace swift {
   class ParameterTypeFlags;
   class Pattern;
   struct PrintOptions;
+  struct PropertyWrapperBackingPropertyInfo;
+  struct PropertyWrapperTypeInfo;
   class ProtocolDecl;
   class ProtocolType;
   struct RawComment;
@@ -359,7 +361,7 @@ protected:
     IsStatic : 1
   );
 
-  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 4+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 4+1+1+1+1+1,
     /// The specifier associated with this variable or parameter.  This
     /// determines the storage semantics of the value e.g. mutability.
     Specifier : 4,
@@ -378,7 +380,10 @@ protected:
 
     /// Whether this is a property defined in the debugger's REPL.
     /// FIXME: Remove this once LLDB has proper support for resilience.
-    IsREPLVar : 1
+    IsREPLVar : 1,
+
+    /// Whether this is the backing storage for a property wrapper.
+    IsPropertyWrapperBackingProperty : 1
   );
 
   SWIFT_INLINE_BITFIELD(ParamDecl, VarDecl, 1 + NumDefaultArgumentKindBits,
@@ -1895,7 +1900,10 @@ class PatternBindingEntry {
   enum class Flags {
     Checked = 1 << 0,
     Removed = 1 << 1,
-    Lazy    = 1 << 2
+    /// Whether the contents of this initializer were subsumed by
+    /// some other initialization, e.g., a lazy property's initializer
+    /// gets subsumed by the getter body.
+    Subsumed    = 1 << 2
   };
   llvm::PointerIntPair<Pattern *, 3, OptionSet<Flags>> PatternAndFlags;
 
@@ -1930,14 +1938,20 @@ public:
 
   Pattern *getPattern() const { return PatternAndFlags.getPointer(); }
   void setPattern(Pattern *P) { PatternAndFlags.setPointer(P); }
+
+  /// Whether the given pattern binding entry is initialized.
+  bool isInitialized() const;
+
   Expr *getInit() const {
     if (PatternAndFlags.getInt().contains(Flags::Removed) ||
         InitContextAndIsText.getInt())
       return nullptr;
     return InitExpr.Node;
   }
-  Expr *getNonLazyInit() const {
-    return isInitializerLazy() ? nullptr : getInit();
+  /// Retrieve the initializer if it should be executed to initialize this
+  /// particular pattern binding.
+  Expr *getExecutableInit() const {
+    return isInitializerSubsumed() ? nullptr : getInit();
   }
   SourceRange getOrigInitRange() const;
   void setInit(Expr *E);
@@ -1981,11 +1995,11 @@ public:
     PatternAndFlags.setInt(PatternAndFlags.getInt() | Flags::Checked);
   }
 
-  bool isInitializerLazy() const {
-    return PatternAndFlags.getInt().contains(Flags::Lazy);
+  bool isInitializerSubsumed() const {
+    return PatternAndFlags.getInt().contains(Flags::Subsumed);
   }
-  void setInitializerLazy() {
-    PatternAndFlags.setInt(PatternAndFlags.getInt() | Flags::Lazy);
+  void setInitializerSubsumed() {
+    PatternAndFlags.setInt(PatternAndFlags.getInt() | Flags::Subsumed);
   }
 
   // Return the first variable initialized by this pattern.
@@ -2077,11 +2091,16 @@ public:
     getMutablePatternList()[i].setInitStringRepresentation(str);
   }
 
+  /// Whether the given pattern entry is initialized.
+  bool isInitialized(unsigned i) const {
+    return getPatternList()[i].isInitialized();
+  }
+
   Expr *getInit(unsigned i) const {
     return getPatternList()[i].getInit();
   }
-  Expr *getNonLazyInit(unsigned i) const {
-    return getPatternList()[i].getNonLazyInit();
+  Expr *getExecutableInit(unsigned i) const {
+    return getPatternList()[i].getExecutableInit();
   }
   
   SourceRange getOrigInitRange(unsigned i) const {
@@ -2122,12 +2141,12 @@ public:
     getMutablePatternList()[i].setInitializerChecked();
   }
 
-  bool isInitializerLazy(unsigned i) const {
-    return getPatternList()[i].isInitializerLazy();
+  bool isInitializerSubsumed(unsigned i) const {
+    return getPatternList()[i].isInitializerSubsumed();
   }
 
-  void setInitializerLazy(unsigned i) {
-    getMutablePatternList()[i].setInitializerLazy();
+  void setInitializerSubsumed(unsigned i) {
+    getMutablePatternList()[i].setInitializerSubsumed();
   }
   
   /// Does this binding declare something that requires storage?
@@ -2135,11 +2154,7 @@ public:
 
   /// Determines whether this binding either has an initializer expression, or is
   /// default initialized, without performing any type checking on it.
-  ///
-  /// This is only valid to check for bindings which have storage.
   bool isDefaultInitializable() const {
-    assert(hasStorage());
-
     for (unsigned i = 0, e = getNumPatternEntries(); i < e; ++i)
       if (!isDefaultInitializable(i))
         return false;
@@ -3369,6 +3384,9 @@ public:
 
   /// Is this a key path type?
   Optional<KeyPathTypeKind> getKeyPathTypeKind() const;
+
+  /// Retrieve information about this type as a property wrapper.
+  PropertyWrapperTypeInfo getPropertyWrapperTypeInfo() const;
 
 private:
   /// Predicate used to filter StoredPropertyRange.
@@ -4716,6 +4734,17 @@ public:
   }
 };
 
+/// Describes which synthesized property for a property with an attached
+/// wrapper is being referenced.
+enum class PropertyWrapperSynthesizedPropertyKind {
+  /// The backing storage property, which is a stored property of the
+  /// wrapper type.
+  Backing,
+  /// A storage wrapper (e.g., `$foo`), which is a wrapper over the
+  /// wrapper instance's `wrapperValue` property.
+  StorageWrapper,
+};
+
 /// VarDecl - 'var' and 'let' declarations.
 class VarDecl : public AbstractStorageDecl {
 public:
@@ -4746,6 +4775,7 @@ protected:
     Bits.VarDecl.IsDebuggerVar = false;
     Bits.VarDecl.IsREPLVar = false;
     Bits.VarDecl.HasNonPatternBindingInit = false;
+    Bits.VarDecl.IsPropertyWrapperBackingProperty = false;
   }
 
   /// This is the type specified, including location information.
@@ -4912,12 +4942,19 @@ public:
     return nullptr;
   }
 
+  /// Whether there exists an initializer for this \c VarDecl.
+  bool isParentInitialized() const {
+    if (auto *PBD = getParentPatternBinding())
+      return PBD->getPatternEntryForVarDecl(this).isInitialized();
+    return false;
+  }
+
   // Return whether this VarDecl has an initial value, either by checking
   // if it has an initializer in its parent pattern binding or if it has
   // the @_hasInitialValue attribute.
   bool hasInitialValue() const {
     return getAttrs().hasAttribute<HasInitialValueAttr>() ||
-           getParentInitializer();
+           isParentInitialized();
   }
 
   VarDecl *getOverriddenDecl() const {
@@ -5033,6 +5070,65 @@ public:
     Bits.VarDecl.IsREPLVar = IsREPLVar;
   }
 
+  /// Retrieve the custom attribute that attaches a property wrapper to this
+  /// property.
+  CustomAttr *getAttachedPropertyWrapper() const;
+
+  /// Retrieve the type of the attached property wrapper as a contextual
+  /// type.
+  ///
+  /// \returns a NULL type for properties without attached wrappers,
+  /// an error type when the property wrapper type itself is erroneous,
+  /// or the wrapper type itself, which may involve unbound generic
+  /// types.
+  Type getAttachedPropertyWrapperType() const;
+
+  /// Retrieve information about the attached property wrapper type.
+  PropertyWrapperTypeInfo getAttachedPropertyWrapperTypeInfo() const;
+
+  /// Retrieve the fully resolved attached property wrapper type.
+  ///
+  /// This type will be the fully-resolved form of
+  /// \c getAttachedPropertyWrapperType(), which will not contain any
+  /// unbound generic types. It will be the type of the backing property.
+  Type getPropertyWrapperBackingPropertyType() const;
+
+  /// Retrieve information about the backing properties of the attached
+  /// property wrapper.
+  PropertyWrapperBackingPropertyInfo
+      getPropertyWrapperBackingPropertyInfo() const;
+
+  /// Retrieve the backing storage property for a property that has an
+  /// attached property wrapper.
+  ///
+  /// The backing storage property will be a stored property of the
+  /// wrapper's type. This will be equivalent to
+  /// \c getAttachedPropertyWrapperType() when it is fully-specified;
+  /// if \c getAttachedPropertyWrapperType() involves an unbound
+  /// generic type, the backing storage property will be the appropriate
+  /// bound generic version.
+  VarDecl *getPropertyWrapperBackingProperty() const;
+
+  /// Whether this is a property with a property wrapper that was initialized
+  /// via a value of the original type, e.g.,
+  ///
+  /// \code
+  /// @Lazy var i = 17
+  /// \end
+  bool isPropertyWrapperInitializedWithInitialValue() const;
+
+  /// If this property is the backing storage for a property with an attached
+  /// property wrapper, return the original property.
+  ///
+  /// \param kind If not \c None, only returns the original property when
+  /// \c this property is the specified synthesized property.
+  VarDecl *getOriginalWrappedProperty(
+      Optional<PropertyWrapperSynthesizedPropertyKind> kind = None) const;
+
+  /// Set the property that wraps to this property as it's backing
+  /// property.
+  void setOriginalWrappedProperty(VarDecl *originalProperty);
+
   /// Return the Objective-C runtime name for this property.
   Identifier getObjCPropertyName() const;
 
@@ -5053,7 +5149,17 @@ public:
 
   /// Returns true if the name is the self identifier and is implicit.
   bool isSelfParameter() const;
-  
+
+  /// Determine whether this property will be part of the implicit memberwise
+  /// initializer.
+  ///
+  /// \param preferDeclaredProperties When encountering a `lazy` property
+  /// or a property that has an attached property wrapper, prefer the
+  /// actual declared property (which may or may not be considered "stored"
+  /// as the moment) to the backing storage property. Otherwise, the stored
+  /// backing property will be treated as the member-initialized property.
+  bool isMemberwiseInitialized(bool preferDeclaredProperties) const;
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) { 
     return D->getKind() == DeclKind::Var || D->getKind() == DeclKind::Param; 
