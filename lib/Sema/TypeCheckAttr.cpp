@@ -2887,8 +2887,10 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
 
   AbstractFunctionDecl *original = dyn_cast<AbstractFunctionDecl>(D);
   if (auto *asd = dyn_cast<AbstractStorageDecl>(D)) {
-    if (asd->getImplInfo().isSimpleStored()) {
-      diagnoseAndRemoveAttr(attr, diag::differentiable_attr_stored_property_unsupported);
+    if (asd->getImplInfo().isSimpleStored() &&
+        (attr->getJVP() || attr->getVJP())) {
+      diagnoseAndRemoveAttr(attr,
+          diag::differentiable_attr_stored_property_variable_unsupported);
 	  return;
     }
     // When used directly on a storage decl (stored/computed property or
