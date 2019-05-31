@@ -3945,9 +3945,8 @@ private:
   DenseMap<std::pair<SILBasicBlock *, SILBasicBlock *>, SILBasicBlock *>
       adjointTrampolineBBMap;
 
-  /// Mapping from original basic blocks to local stack allocations.
-  /// Local allocations should be freed in
-  DenseMap<SILBasicBlock *, SmallVector<ValueWithCleanup, 8>> localAllocations;
+  /// Stack buffers allocated for storing local adjoint adjoint values.
+  SmallVector<ValueWithCleanup, 8> functionLocalAllocations;
 
   /// Mapping from original basic blocks to active values.
   DenseMap<SILBasicBlock *, SmallVector<SILValue, 8>> activeValues;
@@ -4088,8 +4087,9 @@ private:
   /// Assuming the given type conforms to `Differentiable` after remapping,
   /// returns the associated tangent space type.
   SILType getRemappedTangentType(SILType type) {
-    return SILType::getPrimitiveObjectType(
-        getTangentSpace(remapType(type).getASTType())->getCanonicalType());
+    return SILType::getPrimitiveType(
+        getTangentSpace(remapType(type).getASTType())->getCanonicalType(),
+        type.getCategory());
   }
 
   //--------------------------------------------------------------------------//
@@ -4210,6 +4210,14 @@ private:
     }
     return SILValue();
   }
+  
+  SILBasicBlock::iterator getNextFunctionLocalAllocationInsertionPoint() {
+    if (functionLocalAllocations.empty())
+      return getAdjoint().getEntryBlock()->begin();
+    auto lastLocalAlloc = functionLocalAllocations.back().getValue();
+    auto it = lastLocalAlloc->getDefiningInstruction()->getIterator();
+    return std::next(it);
+  }
 
   ValueWithCleanup &getAdjointBuffer(SILValue originalBuffer) {
     assert(originalBuffer->getType().isAddress());
@@ -4239,16 +4247,10 @@ private:
     }
 
     // Set insertion point for local allocation builder: before the last local
-    // allocation, or at the start of the adjoint entry BB if no local
+    // allocation, or at the start of the adjoint function's entry if no local
     // allocations exist yet.
-    auto *origBB = originalBuffer->getParentBlock();
-    auto *adjBB = getAdjointBlock(origBB);
-    auto &localBlockAllocations = localAllocations[origBB];
-    if (localBlockAllocations.empty())
-      localAllocBuilder.setInsertionPoint(adjBB, adjBB->begin());
-    else
-      localAllocBuilder.setInsertionPoint(
-          localBlockAllocations.back().getValue()->getDefiningInstruction());
+    localAllocBuilder.setInsertionPoint(
+        getNextFunctionLocalAllocationInsertionPoint());
     // Allocate local buffer and initialize to zero.
     auto *newBuf = localAllocBuilder.createAllocStack(
         originalBuffer.getLoc(),
@@ -4269,7 +4271,7 @@ private:
         access->getLoc(), access, /*aborted*/ false);
     // Create cleanup for local buffer.
     ValueWithCleanup bufWithCleanup(newBuf, makeCleanup(newBuf, emitCleanup));
-    localBlockAllocations.push_back(bufWithCleanup);
+    functionLocalAllocations.push_back(bufWithCleanup);
     return (insertion.first->getSecond() = bufWithCleanup);
   }
 
@@ -4380,9 +4382,16 @@ public:
       // Otherwise, if the original block has active values:
       // - For each active value, add adjoint value arguments to the adjoint
       //   block.
-      for (auto activeValue : activeBBValues)
-        adjointBB->createPhiArgument(
-            remapType(activeValue->getType()), ValueOwnershipKind::Guaranteed);
+      for (auto activeValue : activeBBValues) {
+        if (activeValue->getType().isAddress()) {
+#error "FIXME: create local allocations"
+        }
+        else {
+          adjointBB->createPhiArgument(
+              getRemappedTangentType(activeValue->getType()),
+              ValueOwnershipKind::Guaranteed);
+        }
+      }
       // - Create adjoint trampoline blocks for each successor block of the
       //   original block. Adjoint trampoline blocks only have a pullback
       //   struct argument, and branch from the adjoint successor block to the
@@ -4435,7 +4444,7 @@ public:
       ValueWithCleanup seedBufferCopyWithCleanup(
           seedBufCopy, makeCleanup(seedBufCopy, emitCleanup));
       setAdjointBuffer(origResult, seedBufferCopyWithCleanup);
-      localAllocations[origExit].push_back(seedBufferCopyWithCleanup);
+      functionLocalAllocations.push_back(seedBufferCopyWithCleanup);
     } else {
       builder.createRetainValue(adjLoc, seed, builder.getDefaultAtomicity());
       initializeAdjointValue(origExit, origResult, makeConcreteAdjointValue(
@@ -4556,8 +4565,9 @@ public:
                 initializeAdjointValue(predBB, activeValue, forwardedArgAdj);
               }
             } else {
-              auto activeValueAdjBuf = getAdjointBuffer(activeValue);
-              arguments.push_back(activeValueAdjBuf.getValue());
+//              auto activeValueAdjBuf = getAdjointBuffer(activeValue);
+//              arguments.push_back(activeValueAdjBuf.getValue());
+#error "copy_addr to the corresponding local allocation"
             }
           }
           adjointTrampolineBBBuilder.createBranch(adjLoc, adjointBB, arguments);
@@ -4645,31 +4655,16 @@ public:
         cleanup->disable();
     }
 
-    // Deallocate local allocations.
-    for (auto pair : localAllocations) {
-      auto *origBB = pair.getFirst();
-      auto localBlockAllocations = pair.getSecond();
-
-      // Move builder to the end of the adjoint block.
-      auto *adjBB = getAdjointBlock(origBB);
-      if (adjBB == getAdjointBlock(origEntry))
-        builder.setInsertionPoint(adjBB);
-      else
-        builder.setInsertionPoint(adjBB->getTerminator());
-
-      // Create `dealloc_stack` instructions.
-      for (auto alloc : localBlockAllocations) {
-        // Assert that local allocations have at least one use.
-        assert(adjBB == alloc.getValue()->getParentBlock());
-        // Assert that local allocations have at least one use.
-        // Buffers should not be allocated needlessly.
-        assert(!alloc.getValue()->use_empty());
-        if (auto *cleanup = alloc.getCleanup())
-          cleanup->applyRecursively(builder, adjLoc);
-        builder.createDeallocStack(adjLoc, alloc);
-      }
-    }
     builder.setInsertionPoint(getAdjointBlock(original.getEntryBlock()));
+    // Deallocate local allocations.
+    for (auto alloc : reversed(functionLocalAllocations)) {
+      // Assert that local allocations have at least one use.
+      // Buffers should not be allocated needlessly.
+      assert(!alloc.getValue()->use_empty());
+      if (auto *cleanup = alloc.getCleanup())
+        cleanup->applyRecursively(builder, adjLoc);
+      builder.createDeallocStack(adjLoc, alloc);
+    }
     builder.createReturn(adjLoc, joinElements(retElts, builder, adjLoc));
 
     LLVM_DEBUG(getADDebugStream() << "Generated adjoint:\n" << adjoint);
