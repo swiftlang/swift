@@ -83,6 +83,8 @@ PROTOCOL(FloatingPoint)
 PROTOCOL(KeyPathIterable)
 PROTOCOL(TensorArrayProtocol)
 PROTOCOL(TensorGroup)
+PROTOCOL_(TensorFlowDataTypeCompatible)
+PROTOCOL(TensorProtocol)
 PROTOCOL(VectorNumeric)
 PROTOCOL(Differentiable)
 
