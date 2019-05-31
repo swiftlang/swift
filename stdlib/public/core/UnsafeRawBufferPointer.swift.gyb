@@ -92,7 +92,7 @@
 ///
 ///     destBytes[0..<n] = someBytes[n..<(n + n)]
 % end
-@_fixed_layout
+@frozen
 public struct Unsafe${Mutable}RawBufferPointer {
   @usableFromInline
   internal let _position, _end: Unsafe${Mutable}RawPointer?
@@ -101,7 +101,7 @@ public struct Unsafe${Mutable}RawBufferPointer {
 %if not mutable:
 extension UnsafeRawBufferPointer {
   /// An iterator over the bytes viewed by a raw buffer pointer.
-  @_fixed_layout
+  @frozen
   public struct Iterator {
     @usableFromInline
     internal var _position, _end: UnsafeRawPointer?

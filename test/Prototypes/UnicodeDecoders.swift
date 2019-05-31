@@ -37,7 +37,7 @@ extension Unicode.Scalar {
 //===----------------------------------------------------------------------===//
 
 extension Unicode {
-  @_fixed_layout
+  @frozen
   public // @testable
   struct _ParsingIterator<
     CodeUnitIterator : IteratorProtocol, 

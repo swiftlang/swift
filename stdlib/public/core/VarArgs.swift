@@ -430,7 +430,7 @@ extension Float80 : CVarArg, _CVarArgAligned {
 @usableFromInline // c-abi
 final internal class __VaListBuilder {
   #if arch(x86_64) || arch(s390x)
-  @_fixed_layout // c-abi
+  @frozen // c-abi
   @usableFromInline
   internal struct Header {
     @inlinable // c-abi

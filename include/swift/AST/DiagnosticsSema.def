@@ -1388,8 +1388,8 @@ WARNING(pattern_type_not_usable_from_inline_warn,none,
         "%select{%select{variable|constant}0|property}1 "
         "should be '@usableFromInline' or public",
         (bool, bool))
-ERROR(pattern_type_not_usable_from_inline_fixed_layout,none,
-      "type referenced from a stored property in a '@_fixed_layout' struct must "
+ERROR(pattern_type_not_usable_from_inline_frozen,none,
+      "type referenced from a stored property in a '@frozen' struct must "
       "be '@usableFromInline' or public",
       (/*ignored*/bool, /*ignored*/bool))
 ERROR(pattern_type_not_usable_from_inline_inferred,none,
@@ -1404,9 +1404,9 @@ WARNING(pattern_type_not_usable_from_inline_inferred_warn,none,
         "with inferred type %2 "
         "should be '@usableFromInline' or public",
         (bool, bool, Type))
-ERROR(pattern_type_not_usable_from_inline_inferred_fixed_layout,none,
+ERROR(pattern_type_not_usable_from_inline_inferred_frozen,none,
       "type referenced from a stored property with inferred type %2 in a "
-      "'@_fixed_layout' struct must be '@usableFromInline' or public",
+      "'@frozen' struct must be '@usableFromInline' or public",
       (/*ignored*/bool, /*ignored*/bool, Type))
 
 ERROR(pattern_binds_no_variables,none,
@@ -4136,6 +4136,15 @@ ERROR(fixed_layout_attr_on_internal_type,
       "%select{private|fileprivate|internal|%error|%error}1",
       (DeclName, AccessLevel))
 
+WARNING(fixed_layout_struct,
+      none, "'@frozen' attribute is now used for fixed-layout structs", ())
+
+ERROR(frozen_attr_on_internal_type,
+      none, "'@frozen' attribute can only be applied to '@usableFromInline' "
+      "or public declarations, but %0 is "
+      "%select{private|fileprivate|internal|%error|%error}1",
+      (DeclName, AccessLevel))
+
 ERROR(usable_from_inline_attr_with_explicit_access,
       none, "'@usableFromInline' attribute can only be applied to internal "
       "declarations, but %0 is %select{private|fileprivate|%error|public|open}1",
@@ -4152,7 +4161,7 @@ ERROR(usable_from_inline_attr_in_protocol,none,
   "an '@inlinable' function|" \
   "an '@_alwaysEmitIntoClient' function|" \
   "a default argument value|" \
-  "a property initializer in a '@_fixed_layout' type}"
+  "a property initializer in a '@frozen' type}"
 
 #define DECL_OR_ACCESSOR "%select{%0|%0 for}"
 

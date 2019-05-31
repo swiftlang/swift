@@ -28,7 +28,7 @@ internal protocol _SetBuffer {
 
 extension Set {
   @usableFromInline
-  @_fixed_layout
+  @frozen
   internal struct _Variant {
     @usableFromInline
     internal var object: _BridgeStorage<__RawSetStorage>

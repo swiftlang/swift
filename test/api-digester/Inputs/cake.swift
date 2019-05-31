@@ -3,7 +3,7 @@
 public protocol P1 {}
 public protocol P2 {}
 public protocol P3: P2, P1 {}
-@_fixed_layout
+@frozen
 public struct S1: P1 {
   public static func foo1() {}
   mutating public func foo2() {}
@@ -46,7 +46,7 @@ public extension Int {
   public func foo() {}
 }
 
-@_fixed_layout
+@frozen
 public struct fixedLayoutStruct {
   public var a = 1
   private var b = 2 { didSet {} willSet(value) {} }

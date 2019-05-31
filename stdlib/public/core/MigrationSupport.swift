@@ -607,7 +607,7 @@ extension Zip2Sequence {
 @available(swift, deprecated: 4.2, message: "PlaygroundQuickLook will be removed in a future Swift version. For customizing how types are presented in playgrounds, use CustomPlaygroundDisplayConvertible instead.")
 public typealias PlaygroundQuickLook = _PlaygroundQuickLook
 
-@_frozen // rdar://problem/38719739 - needed by LLDB
+@frozen // rdar://problem/38719739 - needed by LLDB
 public enum _PlaygroundQuickLook {
   case text(String)
   case int(Int64)
