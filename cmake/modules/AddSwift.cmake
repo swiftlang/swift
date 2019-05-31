@@ -303,6 +303,11 @@ function(_add_variant_c_compile_flags)
                        "-fcoverage-mapping")
   endif()
 
+  if((CFLAGS_ARCH STREQUAL "armv7" OR CFLAGS_ARCH STREQUAL "aarch64") AND
+     (CFLAGS_SDK STREQUAL "LINUX" OR CFLAGS_SDK STREQUAL "ANDROID"))
+     list(APPEND result -funwind-tables)
+  endif()
+
   if("${CFLAGS_SDK}" STREQUAL "ANDROID")
     swift_android_libcxx_include_paths(CFLAGS_CXX_INCLUDES)
     swift_android_include_for_arch("${CFLAGS_ARCH}" "${CFLAGS_ARCH}_INCLUDE")
