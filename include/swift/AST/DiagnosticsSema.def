@@ -2734,7 +2734,7 @@ ERROR(differentiable_attr_unsupported_req_kind,none,
 ERROR(differentiable_attr_class_unsupported,none,
       "class members cannot be marked with '@differentiable'", ())
 ERROR(differentiable_attr_stored_property_variable_unsupported,none,
-      "stored properties/variables cannot be marked with '@differentiable' with a custom VJP/JVP", ())
+      "'jvp:' or 'vjp:' cannot be specified for stored properties", ())
 NOTE(protocol_witness_missing_specific_differentiable_attr,none,
      "candidate is missing attribute '%0'", (StringRef))
 

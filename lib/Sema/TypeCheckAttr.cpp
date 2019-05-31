@@ -2891,7 +2891,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
         (attr->getJVP() || attr->getVJP())) {
       diagnoseAndRemoveAttr(attr,
           diag::differentiable_attr_stored_property_variable_unsupported);
-	  return;
+      return;
     }
     // When used directly on a storage decl (stored/computed property or
     // subscript), the getter is currently inferred to be `@differentiable`.

@@ -1,7 +1,10 @@
 // RUN: %target-swift-frontend -typecheck -verify %s
 
 @differentiable // expected-error {{'@differentiable' attribute cannot be applied to this declaration}}
-let global: Float = 1
+let globalConst: Float = 1
+
+@differentiable // expected-error {{'@differentiable' attribute cannot be applied to this declaration}}
+var globalVar: Float = 1
 
 func testLocalVariables() {
   // expected-error @+1 {{'_' has no parameters to differentiate with respect to}}
@@ -225,25 +228,18 @@ class Foo {
 }
 
 struct JVPStruct {
+  @differentiable
   let p: Float
 
-  @differentiable(wrt: (self), jvp: storedPropJVP)
-  let storedImmutableOk: Float
-
-  // expected-error @+1 {{'storedPropJVP' does not have expected type '(JVPStruct) -> () -> (Double, (JVPStruct.TangentVector) -> Double.TangentVector)' (aka '(JVPStruct) -> () -> (Double, (JVPStruct) -> Double)'}}
-  @differentiable(wrt: (self), jvp: storedPropJVP)
-  let storedImmutableWrongType: Double
-
-  @differentiable(wrt: (self), jvp: storedPropJVP)
-  var storedMutableOk: Float
-
-  // expected-error @+1 {{'storedPropJVP' does not have expected type '(JVPStruct) -> () -> (Double, (JVPStruct.TangentVector) -> Double.TangentVector)' (aka '(JVPStruct) -> () -> (Double, (JVPStruct) -> Double)'}}
-  @differentiable(wrt: (self), jvp: storedPropJVP)
-  var storedMutableWrongType: Double
+  // expected-error @+1 {{'funcJVP' does not have expected type '(JVPStruct) -> () -> (Double, (JVPStruct.TangentVector) -> Double.TangentVector)' (aka '(JVPStruct) -> () -> (Double, (JVPStruct) -> Double)'}}
+  @differentiable(wrt: (self), jvp: funcJVP)
+  func funcWrongType() -> Double {
+    fatalError("unimplemented")
+  }
 }
 
 extension JVPStruct {
-  func storedPropJVP() -> (Float, (JVPStruct) -> Float) {
+  func funcJVP() -> (Float, (JVPStruct) -> Float) {
     fatalError("unimplemented")
   }
 }
@@ -383,23 +379,15 @@ func vjpNonDiffResult2(x: Float) -> (Float, Int) {
 struct VJPStruct {
   let p: Float
 
-  @differentiable(vjp: storedPropVJP)
-  let storedImmutableOk: Float
-
-  // expected-error @+1 {{'storedPropVJP' does not have expected type '(VJPStruct) -> () -> (Double, (Double.TangentVector) -> VJPStruct.TangentVector)' (aka '(VJPStruct) -> () -> (Double, (Double) -> VJPStruct)'}}
-  @differentiable(vjp: storedPropVJP)
-  let storedImmutableWrongType: Double
-
-  @differentiable(vjp: storedPropVJP)
-  var storedMutableOk: Float
-
-  // expected-error @+1 {{'storedPropVJP' does not have expected type '(VJPStruct) -> () -> (Double, (Double.TangentVector) -> VJPStruct.TangentVector)' (aka '(VJPStruct) -> () -> (Double, (Double) -> VJPStruct)'}}
-  @differentiable(vjp: storedPropVJP)
-  var storedMutableWrongType: Double
+  // expected-error @+1 {{'funcVJP' does not have expected type '(VJPStruct) -> () -> (Double, (Double.TangentVector) -> VJPStruct.TangentVector)' (aka '(VJPStruct) -> () -> (Double, (Double) -> VJPStruct)'}}
+  @differentiable(vjp: funcVJP)
+  func funcWrongType() -> Double {
+    fatalError("unimplemented")
+  }
 }
 
 extension VJPStruct {
-  func storedPropVJP() -> (Float, (Float) -> VJPStruct) {
+  func funcVJP() -> (Float, (Float) -> VJPStruct) {
     fatalError("unimplemented")
   }
 }

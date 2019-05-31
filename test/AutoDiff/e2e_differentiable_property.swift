@@ -30,10 +30,9 @@ struct Space {
   }
 
   private let storedX: Float
-
-  /// `y` is a stored property with a custom vjp for its getter.
-  @differentiable(vjp: vjpY)
-  let y: Float
+  
+  @differentiable
+  var y: Float
 
   func vjpY() -> (Float, (Float) -> TangentSpace) {
     return (y, { v in TangentSpace(dx: 0, dy: v) })
@@ -70,7 +69,7 @@ E2EDifferentiablePropertyTests.test("stored property") {
 
 struct GenericMemberWrapper<T : Differentiable> : Differentiable {
   // Stored property.
-  @differentiable(vjp: vjpX)
+  @differentiable
   var x: T
 
   func vjpX() -> (T, (T.TangentVector) -> GenericMemberWrapper.TangentVector) {
