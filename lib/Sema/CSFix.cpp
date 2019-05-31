@@ -283,6 +283,20 @@ DefineMemberBasedOnUse::create(ConstraintSystem &cs, Type baseType,
       DefineMemberBasedOnUse(cs, baseType, member, locator);
 }
 
+AllowMemberRefOnExistential *
+AllowMemberRefOnExistential::create(ConstraintSystem &cs, Type baseType,
+                                    ValueDecl *member, DeclName memberName,
+                                    ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowMemberRefOnExistential(cs, baseType, memberName, member, locator);
+}
+
+bool AllowMemberRefOnExistential::diagnose(Expr *root, bool asNote) const {
+  auto failure = InvalidMemberRefOnExistential(root, getConstraintSystem(),
+                                               BaseType, Name, getLocator());
+  return failure.diagnose(asNote);
+}
+
 bool AllowTypeOrInstanceMember::diagnose(Expr *root, bool asNote) const {
   auto failure = AllowTypeOrInstanceMemberFailure(
       root, getConstraintSystem(), BaseType, Member, UsedName, getLocator());

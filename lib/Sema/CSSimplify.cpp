@@ -4529,10 +4529,16 @@ fixMemberRef(ConstraintSystem &cs, Type baseTy,
       assert(choice.isDecl());
       return AllowInaccessibleMember::create(cs, choice.getDecl(), locator);
 
+    case MemberLookupResult::UR_UnavailableInExistential: {
+      return choice.isDecl()
+                 ? AllowMemberRefOnExistential::create(
+                       cs, baseTy, choice.getDecl(), memberName, locator)
+                 : nullptr;
+    }
+
     case MemberLookupResult::UR_MutatingMemberOnRValue:
     case MemberLookupResult::UR_MutatingGetterOnRValue:
     case MemberLookupResult::UR_LabelMismatch:
-    case MemberLookupResult::UR_UnavailableInExistential:
     // TODO(diagnostics): Add a new fix that is suggests to
     // add `subscript(dynamicMember: {Writable}KeyPath<T, U>)`
     // overload here, that would help if such subscript has
@@ -6637,6 +6643,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::RelabelArguments:
   case FixKind::RemoveUnwrap:
   case FixKind::DefineMemberBasedOnUse:
+  case FixKind::AllowMemberRefOnExistential:
   case FixKind::AllowTypeOrInstanceMember:
   case FixKind::AllowInvalidPartialApplication:
   case FixKind::AllowInvalidInitRef:
