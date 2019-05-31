@@ -126,7 +126,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   //                               Attributes
   //===--------------------------------------------------------------------===//
   bool visitCustomAttributes(Decl *D) {
-    for (auto *customAttr : D->getAttrs().getAttributes<CustomAttr>()) {
+    for (auto *customAttr : D->getAttrs().getAttributes<CustomAttr, true>()) {
       CustomAttr *mutableCustomAttr = const_cast<CustomAttr *>(customAttr);
       if (doIt(mutableCustomAttr->getTypeLoc()))
         return true;
