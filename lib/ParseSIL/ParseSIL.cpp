@@ -2028,18 +2028,9 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Member, bool FnTypeRequired) {
     for (unsigned I = 0, E = values.size(); I < E; I++) {
       auto *decl = values[I];
 
-      unsigned numArgumentLabels = 0;
-      if (auto *eed = dyn_cast<EnumElementDecl>(decl)) {
-        numArgumentLabels =
-          (eed->hasAssociatedValues() ? 2 : 1);
-      } else if (auto *afd = dyn_cast<AbstractFunctionDecl>(decl)) {
-        numArgumentLabels =
-          (decl->getDeclContext()->isTypeContext() ? 2 : 1);
-      }
-
       auto lookupTy =
         decl->getInterfaceType()
-            ->removeArgumentLabels(numArgumentLabels);
+            ->removeArgumentLabels(decl->getNumCurryLevels());
       if (declTy == lookupTy->getCanonicalType()) {
         TheDecl = decl;
         // Update SILDeclRef to point to the right Decl.

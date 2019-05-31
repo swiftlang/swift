@@ -2704,6 +2704,9 @@ public:
   /// parameter lists, for example an enum element without associated values.
   bool hasParameterList() const;
 
+  /// Returns the number of curry levels in the declaration's interface type.
+  unsigned getNumCurryLevels() const;
+
   /// Get the decl for this value's opaque result type, if it has one.
   OpaqueTypeDecl *getOpaqueResultTypeDecl() const;
 
@@ -7162,6 +7165,15 @@ inline bool ValueDecl::hasParameterList() const {
   if (auto *eed = dyn_cast<EnumElementDecl>(this))
     return eed->hasAssociatedValues();
   return isa<AbstractFunctionDecl>(this) || isa<SubscriptDecl>(this);
+}
+
+inline unsigned ValueDecl::getNumCurryLevels() const {
+  unsigned curryLevels = 0;
+  if (hasParameterList())
+    curryLevels++;
+  if (hasCurriedSelf())
+    curryLevels++;
+  return curryLevels;
 }
 
 inline bool Decl::isPotentiallyOverridable() const {
