@@ -27,7 +27,6 @@ list(APPEND swift_stdlib_compile_flags "-Xllvm" "-sil-inline-generics")
 list(APPEND swift_stdlib_compile_flags "-Xllvm" "-sil-partial-specialization")
 list(APPEND swift_stdlib_compile_flags "-force-single-frontend-invocation")
 list(APPEND swift_stdlib_compile_flags "-O" "-whole-module-optimization")
-list(APPEND swift_stdlib_compile_flags "-Onone")
 list(APPEND swift_stdlib_compile_flags "-DCOMPILING_TENSORFLOW_MODULE")
 
 set(SOURCES "")
