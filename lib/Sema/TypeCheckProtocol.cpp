@@ -209,112 +209,6 @@ getTypesToCompare(ValueDecl *reqt, Type reqtType, bool reqtTypeIsIUO,
   return std::make_tuple(reqtType, witnessType, optAdjustment);
 }
 
-// Verify that the mutating bit is correct between a protocol requirement and a
-// witness.  This returns true on invalid.
-static bool checkMutating(FuncDecl *requirement, FuncDecl *witness,
-                          ValueDecl *witnessDecl) {
-  // Witnesses in classes never have mutating conflicts.
-  if (auto contextType =
-        witnessDecl->getDeclContext()->getDeclaredInterfaceType())
-    if (contextType->hasReferenceSemantics())
-      return false;
-  
-  // Determine whether the witness will be mutating or not.  If the witness is
-  // stored property accessor, it may not be synthesized yet.
-  bool witnessMutating;
-  if (witness)
-    witnessMutating = (requirement->isInstanceMember() &&
-                       witness->isMutating());
-  else {
-    auto reqtAsAccessor = cast<AccessorDecl>(requirement);
-    auto storage = cast<AbstractStorageDecl>(witnessDecl);
-
-    auto isReadMutating = [&] {
-      switch (storage->getReadImpl()) {
-      case ReadImplKind::Stored:
-        return false;
-      case ReadImplKind::Address:
-        return storage->getAddressor()->isMutating();
-      case ReadImplKind::Read:
-        return storage->getReadCoroutine()->isMutating();
-      case ReadImplKind::Inherited:
-      case ReadImplKind::Get:
-        llvm_unreachable("should have a getter");
-      }
-      llvm_unreachable("unhandled kind");
-    };
-
-    auto isStoredSetterMutating = [&] {
-      // A stored property on a value type will have a mutating setter
-      // and a non-mutating getter.
-      return reqtAsAccessor->isInstanceMember();
-    };
-
-    auto isWriteMutating = [&] {
-      switch (storage->getWriteImpl()) {
-      case WriteImplKind::Stored:
-        return isStoredSetterMutating();
-      case WriteImplKind::MutableAddress:
-        return storage->getMutableAddressor()->isMutating();
-      case WriteImplKind::Modify:
-        return storage->getModifyCoroutine()->isMutating();
-      case WriteImplKind::Immutable:
-        llvm_unreachable("asking for setter for immutable storage");
-      case WriteImplKind::Set:
-      case WriteImplKind::StoredWithObservers:
-      case WriteImplKind::InheritedWithObservers:
-        llvm_unreachable("should have a setter");
-      }
-      llvm_unreachable("unhandled kind");
-    };
-
-    auto isReadWriteMutating = [&] {
-      switch (storage->getReadWriteImpl()) {
-      case ReadWriteImplKind::Stored:
-        return isStoredSetterMutating();
-      case ReadWriteImplKind::MutableAddress:
-        return storage->getMutableAddressor()->isMutating();
-      case ReadWriteImplKind::Modify:
-        return storage->getModifyCoroutine()->isMutating();
-      case ReadWriteImplKind::MaterializeToTemporary:
-        return isReadMutating() || isWriteMutating();
-      case ReadWriteImplKind::Immutable:
-        llvm_unreachable("asking for setter for immutable storage");
-      }
-      llvm_unreachable("unhandled kind");
-    };
-
-    switch (reqtAsAccessor->getAccessorKind()) {
-    case AccessorKind::Get:
-    case AccessorKind::Read:
-      witnessMutating = isReadMutating();
-      break;
-
-    case AccessorKind::Set:
-      witnessMutating = isWriteMutating();
-      break;
-
-    case AccessorKind::Modify:
-      witnessMutating = isReadWriteMutating();
-      break;
-
-#define OPAQUE_ACCESSOR(ID, KEYWORD)
-#define ACCESSOR(ID) \
-    case AccessorKind::ID:
-#include "swift/AST/AccessorKinds.def"
-      llvm_unreachable("unexpected accessor requirement");
-    }
-  }
-
-  // Requirements in class-bound protocols never 'mutate' self.
-  auto *proto = cast<ProtocolDecl>(requirement->getDeclContext());
-  bool requirementMutating = (requirement->isMutating() &&
-                              !proto->requiresClass());
-
-  // The witness must not be more mutating than the requirement.
-  return !requirementMutating && witnessMutating;
-}
-
 /// Check that the Objective-C method(s) provided by the witness have
 /// the same selectors as those required by the requirement.
 static bool checkObjCWitnessSelector(TypeChecker &tc, ValueDecl *req,
@@ -484,7 +378,7 @@ swift::matchWitness(
       return RequirementMatch(witness, MatchKind::PostfixNonPostfixConflict);
 
     // Check that the mutating bit is ok.
-    if (checkMutating(funcReq, funcWitness, funcWitness))
+    if (!funcReq->isMutating() && funcWitness->isMutating())
       return RequirementMatch(witness, MatchKind::MutatingConflict);
 
     // If the requirement is rethrows, the witness must either be
@@ -509,15 +403,15 @@ swift::matchWitness(
       return RequirementMatch(witness, MatchKind::SettableConflict);
 
     // Validate that the 'mutating' bit lines up for getters and setters.
-    if (checkMutating(reqASD->getGetter(), witnessASD->getGetter(),
-                      witnessASD))
+    if (!reqASD->isGetterMutating() && witnessASD->isGetterMutating())
       return RequirementMatch(getStandinForAccessor(witnessASD, AccessorKind::Get),
                               MatchKind::MutatingConflict);
-    
-    if (req->isSettable(req->getDeclContext()) &&
-        checkMutating(reqASD->getSetter(), witnessASD->getSetter(), witnessASD))
-      return RequirementMatch(getStandinForAccessor(witnessASD, AccessorKind::Set),
-                              MatchKind::MutatingConflict);
+
+    if (req->isSettable(req->getDeclContext())) {
+      if (!reqASD->isSetterMutating() && witnessASD->isSetterMutating())
+        return RequirementMatch(getStandinForAccessor(witnessASD, AccessorKind::Set),
+                                MatchKind::MutatingConflict);
+    }
 
     // Decompose the parameters for subscript declarations.
     decomposeFunctionType = isa<SubscriptDecl>(req);
