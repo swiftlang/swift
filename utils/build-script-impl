@@ -174,7 +174,7 @@ KNOWN_SETTINGS=(
     skip-test-benchmarks        ""               "set to skip running Swift Benchmark Suite"
     skip-test-optimized         ""               "set to skip testing the test suite in optimized mode"
     skip-test-optimize-for-size ""               "set to skip testing the test suite in optimize for size mode"
-    skip-test-optimize-none-implicit-dynamic ""  "set to skip testing the test suite in optimize none with implicit dynamic mode"
+    skip-test-optimize-none-with-implicit-dynamic ""  "set to skip testing the test suite in optimize none with implicit dynamic mode"
     skip-test-sourcekit         ""               "set to skip testing SourceKit"
     stress-test-sourcekit       ""               "set to run the stress-SourceKit target"
     workspace                   "${HOME}/src"    "source directory containing llvm, clang, swift"
@@ -1500,7 +1500,7 @@ function calculate_targets_for_host() {
                 SWIFT_TEST_TARGETS+=("check-swift${test_subset_target_suffix}-optimize_size-${stdlib_deployment_target}")
             fi
             if [[ $(not ${SKIP_TEST_OPTIMIZE_NONE_IMPLICIT_DYNAMIC}) && ! -n "${test_host_only}" ]] ; then
-                SWIFT_TEST_TARGETS+=("check-swift${test_subset_target_suffix}-optimize_none_implicit_dynamic-${stdlib_deployment_target}")
+                SWIFT_TEST_TARGETS+=("check-swift${test_subset_target_suffix}-optimize_none_with_implicit_dynamic-${stdlib_deployment_target}")
             fi
         fi
     done
