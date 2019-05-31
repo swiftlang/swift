@@ -39,6 +39,9 @@ namespace ast_scope {
 #pragma mark ScopeCreator
 
 class ScopeCreator {
+  /// For allocating scopes.
+  ASTContext &ctx;
+
 
   /// \c SourceFiles and \c BraceStmts have \c Decls and \c ASTNodes in them
   /// that must be scoped in distant descendants. As scopes are created, pass
@@ -69,15 +72,13 @@ class ScopeCreator {
   /// Be robust against AST mutatations in flight:
   llvm::DenseSet<ClosureExpr *> alreadyHandledClosures;
 
-  ASTContext &ctx;
-
 public:
 
   ScopeCreator(SourceFile *SF)
   : ctx(SF->getASTContext()),
       sourceFileScope(constructScope<ASTSourceFileScope>(SF, this)),
       _lastAdopter(sourceFileScope),
-        lastAdopter(lastAdopter) {}
+        lastAdopter(_lastAdopter) {}
 
   ~ScopeCreator() {
     assert(empty() && "Should have consumed all deferred nodes");
@@ -87,7 +88,7 @@ public:
 
   /// Get a half-copy of me for passing down the tree with its own deferred
   /// nodes
-  ScopeCreator withoutDeferrals() { return new (ctx) ScopeCreator(*this); }
+  ScopeCreator &withoutDeferrals() { return *(new (ctx) ScopeCreator(*this)); }
 
 private:
   explicit ScopeCreator(ScopeCreator &sc)
@@ -219,20 +220,20 @@ private:
           foundClosure);
 
   static bool hasCustomAttribute(VarDecl *vd) {
-    return AttachedPropertyDelegateScope::getCustomAttributesSourceRange(vd)
+    return ç::getCustomAttributesSourceRange(vd)
         .isValid();
   }
 
 public:
-  /// If the pattern has an attached property delegate, create a scope for it
+  /// If the pattern has an attached property wrapper, create a scope for it
   /// so it can be looked up.
 
-  void createAttachedPropertyDelegateScope(PatternBindingDecl *patternBinding,
+  void createAttachedPropertyWrapperScope(PatternBindingDecl *patternBinding,
                                            ASTScopeImpl *parent) {
     patternBinding->getPattern(0)->forEachVariable([&](VarDecl *vd) {
       // assume all same as first
       if (hasCustomAttribute(vd))
-        withoutDeferrals().createSubtree<AttachedPropertyDelegateScope>(parent,
+        withoutDeferrals().createSubtree<AttachedPropertyWrapperScope>(parent,
                                                                         vd);
     });
   }
@@ -510,7 +511,7 @@ public:
   void visitProtocolDecl(ProtocolDecl *e, ASTScopeImpl *p,
                          ScopeCreator &scopeCreator) {
     e->createGenericParamsIfMissing();
-    scopeCreator.withoutDeferrals
+    scopeCreator.withoutDeferrals()
         .createSubtree2D<NominalTypeScope, GTXWholePortion>(p.e);
   }
 
@@ -557,7 +558,7 @@ public:
 
   void visitPatternBindingDecl(PatternBindingDecl *patternBinding,
                                ASTScopeImpl *p, ScopeCreator &scopeCreator) {
-    scopeCreator.createAttachedPropertyDelegateScope(patternBinding, p);
+    scopeCreator.createAttachedPropertyWrapperScope(patternBinding, p);
     // scopeCreator will contain any nodes that need to be put into subscopes.
     // In a type decl body, there won't be any.
     // The comment for \c AbstractPatternEntryScope.

@@ -101,7 +101,7 @@ Decl *SubscriptDeclScope::getEnclosingAbstractFunctionOrSubscriptDecl() const {
 }
 
 // Conservative, because using precise info would be circular
-SourceRange AttachedPropertyDelegateScope::getCustomAttributesSourceRange(
+SourceRange AttachedPropertyWrapperScope::getCustomAttributesSourceRange(
     const VarDecl *const vd) {
   SourceRange sr;
   for (auto *attr : vd->getAttrs().getAttributes<CustomAttr>()) {
@@ -159,7 +159,7 @@ NullablePtr<DeclContext> CaptureListScope::getDeclContext() const {
 }
 
 
-NullablePtr<DeclContext> AttachedPropertyDelegateScope::getDeclContext() const {
+NullablePtr<DeclContext> AttachedPropertyWrapperScope::getDeclContext() const {
   return decl->getParentPatternBinding()
       ->getPatternList()
       .front()
@@ -186,7 +186,7 @@ DEFINE_GET_CLASS_NAME(AbstractFunctionParamsScope)
 DEFINE_GET_CLASS_NAME(MethodBodyScope)
 DEFINE_GET_CLASS_NAME(PureFunctionBodyScope)
 DEFINE_GET_CLASS_NAME(DefaultArgumentInitializerScope)
-DEFINE_GET_CLASS_NAME(AttachedPropertyDelegateScope)
+DEFINE_GET_CLASS_NAME(AttachedPropertyWrapperScope)
 DEFINE_GET_CLASS_NAME(PatternEntryDeclScope)
 DEFINE_GET_CLASS_NAME(PatternEntryInitializerScope)
 DEFINE_GET_CLASS_NAME(PatternEntryUseScope)

@@ -780,21 +780,21 @@ protected:
 };
 
 // Consider:
-//  @_propertyDelegate
+//  @_propertyWrapper
 //  struct WrapperWithInitialValue {
 //  }
-//  struct HasDelegates {
+//  struct HasWrapper {
 //    @WrapperWithInitialValue var y = 17
 //  }
 // Lookup has to be able to find the use of WrapperWithInitialValue, that's what
 // this scope is for. Because the source positions are screwy.
 
-class AttachedPropertyDelegateScope : public ASTScopeImpl {
+class AttachedPropertyWrapperScope : public ASTScopeImpl {
 public:
   VarDecl *const decl;
 
-  AttachedPropertyDelegateScope(VarDecl *e) : decl(e) {}
-  virtual ~AttachedPropertyDelegateScope() {}
+  AttachedPropertyWrapperScope(VarDecl *e) : decl(e) {}
+  virtual ~AttachedPropertyWrapperScope() {}
 
   std::string getClassName() const override;
   SourceRange getChildlessSourceRange() const override;

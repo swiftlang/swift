@@ -408,7 +408,7 @@ SourceRange ClosureBodyScope::getChildlessSourceRange() const {
   return closureExpr->getSourceRange();
 }
 
-SourceRange AttachedPropertyDelegateScope::getChildlessSourceRange() const {
+SourceRange AttachedPropertyWrapperScope::getChildlessSourceRange() const {
   return getCustomAttributesSourceRange(decl);
 }
 
