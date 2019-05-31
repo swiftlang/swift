@@ -188,7 +188,7 @@ EXPECTED_DEFAULTS = {
     'test_ios_simulator': False,
     'test_linux': False,
     'test_optimize_for_size': None,
-    'test_optimize_none_implicit_dynamic': None,
+    'test_optimize_none_with_implicit_dynamic': None,
     'test_optimized': None,
     'test_osx': False,
     'test_paths': [],
@@ -385,7 +385,8 @@ EXPECTED_OPTIONS = [
     SetOption('-T', dest='validation_test', value=True),
     SetOption('-o', dest='test_optimized', value=True),
     SetOption('-s', dest='test_optimize_for_size', value=True),
-    SetOption('-y', dest='test_optimize_none_implicit_dynamic', value=True),
+    SetOption('-y',
+              dest='test_optimize_none_with_implicit_dynamic', value=True),
     SetOption('-t', dest='test', value=True),
     SetOption('-a', dest='assertions', value=True),
 
@@ -463,7 +464,7 @@ EXPECTED_OPTIONS = [
     EnableOption('--stress-test'),
     EnableOption('--test'),
     EnableOption('--test-optimize-for-size'),
-    EnableOption('--test-optimize-none-implicit-dynamic'),
+    EnableOption('--test-optimize-none-with-implicit-dynamic'),
     EnableOption('--test-optimized'),
     EnableOption('--tvos'),
     EnableOption('--validation-test'),
@@ -572,7 +573,7 @@ EXPECTED_OPTIONS = [
     UnsupportedOption('--common-cmake-options'),
     UnsupportedOption('--only-execute'),
     UnsupportedOption('--skip-test-optimize-for-size'),
-    UnsupportedOption('--skip-test-optimize-none-implicit-dynamic'),
+    UnsupportedOption('--skip-test-optimize-none-with-implicit-dynamic'),
     UnsupportedOption('--skip-test-optimized'),
 
     # NOTE: LTO flag is a special case that acts both as an option and has
