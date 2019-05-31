@@ -158,6 +158,11 @@ enum class FixKind : uint8_t {
   /// Remove `return` or default last expression of single expression
   /// function to `Void` to conform to expected result type.
   RemoveReturn,
+
+  /// Generic parameters could not be inferred and have to be explicitly
+  /// specified in the source. This fix groups all of the missing arguments
+  /// associated with single declaration.
+  ExplicitlySpecifyGenericArguments,
 };
 
 class ConstraintFix {
@@ -946,6 +951,45 @@ public:
   static CollectionElementContextualMismatch *
   create(ConstraintSystem &cs, Type srcType, Type dstType,
          ConstraintLocator *locator);
+};
+
+class ExplicitlySpecifyGenericArguments final
+    : public ConstraintFix,
+      private llvm::TrailingObjects<ExplicitlySpecifyGenericArguments,
+                                    GenericTypeParamType *> {
+  friend TrailingObjects;
+
+  unsigned NumMissingParams;
+
+  ExplicitlySpecifyGenericArguments(ConstraintSystem &cs,
+                                    ArrayRef<GenericTypeParamType *> params,
+                                    ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::ExplicitlySpecifyGenericArguments, locator),
+        NumMissingParams(params.size()) {
+    assert(!params.empty());
+    std::uninitialized_copy(params.begin(), params.end(),
+                            getParametersBuf().begin());
+  }
+
+public:
+  std::string getName() const override {
+    return "default missing generic arguments to `Any`";
+  }
+
+  ArrayRef<GenericTypeParamType *> getParameters() const {
+    return {getTrailingObjects<GenericTypeParamType *>(), NumMissingParams};
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static ExplicitlySpecifyGenericArguments *
+  create(ConstraintSystem &cs, ArrayRef<GenericTypeParamType *> params,
+         ConstraintLocator *locator);
+
+private:
+  MutableArrayRef<GenericTypeParamType *> getParametersBuf() {
+    return {getTrailingObjects<GenericTypeParamType *>(), NumMissingParams};
+  }
 };
 
 } // end namespace constraints

@@ -101,7 +101,7 @@ Warning: Creating the above links usually requires administrator privileges. The
 ## 6. Build LLVM/Clang
 - This must be done from within a developer command prompt. LLVM and Clang are
   large projects, so building might take a few hours. Make sure that the build
-  type for LLVM/Clang is compatbile with the build type for Swift. That is,
+  type for LLVM/Clang is compatible with the build type for Swift. That is,
   either build everything `Debug` or some variant of `Release` (e.g. `Release`,
   `RelWithDebInfo`).
 ```cmd

@@ -554,3 +554,20 @@ CollectionElementContextualMismatch::create(ConstraintSystem &cs, Type srcType,
   return new (cs.getAllocator())
       CollectionElementContextualMismatch(cs, srcType, dstType, locator);
 }
+
+bool ExplicitlySpecifyGenericArguments::diagnose(Expr *root,
+                                                 bool asNote) const {
+  auto &cs = getConstraintSystem();
+  MissingGenericArgumentsFailure failure(root, cs, getParameters(),
+                                         getLocator());
+  return failure.diagnose(asNote);
+}
+
+ExplicitlySpecifyGenericArguments *ExplicitlySpecifyGenericArguments::create(
+    ConstraintSystem &cs, ArrayRef<GenericTypeParamType *> params,
+    ConstraintLocator *locator) {
+  unsigned size = totalSizeToAlloc<GenericTypeParamType *>(params.size());
+  void *mem = cs.getAllocator().Allocate(
+      size, alignof(ExplicitlySpecifyGenericArguments));
+  return new (mem) ExplicitlySpecifyGenericArguments(cs, params, locator);
+}
