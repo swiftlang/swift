@@ -42,7 +42,11 @@ extension NSValue {
             }
             let allocated = UnsafeMutablePointer<StoredType>.allocate(capacity: 1)
             defer { allocated.deallocate() }
-            getValue(allocated, size: storedSize)
+            if #available(OSX 10.13, iOS 11.0, tvOS 11.0, watchOS 4.0, *) {
+                getValue(allocated, size: storedSize)
+            } else {
+                getValue(allocated)
+            }
             return allocated.pointee
         }
         return nil
