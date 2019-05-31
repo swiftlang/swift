@@ -3546,7 +3546,8 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
                                 SILFunction *implFn,
                                 AbstractionPattern inputOrigType,
                                 CanAnyFunctionType inputSubstType,
-                                CanAnyFunctionType outputSubstType) {
+                                CanAnyFunctionType outputSubstType,
+                                bool baseLessVisibleThanDerived) {
   auto fd = cast<AbstractFunctionDecl>(derived.getDecl());
 
   SILLocation loc(fd);
@@ -3558,7 +3559,12 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
   SmallVector<ManagedValue, 8> thunkArgs;
   collectThunkParams(loc, thunkArgs);
 
-  auto derivedFTy = SGM.Types.getConstantInfo(derived).SILFnType;
+  CanSILFunctionType derivedFTy;
+  if (baseLessVisibleThanDerived) {
+    derivedFTy = SGM.Types.getConstantOverrideType(derived);
+  } else {
+    derivedFTy = SGM.Types.getConstantInfo(derived).SILFnType;
+  }
 
   SubstitutionMap subs;
   if (auto *genericEnv = fd->getGenericEnvironment()) {
@@ -3610,7 +3616,15 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
   forwardFunctionArguments(*this, loc, derivedFTy, substArgs, args);
 
   // Create the call.
-  auto derivedRef = B.createFunctionRefFor(loc, implFn);
+  SILValue derivedRef;
+  if (baseLessVisibleThanDerived) {
+    // See the comment in SILVTableVisitor.h under maybeAddMethod().
+    auto selfValue = thunkArgs.back().getValue();
+    auto derivedTy = SGM.Types.getConstantOverrideType(derived);
+    derivedRef = emitClassMethodRef(loc, selfValue, derived, derivedTy);
+  } else {
+    derivedRef = B.createFunctionRefFor(loc, implFn);
+  }
 
   SILValue result;
 
