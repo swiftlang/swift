@@ -596,7 +596,8 @@ class ToolchainTestCase(unittest.TestCase):
                       before.swift_test_run_targets)
         self.assertIn(target_name.format('optimize_size'),
                       before.swift_test_run_targets)
-        self.assertIn(target_name.format('optimize_none_with_implicit_dynamic'),
+        self.assertIn(target_name.format(
+                      'optimize_none_with_implicit_dynamic'),
                       before.swift_test_run_targets)
 
     def default_args(self):
