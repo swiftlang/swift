@@ -1250,7 +1250,6 @@ ADContext::emitNondifferentiabilityError(SourceLoc loc,
     }
     diagnose(loc, diag::autodiff_expression_not_differentiable_error);
     return diagnose(loc, diag, std::forward<U>(args)...);
-        //diag.getValueOr(diag::autodiff_expression_not_differentiable_note),
   }
 
   // For `[differentiable]` attributes, try to find an AST function declaration
