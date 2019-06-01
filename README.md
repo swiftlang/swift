@@ -141,6 +141,7 @@ more environments.
 
 To build using Ninja, run:
 
+    cd swift
     utils/build-script --release-debuginfo
 
 When developing Swift, it helps to build what you're working on in a debug
