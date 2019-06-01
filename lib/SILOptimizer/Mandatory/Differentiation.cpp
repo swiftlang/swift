@@ -4546,7 +4546,7 @@ public:
         auto *adjointBB = getAdjointBlock(predBB);
         auto *adjointTrampolineBB = getAdjointTrampolineBlock(predBB, bb);
         SILBasicBlock *adjointSuccBB = nullptr;
-        // If the predecesssor block does not have a corresponding adjoint
+        // If the predecessor block does not have a corresponding adjoint
         // trampoline block, then the adjoint successor is the adjoint block.
         if (!adjointTrampolineBB) {
           adjointSuccBB = adjointBB;
