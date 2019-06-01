@@ -720,25 +720,6 @@ void TypeChecker::checkDeclAttributesEarly(Decl *D) {
   }
 }
 
-/// Determine whether the given string is an attribute name that is
-/// reserved for the implementation.
-static bool isReservedAttributeName(StringRef name) {
-  for (unsigned i : indices(name)) {
-    if (name[i] == '_')
-      continue;
-
-    // First character is lowercase; reserved.
-    if (clang::isLowercase(name[i]))
-      return true;
-
-    // Everything else is reserved.
-    return false;
-  }
-
-  // All underscores is reserved.
-  return true;
-}
-
 namespace {
 class AttributeChecker : public AttributeVisitor<AttributeChecker> {
   TypeChecker &TC;
@@ -2566,11 +2547,6 @@ void AttributeChecker::visitPropertyWrapperAttr(PropertyWrapperAttr *attr) {
 
   // Force checking of the property wrapper type.
   (void)nominal->getPropertyWrapperTypeInfo();
-
-  // Make sure the name isn't reserved.
-  if (isReservedAttributeName(nominal->getName().str())) {
-    nominal->diagnose(diag::property_wrapper_reserved_name);
-  }
 }
 
 void TypeChecker::checkDeclAttributes(Decl *D) {

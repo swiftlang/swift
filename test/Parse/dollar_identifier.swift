@@ -62,10 +62,10 @@ func escapedDollarAnd() {
   `$abc` = 3
 }
 
-func $declareWithDollar() { // expected-error{{cannot declare entity '$declareWithDollar' with a '$' prefix}}
-  var $foo = 17 // expected-error{{cannot declare entity '$foo' with a '$' prefix}}
-  func $bar() { } // expected-error{{cannot declare entity '$bar' with a '$' prefix}}
+func $declareWithDollar() { // expected-error{{cannot declare entity named '$declareWithDollar'}}
+  var $foo = 17 // expected-error{{cannot declare entity named '$foo'}}
+  func $bar() { } // expected-error{{cannot declare entity named '$bar'}}
   func wibble(
-    $a: Int, // expected-error{{cannot declare entity '$a' with a '$' prefix}}
-    $b c: Int) { } // expected-error{{cannot declare entity '$b' with a '$' prefix}}
+    $a: Int, // expected-error{{cannot declare entity named '$a'}}
+    $b c: Int) { } // expected-error{{cannot declare entity named '$b'}}
 }
