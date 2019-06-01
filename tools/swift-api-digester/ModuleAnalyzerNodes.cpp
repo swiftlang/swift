@@ -1969,7 +1969,7 @@ swift::ide::api::getSDKNodeRoot(SDKContext &SDKCtx,
                                  CheckerOptions Opts) {
   CompilerInvocation Invocation(InitInvok);
 
-  CompilerInstance &CI = SDKCtx.getCompilerInstance();
+  CompilerInstance &CI = SDKCtx.newCompilerInstance();
   // Display diagnostics to stderr.
   PrintingDiagnosticConsumer PrintDiags;
   CI.addDiagnosticConsumer(&PrintDiags);

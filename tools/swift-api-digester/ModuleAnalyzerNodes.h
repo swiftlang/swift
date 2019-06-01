@@ -150,7 +150,7 @@ struct CheckerOptions {
 };
 
 class SDKContext {
-  CompilerInstance CI;
+  std::vector<std::unique_ptr<CompilerInstance>> CIs;
   llvm::StringSet<> TextData;
   llvm::BumpPtrAllocator Allocator;
   SourceManager SourceMgr;
@@ -189,7 +189,6 @@ public:
   DiagnosticEngine &getDiags() {
     return Diags;
   }
-  CompilerInstance &getCompilerInstance() { return CI; }
   StringRef getPlatformIntroVersion(Decl *D, PlatformKind Kind);
   StringRef getLanguageIntroVersion(Decl *D);
   bool isEqual(const SDKNode &Left, const SDKNode &Right);
@@ -199,6 +198,11 @@ public:
   bool shouldIgnore(Decl *D, const Decl* Parent = nullptr) const;
   ArrayRef<BreakingAttributeInfo> getBreakingAttributeInfo() const { return BreakingAttrs; }
   Optional<uint8_t> getFixedBinaryOrder(ValueDecl *VD) const;
+
+  CompilerInstance &newCompilerInstance() {
+    CIs.emplace_back(new CompilerInstance());
+    return *CIs.back();
+  }
 
   template<class YAMLNodeTy, typename ...ArgTypes>
   void diagnose(YAMLNodeTy node, Diag<ArgTypes...> ID,
