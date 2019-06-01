@@ -714,3 +714,20 @@ struct TestPD {
   @PD(a: "foo") var foo: Int = 42 // expected-error{{property 'foo' with attached wrapper cannot initialize both the wrapper type and the property}}
   // expected-error@-1{{missing argument for parameter 'initialValue' in call}}
 }
+
+protocol P { }
+
+@_propertyWrapper
+struct WrapperRequiresP<T: P> {
+  var value: T
+  var wrapperValue: T { return value }
+}
+
+struct UsesWrapperRequiringP {
+  // expected-note@-1{{in declaration of}}
+  
+  @WrapperRequiresP var x.: UsesWrapperRequiringP
+  // expected-error@-1{{expected member name following '.'}}
+  // expected-error@-2{{expected declaration}}
+  // expected-error@-3{{type annotation missing in pattern}}
+}
