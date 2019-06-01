@@ -5438,6 +5438,15 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
       if (classDecl->hasClangNode())
         continue;
 
+      // If the superclass initializer is not accessible from the derived
+      // class, don't synthesize an override, since we cannot reference the
+      // superclass initializer's method descriptor at all.
+      //
+      // FIXME: This should be checked earlier as part of calculating
+      // canInheritInitializers.
+      if (!superclassCtor->isAccessibleFrom(classDecl))
+        continue;
+
       // Diagnose a missing override of a required initializer.
       if (superclassCtor->isRequired() && !canInheritInitializers) {
         diagnoseMissingRequiredInitializer(*this, classDecl, superclassCtor);
@@ -5469,14 +5478,6 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
       auto kind = canInheritInitializers
                     ? DesignatedInitKind::Chaining
                     : DesignatedInitKind::Stub;
-
-      // If the superclass initializer is not accessible from the derived
-      // class, we cannot chain to 'super.init' either -- create a stub.
-      if (!superclassCtor->isAccessibleFrom(classDecl)) {
-        assert(!superclassCtor->isRequired() &&
-               "required initializer less visible than the class?");
-        kind = DesignatedInitKind::Stub;
-      }
 
       // We have a designated initializer. Create an override of it.
       // FIXME: Validation makes sure we get a generic signature here.
@@ -5592,62 +5593,12 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
   if (decl->hasClangNode())
     return;
 
-  // For a class, check whether the superclass (if it exists) is
-  // default-initializable.
-  if (isa<ClassDecl>(decl)) {
-    // We need to look for a default constructor.
-    if (auto superTy = decl->getDeclaredInterfaceType()->getSuperclass()) {
-      // If there are no default ctors for our supertype, we can't do anything.
-      auto ctors = lookupConstructors(decl, superTy);
-      if (!ctors)
-        return;
-
-      // Check whether we have a constructor that can be called with an empty
-      // tuple.
-      bool foundDefaultConstructor = false;
-      for (auto memberResult : ctors) {
-        auto member = memberResult.getValueDecl();
-
-        // Dig out the parameter tuple for this constructor.
-        auto ctor = dyn_cast<ConstructorDecl>(member);
-        if (!ctor || ctor->isInvalid())
-          continue;
-
-        // Check to see if this ctor has zero arguments, or if they all have
-        // default values.
-        auto params = ctor->getParameters();
-        
-        bool missingInit = false;
-        for (auto param : *params) {
-          if (!param->isDefaultArgument()) {
-            missingInit = true;
-            break;
-          }
-        }
-
-        // Check to see if this is an impossible candidate.
-        if (missingInit) {
-          // If we found an impossible designated initializer, then we cannot
-          // call super.init(), even if there is a match.
-          if (ctor->isDesignatedInit())
-            return;
-
-          // Otherwise, keep looking.
-          continue;
-        }
-
-        // Ok, we found a constructor that can be invoked with an empty tuple.
-        // If this is our second, then we bail out, because we don't want to
-        // pick one arbitrarily.
-        if (foundDefaultConstructor)
-          return;
-
-        foundDefaultConstructor = true;
-      }
-
-      // If our superclass isn't default constructible, we aren't either.
-      if (!foundDefaultConstructor) return;
-    }
+  // A class is only default initializable if it's a root class.
+  if (auto *classDecl = dyn_cast<ClassDecl>(decl)) {
+    // If the class has a superclass, we should have either inherited it's
+    // designated initializers or diagnosed the absence of our own.
+    if (classDecl->getSuperclass())
+      return;
   }
 
   // Create the default constructor.
