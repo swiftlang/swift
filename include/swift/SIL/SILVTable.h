@@ -12,9 +12,14 @@
 //
 // This file defines the SILVTable class, which is used to map dynamically
 // dispatchable class methods and properties to their concrete implementations
-// for a dynamic type. This information is (FIXME will be) used by IRGen to lay
-// out class vtables, and can be used by devirtualization passes to promote
-// class_method instructions to static function_refs.
+// for a dynamic type. This information is used by IRGen to emit class vtables,
+// by the devirtualization pass to promote class_method instructions to static
+// function_refs.
+//
+// Note that vtable layout itself is implemented in SILVTableLayout.h and is
+// independent of the SILVTable; in general, for a class from another module we
+// might not have a SILVTable to deserialize, and for a class in a different
+// translation in the same module the SILVTable is not available either.
 //
 //===----------------------------------------------------------------------===//
 
@@ -56,16 +61,10 @@ public:
     };
 
     Entry()
-      : Implementation(nullptr),
-        TheKind(Kind::Normal),
-        Linkage(SILLinkage::Private) { }
+      : Implementation(nullptr), TheKind(Kind::Normal) { }
 
-    Entry(SILDeclRef Method, SILFunction *Implementation,
-          Kind TheKind, SILLinkage Linkage)
-      : Method(Method),
-        Implementation(Implementation),
-        TheKind(TheKind),
-        Linkage(Linkage) { }
+    Entry(SILDeclRef Method, SILFunction *Implementation, Kind TheKind)
+      : Method(Method), Implementation(Implementation), TheKind(TheKind) { }
 
     /// The declaration reference to the least-derived method visible through
     /// the class.
@@ -76,14 +75,6 @@ public:
 
     /// The entry kind.
     Kind TheKind;
-
-    /// The linkage of the implementing function.
-    ///
-    /// This is usually the same as
-    ///   stripExternalFromLinkage(Implementation->getLinkage())
-    /// except if Implementation is a thunk (which has private or shared
-    /// linkage).
-    SILLinkage Linkage;
   };
 
   // Disallow copying into temporary objects.
