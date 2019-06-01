@@ -92,6 +92,8 @@ nsValueBridging.test("NSValue can only be cast back to its original type") {
 }
 
 nsValueBridging.test("NSValue fetching method should be able to convert constructed values safely") {
+  guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else { return }
+
   let range = NSRange(location: 17, length: 38)
   let value = NSValue(range: range)
   expectEqual(value.value(of: NSRange.self)?.location, range.location)
