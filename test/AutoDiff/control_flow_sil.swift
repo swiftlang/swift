@@ -2,7 +2,6 @@
 // RUN: %target-swift-frontend -emit-sil -verify -Xllvm -differentiation-enable-control-flow %s | %FileCheck %s -check-prefix=CHECK-SIL
 
 // TODO: Add adjoint SIL FileCheck tests.
-// FIXME: Fix "instruction isn't dominated by its operand" crash in AdjointEmitter.
 
 // Test conditional: a simple if-diamond.
 
@@ -78,8 +77,6 @@ func nested_cond(_ x: Float, _ y: Float) -> Float {
   return y - x
 }
 
-// FIXME: Fix "instruction isn't dominated by its operand" crash in AdjointEmitter.
-/*
 @differentiable
 @_silgen_name("nested_cond_generic")
 func nested_cond_generic<T : Differentiable & FloatingPoint>(_ x: T, _ y: T) -> T {
@@ -92,4 +89,3 @@ func nested_cond_generic<T : Differentiable & FloatingPoint>(_ x: T, _ y: T) -> 
   }
   return y
 }
-*/

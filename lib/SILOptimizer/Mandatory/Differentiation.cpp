@@ -3925,12 +3925,13 @@ private:
   /// Post-order info for the original function.
   PostOrderFunctionInfo *postOrderInfo = nullptr;
 
-  /// Mapping from original basic blocks to a mapping from original values to
-  /// their corresponding adjoint values.
+  /// Mapping from original basic blocks and original values to corresponding
+  /// adjoint values.
   DenseMap<std::pair<SILBasicBlock *, SILValue>, AdjointValue> valueMap;
 
-  /// Mapping from original buffers to their corresponding adjoint buffers.
-  DenseMap<SILValue, ValueWithCleanup> bufferMap;
+  /// Mapping from original basic blocks and original buffers to corresponding
+  /// adjoint buffers.
+  DenseMap<std::pair<SILBasicBlock *, SILValue>, ValueWithCleanup> bufferMap;
 
   /// Mapping from original basic blocks to corresponding adjoint basic blocks.
   /// Adjoint basic blocks always have the predecessor as the single argument.
@@ -4163,17 +4164,20 @@ private:
   // Buffer mapping
   //--------------------------------------------------------------------------//
 
-  void setAdjointBuffer(SILValue originalBuffer,
+  void setAdjointBuffer(SILBasicBlock *origBB,
+                        SILValue originalBuffer,
                         ValueWithCleanup adjointBuffer) {
     assert(originalBuffer->getType().isAddress());
-    auto insertion = bufferMap.try_emplace(originalBuffer, adjointBuffer);
+    auto insertion =
+        bufferMap.try_emplace({origBB, originalBuffer}, adjointBuffer);
     assert(insertion.second); (void)insertion;
   }
 
-  SILValue getAdjointProjection(SILValue originalProjection) {
+  SILValue getAdjointProjection(SILBasicBlock *origBB,
+                                SILValue originalProjection) {
     // Handle `struct_element_addr`.
     if (auto *seai = dyn_cast<StructElementAddrInst>(originalProjection)) {
-      auto adjSource = getAdjointBuffer(seai->getOperand());
+      auto adjSource = getAdjointBuffer(origBB, seai->getOperand());
       auto *tangentVectorDecl =
           adjSource.getType().getStructOrBoundGenericStruct();
       auto tanFieldLookup =
@@ -4186,7 +4190,7 @@ private:
     // Handle `tuple_element_addr`.
     if (auto *teai = dyn_cast<TupleElementAddrInst>(originalProjection)) {
       auto source = teai->getOperand();
-      auto adjSource = getAdjointBuffer(source);
+      auto adjSource = getAdjointBuffer(origBB, source);
       if (!adjSource.getType().is<TupleType>())
         return adjSource;
       auto origTupleTy = source->getType().castTo<TupleType>();
@@ -4201,16 +4205,16 @@ private:
     }
     // Handle `begin_access`.
     if (auto *bai = dyn_cast<BeginAccessInst>(originalProjection)) {
-      auto adjBase = getAdjointBuffer(bai->getOperand());
+      auto adjBase = getAdjointBuffer(origBB, bai->getOperand());
       if (errorOccurred)
-        return (bufferMap[originalProjection] = ValueWithCleanup());
+        return (bufferMap[{origBB, originalProjection}] = ValueWithCleanup());
       return builder.createBeginAccess(
           bai->getLoc(), adjBase, bai->getAccessKind(), bai->getEnforcement(),
           /*noNestedConflict*/ false, /*fromBuiltin*/ false);
     }
     return SILValue();
   }
-  
+
   SILBasicBlock::iterator getNextFunctionLocalAllocationInsertionPoint() {
     if (functionLocalAllocations.empty())
       return getAdjoint().getEntryBlock()->begin();
@@ -4219,10 +4223,11 @@ private:
     return std::next(it);
   }
 
-  ValueWithCleanup &getAdjointBuffer(SILValue originalBuffer) {
+  ValueWithCleanup &getAdjointBuffer(SILBasicBlock *origBB,
+                                     SILValue originalBuffer) {
     assert(originalBuffer->getType().isAddress());
     assert(originalBuffer->getFunction() == &getOriginal());
-    auto insertion = bufferMap.try_emplace(originalBuffer,
+    auto insertion = bufferMap.try_emplace({origBB, originalBuffer},
                                            ValueWithCleanup(SILValue()));
     if (!insertion.second) // not inserted
       return insertion.first->getSecond();
@@ -4234,22 +4239,23 @@ private:
             originalBuffer, getInvoker(),
             diag::autodiff_noderivative_stored_property);
         errorOccurred = true;
-        return (bufferMap[originalBuffer] = ValueWithCleanup());
+        return (bufferMap[{origBB, originalBuffer}] = ValueWithCleanup());
       }
     }
 
     // If the original buffer is a projection, return a corresponding projection
     // into the adjoint buffer.
-    if (auto adjProj = getAdjointProjection(originalBuffer)) {
+    if (auto adjProj = getAdjointProjection(origBB, originalBuffer)) {
       ValueWithCleanup projWithCleanup(
           adjProj, makeCleanup(adjProj, /*cleanup*/ nullptr));
-      return (bufferMap[originalBuffer] = projWithCleanup);
+      return (bufferMap[{origBB, originalBuffer}] = projWithCleanup);
     }
 
     // Set insertion point for local allocation builder: before the last local
     // allocation, or at the start of the adjoint function's entry if no local
     // allocations exist yet.
     localAllocBuilder.setInsertionPoint(
+        getAdjoint().getEntryBlock(),
         getNextFunctionLocalAllocationInsertionPoint());
     // Allocate local buffer and initialize to zero.
     auto *newBuf = localAllocBuilder.createAllocStack(
@@ -4277,13 +4283,13 @@ private:
 
   // Accumulates `rhsBufferAccess` into the adjoint buffer corresponding to
   // `originalBuffer`.
-  void addToAdjointBuffer(SILValue originalBuffer,
+  void addToAdjointBuffer(SILBasicBlock *origBB, SILValue originalBuffer,
                           SILValue rhsBufferAccess) {
     assert(originalBuffer->getType().isAddress() &&
            rhsBufferAccess->getType().isAddress());
     assert(originalBuffer->getFunction() == &getOriginal());
     assert(rhsBufferAccess->getFunction() == &getAdjoint());
-    auto adjointBuffer = getAdjointBuffer(originalBuffer);
+    auto adjointBuffer = getAdjointBuffer(origBB, originalBuffer);
     if (errorOccurred)
       return;
     auto *destAccess = builder.createBeginAccess(
@@ -4380,11 +4386,17 @@ public:
       if (activeBBValues.empty())
         continue;
       // Otherwise, if the original block has active values:
-      // - For each active value, add adjoint value arguments to the adjoint
-      //   block.
+      // - For each active buffer in the original block, allocate a new local
+      //   buffer in the adjoint entry. (All adjoint buffers are allocated in
+      //   the adjoint entry and deallocated in the adjoint exit.)
+      // - For each active value in the original block, add adjoint value
+      //   arguments to the adjoint block.
       for (auto activeValue : activeBBValues) {
         if (activeValue->getType().isAddress()) {
-#error "FIXME: create local allocations"
+          // Allocate and zero initialize a new local buffer using
+          // `getAdjointBuffer`.
+          builder.setInsertionPoint(adjoint.getEntryBlock());
+          getAdjointBuffer(origBB, activeValue);
         }
         else {
           adjointBB->createPhiArgument(
@@ -4443,7 +4455,7 @@ public:
                                       builder.getDefaultAtomicity());
       ValueWithCleanup seedBufferCopyWithCleanup(
           seedBufCopy, makeCleanup(seedBufCopy, emitCleanup));
-      setAdjointBuffer(origResult, seedBufferCopyWithCleanup);
+      setAdjointBuffer(origExit, origResult, seedBufferCopyWithCleanup);
       functionLocalAllocations.push_back(seedBufferCopyWithCleanup);
     } else {
       builder.createRetainValue(adjLoc, seed, builder.getDefaultAtomicity());
@@ -4546,7 +4558,7 @@ public:
           // Propagate pullback struct argument.
           SmallVector<SILValue, 8> arguments;
           arguments.push_back(adjointSuccBB->getArguments().front());
-          // Propagate adjoint values of active values.
+          // Propagate adjoint values/buffers of active values/buffers.
           for (unsigned i : indices(activeValues[predBB])) {
             auto activeValue = activeValues[predBB][i];
             if (activeValue->getType().isObject()) {
@@ -4565,9 +4577,11 @@ public:
                 initializeAdjointValue(predBB, activeValue, forwardedArgAdj);
               }
             } else {
-//              auto activeValueAdjBuf = getAdjointBuffer(activeValue);
-//              arguments.push_back(activeValueAdjBuf.getValue());
-#error "copy_addr to the corresponding local allocation"
+              // Propagate adjoint buffers using `copy_addr`.
+              auto adjBuf = getAdjointBuffer(bb, activeValue);
+              auto succAdjBuf = getAdjointBuffer(predBB, activeValue);
+              builder.createCopyAddr(
+                  adjLoc, adjBuf, succAdjBuf, IsNotTake, IsNotInitialization);
             }
           }
           adjointTrampolineBBBuilder.createBranch(adjLoc, adjointBB, arguments);
@@ -4607,7 +4621,7 @@ public:
     // Place the builder at the adjoint exit, i.e. the adjoint block
     // corresponding to the original entry. Return the adjoints wrt parameters
     // in the adjoint exit.
-    builder.setInsertionPoint(getAdjointBlock(original.getEntryBlock()));
+    builder.setInsertionPoint(getAdjointBlock(origEntry));
 
     // This vector will contain all the materialized return elements.
     SmallVector<SILValue, 8> retElts;
@@ -4633,7 +4647,7 @@ public:
         }
         retElts.push_back(val);
       } else {
-        auto adjBuf = getAdjointBuffer(origParam);
+        auto adjBuf = getAdjointBuffer(origEntry, origParam);
         if (errorOccurred)
           return;
         indParamAdjoints.push_back(adjBuf);
@@ -4747,7 +4761,7 @@ public:
         seed = materializeAdjoint(getAdjointValue(bb, origResult), loc);
       }
     } else {
-      seed = getAdjointBuffer(origResult);
+      seed = getAdjointBuffer(bb, origResult);
       if (errorOccurred)
         return;
     }
@@ -4806,11 +4820,11 @@ public:
       auto origArg = ai->getArgument(origNumIndRes + i);
       auto tan = *allResultsIt++;
       if (tan->getType().isAddress()) {
-        addToAdjointBuffer(origArg, tan);
+        addToAdjointBuffer(bb, origArg, tan);
         emitCleanup(builder, loc, tan);
       } else {
         if (origArg->getType().isAddress()) {
-          auto adjBuf = getAdjointBuffer(origArg);
+          auto adjBuf = getAdjointBuffer(bb, origArg);
           if (errorOccurred)
             return;
           auto *tmpBuf = builder.createAllocStack(loc, tan->getType());
@@ -5101,7 +5115,8 @@ public:
   //   Original: y = alloc_stack $T
   //    Adjoint: dealloc_stack adj[y]
   void visitAllocStackInst(AllocStackInst *asi) {
-    auto adjBuf = getAdjointBuffer(asi);
+    auto *bb = asi->SILInstruction::getParentBlock();
+    auto adjBuf = getAdjointBuffer(bb, asi);
     if (errorOccurred)
       return;
     if (auto *cleanup = adjBuf.getCleanup())
@@ -5113,6 +5128,7 @@ public:
   //   Original: dealloc_stack y
   //    Adjoint: adj[y] = alloc_stack $T.TangentVector
   void visitDeallocStackInst(DeallocStackInst *dsi) {
+    auto *bb = dsi->SILInstruction::getParentBlock();
     auto bufType = getRemappedTangentType(dsi->getOperand()->getType());
     auto *adjBuf = builder.createAllocStack(dsi->getLoc(), bufType);
     auto *access = builder.createBeginAccess(dsi->getLoc(), adjBuf,
@@ -5122,7 +5138,7 @@ public:
                                              /*fromBuiltin*/ false);
     emitZeroIndirect(bufType.getASTType(), access, dsi->getLoc());
     builder.createEndAccess(dsi->getLoc(), access, /*aborted*/ false);
-    setAdjointBuffer(dsi->getOperand(),
+    setAdjointBuffer(bb, dsi->getOperand(),
         ValueWithCleanup(adjBuf, makeCleanup(adjBuf, emitCleanup)));
   }
 
@@ -5143,7 +5159,7 @@ public:
         getBufferSOQ(localBuf->getType().getASTType(), getAdjoint()));
     builder.createEndAccess(li->getLoc(), initAccess, /*aborted*/ false);
     // Get the adjoint buffer.
-    auto &adjBuf = getAdjointBuffer(li->getOperand());
+    auto &adjBuf = getAdjointBuffer(bb, li->getOperand());
     if (errorOccurred)
       return;
     // Accumulate the adjoint value in the local buffer into the adjoint buffer.
@@ -5165,7 +5181,7 @@ public:
   //    Adjoint: adj[x] += load adj[y]; adj[y] = 0
   void visitStoreInst(StoreInst *si) {
     auto *bb = si->SILInstruction::getParentBlock();
-    auto &adjBuf = getAdjointBuffer(si->getDest());
+    auto &adjBuf = getAdjointBuffer(bb, si->getDest());
     if (errorOccurred)
       return;
     auto bufType = remapType(adjBuf.getType());
@@ -5198,7 +5214,8 @@ public:
   //   Original: copy_addr x to y
   //    Adjoint: adj[x] += adj[y]; adj[y] = 0
   void visitCopyAddrInst(CopyAddrInst *cai) {
-    auto &adjDest = getAdjointBuffer(cai->getDest());
+    auto *bb = cai->SILInstruction::getParentBlock();
+    auto &adjDest = getAdjointBuffer(bb, cai->getDest());
     if (errorOccurred)
       return;
     auto destType = remapType(adjDest.getType());
@@ -5213,7 +5230,7 @@ public:
         cai->getLoc(), adjDest, SILAccessKind::Read,
         SILAccessEnforcement::Static, /*noNestedConflict*/ true,
         /*fromBuiltin*/ false);
-    addToAdjointBuffer(cai->getSrc(), readAccess);
+    addToAdjointBuffer(bb, cai->getSrc(), readAccess);
     builder.createEndAccess(cai->getLoc(), readAccess, /*aborted*/ false);
     // Set the buffer to zero, with a cleanup.
     auto *bai = dyn_cast<BeginAccessInst>(adjDest.getValue());
@@ -5251,8 +5268,9 @@ public:
         return;
       }
     }
-    auto accessBuf = getAdjointBuffer(bai);
-    auto &sourceBuf = getAdjointBuffer(bai->getSource());
+    auto *bb = bai->SILInstruction::getParentBlock();
+    auto accessBuf = getAdjointBuffer(bb, bai);
+    auto &sourceBuf = getAdjointBuffer(bb, bai->getSource());
     sourceBuf.setCleanup(makeCleanupFromChildren({sourceBuf.getCleanup(),
                                                   accessBuf.getCleanup()}));
     if (errorOccurred)
@@ -5264,7 +5282,8 @@ public:
   //   Original: end_access y, where y = begin_access x
   //    Adjoint: adj[y] = begin_access inverse(access_kind) adj[x]
   void visitEndAccessInst(EndAccessInst *eai) {
-    auto adjBuf = getAdjointBuffer(eai->getSource());
+    auto *bb = eai->SILInstruction::getParentBlock();
+    auto adjBuf = getAdjointBuffer(bb, eai->getSource());
     if (errorOccurred)
       return;
     SILAccessKind kind;
@@ -5278,14 +5297,15 @@ public:
         eai->getLoc(), adjBuf, kind, eai->getBeginAccess()->getEnforcement(),
         eai->getBeginAccess()->hasNoNestedConflict(),
         eai->getBeginAccess()->isFromBuiltin());
-    setAdjointBuffer(eai->getOperand(),
+    setAdjointBuffer(bb, eai->getOperand(),
                      ValueWithCleanup(adjAccess, makeCleanupFromChildren({})));
   }
 
 #define PROPAGATE_BUFFER_CLEANUP(INST) \
   void visit##INST##Inst(INST##Inst *inst) { \
-    auto &adjBase = getAdjointBuffer(inst->getOperand()); \
-    auto &adjProj = getAdjointBuffer(inst); \
+    auto *bb = inst->SILInstruction::getParentBlock(); \
+    auto &adjBase = getAdjointBuffer(bb, inst->getOperand()); \
+    auto &adjProj = getAdjointBuffer(bb, inst); \
     adjProj.setCleanup(makeCleanupFromChildren( \
         {adjProj.getCleanup(), adjBase.getCleanup()})); \
   }
