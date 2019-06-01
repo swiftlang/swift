@@ -852,6 +852,8 @@ SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
     if (overridden.kind == SILDeclRef::Kind::Initializer) {
       return SILDeclRef();
     }
+
+    // Overrides of @objc dynamic declarations are not in the vtable.
     if (overridden.getDecl()->isObjCDynamic()) {
       return SILDeclRef();
     }
