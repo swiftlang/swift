@@ -640,6 +640,7 @@ class ASTScope {
 public:
   ASTScope(ast_scope::ASTSourceFileScope *sfs) : impl(sfs) {}
   static ASTScope *createScopeTreeFor(SourceFile *);
+  void addAnyNewScopesToTree();
   static Optional<bool>
   unqualifiedLookup(SourceFile *, DeclName, SourceLoc,
                     const DeclContext *startingContext,

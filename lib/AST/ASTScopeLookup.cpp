@@ -57,10 +57,10 @@ const ASTScopeImpl *ASTScopeImpl::findStartingScopeForLookup(
   if (startingContext->getContextKind() == DeclContextKind::Module)
     return nullptr;
 
-  auto *const fileScope = sourceFile->getScope()->impl;
   // Parser may have added decls to source file, since previous lookup
-  fileScope->creationState->addAnyNewDeclsToTree();
-  if (name.isOperator())
+  sourceFile->getScope()->addAnyNewScopesToTree();
+  auto *const fileScope = sourceFile->getScope()->impl;
+      if (name.isOperator())
     return fileScope; // operators always at file scope
 
   const auto innermost = fileScope->findInnermostEnclosingScope(loc);

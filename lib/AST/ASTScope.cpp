@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 ///
-/// This file implements the common functions of the ASTScopeImpl ontology.
+/// This file implements the common functions of the 49 ontology.
 ///
 //===----------------------------------------------------------------------===//
 #include "swift/AST/ASTScope.h"
