@@ -280,7 +280,6 @@ static Optional<StringRef> getRelativeDepPath(StringRef DepPath,
 /// output path.
 /// \note Needs to be in the swift namespace so CompilerInvocation can see it.
 class swift::ParseableInterfaceBuilder {
-  ASTContext &ctx;
   llvm::vfs::FileSystem &fs;
   DiagnosticEngine &diags;
   const StringRef interfacePath;
@@ -307,10 +306,9 @@ class swift::ParseableInterfaceBuilder {
       .setMainAndSupplementaryOutputs({MainOut}, {SOPs});
   }
 
-  void configureSubInvocation() {
-    auto &SearchPathOpts = ctx.SearchPathOpts;
-    auto &LangOpts = ctx.LangOpts;
-
+  void configureSubInvocation(const SearchPathOptions &SearchPathOpts,
+                              const LangOptions &LangOpts,
+                              ClangModuleLoader *ClangLoader) {
     // Start with a SubInvocation that copies various state from our
     // invoking ASTContext.
     subInvocation.setImportSearchPaths(SearchPathOpts.ImportSearchPaths);
@@ -329,7 +327,7 @@ class swift::ParseableInterfaceBuilder {
     // Respect the detailed-record preprocessor setting of the parent context.
     // This, and the "raw" clang module format it implicitly enables, are
     // required by sourcekitd.
-    if (auto *ClangLoader = ctx.getClangModuleLoader()) {
+    if (ClangLoader) {
       auto &Opts = ClangLoader->getClangInstance().getPreprocessorOpts();
       if (Opts.DetailedRecord) {
         subInvocation.getClangImporterOptions().DetailedPreprocessingRecord = true;
@@ -472,7 +470,10 @@ class swift::ParseableInterfaceBuilder {
   }
 
 public:
-  ParseableInterfaceBuilder(ASTContext &ctx,
+  ParseableInterfaceBuilder(SourceManager &sourceMgr, DiagnosticEngine &diags,
+                            const SearchPathOptions &searchPathOpts,
+                            const LangOptions &langOpts,
+                            ClangModuleLoader *clangImporter,
                             StringRef interfacePath,
                             StringRef moduleName,
                             StringRef moduleCachePath,
@@ -482,14 +483,14 @@ public:
                             bool remarkOnRebuildFromInterface = false,
                             SourceLoc diagnosticLoc = SourceLoc(),
                             DependencyTracker *tracker = nullptr)
-  : ctx(ctx), fs(*ctx.SourceMgr.getFileSystem()), diags(ctx.Diags),
-  interfacePath(interfacePath), moduleName(moduleName),
-  moduleCachePath(moduleCachePath), prebuiltCachePath(prebuiltCachePath),
-  serializeDependencyHashes(serializeDependencyHashes),
-  trackSystemDependencies(trackSystemDependencies),
-  remarkOnRebuildFromInterface(remarkOnRebuildFromInterface),
-  diagnosticLoc(diagnosticLoc), dependencyTracker(tracker) {
-    configureSubInvocation();
+    : fs(*sourceMgr.getFileSystem()), diags(diags),
+      interfacePath(interfacePath), moduleName(moduleName),
+      moduleCachePath(moduleCachePath), prebuiltCachePath(prebuiltCachePath),
+      serializeDependencyHashes(serializeDependencyHashes),
+      trackSystemDependencies(trackSystemDependencies),
+      remarkOnRebuildFromInterface(remarkOnRebuildFromInterface),
+      diagnosticLoc(diagnosticLoc), dependencyTracker(tracker) {
+    configureSubInvocation(searchPathOpts, langOpts, clangImporter);
   }
 
   const CompilerInvocation &getSubInvocation() const {
@@ -1236,9 +1237,11 @@ class ParseableInterfaceModuleLoaderImpl {
     // Set up a builder if we need to build the module. It'll also set up
     // the subinvocation we'll need to use to compute the cache paths.
     ParseableInterfaceBuilder builder(
-      ctx, interfacePath, moduleName, cacheDir, prebuiltCacheDir,
-      /*serializeDependencyHashes*/false, trackSystemDependencies,
-      remarkOnRebuildFromInterface, diagnosticLoc, dependencyTracker);
+      ctx.SourceMgr, ctx.Diags, ctx.SearchPathOpts, ctx.LangOpts,
+      ctx.getClangModuleLoader(), interfacePath, moduleName, cacheDir,
+      prebuiltCacheDir, /*serializeDependencyHashes*/false,
+      trackSystemDependencies, remarkOnRebuildFromInterface, diagnosticLoc,
+      dependencyTracker);
     auto &subInvocation = builder.getSubInvocation();
 
     // Compute the output path if we're loading or emitting a cached module.
@@ -1373,12 +1376,15 @@ std::error_code ParseableInterfaceModuleLoader::findModuleFilesInDirectory(
 
 
 bool ParseableInterfaceModuleLoader::buildSwiftModuleFromSwiftInterface(
-  ASTContext &Ctx, StringRef CacheDir, StringRef PrebuiltCacheDir,
-  StringRef ModuleName, StringRef InPath, StringRef OutPath,
-  bool SerializeDependencyHashes, bool TrackSystemDependencies,
-  bool RemarkOnRebuildFromInterface) {
-  ParseableInterfaceBuilder builder(Ctx, InPath, ModuleName,
-                                    CacheDir, PrebuiltCacheDir,
+    SourceManager &SourceMgr, DiagnosticEngine &Diags,
+    const SearchPathOptions &SearchPathOpts, const LangOptions &LangOpts,
+    StringRef CacheDir, StringRef PrebuiltCacheDir,
+    StringRef ModuleName, StringRef InPath, StringRef OutPath,
+    bool SerializeDependencyHashes, bool TrackSystemDependencies,
+    bool RemarkOnRebuildFromInterface) {
+  ParseableInterfaceBuilder builder(SourceMgr, Diags, SearchPathOpts, LangOpts,
+                                    /*clangImporter*/nullptr, InPath,
+                                    ModuleName, CacheDir, PrebuiltCacheDir,
                                     SerializeDependencyHashes,
                                     TrackSystemDependencies,
                                     RemarkOnRebuildFromInterface);
