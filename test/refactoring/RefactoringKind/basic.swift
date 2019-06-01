@@ -275,6 +275,23 @@ func testConvertToIfLetExpr(idxOpt: Int?) {
   print(idx)
 }
 
+func testConvertToSwitchStmt(e: E) {
+  if e == .e1 {
+    print("e1")
+  } else if e == .e2 {
+    print("e2")
+  }
+  else {
+    print("default")
+  }
+
+  let x = "some other type"
+  if e == .e1 {
+    print("e1")
+  } else if x == "some value" {
+    print("x")
+  }
+}
 
 // RUN: %refactor -source-filename %s -pos=2:1 -end-pos=5:13 | %FileCheck %s -check-prefix=CHECK1
 // RUN: %refactor -source-filename %s -pos=3:1 -end-pos=5:13 | %FileCheck %s -check-prefix=CHECK1
@@ -373,6 +390,9 @@ func testConvertToIfLetExpr(idxOpt: Int?) {
 
 // RUN: %refactor -source-filename %s -pos=272:3 -end-pos=275:13 | %FileCheck %s -check-prefix=CHECK-CONVERT-TO-IFLET-EXPRESSION
 
+// RUN: %refactor -source-filename %s -pos=279:3 -end-pos=286:4 | %FileCheck %s -check-prefix=CHECK-CONVERT-TO-SWITCH-STATEMENT
+// RUN: %refactor -pos=289:3 -end-pos=293:4 -source-filename %s | %FileCheck %s -check-prefix=CHECK-EXTRCT-METHOD
+
 // CHECK1: Action begins
 // CHECK1-NEXT: Extract Method
 // CHECK1-NEXT: Action ends
@@ -423,3 +443,5 @@ func testConvertToIfLetExpr(idxOpt: Int?) {
 // CHECK-CONVERT-TO-GUARD-EXPRESSION: Convert To Guard Expression
 
 // CHECK-CONVERT-TO-IFLET-EXPRESSION: Convert To IfLet Expression
+
+// CHECK-CONVERT-TO-SWITCH-STATEMENT: Convert To Switch Statement

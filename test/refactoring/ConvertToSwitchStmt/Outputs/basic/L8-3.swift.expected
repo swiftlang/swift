@@ -1,0 +1,39 @@
+enum E {
+  case case1
+  case case2
+  case case3
+}
+
+func someFunc(e: E) {
+  switch e {
+case .case1:
+print("case1")
+case .case2:
+print("case2")
+default:
+print("default")
+}
+}
+
+func twoStringBody(e: E) {
+  if e == .case1 {
+    print("first string")
+    print("second string")
+  } else {
+    print("default")
+  }
+}
+
+func withoutElse(e: E) {
+  if e == .case1 {
+    print("case1")
+  } else if e == .case2 {
+    print("case2")
+  } else if e == .case3 {
+    print("case3")
+  }
+}
+
+
+
+

@@ -2243,6 +2243,104 @@ bool RefactoringActionConvertGuardExprToIfLetExpr::performChange() {
   return false;
 }
 
+bool RefactoringActionConvertToSwitchStmt::
+isApplicable(ResolvedRangeInfo Info, DiagnosticEngine &Diag) {
+  if (Info.Kind != RangeKind::SingleStatement)
+    return false;
+
+  IfStmt *If = nullptr;
+  if (Info.ContainedNodes.size() == 1) {
+    if (auto S = Info.ContainedNodes[0].dyn_cast<Stmt*>()) {
+      If = dyn_cast<IfStmt>(S);
+    }
+  }
+  if (!If)
+    return false;
+
+  StringRef CondVarName;
+  do {
+    auto CondList = If->getCond();
+    if (CondList.size() != 1)
+      return false;
+    auto FirstConditionElement = CondList[0];
+    auto ConditionKind = FirstConditionElement.getKind();
+    if (ConditionKind != swift::StmtConditionElement::CK_Boolean)
+      return false;
+    auto ConditionExpr = dyn_cast<BinaryExpr>(FirstConditionElement.getBoolean());
+    if (!ConditionExpr)
+      return false;
+    auto ConditionArguments = ConditionExpr->getArg();
+    auto FirstArgument = dyn_cast<DeclRefExpr>(ConditionArguments->getElement(0));
+    auto FirstArgumentValue = dyn_cast<VarDecl>(FirstArgument->getDecl());
+    auto FirstArgumentType = FirstArgument->getType();
+    auto TypeKind = FirstArgumentType->getKind();
+    if (TypeKind != TypeKind::Enum)
+      return false;
+    if (CondVarName.size() > 0 && FirstArgumentValue->getNameStr() != CondVarName)
+      return false;
+    CondVarName = FirstArgumentValue->getNameStr();
+  } while ((If = dyn_cast_or_null<IfStmt>(If->getElseStmt())));
+
+  return true;
+}
+
+bool RefactoringActionConvertToSwitchStmt::performChange() {
+  auto S = RangeInfo.ContainedNodes[0].dyn_cast<Stmt*>();
+  IfStmt *If = dyn_cast<IfStmt>(S);
+
+  llvm::SmallString<64> DeclBuffer;
+  llvm::raw_svector_ostream OS(DeclBuffer);
+  llvm::StringRef Space = " ";
+  llvm::StringRef NewLine = "\n";
+
+  bool IsBegin = true;
+  IfStmt *PreviousIf = nullptr;
+  do {
+    auto CondList = If->getCond();
+    auto FirstConditionElement = CondList[0];
+    auto ConditionExpr = dyn_cast<BinaryExpr>(FirstConditionElement.getBoolean());
+    auto ConditionArguments = ConditionExpr->getArg();
+
+    if (IsBegin) {
+      auto FirstArgument = dyn_cast<DeclRefExpr>(ConditionArguments->getElement(0));
+      auto FirstArgumentValue = dyn_cast<VarDecl>(FirstArgument->getDecl());
+      OS << tok::kw_switch << Space << FirstArgumentValue->getNameStr().str() << Space << tok::l_brace << NewLine;
+    }
+    IsBegin = false;
+
+    auto SecondArgument = ConditionArguments->getElement(1);
+    auto SecondArgumentValue = Lexer::getCharSourceRangeFromSourceRange(SM, SecondArgument->getSourceRange());
+
+    auto IfBody = dyn_cast_or_null<BraceStmt>(If->getThenStmt());
+    auto FirstBodyElement = IfBody->getElements()[0];
+    auto LastBodyElement = IfBody->getElements().back();
+    SourceRange FirstBodyRange = FirstBodyElement.getSourceRange();
+    FirstBodyRange.widen(LastBodyElement.getSourceRange());
+    auto BodyCharRange = Lexer::getCharSourceRangeFromSourceRange(SM, FirstBodyRange);
+
+    OS << tok::kw_case << Space << SecondArgumentValue.str().str() << tok::colon << NewLine;
+    OS << BodyCharRange.str().str() << NewLine;
+    PreviousIf = If;
+  } while ((If = dyn_cast_or_null<IfStmt>(If->getElseStmt())));
+
+  auto Else = dyn_cast_or_null<BraceStmt>(PreviousIf->getElseStmt());
+  if (Else) {
+    auto ElseFirstElement = Else->getElements()[0];
+    auto ElseLastElement = Else->getElements().back();
+    SourceRange ElseBodyRange = ElseFirstElement.getSourceRange();
+    ElseBodyRange.widen(ElseLastElement.getSourceRange());
+    auto ElseBodyCharRange = Lexer::getCharSourceRangeFromSourceRange(SM, ElseBodyRange);
+
+    OS << tok::kw_default << tok::colon << NewLine;
+    OS << ElseBodyCharRange.str().str() << NewLine;
+  }
+  OS << tok::r_brace;
+
+  auto ReplaceRange = RangeInfo.ContentRange;
+  EditConsumer.accept(SM, ReplaceRange, DeclBuffer.str());
+  return false;
+}
+
 /// Struct containing info about an IfStmt that can be converted into an IfExpr.
 struct ConvertToTernaryExprInfo {
   ConvertToTernaryExprInfo() {}

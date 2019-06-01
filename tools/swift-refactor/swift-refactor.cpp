@@ -71,7 +71,8 @@ Action(llvm::cl::desc("kind:"), llvm::cl::init(RefactoringKind::None),
                       "trailingclosure", "Perform trailing closure refactoring"),
            clEnumValN(RefactoringKind::ReplaceBodiesWithFatalError,
                       "replace-bodies-with-fatalError", "Perform trailing closure refactoring"),
-           clEnumValN(RefactoringKind::MemberwiseInitLocalRefactoring, "memberwise-init", "Generate member wise initializer")));
+           clEnumValN(RefactoringKind::MemberwiseInitLocalRefactoring, "memberwise-init", "Generate member wise initializer"),
+           clEnumValN(RefactoringKind::ConvertToSwitchStmt, "convert-to-switch-stmt", "Perform convert to switch statement")));
 
 
 static llvm::cl::opt<std::string>
