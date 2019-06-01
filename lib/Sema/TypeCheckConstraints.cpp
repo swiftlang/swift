@@ -2869,9 +2869,8 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
 
       // Perform any necessary conversions of the sequence (e.g. [T]! -> [T]).
       expr = solution.coerceToType(expr, SequenceType, cs.getConstraintLocator(expr));
-      if (!expr) {
-        return nullptr;
-      }
+      
+      if (!expr) return nullptr;
 
       cs.cacheExprTypes(expr);
 
