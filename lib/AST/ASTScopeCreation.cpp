@@ -399,11 +399,13 @@ public:
 
 ASTScope *ASTScope::createScopeTreeFor(SourceFile *SF) {
   ScopeCreator scopeCreator(SF);
+  auto *scope = new (SF->getASTContext()) ASTScope(scopeCreator.sourceFileScope);
   scopeCreator.addAnyNewScopesToTree();
-  return new (SF->getASTContext()) ASTScope(scopeCreator.sourceFileScope);
+  return scope;
 }
 
 void ASTScope::addAnyNewScopesToTree() {
+  assert(impl->SF && impl->scopeCreator);
   impl->scopeCreator->addAnyNewScopesToTree();
 }
 
