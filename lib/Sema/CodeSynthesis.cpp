@@ -2722,6 +2722,7 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
     auto paramTy = decl->getInterfaceType();
     auto substTy = paramTy.subst(subMap, SubstFlags::UseErrorType);
     decl->setInterfaceType(substTy);
+    decl->getTypeLoc() = TypeLoc::withoutLoc(substTy);
   }
 
   // Create the initializer declaration, inheriting the name,
