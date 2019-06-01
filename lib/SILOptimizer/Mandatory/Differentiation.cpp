@@ -4216,11 +4216,15 @@ private:
   }
 
   SILBasicBlock::iterator getNextFunctionLocalAllocationInsertionPoint() {
+    // If there are no local allocations, insert at the adjont entry beginning.
     if (functionLocalAllocations.empty())
       return getAdjoint().getEntryBlock()->begin();
+    // Otherwise, insert before the last local allocation. Inserting before
+    // rather than after ensures that allocation and zero initialization
+    // instructions are grouped together.
     auto lastLocalAlloc = functionLocalAllocations.back().getValue();
     auto it = lastLocalAlloc->getDefiningInstruction()->getIterator();
-    return std::next(it);
+    return it;
   }
 
   ValueWithCleanup &getAdjointBuffer(SILBasicBlock *origBB,
@@ -4442,8 +4446,8 @@ public:
             .fixItInsertAfter(sourceLoc, ".withoutDerivative()");
       }
     }
-
-    builder.setInsertionPoint(adjointEntry);
+    builder.setInsertionPoint(
+        adjointEntry, getNextFunctionLocalAllocationInsertionPoint());
     if (seed->getType().isAddress()) {
       // Create a local copy so that it can be written to by later adjoint
       // zero'ing logic.
@@ -4669,9 +4673,9 @@ public:
         cleanup->disable();
     }
 
-    builder.setInsertionPoint(getAdjointBlock(original.getEntryBlock()));
+    builder.setInsertionPoint(getAdjointBlock(origEntry));
     // Deallocate local allocations.
-    for (auto alloc : reversed(functionLocalAllocations)) {
+    for (auto alloc : functionLocalAllocations) {
       // Assert that local allocations have at least one use.
       // Buffers should not be allocated needlessly.
       assert(!alloc.getValue()->use_empty());
