@@ -1734,7 +1734,7 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
                                                      VarDecl *var) const {
   // Determine the type of the backing property.
   auto wrapperType = var->getPropertyWrapperBackingPropertyType();
-  if (!wrapperType)
+  if (!wrapperType || wrapperType->hasError())
     return PropertyWrapperBackingPropertyInfo();
 
   auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo();
