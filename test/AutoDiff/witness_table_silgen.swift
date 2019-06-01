@@ -11,7 +11,6 @@ protocol Proto : Differentiable {
   func function3(_ x: Float, _ y: Double) -> Double
 }
 
-@_fieldwiseDifferentiable
 struct S : Proto, VectorNumeric {
   static var zero: S { return S(p: 0) }
   typealias Scalar = Float

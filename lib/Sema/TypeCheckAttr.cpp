@@ -135,7 +135,6 @@ public:
   IGNORED_ATTR(Differentiable)
   IGNORED_ATTR(Differentiating)
   IGNORED_ATTR(CompilerEvaluable)
-  IGNORED_ATTR(FieldwiseDifferentiable)
   IGNORED_ATTR(NoDerivative)
 #undef IGNORED_ATTR
 
@@ -872,7 +871,6 @@ public:
   void visitDifferentiableAttr(DifferentiableAttr *attr);
   void visitDifferentiatingAttr(DifferentiatingAttr *attr);
   void visitCompilerEvaluableAttr(CompilerEvaluableAttr *attr);
-  void visitFieldwiseDifferentiableAttr(FieldwiseDifferentiableAttr *attr);
   void visitNoDerivativeAttr(NoDerivativeAttr *attr);
 };
 } // end anonymous namespace
@@ -3574,23 +3572,6 @@ void AttributeChecker::visitCompilerEvaluableAttr(CompilerEvaluableAttr *attr) {
   // follow certain rules. We can only check these rules after the body is type
   // checked, and it's not type checked yet, so we check these rules later in
   // TypeChecker::checkFunctionBodyCompilerEvaluable().
-}
-
-// SWIFT_ENABLE_TENSORFLOW
-void AttributeChecker::visitFieldwiseDifferentiableAttr(
-    FieldwiseDifferentiableAttr *attr) {
-  auto *structDecl = dyn_cast<StructDecl>(D);
-  if (!structDecl) {
-    diagnoseAndRemoveAttr(attr,
-        diag::fieldwise_differentiable_only_on_differentiable_structs);
-    return;
-  }
-  if (!conformsToDifferentiableInModule(
-          structDecl->getDeclaredInterfaceType(), D->getModuleContext())) {
-    diagnoseAndRemoveAttr(attr,
-        diag::fieldwise_differentiable_only_on_differentiable_structs);
-    return;
-  }
 }
 
 // SWIFT_ENABLE_TENSORFLOW

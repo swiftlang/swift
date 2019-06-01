@@ -9,7 +9,7 @@ import StdlibUnittest
 var E2EDifferentiablePropertyTests = TestSuite("E2EDifferentiableProperty")
 
 struct TangentSpace : VectorNumeric {
-  let dx, dy: Float
+  let x, y: Float
 }
 
 extension TangentSpace : Differentiable {
@@ -26,17 +26,13 @@ struct Space {
   }
 
   func vjpX() -> (Float, (Float) -> TangentSpace) {
-    return (x, { v in TangentSpace(dx: v, dy: 0) } )
+    return (x, { v in TangentSpace(x: v, y: 0) } )
   }
 
   private let storedX: Float
-  
+
   @differentiable
   var y: Float
-
-  func vjpY() -> (Float, (Float) -> TangentSpace) {
-    return (y, { v in TangentSpace(dx: 0, dy: v) })
-  }
 
   init(x: Float, y: Float) {
     self.storedX = x
@@ -47,7 +43,7 @@ struct Space {
 extension Space : Differentiable {
   typealias TangentVector = TangentSpace
   func moved(along: TangentSpace) -> Space {
-    return Space(x: x + along.dx, y: y + along.dy)
+    return Space(x: x + along.x, y: y + along.y)
   }
 }
 
@@ -55,7 +51,7 @@ E2EDifferentiablePropertyTests.test("computed property") {
   let actualGrad = gradient(at: Space(x: 0, y: 0)) { (point: Space) -> Float in
     return 2 * point.x
   }
-  let expectedGrad = TangentSpace(dx: 2, dy: 0)
+  let expectedGrad = TangentSpace(x: 2, y: 0)
   expectEqual(expectedGrad, actualGrad)
 }
 
@@ -63,7 +59,7 @@ E2EDifferentiablePropertyTests.test("stored property") {
   let actualGrad = gradient(at: Space(x: 0, y: 0)) { (point: Space) -> Float in
     return 3 * point.y
   }
-  let expectedGrad = TangentSpace(dx: 0, dy: 3)
+  let expectedGrad = TangentSpace(x: 0, y: 3)
   expectEqual(expectedGrad, actualGrad)
 }
 
@@ -85,7 +81,6 @@ E2EDifferentiablePropertyTests.test("generic stored property") {
   expectEqual(expectedGrad, actualGrad)
 }
 
-@_fieldwiseDifferentiable
 struct ProductSpaceSelfTangent : VectorNumeric {
   let x, y: Float
 }
@@ -110,7 +105,6 @@ extension ProductSpaceOtherTangentTangentSpace : Differentiable {
   typealias TangentVector = ProductSpaceOtherTangentTangentSpace
 }
 
-@_fieldwiseDifferentiable
 struct ProductSpaceOtherTangent {
   let x, y: Float
 }

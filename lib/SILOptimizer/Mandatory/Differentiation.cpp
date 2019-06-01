@@ -726,20 +726,6 @@ struct NestedApplyInfo {
   Optional<CanSILFunctionType> originalPullbackType;
 };
 
-/// Specifies how we should differentiate a `struct_extract` instruction.
-enum class StructExtractDifferentiationStrategy {
-  // The `struct_extract` is not active, so do not differentiate it.
-  Inactive,
-
-  // The `struct_extract` is extracting a field from a Differentiable struct
-  // with @_fieldwiseProductSpace tangent space. Therefore, differentiate the
-  // `struct_extract` by setting the adjoint to a vector in the tangent space
-  // that is zero except along the direction of the corresponding field.
-  //
-  // Fields correspond by matching name.
-  Fieldwise
-};
-
 static inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                                             DifferentiationInvoker invoker) {
   invoker.print(os);
@@ -900,11 +886,6 @@ private:
   /// `NestedApplyInfo`s.
   DenseMap<ApplyInst *, NestedApplyInfo> nestedApplyInfo;
 
-  /// Mapping from original `struct_extract` and `struct_element_addr`
-  /// instructions to their strategies.
-  DenseMap<SILInstruction *, StructExtractDifferentiationStrategy>
-      structExtractDifferentiationStrategies;
-
   /// List of generated functions (JVPs, VJPs, adjoints, and thunks).
   /// Saved for deletion during cleanup.
   SmallVector<SILFunction *, 32> generatedFunctions;
@@ -964,11 +945,6 @@ public:
 
   DenseMap<ApplyInst *, NestedApplyInfo> &getNestedApplyInfo() {
     return nestedApplyInfo;
-  }
-
-  DenseMap<SILInstruction *, StructExtractDifferentiationStrategy>
-  &getStructExtractDifferentiationStrategies() {
-    return structExtractDifferentiationStrategies;
   }
 
   SmallVector<SILFunction *, 32> &getGeneratedFunctions() {
@@ -1188,9 +1164,9 @@ public:
                                     SILDifferentiableAttr *attr, StringRef name,
                                     AutoDiffAssociatedFunctionKind kind);
 
-  template <typename... T, typename... U>
+  template <typename ...T, typename ...U>
   InFlightDiagnostic diagnose(SourceLoc loc, Diag<T...> diag,
-                              U &&... args) const {
+                              U &&...args) const {
     return getASTContext().Diags.diagnose(loc, diag, std::forward<U>(args)...);
   }
 
@@ -1198,23 +1174,26 @@ public:
   /// parent function, emits a "not differentiable" error based on the task. If
   /// the task is indirect, emits notes all the way up to the outermost task,
   /// and emits an error at the outer task. Otherwise, emits an error directly.
+  template<typename ...T, typename ...U>
   InFlightDiagnostic emitNondifferentiabilityError(
       SILInstruction *inst, DifferentiationInvoker invoker,
-      Optional<Diag<>> diag = None);
+      Diag<T...> diag, U &&...args);
 
   /// Given a value and a differentiation task associated with the parent
   /// function, emits a "not differentiable" error based on the task. If the
   /// task is indirect, emits notes all the way up to the outermost task, and
   /// emits an error at the outer task. Otherwise, emits an error directly.
+  template<typename ...T, typename ...U>
   InFlightDiagnostic emitNondifferentiabilityError(
       SILValue value, DifferentiationInvoker invoker,
-      Optional<Diag<>> diag = None);
+      Diag<T...> diag, U &&...args);
 
   /// Emit a "not differentiable" error based on the given differentiation task
   /// and diagnostic.
+  template<typename ...T, typename ...U>
   InFlightDiagnostic emitNondifferentiabilityError(
       SourceLoc loc, DifferentiationInvoker invoker,
-      Optional<Diag<>> diag = None);
+      Diag<T...> diag, U &&...args);
 };
 } // end anonymous namespace
 
@@ -1222,36 +1201,41 @@ ADContext::ADContext(SILModuleTransform &transform)
     : transform(transform), module(*transform.getModule()),
       passManager(*transform.getPassManager()) {}
 
+template<typename ...T, typename ...U>
 InFlightDiagnostic
 ADContext::emitNondifferentiabilityError(SILValue value,
                                          DifferentiationInvoker invoker,
-                                         Optional<Diag<>> diag) {
+                                         Diag<T...> diag, U &&...args) {
   LLVM_DEBUG({
     getADDebugStream() << "Diagnosing non-differentiability.\n";
     getADDebugStream() << "For value:\n" << value;
     getADDebugStream() << "With invoker:\n" << invoker << '\n';
   });
   auto valueLoc = value.getLoc().getSourceLoc();
-  return emitNondifferentiabilityError(valueLoc, invoker, diag);
+  return emitNondifferentiabilityError(valueLoc, invoker, diag,
+                                       std::forward<U>(args)...);
 }
 
+template<typename ...T, typename ...U>
 InFlightDiagnostic
 ADContext::emitNondifferentiabilityError(SILInstruction *inst,
                                          DifferentiationInvoker invoker,
-                                         Optional<Diag<>> diag) {
+                                         Diag<T...> diag, U &&...args) {
   LLVM_DEBUG({
     getADDebugStream() << "Diagnosing non-differentiability.\n";
     getADDebugStream() << "For instruction:\n" << *inst;
     getADDebugStream() << "With invoker:\n" << invoker << '\n';
   });
   auto instLoc = inst->getLoc().getSourceLoc();
-  return emitNondifferentiabilityError(instLoc, invoker, diag);
+  return emitNondifferentiabilityError(instLoc, invoker, diag,
+                                       std::forward<U>(args)...);
 }
 
+template<typename ...T, typename ...U>
 InFlightDiagnostic
 ADContext::emitNondifferentiabilityError(SourceLoc loc,
                                          DifferentiationInvoker invoker,
-                                         Optional<Diag<>> diag) {
+                                         Diag<T...> diag, U &&...args) {
   switch (invoker.getKind()) {
   // For `autodiff_function` instructions: if the `autodiff_function`
   // instruction comes from a differential operator, emit an error on the
@@ -1262,12 +1246,11 @@ ADContext::emitNondifferentiabilityError(SourceLoc loc,
     if (auto *expr = findDifferentialOperator(inst)) {
       diagnose(expr->getLoc(), diag::autodiff_function_not_differentiable_error)
           .highlight(expr->getSubExpr()->getSourceRange());
-      return diagnose(loc,
-          diag.getValueOr(diag::autodiff_expression_not_differentiable_note));
+      return diagnose(loc, diag, std::forward<U>(args)...);
     }
     diagnose(loc, diag::autodiff_expression_not_differentiable_error);
-    return diagnose(loc,
-        diag.getValueOr(diag::autodiff_expression_not_differentiable_note));
+    return diagnose(loc, diag, std::forward<U>(args)...);
+        //diag.getValueOr(diag::autodiff_expression_not_differentiable_note),
   }
 
   // For `[differentiable]` attributes, try to find an AST function declaration
@@ -1295,8 +1278,7 @@ ADContext::emitNondifferentiabilityError(SourceLoc loc,
     if (!foundAttr)
       diagnose(original->getLocation().getSourceLoc(),
                diag::autodiff_function_not_differentiable_error);
-    return diagnose(loc,
-        diag.getValueOr(diag::autodiff_expression_not_differentiable_note));
+    return diagnose(loc, diag, std::forward<U>(args)...);
   }
 
   // For indirect differentiation, emit a "not differentiable" note on the
@@ -1309,9 +1291,9 @@ ADContext::emitNondifferentiabilityError(SourceLoc loc,
     std::tie(inst, attr) = invoker.getIndirectDifferentiation();
     auto invokerLookup = invokers.find(attr);
     assert(invokerLookup != invokers.end() && "Expected parent invoker");
-    emitNondifferentiabilityError(inst, invokerLookup->second, None);
-    return diagnose(loc,
-        diag.getValueOr(diag::autodiff_when_differentiating_function_call));
+    emitNondifferentiabilityError(inst, invokerLookup->second,
+        diag::autodiff_expression_not_differentiable_note);
+    return diagnose(loc, diag::autodiff_when_differentiating_function_call);
   }
   }
 }
@@ -1560,18 +1542,15 @@ void DifferentiableActivityInfo::analyze(DominanceInfo *di,
         }
 
 // Handle `struct_extract` and `struct_element_addr` instructions.
-// - If the field is marked `@noDerivative` and belongs to a
-//   `@_fieldwiseDifferentiable` struct, do not set the result as varied because
-//   it is not in the set of differentiable variables.
+// - If the field is marked `@noDerivative`, do not set the result as varied
+//   because it is not in the set of differentiable variables.
 // - Otherwise, propagate variedness from operand to result as usual.
 #define PROPAGATE_VARIED_FOR_STRUCT_EXTRACTION(INST) \
   else if (auto *sei = dyn_cast<INST##Inst>(&inst)) { \
     if (isVaried(sei->getOperand(), i)) { \
       auto hasNoDeriv = sei->getField()->getAttrs() \
           .hasAttribute<NoDerivativeAttr>(); \
-      auto structIsFieldwiseDiffable = sei->getStructDecl()->getAttrs() \
-          .hasAttribute<FieldwiseDifferentiableAttr>(); \
-      if (!(hasNoDeriv && structIsFieldwiseDiffable)) \
+      if (!hasNoDeriv) \
         setVaried(sei, i); \
     } \
   }
@@ -2838,20 +2817,6 @@ static void collectMinimalIndicesForFunctionCall(
   }
 }
 
-// Returns the associated function with name `assocFnName`. If the function
-// cannot be found, returns a reference to an external asssociated function
-// declaration.
-static SILFunction *getAssociatedFunction(
-    ADContext &context, SILFunction *original, SILDifferentiableAttr *attr,
-    AutoDiffAssociatedFunctionKind kind, StringRef assocFnName) {
-  auto &module = context.getModule();
-  auto *assocFn = module.lookUpFunction(assocFnName);
-  if (!assocFn)
-    assocFn = context.declareExternalAssociatedFunction(
-       original, attr, assocFnName, kind);
-  return assocFn;
-}
-
 namespace {
 class VJPEmitter final
     : public TypeSubstCloner<VJPEmitter, SILOptFunctionBuilder> {
@@ -3095,7 +3060,8 @@ public:
   }
 
   void visitSILInstruction(SILInstruction *inst) {
-    context.emitNondifferentiabilityError(inst, invoker);
+    context.emitNondifferentiabilityError(inst, invoker,
+        diag::autodiff_expression_not_differentiable_note);
     errorOccurred = true;
   }
 
@@ -3217,39 +3183,6 @@ public:
         ri->getLoc(), joinElements(directResults, builder, loc));
   }
 
-  void visitStructExtractInst(StructExtractInst *sei) {
-    auto &strategies = context.getStructExtractDifferentiationStrategies();
-    // Special handling logic only applies when the `struct_extract` is active.
-    // If not, just do standard cloning.
-    if (!activityInfo.isActive(sei, getIndices())) {
-      LLVM_DEBUG(getADDebugStream() << "Not active:\n" << *sei << '\n');
-      strategies.insert(
-          {sei, StructExtractDifferentiationStrategy::Inactive});
-      SILClonerWithScopes::visitStructExtractInst(sei);
-      return;
-    }
-    // This instruction is active. Use the field wise differentiation strategy
-    // to differentiate the struct extract instruction.
-    strategies[sei] = StructExtractDifferentiationStrategy::Fieldwise;
-    SILClonerWithScopes::visitStructExtractInst(sei);
-  }
-
-  void visitStructElementAddrInst(StructElementAddrInst *seai) {
-    auto &strategies = context.getStructExtractDifferentiationStrategies();
-    // Special handling logic only applies when the `struct_element_addr` is
-    // active. If not, just do standard cloning.
-    if (!activityInfo.isActive(seai, getIndices())) {
-      LLVM_DEBUG(getADDebugStream() << "Not active:\n" << *seai << '\n');
-      strategies[seai] =StructExtractDifferentiationStrategy::Inactive;
-      SILClonerWithScopes::visitStructElementAddrInst(seai);
-      return;
-    }
-    // This instruction is active. Use the field wise differentiation strategy
-    // to differentiate the struct extract instruction.
-    strategies[seai] = StructExtractDifferentiationStrategy::Fieldwise;
-    SILClonerWithScopes::visitStructElementAddrInst(seai);
-  }
-
   // If an `apply` has active results or active inout parameters, replace it
   // with an `apply` of its VJP.
   void visitApplyInst(ApplyInst *ai) {
@@ -3309,7 +3242,8 @@ public:
                s << "}\n";);
     // FIXME: We don't support multiple active results yet.
     if (activeResultIndices.size() > 1) {
-      context.emitNondifferentiabilityError(ai, invoker);
+      context.emitNondifferentiabilityError(
+          ai, invoker, diag::autodiff_expression_not_differentiable_note);
       errorOccurred = true;
       return;
     }
@@ -4429,7 +4363,8 @@ public:
   void visitSILInstruction(SILInstruction *inst) {
     LLVM_DEBUG(getADDebugStream()
                << "Unhandled instruction in adjoint emitter: " << *inst);
-    getContext().emitNondifferentiabilityError(inst, getInvoker());
+    getContext().emitNondifferentiabilityError(inst, getInvoker(),
+        diag::autodiff_expression_not_differentiable_note);
     errorOccurred = true;
   }
 
@@ -4590,48 +4525,48 @@ public:
       break;
     case AdjointValueKind::Concrete: {
       auto adjStruct = materializeAdjointDirect(std::move(av), loc);
-      if (structDecl->getAttrs().hasAttribute<FieldwiseDifferentiableAttr>()) {
-        // Find the struct `TangentVector` type.
-        auto structTy = remapType(si->getType()).getASTType();
-        auto tangentVectorTy = structTy->getAutoDiffAssociatedTangentSpace(
-            LookUpConformanceInModule(getModule().getSwiftModule()))
-                ->getType()->getCanonicalType();
-        assert(!getModule().Types.getTypeLowering(
-                   tangentVectorTy, ResilienceExpansion::Minimal)
-                       .isAddressOnly());
-        auto *tangentVectorDecl =
-            tangentVectorTy->getStructOrBoundGenericStruct();
-        assert(tangentVectorDecl);
+      // Find the struct `TangentVector` type.
+      auto structTy = remapType(si->getType()).getASTType();
+      auto tangentVectorTy = structTy->getAutoDiffAssociatedTangentSpace(
+          LookUpConformanceInModule(getModule().getSwiftModule()))
+              ->getType()->getCanonicalType();
+      assert(!getModule().Types.getTypeLowering(
+                 tangentVectorTy, ResilienceExpansion::Minimal)
+                     .isAddressOnly());
+      auto *tangentVectorDecl =
+          tangentVectorTy->getStructOrBoundGenericStruct();
+      assert(tangentVectorDecl);
 
-        // Accumulate adjoints for the fields of the `struct` operand.
-        for (auto *field : structDecl->getStoredProperties()) {
-          // There does not exist a corresponding tangent field for original
-          // fields with `@noDerivative` attribute. Emit an error.
-          if (field->getAttrs().hasAttribute<NoDerivativeAttr>())
-            continue;
-          // Find the corresponding field in the tangent space.
-          VarDecl *tanField = nullptr;
-          if (tangentVectorDecl == structDecl)
-            tanField = field;
-          // Otherwise, look up the field by name.
-          else {
-            auto tanFieldLookup =
-                tangentVectorDecl->lookupDirect(field->getName());
-            assert(tanFieldLookup.size() == 1);
-            tanField = cast<VarDecl>(tanFieldLookup.front());
+      // Accumulate adjoints for the fields of the `struct` operand.
+      for (auto *field : structDecl->getStoredProperties()) {
+        // There does not exist a corresponding tangent field for original
+        // fields with `@noDerivative` attribute. Emit an error.
+        if (field->getAttrs().hasAttribute<NoDerivativeAttr>())
+          continue;
+        // Find the corresponding field in the tangent space.
+        VarDecl *tanField = nullptr;
+        if (tangentVectorDecl == structDecl)
+          tanField = field;
+        // Otherwise, look up the field by name.
+        else {
+          auto tanFieldLookup =
+              tangentVectorDecl->lookupDirect(field->getName());
+          if (tanFieldLookup.empty()) {
+            getContext().emitNondifferentiabilityError(
+                si, getInvoker(),
+                diag::autodiff_stored_property_no_corresponding_tangent,
+                tangentVectorDecl->getNameStr(), field->getNameStr());
+            errorOccurred = true;
+            return;
           }
-          auto *adjStructElt =
-              builder.createStructExtract(loc, adjStruct, tanField);
-          addAdjointValue(
-              si->getFieldValue(field),
-              makeConcreteAdjointValue(ValueWithCleanup(
-                  adjStructElt, makeCleanup(adjStructElt, emitCleanup))));
+          tanField = cast<VarDecl>(tanFieldLookup.front());
         }
-      } else {
-        // FIXME(TF-21): If `TangentVector` is not marked
-        // `@_fieldwiseProductSpace`, call the VJP of the memberwise initializer.
-        llvm_unreachable("Unhandled. Are you trying to differentiate a "
-                         "memberwise initializer?");
+        auto *adjStructElt =
+            builder.createStructExtract(loc, adjStruct, tanField);
+        addAdjointValue(
+            si->getFieldValue(field),
+            makeConcreteAdjointValue(ValueWithCleanup(
+                adjStructElt, makeCleanup(adjStructElt, emitCleanup))));
       }
       break;
     }
@@ -4650,73 +4585,69 @@ public:
     assert(!sei->getField()->getAttrs().hasAttribute<NoDerivativeAttr>() &&
            "`struct_extract` with `@noDerivative` field should not be "
            "differentiated; activity analysis should not marked as varied");
-    auto loc = sei->getLoc();
-    auto &differentiationStrategies =
-        getContext().getStructExtractDifferentiationStrategies();
-    auto strategy = differentiationStrategies.lookup(sei);
-    switch (strategy) {
-    case StructExtractDifferentiationStrategy::Inactive:
-      assert(!getActivityInfo().isActive(sei, getIndices()));
-      return;
-    case StructExtractDifferentiationStrategy::Fieldwise: {
-      // Compute adjoint as follows:
-      //   y = struct_extract x, #key
-      //   adj[x] += struct (0, ..., #key': adj[y], ..., 0)
-      // where `#key'` is the field in the tangent space corresponding to
-      // `#key`.
-      auto structTy = remapType(sei->getOperand()->getType()).getASTType();
-      auto tangentVectorTy = structTy->getAutoDiffAssociatedTangentSpace(
-          LookUpConformanceInModule(getModule().getSwiftModule()))
-              ->getType()->getCanonicalType();
-      assert(!getModule().Types.getTypeLowering(
-                 tangentVectorTy, ResilienceExpansion::Minimal)
-                     .isAddressOnly());
-      auto tangentVectorSILTy =
-          SILType::getPrimitiveObjectType(tangentVectorTy);
-      auto *tangentVectorDecl =
-          tangentVectorTy->getStructOrBoundGenericStruct();
-      assert(tangentVectorDecl);
-      // Find the corresponding field in the tangent space.
-      VarDecl *tanField = nullptr;
-      // If the tangent space is the original struct, then field is the same.
-      if (tangentVectorDecl == sei->getStructDecl())
-        tanField = sei->getField();
-      // Otherwise, look up the field by name.
-      else {
-        auto tanFieldLookup =
-            tangentVectorDecl->lookupDirect(sei->getField()->getName());
-        assert(tanFieldLookup.size() == 1);
-        tanField = cast<VarDecl>(tanFieldLookup.front());
+    // Compute adjoint as follows:
+    //   y = struct_extract x, #key
+    //   adj[x] += struct (0, ..., #key': adj[y], ..., 0)
+    // where `#key'` is the field in the tangent space corresponding to
+    // `#key`.
+    auto structTy = remapType(sei->getOperand()->getType()).getASTType();
+    auto tangentVectorTy = structTy->getAutoDiffAssociatedTangentSpace(
+        LookUpConformanceInModule(getModule().getSwiftModule()))
+            ->getType()->getCanonicalType();
+    assert(!getModule().Types.getTypeLowering(
+               tangentVectorTy, ResilienceExpansion::Minimal)
+                   .isAddressOnly());
+    auto tangentVectorSILTy =
+        SILType::getPrimitiveObjectType(tangentVectorTy);
+    auto *tangentVectorDecl =
+        tangentVectorTy->getStructOrBoundGenericStruct();
+    assert(tangentVectorDecl);
+    // Find the corresponding field in the tangent space.
+    VarDecl *tanField = nullptr;
+    // If the tangent space is the original struct, then field is the same.
+    if (tangentVectorDecl == sei->getStructDecl())
+      tanField = sei->getField();
+    // Otherwise, look up the field by name.
+    else {
+      auto tanFieldLookup =
+          tangentVectorDecl->lookupDirect(sei->getField()->getName());
+      if (tanFieldLookup.empty()) {
+        getContext().emitNondifferentiabilityError(
+            sei, getInvoker(),
+            diag::autodiff_stored_property_no_corresponding_tangent,
+            sei->getStructDecl()->getNameStr(),
+            sei->getField()->getNameStr());
+        errorOccurred = true;
+        return;
       }
-      // Accumulate adjoint for the `struct_extract` operand.
-      auto av = takeAdjointValue(sei);
-      switch (av.getKind()) {
-      case AdjointValueKind::Zero:
-        addAdjointValue(sei->getOperand(),
-                        makeZeroAdjointValue(tangentVectorSILTy));
-        break;
-      case AdjointValueKind::Concrete:
-      case AdjointValueKind::Aggregate: {
-        SmallVector<AdjointValue, 8> eltVals;
-        for (auto *field : tangentVectorDecl->getStoredProperties()) {
-          if (field == tanField) {
-            eltVals.push_back(av);
-          } else {
-            auto substMap = tangentVectorTy->getMemberSubstitutionMap(
-                field->getModuleContext(), field);
-            auto fieldTy = field->getType().subst(substMap);
-            auto fieldSILTy =
-                getContext().getTypeConverter().getLoweredType(
-                    fieldTy, ResilienceExpansion::Minimal);
-            assert(fieldSILTy.isObject());
-            eltVals.push_back(makeZeroAdjointValue(fieldSILTy));
-          }
+      tanField = cast<VarDecl>(tanFieldLookup.front());
+    }
+    // Accumulate adjoint for the `struct_extract` operand.
+    auto av = takeAdjointValue(sei);
+    switch (av.getKind()) {
+    case AdjointValueKind::Zero:
+      addAdjointValue(sei->getOperand(),
+                      makeZeroAdjointValue(tangentVectorSILTy));
+      break;
+    case AdjointValueKind::Concrete:
+    case AdjointValueKind::Aggregate: {
+      SmallVector<AdjointValue, 8> eltVals;
+      for (auto *field : tangentVectorDecl->getStoredProperties()) {
+        if (field == tanField) {
+          eltVals.push_back(av);
+        } else {
+          auto substMap = tangentVectorTy->getMemberSubstitutionMap(
+              field->getModuleContext(), field);
+          auto fieldTy = field->getType().subst(substMap);
+          auto fieldSILTy =
+              getContext().getTypeConverter().getLoweredType(
+                  fieldTy, ResilienceExpansion::Minimal);
+          assert(fieldSILTy.isObject());
+          eltVals.push_back(makeZeroAdjointValue(fieldSILTy));
         }
-        addAdjointValue(sei->getOperand(),
-            makeAggregateAdjointValue(tangentVectorSILTy, eltVals));
       }
-      }
-      return;
+      addAdjointValue(sei->getOperand(),
+          makeAggregateAdjointValue(tangentVectorSILTy, eltVals));
     }
     }
   }
