@@ -524,7 +524,8 @@ public:
       Optional<bool> isCascadingUse) const override;
 
   // Only for DeclScope, not BodyScope
-  virtual ASTScopeImpl *createTrailingWhereClauseScope(ASTScopeImpl *parent, ScopeCreator&) {
+  virtual ASTScopeImpl *createTrailingWhereClauseScope(ASTScopeImpl *parent,
+                                                       ScopeCreator &) {
     return parent;
   }
   NullablePtr<DeclContext> getDeclContext() const override;
@@ -574,7 +575,8 @@ public:
   NullablePtr<const ASTScopeImpl> getLookupLimitForDecl() const override;
 
   void createBodyScope(ASTScopeImpl *leaf, ScopeCreator &) override;
-  ASTScopeImpl *createTrailingWhereClauseScope(ASTScopeImpl *parent, ScopeCreator&) override;
+  ASTScopeImpl *createTrailingWhereClauseScope(ASTScopeImpl *parent,
+                                               ScopeCreator &) override;
 };
 
 class ExtensionScope final : public IterableTypeScope {
@@ -591,7 +593,8 @@ public:
   NullablePtr<NominalTypeDecl> getCorrespondingNominalTypeDecl() const override;
   std::string declKindName() const override { return "Extension"; }
   SourceRange getBraces() const override;
-  ASTScopeImpl *createTrailingWhereClauseScope(ASTScopeImpl *parent, ScopeCreator&) override;
+  ASTScopeImpl *createTrailingWhereClauseScope(ASTScopeImpl *parent,
+                                               ScopeCreator &) override;
   void createBodyScope(ASTScopeImpl *leaf, ScopeCreator &) override;
   NullablePtr<Decl> getDecl() const override { return decl; }
 };
@@ -603,7 +606,8 @@ public:
   virtual ~TypeAliasScope() {}
 
   std::string declKindName() const override { return "TypeAlias"; }
-  ASTScopeImpl *createTrailingWhereClauseScope(ASTScopeImpl *parent, ScopeCreator&) override;
+  ASTScopeImpl *createTrailingWhereClauseScope(ASTScopeImpl *parent,
+                                               ScopeCreator &) override;
   GenericContext *getGenericContext() const override { return decl; }
   NullablePtr<Decl> getDecl() const override { return decl; }
 };

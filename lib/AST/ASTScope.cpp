@@ -158,7 +158,6 @@ NullablePtr<DeclContext> CaptureListScope::getDeclContext() const {
   return expr->getClosureBody();
 }
 
-
 NullablePtr<DeclContext> AttachedPropertyWrapperScope::getDeclContext() const {
   return decl->getParentPatternBinding()
       ->getPatternList()

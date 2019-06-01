@@ -42,7 +42,6 @@ class ScopeCreator {
   /// For allocating scopes.
   ASTContext &ctx;
 
-
   /// \c SourceFiles and \c BraceStmts have \c Decls and \c ASTNodes in them
   /// that must be scoped in distant descendants. As scopes are created, pass
   /// down the \c ASTNodes in enclosing \c Decls that really need to be in
@@ -60,6 +59,7 @@ class ScopeCreator {
 
 public:
   ASTSourceFileScope *const sourceFileScope;
+
 private:
   /// The last scope to "adopt" deferred nodes.
   /// When adding \c Decls to a scope tree that have been created since the tree
@@ -74,12 +74,10 @@ private:
   llvm::DenseSet<ClosureExpr *> alreadyHandledClosures;
 
 public:
-
   ScopeCreator(SourceFile *SF)
-  : ctx(SF->getASTContext()),
-      sourceFileScope(constructScope<ASTSourceFileScope>(SF, this)),
-      _lastAdopter(sourceFileScope),
-        lastAdopter(_lastAdopter) {}
+      : ctx(SF->getASTContext()),
+        sourceFileScope(constructScope<ASTSourceFileScope>(SF, this)),
+        _lastAdopter(sourceFileScope), lastAdopter(_lastAdopter) {}
 
   ~ScopeCreator() {
     assert(empty() && "Should have consumed all deferred nodes");
@@ -93,11 +91,9 @@ public:
 
 private:
   explicit ScopeCreator(ScopeCreator &sc)
-      : ctx(sc.ctx) ,
-        sourceFileScope(sc.sourceFileScope),
+      : ctx(sc.ctx), sourceFileScope(sc.sourceFileScope),
         lastAdopter(sc.lastAdopter),
-        alreadyHandledClosures(sc.alreadyHandledClosures)
-        {}
+        alreadyHandledClosures(sc.alreadyHandledClosures) {}
 
 public:
   template <typename Scope, typename... Args>
@@ -231,12 +227,12 @@ public:
   /// so it can be looked up.
 
   void createAttachedPropertyWrapperScope(PatternBindingDecl *patternBinding,
-                                           ASTScopeImpl *parent) {
+                                          ASTScopeImpl *parent) {
     patternBinding->getPattern(0)->forEachVariable([&](VarDecl *vd) {
       // assume all same as first
       if (hasCustomAttribute(vd))
         withoutDeferrals().createSubtree<AttachedPropertyWrapperScope>(parent,
-                                                                        vd);
+                                                                       vd);
     });
   }
 
@@ -298,8 +294,9 @@ public:
     return s;
   }
 
-  void addChildrenForAllExplicitAccessors(AbstractStorageDecl *asd, ASTScopeImpl *parent);
-  
+  void addChildrenForAllExplicitAccessors(AbstractStorageDecl *asd,
+                                          ASTScopeImpl *parent);
+
   void
   forEachSpecializeAttrInSourceOrder(Decl *declBeingSpecialized,
                                      function_ref<void(SpecializeAttr *)> fn) {
@@ -396,7 +393,7 @@ public:
   }
 };
 } // ast_scope
-} // swift
+} // namespace swift
 
 #pragma mark Scope tree creation and extension
 
@@ -493,8 +490,8 @@ public:
 
 #define VISIT_AND_CREATE_WHOLE_PORTION(What, WhatScope)                        \
   void visit##What(What *w, ASTScopeImpl *p, ScopeCreator &scopeCreator) {     \
-    scopeCreator.withoutDeferrals().createSubtree2D<WhatScope, GTXWholePortion>( \
-        p, w);                                                                 \
+    scopeCreator.withoutDeferrals()                                            \
+        .createSubtree2D<WhatScope, GTXWholePortion>(p, w);                    \
   }
 
   VISIT_AND_CREATE_WHOLE_PORTION(ExtensionDecl, ExtensionScope)
@@ -602,19 +599,18 @@ void ScopeCreator::createScopeFor(StmtOrExprOrDecl *sed, ASTScopeImpl *parent) {
 }
 
 void ScopeCreator::addChildrenForAllExplicitAccessors(AbstractStorageDecl *asd,
-ASTScopeImpl *parent) {
+                                                      ASTScopeImpl *parent) {
   for (auto accessor : asd->getAllAccessors()) {
     if (!accessor->isImplicit() && accessor->getStartLoc().isValid()) {
       // Accessors are always nested within their abstract storage
       // declaration. The nesting may not be immediate, because subscripts may
       // have intervening scopes for generics.
       if (parent->getEnclosingAbstractStorageDecl() == accessor->getStorage())
-        ASTVisitorForScopeCreation().visitAbstractFunctionDecl(accessor,
-                                                               parent, *this);
+        ASTVisitorForScopeCreation().visitAbstractFunctionDecl(accessor, parent,
+                                                               *this);
     }
   }
 }
-
 
 #pragma mark creation helpers
 
@@ -890,7 +886,8 @@ void GTXWholePortion::expandScope(GTXScope *scope,
       scope->getDecl().get(), scope->getGenericContext()->getGenericParams(),
       scope);
   if (scope->getGenericContext()->getTrailingWhereClause())
-    deepestScope = scope->createTrailingWhereClauseScope(deepestScope, scopeCreator);
+    deepestScope =
+        scope->createTrailingWhereClauseScope(deepestScope, scopeCreator);
 
   scope->createBodyScope(deepestScope, scopeCreator);
 }
@@ -918,17 +915,20 @@ void NominalTypeScope::createBodyScope(ASTScopeImpl *leaf,
 #pragma mark createTrailingWhereClauseScope
 
 ASTScopeImpl *
-ExtensionScope::createTrailingWhereClauseScope(ASTScopeImpl *parent, ScopeCreator &scopeCreator) {
+ExtensionScope::createTrailingWhereClauseScope(ASTScopeImpl *parent,
+                                               ScopeCreator &scopeCreator) {
   return scopeCreator.withoutDeferrals()
       .createSubtree2D<ExtensionScope, GTXWherePortion>(parent, decl);
 }
 ASTScopeImpl *
-NominalTypeScope::createTrailingWhereClauseScope(ASTScopeImpl *parent, ScopeCreator &scopeCreator) {
+NominalTypeScope::createTrailingWhereClauseScope(ASTScopeImpl *parent,
+                                                 ScopeCreator &scopeCreator) {
   return scopeCreator.withoutDeferrals()
       .createSubtree2D<NominalTypeScope, GTXWherePortion>(parent, decl);
 }
 ASTScopeImpl *
-TypeAliasScope::createTrailingWhereClauseScope(ASTScopeImpl *parent, ScopeCreator &scopeCreator) {
+TypeAliasScope::createTrailingWhereClauseScope(ASTScopeImpl *parent,
+                                               ScopeCreator &scopeCreator) {
   return scopeCreator.withoutDeferrals()
       .createSubtree2D<TypeAliasScope, GTXWherePortion>(parent, decl);
 }
