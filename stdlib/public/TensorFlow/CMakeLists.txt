@@ -27,45 +27,16 @@ list(APPEND swift_stdlib_compile_flags "-Xllvm" "-sil-inline-generics")
 list(APPEND swift_stdlib_compile_flags "-Xllvm" "-sil-partial-specialization")
 list(APPEND swift_stdlib_compile_flags "-force-single-frontend-invocation")
 # FIXME(SR-7972): Some tests fail when TensorFlow is optimized.
+# list(APPEND swift_stdlib_compile_flags "-O" "-whole-module-optimization")
 list(APPEND swift_stdlib_compile_flags "-Onone")
 list(APPEND swift_stdlib_compile_flags "-DCOMPILING_TENSORFLOW_MODULE")
 
-set(SOURCES
-  ArrayOps.swift
-  CompilerRuntime.swift
-  CompositeMath.swift
-  DataTypes.swift
-  Execution.swift
-  Gradients.swift
-  Ops.swift
-  # NumPy bridging for `ShapedArray` and `Tensor`.
-  PythonConversion.swift
-  ShapedArray.swift
-  StringOps.swift
-  StringTensor.swift
-  Tensor.swift
-  TensorGroup.swift
-  TensorHandle.swift
-  TensorProtocol.swift
-  TensorShape.swift
-  Threading.swift
-  Utilities.swift)
-
-set(GYB_SOURCES
-  ExecuteOp.swift.gyb)
-
-# Copy TensorFlow bindings file, if it exists.
-if (TENSORFLOW_SWIFT_BINDINGS)
-  file(GLOB_RECURSE TENSORFLOW_SWIFT_BINDINGS_SOURCES
-    "${TENSORFLOW_SWIFT_BINDINGS}/*.swift")
-  list(APPEND SOURCES "${TENSORFLOW_SWIFT_BINDINGS_SOURCES}")
-endif()
+set(SOURCES "")
 
 # Copy TensorFlow high-level API sources, if they exist.
 if (TENSORFLOW_SWIFT_APIS)
   file(GLOB_RECURSE TENSORFLOW_SWIFT_API_SOURCES
-    "${TENSORFLOW_SWIFT_APIS}/Sources/*.swift"
-    "${TENSORFLOW_SWIFT_APIS}/Sources/Core/*.swift")
+    "${TENSORFLOW_SWIFT_APIS}/Sources/*.swift")
   message(STATUS "Using TensorFlow high-level APIs library.")
   list(APPEND SOURCES "${TENSORFLOW_SWIFT_API_SOURCES}")
 endif()
@@ -79,7 +50,6 @@ endif()
 
 add_swift_target_library(swiftTensorFlow ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   "${SOURCES}"
-  GYB_SOURCES "${GYB_SOURCES}"
 
   INCORPORATE_OBJECT_LIBRARIES swiftCTensorFlow
   TARGET_SDKS OSX LINUX

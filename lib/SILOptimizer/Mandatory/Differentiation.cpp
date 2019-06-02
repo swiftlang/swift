@@ -789,73 +789,44 @@ static bool checkRequirementsSatisfied(
     SILFunction *original, ModuleDecl *swiftModule) {
   if (requirements.empty())
     return true;
-  // Jointly iterate through associated function requirements/conformances.
-  // Check whether all requirements are satisfied.
+  // Iterate through all requirements and check whether they are satisfied.
   SmallVector<Requirement, 2> unsatisfiedRequirements;
   for (auto req : requirements) {
     auto firstType = req.getFirstType();
     auto secondType = req.getSecondType();
+    // Substitute first and second types using the given substitution map,
+    // looking up conformances in the current module, if possible.
+    if (auto substFirstType =
+            firstType.subst(QuerySubstitutionMap{substMap},
+                            LookUpConformanceInModule(swiftModule))) {
+      firstType = substFirstType;
+    }
+    if (auto substSecondType =
+            secondType.subst(QuerySubstitutionMap{substMap},
+                             LookUpConformanceInModule(swiftModule))) {
+      secondType = substSecondType;
+    }
     switch (req.getKind()) {
     // Check same type requirements.
-    case RequirementKind::SameType: {
-      if (auto origFirstType = firstType.subst(substMap))
-        firstType = origFirstType;
-      if (auto origSecondType = secondType.subst(substMap))
-        secondType = origSecondType;
-      // If the second type is a dependent member type, try to resolve it
-      // using the first type as the base type.
-      // TODO: Add checks verifying that first type can be the base type.
-      if (auto depMemType = secondType->getAs<DependentMemberType>()) {
-        if (!firstType->hasTypeParameter())
-          if (auto substType = depMemType->substBaseType(
-                  firstType, LookUpConformanceInModule(swiftModule)))
-            secondType = substType->getCanonicalType();
-      }
+    case RequirementKind::SameType:
+      // If the first type does not equal the second type, then record the
+      // unsatisfied requirement.
       if (!firstType->isEqual(secondType))
         unsatisfiedRequirements.push_back(req);
       continue;
-    }
     // Check conformance requirements.
     case RequirementKind::Conformance: {
       auto protocolType = req.getSecondType()->castTo<ProtocolType>();
       auto protocol = protocolType->getDecl();
       assert(protocol && "Expected protocol in generic signature requirement");
-      // Try substituting requirement type using original substutition map.
-      // If the result type is known to conform to protocol in the current
-      // module, continue.
-      // This handles cases where the VJP caller is non-generic (specialized
-      // with concrete types) but the associated derivative callee is generic.
-      if (auto origFirstType = firstType.subst(substMap)) {
-        if (!origFirstType->hasError() &&
-            swiftModule->lookupConformance(origFirstType, protocol)) {
-          continue;
-        }
-      }
-      Optional<ProtocolConformanceRef> conformance;
-      // FIXME terrible hack: If LHS is a dependent member, try to resolve it
-      // using the `Self` type, assuming the first replacement type is `Self`.
-      if (auto depMemType = firstType->getAs<DependentMemberType>()) {
-        if (original->hasSelfParam() &&
-            !substMap.getReplacementTypes().empty()) {
-          if (auto substType = depMemType->substBaseType(
-                  substMap.getReplacementTypes().front(),
-                  LookUpConformanceInModule(swiftModule))) {
-            firstType = substType;
-          }
-        }
-        conformance = swiftModule->conformsToProtocol(firstType, protocol);
-      }
-      // Otherwise, try to look up conformance in substitution maps.
-      else {
-        conformance = substMap.lookupConformance(
-            firstType->getCanonicalType(), protocol);
-      }
-        
-      if (!conformance)
+      // If the first type does not conform to the second type in the current
+      // module, then record the unsatisfied requirement.
+      if (!swiftModule->lookupConformance(firstType, protocol))
         unsatisfiedRequirements.push_back(req);
       continue;
     }
     // Ignore other requirements (superclass and layout).
+    // Layout requirements are rejected during type-checking.
     default:
       continue;
     }

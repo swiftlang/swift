@@ -153,8 +153,6 @@ Below is more information about TensorFlow-related build arguments.
     * Default value: None.
 * `tensorflow-swift-apis`: A path to the [tensorflow/swift-apis](https://github.com/tensorflow/swift-apis) deep learning library repository.
     * Default value: `tensorflow-swift-apis` if the [tensorflow/swift-apis](https://github.com/tensorflow/swift-apis) repository is cloned. Otherwise, none.
-* `tensorflow-swift-bindings`: A path to the [tensorflow/swift-bindings](https://github.com/tensorflow/swift-bindings) repository.
-    * Default value: `tensorflow-swift-bindings` if the [tensorflow/swift-bindings](https://github.com/tensorflow/swift-bindings) repository is cloned. Otherwise, none.
 
 ### Build systems
 
