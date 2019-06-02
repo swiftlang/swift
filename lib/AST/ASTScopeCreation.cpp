@@ -64,11 +64,7 @@ private:
   /// The last scope to "adopt" deferred nodes.
   /// When adding \c Decls to a scope tree that have been created since the tree
   /// was originally built, add them as children of this scope.
-  ASTScopeImpl *_lastAdopter;
-
-  /// When copying for "withoutDeferrals" this reference refers to the original
-  /// _lastAdopter
-  ASTScopeImpl *&lastAdopter;
+  ASTScopeImpl *lastAdopter;
 
   /// Be robust against AST mutatations in flight:
   llvm::DenseSet<ClosureExpr *> alreadyHandledClosures;
@@ -77,7 +73,7 @@ public:
   ScopeCreator(SourceFile *SF)
       : ctx(SF->getASTContext()),
         sourceFileScope(constructScope<ASTSourceFileScope>(SF, this)),
-        _lastAdopter(sourceFileScope), lastAdopter(_lastAdopter) {}
+        lastAdopter(sourceFileScope) {}
 
   ~ScopeCreator() {
     assert(empty() && "Should have consumed all deferred nodes");
