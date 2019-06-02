@@ -522,6 +522,7 @@ static bool isValidProtocolMemberForTBDGen(const Decl *D) {
   case DeclKind::PostfixOperator:
     return false;
   }
+  llvm_unreachable("covered switch");
 }
 #endif
 

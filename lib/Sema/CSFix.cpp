@@ -345,6 +345,7 @@ bool AllowInvalidInitRef::diagnose(Expr *root, bool asNote) const {
     return failure.diagnose(asNote);
   }
   }
+  llvm_unreachable("covered switch");
 }
 
 AllowInvalidInitRef *AllowInvalidInitRef::dynamicOnMetatype(
@@ -478,6 +479,7 @@ bool AllowInvalidRefInKeyPath::diagnose(Expr *root, bool asNote) const {
     return failure.diagnose(asNote);
   }
   }
+  llvm_unreachable("covered switch");
 }
 
 AllowInvalidRefInKeyPath *

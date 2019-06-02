@@ -1998,6 +1998,7 @@ static ConstraintFix *fixRequirementFailure(ConstraintSystem &cs, Type type1,
   case RequirementKind::Conformance:
     return MissingConformance::forRequirement(cs, type1, type2, reqLoc);
   }
+  llvm_unreachable("covered switch");
 }
 
 /// Attempt to repair typing failures and record fixes if needed.

@@ -1181,6 +1181,7 @@ doesAccessorNeedDynamicAttribute(AccessorDecl *accessor, Evaluator &evaluator) {
       return isStorageDynamic(evaluator, accessor);
     return false;
   }
+  llvm_unreachable("covered switch");
 }
 
 llvm::Expected<bool>

@@ -4470,6 +4470,7 @@ VarDecl *VarDecl::getOriginalWrappedProperty(
   case PropertyWrapperSynthesizedPropertyKind::StorageWrapper:
     return this == wrapperInfo.storageWrapperVar ? original : nullptr;
   }
+  llvm_unreachable("covered switch");
 }
 
 void VarDecl::setOriginalWrappedProperty(VarDecl *originalProperty) {

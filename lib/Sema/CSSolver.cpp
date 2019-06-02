@@ -2035,6 +2035,7 @@ static Constraint *tryOptimizeGenericDisjunction(
   case Comparison::Unordered:
     return nullptr;
   }
+  llvm_unreachable("covered switch");
 }
 
 void ConstraintSystem::partitionDisjunction(
