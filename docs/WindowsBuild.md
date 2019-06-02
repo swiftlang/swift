@@ -204,7 +204,7 @@ ninja
 Running the testsuite on Windows has additional external dependencies.
 
 ```cmd
-path S:\thirdparty\icu4c-63_1-Win64-MSVC2017\bin64;S:\b\swift\bin;S:\b\swift\libdispatch-prefix\bin;%PATH%;%ProgramFiles%\Git\usr\bin
+path S:\thirdparty\icu4c-64_2-Win64-MSVC2017\bin64;S:\b\swift\bin;S:\b\swift\libdispatch-prefix\bin;%PATH%;%ProgramFiles%\Git\usr\bin
 ninja -C S:\b\swift check-swift
 ```
 
