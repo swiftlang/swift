@@ -77,43 +77,6 @@ public func dhasvjp(_ x: Float, _ y: Float) -> (Float, (Float) -> (Float, Float)
 // CHECK-LABEL: sil [ossa] @dhasvjp
 
 //===----------------------------------------------------------------------===//
-// Stored property
-//===----------------------------------------------------------------------===//
-
-struct DiffStoredProp {
-  @differentiable(wrt: (self), jvp: storedPropJVP, vjp: storedPropVJP)
-  let storedProp: Float
-
-  @_silgen_name("storedPropJVP")
-  func storedPropJVP() -> (Float, (DiffStoredProp) -> Float) {
-    fatalError("unimplemented")
-  }
-
-  @_silgen_name("storedPropVJP")
-  func storedPropVJP() -> (Float, (Float) -> DiffStoredProp) {
-    fatalError("unimplemented")
-  }
-}
-
-extension DiffStoredProp : VectorNumeric {
-  static var zero: DiffStoredProp { fatalError("unimplemented") }
-  static func + (lhs: DiffStoredProp, rhs: DiffStoredProp) -> DiffStoredProp {
-    fatalError("unimplemented")
-  }
-  static func - (lhs: DiffStoredProp, rhs: DiffStoredProp) -> DiffStoredProp {
-    fatalError("unimplemented")
-  }
-  typealias Scalar = Float
-  static func * (lhs: Float, rhs: DiffStoredProp) -> DiffStoredProp {
-    fatalError("unimplemented")
-  }
-}
-
-extension DiffStoredProp : Differentiable {
-  typealias TangentVector = DiffStoredProp
-}
-
-//===----------------------------------------------------------------------===//
 // Computed property
 //===----------------------------------------------------------------------===//
 

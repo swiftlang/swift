@@ -1303,7 +1303,6 @@ namespace  {
     UNINTERESTING_ATTR(Differentiable)
     UNINTERESTING_ATTR(Differentiating)
     UNINTERESTING_ATTR(CompilerEvaluable)
-    UNINTERESTING_ATTR(FieldwiseDifferentiable)
     UNINTERESTING_ATTR(NoDerivative)
 
     // These can't appear on overridable declarations.

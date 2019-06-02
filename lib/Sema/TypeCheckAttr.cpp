@@ -135,7 +135,6 @@ public:
   IGNORED_ATTR(Differentiable)
   IGNORED_ATTR(Differentiating)
   IGNORED_ATTR(CompilerEvaluable)
-  IGNORED_ATTR(FieldwiseDifferentiable)
   IGNORED_ATTR(NoDerivative)
 #undef IGNORED_ATTR
 
@@ -872,7 +871,6 @@ public:
   void visitDifferentiableAttr(DifferentiableAttr *attr);
   void visitDifferentiatingAttr(DifferentiatingAttr *attr);
   void visitCompilerEvaluableAttr(CompilerEvaluableAttr *attr);
-  void visitFieldwiseDifferentiableAttr(FieldwiseDifferentiableAttr *attr);
   void visitNoDerivativeAttr(NoDerivativeAttr *attr);
 };
 } // end anonymous namespace
@@ -2887,6 +2885,12 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
 
   AbstractFunctionDecl *original = dyn_cast<AbstractFunctionDecl>(D);
   if (auto *asd = dyn_cast<AbstractStorageDecl>(D)) {
+    if (asd->getImplInfo().isSimpleStored() &&
+        (attr->getJVP() || attr->getVJP())) {
+      diagnoseAndRemoveAttr(attr,
+          diag::differentiable_attr_stored_property_variable_unsupported);
+      return;
+    }
     // When used directly on a storage decl (stored/computed property or
     // subscript), the getter is currently inferred to be `@differentiable`.
     // TODO(TF-129): Infer setter to also be `@differentiable` after
@@ -3568,23 +3572,6 @@ void AttributeChecker::visitCompilerEvaluableAttr(CompilerEvaluableAttr *attr) {
   // follow certain rules. We can only check these rules after the body is type
   // checked, and it's not type checked yet, so we check these rules later in
   // TypeChecker::checkFunctionBodyCompilerEvaluable().
-}
-
-// SWIFT_ENABLE_TENSORFLOW
-void AttributeChecker::visitFieldwiseDifferentiableAttr(
-    FieldwiseDifferentiableAttr *attr) {
-  auto *structDecl = dyn_cast<StructDecl>(D);
-  if (!structDecl) {
-    diagnoseAndRemoveAttr(attr,
-        diag::fieldwise_differentiable_only_on_differentiable_structs);
-    return;
-  }
-  if (!conformsToDifferentiableInModule(
-          structDecl->getDeclaredInterfaceType(), D->getModuleContext())) {
-    diagnoseAndRemoveAttr(attr,
-        diag::fieldwise_differentiable_only_on_differentiable_structs);
-    return;
-  }
 }
 
 // SWIFT_ENABLE_TENSORFLOW

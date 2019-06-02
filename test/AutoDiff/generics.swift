@@ -139,4 +139,16 @@ func TF_508() {
   })
 }
 
+// TF-523
+struct TF_523_Struct : Differentiable & AdditiveArithmetic {
+  var a: Float = 1
+  typealias TangentVector = TF_523_Struct
+  typealias AllDifferentiableVariables = TF_523_Struct
+}
+
+@differentiable
+func TF_523_f(_ x: TF_523_Struct) -> Float {
+  return x.a * 2
+}
+
 // TODO: add more tests.

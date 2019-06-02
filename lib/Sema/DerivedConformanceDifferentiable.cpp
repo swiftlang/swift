@@ -690,8 +690,6 @@ getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived,
   auto *structDecl = new (C) StructDecl(SourceLoc(), id, SourceLoc(),
                                         /*Inherited*/ C.AllocateCopy(inherited),
                                         /*GenericParams*/ {}, parentDC);
-  structDecl->getAttrs().add(
-      new (C) FieldwiseDifferentiableAttr(/*implicit*/ true));
   structDecl->setImplicit();
   structDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
 
@@ -959,12 +957,6 @@ deriveDifferentiable_AssociatedStruct(DerivedConformance &derived,
   for (auto *member : diffProperties)
     if (!getAssociatedType(member, parentDC, id))
       return nullptr;
-
-  // Since associated types will be derived, we make this struct a fieldwise
-  // differentiable type.
-  if (!nominal->getAttrs().hasAttribute<FieldwiseDifferentiableAttr>())
-    nominal->getAttrs().add(
-        new (C) FieldwiseDifferentiableAttr(/*implicit*/ true));
 
   // Prevent re-synthesis during repeated calls.
   // FIXME: Investigate why this is necessary to prevent duplicate synthesis.

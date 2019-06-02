@@ -18,23 +18,14 @@ extension DiffReq where TangentVector : AdditiveArithmetic {
 struct Quadratic : DiffReq, Equatable {
   typealias TangentVector = Quadratic
 
-  @differentiable(wrt: (self), vjp: vjpA)
+  @differentiable
   let a: Float
-  func vjpA() -> (Float, (Float) -> Quadratic) {
-    return (a, { da in Quadratic(da, 0, 0) } )
-  }
 
-  @differentiable(wrt: (self), vjp: vjpB)
+  @differentiable
   let b: Float
-  func vjpB() -> (Float, (Float) -> Quadratic) {
-    return (b, { db in Quadratic(0, db, 0) } )
-  }
 
-  @differentiable(wrt: (self), vjp: vjpC)
+  @differentiable
   let c: Float
-  func vjpC() -> (Float, (Float) -> Quadratic) {
-    return (c, { dc in Quadratic(0, 0, dc) } )
-  }
 
   init(_ a: Float, _ b: Float, _ c: Float) {
     self.a = a
