@@ -66,30 +66,23 @@ private:
   /// was originally built, add them as children of this scope.
   ASTScopeImpl *lastAdopter;
 
-  /// Be robust against AST mutatations in flight:
-  Optional<llvm::DenseSet<ClosureExpr *>> _alreadyHandledClosures;
-  llvm::DenseSet<ClosureExpr *> &alreadyHandledClosures;
-
   /// Catch duplicate nodes in the AST
   /// TODO: better to use a shared pointer? Unique pointer?
-  Optional<llvm::DenseSet<ASTNode>> _astDuplicates;
-  llvm::DenseSet<ASTNode> &astDuplicates;
+  Optional<llvm::DenseSet<void*>> _astDuplicates;
+  llvm::DenseSet<void*> &astDuplicates;
 
 public:
   ScopeCreator(SourceFile *SF)
       : ctx(SF->getASTContext()),
         sourceFileScope(constructScope<ASTSourceFileScope>(SF, this)),
         lastAdopter(sourceFileScope),
-        _alreadyHandledClosures(llvm::DenseSet<ClosureExpr *>()),
-        alreadyHandledClosures(_alreadyHandledClosures.getValue()),
-        _astDuplicates(llvm::DenseSet<ASTNode>()),
+        _astDuplicates(llvm::DenseSet<void*>()),
         astDuplicates(_astDuplicates.getValue()) {}
 
 private:
   explicit ScopeCreator(ScopeCreator &sc)
       : ctx(sc.ctx), sourceFileScope(sc.sourceFileScope),
         lastAdopter(sc.lastAdopter),
-        alreadyHandledClosures(sc.alreadyHandledClosures),
         astDuplicates(sc.astDuplicates) {}
 
 public:
@@ -238,7 +231,7 @@ private:
           foundUniqueClosure) {
     forEachClosureIn(expr, [&](NullablePtr<CaptureListExpr> captureList,
                                ClosureExpr *closureExpr) {
-      if (alreadyHandledClosures.insert(closureExpr).second)
+      if (!isDuplicate(closureExpr))
         foundUniqueClosure(captureList, closureExpr);
     });
   }
@@ -282,11 +275,13 @@ public:
 public:
   void createSiblingPatternScopes(PatternBindingDecl *patternBinding,
                                   ASTScopeImpl *parent) {
-    for (auto entryIndex : range(patternBinding->getNumPatternEntries()))
-      if (!patternBinding->getPattern(entryIndex)->isImplicit()) {
+    for (auto entryIndex : range(patternBinding->getNumPatternEntries())) {
+      auto *const pattern = patternBinding->getPattern(entryIndex);
+      if (!isDuplicate(pattern)  && !pattern->isImplicit()) {
         withoutDeferrals().createSubtree<PatternEntryDeclScope>(
             parent, patternBinding, entryIndex);
       }
+    }
   }
 
   void createNestedPatternScopes(PatternBindingDecl *patternBinding,
@@ -320,8 +315,10 @@ public:
       return parent;
     auto *s = parent;
     for (unsigned i : indices(generics->getParams()))
-      s = withoutDeferrals().createSubtree<GenericParamScope>(
-          s, parameterizedDecl, generics, i);
+      if (!isDuplicate(generics->getParams()[i])) {
+        s = withoutDeferrals().createSubtree<GenericParamScope>(
+                                  s, parameterizedDecl, generics, i);
+      }
     return s;
   }
 
@@ -332,9 +329,12 @@ public:
   forEachSpecializeAttrInSourceOrder(Decl *declBeingSpecialized,
                                      function_ref<void(SpecializeAttr *)> fn) {
     llvm::SmallVector<SpecializeAttr *, 8> sortedSpecializeAttrs;
-    for (auto *attr : declBeingSpecialized->getAttrs())
-      if (auto *specializeAttr = dyn_cast<SpecializeAttr>(attr))
-        sortedSpecializeAttrs.push_back(specializeAttr);
+    for (auto *attr : declBeingSpecialized->getAttrs()) {
+      if (auto *specializeAttr = dyn_cast<SpecializeAttr>(attr)) {
+        if (!isDuplicate(specializeAttr))
+          sortedSpecializeAttrs.push_back(specializeAttr);
+      }
+    }
     const auto &srcMgr = declBeingSpecialized->getASTContext().SourceMgr;
     std::sort(sortedSpecializeAttrs.begin(), sortedSpecializeAttrs.end(),
               [&](const SpecializeAttr *a, const SpecializeAttr *b) {
@@ -358,7 +358,7 @@ public:
     if (ASTScopeImpl::isCreatedDirectly(n))
       return;
 
-    if (!astDuplicates.insert(n).second)
+    if (!astDuplicates.insert(n.getOpaqueValue()).second)
       return;
 
     deferredNodesInReverse.push_back(n);
@@ -373,6 +373,10 @@ public:
   void pushSourceFileDecls(ArrayRef<Decl *> declsToPrepend) {
     pushAllNecessaryNodes(declsToPrepend.slice(numberOfDeclsAlreadySeen));
     numberOfDeclsAlreadySeen = declsToPrepend.size();
+  }
+  
+  bool isDuplicate(void* p) {
+    return !astDuplicates.insert(p).second;
   }
 
 private:
@@ -642,7 +646,7 @@ void ScopeCreator::addChildrenForAllExplicitAccessors(AbstractStorageDecl *asd,
       // Accessors are always nested within their abstract storage
       // declaration. The nesting may not be immediate, because subscripts may
       // have intervening scopes for generics.
-      if (parent->getEnclosingAbstractStorageDecl() == accessor->getStorage())
+      if (!isDuplicate(accessor) && parent->getEnclosingAbstractStorageDecl() == accessor->getStorage())
         ASTVisitorForScopeCreation().visitAbstractFunctionDecl(accessor, parent,
                                                                *this);
     }
@@ -782,8 +786,10 @@ void DoCatchStmtScope::expandMe(ScopeCreator &scopeCreator) {
   scopeCreator.createScopeFor(stmt->getBody(), this);
 
   for (auto catchClause : stmt->getCatches())
-    ASTVisitorForScopeCreation().visitCatchStmt(catchClause, this,
-                                                scopeCreator);
+    if (!scopeCreator.isDuplicate(catchClause)) {
+      ASTVisitorForScopeCreation().visitCatchStmt(catchClause, this,
+                                                  scopeCreator);
+    }
 }
 
 void SwitchStmtScope::expandMe(ScopeCreator &scopeCreator) {
@@ -791,8 +797,10 @@ void SwitchStmtScope::expandMe(ScopeCreator &scopeCreator) {
                                          scopeCreator);
 
   for (auto caseStmt : stmt->getCases())
+    if (!scopeCreator.isDuplicate(caseStmt)) {
     scopeCreator.withoutDeferrals().createSubtree<CaseStmtScope>(this,
                                                                  caseStmt);
+    }
 }
 
 void ForEachStmtScope::expandMe(ScopeCreator &scopeCreator) {
@@ -896,7 +904,7 @@ void AbstractFunctionParamsScope::expandMe(ScopeCreator &scopeCreator) {
   // Unlike generic parameters or pattern initializers, it cannot refer to a
   // previous parameter.
   for (ParamDecl *pd : params->getArray()) {
-    if (pd->getDefaultValue())
+    if (!scopeCreator.isDuplicate(pd) && pd->getDefaultValue())
       scopeCreator.withoutDeferrals()
           .createSubtree<DefaultArgumentInitializerScope>(this, pd);
   }
@@ -933,7 +941,8 @@ void IterableTypeBodyPortion::expandScope(GTXScope *scope,
                                           ScopeCreator &scopeCreator) const {
   if (auto *idc = scope->getIterableDeclContext().getPtrOrNull())
     for (auto member : idc->getMembers())
-      scopeCreator.createScopeFor(member, scope);
+      if (!scopeCreator.isDuplicate(member))
+        scopeCreator.createScopeFor(member, scope);
 }
 
 #pragma mark createBodyScope
@@ -982,6 +991,8 @@ AbstractPatternEntryScope::AbstractPatternEntryScope(
 void AbstractPatternEntryScope::addVarDeclScopesAndTheirAccessors(
     ASTScopeImpl *parent, ScopeCreator &scopeCreator) const {
   getPatternEntry().getPattern()->forEachVariable([&](VarDecl *var) {
+    if (scopeCreator.isDuplicate(var))
+      return;
     const bool hasAccessors = var->getBracesRange().isValid();
     if (hasAccessors && !var->isImplicit())
       scopeCreator.withoutDeferrals().createSubtree<VarDeclScope>(parent, var);
@@ -992,6 +1003,8 @@ bool ASTScopeImpl::isCreatedDirectly(const ASTNode n) {
   // See addVarDeclScopesAndTheirAccessors and addChildrenForAllExplicitAccessors
   if (auto *d = n.dyn_cast<Decl*>())
     return isa<VarDecl>(d) || isa<AccessorDecl>(d);
+  if (n.isExpr(ExprKind::Closure))
+    return true;
   return false;
 }
 
