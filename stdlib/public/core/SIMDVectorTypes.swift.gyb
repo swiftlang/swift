@@ -192,7 +192,7 @@ extension SIMD${n} where Scalar: BinaryFloatingPoint {
 // SWIFT_ENABLE_TENSORFLOW
 extension SIMD${n} : AdditiveArithmetic where Scalar : FloatingPoint {}
 
-extension SIMD${n} : VectorNumeric where Scalar : FloatingPoint {}
+//extension SIMD${n} : VectorNumeric where Scalar : FloatingPoint {}
 
 extension SIMD${n} : Differentiable
   where Scalar : Differentiable & BinaryFloatingPoint,
