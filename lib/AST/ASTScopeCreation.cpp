@@ -1003,8 +1003,6 @@ bool ASTScopeImpl::isCreatedDirectly(const ASTNode n) {
   // See addVarDeclScopesAndTheirAccessors and addChildrenForAllExplicitAccessors
   if (auto *d = n.dyn_cast<Decl*>())
     return isa<VarDecl>(d) || isa<AccessorDecl>(d);
-  if (n.isExpr(ExprKind::Closure))
-    return true;
   return false;
 }
 
