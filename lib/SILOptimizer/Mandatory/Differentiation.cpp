@@ -4570,10 +4570,6 @@ public:
       break;
     }
     case AdjointValueKind::Aggregate: {
-      // FIXME(TF-21): If `TangentVector` is not marked
-      // `@_fieldwiseProductSpace`, call the VJP of the memberwise initializer.
-      // for (auto pair : llvm::zip(si->getElements(), av.getAggregateElements()))
-      //   addAdjointValue(std::get<0>(pair), std::get<1>(pair));
       llvm_unreachable("Unhandled. Are you trying to differentiate a "
                        "memberwise initializer?");
     }
