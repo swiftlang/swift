@@ -161,6 +161,9 @@ void AbstractFunctionDeclScope::printSpecifics(llvm::raw_ostream &out) const {
 
 void AbstractPatternEntryScope::printSpecifics(llvm::raw_ostream &out) const {
   out << " entry " << patternEntryIndex;
+  getPattern()->forEachVariable([&](VarDecl *vd) {
+    out << " '" << vd->getName() << "'";
+  });
 }
 
 
