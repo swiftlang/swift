@@ -67,14 +67,32 @@ private:
   ASTScopeImpl *lastAdopter;
 
   /// Be robust against AST mutatations in flight:
-  llvm::DenseSet<ClosureExpr *> alreadyHandledClosures;
+  Optional<llvm::DenseSet<ClosureExpr *>> _alreadyHandledClosures;
+  llvm::DenseSet<ClosureExpr *> &alreadyHandledClosures;
+
+  /// Catch duplicate nodes in the AST
+  /// TODO: better to use a shared pointer? Unique pointer?
+  Optional<llvm::DenseSet<ASTNode>> _astDuplicates;
+  llvm::DenseSet<ASTNode> &astDuplicates;
 
 public:
   ScopeCreator(SourceFile *SF)
       : ctx(SF->getASTContext()),
         sourceFileScope(constructScope<ASTSourceFileScope>(SF, this)),
-        lastAdopter(sourceFileScope) {}
+        lastAdopter(sourceFileScope),
+        _alreadyHandledClosures(llvm::DenseSet<ClosureExpr *>()),
+        alreadyHandledClosures(_alreadyHandledClosures.getValue()),
+        _astDuplicates(llvm::DenseSet<ASTNode>()),
+        astDuplicates(_astDuplicates.getValue()) {}
 
+private:
+  explicit ScopeCreator(ScopeCreator &sc)
+      : ctx(sc.ctx), sourceFileScope(sc.sourceFileScope),
+        lastAdopter(sc.lastAdopter),
+        alreadyHandledClosures(sc.alreadyHandledClosures),
+        astDuplicates(sc.astDuplicates) {}
+
+public:
   ~ScopeCreator() {
     assert(!haveDeferredNodes() && "Should have consumed all deferred nodes");
   }
@@ -84,12 +102,6 @@ public:
   /// Get a half-copy of me for passing down the tree with its own deferred
   /// nodes
   ScopeCreator &withoutDeferrals() { return *(new (ctx) ScopeCreator(*this)); }
-
-private:
-  explicit ScopeCreator(ScopeCreator &sc)
-      : ctx(sc.ctx), sourceFileScope(sc.sourceFileScope),
-        lastAdopter(sc.lastAdopter),
-        alreadyHandledClosures(sc.alreadyHandledClosures) {}
 
 public:
   template <typename Scope, typename... Args>
@@ -344,6 +356,9 @@ public:
 
     // An optimization; will be ignored later anyway.
     if (ASTScopeImpl::isCreatedDirectly(n))
+      return;
+
+    if (!astDuplicates.insert(n).second)
       return;
 
     deferredNodesInReverse.push_back(n);
