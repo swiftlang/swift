@@ -1372,6 +1372,7 @@ void SILGenModule::visitVarDecl(VarDecl *vd) {
 #include "swift/AST/AccessorKinds.def"
         llvm_unreachable("not an opaque accessor");
       }
+      llvm_unreachable("covered switch");
     }();
     if (!shouldEmit) return;
 

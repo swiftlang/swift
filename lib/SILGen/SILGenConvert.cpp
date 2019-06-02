@@ -985,6 +985,7 @@ SILGenFunction::emitOpenExistential(
   case ExistentialRepresentation::None:
     llvm_unreachable("not existential");
   }
+  llvm_unreachable("covered switch");
 }
 
 ManagedValue SILGenFunction::manageOpaqueValue(ManagedValue value,

@@ -6472,6 +6472,7 @@ bool AbstractFunctionDecl::hasInlinableBodyText() const {
   case BodyKind::MemberwiseInitializer:
     return false;
   }
+  llvm_unreachable("covered switch");
 }
 
 StringRef AbstractFunctionDecl::getInlinableBodyText(

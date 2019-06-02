@@ -636,6 +636,7 @@ static ApplySite replaceApplySite(SILBuilder &B, SILLocation Loc,
     return replacePartialApplyInst(B, Loc, OldPAI, NewFn, NewSubs, NewArgs);
   }
   }
+  llvm_unreachable("covered switch");
 }
 
 /// Delete an apply site that's been successfully devirtualized.
