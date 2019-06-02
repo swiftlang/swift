@@ -136,15 +136,12 @@ public:
   template <typename StmtOrExprOrDecl>
   void createScopeFor(StmtOrExprOrDecl *, ASTScopeImpl *parent);
 
-  template <typename StmtOrExpr> bool shouldCreateScope(StmtOrExpr *se) const {
-    return se;
-  }
-
-  bool shouldCreateScope(Decl *d) const {
-    if (!d)
+  template <typename DeclOrStmt>
+  bool shouldCreateScope(DeclOrStmt *ds) const {
+    if (!ds)
       return false;
-    // Implicit declarations don't have source information for name lookup.
-    if (d->isImplicit())
+    // Implicit nodes don't have source information for name lookup.
+    if (ds->isImplicit())
       return false;
     // Have also seen the following in an AST:
     // Source::
@@ -162,10 +159,15 @@ public:
     //     (pattern_named '_')))
     //
     // So test the SourceRange
-    if (d->getStartLoc() == d->getEndLoc())
+    if (ds->getStartLoc() == ds->getEndLoc())
       return false;
     return true;
   }
+  
+  bool shouldCreateScope(Expr *e) const {
+    return e;
+  }
+
 
   template <typename Scope, typename... Args>
   /// Create a new scope of class ChildScope initialized with a ChildElement,
@@ -593,7 +595,8 @@ public:
 // ASTVisitorForScopeCreation
 template <typename StmtOrExprOrDecl>
 void ScopeCreator::createScopeFor(StmtOrExprOrDecl *sed, ASTScopeImpl *parent) {
-  ASTVisitorForScopeCreation().visit(sed, parent, *this);
+  if (shouldCreateScope(sed))
+      ASTVisitorForScopeCreation().visit(sed, parent, *this);
 }
 
 void ScopeCreator::addChildrenForAllExplicitAccessors(AbstractStorageDecl *asd,
