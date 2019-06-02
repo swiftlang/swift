@@ -895,6 +895,7 @@ public:
     case RefKind::Method:
       return "allow reference to a method as a key path component";
     }
+    llvm_unreachable("covered switch");
   }
 
   bool diagnose(Expr *root, bool asNote = false) const override;

@@ -230,6 +230,7 @@ void SerializedModuleLoaderBase::collectVisibleTopLevelModuleNamesImpl(
       return None;
     }
     }
+    llvm_unreachable("covered switch");
   });
 }
 
@@ -474,6 +475,7 @@ SerializedModuleLoaderBase::findModule(AccessPathElem moduleID,
           return findTargetSpecificModuleFiles();
         }
         }
+        llvm_unreachable("covered switch");
       });
   return result.getValueOr(false);
 }
