@@ -160,12 +160,31 @@ public:
     //  }
     //
     // AST:
-    //  (pattern_binding_decl range=[test.swift:2:3 - line:2:3]
-    //   (pattern_typed implicit type='<<error type>>'
-    //     (pattern_named '_')))
+    // clang-format off
+    //    (source_file "test.swift"
+    //     (func_decl range=[test.swift:1:3 - line:3:3] "testInvalidKeyPathComponents()" interface type='() -> ()' access=internal
+    //      (parameter_list range=[test.swift:1:36 - line:1:37])
+    //      (brace_stmt range=[test.swift:1:39 - line:3:3]
+    //       (pattern_binding_decl range=[test.swift:2:5 - line:2:11]
+    //        (pattern_any)
+    //        (error_expr implicit type='<null>'))
+    //
+    //       (pattern_binding_decl range=[test.swift:2:5 - line:2:5] <=== SOURCE RANGE WILL CONFUSE SCOPE CODE
+    //        (pattern_typed implicit type='<<error type>>'
+    //         (pattern_named '_')))
+    //      ...
+    // clang-format on
     //
     // So test the SourceRange
-    if (d->getStartLoc() == d->getEndLoc())
+    //
+    // But wait!
+    // var z = $x0 + $x1
+    // z
+    //
+    // z has start == end, but must be pushed to expand source range
+    //
+    // So, only check source ranges for PatternBindingDecls
+    if (isa<PatternBindingDecl>(d) && (d->getStartLoc() == d->getEndLoc()))
       return false;
     return true;
   }
