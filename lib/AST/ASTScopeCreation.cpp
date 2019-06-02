@@ -212,8 +212,8 @@ public:
     // Use the ASTWalker to find buried captures and closures
     forEachUniqueClosureIn(expr, [&](NullablePtr<CaptureListExpr> captureList,
                                      ClosureExpr *closureExpr) {
-      withoutDeferrals().createSubtree<WholeClosureScope>(parent, captureList,
-                                                          closureExpr);
+      withoutDeferrals().createSubtree<WholeClosureScope>(parent, closureExpr,
+                                                          captureList);
     });
   }
 
@@ -848,9 +848,9 @@ void WholeClosureScope::expandMe(ScopeCreator &scopeCreator) {
     scopeCreator.withoutDeferrals().createSubtree<CaptureListScope>(this, cl);
   if (closureExpr->getInLoc().isValid())
     scopeCreator.withoutDeferrals().createSubtree<ClosureParametersScope>(
-        this, captureList, closureExpr);
+        this, closureExpr, captureList);
   scopeCreator.withoutDeferrals().createSubtree<ClosureBodyScope>(
-      this, captureList, closureExpr);
+      this, closureExpr, captureList);
 }
 
 void CaptureListScope::expandMe(ScopeCreator &scopeCreator) {

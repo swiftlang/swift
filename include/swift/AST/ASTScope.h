@@ -1036,8 +1036,8 @@ public:
   NullablePtr<CaptureListExpr> captureList;
   ClosureExpr *const closureExpr;
 
-  AbstractClosureScope(NullablePtr<CaptureListExpr> captureList,
-                       ClosureExpr *closureExpr)
+  AbstractClosureScope(ClosureExpr *closureExpr,
+                       NullablePtr<CaptureListExpr> captureList)
       : captureList(captureList), closureExpr(closureExpr) {}
   virtual ~AbstractClosureScope() {}
 
@@ -1052,9 +1052,9 @@ public:
 
 class WholeClosureScope final : public AbstractClosureScope {
 public:
-  WholeClosureScope(NullablePtr<CaptureListExpr> captureList,
-                    ClosureExpr *closureExpr)
-      : AbstractClosureScope(captureList, closureExpr) {}
+  WholeClosureScope(ClosureExpr *closureExpr,
+                    NullablePtr<CaptureListExpr> captureList)
+      : AbstractClosureScope(closureExpr, captureList) {}
   virtual ~WholeClosureScope() {}
 
   void expandMe(ScopeCreator &) override;
@@ -1066,9 +1066,9 @@ public:
 /// Absent if no "in".
 class ClosureParametersScope final : public AbstractClosureScope {
 public:
-  ClosureParametersScope(NullablePtr<CaptureListExpr> captureList,
-                         ClosureExpr *closureExpr)
-      : AbstractClosureScope(captureList, closureExpr) {}
+  ClosureParametersScope(ClosureExpr *closureExpr,
+                         NullablePtr<CaptureListExpr> captureList)
+      : AbstractClosureScope(closureExpr, captureList) {}
   virtual ~ClosureParametersScope() {}
 
   std::string getClassName() const override;
@@ -1084,9 +1084,9 @@ protected:
 // there is an "in"
 class ClosureBodyScope final : public AbstractClosureScope {
 public:
-  ClosureBodyScope(NullablePtr<CaptureListExpr> captureList,
-                   ClosureExpr *closureExpr)
-      : AbstractClosureScope(captureList, closureExpr) {}
+  ClosureBodyScope(ClosureExpr *closureExpr,
+                   NullablePtr<CaptureListExpr> captureList)
+      : AbstractClosureScope(closureExpr, captureList) {}
   virtual ~ClosureBodyScope() {}
 
   void expandMe(ScopeCreator &) override;
