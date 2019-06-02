@@ -31,7 +31,7 @@ TypeRefBuilder::getRemoteAddrOfTypeRefPointer(const void *pointer) {
   // Find what type ref section the pointer resides in, if any.
   const ReflectionInfo *containingInfo = nullptr;
   for (auto &info : ReflectionInfos) {
-    auto start = (uint64_t)info.TypeReference.Metadata.startAddress();
+    auto start = (uint64_t)info.TypeReference.Metadata.getStartAddress();
     auto size = (uint64_t)info.TypeReference.Metadata.size();
     if (start <= (uint64_t)pointer && (uint64_t)pointer < start + size) {
        containingInfo = &info;
@@ -194,8 +194,10 @@ bool TypeRefBuilder::getFieldTypeRefs(
                        - FD.second->TypeReference.SectionOffset;
     auto FieldOffset = FD.second->Field.SectionOffset
                      - FD.second->ReflectionString.SectionOffset;
-    auto Low = (uintptr_t)(FD.second->ReflectionString.Metadata.startAddress());
-    auto High = (uintptr_t)(FD.second->ReflectionString.Metadata.endAddress());
+    auto Low =
+        (uintptr_t)(FD.second->ReflectionString.Metadata.getStartAddress());
+    auto High =
+        (uintptr_t)(FD.second->ReflectionString.Metadata.getEndAddress());
     auto FieldName = Field.getFieldName(FieldOffset, Low, High);
 
     // Empty cases of enums do not have a type
@@ -341,8 +343,10 @@ void TypeRefBuilder::dumpFieldSection(std::ostream &OS) {
         OS << '-';
       OS << '\n';
       for (auto &field : descriptor) {
-        auto Low = (uintptr_t)sections.ReflectionString.Metadata.startAddress();
-        auto High = (uintptr_t)sections.ReflectionString.Metadata.endAddress();
+        auto Low =
+            (uintptr_t)sections.ReflectionString.Metadata.getStartAddress();
+        auto High =
+            (uintptr_t)sections.ReflectionString.Metadata.getEndAddress();
         OS << std::string(field.getFieldName(NameOffset, Low, High).begin(),
                           field.getFieldName(NameOffset, Low, High).end());
         if (field.hasMangledTypeName()) {
