@@ -52,10 +52,10 @@ class ScopeCreator {
   /// In reverse order!
   std::vector<ASTNode> nodesInReverse;
 
-  /// The number of \c Decls in the \c SourceFile that were already processed
-  /// into scopes. Since parsing can be interleaved with type-checking, on every
-  /// lookup, create scopes for any \c Decls beyond this number.
-  int numberOfDeclsAlreadyProcessed = 0;
+  /// The number of \c Decls in the \c SourceFile that were already seen.
+  /// Since parsing can be interleaved with type-checking, on every
+  /// lookup, look at creating scopes for any \c Decls beyond this number.
+  int numberOfDeclsAlreadySeen = 0;
 
 public:
   ASTSourceFileScope *const sourceFileScope;
@@ -335,8 +335,8 @@ public:
   }
 
   void pushSourceFileDecls(ArrayRef<Decl *> declsToPrepend) {
-    pushAllNecessaryNodes(declsToPrepend.slice(numberOfDeclsAlreadyProcessed));
-    numberOfDeclsAlreadyProcessed = declsToPrepend.size();
+    pushAllNecessaryNodes(declsToPrepend.slice(numberOfDeclsAlreadySeen));
+    numberOfDeclsAlreadySeen = declsToPrepend.size();
   }
 
 private:
