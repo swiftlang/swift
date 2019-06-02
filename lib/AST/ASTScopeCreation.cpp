@@ -398,9 +398,9 @@ public:
 #pragma mark Scope tree creation and extension
 
 ASTScope *ASTScope::createScopeTreeFor(SourceFile *SF) {
-  ScopeCreator scopeCreator(SF);
-  auto *scope = new (SF->getASTContext()) ASTScope(scopeCreator.sourceFileScope);
-  scopeCreator.addAnyNewScopesToTree();
+  ScopeCreator *scopeCreator = new (SF->getASTContext()) ScopeCreator(SF);
+  auto *scope = new (SF->getASTContext()) ASTScope(scopeCreator->sourceFileScope);
+  scopeCreator->addAnyNewScopesToTree();
   return scope;
 }
 
