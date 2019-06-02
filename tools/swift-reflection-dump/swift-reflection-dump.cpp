@@ -86,8 +86,9 @@ static void reportError(std::error_code EC) {
   exit(EXIT_FAILURE);
 }
 
+using NativeRuntime = External<RuntimeTarget<sizeof(uintptr_t)>>;
 using NativeReflectionContext =
-    swift::reflection::ReflectionContext<External<RuntimeTarget<sizeof(uintptr_t)>>>;
+    swift::reflection::ReflectionContext<NativeRuntime>;
 
 using ReadBytesResult = swift::remote::MemoryReader::ReadBytesResult;
 
