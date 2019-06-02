@@ -50,7 +50,7 @@ class ScopeCreator {
   ///  /// The nodes that must be passed down to deeper levels in the scope
   ///  tree.
   /// In reverse order!
-  std::vector<ASTNode> nodesInReverse;
+  std::vector<ASTNode> deferredNodesInReverse;
 
   /// The number of \c Decls in the \c SourceFile that were already seen.
   /// Since parsing can be interleaved with type-checking, on every
@@ -76,7 +76,7 @@ public:
         lastAdopter(sourceFileScope) {}
 
   ~ScopeCreator() {
-    assert(empty() && "Should have consumed all deferred nodes");
+    assert(!haveDeferredNodes() && "Should have consumed all deferred nodes");
   }
   ScopeCreator(const ScopeCreator &) = delete;  // ensure no copies
   ScopeCreator(const ScopeCreator &&) = delete; // ensure no moves
@@ -118,7 +118,7 @@ public:
   void createScopesForDeferredNodes(ASTScopeImpl *parent) {
     setLastAdopter(parent); // in case we come back here later after adding
     // more Decls to the SourceFile
-    while (!empty()) {
+    while (haveDeferredNodes()) {
       Optional<ASTNode> node = popNextDeferredNodeForAdoptionBy(parent);
       if (!node)
         return;
@@ -333,7 +333,7 @@ public:
       fn(specializeAttr);
   }
 
-  bool empty() const { return nodesInReverse.empty(); }
+  bool haveDeferredNodes() const { return !deferredNodesInReverse.empty(); }
 
   void pushIfNecessary(ASTNode n) {
     // Do not defer VarDecls or Accessors because
@@ -346,7 +346,7 @@ public:
     if (ASTScopeImpl::isCreatedDirectly(n))
       return;
 
-    nodesInReverse.push_back(n);
+    deferredNodesInReverse.push_back(n);
   }
 
   template <typename ASTNodelike>
@@ -363,8 +363,8 @@ public:
 private:
   ASTNode popNextDeferredNodeForAdoptionBy(ASTScopeImpl *s) {
     setLastAdopter(s);
-    auto f = nodesInReverse.back();
-    nodesInReverse.pop_back();
+    auto f = deferredNodesInReverse.back();
+    deferredNodesInReverse.pop_back();
     return f;
   }
 
@@ -390,7 +390,7 @@ public:
 
   void print(raw_ostream &out) const {
     int i = 0;
-    for (auto n : reverse(nodesInReverse)) {
+    for (auto n : reverse(deferredNodesInReverse)) {
       out << i++ << ": ";
       n.dump(out);
       out << "\n";
@@ -710,7 +710,7 @@ void PatternEntryDeclScope::expandMe(ScopeCreator &scopeCreator) {
     initializerEnd = initializer->getSourceRange().End;
   }
   // If there are no uses of the declararations, add the accessors immediately.
-  if (scopeCreator.empty())
+  if (!scopeCreator.haveDeferredNodes())
     addVarDeclScopesAndTheirAccessors(this, scopeCreator);
   else
     // Note: the accessors will follow the pattern binding.
@@ -828,7 +828,7 @@ void BraceStmtScope::expandMe(ScopeCreator &scopeCreator) {
 }
 
 void VarDeclScope::expandMe(ScopeCreator &scopeCreator) {
-  assert(scopeCreator.empty() &&
+  assert(!scopeCreator.haveDeferredNodes() &&
          "Decls needing this var go into the PatternEntryUseScope, not here");
   scopeCreator.addChildrenForAllExplicitAccessors(decl, this);
 }
@@ -872,7 +872,7 @@ void ClosureBodyScope::expandMe(ScopeCreator &scopeCreator) {
 
 void TopLevelCodeScope::expandMe(ScopeCreator &scopeCreator) {
   scopeCreator.createSubtree<BraceStmtScope>(this, decl->getBody());
-  assert(scopeCreator.empty() &&
+  assert(!scopeCreator.haveDeferredNodes() &&
          "a top level code scope should snarf up all the deferred nodes");
 }
 
