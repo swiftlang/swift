@@ -2092,6 +2092,9 @@ function(add_swift_target_library name)
       # Add the arch-specific library targets to the global exports.
       foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
         set(_variant_name "${name}-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
+        if(NOT TARGET "${_variant_name}")
+          continue()
+        endif()
 
         if(is_installing)
           set_property(GLOBAL APPEND
@@ -2104,13 +2107,12 @@ function(add_swift_target_library name)
 
       # Add the swiftmodule-only targets to the lipo target depdencies.
       foreach(arch ${SWIFT_SDK_${sdk}_MODULE_ARCHITECTURES})
-        set(_variant_name
-          "${name}-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
-
-        if(TARGET "${_variant_name}")
-          add_dependencies("${lipo_target}"
-            "${_variant_name}")
+        set(_variant_name "${name}-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
+        if(NOT TARGET "${_variant_name}")
+          continue()
         endif()
+
+        add_dependencies("${lipo_target}" "${_variant_name}")
       endforeach()
 
       # If we built static variants of the library, create a lipo target for
