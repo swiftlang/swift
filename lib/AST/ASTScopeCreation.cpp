@@ -135,13 +135,19 @@ public:
 
   template <typename StmtOrExprOrDecl>
   void createScopeFor(StmtOrExprOrDecl *, ASTScopeImpl *parent);
+  
+  template <typename StmtOrExpr>
+  bool shouldCreateScope(StmtOrExpr *n) const {
+    // Cannot ignore implicit statements because implict return can contain
+    // scopes in the expression, such as closures.
+    return n;
+  }
 
-  template <typename DeclOrStmt>
-  bool shouldCreateScope(DeclOrStmt *ds) const {
-    if (!ds)
+  bool shouldCreateScope(Decl *d) const {
+    if (!d)
       return false;
     // Implicit nodes don't have source information for name lookup.
-    if (ds->isImplicit())
+    if (d->isImplicit())
       return false;
     // Have also seen the following in an AST:
     // Source::
@@ -159,13 +165,9 @@ public:
     //     (pattern_named '_')))
     //
     // So test the SourceRange
-    if (ds->getStartLoc() == ds->getEndLoc())
+    if (d->getStartLoc() == d->getEndLoc())
       return false;
     return true;
-  }
-  
-  bool shouldCreateScope(Expr *e) const {
-    return e;
   }
 
 
