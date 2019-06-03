@@ -8,8 +8,15 @@ var MethodTests = TestSuite("Method")
 // ==== Tests with generated adjoint ====
 
 struct Parameter : Equatable {
+  private let storedX: Float
   @differentiable(wrt: (self), jvp: jvpX, vjp: vjpX)
-  let x: Float
+  var x: Float {
+      return storedX
+  }
+  
+  init(x: Float) {
+    storedX = x
+  }
 
   func vjpX() -> (Float, (Float) -> Parameter) {
     return (x, { dx in Parameter(x: dx) } )
@@ -155,8 +162,15 @@ struct DiffWrtSelf : Differentiable {
 }
 
 struct CustomParameter : Equatable {
+  let storedX: Float
   @differentiable(wrt: (self), vjp: vjpX)
-  let x: Float
+  var x: Float {
+      return storedX
+  }
+  
+  init(x: Float) {
+    storedX = x
+  }
 
   func vjpX() -> (Float, (Float) -> CustomParameter) {
     return (x, { dx in CustomParameter(x: dx) })

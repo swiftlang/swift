@@ -447,6 +447,9 @@ NOTE(autodiff_opaque_function_not_differentiable,none,
      "opaque non-'@differentiable' function is not differentiable", ())
 NOTE(autodiff_property_not_differentiable,none,
      "property is not differentiable", ())
+NOTE(autodiff_stored_property_no_corresponding_tangent,none,
+     "property cannot be differentiated because '%0.TangentVector' does not "
+     "have a member named '%1'", (StringRef, StringRef))
 NOTE(autodiff_value_defined_here,none,
      "value defined here", ())
 NOTE(autodiff_when_differentiating_function_call,none,
