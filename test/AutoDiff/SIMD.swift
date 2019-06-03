@@ -30,6 +30,16 @@ SIMDTests.test("Negate") {
   expectEqual(-a, bp1(a))
 }
 
+SIMDTests.test("init(repeating:)") {
+  let g = SIMD4<Float>(1, 1, 1, 1)
+  
+  let foo1 = { (x: Float) -> SIMD4<Float> in
+    return SIMD4<Float>(repeating: x)
+  }
+  let bp1 = pullback(at: 5, in: foo1)
+  expectEqual(4, bp1(g))
+}
+
 SIMDTests.test("Sum") {
   let a = SIMD4<Float>(1, 2, 3, 4)
 
