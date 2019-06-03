@@ -4374,6 +4374,8 @@ ERROR(property_wrapper_type_requirement_not_accessible,none,
 ERROR(property_wrapper_attribute_not_on_property, none,
       "property wrapper attribute %0 can only be applied to a property",
       (DeclName))
+NOTE(property_wrapper_declared_here,none,
+     "property wrapper type %0 declared here", (DeclName))
 
 ERROR(property_wrapper_multiple,none,
       "only one property wrapper can be attached to a given property", ())
@@ -4413,9 +4415,9 @@ NOTE(property_wrapper_direct_init,none,
      "initialize the property wrapper type directly with "
      "'(...') on the attribute", ())
 
-ERROR(property_wrapper_incompatible_unbound, none,
-      "property wrapper type %0 must either specify all generic arguments "
-      "or require only a single generic argument", (Type))
+ERROR(property_wrapper_incompatible_property, none,
+      "property type %0 does not match that of the 'value' property of "
+      "its wrapper type %1", (Type, Type))
 
 ERROR(property_wrapper_type_access,none,
       "%select{%select{variable|constant}0|property}1 "
