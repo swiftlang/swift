@@ -4132,11 +4132,12 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         uint64_t vjpNameId;
         DeclID vjpDeclId;
         ArrayRef<uint64_t> parameters;
+        DeclID linearId;
         SmallVector<Requirement, 4> requirements;
 
         serialization::decls_block::DifferentiableDeclAttrLayout::readRecord(
             scratch, isImplicit, jvpNameId, jvpDeclId, vjpNameId, vjpDeclId,
-            parameters);
+            parameters, linearId);
 
         Optional<DeclNameWithLoc> jvp;
         FuncDecl *jvpDecl = nullptr;
@@ -4150,6 +4151,8 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
           vjp = { MF.getIdentifier(vjpNameId), DeclNameLoc() };
           vjpDecl = cast<FuncDecl>(MF.getDecl(vjpDeclId));
         }
+        
+        bool linear = linearId != 0 ? true : false;
 
         llvm::SmallBitVector parametersBitVector(parameters.size());
         for (unsigned i : indices(parameters))
@@ -4160,7 +4163,7 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
 
         auto diffAttr =
             DifferentiableAttr::create(ctx, isImplicit, SourceLoc(),
-                                       SourceRange(), indices, jvp, vjp,
+                                       SourceRange(), indices, jvp, vjp, linear,
                                        requirements);
         diffAttr->setJVPFunction(jvpDecl);
         diffAttr->setVJPFunction(vjpDecl);

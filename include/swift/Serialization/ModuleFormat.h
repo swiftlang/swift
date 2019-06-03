@@ -1657,7 +1657,8 @@ namespace decls_block {
     DeclIDField, // JVP function declaration.
     IdentifierIDField, // VJP name.
     DeclIDField, // VJP function declaration.
-    BCArray<BCFixed<1>> // Differentiation parameter indices' bitvector.
+    BCArray<BCFixed<1>>, // Differentiation parameter indices' bitvector.
+    BCFixed<1> // Linear flag.
   >;
 
   // SWIFT_ENABLE_TENSORFLOW

@@ -1510,6 +1510,8 @@ class DifferentiableAttr final
   FuncDecl *VJPFunction = nullptr;
   /// The differentiation parameters' indices, resolved by the type checker.
   AutoDiffParameterIndices *ParameterIndices = nullptr;
+  /// States whether the function is linear (optional).
+  bool linear;
   /// The trailing where clause, if it exists.
   TrailingWhereClause *WhereClause = nullptr;
   /// The requirements for autodiff associated functions. Resolved by the type
@@ -1523,6 +1525,7 @@ class DifferentiableAttr final
                               ArrayRef<ParsedAutoDiffParameter> parameters,
                               Optional<DeclNameWithLoc> jvp,
                               Optional<DeclNameWithLoc> vjp,
+                              bool linear,
                               TrailingWhereClause *clause);
 
   explicit DifferentiableAttr(ASTContext &context, bool implicit,
@@ -1530,6 +1533,7 @@ class DifferentiableAttr final
                               AutoDiffParameterIndices *indices,
                               Optional<DeclNameWithLoc> jvp,
                               Optional<DeclNameWithLoc> vjp,
+                              bool linear,
                               ArrayRef<Requirement> requirements);
 
 public:
@@ -1538,6 +1542,7 @@ public:
                                     ArrayRef<ParsedAutoDiffParameter> params,
                                     Optional<DeclNameWithLoc> jvp,
                                     Optional<DeclNameWithLoc> vjp,
+                                    bool linear,
                                     TrailingWhereClause *clause);
 
   static DifferentiableAttr *create(ASTContext &context, bool implicit,
@@ -1545,6 +1550,7 @@ public:
                                     AutoDiffParameterIndices *indices,
                                     Optional<DeclNameWithLoc> jvp,
                                     Optional<DeclNameWithLoc> vjp,
+                                    bool linear,
                                     ArrayRef<Requirement> requirements);
 
   Optional<DeclNameWithLoc> getJVP() const { return JVP; }

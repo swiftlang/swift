@@ -834,12 +834,13 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
   Optional<DeclNameWithLoc> jvpSpec;
   Optional<DeclNameWithLoc> vjpSpec;
   TrailingWhereClause *whereClause = nullptr;
+  bool linear;
 
   // Parse '('.
   if (consumeIf(tok::l_paren, lParenLoc)) {
     // Parse @differentiable attribute arguments.
     if (parseDifferentiableAttributeArguments(params, jvpSpec, vjpSpec,
-                                              whereClause))
+                                              linear, whereClause))
       return makeParserError();
     // Parse ')'.
     if (!consumeIf(tok::r_paren, rParenLoc)) {
@@ -852,7 +853,7 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
   return ParserResult<DifferentiableAttr>(
     DifferentiableAttr::create(Context, /*implicit*/ false, atLoc,
                                SourceRange(loc, rParenLoc),
-                               params, jvpSpec, vjpSpec, whereClause));
+                               params, jvpSpec, vjpSpec, linear, whereClause));
 }
 
 bool Parser::parseDifferentiationParametersClause(
@@ -934,7 +935,7 @@ bool Parser::parseDifferentiationParametersClause(
 bool Parser::parseDifferentiableAttributeArguments(
     SmallVectorImpl<ParsedAutoDiffParameter> &params,
     Optional<DeclNameWithLoc> &jvpSpec, Optional<DeclNameWithLoc> &vjpSpec,
-    TrailingWhereClause *&whereClause) {
+    bool &linear, TrailingWhereClause *&whereClause) {
   StringRef AttrName = "differentiable";
 
   // Set parse error, skip until ')' and parse it.
@@ -1043,6 +1044,15 @@ bool Parser::parseDifferentiableAttributeArguments(
     // function specifier. `consumeIfTrailingComma` will emit an error.
     if (consumeIfTrailingComma())
       return errorAndSkipToEnd();
+  }
+  
+  // Parse `linear` (optional)
+  if (Tok.is(tok::identifier) && Tok.getText() == "linear") {
+    linear = true;
+    if (consumeIfTrailingComma())
+      return errorAndSkipToEnd();
+  } else {
+    linear = false;
   }
 
   // If parser has not advanced and token is not 'where' or ')', emit error.
