@@ -2296,6 +2296,8 @@ SILType irgen::getSingletonAggregateFieldType(IRGenModule &IGM, SILType t,
         // struct's.
         if (fieldDecl->getEffectiveAccess() >= structDecl->getEffectiveAccess())
           return fieldTy;
+      } else {
+        return fieldTy;
       }
     }
 
@@ -2319,6 +2321,8 @@ SILType irgen::getSingletonAggregateFieldType(IRGenModule &IGM, SILType t,
         // enclosing struct's.
         if (eltDecl->getEffectiveAccess() >= enumDecl->getEffectiveAccess())
           return enumEltTy;
+      } else {
+        return enumEltTy;
       }
     }
 
