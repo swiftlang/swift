@@ -4541,8 +4541,11 @@ public:
       break;
     }
     case AdjointValueKind::Aggregate: {
-      llvm_unreachable("Unhandled. Are you trying to differentiate a "
-                       "memberwise initializer?");
+      // Note: All user-called initializations go through the calls to the
+      // initializer, and synthesized initializers only have one level of struct
+      // formation which will not result into any aggregate adjoint valeus.
+      llvm_unreachable("Aggregate adjoint values should not occur for `struct` "
+                       "instructions");
     }
     }
   }
