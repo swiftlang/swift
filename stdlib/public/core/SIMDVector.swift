@@ -873,14 +873,16 @@ extension SIMD where Scalar : FloatingPoint {
   }
   
   /// Returns the sum of the scalars in the vector.
-  @_alwaysEmitIntoClient
   // SWIFT_ENABLE_TENSORFLOW
-//  @differentiable(vjp: _vjpSum
-//    where Self : Differentiable,
-//          Self.TangentVector : SIMD,
-//          Scalar : BinaryFloatingPoint & Differentiable,
-//          Scalar.TangentVector : BinaryFloatingPoint,
-//          Self.TangentVector == Self)
+  @inlinable
+  // FIXME: TF-545 we want the sum() func to be marked as
+  // `@_alwaysEmitIntoClient` like before when we define the VJP
+  @differentiable(vjp: _vjpSum
+    where Self : Differentiable,
+          Self.TangentVector : SIMD,
+          Scalar : BinaryFloatingPoint & Differentiable,
+          Scalar.TangentVector : BinaryFloatingPoint,
+          Self.TangentVector == Self)
   public func sum() -> Scalar {
     // Implementation note: this eventually be defined to lower to either
     // llvm.experimental.vector.reduce.fadd or an explicit tree-sum. Open-
@@ -1650,17 +1652,17 @@ extension SIMD
   }
 }
 
-//extension SIMD
-//  where Self : Differentiable,
-//        TangentVector : SIMD,
-//        Scalar : BinaryFloatingPoint & Differentiable,
-//        Scalar.TangentVector : BinaryFloatingPoint,
-//        TangentVector == Self {
-//  @usableFromInline
-//  func _vjpSum() -> (Scalar, (Scalar.TangentVector) -> TangentVector) {
-//    return (sum(), { v in Self(repeating: Scalar(v)) })
-//  }
-//}
+extension SIMD
+  where Self : Differentiable,
+        TangentVector : SIMD,
+        Scalar : BinaryFloatingPoint & Differentiable,
+        Scalar.TangentVector : BinaryFloatingPoint,
+        TangentVector == Self {
+  @inlinable
+  func _vjpSum() -> (Scalar, (Scalar.TangentVector) -> TangentVector) {
+    return (sum(), { v in Self(repeating: Scalar(v)) })
+  }
+}
 
 extension SIMD
   where Self : Differentiable,

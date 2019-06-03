@@ -2628,7 +2628,8 @@ static FuncDecl *resolveAutoDiffAssociatedFunction(
   auto isABIPublic = [&](AbstractFunctionDecl *func) {
     return func->getFormalAccess() >= AccessLevel::Public ||
            func->getAttrs().hasAttribute<InlinableAttr>() ||
-           func->getAttrs().hasAttribute<UsableFromInlineAttr>();
+           func->getAttrs().hasAttribute<UsableFromInlineAttr>() ||
+           func->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>();
   };
 
   // If the original function is exported (i.e. it is public or

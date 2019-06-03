@@ -30,15 +30,15 @@ SIMDTests.test("Negate") {
   expectEqual(-a, bp1(a))
 }
 
-//SIMDTests.test("Sum") {
-//  let a = SIMD4<Float>(1, 2, 3, 4)
-//
-//  let foo1 = { (x: SIMD4<Float>) -> Float in
-//    return x.sum()
-//  }
-//  let bp1 = pullback(at: a, in: foo1)
-//  expectEqual(SIMD4<Float>(3, 3, 3, 3), bp1(3))
-//}
+SIMDTests.test("Sum") {
+  let a = SIMD4<Float>(1, 2, 3, 4)
+
+  let foo1 = { (x: SIMD4<Float>) -> Float in
+    return x.sum()
+  }
+  let bp1 = pullback(at: a, in: foo1)
+  expectEqual(SIMD4<Float>(3, 3, 3, 3), bp1(3))
+}
 
 SIMDTests.test("Addition") {
   let a = SIMD4<Float>(1, 2, 3, 4)
