@@ -887,6 +887,11 @@ def main_preset():
              "various values used to build in this configuration",
         action="store_true",
         default=False)
+    parser.add_argument(
+        "--reconfigure",
+        help="Reconfigure all projects as we build",
+        action="store_true",
+        default=False)
     args = parser.parse_args()
     if len(args.preset_file_names) == 0:
         args.preset_file_names = [
@@ -954,14 +959,17 @@ def main_preset():
         build_script_args += ["--cmake-c-launcher", args.cmake_c_launcher]
     if args.cmake_cxx_launcher:
         build_script_args += ["--cmake-cxx-launcher", args.cmake_cxx_launcher]
-
     printable_command = shell.quote_command(build_script_args)
     if args.expand_invocation:
         print(printable_command)
-    else:
-        diagnostics.note('using preset "{}", which expands to \n\n{}\n'.format(
-            args.preset, printable_command))
-        shell.call_without_sleeping(build_script_args)
+        return 0
+
+    if args.reconfigure:
+        build_script_args += ["--reconfigure"]
+
+    diagnostics.note('using preset "{}", which expands to \n\n{}\n'.format(
+        args.preset, printable_command))
+    shell.call_without_sleeping(build_script_args)
     return 0
 
 
