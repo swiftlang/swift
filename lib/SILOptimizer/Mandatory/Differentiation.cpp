@@ -1446,14 +1446,6 @@ public:
                        const SILAutoDiffIndices &indices) const;
   Activity getActivity(SILInstruction *inst,
                        const SILAutoDiffIndices &indices) const;
-
-
-  /// Collects all values (basic block arguments and instruction
-  /// operands/results) in the given basic block that are active for the given
-  /// indices into `activeValues`.
-  void collectAllActiveValues(SILBasicBlock *bb,
-                              const SILAutoDiffIndices &indices,
-                              SmallVectorImpl<SILValue> &activeValues) const;
 };
 
 class DifferentiableActivityCollection {
@@ -1781,30 +1773,6 @@ Activity DifferentiableActivityInfo::getActivity(
   for (auto result : inst->getResults())
     activity |= getActivity(result, indices);
   return activity;
-}
-
-void DifferentiableActivityInfo::collectAllActiveValues(
-    SILBasicBlock *bb, const SILAutoDiffIndices &indices,
-    SmallVectorImpl<SILValue> &activeValues) const {
-  SmallPtrSet<SILValue, 8> registered;
-  // Register a value as active if it has not yet been registered.
-  auto addActiveValue = [&](SILValue v) {
-    if (registered.count(v))
-      return;
-    registered.insert(v);
-    activeValues.push_back(v);
-  };
-  for (auto *arg : bb->getArguments())
-    if (isActive(arg, indices))
-      addActiveValue(arg);
-  for (auto &inst : *bb) {
-    for (auto op : inst.getOperandValues())
-      if (isActive(op, indices))
-        addActiveValue(op);
-    for (auto result : inst.getResults())
-      if (isActive(result, indices))
-        addActiveValue(result);
-  }
 }
 
 static void dumpActivityInfo(SILValue value,
@@ -3946,11 +3914,16 @@ private:
   DenseMap<std::pair<SILBasicBlock *, SILBasicBlock *>, SILBasicBlock *>
       adjointTrampolineBBMap;
 
+  /// Mapping from original basic blocks to dominated active values.
+  DenseMap<SILBasicBlock *, SmallVector<SILValue, 8>> activeValues;
+
+  /// Mapping from original basic blocks and original active values to
+  /// corresponding adjoint block arguments.
+  DenseMap<std::pair<SILBasicBlock *, SILValue>, SILArgument *>
+      activeValueAdjointBBArgumentMap;
+
   /// Stack buffers allocated for storing local adjoint adjoint values.
   SmallVector<ValueWithCleanup, 8> functionLocalAllocations;
-
-  /// Mapping from original basic blocks to active values.
-  DenseMap<SILBasicBlock *, SmallVector<SILValue, 8>> activeValues;
 
   /// The seed argument in the adjoint function.
   SILArgument *seed = nullptr;
@@ -4160,6 +4133,17 @@ private:
         accumulateAdjointsDirect(existingValue, newAdjointValue));
   }
 
+  /// Get the adjoint block argument corresponding to the given original block
+  /// and active value.
+  SILArgument *getActiveValueAdjointBlockArgument(SILBasicBlock *origBB,
+                                                  SILValue activeValue) {
+    assert(origBB->getParent() == &getOriginal());
+    auto adjointBBArg = activeValueAdjointBBArgumentMap[{origBB, activeValue}];
+    assert(adjointBBArg);
+    assert(adjointBBArg->getParent() == getAdjointBlock(origBB));
+    return adjointBBArg;
+  }
+
   //--------------------------------------------------------------------------//
   // Buffer mapping
   //--------------------------------------------------------------------------//
@@ -4343,8 +4327,8 @@ private:
                 ai->getArgumentsWithoutIndirectResults()[i], indices))
           return true;
     }
-    // Instructions that may write to memory and has an active operand should
-    // be differentiated.
+    // Instructions that may write to memory and that have an active operand
+    // should be differentiated.
     if (inst->mayWriteToMemory())
       for (auto &op : inst->getAllOperands())
         if (getActivityInfo().isActive(op.get(), indices))
@@ -4368,6 +4352,47 @@ public:
     Lowering::GenericContextScope genericContextScope(
         getContext().getTypeConverter(), adjGenSig);
 
+    // Get dominated active values in original blocks.
+    // Adjoint values of dominated active values are passed as adjoint block
+    // arguments.
+    auto *domAnalysis =
+        getContext().getPassManager().getAnalysis<DominanceAnalysis>();
+    auto *domInfo = domAnalysis->get(&original);
+    DominanceOrder domOrder(original.getEntryBlock(), domInfo);
+    while (auto *bb = domOrder.getNext()) {
+      auto &activeBBValues = activeValues[bb];
+      // If the current block has an immediate dominator, append the immediate
+      // dominator block's active values to the current block's active values.
+      auto *domNode = domInfo->getNode(bb)->getIDom();
+      if (domNode) {
+        auto &activeDomBBValues = activeValues[domNode->getBlock()];
+        activeBBValues.append(activeDomBBValues.begin(),
+                              activeDomBBValues.end());
+      }
+      SmallPtrSet<SILValue, 8> registered(activeBBValues.begin(),
+                                          activeBBValues.end());
+      // Register a value as active if it has not yet been registered.
+      auto addActiveValue = [&](SILValue v) {
+        if (registered.count(v))
+          return;
+        registered.insert(v);
+        activeBBValues.push_back(v);
+      };
+      // Register bb arguments and all instruction operands/results.
+      for (auto *arg : bb->getArguments())
+        if (getActivityInfo().isActive(arg, getIndices()))
+          addActiveValue(arg);
+      for (auto &inst : *bb) {
+        for (auto op : inst.getOperandValues())
+          if (getActivityInfo().isActive(op, getIndices()))
+            addActiveValue(op);
+        for (auto result : inst.getResults())
+          if (getActivityInfo().isActive(result, getIndices()))
+            addActiveValue(result);
+      }
+      domOrder.pushChildren(bb);
+    }
+
     // Create adjoint blocks and arguments, visiting original blocks in
     // post-order.
     for (auto *origBB : postOrderInfo->getPostOrder()) {
@@ -4385,8 +4410,6 @@ public:
       // Get all active values in the original block.
       // If the original block has no active values, continue.
       auto &activeBBValues = activeValues[origBB];
-      getActivityInfo().collectAllActiveValues(
-          origBB, getIndices(), activeBBValues);
       if (activeBBValues.empty())
         continue;
       // Otherwise, if the original block has active values:
@@ -4401,11 +4424,12 @@ public:
           // `getAdjointBuffer`.
           builder.setInsertionPoint(adjoint.getEntryBlock());
           getAdjointBuffer(origBB, activeValue);
-        }
-        else {
-          adjointBB->createPhiArgument(
+        } else {
+          // Create and register adjoint block argument for the active value.
+          auto *adjointArg = adjointBB->createPhiArgument(
               getRemappedTangentType(activeValue->getType()),
               ValueOwnershipKind::Guaranteed);
+          activeValueAdjointBBArgumentMap[{origBB, activeValue}] = adjointArg;
         }
       }
       // - Create adjoint trampoline blocks for each successor block of the
@@ -4556,12 +4580,11 @@ public:
         // active values.
         else {
           adjointSuccBB = adjointTrampolineBB;
-          adjointSuccBB = getAdjointTrampolineBlock(predBB, bb);
           assert(adjointSuccBB && adjointSuccBB->getNumArguments() == 1);
           SILBuilder adjointTrampolineBBBuilder(adjointSuccBB);
+          SmallVector<SILValue, 8> trampolineArguments;
           // Propagate pullback struct argument.
-          SmallVector<SILValue, 8> arguments;
-          arguments.push_back(adjointSuccBB->getArguments().front());
+          trampolineArguments.push_back(adjointSuccBB->getArguments().front());
           // Propagate adjoint values/buffers of active values/buffers.
           for (unsigned i : indices(activeValues[predBB])) {
             auto activeValue = activeValues[predBB][i];
@@ -4569,15 +4592,17 @@ public:
               auto activeValueAdj = getAdjointValue(bb, activeValue);
               auto concreteActiveValueAdj =
                   materializeAdjointDirect(activeValueAdj, adjLoc);
-              arguments.push_back(concreteActiveValueAdj);
+              trampolineArguments.push_back(concreteActiveValueAdj);
               // If the adjoint block does not yet have a registered adjoint
               // value for the active value, set the adjoint value to the
               // forwarded adjoint value argument.
-              // TODO: Revisit this logic. The `hasAdjointValue` check seems
-              // hacky and not robust.
+              // TODO: Hoist this logic out of loop over predecessor blocks to
+              // remove the `hasAdjointValue` check.
               if (!hasAdjointValue(predBB, activeValue)) {
-                auto forwardedArgAdj = makeConcreteAdjointValue(
-                    ValueWithCleanup(adjointBB->getArgument(1 + i)));
+                auto *adjointBBArg =
+                    getActiveValueAdjointBlockArgument(predBB, activeValue);
+                auto forwardedArgAdj =
+                    makeConcreteAdjointValue(ValueWithCleanup(adjointBBArg));
                 initializeAdjointValue(predBB, activeValue, forwardedArgAdj);
               }
             } else {
@@ -4588,7 +4613,9 @@ public:
                   adjLoc, adjBuf, succAdjBuf, IsNotTake, IsNotInitialization);
             }
           }
-          adjointTrampolineBBBuilder.createBranch(adjLoc, adjointBB, arguments);
+          // Branch from adjoint trampoline block to adjoint block.
+          adjointTrampolineBBBuilder.createBranch(
+              adjLoc, adjointBB, trampolineArguments);
         }
         auto *enumEltDecl =
             getPullbackInfo().lookUpPredecessorEnumElement(predBB, bb);
@@ -5115,37 +5142,6 @@ public:
     }
   }
 
-  // Handle `alloc_stack` instruction.
-  //   Original: y = alloc_stack $T
-  //    Adjoint: dealloc_stack adj[y]
-  void visitAllocStackInst(AllocStackInst *asi) {
-    auto *bb = asi->SILInstruction::getParentBlock();
-    auto adjBuf = getAdjointBuffer(bb, asi);
-    if (errorOccurred)
-      return;
-    if (auto *cleanup = adjBuf.getCleanup())
-      cleanup->applyRecursively(builder, asi->getLoc());
-    builder.createDeallocStack(asi->getLoc(), adjBuf);
-  }
-
-  // Handle `dealloc_stack` instruction.
-  //   Original: dealloc_stack y
-  //    Adjoint: adj[y] = alloc_stack $T.TangentVector
-  void visitDeallocStackInst(DeallocStackInst *dsi) {
-    auto *bb = dsi->SILInstruction::getParentBlock();
-    auto bufType = getRemappedTangentType(dsi->getOperand()->getType());
-    auto *adjBuf = builder.createAllocStack(dsi->getLoc(), bufType);
-    auto *access = builder.createBeginAccess(dsi->getLoc(), adjBuf,
-                                             SILAccessKind::Init,
-                                             SILAccessEnforcement::Static,
-                                             /*noNestedConflict*/ true,
-                                             /*fromBuiltin*/ false);
-    emitZeroIndirect(bufType.getASTType(), access, dsi->getLoc());
-    builder.createEndAccess(dsi->getLoc(), access, /*aborted*/ false);
-    setAdjointBuffer(bb, dsi->getOperand(),
-        ValueWithCleanup(adjBuf, makeCleanup(adjBuf, emitCleanup)));
-  }
-
   // Handle `load` instruction.
   //   Original: y = load x
   //    Adjoint: adj[x] += adj[y]
@@ -5332,6 +5328,10 @@ public:
   NO_ADJOINT(Return)
   NO_ADJOINT(Branch)
   NO_ADJOINT(CondBranch)
+
+  // Stack allocation/deallocation.
+  NO_ADJOINT(AllocStack)
+  NO_ADJOINT(DeallocStack)
 
   // Debugging/reference counting instructions.
   NO_ADJOINT(DebugValue)
