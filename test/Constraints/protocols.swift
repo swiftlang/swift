@@ -377,3 +377,27 @@ func testClonableExistential(_ v: Clonable, _ vv: Clonable.Type) {
   let _ = v.veryBadClonerFn() // expected-error {{member 'veryBadClonerFn' cannot be used on value of protocol type 'Clonable'; use a generic constraint instead}}
 
 }
+
+
+// rdar://problem/50099849
+
+protocol Trivial {
+  associatedtype T
+}
+
+func rdar_50099849() {
+  struct A : Trivial {
+    typealias T = A
+  }
+
+  struct B<C : Trivial> : Trivial { // expected-note {{'C' declared as parameter to type 'B'}}
+    typealias T = C.T
+  }
+
+  struct C<W: Trivial, Z: Trivial> : Trivial where W.T == Z.T {
+    typealias T = W.T
+  }
+
+  let _ = C<A, B>() // expected-error {{generic parameter 'C' could not be inferred}}
+  // expected-note@-1 {{explicitly specify the generic arguments to fix this issue}} {{17-17=<<#C: Trivial#>>}}
+}
