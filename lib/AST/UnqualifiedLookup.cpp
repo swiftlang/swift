@@ -1324,9 +1324,10 @@ bool UnqualifiedLookupFactory::verifyEqualTo(
   }
   if (recordedSF != other.recordedSF) {
     writeErr( std::string("recordedSF differs: shouldBe: ")
-             + recordedSF->getFilename().str()
+             + (recordedSF ? recordedSF->getFilename().str() : std::string("<no name>"))
              + std::string( " is: ")
-             + other.recordedSF->getFilename().str());
+             + (other.recordedSF ? other.recordedSF->getFilename().str() : std::string("<no name>"))
+             );
     assert(false && "ASTScopeImpl recordedSF differs");
   }
   if (recordedSF && recordedIsCascadingUse != other.recordedIsCascadingUse) {
