@@ -1,12 +1,8 @@
 // RUN: %empty-directory(%t)
 //
 // RUN: %gyb %s -o %t/main.swift
-// RUN: if [ %target-runtime == "objc" ]; then \
-// RUN:   %target-clang -fobjc-arc %S/Inputs/SlurpFastEnumeration/SlurpFastEnumeration.m -c -o %t/SlurpFastEnumeration.o; \
-// RUN:   %line-directive %t/main.swift -- %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %S/Inputs/DictionaryKeyValueTypesObjC.swift %t/main.swift -I %S/Inputs/SlurpFastEnumeration/ -Xlinker %t/SlurpFastEnumeration.o -o %t/Dictionary -Xfrontend -disable-access-control; \
-// RUN: else \
-// RUN:   %line-directive %t/main.swift -- %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %t/main.swift -o %t/Dictionary -Xfrontend -disable-access-control; \
-// RUN: fi
+// RUN: %target-clang -fobjc-arc %S/Inputs/SlurpFastEnumeration/SlurpFastEnumeration.m -c -o %t/SlurpFastEnumeration.o
+// RUN: %line-directive %t/main.swift -- %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %S/Inputs/DictionaryKeyValueTypesObjC.swift %t/main.swift -I %S/Inputs/SlurpFastEnumeration/ -Xlinker %t/SlurpFastEnumeration.o -o %t/Dictionary -Xfrontend -disable-access-control
 //
 // RUN: %target-codesign %t/Dictionary && %line-directive %t/main.swift -- %target-run %t/Dictionary
 // REQUIRES: executable_test
