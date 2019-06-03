@@ -1221,7 +1221,7 @@ extension SIMD where Scalar: FloatingPoint {
   
   @_transparent
   // SWIFT_ENABLE_TENSORFLOW
-  @differentiable(vjp: _vjpAdd(lhs:rhs:)
+  @differentiable(vjp: _vjpSubtract(lhs:rhs:)
     where Self : Differentiable,
           Self.TangentVector : SIMD,
           Scalar : Differentiable & BinaryFloatingPoint,
@@ -1269,7 +1269,7 @@ extension SIMD where Scalar: FloatingPoint {
   
   @_transparent
   // SWIFT_ENABLE_TENSORFLOW
-  @differentiable(vjp: _vjpAdd(lhs:rhs:)
+  @differentiable(vjp: _vjpSubtract(lhs:rhs:)
     where Self : Differentiable,
           Self.TangentVector : SIMD,
           Scalar : Differentiable & BinaryFloatingPoint,
@@ -1303,16 +1303,6 @@ extension SIMD where Scalar: FloatingPoint {
     return lhs / Self(repeating: rhs)
   }
   
-//  @_transparent
-//  public static func +=(lhs: inout Self, rhs: Self) {
-//    lhs = lhs + rhs
-//  }
-
-//  @_transparent
-//  public static func -=(lhs: inout Self, rhs: Self) {
-//    lhs = lhs - rhs
-//  }
-  
   @_transparent
   public static func *=(lhs: inout Self, rhs: Self) {
     lhs = lhs * rhs
@@ -1323,11 +1313,6 @@ extension SIMD where Scalar: FloatingPoint {
     lhs = lhs / rhs
   }
   
-//  @_transparent
-//  public static func *=(lhs: inout Self, rhs: Scalar) {
-//    lhs = lhs * rhs
-//  }
-  
   @_transparent
   public static func +=(lhs: inout Self, rhs: Scalar) {
     lhs = lhs + rhs
@@ -1336,6 +1321,11 @@ extension SIMD where Scalar: FloatingPoint {
   @_transparent
   public static func -=(lhs: inout Self, rhs: Scalar) {
     lhs = lhs - rhs
+  }
+
+  @_transparent
+  public static func *=(lhs: inout Self, rhs: Scalar) {
+    lhs = lhs * rhs
   }
   
   @_transparent
