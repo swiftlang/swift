@@ -260,29 +260,7 @@ public:
     });
   }
 
-  void
-  createScopesForPatternBindingInATypeDecl(PatternBindingDecl *patternBinding,
-                                           ASTScopeImpl *parent) {
-    createSiblingPatternScopes(patternBinding, parent);
-  }
-
-  void
-  createScopesForPatternBindingInAFunction(PatternBindingDecl *patternBinding,
-                                           ASTScopeImpl *parent) {
-    createNestedPatternScopes(patternBinding, parent);
-  }
-
 public:
-  void createSiblingPatternScopes(PatternBindingDecl *patternBinding,
-                                  ASTScopeImpl *parent) {
-    for (auto entryIndex : range(patternBinding->getNumPatternEntries())) {
-      auto *const pattern = patternBinding->getPattern(entryIndex);
-      if (!isDuplicate(pattern)  && !pattern->isImplicit()) {
-        withoutDeferrals().createSubtree<PatternEntryDeclScope>(
-            parent, patternBinding, entryIndex);
-      }
-    }
-  }
 
   void createNestedPatternScopes(PatternBindingDecl *patternBinding,
                                  ASTScopeImpl *parent) {
@@ -599,10 +577,7 @@ public:
     const bool isInTypeDecl =
         p->getDecl() && (isa<NominalTypeDecl>(p->getDecl().get()) ||
                               isa<ExtensionDecl>(p->getDecl().get()));
-    if (isInTypeDecl)
-      scopeCreator.createScopesForPatternBindingInATypeDecl(patternBinding, p);
-    else
-      scopeCreator.createScopesForPatternBindingInAFunction(patternBinding, p);
+      scopeCreator.createNestedPatternScopes(patternBinding, p);
   }
 
   void visitReturnStmt(ReturnStmt *rs, ASTScopeImpl *p,
@@ -728,13 +703,9 @@ void PatternEntryDeclScope::expandMe(ScopeCreator &scopeCreator) {
                                 this, decl, patternEntryIndex);
     initializerEnd = initializer->getSourceRange().End;
   }
-  // If there are no uses of the declararations, add the accessors immediately.
-  if (!scopeCreator.haveDeferredNodes())
-    addVarDeclScopesAndTheirAccessors(this, scopeCreator);
-  else
-    // Note: the accessors will follow the pattern binding.
-    scopeCreator.createSubtree<PatternEntryUseScope>(
-        this, decl, patternEntryIndex, initializerEnd);
+  // Note: the accessors will follow the pattern binding.
+  scopeCreator.createSubtree<PatternEntryUseScope>(
+    this, decl, patternEntryIndex, initializerEnd);
 }
 
 void PatternEntryInitializerScope::expandMe(ScopeCreator &scopeCreator) {
