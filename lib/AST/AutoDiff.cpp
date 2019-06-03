@@ -38,6 +38,7 @@ AutoDiffAssociatedFunctionKind(StringRef string) {
 AutoDiffIndexSubset *
 autodiff::getLoweredParameterIndices(AutoDiffIndexSubset *indices,
                                      AnyFunctionType *type) {
+  type = type->getCanonicalType()->castTo<AnyFunctionType>();
   assert(!type->isDifferentiable());
   unsigned capacity = 0;
   SmallVector<unsigned, 8> loweredIndices;
@@ -79,6 +80,7 @@ autodiff::getLoweredParameterIndices(AutoDiffIndexSubset *indices,
 void autodiff::getSubsetParameterTypes(AutoDiffIndexSubset *indices,
                                        AnyFunctionType *type,
                                        SmallVectorImpl<Type> &result) {
+  type = type->getCanonicalType()->castTo<AnyFunctionType>();
   auto params = type->getParams();
   auto methodType = type->getResult()->getAs<AnyFunctionType>();
   if (type->getExtInfo().hasSelfParam() || methodType) {

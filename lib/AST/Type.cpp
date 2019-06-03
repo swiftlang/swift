@@ -4463,8 +4463,8 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
     auto resultFnType = getResult()->castTo<AnyFunctionType>();
     autodiff::getSubsetParameterTypes(indices, resultFnType, wrtParamTypes);
     assert(getNumParams() == 1); // The self parameter.
-    autodiff::getSubsetParameterTypes(AutoDiffIndexSubset::get(ctx, 1, {1}),
-                                      this, wrtParamTypes);
+    if (indices->contains(indices->getCapacity() - 1))
+      wrtParamTypes.push_back(getParams().front().getPlainType());
   }
 
   // Unwrap curry levels. At most, two parameter lists are necessary, for

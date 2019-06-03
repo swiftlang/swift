@@ -162,6 +162,7 @@ TEST(AutoDiffIndexSubset, Insertion) {
 TEST(AutoDiffIndexSubset, Lowering) {
   TestContext testCtx;
   auto &C = testCtx.Ctx;
+  // ((T, T)) -> ()
   EXPECT_EQ(
       autodiff::getLoweredParameterIndices(
           AutoDiffIndexSubset::get(C, 1, {0}),
@@ -170,6 +171,7 @@ TEST(AutoDiffIndexSubset, Lowering) {
                   TupleType::get({C.TheAnyType, C.TheAnyType}, C))},
               C.TheEmptyTupleType)),
       AutoDiffIndexSubset::get(C, 2, {0, 1}));
+  // ((), (T, T)) -> ()
   EXPECT_EQ(
       autodiff::getLoweredParameterIndices(
           AutoDiffIndexSubset::get(C, 2, {1}),
@@ -179,6 +181,7 @@ TEST(AutoDiffIndexSubset, Lowering) {
                   TupleType::get({C.TheAnyType, C.TheAnyType}, C))},
                                  C.TheEmptyTupleType)),
       AutoDiffIndexSubset::get(C, 2, {0, 1}));
+  // (T, (T, T)) -> ()
   EXPECT_EQ(
     autodiff::getLoweredParameterIndices(
       AutoDiffIndexSubset::get(C, 2, {1}),
@@ -188,6 +191,7 @@ TEST(AutoDiffIndexSubset, Lowering) {
             TupleType::get({C.TheAnyType, C.TheAnyType}, C))},
         C.TheEmptyTupleType)),
     AutoDiffIndexSubset::get(C, 3, {1, 2}));
+  // (T, (T, T)) -> ()
   EXPECT_EQ(
     autodiff::getLoweredParameterIndices(
       AutoDiffIndexSubset::get(C, 2, {0, 1}),
@@ -197,13 +201,15 @@ TEST(AutoDiffIndexSubset, Lowering) {
             TupleType::get({C.TheAnyType, C.TheAnyType}, C))},
         C.TheEmptyTupleType)),
     AutoDiffIndexSubset::get(C, 3, {0, 1, 2}));
+  // (T, ((T, T)), (T, T), T) -> ()
   EXPECT_EQ(
     autodiff::getLoweredParameterIndices(
       AutoDiffIndexSubset::get(C, 4, {0, 1, 3}),
       FunctionType::get({
           FunctionType::Param(C.TheAnyType),
           FunctionType::Param(
-            TupleType::get({C.TheAnyType, C.TheAnyType}, C)),
+              TupleType::get({
+                  TupleType::get({C.TheAnyType, C.TheAnyType}, C)}, C)),
           FunctionType::Param(
             TupleType::get({C.TheAnyType, C.TheAnyType}, C)),
           FunctionType::Param(C.TheAnyType)},
@@ -225,4 +231,39 @@ TEST(AutoDiffIndexSubset, Lowering) {
                   FunctionType::ExtInfo().withSILRepresentation(
                   SILFunctionTypeRepresentation::Method)))),
     AutoDiffIndexSubset::get(C, 6, {0, 1, 4, 5}));
+}
+
+TEST(AutoDiffIndexSubset, GetSubsetParameterTypes) {
+  TestContext testCtx;
+  auto &C = testCtx.Ctx;
+  // (T, T) -> ()
+  {
+    SmallVector<Type, 8> subset;
+    autodiff::getSubsetParameterTypes(
+        AutoDiffIndexSubset::get(C, 1, {0}),
+        FunctionType::get(
+            {FunctionType::Param(C.TheAnyType),
+             FunctionType::Param(C.TheAnyType)},
+            C.TheEmptyTupleType),
+        subset);
+    Type expected[] = {C.TheAnyType};
+    EXPECT_TRUE(std::equal(subset.begin(), subset.end(), expected,
+                    [](Type ty1, Type ty2) { return ty1->isEqual(ty2); }));
+  }
+  // (T) -> (T, T) -> ()
+  {
+    SmallVector<Type, 8> subset;
+    autodiff::getSubsetParameterTypes(
+        AutoDiffIndexSubset::get(C, 3, {0, 1, 2}),
+        FunctionType::get(
+            {FunctionType::Param(C.TheIEEE16Type)},
+            FunctionType::get(
+                {FunctionType::Param(C.TheAnyType),
+                 FunctionType::Param(C.TheAnyType)},
+                C.TheEmptyTupleType)),
+        subset);
+    Type expected[] = {C.TheIEEE16Type, C.TheAnyType, C.TheAnyType};
+    EXPECT_TRUE(std::equal(subset.begin(), subset.end(), expected,
+                    [](Type ty1, Type ty2) { return ty1->isEqual(ty2); }));
+  }
 }
