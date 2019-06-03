@@ -1330,13 +1330,18 @@ bool UnqualifiedLookupFactory::verifyEqualTo(
              );
     assert(false && "ASTScopeImpl recordedSF differs");
   }
-  if (recordedSF && recordedIsCascadingUse != other.recordedIsCascadingUse) {
-    writeErr( std::string("recordedIsCascadingUse differs: shouldBe: ")
-             + std::to_string(recordedIsCascadingUse)
-             + std::string( " is: ")
-             + std::to_string(other.recordedIsCascadingUse));
-    assert(false && "ASTScopeImpl recordedIsCascadingUse differs");
+  static bool hasWarned = false;
+  if (!hasWarned) {
+    hasWarned = true;
+    llvm::errs() << "WARNING: not checking deps HERE\n";
   }
+//  if (recordedSF && recordedIsCascadingUse != other.recordedIsCascadingUse) {
+//    writeErr( std::string("recordedIsCascadingUse differs: shouldBe: ")
+//             + std::to_string(recordedIsCascadingUse)
+//             + std::string( " is: ")
+//             + std::to_string(other.recordedIsCascadingUse));
+//    assert(false && "ASTScopeImpl recordedIsCascadingUse differs");
+//  }
   return true;
 }
 
@@ -1400,6 +1405,6 @@ void UnqualifiedLookupFactory::addedResult(const LookupResultEntry &e) const {
 unsigned UnqualifiedLookupFactory::lookupCounter = 0;
 
 // set to ~0 when not debugging
-const unsigned UnqualifiedLookupFactory::targetLookup = ~0;
+const unsigned UnqualifiedLookupFactory::targetLookup = 3;
 
 #endif // NDEBUG
