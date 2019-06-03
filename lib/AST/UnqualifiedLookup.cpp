@@ -460,7 +460,7 @@ UnqualifiedLookupFactory::UnqualifiedLookupFactory(
 // clang-format on
 
 void UnqualifiedLookupFactory::performUnqualifiedLookup() {
-#ifdef NDEBUG
+#ifndef NDEBUG
   ++lookupCounter;
   stopForDebuggingIfStartingTargetLookup(false);
 #endif
@@ -546,7 +546,7 @@ void UnqualifiedLookupFactory::lookupOperatorInDeclContexts(
 // TODO: Unify with LookupVisibleDecls.cpp::lookupVisibleDeclsImpl
 void UnqualifiedLookupFactory::lookupNamesIntroducedBy(
     const ContextAndUnresolvedIsCascadingUse contextAndIsCascadingUseArg) {
-#ifdef NDEBUG
+#ifndef NDEBUG
   stopForDebuggingIfDuringTargetLookup(false);
 #endif
   DeclContext *const dc = contextAndIsCascadingUseArg.whereToLook;
@@ -773,7 +773,7 @@ void UnqualifiedLookupFactory::finishLookingInContext(
        DeclContext *const lookupContextForThisContext,
        Optional<ResultFinderForTypeContext> &&resultFinderForTypeContext,
        const Optional<bool> isCascadingUse) {
-#ifdef NDEBUG
+#ifndef NDEBUG
   stopForDebuggingIfDuringTargetLookup(false);
 #endif
   // When a generic has the same name as a member, Swift prioritizes the generic
@@ -1107,7 +1107,7 @@ void UnqualifiedLookupFactory::experimentallyLookInASTScopes(
 
   ASTScopeDeclConsumerForUnqualifiedLookup consumer(*this);
 
-#ifdef NDEBUG
+#ifndef NDEBUG
   stopForDebuggingIfStartingTargetLookup(true);
 #endif
 
@@ -1133,7 +1133,7 @@ bool ASTScopeDeclConsumerForUnqualifiedLookup::consume(
       continue;
     if (value->getFullName().matchesRef(factory.Name)) {
       factory.Results.push_back(LookupResultEntry(value));
-#ifdef NDEBUG
+#ifndef NDEBUG
       factory.stopForDebuggingIfAddingTargetLookupResult(factory.Results.back());
 #endif
     }
