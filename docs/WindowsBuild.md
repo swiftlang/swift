@@ -40,7 +40,7 @@ git clone https://github.com/apple/swift-cmark cmark
 git clone https://github.com/apple/swift-clang clang
 git clone https://github.com/apple/swift-llvm llvm
 git clone https://github.com/apple/swift-compiler-rt compiler-rt
-git clone -c core.autocrlf=input https://github.com/apple/swift
+git clone -c core.autocrlf=input -c core.symlinks=true https://github.com/apple/swift
 git clone https://github.com/apple/swift-corelibs-libdispatch
 git clone https://github.com/apple/swift-corelibs-foundation
 git clone https://github.com/apple/swift-corelibs-xctest
