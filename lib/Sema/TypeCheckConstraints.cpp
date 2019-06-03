@@ -3323,6 +3323,11 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc,
   // TODO: need to add kind arg?
   // Construct a constraint system from this expression.
   ConstraintSystem cs(*this, dc, ConstraintSystemFlags::AllowFixes);
+    
+  // Cache the expression type on the system to ensure it is available
+  // on diagnostics if the convertion fails.
+  cs.cacheExprTypes(expr);
+
   // If there is a type that we're expected to convert to, add the conversion
   // constraint.
   cs.addConstraint(ConstraintKind::Conversion, expr->getType(), type,

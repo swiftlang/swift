@@ -3708,9 +3708,8 @@ namespace {
 
         cs.setExprTypes(sub);
 
-        sub = coerceToType(sub, toType, cs.getConstraintLocator(sub));
-
-        if (!sub) return nullptr;
+        if (tc.convertToType(sub, toType, cs.DC))
+          return nullptr;
           
         cs.cacheExprTypes(sub);
 
