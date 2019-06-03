@@ -4457,13 +4457,22 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
   auto &ctx = getASTContext();
 
   SmallVector<Type, 8> wrtParamTypes;
-  if (makeSelfParamFirst || !getResult()->is<AnyFunctionType>()) {
+  auto *resultFnType = getResult()->getAs<AnyFunctionType>();
+  if (makeSelfParamFirst || !resultFnType) {
     autodiff::getSubsetParameterTypes(indices, this, wrtParamTypes);
   } else {
-    auto resultFnType = getResult()->castTo<AnyFunctionType>();
-    autodiff::getSubsetParameterTypes(indices, resultFnType, wrtParamTypes);
+    assert(resultFnType);
     assert(getNumParams() == 1); // The self parameter.
-    if (indices->contains(indices->getCapacity() - 1))
+    bool hasSelf = false;
+    auto nonSelfIndices = indices->getIndices();
+    if (indices->contains(0)) {
+      nonSelfIndices = llvm::drop_begin(nonSelfIndices, 1);
+      hasSelf = true;
+    }
+    for (auto i : indices->getIndices())
+      wrtParamTypes.push_back(
+          resultFnType->getParams()[i - 1].getPlainType());
+    if (hasSelf)
       wrtParamTypes.push_back(getParams().front().getPlainType());
   }
 

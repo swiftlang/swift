@@ -46,33 +46,35 @@ autodiff::getLoweredParameterIndices(AutoDiffIndexSubset *indices,
   auto params = type->getParams();
   auto methodType = type->getResult()->getAs<AnyFunctionType>();
   bool hasSelf = false;
+  unsigned methodParamOffset = 0;
   if (type->getExtInfo().hasSelfParam() || methodType) {
     assert(methodType);
-    if (indices->contains(indices->getCapacity() - 1))
+    if (indices->contains(0))
       hasSelf = true;
     capacity++;
     params = methodType->getParams();
+    methodParamOffset = 1;
   }
-  unsigned currentIndex = 0;
+  unsigned paramIndex = 0;
   for (auto i : swift::indices(params)) {
     auto &param = params[i];
     auto paramType = param.getPlainType()->getCanonicalType();
     if (auto tupleType = paramType->getAs<TupleType>()) {
-      auto endIndex = currentIndex + tupleType->getNumElements();
-      IntRange<> range(currentIndex, endIndex);
-      if (indices->contains(i))
+      auto endIndex = paramIndex + tupleType->getNumElements();
+      IntRange<> range(paramIndex, endIndex);
+      if (indices->contains(i + methodParamOffset))
         loweredIndices.append(range.begin(), range.end());
-      currentIndex = endIndex;
+      paramIndex = endIndex;
       capacity += range.size();
     } else {
-      if (indices->contains(i))
-        loweredIndices.push_back(currentIndex);
-      currentIndex++;
+      if (indices->contains(i + methodParamOffset))
+        loweredIndices.push_back(paramIndex);
+      paramIndex++;
       capacity++;
     }
   }
   if (hasSelf)
-    loweredIndices.push_back(capacity - 1);
+    loweredIndices.push_back(0);
   return AutoDiffIndexSubset::get(
       type->getASTContext(), capacity, loweredIndices);
 }
@@ -85,12 +87,12 @@ void autodiff::getSubsetParameterTypes(AutoDiffIndexSubset *indices,
   auto methodType = type->getResult()->getAs<AnyFunctionType>();
   if (type->getExtInfo().hasSelfParam() || methodType) {
     assert(methodType);
-    if (indices->contains(indices->getCapacity() - 1))
+    if (indices->contains(0))
       result.push_back(type->getParams().front().getPlainType());
     params = methodType->getParams();
   }
   for (auto i : swift::indices(params))
-    if (indices->contains(i))
+    if (indices->contains(i + 1))
       result.push_back(params[i].getPlainType());
 }
 
@@ -203,11 +205,8 @@ AutoDiffParameterIndicesBuilder::inferParameters(AnyFunctionType *functionType,
   AutoDiffParameterIndicesBuilder builder(functionType);
   SmallVector<Type, 4> allParamTypes;
 
-  // Returns true if the i-th parameter type is differentiable.
-  auto isDifferentiableParam = [&](unsigned i) -> bool {
-    if (i >= allParamTypes.size())
-      return false;
-    auto paramType = allParamTypes[i];
+  // Returns true if the type is differentiable.
+  auto isDifferentiable = [&](Type paramType) -> bool {
     // Return false for class/existential types.
     if ((!paramType->hasTypeParameter() &&
          paramType->isAnyClassReferenceType()) ||
@@ -225,15 +224,19 @@ AutoDiffParameterIndicesBuilder::inferParameters(AnyFunctionType *functionType,
   // `functionType` comes from a static/instance method, and not a free function
   // returning a function type. In practice, this code path should not be
   // reachable for free functions returning a function type.
-  if (auto resultFnType = functionType->getResult()->getAs<AnyFunctionType>())
-    for (auto &param : resultFnType->getParams())
-      allParamTypes.push_back(param.getPlainType());
-  for (auto &param : functionType->getParams())
+  auto params = functionType->getParams();
+  auto resultFnType = functionType->getResult()->getAs<AnyFunctionType>();
+  if (functionType->getExtInfo().hasSelfParam() || resultFnType) {
+    assert(functionType->getNumParams() == 1);
+    allParamTypes.push_back(params.front().getPlainType());
+    params = resultFnType->getParams();
+  }
+  for (auto &param : params)
     allParamTypes.push_back(param.getPlainType());
 
   // Set differentiation parameters.
-  for (unsigned i : range(builder.parameters.size()))
-    if (isDifferentiableParam(i))
+  for (unsigned i : indices(allParamTypes))
+    if (isDifferentiable(allParamTypes[i]))
       builder.setParameter(i);
 
   return builder;

@@ -501,7 +501,7 @@ void getSubsetParameterTypes(AutoDiffIndexSubset *indices,
 /// - The function must not be curried unless it's a method. Otherwise, the
 ///   behavior is undefined.
 /// - For methods, whether the self parameter is set is represented by the
-///   inclusion of the `indices->getCapacity() - 1` index in `indices`.
+///   inclusion of the `0` index in `indices`.
 AutoDiffIndexSubset *getLoweredParameterIndices(AutoDiffIndexSubset *indices,
                                                 AnyFunctionType *type);
 

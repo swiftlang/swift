@@ -218,7 +218,7 @@ TEST(AutoDiffIndexSubset, Lowering) {
   // Method (T) -> ((T, T), (T, T), T) -> ()
   EXPECT_EQ(
     autodiff::getLoweredParameterIndices(
-      AutoDiffIndexSubset::get(C, 4, {0, 2, 3}),
+      AutoDiffIndexSubset::get(C, 4, {0, 1, 3}),
       FunctionType::get(
           {FunctionType::Param(C.TheAnyType)},
           FunctionType::get({

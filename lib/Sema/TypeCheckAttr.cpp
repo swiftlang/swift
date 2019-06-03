@@ -2733,6 +2733,7 @@ static AutoDiffIndexSubset *computeDifferentiationParameters(
       ->castTo<AnyFunctionType>();
   auto &params = *function->getParameters();
   auto isInstanceMethod = function->isInstanceMember();
+  auto isMethod = function->getImplicitSelfDecl() != nullptr;
 
   // Diagnose if function has no parameters.
   if (params.size() == 0) {
@@ -2775,6 +2776,7 @@ static AutoDiffIndexSubset *computeDifferentiationParameters(
   // Otherwise, build parameter indices from parsed differentiation parameters.
   AutoDiffParameterIndicesBuilder builder(functionType);
   int lastIndex = -1;
+  unsigned methodParamOffset = isMethod ? 1 : 0;
   for (unsigned i : indices(parsedWrtParams)) {
     auto paramLoc = parsedWrtParams[i].getLoc();
     switch (parsedWrtParams[i].getKind()) {
@@ -2790,7 +2792,8 @@ static AutoDiffIndexSubset *computeDifferentiationParameters(
           return nullptr;
         }
         // Parameter names must be specified in the original order.
-        unsigned index = std::distance(params.begin(), nameIter);
+        unsigned index =
+            std::distance(params.begin(), nameIter) + methodParamOffset;
         if ((int)index <= lastIndex) {
           TC.diagnose(paramLoc,
                       diag::diff_params_clause_params_not_original_order);
@@ -2812,7 +2815,7 @@ static AutoDiffIndexSubset *computeDifferentiationParameters(
           TC.diagnose(paramLoc, diag::diff_params_clause_self_must_be_first);
           return nullptr;
         }
-        builder.setParameter(builder.size() - 1);
+        builder.setParameter(0);
         break;
       }
     }
