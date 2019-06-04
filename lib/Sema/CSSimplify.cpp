@@ -5827,7 +5827,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(
     auto &ctx = getASTContext();
     // Get all call methods of the nominal type.
     SmallVector<FuncDecl *, 4> callMethods;
-    auto candidates = lookupMember(desugar2, DeclName(ctx.Id_call));
+    auto candidates = lookupMember(desugar2, DeclName(ctx.Id_callAsFunction));
     for (auto entry : candidates) {
       auto callMethod = dyn_cast<FuncDecl>(entry.getValueDecl());
       if (!callMethod)
