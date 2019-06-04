@@ -874,7 +874,7 @@ PropertyListEncoderTests.test("testEncodingTopLevelDeepStructuredType") { TestPr
 PropertyListEncoderTests.test("testEncodingClassWhichSharesEncoderWithSuper") { TestPropertyListEncoder().testEncodingClassWhichSharesEncoderWithSuper() }
 PropertyListEncoderTests.test("testEncodingTopLevelNullableType") { TestPropertyListEncoder().testEncodingTopLevelNullableType() }
 PropertyListEncoderTests.test("testEncodingMultipleNestedContainersWithTheSameTopLevelKey") {
-  if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+  if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
     TestPropertyListEncoder().testEncodingMultipleNestedContainersWithTheSameTopLevelKey()
   }
 }

@@ -8,7 +8,7 @@ let suite = TestSuite("Diffing")
 
 // This availability test has to be this awkward because of
 // rdar://problem/48450376 - Availability checks don't apply to top-level code
-if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
+if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
 
   suite.test("Diffing empty collections") {
     let a = [Int]()

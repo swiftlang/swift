@@ -123,7 +123,7 @@ print("target removed")
 
 // The following tests are only expected to pass when running with the
 // Swift 5.1 and later libraries.
-if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
+if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
   print("-check-prefix=CHECK-51")
 } else {
   print("-check-prefix=DONT-CHECK")
