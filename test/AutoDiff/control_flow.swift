@@ -56,6 +56,31 @@ ControlFlowTests.test("Conditionals") {
   expectEqual((5, 4), gradient(at: 4, 5, in: cond3))
   expectEqual((-1, 1), gradient(at: -3, -2, in: cond3))
 
+  func cond_tuple(_ x: Float) -> Float {
+    let y: (Float, Float) = (x, x)
+    return y.0 + y.1
+  }
+  expectEqual(8, gradient(at: 4, in: cond2))
+  expectEqual(2, gradient(at: -10, in: cond2))
+  expectEqual(0, gradient(at: -1337, in: cond2))
+
+  func cond_tuple_var(_ x: Float) -> Float {
+    var y: (Float, Float) = (x, x)
+    var z: (Float, Float) = (x + x, x - x)
+    if x > 0 {
+      y.0 = x
+      y.1 = x
+      z.0 = z.0 - y.0
+      z.1 = z.1 + y.0
+    } else {
+      z = (x, x)
+    }
+    return y.0 + y.1 - z.0 + z.1
+  }
+  expectEqual(8, gradient(at: 4, in: cond2_var))
+  expectEqual(2, gradient(at: -10, in: cond2_var))
+  expectEqual(0, gradient(at: -1337, in: cond2_var))
+
   func guard1(_ x: Float, _ y: Float) -> Float {
     guard x > 0 else {
       return x * x
@@ -85,7 +110,7 @@ ControlFlowTests.test("Conditionals") {
     var z = y
     guard x > 0 else {
       if y > 0 {
-        z = z * y
+        z = z * x
       } else if x == -1337 {
         z = x
         z = z * z

@@ -3972,9 +3972,8 @@ private:
       auto adjBase = getAdjointBuffer(origBB, bai->getOperand());
       if (errorOccurred)
         return (bufferMap[{origBB, originalProjection}] = ValueWithCleanup());
-      return builder.createBeginAccess(
-          bai->getLoc(), adjBase, bai->getAccessKind(), bai->getEnforcement(),
-          /*noNestedConflict*/ false, /*fromBuiltin*/ false);
+      // Return the base buffer's adjoint buffer.
+      return adjBase;
     }
     return SILValue();
   }
@@ -4362,7 +4361,8 @@ public:
           SmallVector<SILValue, 8> trampolineArguments;
           // Propagate pullback struct argument.
           trampolineArguments.push_back(adjointSuccBB->getArguments().front());
-          // Propagate adjoint values/buffers of active values/buffers.
+          // Propagate adjoint values/buffers of active values/buffers to
+          // predecessor blocks.
           auto &predBBActiveValues = activeValues[predBB];
           for (auto activeValue : predBBActiveValues) {
             if (activeValue->getType().isObject()) {
@@ -4378,6 +4378,7 @@ public:
               if (!hasAdjointValue(predBB, activeValue)) {
                 auto *adjointBBArg =
                     getActiveValueAdjointBlockArgument(predBB, activeValue);
+                // FIXME: Propagate cleanups to fix memory leaks.
                 auto forwardedArgAdj =
                     makeConcreteAdjointValue(ValueWithCleanup(adjointBBArg));
                 initializeAdjointValue(predBB, activeValue, forwardedArgAdj);
@@ -4386,6 +4387,9 @@ public:
               // Propagate adjoint buffers using `copy_addr`.
               auto adjBuf = getAdjointBuffer(bb, activeValue);
               auto succAdjBuf = getAdjointBuffer(predBB, activeValue);
+              // FIXME: Propagate cleanups to fix memory leaks.
+              succAdjBuf.setCleanup(makeCleanupFromChildren(
+                  {adjBuf.getCleanup(), succAdjBuf.getCleanup()}));
               builder.createCopyAddr(
                   adjLoc, adjBuf, succAdjBuf, IsNotTake, IsNotInitialization);
             }
@@ -4997,7 +5001,7 @@ public:
 
   // Handle `begin_access` instruction.
   //   Original: y = begin_access x
-  //    Adjoint: end_access adj[y]
+  //    Adjoint: nothing
   void visitBeginAccessInst(BeginAccessInst *bai) {
     // Check for non-differentiable writes.
     if (bai->getAccessKind() == SILAccessKind::Modify) {
@@ -5019,32 +5023,6 @@ public:
     auto &sourceBuf = getAdjointBuffer(bb, bai->getSource());
     sourceBuf.setCleanup(makeCleanupFromChildren({sourceBuf.getCleanup(),
                                                   accessBuf.getCleanup()}));
-    if (errorOccurred)
-      return;
-    builder.createEndAccess(bai->getLoc(), accessBuf, /*aborted*/ false);
-  }
-
-  // Handle `end_access` instruction.
-  //   Original: end_access y, where y = begin_access x
-  //    Adjoint: adj[y] = begin_access inverse(access_kind) adj[x]
-  void visitEndAccessInst(EndAccessInst *eai) {
-    auto *bb = eai->getParent();
-    auto adjBuf = getAdjointBuffer(bb, eai->getSource());
-    if (errorOccurred)
-      return;
-    SILAccessKind kind;
-    switch (eai->getBeginAccess()->getAccessKind()) {
-    case SILAccessKind::Read: kind = SILAccessKind::Modify; break;
-    case SILAccessKind::Modify: kind = SILAccessKind::Read; break;
-    case SILAccessKind::Init: kind = SILAccessKind::Deinit; break;
-    case SILAccessKind::Deinit: kind = SILAccessKind::Init; break;
-    }
-    auto adjAccess = builder.createBeginAccess(
-        eai->getLoc(), adjBuf, kind, eai->getBeginAccess()->getEnforcement(),
-        eai->getBeginAccess()->hasNoNestedConflict(),
-        eai->getBeginAccess()->isFromBuiltin());
-    setAdjointBuffer(bb, eai->getOperand(),
-                     ValueWithCleanup(adjAccess, makeCleanupFromChildren({})));
   }
 
 #define PROPAGATE_BUFFER_CLEANUP(INST) \
@@ -5075,9 +5053,10 @@ public:
   NO_ADJOINT(Branch)
   NO_ADJOINT(CondBranch)
 
-  // Stack allocation/deallocation.
+  // Memory allocation/access.
   NO_ADJOINT(AllocStack)
   NO_ADJOINT(DeallocStack)
+  NO_ADJOINT(EndAccess)
 
   // Debugging/reference counting instructions.
   NO_ADJOINT(DebugValue)
