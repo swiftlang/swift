@@ -1510,8 +1510,6 @@ class DifferentiableAttr final
   FuncDecl *VJPFunction = nullptr;
   /// The differentiation parameters' indices, resolved by the type checker.
   AutoDiffParameterIndices *ParameterIndices = nullptr;
-  /// States whether the function is linear (optional).
-  bool linear = false;
   /// The trailing where clause, if it exists.
   TrailingWhereClause *WhereClause = nullptr;
   /// The requirements for autodiff associated functions. Resolved by the type

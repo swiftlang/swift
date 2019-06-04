@@ -986,7 +986,7 @@ bool Parser::parseDifferentiableAttributeArguments(
   } else {
     linear = false;
   }
-  
+
   // If 'withRespectTo' is used, make the user change it to 'wrt'.
   if (Tok.is(tok::identifier) && Tok.getText() == "withRespectTo") {
     SourceRange withRespectToRange(Tok.getLoc(), peekToken().getLoc());

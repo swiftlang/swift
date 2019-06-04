@@ -1337,7 +1337,7 @@ DifferentiableAttr::DifferentiableAttr(ASTContext &context, bool implicit,
                                        Optional<DeclNameWithLoc> vjp,
                                        ArrayRef<Requirement> requirements)
     : DeclAttribute(DAK_Differentiable, atLoc, baseRange, implicit),
-      JVP(std::move(jvp)), VJP(std::move(vjp)), ParameterIndices(indices)  {
+      JVP(std::move(jvp)), VJP(std::move(vjp)), ParameterIndices(indices) {
   setRequirements(context, requirements);
 }
 
