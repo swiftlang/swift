@@ -703,9 +703,15 @@ void PatternEntryDeclScope::expandMe(ScopeCreator &scopeCreator) {
                                 this, decl, patternEntryIndex);
     initializerEnd = initializer->getSourceRange().End;
   }
-  // Note: the accessors will follow the pattern binding.
-  scopeCreator.createSubtree<PatternEntryUseScope>(
-    this, decl, patternEntryIndex, initializerEnd);
+  // If there are no uses of the declararations, add the accessors immediately.
+  // Must omit use scope in this case because otherwise there is no source
+  // location for it.
+  if (!scopeCreator.haveDeferredNodes())
+    addVarDeclScopesAndTheirAccessors(this, scopeCreator);
+  else
+    // Note: the accessors will follow the pattern binding.
+    scopeCreator.createSubtree<PatternEntryUseScope>(
+        this, decl, patternEntryIndex, initializerEnd);
 }
 
 void PatternEntryInitializerScope::expandMe(ScopeCreator &scopeCreator) {

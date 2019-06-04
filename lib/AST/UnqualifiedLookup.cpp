@@ -1132,7 +1132,7 @@ bool ASTScopeDeclConsumerForUnqualifiedLookup::consume(
   for (auto *value: values) {
     if (factory.isOriginallyTypeLookup && !isa<TypeDecl>(value))
       continue;
-    if (value->getFullName().matchesRef(factory.Name))
+    if (!value->getFullName().matchesRef(factory.Name))
       continue;
     factory.Results.push_back(LookupResultEntry(value));
     auto *const contextOfResult = value->getDeclContext();
