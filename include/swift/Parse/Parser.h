@@ -954,9 +954,9 @@ public:
 
   /// Parse the arguments inside the @differentiable attribute.
   bool parseDifferentiableAttributeArguments(
-      SmallVectorImpl<ParsedAutoDiffParameter> &params,
+      bool &linear, SmallVectorImpl<ParsedAutoDiffParameter> &params,
       Optional<DeclNameWithLoc> &jvpSpec, Optional<DeclNameWithLoc> &vjpSpec,
-      bool &linear, TrailingWhereClause *&whereClause);
+      TrailingWhereClause *&whereClause);
 
   /// Parse a differentiation parameters clause.
   bool parseDifferentiationParametersClause(

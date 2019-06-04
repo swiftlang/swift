@@ -839,8 +839,8 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
   // Parse '('.
   if (consumeIf(tok::l_paren, lParenLoc)) {
     // Parse @differentiable attribute arguments.
-    if (parseDifferentiableAttributeArguments(params, jvpSpec, vjpSpec,
-                                              linear, whereClause))
+    if (parseDifferentiableAttributeArguments(linear, params, jvpSpec, vjpSpec,
+                                              whereClause))
       return makeParserError();
     // Parse ')'.
     if (!consumeIf(tok::r_paren, rParenLoc)) {
@@ -933,9 +933,9 @@ bool Parser::parseDifferentiationParametersClause(
 }
 
 bool Parser::parseDifferentiableAttributeArguments(
-    SmallVectorImpl<ParsedAutoDiffParameter> &params,
+    bool &linear, SmallVectorImpl<ParsedAutoDiffParameter> &params,
     Optional<DeclNameWithLoc> &jvpSpec, Optional<DeclNameWithLoc> &vjpSpec,
-    bool &linear, TrailingWhereClause *&whereClause) {
+    TrailingWhereClause *&whereClause) {
   StringRef AttrName = "differentiable";
 
   // Set parse error, skip until ')' and parse it.
@@ -974,16 +974,15 @@ bool Parser::parseDifferentiableAttributeArguments(
 
   // Parse optional differentiation parameters.
   // Parse 'linear' label (optional).
+  linear = false;
   if (Tok.is(tok::identifier) && Tok.getText() == "linear") {
     linear = true;
-    consumeIdentifier();
+    consumeToken(tok::identifier);
     // If no trailing comma or 'where' clause, terminate parsing arguments.
     if (Tok.isNot(tok::comma) && Tok.isNot(tok::kw_where))
       return false;
     if (consumeIfTrailingComma())
       return errorAndSkipToEnd();
-  } else {
-    linear = false;
   }
 
   // If 'withRespectTo' is used, make the user change it to 'wrt'.
