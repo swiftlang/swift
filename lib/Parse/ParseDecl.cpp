@@ -834,11 +834,12 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
   Optional<DeclNameWithLoc> jvpSpec;
   Optional<DeclNameWithLoc> vjpSpec;
   TrailingWhereClause *whereClause = nullptr;
+  bool linear;
 
   // Parse '('.
   if (consumeIf(tok::l_paren, lParenLoc)) {
     // Parse @differentiable attribute arguments.
-    if (parseDifferentiableAttributeArguments(params, jvpSpec, vjpSpec,
+    if (parseDifferentiableAttributeArguments(linear, params, jvpSpec, vjpSpec,
                                               whereClause))
       return makeParserError();
     // Parse ')'.
@@ -932,7 +933,7 @@ bool Parser::parseDifferentiationParametersClause(
 }
 
 bool Parser::parseDifferentiableAttributeArguments(
-    SmallVectorImpl<ParsedAutoDiffParameter> &params,
+    bool &linear, SmallVectorImpl<ParsedAutoDiffParameter> &params,
     Optional<DeclNameWithLoc> &jvpSpec, Optional<DeclNameWithLoc> &vjpSpec,
     TrailingWhereClause *&whereClause) {
   StringRef AttrName = "differentiable";
@@ -956,8 +957,9 @@ bool Parser::parseDifferentiableAttributeArguments(
       diagnose(Tok, diag::unexpected_separator, ",");
       return true;
     }
-    // Check that token after comma is a function specifier label.
-    if (!Tok.is(tok::identifier) || !(Tok.getText() == "jvp" ||
+    // Check that token after comma is 'wrt:' or a function specifier label.
+    if (!Tok.is(tok::identifier) || !(Tok.getText() == "wrt" ||
+                                      Tok.getText() == "jvp" ||
                                       Tok.getText() == "vjp")) {
       diagnose(Tok, diag::attr_differentiable_expected_label);
       return true;
@@ -970,7 +972,19 @@ bool Parser::parseDifferentiableAttributeArguments(
   SyntaxParsingContext ContentContext(
       SyntaxContext, SyntaxKind::DifferentiableAttributeArguments);
 
-  // Parse optional differentiation parameters, starting with the 'wrt:' label.
+  // Parse optional differentiation parameters.
+  // Parse 'linear' label (optional).
+  linear = false;
+  if (Tok.is(tok::identifier) && Tok.getText() == "linear") {
+    linear = true;
+    consumeToken(tok::identifier);
+    // If no trailing comma or 'where' clause, terminate parsing arguments.
+    if (Tok.isNot(tok::comma) && Tok.isNot(tok::kw_where))
+      return false;
+    if (consumeIfTrailingComma())
+      return errorAndSkipToEnd();
+  }
+
   // If 'withRespectTo' is used, make the user change it to 'wrt'.
   if (Tok.is(tok::identifier) && Tok.getText() == "withRespectTo") {
     SourceRange withRespectToRange(Tok.getLoc(), peekToken().getLoc());

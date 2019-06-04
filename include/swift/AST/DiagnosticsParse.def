@@ -1498,7 +1498,8 @@ ERROR(attr_differentiable_use_wrt_not_withrespectto,none,
 ERROR(attr_differentiable_missing_label,PointsToFirstBadToken,
       "missing label '%0:' in '@differentiable' attribute", (StringRef))
 ERROR(attr_differentiable_expected_label,none,
-      "expected a function specifier label, e.g. 'wrt:', 'jvp:', or 'vjp:'", ())
+      "expected either 'wrt:' or a function specifier label, e.g. 'jvp:', "
+      "or 'vjp:'", ())
 
 // differentiating
 ERROR(attr_differentiating_expected_original_name,PointsToFirstBadToken,
