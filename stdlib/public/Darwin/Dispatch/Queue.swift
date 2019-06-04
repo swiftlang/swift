@@ -94,19 +94,23 @@ extension DispatchQueue {
 
 		internal func _attr(attr: __OS_dispatch_queue_attr?) -> __OS_dispatch_queue_attr? {
 			if #available(macOS 10.12, iOS 10.0, tvOS 10.0, watchOS 3.0, *) {
-				switch self {
-				case .inherit:
-					// DISPATCH_AUTORELEASE_FREQUENCY_INHERIT
-					return __dispatch_queue_attr_make_with_autorelease_frequency(attr, __dispatch_autorelease_frequency_t(0))
-				case .workItem:
-					// DISPATCH_AUTORELEASE_FREQUENCY_WORK_ITEM
-					return __dispatch_queue_attr_make_with_autorelease_frequency(attr, __dispatch_autorelease_frequency_t(1))
-				case .never:
-					// DISPATCH_AUTORELEASE_FREQUENCY_NEVER
-					return __dispatch_queue_attr_make_with_autorelease_frequency(attr, __dispatch_autorelease_frequency_t(2))
-				}
+				return __dispatch_queue_attr_make_with_autorelease_frequency(attr, self._rawValue)
 			} else {
 				return attr
+			}
+		}
+
+		internal var _rawValue: __dispatch_autorelease_frequency_t {
+			switch self {
+			case .inherit:
+				// DISPATCH_AUTORELEASE_FREQUENCY_INHERIT
+				return (__dispatch_autorelease_frequency_t(rawValue: 0) as Optional)!
+			case .workItem:
+				// DISPATCH_AUTORELEASE_FREQUENCY_WORK_ITEM
+				return (__dispatch_autorelease_frequency_t(rawValue: 1) as Optional)!
+			case .never:
+				// DISPATCH_AUTORELEASE_FREQUENCY_NEVER
+				return (__dispatch_autorelease_frequency_t(rawValue: 2) as Optional)!
 			}
 		}
 	}

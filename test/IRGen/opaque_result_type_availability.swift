@@ -1,12 +1,11 @@
 // RUN: %target-swift-frontend -target x86_64-apple-macosx10.9 -Onone -emit-ir %s | %FileCheck --check-prefix=MAYBE-AVAILABLE %s
-// TODO: Build with a macos deployment target that unconditionally supports opaque result types
-// R/UN: %target-swift-frontend -target x86_64-apple-macosx10.9999 -Onone -emit-ir %s | %FileCheck --check-prefix=ALWAYS-AVAILABLE %s
+// RUN: %target-swift-frontend -target x86_64-apple-macosx10.15 -Onone -emit-ir %s | %FileCheck --check-prefix=ALWAYS-AVAILABLE %s
 // REQUIRES: OS=macosx
 
 protocol P {}
 extension Int: P {}
 
-@available(macOS 9999, *)
+@available(macOS 10.15, *)
 func foo() -> some P {
   return 1738
 }
@@ -14,7 +13,7 @@ func foo() -> some P {
 @_silgen_name("external")
 func generic<T: P>(x: T, y: T)
 
-@available(macOS 9999, *)
+@available(macOS 10.15, *)
 public func main() {
   generic(x: foo(), y: foo())
 }
