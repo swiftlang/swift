@@ -33,6 +33,7 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/Program.h"
+#include "llvm/Support/VersionTuple.h"
 
 using namespace swift;
 using namespace swift::driver;
@@ -221,42 +222,6 @@ static bool wantsObjCRuntime(const llvm::Triple &triple) {
   llvm_unreachable("unknown Darwin OS");
 }
 
-/// Return the earliest backward deployment compatibility version we need to
-/// link in for the given target triple, if any.
-static Optional<std::pair<unsigned, unsigned>>
-getSwiftRuntimeCompatibilityVersionForTarget(const llvm::Triple &Triple) {
-  unsigned Major, Minor, Micro;
-  
-  if (Triple.isMacOSX()) {
-    Triple.getMacOSXVersion(Major, Minor, Micro);
-    if (Major == 10) {
-      if (Minor <= 14) {
-        return std::make_pair(5u, 0u);
-      } else {
-        return None;
-      }
-    } else {
-      return None;
-    }
-  } else if (Triple.isiOS()) { // includes tvOS
-    Triple.getiOSVersion(Major, Minor, Micro);
-    if (Major <= 12) {
-      return std::make_pair(5u, 0u);
-    } else {
-      return None;
-    }
-  } else if (Triple.isWatchOS()) {
-    Triple.getWatchOSVersion(Major, Minor, Micro);
-    if (Major <= 5) {
-      return std::make_pair(5u, 0u);
-    } else {
-      return None;
-    }
-  } else {
-    return None;
-  }
-}
-
 ToolChain::InvocationInfo
 toolchains::Darwin::constructInvocation(const LinkJobAction &job,
                                         const JobContext &context) const
@@ -431,12 +396,13 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
 
   // Link compatibility libraries, if we're deploying back to OSes that
   // have an older Swift runtime.
-  Optional<std::pair<unsigned, unsigned>> runtimeCompatibilityVersion;
+  Optional<llvm::VersionTuple> runtimeCompatibilityVersion;
   
   if (context.Args.hasArg(options::OPT_runtime_compatibility_version)) {
-    auto value = context.Args.getLastArgValue(options::OPT_runtime_compatibility_version);
+    auto value = context.Args.getLastArgValue(
+                                    options::OPT_runtime_compatibility_version);
     if (value.equals("5.0")) {
-      runtimeCompatibilityVersion = std::make_pair(5u, 0u);
+      runtimeCompatibilityVersion = llvm::VersionTuple(5, 0);
     } else if (value.equals("none")) {
       runtimeCompatibilityVersion = None;
     } else {
@@ -448,7 +414,7 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
   }
   
   if (runtimeCompatibilityVersion) {
-    if (*runtimeCompatibilityVersion <= std::make_pair(5u, 0u)) {
+    if (*runtimeCompatibilityVersion <= llvm::VersionTuple(5, 0)) {
       // Swift 5.0 compatibility library
       SmallString<128> BackDeployLib;
       BackDeployLib.append(RuntimeLibPath);
