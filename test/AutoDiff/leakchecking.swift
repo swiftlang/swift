@@ -8,7 +8,7 @@ import DifferentiationUnittest
 
 var LeakCheckingTests = TestSuite("LeakChecking")
 
-/// Execute body, check expect leak count, and reset global leak count.
+/// Execute body, check expected leak count, and reset global leak count.
 func testWithLeakChecking(expectedLeakCount: Int = 0, _ body: () -> Void) {
   body()
   expectEqual(expectedLeakCount, _GlobalLeakCount.count, "Leak detected.")
@@ -33,22 +33,9 @@ LeakCheckingTests.test("BasicVarLeakChecking") {
 }
 
 LeakCheckingTests.test("ControlFlow") {
-  testWithLeakChecking(expectedLeakCount: 0) {
-    func cond_tuple_var(_ x: Float) -> Float {
-      var y: (Float, Float) = (x, x)
-      var z: (Float, Float) = (x + x, x - x)
-      if x > 0 {
-        y.0 = x
-        y.1 = x
-        z.0 = z.0 - y.0
-        z.1 = z.1 + y.0
-      } else {
-        z = (x, x)
-      }
-      return y.0 + y.1 - z.0 + z.1
-    }
-    _ = gradient(at: 4, in: cond_tuple_var)
-  }
+  // TODO: Add more `var` + control flow tests.
+  // Porting tests from test/AutoDiff/control_flow.swift requires more support
+  // for `Tracked<Float>`.
 
   // FIXME: Fix control flow AD memory leaks.
   // See related FIXME comments in adjoint value/buffer propagation in
