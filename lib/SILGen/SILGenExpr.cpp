@@ -3628,20 +3628,22 @@ visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, SGFContext C) {
       SGF.getLoweredType(UnsafeRawPointer->getDeclaredInterfaceType());
     SILType BuiltinRawPtrTy = SILType::getRawPointerType(SGF.getASTContext());
 
+    SILModule &M = SGF.SGM.M;
+    SILBuilder &B = SGF.B;
 
-    auto DSOGlobal = SGF.SGM.M.lookUpGlobalVariable("__dso_handle");
+    auto DSOGlobal = M.lookUpGlobalVariable("__dso_handle");
     if (!DSOGlobal)
-      DSOGlobal = SILGlobalVariable::create(SGF.SGM.M,
-                                            SILLinkage::PublicExternal,
-                                            IsNotSerialized, "__dso_handle",
-                                            BuiltinRawPtrTy);
-    auto DSOAddr = SGF.B.createGlobalAddr(SILLoc, DSOGlobal);
+      DSOGlobal =
+          SILGlobalVariable::create(M, SILLinkage::PublicExternal,
+                                    IsNotSerialized, "__dso_handle",
+                                    BuiltinRawPtrTy);
 
-    auto DSOPointer = SGF.B.createAddressToPointer(SILLoc, DSOAddr,
-                                                   BuiltinRawPtrTy);
+    auto DSOAddr = B.createGlobalAddr(SILLoc, DSOGlobal);
+    auto DSOPointer =
+        B.createAddressToPointer(SILLoc, DSOAddr, BuiltinRawPtrTy);
+    auto UnsafeRawPtrStruct =
+        B.createStruct(SILLoc, UnsafeRawPtrTy, { DSOPointer });
 
-    auto UnsafeRawPtrStruct = SGF.B.createStruct(SILLoc, UnsafeRawPtrTy,
-                                                 { DSOPointer });
     return RValue(SGF, E, ManagedValue::forUnmanaged(UnsafeRawPtrStruct));
   }
   }
