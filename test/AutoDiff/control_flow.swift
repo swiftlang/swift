@@ -30,6 +30,23 @@ ControlFlowTests.test("Conditionals") {
   expectEqual(2, gradient(at: -10, in: cond2))
   expectEqual(0, gradient(at: -1337, in: cond2))
 
+  func cond2_var(_ x: Float) -> Float {
+    var y: Float = x
+    if x > 0 {
+      y = y * x
+    } else if x == -1337 {
+      y = x // Dummy assignment; shouldn't affect computation.
+      y = x // Dummy assignment; shouldn't affect computation.
+      y = 0
+    } else {
+      y = x + y
+    }
+    return y
+  }
+  expectEqual(8, gradient(at: 4, in: cond2_var))
+  expectEqual(2, gradient(at: -10, in: cond2_var))
+  expectEqual(0, gradient(at: -1337, in: cond2_var))
+
   func cond3(_ x: Float, _ y: Float) -> Float {
     if x > 0 {
       return x * y
@@ -63,6 +80,26 @@ ControlFlowTests.test("Conditionals") {
   expectEqual((5, -1337), gradient(at: -1337, 5, in: guard2))
   expectEqual((-2674, 0), gradient(at: -1337, -5, in: guard2))
   expectEqual((2, -3), gradient(at: -3, 2, in: guard2))
+
+  func guard2_var(_ x: Float, _ y: Float) -> Float {
+    var z = y
+    guard x > 0 else {
+      if y > 0 {
+        z = z * y
+      } else if x == -1337 {
+        z = x
+        z = z * z
+      } else {
+        z = 0
+      }
+      return z
+    }
+    return z * y
+  }
+  expectEqual((0, 10), gradient(at: 4, 5, in: guard2_var))
+  expectEqual((5, -1337), gradient(at: -1337, 5, in: guard2_var))
+  expectEqual((-2674, 0), gradient(at: -1337, -5, in: guard2_var))
+  expectEqual((2, -3), gradient(at: -3, 2, in: guard2_var))
 
   func guard3(_ x: Float, _ y: Float) -> Float {
     guard x > 0 else {
@@ -144,6 +181,31 @@ ControlFlowTests.test("NestedConditionals") {
   expectEqual((0, -1), gradient(at: 4, 21, in: nested3))
   expectEqual((1, 1), gradient(at: 4, 5, in: nested3))
   expectEqual((0, -1), gradient(at: -3, -2, in: nested3))
+
+  func nested3_var(_ x: Float, _ y: Float) -> Float {
+    var w = y
+    if x > 0 {
+      if y > 10 {
+        var z = x * w
+        if z > 100 {
+          z = x + z
+          return z
+        } else if y == 20 {
+          z = z + z
+          return z
+        }
+      } else {
+        w = x + w
+        return w
+      }
+    }
+    w = -w
+    return w
+  }
+  expectEqual((40, 8), gradient(at: 4, 20, in: nested3))
+  expectEqual((0, -1), gradient(at: 4, 21, in: nested3))
+  expectEqual((1, 1), gradient(at: 4, 5, in: nested3))
+  expectEqual((0, -1), gradient(at: -3, -2, in: nested3))
 }
 
 ControlFlowTests.test("Recursion") {
@@ -152,6 +214,22 @@ ControlFlowTests.test("Recursion") {
       return 1
     }
     return x * factorial(x - 1)
+  }
+  expectEqual(0, gradient(at: 1, in: factorial))
+  expectEqual(1, gradient(at: 2, in: factorial))
+  expectEqual(5, gradient(at: 3, in: factorial))
+  expectEqual(26, gradient(at: 4, in: factorial))
+  expectEqual(154, gradient(at: 5, in: factorial))
+
+  func factorial_var(_ x: Float) -> Float {
+    var y: Float = 1
+    if x == 1 {
+      y = 1
+    } else {
+      y = x
+      y = y * factorial(y - 1)
+    }
+    return y
   }
   expectEqual(0, gradient(at: 1, in: factorial))
   expectEqual(1, gradient(at: 2, in: factorial))
