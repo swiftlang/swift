@@ -572,12 +572,7 @@ public:
                                ASTScopeImpl *p, ScopeCreator &scopeCreator) {
     scopeCreator.createAttachedPropertyWrapperScope(patternBinding, p);
     // scopeCreator will contain any nodes that need to be put into subscopes.
-    // In a type decl body, there won't be any.
-    // The comment for \c AbstractPatternEntryScope.
-    const bool isInTypeDecl =
-        p->getDecl() && (isa<NominalTypeDecl>(p->getDecl().get()) ||
-                              isa<ExtensionDecl>(p->getDecl().get()));
-      scopeCreator.createNestedPatternScopes(patternBinding, p);
+    scopeCreator.createNestedPatternScopes(patternBinding, p);
   }
 
   void visitReturnStmt(ReturnStmt *rs, ASTScopeImpl *p,
