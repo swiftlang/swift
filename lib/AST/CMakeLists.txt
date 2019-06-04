@@ -38,6 +38,7 @@ add_swift_host_library(swiftAST STATIC
   DiagnosticEngine.cpp
   DiagnosticList.cpp
   DocComment.cpp
+  DynamicallyReplaceableInfoPrinter.cpp
   Evaluator.cpp
   ExperimentalDependencies.cpp
   ExperimentalDependenciesSourceFileDepGraphConstructor.cpp

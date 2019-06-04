@@ -545,6 +545,11 @@ def prebuilt_module_cache_path_EQ :
 def force_public_linkage : Flag<["-"], "force-public-linkage">,
    HelpText<"Force public linkage for private symbols. Used by LLDB.">;
 
+def emit_dynamically_replaceable_info_path
+    : Separate<[ "-" ], "dynamically-replaceable-info-path">,
+      HelpText<"The path to output the information about dynamically "
+               "replaceable declarations for the compiled source files">;
+
 def dump_api_path : Separate<["-"], "dump-api-path">,
   HelpText<"The path to output swift interface files for the compiled source files">;
 

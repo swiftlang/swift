@@ -29,6 +29,7 @@
 #include "swift/AST/ASTScope.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/DynamicallyReplaceableInfoPrinter.h"
 #include "swift/AST/ExperimentalDependencies.h"
 #include "swift/AST/FileSystem.h"
 #include "swift/AST/GenericSignatureBuilder.h"
@@ -954,6 +955,57 @@ static bool performCompileStepsPostSILGen(
     bool moduleIsPublic, int &ReturnValue, FrontendObserver *observer,
     UnifiedStatsReporter *Stats);
 
+/// Returns true if an error occurred.
+static bool emitDynamicallyReplaceableInfo(CompilerInstance &instance,
+                                           CompilerInvocation &invocation,
+                                           StringRef outputPath) {
+  using namespace llvm::sys;
+
+  auto getOutPath = [&](SourceFile *SF) -> std::string {
+    SmallString<256> Path = outputPath;
+    std::string Filename = SF->getFilename();
+    Filename.append(".swiftrinfo");
+    path::append(Path, path::filename(Filename));
+    return Path.str();
+  };
+
+  std::error_code EC = fs::create_directories(outputPath);
+  if (EC) {
+    llvm::errs() << "error creating directory '" << outputPath << "': "
+                 << EC.message() << '\n';
+    return true;
+  }
+
+  auto primaryFiles = instance.getPrimarySourceFiles();
+  if (!primaryFiles.empty()) {
+    for (SourceFile *sourceFile: primaryFiles) {
+      swift::DynamicallyReplaceableInfoPrinter walker(
+          invocation.getModuleName());
+      sourceFile->walk(walker);
+
+      auto fileName = getOutPath(sourceFile);
+      auto ostream = getFileOutputStream(fileName, instance.getASTContext());
+      if (!ostream)
+        return true;
+
+      walker.writeToStream(*ostream);
+    }
+  } else {
+    swift::DynamicallyReplaceableInfoPrinter walker(invocation.getModuleName());
+    instance.getMainModule()->walk(walker);
+
+    SmallString<256> outputFilename = outputPath;
+    path::append(outputFilename, path::filename("Module.swiftrinfo"));
+    auto ostream =
+        getFileOutputStream(outputFilename.str(), instance.getASTContext());
+    if (!ostream)
+      return true;
+
+    walker.writeToStream(*ostream);
+  }
+  return false;
+}
+
 /// Performs the compile requested by the user.
 /// \param Instance Will be reset after performIRGeneration when the verifier
 ///                 mode is NoVerify and there were no errors.
@@ -1065,6 +1117,14 @@ static bool performCompile(CompilerInstance &Instance,
       return true;
     }
     return false;
+  }
+
+  if (!Invocation.getFrontendOptions()
+           .EmitDynamicallyReplaceableInfoPath.empty()) {
+    if (emitDynamicallyReplaceableInfo(
+            Instance, Invocation,
+            Invocation.getFrontendOptions().EmitDynamicallyReplaceableInfoPath))
+      return true;
   }
 
   assert(FrontendOptions::doesActionGenerateSIL(Action) &&

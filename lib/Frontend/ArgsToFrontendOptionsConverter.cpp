@@ -51,6 +51,10 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   handleDebugCrashGroupArguments();
 
+  if (const Arg *A =
+          Args.getLastArg(OPT_emit_dynamically_replaceable_info_path)) {
+    Opts.EmitDynamicallyReplaceableInfoPath = A->getValue();
+  }
   if (const Arg *A = Args.getLastArg(OPT_dump_api_path)) {
     Opts.DumpAPIPath = A->getValue();
   }

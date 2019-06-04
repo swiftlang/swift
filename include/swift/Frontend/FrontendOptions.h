@@ -76,6 +76,9 @@ public:
   /// binary module has already been built for use by the compiler.
   std::string PrebuiltModuleCachePath;
 
+  /// The path to output dynamically replaceable declarations information.
+  std::string EmitDynamicallyReplaceableInfoPath;
+
   /// Emit index data for imported serialized swift system modules.
   bool IndexSystemModules = false;
 
