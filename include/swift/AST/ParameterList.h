@@ -97,7 +97,8 @@ public:
 
   const ParamDecl *operator[](unsigned i) const { return get(i); }
   ParamDecl *&operator[](unsigned i) { return get(i); }
-  
+  bool hasInternalParameter(StringRef prefix) const;
+
   /// Change the DeclContext of any contained parameters to the specified
   /// DeclContext.
   void setDeclContextOfParamDecls(DeclContext *DC);
