@@ -39,6 +39,42 @@ ControlFlowTests.test("Conditionals") {
   expectEqual((5, 4), gradient(at: 4, 5, in: cond3))
   expectEqual((-1, 1), gradient(at: -3, -2, in: cond3))
 
+  func guard1(_ x: Float, _ y: Float) -> Float {
+    guard x > 0 else {
+      return x * x
+    }
+    return y * y
+  }
+  expectEqual((0, 10), gradient(at: 4, 5, in: guard1))
+  expectEqual((-6, 0), gradient(at: -3, -2, in: guard1))
+
+  func guard2(_ x: Float, _ y: Float) -> Float {
+    guard x > 0 else {
+      if y > 0 {
+        return x * y
+      } else if x == -1337 {
+        return x * x
+      }
+      return 0
+    }
+    return y * y
+  }
+  expectEqual((0, 10), gradient(at: 4, 5, in: guard2))
+  expectEqual((5, -1337), gradient(at: -1337, 5, in: guard2))
+  expectEqual((-2674, 0), gradient(at: -1337, -5, in: guard2))
+  expectEqual((2, -3), gradient(at: -3, 2, in: guard2))
+
+  func guard3(_ x: Float, _ y: Float) -> Float {
+    guard x > 0 else {
+      fatalError()
+    }
+    return y * y
+  }
+  expectEqual((0, 10), gradient(at: 4, 5, in: guard2))
+  expectCrash {
+    gradient(at: -3, -2, in: guard3)
+  }
+
   func cond_empty(_ x: Float) -> Float {
     if x > 0 {
       // Create empty trampoline blocks.
