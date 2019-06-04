@@ -7140,8 +7140,8 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     };
 
   // SWIFT_ENABLE_TENSORFLOW
-  // Save the original potentially lvalue function for rewriting call method
-  // applications.
+  // Save the original potentially lvalue function for rewriting
+  // 'callAsFunction' method applications.
   auto *originalFn = fn;
   // SWIFT_ENABLE_TENSORFLOW END
   // The function is always an rvalue.
@@ -7291,7 +7291,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   }
 
   // SWIFT_ENABLE_TENSORFLOW
-  // Handle call method applications.
+  // Handle 'callAsFunction' method applications.
   auto &ctx = cs.getASTContext();
 
   TupleExpr *arg = dyn_cast<TupleExpr>(apply->getArg());
