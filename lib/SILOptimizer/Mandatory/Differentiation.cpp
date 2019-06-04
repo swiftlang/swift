@@ -4137,23 +4137,23 @@ public:
     // arguments.
     DominanceOrder domOrder(original.getEntryBlock(), domInfo);
     while (auto *bb = domOrder.getNext()) {
-      auto &activeBBValues = activeValues[bb];
+      auto &bbActiveValues = activeValues[bb];
       // If the current block has an immediate dominator, append the immediate
       // dominator block's active values to the current block's active values.
       auto *domNode = domInfo->getNode(bb)->getIDom();
       if (domNode) {
-        auto &activeDomBBValues = activeValues[domNode->getBlock()];
-        activeBBValues.append(activeDomBBValues.begin(),
-                              activeDomBBValues.end());
+        auto &domBBActiveValues = activeValues[domNode->getBlock()];
+        bbActiveValues.append(domBBActiveValues.begin(),
+                              domBBActiveValues.end());
       }
-      SmallPtrSet<SILValue, 8> registered(activeBBValues.begin(),
-                                          activeBBValues.end());
-      // Register a value as active if it has not yet been registered.
+      SmallPtrSet<SILValue, 8> visited(bbActiveValues.begin(),
+                                       bbActiveValues.end());
+      // Register a value as active if it has not yet been visited.
       auto addActiveValue = [&](SILValue v) {
-        if (registered.count(v))
+        if (visited.count(v))
           return;
-        registered.insert(v);
-        activeBBValues.push_back(v);
+        visited.insert(v);
+        bbActiveValues.push_back(v);
       };
       // Register bb arguments and all instruction operands/results.
       for (auto *arg : bb->getArguments())
@@ -4186,8 +4186,8 @@ public:
       adjointPullbackStructArguments[origBB] = pbStructArg;
       // Get all active values in the original block.
       // If the original block has no active values, continue.
-      auto &activeBBValues = activeValues[origBB];
-      if (activeBBValues.empty())
+      auto &bbActiveValues = activeValues[origBB];
+      if (bbActiveValues.empty())
         continue;
       // Otherwise, if the original block has active values:
       // - For each active buffer in the original block, allocate a new local
@@ -4195,7 +4195,7 @@ public:
       //   the adjoint entry and deallocated in the adjoint exit.)
       // - For each active value in the original block, add adjoint value
       //   arguments to the adjoint block.
-      for (auto activeValue : activeBBValues) {
+      for (auto activeValue : bbActiveValues) {
         if (activeValue->getType().isAddress()) {
           // Allocate and zero initialize a new local buffer using
           // `getAdjointBuffer`.
@@ -4363,8 +4363,8 @@ public:
           // Propagate pullback struct argument.
           trampolineArguments.push_back(adjointSuccBB->getArguments().front());
           // Propagate adjoint values/buffers of active values/buffers.
-          for (unsigned i : indices(activeValues[predBB])) {
-            auto activeValue = activeValues[predBB][i];
+          auto &predBBActiveValues = activeValues[predBB];
+          for (auto activeValue : predBBActiveValues) {
             if (activeValue->getType().isObject()) {
               auto activeValueAdj = getAdjointValue(bb, activeValue);
               auto concreteActiveValueAdj =
@@ -4555,7 +4555,7 @@ public:
 
     // Get the seed (i.e. adjoint value of the original result).
     ValueWithCleanup seed;
-    auto *bb = ai->SILInstruction::getParentBlock();
+    auto *bb = ai->getParent();
     if (origResult->getType().isObject()) {
       // If original result is a `tuple_extract`, materialize adjoint value of
       // `ai` and extract the corresponding element adjoint value.
@@ -4664,7 +4664,7 @@ public:
   ///   adj[x2] += struct_extract adj[y], #x2
   ///   ...
   void visitStructInst(StructInst *si) {
-    auto *bb = si->SILInstruction::getParentBlock();
+    auto *bb = si->getParent();
     auto loc = si->getLoc();
     auto *structDecl = si->getStructDecl();
     auto av = getAdjointValue(bb, si);
@@ -4739,7 +4739,7 @@ public:
     //   adj[x] += struct (0, ..., #key': adj[y], ..., 0)
     // where `#key'` is the field in the tangent space corresponding to
     // `#key`.
-    auto *bb = sei->SILInstruction::getParentBlock();
+    auto *bb = sei->getParent();
     auto structTy = remapType(sei->getOperand()->getType()).getASTType();
     auto tangentVectorTy = structTy->getAutoDiffAssociatedTangentSpace(
         LookUpConformanceInModule(getModule().getSwiftModule()))
@@ -4807,7 +4807,7 @@ public:
   ///   adj[x0] += tuple_extract adj[y], 0
   ///   ...
   void visitTupleInst(TupleInst *ti) {
-    auto *bb = ti->SILInstruction::getParentBlock();
+    auto *bb = ti->getParent();
     auto av = getAdjointValue(bb, ti);
     switch (av.getKind()) {
     case AdjointValueKind::Zero:
@@ -4848,7 +4848,7 @@ public:
   ///                         |--- n-th element
   ///   adj[x] += tuple (0, 0, ..., adj[y], ..., 0, 0)
   void visitTupleExtractInst(TupleExtractInst *tei) {
-    auto *bb = tei->SILInstruction::getParentBlock();
+    auto *bb = tei->getParent();
     auto tupleTanTy = getRemappedTangentType(tei->getOperand()->getType());
     auto av = getAdjointValue(bb, tei);
     switch (av.getKind()) {
@@ -4892,7 +4892,7 @@ public:
   //   Original: y = load x
   //    Adjoint: adj[x] += adj[y]
   void visitLoadInst(LoadInst *li) {
-    auto *bb = li->SILInstruction::getParentBlock();
+    auto *bb = li->getParent();
     auto adjVal = materializeAdjointDirect(getAdjointValue(bb, li), li->getLoc());
     // Allocate a local buffer and store the adjoint value. This buffer will be
     // used for accumulation into the adjoint buffer.
@@ -4926,7 +4926,7 @@ public:
   //   Original: store x to y
   //    Adjoint: adj[x] += load adj[y]; adj[y] = 0
   void visitStoreInst(StoreInst *si) {
-    auto *bb = si->SILInstruction::getParentBlock();
+    auto *bb = si->getParent();
     auto &adjBuf = getAdjointBuffer(bb, si->getDest());
     if (errorOccurred)
       return;
@@ -4960,7 +4960,7 @@ public:
   //   Original: copy_addr x to y
   //    Adjoint: adj[x] += adj[y]; adj[y] = 0
   void visitCopyAddrInst(CopyAddrInst *cai) {
-    auto *bb = cai->SILInstruction::getParentBlock();
+    auto *bb = cai->getParent();
     auto &adjDest = getAdjointBuffer(bb, cai->getDest());
     if (errorOccurred)
       return;
@@ -5014,7 +5014,7 @@ public:
         return;
       }
     }
-    auto *bb = bai->SILInstruction::getParentBlock();
+    auto *bb = bai->getParent();
     auto accessBuf = getAdjointBuffer(bb, bai);
     auto &sourceBuf = getAdjointBuffer(bb, bai->getSource());
     sourceBuf.setCleanup(makeCleanupFromChildren({sourceBuf.getCleanup(),
@@ -5028,7 +5028,7 @@ public:
   //   Original: end_access y, where y = begin_access x
   //    Adjoint: adj[y] = begin_access inverse(access_kind) adj[x]
   void visitEndAccessInst(EndAccessInst *eai) {
-    auto *bb = eai->SILInstruction::getParentBlock();
+    auto *bb = eai->getParent();
     auto adjBuf = getAdjointBuffer(bb, eai->getSource());
     if (errorOccurred)
       return;
@@ -5049,7 +5049,7 @@ public:
 
 #define PROPAGATE_BUFFER_CLEANUP(INST) \
   void visit##INST##Inst(INST##Inst *inst) { \
-    auto *bb = inst->SILInstruction::getParentBlock(); \
+    auto *bb = inst->getParent(); \
     auto &adjBase = getAdjointBuffer(bb, inst->getOperand()); \
     auto &adjProj = getAdjointBuffer(bb, inst); \
     adjProj.setCleanup(makeCleanupFromChildren( \
