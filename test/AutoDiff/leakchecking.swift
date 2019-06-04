@@ -49,10 +49,42 @@ struct Pair<T : Differentiable, U : Differentiable> : Differentiable
 }
 
 LeakCheckingTests.test("BasicVarLeakChecking") {
-  testWithLeakChecking(expectedLeakCount: 0) {
+  testWithLeakChecking {
     var model = ExampleLeakModel()
     let x: Tracked<Float> = 1.0
     _ = model.gradient(at: x) { m, x in m.applied(to: x) }
+  }
+
+  testWithLeakChecking {
+    var model = ExampleLeakModel()
+    let x: Tracked<Float> = 1.0
+
+    _ = model.gradient { m in m.applied(to: x) }
+    for _ in 0..<10 {
+      _ = model.gradient { m in m.applied(to: x) }
+    }
+  }
+
+  testWithLeakChecking {
+    var model = ExampleLeakModel()
+    var x: Tracked<Float> = 1.0
+    _ = model.gradient { m in
+      x = x + x
+      var y = x + Tracked<Float>(x.value)
+      return m.applied(to: y)
+    }
+  }
+
+  // TODO: Fix memory leak.
+  testWithLeakChecking(expectedLeakCount: 1) {
+    var model = ExampleLeakModel()
+    let x: Tracked<Float> = 1.0
+    _ = model.gradient { m in
+      var model = m
+      // Next line causes leak.
+      model.bias = x
+      return model.applied(to: x)
+    }
   }
 }
 
@@ -111,7 +143,7 @@ LeakCheckingTests.test("ControlFlow") {
   testWithLeakChecking(expectedLeakCount: 9) {
     var model = ExampleLeakModel()
     let x: Tracked<Float> = 1.0
-    let _ = model.gradient(at: x) { m, x in
+    _ = model.gradient(at: x) { m, x in
       let result: Tracked<Float>
       if x > 0 {
         result = m.applied(to: x)
@@ -128,7 +160,7 @@ LeakCheckingTests.test("ControlFlow") {
   testWithLeakChecking(expectedLeakCount: 14) {
     var model = ExampleLeakModel()
     let x: Tracked<Float> = 1.0
-    let _ = model.gradient(at: x) { m, x in
+    _ = model.gradient(at: x) { m, x in
       var result: Tracked<Float> = x
       if x > 0 {
         result = result + m.applied(to: x)
