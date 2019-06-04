@@ -3631,20 +3631,33 @@ visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, SGFContext C) {
     SILModule &M = SGF.SGM.M;
     SILBuilder &B = SGF.B;
 
-    auto DSOGlobal = M.lookUpGlobalVariable("__dso_handle");
-    if (!DSOGlobal)
-      DSOGlobal =
-          SILGlobalVariable::create(M, SILLinkage::PublicExternal,
-                                    IsNotSerialized, "__dso_handle",
-                                    BuiltinRawPtrTy);
+    StructInst *S = nullptr;
+    if (M.getASTContext().LangOpts.Target.isOSWindows()) {
+      auto ImageBase = M.lookUpGlobalVariable("__ImageBase");
+      if (!ImageBase)
+        ImageBase =
+            SILGlobalVariable::create(M, SILLinkage::Public, IsNotSerialized,
+                                      "__ImageBase", BuiltinRawPtrTy);
 
-    auto DSOAddr = B.createGlobalAddr(SILLoc, DSOGlobal);
-    auto DSOPointer =
-        B.createAddressToPointer(SILLoc, DSOAddr, BuiltinRawPtrTy);
-    auto UnsafeRawPtrStruct =
-        B.createStruct(SILLoc, UnsafeRawPtrTy, { DSOPointer });
+      auto ImageBaseAddr = B.createGlobalAddr(SILLoc, ImageBase);
+      auto ImageBasePointer =
+          B.createAddressToPointer(SILLoc, ImageBaseAddr, BuiltinRawPtrTy);
+      S = B.createStruct(SILLoc, UnsafeRawPtrTy, { ImageBasePointer });
+    } else {
+      auto DSOGlobal = M.lookUpGlobalVariable("__dso_handle");
+      if (!DSOGlobal)
+        DSOGlobal =
+            SILGlobalVariable::create(M, SILLinkage::PublicExternal,
+                                      IsNotSerialized, "__dso_handle",
+                                      BuiltinRawPtrTy);
 
-    return RValue(SGF, E, ManagedValue::forUnmanaged(UnsafeRawPtrStruct));
+      auto DSOAddr = B.createGlobalAddr(SILLoc, DSOGlobal);
+      auto DSOPointer =
+          B.createAddressToPointer(SILLoc, DSOAddr, BuiltinRawPtrTy);
+      S = B.createStruct(SILLoc, UnsafeRawPtrTy, { DSOPointer });
+    }
+
+    return RValue(SGF, E, ManagedValue::forUnmanaged(S));
   }
   }
 
