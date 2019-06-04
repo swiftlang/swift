@@ -261,27 +261,6 @@ public:
   }
 
 public:
-
-  void createNestedPatternScopes(PatternBindingDecl *patternBinding,
-                                 ASTScopeImpl *parent) {
-    createRestOfNestedPatternScopes(patternBinding, parent, 0);
-  }
-
-  void createRestOfNestedPatternScopes(PatternBindingDecl *patternBinding,
-                                       ASTScopeImpl *parent,
-                                       unsigned entryIndex) {
-    if (entryIndex < patternBinding->getPatternList().size()) {
-      // When PatternEntryDeclScope expands, it will create a
-      // PatternEntryUseScope which will call createRestOfNestedPatternScopes
-      // when it expands.
-      createSubtree<PatternEntryDeclScope>(parent, patternBinding, entryIndex);
-    } else {
-      // no more entries, create the scopes inside the pattern use
-      createScopesForDeferredNodes(parent);
-    }
-  }
-
-public:
   /// Create the matryoshka nested generic param scopes (if any)
   /// that are subscopes of the receiver. Return
   /// the furthest descendant.
@@ -571,8 +550,7 @@ public:
   void visitPatternBindingDecl(PatternBindingDecl *patternBinding,
                                ASTScopeImpl *p, ScopeCreator &scopeCreator) {
     scopeCreator.createAttachedPropertyWrapperScope(patternBinding, p);
-    // scopeCreator will contain any nodes that need to be put into subscopes.
-    scopeCreator.createNestedPatternScopes(patternBinding, p);
+    scopeCreator.createSubtree<PatternEntryDeclScope>(p, patternBinding, 0);
   }
 
   void visitReturnStmt(ReturnStmt *rs, ASTScopeImpl *p,
@@ -701,12 +679,11 @@ void PatternEntryDeclScope::expandMe(ScopeCreator &scopeCreator) {
   // If there are no uses of the declararations, add the accessors immediately.
   // Must omit use scope in this case because otherwise there is no source
   // location for it.
-  if (!scopeCreator.haveDeferredNodes())
-    addVarDeclScopesAndTheirAccessors(this, scopeCreator);
-  else
+  if (isUseScopeNeeded(scopeCreator)) {
     // Note: the accessors will follow the pattern binding.
     scopeCreator.createSubtree<PatternEntryUseScope>(
         this, decl, patternEntryIndex, initializerEnd);
+  }
 }
 
 void PatternEntryInitializerScope::expandMe(ScopeCreator &scopeCreator) {
@@ -717,10 +694,16 @@ void PatternEntryInitializerScope::expandMe(ScopeCreator &scopeCreator) {
 
 void PatternEntryUseScope::expandMe(ScopeCreator &scopeCreator) {
   // Add accessors for the variables in this pattern.
-  addVarDeclScopesAndTheirAccessors(this, scopeCreator);
-  // Create a child for the next pattern binding.
-  scopeCreator.createRestOfNestedPatternScopes(decl, this,
-                                               patternEntryIndex + 1);
+  forEachVarDeclWithExplicitAccessors(scopeCreator, [&](VarDecl *var) {
+    scopeCreator.withoutDeferrals().createSubtree<VarDeclScope>(this, var);
+  });
+  if (!isLastEntry()) {
+    scopeCreator.createSubtree<PatternEntryDeclScope>(this, decl,
+                                                      patternEntryIndex + 1);
+  } else {
+    // no more entries, create the scopes inside the pattern use
+    scopeCreator.createScopesForDeferredNodes(this);
+  }
 }
 
 void ConditionalClauseScope::expandMe(ScopeCreator &scopeCreator) {
@@ -960,19 +943,19 @@ AbstractPatternEntryScope::AbstractPatternEntryScope(
          "out of bounds");
 }
 
-void AbstractPatternEntryScope::addVarDeclScopesAndTheirAccessors(
-    ASTScopeImpl *parent, ScopeCreator &scopeCreator) const {
+void AbstractPatternEntryScope::forEachVarDeclWithExplicitAccessors(
+    ScopeCreator &scopeCreator, function_ref<void(VarDecl *)> foundOne) const {
   getPatternEntry().getPattern()->forEachVariable([&](VarDecl *var) {
     if (scopeCreator.isDuplicate(var))
       return;
     const bool hasAccessors = var->getBracesRange().isValid();
     if (hasAccessors && !var->isImplicit())
-      scopeCreator.withoutDeferrals().createSubtree<VarDeclScope>(parent, var);
+      foundOne(var);
   });
 }
 
 bool ASTScopeImpl::isCreatedDirectly(const ASTNode n) {
-  // See addVarDeclScopesAndTheirAccessors and addChildrenForAllExplicitAccessors
+  // See PatternEntryUseScope::expandMe and addChildrenForAllExplicitAccessors
   if (auto *d = n.dyn_cast<Decl*>())
     return isa<VarDecl>(d) || isa<AccessorDecl>(d);
   return false;
@@ -1040,6 +1023,20 @@ void GuardConditionalClauseScope::createSubtreeForAfterClauses(
   // The scope *after* the guard statement must include any deferred nodes
   // so that any let vars in the guard are in scope.
   scopeCreator.createScopesForDeferredNodes(this);
+}
+
+bool AbstractPatternEntryScope::isUseScopeNeeded(
+    ScopeCreator &scopeCreator) const {
+  if (!isLastEntry() || !scopeCreator.haveDeferredNodes())
+    return true;
+  bool hasVarDeclToBeCreatedInUse = false;
+  forEachVarDeclWithExplicitAccessors(
+      scopeCreator, [&](VarDecl *) { hasVarDeclToBeCreatedInUse = true; });
+  return hasVarDeclToBeCreatedInUse;
+}
+
+bool AbstractPatternEntryScope::isLastEntry() const {
+  return patternEntryIndex + 1 == decl->getPatternList().size();
 }
 
 // Following must be after uses to ensure templates get instantiated

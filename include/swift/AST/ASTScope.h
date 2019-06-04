@@ -846,14 +846,16 @@ public:
 
   const PatternBindingEntry &getPatternEntry() const;
   Pattern *getPattern() const;
-  void addVarDeclScopesAndTheirAccessors(ASTScopeImpl *parent,
-                                         ScopeCreator &) const;
 
 protected:
   void printSpecifics(llvm::raw_ostream &out) const override;
+  bool isUseScopeNeeded(ScopeCreator &) const;
+  void forEachVarDeclWithExplicitAccessors(
+      ScopeCreator &scopeCreator, function_ref<void(VarDecl *)> foundOne) const;
 
 public:
   NullablePtr<const void> addressForPrinting() const override { return decl; }
+  bool isLastEntry() const;
 };
 
 class PatternEntryDeclScope final : public AbstractPatternEntryScope {
