@@ -31,3 +31,8 @@ __attribute__((used, section("__DATA,__swift_hooks"))) = {
   .version = 0,
   .conformsToProtocol = swift50override_conformsToProtocol,
 };
+
+// Allow this library to get force-loaded by autolinking
+__attribute__((weak, visibility("hidden")))
+extern "C"
+char _swift_FORCE_LOAD_$_swiftCompatibility50 = 0;
