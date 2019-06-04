@@ -238,7 +238,8 @@ def main():
                                      args.target_codesign, args.target_nm,
                                      args.t, args.S, args.s, args.lib_prefix,
                                      args.lib_suffix,
-                                     args.additional_compile_flags, args.triple,
+                                     args.additional_compile_flags,
+                                     args.triple,
                                      args.backward_deployment,
                                      args.no_symbol_diff)
 
