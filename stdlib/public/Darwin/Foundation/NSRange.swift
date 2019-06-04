@@ -176,7 +176,7 @@ extension Range where Bound == String.Index {
     _ range: NSRange, _genericIn string: __shared S
   ) {
     // Corresponding stdlib version
-    guard #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) else {
+    guard #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) else {
       fatalError()
     }
     let u = string.utf16
@@ -195,7 +195,7 @@ extension Range where Bound == String.Index {
   public init?(_ range: NSRange, in string: __shared String) {
     self.init(range, _genericIn: string)
   }
-  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+  @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
   public init?<S: StringProtocol>(_ range: NSRange, in string: __shared S) {
     self.init(range, _genericIn: string)
   }

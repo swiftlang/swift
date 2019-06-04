@@ -12,7 +12,7 @@
 
 /// A collection of insertions and removals that describe the difference 
 /// between two ordered collection states.
-@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 public struct CollectionDifference<ChangeElement> {
   /// A single change to a collection.
   @frozen
@@ -222,7 +222,11 @@ public struct CollectionDifference<ChangeElement> {
 ///   }
 /// }
 /// ```
+<<<<<<< HEAD
 @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+=======
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
+>>>>>>> Replace 9999 availability in stdlib
 extension CollectionDifference: Collection {
   public typealias Element = Change
 
@@ -270,7 +274,11 @@ extension CollectionDifference: Collection {
   }
 }
 
+<<<<<<< HEAD
 @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+=======
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
+>>>>>>> Replace 9999 availability in stdlib
 extension CollectionDifference.Index: Equatable {
   @inlinable
   public static func == (
@@ -281,7 +289,11 @@ extension CollectionDifference.Index: Equatable {
   }
 }
 
+<<<<<<< HEAD
 @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+=======
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
+>>>>>>> Replace 9999 availability in stdlib
 extension CollectionDifference.Index: Comparable {
   @inlinable
   public static func < (
@@ -292,7 +304,11 @@ extension CollectionDifference.Index: Comparable {
   }
 }
 
+<<<<<<< HEAD
 @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+=======
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
+>>>>>>> Replace 9999 availability in stdlib
 extension CollectionDifference.Index: Hashable {
   @inlinable
   public func hash(into hasher: inout Hasher) {
@@ -300,6 +316,7 @@ extension CollectionDifference.Index: Hashable {
   }
 }
 
+<<<<<<< HEAD
 @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
 extension CollectionDifference.Change: Equatable where ChangeElement: Equatable {}
 
@@ -313,6 +330,21 @@ extension CollectionDifference.Change: Hashable where ChangeElement: Hashable {}
 extension CollectionDifference: Hashable where ChangeElement: Hashable {}
 
 @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+=======
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
+extension CollectionDifference.Change: Equatable where ChangeElement: Equatable {}
+
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
+extension CollectionDifference: Equatable where ChangeElement: Equatable {}
+
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
+extension CollectionDifference.Change: Hashable where ChangeElement: Hashable {}
+
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
+extension CollectionDifference: Hashable where ChangeElement: Hashable {}
+
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
+>>>>>>> Replace 9999 availability in stdlib
 extension CollectionDifference where ChangeElement: Hashable {
   /// Returns a new collection difference with associations between individual
   /// elements that have been removed and inserted only once.
@@ -369,7 +401,11 @@ extension CollectionDifference where ChangeElement: Hashable {
   }
 }
 
+<<<<<<< HEAD
 @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+=======
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
+>>>>>>> Replace 9999 availability in stdlib
 extension CollectionDifference.Change: Codable where ChangeElement: Codable {
   private enum _CodingKeys: String, CodingKey {
     case offset
@@ -406,5 +442,9 @@ extension CollectionDifference.Change: Codable where ChangeElement: Codable {
   }
 }
 
+<<<<<<< HEAD
 @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+=======
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
+>>>>>>> Replace 9999 availability in stdlib
 extension CollectionDifference: Codable where ChangeElement: Codable {}
