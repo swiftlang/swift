@@ -13,6 +13,54 @@ import TensorFlowUnittest
 
 var TensorADTests = TestSuite("TensorControlFlowAD")
 
+TensorADTests.testAllBackends("Conditionals") {
+  func cond_nestedtuple_var(_ x: Tensor<Float>) -> Tensor<Float> {
+    // Convoluted function returning `x + x`.
+    var y: (Tensor<Float>, Tensor<Float>) = (x + x, x - x)
+    var z: ((Tensor<Float>, Tensor<Float>), Tensor<Float>) = (y, x)
+    if x > 0 {
+      var w = (x, x)
+      y.0 = w.1
+      y.1 = w.0
+      z.0.0 = z.0.0 - y.0
+      z.0.1 = z.0.1 + y.0
+    } else {
+      z = ((y.0 - x, y.1 + x), x)
+    }
+    return y.0 + y.1 - z.0.0 + z.0.1
+  }
+  expectEqual((Tensor(8), Tensor(2)),
+               valueWithGradient(at: Tensor(4), in: cond_nestedtuple_var))
+  expectEqual((Tensor(-20), Tensor(2)),
+              valueWithGradient(at: Tensor(-10), in: cond_nestedtuple_var))
+  expectEqual((Tensor(-2674), Tensor(2)),
+              valueWithGradient(at: Tensor(-1337), in: cond_nestedtuple_var))
+
+  func guard2_var(_ x: Tensor<Float>, _ y: Tensor<Float>) -> Tensor<Float> {
+    var z = y
+    guard x > 0 else {
+      if y > 0 {
+        z = z * x
+      } else if x == Tensor(-1337) {
+        z = x
+        z = z * z
+      } else {
+        z = Tensor(0)
+      }
+      return z
+    }
+    return z * y
+  }
+  expectEqual((Tensor(0), Tensor(10)),
+              gradient(at: Tensor(4), Tensor(5), in: guard2_var))
+  expectEqual((Tensor(5), Tensor(-1337)),
+              gradient(at: Tensor(-1337), Tensor(5), in: guard2_var))
+  expectEqual((Tensor(-2674), Tensor(0)),
+              gradient(at: Tensor(-1337), Tensor(-5), in: guard2_var))
+  expectEqual((Tensor(2), Tensor(-3)),
+              gradient(at: Tensor(-3), Tensor(2), in: guard2_var))
+}
+
 TensorADTests.testAllBackends("NestedConditionals") {
   // Test tensor-tensor ops.
   func cond_nested1(_ x: Tensor<Float>, _ y: Tensor<Float>) -> Tensor<Float> {
