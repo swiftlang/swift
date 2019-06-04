@@ -2380,15 +2380,12 @@ public:
   /// requirements asscoiated with given function type.
   ///
   /// \returns The opened type, or \c type if there are no archetypes in it.
-  Type openFunctionType(
-      AnyFunctionType *funcType,
-      unsigned numArgumentLabelsToRemove,
-      ConstraintLocatorBuilder locator,
-      OpenedTypeMap &replacements,
-      DeclContext *innerDC,
-      DeclContext *outerDC,
-      bool skipProtocolSelfConstraint,
-      bool skipGenericRequirements = false);
+  FunctionType *openFunctionType(AnyFunctionType *funcType,
+                                 ConstraintLocatorBuilder locator,
+                                 OpenedTypeMap &replacements,
+                                 DeclContext *innerDC, DeclContext *outerDC,
+                                 bool skipProtocolSelfConstraint,
+                                 bool skipGenericRequirements = false);
 
   /// Open the generic parameter list and (if requested) its requirements,
   /// creating type variables for each of the type parameters.

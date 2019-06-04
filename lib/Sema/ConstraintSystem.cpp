@@ -633,9 +633,8 @@ Type ConstraintSystem::openType(Type type, OpenedTypeMap &replacements) {
     });
 }
 
-Type ConstraintSystem::openFunctionType(
+FunctionType *ConstraintSystem::openFunctionType(
        AnyFunctionType *funcType,
-       unsigned numArgumentLabelsToRemove,
        ConstraintLocatorBuilder locator,
        OpenedTypeMap &replacements,
        DeclContext *innerDC,
@@ -671,7 +670,7 @@ Type ConstraintSystem::openFunctionType(
         FunctionType::ExtInfo().withThrows(genericFn->throws()));
   }
 
-  return funcType->removeArgumentLabels(numArgumentLabelsToRemove);
+  return funcType->castTo<FunctionType>();
 }
 
 Optional<Type> ConstraintSystem::isArrayType(Type type) {
@@ -936,12 +935,10 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
     auto openedType = openFunctionType(
             func->getInterfaceType()->castTo<AnyFunctionType>(),
-            /*numArgumentLabelsToRemove=*/0,
             locator, replacements,
             func->getInnermostDeclContext(),
             func->getDeclContext(),
             /*skipProtocolSelfConstraint=*/false);
-    auto openedFnType = openedType->castTo<FunctionType>();
 
     // If we opened up any type variables, record the replacements.
     recordOpenedTypes(locator, replacements);
@@ -950,19 +947,18 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     // DynamicSelf with the actual object type.
     if (!func->getDeclContext()->getSelfProtocolDecl()) {
       if (func->hasDynamicSelf()) {
-        auto params = openedFnType->getParams();
+        auto params = openedType->getParams();
         assert(params.size() == 1);
         Type selfTy = params.front().getPlainType()->getMetatypeInstanceType();
-        openedType = openedType->replaceCovariantResultType(selfTy, 2);
-        openedFnType = openedType->castTo<FunctionType>();
+        openedType = openedType->replaceCovariantResultType(selfTy, 2)
+                         ->castTo<FunctionType>();
       }
     } else {
-      openedType = openedType->eraseDynamicSelfType();
-      openedFnType = openedType->castTo<FunctionType>();
+      openedType = openedType->eraseDynamicSelfType()->castTo<FunctionType>();
     }
 
     // The reference implicitly binds 'self'.
-    return { openedType, openedFnType->getResult() };
+    return {openedType, openedType->getResult()};
   }
 
   // Unqualified reference to a local or global function.
@@ -970,16 +966,15 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     OpenedTypeMap replacements;
 
     auto funcType = funcDecl->getInterfaceType()->castTo<AnyFunctionType>();
-    auto openedType =
-      openFunctionType(
-        funcType,
-        getNumRemovedArgumentLabels(TC, funcDecl,
-                                    /*isCurriedInstanceReference=*/false,
-                                    functionRefKind),
-        locator, replacements,
-        funcDecl->getInnermostDeclContext(),
-        funcDecl->getDeclContext(),
-        /*skipProtocolSelfConstraint=*/false);
+    auto numLabelsToRemove = getNumRemovedArgumentLabels(
+        TC, funcDecl,
+        /*isCurriedInstanceReference=*/false, functionRefKind);
+
+    auto openedType = openFunctionType(funcType, locator, replacements,
+                                       funcDecl->getInnermostDeclContext(),
+                                       funcDecl->getDeclContext(),
+                                       /*skipProtocolSelfConstraint=*/false)
+                          ->removeArgumentLabels(numLabelsToRemove);
 
     // If we opened up any type variables, record the replacements.
     recordOpenedTypes(locator, replacements);
@@ -1331,10 +1326,11 @@ ConstraintSystem::getTypeOfMemberReference(
 
   // While opening member function type, let's delay opening requirements
   // to allow contextual types to affect the situation.
-  openedType = openFunctionType(funcType, numRemovedArgumentLabels,
-                                locator, replacements, innerDC, outerDC,
-                                /*skipProtocolSelfConstraint=*/true,
-                                /*skipGenericRequirements=*/true);
+  openedType =
+      openFunctionType(funcType, locator, replacements, innerDC, outerDC,
+                       /*skipProtocolSelfConstraint=*/true,
+                       /*skipGenericRequirements=*/true)
+          ->removeArgumentLabels(numRemovedArgumentLabels);
 
   if (!outerDC->getSelfProtocolDecl()) {
     // Class methods returning Self as well as constructors get the

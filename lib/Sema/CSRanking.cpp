@@ -517,12 +517,10 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
       OpenedTypeMap unused;
       Type openedType2;
       if (auto *funcType = type2->getAs<AnyFunctionType>()) {
-        openedType2 = cs.openFunctionType(
-            funcType, /*numArgumentLabelsToRemove=*/0, locator,
-            /*replacements=*/unused,
-            innerDC2,
-            outerDC2,
-            /*skipProtocolSelfConstraint=*/false);
+        openedType2 =
+            cs.openFunctionType(funcType, locator,
+                                /*replacements=*/unused, innerDC2, outerDC2,
+                                /*skipProtocolSelfConstraint=*/false);
       } else {
         cs.openGeneric(innerDC2,
                        outerDC2,
@@ -539,12 +537,9 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
       OpenedTypeMap replacements;
       Type openedType1;
       if (auto *funcType = type1->getAs<AnyFunctionType>()) {
-        openedType1 = cs.openFunctionType(
-            funcType, /*numArgumentLabelsToRemove=*/0, locator,
-            replacements,
-            innerDC1,
-            outerDC1,
-            /*skipProtocolSelfConstraint=*/false);
+        openedType1 = cs.openFunctionType(funcType, locator, replacements,
+                                          innerDC1, outerDC1,
+                                          /*skipProtocolSelfConstraint=*/false);
       } else {
         cs.openGeneric(innerDC1,
                        outerDC1,
