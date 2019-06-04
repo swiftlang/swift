@@ -2251,8 +2251,17 @@ SILType irgen::getSingletonAggregateFieldType(IRGenModule &IGM, SILType t,
     auto allFields = structDecl->getStoredProperties();
     
     auto field = allFields.begin();
-    if (!allFields.empty() && std::next(field) == allFields.end())
-      return t.getFieldType(*field, IGM.getSILModule());
+    if (!allFields.empty() && std::next(field) == allFields.end()) {
+      auto fieldTy = t.getFieldType(*field, IGM.getSILModule());
+      if (auto fieldDecl = fieldTy.getNominalOrBoundGenericNominal()) {
+        // The field's access level must be higher or equal to the enclosing
+        // struct's.
+        if (fieldDecl->getEffectiveAccess() >= structDecl->getEffectiveAccess())
+          return fieldTy;
+      } else {
+        return fieldTy;
+      }
+    }
 
     return SILType();
   }
@@ -2267,8 +2276,17 @@ SILType irgen::getSingletonAggregateFieldType(IRGenModule &IGM, SILType t,
     
     auto theCase = allCases.begin();
     if (!allCases.empty() && std::next(theCase) == allCases.end()
-        && (*theCase)->hasAssociatedValues())
-      return t.getEnumElementType(*theCase, IGM.getSILModule());
+        && (*theCase)->hasAssociatedValues()) {
+      auto enumEltTy = t.getEnumElementType(*theCase, IGM.getSILModule());
+      if (auto eltDecl = enumEltTy.getNominalOrBoundGenericNominal()) {
+        // The enum element's access level must be higher or equal to the
+        // enclosing struct's.
+        if (eltDecl->getEffectiveAccess() >= enumDecl->getEffectiveAccess())
+          return enumEltTy;
+      } else {
+        return enumEltTy;
+      }
+    }
 
     return SILType();
   }
