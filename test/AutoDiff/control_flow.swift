@@ -70,7 +70,7 @@ ControlFlowTests.test("Conditionals") {
     }
     return y * y
   }
-  expectEqual((0, 10), gradient(at: 4, 5, in: guard2))
+  expectEqual((0, 10), gradient(at: 4, 5, in: guard3))
   expectCrash {
     gradient(at: -3, -2, in: guard3)
   }

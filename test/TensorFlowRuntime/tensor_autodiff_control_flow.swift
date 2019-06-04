@@ -1,6 +1,9 @@
 // RUN: %target-run-simple-swift-control-flow-differentiation
 // REQUIRES: executable_test
 //
+// FIXME(TF-326): Re-enable `-O` after deserialization failure fix.
+// UNSUPPORTED: swift_test_mode_optimize
+//
 // Tensor control flow AD runtime tests.
 // TODO: Move TensorFlow-specific AD tests into test/AutoDiff.
 

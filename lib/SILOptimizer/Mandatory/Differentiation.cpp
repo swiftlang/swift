@@ -3665,6 +3665,9 @@ private:
   /// The parent VJP emitter.
   VJPEmitter &vjpEmitter;
 
+  /// Dominance info for the original function.
+  DominanceInfo *domInfo = nullptr;
+
   /// Post-order info for the original function.
   PostOrderFunctionInfo *postOrderInfo = nullptr;
 
@@ -3740,9 +3743,11 @@ public:
   explicit AdjointEmitter(VJPEmitter &vjpEmitter)
       : vjpEmitter(vjpEmitter), builder(getAdjoint()),
         localAllocBuilder(getAdjoint()) {
-    // Get post-order info for the original function.
+    // Get dominance and post-order info for the original function.
     auto &passManager = getContext().getPassManager();
+    auto *domAnalysis = passManager.getAnalysis<DominanceAnalysis>();
     auto *postOrderAnalysis = passManager.getAnalysis<PostOrderAnalysis>();
+    domInfo = domAnalysis->get(vjpEmitter.original);
     postOrderInfo = postOrderAnalysis->get(vjpEmitter.original);
   }
 
@@ -4130,9 +4135,6 @@ public:
     // Get dominated active values in original blocks.
     // Adjoint values of dominated active values are passed as adjoint block
     // arguments.
-    auto *domAnalysis =
-        getContext().getPassManager().getAnalysis<DominanceAnalysis>();
-    auto *domInfo = domAnalysis->get(&original);
     DominanceOrder domOrder(original.getEntryBlock(), domInfo);
     while (auto *bb = domOrder.getNext()) {
       auto &activeBBValues = activeValues[bb];
