@@ -1,4 +1,5 @@
 // RUN: not %target-build-swift -typecheck %s 2>&1 | %FileCheck -check-prefix=CHECK-%target-os %s
+// REQUIRES: objc_interop
 // REQUIRES: executable_test
 
 class IBActionWrapperTy {
