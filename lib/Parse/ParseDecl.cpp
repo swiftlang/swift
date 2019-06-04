@@ -853,7 +853,7 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
   return ParserResult<DifferentiableAttr>(
     DifferentiableAttr::create(Context, /*implicit*/ false, atLoc,
                                SourceRange(loc, rParenLoc),
-                               params, jvpSpec, vjpSpec, linear, whereClause));
+                               params, jvpSpec, vjpSpec, whereClause));
 }
 
 bool Parser::parseDifferentiationParametersClause(
@@ -971,7 +971,22 @@ bool Parser::parseDifferentiableAttributeArguments(
   SyntaxParsingContext ContentContext(
       SyntaxContext, SyntaxKind::DifferentiableAttributeArguments);
 
-  // Parse optional differentiation parameters, starting with the 'wrt:' label.
+  // Parse optional differentiation parameters, starting with
+  // the 'linear' label (optinal).
+  if (Tok.is(tok::identifier) && Tok.getText() == "linear") {
+    linear = true;
+    if (consumeIfTrailingComma())
+      return errorAndSkipToEnd();
+    consumeToken();
+    if (Tok.isNot(tok::comma) && Tok.isNot(tok::kw_where))
+      return false;
+    if (Tok.is(tok::comma)) {
+      consumeToken();
+    }
+  } else {
+    linear = false;
+  }
+  
   // If 'withRespectTo' is used, make the user change it to 'wrt'.
   if (Tok.is(tok::identifier) && Tok.getText() == "withRespectTo") {
     SourceRange withRespectToRange(Tok.getLoc(), peekToken().getLoc());
@@ -1044,15 +1059,6 @@ bool Parser::parseDifferentiableAttributeArguments(
     // function specifier. `consumeIfTrailingComma` will emit an error.
     if (consumeIfTrailingComma())
       return errorAndSkipToEnd();
-  }
-  
-  // Parse `linear` (optional)
-  if (Tok.is(tok::identifier) && Tok.getText() == "linear") {
-    linear = true;
-    if (consumeIfTrailingComma())
-      return errorAndSkipToEnd();
-  } else {
-    linear = false;
   }
 
   // If parser has not advanced and token is not 'where' or ')', emit error.

@@ -57,6 +57,35 @@ public func squareRoot() -> Self {
   return lhs
 }
 
+func constFunc(_ slope: Float) -> ((Float) -> (Float, (Float) -> Float)) {
+  return { (orig: Float) in
+    let orig = slope * orig
+    let pb: (Float) -> Float = { v in
+      return slope
+    }
+    return (orig, pb)
+  }
+}
+
+@differentiable(linear) // okay
+func identity(_ x: Float) -> Float {
+  return x
+}
+
+@differentiable(linear, wrt: x) // okay
+func slope2(_ x: Float) -> Float {
+  return 2 * x
+}
+
+func const3(_ x: Float) -> (Float, (Float) -> Float) {
+  return constFunc(3)(x)
+}
+
+@differentiable(linear, wrt: x, vjp: const3) // okay
+func slope3(_ x: Float) -> Float {
+  return 3 * x
+}
+
 /// Bad
 
 @differentiable(3) // expected-error {{expected a function specifier label, e.g. 'wrt:', 'jvp:', or 'vjp:'}}
@@ -112,4 +141,27 @@ func bar(_ x: Float, _: Float) -> Float {
 @differentiable(vjp: foo(_:_:), where T) // expected-error {{unexpected ',' separator}}
 func bar<T : Numeric>(_ x: T, _: T) -> T {
     return 1 + x
+}
+
+@differentiable(wrt: x, linear) // expected-error {{expected a function specifier label, e.g. 'wrt:', 'jvp:', or 'vjp:'}}
+func slope4(_ x: Float) -> Float {
+  return 4 * x
+}
+
+func const5(_ x: Float) -> (Float, (Float) -> Float) {
+  return constFunc(5)(x)
+}
+
+@differentiable(wrt: x, linear, vjp: const5) // expected-error {{expected a function specifier label, e.g. 'wrt:', 'jvp:', or 'vjp:'}}
+func slope5(_ x: Float) -> Float {
+  return 5 * x
+}
+
+func const6(_ x: Float) -> (Float, (Float) -> Float) {
+  return constFunc(6)(x)
+}
+
+@differentiable(wrt: x, vjp: const6, linear) // expected-error {{expected a function specifier label, e.g. 'wrt:', 'jvp:', or 'vjp:'}}
+func slope5(_ x: Float) -> Float {
+  return 6 * x
 }
