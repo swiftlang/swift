@@ -957,8 +957,9 @@ bool Parser::parseDifferentiableAttributeArguments(
       diagnose(Tok, diag::unexpected_separator, ",");
       return true;
     }
-    // Check that token after comma is a function specifier label.
-    if (!Tok.is(tok::identifier) || !(Tok.getText() == "jvp" ||
+    // Check that token after comma is 'wrt:' or a function specifier label.
+    if (!Tok.is(tok::identifier) || !(Tok.getText() == "wrt" ||
+                                      Tok.getText() == "jvp" ||
                                       Tok.getText() == "vjp")) {
       diagnose(Tok, diag::attr_differentiable_expected_label);
       return true;
@@ -971,18 +972,16 @@ bool Parser::parseDifferentiableAttributeArguments(
   SyntaxParsingContext ContentContext(
       SyntaxContext, SyntaxKind::DifferentiableAttributeArguments);
 
-  // Parse optional differentiation parameters, starting with
-  // the 'linear' label (optinal).
+  // Parse optional differentiation parameters.
+  // Parse 'linear' label (optional).
   if (Tok.is(tok::identifier) && Tok.getText() == "linear") {
     linear = true;
-    if (consumeIfTrailingComma())
-      return errorAndSkipToEnd();
-    consumeToken();
+    consumeIdentifier();
+    // If no trailing comma or 'where' clause, terminate parsing arguments.
     if (Tok.isNot(tok::comma) && Tok.isNot(tok::kw_where))
       return false;
-    if (Tok.is(tok::comma)) {
-      consumeToken();
-    }
+    if (consumeIfTrailingComma())
+      return errorAndSkipToEnd();
   } else {
     linear = false;
   }
