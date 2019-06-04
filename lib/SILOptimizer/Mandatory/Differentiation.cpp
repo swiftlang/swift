@@ -4386,12 +4386,12 @@ public:
             } else {
               // Propagate adjoint buffers using `copy_addr`.
               auto adjBuf = getAdjointBuffer(bb, activeValue);
-              auto succAdjBuf = getAdjointBuffer(predBB, activeValue);
+              auto predAdjBuf = getAdjointBuffer(predBB, activeValue);
               // FIXME: Propagate cleanups to fix memory leaks.
-              succAdjBuf.setCleanup(makeCleanupFromChildren(
-                  {adjBuf.getCleanup(), succAdjBuf.getCleanup()}));
+              predAdjBuf.setCleanup(makeCleanupFromChildren(
+                  {adjBuf.getCleanup(), predAdjBuf.getCleanup()}));
               builder.createCopyAddr(
-                  adjLoc, adjBuf, succAdjBuf, IsNotTake, IsNotInitialization);
+                  adjLoc, adjBuf, predAdjBuf, IsNotTake, IsNotInitialization);
             }
           }
           // Branch from adjoint trampoline block to adjoint block.
