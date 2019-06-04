@@ -1,6 +1,6 @@
 {
   key.offset: 0,
-  key.length: 2136,
+  key.length: 2259,
   key.diagnostic_stage: source.diagnostic.stage.swift.parse,
   key.substructure: [
     {
@@ -1324,6 +1324,70 @@
           key.typename: "() throws -> Void",
           key.nameoffset: 2093,
           key.namelength: 10
+        }
+      ]
+    },
+    {
+      key.kind: source.lang.swift.decl.class,
+      key.accessibility: source.lang.swift.accessibility.internal,
+      key.name: "OneMore",
+      key.offset: 2137,
+      key.length: 121,
+      key.runtime_name: "_TtC13StructureTest7OneMore",
+      key.nameoffset: 2143,
+      key.namelength: 7,
+      key.bodyoffset: 2152,
+      key.bodylength: 105,
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.accessibility: source.lang.swift.accessibility.internal,
+          key.name: "testAction(coder:_:)",
+          key.offset: 2170,
+          key.length: 86,
+          key.typename: "AnyObject",
+          key.selector_name: "testActionWithCoder::",
+          key.nameoffset: 2175,
+          key.namelength: 45,
+          key.bodyoffset: 2235,
+          key.bodylength: 20,
+          key.attributes: [
+            {
+              key.offset: 2155,
+              key.length: 14,
+              key.attribute: source.decl.attribute.ibsegueaction
+            }
+          ],
+          key.substructure: [
+            {
+              key.kind: source.lang.swift.decl.var.parameter,
+              key.name: "coder",
+              key.offset: 2186,
+              key.length: 16,
+              key.typename: "AnyObject",
+              key.nameoffset: 2186,
+              key.namelength: 5
+            },
+            {
+              key.kind: source.lang.swift.decl.var.parameter,
+              key.name: "ident",
+              key.offset: 2204,
+              key.length: 15,
+              key.typename: "String",
+              key.nameoffset: 0,
+              key.namelength: 0
+            },
+            {
+              key.kind: source.lang.swift.expr.call,
+              key.name: "fatalError",
+              key.offset: 2240,
+              key.length: 12,
+              key.nameoffset: 2240,
+              key.namelength: 10,
+              key.bodyoffset: 2251,
+              key.bodylength: 0
+            }
+          ]
         }
       ]
     }

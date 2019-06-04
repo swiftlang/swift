@@ -407,6 +407,10 @@ SIMPLE_DECL_ATTR(_disfavoredOverload, DisfavoredOverload,
   OnAbstractFunction | OnVar | OnSubscript | UserInaccessible,
   87)
 
+SIMPLE_DECL_ATTR(IBSegueAction, IBSegueAction,
+  OnFunc,
+  95)
+
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS
