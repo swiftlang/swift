@@ -344,10 +344,12 @@ protected:
   /// Just a placeholder to make it easier to find
   static void dontExpand() {}
 
-  virtual bool lookInGenericParameters(DeclConsumer) const;
+  virtual bool lookInGenericParameters(Optional<bool> isCascadingUse,
+                                       DeclConsumer) const;
 
   // Consume the generic parameters in the context and its outer contexts
   static bool lookInMyAndOuterGenericParameters(const GenericContext *,
+                                                Optional<bool> isCascadingUse,
                                                 DeclConsumer);
 
   NullablePtr<const ASTScopeImpl> parentIfNotChildOfTopScope() const {
@@ -364,9 +366,11 @@ protected:
   // It is not an instance variable or inherited type.
 
   /// Return true if consumer returns true
-  virtual bool lookupLocalBindings(DeclConsumer) const;
+  virtual bool lookupLocalBindings(Optional<bool>, DeclConsumer) const;
 
-  static bool lookupLocalBindingsInPattern(Pattern *p, DeclConsumer consumer);
+  static bool lookupLocalBindingsInPattern(Pattern *p,
+                                           Optional<bool> isCascadingUse,
+                                           DeclConsumer consumer);
 
   /// When lookup must stop before the outermost scope, return the scope to stop
   /// at. Example, if a protocol is nested in a struct, we must stop before
@@ -517,7 +521,8 @@ public:
   virtual std::string declKindName() const = 0;
   virtual bool doesDeclHaveABody() const;
   const char *portionName() const { return portion->portionName; }
-  bool lookInGenericParameters(DeclConsumer) const override;
+  bool lookInGenericParameters(Optional<bool> isCascadingUse,
+                               DeclConsumer) const override;
   NullablePtr<DeclContext>
       computeSelfDCForParent(NullablePtr<DeclContext>) const override;
   Optional<bool> resolveIsCascadingUseForThisScope(
@@ -663,7 +668,7 @@ public:
   }
 
 protected:
-  bool lookupLocalBindings(DeclConsumer) const override;
+  bool lookupLocalBindings(Optional<bool>, DeclConsumer) const override;
   bool doesContextMatchStartingContext(const DeclContext *) const override;
   Optional<bool>
   resolveIsCascadingUseForThisScope(Optional<bool>) const override;
@@ -694,7 +699,8 @@ public:
 
 protected:
   Decl *getEnclosingAbstractFunctionOrSubscriptDecl() const override;
-  bool lookInGenericParameters(DeclConsumer) const override;
+  bool lookInGenericParameters(Optional<bool> isCascadingUse,
+                               DeclConsumer) const override;
   Optional<bool>
   resolveIsCascadingUseForThisScope(Optional<bool>) const override;
 };
@@ -737,7 +743,7 @@ public:
   virtual NullablePtr<Decl> getDecl() const override { return decl; }
 
 protected:
-  bool lookupLocalBindings(DeclConsumer) const override;
+  bool lookupLocalBindings(Optional<bool>, DeclConsumer) const override;
   Optional<bool>
   resolveIsCascadingUseForThisScope(Optional<bool>) const override;
 };
@@ -759,7 +765,8 @@ public:
   PureFunctionBodyScope(AbstractFunctionDecl *e)
       : AbstractFunctionBodyScope(e) {}
   std::string getClassName() const override;
-  bool lookupLocalBindings(DeclConsumer consumer) const override;
+  bool lookupLocalBindings(Optional<bool>,
+                           DeclConsumer consumer) const override;
 
 protected:
   NullablePtr<DeclContext>
@@ -873,7 +880,7 @@ public:
   virtual NullablePtr<Decl> getDecl() const override { return decl; }
 
 protected:
-  bool lookupLocalBindings(DeclConsumer) const override;
+  bool lookupLocalBindings(Optional<bool>, DeclConsumer) const override;
   NullablePtr<DeclContext>
       computeSelfDCForParent(NullablePtr<DeclContext>) const override;
   Optional<bool>
@@ -899,7 +906,7 @@ public:
   SourceRange getChildlessSourceRange() const override;
 
 protected:
-  bool lookupLocalBindings(DeclConsumer) const override;
+  bool lookupLocalBindings(Optional<bool>, DeclConsumer) const override;
 };
 
 /// The scope introduced by a conditional clause in an if/guard/while
@@ -1009,7 +1016,7 @@ public:
   }
 
 protected:
-  bool lookupLocalBindings(DeclConsumer) const override;
+  bool lookupLocalBindings(Optional<bool>, DeclConsumer) const override;
 };
 
 /// Capture lists may contain initializer expressions
@@ -1075,7 +1082,7 @@ public:
   SourceRange getChildlessSourceRange() const override;
 
 protected:
-  bool lookupLocalBindings(DeclConsumer) const override;
+  bool lookupLocalBindings(Optional<bool>, DeclConsumer) const override;
   Optional<bool> resolveIsCascadingUseForThisScope(
       Optional<bool> isCascadingUse) const override;
 };
@@ -1135,7 +1142,7 @@ public:
   getEnclosingAbstractStorageDecl() const override;
 
 protected:
-  bool lookupLocalBindings(DeclConsumer) const override;
+  bool lookupLocalBindings(Optional<bool>, DeclConsumer) const override;
 };
 
 class SubscriptDeclScope final : public ASTScopeImpl {
@@ -1160,7 +1167,8 @@ public:
 
 protected:
   Decl *getEnclosingAbstractFunctionOrSubscriptDecl() const override;
-  bool lookInGenericParameters(DeclConsumer) const override;
+  bool lookInGenericParameters(Optional<bool> isCascadingUse,
+                               DeclConsumer) const override;
   NullablePtr<AbstractStorageDecl>
   getEnclosingAbstractStorageDecl() const override {
     return decl;
@@ -1268,7 +1276,7 @@ public:
   SourceRange getChildlessSourceRange() const override;
 
 protected:
-  bool lookupLocalBindings(DeclConsumer) const override;
+  bool lookupLocalBindings(Optional<bool>, DeclConsumer) const override;
 };
 
 class GuardStmtScope : public AbstractStmtScope {
@@ -1294,7 +1302,8 @@ public:
   Stmt *getStmt() const override { return stmt; }
 
 protected:
-  bool lookupLocalBindings(ASTScopeImpl::DeclConsumer) const override;
+  bool lookupLocalBindings(Optional<bool>,
+                           ASTScopeImpl::DeclConsumer) const override;
 };
 
 class CaseStmtScope : public AbstractStmtScope {
@@ -1309,7 +1318,8 @@ public:
   Stmt *getStmt() const override { return stmt; }
 
 protected:
-  bool lookupLocalBindings(ASTScopeImpl::DeclConsumer) const override;
+  bool lookupLocalBindings(Optional<bool>,
+                           ASTScopeImpl::DeclConsumer) const override;
 };
 
 class BraceStmtScope : public AbstractStmtScope {
@@ -1327,7 +1337,7 @@ public:
   Stmt *getStmt() const override { return stmt; }
 
 protected:
-  bool lookupLocalBindings(DeclConsumer) const override;
+  bool lookupLocalBindings(Optional<bool>, DeclConsumer) const override;
 };
 } // namespace ast_scope
 } // namespace swift

@@ -401,6 +401,7 @@ public:
   virtual ~ASTScopeDeclConsumerForUnqualifiedLookup() = default;
 
   bool consume(ArrayRef<ValueDecl *> values, DeclVisibilityKind vis,
+               Optional<bool> isCascadingUse,
                NullablePtr<DeclContext> baseDC = nullptr) override;
 
   /// returns true if finished and new value for isCascadingUse
@@ -1127,24 +1128,27 @@ void UnqualifiedLookupFactory::experimentallyLookInASTScopes(
 
 bool ASTScopeDeclConsumerForUnqualifiedLookup::consume(
     ArrayRef<ValueDecl *> values, DeclVisibilityKind vis,
-    NullablePtr<DeclContext> baseDC) {
+    Optional<bool> isCascadingUse, NullablePtr<DeclContext> baseDC) {
   for (auto *value: values) {
     if (factory.isOriginallyTypeLookup && !isa<TypeDecl>(value))
       continue;
-    if (value->getFullName().matchesRef(factory.Name)) {
-      factory.Results.push_back(LookupResultEntry(value));
+    if (value->getFullName().matchesRef(factory.Name))
+      continue;
+    factory.Results.push_back(LookupResultEntry(value));
+    auto *const contextOfResult = value->getDeclContext();
+    if (contextOfResult->isModuleContext())
+      factory.recordDependencyOnTopLevelName(contextOfResult, factory.Name,
+                                             isCascadingUse.getValueOr(true));
 #ifndef NDEBUG
-      factory.stopForDebuggingIfAddingTargetLookupResult(factory.Results.back());
+    factory.stopForDebuggingIfAddingTargetLookupResult(factory.Results.back());
 #endif
-    }
   }
-
   factory.recordCompletionOfAScope();
   return factory.isFirstResultEnough();
 }
 
 bool ASTScopeDeclGatherer::consume(ArrayRef<ValueDecl *> valuesArg,
-                                   DeclVisibilityKind,
+                                   DeclVisibilityKind, Optional<bool>,
                                    NullablePtr<DeclContext>) {
   for (auto *v: valuesArg)
     values.push_back(v);
@@ -1330,18 +1334,12 @@ bool UnqualifiedLookupFactory::verifyEqualTo(
              );
     assert(false && "ASTScopeImpl recordedSF differs");
   }
-  static bool hasWarned = false;
-  if (!hasWarned) {
-    hasWarned = true;
-    llvm::errs() << "WARNING: not checking deps HERE\n";
+  if (recordedSF && recordedIsCascadingUse != other.recordedIsCascadingUse) {
+    writeErr(std::string("recordedIsCascadingUse differs: shouldBe: ") +
+             std::to_string(recordedIsCascadingUse) + std::string(" is: ") +
+             std::to_string(other.recordedIsCascadingUse));
+    assert(false && "ASTScopeImpl recordedIsCascadingUse differs");
   }
-//  if (recordedSF && recordedIsCascadingUse != other.recordedIsCascadingUse) {
-//    writeErr( std::string("recordedIsCascadingUse differs: shouldBe: ")
-//             + std::to_string(recordedIsCascadingUse)
-//             + std::string( " is: ")
-//             + std::to_string(other.recordedIsCascadingUse));
-//    assert(false && "ASTScopeImpl recordedIsCascadingUse differs");
-//  }
   return true;
 }
 

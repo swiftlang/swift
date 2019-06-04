@@ -592,6 +592,7 @@ public:
   /// Takes an array in order to batch the consumption before setting
   /// IndexOfFirstOuterResult when necessary.
   virtual bool consume(ArrayRef<ValueDecl *> values, DeclVisibilityKind vis,
+                       Optional<bool> isCascadingUse,
                        NullablePtr<DeclContext> baseDC = nullptr) = 0;
 
   /// Eventually this functionality should move into ASTScopeLookup
@@ -614,6 +615,7 @@ public:
   virtual ~ASTScopeDeclGatherer() = default;
 
   bool consume(ArrayRef<ValueDecl *> values, DeclVisibilityKind vis,
+               Optional<bool> isCascadingUse,
                NullablePtr<DeclContext> baseDC = nullptr) override;
 
   /// Eventually this functionality should move into ASTScopeLookup
