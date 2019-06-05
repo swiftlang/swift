@@ -8,6 +8,7 @@
 
 
 import os
+import platform
 import sys
 import unittest
 from contextlib import contextmanager
@@ -344,7 +345,10 @@ class TestDriverArgumentParserMeta(type):
     def generate_preset_test(cls, preset_name, preset_args):
         def test(self):
             try:
-                self.parse_default_args(preset_args, check_impl_args=True)
+                # Windows cannot run build-script-impl to check the impl args.
+                is_windows = platform.system() == 'Windows'
+                self.parse_default_args(preset_args,
+                                        check_impl_args=not is_windows)
             except ParserError as e:
                 self.fail('failed to parse preset "{}": {}'.format(
                     preset_name, e))

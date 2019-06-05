@@ -119,7 +119,15 @@ class NinjaTestCase(unittest.TestCase):
 + pushd {build_dir}
 + {expect_env}{python} configure.py --bootstrap
 + popd
-""".format(source_dir=self.workspace.source_dir('ninja'),
-           build_dir=self.workspace.build_dir('build', 'ninja'),
+""".format(source_dir=self._platform_quote(
+            self.workspace.source_dir('ninja')),
+           build_dir=self._platform_quote(
+            self.workspace.build_dir('build', 'ninja')),
            expect_env=expect_env,
-           python=sys.executable))
+           python=self._platform_quote(sys.executable)))
+
+    def _platform_quote(self, path):
+        if platform.system() == 'Windows':
+            return "'{}'".format(path)
+        else:
+            return path
