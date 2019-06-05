@@ -65,7 +65,7 @@ bool ASTScopeImpl::isGuardContinuationConditionalClause() const {
   return false;
 }
 
-bool GuardContinuationScope::isGuardContinuationConditionalClause() const {
+bool GuardUseScope::isGuardContinuationConditionalClause() const {
   return true;
 }
 
@@ -192,7 +192,7 @@ DEFINE_GET_CLASS_NAME(PatternEntryUseScope)
 DEFINE_GET_CLASS_NAME(WhileConditionalClauseScope)
 DEFINE_GET_CLASS_NAME(IfConditionalClauseScope)
 DEFINE_GET_CLASS_NAME(GuardConditionalClauseScope)
-DEFINE_GET_CLASS_NAME(GuardContinuationScope)
+DEFINE_GET_CLASS_NAME(GuardUseScope)
 DEFINE_GET_CLASS_NAME(StatementConditionElementPatternScope)
 DEFINE_GET_CLASS_NAME(CaptureListScope)
 DEFINE_GET_CLASS_NAME(WholeClosureScope)

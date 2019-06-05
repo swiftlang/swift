@@ -987,9 +987,9 @@ public:
 
 /// A conditional clause  being used for the 'guard'
 /// continuation.
-class GuardContinuationScope : public GuardConditionalClauseScope {
+class GuardUseScope : public ASTScopeImpl {
 public:
-  GuardContinuationScope(GuardStmt *stmt, unsigned index)
+  GuardUseScope(GuardStmt *stmt, unsigned index)
       : GuardConditionalClauseScope(stmt, index) {}
 
   bool isGuardContinuationConditionalClause() const override;

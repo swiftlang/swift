@@ -997,7 +997,7 @@ void ConditionalClauseScope::createSubtreeForCondition(
   }
 }
 
-void GuardContinuationScope::createSubtreeForCondition(ScopeCreator &) {
+void GuardUseScope::createSubtreeForCondition(ScopeCreator &) {
   // no condition for this one
 }
 
@@ -1015,9 +1015,9 @@ void GuardConditionalClauseScope::createSubtreeForNextConditionalClause(
   scopeCreator.createSubtree<GuardConditionalClauseScope>(this, stmt,
                                                           index + 1);
 }
-void GuardContinuationScope::createSubtreeForNextConditionalClause(
+void GuardUseScope::createSubtreeForNextConditionalClause(
     ScopeCreator &scopeCreator) {
-  scopeCreator.createSubtree<GuardContinuationScope>(this, stmt, index + 1);
+  scopeCreator.createSubtree<GuardUseScope>(this, stmt, index + 1);
 }
 
 void WhileConditionalClauseScope::finishExpansion(

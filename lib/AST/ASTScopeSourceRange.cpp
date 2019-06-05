@@ -387,7 +387,7 @@ SourceRange GuardConditionalClauseScope::getChildlessSourceRange() const {
   return SourceRange(startLoc, stmt->getBody()->getStartLoc());
 }
 
-SourceRange GuardContinuationScope::getChildlessSourceRange() const {
+SourceRange GuardUseScope::getChildlessSourceRange() const {
   // For a guard continuation, the scope extends from the end of the 'else'
   // to the end of the continuation.
   return SourceRange(stmt->getBody()->getEndLoc());
