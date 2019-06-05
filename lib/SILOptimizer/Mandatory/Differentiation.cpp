@@ -1741,6 +1741,7 @@ static void dumpActivityInfo(SILFunction &fn,
                              llvm::raw_ostream &s = llvm::dbgs()) {
   s << "Activity info for " << fn.getName() << " at " << indices << '\n';
   for (auto &bb : fn) {
+    s << "bb" << bb.getDebugID() << ":\n";
     for (auto *arg : bb.getArguments())
       dumpActivityInfo(arg, indices, activityInfo, s);
     for (auto &inst : bb)
@@ -3192,7 +3193,7 @@ public:
     // Do standard cloning.
     if (!hasActiveResults || !hasActiveArguments) {
       LLVM_DEBUG(getADDebugStream() << "No active results:\n" << *ai << '\n');
-      SILClonerWithScopes::visitApplyInst(ai);
+      TypeSubstCloner::visitApplyInst(ai);
       return;
     }
 
@@ -3893,11 +3894,10 @@ private:
     LLVM_DEBUG(getADDebugStream() << "Adding adjoint for " << originalValue);
 #ifndef NDEBUG
     auto origTy = remapType(originalValue->getType()).getASTType();
-    auto tanSpace = origTy->getAutoDiffAssociatedTangentSpace(
-        LookUpConformanceInModule(getModule().getSwiftModule()));
+    auto tangentSpace = getTangentSpace(origTy);
     // The adjoint value must be in the tangent space.
-    assert(tanSpace && newAdjointValue.getType().getASTType()->isEqual(
-               tanSpace->getCanonicalType()));
+    assert(tangentSpace && newAdjointValue.getType().getASTType()->isEqual(
+               tangentSpace->getCanonicalType()));
 #endif
     auto insertion =
         valueMap.try_emplace({origBB, originalValue}, newAdjointValue);
@@ -4662,11 +4662,11 @@ public:
   }
 
   /// Handle `struct` instruction.
-  ///   y = struct (x0, x1, x2, ...)
-  ///   adj[x0] += struct_extract adj[y], #x0
-  ///   adj[x1] += struct_extract adj[y], #x1
-  ///   adj[x2] += struct_extract adj[y], #x2
-  ///   ...
+  ///   Original: y = struct (x0, x1, x2, ...)
+  ///    Adjoint: adj[x0] += struct_extract adj[y], #x0
+  ///             adj[x1] += struct_extract adj[y], #x1
+  ///             adj[x2] += struct_extract adj[y], #x2
+  ///             ...
   void visitStructInst(StructInst *si) {
     auto *bb = si->getParent();
     auto loc = si->getLoc();
@@ -4684,9 +4684,8 @@ public:
       auto adjStruct = materializeAdjointDirect(std::move(av), loc);
       // Find the struct `TangentVector` type.
       auto structTy = remapType(si->getType()).getASTType();
-      auto tangentVectorTy = structTy->getAutoDiffAssociatedTangentSpace(
-          LookUpConformanceInModule(getModule().getSwiftModule()))
-              ->getType()->getCanonicalType();
+      auto tangentVectorTy =
+          getTangentSpace(structTy)->getType()->getCanonicalType();
       assert(!getModule().Types.getTypeLowering(
                  tangentVectorTy, ResilienceExpansion::Minimal)
                      .isAddressOnly());
@@ -4737,20 +4736,19 @@ public:
     }
   }
 
+  /// Handle `struct_extract` instruction.
+  ///   Original: y = struct_extract x, #field
+  ///    Adjoint: adj[x] += struct (0, ..., #field': adj[y], ..., 0)
+  ///                                       ^~~~~~~
+  ///                     field in tangent space corresponding to #field
   void visitStructExtractInst(StructExtractInst *sei) {
     assert(!sei->getField()->getAttrs().hasAttribute<NoDerivativeAttr>() &&
            "`struct_extract` with `@noDerivative` field should not be "
            "differentiated; activity analysis should not marked as varied");
-    // Compute adjoint as follows:
-    //   y = struct_extract x, #key
-    //   adj[x] += struct (0, ..., #key': adj[y], ..., 0)
-    // where `#key'` is the field in the tangent space corresponding to
-    // `#key`.
     auto *bb = sei->getParent();
     auto structTy = remapType(sei->getOperand()->getType()).getASTType();
-    auto tangentVectorTy = structTy->getAutoDiffAssociatedTangentSpace(
-        LookUpConformanceInModule(getModule().getSwiftModule()))
-            ->getType()->getCanonicalType();
+    auto tangentVectorTy =
+        getTangentSpace(structTy)->getType()->getCanonicalType();
     assert(!getModule().Types.getTypeLowering(
                tangentVectorTy, ResilienceExpansion::Minimal)
                    .isAddressOnly());
@@ -4810,9 +4808,9 @@ public:
   }
 
   /// Handle `tuple` instruction.
-  ///   y = tuple (x0, x1, x2, ...)
-  ///   adj[x0] += tuple_extract adj[y], 0
-  ///   ...
+  ///   Original: y = tuple (x0, x1, x2, ...)
+  ///    Adjoint: adj[x0] += tuple_extract adj[y], 0
+  ///             ...
   void visitTupleInst(TupleInst *ti) {
     auto *bb = ti->getParent();
     auto av = getAdjointValue(bb, ti);
@@ -4851,9 +4849,11 @@ public:
   }
 
   /// Handle `tuple_extract` instruction.
-  ///   y = tuple_extract x, <n>
-  ///                         |--- n-th element
-  ///   adj[x] += tuple (0, 0, ..., adj[y], ..., 0, 0)
+  ///   Original: y = tuple_extract x, <n>
+  ///    Adjoint: adj[x] += tuple (0, 0, ..., adj[y], ..., 0, 0)
+  ///                                         ^~~~~~
+  ///                            n'-th element, where n' is tuple tangent space
+  ///                            index corresponding to n
   void visitTupleExtractInst(TupleExtractInst *tei) {
     auto *bb = tei->getParent();
     auto tupleTanTy = getRemappedTangentType(tei->getOperand()->getType());
@@ -5234,9 +5234,7 @@ void AdjointEmitter::materializeAdjointIndirectHelper(
 
 void AdjointEmitter::emitZeroIndirect(CanType type, SILValue bufferAccess,
                                       SILLocation loc) {
-  auto *swiftMod = getModule().getSwiftModule();
-  auto tangentSpace = type->getAutoDiffAssociatedTangentSpace(
-      LookUpConformanceInModule(swiftMod));
+  auto tangentSpace = getTangentSpace(type);
   assert(tangentSpace && "No tangent space for this type");
   switch (tangentSpace->getKind()) {
   case VectorSpace::Kind::Vector:
@@ -5371,9 +5369,7 @@ SILValue AdjointEmitter::accumulateDirect(SILValue lhs, SILValue rhs) {
   auto adjointTy = lhs->getType();
   auto adjointASTTy = adjointTy.getASTType();
   auto loc = lhs.getLoc();
-  auto *swiftMod = getModule().getSwiftModule();
-  auto tangentSpace = adjointASTTy->getAutoDiffAssociatedTangentSpace(
-      LookUpConformanceInModule(swiftMod));
+  auto tangentSpace = getTangentSpace(adjointASTTy);
   assert(tangentSpace && "No tangent space for this type");
   switch (tangentSpace->getKind()) {
   case VectorSpace::Kind::Vector: {
