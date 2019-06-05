@@ -829,7 +829,6 @@ ParserResult<DifferentiableAttr>
 Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
   StringRef AttrName = "differentiable";
   SourceLoc lParenLoc = loc, rParenLoc = loc;
-
   bool linear = false;
   SmallVector<ParsedAutoDiffParameter, 8> params;
   Optional<DeclNameWithLoc> jvpSpec;
