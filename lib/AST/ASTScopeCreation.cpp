@@ -104,22 +104,19 @@ public:
 
   void addAnyNewScopesToTree() {
     pushSourceFileDecls(sourceFileScope->SF->Decls);
-    addChildScopesForAnyRemainingDeferredNodesTo(lastAdopter);
-  }
-
-protected:
-  /// Create and expandScope scopes for any deferred nodes, adding those scopes
-  /// as children of the receiver.
-
-  void addChildScopesForAnyRemainingDeferredNodesTo(ASTScopeImpl *parent) {
-    parent->clearCachedSourceRangesOfAncestors();
-    createScopesForDeferredNodes(parent);
-    parent->cacheSourceRangesOfAncestors();
+    if (!haveDeferredNodes())
+      return; // an optimization
+    auto *const injectionPoint = lastAdopter;
+    lastAdopter->clearCachedSourceRangesOfMeAndAncestors();
+    createScopesForDeferredNodes(lastAdopter);
+    injectionPoint->cacheSourceRangesOfSlice();
   }
 
 public:
   /// For each deferred node, create scopes as needed and add those scopes as
   /// children of the argument.
+  /// Since nodes added to the source file in the future need to go where
+  /// deferred ndoes go, remember me as an adopter, too.
   void createScopesForDeferredNodes(ASTScopeImpl *parent) {
     setLastAdopter(parent); // in case we come back here later after adding
     // more Decls to the SourceFile
@@ -202,7 +199,7 @@ public:
     auto *child = constructScope<Scope>(args...);
     parent->addChild(child, ctx);
     child->expandMe(*this);
-    addChildScopesForAnyRemainingDeferredNodesTo(child);
+    createScopesForDeferredNodes(child);
     return child;
   }
 
@@ -686,6 +683,7 @@ void PatternEntryDeclScope::expandMe(ScopeCreator &scopeCreator) {
     auto *initializer = scopeCreator.withoutDeferrals()
                             .createSubtree<PatternEntryInitializerScope>(
                                 this, decl, patternEntryIndex, vis);
+    initializer->cacheSourceRange();
     initializerEnd = initializer->getSourceRange().End;
   }
   // If there are no uses of the declararations, add the accessors immediately.

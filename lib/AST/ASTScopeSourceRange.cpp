@@ -50,6 +50,8 @@ SourceRange ASTScopeImpl::getUncachedSourceRange(bool forDebugging) const {
     assert(childlessRange.Start.isValid());
     return childlessRange;
   }
+  for (auto *c: getChildren())
+    c->cacheSourceRange();
   const auto childStart =
       getChildren().front()->getSourceRange(forDebugging).Start;
   assert(forDebugging || childStart.isValid());
@@ -419,20 +421,23 @@ SourceRange AttachedPropertyWrapperScope::getChildlessSourceRange() const {
 #pragma mark source range caching
 
 void ASTScopeImpl::cacheSourceRange() {
+  if (cachedSourceRange)
+    return;
   cachedSourceRange = getUncachedSourceRange();
   verifySourceRange();
 }
 
-void ASTScopeImpl::clearSourceRangeCache() { cachedSourceRange = SourceLoc(); }
-void ASTScopeImpl::cacheSourceRangesOfAncestors() {
+void ASTScopeImpl::clearSourceRangeCache() { cachedSourceRange = None; }
+void ASTScopeImpl::cacheSourceRangesOfSlice() {
   cacheSourceRange();
-  if (auto p = getParent())
-    p.get()->cacheSourceRangesOfAncestors();
+  for (auto *s = this->getParent().getPtrOrNull(); s;
+       s = s->getParent().getPtrOrNull())
+    s->cacheSourceRange();
 }
-void ASTScopeImpl::clearCachedSourceRangesOfAncestors() {
+void ASTScopeImpl::clearCachedSourceRangesOfMeAndAncestors() {
   clearSourceRangeCache();
   if (auto p = getParent())
-    p.get()->clearCachedSourceRangesOfAncestors();
+    p.get()->clearCachedSourceRangesOfMeAndAncestors();
 }
 
 #pragma mark ignored nodes and compensating for InterpolatedStringLiteralExprs and EditorPlaceHolders

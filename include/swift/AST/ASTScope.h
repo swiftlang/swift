@@ -163,6 +163,9 @@ protected:
 private:
   NullablePtr<ASTScopeImpl> getPriorSibling() const;
 
+public:
+  void postOrderDo(function_ref<void(ASTScopeImpl *)>);
+
 #pragma mark - source ranges
 
 public:
@@ -184,10 +187,12 @@ public:
 
 private:
   SourceRange getUncachedSourceRange(bool forDebugging = false) const;
+public: // for PatternEntryDeclScope::expandMe
   void cacheSourceRange();
+private:
   void clearSourceRangeCache();
-  void cacheSourceRangesOfAncestors();
-  void clearCachedSourceRangesOfAncestors();
+  void cacheSourceRangesOfSlice();
+  void clearCachedSourceRangesOfMeAndAncestors();
 
   /// Even ASTNodes that do not form scopes must be included in a Scope's source
   /// range. Widen the source range of the receiver to include the (ignored)

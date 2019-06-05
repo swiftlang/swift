@@ -222,3 +222,9 @@ NullablePtr<NominalTypeDecl>
 ExtensionScope::getCorrespondingNominalTypeDecl() const {
   return decl->getExtendedNominal();
 }
+
+void ASTScopeImpl::postOrderDo(function_ref<void(ASTScopeImpl *)> fn) {
+  for (auto *child : getChildren())
+    child->postOrderDo(fn);
+  fn(this);
+}
