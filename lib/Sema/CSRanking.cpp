@@ -341,10 +341,9 @@ static bool isProtocolExtensionAsSpecializedAs(TypeChecker &tc,
   // the second protocol extension.
   ConstraintSystem cs(tc, dc1, None);
   OpenedTypeMap replacements;
-  cs.openGeneric(dc2, dc2, sig2,
+  cs.openGeneric(dc2, sig2,
                  /*skipProtocolSelfConstraint=*/false,
-                 ConstraintLocatorBuilder(nullptr),
-                 replacements);
+                 ConstraintLocatorBuilder(nullptr), replacements);
 
   // Bind the 'Self' type from the first extension to the type parameter from
   // opening 'Self' of the second extension.
@@ -517,17 +516,12 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
       OpenedTypeMap unused;
       Type openedType2;
       if (auto *funcType = type2->getAs<AnyFunctionType>()) {
-        openedType2 =
-            cs.openFunctionType(funcType, locator,
-                                /*replacements=*/unused, innerDC2, outerDC2,
-                                /*skipProtocolSelfConstraint=*/false);
+        openedType2 = cs.openFunctionType(funcType, locator,
+                                          /*replacements=*/unused, outerDC2,
+                                          /*skipProtocolSelfConstraint=*/false);
       } else {
-        cs.openGeneric(innerDC2,
-                       outerDC2,
-                       innerDC2->getGenericSignatureOfContext(),
-                       /*skipProtocolSelfConstraint=*/false,
-                       locator,
-                       unused);
+        cs.openGeneric(outerDC2, innerDC2->getGenericSignatureOfContext(),
+                       /*skipProtocolSelfConstraint=*/false, locator, unused);
 
         openedType2 = cs.openType(type2, unused);
       }
@@ -537,15 +531,12 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
       OpenedTypeMap replacements;
       Type openedType1;
       if (auto *funcType = type1->getAs<AnyFunctionType>()) {
-        openedType1 = cs.openFunctionType(funcType, locator, replacements,
-                                          innerDC1, outerDC1,
-                                          /*skipProtocolSelfConstraint=*/false);
+        openedType1 =
+            cs.openFunctionType(funcType, locator, replacements, outerDC1,
+                                /*skipProtocolSelfConstraint=*/false);
       } else {
-        cs.openGeneric(innerDC1,
-                       outerDC1,
-                       innerDC1->getGenericSignatureOfContext(),
-                       /*skipProtocolSelfConstraint=*/false,
-                       locator,
+        cs.openGeneric(outerDC1, innerDC1->getGenericSignatureOfContext(),
+                       /*skipProtocolSelfConstraint=*/false, locator,
                        replacements);
 
         openedType1 = cs.openType(type1, replacements);
