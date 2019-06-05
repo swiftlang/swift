@@ -1653,6 +1653,7 @@ namespace decls_block {
   using DifferentiableDeclAttrLayout = BCRecordLayout<
     Differentiable_DECL_ATTR,
     BCFixed<1>, // Implicit flag.
+    BCFixed<1>, // Linear flag.
     IdentifierIDField, // JVP name.
     DeclIDField, // JVP function declaration.
     IdentifierIDField, // VJP name.

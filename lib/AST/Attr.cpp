@@ -423,13 +423,19 @@ static void printDifferentiableAttrArguments(
     }
     stream << ", ";
   };
+  
+  // Print if the function is marked as differentiable.
+  if (attr->isLinear()) {
+    isLeadingClause = false;
+    stream << "linear";
+  }
 
   // Print differentiation parameters, if any.
   auto diffParamsString = getDifferentiationParametersClauseString(
       original, attr->getParameterIndices(), attr->getParsedParameters(),
       prettyPrintInModule);
   if (!diffParamsString.empty()) {
-    isLeadingClause = false;
+    printCommaIfNecessary();
     stream << diffParamsString;
   }
   // Print jvp function name.
@@ -1319,31 +1325,35 @@ SpecializeAttr *SpecializeAttr::create(ASTContext &Ctx, SourceLoc atLoc,
 // SWIFT_ENABLE_TENSORFLOW
 DifferentiableAttr::DifferentiableAttr(ASTContext &context, bool implicit,
                                        SourceLoc atLoc, SourceRange baseRange,
+                                       bool linear,
                                        ArrayRef<ParsedAutoDiffParameter> params,
                                        Optional<DeclNameWithLoc> jvp,
                                        Optional<DeclNameWithLoc> vjp,
                                        TrailingWhereClause *clause)
   : DeclAttribute(DAK_Differentiable, atLoc, baseRange, implicit),
-    NumParsedParameters(params.size()),
-    JVP(std::move(jvp)), VJP(std::move(vjp)), WhereClause(clause) {
+    linear(linear), NumParsedParameters(params.size()), JVP(std::move(jvp)),
+    VJP(std::move(vjp)), WhereClause(clause) {
   std::copy(params.begin(), params.end(),
             getTrailingObjects<ParsedAutoDiffParameter>());
 }
 
 DifferentiableAttr::DifferentiableAttr(ASTContext &context, bool implicit,
                                        SourceLoc atLoc, SourceRange baseRange,
+                                       bool linear,
                                        AutoDiffParameterIndices *indices,
                                        Optional<DeclNameWithLoc> jvp,
                                        Optional<DeclNameWithLoc> vjp,
                                        ArrayRef<Requirement> requirements)
     : DeclAttribute(DAK_Differentiable, atLoc, baseRange, implicit),
-      JVP(std::move(jvp)), VJP(std::move(vjp)), ParameterIndices(indices) {
+      linear(linear), JVP(std::move(jvp)), VJP(std::move(vjp)),
+      ParameterIndices(indices) {
   setRequirements(context, requirements);
 }
 
 DifferentiableAttr *
 DifferentiableAttr::create(ASTContext &context, bool implicit,
                            SourceLoc atLoc, SourceRange baseRange,
+                           bool linear,
                            ArrayRef<ParsedAutoDiffParameter> parameters,
                            Optional<DeclNameWithLoc> jvp,
                            Optional<DeclNameWithLoc> vjp,
@@ -1351,13 +1361,14 @@ DifferentiableAttr::create(ASTContext &context, bool implicit,
   unsigned size = totalSizeToAlloc<ParsedAutoDiffParameter>(parameters.size());
   void *mem = context.Allocate(size, alignof(DifferentiableAttr));
   return new (mem) DifferentiableAttr(context, implicit, atLoc, baseRange,
-                                      parameters, std::move(jvp),
+                                      linear, parameters, std::move(jvp),
                                       std::move(vjp), clause);
 }
 
 DifferentiableAttr *
 DifferentiableAttr::create(ASTContext &context, bool implicit,
                            SourceLoc atLoc, SourceRange baseRange,
+                           bool linear,
                            AutoDiffParameterIndices *indices,
                            Optional<DeclNameWithLoc> jvp,
                            Optional<DeclNameWithLoc> vjp,
@@ -1365,8 +1376,8 @@ DifferentiableAttr::create(ASTContext &context, bool implicit,
   void *mem = context.Allocate(sizeof(DifferentiableAttr),
                                alignof(DifferentiableAttr));
   return new (mem) DifferentiableAttr(context, implicit, atLoc, baseRange,
-                                      indices, std::move(jvp), std::move(vjp),
-                                      requirements);
+                                      linear, indices, std::move(jvp),
+                                      std::move(vjp), requirements);
 }
 
 void DifferentiableAttr::setRequirements(ASTContext &context,

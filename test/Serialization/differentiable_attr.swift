@@ -14,6 +14,13 @@ func simple(x: Float) -> Float {
   return x
 }
 
+// CHECK: @differentiable(wrt: x, jvp: jvpSimple, vjp: vjpSimple)
+// CHECK-NEXT: func simple2(x: Float) -> Float
+@differentiable(linear, wrt: x, jvp: jvpSimple, vjp: vjpSimple)
+func simple2(x: Float) -> Float {
+  return x
+}
+
 func jvpSimple(x: Float) -> (Float, (Float) -> Float) {
   return (x, { v in v })
 }

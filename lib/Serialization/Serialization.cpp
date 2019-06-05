@@ -2522,6 +2522,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     case DAK_Differentiable: {
       auto abbrCode = S.DeclTypeAbbrCodes[DifferentiableDeclAttrLayout::Code];
       auto attr = cast<DifferentiableAttr>(DA);
+      bool linear = false;
 
       IdentifierID jvpName = 0;
       DeclID jvpRef = 0;
@@ -2544,7 +2545,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
 
       DifferentiableDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(),
-          jvpName, jvpRef, vjpName, vjpRef, indices);
+          linear, jvpName, jvpRef, vjpName, vjpRef, indices);
 
       S.writeGenericRequirements(attr->getRequirements(), S.DeclTypeAbbrCodes);
       return;
