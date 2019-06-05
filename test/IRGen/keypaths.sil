@@ -553,6 +553,13 @@ entry:
   return undef : $()
 }
 
+sil @class_constrainted : $@convention(thin) <V where V : C> () -> () {
+bb0:
+  %k = keypath $KeyPath<V, String>, <τ_0_0 where τ_0_0 : C> (root $τ_0_0; stored_property #C.y : $String) <V>
+  %t = tuple ()
+  return %t : $()
+}
+
 sil @s_get : $@convention(thin) <A: Hashable, B: Hashable> (@in_guaranteed A, UnsafeRawPointer) -> @out B
 sil @s_set : $@convention(thin) <A: Hashable, B: Hashable> (@in_guaranteed B, @in_guaranteed A, UnsafeRawPointer) -> ()
 sil @s_equals : $@convention(thin) <A: Hashable, B: Hashable> (UnsafeRawPointer, UnsafeRawPointer) -> Bool
