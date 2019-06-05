@@ -71,6 +71,7 @@ class ASTScopeImpl;
 class GTXScope;
 class IterableTypeScope;
 class TypeAliasScope;
+class StatementConditionElementPatternScope;
 class ScopeCreator;
 
 #pragma mark the root ASTScopeImpl class
@@ -216,7 +217,7 @@ public:
   /// Print out this scope for debugging/reporting purposes.
   void print(llvm::raw_ostream &out, unsigned level = 0, bool lastChild = false,
              bool printChildren = true) const;
-private:
+
   void printRange(llvm::raw_ostream &out) const;
 
 protected:
@@ -361,7 +362,9 @@ protected:
   /// The tree is organized by source location and for most nodes this is also
   /// what obtaines for scoping. However, guards are different. The scope after
   /// the guard else must hop into the innermoset scope of the guard condition.
-  virtual NullablePtr<const ASTScopeImpl> getLookupParent { return parent; }
+  virtual NullablePtr<const ASTScopeImpl> getLookupParent() const {
+    return parent;
+  }
 
 #pragma mark - - lookup- local bindings
 protected:
@@ -926,10 +929,18 @@ public:
   /// The index of the conditional clause.
   const unsigned index;
 
+  /// The next deepest, if any
+  NullablePtr<const ConditionalClauseScope> nextConditionalClause;
+
+  NullablePtr<const StatementConditionElementPatternScope>
+      statementConditionElementPatternScope;
+
   ConditionalClauseScope(unsigned index) : index(index) {}
   virtual ~ConditionalClauseScope() {}
 
   void expandMe(ScopeCreator &) override;
+
+  bool isLastCondition() const;
 
 protected:
   void printSpecifics(llvm::raw_ostream &out) const override;
@@ -940,9 +951,15 @@ public:
     return getContainingStatement();
   }
   virtual void createSubtreeForCondition(ScopeCreator &);
-  virtual void createSubtreeForNextConditionalClause(ScopeCreator &) = 0;
+  virtual ConditionalClauseScope *
+  createSubtreeForNextConditionalClause(ScopeCreator &) = 0;
   virtual void finishExpansion(ScopeCreator &) = 0;
   SourceLoc startLocAccordingToCondition() const;
+
+  const ConditionalClauseScope *findDeepestConditionalClauseScope() const;
+
+  NullablePtr<const StatementConditionElementPatternScope>
+  getStatementConditionElementPatternScope() const;
 };
 
 class WhileConditionalClauseScope : public ConditionalClauseScope {
@@ -953,7 +970,8 @@ public:
   LabeledConditionalStmt *getContainingStatement() const override {
     return stmt;
   }
-  void createSubtreeForNextConditionalClause(ScopeCreator &) override;
+  ConditionalClauseScope *
+  createSubtreeForNextConditionalClause(ScopeCreator &) override;
   std::string getClassName() const override;
   void finishExpansion(ScopeCreator &) override;
   SourceRange getChildlessSourceRange() const override;
@@ -966,7 +984,8 @@ public:
   LabeledConditionalStmt *getContainingStatement() const override {
     return stmt;
   }
-  void createSubtreeForNextConditionalClause(ScopeCreator &) override;
+  ConditionalClauseScope *
+  createSubtreeForNextConditionalClause(ScopeCreator &) override;
   std::string getClassName() const override;
   void finishExpansion(ScopeCreator &) override;
   SourceRange getChildlessSourceRange() const override;
@@ -980,7 +999,8 @@ public:
   LabeledConditionalStmt *getContainingStatement() const override {
     return stmt;
   }
-  void createSubtreeForNextConditionalClause(ScopeCreator &) override;
+  ConditionalClauseScope *
+  createSubtreeForNextConditionalClause(ScopeCreator &) override;
   std::string getClassName() const override;
   void finishExpansion(ScopeCreator &) override;
   SourceRange getChildlessSourceRange() const override;
@@ -990,10 +1010,10 @@ public:
 /// continuation.
 class GuardUseScope : public ASTScopeImpl {
   GuardStmt *const stmt;
-  ASTScopeImpl *const lookupParent;
+  const ASTScopeImpl *const lookupParent;
 
 public:
-  GuardUseScope(GuardStmt *stmt, ASTScopeImpl *lookupParent)
+  GuardUseScope(GuardStmt *stmt, const ASTScopeImpl *lookupParent)
       : stmt(stmt), lookupParent(lookupParent) {}
 
   SourceRange getChildlessSourceRange() const override;
@@ -1001,7 +1021,9 @@ public:
 
 protected:
   void printSpecifics(llvm::raw_ostream &out) const override;
-  NullablePtr<const ASTScopeImpl> getLookupParent { return lookupParent; }
+  NullablePtr<const ASTScopeImpl> getLookupParent() const override {
+    return lookupParent;
+  }
 };
 
 /// Within a ConditionalClauseScope, there may be a pattern binding
@@ -1302,6 +1324,10 @@ public:
   void expandMe(ScopeCreator &) override;
   std::string getClassName() const override;
   Stmt *getStmt() const override { return stmt; }
+
+private:
+  static const ASTScopeImpl *findLookupParentForUse(
+      const GuardConditionalClauseScope *firstConditionalClause);
 };
 
 class CatchStmtScope : public AbstractStmtScope {
