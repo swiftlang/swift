@@ -336,6 +336,8 @@ bool GenericParamScope::lookupLocalBindings(Optional<bool> isCascadingUse,
 
 bool PatternEntryUseScope::lookupLocalBindings(Optional<bool> isCascadingUse,
                                                DeclConsumer consumer) const {
+  if (vis != DeclVisibilityKind::LocalVariable)
+    return false; // look in self type will find this later
   return lookupLocalBindingsInPattern(getPattern(), isCascadingUse, vis,
                                       consumer);
 }

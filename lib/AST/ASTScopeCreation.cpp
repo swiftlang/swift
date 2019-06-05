@@ -331,9 +331,11 @@ public:
     pushAllNecessaryNodes(declsToPrepend.slice(numberOfDeclsAlreadySeen));
     numberOfDeclsAlreadySeen = declsToPrepend.size();
   }
-  
-  bool isDuplicate(void* p) {
-    return !astDuplicates.insert(p).second;
+
+  bool isDuplicate(void *p, bool registerDuplicate = true) {
+    if (registerDuplicate)
+      return !astDuplicates.insert(p).second;
+    return astDuplicates.count(p);
   }
 
 private:
@@ -703,7 +705,7 @@ void PatternEntryInitializerScope::expandMe(ScopeCreator &scopeCreator) {
 
 void PatternEntryUseScope::expandMe(ScopeCreator &scopeCreator) {
   // Add accessors for the variables in this pattern.
-  forEachVarDeclWithExplicitAccessors(scopeCreator, [&](VarDecl *var) {
+  forEachVarDeclWithExplicitAccessors(scopeCreator, false, [&](VarDecl *var) {
     scopeCreator.withoutDeferrals().createSubtree<VarDeclScope>(this, var);
   });
   if (!isLastEntry()) {
@@ -713,6 +715,8 @@ void PatternEntryUseScope::expandMe(ScopeCreator &scopeCreator) {
     // no more entries, create the scopes inside the pattern use
     scopeCreator.createScopesForDeferredNodes(this);
   }
+  assert(!getChildren().empty() &&
+         "Should not be have created childless use scopes");
 }
 
 void ConditionalClauseScope::expandMe(ScopeCreator &scopeCreator) {
@@ -954,9 +958,11 @@ AbstractPatternEntryScope::AbstractPatternEntryScope(
 }
 
 void AbstractPatternEntryScope::forEachVarDeclWithExplicitAccessors(
-    ScopeCreator &scopeCreator, function_ref<void(VarDecl *)> foundOne) const {
+    ScopeCreator &scopeCreator, bool dontRegisterAsDuplicate,
+    function_ref<void(VarDecl *)> foundOne) const {
   getPatternEntry().getPattern()->forEachVariable([&](VarDecl *var) {
-    if (scopeCreator.isDuplicate(var))
+    // Since I'll be called twice, don't register the first time.
+    if (scopeCreator.isDuplicate(var, !dontRegisterAsDuplicate))
       return;
     const bool hasAccessors = var->getBracesRange().isValid();
     if (hasAccessors && !var->isImplicit())
@@ -1037,11 +1043,12 @@ void GuardConditionalClauseScope::createSubtreeForAfterClauses(
 
 bool AbstractPatternEntryScope::isUseScopeNeeded(
     ScopeCreator &scopeCreator) const {
-  if (!isLastEntry() || !scopeCreator.haveDeferredNodes())
+  if (!isLastEntry() || scopeCreator.haveDeferredNodes())
     return true;
   bool hasVarDeclToBeCreatedInUse = false;
-  forEachVarDeclWithExplicitAccessors(
-      scopeCreator, [&](VarDecl *) { hasVarDeclToBeCreatedInUse = true; });
+  forEachVarDeclWithExplicitAccessors(scopeCreator, true, [&](VarDecl *) {
+    hasVarDeclToBeCreatedInUse = true;
+  });
   return hasVarDeclToBeCreatedInUse;
 }
 

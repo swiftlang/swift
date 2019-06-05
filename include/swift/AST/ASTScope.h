@@ -854,7 +854,8 @@ protected:
   void printSpecifics(llvm::raw_ostream &out) const override;
   bool isUseScopeNeeded(ScopeCreator &) const;
   void forEachVarDeclWithExplicitAccessors(
-      ScopeCreator &scopeCreator, function_ref<void(VarDecl *)> foundOne) const;
+      ScopeCreator &scopeCreator, bool dontRegisterAsDuplicate,
+      function_ref<void(VarDecl *)> foundOne) const;
 
 public:
   NullablePtr<const void> addressForPrinting() const override { return decl; }

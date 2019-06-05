@@ -1412,6 +1412,6 @@ void UnqualifiedLookupFactory::addedResult(const LookupResultEntry &e) const {
 unsigned UnqualifiedLookupFactory::lookupCounter = 0;
 
 // set to ~0 when not debugging
-const unsigned UnqualifiedLookupFactory::targetLookup = 7;
+const unsigned UnqualifiedLookupFactory::targetLookup = 2;
 
 #endif // NDEBUG
