@@ -809,12 +809,13 @@ void GuardStmtScope::expandMe(ScopeCreator &scopeCreator) {
   // Add a child for the 'guard' body, which always exits.
   scopeCreator.createScopeFor(stmt->getBody(), this);
 
-  if (scopeCreator.haveDeferredNodes()) {
-    // Add a child to describe the guard condition for the continuation.
-    const ASTScopeImpl *lookupParent =
-        findLookupParentForUse(firstConditionalClauseScope);
-    scopeCreator.createSubtree<GuardUseScope>(this, stmt, lookupParent);
-  }
+  // Add a child to describe the guard condition for the continuation.
+  // Even if there are no deferred nodes now, some might get added to the
+  // SourceFile later, so create the use scope unconditionally so it
+  // gets set as lastAdopter.
+  const ASTScopeImpl *lookupParent =
+      findLookupParentForUse(firstConditionalClauseScope);
+  scopeCreator.createSubtree<GuardUseScope>(this, stmt, lookupParent);
 }
 
 void BraceStmtScope::expandMe(ScopeCreator &scopeCreator) {
