@@ -4130,6 +4130,10 @@ public:
         : nullptr;
     Lowering::GenericContextScope genericContextScope(
         getContext().getTypeConverter(), adjGenSig);
+    auto origExitIt = original.findReturnBB();
+    assert(!origExitIt.isEnd() &&
+           "Functions without returns must have been diagnosed");
+    auto *origExit = &*origExitIt;
 
     // Get dominated active values in original blocks.
     // Adjoint values of dominated active values are passed as adjoint block
@@ -4168,18 +4172,29 @@ public:
       }
       domOrder.pushChildren(bb);
     }
-
+    
     // Create adjoint blocks and arguments, visiting original blocks in
     // post-order.
     for (auto *origBB : postOrderInfo->getPostOrder()) {
       auto *adjointBB = adjoint.createBasicBlock();
       adjointBBMap.insert({origBB, adjointBB});
-      // If adjoint block is the adjoint entry, continue.
-      if (adjointBB->isEntry())
-        continue;
-      // Otherwise, add a pullback struct argument to the adjoint block.
       auto pbStructLoweredType =
           remapType(getPullbackInfo().getPullbackStructLoweredType(origBB));
+      // If the BB is the original exit, then the adjoint block that we just
+      // createed must be the adjoint function's entry. We always know what an
+      // entry block's arguments should be, so we generate them and skip to the
+      // the next block.
+      if (origBB == origExit) {
+        assert(adjointBB->isEntry());
+        createEntryArguments(&getAdjoint());
+        auto *lastArg = adjointBB->getArguments().back();
+        assert(lastArg->getType() == pbStructLoweredType);
+        adjointPullbackStructArguments[origBB] = lastArg;
+        continue;
+      }
+      
+      // Otherwise, we create a phi argument for the corresponding primal value
+      // struct, and then turn active values into phi arguments.
       auto *pbStructArg = adjointBB->createPhiArgument(
           pbStructLoweredType, ValueOwnershipKind::Guaranteed);
       adjointPullbackStructArguments[origBB] = pbStructArg;
@@ -4221,15 +4236,11 @@ public:
       }
     }
 
-    auto *origEntry = original.getEntryBlock();
-    auto *origExit = &*original.findReturnBB();
     auto *adjointEntry = adjoint.getEntryBlock();
-    createEntryArguments(&adjoint);
     // The adjoint function has type (seed, exit_pbs) -> ([arg0], ..., [argn]).
     auto adjParamArgs = adjoint.getArgumentsWithoutIndirectResults();
     assert(adjParamArgs.size() == 2);
     seed = adjParamArgs[0];
-    adjointPullbackStructArguments[origExit] = adjParamArgs[1];
 
     // Assign adjoint for original result.
     SmallVector<SILValue, 8> origFormalResults;
@@ -4433,6 +4444,7 @@ public:
     // Place the builder at the adjoint exit, i.e. the adjoint block
     // corresponding to the original entry. Return the adjoints wrt parameters
     // in the adjoint exit.
+    auto *origEntry = getOriginal().getEntryBlock();
     builder.setInsertionPoint(getAdjointBlock(origEntry));
 
     // This vector will contain all the materialized return elements.
