@@ -72,6 +72,34 @@ extension vImage_Buffer {
     
     /// Initializes a vImage buffer of a specified size.
     ///
+    /// - Parameter size: The size of the buffer.
+    /// - Parameter bitsPerPixel: The number of bits in a pixel of image data.
+    ///
+    /// - Returns: An initialized vImage buffer.
+    public init(size: CGSize,
+                bitsPerPixel: UInt32) throws {
+        
+        guard
+            let width = Int(exactly: size.width), width > 0,
+            let height = Int(exactly: size.height), height > 0 else {
+                throw vImage.Error.invalidParameter
+        }
+        
+        self.init()
+        
+        let error = vImageBuffer_Init(&self,
+                                      vImagePixelCount(height),
+                                      vImagePixelCount(width),
+                                      bitsPerPixel,
+                                      vImage_Flags(kvImageNoFlags))
+        
+        if error < kvImageNoError {
+            throw vImage.Error(vImageError: error)
+        }
+    }
+    
+    /// Initializes a vImage buffer of a specified width and height.
+    ///
     /// - Parameter width: The width of the buffer.
     /// - Parameter height: The height of the buffer.
     /// - Parameter bitsPerPixel: The number of bits in a pixel of image data.

@@ -1,9 +1,7 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
-// REQUIRES: rdar50244151
-// REQUIRES: objc_interop
-// UNSUPPORTED: OS=watchos
+
 
 import StdlibUnittest
 import Accelerate
@@ -221,6 +219,16 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
         expectCrashLater()
         let buffer = try! vImage_Buffer(width: 99999999, height: 99999999,
                                         bitsPerPixel: 99999999)
+    }
+    
+    Accelerate_vImageTests.test("vImage/InitBufferFromCGSize") {
+        let buffer = try! vImage_Buffer(size: CGSize(width: 16,
+                                                     height: 32),
+                                        bitsPerPixel: 8)
+        
+        expectEqual(buffer.width, 16)
+        expectEqual(buffer.height, 32)
+        expectTrue(buffer.data != nil)
     }
     
     Accelerate_vImageTests.test("vImage/InitWithInvalidImageFormat") {
