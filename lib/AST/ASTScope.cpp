@@ -59,15 +59,6 @@ unsigned ASTScopeImpl::depth() const {
   return getParent() ? 1 + getParent().get()->depth() : 0;
 }
 
-/// TODO: maybe this predicate is masking an ontological difference?
-
-bool ASTScopeImpl::isGuardContinuationConditionalClause() const {
-  return false;
-}
-
-bool GuardUseScope::isGuardContinuationConditionalClause() const {
-  return true;
-}
 
 const PatternBindingEntry &AbstractPatternEntryScope::getPatternEntry() const {
   return decl->getPatternList()[patternEntryIndex];

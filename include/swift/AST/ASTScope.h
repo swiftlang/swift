@@ -381,10 +381,6 @@ protected:
 
   NullablePtr<const ASTScopeImpl>
   ancestorWithDeclSatisfying(function_ref<bool(const Decl *)> predicate) const;
-
-#pragma mark - general queries
-protected:
-  virtual bool isGuardContinuationConditionalClause() const;
 }; // end of ASTScopeImpl
 
 #pragma mark specific scope classes
@@ -992,7 +988,6 @@ public:
   GuardUseScope(GuardStmt *stmt, unsigned index)
       : GuardConditionalClauseScope(stmt, index) {}
 
-  bool isGuardContinuationConditionalClause() const override;
   void createSubtreeForCondition(ScopeCreator &) override;
   SourceRange getChildlessSourceRange() const override;
   void createSubtreeForNextConditionalClause(ScopeCreator &) override;
