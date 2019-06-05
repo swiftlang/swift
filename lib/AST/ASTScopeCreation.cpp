@@ -548,14 +548,18 @@ public:
   }
 
   void visitPatternBindingDecl(PatternBindingDecl *patternBinding,
-                               ASTScopeImpl *parentScope, ScopeCreator &scopeCreator) {
-    scopeCreator.createAttachedPropertyWrapperScope(patternBinding, parentScope);
+                               ASTScopeImpl *parentScope,
+                               ScopeCreator &scopeCreator) {
+    scopeCreator.createAttachedPropertyWrapperScope(patternBinding,
+                                                    parentScope);
     Decl *const pd = parentScope->getDecl().getPtrOrNull();
-    const bool isInTypeDecl = pd && (isa<NominalTypeDecl>(pd) || isa<ExtensionDecl>(pd));
-    const DeclVisibilityKind vis = isInTypeDecl
-    ? DeclVisibilityKind::MemberOfCurrentNominal
-    : DeclVisibilityKind::LocalVariable;
-    scopeCreator.createSubtree<PatternEntryDeclScope>(parentScope, patternBinding, 0, vis);
+    const bool isInTypeDecl =
+        pd && (isa<NominalTypeDecl>(pd) || isa<ExtensionDecl>(pd));
+    const DeclVisibilityKind vis =
+        isInTypeDecl ? DeclVisibilityKind::MemberOfCurrentNominal
+                     : DeclVisibilityKind::LocalVariable;
+    scopeCreator.createSubtree<PatternEntryDeclScope>(parentScope,
+                                                      patternBinding, 0, vis);
   }
 
   void visitReturnStmt(ReturnStmt *rs, ASTScopeImpl *p,
@@ -703,8 +707,8 @@ void PatternEntryUseScope::expandMe(ScopeCreator &scopeCreator) {
     scopeCreator.withoutDeferrals().createSubtree<VarDeclScope>(this, var);
   });
   if (!isLastEntry()) {
-    scopeCreator.createSubtree<PatternEntryDeclScope>(this, decl,
-                                                      patternEntryIndex + 1, vis);
+    scopeCreator.createSubtree<PatternEntryDeclScope>(
+        this, decl, patternEntryIndex + 1, vis);
   } else {
     // no more entries, create the scopes inside the pattern use
     scopeCreator.createScopesForDeferredNodes(this);
@@ -942,8 +946,9 @@ TypeAliasScope::createTrailingWhereClauseScope(ASTScopeImpl *parent,
 #pragma mark misc
 
 AbstractPatternEntryScope::AbstractPatternEntryScope(
-  PatternBindingDecl *declBeingScoped, unsigned entryIndex, DeclVisibilityKind vis)
-: decl(declBeingScoped), patternEntryIndex(entryIndex), vis(vis) {
+    PatternBindingDecl *declBeingScoped, unsigned entryIndex,
+    DeclVisibilityKind vis)
+    : decl(declBeingScoped), patternEntryIndex(entryIndex), vis(vis) {
   assert(entryIndex < declBeingScoped->getPatternList().size() &&
          "out of bounds");
 }

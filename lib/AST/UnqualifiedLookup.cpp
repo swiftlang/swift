@@ -1115,38 +1115,38 @@ void UnqualifiedLookupFactory::experimentallyLookInASTScopes(
   Optional<bool> isCascadingUseResult = ASTScope::unqualifiedLookup(
       DC->getParentSourceFile(), Name, Loc,
       contextAndIsCascadingUseArg.whereToLook, isCascadingUse, consumer);
-  
-  ifNotDoneYet( [&] {
+
+  ifNotDoneYet([&] {
     // Copied from lookupInModuleScopeContext
     // If no result has been found yet, the dependency must be on a top-level
     // name, since up to now, the search has been for non-top-level names.
     auto *const moduleScopeContext = DC->getParentSourceFile();
-    recordDependencyOnTopLevelName(moduleScopeContext, Name, isCascadingUseResult.getValueOr(true));
+    recordDependencyOnTopLevelName(moduleScopeContext, Name,
+                                   isCascadingUseResult.getValueOr(true));
     lookUpTopLevelNamesInModuleScopeContext(moduleScopeContext);
   });
 }
 
-
 bool ASTScopeDeclConsumerForUnqualifiedLookup::consume(
     ArrayRef<ValueDecl *> values, DeclVisibilityKind vis,
-Optional<bool> isCascadingUse, NullablePtr<DeclContext> baseDC) {
+    Optional<bool> isCascadingUse, NullablePtr<DeclContext> baseDC) {
   for (auto *value: values) {
     if (factory.isOriginallyTypeLookup && !isa<TypeDecl>(value))
       continue;
     if (!value->getFullName().matchesRef(factory.Name))
       continue;
-    
+
     // In order to preserve the behavior of the existing context-based lookup,
-    // which finds all results for non-local variables at the top level instead of stopping at the first one,
-    // ignore results at the top level that are not local variables.
-    // The caller \c experimentallyLookInASTScopes will then do the appropriate work
-    // when the scope lookup fails.
-    // In FindLocalVal::visitBraceStmt, it sees PatternBindingDecls, not VarDecls,
+    // which finds all results for non-local variables at the top level instead
+    // of stopping at the first one, ignore results at the top level that are
+    // not local variables. The caller \c experimentallyLookInASTScopes will
+    // then do the appropriate work when the scope lookup fails. In
+    // FindLocalVal::visitBraceStmt, it sees PatternBindingDecls, not VarDecls,
     // so a VarDecl at top level would not be found by the context-based lookup.
-    if (isa<SourceFile>(value->getDeclContext()) && (
-       vis != DeclVisibilityKind::LocalVariable || isa<VarDecl>(value)))
+    if (isa<SourceFile>(value->getDeclContext()) &&
+        (vis != DeclVisibilityKind::LocalVariable || isa<VarDecl>(value)))
       return false;
-    
+
     factory.Results.push_back(LookupResultEntry(value));
 #ifndef NDEBUG
     factory.stopForDebuggingIfAddingTargetLookupResult(factory.Results.back());

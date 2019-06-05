@@ -336,31 +336,36 @@ bool GenericParamScope::lookupLocalBindings(Optional<bool> isCascadingUse,
 
 bool PatternEntryUseScope::lookupLocalBindings(Optional<bool> isCascadingUse,
                                                DeclConsumer consumer) const {
-  return lookupLocalBindingsInPattern(getPattern(), isCascadingUse, vis, consumer);
+  return lookupLocalBindingsInPattern(getPattern(), isCascadingUse, vis,
+                                      consumer);
 }
 
 bool StatementConditionElementPatternScope::lookupLocalBindings(
     Optional<bool> isCascadingUse, DeclConsumer consumer) const {
-  return lookupLocalBindingsInPattern(pattern, isCascadingUse, DeclVisibilityKind::LocalVariable, consumer);
+  return lookupLocalBindingsInPattern(
+      pattern, isCascadingUse, DeclVisibilityKind::LocalVariable, consumer);
 }
 
 bool ForEachPatternScope::lookupLocalBindings(Optional<bool> isCascadingUse,
                                               DeclConsumer consumer) const {
   return lookupLocalBindingsInPattern(stmt->getPattern(), isCascadingUse,
-                                      DeclVisibilityKind::LocalVariable, consumer);
+                                      DeclVisibilityKind::LocalVariable,
+                                      consumer);
 }
 
 bool CatchStmtScope::lookupLocalBindings(Optional<bool> isCascadingUse,
                                          DeclConsumer consumer) const {
   return lookupLocalBindingsInPattern(stmt->getErrorPattern(), isCascadingUse,
-                                      DeclVisibilityKind::LocalVariable, consumer);
+                                      DeclVisibilityKind::LocalVariable,
+                                      consumer);
 }
 
 bool CaseStmtScope::lookupLocalBindings(Optional<bool> isCascadingUse,
                                         DeclConsumer consumer) const {
   for (auto &item : stmt->getMutableCaseLabelItems())
     if (lookupLocalBindingsInPattern(item.getPattern(), isCascadingUse,
-                                     DeclVisibilityKind::LocalVariable, consumer))
+                                     DeclVisibilityKind::LocalVariable,
+                                     consumer))
       return true;
   return false;
 }
@@ -470,8 +475,7 @@ bool ASTScopeImpl::lookupLocalBindingsInPattern(Pattern *p,
   bool isDone = false;
   p->forEachVariable([&](VarDecl *var) {
     if (!isDone)
-      isDone = consumer.consume({var}, vis,
-                                isCascadingUse);
+      isDone = consumer.consume({var}, vis, isCascadingUse);
   });
   return isDone;
 }

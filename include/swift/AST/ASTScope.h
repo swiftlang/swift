@@ -843,7 +843,8 @@ public:
   const unsigned patternEntryIndex;
   const DeclVisibilityKind vis;
 
-  AbstractPatternEntryScope(PatternBindingDecl *, unsigned entryIndex, DeclVisibilityKind);
+  AbstractPatternEntryScope(PatternBindingDecl *, unsigned entryIndex,
+                            DeclVisibilityKind);
   virtual ~AbstractPatternEntryScope() {}
 
   const PatternBindingEntry &getPatternEntry() const;
@@ -862,7 +863,8 @@ public:
 
 class PatternEntryDeclScope final : public AbstractPatternEntryScope {
 public:
-  PatternEntryDeclScope(PatternBindingDecl *pbDecl, unsigned entryIndex, DeclVisibilityKind vis)
+  PatternEntryDeclScope(PatternBindingDecl *pbDecl, unsigned entryIndex,
+                        DeclVisibilityKind vis)
       : AbstractPatternEntryScope(pbDecl, entryIndex, vis) {}
   virtual ~PatternEntryDeclScope() {}
 
@@ -873,7 +875,8 @@ public:
 
 class PatternEntryInitializerScope final : public AbstractPatternEntryScope {
 public:
-  PatternEntryInitializerScope(PatternBindingDecl *pbDecl, unsigned entryIndex, DeclVisibilityKind vis)
+  PatternEntryInitializerScope(PatternBindingDecl *pbDecl, unsigned entryIndex,
+                               DeclVisibilityKind vis)
       : AbstractPatternEntryScope(pbDecl, entryIndex, vis) {}
   virtual ~PatternEntryInitializerScope() {}
 
@@ -899,8 +902,8 @@ public:
   /// contain names to look up after their source locations.
   const SourceLoc initializerEnd;
 
-  PatternEntryUseScope(PatternBindingDecl *pbDecl, unsigned entryIndex, DeclVisibilityKind vis,
-                       SourceLoc initializerEnd)
+  PatternEntryUseScope(PatternBindingDecl *pbDecl, unsigned entryIndex,
+                       DeclVisibilityKind vis, SourceLoc initializerEnd)
       : AbstractPatternEntryScope(pbDecl, entryIndex, vis),
         initializerEnd(initializerEnd) {}
   virtual ~PatternEntryUseScope() {}
