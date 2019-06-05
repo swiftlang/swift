@@ -548,9 +548,14 @@ public:
   }
 
   void visitPatternBindingDecl(PatternBindingDecl *patternBinding,
-                               ASTScopeImpl *p, ScopeCreator &scopeCreator) {
-    scopeCreator.createAttachedPropertyWrapperScope(patternBinding, p);
-    scopeCreator.createSubtree<PatternEntryDeclScope>(p, patternBinding, 0);
+                               ASTScopeImpl *parentScope, ScopeCreator &scopeCreator) {
+    scopeCreator.createAttachedPropertyWrapperScope(patternBinding, parentScope);
+    Decl *const pd = parentScope->getDecl().getPtrOrNull();
+    const bool isInTypeDecl = pd && (isa<NominalTypeDecl>(pd) || isa<ExtensionDecl>(pd));
+    const DeclVisibilityKind vis = isInTypeDecl
+    ? DeclVisibilityKind::MemberOfCurrentNominal
+    : DeclVisibilityKind::LocalVariable;
+    scopeCreator.createSubtree<PatternEntryDeclScope>(parentScope, patternBinding, 0, vis);
   }
 
   void visitReturnStmt(ReturnStmt *rs, ASTScopeImpl *p,
@@ -673,7 +678,7 @@ void PatternEntryDeclScope::expandMe(ScopeCreator &scopeCreator) {
       patternEntry.getInitAsWritten()->getSourceRange().isValid()) {
     auto *initializer = scopeCreator.withoutDeferrals()
                             .createSubtree<PatternEntryInitializerScope>(
-                                this, decl, patternEntryIndex);
+                                this, decl, patternEntryIndex, vis);
     initializerEnd = initializer->getSourceRange().End;
   }
   // If there are no uses of the declararations, add the accessors immediately.
@@ -682,7 +687,7 @@ void PatternEntryDeclScope::expandMe(ScopeCreator &scopeCreator) {
   if (isUseScopeNeeded(scopeCreator)) {
     // Note: the accessors will follow the pattern binding.
     scopeCreator.createSubtree<PatternEntryUseScope>(
-        this, decl, patternEntryIndex, initializerEnd);
+        this, decl, patternEntryIndex, vis, initializerEnd);
   }
 }
 
@@ -699,7 +704,7 @@ void PatternEntryUseScope::expandMe(ScopeCreator &scopeCreator) {
   });
   if (!isLastEntry()) {
     scopeCreator.createSubtree<PatternEntryDeclScope>(this, decl,
-                                                      patternEntryIndex + 1);
+                                                      patternEntryIndex + 1, vis);
   } else {
     // no more entries, create the scopes inside the pattern use
     scopeCreator.createScopesForDeferredNodes(this);
@@ -937,8 +942,8 @@ TypeAliasScope::createTrailingWhereClauseScope(ASTScopeImpl *parent,
 #pragma mark misc
 
 AbstractPatternEntryScope::AbstractPatternEntryScope(
-  PatternBindingDecl *declBeingScoped, unsigned entryIndex)
-: decl(declBeingScoped), patternEntryIndex(entryIndex) {
+  PatternBindingDecl *declBeingScoped, unsigned entryIndex, DeclVisibilityKind vis)
+: decl(declBeingScoped), patternEntryIndex(entryIndex), vis(vis) {
   assert(entryIndex < declBeingScoped->getPatternList().size() &&
          "out of bounds");
 }

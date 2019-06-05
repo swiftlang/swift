@@ -370,6 +370,7 @@ protected:
 
   static bool lookupLocalBindingsInPattern(Pattern *p,
                                            Optional<bool> isCascadingUse,
+                                           DeclVisibilityKind vis,
                                            DeclConsumer consumer);
 
   /// When lookup must stop before the outermost scope, return the scope to stop
@@ -840,8 +841,9 @@ class AbstractPatternEntryScope : public ASTScopeImpl {
 public:
   PatternBindingDecl *const decl;
   const unsigned patternEntryIndex;
+  const DeclVisibilityKind vis;
 
-  AbstractPatternEntryScope(PatternBindingDecl *, unsigned entryIndex);
+  AbstractPatternEntryScope(PatternBindingDecl *, unsigned entryIndex, DeclVisibilityKind);
   virtual ~AbstractPatternEntryScope() {}
 
   const PatternBindingEntry &getPatternEntry() const;
@@ -860,8 +862,8 @@ public:
 
 class PatternEntryDeclScope final : public AbstractPatternEntryScope {
 public:
-  PatternEntryDeclScope(PatternBindingDecl *pbDecl, unsigned entryIndex)
-      : AbstractPatternEntryScope(pbDecl, entryIndex) {}
+  PatternEntryDeclScope(PatternBindingDecl *pbDecl, unsigned entryIndex, DeclVisibilityKind vis)
+      : AbstractPatternEntryScope(pbDecl, entryIndex, vis) {}
   virtual ~PatternEntryDeclScope() {}
 
   void expandMe(ScopeCreator &) override;
@@ -871,8 +873,8 @@ public:
 
 class PatternEntryInitializerScope final : public AbstractPatternEntryScope {
 public:
-  PatternEntryInitializerScope(PatternBindingDecl *pbDecl, unsigned entryIndex)
-      : AbstractPatternEntryScope(pbDecl, entryIndex) {}
+  PatternEntryInitializerScope(PatternBindingDecl *pbDecl, unsigned entryIndex, DeclVisibilityKind vis)
+      : AbstractPatternEntryScope(pbDecl, entryIndex, vis) {}
   virtual ~PatternEntryInitializerScope() {}
 
   void expandMe(ScopeCreator &) override;
@@ -897,9 +899,9 @@ public:
   /// contain names to look up after their source locations.
   const SourceLoc initializerEnd;
 
-  PatternEntryUseScope(PatternBindingDecl *pbDecl, unsigned entryIndex,
+  PatternEntryUseScope(PatternBindingDecl *pbDecl, unsigned entryIndex, DeclVisibilityKind vis,
                        SourceLoc initializerEnd)
-      : AbstractPatternEntryScope(pbDecl, entryIndex),
+      : AbstractPatternEntryScope(pbDecl, entryIndex, vis),
         initializerEnd(initializerEnd) {}
   virtual ~PatternEntryUseScope() {}
 

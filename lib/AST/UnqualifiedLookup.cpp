@@ -1115,30 +1115,38 @@ void UnqualifiedLookupFactory::experimentallyLookInASTScopes(
   Optional<bool> isCascadingUseResult = ASTScope::unqualifiedLookup(
       DC->getParentSourceFile(), Name, Loc,
       contextAndIsCascadingUseArg.whereToLook, isCascadingUse, consumer);
-
-  resultsSizeBeforeLocalsPass = Results.size();
-  ifNotDoneYet(
-      [&] {
-        lookupInModuleScopeContext(
-            DC->getParentSourceFile(),
-            isCascadingUseResult.getValueOr(
-                true));
-      });
+  
+  ifNotDoneYet( [&] {
+    // Copied from lookupInModuleScopeContext
+    // If no result has been found yet, the dependency must be on a top-level
+    // name, since up to now, the search has been for non-top-level names.
+    auto *const moduleScopeContext = DC->getParentSourceFile();
+    recordDependencyOnTopLevelName(moduleScopeContext, Name, isCascadingUseResult.getValueOr(true));
+    lookUpTopLevelNamesInModuleScopeContext(moduleScopeContext);
+  });
 }
+
 
 bool ASTScopeDeclConsumerForUnqualifiedLookup::consume(
     ArrayRef<ValueDecl *> values, DeclVisibilityKind vis,
-    Optional<bool> isCascadingUse, NullablePtr<DeclContext> baseDC) {
+Optional<bool> isCascadingUse, NullablePtr<DeclContext> baseDC) {
+
+  
   for (auto *value: values) {
     if (factory.isOriginallyTypeLookup && !isa<TypeDecl>(value))
       continue;
     if (!value->getFullName().matchesRef(factory.Name))
       continue;
+    
+    // In order to preserve the behavior of the existing context-based lookup,
+    // which finds all results for non-local variables at the top level instead of stopping at the first one,
+    // ignore results at the top level that are not local variables.
+    // The caller \c experimentallyLookInASTScopes will then do the appropriate work
+    // when the scope lookup fails.
+    if (isa<SourceFile>(value->getDeclContext()) && vis != DeclVisibilityKind::LocalVariable)
+      return false;
+    
     factory.Results.push_back(LookupResultEntry(value));
-    auto *const contextOfResult = value->getDeclContext();
-    if (contextOfResult->isModuleContext())
-      factory.recordDependencyOnTopLevelName(contextOfResult, factory.Name,
-                                             isCascadingUse.getValueOr(true));
 #ifndef NDEBUG
     factory.stopForDebuggingIfAddingTargetLookupResult(factory.Results.back());
 #endif
@@ -1403,6 +1411,6 @@ void UnqualifiedLookupFactory::addedResult(const LookupResultEntry &e) const {
 unsigned UnqualifiedLookupFactory::lookupCounter = 0;
 
 // set to ~0 when not debugging
-const unsigned UnqualifiedLookupFactory::targetLookup = ~0;
+const unsigned UnqualifiedLookupFactory::targetLookup = 7;
 
 #endif // NDEBUG
