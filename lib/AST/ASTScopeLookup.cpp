@@ -236,7 +236,7 @@ Optional<bool> ASTScopeImpl::lookupInParent(
   const NullablePtr<const ASTScopeImpl> limitForParent =
       limit ? limit : getLookupLimit();
 
-  return getParent().get()->lookup(
+  return getLookupParent().get()->lookup(
       computeSelfDCForParent(selfDC), limitForParent,
       haveAlreadyLookedHereForParent, isCascadingUse, consumer);
 }

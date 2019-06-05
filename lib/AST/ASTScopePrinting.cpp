@@ -187,6 +187,11 @@ void VarDeclScope::printSpecifics(llvm::raw_ostream &out) const {
   decl->dumpRef(out);
 }
 
+void GuardUseScope::printSpecifics(llvm::raw_ostream &out) const {
+  out << " lookup parent: ";
+  lookupParent->printRange(out);
+}
+
 bool GTXScope::doesDeclHaveABody() const { return false; }
 
 bool IterableTypeScope::doesDeclHaveABody() const {

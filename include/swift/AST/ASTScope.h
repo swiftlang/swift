@@ -358,6 +358,11 @@ protected:
     return p->getParent().isNonNull() ? p : nullptr;
   }
 
+  /// The tree is organized by source location and for most nodes this is also
+  /// what obtaines for scoping. However, guards are different. The scope after
+  /// the guard else must hop into the innermoset scope of the guard condition.
+  virtual NullablePtr<const ASTScopeImpl> getLookupParent { return parent; }
+
 #pragma mark - - lookup- local bindings
 protected:
   virtual Optional<bool>
@@ -984,14 +989,19 @@ public:
 /// A conditional clause  being used for the 'guard'
 /// continuation.
 class GuardUseScope : public ASTScopeImpl {
-public:
-  GuardUseScope(GuardStmt *stmt, unsigned index)
-      : GuardConditionalClauseScope(stmt, index) {}
+  GuardStmt *const stmt;
+  ASTScopeImpl *const lookupParent;
 
-  void createSubtreeForCondition(ScopeCreator &) override;
+public:
+  GuardUseScope(GuardStmt *stmt, ASTScopeImpl *lookupParent)
+      : stmt(stmt), lookupParent(lookupParent) {}
+
   SourceRange getChildlessSourceRange() const override;
-  void createSubtreeForNextConditionalClause(ScopeCreator &) override;
   std::string getClassName() const override;
+
+protected:
+  void printSpecifics(llvm::raw_ostream &out) const override;
+  NullablePtr<const ASTScopeImpl> getLookupParent { return lookupParent; }
 };
 
 /// Within a ConditionalClauseScope, there may be a pattern binding

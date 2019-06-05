@@ -809,8 +809,11 @@ void GuardStmtScope::expandMe(ScopeCreator &scopeCreator) {
   // Add a child for the 'guard' body, which always exits.
   scopeCreator.createScopeFor(stmt->getBody(), this);
 
-  // Add a child to describe the guard condition for the continuation.
-  scopeCreator.createSubtree<GuardContinuationScope>(this, stmt, 0);
+  if (scopeCreator.haveDeferredNodes()) {
+    // Add a child to describe the guard condition for the continuation.
+    ASTScopeImpl *lookupParent = findLookupParentForUse();
+    scopeCreator.createSubtree<GuardUseScope>(this, stmt, lookupParent);
+  }
 }
 
 void BraceStmtScope::expandMe(ScopeCreator &scopeCreator) {
@@ -1031,14 +1034,6 @@ void IfConditionalClauseScope::finishExpansion(
 
 void GuardConditionalClauseScope::finishExpansion(
     ScopeCreator &scopeCreator) {
-  // There aren't any additional conditional clauses. Add the appropriate
-  // nested scope based on the kind of statement.
-
-  // Note: guard statements have the continuation nested under the last
-  // condition.
-  // The scope *after* the guard statement must include any deferred nodes
-  // so that any let vars in the guard are in scope.
-  scopeCreator.createScopesForDeferredNodes(this);
 }
 
 bool AbstractPatternEntryScope::isUseScopeNeeded(
