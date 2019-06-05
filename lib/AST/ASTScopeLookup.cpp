@@ -580,8 +580,7 @@ NullablePtr<DeclContext> PureFunctionBodyScope::computeSelfDCForParent(
   return selfDC;
 }
 
-#pragma mark resolveIsCascadingUseForThisScope helpers
-// TODO: rename and comment
+#pragma mark ifUnknownIsCascadingUseAccordingTo
 
 static bool isCascadingUseAccordingTo(const DeclContext *const dc) {
   return dc->isCascadingContextForLookup(false);

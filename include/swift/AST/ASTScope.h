@@ -267,8 +267,7 @@ public:
   unsigned depth() const;
 
 #pragma mark - lookup
-  // TODO: maybe use multiple inheritance to put creation, lookup, printing,
-  // source-ranges into separate classes?
+
 public:
   using DeclConsumer = namelookup::AbstractASTScopeDeclConsumer &;
 
@@ -285,7 +284,7 @@ private:
                                                         const SourceLoc where,
                                                         const DeclContext *ctx);
 
-protected: // TODO: some could be private/prot?
+protected:
   virtual bool doesContextMatchStartingContext(const DeclContext *) const;
 
 protected:
@@ -657,7 +656,6 @@ public:
 /// (e.g. <A, B: A>) -- it's not legal but that's how lookup behaves --
 /// Each GenericParamScope scopes just ONE parameter, and we next
 /// each one within the previous one.
-/// TODO: ontology for AFD, Proto, Ext, etc?
 ///
 /// Here's a wrinkle: for a Subscript, the caller expects this scope (based on
 /// source loc) to match requested DeclContexts for starting lookup in EITHER
