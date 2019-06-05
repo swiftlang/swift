@@ -64,6 +64,13 @@ func dfoo(x: Float) -> (value: Float, differential: (Float) -> (Float)) {
   return (x, { $0 })
 }
 
+// expected-error @+2 {{expected ')' in 'differentiating' attribute}}
+// expected-error @+1 {{expected declaration}}
+@differentiating(foo, wrt: x, linear)
+func dfoo(x: Float) -> (value: Float, differential: (Float) -> (Float)) {
+    return (x, { $0 })
+}
+
 // expected-error @+2 {{unexpected ',' separator}}
 // expected-error @+1 {{expected declaration}}
 @differentiating(foo,)

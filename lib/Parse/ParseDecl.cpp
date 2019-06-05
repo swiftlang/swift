@@ -1098,7 +1098,7 @@ Parser::parseDifferentiatingAttribute(SourceLoc atLoc, SourceLoc loc) {
     // Check that token after comma is 'linear' or 'wrt:'.
     if (!Tok.is(tok::identifier) ||
         !(Tok.getText() == "linear" || Tok.getText() == "wrt")) {
-      diagnose(Tok, diag::attr_differentiating_expected_linear_wrt);
+      diagnose(Tok, diag::attr_differentiating_expected_label_linear_or_wrt);
       return true;
     }
     return false;
@@ -1128,7 +1128,7 @@ Parser::parseDifferentiatingAttribute(SourceLoc atLoc, SourceLoc loc) {
         return makeParserError();
     }
     
-    // Parse the optional `linear` differentiation flag.
+    // Parse the optional 'linear' differentiation flag.
     if (Tok.is(tok::identifier) && Tok.getText() == "linear") {
       linear = true;
       consumeToken(tok::identifier);
@@ -1136,7 +1136,7 @@ Parser::parseDifferentiatingAttribute(SourceLoc atLoc, SourceLoc loc) {
         return makeParserError();
     }
     
-    // Parse the optional `wrt` differentiation parameters clause.
+    // Parse the optional 'wrt' differentiation parameters clause.
     if (Tok.is(tok::identifier) && Tok.getText() == "wrt" &&
         parseDifferentiationParametersClause(params, AttrName))
       return makeParserError();
