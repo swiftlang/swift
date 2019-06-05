@@ -626,7 +626,6 @@ public:
       TotalStride(Size(ClangLayout.getSize().getQuantity())),
       TotalAlignment(IGM.getCappedAlignment(
                                        Alignment(ClangLayout.getAlignment()))) {
-    SpareBits.reserve(TotalStride.getValue() * 8);
   }
 
   void collectRecordFields() {
