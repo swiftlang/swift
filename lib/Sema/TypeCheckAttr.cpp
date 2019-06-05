@@ -2635,15 +2635,6 @@ void AttributeChecker::visitPropertyWrapperAttr(PropertyWrapperAttr *attr) {
 }
 
 void AttributeChecker::visitFunctionBuilderAttr(FunctionBuilderAttr *attr) {
-  auto nominal = dyn_cast<NominalTypeDecl>(D);
-  if (!nominal)
-    return;
-
-  // Make sure the name isn't reserved.
-  if (isReservedAttributeName(nominal->getName().str())) {
-    nominal->diagnose(diag::function_builder_reserved_name);
-  }
-
   // TODO: check that the type at least provides a `sequence` factory?
   // Any other validation?
 }
