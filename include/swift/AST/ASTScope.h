@@ -857,7 +857,6 @@ public:
 
 protected:
   void printSpecifics(llvm::raw_ostream &out) const override;
-  bool isUseScopeNeeded(ScopeCreator &) const;
   void forEachVarDeclWithExplicitAccessors(
       ScopeCreator &scopeCreator, bool dontRegisterAsDuplicate,
       function_ref<void(VarDecl *)> foundOne) const;

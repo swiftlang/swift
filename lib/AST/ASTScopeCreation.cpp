@@ -687,13 +687,10 @@ void PatternEntryDeclScope::expandMe(ScopeCreator &scopeCreator) {
     initializerEnd = initializer->getSourceRange().End;
   }
   // If there are no uses of the declararations, add the accessors immediately.
-  // Must omit use scope in this case because otherwise there is no source
-  // location for it.
-  if (isUseScopeNeeded(scopeCreator)) {
-    // Note: the accessors will follow the pattern binding.
-    scopeCreator.createSubtree<PatternEntryUseScope>(
-        this, decl, patternEntryIndex, vis, initializerEnd);
-  }
+  // Create unconditionally because more nodes might be added to SourceFile later.
+  // Note: the accessors will follow the pattern binding.
+  scopeCreator.createSubtree<PatternEntryUseScope>(
+    this, decl, patternEntryIndex, vis, initializerEnd);
 }
 
 void PatternEntryInitializerScope::expandMe(ScopeCreator &scopeCreator) {
@@ -714,8 +711,6 @@ void PatternEntryUseScope::expandMe(ScopeCreator &scopeCreator) {
     // no more entries, create the scopes inside the pattern use
     scopeCreator.createScopesForDeferredNodes(this);
   }
-  assert((!getChildren().empty() || hasValidSourceRangeOfIgnoredASTNodes()) &&
-         "Should not be have created empty use scopes");
 }
 
 void ConditionalClauseScope::expandMe(ScopeCreator &scopeCreator) {
@@ -1033,17 +1028,6 @@ void IfConditionalClauseScope::finishExpansion(
 
 void GuardConditionalClauseScope::finishExpansion(
     ScopeCreator &scopeCreator) {
-}
-
-bool AbstractPatternEntryScope::isUseScopeNeeded(
-    ScopeCreator &scopeCreator) const {
-  if (!isLastEntry() || scopeCreator.haveDeferredNodes())
-    return true;
-  bool hasVarDeclToBeCreatedInUse = false;
-  forEachVarDeclWithExplicitAccessors(scopeCreator, true, [&](VarDecl *) {
-    hasVarDeclToBeCreatedInUse = true;
-  });
-  return hasVarDeclToBeCreatedInUse;
 }
 
 bool AbstractPatternEntryScope::isLastEntry() const {
