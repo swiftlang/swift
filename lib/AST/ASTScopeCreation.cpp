@@ -575,8 +575,10 @@ public:
       visit(ws->getBody(), p, scopeCreator);
       return;
     }
-    scopeCreator.withoutDeferrals().createSubtree<WhileConditionalClauseScope>(
-        p, ws, 0);
+    auto *whileCCS = scopeCreator.withoutDeferrals()
+                         .createSubtree<WhileConditionalClauseScope>(p, ws, 0);
+    auto *deepest = whileCCS->findDeepestConditionalClauseScope();
+    scopeCreator.createScopeFor(ws->getBody(), deepest);
   }
 
   void visitExpr(Expr *expr, ASTScopeImpl *p, ScopeCreator &scopeCreator) {
@@ -720,20 +722,18 @@ void ConditionalClauseScope::expandMe(ScopeCreator &scopeCreator) {
   // If there's another conditional clause, add it as the child.
   if (!isLastCondition())
     nextConditionalClause = createSubtreeForNextConditionalClause(scopeCreator);
-  else {
-    // There aren't any additional conditional clauses. Add the appropriate
-    // nested scope based on the kind of statement.
-    finishExpansion(scopeCreator);
-  }
 }
 
 void IfStmtScope::expandMe(ScopeCreator &scopeCreator) {
   // The first conditional clause or, failing that, the 'then' clause.
-  if (!stmt->getCond().empty())
-    scopeCreator.withoutDeferrals().createSubtree<IfConditionalClauseScope>(
-        this, stmt, 0);
-  else
-    scopeCreator.createScopeFor(stmt->getThenStmt(), this);
+  ASTScopeImpl *thenParent = this;
+  if (!stmt->getCond().empty()) {
+    auto *ifCCS =
+        scopeCreator.withoutDeferrals().createSubtree<IfConditionalClauseScope>(
+            this, stmt, 0);
+    thenParent = ifCCS->findDeepestConditionalClauseScope();
+  }
+  scopeCreator.createScopeFor(stmt->getThenStmt(), thenParent);
 
   // Add the 'else' branch, if needed.
   scopeCreator.createScopeFor(stmt->getElseStmt(), this);
@@ -797,7 +797,7 @@ void CaseStmtScope::expandMe(ScopeCreator &scopeCreator) {
 
 void GuardStmtScope::expandMe(ScopeCreator &scopeCreator) {
   // Add a child to describe the guard condition.
-  const auto *const firstConditionalClauseScope =
+  auto *const firstConditionalClauseScope =
       scopeCreator.withoutDeferrals()
           .createSubtree<GuardConditionalClauseScope>(this, stmt, 0);
 
@@ -808,7 +808,7 @@ void GuardStmtScope::expandMe(ScopeCreator &scopeCreator) {
   // Even if there are no deferred nodes now, some might get added to the
   // SourceFile later, so create the use scope unconditionally so it
   // gets set as lastAdopter.
-  const ASTScopeImpl *lookupParent =
+  ASTScopeImpl *lookupParent =
       findLookupParentForUse(firstConditionalClauseScope);
   scopeCreator.createSubtree<GuardUseScope>(this, stmt, lookupParent);
 }
@@ -1017,19 +1017,6 @@ GuardConditionalClauseScope::createSubtreeForNextConditionalClause(
                                                                  index + 1);
 }
 
-void WhileConditionalClauseScope::finishExpansion(
-    ScopeCreator &scopeCreator) {
-  scopeCreator.createScopeFor(stmt->getBody(), this);
-}
-void IfConditionalClauseScope::finishExpansion(
-    ScopeCreator &scopeCreator) {
-  scopeCreator.createScopeFor(stmt->getThenStmt(), this);
-}
-
-void GuardConditionalClauseScope::finishExpansion(
-    ScopeCreator &scopeCreator) {
-}
-
 bool AbstractPatternEntryScope::isLastEntry() const {
   return patternEntryIndex + 1 == decl->getPatternList().size();
 }
@@ -1038,25 +1025,25 @@ bool ConditionalClauseScope::isLastCondition() const {
   return index + 1 == getContainingStatement()->getCond().size();
 }
 
-const ASTScopeImpl *GuardStmtScope::findLookupParentForUse(
-    const GuardConditionalClauseScope *firstConditionalClause) {
-  const auto *deepestCondClause =
+ASTScopeImpl *GuardStmtScope::findLookupParentForUse(
+    GuardConditionalClauseScope *firstConditionalClause) {
+  auto *const deepestCondClause =
       firstConditionalClause->findDeepestConditionalClauseScope();
-  const auto statementCond =
+  auto statementCond =
       deepestCondClause->getStatementConditionElementPatternScope();
-  if (const auto *s = statementCond.getPtrOrNull())
+  if (ASTScopeImpl *s = statementCond.getPtrOrNull())
     return s;
   return deepestCondClause;
 }
 
-const ConditionalClauseScope *
-ConditionalClauseScope::findDeepestConditionalClauseScope() const {
+ConditionalClauseScope *
+ConditionalClauseScope::findDeepestConditionalClauseScope() {
   return nextConditionalClause
              ? nextConditionalClause.get()->findDeepestConditionalClauseScope()
              : this;
 }
 
-NullablePtr<const StatementConditionElementPatternScope>
+NullablePtr<StatementConditionElementPatternScope>
 ConditionalClauseScope::getStatementConditionElementPatternScope() const {
   return statementConditionElementPatternScope;
 }

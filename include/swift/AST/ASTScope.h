@@ -929,9 +929,9 @@ public:
   const unsigned index;
 
   /// The next deepest, if any
-  NullablePtr<const ConditionalClauseScope> nextConditionalClause;
+  NullablePtr<ConditionalClauseScope> nextConditionalClause;
 
-  NullablePtr<const StatementConditionElementPatternScope>
+  NullablePtr<StatementConditionElementPatternScope>
       statementConditionElementPatternScope;
 
   ConditionalClauseScope(unsigned index) : index(index) {}
@@ -952,12 +952,11 @@ public:
   virtual void createSubtreeForCondition(ScopeCreator &);
   virtual ConditionalClauseScope *
   createSubtreeForNextConditionalClause(ScopeCreator &) = 0;
-  virtual void finishExpansion(ScopeCreator &) = 0;
   SourceLoc startLocAccordingToCondition() const;
 
-  const ConditionalClauseScope *findDeepestConditionalClauseScope() const;
+  ConditionalClauseScope *findDeepestConditionalClauseScope();
 
-  NullablePtr<const StatementConditionElementPatternScope>
+  NullablePtr<StatementConditionElementPatternScope>
   getStatementConditionElementPatternScope() const;
 };
 
@@ -972,7 +971,6 @@ public:
   ConditionalClauseScope *
   createSubtreeForNextConditionalClause(ScopeCreator &) override;
   std::string getClassName() const override;
-  void finishExpansion(ScopeCreator &) override;
   SourceRange getChildlessSourceRange() const override;
 };
 class IfConditionalClauseScope : public ConditionalClauseScope {
@@ -986,7 +984,6 @@ public:
   ConditionalClauseScope *
   createSubtreeForNextConditionalClause(ScopeCreator &) override;
   std::string getClassName() const override;
-  void finishExpansion(ScopeCreator &) override;
   SourceRange getChildlessSourceRange() const override;
 };
 
@@ -1001,7 +998,6 @@ public:
   ConditionalClauseScope *
   createSubtreeForNextConditionalClause(ScopeCreator &) override;
   std::string getClassName() const override;
-  void finishExpansion(ScopeCreator &) override;
   SourceRange getChildlessSourceRange() const override;
 };
 
@@ -1009,10 +1005,10 @@ public:
 /// continuation.
 class GuardUseScope : public ASTScopeImpl {
   GuardStmt *const stmt;
-  const ASTScopeImpl *const lookupParent;
+  ASTScopeImpl *const lookupParent;
 
 public:
-  GuardUseScope(GuardStmt *stmt, const ASTScopeImpl *lookupParent)
+  GuardUseScope(GuardStmt *stmt, ASTScopeImpl *lookupParent)
       : stmt(stmt), lookupParent(lookupParent) {}
 
   SourceRange getChildlessSourceRange() const override;
@@ -1325,8 +1321,8 @@ public:
   Stmt *getStmt() const override { return stmt; }
 
 private:
-  static const ASTScopeImpl *findLookupParentForUse(
-      const GuardConditionalClauseScope *firstConditionalClause);
+  static ASTScopeImpl *
+  findLookupParentForUse(GuardConditionalClauseScope *firstConditionalClause);
 };
 
 class CatchStmtScope : public AbstractStmtScope {
