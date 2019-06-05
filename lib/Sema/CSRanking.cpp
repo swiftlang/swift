@@ -506,41 +506,35 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
           checkKind = CheckAll;
       }
 
+      auto openType = [&](ConstraintSystem &cs, DeclContext *innerDC,
+                          DeclContext *outerDC, Type type,
+                          OpenedTypeMap &replacements,
+                          ConstraintLocator *locator) -> Type {
+        if (auto *funcType = type->getAs<AnyFunctionType>()) {
+          return cs.openFunctionType(funcType, locator, replacements, outerDC,
+                                     /*skipProtocolSelfConstraint=*/false);
+        }
+
+        cs.openGeneric(outerDC, innerDC->getGenericSignatureOfContext(),
+                       /*skipProtocolSelfConstraint=*/false, locator,
+                       replacements);
+
+        return cs.openType(type, replacements);
+      };
+
       // Construct a constraint system to compare the two declarations.
       ConstraintSystem cs(tc, dc, ConstraintSystemOptions());
       bool knownNonSubtype = false;
 
-      auto locator = cs.getConstraintLocator(nullptr);
+      auto *locator = cs.getConstraintLocator(nullptr);
       // FIXME: Locator when anchored on a declaration.
       // Get the type of a reference to the second declaration.
-      OpenedTypeMap unused;
-      Type openedType2;
-      if (auto *funcType = type2->getAs<AnyFunctionType>()) {
-        openedType2 = cs.openFunctionType(funcType, locator,
-                                          /*replacements=*/unused, outerDC2,
-                                          /*skipProtocolSelfConstraint=*/false);
-      } else {
-        cs.openGeneric(outerDC2, innerDC2->getGenericSignatureOfContext(),
-                       /*skipProtocolSelfConstraint=*/false, locator, unused);
 
-        openedType2 = cs.openType(type2, unused);
-      }
-
-      // Get the type of a reference to the first declaration, swapping in
-      // archetypes for the dependent types.
-      OpenedTypeMap replacements;
-      Type openedType1;
-      if (auto *funcType = type1->getAs<AnyFunctionType>()) {
-        openedType1 =
-            cs.openFunctionType(funcType, locator, replacements, outerDC1,
-                                /*skipProtocolSelfConstraint=*/false);
-      } else {
-        cs.openGeneric(outerDC1, innerDC1->getGenericSignatureOfContext(),
-                       /*skipProtocolSelfConstraint=*/false, locator,
-                       replacements);
-
-        openedType1 = cs.openType(type1, replacements);
-      }
+      OpenedTypeMap unused, replacements;
+      auto openedType2 =
+          openType(cs, innerDC1, outerDC2, type2, unused, locator);
+      auto openedType1 =
+          openType(cs, innerDC2, outerDC1, type1, replacements, locator);
 
       for (const auto &replacement : replacements) {
         if (auto mapped = innerDC1->mapTypeIntoContext(replacement.first)) {
