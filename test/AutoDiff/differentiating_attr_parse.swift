@@ -6,6 +6,7 @@
 func jvpSin(x: @nondiff Float) -> (value: Float, differential: (Float) -> (Float)) {
   return (x, { $0 })
 }
+
 @differentiating(sin, wrt: x) // ok
 func vjpSin(x: Float) -> (value: Float, pullback: (Float) -> Float) {
   return (x, { $0 })
