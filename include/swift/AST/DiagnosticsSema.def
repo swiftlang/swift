@@ -4456,8 +4456,6 @@ ERROR(function_builder_control_flow, none,
 NOTE(note_function_builder_control_flow, none,
       "closure containing control flow statement cannot be used with function "
       "builder %0", (DeclName))
-ERROR(function_builder_reserved_name, none,
-      "function builder type name must start with an uppercase letter", ())
 ERROR(function_builder_attribute_not_allowed_here, none,
       "function builder attribute %0 can only be applied to a parameter, "
       "function, or computed property", (DeclName))
