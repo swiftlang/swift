@@ -447,6 +447,16 @@ ERROR(cannot_convert_assign_protocol,none,
 ERROR(cannot_convert_assign_nil,none,
       "'nil' cannot be assigned to type %0", (Type))
 
+// Subscript Assign Expr
+ERROR(cannot_convert_subscript_assign,none,
+      "cannot assign value of type %0 to subscript of type %1",
+      (Type,Type))
+ERROR(cannot_convert_subscript_assign_protocol,none,
+      "value of type %0 does not conform to %1 in subscript assignment",
+      (Type, Type))
+ERROR(cannot_convert_subscript_assign_nil,none,
+      "'nil' cannot be assigned to subscript of type %0", (Type))
+
 // for ... in expression
 ERROR(cannot_convert_sequence_element_value,none,
       "cannot convert sequence element type %0 to expected type %1",
