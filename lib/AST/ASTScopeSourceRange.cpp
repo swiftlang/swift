@@ -282,7 +282,7 @@ SourceRange AbstractFunctionDeclScope::getChildlessSourceRange() const {
 
 SourceRange AbstractFunctionParamsScope::getChildlessSourceRange() const {
   auto *fn = getEnclosingAbstractFunctionOrSubscriptDecl();
-  SourceLoc endLoc = fn->getEndLoc();
+  const SourceLoc endLoc = fn->getEndLoc();
 
   // FIXME: Why oh why don't deinitializers have a parameter list?
 
@@ -295,8 +295,11 @@ SourceRange AbstractFunctionParamsScope::getChildlessSourceRange() const {
                                     SourceLoc();
   // clang-format on
 
+  const SourceLoc safeEndLocEvenWithBadInput =
+      getSourceManager().isBeforeInBuffer(startLoc, endLoc) ? endLoc : startLoc;
+
   assert(startLoc.isValid());
-  return SourceRange(startLoc, endLoc);
+  return SourceRange(startLoc, safeEndLocEvenWithBadInput);
 }
 
 
