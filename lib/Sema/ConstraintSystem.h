@@ -2397,6 +2397,13 @@ public:
                    OpenedTypeMap &replacements,
                    bool skipGenericRequirements = false);
 
+  /// Open the generic parameter list creating type variables for each of the
+  /// type parameters.
+  void openGenericParameters(DeclContext *outerDC,
+                             GenericSignature *signature,
+                             OpenedTypeMap &replacements,
+                             ConstraintLocatorBuilder locator);
+
   /// Given generic signature open its generic requirements,
   /// using substitution function, and record them in the
   /// constraint system for further processing.
