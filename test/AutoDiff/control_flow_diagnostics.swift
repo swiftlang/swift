@@ -1,4 +1,16 @@
-// RUN: %target-swift-frontend -emit-sil -verify %s
+// RUN: %target-swift-frontend -emit-sil -verify -Xllvm -differentiation-enable-control-flow %s
+
+// Test supported `br` and `cond_br` terminators.
+
+@differentiable
+func branch(_ x: Float) -> Float {
+  if x > 0 {
+    return x
+  } else if x < 10 {
+    return x
+  }
+  return x
+}
 
 // Test currently unsupported `switch_enum` terminator.
 

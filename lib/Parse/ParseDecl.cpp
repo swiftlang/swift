@@ -835,6 +835,7 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
   Optional<DeclNameWithLoc> jvpSpec;
   Optional<DeclNameWithLoc> vjpSpec;
   TrailingWhereClause *whereClause = nullptr;
+  bool linear;
 
   // Parse '('.
   if (consumeIf(tok::l_paren, lParenLoc)) {
