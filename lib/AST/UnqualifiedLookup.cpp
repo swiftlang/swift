@@ -1130,8 +1130,6 @@ void UnqualifiedLookupFactory::experimentallyLookInASTScopes(
 bool ASTScopeDeclConsumerForUnqualifiedLookup::consume(
     ArrayRef<ValueDecl *> values, DeclVisibilityKind vis,
 Optional<bool> isCascadingUse, NullablePtr<DeclContext> baseDC) {
-
-  
   for (auto *value: values) {
     if (factory.isOriginallyTypeLookup && !isa<TypeDecl>(value))
       continue;
@@ -1143,7 +1141,10 @@ Optional<bool> isCascadingUse, NullablePtr<DeclContext> baseDC) {
     // ignore results at the top level that are not local variables.
     // The caller \c experimentallyLookInASTScopes will then do the appropriate work
     // when the scope lookup fails.
-    if (isa<SourceFile>(value->getDeclContext()) && vis != DeclVisibilityKind::LocalVariable)
+    // In FindLocalVal::visitBraceStmt, it sees PatternBindingDecls, not VarDecls,
+    // so a VarDecl at top level would not be found by the context-based lookup.
+    if (isa<SourceFile>(value->getDeclContext()) && (
+       vis != DeclVisibilityKind::LocalVariable || isa<VarDecl>(value)))
       return false;
     
     factory.Results.push_back(LookupResultEntry(value));
