@@ -120,7 +120,7 @@ ASTContext &ASTScopeImpl::getASTContext() const {
 
 #pragma mark getDeclContext
 
-NullablePtr<DeclContext> GTXScope::getDeclContext() const {
+NullablePtr<DeclContext> GenericTypeOrExtensionScope::getDeclContext() const {
   return getGenericContext();
 }
 
@@ -162,7 +162,7 @@ NullablePtr<DeclContext> AbstractFunctionParamsScope::getDeclContext() const {
 
 #pragma mark getClassName
 
-std::string GTXScope::getClassName() const {
+std::string GenericTypeOrExtensionScope::getClassName() const {
   return declKindName() + portionName() + "Scope";
 }
 

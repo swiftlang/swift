@@ -486,7 +486,7 @@ public:
 #define VISIT_AND_CREATE_WHOLE_PORTION(What, WhatScope)                        \
   void visit##What(What *w, ASTScopeImpl *p, ScopeCreator &scopeCreator) {     \
     scopeCreator.withoutDeferrals()                                            \
-        .createSubtree2D<WhatScope, GTXWholePortion>(p, w);                    \
+        .createSubtree2D<WhatScope, GenericTypeOrExtensionWholePortion>(p, w); \
   }
 
   VISIT_AND_CREATE_WHOLE_PORTION(ExtensionDecl, ExtensionScope)
@@ -501,7 +501,8 @@ public:
                          ScopeCreator &scopeCreator) {
     e->createGenericParamsIfMissing();
     scopeCreator.withoutDeferrals()
-        .createSubtree2D<NominalTypeScope, GTXWholePortion>(p, e);
+        .createSubtree2D<NominalTypeScope, GenericTypeOrExtensionWholePortion>(
+            p, e);
   }
 
 #pragma mark simple creation with deferred nodes
@@ -882,12 +883,12 @@ void DefaultArgumentInitializerScope::expandMe(ScopeCreator &scopeCreator) {
   ASTVisitorForScopeCreation().visitExpr(initExpr, this, scopeCreator);
 }
 
-void GTXScope::expandMe(ScopeCreator &scopeCreator) {
+void GenericTypeOrExtensionScope::expandMe(ScopeCreator &scopeCreator) {
   portion->expandScope(this, scopeCreator);
 }
 
-void GTXWholePortion::expandScope(GTXScope *scope,
-                                  ScopeCreator &scopeCreator) const {
+void GenericTypeOrExtensionWholePortion::expandScope(
+    GenericTypeOrExtensionScope *scope, ScopeCreator &scopeCreator) const {
   // Prevent circular request bugs caused by illegal input and
   // doing lookups that getExtendedNominal in the midst of getExtendedNominal.
   if (scope->shouldHaveABody() && !scope->doesDeclHaveABody())
@@ -903,7 +904,7 @@ void GTXWholePortion::expandScope(GTXScope *scope,
   scope->createBodyScope(deepestScope, scopeCreator);
 }
 
-void IterableTypeBodyPortion::expandScope(GTXScope *scope,
+void IterableTypeBodyPortion::expandScope(GenericTypeOrExtensionScope *scope,
                                           ScopeCreator &scopeCreator) const {
   if (auto *idc = scope->getIterableDeclContext().getPtrOrNull())
     for (auto member : idc->getMembers())
@@ -930,19 +931,22 @@ ASTScopeImpl *
 ExtensionScope::createTrailingWhereClauseScope(ASTScopeImpl *parent,
                                                ScopeCreator &scopeCreator) {
   return scopeCreator.withoutDeferrals()
-      .createSubtree2D<ExtensionScope, GTXWherePortion>(parent, decl);
+      .createSubtree2D<ExtensionScope, GenericTypeOrExtensionWherePortion>(
+          parent, decl);
 }
 ASTScopeImpl *
 NominalTypeScope::createTrailingWhereClauseScope(ASTScopeImpl *parent,
                                                  ScopeCreator &scopeCreator) {
   return scopeCreator.withoutDeferrals()
-      .createSubtree2D<NominalTypeScope, GTXWherePortion>(parent, decl);
+      .createSubtree2D<NominalTypeScope, GenericTypeOrExtensionWherePortion>(
+          parent, decl);
 }
 ASTScopeImpl *
 TypeAliasScope::createTrailingWhereClauseScope(ASTScopeImpl *parent,
                                                ScopeCreator &scopeCreator) {
   return scopeCreator.withoutDeferrals()
-      .createSubtree2D<TypeAliasScope, GTXWherePortion>(parent, decl);
+      .createSubtree2D<TypeAliasScope, GenericTypeOrExtensionWherePortion>(
+          parent, decl);
 }
 
 #pragma mark misc

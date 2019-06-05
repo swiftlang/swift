@@ -239,12 +239,12 @@ SourceRange ASTSourceFileScope::getChildlessSourceRange() const {
                      SF->Decls.back()->getEndLoc());
 }
 
-SourceRange GTXScope::getChildlessSourceRange() const {
+SourceRange GenericTypeOrExtensionScope::getChildlessSourceRange() const {
   return portion->getChildlessSourceRangeOf(this);
 }
 
-SourceRange
-GTXWholePortion::getChildlessSourceRangeOf(const GTXScope *scope) const {
+SourceRange GenericTypeOrExtensionWholePortion::getChildlessSourceRangeOf(
+    const GenericTypeOrExtensionScope *scope) const {
   auto *d = scope->getDecl().get();
   auto r = d->getSourceRangeIncludingAttrs();
   if (r.Start.isValid()) {
@@ -254,13 +254,13 @@ GTXWholePortion::getChildlessSourceRangeOf(const GTXScope *scope) const {
   return d->getSourceRange();
 }
 
-SourceRange
-GTXWherePortion::getChildlessSourceRangeOf(const GTXScope *scope) const {
+SourceRange GenericTypeOrExtensionWherePortion::getChildlessSourceRangeOf(
+    const GenericTypeOrExtensionScope *scope) const {
   return scope->getGenericContext()->getTrailingWhereClause()->getSourceRange();
 }
 
 SourceRange IterableTypeBodyPortion::getChildlessSourceRangeOf(
-    const GTXScope *scope) const {
+    const GenericTypeOrExtensionScope *scope) const {
   auto *d = scope->getDecl().get();
   if (auto *nt = dyn_cast<NominalTypeDecl>(d))
     return nt->getBraces();

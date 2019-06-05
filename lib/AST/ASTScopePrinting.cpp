@@ -135,8 +135,7 @@ NullablePtr<const void> ASTScopeImpl::addressForPrinting() const {
   return nullptr;
 }
 
-
-void GTXScope::printSpecifics(llvm::raw_ostream &out) const {
+void GenericTypeOrExtensionScope::printSpecifics(llvm::raw_ostream &out) const {
   out << " ";
   if (shouldHaveABody() && !doesDeclHaveABody())
     out << "<no body>";
@@ -192,7 +191,7 @@ void GuardUseScope::printSpecifics(llvm::raw_ostream &out) const {
   lookupParent->printRange(out);
 }
 
-bool GTXScope::doesDeclHaveABody() const { return false; }
+bool GenericTypeOrExtensionScope::doesDeclHaveABody() const { return false; }
 
 bool IterableTypeScope::doesDeclHaveABody() const {
   return getBraces().Start != getBraces().End;

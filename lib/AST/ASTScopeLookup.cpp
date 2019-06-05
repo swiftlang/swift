@@ -257,7 +257,7 @@ bool SubscriptDeclScope::lookInGenericParameters(
   return lookInMyAndOuterGenericParameters(decl, isCascadingUse, consumer);
 }
 
-bool GTXScope::lookInGenericParameters(
+bool GenericTypeOrExtensionScope::lookInGenericParameters(
     Optional<bool> isCascadingUse, ASTScopeImpl::DeclConsumer consumer) const {
   // For Decls:
   // WAIT, WHAT?! Isn't this covered by the GenericParamScope
@@ -296,21 +296,21 @@ ASTScopeImpl::lookupInSelfType(NullablePtr<DeclContext>,
   return dontLookupInSelfType(isCascadingUse);
 }
 
-std::pair<bool, Optional<bool>>
-GTXScope::lookupInSelfType(NullablePtr<DeclContext> selfDC,
-                           const Optional<bool> isCascadingUse,
-                           ASTScopeImpl::DeclConsumer consumer) const {
+std::pair<bool, Optional<bool>> GenericTypeOrExtensionScope::lookupInSelfType(
+    NullablePtr<DeclContext> selfDC, const Optional<bool> isCascadingUse,
+    ASTScopeImpl::DeclConsumer consumer) const {
   return portion->lookupInSelfTypeOf(this, selfDC, isCascadingUse, consumer);
 }
 
 std::pair<bool, Optional<bool>> Portion::lookupInSelfTypeOf(
-    const GTXScope *scope, NullablePtr<DeclContext> selfDC,
+    const GenericTypeOrExtensionScope *scope, NullablePtr<DeclContext> selfDC,
     const Optional<bool> isCascadingUse, ASTScopeImpl::DeclConsumer) const {
   return scope->dontLookupInSelfType(isCascadingUse);
 }
 
-std::pair<bool, Optional<bool>> GTXWhereOrBodyPortion::lookupInSelfTypeOf(
-    const GTXScope *scope, NullablePtr<DeclContext> selfDC,
+std::pair<bool, Optional<bool>>
+GenericTypeOrExtensionWhereOrBodyPortion::lookupInSelfTypeOf(
+    const GenericTypeOrExtensionScope *scope, NullablePtr<DeclContext> selfDC,
     const Optional<bool> isCascadingUse,
     ASTScopeImpl::DeclConsumer consumer) const {
   auto nt = scope->getCorrespondingNominalTypeDecl().getPtrOrNull();
@@ -488,20 +488,23 @@ NullablePtr<const ASTScopeImpl> ASTScopeImpl::getLookupLimit() const {
   return nullptr;
 }
 
-NullablePtr<const ASTScopeImpl> GTXScope::getLookupLimit() const {
+NullablePtr<const ASTScopeImpl>
+GenericTypeOrExtensionScope::getLookupLimit() const {
   return portion->getLookupLimitFor(this);
 }
 
 NullablePtr<const ASTScopeImpl>
-Portion::getLookupLimitFor(const GTXScope *) const {
+Portion::getLookupLimitFor(const GenericTypeOrExtensionScope *) const {
   return nullptr;
 }
 NullablePtr<const ASTScopeImpl>
-GTXWholePortion::getLookupLimitFor(const GTXScope *scope) const {
+GenericTypeOrExtensionWholePortion::getLookupLimitFor(
+    const GenericTypeOrExtensionScope *scope) const {
   return scope->getLookupLimitForDecl();
 }
 
-NullablePtr<const ASTScopeImpl> GTXScope::getLookupLimitForDecl() const {
+NullablePtr<const ASTScopeImpl>
+GenericTypeOrExtensionScope::getLookupLimitForDecl() const {
   return nullptr;
 }
 
@@ -544,8 +547,8 @@ ASTScopeImpl::computeSelfDCForParent(NullablePtr<DeclContext> selfDC) const {
 }
 
 // Forget the "self" declaration:
-NullablePtr<DeclContext>
-GTXScope::computeSelfDCForParent(NullablePtr<DeclContext>) const {
+NullablePtr<DeclContext> GenericTypeOrExtensionScope::computeSelfDCForParent(
+    NullablePtr<DeclContext>) const {
   return nullptr;
 }
 
@@ -614,7 +617,7 @@ Optional<bool> AbstractFunctionBodyScope::resolveIsCascadingUseForThisScope(
   return false;
 }
 
-Optional<bool> GTXScope::resolveIsCascadingUseForThisScope(
+Optional<bool> GenericTypeOrExtensionScope::resolveIsCascadingUseForThisScope(
     Optional<bool> isCascadingUse) const {
   return ifUnknownIsCascadingUseAccordingTo(isCascadingUse,
                                             getDeclContext().get());

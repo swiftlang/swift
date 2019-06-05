@@ -68,7 +68,7 @@ class DeclName;
 
 namespace ast_scope {
 class ASTScopeImpl;
-class GTXScope;
+class GenericTypeOrExtensionScope;
 class IterableTypeScope;
 class TypeAliasScope;
 class StatementConditionElementPatternScope;
@@ -98,10 +98,10 @@ class ScopeCreator;
 class ASTScopeImpl {
   friend class ASTVisitorForScopeCreation;
   friend class Portion;
-  friend class GTXWholePortion;
+  friend class GenericTypeOrExtensionWholePortion;
   friend class NomExtDeclPortion;
-  friend class GTXWherePortion;
-  friend class GTXWherePortion;
+  friend class GenericTypeOrExtensionWherePortion;
+  friend class GenericTypeOrExtensionWherePortion;
   friend class IterableTypeBodyPortion;
   friend class ScopeCreator;
 
@@ -445,74 +445,86 @@ protected:
       return Mem;
     }
 
-    virtual void expandScope(GTXScope *, ScopeCreator &) const {}
+    virtual void expandScope(GenericTypeOrExtensionScope *,
+                             ScopeCreator &) const {}
 
-    virtual SourceRange
-    getChildlessSourceRangeOf(const GTXScope *scope) const = 0;
+    virtual SourceRange getChildlessSourceRangeOf(
+        const GenericTypeOrExtensionScope *scope) const = 0;
 
     /// Returns isDone and isCascadingUse
     virtual std::pair<bool, Optional<bool>>
-    lookupInSelfTypeOf(const GTXScope *scope, NullablePtr<DeclContext> selfDC,
+    lookupInSelfTypeOf(const GenericTypeOrExtensionScope *scope,
+                       NullablePtr<DeclContext> selfDC,
                        const Optional<bool> isCascadingUse,
                        ASTScopeImpl::DeclConsumer consumer) const;
 
     virtual NullablePtr<const ASTScopeImpl>
-    getLookupLimitFor(const GTXScope *) const;
+    getLookupLimitFor(const GenericTypeOrExtensionScope *) const;
   };
 
   // For the whole Decl scope of a GenericType or an Extension
-  class GTXWholePortion : public Portion {
+  class GenericTypeOrExtensionWholePortion : public Portion {
   public:
-    GTXWholePortion() : Portion("Decl") {}
-    virtual ~GTXWholePortion() {}
+    GenericTypeOrExtensionWholePortion() : Portion("Decl") {}
+    virtual ~GenericTypeOrExtensionWholePortion() {}
 
     // Just for TypeAlias
-    void expandScope(GTXScope *, ScopeCreator &) const override;
+    void expandScope(GenericTypeOrExtensionScope *,
+                     ScopeCreator &) const override;
 
-    SourceRange getChildlessSourceRangeOf(const GTXScope *) const override;
+    SourceRange getChildlessSourceRangeOf(
+        const GenericTypeOrExtensionScope *) const override;
 
     NullablePtr<const ASTScopeImpl>
-    getLookupLimitFor(const GTXScope *) const override;
+    getLookupLimitFor(const GenericTypeOrExtensionScope *) const override;
 };
 
-/// GTX = GenericType or Extension
-class GTXWhereOrBodyPortion : public Portion {
+/// GenericTypeOrExtension = GenericType or Extension
+class GenericTypeOrExtensionWhereOrBodyPortion : public Portion {
 public:
-  GTXWhereOrBodyPortion(const char *n) : Portion(n) {}
-  virtual ~GTXWhereOrBodyPortion() {}
+  GenericTypeOrExtensionWhereOrBodyPortion(const char *n) : Portion(n) {}
+  virtual ~GenericTypeOrExtensionWhereOrBodyPortion() {}
 
   std::pair<bool, Optional<bool>>
-  lookupInSelfTypeOf(const GTXScope *scope, NullablePtr<DeclContext> selfDC,
+  lookupInSelfTypeOf(const GenericTypeOrExtensionScope *scope,
+                     NullablePtr<DeclContext> selfDC,
                      const Optional<bool> isCascadingUse,
                      ASTScopeImpl::DeclConsumer consumer) const override;
 };
 
 /// Behavior specific to representing the trailing where clause of a
 /// GenericTypeDecl or ExtensionDecl scope.
-class GTXWherePortion : public GTXWhereOrBodyPortion {
+class GenericTypeOrExtensionWherePortion
+    : public GenericTypeOrExtensionWhereOrBodyPortion {
 public:
-  GTXWherePortion() : GTXWhereOrBodyPortion("Where") {}
+  GenericTypeOrExtensionWherePortion()
+      : GenericTypeOrExtensionWhereOrBodyPortion("Where") {}
 
-  SourceRange getChildlessSourceRangeOf(const GTXScope *) const override;
+  SourceRange
+  getChildlessSourceRangeOf(const GenericTypeOrExtensionScope *) const override;
 };
 
 /// Behavior specific to representing the Body of a NominalTypeDecl or
 /// ExtensionDecl scope
-class IterableTypeBodyPortion final : public GTXWhereOrBodyPortion {
+class IterableTypeBodyPortion final
+    : public GenericTypeOrExtensionWhereOrBodyPortion {
 public:
-  IterableTypeBodyPortion() : GTXWhereOrBodyPortion("Body") {}
-  void expandScope(GTXScope *, ScopeCreator &) const override;
-  SourceRange getChildlessSourceRangeOf(const GTXScope *) const override;
+  IterableTypeBodyPortion()
+      : GenericTypeOrExtensionWhereOrBodyPortion("Body") {}
+  void expandScope(GenericTypeOrExtensionScope *,
+                   ScopeCreator &) const override;
+  SourceRange
+  getChildlessSourceRangeOf(const GenericTypeOrExtensionScope *) const override;
 };
 
 /// GenericType or Extension scope
 /// : Whole type decl, trailing where clause, or body
-class GTXScope : public ASTScopeImpl {
+class GenericTypeOrExtensionScope : public ASTScopeImpl {
 public:
   const Portion *const portion;
 
-  GTXScope(const Portion *p) : portion(p) {}
-  virtual ~GTXScope() {}
+  GenericTypeOrExtensionScope(const Portion *p) : portion(p) {}
+  virtual ~GenericTypeOrExtensionScope() {}
 
   virtual NullablePtr<IterableDeclContext> getIterableDeclContext() const {
     return nullptr;
@@ -559,9 +571,9 @@ public:
   virtual NullablePtr<const ASTScopeImpl> getLookupLimitForDecl() const;
 };
 
-class IterableTypeScope : public GTXScope {
+class IterableTypeScope : public GenericTypeOrExtensionScope {
 public:
-  IterableTypeScope(const Portion *p) : GTXScope(p) {}
+  IterableTypeScope(const Portion *p) : GenericTypeOrExtensionScope(p) {}
   virtual ~IterableTypeScope() {}
 
   virtual SourceRange getBraces() const = 0;
@@ -615,10 +627,11 @@ public:
   NullablePtr<Decl> getDecl() const override { return decl; }
 };
 
-class TypeAliasScope : public GTXScope {
+class TypeAliasScope : public GenericTypeOrExtensionScope {
 public:
   TypeAliasDecl *const decl;
-  TypeAliasScope(const Portion *p, TypeAliasDecl *e) : GTXScope(p), decl(e) {}
+  TypeAliasScope(const Portion *p, TypeAliasDecl *e)
+      : GenericTypeOrExtensionScope(p), decl(e) {}
   virtual ~TypeAliasScope() {}
 
   std::string declKindName() const override { return "TypeAlias"; }
@@ -628,10 +641,11 @@ public:
   NullablePtr<Decl> getDecl() const override { return decl; }
 };
 
-class OpaqueTypeScope final : public GTXScope {
+class OpaqueTypeScope final : public GenericTypeOrExtensionScope {
 public:
   OpaqueTypeDecl *const decl;
-  OpaqueTypeScope(const Portion *p, OpaqueTypeDecl *e) : GTXScope(p), decl(e) {}
+  OpaqueTypeScope(const Portion *p, OpaqueTypeDecl *e)
+      : GenericTypeOrExtensionScope(p), decl(e) {}
   virtual ~OpaqueTypeScope() {}
 
   std::string declKindName() const override { return "OpaqueType"; }
