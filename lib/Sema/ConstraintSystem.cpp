@@ -647,21 +647,8 @@ FunctionType *ConstraintSystem::openFunctionType(
           [&](Type type) -> Type { return openType(type, replacements); });
     }
 
-    // Transform the parameters and output type.
-    llvm::SmallVector<AnyFunctionType::Param, 4> openedParams;
-    openedParams.reserve(genericFn->getNumParams());
-    for (const auto &param : genericFn->getParams()) {
-      auto type = openType(param.getPlainType(), replacements);
-      openedParams.push_back(AnyFunctionType::Param(type, param.getLabel(),
-                                                    param.getParameterFlags()));
-    }
-
-    auto resultTy = openType(genericFn->getResult(), replacements);
-
-    // Build the resulting (non-generic) function type.
-    funcType = FunctionType::get(
-        openedParams, resultTy,
-        FunctionType::ExtInfo().withThrows(genericFn->throws()));
+    funcType = genericFn->substGenericArgs(
+        [&](Type type) { return openType(type, replacements); });
   }
 
   return funcType->castTo<FunctionType>();
