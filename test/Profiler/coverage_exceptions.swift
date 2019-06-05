@@ -1,5 +1,16 @@
 // RUN: %target-swift-frontend -Xllvm -sil-full-demangle -profile-generate -profile-coverage-mapping -emit-sorted-sil -emit-sil -module-name coverage_catch %s | %FileCheck %s
 
+struct S {
+  // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_catch.S.init() -> coverage_catch.S
+  init() {     // CHECK: [[@LINE]]:10 -> [[@LINE+6]]:4 : 0
+    do {       // CHECK: [[@LINE]]:8 -> [[@LINE+2]]:6 : 0
+      throw SomeErr.Err1
+    } catch {
+      // CHECK: [[@LINE-1]]:13 -> [[@LINE+1]]:6 : 1
+    } // CHECK: [[@LINE]]:6 -> [[@LINE+1]]:4 : 0
+  }
+}
+
 enum SomeErr : Error {
   case Err1
   case Err2
@@ -108,15 +119,4 @@ func joo() -> Int {
 
   } while false // CHECK: [[@LINE]]:11 {{.*}} : (1 - 2)
   return 1
-}
-
-struct S {
-  // CHECK: sil_coverage_map {{.*}}// __ntd_S_line:[[@LINE-1]]
-  init() {
-    do {
-      throw SomeErr.Err1
-    } catch {
-      // CHECK: [[@LINE-1]]:13 -> [[@LINE+1]]:6 : 1
-    } // CHECK: [[@LINE]]:6 -> [[@LINE+1]]:4 : 0
-  }
 }
