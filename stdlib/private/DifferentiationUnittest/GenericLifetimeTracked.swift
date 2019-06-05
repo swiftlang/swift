@@ -20,20 +20,35 @@ public enum _GlobalLeakCount {
 /// automatic differentiation.
 public struct Tracked<T> {
   fileprivate class Box {
-    fileprivate let value : T
+    fileprivate var value : T
     init(_ value: T) {
       self.value = value
-        _GlobalLeakCount.count += 1
+      _GlobalLeakCount.count += 1
     }
     deinit {
       _GlobalLeakCount.count -= 1
     }
   }
-  private let handle: Box
+  private var handle: Box
+
+  @differentiable(
+    vjp: _vjpInit
+    where T : Differentiable, T == T.AllDifferentiableVariables,
+          T == T.TangentVector
+  )
   public init(_ value: T) {
     self.handle = Box(value)
   }
-  public var value: T { return handle.value }
+
+  @differentiable(
+    vjp: _vjpValue
+    where T : Differentiable, T == T.AllDifferentiableVariables,
+          T == T.TangentVector
+  )
+  public var value: T {
+    get { handle.value }
+    set { handle.value = newValue }
+  }
 }
 
 extension Tracked : ExpressibleByFloatLiteral where T : ExpressibleByFloatLiteral {
@@ -123,17 +138,37 @@ extension Tracked : Differentiable
   public typealias TangentVector = Tracked<T.TangentVector>
 }
 
-@differentiable(vjp: _vjpAdd)
-public func + (_ a: Tracked<Float>, _ b: Tracked<Float>) -> Tracked<Float> {
-  return Tracked<Float>(a.value + b.value)
+extension Tracked where T : Differentiable, T == T.AllDifferentiableVariables,
+                        T == T.TangentVector
+{
+  @usableFromInline
+  internal static func _vjpInit(_ value: T)
+      -> (value: Self, pullback: (Self.TangentVector) -> (T.TangentVector)) {
+    return (Tracked(value), { v in v.value })
+  }
+
+  @usableFromInline
+  internal func _vjpValue() -> (T, (T.TangentVector) -> Self.TangentVector) {
+    return (value, { v in Tracked(v) })
+  }
 }
 
-@usableFromInline
-func _vjpAdd(_ a: Tracked<Float>, _ b: Tracked<Float>)
-    -> (Tracked<Float>, (Tracked<Float>) -> (Tracked<Float>, Tracked<Float>)) {
-  return (Tracked<Float>(a.value + b.value), { v in
-    return (v, v)
-  })
+extension Tracked where T : Differentiable, T == T.AllDifferentiableVariables,
+                        T == T.TangentVector
+{
+  @usableFromInline
+  @differentiating(+)
+  internal static func _vjpAdd(lhs: Self, rhs: Self)
+      -> (value: Self, pullback: (Self) -> (Self, Self)) {
+    return (lhs + rhs, { v in (v, v) })
+  }
+
+  @usableFromInline
+  @differentiating(-)
+  internal static func _vjpSubtract(lhs: Self, rhs: Self)
+      -> (value: Self, pullback: (Self) -> (Self, Self)) {
+    return (lhs - rhs, { v in (v, .zero - v) })
+  }
 }
 
 // Differential operators for `Tracked<Float>`.
@@ -150,5 +185,21 @@ public extension Differentiable {
     at x: T, in f: @differentiable (Self, T) -> Tracked<Float>
   ) -> (TangentVector, T.TangentVector) {
     return self.pullback(at: x, in: f)(1)
+  }
+
+  @inlinable
+  func valueWithGradient(
+    in f: @differentiable (Self) -> Tracked<Float>
+  ) -> (value: Tracked<Float>, gradient: TangentVector) {
+    let (y, pb) = self.valueWithPullback(in: f)
+    return (y, pb(1))
+  }
+
+  @inlinable
+  func valueWithGradient<T : Differentiable>(
+    at x: T, in f: @differentiable (Self, T) -> Tracked<Float>
+  ) -> (value: Tracked<Float>, gradient: (TangentVector, T.TangentVector)) {
+    let (y, pb) = self.valueWithPullback(at: x, in: f)
+    return (y, pb(1))
   }
 }
