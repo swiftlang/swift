@@ -4131,7 +4131,7 @@ public:
     Lowering::GenericContextScope genericContextScope(
         getContext().getTypeConverter(), adjGenSig);
     auto origExitIt = original.findReturnBB();
-    assert(!origExitIt.isEnd() &&
+    assert(origExitIt != original.end() &&
            "Functions without returns must have been diagnosed");
     auto *origExit = &*origExitIt;
 
@@ -4172,7 +4172,7 @@ public:
       }
       domOrder.pushChildren(bb);
     }
-    
+
     // Create adjoint blocks and arguments, visiting original blocks in
     // post-order.
     for (auto *origBB : postOrderInfo->getPostOrder()) {
@@ -4181,9 +4181,8 @@ public:
       auto pbStructLoweredType =
           remapType(getPullbackInfo().getPullbackStructLoweredType(origBB));
       // If the BB is the original exit, then the adjoint block that we just
-      // createed must be the adjoint function's entry. We always know what an
-      // entry block's arguments should be, so we generate them and skip to the
-      // the next block.
+      // created must be the adjoint function's entry. For the adjoint entry,
+      // create entry arguments and continue to the next block.
       if (origBB == origExit) {
         assert(adjointBB->isEntry());
         createEntryArguments(&getAdjoint());
@@ -4193,8 +4192,8 @@ public:
         continue;
       }
       
-      // Otherwise, we create a phi argument for the corresponding primal value
-      // struct, and then turn active values into phi arguments.
+      // Otherwise, we create a phi argument for the corresponding pullback
+      // struct, and handle dominated active values/buffers.
       auto *pbStructArg = adjointBB->createPhiArgument(
           pbStructLoweredType, ValueOwnershipKind::Guaranteed);
       adjointPullbackStructArguments[origBB] = pbStructArg;
