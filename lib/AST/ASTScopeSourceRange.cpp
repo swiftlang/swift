@@ -76,6 +76,10 @@ bool ASTScopeImpl::hasValidSourceRange() const {
                                               sourceRange.Start);
 }
 
+bool ASTScopeImpl::hasValidSourceRangeOfIgnoredASTNodes() const {
+  return sourceRangeOfIgnoredASTNodes.isValid();
+}
+
 bool ASTScopeImpl::precedesInSource(const ASTScopeImpl *next) const {
   if (!hasValidSourceRange() || !next->hasValidSourceRange())
     return false;

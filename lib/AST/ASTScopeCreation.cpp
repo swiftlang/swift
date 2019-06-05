@@ -715,8 +715,8 @@ void PatternEntryUseScope::expandMe(ScopeCreator &scopeCreator) {
     // no more entries, create the scopes inside the pattern use
     scopeCreator.createScopesForDeferredNodes(this);
   }
-  assert(!getChildren().empty() &&
-         "Should not be have created childless use scopes");
+  assert((!getChildren().empty() || hasValidSourceRangeOfIgnoredASTNodes()) &&
+         "Should not be have created empty use scopes");
 }
 
 void ConditionalClauseScope::expandMe(ScopeCreator &scopeCreator) {
