@@ -1095,7 +1095,7 @@ Parser::parseDifferentiatingAttribute(SourceLoc atLoc, SourceLoc loc) {
       diagnose(Tok, diag::unexpected_separator, ",");
       return true;
     }
-    // Check that token after comma is 'wrt:' or 'linear'.
+    // Check that token after comma is 'linear' or 'wrt:'.
     if (!Tok.is(tok::identifier) ||
         !(Tok.getText() == "linear" || Tok.getText() == "wrt")) {
       diagnose(Tok, diag::attr_differentiating_expected_linear_wrt);

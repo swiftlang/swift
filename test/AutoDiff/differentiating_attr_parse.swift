@@ -3,7 +3,8 @@
 /// Good
 
 @differentiating(sin) // ok
-func jvpSin(x: @nondiff Float) -> (value: Float, differential: (Float) -> (Float)) {
+func jvpSin(x: @nondiff Float)
+-> (value: Float, differential: (Float)-> (Float)) {
   return (x, { $0 })
 }
 
@@ -13,8 +14,8 @@ func vjpSin(x: Float) -> (value: Float, pullback: (Float) -> Float) {
 }
 
 @differentiating(add, wrt: (x, y)) // ok
-func vjpAdd(x: Float, y: Float) -> (value: Float, pullback: (Float)
--> (Float, Float)) {
+func vjpAdd(x: Float, y: Float)
+-> (value: Float, pullback: (Float) -> (Float, Float)) {
   return (x + y, { ($0, $0) })
 }
 
