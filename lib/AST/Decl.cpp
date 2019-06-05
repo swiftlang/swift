@@ -5413,6 +5413,11 @@ bool VarDecl::isPropertyWrapperInitializedWithInitialValue() const {
   // If there is no initializer, the initialization form depends on
   // whether the property wrapper type has an init(initialValue:).
   if (!isParentInitialized()) {
+    // If it's default-initializable, that doesn't use an initial value.
+    if (auto *PBD = getParentPatternBinding())
+      if (PBD->isDefaultInitializable())
+        return false;
+
     auto wrapperTypeInfo = getAttachedPropertyWrapperTypeInfo();
     return wrapperTypeInfo.initialValueInit != nullptr;
   }
