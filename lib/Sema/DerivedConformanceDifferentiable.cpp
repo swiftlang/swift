@@ -744,7 +744,7 @@ getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived,
         requirements = extDecl->getGenericRequirements();
       auto *diffableAttr = DifferentiableAttr::create(
           C, /*implicit*/ true, SourceLoc(), SourceLoc(),
-          /* TODO linear*/ false, {}, None, None, requirements);
+          /*linear*/ false, {}, None, None, requirements);
       member->getAttrs().add(diffableAttr);
       // If getter does not exist, trigger synthesis and compute type.
       if (!member->getGetter())

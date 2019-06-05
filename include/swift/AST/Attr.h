@@ -1496,7 +1496,7 @@ class DifferentiableAttr final
                                     ParsedAutoDiffParameter> {
   friend TrailingObjects;
 
-  /// Whether this function is linear (optional)
+  /// Whether this function is linear (optional).
   bool linear;
   /// The number of parsed parameters specified in 'wrt:'.
   unsigned NumParsedParameters = 0;

@@ -1408,9 +1408,11 @@ void DifferentiableAttr::print(llvm::raw_ostream &OS, const Decl *D,
 // SWIFT_ENABLE_TENSORFLOW
 DifferentiatingAttr::DifferentiatingAttr(
     ASTContext &context, bool implicit, SourceLoc atLoc, SourceRange baseRange,
-    DeclNameWithLoc original, bool linear, ArrayRef<ParsedAutoDiffParameter> params)
+    DeclNameWithLoc original, bool linear,
+    ArrayRef<ParsedAutoDiffParameter> params)
     : DeclAttribute(DAK_Differentiating, atLoc, baseRange, implicit),
-    Original(std::move(original)), linear(linear), NumParsedParameters(params.size()) {
+      Original(std::move(original)), linear(linear),
+      NumParsedParameters(params.size()) {
   std::copy(params.begin(), params.end(),
             getTrailingObjects<ParsedAutoDiffParameter>());
 }
