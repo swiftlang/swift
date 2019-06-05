@@ -424,7 +424,7 @@ static void printDifferentiableAttrArguments(
     stream << ", ";
   };
   
-  // Print if the function is marked as differentiable.
+  // Print if the function is marked as linear.
   if (attr->isLinear()) {
     isLeadingClause = false;
     stream << "linear";

@@ -1497,7 +1497,7 @@ class DifferentiableAttr final
   friend TrailingObjects;
 
   /// Whether this function is linear (optional)
-  bool linear = false;
+  bool linear;
   /// The number of parsed parameters specified in 'wrt:'.
   unsigned NumParsedParameters = 0;
   /// The JVP function.
