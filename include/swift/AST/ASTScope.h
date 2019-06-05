@@ -940,7 +940,7 @@ public:
   }
   virtual void createSubtreeForCondition(ScopeCreator &);
   virtual void createSubtreeForNextConditionalClause(ScopeCreator &) = 0;
-  virtual void createSubtreeForAfterClauses(ScopeCreator &) = 0;
+  virtual void finishExpansion(ScopeCreator &) = 0;
   SourceLoc startLocAccordingToCondition() const;
 };
 
@@ -954,7 +954,7 @@ public:
   }
   void createSubtreeForNextConditionalClause(ScopeCreator &) override;
   std::string getClassName() const override;
-  void createSubtreeForAfterClauses(ScopeCreator &) override;
+  void finishExpansion(ScopeCreator &) override;
   SourceRange getChildlessSourceRange() const override;
 };
 class IfConditionalClauseScope : public ConditionalClauseScope {
@@ -967,7 +967,7 @@ public:
   }
   void createSubtreeForNextConditionalClause(ScopeCreator &) override;
   std::string getClassName() const override;
-  void createSubtreeForAfterClauses(ScopeCreator &) override;
+  void finishExpansion(ScopeCreator &) override;
   SourceRange getChildlessSourceRange() const override;
 };
 
@@ -981,7 +981,7 @@ public:
   }
   void createSubtreeForNextConditionalClause(ScopeCreator &) override;
   std::string getClassName() const override;
-  void createSubtreeForAfterClauses(ScopeCreator &) override;
+  void finishExpansion(ScopeCreator &) override;
   SourceRange getChildlessSourceRange() const override;
 };
 

@@ -729,7 +729,7 @@ void ConditionalClauseScope::expandMe(ScopeCreator &scopeCreator) {
   else {
     // There aren't any additional conditional clauses. Add the appropriate
     // nested scope based on the kind of statement.
-    createSubtreeForAfterClauses(scopeCreator);
+    finishExpansion(scopeCreator);
   }
 }
 
@@ -1020,16 +1020,16 @@ void GuardContinuationScope::createSubtreeForNextConditionalClause(
   scopeCreator.createSubtree<GuardContinuationScope>(this, stmt, index + 1);
 }
 
-void WhileConditionalClauseScope::createSubtreeForAfterClauses(
+void WhileConditionalClauseScope::finishExpansion(
     ScopeCreator &scopeCreator) {
   scopeCreator.createScopeFor(stmt->getBody(), this);
 }
-void IfConditionalClauseScope::createSubtreeForAfterClauses(
+void IfConditionalClauseScope::finishExpansion(
     ScopeCreator &scopeCreator) {
   scopeCreator.createScopeFor(stmt->getThenStmt(), this);
 }
 
-void GuardConditionalClauseScope::createSubtreeForAfterClauses(
+void GuardConditionalClauseScope::finishExpansion(
     ScopeCreator &scopeCreator) {
   // There aren't any additional conditional clauses. Add the appropriate
   // nested scope based on the kind of statement.
