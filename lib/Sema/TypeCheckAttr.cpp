@@ -3452,7 +3452,7 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
   // the same differentiation parameters, create one.
   if (!da) {
     da = DifferentiableAttr::create(ctx, /*implicit*/ true, attr->AtLoc,
-                                    attr->getRange(), /*TODO linear*/ false,
+                                    attr->getRange(), attr->isLinear(),
                                     checkedWrtParamIndices, /*jvp*/ None,
                                     /*vjp*/ None, derivativeRequirements);
     switch (kind) {

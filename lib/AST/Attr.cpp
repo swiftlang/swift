@@ -1408,39 +1408,39 @@ void DifferentiableAttr::print(llvm::raw_ostream &OS, const Decl *D,
 // SWIFT_ENABLE_TENSORFLOW
 DifferentiatingAttr::DifferentiatingAttr(
     ASTContext &context, bool implicit, SourceLoc atLoc, SourceRange baseRange,
-    DeclNameWithLoc original, ArrayRef<ParsedAutoDiffParameter> params)
+    DeclNameWithLoc original, bool linear, ArrayRef<ParsedAutoDiffParameter> params)
     : DeclAttribute(DAK_Differentiating, atLoc, baseRange, implicit),
-    Original(std::move(original)), NumParsedParameters(params.size()) {
+    Original(std::move(original)), linear(linear), NumParsedParameters(params.size()) {
   std::copy(params.begin(), params.end(),
             getTrailingObjects<ParsedAutoDiffParameter>());
 }
 
 DifferentiatingAttr::DifferentiatingAttr(
     ASTContext &context, bool implicit, SourceLoc atLoc, SourceRange baseRange,
-    DeclNameWithLoc original, AutoDiffParameterIndices *indices)
+    DeclNameWithLoc original, bool linear, AutoDiffParameterIndices *indices)
     : DeclAttribute(DAK_Differentiating, atLoc, baseRange, implicit),
-    Original(std::move(original)), ParameterIndices(indices) {}
+    Original(std::move(original)), linear(linear), ParameterIndices(indices) {}
 
 DifferentiatingAttr *
 DifferentiatingAttr::create(ASTContext &context, bool implicit,
                             SourceLoc atLoc, SourceRange baseRange,
-                            DeclNameWithLoc original,
+                            DeclNameWithLoc original, bool linear,
                             ArrayRef<ParsedAutoDiffParameter> params) {
   unsigned size = totalSizeToAlloc<ParsedAutoDiffParameter>(params.size());
   void *mem = context.Allocate(size, alignof(DifferentiatingAttr));
   return new (mem) DifferentiatingAttr(context, implicit, atLoc, baseRange,
-                                       std::move(original), params);
+                                       std::move(original), linear, params);
 }
 
 DifferentiatingAttr *
 DifferentiatingAttr::create(ASTContext &context, bool implicit,
                             SourceLoc atLoc, SourceRange baseRange,
-                            DeclNameWithLoc original,
+                            DeclNameWithLoc original, bool linear,
                             AutoDiffParameterIndices *indices) {
   void *mem = context.Allocate(sizeof(DifferentiatingAttr),
                                alignof(DifferentiatingAttr));
   return new (mem) DifferentiatingAttr(context, implicit, atLoc, baseRange,
-                                       std::move(original), indices);
+                                       std::move(original), linear, indices);
 }
 
 ImplementsAttr::ImplementsAttr(SourceLoc atLoc, SourceRange range,

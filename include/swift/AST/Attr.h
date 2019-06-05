@@ -1616,6 +1616,8 @@ class DifferentiatingAttr final
   DeclNameWithLoc Original;
   /// The original function, resolved by the type checker.
   FuncDecl *OriginalFunction = nullptr;
+  /// Whether this function is linear (optional).
+  bool linear;
   /// The number of parsed parameters specified in 'wrt:'.
   unsigned NumParsedParameters = 0;
   /// The differentiation parameters' indices, resolved by the type checker.
@@ -1623,26 +1625,28 @@ class DifferentiatingAttr final
 
   explicit DifferentiatingAttr(ASTContext &context, bool implicit,
                                SourceLoc atLoc, SourceRange baseRange,
-                               DeclNameWithLoc original,
+                               DeclNameWithLoc original, bool linear,
                                ArrayRef<ParsedAutoDiffParameter> params);
 
   explicit DifferentiatingAttr(ASTContext &context, bool implicit,
                                SourceLoc atLoc, SourceRange baseRange,
-                               DeclNameWithLoc original,
+                               DeclNameWithLoc original, bool linear,
                                AutoDiffParameterIndices *indices);
 
 public:
   static DifferentiatingAttr *create(ASTContext &context, bool implicit,
                                      SourceLoc atLoc, SourceRange baseRange,
-                                     DeclNameWithLoc original,
+                                     DeclNameWithLoc original, bool linear,
                                      ArrayRef<ParsedAutoDiffParameter> params);
 
   static DifferentiatingAttr *create(ASTContext &context, bool implicit,
                                      SourceLoc atLoc, SourceRange baseRange,
-                                     DeclNameWithLoc original,
+                                     DeclNameWithLoc original, bool linear,
                                      AutoDiffParameterIndices *indices);
 
   DeclNameWithLoc getOriginal() const { return Original; }
+                                      
+  bool isLinear() const { return linear; }
 
   FuncDecl *getOriginalFunction() const { return OriginalFunction; }
   void setOriginalFunction(FuncDecl *decl) { OriginalFunction = decl; }

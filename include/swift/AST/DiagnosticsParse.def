@@ -1505,7 +1505,7 @@ ERROR(attr_differentiable_expected_label,none,
 ERROR(attr_differentiating_expected_original_name,PointsToFirstBadToken,
       "expected an original function name", ())
 ERROR(attr_differentiating_expected_label_linear_or_wrt,none,
-"expected either 'linear' or 'wrt:'", ())
+      "expected either 'linear' or 'wrt:'", ())
 
 // differentiation `wrt` parameters clause
 ERROR(expected_colon_after_label,PointsToFirstBadToken,
