@@ -1140,14 +1140,14 @@ makeBitFieldAccessors(ClangImporter::Implementation &Impl,
                                                         recordType,
                                                         clang::VK_RValue,
                                                         clang::SourceLocation());
-    auto cGetterExpr = new (Ctx) clang::MemberExpr(cGetterSelfExpr,
-                                                   /*isarrow=*/ false,
-                                                   clang::SourceLocation(),
-                                                   fieldDecl,
-                                                   fieldNameInfo,
-                                                   fieldType,
-                                                   clang::VK_RValue,
-                                                   clang::OK_BitField);
+    auto cGetterExpr = clang::MemberExpr::CreateImplicit(Ctx,
+                                                         cGetterSelfExpr,
+                                                         /*isarrow=*/ false,
+                                                         fieldDecl,
+                                                         fieldType,
+                                                         clang::VK_RValue,
+                                                         clang::OK_BitField);
+
     
     auto cGetterBody = clang::ReturnStmt::Create(Ctx, clang::SourceLocation(),
                                                    cGetterExpr,
@@ -1185,14 +1185,13 @@ makeBitFieldAccessors(ClangImporter::Implementation &Impl,
                                                         clang::VK_RValue,
                                                         clang::SourceLocation());
     
-    auto cSetterMemberExpr = new (Ctx) clang::MemberExpr(cSetterSelfExpr,
-                                                         /*isarrow=*/ true,
-                                                         clang::SourceLocation(),
-                                                         fieldDecl,
-                                                         fieldNameInfo,
-                                                         fieldType,
-                                                         clang::VK_LValue,
-                                                         clang::OK_BitField);
+    auto cSetterMemberExpr = clang::MemberExpr::CreateImplicit(Ctx,
+                                                               cSetterSelfExpr,
+                                                               /*isarrow=*/true,
+                                                               fieldDecl,
+                                                               fieldType,
+                                                               clang::VK_LValue,
+                                                               clang::OK_BitField);
     
     auto cSetterValueExpr = new (Ctx) clang::DeclRefExpr(Ctx, cSetterValue, false,
                                                          fieldType,
