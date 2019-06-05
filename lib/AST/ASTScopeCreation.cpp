@@ -804,7 +804,7 @@ void CaseStmtScope::expandMe(ScopeCreator &scopeCreator) {
 void GuardStmtScope::expandMe(ScopeCreator &scopeCreator) {
   // Add a child to describe the guard condition.
   scopeCreator.withoutDeferrals().createSubtree<GuardConditionalClauseScope>(
-      this, stmt, 0);
+      this, stmt, 0); // HERE without??
 
   // Add a child for the 'guard' body, which always exits.
   scopeCreator.createScopeFor(stmt->getBody(), this);
