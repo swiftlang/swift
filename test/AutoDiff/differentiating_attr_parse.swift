@@ -7,12 +7,12 @@ func jvpSin(x: @nondiff Float) -> (value: Float, differential: (Float) -> (Float
   return (x, { $0 })
 }
 @differentiating(sin, wrt: x) // ok
-func vjpSinExplicitWrt(x: Float) -> (value: Float, pullback: (Float) -> Float) {
+func vjpSin(x: Float) -> (value: Float, pullback: (Float) -> Float) {
   return (x, { $0 })
 }
 
 @differentiating(add, wrt: (x, y)) // ok
-func vjpAddWrtXY(x: Float, y: Float) -> (value: Float, pullback: (Float) 
+func vjpAdd(x: Float, y: Float) -> (value: Float, pullback: (Float)
 -> (Float, Float)) {
   return (x + y, { ($0, $0) })
 }
@@ -45,9 +45,23 @@ func dfoo(x: Float) -> (value: Float, differential: (Float) -> (Float)) {
   return (x, { $0 })
 }
 
-// expected-error @+2 {{expected ')' in 'differentiating' attribute}}
+// expected-error @+2 {{expected either 'linear' or 'wrt:'}}
 // expected-error @+1 {{expected declaration}}
 @differentiating(linear, foo)
+func dfoo(x: Float) -> (value: Float, differential: (Float) -> (Float)) {
+  return (x, { $0 })
+}
+
+// expected-error @+2 {{expected either 'linear' or 'wrt:'}}
+// expected-error @+1 {{expected declaration}}
+@differentiating(linear, foo,)
+func dfoo(x: Float) -> (value: Float, differential: (Float) -> (Float)) {
+  return (x, { $0 })
+}
+
+// expected-error @+2 {{unexpected ',' separator}}
+// expected-error @+1 {{expected declaration}}
+@differentiating(linear,)
 func dfoo(x: Float) -> (value: Float, differential: (Float) -> (Float)) {
   return (x, { $0 })
 }
