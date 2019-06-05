@@ -1026,7 +1026,7 @@ bool ConditionalClauseScope::isLastCondition() const {
 }
 
 ASTScopeImpl *GuardStmtScope::findLookupParentForUse(
-    GuardConditionalClauseScope *firstConditionalClause) {
+    ConditionalClauseScope *firstConditionalClause) {
   auto *const deepestCondClause =
       firstConditionalClause->findDeepestConditionalClauseScope();
   auto statementCond =

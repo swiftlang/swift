@@ -1322,7 +1322,7 @@ public:
 
 private:
   static ASTScopeImpl *
-  findLookupParentForUse(GuardConditionalClauseScope *firstConditionalClause);
+  findLookupParentForUse(ConditionalClauseScope *firstConditionalClause);
 };
 
 class CatchStmtScope : public AbstractStmtScope {
