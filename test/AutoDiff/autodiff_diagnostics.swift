@@ -120,8 +120,6 @@ func calls_grad_of_nested(_ x: Float) -> Float {
 
 func if_else(_ x: Float, _ flag: Bool) -> Float {
   let y: Float
-  // expected-error @+2 {{expression is not differentiable}}
-  // expected-note @+1 {{differentiating control flow is not yet supported}}
   if flag {
     y = x + 1
   } else {

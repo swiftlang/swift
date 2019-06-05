@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -emit-sil -verify -Xllvm -differentiation-enable-control-flow %s | %FileCheck %s -check-prefix=CHECK-DATA-STRUCTURES
-// RUN: %target-swift-frontend -emit-sil -verify -Xllvm -differentiation-enable-control-flow %s | %FileCheck %s -check-prefix=CHECK-SIL
+// RUN: %target-swift-frontend -emit-sil -verify %s | %FileCheck %s -check-prefix=CHECK-DATA-STRUCTURES
+// RUN: %target-swift-frontend -emit-sil -verify %s | %FileCheck %s -check-prefix=CHECK-SIL
 
 // TODO: Add adjoint SIL FileCheck tests.
 

@@ -62,14 +62,6 @@ static llvm::cl::opt<bool> SkipFoldingAutoDiffFunctionExtraction(
     "differentiation-skip-folding-autodiff-function-extraction",
     llvm::cl::init(false));
 
-/// This flag enables experimental differentiation of functions containing
-/// control flow. When this flag is true, adjoint generation is skipped and
-/// adjoint function references are replaced with undef. This is used for SIL
-/// testing purposes, specifically testing VJP generation before adjoint
-/// generation supports control flow.
-static llvm::cl::opt<bool> EnableControlFlow(
-    "differentiation-enable-control-flow", llvm::cl::init(false));
-
 //===----------------------------------------------------------------------===//
 // Helpers
 //===----------------------------------------------------------------------===//
@@ -1783,19 +1775,12 @@ static bool diagnoseUnsupportedControlFlow(ADContext &context,
         diag::autodiff_loops_not_supported);
     return true;
   }
-  // Diagnose unsupported terminators.
+  // Diagnose unsupported branching terminators.
   for (auto &bb : *original) {
     auto *term = bb.getTerminator();
-    // Adjoint generation is not yet robust for control flow.
-    // If control flow is not enable, emit an error.
-    // Otherwise, `br` and `cond_br` instructions are supported terminators.
-    if (isa<BranchInst>(term) || isa<CondBranchInst>(term)) {
-      if (EnableControlFlow)
-        continue;
-      context.emitNondifferentiabilityError(
-          term, invoker, diag::autodiff_control_flow_not_supported);
-      return true;
-    }
+    // Supported terminators are: `br`, `cond_br`.
+    if (isa<BranchInst>(term) || isa<CondBranchInst>(term))
+      continue;
     // If terminator is an unsupported branching terminator, emit an error.
     if (term->isBranch()) {
       context.emitNondifferentiabilityError(
