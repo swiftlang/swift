@@ -1551,7 +1551,6 @@ void DifferentiableActivityInfo::analyze(DominanceInfo *di,
               setVaried(cbi->getFalseBB()->getArgument(opIdx), i);
           }
         }
-
         // Handle everything else.
         else {
           for (auto &op : inst.getAllOperands())
@@ -3863,6 +3862,12 @@ private:
   void initializeAdjointValue(SILBasicBlock *origBB, SILValue originalValue,
                               AdjointValue adjointValue) {
     assert(origBB->getParent() == &getOriginal());
+    assert(originalValue->getType().isObject());
+    assert(adjointValue.getType().isObject());
+    assert(originalValue->getFunction() == &getOriginal());
+    // The adjoint value must be in the tangent space.
+    assert(adjointValue.getType() ==
+               getRemappedTangentType(originalValue->getType()));
     auto insertion =
         valueMap.try_emplace({origBB, originalValue}, adjointValue);
     assert(insertion.second && "Adjoint value inserted before");
@@ -3892,13 +3897,9 @@ private:
     assert(newAdjointValue.getType().isObject());
     assert(originalValue->getFunction() == &getOriginal());
     LLVM_DEBUG(getADDebugStream() << "Adding adjoint for " << originalValue);
-#ifndef NDEBUG
-    auto origTy = remapType(originalValue->getType()).getASTType();
-    auto tangentSpace = getTangentSpace(origTy);
     // The adjoint value must be in the tangent space.
-    assert(tangentSpace && newAdjointValue.getType().getASTType()->isEqual(
-               tangentSpace->getCanonicalType()));
-#endif
+    assert(newAdjointValue.getType() ==
+               getRemappedTangentType(originalValue->getType()));
     auto insertion =
         valueMap.try_emplace({origBB, originalValue}, newAdjointValue);
     auto inserted = insertion.second;
@@ -4493,7 +4494,8 @@ public:
     }
     builder.createReturn(adjLoc, joinElements(retElts, builder, adjLoc));
 
-    LLVM_DEBUG(getADDebugStream() << "Generated adjoint:\n" << adjoint);
+    LLVM_DEBUG(getADDebugStream() << "Generated adjoint for "
+                                  << original.getName() << ":\n" << adjoint);
     return errorOccurred;
   }
 
@@ -5572,7 +5574,7 @@ bool VJPEmitter::run() {
     errorOccurred = true;
     return true;
   }
-  LLVM_DEBUG(getADDebugStream() << "Finished VJPGen for function "
+  LLVM_DEBUG(getADDebugStream() << "Generated VJP for "
                                 << original->getName() << ":\n" << *vjp);
   return errorOccurred;
 }
