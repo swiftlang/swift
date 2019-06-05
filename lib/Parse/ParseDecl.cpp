@@ -1128,7 +1128,7 @@ Parser::parseDifferentiatingAttribute(SourceLoc atLoc, SourceLoc loc) {
         return makeParserError();
     }
     
-    // Parse the optional comma and `linear` differentiation flag.
+    // Parse the optional `linear` differentiation flag.
     if (Tok.is(tok::identifier) && Tok.getText() == "linear") {
       linear = true;
       consumeToken(tok::identifier);
@@ -1136,7 +1136,7 @@ Parser::parseDifferentiatingAttribute(SourceLoc atLoc, SourceLoc loc) {
         return makeParserError();
     }
     
-    // Parse the optional comma and `wrt` differentiation parameters clause.
+    // Parse the optional `wrt` differentiation parameters clause.
     if (Tok.is(tok::identifier) && Tok.getText() == "wrt" &&
         parseDifferentiationParametersClause(params, AttrName))
       return makeParserError();

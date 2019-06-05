@@ -26,6 +26,16 @@ extension AdditiveArithmetic where Self : Differentiable {
   }
 }
 
+@differentiating(linear) // ok
+func dfoo(x: Float) -> (value: Float, differential: (Float) -> (Float)) {
+  return (x, { $0 })
+}
+
+@differentiating(linear, linear) // ok
+func dfoo(x: Float) -> (value: Float, differential: (Float) -> (Float)) {
+  return (x, { $0 })
+}
+
 @differentiating(foo, linear) // ok
 func dfoo(x: Float) -> (value: Float, differential: (Float) -> (Float)) {
   return (x, { $0 })
@@ -49,6 +59,20 @@ func dfoo(x: Float) -> (value: Float, differential: (Float) -> (Float)) {
 // expected-error @+2 {{expected either 'linear' or 'wrt:'}}
 // expected-error @+1 {{expected declaration}}
 @differentiating(linear, foo)
+func dfoo(x: Float) -> (value: Float, differential: (Float) -> (Float)) {
+  return (x, { $0 })
+}
+
+// expected-error @+2 {{unexpected ',' separator}}
+// expected-error @+1 {{expected declaration}}
+@differentiating(foo,)
+func dfoo(x: Float) -> (value: Float, differential: (Float) -> (Float)) {
+  return (x, { $0 })
+}
+
+// expected-error @+2 {{expected ')' in 'differentiating' attribute}}
+// expected-error @+1 {{expected declaration}}
+@differentiating(foo, wrt: x,)
 func dfoo(x: Float) -> (value: Float, differential: (Float) -> (Float)) {
   return (x, { $0 })
 }
