@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift-control-flow-differentiation
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 //
 // FIXME(TF-326): Re-enable `-O` after deserialization failure fix.

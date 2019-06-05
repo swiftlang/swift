@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift-control-flow-differentiation
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
 import StdlibUnittest

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -verify -Xllvm -differentiation-enable-control-flow %s
+// RUN: %target-swift-frontend -emit-sil -verify %s
 
 // Test supported `br` and `cond_br` terminators.
 
