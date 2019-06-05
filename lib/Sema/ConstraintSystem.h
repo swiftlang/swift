@@ -2385,14 +2385,13 @@ public:
                                  bool skipProtocolSelfConstraint,
                                  bool skipGenericRequirements = false);
 
-  /// Open the generic parameter list and (if requested) its requirements,
+  /// Open the generic parameter list and its requirements,
   /// creating type variables for each of the type parameters.
   void openGeneric(DeclContext *outerDC,
                    GenericSignature *signature,
                    bool skipProtocolSelfConstraint,
                    ConstraintLocatorBuilder locator,
-                   OpenedTypeMap &replacements,
-                   bool skipGenericRequirements = false);
+                   OpenedTypeMap &replacements);
 
   /// Open the generic parameter list creating type variables for each of the
   /// type parameters.

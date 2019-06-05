@@ -636,13 +636,16 @@ FunctionType *ConstraintSystem::openFunctionType(
        DeclContext *outerDC,
        bool skipProtocolSelfConstraint,
        bool skipGenericRequirements) {
-  Type type;
-
   if (auto *genericFn = funcType->getAs<GenericFunctionType>()) {
-    // Open up the generic parameters and requirements.
-    openGeneric(outerDC, genericFn->getGenericSignature(),
-                skipProtocolSelfConstraint, locator, replacements,
-                skipGenericRequirements);
+    auto *signature = genericFn->getGenericSignature();
+
+    openGenericParameters(outerDC, signature, replacements, locator);
+
+    if (!skipGenericRequirements) {
+      openGenericRequirements(
+          outerDC, signature, skipProtocolSelfConstraint, locator,
+          [&](Type type) -> Type { return openType(type, replacements); });
+    }
 
     // Transform the parameters and output type.
     llvm::SmallVector<AnyFunctionType::Param, 4> openedParams;
@@ -1091,15 +1094,11 @@ void ConstraintSystem::openGeneric(
        GenericSignature *sig,
        bool skipProtocolSelfConstraint,
        ConstraintLocatorBuilder locator,
-       OpenedTypeMap &replacements,
-       bool skipGenericRequirements) {
+       OpenedTypeMap &replacements) {
   if (sig == nullptr)
     return;
 
   openGenericParameters(outerDC, sig, replacements, locator);
-
-  if (skipGenericRequirements)
-    return;
 
   // Add the requirements as constraints.
   openGenericRequirements(
