@@ -4141,6 +4141,11 @@ public:
       auto addActiveValue = [&](SILValue v) {
         if (visited.count(v))
           return;
+        // Skip address projections.
+        // Address projections do not need their own adjoint buffers; they
+        // become projections into their adjoint base buffer.
+        if (Projection::isAddressProjection(v))
+          return;
         visited.insert(v);
         bbActiveValues.push_back(v);
       };

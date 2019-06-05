@@ -68,6 +68,22 @@ ControlFlowTests.test("Conditionals") {
   expectEqual((-20, 2), valueWithGradient(at: -10, in: cond_tuple))
   expectEqual((-2674, 2), valueWithGradient(at: -1337, in: cond_tuple))
 
+  func cond_tuple2(_ x: Float) -> Float {
+    // Convoluted function returning `x + x`.
+    let y: (Float, Float) = (x, x)
+    let y0 = y.0
+    if x > 0 {
+      let y1 = y.1
+      return y0 + y1
+    }
+    let y0_double = y0 + y.0
+    let y1 = y.1
+    return y0_double - y1 + y.0
+  }
+  expectEqual((8, 2), valueWithGradient(at: 4, in: cond_tuple2))
+  expectEqual((-20, 2), valueWithGradient(at: -10, in: cond_tuple2))
+  expectEqual((-2674, 2), valueWithGradient(at: -1337, in: cond_tuple2))
+
   func cond_tuple_var(_ x: Float) -> Float {
     // Convoluted function returning `x + x`.
     var y: (Float, Float) = (x, x)
@@ -134,6 +150,22 @@ ControlFlowTests.test("Conditionals") {
   expectEqual((8, 2), valueWithGradient(at: 4, in: cond_struct))
   expectEqual((-20, 2), valueWithGradient(at: -10, in: cond_struct))
   expectEqual((-2674, 2), valueWithGradient(at: -1337, in: cond_struct))
+
+  func cond_struct2(_ x: Float) -> Float {
+    // Convoluted function returning `x + x`.
+    let y = FloatPair(x, x)
+    let y0 = y.first
+    if x > 0 {
+      let y1 = y.second
+      return y0 + y1
+    }
+    let y0_double = y0 + y.first
+    let y1 = y.second
+    return y0_double - y1 + y.first
+  }
+  expectEqual((8, 2), valueWithGradient(at: 4, in: cond_struct2))
+  expectEqual((-20, 2), valueWithGradient(at: -10, in: cond_struct2))
+  expectEqual((-2674, 2), valueWithGradient(at: -1337, in: cond_struct2))
 
   func cond_struct_var(_ x: Float) -> Float {
     // Convoluted function returning `x + x`.
