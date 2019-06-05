@@ -220,3 +220,38 @@ func rdar_50668864() {
     }
   }
 }
+
+// SR-10837 (rdar://problem/51442825) - init partial application regression
+func sr_10837() {
+  struct S {
+    let value: Int
+
+    static func foo(_ v: Int?) {
+      _ = v.flatMap(self.init(value:)) // Ok
+      _ = v.flatMap(S.init(value:))    // Ok
+      _ = v.flatMap { S.init(value:)($0) }    // Ok
+      _ = v.flatMap { self.init(value:)($0) } // Ok
+    }
+  }
+
+  class A {
+    init(bar: Int) {}
+  }
+
+  class B : A {
+    init(value: Int) {}
+    convenience init(foo: Int = 42) {
+      self.init(value:)(foo) // Ok
+      self.init(value:)
+      // expected-error@-1 {{partial application of 'self.init' initializer delegation is not allowed}}
+    }
+  }
+
+  class C : A {
+    override init(bar: Int) {
+      super.init(bar:)(bar) // Ok
+      super.init(bar:)
+      // expected-error@-1 {{partial application of 'super.init' initializer chain is not allowed}}
+    }
+  }
+}
