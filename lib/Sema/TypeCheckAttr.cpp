@@ -2894,7 +2894,8 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     // When used directly on a storage decl (stored/computed property or
     // subscript), the getter is currently inferred to be `@differentiable`.
     // TODO(TF-129): Infer setter to also be `@differentiable` after
-    // differentiation supports inout parameters.
+    // differentiation supports inout parameters. This requires refactoring to
+    // handle multiple `original` functions (both getter and setter).
     original = asd->getGetter();
   }
   // Setters are not yet supported.
@@ -3167,13 +3168,37 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     attr->setVJPFunction(vjp);
   }
 
-  auto insertion =
-      ctx.DifferentiableAttrs.try_emplace({D, checkedWrtParamIndices}, attr);
+  auto insertion = ctx.DifferentiableAttrs.try_emplace(
+      {D, attr->getParameterIndices()}, attr);
   // `@differentiable` attributes are uniqued by their parameter indices.
   // Reject duplicate attributes for the same decl and parameter indices pair.
   if (!insertion.second && insertion.first->getSecond() != attr) {
-    diagnoseAndRemoveAttr(attr, diag::differentiable_attr_duplicate);
+    TC.diagnose(attr->getLocation(), diag::differentiable_attr_duplicate);
+    TC.diagnose(insertion.first->getSecond()->getLocation(),
+                diag::differentiable_attr_duplicate_note);
     return;
+  }
+  // Transfer `@differentiable` attribute from storage declaration to
+  // getter accessor.
+  if (auto *asd = dyn_cast<AbstractStorageDecl>(D)) {
+    auto *newAttr = DifferentiableAttr::create(
+        ctx, /*implicit*/ true, attr->AtLoc, attr->getRange(), attr->isLinear(),
+        attr->getParameterIndices(), attr->getJVP(), attr->getVJP(),
+        attr->getRequirements());
+    auto insertion = ctx.DifferentiableAttrs.try_emplace(
+        {asd->getGetter(), attr->getParameterIndices()}, newAttr);
+    // Valid `@differentiable` attributes are uniqued by their parameter
+    // indices. Reject duplicate attributes for the same decl and parameter
+    // indices pair.
+    if (!insertion.second) {
+      TC.diagnose(newAttr->getLocation(), diag::differentiable_attr_duplicate);
+      TC.diagnose(insertion.first->getSecond()->getLocation(),
+                  diag::differentiable_attr_duplicate_note);
+      return;
+    }
+    // Remove `@differentiable` attribute from storage declaration to prevent
+    // duplicate attribute registration during SILGen.
+    D->getAttrs().removeAttribute(attr);
   }
 }
 
@@ -3469,7 +3494,9 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
     // indices. Reject duplicate attributes for the same decl and parameter
     // indices pair.
     if (!insertion.second && insertion.first->getSecond() != da) {
-      diagnoseAndRemoveAttr(da, diag::differentiable_attr_duplicate);
+      TC.diagnose(da->getLocation(), diag::differentiable_attr_duplicate);
+      TC.diagnose(insertion.first->getSecond()->getLocation(),
+                  diag::differentiable_attr_duplicate_note);
       return;
     }
     originalFn->getAttrs().add(da);
