@@ -8,6 +8,9 @@
 // CHECK:  ret
 class MyController {
   var c = InternalContainer(item: [])
+  var c2 = InternalContainer2(item: [])
+  var e = InternalSingletonEnum()
+  var e2 = InternalSingletonEnum2()
   func update(_ n: InternalContainer) {
     c = n
   }
