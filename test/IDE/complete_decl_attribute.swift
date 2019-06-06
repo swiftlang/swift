@@ -166,6 +166,7 @@ struct _S {
 // ON_METHOD-DAG: Keyword/None:                       warn_unqualified_access[#Func Attribute#]; name=warn_unqualified_access
 // ON_METHOD-DAG: Keyword/None:                       usableFromInline[#Func Attribute#]; name=usableFromInline
 // ON_METHOD-DAG: Keyword/None:                       discardableResult[#Func Attribute#]; name=discardableResult
+// ON_METHOD-DAG: Keyword/None:                       IBSegueAction[#Func Attribute#]; name=IBSegueAction
 // ON_METHOD: End completions
 
   @#^ON_MEMBER_LAST^#
@@ -191,6 +192,7 @@ struct _S {
 // ON_MEMBER_LAST-DAG: Keyword/None:                       usableFromInline[#Declaration Attribute#]; name=usableFromInline
 // ON_MEMBER_LAST-DAG: Keyword/None:                       discardableResult[#Declaration Attribute#]; name=discardableResult
 // ON_MEMBER_LAST-DAG: Keyword/None:                       GKInspectable[#Declaration Attribute#]; name=GKInspectable
+// ON_MEMBER_LAST-DAG: Keyword/None:                       IBSegueAction[#Declaration Attribute#]; name=IBSegueAction
 // ON_MEMBER_LAST-DAG: Keyword/None:                       _propertyWrapper[#Declaration Attribute#]; name=_propertyWrapper
 // ON_MEMBER_LAST-NOT: Keyword
 // ON_MEMBER_LAST: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
@@ -224,6 +226,5 @@ struct _S {
 // KEYWORD_LAST-NEXT:             Keyword/None:                       GKInspectable[#Declaration Attribute#]; name=GKInspectable{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       _propertyWrapper[#Declaration Attribute#]; name=_propertyWrapper
 // KEYWORD_LAST-NEXT:             Keyword/None:                       IBSegueAction[#Declaration Attribute#]; name=IBSegueAction{{$}}
-// KEYWORD_LAST-NOT:              Keyword
 // KEYWORD_LAST: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // KEYWORD_LAST:                  End completions
