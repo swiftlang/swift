@@ -2882,6 +2882,14 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   auto &ctx = TC.Context;
   auto lookupConformance =
       LookUpConformanceInModule(D->getDeclContext()->getParentModule());
+  
+  // If functions is marked as linear, you cannot have a custom VJP and/or
+  // a JVP.
+  if (attr->isLinear() && (attr->getVJP() || attr->getJVP())) {
+    diagnoseAndRemoveAttr(attr,
+                          diag::attr_differentiable_no_vjp_or_jvp_when_linear);
+    return;
+  }
 
   AbstractFunctionDecl *original = dyn_cast<AbstractFunctionDecl>(D);
   if (auto *asd = dyn_cast<AbstractStorageDecl>(D)) {

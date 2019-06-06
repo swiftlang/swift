@@ -124,21 +124,6 @@ func bar<T : Numeric>(_ x: T, _: T) -> T {
     return 1 + x
 }
 
-@differentiable(linear, wrt: x, vjp: const3) // expected-error {{can't define 'vjp:' and/or 'jvp:' on functions marked as 'linear'}}
-func slope3(_ x: Float) -> Float {
-  return 3 * x
-}
-
-@differentiable(linear, wrt: x, jvp: const3) // expected-error {{can't define 'vjp:' and/or 'jvp:' on functions marked as 'linear'}}
-func slope3(_ x: Float) -> Float {
-  return 3 * x
-}
-
-@differentiable(linear, vjp: const3, jvp: const3) // expected-error {{can't define 'vjp:' and/or 'jvp:' on functions marked as 'linear'}}
-func slope3(_ x: Float) -> Float {
-  return 3 * x
-}
-
 @differentiable(wrt: x, linear) // expected-error {{expected either 'wrt:' or a function specifier label, e.g. 'jvp:', or 'vjp:'}}
 func slope4(_ x: Float) -> Float {
   return 4 * x
