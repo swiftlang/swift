@@ -1734,11 +1734,15 @@ isInvalidPartialApplication(ConstraintSystem &cs, const ValueDecl *member,
   auto baseTy =
       cs.simplifyType(cs.getType(anchor->getBase()))->getWithoutSpecifierType();
 
+  // Partial applications are not allowed only for constructor
+  // delegation, reference on the metatype is considered acceptable.
+  if (baseTy->is<MetatypeType>() && isa<ConstructorDecl>(member))
+    return {false, 0};
+
   // If base is a metatype it would be ignored (unless this is an initializer
   // call), but if it is some other type it means that we have a single
   // application level already.
-  unsigned level =
-      baseTy->is<MetatypeType>() && !isa<ConstructorDecl>(member) ? 0 : 1;
+  unsigned level = baseTy->is<MetatypeType>() ? 0 : 1;
   if (auto *call = dyn_cast_or_null<CallExpr>(cs.getParentExpr(anchor))) {
     level += dyn_cast_or_null<CallExpr>(cs.getParentExpr(call)) ? 2 : 1;
   }
