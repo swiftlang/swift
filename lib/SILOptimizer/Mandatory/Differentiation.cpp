@@ -4102,6 +4102,10 @@ private:
   }
 
 public:
+  //--------------------------------------------------------------------------//
+  // Entry point
+  //--------------------------------------------------------------------------//
+
   /// Performs adjoint synthesis on the empty adjoint function. Returns true if
   /// any error occurs.
   bool run() {
@@ -4178,11 +4182,6 @@ public:
         continue;
       }
       
-      // Otherwise, we create a phi argument for the corresponding pullback
-      // struct, and handle dominated active values/buffers.
-      auto *pbStructArg = adjointBB->createPhiArgument(
-          pbStructLoweredType, ValueOwnershipKind::Guaranteed);
-      adjointPullbackStructArguments[origBB] = pbStructArg;
       // Get all active values in the original block.
       // If the original block has no active values, continue.
       auto &bbActiveValues = activeValues[origBB];
@@ -4208,6 +4207,10 @@ public:
           activeValueAdjointBBArgumentMap[{origBB, activeValue}] = adjointArg;
         }
       }
+      // Add a pullback struct argument.
+      auto *pbStructArg = adjointBB->createPhiArgument(
+          pbStructLoweredType, ValueOwnershipKind::Guaranteed);
+      adjointPullbackStructArguments[origBB] = pbStructArg;
       // - Create adjoint trampoline blocks for each successor block of the
       //   original block. Adjoint trampoline blocks only have a pullback
       //   struct argument, and branch from the adjoint successor block to the
@@ -4355,8 +4358,6 @@ public:
           assert(adjointSuccBB && adjointSuccBB->getNumArguments() == 1);
           SILBuilder adjointTrampolineBBBuilder(adjointSuccBB);
           SmallVector<SILValue, 8> trampolineArguments;
-          // Propagate pullback struct argument.
-          trampolineArguments.push_back(adjointSuccBB->getArguments().front());
           // Propagate adjoint values/buffers of active values/buffers to
           // predecessor blocks.
           auto &predBBActiveValues = activeValues[predBB];
@@ -4390,6 +4391,8 @@ public:
                   adjLoc, adjBuf, predAdjBuf, IsNotTake, IsNotInitialization);
             }
           }
+          // Propagate pullback struct argument.
+          trampolineArguments.push_back(adjointSuccBB->getArguments().front());
           // Branch from adjoint trampoline block to adjoint block.
           adjointTrampolineBBBuilder.createBranch(
               adjLoc, adjointBB, trampolineArguments);
