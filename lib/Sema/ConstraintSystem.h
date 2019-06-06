@@ -3738,13 +3738,13 @@ matchCallArguments(ConstraintSystem &cs,
 /// subscript, etc.), find the underlying target expression.
 Expr *getArgumentLabelTargetExpr(Expr *fn);
 
-/// Returns true if a reference to a declaration on a given base type will
-/// apply its curried self parameter, assuming it has one.
+/// Returns true if a reference to a member on a given base type will apply its
+/// curried self parameter, assuming it has one.
 ///
 /// This is true for most member references, however isn't true for things like
 /// an instance member being referenced on a metatype, where the curried self
 /// parameter remains unapplied.
-bool doesDeclRefApplyCurriedSelf(Type baseTy, const ValueDecl *decl);
+bool doesMemberRefApplyCurriedSelf(Type baseTy, const ValueDecl *decl);
 
 /// Attempt to prove that arguments with the given labels at the
 /// given parameter depth cannot be used with the given value.

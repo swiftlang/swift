@@ -100,17 +100,18 @@ static Optional<unsigned> scoreParamAndArgNameTypo(StringRef paramName,
   return dist;
 }
 
-bool constraints::doesDeclRefApplyCurriedSelf(Type baseTy,
-                                              const ValueDecl *decl) {
-  // If this isn't a member reference, there's nothing to apply.
-  if (!baseTy || baseTy->is<ModuleType>())
-    return false;
+bool constraints::doesMemberRefApplyCurriedSelf(Type baseTy,
+                                                const ValueDecl *decl) {
+  assert(decl->getDeclContext()->isTypeContext() &&
+         "Expected a member reference");
 
   // For a reference to an instance method on a metatype, we want to keep the
   // curried self.
-  if (auto *afd = dyn_cast<AbstractFunctionDecl>(decl))
-    if (afd->isInstanceMember() && baseTy->is<AnyMetatypeType>())
+  if (decl->isInstanceMember()) {
+    assert(baseTy);
+    if (isa<AbstractFunctionDecl>(decl) && baseTy->is<AnyMetatypeType>())
       return false;
+  }
 
   // Otherwise the reference applies self.
   return true;
@@ -157,7 +158,7 @@ bool constraints::areConservativelyCompatibleArgumentLabels(
   // the member lookup applying the curried self at the first level. But there
   // are cases where we can get an unapplied declaration reference back.
   auto hasAppliedSelf =
-      decl->hasCurriedSelf() && doesDeclRefApplyCurriedSelf(baseType, decl);
+      decl->hasCurriedSelf() && doesMemberRefApplyCurriedSelf(baseType, decl);
 
   auto *fnType = decl->getInterfaceType()->castTo<AnyFunctionType>();
   if (hasAppliedSelf) {
@@ -860,7 +861,7 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
     // In most cases where we reference a declaration with a curried self
     // parameter, it gets dropped from the type of the reference.
     bool hasAppliedSelf =
-        decl->hasCurriedSelf() && doesDeclRefApplyCurriedSelf(baseType, decl);
+        decl->hasCurriedSelf() && doesMemberRefApplyCurriedSelf(baseType, decl);
     return std::make_tuple(decl, hasAppliedSelf, argLabels, hasTrailingClosure);
   }
 

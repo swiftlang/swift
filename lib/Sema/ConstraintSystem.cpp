@@ -1222,7 +1222,7 @@ ConstraintSystem::getTypeOfMemberReference(
 
   // Check to see if the self parameter is applied, in which case we'll want to
   // strip it off later.
-  auto hasAppliedSelf = doesDeclRefApplyCurriedSelf(baseObjTy, value);
+  auto hasAppliedSelf = doesMemberRefApplyCurriedSelf(baseObjTy, value);
 
   baseObjTy = baseObjTy->getMetatypeInstanceType();
   FunctionType::Param baseObjParam(baseObjTy);
