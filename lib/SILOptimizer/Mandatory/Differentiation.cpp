@@ -4366,6 +4366,11 @@ public:
               auto activeValueAdj = getAdjointValue(bb, activeValue);
               auto concreteActiveValueAdj =
                   materializeAdjointDirect(activeValueAdj, adjLoc);
+              // Emit cleanups for children.
+              if (auto *cleanup = concreteActiveValueAdj.getCleanup()) {
+                cleanup->disable();
+                cleanup->applyRecursively(builder, activeValue.getLoc());
+              }
               trampolineArguments.push_back(concreteActiveValueAdj);
               // If the adjoint block does not yet have a registered adjoint
               // value for the active value, set the adjoint value to the
@@ -4375,9 +4380,9 @@ public:
               if (!hasAdjointValue(predBB, activeValue)) {
                 auto *adjointBBArg =
                     getActiveValueAdjointBlockArgument(predBB, activeValue);
-                // FIXME: Propagate cleanups to fix memory leaks.
-                auto forwardedArgAdj =
-                    makeConcreteAdjointValue(ValueWithCleanup(adjointBBArg));
+                auto forwardedArgAdj = makeConcreteAdjointValue(
+                    ValueWithCleanup(adjointBBArg,
+                                     makeCleanup(adjointBBArg, emitCleanup)));
                 initializeAdjointValue(predBB, activeValue, forwardedArgAdj);
               }
             } else {
