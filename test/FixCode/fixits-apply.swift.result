@@ -246,6 +246,7 @@ protocol NonObjCProtocol {}
   @IBOutlet private var ibout6: [String: String]!
   @IBInspectable static private var ibinspect1: IBIssues!
   @IBAction static func ibact() {}
+  @IBSegueAction static func ibsegact(_: String, _: IBIssues) -> IBIssues { return self }
 }
 
 @IBDesignable extension SomeProt {}

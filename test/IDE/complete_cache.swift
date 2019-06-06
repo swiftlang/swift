@@ -1,13 +1,13 @@
-// RUN: rm -rf %t.ccp %t.ccp.bak
+// RUN: rm -rf %t.ccp %t.ccp.bak %t.mcp
 
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=CLANG_UNQUAL_1 -completion-cache-path=%t.ccp > %t.ccp1.compl.txt
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=CLANG_UNQUAL_1 -completion-cache-path=%t.ccp -module-cache-path %t.mcp > %t.ccp1.compl.txt
 // RUN: cp -r %t.ccp %t.ccp.bak
 // RUN: %FileCheck %s -check-prefix=CLANG_CTYPES < %t.ccp1.compl.txt
 // RUN: %FileCheck %s -check-prefix=CLANG_MACROS < %t.ccp1.compl.txt
 // RUN: %FileCheck %s -check-prefix=CLANG_DARWIN < %t.ccp1.compl.txt
 // RUN: %FileCheck %s -check-prefix=CLANG_DARWIN_NEG < %t.ccp1.compl.txt
 
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=CLANG_UNQUAL_1 -completion-cache-path=%t.ccp > %t.ccp2.compl.txt
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=CLANG_UNQUAL_1 -completion-cache-path=%t.ccp -module-cache-path %t.mcp > %t.ccp2.compl.txt
 // RUN: %FileCheck %s -check-prefix=CLANG_CTYPES < %t.ccp2.compl.txt
 // RUN: %FileCheck %s -check-prefix=CLANG_MACROS < %t.ccp2.compl.txt
 // RUN: %FileCheck %s -check-prefix=CLANG_DARWIN < %t.ccp2.compl.txt
@@ -24,7 +24,7 @@
 
 
 // Qualified.
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=CLANG_QUAL_MACROS_1 -completion-cache-path=%t.ccp > %t.macros.ccp1.compl.txt
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=CLANG_QUAL_MACROS_1 -completion-cache-path=%t.ccp -module-cache-path %t.mcp > %t.macros.ccp1.compl.txt
 // RUN: %FileCheck %s -check-prefix=CLANG_QUAL_MACROS_1 -check-prefix=CLANG_QUAL_MACROS_1-%target-runtime < %t.macros.ccp1.compl.txt
 // RUN: diff -r -u %t.ccp %t.ccp.bak
 
@@ -33,14 +33,14 @@
 
 
 // Qualified with dot.
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=CLANG_QUAL_MACROS_2 -completion-cache-path=%t.ccp > %t.macros2.ccp1.compl.txt
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=CLANG_QUAL_MACROS_2 -completion-cache-path=%t.ccp -module-cache-path %t.mcp > %t.macros2.ccp1.compl.txt
 // RUN: %FileCheck %s -check-prefix=CLANG_QUAL_MACROS_2 -check-prefix=CLANG_QUAL_MACROS_2-%target-runtime < %t.macros2.ccp1.compl.txt
 
 // Check the individual cache item.
 // RUN: %target-swift-ide-test -dump-completion-cache %t.ccp/macros-dot-* | %FileCheck %s -check-prefix=CLANG_QUAL_MACROS_2
 
 // Qualified private with dot.
-// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=CLANG_QUAL_STRING -completion-cache-path=%t.ccp > %t.string.ccp1.compl.txt
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=CLANG_QUAL_STRING -completion-cache-path=%t.ccp -module-cache-path %t.mcp > %t.string.ccp1.compl.txt
 // RUN: %FileCheck %s -check-prefix=CLANG_QUAL_STRING  < %t.string.ccp1.compl.txt
 
 

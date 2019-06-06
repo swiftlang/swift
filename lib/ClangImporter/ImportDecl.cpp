@@ -4169,6 +4169,8 @@ namespace {
             new (Impl.SwiftContext) IBActionAttr(/*IsImplicit=*/false));
       }
 
+      // FIXME: Is there an IBSegueAction equivalent?
+
       // Check whether there's some special method to import.
       if (!forceClassMethod) {
         if (dc == Impl.importDeclContextOf(decl, decl->getDeclContext()) &&

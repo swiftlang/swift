@@ -1,7 +1,5 @@
 set(sources
-  Accelerate.apinotes
   Dispatch.apinotes
-  ScriptingBridge.apinotes
   os.apinotes
 )
 
