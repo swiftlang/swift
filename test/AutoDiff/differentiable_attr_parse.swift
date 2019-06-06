@@ -67,11 +67,6 @@ func slope2(_ x: Float) -> Float {
   return 2 * x
 }
 
-@differentiable(linear, wrt: x, vjp: const3) // okay
-func slope3(_ x: Float) -> Float {
-  return 3 * x
-}
-
 /// Bad
 
 @differentiable(3) // expected-error {{expected either 'wrt:' or a function specifier label, e.g. 'jvp:', or 'vjp:'}}
@@ -127,6 +122,21 @@ func bar(_ x: Float, _: Float) -> Float {
 @differentiable(vjp: foo(_:_:), where T) // expected-error {{unexpected ',' separator}}
 func bar<T : Numeric>(_ x: T, _: T) -> T {
     return 1 + x
+}
+
+@differentiable(linear, wrt: x, vjp: const3) // expected-error {{can't define 'vjp:' and/or 'jvp:' on functions marked as 'linear'}}
+func slope3(_ x: Float) -> Float {
+  return 3 * x
+}
+
+@differentiable(linear, wrt: x, jvp: const3) // expected-error {{can't define 'vjp:' and/or 'jvp:' on functions marked as 'linear'}}
+func slope3(_ x: Float) -> Float {
+  return 3 * x
+}
+
+@differentiable(linear, vjp: const3, jvp: const3) // expected-error {{can't define 'vjp:' and/or 'jvp:' on functions marked as 'linear'}}
+func slope3(_ x: Float) -> Float {
+  return 3 * x
 }
 
 @differentiable(wrt: x, linear) // expected-error {{expected either 'wrt:' or a function specifier label, e.g. 'jvp:', or 'vjp:'}}

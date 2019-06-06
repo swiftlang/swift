@@ -1032,6 +1032,10 @@ bool Parser::parseDifferentiableAttributeArguments(
 
   // Parse 'jvp: <func_name>' (optional).
   if (Tok.is(tok::identifier) && Tok.getText() == "jvp") {
+    if (linear) {
+      diagnose(Tok, diag::attr_differentiable_no_vjp_or_jvp_when_linear);
+      return errorAndSkipToEnd();
+    }
     SyntaxParsingContext JvpContext(
         SyntaxContext, SyntaxKind::DifferentiableAttributeFuncSpecifier);
     jvpSpec = DeclNameWithLoc();
@@ -1045,6 +1049,10 @@ bool Parser::parseDifferentiableAttributeArguments(
 
   // Parse 'vjp: <func_name>' (optional).
   if (Tok.is(tok::identifier) && Tok.getText() == "vjp") {
+    if (linear) {
+      diagnose(Tok, diag::attr_differentiable_no_vjp_or_jvp_when_linear);
+      return errorAndSkipToEnd();
+    }
     SyntaxParsingContext VjpContext(
         SyntaxContext, SyntaxKind::DifferentiableAttributeFuncSpecifier);
     vjpSpec = DeclNameWithLoc();
