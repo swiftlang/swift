@@ -54,6 +54,7 @@ using namespace swift;
 using llvm::DenseMap;
 using llvm::SmallDenseMap;
 using llvm::SmallDenseSet;
+using llvm::SmallMapVector;
 using llvm::SmallSet;
 
 /// This flag is used to disable `autodiff_function_extract` instruction folding
@@ -844,7 +845,9 @@ private:
   SmallPtrSet<AutoDiffFunctionInst *, 32> processedAutoDiffFunctionInsts;
 
   /// Mapping from `[differentiable]` attributes to invokers.
-  DenseMap<SILDifferentiableAttr *, DifferentiationInvoker> invokers;
+  /// `SmallMapVector` is used for deterministic insertion order iteration.
+  SmallMapVector<SILDifferentiableAttr *, DifferentiationInvoker, 32>
+      invokers;
 
   /// Mapping from `autodiff_function` instructions to result indices.
   DenseMap<AutoDiffFunctionInst *, unsigned> resultIndices;
@@ -902,7 +905,8 @@ public:
     return processedAutoDiffFunctionInsts;
   }
 
-  DenseMap<SILDifferentiableAttr *, DifferentiationInvoker> &getInvokers() {
+  llvm::SmallMapVector<SILDifferentiableAttr *, DifferentiationInvoker, 32> &
+  getInvokers() {
     return invokers;
   }
 
@@ -957,8 +961,8 @@ public:
   }
 
   void cleanUp() {
-    for (auto invokerInfo : invokers) {
-      auto *attr = invokerInfo.getFirst();
+    for (auto invokerPair : invokers) {
+      auto *attr = std::get<0>(invokerPair);
       auto *original = attr->getOriginal();
       LLVM_DEBUG(getADDebugStream()
                  << "Removing [differentiable] attribute for "
@@ -4141,6 +4145,11 @@ public:
       auto addActiveValue = [&](SILValue v) {
         if (visited.count(v))
           return;
+        // Skip address projections.
+        // Address projections do not need their own adjoint buffers; they
+        // become projections into their adjoint base buffer.
+        if (Projection::isAddressProjection(v))
+          return;
         visited.insert(v);
         bbActiveValues.push_back(v);
       };
@@ -6352,17 +6361,14 @@ void Differentiation::run() {
   // A global differentiation context.
   ADContext context(*this);
 
-  // Handle all the instructions and attributes in the module that trigger
-  // differentiation.
+  // Register all `@differentiable` attributes and `autodiff_function`
+  // instructions in the module that trigger differentiation.
   for (SILFunction &f : module) {
-    // If `f` has a `[differentiable]` attribute, register `f` and the attribute
-    // with an invoker.
     for (auto *diffAttr : f.getDifferentiableAttrs()) {
       DifferentiationInvoker invoker(diffAttr);
-      auto insertion =
-          context.getInvokers().try_emplace(diffAttr, invoker);
-      assert(insertion.second &&
+      assert(!context.getInvokers().count(diffAttr) &&
              "[differentiable] attribute already has an invoker");
+      context.getInvokers().insert({diffAttr, invoker});
       continue;
     }
     for (SILBasicBlock &bb : f)
@@ -6387,10 +6393,10 @@ void Differentiation::run() {
   bool errorOccurred = false;
 
   // Process all `[differentiable]` attributes.
-  for (auto invokerInfo : context.getInvokers()) {
-    auto *attr = invokerInfo.first;
+  for (auto invokerPair : context.getInvokers()) {
+    auto *attr = invokerPair.first;
     auto *original = attr->getOriginal();
-    auto invoker = invokerInfo.second;
+    auto invoker = invokerPair.second;
     errorOccurred |=
         context.processDifferentiableAttribute(original, attr, invoker);
   }
