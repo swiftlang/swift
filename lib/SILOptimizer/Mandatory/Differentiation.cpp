@@ -6357,17 +6357,21 @@ void Differentiation::run() {
   // A global differentiation context.
   ADContext context(*this);
 
-  // Handle all the instructions and attributes in the module that trigger
-  // differentiation.
+  // Use a temporary list to store `@differentiable` attributes and invokers
+  // for deterministic iteration order.
+  SmallVector<std::pair<SILDifferentiableAttr *, DifferentiationInvoker>, 32>
+      invokerList;
+
+  // Register all `@differentiable` attributes and `autodiff_function`
+  // instructions in the module that trigger differentiation.
   for (SILFunction &f : module) {
-    // If `f` has a `[differentiable]` attribute, register `f` and the attribute
-    // with an invoker.
     for (auto *diffAttr : f.getDifferentiableAttrs()) {
       DifferentiationInvoker invoker(diffAttr);
       auto insertion =
           context.getInvokers().try_emplace(diffAttr, invoker);
       assert(insertion.second &&
              "[differentiable] attribute already has an invoker");
+      invokerList.push_back({diffAttr, invoker});
       continue;
     }
     for (SILBasicBlock &bb : f)
@@ -6392,10 +6396,10 @@ void Differentiation::run() {
   bool errorOccurred = false;
 
   // Process all `[differentiable]` attributes.
-  for (auto invokerInfo : context.getInvokers()) {
-    auto *attr = invokerInfo.first;
+  for (auto invokerPair : invokerList) {
+    auto *attr = invokerPair.first;
     auto *original = attr->getOriginal();
-    auto invoker = invokerInfo.second;
+    auto invoker = invokerPair.second;
     errorOccurred |=
         context.processDifferentiableAttribute(original, attr, invoker);
   }
