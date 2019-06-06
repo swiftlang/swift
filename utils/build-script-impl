@@ -2893,6 +2893,11 @@ for host in "${ALL_HOSTS[@]}"; do
         if [[  "${RECONFIGURE}" || ! -f "${cmake_cache_path}" || \
                     ( ! -z "${generator_output_path}" && ! -f "${generator_output_path}" ) ]] ; then
             call mkdir -p "${build_dir}"
+
+            # Use `cmake-file-api` in case it is available.
+            call mkdir -p "${build_dir}/.cmake/api/v1/query"
+            call touch "${build_dir}/.cmake/api/v1/query/codemodel-v2" "${build_dir}/.cmake/api/v1/query/cache-v2"
+
             if [[ -n "${DISTCC}" ]]; then
                 EXTRA_DISTCC_OPTIONS=("DISTCC_HOSTS=localhost,lzo,cpp")
             fi
