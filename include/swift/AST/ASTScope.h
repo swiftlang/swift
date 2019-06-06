@@ -971,6 +971,8 @@ public:
   createSubtreeForNextConditionalClause(ScopeCreator &) = 0;
   SourceLoc startLocAccordingToCondition() const;
 
+  ASTScopeImpl *findInnermostConditionScope();
+
   ConditionalClauseScope *findDeepestConditionalClauseScope();
 
   NullablePtr<StatementConditionElementPatternScope>
@@ -1336,10 +1338,6 @@ public:
   void expandMe(ScopeCreator &) override;
   std::string getClassName() const override;
   Stmt *getStmt() const override { return stmt; }
-
-private:
-  static ASTScopeImpl *
-  findLookupParentForUse(ConditionalClauseScope *firstConditionalClause);
 };
 
 class CatchStmtScope : public AbstractStmtScope {
