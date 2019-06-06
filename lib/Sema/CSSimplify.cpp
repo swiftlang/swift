@@ -4114,8 +4114,10 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
       if (auto *storage = dyn_cast<AbstractStorageDecl>(decl)) {
         // If this is an attempt to access read-only member via
         // writable key path, let's fail this choice early.
+        auto &ctx = getASTContext();
         if (isReadOnlyKeyPathComponent(storage) &&
-            keyPath == getASTContext().getWritableKeyPathDecl()) {
+            (keyPath == ctx.getWritableKeyPathDecl() ||
+             keyPath == ctx.getReferenceWritableKeyPathDecl())) {
           result.addUnviable(
               candidate,
               MemberLookupResult::UR_WritableKeyPathOnReadOnlyMember);
@@ -4126,7 +4128,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
         // on the other hand if setter is mutating there is no point
         // of attempting `ReferenceWritableKeyPath` overload.
         if (storage->isSetterMutating() &&
-            keyPath == getASTContext().getReferenceWritableKeyPathDecl()) {
+            keyPath == ctx.getReferenceWritableKeyPathDecl()) {
           result.addUnviable(
               candidate,
               MemberLookupResult::UR_ReferenceWritableKeyPathOnMutatingMember);
