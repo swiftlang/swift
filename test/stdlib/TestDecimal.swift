@@ -594,15 +594,6 @@ class TestDecimal : TestDecimalSuper {
     func test_unconditionallyBridgeFromObjectiveC() {
         expectEqual(Decimal(), Decimal._unconditionallyBridgeFromObjectiveC(nil))
     }
-    
-    func test_floatingPointInfinityToDecimal() {
-        let inf = Double.infinity
-        var conversion = Decimal(floatLiteral: inf)
-        expectTrue(conversion.nan.isNaN)
-        
-        conversion = Decimal(floatLiteral: -inf)
-        expectTrue(conversion.nan.isNaN)
-    }
 }
 
 
@@ -625,7 +616,5 @@ DecimalTests.test("test_Round") { TestDecimal().test_Round() }
 DecimalTests.test("test_ScanDecimal") { TestDecimal().test_ScanDecimal() }
 DecimalTests.test("test_SimpleMultiplication") { TestDecimal().test_SimpleMultiplication() }
 DecimalTests.test("test_unconditionallyBridgeFromObjectiveC") { TestDecimal().test_unconditionallyBridgeFromObjectiveC() }
-DecimalTests.test("test_floatingPointInfinityToDecimal") { TestDecimal().test_floatingPointInfinityToDecimal() }
-
 runAllTests()
 #endif

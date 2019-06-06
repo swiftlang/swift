@@ -314,8 +314,7 @@ extension Decimal {
     }
     
     public init(_ value: Double) {
-        if value.isNaN || value == Double.infinity || value == -Double.infinity {
-            // Note: Decimal does not have infinities yet.
+        if value.isNaN {
             self = Decimal.nan
         } else if value == 0.0 {
             self = Decimal(_exponent: 0, _length: 0, _isNegative: 0, _isCompact: 0, _reserved: 0, _mantissa: (0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000))
