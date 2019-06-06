@@ -3178,27 +3178,24 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
                 diag::differentiable_attr_duplicate_note);
     return;
   }
-  // Transfer `@differentiable` attribute from storage declaration to
-  // getter accessor.
   if (auto *asd = dyn_cast<AbstractStorageDecl>(D)) {
-    auto *newAttr = DifferentiableAttr::create(
-        ctx, /*implicit*/ true, attr->AtLoc, attr->getRange(), attr->isLinear(),
-        attr->getParameterIndices(), attr->getJVP(), attr->getVJP(),
-        attr->getRequirements());
+    // Remove `@differentiable` attribute from storage declaration to prevent
+    // duplicate attribute registration during SILGen.
+    D->getAttrs().removeAttribute(attr);
+    // Transfer `@differentiable` attribute from storage declaration to
+    // getter accessor.
+    attr->setImplicit();
     auto insertion = ctx.DifferentiableAttrs.try_emplace(
-        {asd->getGetter(), attr->getParameterIndices()}, newAttr);
+        {asd->getGetter(), attr->getParameterIndices()}, attr);
     // Valid `@differentiable` attributes are uniqued by their parameter
     // indices. Reject duplicate attributes for the same decl and parameter
     // indices pair.
     if (!insertion.second) {
-      TC.diagnose(newAttr->getLocation(), diag::differentiable_attr_duplicate);
+      TC.diagnose(attr->getLocation(), diag::differentiable_attr_duplicate);
       TC.diagnose(insertion.first->getSecond()->getLocation(),
                   diag::differentiable_attr_duplicate_note);
       return;
     }
-    // Remove `@differentiable` attribute from storage declaration to prevent
-    // duplicate attribute registration during SILGen.
-    D->getAttrs().removeAttribute(attr);
   }
 }
 
