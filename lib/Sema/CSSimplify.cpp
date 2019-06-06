@@ -4883,8 +4883,7 @@ ConstraintSystem::simplifyOpaqueUnderlyingTypeConstraint(Type type1, Type type2,
   // corresponding to the underlying type should be the constraints on the
   // underlying return type.
   OpenedTypeMap replacements;
-  openGeneric(DC, opaque2->getBoundSignature(),
-              /*skip self*/ false, locator, replacements);
+  openGeneric(DC, opaque2->getBoundSignature(), locator, replacements);
 
   auto underlyingTyVar = openType(opaque2->getInterfaceType(),
                                   replacements);

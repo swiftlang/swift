@@ -341,9 +341,7 @@ static bool isProtocolExtensionAsSpecializedAs(TypeChecker &tc,
   // the second protocol extension.
   ConstraintSystem cs(tc, dc1, None);
   OpenedTypeMap replacements;
-  cs.openGeneric(dc2, sig2,
-                 /*skipProtocolSelfConstraint=*/false,
-                 ConstraintLocatorBuilder(nullptr), replacements);
+  cs.openGeneric(dc2, sig2, ConstraintLocatorBuilder(nullptr), replacements);
 
   // Bind the 'Self' type from the first extension to the type parameter from
   // opening 'Self' of the second extension.
@@ -511,13 +509,11 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
                           OpenedTypeMap &replacements,
                           ConstraintLocator *locator) -> Type {
         if (auto *funcType = type->getAs<AnyFunctionType>()) {
-          return cs.openFunctionType(funcType, locator, replacements, outerDC,
-                                     /*skipProtocolSelfConstraint=*/false);
+          return cs.openFunctionType(funcType, locator, replacements, outerDC);
         }
 
         cs.openGeneric(outerDC, innerDC->getGenericSignatureOfContext(),
-                       /*skipProtocolSelfConstraint=*/false, locator,
-                       replacements);
+                       locator, replacements);
 
         return cs.openType(type, replacements);
       };
