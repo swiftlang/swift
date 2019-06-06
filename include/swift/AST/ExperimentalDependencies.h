@@ -865,6 +865,7 @@ private:
   void emitDotNode(StringRef id, StringRef label, StringRef shape,
                    StringRef fillColor, StringRef style = StringRef()) {
     auto inserted = nodeIDs.insert(id.str());
+    (void)inserted;
     assert(inserted.second && "NodeIDs must be unique.");
     out << "\"" << id << "\" [ "
         << "label = \"" << label << "\", "

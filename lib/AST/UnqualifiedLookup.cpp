@@ -102,7 +102,6 @@ namespace {
     /// For example, when there's a protocol extension, e.g. extension P where
     /// self: P2, self also conforms to P2 so P2 must be searched.
     class ResultFinderForTypeContext {
-      /// For debugging
       UnqualifiedLookupFactory *const factory;
       /// Nontypes are formally members of the base type, i.e. the dynamic type
       /// of the activation record.
@@ -454,7 +453,11 @@ UnqualifiedLookupFactory::UnqualifiedLookupFactory(
   options(options),
   isOriginallyTypeLookup(options.contains(Flags::TypeLookup)),
   baseNLOptions(computeBaseNLOptions(options, isOriginallyTypeLookup)),
+  #ifdef NDEBUG
+  Consumer(Name, Results, isOriginallyTypeLookup),
+  #else
   Consumer(this, Name, Results, isOriginallyTypeLookup),
+  #endif
   Results(Results),
   IndexOfFirstOuterResult(IndexOfFirstOuterResult)
 {}
@@ -1216,6 +1219,7 @@ void UnqualifiedLookupFactory::InstrumentedNamedDeclConsumer::anchor() {}
 #endif
 
 void UnqualifiedLookupFactory::ResultFinderForTypeContext::dump() const {
+  (void)factory;
   llvm::errs() << "dynamicContext: ";
   dynamicContext->dumpContext();
   llvm::errs() << "staticContext: ";
@@ -1251,7 +1255,7 @@ void UnqualifiedLookupFactory::dumpResults() const {
 
 void UnqualifiedLookupFactory::print(raw_ostream &OS) const {
   OS << "Look up";
-#ifndef DEBUG
+#ifndef NDEBUG
   OS << " (" << lookupCounter << ")";
 #endif
   OS << " '" << Name << "' at: ";
