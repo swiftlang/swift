@@ -829,8 +829,7 @@ ParserResult<DifferentiableAttr>
 Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
   StringRef AttrName = "differentiable";
   SourceLoc lParenLoc = loc, rParenLoc = loc;
-  
-  bool linear;
+  bool linear = false;
   SmallVector<ParsedAutoDiffParameter, 8> params;
   Optional<DeclNameWithLoc> jvpSpec;
   Optional<DeclNameWithLoc> vjpSpec;
@@ -851,9 +850,9 @@ Parser::parseDifferentiableAttribute(SourceLoc atLoc, SourceLoc loc) {
   }
 
   return ParserResult<DifferentiableAttr>(
-    DifferentiableAttr::create(Context, /*implicit*/ false, atLoc,
-                               SourceRange(loc, rParenLoc),
-                               params, jvpSpec, vjpSpec, whereClause));
+      DifferentiableAttr::create(Context, /*implicit*/ false, atLoc,
+                                 SourceRange(loc, rParenLoc), linear,
+                                 params, jvpSpec, vjpSpec, whereClause));
 }
 
 bool Parser::parseDifferentiationParametersClause(
@@ -1151,7 +1150,7 @@ Parser::parseDifferentiatingAttribute(SourceLoc atLoc, SourceLoc loc) {
   return ParserResult<DifferentiatingAttr>(
       DifferentiatingAttr::create(Context, /*implicit*/ false, atLoc,
                                   SourceRange(loc, rParenLoc),
-                                  original, params));
+                                  original, linear, params));
 }
 
 void Parser::parseObjCSelector(SmallVector<Identifier, 4> &Names,

@@ -4127,6 +4127,7 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
       // SWIFT_ENABLE_TENSORFLOW
       case decls_block::Differentiable_DECL_ATTR: {
         bool isImplicit;
+        bool linear;
         uint64_t jvpNameId;
         DeclID jvpDeclId;
         uint64_t vjpNameId;
@@ -4135,8 +4136,8 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         SmallVector<Requirement, 4> requirements;
 
         serialization::decls_block::DifferentiableDeclAttrLayout::readRecord(
-            scratch, isImplicit, jvpNameId, jvpDeclId, vjpNameId, vjpDeclId,
-            parameters);
+            scratch, isImplicit, linear, jvpNameId, jvpDeclId, vjpNameId,
+            vjpDeclId, parameters);
 
         Optional<DeclNameWithLoc> jvp;
         FuncDecl *jvpDecl = nullptr;
@@ -4160,7 +4161,7 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
 
         auto diffAttr =
             DifferentiableAttr::create(ctx, isImplicit, SourceLoc(),
-                                       SourceRange(), indices, jvp, vjp,
+                                       SourceRange(), linear, indices, jvp, vjp,
                                        requirements);
         diffAttr->setJVPFunction(jvpDecl);
         diffAttr->setVJPFunction(vjpDecl);

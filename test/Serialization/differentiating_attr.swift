@@ -21,6 +21,20 @@ func vjpAdd(x: Float, y: Float) -> (value: Float, pullback: (Float) -> (Float, F
   return (x + y, { ($0, $0) })
 }
 
+// CHECK: @differentiable(linear, wrt: x, jvp: jvpLin)
+// CHECK-NEXT: @differentiable(linear, wrt: (x, y), vjp: vjpLin)
+func lin(x: Float, y: Float) -> Float {
+  return x + y
+}
+@differentiating(lin, linear, wrt: x)
+func jvpLin(x: Float, y: Float) -> (value: Float, differential: (Float) -> (Float)) {
+  return (x + y, { $0 })
+}
+@differentiating(lin, linear)
+func vjpLin(x: Float, y: Float) -> (value: Float, pullback: (Float) -> (Float, Float)) {
+  return (x + y, { ($0, $0) })
+}
+
 // CHECK: @differentiable(wrt: x, vjp: vjpGeneric where T : Differentiable)
 func generic<T : Numeric>(x: T) -> T {
   return x

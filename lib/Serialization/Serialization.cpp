@@ -2544,7 +2544,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
 
       DifferentiableDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(),
-          jvpName, jvpRef, vjpName, vjpRef, indices);
+          attr->isLinear(), jvpName, jvpRef, vjpName, vjpRef, indices);
 
       S.writeGenericRequirements(attr->getRequirements(), S.DeclTypeAbbrCodes);
       return;

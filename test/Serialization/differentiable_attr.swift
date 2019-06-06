@@ -14,6 +14,27 @@ func simple(x: Float) -> Float {
   return x
 }
 
+// CHECK: @differentiable(linear, wrt: x, jvp: jvpSimple, vjp: vjpSimple)
+// CHECK-NEXT: func simple2(x: Float) -> Float
+@differentiable(linear, jvp: jvpSimple, vjp: vjpSimple)
+func simple2(x: Float) -> Float {
+  return x
+}
+
+// CHECK: @differentiable(linear, wrt: x, vjp: vjpSimple)
+// CHECK-NEXT: func simple3(x: Float) -> Float
+@differentiable(linear, vjp: vjpSimple)
+func simple3(x: Float) -> Float {
+  return x
+}
+
+// CHECK: @differentiable(linear, wrt: x)
+// CHECK-NEXT: func simple4(x: Float) -> Float
+@differentiable(linear)
+func simple4(x: Float) -> Float {
+  return x
+}
+
 func jvpSimple(x: Float) -> (Float, (Float) -> Float) {
   return (x, { v in v })
 }
