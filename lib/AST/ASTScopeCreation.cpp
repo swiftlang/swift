@@ -995,8 +995,9 @@ void ConditionalClauseScope::createSubtreeForCondition(
         scopeCreator.withoutDeferrals()
             .createSubtree<StatementConditionElementPatternScope>(
                 this, cond.getPattern());
-    ASTVisitorForScopeCreation().visitExpr(cond.getInitializer(), this,
-                                           scopeCreator.withoutDeferrals());
+    ASTVisitorForScopeCreation().visitExpr(
+        cond.getInitializer(), statementConditionElementPatternScope.get(),
+        scopeCreator.withoutDeferrals());
     return;
   }
 }
