@@ -250,3 +250,38 @@ func test_recursive_dynamic_lookup(_ lens: Lens<Lens<Point>>) {
   // CHECK-NEXT: keypath $KeyPath<Lens<Lens<Rectangle>>, Lens<Lens<Int>>>, (root $Lens<Lens<Rectangle>>; settable_property $Lens<Lens<Point>>,  id @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs15WritableKeyPathCyxqd__G_tcluig : {{.*}})
   _ = \Lens<Lens<Rectangle>>.topLeft.x
 }
+
+@dynamicMemberLookup
+struct RefWritableBox<T> {
+  var obj: T
+
+  init(_ obj: T) {
+    self.obj = obj
+  }
+
+  subscript<U>(dynamicMember member: KeyPath<T, U>) -> U {
+    get { return obj[keyPath: member] }
+  }
+
+  subscript<U>(dynamicMember member: ReferenceWritableKeyPath<T, U>) -> U {
+    get { return obj[keyPath: member] }
+    set { obj[keyPath: member] = newValue }
+  }
+}
+
+func prefer_readonly_keypath_over_reference_writable() {
+  class C {
+    let foo: Int
+
+    init(_ foo: Int) {
+      self.foo = foo
+    }
+  }
+
+  var box = RefWritableBox(C(42))
+  // expected-warning@-1 {{variable 'box' was never mutated; consider changing to 'let' constant}}
+
+  // CHECK: function_ref RefWritableBox.subscript.getter
+  // CHECK-NEXT: function_ref @$s29keypath_dynamic_member_lookup14RefWritableBoxV0B6Memberqd__s7KeyPathCyxqd__G_tcluig
+  _ = box.foo
+}
