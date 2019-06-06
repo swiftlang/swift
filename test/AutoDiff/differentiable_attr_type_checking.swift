@@ -50,6 +50,8 @@ struct ComputedPropertyDupeAttributes<T : Differentiable> : Differentiable {
     set { value = newValue }
   }
 
+  // TODO(TF-482): Remove diagnostics when `@differentiable` attributes are
+  // also uniqued based on generic requirements.
   @differentiable(where T == Float) // expected-error {{duplicate '@differentiable' attribute}}
   @differentiable(where T == Double) // expected-note {{other attribute declared here}}
   var computed2: T {
