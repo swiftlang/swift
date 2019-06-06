@@ -239,7 +239,7 @@ protected:
   Size CurSize = Size(0);
 private:
   Alignment CurAlignment = Alignment(1);
-  SpareBitVector CurSpareBits;
+  SmallVector<SpareBitVector, 8> CurSpareBits;
   unsigned NextNonFixedOffsetIndex = 0;
   bool IsFixedLayout = true;
   IsPOD_t IsKnownPOD = IsPOD;
@@ -300,12 +300,9 @@ public:
 
   /// Return the alignment of the structure built so far.
   Alignment getAlignment() const { return CurAlignment; }
-  
-  /// Return the spare bit mask of the structure built so far.
-  const SpareBitVector &getSpareBits() const { return CurSpareBits; }
 
   /// Return the spare bit mask of the structure built so far.
-  SpareBitVector &getSpareBits() { return CurSpareBits; }
+  SpareBitVector getSpareBits() const;
 
   /// Build the current elements as a new anonymous struct type.
   llvm::StructType *getAsAnonStruct() const;
