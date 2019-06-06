@@ -83,7 +83,12 @@ public:
   /// The required platform.
   PlatformKind getPlatform() const { return Platform; }
   SourceLoc getPlatformLoc() const { return PlatformLoc; }
-  
+
+  /// Returns true when the constraint is for a platform that was not
+  /// recognized. This enables better recovery during parsing but should never
+  /// be true after parsing is completed.
+  bool isUnrecognizedPlatform() const { return Platform == PlatformKind::none; }
+
   // The platform version to compare against.
   llvm::VersionTuple getVersion() const { return Version; }
   SourceRange getVersionSrcRange() const { return VersionSrcRange; }
