@@ -3173,7 +3173,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   // `@differentiable` attributes are uniqued by their parameter indices.
   // Reject duplicate attributes for the same decl and parameter indices pair.
   if (!insertion.second && insertion.first->getSecond() != attr) {
-    TC.diagnose(attr->getLocation(), diag::differentiable_attr_duplicate);
+    diagnoseAndRemoveAttr(attr, diag::differentiable_attr_duplicate);
     TC.diagnose(insertion.first->getSecond()->getLocation(),
                 diag::differentiable_attr_duplicate_note);
     return;
@@ -3191,7 +3191,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     // indices. Reject duplicate attributes for the same decl and parameter
     // indices pair.
     if (!insertion.second) {
-      TC.diagnose(attr->getLocation(), diag::differentiable_attr_duplicate);
+      diagnoseAndRemoveAttr(attr, diag::differentiable_attr_duplicate);
       TC.diagnose(insertion.first->getSecond()->getLocation(),
                   diag::differentiable_attr_duplicate_note);
       return;
@@ -3491,7 +3491,7 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
     // indices. Reject duplicate attributes for the same decl and parameter
     // indices pair.
     if (!insertion.second && insertion.first->getSecond() != da) {
-      TC.diagnose(da->getLocation(), diag::differentiable_attr_duplicate);
+      diagnoseAndRemoveAttr(da, diag::differentiable_attr_duplicate);
       TC.diagnose(insertion.first->getSecond()->getLocation(),
                   diag::differentiable_attr_duplicate_note);
       return;
