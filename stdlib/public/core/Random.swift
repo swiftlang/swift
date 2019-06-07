@@ -97,7 +97,13 @@ extension RandomNumberGenerator {
     var random: T = next()
     var m = random.multipliedFullWidth(by: upperBound)
     if (m.low < upperBound) {
-      let t = (0 &- upperBound) % upperBound
+      var t = (0 &- upperBound)
+      if (t >= upperBound) {
+        t -= upperBound
+        if (t >= upperBound) {
+          t %= upperBound
+        }
+      }
       while (m.low < t) {
         random = next()
         m = random.multipliedFullWidth(by: upperBound)
