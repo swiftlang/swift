@@ -15,11 +15,21 @@
 import TestsUtils
 import Foundation
 
-public let AngryPhonebook = BenchmarkInfo(
-  name: "AngryPhonebook",
-  runFunction: run_AngryPhonebook,
-  tags: [.validation, .api, .String],
-  legacyFactor: 7)
+public let AngryPhonebook = [
+  BenchmarkInfo(
+    name: "AngryPhonebook",
+    runFunction: run_AngryPhonebook,
+    tags: [.validation, .api, .String],
+    legacyFactor: 7),
+  BenchmarkInfo(
+    name: "AngryPhonebookCyrillic",
+    runFunction: run_AngryPhonebookCyrillic,
+    tags: [.validation, .api, .String]),
+  BenchmarkInfo(
+    name: "AngryPhonebookArmenian",
+    runFunction: run_AngryPhonebookArmenian,
+    tags: [.validation, .api, .String])
+]
 
 let words = [
   "James", "John", "Robert", "Michael", "William", "David", "Richard", "Joseph",
@@ -34,6 +44,44 @@ public func run_AngryPhonebook(_ N: Int) {
   for _ in 1...N {
     for firstname in words {
       for lastname in words {
+        _ = (firstname.uppercased(), lastname.lowercased())
+      }
+    }
+  }
+}
+
+let cyrillicNames: [String] = [
+  "Александр", "Аркадий", "Аня", "Даниил", "Дмитрий", "Эдуард", "Юрій 🇺🇦", "Давид",
+  "Анна", "Дмитрий 🇺🇸", "Евгений", "Геннадий", "👍🏼 Борис", "Владимир", "Эдуард",
+  "👍🏽 Артур", "Антон", "Антон 👍🏻", "Надія 👍", "Тарас", "Степан", "Алёна", "Алиса",
+  "Елена 🇷🇺", "Елизавета 👍🏾", "Галина", "👍🏿 Инна", "Жанна 🇨🇦", "Ульяна", "Кристина",
+  "Ксения", "Юлия", "Валерия", "Ольга", "Фаина", "Эмилия", "👍🏿👍🏾👍🏽👍🏼👍🏻👍🇺🇦🇷🇺🇨🇦🇺🇸👨‍👩‍👧‍👦"]
+
+@inline(never)
+public func run_AngryPhonebookCyrillic(_ N: Int) {
+  // Permute the names.
+  for _ in 1...N {
+    for firstname in cyrillicNames {
+      for lastname in cyrillicNames {
+        _ = (firstname.uppercased(), lastname.lowercased())
+      }
+    }
+  }
+}
+
+let armenianNames: [String] = [
+  "Արմեն 🇦🇲", "Աննա", "Հարություն", "Միքայել", "Մարիա", "Դավիթ", "Վարդան", "Նարինե",
+  "Հռիփսիմե", "Տիգրան👍", "Տաթև", "Ադամ", "Ազատ", "Ազնաւուր🇨🇦", "Արեւիկ", "Գրիգոր", "Լևոն",
+  "Անի", "Շուշան", "Սեդա", "Շաքէ👍🏾", "Լիլիթ👍🏽", "Հայկ👍🏼", "Անդրանիկ", "Գառնիկ 👨‍👩‍👧‍👦", "Վահրամ",
+  "Վահագն👍🏿", "Գևորգ", "Լուսինե", "Թագուհի🇺🇸", "Թամարա👍🏻", "Սոնա", "Վերա", "Արամ",
+  "Արսեն", "Մովսես", "Մհեր", "Կոմիտաս", "Էդգար", "Բագրատ", "👍🏿👍🏾👍🏽👍🏼👍🏻👍🇦🇲🇨🇦🇺🇸👨‍👩‍👧‍👦"]
+
+@inline(never)
+public func run_AngryPhonebookArmenian(_ N: Int) {
+  // Permute the names.
+  for _ in 1...N {
+    for firstname in armenianNames {
+      for lastname in armenianNames {
         _ = (firstname.uppercased(), lastname.lowercased())
       }
     }
