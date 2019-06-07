@@ -2326,6 +2326,7 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
   StringRef Text = Tok.getText();
   SourceLoc Loc = consumeToken();
   
+  bool linear = false;
   StringRef conventionName;
   StringRef witnessMethodProtocol;
 
@@ -2374,6 +2375,27 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
     parseMatchingToken(tok::r_paren, RPLoc,
                        diag::convention_attribute_expected_rparen,
                        LPLoc);
+  }
+  
+  // SWIFT_ENABLE_TENSORFLOW
+  if (attr == TAK_differentiable) {
+    // Check if there is a 'linear' argument.
+    if (Tok.is(tok::l_paren) && peekToken().is(tok::identifier) && peekToken().getText() == "linear") {
+      consumeToken(tok::l_paren);
+      consumeToken(tok::identifier);
+      
+      linear = true;
+      
+      // Parse the ')'.  We can't use parseMatchingToken if we're in
+      // just-checking mode.
+      if (justChecking && Tok.isNot(tok::r_paren))
+        return true;
+      
+      SourceLoc LPLoc;
+      SourceLoc RPLoc;
+      parseMatchingToken(tok::r_paren, RPLoc,
+                         diag::differentiable_attribute_expected_rparen, LPLoc);
+    }
   }
 
   // In just-checking mode, we only need to consume the tokens, and we don't
@@ -2518,6 +2540,7 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
   // SWIFT_ENABLE_TENSORFLOW
   // @differentiable(...) attribute.
   case TAK_differentiable:
+    Attributes.linear = linear;
     break;
   }
 

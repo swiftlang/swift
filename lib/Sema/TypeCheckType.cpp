@@ -2260,12 +2260,19 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
                  "@autoclosure");
         attrs.clearAttribute(TAK_autoclosure);
       }
+      
+      DifferentiabilityKind diffkind =
+      (attrs.has(TAK_autodiff) || attrs.has(TAK_differentiable)
+       ? (attrs.linear
+          ? DifferentiabilityKind::Linear
+          : DifferentiabilityKind::Normal)
+       : DifferentiabilityKind::NonDifferentiable);
 
       // Resolve the function type directly with these attributes.
       FunctionType::ExtInfo extInfo(rep, /*noescape=*/false,
                                     // SWIFT_ENABLE_TENSORFLOW
                                     fnRepr->throws(),
-                                    attrs.has(TAK_autodiff) || attrs.has(TAK_differentiable));
+                                    diffkind);
 
       ty = resolveASTFunctionType(fnRepr, options, extInfo);
       if (!ty || ty->hasError())

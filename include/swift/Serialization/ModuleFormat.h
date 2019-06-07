@@ -276,6 +276,8 @@ enum class SILParameterDifferentiability : uint8_t {
   DifferentiableOrNotApplicable,
   NotDifferentiable,
 };
+// TODO: description and better(?) location
+using DifferentiabilityKindField = BCFixed<2>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
@@ -777,16 +779,16 @@ namespace decls_block {
     BCFixed<1>,  // noescape?
     // SWIFT_ENABLE_TENSORFLOW
     BCFixed<1>,  // throws?
-    BCFixed<1>   // differentiable?
+    DifferentiabilityKindField // differentiable & linear?
     // trailed by parameters
   >;
 
   using FunctionParamLayout = BCRecordLayout<
     FUNCTION_PARAM,
-    IdentifierIDField,  // name
-    TypeIDField,        // type
-    BCFixed<1>,         // vararg?
-    BCFixed<1>,         // autoclosure?
+    IdentifierIDField,   // name
+    TypeIDField,         // type
+    BCFixed<1>,          // vararg?
+    BCFixed<1>,          // autoclosure?
     ValueOwnershipField, // inout, shared or owned?
     BCFixed<1>           // nondifferentiable?
   >;
@@ -1662,6 +1664,7 @@ namespace decls_block {
   >;
 
   // SWIFT_ENABLE_TENSORFLOW
+  // TODO: why didn't I add a bit for linear flag here?
   using DifferentiatingDeclAttrLayout = BCRecordLayout<
     Differentiating_DECL_ATTR,
     BCFixed<1>, // Implicit flag.

@@ -2867,15 +2867,16 @@ public:
     //
     //   SWIFT_ENABLE_TENSORFLOW
     //   |representation|noEscape|throws|differentiability|
-    //   |    0 .. 3    |    4   |   5  |      6 .. 8     |
+    //   |    0 .. 3    |    4   |   5  |      6 .. 7     |
     //
     enum : unsigned {
-      RepresentationMask     = 0xF << 0,
-      NoEscapeMask           = 1 << 4,
-      ThrowsMask             = 1 << 5,
+      RepresentationMask       = 0xF << 0,
+      NoEscapeMask             = 1 << 4,
+      ThrowsMask               = 1 << 5,
       // SWIFT_ENABLE_TENSORFLOW
-      DifferentiableMask     = 1 << 7,
-      NumMaskBits            = 8
+      DifferentiableMaskOffset = 6,
+      DifferentiableMask       = 0x3 << DifferentiableMaskOffset,
+      NumMaskBits              = 8
     };
 
     unsigned Bits; // Naturally sized for speed.
@@ -2899,11 +2900,12 @@ public:
     ExtInfo(Representation Rep,
             bool IsNoEscape,
             // SWIFT_ENABLE_TENSORFLOW
-            bool Throws, bool IsDifferentiable)
+            bool Throws, DifferentiabilityKind diffKind)
       : ExtInfo(Rep, Throws) {
       Bits |= (IsNoEscape ? NoEscapeMask : 0);
       // SWIFT_ENABLE_TENSORFLOW
-      Bits |= (IsDifferentiable ? DifferentiableMask : 0);
+      Bits |=
+          ((unsigned)diffKind << DifferentiableMaskOffset) & DifferentiableMask;
     }
 
     bool isNoEscape() const { return Bits & NoEscapeMask; }

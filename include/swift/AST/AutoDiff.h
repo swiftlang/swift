@@ -23,6 +23,12 @@
 #include "swift/Basic/Range.h"
 
 namespace swift {
+  
+enum class DifferentiabilityKind: uint8_t {
+  NonDifferentiable = 0b00,
+  Normal = 0b01,
+  Linear = 0b11
+};
 
 class ParsedAutoDiffParameter {
 public:

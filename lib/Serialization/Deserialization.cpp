@@ -4705,6 +4705,8 @@ public:
 
     // SWIFT_ENABLE_TENSORFLOW
     bool noescape = false, throws = false, differentiable = false;
+    uint8_t rawDiffKind;
+    DifferentiabilityKind diffKind = DifferentiabilityKind::NonDifferentiable;
     GenericSignature *genericSig = nullptr;
 
     if (!isGeneric) {
@@ -4713,7 +4715,18 @@ public:
                                                   noescape,
                                                   // SWIFT_ENABLE_TENSORFLOW
                                                   throws,
-                                                  differentiable);
+                                                  rawDiffKind);
+      if (rawDiffKind == 0b11)
+        diffKind = DifferentiabilityKind::Linear;
+      else if (rawDiffKind == 0b01)
+        diffKind = DifferentiabilityKind::Normal;
+      else if (rawDiffKind == 0b00)
+        diffKind = DifferentiabilityKind::NonDifferentiable;
+      else {
+        MF.error();
+        return nullptr;
+      }
+      
     } else {
       GenericSignatureID rawGenericSig;
       decls_block::GenericFunctionTypeLayout::readRecord(scratch,
@@ -4734,7 +4747,7 @@ public:
 
     auto info = FunctionType::ExtInfo(*representation, noescape,
                                       // SWIFT_ENABLE_TENSORFLOW
-                                      throws, differentiable);
+                                      throws, diffKind);
 
     auto resultTy = MF.getTypeChecked(resultID);
     if (!resultTy)

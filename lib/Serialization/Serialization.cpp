@@ -4138,6 +4138,14 @@ public:
 
   void visitFunctionType(const FunctionType *fnTy) {
     using namespace decls_block;
+    
+//    DifferentiabilityKind diffkind =
+//        (differentiable
+//            ? (linear
+//                ? DifferentiabilityKind::Linear
+//                : DifferentiabilityKind::Normal)
+//            : DifferentiabilityKind::NonDifferentiable);
+
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[FunctionTypeLayout::Code];
     FunctionTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
@@ -4145,7 +4153,8 @@ public:
         getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
         fnTy->isNoEscape(),
         // SWIFT_ENABLE_TENSORFLOW
-        fnTy->throws(), fnTy->isDifferentiable());
+        fnTy->throws(),
+        /* TODO remove hardcode*/ 0b11);
 
     serializeFunctionTypeParams(fnTy);
   }
