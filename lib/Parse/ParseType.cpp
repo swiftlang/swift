@@ -422,7 +422,7 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
       diagnose(Tok.getLoc(), DiagID)
           .fixItInsert(arrowLoc, "throws ")
           .fixItRemove(Tok.getLoc());
-      consumeToken();
+      throwsLoc = consumeToken();
     }
     ParserResult<TypeRepr> SecondHalf =
         parseType(diag::expected_type_function_result);
