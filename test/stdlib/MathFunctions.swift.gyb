@@ -45,7 +45,7 @@ func expectEqualWithTolerance<T>(_ expected: TestLiteralType, _ actual: T,
 
 %from SwiftMathFunctions import *
 
-@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
 internal extension ElementaryFunctions where Self: BinaryFloatingPoint {
   static func elementaryFunctionTests() {
     /* Default tolerance is 3 ulps unless specified otherwise. It's OK to relax
@@ -88,7 +88,7 @@ internal extension ElementaryFunctions where Self: BinaryFloatingPoint {
 % end
 
 MathTests.test("${T}") {
-  if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+  if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
     ${T}.elementaryFunctionTests()
   }
 }

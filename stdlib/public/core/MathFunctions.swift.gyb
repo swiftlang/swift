@@ -34,7 +34,7 @@ import SwiftShims
 /// ElementaryFunctions and FloatingPoint.
 ///
 /// [elfn]: http://en.wikipedia.org/wiki/Elementary_function
-@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
 public protocol ElementaryFunctions {
 
 %for func in ElementaryFunctions:
@@ -125,7 +125,7 @@ extension ${Self}: ElementaryFunctions {
 % end
 %end
 
-@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
 extension SIMD where Scalar: ElementaryFunctions {
 % for func in ElementaryFunctions:
 
@@ -168,6 +168,6 @@ extension SIMD where Scalar: ElementaryFunctions {
 }
 
 %for n in [2,3,4,8,16,32,64]:
-@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
 extension SIMD${n}: ElementaryFunctions where Scalar: ElementaryFunctions { }
 %end
