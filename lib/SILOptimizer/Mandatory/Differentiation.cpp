@@ -3519,15 +3519,15 @@ class AdjointValueBase {
 
   /// The underlying value.
   union Value {
-    MutableArrayRef<AdjointValue> aggregate;
+    ArrayRef<AdjointValue> aggregate;
     ValueWithCleanup concrete;
-    Value(MutableArrayRef<AdjointValue> v) : aggregate(v) {}
+    Value(ArrayRef<AdjointValue> v) : aggregate(v) {}
     Value(ValueWithCleanup v) : concrete(v) {}
     Value() {}
   } value;
 
   explicit AdjointValueBase(SILType type,
-                            MutableArrayRef<AdjointValue> aggregate)
+                            ArrayRef<AdjointValue> aggregate)
       : kind(AdjointValueKind::Aggregate), type(type), value(aggregate) {}
 
   explicit AdjointValueBase(ValueWithCleanup v)
@@ -3591,9 +3591,13 @@ public:
     return base->value.aggregate.size();
   }
 
-  AdjointValue takeAggregateElement(unsigned i) {
+  AdjointValue getAggregateElement(unsigned i) const {
     assert(isAggregate());
     return base->value.aggregate[i];
+  }
+
+  ArrayRef<AdjointValue> getAggregateElements() const {
+    return base->value.aggregate;
   }
 
   ValueWithCleanup getConcreteValue() const {
@@ -3684,6 +3688,11 @@ private:
   /// Mapping from original basic blocks to dominated active values.
   DenseMap<SILBasicBlock *, SmallVector<SILValue, 8>> activeValues;
 
+  /// Local adjoint values to be cleaned up. This is populated when adjoint
+  /// emission is run on one basic block and cleaned before processing another
+  /// basic block.
+  SmallVector<AdjointValue, 8> blockLocalAdjointValues;
+
   /// Mapping from original basic blocks and original active values to
   /// corresponding adjoint block arguments.
   DenseMap<std::pair<SILBasicBlock *, SILValue>, SILArgument *>
@@ -3758,7 +3767,7 @@ private:
   AdjointValue makeAggregateAdjointValue(SILType type, EltRange elements);
 
   //--------------------------------------------------------------------------//
-  // Managed value materializers
+  // Symbolic value materializers
   //--------------------------------------------------------------------------//
 
   /// Materialize an adjoint value. The type of the given adjoint value must be
@@ -3777,7 +3786,7 @@ private:
       AdjointValue val, ValueWithCleanup &destBufferAccess);
 
   //--------------------------------------------------------------------------//
-  // Helpers for managed value materializers
+  // Helpers for symbolic value materializers
   //--------------------------------------------------------------------------//
 
   /// Emit a zero value by calling `AdditiveArithmetic.zero`. The given type
@@ -3787,6 +3796,12 @@ private:
   /// Emit a zero value by calling `AdditiveArithmetic.zero`. The given type
   /// must conform to `AdditiveArithmetic` and be loadable in SIL.
   SILValue emitZeroDirect(CanType type, SILLocation loc);
+
+  //--------------------------------------------------------------------------//
+  // Memory cleanup tools
+  //--------------------------------------------------------------------------//
+
+  void emitCleanupForAdjointValue(AdjointValue value);
 
   //--------------------------------------------------------------------------//
   // Accumulator
@@ -3899,8 +3914,9 @@ private:
     auto it = insertion.first;
     auto &&existingValue = it->getSecond();
     valueMap.erase(it);
-    initializeAdjointValue(origBB, originalValue,
-        accumulateAdjointsDirect(existingValue, newAdjointValue));
+    auto adjVal = accumulateAdjointsDirect(existingValue, newAdjointValue);
+    initializeAdjointValue(origBB, originalValue, adjVal);
+    blockLocalAdjointValues.push_back(adjVal);
   }
 
   /// Get the adjoint block argument corresponding to the given original block
@@ -4378,7 +4394,7 @@ public:
               // Emit cleanups for children.
               if (auto *cleanup = concreteActiveValueAdj.getCleanup()) {
                 cleanup->disable();
-                cleanup->applyRecursively(builder, activeValue.getLoc());
+                cleanup->applyRecursively(builder, adjLoc);
               }
               trampolineArguments.push_back(concreteActiveValueAdj);
               // If the adjoint block does not yet have a registered adjoint
@@ -4415,11 +4431,15 @@ public:
             getPullbackInfo().lookUpPredecessorEnumElement(predBB, bb);
         adjointSuccessorCases.push_back({enumEltDecl, adjointSuccBB});
       }
-      assert(adjointSuccessorCases.size() == predEnum->getNumElements());
+      // Emit clenaups for all block-local adjoint values.
+      for (auto adjVal : blockLocalAdjointValues)
+        emitCleanupForAdjointValue(adjVal);
+      blockLocalAdjointValues.clear();
       // - If the original block has exactly one predecessor, then the adjoint
       //   block has exactly one successor. Extract the pullback struct value
       //   from the predecessor enum value using `unchecked_enum_data` and
       //   branch to the adjoint successor block.
+      assert(adjointSuccessorCases.size() == predEnum->getNumElements());
       if (adjointSuccessorCases.size() == 1) {
         auto *predBB = bb->getSinglePredecessorBlock();
         assert(predBB);
@@ -4479,9 +4499,13 @@ public:
         indParamAdjoints.push_back(adjBuf);
       }
     };
-    // Accumulate differentiation parameter adjoints.
+    // Collect differentiation parameter adjoints.
     for (auto i : getIndices().parameters->getIndices())
       addRetElt(i);
+    // Emit cleanups for all local values.
+    for (auto adjVal : blockLocalAdjointValues)
+      emitCleanupForAdjointValue(adjVal);
+    blockLocalAdjointValues.clear();
 
     // Disable cleanup for original indirect parameter adjoint buffers.
     // Copy them to adjoint indirect results.
@@ -4667,8 +4691,9 @@ public:
           builder.createDeallocStack(loc, tmpBuf);
         }
         else
-          addAdjointValue(bb, origArg, makeConcreteAdjointValue(ValueWithCleanup(
-              tan, makeCleanup(tan, emitCleanup, {seed.getCleanup()}))));
+          addAdjointValue(bb, origArg, makeConcreteAdjointValue(
+              ValueWithCleanup(tan,
+                  makeCleanup(tan, emitCleanup, {seed.getCleanup()}))));
       }
     }
     // Deallocate pullback indirect results.
@@ -4857,7 +4882,7 @@ public:
       for (auto i : range(ti->getElements().size())) {
         if (!getTangentSpace(ti->getElement(i)->getType().getASTType()))
           continue;
-        addAdjointValue(bb, ti->getElement(i), av.takeAggregateElement(adjIdx++));
+        addAdjointValue(bb, ti->getElement(i), av.getAggregateElement(adjIdx++));
       }
       break;
     }
@@ -4964,18 +4989,7 @@ public:
     addAdjointValue(bb, si->getSrc(), makeConcreteAdjointValue(
         ValueWithCleanup(adjVal, valueCleanup)));
     // Set the buffer to zero, with a cleanup.
-    auto *bai = dyn_cast<BeginAccessInst>(adjBuf.getValue());
-    if (bai && !(bai->getAccessKind() == SILAccessKind::Modify ||
-                 bai->getAccessKind() == SILAccessKind::Init)) {
-      auto *modifyAccess = builder.createBeginAccess(
-          si->getLoc(), bai->getSource(), SILAccessKind::Modify,
-          SILAccessEnforcement::Static, /*noNestedConflict*/ true,
-          /*fromBuiltin*/ false);
-      emitZeroIndirect(bufType.getASTType(), modifyAccess, si->getLoc());
-      builder.createEndAccess(si->getLoc(), modifyAccess, /*aborted*/ false);
-    } else {
-      emitZeroIndirect(bufType.getASTType(), adjBuf, si->getLoc());
-    }
+    emitZeroIndirect(bufType.getASTType(), adjBuf, si->getLoc());
   }
 
   // Handle `copy_addr` instruction.
@@ -5001,18 +5015,7 @@ public:
     addToAdjointBuffer(bb, cai->getSrc(), readAccess);
     builder.createEndAccess(cai->getLoc(), readAccess, /*aborted*/ false);
     // Set the buffer to zero, with a cleanup.
-    auto *bai = dyn_cast<BeginAccessInst>(adjDest.getValue());
-    if (bai && !(bai->getAccessKind() == SILAccessKind::Modify ||
-                 bai->getAccessKind() == SILAccessKind::Init)) {
-      auto *modifyAccess = builder.createBeginAccess(
-          cai->getLoc(), bai->getSource(), SILAccessKind::Modify,
-          SILAccessEnforcement::Static, /*noNestedConflict*/ true,
-          /*fromBuiltin*/ false);
-      emitZeroIndirect(destType.getASTType(), modifyAccess, cai->getLoc());
-      builder.createEndAccess(cai->getLoc(), modifyAccess, /*aborted*/ false);
-    } else {
-      emitZeroIndirect(destType.getASTType(), adjDest, cai->getLoc());
-    }
+    emitZeroIndirect(destType.getASTType(), adjDest, cai->getLoc());
     auto cleanup = makeCleanup(adjDest, emitCleanup);
     adjDest.setCleanup(cleanup);
   }
@@ -5140,7 +5143,7 @@ ValueWithCleanup AdjointEmitter::materializeAdjointDirect(
     SmallVector<SILValue, 8> elements;
     SmallVector<Cleanup *, 8> cleanups;
     for (auto i : range(val.getNumAggregateElements())) {
-      auto eltVal = materializeAdjointDirect(val.takeAggregateElement(i), loc);
+      auto eltVal = materializeAdjointDirect(val.getAggregateElement(i), loc);
       elements.push_back(eltVal.getValue());
       cleanups.push_back(eltVal.getCleanup());
     }
@@ -5216,7 +5219,7 @@ void AdjointEmitter::materializeAdjointIndirectHelper(
         ValueWithCleanup eltBuf(
             builder.createTupleElementAddr(loc, destBufferAccess, idx, eltTy),
             /*cleanup*/ nullptr);
-        materializeAdjointIndirectHelper(val.takeAggregateElement(idx), eltBuf);
+        materializeAdjointIndirectHelper(val.getAggregateElement(idx), eltBuf);
         destBufferAccess.setCleanup(makeCleanupFromChildren(
             {destBufferAccess.getCleanup(), eltBuf.getCleanup()}));
       }
@@ -5228,7 +5231,7 @@ void AdjointEmitter::materializeAdjointIndirectHelper(
         ValueWithCleanup eltBuf(
             builder.createStructElementAddr(loc, destBufferAccess, *fieldIt),
             /*cleanup*/ nullptr);
-        materializeAdjointIndirectHelper(val.takeAggregateElement(i), eltBuf);
+        materializeAdjointIndirectHelper(val.getAggregateElement(i), eltBuf);
         destBufferAccess.setCleanup(makeCleanupFromChildren(
             {destBufferAccess.getCleanup(), eltBuf.getCleanup()}));
       }
@@ -5293,6 +5296,25 @@ SILValue AdjointEmitter::emitZeroDirect(CanType type, SILLocation loc) {
   return loaded;
 }
 
+void AdjointEmitter::emitCleanupForAdjointValue(AdjointValue value) {
+  switch (value.getKind()) {
+  case AdjointValueKind::Zero: return;
+  case AdjointValueKind::Aggregate:
+    for (auto element : value.getAggregateElements())
+      emitCleanupForAdjointValue(element);
+    break;
+  case AdjointValueKind::Concrete: {
+    auto concrete = value.getConcreteValue();
+    auto *cleanup = concrete.getCleanup();
+    LLVM_DEBUG(getADDebugStream() << "Applying "
+               << cleanup->getNumChildren() << " for value "
+               << concrete.getValue() << " child cleanups\n");
+    cleanup->applyRecursively(builder, concrete.getLoc());
+    break;
+  }
+  }
+}
+
 AdjointValue
 AdjointEmitter::accumulateAdjointsDirect(AdjointValue lhs,
                                          AdjointValue rhs) {
@@ -5324,7 +5346,7 @@ AdjointEmitter::accumulateAdjointsDirect(AdjointValue lhs,
         for (auto idx : range(rhs.getNumAggregateElements())) {
           auto lhsElt = builder.createTupleExtract(
               lhsVal.getLoc(), lhsVal, idx);
-          auto rhsElt = rhs.takeAggregateElement(idx);
+          auto rhsElt = rhs.getAggregateElement(idx);
           newElements.push_back(accumulateAdjointsDirect(
               makeConcreteAdjointValue(
                   ValueWithCleanup(lhsElt, lhsVal.getCleanup())),
@@ -5336,7 +5358,7 @@ AdjointEmitter::accumulateAdjointsDirect(AdjointValue lhs,
              ++fieldIt, ++i) {
           auto lhsElt = builder.createStructExtract(
               lhsVal.getLoc(), lhsVal, *fieldIt);
-          auto rhsElt = rhs.takeAggregateElement(i);
+          auto rhsElt = rhs.getAggregateElement(i);
           newElements.push_back(accumulateAdjointsDirect(
               makeConcreteAdjointValue(
                   ValueWithCleanup(lhsElt, lhsVal.getCleanup())),
@@ -5365,8 +5387,8 @@ AdjointEmitter::accumulateAdjointsDirect(AdjointValue lhs,
       SmallVector<AdjointValue, 8> newElements;
       for (auto i : range(lhs.getNumAggregateElements()))
         newElements.push_back(
-            accumulateAdjointsDirect(lhs.takeAggregateElement(i),
-                                     rhs.takeAggregateElement(i)));
+            accumulateAdjointsDirect(lhs.getAggregateElement(i),
+                                     rhs.getAggregateElement(i)));
       return makeAggregateAdjointValue(lhs.getType(), newElements);
     }
     }
