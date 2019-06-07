@@ -25,7 +25,7 @@ public let RemoveWhere = [
   BenchmarkInfo(name: "RemoveWhereMoveInts", runFunction: run_RemoveWhereMoveInts, tags: [.validation, .api], setUpFunction: buildWorkload),
   BenchmarkInfo(name: "RemoveWhereSwapStrings", runFunction: run_RemoveWhereSwapStrings, tags: [.validation, .api], setUpFunction: buildWorkload),
   BenchmarkInfo(name: "RemoveWhereSwapInts", runFunction: run_RemoveWhereSwapInts, tags: [.validation, .api], setUpFunction: buildWorkload),
-  // these test performance of filter, character iteration/comparison 
+  // these test performance of filter, character iteration/comparison
   BenchmarkInfo(name: "RemoveWhereFilterString", runFunction: run_RemoveWhereFilterString, tags: [.validation, .api], setUpFunction: buildWorkload),
   BenchmarkInfo(name: "RemoveWhereQuadraticString", runFunction: run_RemoveWhereQuadraticString, tags: [.validation, .api], setUpFunction: buildWorkload),
 ]
