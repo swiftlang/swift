@@ -28,13 +28,17 @@ let words = [
   "Joshua", "Kevin", "Ronald", "Timothy", "Jason", "Jeffrey", "Gary", "Ryan",
   "Nicholas", "Eric", "Stephen", "Jacob", "Larry", "Frank"]
 
+let emojis = [
+  "🏄", "🍔", "🎽", "🐟", "😔", "🚓", "🚼", "🍣", "🏃", "🚲", "😼", "🎷", "🙇", "👩", "🙉", "🍲", "😨", "🚃", "🎾", "🚫", "🐰", "😖", "🍫", "💄", "👹", "🚏", "🍢", "🎭", "😌", "🚍", "🍕", "🙈", "👧"]
+
+
 @inline(never)
 public func run_AngryPhonebook(_ N: Int) {
   // Permute the names.
   for _ in 1...N {
     for firstname in words {
       for lastname in words {
-        _ = (firstname.uppercased(), lastname.lowercased())
+        blackHole((firstname.uppercased(), lastname.lowercased()))
       }
     }
   }
