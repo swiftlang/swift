@@ -15,11 +15,23 @@
 import TestsUtils
 import Foundation
 
-public let AngryPhonebook = BenchmarkInfo(
-  name: "AngryPhonebook",
-  runFunction: run_AngryPhonebook,
-  tags: [.validation, .api, .String],
-  legacyFactor: 7)
+public let AngryPhonebook = [
+  BenchmarkInfo(
+    name: "AngryPhonebook",
+    runFunction: run_AngryPhonebook,
+    tags: [.validation, .api, .String],
+    legacyFactor: 7),
+  BenchmarkInfo(
+    name: "AngryNonAsciiPhonebook",
+    runFunction: run_AngryNonAsciiPhonebook,
+    tags: [.validation, .api, .String],
+    legacyFactor: 7),
+  BenchmarkInfo(
+    name: "AngryEmojiPhonebook",
+    runFunction: run_AngryEmojiPhonebook,
+    tags: [.validation, .api, .String])
+]
+
 
 let words = [
   "James", "John", "Robert", "Michael", "William", "David", "Richard", "Joseph",
@@ -27,10 +39,13 @@ let words = [
   "Paul", "Mark", "George", "Steven", "Kenneth", "Andrew", "Edward", "Brian",
   "Joshua", "Kevin", "Ronald", "Timothy", "Jason", "Jeffrey", "Gary", "Ryan",
   "Nicholas", "Eric", "Stephen", "Jacob", "Larry", "Frank"]
-
+let nonAsciWords = [
+  "Michał", "Łucja", "Władysław", "Elżbieta", "Dobrosława", "Bożena", "Żaneta",
+  "Rafał", "Günter", "Jürgen", "Jörg", "Jürgen"]
 let emojis = [
-  "🏄", "🍔", "🎽", "🐟", "😔", "🚓", "🚼", "🍣", "🏃", "🚲", "😼", "🎷", "🙇", "👩", "🙉", "🍲", "😨", "🚃", "🎾", "🚫", "🐰", "😖", "🍫", "💄", "👹", "🚏", "🍢", "🎭", "😌", "🚍", "🍕", "🙈", "👧"]
-
+  "🏄", "🍔", "🎽", "🐟", "😔", "🚓", "🚼", "🍣", "🏃", "🚲", "😼", "🎷",
+  "🙇", "👩", "🙉", "🍲", "😨", "🚃", "🎾", "🚫", "🐰", "😖", "🍫", "💄",
+  "👹", "🚏", "🍢", "🎭", "😌", "🚍", "🍕", "🙈", "👧"]
 
 @inline(never)
 public func run_AngryPhonebook(_ N: Int) {
@@ -40,6 +55,28 @@ public func run_AngryPhonebook(_ N: Int) {
       for lastname in words {
         blackHole((firstname.uppercased(), lastname.lowercased()))
       }
+    }
+  }
+}
+
+@inline(never)
+public func run_AngryNonAsciiPhonebook(_ N: Int) {
+  // Permute the names.
+  for _ in 1...N {
+    for firstname in nonAsciWords {
+      for lastname in nonAsciWords {
+        blackHole((firstname.uppercased(), lastname.lowercased()))
+      }
+    }
+  }
+}
+
+@inline(never)
+public func run_AngryEmojiPhonebook(_ N: Int) {
+  // Permute the names.
+  for _ in 1...N {
+    for emoji in emojis {
+      blackHole((emoji.uppercased(), emoji.lowercased()))
     }
   }
 }
