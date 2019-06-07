@@ -143,6 +143,7 @@ set(SWIFT_BENCH_MODULES
     single-source/RecursiveOwnedParameter
     single-source/ReduceInto
     single-source/RemoveWhere
+    single-source/ReplaceSubrange
     single-source/ReversedCollections
     single-source/RomanNumbers
     single-source/SequenceAlgos

@@ -138,6 +138,7 @@ import RangeReplaceableCollectionPlusDefault
 import RecursiveOwnedParameter
 import ReduceInto
 import RemoveWhere
+import ReplaceSubrange
 import ReversedCollections
 import RomanNumbers
 import SequenceAlgos
@@ -314,6 +315,7 @@ registerBenchmark(RangeReplaceableCollectionPlusDefault)
 registerBenchmark(RecursiveOwnedParameter)
 registerBenchmark(ReduceInto)
 registerBenchmark(RemoveWhere)
+registerBenchmark(ReplaceSubrange)
 registerBenchmark(ReversedCollections)
 registerBenchmark(RomanNumbers)
 registerBenchmark(SequenceAlgos)
