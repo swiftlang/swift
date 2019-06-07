@@ -78,6 +78,11 @@ func cond(_ x: Float) -> Float {
 // CHECK-SIL:   [[BB1_PB:%.*]] = struct_extract [[BB1_PB_STRUCT]]
 // CHECK-SIL:   [[BB1_ADJVALS:%.*]] = apply [[BB1_PB]]([[SEED]]) : $@callee_guaranteed (Float) -> (Float, Float)
 // CHECK-SIL:   [[BB1_PRED:%.*]] = struct_extract [[BB1_PB_STRUCT]]
+// CHECK-SIL:   release_value {{%.*}} : $Float
+// CHECK-SIL:   release_value {{%.*}} : $Float
+// CHECK-SIL:   release_value {{%.*}} : $Float
+// CHECK-SIL:   release_value {{%.*}} : $Float
+// CHECK-SIL:   release_value {{%.*}} : $Float
 // CHECK-SIL:   [[BB1_PB_STRUCT_DATA:%.*]] = unchecked_enum_data [[BB1_PRED]]
 // CHECK-SIL:   br bb5([[BB1_PB_STRUCT_DATA]] : $_AD__cond_bb0__PB__src_0_wrt_0)
 
@@ -88,6 +93,10 @@ func cond(_ x: Float) -> Float {
 // CHECK-SIL:   [[BB2_PB:%.*]] = struct_extract [[BB2_PB_STRUCT]]
 // CHECK-SIL:   [[BB2_ADJVALS:%.*]] = apply [[BB2_PB]]([[SEED]]) : $@callee_guaranteed (Float) -> (Float, Float)
 // CHECK-SIL:   [[BB2_PRED:%.*]] = struct_extract [[BB2_PB_STRUCT]]
+// CHECK-SIL:   release_value {{%.*}} : $Float
+// CHECK-SIL:   release_value {{%.*}} : $Float
+// CHECK-SIL:   release_value {{%.*}} : $Float
+// CHECK-SIL:   release_value {{%.*}} : $Float
 // CHECK-SIL:   [[BB2_PB_STRUCT_DATA:%.*]] = unchecked_enum_data [[BB2_PRED]]
 // CHECK-SIL:   br bb6([[BB2_PB_STRUCT_DATA]] : $_AD__cond_bb0__PB__src_0_wrt_0)
 
@@ -98,6 +107,8 @@ func cond(_ x: Float) -> Float {
 // CHECK-SIL:   br bb7({{%.*}} : $Float, [[BB2_PRED0_TRAMP_PB_STRUCT]] : $_AD__cond_bb0__PB__src_0_wrt_0)
 
 // CHECK-SIL: bb7({{%.*}} : $Float, [[BB0_PB_STRUCT:%.*]] : $_AD__cond_bb0__PB__src_0_wrt_0):
+// CHECK-SIL:   release_value {{%.*}} : $Float
+// CHECK-SIL:   release_value {{%.*}} : $Float
 // CHECK-SIL:   return {{%.*}} : $Float
 
 @differentiable
