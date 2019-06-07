@@ -666,13 +666,14 @@ char *swift_demangle(const char *mangledName,
     return strdup(result.c_str());
   }
 
-  // Indicate a failure if the result does not fit and will be truncated
-  // and set the required outputBufferSize.
+  // Copy into the provided buffer.
+  _swift_strlcpy(outputBuffer, result.c_str(), *outputBufferSize);
+
+  // Indicate a failure if the result did not fit and was truncated
+  // by setting the required outputBufferSize.
   if (*outputBufferSize < result.length() + 1) {
     *outputBufferSize = result.length() + 1;
   }
 
-  // Copy into the provided buffer.
-  _swift_strlcpy(outputBuffer, result.c_str(), *outputBufferSize);
   return outputBuffer;
 }
