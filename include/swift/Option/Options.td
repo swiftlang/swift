@@ -807,7 +807,7 @@ def resource_dir : Separate<["-"], "resource-dir">,
 
 def target : Separate<["-"], "target">,
   Flags<[FrontendOption, ModuleWrapOption, ModuleInterfaceOption]>,
-  HelpText<"Generate code for the given target">;
+  HelpText<"Generate code for the given target <triple>, such as x86_64-apple-macos10.9">, MetaVarName<"<triple>">;
 def target_legacy_spelling : Joined<["--"], "target=">,
   Flags<[FrontendOption]>, Alias<target>;
 
