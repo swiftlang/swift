@@ -38,7 +38,6 @@ set(SWIFTLIB_ESSENTIAL
   BridgeStorage.swift
   BridgingBuffer.swift
   Builtin.swift
-  BuiltinMath.swift.gyb
   Character.swift
   CocoaArray.swift
   Codable.swift.gyb
