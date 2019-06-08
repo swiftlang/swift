@@ -368,7 +368,7 @@ SourceRange ConditionalClauseScope::getChildlessSourceRange() const {
   // From the start of this particular condition to the start of the
   // then/body part.
   const auto startLoc = startLocAccordingToCondition();
-  const auto endLoc = stmtAfterAllConditions->getEndLoc();
+  const auto endLoc = stmtAfterAllConditions->getStartLoc();
   return startLoc.isValid() ? SourceRange(startLoc, endLoc)
                             : SourceRange(endLoc);
 }

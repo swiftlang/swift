@@ -91,8 +91,10 @@ void ASTScopeImpl::print(llvm::raw_ostream &out, unsigned level, bool lastChild,
   out << getClassName();
   if (auto *a = addressForPrinting().getPtrOrNull())
     out << " " << a;
-  printSpecifics(out);
+  out << ", ";
   printRange(out);
+  out << "  ";
+  printSpecifics(out);
   out << "\n";
 
   if (printChildren) {
@@ -105,7 +107,7 @@ void ASTScopeImpl::print(llvm::raw_ostream &out, unsigned level, bool lastChild,
 
 static void printSourceRange(llvm::raw_ostream &out, const SourceRange range,
                              SourceManager &SM) {
-  range.print(out, SM, SM.findBufferContainingLoc(range.Start));
+  range.print(out, SM, false);
 }
 
 void ASTScopeImpl::printRange(llvm::raw_ostream &out) const {
@@ -179,6 +181,7 @@ void ConditionalClauseScope::printSpecifics(llvm::raw_ostream &out) const {
   out << " before ";
   printSourceRange(out, stmtAfterAllConditions->getSourceRange(),
                    getSourceManager());
+  out << "  ";
 }
 
 void SubscriptDeclScope::printSpecifics(llvm::raw_ostream &out) const {
@@ -194,6 +197,7 @@ void VarDeclScope::printSpecifics(llvm::raw_ostream &out) const {
 void ConditionalClauseUseScope::printSpecifics(llvm::raw_ostream &out) const {
   out << " lookup parent: ";
   lookupParent->printRange(out);
+  out << "  ";
 }
 
 bool GenericTypeOrExtensionScope::doesDeclHaveABody() const { return false; }
