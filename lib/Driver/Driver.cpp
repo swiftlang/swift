@@ -3059,6 +3059,20 @@ void Driver::printHelp(bool ShowHidden) const {
   getOpts().PrintHelp(llvm::outs(), Name.c_str(), "Swift compiler",
                       IncludedFlagsBitmask, ExcludedFlagsBitmask,
                       /*ShowAllAliases*/false);
+
+  // These strings match the descriptions found in the corresponding swiftpm 
+  // help pages
+  if (driverKind == DriverKind::Interactive) {
+    llvm::outs() << "\nSEE ALSO - PACKAGE MANAGER COMMANDS: \n"
+        "\t\"swift build\" Build sources into binary products \n"
+        "\t\"swift package\" Perform operations on Swift packages \n"
+        "\t\"swift run\" Build and run an executable product \n"
+        "\t\"swift test\" Build and run tests \n";
+  } else {
+    llvm::outs() << "\nSEE ALSO: swift build, swift run, swift package, " 
+                    "swift test \n";
+  }
+
 }
 
 bool OutputInfo::mightHaveExplicitPrimaryInputs(
