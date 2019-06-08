@@ -183,7 +183,7 @@ public:
 
   bool allowTopLevelCode() const;
 
-  const std::vector<Token> &getSplitTokens() { return SplitTokens; }
+  const std::vector<Token> &getSplitTokens() const { return SplitTokens; }
 
   void markSplitToken(tok Kind, StringRef Txt);
 
