@@ -3718,18 +3718,22 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
             if (!isAutoClosureArgument) {
               auto inoutBaseType = inoutType1->getInOutObjectType();
 
-              Type simplifiedInoutBaseType = getFixedTypeRecursive(
-                  inoutBaseType, /*wantRValue=*/true);
+              auto baseIsArray = isArrayType(
+                  getFixedTypeRecursive(inoutBaseType, /*wantRValue=*/true));
 
               // FIXME: If the base is still a type variable, we can't tell
               // what to do here. Might have to try \c ArrayToPointer and make
               // it more robust.
-              if (isArrayType(simplifiedInoutBaseType)) {
+              if (baseIsArray)
                 conversionsOrFixes.push_back(
                     ConversionRestrictionKind::ArrayToPointer);
-              }
-              conversionsOrFixes.push_back(
-                  ConversionRestrictionKind::InoutToPointer);
+
+              // Only try an inout-to-pointer conversion if we know it's not
+              // an array being converted to a raw pointer type. Such
+              // conversions can only use array-to-pointer.
+              if (!baseIsArray || !isRawPointerKind(pointerKind))
+                conversionsOrFixes.push_back(
+                    ConversionRestrictionKind::InoutToPointer);
             }
           }
 
