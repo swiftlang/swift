@@ -5662,6 +5662,16 @@ bool NonEphemeralConversionFailure::diagnosePointerInit() const {
   return true;
 }
 
+bool NonEphemeralConversionFailure::diagnoseAsNote() {
+  // We can only emit a useful note if we have a callee.
+  if (auto *callee = getCallee()) {
+    emitDiagnostic(callee, diag::candidate_performs_illegal_ephemeral_conv,
+                   getParamPosition());
+    return true;
+  }
+  return false;
+}
+
 bool NonEphemeralConversionFailure::diagnoseAsError() {
   // Emit a specialized diagnostic for
   // Unsafe[Mutable][Raw]Pointer.init([mutating]:) &

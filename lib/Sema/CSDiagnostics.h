@@ -1953,6 +1953,7 @@ public:
   }
 
   bool diagnoseAsError() override;
+  bool diagnoseAsNote() override;
 
 private:
   /// Attempts to emit a specialized diagnostic for

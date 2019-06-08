@@ -446,3 +446,12 @@ let f8: (UnsafeMutablePointer<Int8>) -> Void = takesMutable
 func higherOrder(_ fn: (UnsafeMutableRawPointer, Int) -> Void) {}
 higherOrder(takesMutableRaw)
 
+
+// @_nonEphemeral ambiguities
+func takesPointerOverload(x: Int = 0, @_nonEphemeral _ ptr: UnsafePointer<Int>) {} // expected-note {{candidate expects pointer that outlives the call for parameter #2}}
+func takesPointerOverload(x: Int = 0, @_nonEphemeral _ ptr: UnsafeMutablePointer<Int>) {} // expected-note {{candidate expects pointer that outlives the call for parameter #2}}
+
+func testAmbiguity() {
+  var arr = [1, 2, 3]
+  takesPointerOverload(&arr) // expected-error {{no exact matches in call to global function 'takesPointerOverload(x:_:)'}}
+}
