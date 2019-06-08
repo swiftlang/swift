@@ -341,7 +341,7 @@ bool PatternEntryUseScope::lookupLocalBindings(Optional<bool> isCascadingUse,
   return lookupLocalBindingsInPattern(getPattern(), isCascadingUse, vis,
                                       consumer);
 }
-
+#error all wrong with nested conditional clause scopes
 bool StatementConditionElementPatternScope::lookupLocalBindings(
     Optional<bool> isCascadingUse, DeclConsumer consumer) const {
   return lookupLocalBindingsInPattern(

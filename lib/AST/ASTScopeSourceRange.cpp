@@ -351,7 +351,7 @@ SourceRange BraceStmtScope::getChildlessSourceRange() const {
 
 SourceLoc ConditionalClauseScope::startLocAccordingToCondition() const {
   // Determine the start location if the condition can provide it.
-  auto conditionals = getContainingStatement()->getCond();
+  auto conditionals = enclosingStmt->getCond();
   const StmtConditionElement cond = conditionals[index];
   switch (cond.getKind()) {
   case StmtConditionElement::CK_Boolean:
@@ -364,38 +364,19 @@ SourceLoc ConditionalClauseScope::startLocAccordingToCondition() const {
   }
 }
 
-SourceRange WhileConditionalClauseScope::getChildlessSourceRange() const {
-  // For 'while' statements, the conditional clause covers the body.
-  // If we didn't have a conditional clause to start the new scope, use
-  // the beginning of the body.
-  auto startLoc = startLocAccordingToCondition();
-  if (startLoc.isInvalid())
-    startLoc = stmt->getBody()->getStartLoc();
-  return SourceRange(startLoc, stmt->getBody()->getEndLoc());
-}
-SourceRange IfConditionalClauseScope::getChildlessSourceRange() const {
-  // For 'if' statements, the conditional clause covers the 'then' branch.
-  // If we didn't have a conditional clause to start the new scope, use
-  // the beginning of the 'then' clause.
-  auto startLoc = startLocAccordingToCondition();
-  if (startLoc.isInvalid())
-    startLoc = stmt->getThenStmt()->getStartLoc();
-  return SourceRange(startLoc, stmt->getThenStmt()->getEndLoc());
-}
-SourceRange GuardConditionalClauseScope::getChildlessSourceRange() const {
-  // For 'guard' statements, the conditional clause.
-  // If we didn't have a condition clause to start the new scope, use the
-  // end of the guard statement itself.
-  auto startLoc = startLocAccordingToCondition();
-  if (startLoc.isInvalid())
-    startLoc = stmt->getBody()->getStartLoc();
-  return SourceRange(startLoc, stmt->getBody()->getStartLoc());
+SourceRange ConditionalClauseScope::getChildlessSourceRange() const {
+  // From the start of this particular condition to the start of the
+  // then/body part.
+  const auto startLoc = startLocAccordingToCondition();
+  const auto endLoc = stmtAfterAllConditions->getEndLoc();
+  return startLoc.isValid() ? SourceRange(startLoc, endLoc)
+                            : SourceRange(endLoc);
 }
 
-SourceRange GuardUseScope::getChildlessSourceRange() const {
+SourceRange ConditionalClauseUseScope::getChildlessSourceRange() const {
   // For a guard continuation, the scope extends from the end of the 'else'
   // to the end of the continuation.
-  return SourceRange(stmt->getBody()->getEndLoc());
+  return SourceRange(startLoc);
 }
 
 SourceRange CaptureListScope::getChildlessSourceRange() const {

@@ -462,6 +462,7 @@ public:
 
   VISIT_AND_CREATE(SubscriptDecl, SubscriptDeclScope)
   VISIT_AND_CREATE(IfStmt, IfStmtScope)
+  VISIT_AND_CREATE(WhileStmt, WhileStmtScope)
   VISIT_AND_CREATE(RepeatWhileStmt, RepeatWhileScope)
   VISIT_AND_CREATE(DoCatchStmt, DoCatchStmtScope)
   VISIT_AND_CREATE(SwitchStmt, SwitchStmtScope)
@@ -565,18 +566,6 @@ public:
                        ScopeCreator &scopeCreator) {
     if (rs->hasResult())
       visitExpr(rs->getResult(), p, scopeCreator);
-  }
-
-  void visitWhileStmt(WhileStmt *ws, ASTScopeImpl *p,
-                      ScopeCreator &scopeCreator) {
-    if (ws->getCond().empty()) {
-      visit(ws->getBody(), p, scopeCreator);
-      return;
-    }
-    auto *cc = scopeCreator.withoutDeferrals()
-                   .createSubtree<WhileConditionalClauseScope>(p, ws, 0);
-    scopeCreator.createScopeFor(ws->getBody(),
-                                cc->findInnermostConditionScope());
   }
 
   void visitExpr(Expr *expr, ASTScopeImpl *p, ScopeCreator &scopeCreator) {
@@ -715,27 +704,52 @@ void PatternEntryUseScope::expandMe(ScopeCreator &scopeCreator) {
 }
 
 void ConditionalClauseScope::expandMe(ScopeCreator &scopeCreator) {
-  // If this is a boolean conditional not in a guard continuation, add a
-  // child for the expression.
   createSubtreeForCondition(scopeCreator);
   // If there's another conditional clause, add it as the child.
-  if (!isLastCondition())
-    nextConditionalClause = createSubtreeForNextConditionalClause(scopeCreator);
+  if (index + 1 < getContainingStatement()->getCond().size())
+    nextConditionalClause = scopeCreator.createSubtree<ConditionalClauseScope>(
+        this, enclosingStmt, index + 1, stmtAfterAllConditions);
+}
+
+ASTScopeImpl *
+LabeledConditionalStmtScope::createCondScopes(ScopeCreator &scopeCreator) {
+  if (getLabeledConditionalStmt()->getCond().empty())
+    return this;
+  return scopeCreator.withoutDeferrals()
+      .createSubtree<ConditionalClauseUseScope>(this,
+                                                getLabeledConditionalStmt(), 0);
 }
 
 void IfStmtScope::expandMe(ScopeCreator &scopeCreator) {
-  // The first conditional clause or, failing that, the 'then' clause.
-  ASTScopeImpl *thenParent = this;
-  if (!stmt->getCond().empty()) {
-    auto *cc =
-        scopeCreator.withoutDeferrals().createSubtree<IfConditionalClauseScope>(
-            this, stmt, 0);
-    thenParent = cc->findInnermostConditionScope();
-  }
-  scopeCreator.createScopeFor(stmt->getThenStmt(), thenParent);
+  auto &sc = scopeCreator.withoutDeferrals();
+  ASTScopeImpl *lookupParent = createCondScopes(sc);
+
+  // The 'then' branch
+  auto *use = sc.createSubtree<ConditionalClauseUseScope>(
+      this, lookupParent, stmt->getThenStmt()->getStartLoc());
+  sc.createScopeFor(stmt->getThenStmt(), use);
 
   // Add the 'else' branch, if needed.
-  scopeCreator.createScopeFor(stmt->getElseStmt(), this);
+  sc.createScopeFor(stmt->getElseStmt(), this);
+}
+
+void WhileStmtScope::expandMe(ScopeCreator &scopeCreator) {
+  auto &sc = scopeCreator.withoutDeferrals();
+  ASTScopeImpl *lookupParent = createCondScopes(sc);
+
+  auto *use = sc.createSubtree<ConditionalClauseUseScope>(
+      this, lookupParent, stmt->getBody()->getStartLoc());
+  sc.createScopeFor(stmt->getBody(), this);
+}
+
+void GuardStmtScope::expandMe(ScopeCreator &scopeCreator) {
+  auto &sc = scopeCreator.withoutDeferrals();
+  ASTScopeImpl *lookupParent = createCondScopes(sc);
+
+  auto *use = sc.createSubtree<ConditionalClauseUseScope>(this, lookupParent,
+                                                          stmt->getEndLoc());
+  // Add a child for the 'guard' body, which always exits.
+  scopeCreator.createScopeFor(stmt->getBody(), use);
 }
 
 void RepeatWhileScope::expandMe(ScopeCreator &scopeCreator) {
@@ -794,22 +808,6 @@ void CaseStmtScope::expandMe(ScopeCreator &scopeCreator) {
   scopeCreator.createScopeFor(stmt->getBody(), this);
 }
 
-void GuardStmtScope::expandMe(ScopeCreator &scopeCreator) {
-  // Add a child to describe the guard condition.
-  auto *const cc =
-      scopeCreator.withoutDeferrals()
-          .createSubtree<GuardConditionalClauseScope>(this, stmt, 0);
-
-  // Add a child for the 'guard' body, which always exits.
-  scopeCreator.createScopeFor(stmt->getBody(), this);
-
-  // Add a child to describe the guard condition for the continuation.
-  // Even if there are no deferred nodes now, some might get added to the
-  // SourceFile later, so create the use scope unconditionally so it
-  // gets set as lastAdopter.
-  scopeCreator.createSubtree<GuardUseScope>(this, stmt,
-                                            cc->findInnermostConditionScope());
-}
 
 void BraceStmtScope::expandMe(ScopeCreator &scopeCreator) {
   scopeCreator.pushAllNecessaryNodes(stmt->getElements());
@@ -982,7 +980,7 @@ bool ASTScopeImpl::isCreatedDirectly(const ASTNode n) {
 
 void ConditionalClauseScope::createSubtreeForCondition(
     ScopeCreator &scopeCreator) {
-  const auto &cond = getContainingStatement()->getCond()[index];
+  const auto &cond = enclosingStmt->getCond()[index];
   switch (cond.getKind()) {
   case StmtConditionElement::CK_Availability:
     return;
@@ -995,38 +993,14 @@ void ConditionalClauseScope::createSubtreeForCondition(
         scopeCreator.withoutDeferrals()
             .createSubtree<StatementConditionElementPatternScope>(
                 this, cond.getPattern());
-    ASTVisitorForScopeCreation().visitExpr(
-        cond.getInitializer(), statementConditionElementPatternScope.get(),
-        scopeCreator.withoutDeferrals());
+    ASTVisitorForScopeCreation().visitExpr(cond.getInitializer(), this,
+                                           scopeCreator.withoutDeferrals());
     return;
   }
 }
 
-ConditionalClauseScope *
-WhileConditionalClauseScope::createSubtreeForNextConditionalClause(
-    ScopeCreator &scopeCreator) {
-  return scopeCreator.createSubtree<WhileConditionalClauseScope>(this, stmt,
-                                                                 index + 1);
-}
-ConditionalClauseScope *
-IfConditionalClauseScope::createSubtreeForNextConditionalClause(
-    ScopeCreator &scopeCreator) {
-  return scopeCreator.createSubtree<IfConditionalClauseScope>(this, stmt,
-                                                              index + 1);
-}
-ConditionalClauseScope *
-GuardConditionalClauseScope::createSubtreeForNextConditionalClause(
-    ScopeCreator &scopeCreator) {
-  return scopeCreator.createSubtree<GuardConditionalClauseScope>(this, stmt,
-                                                                 index + 1);
-}
-
 bool AbstractPatternEntryScope::isLastEntry() const {
   return patternEntryIndex + 1 == decl->getPatternList().size();
-}
-
-bool ConditionalClauseScope::isLastCondition() const {
-  return index + 1 == getContainingStatement()->getCond().size();
 }
 
 ASTScopeImpl *ConditionalClauseScope::findInnermostConditionScope() {

@@ -108,6 +108,32 @@ SourceManager &ASTScopeImpl::getSourceManager() const {
   return getASTContext().SourceMgr;
 }
 
+Stmt *LabeledConditionalStmtScope::getStmt() const {
+  return getLabeledConditionalStmt();
+}
+
+#pragma mark getLabeledConditionalStmt
+LabeledConditionalStmt *IfStmtScope::getLabeledConditionalStmt() const {
+  return stmt;
+}
+LabeledConditionalStmt *WhileStmtScope::getLabeledConditionalStmt() const {
+  return stmt;
+}
+LabeledConditionalStmt *GuardStmtScope::getLabeledConditionalStmt() const {
+  return stmt;
+}
+
+#pragma mark getStmtAfterTheConditions
+Stmt *IfStmtScope::getStmtAfterTheConditions() const {
+  return stmt->getThenStmt();
+}
+Stmt *WhileStmtScope::getStmtAfterTheConditions() const {
+  return stmt->getBody();
+}
+Stmt *GuardStmtScope::getStmtAfterTheConditions() const {
+  return stmt->getBody();
+}
+
 #pragma mark getASTContext
 
 ASTContext &ASTScopeImpl::getASTContext() const {
@@ -180,10 +206,8 @@ DEFINE_GET_CLASS_NAME(AttachedPropertyWrapperScope)
 DEFINE_GET_CLASS_NAME(PatternEntryDeclScope)
 DEFINE_GET_CLASS_NAME(PatternEntryInitializerScope)
 DEFINE_GET_CLASS_NAME(PatternEntryUseScope)
-DEFINE_GET_CLASS_NAME(WhileConditionalClauseScope)
-DEFINE_GET_CLASS_NAME(IfConditionalClauseScope)
-DEFINE_GET_CLASS_NAME(GuardConditionalClauseScope)
-DEFINE_GET_CLASS_NAME(GuardUseScope)
+DEFINE_GET_CLASS_NAME(ConditionalClauseScope)
+DEFINE_GET_CLASS_NAME(ConditionalClauseUseScope)
 DEFINE_GET_CLASS_NAME(StatementConditionElementPatternScope)
 DEFINE_GET_CLASS_NAME(CaptureListScope)
 DEFINE_GET_CLASS_NAME(WholeClosureScope)
@@ -194,12 +218,13 @@ DEFINE_GET_CLASS_NAME(SpecializeAttributeScope)
 DEFINE_GET_CLASS_NAME(SubscriptDeclScope)
 DEFINE_GET_CLASS_NAME(VarDeclScope)
 DEFINE_GET_CLASS_NAME(IfStmtScope)
+DEFINE_GET_CLASS_NAME(WhileStmtScope)
+DEFINE_GET_CLASS_NAME(GuardStmtScope)
 DEFINE_GET_CLASS_NAME(RepeatWhileScope)
 DEFINE_GET_CLASS_NAME(DoCatchStmtScope)
 DEFINE_GET_CLASS_NAME(SwitchStmtScope)
 DEFINE_GET_CLASS_NAME(ForEachStmtScope)
 DEFINE_GET_CLASS_NAME(ForEachPatternScope)
-DEFINE_GET_CLASS_NAME(GuardStmtScope)
 DEFINE_GET_CLASS_NAME(CatchStmtScope)
 DEFINE_GET_CLASS_NAME(CaseStmtScope)
 DEFINE_GET_CLASS_NAME(BraceStmtScope)

@@ -103,6 +103,11 @@ void ASTScopeImpl::print(llvm::raw_ostream &out, unsigned level, bool lastChild,
   }
 }
 
+static void printSourceRange(llvm::raw_ostream &out, const SourceRange range,
+                             SourceManager &SM) {
+  range.print(out, SM, SM.findBufferContainingLoc(range.Start));
+}
+
 void ASTScopeImpl::printRange(llvm::raw_ostream &out) const {
   if (!cachedSourceRange)
     out << " (uncached)";
@@ -113,12 +118,7 @@ void ASTScopeImpl::printRange(llvm::raw_ostream &out) const {
     out << " [invalid source range]";
     return;
   }
-
-  auto startLineAndCol = getSourceManager().getLineAndColumn(range.Start);
-  auto endLineAndCol = getSourceManager().getLineAndColumn(range.End);
-
-  out << " [" << startLineAndCol.first << ":" << startLineAndCol.second << " - "
-      << endLineAndCol.first << ":" << endLineAndCol.second << "]";
+  printSourceRange(out, range, getSourceManager());
 }
 
 #pragma mark printSpecifics
@@ -173,7 +173,12 @@ void StatementConditionElementPatternScope::printSpecifics(
 
 void ConditionalClauseScope::printSpecifics(llvm::raw_ostream &out) const {
   ASTScopeImpl::printSpecifics(out);
+  out << " in ";
+  printSourceRange(out, enclosingStmt->getSourceRange(), getSourceManager());
   out << " index " << index;
+  out << " before ";
+  printSourceRange(out, stmtAfterAllConditions->getSourceRange(),
+                   getSourceManager());
 }
 
 void SubscriptDeclScope::printSpecifics(llvm::raw_ostream &out) const {
@@ -186,7 +191,7 @@ void VarDeclScope::printSpecifics(llvm::raw_ostream &out) const {
   decl->dumpRef(out);
 }
 
-void GuardUseScope::printSpecifics(llvm::raw_ostream &out) const {
+void ConditionalClauseUseScope::printSpecifics(llvm::raw_ostream &out) const {
   out << " lookup parent: ";
   lookupParent->printRange(out);
 }

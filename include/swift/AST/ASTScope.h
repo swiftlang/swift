@@ -940,8 +940,13 @@ protected:
 
 /// The scope introduced by a conditional clause in an if/guard/while
 /// statement.
+/// Since there may be more than one "let foo = ..." in (e.g.) an "if",
+/// we allocate a matrushka of these.
 class ConditionalClauseScope : public ASTScopeImpl {
 public:
+  LabeledConditionalStmt *const enclosingStmt;
+  Stmt *const stmtAfterAllConditions;
+
   /// The index of the conditional clause.
   const unsigned index;
 
@@ -951,12 +956,14 @@ public:
   NullablePtr<StatementConditionElementPatternScope>
       statementConditionElementPatternScope;
 
-  ConditionalClauseScope(unsigned index) : index(index) {}
+  ConditionalClauseScope(LabeledConditionalStmt *enclosingStmt, unsigned index,
+                         Stmt *stmtAfterAllConditions)
+      : enclosingStmt(enclosingStmt), index(index),
+        stmtAfterAllConditions(stmtAfterAllConditions) {}
   virtual ~ConditionalClauseScope() {}
 
   void expandMe(ScopeCreator &) override;
-
-  bool isLastCondition() const;
+  std::string getClassName() const override;
 
 protected:
   void printSpecifics(llvm::raw_ostream &out) const override;
@@ -966,9 +973,7 @@ public:
   NullablePtr<const void> addressForPrinting() const override {
     return getContainingStatement();
   }
-  virtual void createSubtreeForCondition(ScopeCreator &);
-  virtual ConditionalClauseScope *
-  createSubtreeForNextConditionalClause(ScopeCreator &) = 0;
+  void createSubtreeForCondition(ScopeCreator &);
   SourceLoc startLocAccordingToCondition() const;
 
   ASTScopeImpl *findInnermostConditionScope();
@@ -977,58 +982,20 @@ public:
 
   NullablePtr<StatementConditionElementPatternScope>
   getStatementConditionElementPatternScope() const;
-};
-
-class WhileConditionalClauseScope : public ConditionalClauseScope {
-public:
-  WhileStmt *const stmt;
-  WhileConditionalClauseScope(WhileStmt *e, unsigned index)
-      : ConditionalClauseScope(index), stmt(e) {}
-  LabeledConditionalStmt *getContainingStatement() const override {
-    return stmt;
-  }
-  ConditionalClauseScope *
-  createSubtreeForNextConditionalClause(ScopeCreator &) override;
-  std::string getClassName() const override;
-  SourceRange getChildlessSourceRange() const override;
-};
-class IfConditionalClauseScope : public ConditionalClauseScope {
-public:
-  IfStmt *const stmt;
-  IfConditionalClauseScope(IfStmt *e, unsigned index)
-      : ConditionalClauseScope(index), stmt(e) {}
-  LabeledConditionalStmt *getContainingStatement() const override {
-    return stmt;
-  }
-  ConditionalClauseScope *
-  createSubtreeForNextConditionalClause(ScopeCreator &) override;
-  std::string getClassName() const override;
   SourceRange getChildlessSourceRange() const override;
 };
 
-class GuardConditionalClauseScope : public ConditionalClauseScope {
-public:
-  GuardStmt *const stmt;
-  GuardConditionalClauseScope(GuardStmt *e, unsigned index)
-      : ConditionalClauseScope(index), stmt(e) {}
-  LabeledConditionalStmt *getContainingStatement() const override {
-    return stmt;
-  }
-  ConditionalClauseScope *
-  createSubtreeForNextConditionalClause(ScopeCreator &) override;
-  std::string getClassName() const override;
-  SourceRange getChildlessSourceRange() const override;
-};
-
-/// A conditional clause  being used for the 'guard'
-/// continuation.
-class GuardUseScope : public ASTScopeImpl {
-  GuardStmt *const stmt;
+/// If, while, & guard statements all start with a conditional clause, then some
+/// later part of the statement, (then, body, or after the guard) circumvents
+/// the normal lookup rule to pass the lookup scope into the deepest conditional
+/// clause.
+class ConditionalClauseUseScope : public ASTScopeImpl {
   ASTScopeImpl *const lookupParent;
+  const SourceLoc startLoc;
 
 public:
-  GuardUseScope(GuardStmt *stmt, ASTScopeImpl *lookupParent)
-      : stmt(stmt), lookupParent(lookupParent) {}
+  ConditionalClauseUseScope(ASTScopeImpl *lookupParent, SourceLoc startLoc)
+      : lookupParent(lookupParent), startLoc(startLoc) {}
 
   SourceRange getChildlessSourceRange() const override;
   std::string getClassName() const override;
@@ -1259,7 +1226,21 @@ public:
   SourceRange getChildlessSourceRange() const override;
 };
 
-class IfStmtScope : public AbstractStmtScope {
+class LabeledConditionalStmtScope : public AbstractStmtScope {
+public:
+  Stmt *getStmt() const override;
+  virtual LabeledConditionalStmt *getLabeledConditionalStmt() const = 0;
+
+  /// If a condition is present, create the martuska.
+  /// Return the lookupParent for the use scope.
+  ASTScopeImpl *createCondScopes();
+
+protected:
+  ASTScopeImpl *createCondScopes(ScopeCreator &);
+  virtual Stmt *getStmtAfterTheConditions() const = 0;
+};
+
+class IfStmtScope : public LabeledConditionalStmtScope {
 public:
   IfStmt *const stmt;
   IfStmtScope(IfStmt *e) : stmt(e) {}
@@ -1267,7 +1248,38 @@ public:
 
   void expandMe(ScopeCreator &) override;
   std::string getClassName() const override;
-  Stmt *getStmt() const override { return stmt; }
+  LabeledConditionalStmt *getLabeledConditionalStmt() const override;
+
+protected:
+  Stmt *getStmtAfterTheConditions() const override;
+};
+
+class WhileStmtScope : public LabeledConditionalStmtScope {
+public:
+  WhileStmt *const stmt;
+  WhileStmtScope(WhileStmt *e) : stmt(e) {}
+  virtual ~WhileStmtScope() {}
+
+  void expandMe(ScopeCreator &) override;
+  std::string getClassName() const override;
+  LabeledConditionalStmt *getLabeledConditionalStmt() const override;
+
+protected:
+  Stmt *getStmtAfterTheConditions() const override;
+};
+
+class GuardStmtScope : public LabeledConditionalStmtScope {
+public:
+  GuardStmt *const stmt;
+  GuardStmtScope(GuardStmt *e) : stmt(e) {}
+  virtual ~GuardStmtScope() {}
+
+  void expandMe(ScopeCreator &) override;
+  std::string getClassName() const override;
+  LabeledConditionalStmt *getLabeledConditionalStmt() const override;
+
+protected:
+  Stmt *getStmtAfterTheConditions() const override;
 };
 
 class RepeatWhileScope : public AbstractStmtScope {
@@ -1327,17 +1339,6 @@ public:
 
 protected:
   bool lookupLocalBindings(Optional<bool>, DeclConsumer) const override;
-};
-
-class GuardStmtScope : public AbstractStmtScope {
-public:
-  GuardStmt *const stmt;
-  GuardStmtScope(GuardStmt *e) : stmt(e) {}
-  virtual ~GuardStmtScope() {}
-
-  void expandMe(ScopeCreator &) override;
-  std::string getClassName() const override;
-  Stmt *getStmt() const override { return stmt; }
 };
 
 class CatchStmtScope : public AbstractStmtScope {
