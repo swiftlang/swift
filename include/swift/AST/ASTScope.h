@@ -945,10 +945,12 @@ protected:
 class ConditionalClauseScope : public ASTScopeImpl {
 public:
   LabeledConditionalStmt *const enclosingStmt;
-  Stmt *const stmtAfterAllConditions;
 
   /// The index of the conditional clause.
   const unsigned index;
+
+  /// The statement after the conditions: body or then.
+  Stmt *const stmtAfterAllConditions;
 
   /// The next deepest, if any
   NullablePtr<ConditionalClauseScope> nextConditionalClause;
@@ -969,9 +971,8 @@ protected:
   void printSpecifics(llvm::raw_ostream &out) const override;
 
 public:
-  virtual LabeledConditionalStmt *getContainingStatement() const = 0;
   NullablePtr<const void> addressForPrinting() const override {
-    return getContainingStatement();
+    return enclosingStmt;
   }
   void createSubtreeForCondition(ScopeCreator &);
   SourceLoc startLocAccordingToCondition() const;

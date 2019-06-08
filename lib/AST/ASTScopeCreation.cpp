@@ -706,7 +706,7 @@ void PatternEntryUseScope::expandMe(ScopeCreator &scopeCreator) {
 void ConditionalClauseScope::expandMe(ScopeCreator &scopeCreator) {
   createSubtreeForCondition(scopeCreator);
   // If there's another conditional clause, add it as the child.
-  if (index + 1 < getContainingStatement()->getCond().size())
+  if (index + 1 < enclosingStmt->getCond().size())
     nextConditionalClause = scopeCreator.createSubtree<ConditionalClauseScope>(
         this, enclosingStmt, index + 1, stmtAfterAllConditions);
 }
@@ -715,9 +715,8 @@ ASTScopeImpl *
 LabeledConditionalStmtScope::createCondScopes(ScopeCreator &scopeCreator) {
   if (getLabeledConditionalStmt()->getCond().empty())
     return this;
-  return scopeCreator.withoutDeferrals()
-      .createSubtree<ConditionalClauseUseScope>(this,
-                                                getLabeledConditionalStmt(), 0);
+  return scopeCreator.withoutDeferrals().createSubtree<ConditionalClauseScope>(
+      this, getLabeledConditionalStmt(), 0, getStmtAfterTheConditions());
 }
 
 void IfStmtScope::expandMe(ScopeCreator &scopeCreator) {
@@ -739,7 +738,7 @@ void WhileStmtScope::expandMe(ScopeCreator &scopeCreator) {
 
   auto *use = sc.createSubtree<ConditionalClauseUseScope>(
       this, lookupParent, stmt->getBody()->getStartLoc());
-  sc.createScopeFor(stmt->getBody(), this);
+  sc.createScopeFor(stmt->getBody(), use);
 }
 
 void GuardStmtScope::expandMe(ScopeCreator &scopeCreator) {
