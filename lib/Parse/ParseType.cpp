@@ -417,8 +417,15 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
   if (Tok.is(tok::arrow)) {
     // Handle type-function if we have an arrow.
     SourceLoc arrowLoc = consumeToken();
+    if (Tok.is(tok::kw_throws)) {
+      Diag<> DiagID = diag::throws_in_wrong_position;
+      diagnose(Tok.getLoc(), DiagID)
+          .fixItInsert(arrowLoc, "throws ")
+          .fixItRemove(Tok.getLoc());
+      throwsLoc = consumeToken();
+    }
     ParserResult<TypeRepr> SecondHalf =
-      parseType(diag::expected_type_function_result);
+        parseType(diag::expected_type_function_result);
     if (SecondHalf.hasCodeCompletion())
       return makeParserCodeCompletionResult<TypeRepr>();
     if (SecondHalf.isNull())
