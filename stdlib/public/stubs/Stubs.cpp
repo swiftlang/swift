@@ -459,10 +459,6 @@ static const char *_swift_stdlib_strtoX_clocale_impl(
   errno = 0;
   const auto result = posixImpl(nptr, &EndPtr, getCLocale());
   *outResult = result;
-  if (result == huge || result == -huge || result == 0.0 || result == -0.0) {
-      if (errno == ERANGE)
-          EndPtr = nullptr;
-  }
   return EndPtr;
 }
     
