@@ -16,7 +16,12 @@ public let ReplaceSubrange = [
   BenchmarkInfo(name: "ReplaceSubrangeWithSmallLiteralString", runFunction: run_ReplaceSubrangeWithSmallLiteralString, tags: [.validation, .api]),
   BenchmarkInfo(name: "ReplaceSubrangeWithLargeLiteralString", runFunction: run_ReplaceSubrangeWithLargeLiteralString, tags: [.validation, .api]),
   BenchmarkInfo(name: "ReplaceSubrangeWithLargeManagedString", runFunction: run_ReplaceSubrangeWithLargeManagedString, tags: [.validation, .api], setUpFunction: setupLargeManagedString),
+  BenchmarkInfo(name: "ReplaceSubrangeWithSmallLiteralSubstring", runFunction: run_ReplaceSubrangeWithSmallLiteralSubstring, tags: [.validation, .api]),
+  BenchmarkInfo(name: "ReplaceSubrangeWithLargeLiteralSubstring", runFunction: run_ReplaceSubrangeWithLargeLiteralSubstring, tags: [.validation, .api]),
+  BenchmarkInfo(name: "ReplaceSubrangeWithLargeManagedSubstring", runFunction: run_ReplaceSubrangeWithLargeManagedSubstring, tags: [.validation, .api], setUpFunction: setupLargeManagedSubstring),
 ]
+
+// MARK: - Privates for String
 
 private func smallLiteralString() -> String {
     return getString("coffee")
@@ -32,6 +37,29 @@ private var largeManagedString: String = {
     return str
 }()
 
+private func setupLargeManagedString() {
+    _ = largeManagedString
+}
+
+// MARK: - Privates for Substring
+
+private func smallLiteralSubstring() -> Substring {
+    return getSubstring("coffee")
+}
+
+private func largeLiteralSubstring() -> Substring {
+    return getSubstring("coffee\u{301}coffeecoffeecoffeecoffee")
+}
+
+private var largeManagedSubstring: Substring = {
+    var substring = largeLiteralSubstring()
+    substring += "z"
+    return substring
+}()
+
+private func setupLargeManagedSubstring() {
+    _ = largeManagedString
+}
 
 @inline(never)
 public func run_ReplaceSubrangeWithSmallLiteralString(N: Int) {
@@ -75,6 +103,44 @@ public func run_ReplaceSubrangeWithLargeManagedString(N: Int) {
     }
 }
 
-private func setupLargeManagedString() {
-    _ = largeManagedString
+@inline(never)
+public func run_ReplaceSubrangeWithSmallLiteralSubstring(N: Int) {
+
+    for _ in 0 ..< N {
+        var string = smallLiteralSubstring()
+
+        for _ in 0 ..< 10000 {
+            let range = string.startIndex..<string.index(after: string.startIndex)
+            let replacingString = "t"
+            string.replaceSubrange(range, with: replacingString)
+        }
+    }
+}
+
+@inline(never)
+public func run_ReplaceSubrangeWithLargeLiteralSubstring(N: Int) {
+
+    for _ in 0 ..< N {
+        var string = largeLiteralSubstring()
+
+        for _ in 0 ..< 10000 {
+            let range = string.startIndex..<string.index(after: string.startIndex)
+            let replacingString = "t"
+            string.replaceSubrange(range, with: replacingString)
+        }
+    }
+}
+
+@inline(never)
+public func run_ReplaceSubrangeWithLargeManagedSubstring(N: Int) {
+
+    for _ in 0 ..< N {
+        var string = largeManagedSubstring
+
+        for _ in 0 ..< 10000 {
+            let range = string.startIndex..<string.index(after: string.startIndex)
+            let replacingString = "t"
+            string.replaceSubrange(range, with: replacingString)
+        }
+    }
 }
