@@ -32,7 +32,6 @@
 #include "swift/Sema/IDETypeChecking.h"
 #include "clang/Basic/CharInfo.h"
 #include "llvm/Support/Debug.h"
-#include "clang/Basic/CharInfo.h"
 
 using namespace swift;
 
