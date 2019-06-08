@@ -223,7 +223,8 @@
     "Comparable.swift",
     "Codable.swift",
     "LegacyABI.swift",
-    "MigrationSupport.swift"
+    "MigrationSupport.swift",
+    "Demangle.swift"
   ],
   "Result": [
     "Result.swift"

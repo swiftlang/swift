@@ -50,6 +50,7 @@ set(SWIFTLIB_ESSENTIAL
   CString.swift
   CTypes.swift
   DebuggerSupport.swift
+  Demangle.swift
   Dictionary.swift
   DictionaryBridging.swift
   DictionaryBuilder.swift
