@@ -2369,36 +2369,27 @@ public:
   /// \param replacements The mapping from opened types to the type
   /// variables to which they were opened.
   ///
-  /// \param innerDC The generic context from which the type originates.
-  ///
   /// \param outerDC The generic context containing the declaration.
   ///
-  /// \param skipProtocolSelfConstraint Whether to skip the constraint on a
-  /// protocol's 'Self' type.
-  ///
-  /// \param skipGenericRequirements Whether to skip opening generic
-  /// requirements asscoiated with given function type.
-  ///
   /// \returns The opened type, or \c type if there are no archetypes in it.
-  Type openFunctionType(
-      AnyFunctionType *funcType,
-      unsigned numArgumentLabelsToRemove,
-      ConstraintLocatorBuilder locator,
-      OpenedTypeMap &replacements,
-      DeclContext *innerDC,
-      DeclContext *outerDC,
-      bool skipProtocolSelfConstraint,
-      bool skipGenericRequirements = false);
+  FunctionType *openFunctionType(AnyFunctionType *funcType,
+                                 ConstraintLocatorBuilder locator,
+                                 OpenedTypeMap &replacements,
+                                 DeclContext *outerDC);
 
-  /// Open the generic parameter list and (if requested) its requirements,
+  /// Open the generic parameter list and its requirements,
   /// creating type variables for each of the type parameters.
-  void openGeneric(DeclContext *innerDC,
-                   DeclContext *outerDC,
+  void openGeneric(DeclContext *outerDC,
                    GenericSignature *signature,
-                   bool skipProtocolSelfConstraint,
                    ConstraintLocatorBuilder locator,
-                   OpenedTypeMap &replacements,
-                   bool skipGenericRequirements = false);
+                   OpenedTypeMap &replacements);
+
+  /// Open the generic parameter list creating type variables for each of the
+  /// type parameters.
+  void openGenericParameters(DeclContext *outerDC,
+                             GenericSignature *signature,
+                             OpenedTypeMap &replacements,
+                             ConstraintLocatorBuilder locator);
 
   /// Given generic signature open its generic requirements,
   /// using substitution function, and record them in the
