@@ -240,7 +240,10 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
       arg->setSpecifier(ParamSpecifier::Default);
       arg->setInterfaceType(varInterfaceType);
       arg->setImplicit();
-      
+
+      // Don't allow the parameter to accept temporary pointer conversions.
+      arg->setNonEphemeralIfPossible();
+
       maybeAddMemberwiseDefaultArg(arg, var, defaultInits, params.size(), ctx);
       
       params.push_back(arg);

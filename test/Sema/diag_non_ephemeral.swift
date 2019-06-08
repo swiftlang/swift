@@ -435,6 +435,39 @@ func testNonEphemeralInOperators() {
   // expected-note@-2 {{use 'withUnsafeMutableBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 }
 
+struct S3 {
+  var ptr1: UnsafeMutableRawPointer
+  lazy var ptr2 = UnsafeMutableRawPointer(&topLevelS)
+}
+
+enum E {
+  case mutableRaw(UnsafeMutableRawPointer)
+  case const(UnsafePointer<Int8>)
+}
+
+func testNonEphemeralInMemberwiseInits() {
+  var local = 0
+
+  _ = S3(ptr1: &topLevelS, ptr2: &local) // expected-error {{cannot use inout expression here; argument #2 must be a pointer that outlives the call to 'init(ptr1:ptr2:)'}}
+  // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeMutableRawPointer?' produces a pointer valid only for the duration of the call to 'init(ptr1:ptr2:)'}}
+  // expected-note@-2 {{use 'withUnsafeMutableBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
+
+  _ = S3.init(ptr1: &local, ptr2: &topLevelS) // expected-error {{cannot use inout expression here; argument #1 must be a pointer that outlives the call to 'init(ptr1:ptr2:)'}}
+  // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call to 'init(ptr1:ptr2:)'}}
+  // expected-note@-2 {{use 'withUnsafeMutableBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
+
+  _ = E.mutableRaw(&local) // expected-error {{cannot use inout expression here; argument #1 must be a pointer that outlives the call to 'mutableRaw'}}
+  // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call to 'mutableRaw'}}
+  // expected-note@-2 {{use 'withUnsafeMutableBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
+
+  _ = E.const([1, 2, 3]) // expected-error {{cannot pass '[Int8]' to parameter; argument #1 must be a pointer that outlives the call to 'const'}}
+  // expected-note@-1 {{implicit argument conversion from '[Int8]' to 'UnsafePointer<Int8>' produces a pointer valid only for the duration of the call to 'const'}}
+  // expected-note@-2 {{use the 'withUnsafeBufferPointer' method on Array in order to explicitly convert argument to buffer pointer valid for a defined scope}}
+
+  _ = E.const("hello") // expected-error {{cannot pass 'String' to parameter; argument #1 must be a pointer that outlives the call to 'const'}}
+  // expected-note@-1 {{implicit argument conversion from 'String' to 'UnsafePointer<Int8>' produces a pointer valid only for the duration of the call to 'const'}}
+  // expected-note@-2 {{use the 'withCString' method on String in order to explicitly convert argument to pointer valid for a defined scope}}
+}
 
 // Allow the stripping of @_nonEphemeral. This is unfortunate, but ensures we don't force the user to write things
 // like `func higherOrder(_ fn: (@_nonEphemeral UnsafeMutableRawPointer) -> Void) {}`, given that the attribute is non-user-facing.

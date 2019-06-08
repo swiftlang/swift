@@ -436,3 +436,37 @@ func testNonEphemeralInOperators() {
   // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call to '^^^'}}
   // expected-note@-2 {{use 'withUnsafeMutableBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
 }
+
+struct S3 {
+  var ptr1: UnsafeMutableRawPointer
+  lazy var ptr2 = UnsafeMutableRawPointer(&topLevelS)
+}
+
+enum E {
+  case mutableRaw(UnsafeMutableRawPointer)
+  case const(UnsafePointer<Int8>)
+}
+
+func testNonEphemeralInMemberwiseInits() {
+  var local = 0
+
+  _ = S3(ptr1: &topLevelS, ptr2: &local) // expected-warning {{inout expression creates a temporary pointer, but argument #2 should be a pointer that outlives the call to 'init(ptr1:ptr2:)'}}
+  // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeMutableRawPointer?' produces a pointer valid only for the duration of the call to 'init(ptr1:ptr2:)'}}
+  // expected-note@-2 {{use 'withUnsafeMutableBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
+
+  _ = S3.init(ptr1: &local, ptr2: &topLevelS) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'init(ptr1:ptr2:)'}}
+  // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call to 'init(ptr1:ptr2:)'}}
+  // expected-note@-2 {{use 'withUnsafeMutableBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
+
+  _ = E.mutableRaw(&local) // expected-warning {{inout expression creates a temporary pointer, but argument #1 should be a pointer that outlives the call to 'mutableRaw'}}
+  // expected-note@-1 {{implicit argument conversion from 'Int' to 'UnsafeMutableRawPointer' produces a pointer valid only for the duration of the call to 'mutableRaw'}}
+  // expected-note@-2 {{use 'withUnsafeMutableBytes' in order to explicitly convert argument to buffer pointer valid for a defined scope}}
+
+  _ = E.const([1, 2, 3]) // expected-warning {{passing '[Int8]' to parameter, but argument #1 should be a pointer that outlives the call to 'const'}}
+  // expected-note@-1 {{implicit argument conversion from '[Int8]' to 'UnsafePointer<Int8>' produces a pointer valid only for the duration of the call to 'const'}}
+  // expected-note@-2 {{use the 'withUnsafeBufferPointer' method on Array in order to explicitly convert argument to buffer pointer valid for a defined scope}}
+
+  _ = E.const("hello") // expected-warning {{passing 'String' to parameter, but argument #1 should be a pointer that outlives the call to 'const'}}
+  // expected-note@-1 {{implicit argument conversion from 'String' to 'UnsafePointer<Int8>' produces a pointer valid only for the duration of the call to 'const'}}
+  // expected-note@-2 {{use the 'withCString' method on String in order to explicitly convert argument to pointer valid for a defined scope}}
+}

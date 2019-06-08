@@ -1424,6 +1424,10 @@ createValueConstructor(ClangImporter::Implementation &Impl,
     param->setSpecifier(ParamSpecifier::Default);
     param->setInterfaceType(var->getInterfaceType());
     Impl.recordImplicitUnwrapForDecl(param, var->isImplicitlyUnwrappedOptional());
+
+    // Don't allow the parameter to accept temporary pointer conversions.
+    param->setNonEphemeralIfPossible();
+
     valueParameters.push_back(param);
   }
 
