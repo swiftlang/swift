@@ -726,8 +726,10 @@ ASTScopeImpl *
 LabeledConditionalStmtScope::createCondScopes(ScopeCreator &scopeCreator) {
   if (getLabeledConditionalStmt()->getCond().empty())
     return this;
-  return scopeCreator.withoutDeferrals().createSubtree<ConditionalClauseScope>(
-      this, getLabeledConditionalStmt(), 0, getStmtAfterTheConditions());
+  auto *topCCS =
+      scopeCreator.withoutDeferrals().createSubtree<ConditionalClauseScope>(
+          this, getLabeledConditionalStmt(), 0, getStmtAfterTheConditions());
+  return topCCS->findInnermostConditionScope();
 }
 
 void IfStmtScope::expandMe(ScopeCreator &scopeCreator) {

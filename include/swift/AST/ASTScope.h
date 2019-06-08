@@ -1237,6 +1237,7 @@ public:
   ASTScopeImpl *createCondScopes();
 
 protected:
+  /// Return the lookupParent required to search these.
   ASTScopeImpl *createCondScopes(ScopeCreator &);
   virtual Stmt *getStmtAfterTheConditions() const = 0;
 };

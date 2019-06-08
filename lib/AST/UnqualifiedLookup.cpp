@@ -1276,13 +1276,15 @@ StringRef UnqualifiedLookupFactory::getSourceFileName() const {
 }
 
 static void writeFirstLine(const UnqualifiedLookupFactory &ul, StringRef s) {
-  std::string line = std::string("In file: ") + ul.getSourceFileName().str() + ", " + s.str();
+  std::string line =
+      std::string("In file: ") + ul.getSourceFileName().str() + ", " + s.str();
   writeLine(line);
 }
 
-static void writeInconsistent(const UnqualifiedLookupFactory &me, const char* thisLabel,
-                              const UnqualifiedLookupFactory &other, const char* otherLabel,
-                              StringRef s) {
+static void writeInconsistent(const UnqualifiedLookupFactory &me,
+                              const char *thisLabel,
+                              const UnqualifiedLookupFactory &other,
+                              const char *otherLabel, StringRef s) {
   writeFirstLine(me, s);
   other.dump();
   llvm::errs() << "\n" << thisLabel << " Results:\n";
@@ -1295,15 +1297,19 @@ static void writeInconsistent(const UnqualifiedLookupFactory &me, const char* th
 #pragma mark comparing results
 
 bool UnqualifiedLookupFactory::verifyEqualTo(
-    const UnqualifiedLookupFactory &&other, const char *thisLabel, const char *otherLabel) const {
+    const UnqualifiedLookupFactory &&other, const char *thisLabel,
+    const char *otherLabel) const {
   if (shouldDiffer()) {
      return true;
   }
-  auto writeErr = [&](StringRef s) { writeInconsistent(*this, thisLabel, other, otherLabel, s); };
+  auto writeErr = [&](StringRef s) {
+    writeInconsistent(*this, thisLabel, other, otherLabel, s);
+  };
   if (Results.size() != other.Results.size()) {
     const bool tooMany = Results.size() < other.Results.size();
-    writeErr( std::string(tooMany ? "Found too many: " : "Found too few: ") +
-             std::to_string(Results.size())   + " vs " + std::to_string(other.Results.size()));
+    writeErr(std::string(tooMany ? "Found too many: " : "Found too few: ") +
+             std::to_string(Results.size()) + " vs " +
+             std::to_string(other.Results.size()));
     if (tooMany)
       assert(false && "ASTScopeImpl found too many");
     else
@@ -1340,11 +1346,12 @@ bool UnqualifiedLookupFactory::verifyEqualTo(
     assert(false && "ASTScopeImpl IndexOfFirstOuterResult differs");
   }
   if (recordedSF != other.recordedSF) {
-    writeErr( std::string("recordedSF differs: shouldBe: ")
-             + (recordedSF ? recordedSF->getFilename().str() : std::string("<no name>"))
-             + std::string( " is: ")
-             + (other.recordedSF ? other.recordedSF->getFilename().str() : std::string("<no name>"))
-             );
+    writeErr(std::string("recordedSF differs: shouldBe: ") +
+             (recordedSF ? recordedSF->getFilename().str()
+                         : std::string("<no name>")) +
+             std::string(" is: ") +
+             (other.recordedSF ? other.recordedSF->getFilename().str()
+                               : std::string("<no name>")));
     assert(false && "ASTScopeImpl recordedSF differs");
   }
   if (recordedSF && recordedIsCascadingUse != other.recordedIsCascadingUse) {
@@ -1376,13 +1383,16 @@ bool UnqualifiedLookupFactory::shouldDiffer() const {
     "swift/test/NameBinding/name-binding.swift"
   };
   StringRef fileName = SF->getFilename();
-  return llvm::any_of(testsThatShouldDiffer, [&](const char* testFile) { return fileName.endswith(testFile);});
+  return llvm::any_of(testsThatShouldDiffer, [&](const char *testFile) {
+    return fileName.endswith(testFile);
+  });
 }
 
 #pragma mark breakpointing
 #ifndef NDEBUG
 
-void UnqualifiedLookupFactory::stopForDebuggingIfStartingTargetLookup(const bool isASTScopeLookup) const {
+void UnqualifiedLookupFactory::stopForDebuggingIfStartingTargetLookup(
+    const bool isASTScopeLookup) const {
   if (lookupCounter != targetLookup)
     return;
   if (isASTScopeLookup)
@@ -1391,7 +1401,8 @@ void UnqualifiedLookupFactory::stopForDebuggingIfStartingTargetLookup(const bool
     llvm::errs() << "starting target context-based lookup\n";
 }
 
-void UnqualifiedLookupFactory::stopForDebuggingIfDuringTargetLookup(const bool isASTScopeLookup) const {
+void UnqualifiedLookupFactory::stopForDebuggingIfDuringTargetLookup(
+    const bool isASTScopeLookup) const {
   if (lookupCounter != targetLookup)
     return;
   if (isASTScopeLookup)
@@ -1400,7 +1411,8 @@ void UnqualifiedLookupFactory::stopForDebuggingIfDuringTargetLookup(const bool i
     llvm::errs() << "during target context-based lookup\n";
 }
 
-void UnqualifiedLookupFactory::stopForDebuggingIfAddingTargetLookupResult(const LookupResultEntry& e) const {
+void UnqualifiedLookupFactory::stopForDebuggingIfAddingTargetLookupResult(
+    const LookupResultEntry &e) const {
   if (lookupCounter != targetLookup)
     return;
   auto &out = llvm::errs();
