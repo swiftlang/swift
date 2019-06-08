@@ -226,16 +226,62 @@ static void checkInheritanceClause(
     DC = ext;
 
     inheritedClause = ext->getInherited();
+    ASTContext &ctx = ext->getASTContext();
 
     // Protocol extensions cannot have inheritance clauses.
     if (auto proto = ext->getExtendedProtocolDecl()) {
-      if (!inheritedClause.empty()) {
+      for (unsigned i = 0, n = inheritedClause.size(); i != n; ++i) {
+
+        // Validate the type.
+        InheritedTypeRequest request{declUnion, i, TypeResolutionStage::Interface};
+        Type inheritedTy = evaluateOrDefault(ctx.evaluator, request, Type());
+
+        // If we couldn't resolve an the inherited type, or it contains an error,
+        // ignore it.
+        if (!inheritedTy || inheritedTy->hasError())
+          continue;
+
+        if (auto inheritedPr = dyn_cast_or_null<ProtocolDecl>(inheritedTy
+            ->getCanonicalType()->getNominalOrBoundGenericNominal())) {
+          std::vector<TypeLoc> Inherited = proto->getInherited();
+          Inherited.push_back(TypeLoc::withoutLoc(inheritedTy));
+          proto->setInherited(ctx.AllocateCopy(MutableArrayRef<TypeLoc>(Inherited)));
+
+          TypeChecker &TC = TypeChecker::createForContext(ctx);
+          auto lookupOptions = defaultMemberTypeLookupOptions;
+          lookupOptions -= NameLookupFlags::PerformConformanceCheck;
+          lookupOptions |= NameLookupFlags::IncludeAttributeImplements;
+
+          bool reported = false;
+          for (auto member : inheritedPr->getMembers()) {
+            if (auto requirement = dyn_cast<ValueDecl>(member)) {
+              auto candidates = TC.lookupMember(DC, ext->getExtendedType(),
+                                                requirement->getFullName(),
+                                                lookupOptions);
+              if (candidates.empty() &&
+                  requirement->getKind() != DeclKind::AssociatedType) {
+                if (!reported) {
+                  TC.diagnose(ext->getExtendedTypeLoc().getLoc(),
+                              diag::protocol_extension_does_not_conform,
+                              ext->getExtendedType(), inheritedTy);
+                  reported = true;
+                }
+                TC.diagnose(requirement, diag::no_witnesses,
+                            diag::RequirementKind::Func, requirement->getFullName(),
+                            requirement->getInterfaceType(), /*AddFixIt=*/true);
+              }
+            }
+          }
+
+          continue;
+        }
+
         ext->diagnose(diag::extension_protocol_inheritance,
                  proto->getName())
           .highlight(SourceRange(inheritedClause.front().getSourceRange().Start,
                                  inheritedClause.back().getSourceRange().End));
-        return;
       }
+      return;
     }
   } else {
     typeDecl = declUnion.get<TypeDecl *>();
