@@ -127,6 +127,7 @@ void FrontendOptions::forAllOutputPaths(
   const std::string *outputs[] = {&outs.ModuleOutputPath,
                                   &outs.ModuleDocOutputPath,
                                   &outs.ParseableInterfaceOutputPath,
+                                  &outs.XCTestMethodsFilePath,
                                   &outs.ObjCHeaderOutputPath};
   for (const std::string *next : outputs) {
     if (!next->empty())

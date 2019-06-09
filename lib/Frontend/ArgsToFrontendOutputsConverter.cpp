@@ -296,11 +296,13 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
   auto TBD = getSupplementaryFilenamesFromArguments(options::OPT_emit_tbd_path);
   auto parseableInterfaceOutput = getSupplementaryFilenamesFromArguments(
       options::OPT_emit_module_interface_path);
+  auto xctestMethodsFilePath = getSupplementaryFilenamesFromArguments(
+      options::OPT_emit_xctest_methods_path);
 
   if (!objCHeaderOutput || !moduleOutput || !moduleDocOutput ||
       !dependenciesFile || !referenceDependenciesFile ||
       !serializedDiagnostics || !fixItsOutput || !loadedModuleTrace || !TBD ||
-      !parseableInterfaceOutput) {
+      !parseableInterfaceOutput || !xctestMethodsFilePath) {
     return None;
   }
   std::vector<SupplementaryOutputPaths> result;
@@ -319,6 +321,7 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
     sop.LoadedModuleTracePath = (*loadedModuleTrace)[i];
     sop.TBDPath = (*TBD)[i];
     sop.ParseableInterfaceOutputPath = (*parseableInterfaceOutput)[i];
+    sop.XCTestMethodsFilePath = (*xctestMethodsFilePath)[i];
 
     result.push_back(sop);
   }
@@ -398,6 +401,9 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
   auto parseableInterfaceOutputPath =
       pathsFromArguments.ParseableInterfaceOutputPath;
 
+  // There is no non-path form of -emit-xctest-methods-path
+  auto xctestMethodsFilePath = pathsFromArguments.XCTestMethodsFilePath;
+
   ID emitModuleOption;
   std::string moduleExtension;
   std::string mainOutputIfUsableForModule;
@@ -420,6 +426,7 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
   sop.LoadedModuleTracePath = loadedModuleTracePath;
   sop.TBDPath = tbdPath;
   sop.ParseableInterfaceOutputPath = parseableInterfaceOutputPath;
+  sop.XCTestMethodsFilePath = xctestMethodsFilePath;
   return sop;
 }
 
@@ -516,6 +523,7 @@ SupplementaryOutputPathsComputer::readSupplementaryOutputFileMap() const {
         options::OPT_serialize_diagnostics_path,
         options::OPT_emit_loaded_module_trace_path,
         options::OPT_emit_module_interface_path,
+        options::OPT_emit_xctest_methods_path,
         options::OPT_emit_tbd_path)) {
     Diags.diagnose(SourceLoc(),
                    diag::error_cannot_have_supplementary_outputs,

@@ -368,6 +368,11 @@ def emit_objc_header_path : Separate<["-"], "emit-objc-header-path">,
          ArgumentIsPath]>,
   MetaVarName<"<path>">, HelpText<"Emit an Objective-C header file to <path>">;
 
+def emit_xctest_methods_path : Separate<["-"], "emit-xctest-methods-path">,
+Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
+ArgumentIsPath]>,
+MetaVarName<"<path>">, HelpText<"Emit a file containing XCTest test methods to <path>">;
+
 def import_cf_types : Flag<["-"], "import-cf-types">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Recognize and import CF types as class types">;

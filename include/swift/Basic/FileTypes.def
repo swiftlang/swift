@@ -70,5 +70,6 @@ TYPE("opt-record",          OptRecord,                 "opt.yaml",        "")
 TYPE("pcm",                 ClangModuleFile,           "pcm",             "")
 TYPE("pch",                 PCH,                       "pch",             "")
 TYPE("none",                Nothing,                   "",                "")
+TYPE("xctest-methods",      XCTestMethodsFile,         "xctest.json",     "")
 
 #undef TYPE

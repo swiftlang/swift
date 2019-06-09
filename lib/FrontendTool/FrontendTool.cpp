@@ -53,6 +53,7 @@
 #include "swift/Frontend/SerializedDiagnosticConsumer.h"
 #include "swift/Frontend/ParseableInterfaceModuleLoader.h"
 #include "swift/Frontend/ParseableInterfaceSupport.h"
+#include "swift/Frontend/XCTestMethodsEmitter.h"
 #include "swift/Immediate/Immediate.h"
 #include "swift/Index/IndexRecord.h"
 #include "swift/Option/Options.h"
@@ -380,6 +381,16 @@ printParseableInterfaceIfNeeded(StringRef outputPath,
   return withOutputFile(diags, outputPath,
                         [M, Opts](raw_ostream &out) -> bool {
     return swift::emitParseableInterface(out, Opts, M);
+  });
+}
+
+static bool printXCTestMethodsIfNeeded(StringRef outputPath, ModuleDecl *M) {
+  if (outputPath.empty())
+    return false;
+
+  return withOutputFile(M->getDiags(), outputPath,
+                        [&](raw_ostream &out) -> bool {
+    return swift::emitXCTestMethods(out, M);
   });
 }
 
@@ -942,6 +953,12 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
 
   {
     hadAnyError |= writeTBDIfNeeded(Invocation, Instance);
+  }
+
+  if (opts.InputsAndOutputs.hasXCTestMethodsFilePath()) {
+    hadAnyError |= printXCTestMethodsIfNeeded(
+        Invocation.getXCTestMethodsFilePathForWholeModule(),
+        Instance.getMainModule());
   }
 
   return hadAnyError;

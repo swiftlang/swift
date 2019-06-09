@@ -124,6 +124,15 @@ CompilerInvocation::getParseableInterfaceOutputPathForWholeModule() const {
       .SupplementaryOutputs.ParseableInterfaceOutputPath;
 }
 
+std::string
+CompilerInvocation::getXCTestMethodsFilePathForWholeModule() const {
+  assert(getFrontendOptions().InputsAndOutputs.isWholeModule() &&
+         "XCTestMethodsFilePath only makes sense when the whole module "
+         "can be seen");
+  return getPrimarySpecificPathsForAtMostOnePrimary()
+  .SupplementaryOutputs.XCTestMethodsFilePath;
+}
+
 SerializationOptions CompilerInvocation::computeSerializationOptions(
     const SupplementaryOutputPaths &outs, bool moduleIsPublic) {
   const FrontendOptions &opts = getFrontendOptions();

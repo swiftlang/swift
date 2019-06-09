@@ -1523,7 +1523,8 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
   } else if (Args.hasArg(options::OPT_emit_objc_header,
                          options::OPT_emit_objc_header_path,
                          options::OPT_emit_module_interface,
-                         options::OPT_emit_module_interface_path) &&
+                         options::OPT_emit_module_interface_path,
+                         options::OPT_emit_xctest_methods_path) &&
              OI.CompilerMode != OutputInfo::Mode::SingleCompile) {
     // An option has been passed which requires whole-module knowledge, but we
     // don't have that. Generate a module, but treat it as an intermediate
@@ -1830,6 +1831,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       case file_types::TY_ModuleTrace:
       case file_types::TY_OptRecord:
       case file_types::TY_SwiftParseableInterfaceFile:
+      case file_types::TY_XCTestMethodsFile:
         // We could in theory handle assembly or LLVM input, but let's not.
         // FIXME: What about LTO?
         Diags.diagnose(SourceLoc(), diag::error_unexpected_input_file,
@@ -2539,6 +2541,9 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
                          options::OPT_emit_module_interface_path))
     chooseParseableInterfacePath(C, JA, workingDirectory, Buf, Output.get());
 
+  if (C.getArgs().hasArg(options::OPT_emit_xctest_methods_path))
+    chooseXCTestMethodsPath(C, JA, workingDirectory, Buf, Output.get());
+
   if (C.getArgs().hasArg(options::OPT_update_code) && isa<CompileJobAction>(JA))
     chooseRemappingOutputPath(C, OutputMap, Output.get());
 
@@ -2859,6 +2864,34 @@ void Driver::chooseParseableInterfacePath(Compilation &C, const JobAction *JA,
       file_types::TY_SwiftParseableInterfaceFile,
       /*TreatAsTopLevelOutput*/true, workingDirectory, buffer);
   output->setAdditionalOutputForType(file_types::TY_SwiftParseableInterfaceFile,
+                                     outputPath);
+}
+
+void Driver::chooseXCTestMethodsPath(Compilation &C, const JobAction *JA,
+                                          StringRef workingDirectory,
+                                          llvm::SmallString<128> &buffer,
+                                          CommandOutput *output) const {
+  switch (C.getOutputInfo().CompilerMode) {
+  case OutputInfo::Mode::StandardCompile:
+  case OutputInfo::Mode::BatchModeCompile:
+    if (!isa<MergeModuleJobAction>(JA))
+      return;
+    break;
+  case OutputInfo::Mode::SingleCompile:
+    if (!isa<CompileJobAction>(JA))
+      return;
+    break;
+  case OutputInfo::Mode::Immediate:
+  case OutputInfo::Mode::REPL:
+    llvm_unreachable("these modes aren't usable with 'swiftc'");
+  }
+
+  StringRef outputPath = *getOutputFilenameFromPathArgOrAsTopLevel(
+      C.getOutputInfo(), C.getArgs(),
+      options::OPT_emit_xctest_methods_path,
+      file_types::TY_XCTestMethodsFile,
+      /*TreatAsTopLevelOutput*/true, workingDirectory, buffer);
+  output->setAdditionalOutputForType(file_types::TY_XCTestMethodsFile,
                                      outputPath);
 }
 

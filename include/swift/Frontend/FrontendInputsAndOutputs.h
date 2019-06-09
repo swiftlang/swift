@@ -236,6 +236,7 @@ public:
   bool hasModuleOutputPath() const;
   bool hasModuleDocOutputPath() const;
   bool hasParseableInterfaceOutputPath() const;
+  bool hasXCTestMethodsFilePath() const;
   bool hasTBDPath() const;
 
   bool hasDependencyTrackerPath() const;

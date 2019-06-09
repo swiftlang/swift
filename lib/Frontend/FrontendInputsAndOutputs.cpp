@@ -441,6 +441,12 @@ bool FrontendInputsAndOutputs::hasParseableInterfaceOutputPath() const {
         return outs.ParseableInterfaceOutputPath;
       });
 }
+bool FrontendInputsAndOutputs::hasXCTestMethodsFilePath() const {
+  return hasSupplementaryOutputPath(
+      [](const SupplementaryOutputPaths &outs) -> const std::string & {
+    return outs.XCTestMethodsFilePath;
+  });
+}
 bool FrontendInputsAndOutputs::hasTBDPath() const {
   return hasSupplementaryOutputPath(
       [](const SupplementaryOutputPaths &outs) -> const std::string & {

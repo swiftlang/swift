@@ -10,7 +10,8 @@ add_swift_host_library(swiftFrontend STATIC
   ParseableInterfaceModuleLoader.cpp
   ParseableInterfaceSupport.cpp
   PrintingDiagnosticConsumer.cpp
-  SerializedDiagnosticConsumer.cpp)
+  SerializedDiagnosticConsumer.cpp
+  XCTestMethodsEmitter.cpp)
 add_dependencies(swiftFrontend
   SwiftOptions)
 target_link_libraries(swiftFrontend PRIVATE

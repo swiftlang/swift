@@ -348,6 +348,9 @@ public:
   /// fail an assert if not in that mode.
   std::string getParseableInterfaceOutputPathForWholeModule() const;
 
+  /// The current implementation requires the whole module.
+  std::string getXCTestMethodsFilePathForWholeModule() const;
+
   SerializationOptions
   computeSerializationOptions(const SupplementaryOutputPaths &outs,
                               bool moduleIsPublic);

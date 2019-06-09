@@ -124,6 +124,18 @@ struct SupplementaryOutputPaths {
   /// \sa swift::emitParseableInterface
   std::string ParseableInterfaceOutputPath;
 
+  /// The path to which we should emit XCTest test methods in JSON format.
+  ///
+  /// This is useful for build systems to generate entry point for corelibs-xctest
+  /// that is used on Linux. Eventually, this can be removed once we have runtime
+  /// reflection support on Linux.
+  ///
+  /// While it is possible to emit this on a per-file basis, the current implementation only
+  /// works for the whole-module.
+  ///
+  /// \sa swift::emitXCTestMethods
+  std::string XCTestMethodsFilePath;
+
   SupplementaryOutputPaths() = default;
   SupplementaryOutputPaths(const SupplementaryOutputPaths &) = default;
 
@@ -132,7 +144,8 @@ struct SupplementaryOutputPaths {
            ModuleDocOutputPath.empty() && DependenciesFilePath.empty() &&
            ReferenceDependenciesFilePath.empty() &&
            SerializedDiagnosticsPath.empty() && LoadedModuleTracePath.empty() &&
-           TBDPath.empty() && ParseableInterfaceOutputPath.empty();
+           TBDPath.empty() && ParseableInterfaceOutputPath.empty() &&
+           XCTestMethodsFilePath.empty();
   }
 };
 } // namespace swift

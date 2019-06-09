@@ -508,6 +508,7 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
   case file_types::TY_TBD:
   case file_types::TY_OptRecord:
   case file_types::TY_SwiftParseableInterfaceFile:
+  case file_types::TY_XCTestMethodsFile:
     llvm_unreachable("Output type can never be primary output.");
   case file_types::TY_INVALID:
     llvm_unreachable("Invalid type ID");
@@ -639,6 +640,9 @@ void ToolChain::JobContext::addFrontendSupplementaryOutputArguments(
                    "-emit-loaded-module-trace-path");
   addOutputsOfType(arguments, Output, Args, file_types::TY_TBD,
                    "-emit-tbd-path");
+  addOutputsOfType(arguments, Output, Args,
+                   file_types::ID::TY_XCTestMethodsFile,
+                   "-emit-xctest-methods-path");
 }
 
 ToolChain::InvocationInfo
@@ -747,6 +751,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_ModuleTrace:
     case file_types::TY_OptRecord:
     case file_types::TY_SwiftParseableInterfaceFile:
+    case file_types::TY_XCTestMethodsFile:
       llvm_unreachable("Output type can never be primary output.");
     case file_types::TY_INVALID:
       llvm_unreachable("Invalid type ID");
@@ -887,6 +892,9 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
   addOutputsOfType(Arguments, context.Output, context.Args,
                    file_types::ID::TY_SwiftParseableInterfaceFile,
                    "-emit-parseable-module-interface-path");
+  addOutputsOfType(Arguments, context.Output, context.Args,
+                   file_types::ID::TY_XCTestMethodsFile,
+                   "-emit-xctest-methods-path");
   addOutputsOfType(Arguments, context.Output, context.Args,
                    file_types::TY_SerializedDiagnostics,
                    "-serialize-diagnostics-path");
