@@ -64,7 +64,7 @@ private:
   /// The last scope to "adopt" deferred nodes.
   /// When adding \c Decls to a scope tree that have been created since the tree
   /// was originally built, add them as children of this scope.
-  NullablePtr<ASTScopeImpl> newNodeInjectionPoint;
+  ASTScopeImpl *newNodeInjectionPoint;
 
   /// Catch duplicate nodes in the AST
   /// TODO: better to use a shared pointer? Unique pointer?

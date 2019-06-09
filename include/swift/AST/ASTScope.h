@@ -999,7 +999,6 @@ public:
 
   SourceRange getChildlessSourceRange() const override;
   std::string getClassName() const override;
-  void expandMe(ScopeCreator &) override;
 
 protected:
   void printSpecifics(llvm::raw_ostream &out) const override;
