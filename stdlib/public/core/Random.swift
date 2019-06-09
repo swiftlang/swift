@@ -96,15 +96,9 @@ extension RandomNumberGenerator {
     _precondition(upperBound != 0, "upperBound cannot be zero.")
     var random: T = next()
     var m = random.multipliedFullWidth(by: upperBound)
-    if (m.low < upperBound) {
-      var t = (0 &- upperBound)
-      if (t >= upperBound) {
-        t -= upperBound
-        if (t >= upperBound) {
-          t %= upperBound
-        }
-      }
-      while (m.low < t) {
+    if m.low < upperBound {
+      let t = (0 &- upperBound) % upperBound
+      while m.low < t {
         random = next()
         m = random.multipliedFullWidth(by: upperBound)
       }
