@@ -542,9 +542,10 @@ public:
 
   void visitYieldStmt(YieldStmt *ys, ASTScopeImpl *p,
                       ScopeCreator &scopeCreator) {
-    scopeCreator.pushAllNecessaryNodes(ys->getYields());
-    scopeCreator.createScopesForDeferredNodes(p);
+    for (Expr* e: ys->getYields())
+      visitExpr(e, p, scopeCreator);
   }
+  
   void visitDeferStmt(DeferStmt *ds, ASTScopeImpl *p,
                       ScopeCreator &scopeCreator) {
     visitFuncDecl(ds->getTempDecl(), p, scopeCreator);
