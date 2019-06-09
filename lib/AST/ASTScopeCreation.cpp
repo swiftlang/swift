@@ -74,7 +74,7 @@ private:
 public:
   ScopeCreator(SourceFile *SF)
       : ctx(SF->getASTContext()),
-        sourceFileScope(constructScope<ASTSourceFileScope>(SF, this)),
+        sourceFileScope(constructInContext<ASTSourceFileScope>(SF, this)),
         newNodeInjectionPoint(sourceFileScope),
         _astDuplicates(llvm::DenseSet<void *>()),
         astDuplicates(_astDuplicates.getValue()) {}
@@ -96,9 +96,9 @@ public:
   ScopeCreator &withoutDeferrals() { return *(new (ctx) ScopeCreator(*this)); }
 
 public:
-  template <typename Scope, typename... Args>
-  Scope *constructScope(Args... args) {
-    return new (ctx) Scope(args...);
+  template <typename ClassToConstruct, typename... Args>
+  ClassToConstruct *constructInContext(Args... args) {
+    return new (ctx) ClassToConstruct(args...);
   }
 
   void addAnyNewScopesToTree() {
@@ -197,7 +197,7 @@ public:
   /// expandScope it,
   /// add it as a child of the receiver, and return the child.
   Scope *createSubtree(ASTScopeImpl *parent, Args... args) {
-    auto *child = constructScope<Scope>(args...);
+    auto *child = constructInContext<Scope>(args...);
     parent->addChild(child, ctx);
     child->expandMe(*this);
     return child;
@@ -205,7 +205,7 @@ public:
 
   template <typename Scope, typename Portion, typename... Args>
   ASTScopeImpl *createSubtree2D(ASTScopeImpl *parent, Args... args) {
-    const Portion *portion = new (ctx) Portion();
+    const Portion *portion = constructInContext<Portion>();
     return createSubtree<Scope>(parent, portion, args...);
   }
 
