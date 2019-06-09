@@ -197,12 +197,11 @@ public:
   /// expandScope it,
   /// add it as a child of the receiver, and return the child and the scope to
   /// receive more decls.
-  std::pair<Scope *, Scope *> createSubtree(ASTScopeImpl *parent,
-                                            Args... args) {
+  Scope *createSubtree(ASTScopeImpl *parent, Args... args) {
     auto *child = constructInContext<Scope>(args...);
     parent->addChild(child, ctx);
     NullablePtr<ASTScopeImpl> moreDecls = child->expandMe(*this);
-    return std::make_pair(child, moreDecls ? moreDecls.get() : parent);
+    return moreDecls ? moreDecls.get() : parent;
   }
 
   template <typename Scope, typename Portion, typename... Args>
@@ -646,8 +645,7 @@ void AbstractFunctionDeclScope::expandNonSplittingMe(
     if (!decl->isImplicit()) {
       leaf = scopeCreator.withoutDeferrals()
                  .createSubtree<AbstractFunctionParamsScope>(
-                     leaf, decl->getParameters(), nullptr)
-                 .second;
+                     leaf, decl->getParameters(), nullptr);
     }
   }
   // Create scope for the body.
@@ -692,18 +690,15 @@ PatternEntryDeclScope::expandMe(ScopeCreator &scopeCreator) {
       patternEntry.getInitAsWritten()->getSourceRange().isValid()) {
     auto *initializer = scopeCreator.withoutDeferrals()
                             .createSubtree<PatternEntryInitializerScope>(
-                                this, decl, patternEntryIndex, vis)
-                            .second;
+                                this, decl, patternEntryIndex, vis);
     initializer->cacheSourceRange();
     initializerEnd = initializer->getSourceRange().End;
   }
   // If there are no uses of the declararations, add the accessors immediately.
   // Create unconditionally because more nodes might be added to SourceFile later.
   // Note: the accessors will follow the pattern binding.
-  auto *useScope = scopeCreator
-                       .createSubtree<PatternEntryUseScope>(
-                           this, decl, patternEntryIndex, vis, initializerEnd)
-                       .second;
+  auto *useScope = scopeCreator.createSubtree<PatternEntryUseScope>(
+      this, decl, patternEntryIndex, vis, initializerEnd);
   return useScope;
 }
 
@@ -722,10 +717,8 @@ PatternEntryUseScope::expandMe(ScopeCreator &scopeCreator) {
     scopeCreator.withoutDeferrals().createSubtree<VarDeclScope>(this, var);
   });
   if (!isLastEntry()) {
-    return scopeCreator
-        .createSubtree<PatternEntryDeclScope>(this, decl, patternEntryIndex + 1,
-                                              vis)
-        .second;
+    return scopeCreator.createSubtree<PatternEntryDeclScope>(
+        this, decl, patternEntryIndex + 1, vis);
   } else {
     // no more entries, create the scopes inside the pattern use
     return this;
@@ -737,10 +730,8 @@ ConditionalClauseScope::expandMe(ScopeCreator &scopeCreator) {
   createSubtreeForCondition(scopeCreator);
   // If there's another conditional clause, add it as the child.
   if (index + 1 < enclosingStmt->getCond().size())
-    return scopeCreator
-        .createSubtree<ConditionalClauseScope>(this, enclosingStmt, index + 1,
-                                               stmtAfterAllConditions)
-        .second;
+    return scopeCreator.createSubtree<ConditionalClauseScope>(
+        this, enclosingStmt, index + 1, stmtAfterAllConditions);
   if (auto *sceps = statementConditionElementPatternScope.getPtrOrNull())
     return sceps;
   return this;
@@ -750,10 +741,8 @@ ASTScopeImpl *
 LabeledConditionalStmtScope::createCondScopes(ScopeCreator &scopeCreator) {
   if (getLabeledConditionalStmt()->getCond().empty())
     return this;
-  return scopeCreator.withoutDeferrals()
-      .createSubtree<ConditionalClauseScope>(this, getLabeledConditionalStmt(),
-                                             0, getStmtAfterTheConditions())
-      .second;
+  return scopeCreator.withoutDeferrals().createSubtree<ConditionalClauseScope>(
+      this, getLabeledConditionalStmt(), 0, getStmtAfterTheConditions());
 }
 
 void IfStmtScope::expandNonSplittingMe(ScopeCreator &scopeCreator) {
@@ -780,10 +769,8 @@ NullablePtr<ASTScopeImpl> GuardStmtScope::expandMe(ScopeCreator &scopeCreator) {
   // Parent is whole guard stmt scope, NOT the cond scopes
   scopeCreator.createScopeFor(stmt->getBody(), this);
 
-  return sc
-      .createSubtree<ConditionalClauseUseScope>(this, lookupParent,
-                                                stmt->getEndLoc())
-      .second;
+  return sc.createSubtree<ConditionalClauseUseScope>(this, lookupParent,
+                                                     stmt->getEndLoc());
 }
 
 void RepeatWhileScope::expandNonSplittingMe(ScopeCreator &scopeCreator) {
@@ -894,10 +881,8 @@ void ClosureBodyScope::expandNonSplittingMe(ScopeCreator &scopeCreator) {
       this, closureExpr->getBody());
 }
 
-NullablePtr<ASTScopeImpl>
-TopLevelCodeScope::expandMe(ScopeCreator &scopeCreator) {
-  return scopeCreator.createSubtree<BraceStmtScope>(this, decl->getBody())
-      .second;
+void TopLevelCodeScope::expandNonSplittingMe(ScopeCreator &scopeCreator) {
+  scopeCreator.createSubtree<BraceStmtScope>(this, decl->getBody());
 }
 
 void DefaultArgumentInitializerScope::expandNonSplittingMe(
@@ -1018,8 +1003,7 @@ void ConditionalClauseScope::createSubtreeForCondition(
     statementConditionElementPatternScope =
         scopeCreator.withoutDeferrals()
             .createSubtree<StatementConditionElementPatternScope>(
-                this, cond.getPattern())
-            .second;
+                this, cond.getPattern());
     ASTVisitorForScopeCreation().visitExpr(cond.getInitializer(), this,
                                            scopeCreator.withoutDeferrals());
     return;

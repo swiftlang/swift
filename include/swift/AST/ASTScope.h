@@ -1114,7 +1114,7 @@ public:
       : AbstractClosureScope(closureExpr, captureList) {}
   virtual ~ClosureBodyScope() {}
 
-  NullablePtr<ASTScopeImpl> expandMe(ScopeCreator &) override;
+  void expandNonSplittingMe(ScopeCreator &) override;
   std::string getClassName() const override;
   SourceRange getChildlessSourceRange() const override;
 
@@ -1129,7 +1129,7 @@ public:
   TopLevelCodeScope(TopLevelCodeDecl *e) : decl(e) {}
   virtual ~TopLevelCodeScope() {}
 
-  NullablePtr<ASTScopeImpl> expandMe(ScopeCreator &) override;
+  void expandNonSplittingMe(ScopeCreator &) override;
   std::string getClassName() const override;
   SourceRange getChildlessSourceRange() const override;
   virtual NullablePtr<DeclContext> getDeclContext() const override {
