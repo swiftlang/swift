@@ -55,10 +55,6 @@ void ASTScope::dumpOneScopeMapLocation(
 
 #pragma mark ASTScopeImpl
 
-unsigned ASTScopeImpl::depth() const {
-  return getParent() ? 1 + getParent().get()->depth() : 0;
-}
-
 
 const PatternBindingEntry &AbstractPatternEntryScope::getPatternEntry() const {
   return decl->getPatternList()[patternEntryIndex];

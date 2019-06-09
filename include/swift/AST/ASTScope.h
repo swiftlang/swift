@@ -257,14 +257,13 @@ public:
 
 #pragma mark - - creation queries
 protected:
+  /// In other words, does this scope introduce a new definition
   bool areDeferredNodesInANewScope() const {
     // After an abstract storage decl, what was declared is now accessible.
     return isThisAnAbstractStorageDecl();
   }
 public:
   virtual bool isThisAnAbstractStorageDecl() const { return false; }
-
-  unsigned depth() const;
 
 #pragma mark - lookup
 
@@ -1000,6 +999,7 @@ public:
 
   SourceRange getChildlessSourceRange() const override;
   std::string getClassName() const override;
+  void expandMe(ScopeCreator &) override;
 
 protected:
   void printSpecifics(llvm::raw_ostream &out) const override;

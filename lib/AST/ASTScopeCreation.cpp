@@ -64,8 +64,7 @@ private:
   /// The last scope to "adopt" deferred nodes.
   /// When adding \c Decls to a scope tree that have been created since the tree
   /// was originally built, add them as children of this scope.
-  ASTScopeImpl *_lastAdopter;
-  ASTScopeImpl *&lastAdopter;
+  NullablePtr<ASTScopeImpl> newNodeInjectionPoint;
 
   /// Catch duplicate nodes in the AST
   /// TODO: better to use a shared pointer? Unique pointer?
@@ -76,15 +75,13 @@ public:
   ScopeCreator(SourceFile *SF)
       : ctx(SF->getASTContext()),
         sourceFileScope(constructScope<ASTSourceFileScope>(SF, this)),
-        _lastAdopter(sourceFileScope),
-        lastAdopter(_lastAdopter),
-        _astDuplicates(llvm::DenseSet<void*>()),
+        newNodeInjectionPoint(sourceFileScope),
+        _astDuplicates(llvm::DenseSet<void *>()),
         astDuplicates(_astDuplicates.getValue()) {}
 
 private:
   explicit ScopeCreator(ScopeCreator &sc)
       : ctx(sc.ctx), sourceFileScope(sc.sourceFileScope),
-        lastAdopter(sc.lastAdopter),
         astDuplicates(sc.astDuplicates) {}
 
 public:
@@ -108,10 +105,10 @@ public:
     pushSourceFileDecls(sourceFileScope->SF->Decls);
     if (!haveDeferredNodes())
       return; // an optimization
-    auto *const injectionPoint = lastAdopter;
-    lastAdopter->clearCachedSourceRangesOfMeAndAncestors();
-    createScopesForDeferredNodes(lastAdopter);
-    injectionPoint->cacheSourceRangesOfSlice();
+    newNodeInjectionPoint->clearCachedSourceRangesOfMeAndAncestors();
+    auto *const sourceRangeFixupPoint = newNodeInjectionPoint;
+    createScopesForDeferredNodes(newNodeInjectionPoint);
+    sourceRangeFixupPoint->cacheSourceRangesOfSlice();
   }
 
 public:
@@ -120,7 +117,9 @@ public:
   /// Since nodes added to the source file in the future need to go where
   /// deferred ndoes go, remember me as an adopter, too.
   void createScopesForDeferredNodes(ASTScopeImpl *parent) {
-    setLastAdopter(parent); // in case we come back here later after adding
+    // If a scope is a home for the deferred nodes,
+    // it's also the place to add
+    setNewNodeInjectionPoint(parent);
     // more Decls to the SourceFile
     while (haveDeferredNodes()) {
       Optional<ASTNode> node = popNextDeferredNodeForAdoptionBy(parent);
@@ -201,7 +200,6 @@ public:
     auto *child = constructScope<Scope>(args...);
     parent->addChild(child, ctx);
     child->expandMe(*this);
-    createScopesForDeferredNodes(child);
     return child;
   }
 
@@ -338,7 +336,6 @@ public:
 
 private:
   ASTNode popNextDeferredNodeForAdoptionBy(ASTScopeImpl *s) {
-    setLastAdopter(s);
     auto f = deferredNodesInReverse.back();
     deferredNodesInReverse.pop_back();
     return f;
@@ -348,26 +345,10 @@ private:
   // after the parser has added more decls to the source file,
   // we can resume building the scope tree where we left off.
 
-  void setLastAdopter(ASTScopeImpl *s) {
+  void setNewNodeInjectionPoint(ASTScopeImpl *s) {
     // We get here for any scope that wants to add a deferred node as a child.
     // But after creating a deeper node that has registered as last adopter,
-    // an ancestor node might try to get more deferred nodes. So,
-    // only set it for a deeper node.
-    // If scope construction gets called later on for the same SourceFile,
-    // we'll always want to add scopes to the deepest adopter.
-    if (lastAdopter == s)
-      return; // optimization
-#if !-defined(NDEBUG) && 0
-    auto &out = llvm::errs();
-    out << "Attempting to setLastAdopter: ";
-    s->print(out, 0, false, false);
-    if (lastAdopter->depth() > s->depth()) {
-      out << "  Ignored in favor of: ";
-      lastAdopter->print(out, 0, false, false);
-    }
-#endif
-    if (lastAdopter->depth() <= s->depth())
-      lastAdopter = s;
+    newNodeInjectionPoint = s;
   }
 
 public:
@@ -542,10 +523,10 @@ public:
 
   void visitYieldStmt(YieldStmt *ys, ASTScopeImpl *p,
                       ScopeCreator &scopeCreator) {
-    for (Expr* e: ys->getYields())
+    for (Expr *e : ys->getYields())
       visitExpr(e, p, scopeCreator);
   }
-  
+
   void visitDeferStmt(DeferStmt *ds, ASTScopeImpl *p,
                       ScopeCreator &scopeCreator) {
     visitFuncDecl(ds->getTempDecl(), p, scopeCreator);
@@ -758,11 +739,13 @@ void WhileStmtScope::expandMe(ScopeCreator &scopeCreator) {
 void GuardStmtScope::expandMe(ScopeCreator &scopeCreator) {
   auto &sc = scopeCreator.withoutDeferrals();
   ASTScopeImpl *lookupParent = createCondScopes(sc);
+  // Add a child for the 'guard' body, which always exits.
+  // Parent is whole guard stmt scope, NOT the cond scopes
+  scopeCreator.createScopeFor(stmt->getBody(), this);
 
   auto *use = sc.createSubtree<ConditionalClauseUseScope>(this, lookupParent,
                                                           stmt->getEndLoc());
-  // Add a child for the 'guard' body, which always exits.
-  scopeCreator.createScopeFor(stmt->getBody(), use);
+  scopeCreator.createScopesForDeferredNodes(use);
 }
 
 void RepeatWhileScope::expandMe(ScopeCreator &scopeCreator) {
