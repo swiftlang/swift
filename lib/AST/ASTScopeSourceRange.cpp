@@ -471,7 +471,7 @@ void ASTScopeImpl::widenSourceRangeForIgnoredASTNode(const ASTNode n) {
   // Doing the default here would cause a pattern initializer scope's range
   // to overlap the pattern use scope's range.
 
-  if (AbstractPatternEntryScope::isCreatedDirectly(n))
+  if (PatternEntryDeclScope::isHandledSpecially(n))
     return;
 
   SourceRange r = getEffectiveSourceRange(n);

@@ -204,6 +204,11 @@ private:
   // identifer within one of them. So, find the real source range of them here.
   SourceRange getEffectiveSourceRange(ASTNode) const;
 
+  /// Since source ranges are cached but depend on child ranges,
+  /// when descendants are added, my and my ancestor ranges must be
+  /// recalculated.
+  void ensureSourceRangesAreCorrectWhenAddingDescendants(function_ref<void()>);
+
 public: // public for debugging
   virtual SourceRange getChildlessSourceRange() const = 0;
 
@@ -253,7 +258,7 @@ public:
   // contribute to widenSourceRangeForIgnoredASTNode.
   // Closures and captures are also created directly but are
   // screened out because they are expressions.
-  static bool isCreatedDirectly(const ASTNode n);
+  static bool isHandledSpeciallyByPatterns(const ASTNode n);
 
   virtual NullablePtr<AbstractStorageDecl>
   getEnclosingAbstractStorageDecl() const;
@@ -261,8 +266,9 @@ public:
 #pragma mark - - creation queries
 protected:
   /// In other words, does this scope introduce a new definition
-  bool areDeferredNodesInANewScope() const {
-    // After an abstract storage decl, what was declared is now accessible.
+  bool doISplitAScope() const {
+    // Before an abstract storage decl, the decl is inaccessible.
+    // After an abstract storage decl, it is now accessible.
     return isThisAnAbstractStorageDecl();
   }
 public:
@@ -403,6 +409,11 @@ public:
   SourceFile *const SF;
   ScopeCreator *const scopeCreator;
 
+  /// The number of \c Decls in the \c SourceFile that were already seen.
+  /// Since parsing can be interleaved with type-checking, on every
+  /// lookup, look at creating scopes for any \c Decls beyond this number.
+  int numberOfDeclsAlreadySeen = 0;
+
   ASTSourceFileScope(SourceFile *SF, ScopeCreator *scopeCreator)
       : SF(SF), scopeCreator(scopeCreator) {}
 
@@ -417,11 +428,13 @@ public:
     return NullablePtr<DeclContext>(SF);
   }
 
+  void addNewDeclsToTree();
+
   const SourceFile *getSourceFile() const override;
   NullablePtr<const void> addressForPrinting() const override { return SF; }
 
 protected:
-  NullablePtr<ASTScopeImpl> expandMe(ScopeCreator &) override;
+  void expandNonSplittingMe(ScopeCreator &) override;
   };
 
   class Portion {
@@ -602,8 +615,8 @@ public:
   NullablePtr<const ASTScopeImpl> getLookupLimitForDecl() const override;
 
   void createBodyScope(ASTScopeImpl *leaf, ScopeCreator &) override;
-  ASTScopeImpl *createTrailingWhereClauseScope(ASTScopeImpl *parent,
-                                               ScopeCreator &) override;
+  void createTrailingWhereClauseScope(ASTScopeImpl *parent,
+                                      ScopeCreator &) override;
 };
 
 class ExtensionScope final : public IterableTypeScope {
@@ -620,8 +633,8 @@ public:
   NullablePtr<NominalTypeDecl> getCorrespondingNominalTypeDecl() const override;
   std::string declKindName() const override { return "Extension"; }
   SourceRange getBraces() const override;
-  ASTScopeImpl *createTrailingWhereClauseScope(ASTScopeImpl *parent,
-                                               ScopeCreator &) override;
+  void createTrailingWhereClauseScope(ASTScopeImpl *parent,
+                                      ScopeCreator &) override;
   void createBodyScope(ASTScopeImpl *leaf, ScopeCreator &) override;
   NullablePtr<Decl> getDecl() const override { return decl; }
 };
@@ -634,8 +647,8 @@ public:
   virtual ~TypeAliasScope() {}
 
   std::string declKindName() const override { return "TypeAlias"; }
-  ASTScopeImpl *createTrailingWhereClauseScope(ASTScopeImpl *parent,
-                                               ScopeCreator &) override;
+  void createTrailingWhereClauseScope(ASTScopeImpl *parent,
+                                      ScopeCreator &) override;
   GenericContext *getGenericContext() const override { return decl; }
   NullablePtr<Decl> getDecl() const override { return decl; }
 };
@@ -893,6 +906,8 @@ public:
   NullablePtr<ASTScopeImpl> expandMe(ScopeCreator &) override;
   std::string getClassName() const override;
   SourceRange getChildlessSourceRange() const override;
+
+  static bool isHandledSpecially(const ASTNode n);
 };
 
 class PatternEntryInitializerScope final : public AbstractPatternEntryScope {
@@ -952,9 +967,6 @@ public:
   /// The statement after the conditions: body or then.
   Stmt *const stmtAfterAllConditions;
 
-  /// The next deepest, if any
-  NullablePtr<ConditionalClauseScope> nextConditionalClause;
-
   NullablePtr<StatementConditionElementPatternScope>
       statementConditionElementPatternScope;
 
@@ -976,10 +988,6 @@ public:
   }
   void createSubtreeForCondition(ScopeCreator &);
   SourceLoc startLocAccordingToCondition() const;
-
-  ASTScopeImpl *findInnermostConditionScope();
-
-  ConditionalClauseScope *findDeepestConditionalClauseScope();
 
   NullablePtr<StatementConditionElementPatternScope>
   getStatementConditionElementPatternScope() const;
