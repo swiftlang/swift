@@ -293,7 +293,7 @@ ValueOwnershipKind ValueOwnershipKindClassifier::visitSILFunctionArgument(
 // This is a forwarding instruction through only one of its arguments.
 ValueOwnershipKind
 ValueOwnershipKindClassifier::visitMarkDependenceInst(MarkDependenceInst *MDI) {
-  return MDI->getValue().getOwnershipKind();
+  return MDI->getOwnershipKind();
 }
 
 ValueOwnershipKind ValueOwnershipKindClassifier::visitApplyInst(ApplyInst *ai) {

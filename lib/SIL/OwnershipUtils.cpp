@@ -44,6 +44,7 @@ bool swift::isOwnershipForwardingValueKind(SILNodeKind kind) {
   case SILNodeKind::CondBranchInst:
   case SILNodeKind::DestructureStructInst:
   case SILNodeKind::DestructureTupleInst:
+  case SILNodeKind::MarkDependenceInst:
     return true;
   default:
     return false;
