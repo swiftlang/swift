@@ -26,4 +26,5 @@ DECLARE_SWIFT_SECTION(swift5_reflstr)
 DECLARE_SWIFT_SECTION(swift5_fieldmd)
 DECLARE_SWIFT_SECTION(swift5_assocty)
 DECLARE_SWIFT_SECTION(swift5_replace)
+DECLARE_SWIFT_SECTION(swift5_replac2)
 }
