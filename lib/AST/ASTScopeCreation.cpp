@@ -38,7 +38,7 @@ namespace ast_scope {
 
 #pragma mark ScopeCreator
 
-class ScopeCreator {
+class ScopeCreator final {
   /// For allocating scopes.
   ASTContext &ctx;
 

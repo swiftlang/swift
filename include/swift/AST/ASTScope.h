@@ -579,7 +579,7 @@ public:
   bool doesDeclHaveABody() const override;
 };
 
-class NominalTypeScope : public IterableTypeScope {
+class NominalTypeScope final : public IterableTypeScope {
 public:
   NominalTypeDecl *decl;
   NominalTypeScope(const Portion *p, NominalTypeDecl *e)
@@ -625,7 +625,7 @@ public:
   NullablePtr<Decl> getDecl() const override { return decl; }
 };
 
-class TypeAliasScope : public GenericTypeOrExtensionScope {
+class TypeAliasScope final : public GenericTypeOrExtensionScope {
 public:
   TypeAliasDecl *const decl;
   TypeAliasScope(const Portion *p, TypeAliasDecl *e)
@@ -697,7 +697,7 @@ protected:
 };
 
 /// Concrete class for a function/initializer/deinitializer
-class AbstractFunctionDeclScope : public ASTScopeImpl {
+class AbstractFunctionDeclScope final : public ASTScopeImpl {
 public:
   AbstractFunctionDecl *const decl;
   AbstractFunctionDeclScope(AbstractFunctionDecl *e) : decl(e) {}
@@ -823,7 +823,7 @@ protected:
 // Lookup has to be able to find the use of WrapperWithInitialValue, that's what
 // this scope is for. Because the source positions are screwy.
 
-class AttachedPropertyWrapperScope : public ASTScopeImpl {
+class AttachedPropertyWrapperScope final : public ASTScopeImpl {
 public:
   VarDecl *const decl;
 
@@ -941,7 +941,7 @@ protected:
 /// statement.
 /// Since there may be more than one "let foo = ..." in (e.g.) an "if",
 /// we allocate a matrushka of these.
-class ConditionalClauseScope : public ASTScopeImpl {
+class ConditionalClauseScope final : public ASTScopeImpl {
 public:
   LabeledConditionalStmt *const enclosingStmt;
 
@@ -989,7 +989,7 @@ public:
 /// later part of the statement, (then, body, or after the guard) circumvents
 /// the normal lookup rule to pass the lookup scope into the deepest conditional
 /// clause.
-class ConditionalClauseUseScope : public ASTScopeImpl {
+class ConditionalClauseUseScope final : public ASTScopeImpl {
   ASTScopeImpl *const lookupParent;
   const SourceLoc startLoc;
 
@@ -1015,7 +1015,7 @@ protected:
 /// We need to be able to lookup either a and the second a must not bind to the
 /// first one. This scope represents the scope of the variable being
 /// initialized.
-class StatementConditionElementPatternScope : public ASTScopeImpl {
+class StatementConditionElementPatternScope final : public ASTScopeImpl {
 public:
   Pattern *const pattern;
   StatementConditionElementPatternScope(Pattern *e) : pattern(e) {}
@@ -1039,7 +1039,7 @@ protected:
 /// Capture lists may contain initializer expressions
 /// No local bindings here (other than closures in initializers);
 /// rather include these in the params or body local bindings
-class CaptureListScope : public ASTScopeImpl {
+class CaptureListScope final : public ASTScopeImpl {
 public:
   CaptureListExpr *const expr;
   CaptureListScope(CaptureListExpr *e) : expr(e) {}
@@ -1241,7 +1241,7 @@ protected:
   virtual Stmt *getStmtAfterTheConditions() const = 0;
 };
 
-class IfStmtScope : public LabeledConditionalStmtScope {
+class IfStmtScope final : public LabeledConditionalStmtScope {
 public:
   IfStmt *const stmt;
   IfStmtScope(IfStmt *e) : stmt(e) {}
@@ -1255,7 +1255,7 @@ protected:
   Stmt *getStmtAfterTheConditions() const override;
 };
 
-class WhileStmtScope : public LabeledConditionalStmtScope {
+class WhileStmtScope final : public LabeledConditionalStmtScope {
 public:
   WhileStmt *const stmt;
   WhileStmtScope(WhileStmt *e) : stmt(e) {}
@@ -1269,7 +1269,7 @@ protected:
   Stmt *getStmtAfterTheConditions() const override;
 };
 
-class GuardStmtScope : public LabeledConditionalStmtScope {
+class GuardStmtScope final : public LabeledConditionalStmtScope {
 public:
   GuardStmt *const stmt;
   GuardStmtScope(GuardStmt *e) : stmt(e) {}
@@ -1283,7 +1283,7 @@ protected:
   Stmt *getStmtAfterTheConditions() const override;
 };
 
-class RepeatWhileScope : public AbstractStmtScope {
+class RepeatWhileScope final : public AbstractStmtScope {
 public:
   RepeatWhileStmt *const stmt;
   RepeatWhileScope(RepeatWhileStmt *e) : stmt(e) {}
@@ -1294,7 +1294,7 @@ public:
   Stmt *getStmt() const override { return stmt; }
 };
 
-class DoCatchStmtScope : public AbstractStmtScope {
+class DoCatchStmtScope final : public AbstractStmtScope {
 public:
   DoCatchStmt *const stmt;
   DoCatchStmtScope(DoCatchStmt *e) : stmt(e) {}
@@ -1305,7 +1305,7 @@ public:
   Stmt *getStmt() const override { return stmt; }
 };
 
-class SwitchStmtScope : public AbstractStmtScope {
+class SwitchStmtScope final : public AbstractStmtScope {
 public:
   SwitchStmt *const stmt;
   SwitchStmtScope(SwitchStmt *e) : stmt(e) {}
@@ -1316,7 +1316,7 @@ public:
   Stmt *getStmt() const override { return stmt; }
 };
 
-class ForEachStmtScope : public AbstractStmtScope {
+class ForEachStmtScope final : public AbstractStmtScope {
 public:
   ForEachStmt *const stmt;
   ForEachStmtScope(ForEachStmt *e) : stmt(e) {}
@@ -1327,7 +1327,7 @@ public:
   Stmt *getStmt() const override { return stmt; }
 };
 
-class ForEachPatternScope : public AbstractStmtScope {
+class ForEachPatternScope final : public AbstractStmtScope {
 public:
   ForEachStmt *const stmt;
   ForEachPatternScope(ForEachStmt *e) : stmt(e) {}
@@ -1342,7 +1342,7 @@ protected:
   bool lookupLocalBindings(Optional<bool>, DeclConsumer) const override;
 };
 
-class CatchStmtScope : public AbstractStmtScope {
+class CatchStmtScope final : public AbstractStmtScope {
 public:
   CatchStmt *const stmt;
   CatchStmtScope(CatchStmt *e) : stmt(e) {}
@@ -1358,7 +1358,7 @@ protected:
                            ASTScopeImpl::DeclConsumer) const override;
 };
 
-class CaseStmtScope : public AbstractStmtScope {
+class CaseStmtScope final : public AbstractStmtScope {
 public:
   CaseStmt *const stmt;
   CaseStmtScope(CaseStmt *e) : stmt(e) {}
@@ -1374,7 +1374,7 @@ protected:
                            ASTScopeImpl::DeclConsumer) const override;
 };
 
-class BraceStmtScope : public AbstractStmtScope {
+class BraceStmtScope final : public AbstractStmtScope {
 public:
   BraceStmt *const stmt;
   BraceStmtScope(BraceStmt *e) : stmt(e) {}
