@@ -449,20 +449,6 @@ static bool findNonMembers(TypeChecker &TC,
   return AllDeclRefs;
 }
 
-/// Whether we should be looking at the outer results for a function called \c
-/// name.
-///
-/// This is very restrictive because it's a source compatibility issue (see the
-/// if (AllConditionalConformances) { (void)findNonMembers(...); } below).
-static bool shouldConsiderOuterResultsFor(DeclName name) {
-  const StringRef specialNames[] = {"min", "max"};
-  for (auto specialName : specialNames)
-    if (name.isSimpleName(specialName))
-      return true;
-
-  return false;
-}
-
 /// Bind an UnresolvedDeclRefExpr by performing name lookup and
 /// returning the resultant expression. Context is the DeclContext used
 /// for the lookup.
@@ -473,11 +459,10 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
   SourceLoc Loc = UDRE->getLoc();
 
   // Perform standard value name lookup.
-  NameLookupOptions lookupOptions = defaultUnqualifiedLookupOptions;
+  NameLookupOptions lookupOptions =
+      defaultUnqualifiedLookupOptions | NameLookupFlags::IncludeOuterResults;
   if (isa<AbstractFunctionDecl>(DC))
     lookupOptions |= NameLookupFlags::KnownPrivate;
-  if (shouldConsiderOuterResultsFor(Name))
-    lookupOptions |= NameLookupFlags::IncludeOuterResults;
 
   auto Lookup = lookupUnqualified(DC, Name, Loc, lookupOptions);
 
@@ -762,22 +747,11 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
                                            /*Implicit=*/true);
     }
 
-    // We *might* include any non-members that we found in outer contexts in
-    // some special cases, for backwards compatibility: first, we have to be
-    // looking for one of the special names
-    // ('shouldConsiderOuterResultsFor(Name)'), and second, all of the inner
-    // results need to come from conditional conformances. The second condition
-    // is how the problem here was encountered: a type ('Range') was made to
-    // conditionally conform to a new protocol ('Sequence'), which introduced
-    // some extra methods ('min' and 'max') that shadowed global functions that
-    // people regularly called within extensions to that type (usually adding
-    // 'clamp').
+    // Include any non-members that we found in outer contexts.
     llvm::SmallVector<ValueDecl *, 4> outerAlternatives;
-    if (AllConditionalConformances) {
-      (void)findNonMembers(*this, Lookup.outerResults(), UDRE->getRefKind(),
-                           /*breakOnMember=*/false, outerAlternatives,
-                           /*isValid=*/[&](ValueDecl *) { return true; });
-    }
+    (void)findNonMembers(*this, Lookup.outerResults(), UDRE->getRefKind(),
+                         /*breakOnMember=*/false, outerAlternatives,
+                         /*isValid=*/[&](ValueDecl *) { return true; });
 
     // Otherwise, form an UnresolvedDotExpr and sema will resolve it based on
     // type information.

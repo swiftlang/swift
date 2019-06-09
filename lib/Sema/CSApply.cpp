@@ -2660,10 +2660,7 @@ namespace {
         //
         // The only way to get here is via an UnresolvedDotExpr with outer
         // alternatives.
-        auto UDE = cast<UnresolvedDotExpr>(expr);
-        cs.diagnoseDeprecatedConditionalConformanceOuterAccess(
-            UDE, selected.choice.getDecl());
-
+        assert(isa<UnresolvedDotExpr>(expr));
         return buildDeclRef(selected.choice, nameLoc, selected.openedFullType,
                             memberLocator, implicit,
                             selected.choice.getFunctionRefKind(),

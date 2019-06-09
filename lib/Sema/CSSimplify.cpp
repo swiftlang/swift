@@ -4604,16 +4604,16 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
         [&](unsigned, const OverloadChoice &choice) {
           return fixMemberRef(*this, baseTy, member, choice, locator);
         });
+  }
 
-    if (!outerAlternatives.empty()) {
-      // If local scope has a single choice,
-      // it should always be preferred.
-      if (candidates.size() == 1)
-        candidates.front()->setFavored();
+  if (!outerAlternatives.empty()) {
+    // If local scope has a single choice,
+    // it should always be preferred.
+    if (candidates.size() == 1)
+      candidates.front()->setFavored();
 
-      generateConstraints(candidates, memberTy, outerAlternatives,
-                          useDC, locator);
-    }
+    generateConstraints(candidates, memberTy, outerAlternatives,
+                        useDC, locator);
   }
 
   if (!result.UnviableCandidates.empty()) {
