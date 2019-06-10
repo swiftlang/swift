@@ -1,3 +1,5 @@
+// REQUIRES: objc_interop
+
 // RUN: %target-typecheck-verify-swift -enable-objc-interop -import-objc-header %S/Inputs/diag_ownership_incompatibility.h
 
 class C {
