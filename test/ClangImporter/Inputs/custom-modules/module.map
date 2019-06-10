@@ -229,3 +229,7 @@ module ConditionallyFoo {
 module ForwardDeclarationsHelper {
   header "ForwardDeclarationsHelper.h"
 }
+
+module CXXInterop {
+  header "cxx_interop.h"
+}

@@ -3162,6 +3162,12 @@ namespace {
 
       // Create the struct declaration and record it.
       auto name = importedName.getDeclName().getBaseIdentifier();
+      {
+        // Hack for nested types (They produce cycles)...
+        auto Known = Impl.ImportedDecls.find({decl->getCanonicalDecl(), getVersion()});
+        if (Known != Impl.ImportedDecls.end())
+           return Known->second;
+      }
       auto result = Impl.createDeclWithClangNode<StructDecl>(decl,
                                  AccessLevel::Public,
                                  Impl.importSourceLoc(decl->getBeginLoc()),
@@ -8066,7 +8072,7 @@ ClangImporter::Implementation::importDeclContextOf(
   switch (context.getKind()) {
   case EffectiveClangContext::DeclContext: {
     auto dc = context.getAsDeclContext();
-    if (dc->isTranslationUnit()) {
+    if (dc->isFileContext()) {
       if (auto *module = getClangModuleForDecl(decl))
         return module;
       else
