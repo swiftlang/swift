@@ -25,7 +25,10 @@
 
 setlocal enableextensions enabledelayedexpansion
 
-set icu_version=63_1
+set icu_version_major=64
+set icu_version_minor=2
+set icu_version=%icu_version_major%_%icu_version_minor%
+set icu_version_dotted=%icu_version_major%.%icu_version_minor%
 
 set "exitOnError=|| (exit /b)"
 set current_directory=%~dp0
@@ -92,7 +95,7 @@ endlocal
 setlocal enableextensions enabledelayedexpansion
 
 set file_name=icu4c-%icu_version%-Win64-MSVC2017.zip
-curl -L -O -z %file_name% "http://download.icu-project.org/files/icu4c/63.1/%file_name%" %exitOnError%
+curl -L -O -z %file_name% "http://download.icu-project.org/files/icu4c/%icu_version_dotted%/%file_name%" %exitOnError%
 :: unzip warns about the paths in the zip using slashes, which raises the
 :: errorLevel to 1. We cannot use exitOnError, and have to ignore errors.
 unzip -o %file_name% -d "%source_root%\icu-%icu_version%"
