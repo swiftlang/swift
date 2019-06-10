@@ -4727,7 +4727,7 @@ public:
         return nullptr;
       }
       
-    } else {
+    } else { // TODO: Handle generic func type
       GenericSignatureID rawGenericSig;
       decls_block::GenericFunctionTypeLayout::readRecord(scratch,
                                                          resultID,

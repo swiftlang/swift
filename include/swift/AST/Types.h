@@ -1756,6 +1756,7 @@ class ParameterTypeFlags {
     OwnershipShift = 2,
     Ownership   = 7 << OwnershipShift,
     // SWIFT_ENABLE_TENSORFLOW
+    // TODO: need to handle parameters
     NonDifferentiable = 1 << 5,
     NumBits = 6
   };
@@ -2911,7 +2912,13 @@ public:
     bool isNoEscape() const { return Bits & NoEscapeMask; }
     bool throws() const { return Bits & ThrowsMask; }
     // SWIFT_ENABLE_TENSORFLOW
-    bool isDifferentiable() const { return Bits & DifferentiableMask; }
+    bool isDifferentiable() const {
+      return (getDifferentiabilityKind() == DifferentiabilityKind::Normal) ||
+          (getDifferentiabilityKind() == DifferentiabilityKind::Linear);
+    }
+    DifferentiabilityKind getDifferentiabilityKind() const {
+      return DifferentiabilityKind(DifferentiableMask >> DifferentiableMaskOffset);
+    }
     Representation getRepresentation() const {
       unsigned rawRep = Bits & RepresentationMask;
       assert(rawRep <= unsigned(Representation::Last)
@@ -3107,8 +3114,12 @@ public:
   }
   
   // SWIFT_ENABLE_TENSORFLOW
+  // TODO: take a look everywhere it's used
   bool isDifferentiable() const {
     return getExtInfo().isDifferentiable();
+  }
+  DifferentiabilityKind getDifferentiabilityKind() const {
+    return getExtInfo().getDifferentiabilityKind();
   }
 
   /// Returns a new function type exactly like this one but with the ExtInfo
