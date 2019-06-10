@@ -461,8 +461,9 @@ public:
       return Mem;
     }
 
-    virtual void expandScope(GenericTypeOrExtensionScope *,
-                             ScopeCreator &) const {}
+    /// Return the new injection point
+    virtual ASTScopeImpl *expandScope(GenericTypeOrExtensionScope *,
+                                      ScopeCreator &) const = 0;
 
     virtual SourceRange getChildlessSourceRangeOf(
         const GenericTypeOrExtensionScope *scope) const = 0;
@@ -479,14 +480,14 @@ public:
   };
 
   // For the whole Decl scope of a GenericType or an Extension
-  class GenericTypeOrExtensionWholePortion : public Portion {
+  class GenericTypeOrExtensionWholePortion final : public Portion {
   public:
     GenericTypeOrExtensionWholePortion() : Portion("Decl") {}
     virtual ~GenericTypeOrExtensionWholePortion() {}
 
     // Just for TypeAlias
-    void expandScope(GenericTypeOrExtensionScope *,
-                     ScopeCreator &) const override;
+    ASTScopeImpl *expandScope(GenericTypeOrExtensionScope *,
+                              ScopeCreator &) const override;
 
     SourceRange getChildlessSourceRangeOf(
         const GenericTypeOrExtensionScope *) const override;
@@ -510,11 +511,14 @@ public:
 
 /// Behavior specific to representing the trailing where clause of a
 /// GenericTypeDecl or ExtensionDecl scope.
-class GenericTypeOrExtensionWherePortion
+class GenericTypeOrExtensionWherePortion final
     : public GenericTypeOrExtensionWhereOrBodyPortion {
 public:
   GenericTypeOrExtensionWherePortion()
       : GenericTypeOrExtensionWhereOrBodyPortion("Where") {}
+
+  ASTScopeImpl *expandScope(GenericTypeOrExtensionScope *,
+                            ScopeCreator &) const override;
 
   SourceRange
   getChildlessSourceRangeOf(const GenericTypeOrExtensionScope *) const override;
@@ -527,8 +531,9 @@ class IterableTypeBodyPortion final
 public:
   IterableTypeBodyPortion()
       : GenericTypeOrExtensionWhereOrBodyPortion("Body") {}
-  void expandScope(GenericTypeOrExtensionScope *,
-                   ScopeCreator &) const override;
+
+  ASTScopeImpl *expandScope(GenericTypeOrExtensionScope *,
+                            ScopeCreator &) const override;
   SourceRange
   getChildlessSourceRangeOf(const GenericTypeOrExtensionScope *) const override;
 };
@@ -550,7 +555,7 @@ public:
   ASTScopeImpl *expandMe(ScopeCreator &scopeCreator) override;
 
 private:
-  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
+  ASTScopeImpl *expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
 
 public:
   SourceRange getChildlessSourceRange() const override;

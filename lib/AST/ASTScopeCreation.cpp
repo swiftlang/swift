@@ -584,8 +584,9 @@ bool PatternEntryDeclScope::isHandledSpecially(const ASTNode n) {
     return getParent().get();                                                  \
   }
 
+// Return this in particular for GenericParamScope so body is scoped under it
 #define NO_EXPANSION(Scope)                                                    \
-  ASTScopeImpl *Scope::expandMe(ScopeCreator &) { return getParent().get(); }
+  ASTScopeImpl *Scope::expandMe(ScopeCreator &) { return this; }
 
 CREATES_NEW_INSERTION_POINT(AbstractFunctionParamsScope)
 CREATES_NEW_INSERTION_POINT(ConditionalClauseScope)
@@ -593,6 +594,7 @@ CREATES_NEW_INSERTION_POINT(GuardStmtScope)
 CREATES_NEW_INSERTION_POINT(PatternEntryDeclScope)
 CREATES_NEW_INSERTION_POINT(PatternEntryInitializerScope)
 CREATES_NEW_INSERTION_POINT(PatternEntryUseScope)
+CREATES_NEW_INSERTION_POINT(GenericTypeOrExtensionScope)
 
 NO_NEW_INSERTION_POINT(AbstractFunctionBodyScope)
 NO_NEW_INSERTION_POINT(AbstractFunctionDeclScope)
@@ -605,7 +607,6 @@ NO_NEW_INSERTION_POINT(DefaultArgumentInitializerScope)
 NO_NEW_INSERTION_POINT(DoCatchStmtScope)
 NO_NEW_INSERTION_POINT(ForEachPatternScope)
 NO_NEW_INSERTION_POINT(ForEachStmtScope)
-NO_NEW_INSERTION_POINT(GenericTypeOrExtensionScope)
 NO_NEW_INSERTION_POINT(IfStmtScope)
 NO_NEW_INSERTION_POINT(RepeatWhileScope)
 NO_NEW_INSERTION_POINT(SubscriptDeclScope)
@@ -696,6 +697,12 @@ ASTScopeImpl *GuardStmtScope::expandAScopeThatCreatesANewInsertionPoint(
 
   return scopeCreator.createSubtree<ConditionalClauseUseScope>(
       this, lookupParent, stmt->getEndLoc());
+}
+
+ASTScopeImpl *
+GenericTypeOrExtensionScope::expandAScopeThatCreatesANewInsertionPoint(
+    ScopeCreator &scopeCreator) {
+  return portion->expandScope(this, scopeCreator);
 }
 
 #pragma mark expandAScopeThatDoesNotCreateANewInsertionPoint
@@ -880,12 +887,6 @@ void DefaultArgumentInitializerScope::
   ASTVisitorForScopeCreation().visitExpr(initExpr, this, scopeCreator);
 }
 
-void GenericTypeOrExtensionScope::
-    expandAScopeThatDoesNotCreateANewInsertionPoint(
-        ScopeCreator &scopeCreator) {
-  portion->expandScope(this, scopeCreator);
-}
-
 void BraceStmtScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
     ScopeCreator &scopeCreator) {
   scopeCreator.addScopesToTree(stmt->getElements());
@@ -893,12 +894,12 @@ void BraceStmtScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
 
 #pragma mark expandScope
 
-void GenericTypeOrExtensionWholePortion::expandScope(
+ASTScopeImpl *GenericTypeOrExtensionWholePortion::expandScope(
     GenericTypeOrExtensionScope *scope, ScopeCreator &scopeCreator) const {
   // Prevent circular request bugs caused by illegal input and
   // doing lookups that getExtendedNominal in the midst of getExtendedNominal.
   if (scope->shouldHaveABody() && !scope->doesDeclHaveABody())
-    return;
+    return scope->getParent().get();
 
   auto *deepestScope = scopeCreator.createGenericParamScopes(
       scope->getDecl().get(), scope->getGenericContext()->getGenericParams(),
@@ -907,14 +908,25 @@ void GenericTypeOrExtensionWholePortion::expandScope(
     deepestScope =
         scope->createTrailingWhereClauseScope(deepestScope, scopeCreator);
   scope->createBodyScope(deepestScope, scopeCreator);
+  return scope->getParent().get();
 }
 
-void IterableTypeBodyPortion::expandScope(GenericTypeOrExtensionScope *scope,
-                                          ScopeCreator &scopeCreator) const {
-  if (auto *idc = scope->getIterableDeclContext().getPtrOrNull())
-    for (auto member : idc->getMembers())
+ASTScopeImpl *
+IterableTypeBodyPortion::expandScope(GenericTypeOrExtensionScope *scope,
+                                     ScopeCreator &scopeCreator) const {
+  if (auto *idc = scope->getIterableDeclContext().getPtrOrNull()) {
+    for (auto member : idc->getMembers()) {
       if (!scopeCreator.isDuplicate(member))
         scopeCreator.createScopeFor(member, scope);
+    }
+  }
+  return scope->getParent().get();
+}
+
+ASTScopeImpl *GenericTypeOrExtensionWherePortion::expandScope(
+    GenericTypeOrExtensionScope *scope, ScopeCreator &) const {
+  return scope->getParent().get();
+  ;
 }
 
 #pragma mark createBodyScope
