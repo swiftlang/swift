@@ -75,16 +75,11 @@ public:
   ASTScopeImpl *
   addScopesToTree(ASTScopeImpl *const insertionPoint,
                   ArrayRef<ASTNode_or_DeclPtr> nodesOrDeclsToAdd) {
-    // Save source range recalculation work if possible
-    if (nodesOrDeclsToAdd.empty())
-      return insertionPoint;
     auto *ip = insertionPoint;
-    ip->ensureSourceRangesAreCorrectWhenAddingDescendants([&] {
-      for (auto nd : nodesOrDeclsToAdd) {
-        if (shouldThisNodeBeScopedWhenEncountered(nd))
-          ip = createScopeFor(nd, ip);
-      }
-    });
+    for (auto nd : nodesOrDeclsToAdd) {
+      if (shouldThisNodeBeScopedWhenEncountered(nd))
+        ip = createScopeFor(nd, ip);
+    }
     return ip;
   }
 
@@ -315,7 +310,13 @@ void ASTScope::addAnyNewScopesToTree() {
 void ASTSourceFileScope::addNewDeclsToTree() {
   ArrayRef<Decl *> decls = SF->Decls;
   ArrayRef<Decl *> newDecls = decls.slice(numberOfDeclsAlreadySeen);
-  insertionPoint = scopeCreator->addScopesToTree(insertionPoint, newDecls);
+  // Save source range recalculation work if possible
+  if (newDecls.empty())
+    return;
+
+  insertionPoint->ensureSourceRangesAreCorrectWhenAddingDescendants([&] {
+    insertionPoint = scopeCreator->addScopesToTree(insertionPoint, newDecls);
+  });
   numberOfDeclsAlreadySeen = SF->Decls.size();
 }
 

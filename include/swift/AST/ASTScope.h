@@ -204,6 +204,7 @@ private:
   // identifer within one of them. So, find the real source range of them here.
   SourceRange getEffectiveSourceRange(ASTNode) const;
 
+public:
   /// Since source ranges are cached but depend on child ranges,
   /// when descendants are added, my and my ancestor ranges must be
   /// recalculated.
