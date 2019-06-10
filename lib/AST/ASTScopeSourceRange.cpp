@@ -159,10 +159,6 @@ SourceRange AbstractFunctionBodyScope::getChildlessSourceRange() const {
   return decl->getBodySourceRange();
 }
 
-SourceRange
-StatementConditionElementPatternScope::getChildlessSourceRange() const {
-  return pattern->getSourceRange();
-}
 
 SourceRange TopLevelCodeScope::getChildlessSourceRange() const {
   return decl->getSourceRange();
@@ -349,26 +345,12 @@ SourceRange BraceStmtScope::getChildlessSourceRange() const {
   return stmt->getSourceRange();
 }
 
-SourceLoc ConditionalClauseScope::startLocAccordingToCondition() const {
-  // Determine the start location if the condition can provide it.
-  auto conditionals = enclosingStmt->getCond();
-  const StmtConditionElement cond = conditionals[index];
-  switch (cond.getKind()) {
-  case StmtConditionElement::CK_Boolean:
-  case StmtConditionElement::CK_Availability:
-    return cond.getStartLoc();
-  case StmtConditionElement::CK_PatternBinding:
-    return index + 1 < conditionals.size()
-               ? conditionals[index + 1].getStartLoc()
-               : SourceLoc();
-  }
-}
 
 SourceRange ConditionalClauseScope::getChildlessSourceRange() const {
   // From the start of this particular condition to the start of the
   // then/body part.
-  const auto startLoc = startLocAccordingToCondition();
-  const auto endLoc = stmtAfterAllConditions->getStartLoc();
+  const auto startLoc = enclosingStmt->getCond()[index].getStartLoc();
+  const auto endLoc = useScopeStart;
   return startLoc.isValid() ? SourceRange(startLoc, endLoc)
                             : SourceRange(endLoc);
 }

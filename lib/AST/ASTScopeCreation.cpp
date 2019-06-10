@@ -610,6 +610,7 @@ NO_EXPANSION(GenericParamScope)
 NO_EXPANSION(ASTSourceFileScope)
 NO_EXPANSION(ClosureParametersScope)
 NO_EXPANSION(SpecializeAttributeScope)
+// no accessors, unlike PatternEntryUseScope
 NO_EXPANSION(ConditionalClauseUseScope)
 NO_EXPANSION(AttachedPropertyWrapperScope)
 NO_EXPANSION(StatementConditionElementPatternScope)
@@ -673,14 +674,27 @@ ASTScopeImpl *PatternEntryUseScope::expandAScopeThatCreatesANewInsertionPoint(
 }
 
 ASTScopeImpl *ConditionalClauseScope::expandAScopeThatCreatesANewInsertionPoint(
-    ScopeCreator &scopeCreator) {
-  createSubtreeForCondition(scopeCreator);
-  return this;
+                                                                                ScopeCreator &scopeCreator) {
+  const auto &cond = enclosingStmt->getCond()[index];
+  switch (cond.getKind()) {
+    case StmtConditionElement::CK_Availability:
+      return this;
+    case StmtConditionElement::CK_Boolean:
+      ASTVisitorForScopeCreation().visitExpr(cond.getBoolean(), this,
+                                             scopeCreator);
+      return this;
+    case StmtConditionElement::CK_PatternBinding:
+      pattern = cond.getPattern());
+      ASTVisitorForScopeCreation().visitExpr(cond.getInitializer(), this,
+                                             scopeCreator);
+      return scopeCreator.createSubtree<ConditionalClauseUseScope>(this, this, cond.getEndLoc());
+  }
 }
 
 ASTScopeImpl *GuardStmtScope::expandAScopeThatCreatesANewInsertionPoint(
     ScopeCreator &scopeCreator) {
-  ASTScopeImpl *lookupParent = createCondScopes(scopeCreator);
+  
+  ASTScopeImpl *lookupParent = createNestedConditionalClauseScopes(scopeCreator, stmt->getBody()->getEndLoc();
   // Add a child for the 'guard' body, which always exits.
   // Parent is whole guard stmt scope, NOT the cond scopes
   scopeCreator.createScopeFor(stmt->getBody(), this);
@@ -746,10 +760,10 @@ void AbstractFunctionBodyScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
 
 void IfStmtScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
     ScopeCreator &scopeCreator) {
-  ASTScopeImpl *lookupParent = createCondScopes(scopeCreator);
+  ASTScopeImpl *insertionPoint = createNestedConditionalClauseScopes(scopeCreator, stmt->getThenStmt()->getStartLoc());
 
   // The 'then' branch
-  scopeCreator.createScopeFor(stmt->getThenStmt(), lookupParent);
+  scopeCreator.createScopeFor(stmt->getThenStmt(), insertionPoint);
 
   // Add the 'else' branch, if needed.
   scopeCreator.createScopeFor(stmt->getElseStmt(), this);
@@ -757,8 +771,8 @@ void IfStmtScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
 
 void WhileStmtScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
     ScopeCreator &scopeCreator) {
-  ASTScopeImpl *lookupParent = createCondScopes(scopeCreator);
-  scopeCreator.createScopeFor(stmt->getBody(), lookupParent);
+  ASTScopeImpl *insertionPoint = createNestedConditionalClauseScopes(scopeCreator, stmt->getBody()->getStartLoc());
+  scopeCreator.createScopeFor(stmt->getBody(), insertionPoint);
 }
 
 void RepeatWhileScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
@@ -964,21 +978,16 @@ TypeAliasScope::createTrailingWhereClauseScope(ASTScopeImpl *parent,
 #pragma mark misc
 
 ASTScopeImpl *
-LabeledConditionalStmtScope::createCondScopes(ScopeCreator &scopeCreator) {
+LabeledConditionalStmtScope::createNestedConditionalClauseScopes(ScopeCreator &scopeCreator, SourceLoc lastUseScopeStart) {
   auto *stmt = getLabeledConditionalStmt();
   ASTScopeImpl *insertionPoint = this;
-  for (unsigned i = 0; i < stmt->getCond().size(); ++i)
+  for (unsigned i = 0; i < stmt->getCond().size(); ++i) {
+    // If cond has a pattern, it needs to know where to start the use scope
+    const SourceLoc useScopeStart = i + 1 < stmt->getCond().size() ? stmt->getCond()[i+1].getStartLoc() : lastUseStart;
     insertionPoint = scopeCreator.createSubtree<ConditionalClauseScope>(
-        insertionPoint, stmt, i, getStmtAfterTheConditions());
-  return insertionPoint->getStatementConditionIfAny();
-}
-
-ASTScopeImpl *ASTScopeImpl::getStatementConditionIfAny() { return this; }
-
-ASTScopeImpl *ConditionalClauseScope::getStatementConditionIfAny() {
-  return statementConditionElementPatternScope
-             ? statementConditionElementPatternScope.get()
-             : this;
+        insertionPoint, stmt, i, useScopeStart);
+  }
+  return insertionPoint;
 }
 
 AbstractPatternEntryScope::AbstractPatternEntryScope(
@@ -1000,27 +1009,6 @@ void AbstractPatternEntryScope::forEachVarDeclWithExplicitAccessors(
     if (hasAccessors && !var->isImplicit())
       foundOne(var);
   });
-}
-
-
-void ConditionalClauseScope::createSubtreeForCondition(
-    ScopeCreator &scopeCreator) {
-  const auto &cond = enclosingStmt->getCond()[index];
-  switch (cond.getKind()) {
-  case StmtConditionElement::CK_Availability:
-    return;
-  case StmtConditionElement::CK_Boolean:
-    ASTVisitorForScopeCreation().visitExpr(cond.getBoolean(), this,
-                                           scopeCreator);
-    return;
-  case StmtConditionElement::CK_PatternBinding:
-    statementConditionElementPatternScope =
-        scopeCreator.createSubtree<StatementConditionElementPatternScope>(
-            this, cond.getPattern());
-    ASTVisitorForScopeCreation().visitExpr(cond.getInitializer(), this,
-                                           scopeCreator);
-    return;
-  }
 }
 
 bool AbstractPatternEntryScope::isLastEntry() const {

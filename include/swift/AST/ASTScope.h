@@ -71,7 +71,6 @@ class ASTScopeImpl;
 class GenericTypeOrExtensionScope;
 class IterableTypeScope;
 class TypeAliasScope;
-class StatementConditionElementPatternScope;
 class ScopeCreator;
 
 #pragma mark the root ASTScopeImpl class
@@ -262,7 +261,6 @@ public:
 
   bool isATypeDeclScope() const;
 
-  virtual ASTScopeImpl *getStatementConditionIfAny();
 
 #pragma mark - - creation queries
 protected:
@@ -1012,15 +1010,15 @@ public:
   /// The index of the conditional clause.
   const unsigned index;
 
-  /// The statement after the conditions: body or then.
-  Stmt *const stmtAfterAllConditions;
+  const SourceLoc useScopeStart;
 
-  NullablePtr<ASTScopeImpl> statementConditionElementPatternScope;
+  /// If I have a let ..., this holds the pattern
+  NullablePtr<Pattern> pattern;
 
   ConditionalClauseScope(LabeledConditionalStmt *enclosingStmt, unsigned index,
-                         Stmt *stmtAfterAllConditions)
+                         SourceLoc useScopeStart)
       : enclosingStmt(enclosingStmt), index(index),
-        stmtAfterAllConditions(stmtAfterAllConditions) {}
+        useScopeStart(useScopeStart) {}
   virtual ~ConditionalClauseScope() {}
 
   ASTScopeImpl *expandMe(ScopeCreator &scopeCreator) override;
@@ -1038,11 +1036,6 @@ public:
   NullablePtr<const void> addressForPrinting() const override {
     return enclosingStmt;
   }
-  void createSubtreeForCondition(ScopeCreator &);
-  SourceLoc startLocAccordingToCondition() const;
-
-  ASTScopeImpl *getStatementConditionIfAny() override;
-
   SourceRange getChildlessSourceRange() const override;
 };
 
@@ -1051,11 +1044,11 @@ public:
 /// the normal lookup rule to pass the lookup scope into the deepest conditional
 /// clause.
 class ConditionalClauseUseScope final : public ASTScopeImpl {
-  ASTScopeImpl *const lookupParent;
+  ConditionalClauseScope *const lookupParent;
   const SourceLoc startLoc;
 
 public:
-  ConditionalClauseUseScope(ASTScopeImpl *lookupParent, SourceLoc startLoc)
+  ConditionalClauseUseScope(ConditionalClauseScope *lookupParent, SourceLoc startLoc)
       : lookupParent(lookupParent), startLoc(startLoc) {}
 
   SourceRange getChildlessSourceRange() const override;
@@ -1064,42 +1057,14 @@ public:
   ASTScopeImpl *expandMe(ScopeCreator &) override;
 
 protected:
+ bool lookupLocalBindings(Optional<bool>, DeclConsumer) const override;
+ 
   void printSpecifics(llvm::raw_ostream &out) const override;
   NullablePtr<const ASTScopeImpl> getLookupParent() const override {
     return lookupParent;
   }
 };
 
-/// Within a ConditionalClauseScope, there may be a pattern binding
-/// StmtConditionElement. If so, it splits the scope into two scopes: one
-/// containing the definitions and the other containing the initializer. We must
-/// split it because the initializer must not be in scope of the definitions:
-/// e.g.: if let a = a {}
-/// We need to be able to lookup either a and the second a must not bind to the
-/// first one. This scope represents the scope of the variable being
-/// initialized.
-class StatementConditionElementPatternScope final : public ASTScopeImpl {
-public:
-  Pattern *const pattern;
-  StatementConditionElementPatternScope(Pattern *e) : pattern(e) {}
-  virtual ~StatementConditionElementPatternScope() {}
-
-  std::string getClassName() const override;
-  SourceRange getChildlessSourceRange() const override;
-
-  ASTScopeImpl *expandMe(ScopeCreator &) override;
-
-protected:
-  void printSpecifics(llvm::raw_ostream &out) const override;
-
-public:
-  NullablePtr<const void> addressForPrinting() const override {
-    return pattern;
-  }
-
-protected:
-  bool lookupLocalBindings(Optional<bool>, DeclConsumer) const override;
-};
 
 /// Capture lists may contain initializer expressions
 /// No local bindings here (other than closures in initializers);
@@ -1336,7 +1301,7 @@ public:
 
 protected:
   /// Return the lookupParent required to search these.
-  ASTScopeImpl *createCondScopes(ScopeCreator &);
+  ASTScopeImpl *createNestedConditionalClauseScopes(ScopeCreator &, SourceLoc lastUseScopeStart);
   virtual Stmt *getStmtAfterTheConditions() const = 0;
 };
 

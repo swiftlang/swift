@@ -167,7 +167,7 @@ void AbstractPatternEntryScope::printSpecifics(llvm::raw_ostream &out) const {
   });
 }
 
-
+#error ruse scope
 void StatementConditionElementPatternScope::printSpecifics(
     llvm::raw_ostream &out) const {
   pattern->print(out);
@@ -178,9 +178,6 @@ void ConditionalClauseScope::printSpecifics(llvm::raw_ostream &out) const {
   out << " in ";
   printSourceRange(out, enclosingStmt->getSourceRange(), getSourceManager());
   out << " index " << index;
-  out << " before ";
-  printSourceRange(out, stmtAfterAllConditions->getSourceRange(),
-                   getSourceManager());
   out << "  ";
 }
 
