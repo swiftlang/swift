@@ -269,6 +269,34 @@ extension ClassUsingWrapper {
   }
 }
 
+// 
+@_propertyWrapper
+struct WrapperWithDefaultInit<T> {
+  private var storage: T?
+
+  init() {
+    self.storage = nil
+  }
+  
+  init(initialValue: T) {
+    self.storage = initialValue
+  }
+
+  var value: T {
+    get { return storage! }
+    set { storage = newValue }
+  }
+}
+
+class UseWrapperWithDefaultInit {
+  @WrapperWithDefaultInit var name: String
+}
+
+// CHECK-LABEL: sil hidden [transparent] [ossa] @$s17property_wrappers25UseWrapperWithDefaultInitC5$name33_F728088E0028E14D18C6A10CF68512E8LLAA0defG0VySSGvpfi : $@convention(thin) () -> @owned WrapperWithDefaultInit<String>
+// CHECK: function_ref @$s17property_wrappers22WrapperWithDefaultInitVACyxGycfC
+// CHECK: return {{%.*}} : $WrapperWithDefaultInit<String>
+
+
 // CHECK-LABEL: sil_vtable ClassUsingWrapper {
 // CHECK:  #ClassUsingWrapper.x!getter.1: (ClassUsingWrapper) -> () -> Int : @$s17property_wrappers17ClassUsingWrapperC1xSivg   // ClassUsingWrapper.x.getter
 // CHECK:  #ClassUsingWrapper.x!setter.1: (ClassUsingWrapper) -> (Int) -> () : @$s17property_wrappers17ClassUsingWrapperC1xSivs // ClassUsingWrapper.x.setter
