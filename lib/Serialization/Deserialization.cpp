@@ -4716,16 +4716,7 @@ public:
                                                   // SWIFT_ENABLE_TENSORFLOW
                                                   throws,
                                                   rawDiffKind);
-      if (rawDiffKind == 0b11)
-        diffKind = DifferentiabilityKind::Linear;
-      else if (rawDiffKind == 0b01)
-        diffKind = DifferentiabilityKind::Normal;
-      else if (rawDiffKind == 0b00)
-        diffKind = DifferentiabilityKind::NonDifferentiable;
-      else {
-        MF.error();
-        return nullptr;
-      }
+      diffKind = DifferentiabilityKind(rawDiffKind);
       
     } else { // TODO: Handle generic func type
       GenericSignatureID rawGenericSig;
@@ -4737,6 +4728,10 @@ public:
                                                          differentiable,
                                                          rawGenericSig);
       genericSig = MF.getGenericSignature(rawGenericSig);
+      // TODO: temporary while I handle generic functions
+      if (differentiable) {
+        diffKind = DifferentiabilityKind::Normal;
+      }
     }
 
     auto representation = getActualFunctionTypeRepresentation(rawRepresentation);
