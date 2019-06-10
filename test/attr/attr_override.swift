@@ -29,6 +29,7 @@ class A {
 
   var v1: Int { return 5 }
   var v2: Int { return 5 } // expected-note{{overridden declaration is here}}
+  internal var v21: Int { return 5 } // expected-note{{overridden declaration is here}}
   var v4: String { return "hello" }// expected-note{{attempt to override property here}}
   var v5: A { return self }
   var v6: A { return self }
@@ -93,9 +94,9 @@ class B : A {
   override func f0() { }
   func f1() { } // expected-error{{overriding declaration requires an 'override' keyword}}{{3-3=override }}
   override func f2() { } // expected-error{{method does not override any method from its superclass}}
-
   override var v1: Int { return 5 }
-  var v2: Int { return 5 } // expected-error{{overriding declaration requires an 'override' keyword}}
+  var v2: Int { return 5 } // expected-error{{overriding declaration requires an 'override' keyword}}{{3-3=override }}
+  internal var v21: Int { return 5 } // expected-error{{overriding declaration requires an 'override' keyword}}{{12-12=override }}
   override var v3: Int { return 5 } // expected-error{{property does not override any property from its superclass}}
   override var v4: Int { return 5 } // expected-error{{property 'v4' with type 'Int' cannot override a property with type 'String'}}
 
