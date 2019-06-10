@@ -1009,7 +1009,7 @@ static ValueDecl *getAutoDiffApplyAssociatedFunction(
     [=, &fnArgGens](BuiltinGenericSignatureBuilder &builder) -> Type {
       FunctionType::ExtInfo ext;
       auto extInfo = FunctionType::ExtInfo()
-          .withDifferentiable().withNoEscape().withThrows(rethrows);
+          .withDifferentiabilityKind().withNoEscape().withThrows(rethrows);
       SmallVector<FunctionType::Param, 2> params;
       for (auto &paramGen : fnArgGens)
         params.push_back(FunctionType::Param(paramGen.build(builder)));

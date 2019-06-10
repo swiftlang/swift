@@ -385,7 +385,7 @@ Type ASTBuilder::createFunctionType(
 
   // SWIFT_ENABLE_TENSORFLOW
   if (flags.isDifferentiable())
-    einfo = einfo.withDifferentiable(true);
+    einfo = einfo.withDifferentiabilityKind(DifferentiabilityKind::Normal);
 
   // The result type must be materializable.
   if (!output->isMaterializable()) return Type();

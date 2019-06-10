@@ -2915,7 +2915,6 @@ public:
     bool throws() const { return Bits & ThrowsMask; }
     // SWIFT_ENABLE_TENSORFLOW
     bool isDifferentiable() const {
-//      llvm::errs() << "( " << (unsigned)getDifferentiabilityKind() << " )" << "\n";
       return getDifferentiabilityKind() >= DifferentiabilityKind::Normal;
     }
     DifferentiabilityKind getDifferentiabilityKind() const {
@@ -2987,11 +2986,17 @@ public:
     }
     // SWIFT_ENABLE_TENSORFLOW
     LLVM_NODISCARD
-    ExtInfo withDifferentiable(bool isDifferentiable = true) const {
-      if (isDifferentiable)
-        return ExtInfo(Bits | DifferentiabilityMask);
-      else
-        return ExtInfo(Bits & ~DifferentiabilityMask);
+    ExtInfo withDifferentiabilityKind(
+        DifferentiabilityKind differentiability = DifferentiabilityKind::Normal)
+    const {
+      switch (differentiability) {
+        case DifferentiabilityKind::NonDifferentiable:
+          return ExtInfo(Bits & ~DifferentiabilityMask);
+        case DifferentiabilityKind::Normal:
+          return ExtInfo(Bits & ~(0b10 << DifferentiabilityMaskOffset));
+        case DifferentiabilityKind::Linear:
+          return ExtInfo(Bits | DifferentiabilityMask);
+      }
     }
 
     unsigned getFuncAttrKey() const {
