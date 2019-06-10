@@ -394,50 +394,42 @@ ERROR(cannot_convert_closure_result_protocol,none,
 ERROR(cannot_convert_closure_result_nil,none,
       "'nil' is not compatible with closure result type %0", (Type))
 
+NOTE(generic_argument_mismatch,none,
+     "arguments to generic parameter %0 (%1 and %2) are expected to be equal",
+     (Identifier, Type, Type))
 ERROR(cannot_convert_generic_type_argument,none,
-      "cannot convert %0 to expected argument type %1, "
-      "arguments to generic parameter %2 (%3 and %4) are expected to be equal",
-      (Type, Type, Identifier, Type, Type))
+      "cannot convert value of type %0 to expected argument type %1, ",
+      (Type, Type))
 ERROR(cannot_convert_generic_type_default_argument,none,
-      "default argument value of type %0 cannot be converted to type %1, "
-      "arguments to generic parameter %2 (%3 and %4) are expected to be equal",
-      (Type, Type, Identifier, Type, Type))
+      "default argument value of type %0 cannot be converted to type %1",
+      (Type, Type))
 ERROR(cannot_convert_generic_type_return,none,
-      "cannot convert return expression of type %0 to return type %1, "
-      "arguments to generic parameter %2 (%3 and %4) are expected to be equal",
-      (Type, Type, Identifier, Type, Type))
+      "cannot convert return expression of type %0 to return type %1",
+      (Type, Type))
 ERROR(cannot_convert_generic_type_yield,none,
-      "cannot convert value of type %0 to expected yield type %1, "
-      "arguments to generic parameter %2 (%3 and %4) are expected to be equal",
-      (Type, Type, Identifier, Type, Type))
+      "cannot convert value of type %0 to expected yield type %1",
+      (Type, Type))
 ERROR(cannot_convert_generic_type_closure_result,none,
-      "cannot convert value of type %0 to closure result type %1, "
-      "arguments to generic parameter %2 (%3 and %4) are expected to be equal",
-      (Type, Type, Identifier, Type, Type))
+      "cannot convert value of type %0 to closure result type %1",
+      (Type, Type))
 ERROR(cannot_convert_generic_type_array_element,none,
-      "cannot convert value of type %0 to expected element type %1, "
-      "arguments to generic parameter %2 (%3 and %4) are expected to be equal",
-      (Type, Type, Identifier, Type, Type))
+      "cannot convert value of type %0 to expected element type %1",
+      (Type, Type))
 ERROR(cannot_convert_generic_type_dict_key,none,
-      "cannot convert value of type %0 to expected dictionary key type %1, "
-      "arguments to generic parameter %2 (%3 and %4) are expected to be equal",
-      (Type, Type, Identifier, Type, Type))
+      "cannot convert value of type %0 to expected dictionary key type %1",
+      (Type, Type))
 ERROR(cannot_convert_generic_type_dict_value,none,
-      "cannot convert value of type %0 to expected dictionary value type %1, "
-      "arguments to generic parameter %2 (%3 and %4) are expected to be equal",
-      (Type, Type, Identifier, Type, Type))
+      "cannot convert value of type %0 to expected dictionary value type %1",
+      (Type, Type))
 ERROR(cannot_convert_generic_type_coerce,none,
-      "cannot convert value of type %0 to type %1 in coercion, "
-      "arguments to generic parameter %2 (%3 and %4) are expected to be equal",
-      (Type, Type, Identifier, Type, Type))
+      "cannot convert value of type %0 to type %1 in coercion",
+      (Type, Type))
 ERROR(cannot_convert_generic_type_assign,none,
-      "cannot convert value of type %0 to %1 in assignment, "
-      "arguments to generic parameter %2 (%3 and %4) are expected to be equal",
-      (Type, Type, Identifier, Type, Type))
+      "cannot convert value of type %0 to %1 in assignment",
+      (Type, Type))
 ERROR(cannot_convert_generic_type_parent_type,none,
-      "cannot convert parent type %0 to expected type %1, "
-      "arguments to generic parameter %2 (%3 and %4) are expected to be equal",
-      (Type, Type, Identifier, Type, Type))
+      "cannot convert parent type %0 to expected type %1",
+      (Type, Type))
 
 ERROR(destructor_not_accessible,none,
       "deinitializers cannot be accessed", ())

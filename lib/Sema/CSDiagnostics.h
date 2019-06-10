@@ -367,17 +367,15 @@ protected:
 /// let _:F<Int> = F<Bool>()
 /// ```
 class GenericArgumentsMismatchFailure final : public FailureDiagnostic {
-  using GenericMismatchDiag = Diag<Type, Type, Identifier, Type, Type>;
-
   BoundGenericType *Actual;
   BoundGenericType *Required;
-  llvm::SmallVector<int, 4> Mismatches;
+  ArrayRef<unsigned> Mismatches;
 
 public:
   GenericArgumentsMismatchFailure(Expr *expr, ConstraintSystem &cs,
                                   BoundGenericType *actual,
                                   BoundGenericType *required,
-                                  llvm::SmallVector<int, 4> mismatches,
+                                  ArrayRef<unsigned> mismatches,
                                   ConstraintLocator *locator)
       : FailureDiagnostic(expr, cs, locator), Actual(actual),
         Required(required), Mismatches(mismatches) {}
@@ -385,16 +383,15 @@ public:
   bool diagnoseAsError() override;
 
 private:
-  void emitDiagnosticForMismatches(GenericMismatchDiag diagnostic) {
-    for (int position : Mismatches) {
-      emitDiagnosticForMismatch(diagnostic, position);
+  void emitNotesForMismatches() {
+    for (unsigned position : Mismatches) {
+      emitNoteForMismatch(position);
     }
   }
 
-  void emitDiagnosticForMismatch(GenericMismatchDiag diagnostic,
-                                 int mismatchPosition);
+  void emitNoteForMismatch(int mismatchPosition);
 
-  Optional<GenericMismatchDiag> getDiagnosticFor(ContextualTypePurpose context);
+  Optional<Diag<Type, Type>> getDiagnosticFor(ContextualTypePurpose context);
 
   /// The actual type being used.
   BoundGenericType *getActual() const { return Actual; }

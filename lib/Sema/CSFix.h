@@ -88,7 +88,7 @@ enum class FixKind : uint8_t {
   /// like the types are aligned.
   ContextualMismatch,
 
-  /// Fix up the generic arguments of two types so they match eachother.
+  /// Fix up the generic arguments of two types so they match each other.
   GenericArgumentsMismatch,
 
   /// Fix up @autoclosure argument to the @autoclosure parameter,
@@ -498,18 +498,27 @@ public:
 /// struct F<G> {}
 /// let _:F<Int> = F<Bool>()
 /// ```
-class GenericArgumentsMismatch : public ConstraintFix {
+class GenericArgumentsMismatch final
+    : public ConstraintFix,
+      private llvm::TrailingObjects<GenericArgumentsMismatch,
+                                    unsigned> {
+  friend TrailingObjects;
+  
   BoundGenericType *Actual;
   BoundGenericType *Required;
-  llvm::SmallVector<int, 4> Mismatches;
+  
+  unsigned NumMismatches;
 
 protected:
   GenericArgumentsMismatch(ConstraintSystem &cs, BoundGenericType *actual,
                            BoundGenericType *required,
-                           llvm::SmallVector<int, 4> mismatches,
+                           llvm::ArrayRef<unsigned> mismatches,
                            ConstraintLocator *locator)
       : ConstraintFix(cs, FixKind::GenericArgumentsMismatch, locator),
-        Actual(actual), Required(required), Mismatches(mismatches) {}
+        Actual(actual), Required(required), NumMismatches(mismatches.size()) {
+    std::uninitialized_copy(mismatches.begin(), mismatches.end(),
+                            getMismatchesBuf().begin());
+  }
 
 public:
   std::string getName() const override {
@@ -519,15 +528,22 @@ public:
   BoundGenericType *getActual() const { return Actual; }
   BoundGenericType *getRequired() const { return Required; }
 
-  llvm::SmallVector<int, 4> getMismatches() const { return Mismatches; }
+  ArrayRef<unsigned> getMismatches() const {
+    return {getTrailingObjects<unsigned>(), NumMismatches};
+  }
 
   bool diagnose(Expr *root, bool asNote = false) const override;
 
   static GenericArgumentsMismatch *create(ConstraintSystem &cs,
                                           BoundGenericType *actual,
                                           BoundGenericType *required,
-                                          llvm::SmallVector<int, 4> mismatches,
+                                          llvm::ArrayRef<unsigned> mismatches,
                                           ConstraintLocator *locator);
+                                          
+private:
+  MutableArrayRef<unsigned> getMismatchesBuf() {
+    return {getTrailingObjects<unsigned>(), NumMismatches};
+  }
 };
 
 /// Detect situations where key path doesn't have capability required

@@ -237,8 +237,10 @@ bool GenericArgumentsMismatch::diagnose(Expr *root, bool asNote) const {
 
 GenericArgumentsMismatch *GenericArgumentsMismatch::create(
     ConstraintSystem &cs, BoundGenericType *actual, BoundGenericType *required,
-    llvm::SmallVector<int, 4> mismatches, ConstraintLocator *locator) {
-  return new (cs.getAllocator())
+    llvm::ArrayRef<unsigned> mismatches, ConstraintLocator *locator) {
+  unsigned size = totalSizeToAlloc<unsigned>(mismatches.size());
+  void *mem = cs.getAllocator().Allocate(size, alignof(GenericArgumentsMismatch));
+  return new (mem)
       GenericArgumentsMismatch(cs, actual, required, mismatches, locator);
 }
 

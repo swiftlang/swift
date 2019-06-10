@@ -384,7 +384,7 @@ bool MissingConformanceFailure::diagnoseAsError() {
   return RequirementFailure::diagnoseAsError();
 }
 
-Optional<GenericArgumentsMismatchFailure::GenericMismatchDiag>
+Optional<Diag<Type, Type>>
 GenericArgumentsMismatchFailure::getDiagnosticFor(
     ContextualTypePurpose context) {
   switch (context) {
@@ -424,8 +424,7 @@ GenericArgumentsMismatchFailure::getDiagnosticFor(
   return None;
 }
 
-void GenericArgumentsMismatchFailure::emitDiagnosticForMismatch(
-    GenericMismatchDiag diagnostic, int position) {
+void GenericArgumentsMismatchFailure::emitNoteForMismatch(int position) {
   auto genericTypeDecl = getActual()->getCanonicalType()->getAnyGeneric();
   auto param = genericTypeDecl->getGenericParams()->getParams()[position];
 
@@ -434,23 +433,21 @@ void GenericArgumentsMismatchFailure::emitDiagnosticForMismatch(
   auto rhs = resolveType(getRequired()->getGenericArgs()[position])
                  ->reconstituteSugar(/*recursive=*/false);
 
-  emitDiagnostic(
-      getAnchor()->getLoc(), diagnostic,
-      resolveType(getActual())->reconstituteSugar(/*recursive=*/false),
-      resolveType(getRequired())->reconstituteSugar(/*recursive=*/false),
-      param->getName(), lhs, rhs);
-
-  if (param->getLoc().isValid()) {
-    emitDiagnostic(param->getLoc(), diag::kind_declname_declared_here,
-                   DescriptiveDeclKind::GenericTypeParam, param->getName());
+  auto noteLocation = param->getLoc();
+  
+  if (!noteLocation.isValid()) {
+    noteLocation = getAnchor()->getLoc();
   }
+
+  emitDiagnostic(noteLocation, diag::generic_argument_mismatch,
+                 param->getName(), lhs, rhs);
 }
 
 bool GenericArgumentsMismatchFailure::diagnoseAsError() {
   auto *anchor = getAnchor();
   auto path = getLocator()->getPath();
 
-  Optional<GenericMismatchDiag> diagnostic;
+  Optional<Diag<Type, Type>> diagnostic;
   if (path.empty()) {
     assert(isa<AssignExpr>(anchor));
     diagnostic = getDiagnosticFor(CTP_AssignSource);
@@ -488,7 +485,13 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
   if (!diagnostic)
     return false;
 
-  emitDiagnosticForMismatches(*diagnostic);
+  emitDiagnostic(getAnchor()->getLoc(), *diagnostic,
+                 resolveType(getActual())->reconstituteSugar(/*recursive=*/false),
+                 resolveType(getRequired())->reconstituteSugar(/*recursive=*/false));
+                 
+  
+  
+  emitNotesForMismatches();
   return true;
 }
 

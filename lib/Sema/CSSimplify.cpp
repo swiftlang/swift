@@ -1596,30 +1596,14 @@ ConstraintSystem::matchSuperclassTypes(Type type1, Type type2,
 
 static ConstraintSystem::TypeMatchResult matchDeepTypeArguments(
     ConstraintSystem &cs, ConstraintSystem::TypeMatchOptions subflags,
-    BoundGenericType *base1, BoundGenericType *base2, ArrayRef<Type> args1,
-    ArrayRef<Type> args2, ConstraintLocatorBuilder locator) {
+    ArrayRef<Type> args1, ArrayRef<Type> args2,
+    ConstraintLocatorBuilder locator,
+    llvm::function_ref<void(unsigned)> recordMismatch = [](unsigned) {}) {
   if (args1.size() != args2.size()) {
     return cs.getTypeMatchFailure(locator);
   }
 
-  SmallVector<int, 4> failedArguments;
   ConstraintSystem::TypeMatchResult fullMatchResult = cs.getTypeMatchSuccess();
-
-  bool forRequirement = false;
-  if (auto last = locator.last()) {
-    forRequirement =
-        last->isTypeParameterRequirement() || last->isConditionalRequirement();
-  }
-
-  bool hasBase = base1 && base2;
-
-  // Optionals and arrays have a lot of special diagnostics and only one
-  // generic argument so if we're dealing with one, don't produce generic
-  // arguments mismatch fixes.
-  // TODO(diagnostics): Move Optional and Array diagnostics over to the
-  // new framework.
-  bool isOptional = hasBase && base1 && base1->getDecl()->isOptionalDecl();
-  bool isArray = hasBase && cs.isArrayType(base1);
 
   for (unsigned i = 0, n = args1.size(); i != n; ++i) {
     auto result = cs.matchTypes(
@@ -1627,25 +1611,11 @@ static ConstraintSystem::TypeMatchResult matchDeepTypeArguments(
         locator.withPathElement(LocatorPathElt::getGenericArgument(i)));
 
     if (result.isFailure()) {
-      if (!cs.shouldAttemptFixes() || !hasBase || forRequirement ||
-          isOptional || isArray)
+      if (!cs.shouldAttemptFixes())
         return result;
-
+        
       fullMatchResult = result;
-      failedArguments.push_back(i);
-    }
-  }
-
-  if (!failedArguments.empty()) {
-    auto *fix = GenericArgumentsMismatch::create(
-        cs, base1, base2, failedArguments, cs.getConstraintLocator(locator));
-    // Increase the current solution's score for each mismatched argument.
-    for (unsigned i = 0; i < failedArguments.size(); ++i) {
-      cs.increaseScore(SK_Fix);
-    }
-
-    if (!cs.recordFix(fix)) {
-      return cs.getTypeMatchSuccess();
+      recordMismatch(i);
     }
   }
 
@@ -1671,8 +1641,7 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
     auto args1 = opaque1->getSubstitutions().getReplacementTypes();
     auto args2 = opaque2->getSubstitutions().getReplacementTypes();
     // Match up the replacement types of the respective substitution maps.
-    return matchDeepTypeArguments(*this, subflags, nullptr, nullptr, args1,
-                                  args2, locator);
+    return matchDeepTypeArguments(*this, subflags, args1, args2, locator);
   }
   
   // Handle nominal types that are not directly generic.
@@ -1705,12 +1674,44 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
     if (result.isFailure())
       return result;
   }
-
-  // Match up the generic arguments, exactly.
+  
+  
+  bool forRequirement = false;
+  if (auto last = locator.last()) {
+    forRequirement =
+        last->isTypeParameterRequirement() || last->isConditionalRequirement();
+  }
+  // Optionals and arrays have a lot of special diagnostics and only one
+  // generic argument so if we' re dealing with one, don't produce generic
+  // arguments mismatch fixes.
+  // TODO(diagnostics): Move Optional and Array diagnostics over to the
+  // new framework.
+  bool isOptional = bound1->getDecl()->isOptionalDecl();
+  bool isArray = isArrayType(bound1).hasValue();
+  
   auto args1 = bound1->getGenericArgs();
   auto args2 = bound2->getGenericArgs();
-  return matchDeepTypeArguments(*this, subflags, bound1, bound2, args1, args2,
-                                locator);
+  
+  SmallVector<unsigned, 4> failedArguments;
+    // Match up the generic arguments, exactly.
+  auto result = matchDeepTypeArguments(*this, subflags, args1, args2, locator,
+                                       [&failedArguments, forRequirement, isOptional, isArray] (unsigned position) {
+                                         if (!(forRequirement || isOptional || isArray))
+                                           failedArguments.push_back(position); 
+                                        });
+  if (!failedArguments.empty()) {
+    auto *fix = GenericArgumentsMismatch::create(
+        *this, bound1, bound2, failedArguments, getConstraintLocator(locator));
+    // Increase the solution's score for each mismtach this fixes.
+    for (unsigned i = 0; i < failedArguments.size(); ++i) {
+      increaseScore(SK_Fix);
+    }
+
+    if (!recordFix(fix)) {
+      return getTypeMatchSuccess();
+    }
+  }
+  return result;
 }
 
 ConstraintSystem::TypeMatchResult
@@ -2149,6 +2150,16 @@ bool ConstraintSystem::repairFailures(
 
     return false;
   }
+  
+  auto hasConversionOrRestriction = [&](ConversionRestrictionKind kind) {
+    return llvm::any_of(
+        conversionsOrFixes, [](const RestrictionOrFix possibleRestriction) {
+          auto restriction = possibleRestriction.getRestriction();
+          if (!restriction)
+            return false;
+          return restriction == ConversionRestrictionKind::DeepEquality;
+        });
+  };
 
   auto &elt = path.back();
   switch (elt.getKind()) {
@@ -2220,14 +2231,7 @@ bool ConstraintSystem::repairFailures(
   case ConstraintLocator::ClosureResult: {
     // If we could record a generic arguments mismatch instead of this fix,
     // don't record a ContextualMismatch here.
-    auto hasDeepEqualityRestriction = llvm::any_of(
-        conversionsOrFixes, [](const RestrictionOrFix possibleRestriction) {
-          auto restriction = possibleRestriction.getRestriction();
-          if (!restriction)
-            return false;
-          return restriction == ConversionRestrictionKind::DeepEquality;
-        });
-    if (hasDeepEqualityRestriction)
+    if (hasConversionOrRestriction(ConversionRestrictionKind::DeepEquality))
       break;
 
     auto *fix = ContextualMismatch::create(*this, lhs, rhs,
@@ -2290,14 +2294,7 @@ bool ConstraintSystem::repairFailures(
     if (anchor && (isa<ArrayExpr>(anchor) || isa<DictionaryExpr>(anchor))) {
       // If we could record a generic arguments mismatch instead of this fix,
       // don't record a ContextualMismatch here.
-      auto hasDeepEqualityRestriction = llvm::any_of(
-          conversionsOrFixes, [](const RestrictionOrFix possibleRestriction) {
-            auto restriction = possibleRestriction.getRestriction();
-            if (!restriction)
-              return false;
-            return restriction == ConversionRestrictionKind::DeepEquality;
-          });
-      if (hasDeepEqualityRestriction)
+      if (hasConversionOrRestriction(ConversionRestrictionKind::DeepEquality))
         break;
 
       conversionsOrFixes.push_back(CollectionElementContextualMismatch::create(
@@ -4831,7 +4828,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
 
     // FIXME(diagnostics): If there were no viable results, but there are
     // unviable ones, we'd have to introduce fix for each specific problem.
-    // TODO(diagnostics): Remove this, see what happens (should be noop)
     if (!result.UnviableCandidates.empty())
       return SolutionKind::Error;
 
@@ -6940,7 +6936,7 @@ void ConstraintSystem::addConstraint(Requirement req,
     kind = ConstraintKind::Subtype;
     break;
   case RequirementKind::SameType:
-    kind = ConstraintKind::Equal;
+    kind = ConstraintKind::Bind;
     break;
   case RequirementKind::Layout:
     // Only a class constraint can be modeled as a constraint, and only that can
