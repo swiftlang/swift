@@ -124,7 +124,7 @@ CanSILFunctionType SILFunctionType::getWithDifferentiability(
                 : SILParameterDifferentiability::NotDifferentiable));
   }
 
-  auto newExtInfo = getExtInfo().withDifferentiable();
+  auto newExtInfo = getExtInfo().withDifferentiabilityKind();
 
   return get(getGenericSignature(), newExtInfo, getCoroutineKind(),
              getCalleeConvention(), newParameters, getYields(), getResults(),
@@ -135,7 +135,8 @@ CanSILFunctionType SILFunctionType::getWithDifferentiability(
 CanSILFunctionType SILFunctionType::getWithoutDifferentiability() {
   if (!isDifferentiable())
     return CanSILFunctionType(this);
-  auto nondiffExtInfo = getExtInfo().withDifferentiable(false);
+  auto nondiffExtInfo = getExtInfo().withDifferentiabilityKind(
+                            DifferentiabilityKind::NonDifferentiable);
   SmallVector<SILParameterInfo, 8> newParams;
   for (auto &param : getParameters())
     newParams.push_back(param.getWithDifferentiability(
@@ -1227,7 +1228,9 @@ static CanSILFunctionType getSILFunctionType(
     .withIsPseudogeneric(pseudogeneric)
     // SWIFT_ENABLE_TENSORFLOW
     .withNoEscape(extInfo.isNoEscape())
-    .withDifferentiable(extInfo.isDifferentiable());
+  .withDifferentiabilityKind(extInfo.isDifferentiable()
+                                 ? DifferentiabilityKind::Normal
+                                 : DifferentiabilityKind::NonDifferentiable);
   
   return SILFunctionType::get(genericSig, silExtInfo, coroutineKind,
                               calleeConvention, inputs, yields,

@@ -5121,7 +5121,10 @@ public:
     }
     // SWIFT_ENABLE_TENSORFLOW
     SILFunctionType::ExtInfo extInfo(*representation, pseudogeneric, noescape,
-                                     differentiable);
+                                     differentiable
+                                         ? DifferentiabilityKind::Normal
+                                         : DifferentiabilityKind
+                                               ::NonDifferentiable);
 
     // Process the coroutine kind.
     auto coroutineKind = getActualSILCoroutineKind(rawCoroutineKind);

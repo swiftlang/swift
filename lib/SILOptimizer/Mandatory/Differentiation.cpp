@@ -6170,7 +6170,8 @@ SILValue ADContext::promoteToDifferentiableFunction(
       if (auto resultFnTy = thunkResult.getType()->getAs<SILFunctionType>()) {
         // Construct new curry thunk type with `@differentiable` result.
         auto diffableResultFnTy = resultFnTy->getWithExtInfo(
-            resultFnTy->getExtInfo().withDifferentiable(true));
+            resultFnTy->getExtInfo()
+                .withDifferentiabilityKind(DifferentiabilityKind::Normal));
         auto newThunkResult = thunkResult.getWithType(diffableResultFnTy);
         auto thunkType = SILFunctionType::get(
             thunkTy->getGenericSignature(), thunkTy->getExtInfo(),

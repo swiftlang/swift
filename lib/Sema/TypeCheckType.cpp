@@ -2226,7 +2226,10 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       SILFunctionType::ExtInfo extInfo(rep, attrs.has(TAK_pseudogeneric),
                                        // SWIFT_ENABLE_TENSORFLOW
                                        attrs.has(TAK_noescape),
-                                       attrs.has(TAK_autodiff) || attrs.has(TAK_differentiable));
+                                       attrs.has(TAK_differentiable)
+                                           ? DifferentiabilityKind::Normal
+                                           : DifferentiabilityKind
+                                                 ::NonDifferentiable);
 
       ty = resolveSILFunctionType(fnRepr, options, coroutineKind, extInfo,
                                   calleeConvention, witnessMethodProtocol);
