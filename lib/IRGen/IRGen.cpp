@@ -271,6 +271,8 @@ void swift::performLLVMOptimizations(IRGenOptions &Opts, llvm::Module *Module,
 
   PMBuilder.populateModulePassManager(ModulePasses);
 
+  ModulePasses.add(createSwiftWeakFunctionEmulationPass());
+
   // The PMBuilder only knows about LLVM AA passes.  We should explicitly add
   // the swift AA pass after the other ones.
   if (RunSwiftSpecificLLVMOptzns) {

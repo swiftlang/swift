@@ -25,6 +25,7 @@ namespace llvm {
   void initializeSwiftARCContractPass(PassRegistry &);
   void initializeInlineTreePrinterPass(PassRegistry &);
   void initializeSwiftMergeFunctionsPass(PassRegistry &);
+  void initializeSwiftWeakFunctionEmulationPassPass(PassRegistry &);
 }
 
 namespace swift {
@@ -34,6 +35,7 @@ namespace swift {
   llvm::ModulePass *createSwiftMergeFunctionsPass();
   llvm::ImmutablePass *createSwiftAAWrapperPass();
   llvm::ImmutablePass *createSwiftRCIdentityPass();
+  llvm::ModulePass *createSwiftWeakFunctionEmulationPass();
 } // end namespace swift
 
 #endif
