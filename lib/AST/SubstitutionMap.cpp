@@ -416,17 +416,6 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
       // to use that.
       if (normal->getState() == ProtocolConformanceState::CheckingTypeWitnesses)
         return None;
-
-      auto lazyResolver = type->getASTContext().getLazyResolver();
-      if (lazyResolver == nullptr)
-        return None;
-
-      lazyResolver->resolveTypeWitness(normal, nullptr);
-
-      // Error case: the conformance is broken, so we cannot handle this
-      // substitution.
-      if (normal->getSignatureConformances().empty())
-        return None;
     }
 
     // Get the associated conformance.
@@ -472,7 +461,8 @@ SubstitutionMap SubstitutionMap::subst(TypeSubstitutionFn subs,
 
     // Fast path for concrete case -- we don't need to compute substType
     // at all.
-    if (conformance.isConcrete()) {
+    if (conformance.isConcrete() &&
+        !options.contains(SubstFlags::SubstituteOpaqueArchetypes)) {
       newConformances.push_back(
         ProtocolConformanceRef(
           conformance.getConcrete()->subst(subs, conformances)));

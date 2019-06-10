@@ -99,8 +99,8 @@ private:
   /// evaluation.
   SmallPtrSet<SILBasicBlock *, 8> visitedBlocks;
 
-  ConstExprStepEvaluator(const ConstExprEvaluator &) = delete;
-  void operator=(const ConstExprEvaluator &) = delete;
+  ConstExprStepEvaluator(const ConstExprStepEvaluator &) = delete;
+  void operator=(const ConstExprStepEvaluator &) = delete;
 
 public:
   /// Constructs a step evaluator given an allocator and a non-null pointer to a

@@ -17,6 +17,7 @@
 #include "swift/Parse/Parser.h"
 
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/DiagnosticSuppression.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Version.h"
@@ -594,6 +595,12 @@ ParserResult<IfConfigDecl> Parser::parseIfConfig(
     Expr *Condition = nullptr;
     bool isActive = false;
 
+    if (!Tok.isAtStartOfLine() && isElse && Tok.is(tok::kw_if)) {
+      diagnose(Tok, diag::unexpected_if_following_else_compilation_directive)
+          .fixItReplace(SourceRange(ClauseLoc, consumeToken()), "#elseif");
+      isElse = false;
+    }
+
     // Parse the condition.  Evaluate it to determine the active
     // clause unless we're doing a parse-only pass.
     if (isElse) {
@@ -638,6 +645,12 @@ ParserResult<IfConfigDecl> Parser::parseIfConfig(
     SmallVector<ASTNode, 16> Elements;
     if (isActive || !isVersionCondition) {
       parseElements(Elements, isActive);
+    } else if (SyntaxContext->isEnabled()) {
+      // We shouldn't skip code if we are building syntax tree.
+      // The parser will keep running and we just discard the AST part.
+      DiagnosticSuppression suppression(Context.Diags);
+      SmallVector<ASTNode, 16> dropedElements;
+      parseElements(dropedElements, false);
     } else {
       DiagnosticTransaction DT(Diags);
       skipUntilConditionalBlockClose();

@@ -42,8 +42,8 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
                                SILDeclRef derived, SILDeclRef base) {
   assert(base.kind == derived.kind);
 
-  auto *baseDecl = base.getDecl();
-  auto *derivedDecl = derived.getDecl();
+  auto *baseDecl = cast<AbstractFunctionDecl>(base.getDecl());
+  auto *derivedDecl = cast<AbstractFunctionDecl>(derived.getDecl());
 
   // Note: We intentionally don't support extension members here.
   //
@@ -80,8 +80,11 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
   // If the member is dynamic, reference its dynamic dispatch thunk so that
   // it will be redispatched, funneling the method call through the runtime
   // hook point.
-  if (derivedDecl->isObjCDynamic()
-      && derived.kind != SILDeclRef::Kind::Allocator) {
+  bool usesObjCDynamicDispatch =
+      (derivedDecl->isObjCDynamic() &&
+       derived.kind != SILDeclRef::Kind::Allocator);
+
+  if (usesObjCDynamicDispatch) {
     implFn = getDynamicThunk(derived, Types.getConstantInfo(derived).SILFnType);
     implLinkage = SILLinkage::Public;
   } else {
@@ -92,6 +95,12 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
   // As a fast path, if there is no override, definitely no thunk is necessary.
   if (derived == base)
     return SILVTable::Entry(base, implFn, implKind, implLinkage);
+
+  // If the base method is less visible than the derived method, we need
+  // a thunk.
+  bool baseLessVisibleThanDerived =
+    (derivedDecl->isEffectiveLinkageMoreVisibleThan(baseDecl) &&
+     !usesObjCDynamicDispatch);
 
   // Determine the derived thunk type by lowering the derived type against the
   // abstraction pattern of the base.
@@ -104,7 +113,8 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
   // The override member type is semantically a subtype of the base
   // member type. If the override is ABI compatible, we do not need
   // a thunk.
-  if (M.Types.checkFunctionForABIDifferences(derivedInfo.SILFnType,
+  if (!baseLessVisibleThanDerived &&
+      M.Types.checkFunctionForABIDifferences(derivedInfo.SILFnType,
                                              overrideInfo.SILFnType)
       == TypeConverter::ABIDifference::Trivial)
     return SILVTable::Entry(base, implFn, implKind, implLinkage);
@@ -138,10 +148,13 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
       IsBare, IsNotTransparent, IsNotSerialized, IsNotDynamic);
   thunk->setDebugScope(new (M) SILDebugScope(loc, thunk));
 
+  PrettyStackTraceSILFunction trace("generating vtable thunk", thunk);
+
   SILGenFunction(*this, *thunk, theClass)
-    .emitVTableThunk(derived, implFn, basePattern,
+    .emitVTableThunk(base, derived, implFn, basePattern,
                      overrideInfo.LoweredType,
-                     derivedInfo.LoweredType);
+                     derivedInfo.LoweredType,
+                     baseLessVisibleThanDerived);
   emitLazyConformancesForFunction(thunk);
 
   return SILVTable::Entry(base, thunk, implKind, implLinkage);
@@ -545,27 +558,6 @@ public:
 
 } // end anonymous namespace
 
-static SILWitnessTable *
-getWitnessTableToInsertAfter(SILGenModule &SGM,
-                             NormalProtocolConformance *insertAfter) {
-  while (insertAfter) {
-    // If the table was emitted, emit after it.
-    auto found = SGM.emittedWitnessTables.find(insertAfter);
-    if (found != SGM.emittedWitnessTables.end())
-      return found->second;
-
-    // Otherwise, try inserting after the table we would transitively be
-    // inserted after.
-    auto foundDelayed = SGM.delayedConformances.find(insertAfter);
-    if (foundDelayed != SGM.delayedConformances.end())
-      insertAfter = foundDelayed->second.insertAfter;
-    else
-      break;
-  }
-
-  return nullptr;
-}
-
 SILWitnessTable *
 SILGenModule::getWitnessTable(NormalProtocolConformance *conformance) {
   // If we've already emitted this witness table, return it.
@@ -576,23 +568,6 @@ SILGenModule::getWitnessTable(NormalProtocolConformance *conformance) {
   SILWitnessTable *table = SILGenConformance(*this, conformance).emit();
   emittedWitnessTables.insert({conformance, table});
 
-  // If we delayed emission of this witness table, move it to its rightful
-  // place within the module.
-  auto foundDelayed = delayedConformances.find(conformance);
-  if (foundDelayed != delayedConformances.end()) {
-    M.witnessTables.remove(table);
-    auto insertAfter = getWitnessTableToInsertAfter(*this,
-                                              foundDelayed->second.insertAfter);
-    if (!insertAfter) {
-      M.witnessTables.push_front(table);
-    } else {
-      M.witnessTables.insertAfter(insertAfter->getIterator(), table);
-    }
-  } else {
-    // We would have marked a delayed conformance as "last emitted" when it
-    // was delayed.
-    lastEmittedConformance = conformance;
-  }
   return table;
 }
 
@@ -976,7 +951,7 @@ public:
     // Emit witness tables for conformances of concrete types. Protocol types
     // are existential and do not have witness tables.
     for (auto *conformance : theType->getLocalConformances(
-                               ConformanceLookupKind::All, nullptr)) {
+                               ConformanceLookupKind::NonInherited, nullptr)) {
       if (conformance->isComplete()) {
         if (auto *normal = dyn_cast<NormalProtocolConformance>(conformance))
           SGM.getWitnessTable(normal);

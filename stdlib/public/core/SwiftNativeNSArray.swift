@@ -47,7 +47,7 @@ internal class __SwiftNativeNSArrayWithContiguousStorage
   : __SwiftNativeNSArray { // Provides NSArray inheritance and native refcounting
 
   @inlinable
-  @nonobjc internal override init() {}
+  @nonobjc internal override init() { super.init() }
 
   @inlinable
   deinit {}

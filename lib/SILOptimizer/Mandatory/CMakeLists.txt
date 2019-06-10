@@ -2,6 +2,7 @@ silopt_register_sources(
   AccessEnforcementSelection.cpp
   AccessMarkerElimination.cpp
   AddressLowering.cpp
+  ClosureLifetimeFixup.cpp
   ConstantPropagation.cpp
   DefiniteInitialization.cpp
   DIMemoryUseCollector.cpp
@@ -15,8 +16,9 @@ silopt_register_sources(
   MandatoryInlining.cpp
   PredictableMemOpt.cpp
   PMOMemoryUseCollector.cpp
-  SemanticARCOpts.cpp
-  ClosureLifetimeFixup.cpp
   RawSILInstLowering.cpp
+  SemanticARCOpts.cpp
+  SILGenCleanup.cpp
   YieldOnceCheck.cpp
+  OSLogOptimization.cpp
 )

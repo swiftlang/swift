@@ -105,9 +105,6 @@ FRONTEND_STATISTIC(AST, NumLinkLibraries)
 /// Number of top-level modules loaded in the AST context.
 FRONTEND_STATISTIC(AST, NumLoadedModules)
 
-/// Number of external definitions imported into the AST context.
-FRONTEND_STATISTIC(AST, NumImportedExternalDefinitions)
-
 /// Number of Clang entities imported into the AST context.
 FRONTEND_STATISTIC(AST, NumTotalClangImportedEntities)
 
@@ -140,6 +137,9 @@ FRONTEND_STATISTIC(AST, NumPrefixOperators)
 
 /// Number of precedence groups in the AST context.
 FRONTEND_STATISTIC(AST, NumPrecedenceGroups)
+
+/// Number of precedence groups in the AST context.
+FRONTEND_STATISTIC(AST, NumStoredPropertiesQueries)
 
 /// Number of full function bodies parsed.
 FRONTEND_STATISTIC(Parse, NumFunctionsParsed)

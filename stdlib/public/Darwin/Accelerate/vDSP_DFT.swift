@@ -159,7 +159,6 @@ extension Double: vDSP_FloatingPointDiscreteFourierTransformable {
 public protocol vDSP_DFTFunctions {
     associatedtype Scalar
     
-    @inline(__always)
     /// Returns a setup structure to perform a discrete Fourier transform
     ///
     /// - Parameter previous: a previous vDSP_DFT instance to share data with.
@@ -178,7 +177,6 @@ public protocol vDSP_DFTFunctions {
     /// - Parameter inputImaginary: Input vector - imaginary part.
     /// - Parameter outputReal: Output vector - real part.
     /// - Parameter outputImaginary: Output vector - imaginary part.
-    @inline(__always)
     static func transform<U, V>(dftSetup: OpaquePointer,
                                 inputReal: U,
                                 inputImaginary: U,
@@ -190,7 +188,6 @@ public protocol vDSP_DFTFunctions {
         U.Element == Scalar, V.Element == Scalar
     
     /// Releases a DFT setup object.
-    @inline(__always)
     static func destroySetup(_ setup: OpaquePointer)
 }
 
@@ -209,7 +206,6 @@ extension vDSP.VectorizableFloat: vDSP_DFTFunctions {
     /// - Parameter count: the number of real elements to be transformed.
     /// - Parameter direction: Specifies the transform direction.
     /// - Parameter transformType: Specficies whether to forward transform is real-to-complex or complex-to-complex.
-    @inline(__always)
     public static func makeDFTSetup<T>(previous: vDSP.DFT<T>? = nil,
                                        count: Int,
                                        direction: vDSP.FourierTransformDirection,
@@ -235,7 +231,6 @@ extension vDSP.VectorizableFloat: vDSP_DFTFunctions {
     /// - Parameter inputImaginary: Input vector - imaginary part.
     /// - Parameter outputReal: Output vector - real part.
     /// - Parameter outputImaginary: Output vector - imaginary part.
-    @inline(__always)
     public static func transform<U, V>(dftSetup: OpaquePointer,
                                        inputReal: U,
                                        inputImaginary: U,
@@ -263,7 +258,6 @@ extension vDSP.VectorizableFloat: vDSP_DFTFunctions {
     }
     
     /// Releases a DFT setup object.
-    @inline(__always)
     public static func destroySetup(_ setup: OpaquePointer) {
         vDSP_DFT_DestroySetup(setup)
     }
@@ -278,7 +272,6 @@ extension vDSP.VectorizableDouble: vDSP_DFTFunctions {
     /// - Parameter count: the number of real elements to be transformed.
     /// - Parameter direction: Specifies the transform direction.
     /// - Parameter transformType: Specficies whether to forward transform is real-to-complex or complex-to-complex.
-    @inline(__always)
     public static func makeDFTSetup<T>(previous: vDSP.DFT<T>? = nil,
                                        count: Int,
                                        direction: vDSP.FourierTransformDirection,
@@ -304,7 +297,6 @@ extension vDSP.VectorizableDouble: vDSP_DFTFunctions {
     /// - Parameter inputImaginary: Input vector - imaginary part.
     /// - Parameter outputReal: Output vector - real part.
     /// - Parameter outputImaginary: Output vector - imaginary part.
-    @inline(__always)
     public static func transform<U, V>(dftSetup: OpaquePointer,
                                        inputReal: U, inputImaginary: U,
                                        outputReal: inout V, outputImaginary: inout V)
@@ -330,7 +322,6 @@ extension vDSP.VectorizableDouble: vDSP_DFTFunctions {
     }
     
     /// Releases a DFT setup object.
-    @inline(__always)
     public static func destroySetup(_ setup: OpaquePointer) {
         vDSP_DFT_DestroySetupD(setup)
     }

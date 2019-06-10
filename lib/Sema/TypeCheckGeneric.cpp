@@ -158,9 +158,9 @@ static void revertDependentTypeLoc(TypeLoc &tl) {
   tl.setType(Type());
 }
 
-///
-/// Generic functions
-///
+//
+// Generic functions
+//
 
 /// Get the opaque type representing the return type of a declaration, or
 /// create it if it does not yet exist.
@@ -170,6 +170,18 @@ Type TypeChecker::getOrCreateOpaqueResultType(TypeResolution resolution,
   // If the decl already has an opaque type decl for its return type, use it.
   if (auto existingDecl = originatingDecl->getOpaqueResultTypeDecl()) {
     return existingDecl->getDeclaredInterfaceType();
+  }
+  
+  // Check the availability of the opaque type runtime support.
+  if (!Context.LangOpts.DisableAvailabilityChecking) {
+    auto runningOS = overApproximateAvailabilityAtLocation(repr->getLoc(),
+                                    originatingDecl->getInnermostDeclContext());
+    auto availability = Context.getOpaqueTypeAvailability();
+    if (!runningOS.isContainedIn(availability)) {
+      diagnosePotentialOpaqueTypeUnavailability(repr->getSourceRange(),
+       originatingDecl->getInnermostDeclContext(),
+       UnavailabilityReason::requiresVersionRange(availability.getOSVersion()));
+    }
   }
   
   // Try to resolve the constraint repr. It should be some kind of existential
@@ -729,10 +741,8 @@ GenericEnvironment *TypeChecker::checkGenericEnvironment(
 
 void TypeChecker::validateGenericTypeSignature(GenericTypeDecl *typeDecl) {
   if (auto *proto = dyn_cast<ProtocolDecl>(typeDecl)) {
-    // Compute the requirement signature first.
-    if (!proto->isRequirementSignatureComputed())
-      proto->computeRequirementSignature();
-
+    // The requirement signature is created lazily by
+    // ProtocolDecl::getRequirementSignature().
     // The generic signature and environment is created lazily by
     // GenericContext::getGenericSignature(), so there is nothing we
     // need to do.

@@ -12,7 +12,7 @@
 
 /// A sequence that presents the elements of a base sequence of sequences
 /// concatenated using a given separator.
-@_fixed_layout // lazy-performance
+@frozen // lazy-performance
 public struct JoinedSequence<Base : Sequence> where Base.Element : Sequence {
 
   public typealias Element = Base.Element.Element
@@ -37,7 +37,7 @@ public struct JoinedSequence<Base : Sequence> where Base.Element : Sequence {
 extension JoinedSequence {
   /// An iterator that presents the elements of the sequences traversed
   /// by a base iterator, concatenated using a given separator.
-  @_fixed_layout // lazy-performance
+  @frozen // lazy-performance
   public struct Iterator {
     @usableFromInline // lazy-performance
     internal var _base: Base.Iterator
@@ -48,7 +48,7 @@ extension JoinedSequence {
     @usableFromInline // lazy-performance
     internal var _separator: ContiguousArray<Element>.Iterator?
     
-    @_frozen // lazy-performance
+    @frozen // lazy-performance
     @usableFromInline // lazy-performance
     internal enum _JoinIteratorState {
       case start

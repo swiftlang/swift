@@ -33,7 +33,7 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PrettyStackTrace.h"
-#include "swift/AST/PropertyDelegates.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/TypeWalker.h"
@@ -1110,36 +1110,14 @@ static bool inferFinalAndDiagnoseIfNeeded(ValueDecl *D,
   return true;
 }
 
-/// Try to make the given declaration 'dynamic', checking any semantic
-/// constraints before doing so.
-///
-/// \returns true if it can be made dynamic, false otherwise.
-static bool makeObjCDynamic(ValueDecl *decl) {
-  // Only  members of classes can be dynamic.
-  auto classDecl = decl->getDeclContext()->getSelfClassDecl();
-  if (!classDecl) {
-    auto attr = decl->getAttrs().getAttribute<DynamicAttr>();
-    decl->diagnose(diag::dynamic_not_in_class)
-      .fixItRemove(attr ? SourceRange(attr->getLocation()) : SourceRange());
-    return false;
-  }
-
-  // '@objc dynamic' is only supported through the Objective-C runtime.
-  if (!decl->isObjC()) {
-    decl->diagnose(diag::dynamic_requires_objc,
-                   decl->getDescriptiveKind(), decl->getFullName())
-      .fixItInsert(decl->getAttributeInsertionLoc(/*forModifier=*/false),
-                   "@objc ");
-    return false;
-  }
-
+/// Make the given declaration 'dynamic', if it isn't already marked as such.
+static void makeDynamic(ValueDecl *decl) {
   // If there isn't already a 'dynamic' attribute, add an inferred one.
-  if (!decl->getAttrs().hasAttribute<DynamicAttr>()) {
-    auto attr = new (decl->getASTContext()) DynamicAttr(/*implicit=*/true);
-    decl->getAttrs().add(attr);
-  }
-
-  return true;
+  if (decl->getAttrs().hasAttribute<DynamicAttr>())
+    return;
+  
+  auto attr = new (decl->getASTContext()) DynamicAttr(/*implicit=*/true);
+  decl->getAttrs().add(attr);
 }
 
 static llvm::Expected<bool> isStorageDynamic(Evaluator &evaluator,
@@ -1203,6 +1181,7 @@ doesAccessorNeedDynamicAttribute(AccessorDecl *accessor, Evaluator &evaluator) {
       return isStorageDynamic(evaluator, accessor);
     return false;
   }
+  llvm_unreachable("covered switch");
 }
 
 llvm::Expected<bool>
@@ -1301,9 +1280,7 @@ IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
 
   // If 'dynamic' was explicitly specified, check it.
   if (decl->getAttrs().hasAttribute<DynamicAttr>()) {
-    if (decl->getASTContext().LangOpts.isSwiftVersionAtLeast(5))
-      return true;
-    return makeObjCDynamic(decl);
+    return true;
   }
 
   if (auto accessor = dyn_cast<AccessorDecl>(decl)) {
@@ -1319,15 +1296,11 @@ IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     case AccessorKind::Get:
     case AccessorKind::Set: {
       auto isDynamicResult = evaluator(
-        IsDynamicRequest{accessor->getStorage()});
-
-      if (!isDynamicResult)
-        return isDynamicResult;
-
-      if (*isDynamicResult)
-        return makeObjCDynamic(decl);
-
-      return false;
+          IsDynamicRequest{accessor->getStorage()});
+      if (isDynamicResult && *isDynamicResult)
+        makeDynamic(decl);
+      
+      return isDynamicResult;  
     }
 
 #define OBJC_ACCESSOR(ID, KEYWORD)
@@ -1342,7 +1315,8 @@ IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   // FIXME: Use a semantic check for NSManaged rather than looking for the
   // attribute (which could be ill-formed).
   if (decl->getAttrs().hasAttribute<NSManagedAttr>()) {
-    return makeObjCDynamic(decl);
+    makeDynamic(decl);
+    return true;
   }
 
   // The presence of 'final' blocks the inference of 'dynamic'.
@@ -1361,7 +1335,8 @@ IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   // This is intended to enable overriding the declarations.
   auto dc = decl->getDeclContext();
   if (isa<ExtensionDecl>(dc) && dc->getSelfClassDecl()) {
-    return makeObjCDynamic(decl);
+    makeDynamic(decl);
+    return true;
   }
 
   // If any of the declarations overridden by this declaration are dynamic
@@ -1372,16 +1347,61 @@ IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   auto overriddenDecls = evaluateOrDefault(evaluator,
     OverriddenDeclsRequest{decl}, {});
   for (auto overridden : overriddenDecls) {
-    if (overridden->isDynamic() &&
-        (!decl->getASTContext().LangOpts.isSwiftVersionAtLeast(5) ||
-         overridden->isObjC()))
-      return makeObjCDynamic(decl);
-
-    if (overridden->hasClangNode())
-      return makeObjCDynamic(decl);
+    if (overridden->isDynamic() || overridden->hasClangNode()) {
+      makeDynamic(decl);
+      return true;
+    }
   }
 
   return false;
+}
+
+llvm::Expected<ArrayRef<Requirement>>
+RequirementSignatureRequest::evaluate(Evaluator &evaluator, ProtocolDecl *proto) const {
+  GenericSignatureBuilder builder(proto->getASTContext());
+
+  // Add all of the generic parameters.
+  proto->createGenericParamsIfMissing();
+  for (auto gp : *proto->getGenericParams())
+    builder.addGenericParameter(gp);
+
+  // Add the conformance of 'self' to the protocol.
+  auto selfType =
+    proto->getSelfInterfaceType()->castTo<GenericTypeParamType>();
+  auto requirement =
+    Requirement(RequirementKind::Conformance, selfType,
+              proto->getDeclaredInterfaceType());
+
+  builder.addRequirement(
+          requirement,
+          GenericSignatureBuilder::RequirementSource::forRequirementSignature(
+                                                      builder, selfType, proto),
+          nullptr);
+
+  auto reqSignature = std::move(builder).computeGenericSignature(
+                        SourceLoc(),
+                        /*allowConcreteGenericPArams=*/false,
+                        /*allowBuilderToMove=*/false);
+  return reqSignature->getRequirements();
+}
+
+llvm::Expected<Type>
+DefaultDefinitionTypeRequest::evaluate(Evaluator &evaluator,
+                                       AssociatedTypeDecl *assocType) const {
+  if (assocType->Resolver) {
+    auto defaultType = assocType->Resolver->loadAssociatedTypeDefault(
+                                    assocType, assocType->ResolverContextData);
+    assocType->Resolver = nullptr;
+    return defaultType;
+  }
+
+  TypeRepr *defaultDefinition = assocType->getDefaultDefinitionTypeRepr();
+  if (defaultDefinition) {
+    auto resolution = TypeResolution::forInterface(assocType->getDeclContext());
+    return resolution.resolveType(defaultDefinition, None);
+  }
+
+  return Type();
 }
 
 namespace {
@@ -2017,15 +2037,15 @@ static bool computeIsGetterMutating(TypeChecker &TC,
            !storage->isStatic();
   }
 
-  // If we have an attached property delegate, the getter is mutating if
-  // the "value" property of the delegate type is mutating and we're in
+  // If we have an attached property wrapper, the getter is mutating if
+  // the "value" property of the wrapper type is mutating and we're in
   // a context that has value semantics.
   if (auto var = dyn_cast<VarDecl>(storage)) {
-    if (auto delegateInfo = var->getAttachedPropertyDelegateTypeInfo()) {
-      if (delegateInfo.valueVar &&
+    if (auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo()) {
+      if (wrapperInfo.valueVar &&
           (!storage->getGetter() || storage->getGetter()->isImplicit())) {
-        TC.validateDecl(delegateInfo.valueVar);
-        return delegateInfo.valueVar->isGetterMutating() &&
+        TC.validateDecl(wrapperInfo.valueVar);
+        return wrapperInfo.valueVar->isGetterMutating() &&
             var->isInstanceMember() &&
             doesContextHaveValueSemantics(var->getDeclContext());
       }
@@ -2052,15 +2072,15 @@ static bool computeIsGetterMutating(TypeChecker &TC,
 
 static bool computeIsSetterMutating(TypeChecker &TC,
                                     AbstractStorageDecl *storage) {
-  // If we have an attached property delegate, the setter is mutating if
-  // the "value" property of the delegate type is mutating and we're in
+  // If we have an attached property wrapper, the setter is mutating if
+  // the "value" property of the wrapper type is mutating and we're in
   // a context that has value semantics.
   if (auto var = dyn_cast<VarDecl>(storage)) {
-    if (auto delegateInfo = var->getAttachedPropertyDelegateTypeInfo()) {
-      if (delegateInfo.valueVar &&
+    if (auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo()) {
+      if (wrapperInfo.valueVar &&
           (!storage->getSetter() || storage->getSetter()->isImplicit())) {
-        TC.validateDecl(delegateInfo.valueVar);
-        return delegateInfo.valueVar->isSetterMutating() &&
+        TC.validateDecl(wrapperInfo.valueVar);
+        return wrapperInfo.valueVar->isSetterMutating() &&
             var->isInstanceMember() &&
             doesContextHaveValueSemantics(var->getDeclContext());
       }
@@ -2532,11 +2552,11 @@ public:
         // If we entered an initializer context, contextualize any
         // auto-closures we might have created.
         // Note that we don't contextualize the initializer for a property
-        // with a delegate, because the initializer will have been subsumed
+        // with a wrapper, because the initializer will have been subsumed
         // by the backing storage property.
         if (!DC->isLocalContext() &&
             !(PBD->getSingleVar() &&
-              PBD->getSingleVar()->getAttachedPropertyDelegate())) {
+              PBD->getSingleVar()->getAttachedPropertyWrapper())) {
           auto *initContext = cast_or_null<PatternBindingInitializer>(
               entry.getInitContext());
           if (initContext) {
@@ -2623,6 +2643,25 @@ public:
 
     // Trigger the checking for overridden declarations.
     (void)AT->getOverriddenDecls();
+
+    auto defaultType = AT->getDefaultDefinitionType();
+    if (defaultType && !defaultType->hasError()) {
+      // associatedtype X = X is invalid
+      auto mentionsItself =
+        defaultType.findIf([&](Type defaultType) {
+          if (auto DMT = defaultType->getAs<DependentMemberType>()) {
+            return DMT->getAssocType() == AT;
+          }
+          return false;
+        });
+
+      if (mentionsItself) {
+        TC.diagnose(AT->getDefaultDefinitionTypeRepr()->getLoc(),
+                    diag::recursive_decl_reference,
+                    AT->getDescriptiveKind(), AT->getName());
+        AT->diagnose(diag::kind_declared_here, DescriptiveDeclKind::Type);
+      }
+    }
   }
 
   void checkUnsupportedNestedType(NominalTypeDecl *NTD) {
@@ -2891,7 +2930,9 @@ public:
         break;
       }
 
-      if (!isInvalidSuperclass && Super->hasMissingVTableEntries()) {
+      if (!isInvalidSuperclass && Super->hasMissingVTableEntries() &&
+          !Super->isResilient(CD->getParentModule(),
+                              ResilienceExpansion::Minimal)) {
         auto *superFile = Super->getModuleScopeContext();
         if (auto *serialized = dyn_cast<SerializedASTFile>(superFile)) {
           if (serialized->getLanguageVersionBuiltWith() !=
@@ -3014,6 +3055,9 @@ public:
 
     // Explicitly calculate this bit.
     (void) PD->existentialTypeSupported(&TC);
+
+    // Explicity compute the requirement signature to detect errors.
+    (void) PD->getRequirementSignature();
   }
 
   void visitVarDecl(VarDecl *VD) {
@@ -3722,32 +3766,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     DeclValidationRAII IBV(assocType);
 
-    // Check the default definition, if there is one.
-    TypeLoc &defaultDefinition = assocType->getDefaultDefinitionLoc();
-    if (!defaultDefinition.isNull()) {
-      if (validateType(
-            defaultDefinition,
-            TypeResolution::forInterface(
-              assocType->getDeclContext()),
-            None)) {
-        defaultDefinition.setInvalidType(Context);
-      } else {
-        // associatedtype X = X is invalid
-        auto mentionsItself =
-            defaultDefinition.getType().findIf([&](Type type) {
-              if (auto DMT = type->getAs<DependentMemberType>()) {
-                return DMT->getAssocType() == assocType;
-              }
-              return false;
-            });
-
-        if (mentionsItself) {
-          diagnose(defaultDefinition.getLoc(), diag::recursive_decl_reference,
-                   assocType->getDescriptiveKind(), assocType->getName());
-          diagnose(assocType, diag::kind_declared_here, DescriptiveDeclKind::Type);
-        }
-      }
-    }
     // Finally, set the interface type.
     if (!assocType->hasInterfaceType())
       assocType->computeType();
@@ -4275,9 +4293,6 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
       return;
     proto->computeType();
 
-    // Compute the requirement signature later to avoid circularity.
-    DelayedRequirementSignatures.insert(proto);
-
     // FIXME: IRGen likes to emit @objc protocol descriptors even if the
     // protocol comes from a different module or translation unit.
     //
@@ -4362,7 +4377,7 @@ static bool shouldValidateMemberDuringFinalization(NominalTypeDecl *nominal,
        !cast<VarDecl>(VD)->isStatic() &&
        (cast<VarDecl>(VD)->hasStorage() ||
         VD->getAttrs().hasAttribute<LazyAttr>() ||
-        cast<VarDecl>(VD)->getAttachedPropertyDelegate())))
+        cast<VarDecl>(VD)->getAttachedPropertyWrapper())))
     return true;
 
   // For classes, we need to validate properties and functions,
@@ -4459,10 +4474,10 @@ static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
       completeLazyVarImplementation(prop);
     }
 
-    // Ensure that we create the backing variable for a property delegate.
-    if (prop->getAttachedPropertyDelegate()) {
+    // Ensure that we create the backing variable for a property wrapper.
+    if (prop->getAttachedPropertyWrapper()) {
       finalizeAbstractStorageDecl(TC, prop);
-      (void)prop->getPropertyDelegateBackingProperty();
+      (void)prop->getPropertyWrapperBackingProperty();
     }
   }
 
@@ -4470,13 +4485,16 @@ static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
     // We need the superclass vtable layout as well.
     TC.requestSuperclassLayout(CD);
 
-    auto useConformance = [&](ProtocolDecl *protocol) {
+    auto forceConformance = [&](ProtocolDecl *protocol) {
       if (auto ref = TC.conformsToProtocol(
             CD->getDeclaredInterfaceType(), protocol, CD,
             ConformanceCheckFlags::SkipConditionalRequirements,
             SourceLoc())) {
-        if (ref->getConcrete()->getDeclContext() == CD)
-          TC.markConformanceUsed(*ref, CD);
+        auto conformance = ref->getConcrete();
+        if (conformance->getDeclContext() == CD &&
+            conformance->getState() == ProtocolConformanceState::Incomplete) {
+          TC.checkConformance(conformance->getRootNormalConformance());
+        }
       }
     };
 
@@ -4485,9 +4503,9 @@ static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
     //
     // FIXME: Generalize this to other protocols for which
     // we can derive conformances.
-    useConformance(TC.Context.getProtocol(KnownProtocolKind::Decodable));
-    useConformance(TC.Context.getProtocol(KnownProtocolKind::Encodable));
-    useConformance(TC.Context.getProtocol(KnownProtocolKind::Hashable));
+    forceConformance(TC.Context.getProtocol(KnownProtocolKind::Decodable));
+    forceConformance(TC.Context.getProtocol(KnownProtocolKind::Encodable));
+    forceConformance(TC.Context.getProtocol(KnownProtocolKind::Hashable));
   }
 
   // validateDeclForNameLookup will not trigger an immediate full
@@ -4495,9 +4513,7 @@ static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
   // like the requirement signature have been set.
   if (auto PD = dyn_cast<ProtocolDecl>(nominal)) {
     (void)PD->getInheritedProtocols();
-    if (!PD->isRequirementSignatureComputed()) {
-      TC.validateDecl(PD);
-    }
+    TC.validateDecl(PD);
   }
 }
 
@@ -4986,7 +5002,7 @@ static void diagnoseClassWithoutInitializers(TypeChecker &tc,
     if (!computedBackingToOriginalVars) {
       for (auto member : classDecl->getMembers()) {
         if (auto var = dyn_cast<VarDecl>(member)) {
-          if (auto backingVar = var->getPropertyDelegateBackingProperty()) {
+          if (auto backingVar = var->getPropertyWrapperBackingProperty()) {
             backingToOriginalVars[backingVar] = var;
           }
         }
@@ -5277,16 +5293,16 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
       }
 
       if (auto var = dyn_cast<VarDecl>(member)) {
-        // If this variable has a property delegate, go validate it to ensure
+        // If this variable has a property wrapper, go validate it to ensure
         // that we create the backing storage property.
-        if (auto backingVar = var->getPropertyDelegateBackingProperty()) {
+        if (auto backingVar = var->getPropertyWrapperBackingProperty()) {
           validateDecl(var);
           maybeAddAccessorsToStorage(var);
 
           backingStorageVars.insert(backingVar);
         }
 
-        // Ignore the backing storage for properties with attached delegates.
+        // Ignore the backing storage for properties with attached wrappers.
         if (backingStorageVars.count(var) > 0)
           continue;
 
@@ -5423,6 +5439,15 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
       if (classDecl->hasClangNode())
         continue;
 
+      // If the superclass initializer is not accessible from the derived
+      // class, don't synthesize an override, since we cannot reference the
+      // superclass initializer's method descriptor at all.
+      //
+      // FIXME: This should be checked earlier as part of calculating
+      // canInheritInitializers.
+      if (!superclassCtor->isAccessibleFrom(classDecl))
+        continue;
+
       // Diagnose a missing override of a required initializer.
       if (superclassCtor->isRequired() && !canInheritInitializers) {
         diagnoseMissingRequiredInitializer(*this, classDecl, superclassCtor);
@@ -5455,20 +5480,11 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
                     ? DesignatedInitKind::Chaining
                     : DesignatedInitKind::Stub;
 
-      // If the superclass initializer is not accessible from the derived
-      // class, we cannot chain to 'super.init' either -- create a stub.
-      if (!superclassCtor->isAccessibleFrom(classDecl)) {
-        assert(!superclassCtor->isRequired() &&
-               "required initializer less visible than the class?");
-        kind = DesignatedInitKind::Stub;
-      }
-
       // We have a designated initializer. Create an override of it.
       // FIXME: Validation makes sure we get a generic signature here.
       validateDecl(classDecl);
       if (auto ctor = createDesignatedInitOverride(
                         *this, classDecl, superclassCtor, kind)) {
-        Context.addSynthesizedDecl(ctor);
         classDecl->addMember(ctor);
       }
     }
@@ -5510,9 +5526,7 @@ void TypeChecker::synthesizeMemberForLookup(NominalTypeDecl *target,
     auto targetType = target->getDeclaredInterfaceType();
     if (auto ref = conformsToProtocol(
                         targetType, protocol, target,
-                        (ConformanceCheckFlags::Used|
-                         ConformanceCheckFlags::SkipConditionalRequirements),
-                         SourceLoc())) {
+                        ConformanceCheckFlags::SkipConditionalRequirements)) {
       if (auto *conformance = dyn_cast<NormalProtocolConformance>(
             ref->getConcrete()->getRootConformance())) {
         if (conformance->getState() == ProtocolConformanceState::Incomplete) {
@@ -5580,62 +5594,12 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
   if (decl->hasClangNode())
     return;
 
-  // For a class, check whether the superclass (if it exists) is
-  // default-initializable.
-  if (isa<ClassDecl>(decl)) {
-    // We need to look for a default constructor.
-    if (auto superTy = decl->getDeclaredInterfaceType()->getSuperclass()) {
-      // If there are no default ctors for our supertype, we can't do anything.
-      auto ctors = lookupConstructors(decl, superTy);
-      if (!ctors)
-        return;
-
-      // Check whether we have a constructor that can be called with an empty
-      // tuple.
-      bool foundDefaultConstructor = false;
-      for (auto memberResult : ctors) {
-        auto member = memberResult.getValueDecl();
-
-        // Dig out the parameter tuple for this constructor.
-        auto ctor = dyn_cast<ConstructorDecl>(member);
-        if (!ctor || ctor->isInvalid())
-          continue;
-
-        // Check to see if this ctor has zero arguments, or if they all have
-        // default values.
-        auto params = ctor->getParameters();
-        
-        bool missingInit = false;
-        for (auto param : *params) {
-          if (!param->isDefaultArgument()) {
-            missingInit = true;
-            break;
-          }
-        }
-
-        // Check to see if this is an impossible candidate.
-        if (missingInit) {
-          // If we found an impossible designated initializer, then we cannot
-          // call super.init(), even if there is a match.
-          if (ctor->isDesignatedInit())
-            return;
-
-          // Otherwise, keep looking.
-          continue;
-        }
-
-        // Ok, we found a constructor that can be invoked with an empty tuple.
-        // If this is our second, then we bail out, because we don't want to
-        // pick one arbitrarily.
-        if (foundDefaultConstructor)
-          return;
-
-        foundDefaultConstructor = true;
-      }
-
-      // If our superclass isn't default constructible, we aren't either.
-      if (!foundDefaultConstructor) return;
-    }
+  // A class is only default initializable if it's a root class.
+  if (auto *classDecl = dyn_cast<ClassDecl>(decl)) {
+    // If the class has a superclass, we should have either inherited it's
+    // designated initializers or diagnosed the absence of our own.
+    if (classDecl->getSuperclass())
+      return;
   }
 
   // Create the default constructor.
@@ -5645,11 +5609,14 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
   // Add the constructor.
   decl->addMember(ctor);
 
-  // Create an empty body for the default constructor. The type-check of the
-  // constructor body will introduce default initializations of the members.
-  ctor->setBody(BraceStmt::create(Context, SourceLoc(), { }, SourceLoc()));
+  // Create an empty body for the default constructor.
+  SmallVector<ASTNode, 1> stmts;
+  stmts.push_back(new (Context) ReturnStmt(decl->getLoc(), nullptr));
+  ctor->setBody(BraceStmt::create(Context, SourceLoc(), stmts, SourceLoc()));
+  ctor->setBodyTypeCheckedIfPresent();
 
-  // Make sure we type check the constructor later.
+  // FIXME: This is still needed so that DI can check captures for
+  // initializer expressions. Rethink that completely.
   Context.addSynthesizedDecl(ctor);
 }
 

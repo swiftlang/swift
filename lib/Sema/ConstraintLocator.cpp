@@ -64,8 +64,7 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
     case ClosureResult:
     case ParentType:
     case InstanceType:
-    case SequenceIteratorProtocol:
-    case GeneratorElementType:
+    case SequenceElementType:
     case AutoclosureResult:
     case GenericArgument:
     case NamedTupleElement:
@@ -170,6 +169,30 @@ bool ConstraintLocator::isForKeyPathComponent() const {
   });
 }
 
+static bool isLastElement(const ConstraintLocator *locator,
+                          ConstraintLocator::PathElementKind expectedKind) {
+  auto path = locator->getPath();
+  return !path.empty() && path.back().getKind() == expectedKind;
+}
+
+bool ConstraintLocator::isForGenericParameter() const {
+  return isLastElement(this, ConstraintLocator::GenericParameter);
+}
+
+bool ConstraintLocator::isForSequenceElementType() const {
+  return isLastElement(this, ConstraintLocator::SequenceElementType);
+}
+
+bool ConstraintLocator::isForContextualType() const {
+  return isLastElement(this, ConstraintLocator::ContextualType);
+}
+
+GenericTypeParamType *ConstraintLocator::getGenericParameter() const {
+  assert(isForGenericParameter());
+  auto path = getPath();
+  return path.back().getGenericParameter();
+}
+
 void ConstraintLocator::dump(SourceManager *sm) {
   dump(sm, llvm::errs());
   llvm::errs() << "\n";
@@ -251,8 +274,8 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
       out << "function result";
       break;
 
-    case GeneratorElementType:
-      out << "generator element type";
+    case SequenceElementType:
+      out << "sequence element type";
       break;
 
     case GenericArgument:
@@ -293,10 +316,6 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
 
     case RValueAdjustment:
       out << "rvalue adjustment";
-      break;
-
-    case SequenceIteratorProtocol:
-      out << "sequence iterator type";
       break;
 
     case SubscriptMember:

@@ -76,15 +76,13 @@ struct J {
 
 // CHECK-LABEL: sil hidden [ossa] @$s27stored_property_default_arg16checkOptionalNilyyF : $@convention(thin) () -> () {
 func checkOptionalNil() {
-// CHECK: {{.*}} = metatype $@thin Optional<Int>.Type
-// CHECK-NEXT: [[L1_REF:%.*]] = enum $Optional<Int>, #Optional.none!enumelt
+// CHECK: [[L1_REF:%.*]] = enum $Optional<Int>, #Optional.none!enumelt
 // CHECK-NEXT: function_ref J.init(k:l:)
 // CHECK-NEXT: [[J1_REF:%.*]] = function_ref @$s27stored_property_default_arg1JV1k1lACSbSg_SiSgtcfC : $@convention(method) (Optional<Bool>, Optional<Int>, @thin J.Type) -> J
 // CHECK-NEXT: {{.*}} = apply [[J1_REF]]({{.*}}, [[L1_REF]], {{.*}}) : $@convention(method) (Optional<Bool>, Optional<Int>, @thin J.Type) -> J
   let m = J(k: true)
 
-// CHECK: {{.*}} = metatype $@thin Optional<Bool>.Type
-// CHECK-NEXT: [[K1_REF:%.*]] = enum $Optional<Bool>, #Optional.none!enumelt
+// CHECK: [[K1_REF:%.*]] = enum $Optional<Bool>, #Optional.none!enumelt
 // CHECK: function_ref J.init(k:l:)
 // CHECK-NEXT: [[J2_REF:%.*]] = function_ref @$s27stored_property_default_arg1JV1k1lACSbSg_SiSgtcfC : $@convention(method) (Optional<Bool>, Optional<Int>, @thin J.Type) -> J
 // CHECK-NEXT: {{.*}} = apply [[J2_REF]]([[K1_REF]], {{.*}}, {{.*}}) : $@convention(method) (Optional<Bool>, Optional<Int>, @thin J.Type) -> J

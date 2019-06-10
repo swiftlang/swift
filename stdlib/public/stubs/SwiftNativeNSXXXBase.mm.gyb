@@ -63,7 +63,7 @@ SWIFT_RUNTIME_STDLIB_API
 @implementation __SwiftNativeNS${Class}Base
 
 - (id)initWithCoder: (NSCoder *)coder {
-  return [self init];
+  return [super init];
 }
 - (id)retain {
   auto SELF = reinterpret_cast<HeapObject *>(self);

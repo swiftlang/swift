@@ -72,7 +72,7 @@
 ///     let pairs = IntPairs([1: 2, 1: 1, 3: 4, 2: 1])
 ///     print(pairs.elements)
 ///     // Prints "[(1, 2), (1, 1), (3, 4), (2, 1)]"
-@_fixed_layout // trivial-implementation
+@frozen // trivial-implementation
 public struct KeyValuePairs<Key, Value> : ExpressibleByDictionaryLiteral {
   @usableFromInline // trivial-implementation
   internal let _elements: [(Key, Value)]

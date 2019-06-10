@@ -1,4 +1,8 @@
-// RUN: %target-swift-frontend -O -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -disable-availability-checking -O -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -disable-availability-checking -Onone -emit-sil %s | %FileCheck %s --check-prefix=MANDATORY
+// RUN: %target-swift-frontend -Xllvm -sil-disable-pass=FunctionSignatureOpts -Xllvm -sil-disable-pass=PerfInliner -enable-ownership-stripping-after-serialization -disable-availability-checking -O -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-ownership-stripping-after-serialization -disable-availability-checking -Onone -emit-sil %s | %FileCheck %s --check-prefix=MANDATORY
+
 // We want to check two things here:
 // - Correctness
 // - That certain "is" checks are eliminated based on static analysis at compile-time
@@ -1063,6 +1067,24 @@ public func testCastToPForOptionalSuccess() -> Bool {
 public func testCastToPForOptionalFailure() -> Bool {
   let t: Int = 42
   return testCastToPForOptional(t)
+}
+
+struct Underlying : P {
+}
+
+func returnOpaque() -> some P {
+  return Underlying()
+}
+
+// MANDATORY-LABEL: sil{{.*}} @$s12cast_folding23testCastOpaqueArchetypeyyF
+// MANDATORY:   [[O:%.*]] = alloc_stack $@_opaqueReturnTypeOf("$s12cast_folding12returnOpaqueQryF", 0)
+// MANDATORY:   [[F:%.*]] = function_ref @$s12cast_folding12returnOpaqueQryF
+// MANDATORY:   apply [[F]]([[O]])
+// MANDATORY:   [[U:%.*]] = alloc_stack $Underlying
+// MANDATORY:   unconditional_checked_cast_addr @_opaqueReturnTypeOf{{.*}}in [[O]] : $*@_opaqueReturnTypeOf{{.*}}to Underlying in [[U]] : $*Underlying
+// MANDATORY:   load [[U]] : $*Underlying
+public func testCastOpaqueArchetype() {
+  let o = returnOpaque() as! Underlying
 }
 
 print("test0=\(test0())")

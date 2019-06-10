@@ -142,15 +142,14 @@ ProtocolConformanceRef::subst(Type origType,
 }
 
 Type
-ProtocolConformanceRef::getTypeWitnessByName(Type type,
-                                             ProtocolConformanceRef conformance,
-                                             Identifier name,
-                                             LazyResolver *resolver) {
-  assert(!conformance.isInvalid());
+ProtocolConformanceRef::getTypeWitnessByName(Type type, Identifier name) const {
+  assert(!isInvalid());
 
   // Find the named requirement.
+  ProtocolDecl *proto = getRequirement();
   AssociatedTypeDecl *assocType = nullptr;
-  auto members = conformance.getRequirement()->lookupDirect(name);
+  auto members = proto->lookupDirect(name,
+                      NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions);
   for (auto member : members) {
     assocType = dyn_cast<AssociatedTypeDecl>(member);
     if (assocType)
@@ -161,21 +160,36 @@ ProtocolConformanceRef::getTypeWitnessByName(Type type,
   if (!assocType)
     return nullptr;
 
-  if (conformance.isAbstract()) {
-    // For an archetype, retrieve the nested type with the appropriate
-    // name. There are no conformance tables.
-    if (auto archetype = type->getAs<ArchetypeType>()) {
-      return archetype->getNestedType(name);
-    }
+  return assocType->getDeclaredInterfaceType().subst(
+    SubstitutionMap::getProtocolSubstitutions(proto, type, *this));
+}
 
-    return DependentMemberType::get(type, assocType);
+ConcreteDeclRef
+ProtocolConformanceRef::getWitnessByName(Type type, DeclName name) const {
+  // Find the named requirement.
+  auto *proto = getRequirement();
+  auto results =
+    proto->lookupDirect(name,
+                      NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions);
+
+  ValueDecl *requirement = nullptr;
+  for (auto *result : results) {
+    if (isa<ProtocolDecl>(result->getDeclContext()))
+      requirement = result;
   }
 
-  auto concrete = conformance.getConcrete();
-  if (!concrete->hasTypeWitness(assocType, resolver)) {
-    return nullptr;
+  if (requirement == nullptr)
+    return ConcreteDeclRef();
+
+  // For a type with dependent conformance, just return the requirement from
+  // the protocol. There are no protocol conformance tables.
+  if (!isConcrete()) {
+    auto subs = SubstitutionMap::getProtocolSubstitutions(proto, type, *this);
+    return ConcreteDeclRef(requirement, subs);
   }
-  return concrete->getTypeWitness(assocType, resolver);
+
+  auto *resolver = proto->getASTContext().getLazyResolver();
+  return getConcrete()->getWitnessDeclRef(requirement, resolver);
 }
 
 void *ProtocolConformance::operator new(size_t bytes, ASTContext &context,
@@ -498,37 +512,6 @@ ProtocolConformanceRef::getConditionalRequirements() const {
   else
     // An abstract conformance is never conditional, as above.
     return {};
-}
-
-ProtocolConformanceRef
-ProtocolConformanceRef::getInheritedConformanceRef(ProtocolDecl *base) const {
-  if (isAbstract()) {
-    assert(getRequirement()->inheritsFrom(base));
-    return ProtocolConformanceRef(base);
-  }
-
-  auto concrete = getConcrete();
-  auto proto = concrete->getProtocol();
-  auto path =
-    proto->getGenericSignature()->getConformanceAccessPath(
-                                            proto->getSelfInterfaceType(), base);
-  ProtocolConformanceRef result = *this;
-  Type resultType = concrete->getType();
-  bool first = true;
-  for (const auto &step : path) {
-    if (first) {
-      assert(step.first->isEqual(proto->getSelfInterfaceType()));
-      assert(step.second == proto);
-      first = false;
-      continue;
-    }
-
-    result =
-        result.getAssociatedConformance(resultType, step.first, step.second);
-    resultType = result.getAssociatedType(resultType, step.first);
-  }
-
-  return result;
 }
 
 void NormalProtocolConformance::differenceAndStoreConditionalRequirements()
@@ -921,8 +904,9 @@ NormalProtocolConformance::getAssociatedConformance(Type assocType,
   // Fill in the signature conformances, if we haven't done so yet.
   if (getSignatureConformances().empty()) {
     assocType->getASTContext().getLazyResolver()
-      ->checkConformanceRequirements(
-        const_cast<NormalProtocolConformance *>(this));
+      ->resolveTypeWitness(
+        const_cast<NormalProtocolConformance *>(this),
+        nullptr);
   }
 
   assert(!getSignatureConformances().empty() &&

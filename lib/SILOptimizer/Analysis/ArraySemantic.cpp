@@ -24,7 +24,7 @@ using namespace swift;
 static ParameterConvention
 getSelfParameterConvention(ApplyInst *SemanticsCall) {
   FunctionRefInst *FRI = cast<FunctionRefInst>(SemanticsCall->getCallee());
-  SILFunction *F = FRI->getReferencedFunction();
+  SILFunction *F = FRI->getInitiallyReferencedFunction();
   auto FnTy = F->getLoweredFunctionType();
 
   return FnTy->getSelfParameter().getConvention();
@@ -36,7 +36,7 @@ bool swift::ArraySemanticsCall::isValidSignature() {
   assert(SemanticsCall && getKind() != ArrayCallKind::kNone &&
          "Need an array semantic call");
   FunctionRefInst *FRI = cast<FunctionRefInst>(SemanticsCall->getCallee());
-  SILFunction *F = FRI->getReferencedFunction();
+  SILFunction *F = FRI->getInitiallyReferencedFunction();
   auto FnTy = F->getLoweredFunctionType();
   auto &Mod = F->getModule();
 
@@ -84,7 +84,7 @@ bool swift::ArraySemanticsCall::isValidSignature() {
       auto *AllocBufferAI = dyn_cast<ApplyInst>(Arg0);
       if (!AllocBufferAI)
         return false;
-      auto *AllocFn = AllocBufferAI->getReferencedFunction();
+      auto *AllocFn = AllocBufferAI->getReferencedFunctionOrNull();
       if (!AllocFn || AllocFn->getName() != "swift_bufferAllocate" ||
           !hasOneNonDebugUse(AllocBufferAI))
         return false;
@@ -132,7 +132,7 @@ swift::ArraySemanticsCall::ArraySemanticsCall(ApplyInst *AI,
 
 void ArraySemanticsCall::initialize(ApplyInst *AI, StringRef semanticName,
                                     bool matchPartialName) {
-  auto *fn = AI->getReferencedFunction();
+  auto *fn = AI->getReferencedFunctionOrNull();
   if (!fn)
     return;
 
@@ -159,7 +159,7 @@ ArrayCallKind swift::ArraySemanticsCall::getKind() const {
     return ArrayCallKind::kNone;
 
   auto F = cast<FunctionRefInst>(SemanticsCall->getCallee())
-               ->getReferencedFunction();
+               ->getInitiallyReferencedFunction();
 
   ArrayCallKind Kind = ArrayCallKind::kNone;
 
@@ -773,7 +773,7 @@ bool swift::ArraySemanticsCall::replaceByAppendingValues(
     }
   }
   CanSILFunctionType AppendContentsOfFnTy =
-    SemanticsCall->getReferencedFunction()->getLoweredFunctionType();
+      SemanticsCall->getReferencedFunctionOrNull()->getLoweredFunctionType();
   if (AppendContentsOfFnTy->getParameters()[0].getConvention() ==
         ParameterConvention::Direct_Owned) {
     SILValue SrcArray = SemanticsCall->getArgument(0);

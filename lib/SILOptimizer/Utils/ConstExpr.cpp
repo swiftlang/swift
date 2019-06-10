@@ -46,7 +46,9 @@ enum class WellKnownFunction {
   // static String.append (_: String, _: inout String)
   StringAppend,
   // static String.== infix(_: String)
-  StringEquals
+  StringEquals,
+  // String.percentEscapedString.getter
+  StringEscapePercent
 };
 
 static llvm::Optional<WellKnownFunction> classifyFunction(SILFunction *fn) {
@@ -61,6 +63,8 @@ static llvm::Optional<WellKnownFunction> classifyFunction(SILFunction *fn) {
     return WellKnownFunction::StringAppend;
   if (fn->hasSemanticsAttr("string.equals"))
     return WellKnownFunction::StringEquals;
+  if (fn->hasSemanticsAttr("string.escapePercent.get"))
+    return WellKnownFunction::StringEscapePercent;
   return None;
 }
 
@@ -210,7 +214,7 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
     return SymbolicValue::getString(sli->getValue(), evaluator.getAllocator());
 
   if (auto *fri = dyn_cast<FunctionRefInst>(value))
-    return SymbolicValue::getFunction(fri->getReferencedFunction());
+    return SymbolicValue::getFunction(fri->getInitiallyReferencedFunction());
 
   // If we have a reference to a metatype, constant fold any substitutable
   // types.
@@ -401,6 +405,11 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
   // This instruction is a marker that returns its first operand.
   if (auto *bai = dyn_cast<BeginAccessInst>(value))
     return getConstantValue(bai->getOperand());
+
+  // Look through copy_value and begin_borrow since the interpreter doesn't
+  // model these memory management instructions.
+  if (isa<CopyValueInst>(value) || isa<BeginBorrowInst>(value))
+    return getConstantValue(cast<SingleValueInstruction>(value)->getOperand(0));
 
   LLVM_DEBUG(llvm::dbgs() << "ConstExpr Unknown simple: " << *value << "\n");
 
@@ -758,6 +767,38 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
     auto result = SymbolicValue::getAggregate(ArrayRef<SymbolicValue>(intVal),
                                               evaluator.getAllocator());
     setValue(apply, result);
+    return None;
+  }
+  case WellKnownFunction::StringEscapePercent: {
+    // String.percentEscapedString.getter
+    assert(conventions.getNumDirectSILResults() == 1 &&
+           conventions.getNumIndirectSILResults() == 0 &&
+           conventions.getNumParameters() == 1 &&
+           "unexpected String.percentEscapedString signature");
+
+    auto stringArgument = getConstantValue(apply->getOperand(1));
+    if (!stringArgument.isConstant()) {
+      return stringArgument;
+    }
+
+    if (stringArgument.getKind() != SymbolicValue::String) {
+      return evaluator.getUnknown((SILInstruction *)apply,
+                                  UnknownReason::InvalidOperandValue);
+    }
+
+    // Replace all precent symbol (%) in the string with double percents (%%)
+    StringRef stringVal = stringArgument.getStringValue();
+    SmallString<4> percentEscapedString;
+    for (auto charElem : stringVal) {
+      percentEscapedString.push_back(charElem);
+      if (charElem == '%') {
+        percentEscapedString.push_back('%');
+      }
+    }
+
+    auto resultVal = SymbolicValue::getString(percentEscapedString.str(),
+                                              evaluator.getAllocator());
+    setValue(apply, resultVal);
     return None;
   }
   }
@@ -1256,13 +1297,23 @@ ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
       // skip them.
       isa<DestroyAddrInst>(inst) || isa<RetainValueInst>(inst) ||
       isa<ReleaseValueInst>(inst) || isa<StrongRetainInst>(inst) ||
-      isa<StrongReleaseInst>(inst))
+      isa<StrongReleaseInst>(inst) || isa<DestroyValueInst>(inst) ||
+      isa<EndBorrowInst>(inst))
     return None;
 
   // If this is a special flow-sensitive instruction like a stack allocation,
   // store, copy_addr, etc, we handle it specially here.
   if (auto asi = dyn_cast<AllocStackInst>(inst)) {
     createMemoryObject(asi, SymbolicValue::getUninitMemory());
+    return None;
+  }
+
+  // Make sure that our copy_value, begin_borrow form constants. Otherwise,
+  // return why.
+  if (isa<CopyValueInst>(inst) || isa<BeginBorrowInst>(inst)) {
+    auto result = getConstantValue(inst->getOperand(0));
+    if (!result.isConstant())
+      return result;
     return None;
   }
 
@@ -1308,14 +1359,31 @@ ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
                           injectEnumInst->getOperand());
   }
 
-  // If the instruction produces normal results, try constant folding it.
+  // If the instruction produces a result, try constant folding it.
   // If this fails, then we fail.
-  if (inst->getNumResults() != 0) {
+  if (isa<SingleValueInstruction>(inst)) {
     auto oneResultVal = inst->getResults()[0];
     auto result = getConstantValue(oneResultVal);
     if (!result.isConstant())
       return result;
     LLVM_DEBUG(llvm::dbgs() << "  RESULT: "; result.dump());
+    return None;
+  }
+
+  if (isa<DestructureTupleInst>(inst) || isa<DestructureStructInst>(inst)) {
+    auto *mvi = cast<MultipleValueInstruction>(inst);
+    SymbolicValue aggVal = getConstantValue(mvi->getOperand(0));
+    if (!aggVal.isConstant()) {
+      return aggVal;
+    }
+    assert(aggVal.getKind() == SymbolicValue::Aggregate);
+
+    ArrayRef<SymbolicValue> aggElems = aggVal.getAggregateValue();
+    assert(aggElems.size() == mvi->getNumResults());
+
+    for (unsigned i = 0; i < mvi->getNumResults(); ++i) {
+      setValue(mvi->getResult(i), aggElems[i]);
+    }
     return None;
   }
 
@@ -1554,9 +1622,8 @@ void ConstExprEvaluator::computeConstantValues(
 
 ConstExprStepEvaluator::ConstExprStepEvaluator(SymbolicValueAllocator &alloc,
                                                SILFunction *fun)
-    : evaluator(ConstExprEvaluator(alloc)),
-      internalState(
-          new ConstExprFunctionState(evaluator, fun, {}, stepsEvaluated)) {
+    : evaluator(alloc), internalState(new ConstExprFunctionState(
+                            evaluator, fun, {}, stepsEvaluated)) {
   assert(fun);
 }
 

@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 extension Unicode {
-  @_frozen
+  @frozen
   public enum UTF32 {
   case _swift3Codec
   }
@@ -56,7 +56,7 @@ extension Unicode.UTF32 : Unicode.Encoding {
     return EncodedScalar(source.value)
   }
   
-  @_fixed_layout
+  @frozen
   public struct Parser {
     @inlinable
     public init() { }

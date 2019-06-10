@@ -535,7 +535,7 @@ extension UnsafeMutableRawBufferPointer {
 // Note that the second overload is declared on a more specific protocol.
 // See: test/stdlib/StringFlatMap.swift for tests.
 extension Sequence {
-  @available(swift, deprecated: 4.1, obsoleted: 5.1, renamed: "compactMap(_:)",
+  @available(swift, deprecated: 4.1/*, obsoleted: 5.1 */, renamed: "compactMap(_:)",
     message: "Please use compactMap(_:) for the case where closure returns an optional value")
   public func flatMap<ElementOfResult>(
     _ transform: (Element) throws -> ElementOfResult?
@@ -607,7 +607,7 @@ extension Zip2Sequence {
 @available(swift, deprecated: 4.2, message: "PlaygroundQuickLook will be removed in a future Swift version. For customizing how types are presented in playgrounds, use CustomPlaygroundDisplayConvertible instead.")
 public typealias PlaygroundQuickLook = _PlaygroundQuickLook
 
-@_frozen // rdar://problem/38719739 - needed by LLDB
+@frozen // rdar://problem/38719739 - needed by LLDB
 public enum _PlaygroundQuickLook {
   case text(String)
   case int(Int64)

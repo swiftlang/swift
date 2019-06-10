@@ -64,12 +64,9 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
   class DiagnoseWalker : public ASTWalker {
     SmallPtrSet<Expr*, 4> AlreadyDiagnosedMetatypes;
     SmallPtrSet<DeclRefExpr*, 4> AlreadyDiagnosedBitCasts;
-    
-    // Keep track of acceptable DiscardAssignmentExpr's.
-    SmallPtrSet<DiscardAssignmentExpr*, 2> CorrectDiscardAssignmentExprs;
 
-    /// Keep track of InOutExprs
-    SmallPtrSet<InOutExpr*, 2> AcceptableInOutExprs;
+    /// Keep track of acceptable DiscardAssignmentExpr's.
+    SmallPtrSet<DiscardAssignmentExpr*, 2> CorrectDiscardAssignmentExprs;
 
     /// Keep track of the arguments to CallExprs.
     SmallPtrSet<Expr *, 2> CallArgs;
@@ -127,14 +124,8 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       if (isa<TypeExpr>(Base))
         checkUseOfMetaTypeName(Base);
 
-      if (auto *SE = dyn_cast<SubscriptExpr>(E)) {
+      if (auto *SE = dyn_cast<SubscriptExpr>(E))
         CallArgs.insert(SE->getIndex());
-
-        // Implicit InOutExpr's are allowed in the base of a subscript expr.
-        if (auto *IOE = dyn_cast<InOutExpr>(SE->getBase()))
-          if (IOE->isImplicit())
-            AcceptableInOutExprs.insert(IOE);
-      }
 
       if (auto *KPE = dyn_cast<KeyPathExpr>(E)) {
         for (auto Comp : KPE->getComponents()) {
@@ -197,11 +188,6 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         }
 
         visitArguments(Call, [&](unsigned argIndex, Expr *arg) {
-          // InOutExpr's are allowed in argument lists directly.
-          if (auto *IOE = dyn_cast<InOutExpr>(arg)) {
-            if (isa<CallExpr>(Call))
-              AcceptableInOutExprs.insert(IOE);
-          }
           // InOutExprs can be wrapped in some implicit casts.
           Expr *unwrapped = arg;
           if (auto *IIO = dyn_cast<InjectIntoOptionalExpr>(arg))
@@ -212,10 +198,8 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
               isa<ErasureExpr>(unwrapped)) {
             auto operand =
               cast<ImplicitConversionExpr>(unwrapped)->getSubExpr();
-            if (auto *IOE = dyn_cast<InOutExpr>(operand)) {
-              AcceptableInOutExprs.insert(IOE);
+            if (auto *IOE = dyn_cast<InOutExpr>(operand))
               operand = IOE->getSubExpr();
-            }
 
             // Also do some additional work based on how the function uses
             // the argument.
@@ -238,14 +222,6 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
           TC.diagnose(DAE->getLoc(), diag::discard_expr_outside_of_assignment);
       }
 
-      // Diagnose an '&' that isn't in an argument lists.
-      if (auto *IOE = dyn_cast<InOutExpr>(E)) {
-        if (!IOE->isImplicit() && !AcceptableInOutExprs.count(IOE) &&
-            !IOE->getType()->hasError())
-          TC.diagnose(IOE->getLoc(), diag::inout_expr_outside_of_call)
-            .highlight(IOE->getSubExpr()->getSourceRange());
-      }
-
       // Diagnose 'self.init' or 'super.init' nested in another expression
       // or closure.
       if (auto *rebindSelfExpr = dyn_cast<RebindSelfInConstructorExpr>(E)) {
@@ -265,6 +241,42 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
                         diag::tuple_single_element)
               .fixItRemoveChars(tupleExpr->getElementNameLoc(0),
                                 tupleExpr->getElement(0)->getStartLoc());
+          }
+        }
+      }
+
+      // Diagnose tuple expressions with duplicate element label
+      if (auto *tupleExpr = dyn_cast<TupleExpr>(E)) {
+        // FIXME: Duplicate labels on enum payloads should be diagnosed
+        // when declared, not when called.
+        bool isEnumCase = false;
+        if (auto CE = dyn_cast_or_null<CallExpr>(Parent.getAsExpr())) {
+          auto calledValue = CE->getCalledValue();
+          if (calledValue) {
+            isEnumCase = isa<EnumElementDecl>(calledValue);
+          }
+        }
+
+        if ((!CallArgs.count(tupleExpr)) || isEnumCase) {
+          auto diagnose = false;
+
+          llvm::SmallDenseSet<Identifier> names;
+          names.reserve(tupleExpr->getNumElements());
+
+          for (auto name : tupleExpr->getElementNames()) {
+            if (name.empty())
+              continue;
+
+            if (names.count(name) == 1) {
+              diagnose = true;
+              break;
+            }
+
+            names.insert(name);
+          }
+
+          if (diagnose) {
+            TC.diagnose(tupleExpr->getLoc(), diag::tuple_duplicate_label);
           }
         }
       }

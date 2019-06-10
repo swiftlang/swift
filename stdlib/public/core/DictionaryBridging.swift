@@ -71,6 +71,7 @@ final internal class _SwiftDictionaryNSEnumerator<Key: Hashable, Value>
     self.bridgedKeys = nil
     self.nextBucket = base.hashTable.startBucket
     self.endBucket = base.hashTable.endBucket
+    super.init()
   }
 
   @nonobjc
@@ -80,6 +81,7 @@ final internal class _SwiftDictionaryNSEnumerator<Key: Hashable, Value>
     self.bridgedKeys = deferred.bridgeKeys()
     self.nextBucket = base.hashTable.startBucket
     self.endBucket = base.hashTable.endBucket
+    super.init()
   }
 
   private func bridgedKey(at bucket: _HashTable.Bucket) -> AnyObject {
@@ -422,7 +424,7 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
 // classes, so it was renamed. The old names must not be used in the new
 // runtime.
 @usableFromInline
-@_fixed_layout
+@frozen
 internal struct __CocoaDictionary {
   @usableFromInline
   internal let object: AnyObject
@@ -565,7 +567,7 @@ extension __CocoaDictionary {
 }
 
 extension __CocoaDictionary {
-  @_fixed_layout
+  @frozen
   @usableFromInline
   internal struct Index {
     internal var _storage: Builtin.BridgeObject

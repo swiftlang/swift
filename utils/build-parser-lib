@@ -40,10 +40,10 @@ from swift_build_support.swift_build_support.SwiftBuildSupport import (
 )
 from swift_build_support.swift_build_support.toolchain import host_toolchain
 
-isMac = platform.system() == 'Darwin'
+isDarwin = platform.system() == 'Darwin'
 
 class Builder(object):
-    def __init__(self, toolchain, args):
+    def __init__(self, toolchain, args, profile_data=None, arch=None, native_build_dir=None):
         self.toolchain = toolchain
         self.ninja_path = args.ninja_path
         self.build_release = args.release
@@ -51,14 +51,16 @@ class Builder(object):
         self.lto_type = args.lto_type
         self.pgo_type = args.pgo_type
         self.profile_input = args.profile_input
+        self.profile_data = profile_data
         self.dry_run = args.dry_run
         self.jobs = args.build_jobs
         self.verbose = args.verbose
         self.build_dir = args.build_dir
-        self.install_symroot = args.install_symroot
         self.install_destdir = args.install_destdir
         self.install_prefix = args.install_prefix
         self.version = args.version
+        self.arch = arch
+        self.native_build_dir = native_build_dir
 
     def call(self, command, env=None, without_sleeping=False):
         if without_sleeping:
@@ -69,8 +71,25 @@ class Builder(object):
     def configure(self, enable_debuginfo, instrumentation=None, profile_data=None):
         cmake_args = [self.toolchain.cmake, '-G', 'Ninja']
         cmake_args += ['-DCMAKE_MAKE_PROGRAM='+self.ninja_path]
-        if isMac:
+        if isDarwin:
             cmake_args += ['-DCMAKE_OSX_DEPLOYMENT_TARGET=10.12', '-DSWIFT_DARWIN_DEPLOYMENT_VERSION_OSX=10.12']
+            if self.arch is not None:
+                cmake_args += [
+                    '-DLLVM_HOST_TRIPLE:STRING='+self.arch+'-apple-darwin16.0',
+                    '-DSWIFT_HOST_TRIPLE:STRING='+self.arch+'-apple-darwin16.0',
+                    '-DCMAKE_C_FLAGS=-arch '+self.arch,
+                    '-DCMAKE_CXX_FLAGS=-arch '+self.arch,
+                    '-DSWIFT_HOST_VARIANT_ARCH='+self.arch,
+                ]
+            if self.native_build_dir is not None:
+                cmake_args += [
+                    '-DLLVM_TABLEGEN='+os.path.join(self.native_build_dir, 'bin', 'llvm-tblgen'),
+                    '-DCLANG_TABLEGEN='+os.path.join(self.native_build_dir, 'bin', 'clang-tblgen'),
+                    '-DLLVM_NATIVE_BUILD='+self.native_build_dir,
+                    '-DSWIFT_NATIVE_LLVM_TOOLS_PATH:STRING='+os.path.join(self.native_build_dir, 'bin'),
+                    '-DSWIFT_NATIVE_CLANG_TOOLS_PATH:STRING='+os.path.join(self.native_build_dir, 'bin'),
+                    '-DSWIFT_NATIVE_SWIFT_TOOLS_PATH:STRING='+os.path.join(self.native_build_dir, 'bin'),
+                ]
         else:
             dispatch_source_path = os.path.join(SWIFT_SOURCE_ROOT, 'swift-corelibs-libdispatch')
             cmake_args += ['-DSWIFT_HOST_VARIANT=linux', '-DSWIFT_HOST_VARIANT_SDK=LINUX', '-DSWIFT_HOST_VARIANT_ARCH=x86_64',
@@ -123,19 +142,7 @@ class Builder(object):
             env = {'DESTDIR': self.install_destdir}
         self.build_target(self.build_dir, 'tools/swift/tools/libSwiftSyntaxParser/install', env=env)
 
-    def extract_symbols(self):
-        if not isMac:
-            return
-        extract_script = os.path.join(SWIFT_SOURCE_ROOT, "swift", "utils", "parser-lib", "darwin-extract-symbols")
-        print("--- Extracting symbols ---", file=sys.stderr)
-        env = {'INSTALL_DIR': self.install_destdir,
-               'INSTALL_PREFIX': self.install_prefix,
-               'INSTALL_SYMROOT': self.install_symroot,
-               'BUILD_JOBS': str(self.jobs)}
-        self.call([extract_script], env=env)
-
-    def get_profile_data(self):
-        profile_dir = os.path.join(self.build_dir, 'profiling')
+    def get_profile_data(self, profile_dir):
         shell.makedirs(profile_dir, dry_run=self.dry_run)
         instrumentation = 'IR' if self.pgo_type == 'ir' else 'Frontend'
         with shell.pushd(profile_dir, dry_run=self.dry_run):
@@ -145,24 +152,29 @@ class Builder(object):
             shell.rmtree("profiles", dry_run=self.dry_run)
             self.call([os.path.join("bin", "swift-syntax-parser-test"), self.profile_input, '-time'])
             self.call([self.toolchain.llvm_profdata, "merge", "-output=profdata.prof", "profiles"])
-        return os.path.join(profile_dir, "profdata.prof")
 
     def run(self):
         shell.makedirs(self.build_dir, dry_run=self.dry_run)
 
-        profile_data = None
-        if self.pgo_type:
-            profile_data = self.get_profile_data()
-
         with shell.pushd(self.build_dir, dry_run=self.dry_run):
-            self.configure(enable_debuginfo=True, profile_data=profile_data)
+            self.configure(enable_debuginfo=True, profile_data=self.profile_data)
 
         self.build_target(self.build_dir, 'swift-syntax-parser-test')
 
         if self.install_destdir:
             self.install()
-        if self.install_symroot:
-            self.extract_symbols()
+
+
+def extract_symbols(install_destdir, install_prefix, install_symroot, jobs):
+    if not isDarwin:
+        return
+    extract_script = os.path.join(SWIFT_SOURCE_ROOT, "swift", "utils", "parser-lib", "darwin-extract-symbols")
+    print("--- Extracting symbols ---", file=sys.stderr)
+    env = {'INSTALL_DIR': install_destdir,
+           'INSTALL_PREFIX': install_prefix,
+           'INSTALL_SYMROOT': install_symroot,
+           'BUILD_JOBS': str(jobs)}
+    shell.call([extract_script], env=env)
 
 
 def main():
@@ -177,11 +189,12 @@ def main():
     store_path = optbuilder.actions.store_path
 
     toolchain = host_toolchain(xcrun_toolchain='default')
+    default_architectures = platform.machine()
 
     default_profile_input = os.path.join(SWIFT_SOURCE_ROOT, "swift", "utils", "parser-lib", "profile-input.swift")
     default_jobs = multiprocessing.cpu_count()
     default_build_dir = os.path.join(SWIFT_BUILD_ROOT, 'parser-lib')
-    default_install_prefix = defaults.DARWIN_INSTALL_PREFIX if isMac else UNIX_INSTALL_PREFIX
+    default_install_prefix = defaults.DARWIN_INSTALL_PREFIX if isDarwin else UNIX_INSTALL_PREFIX
     default_ninja = toolchain.ninja
 
     option('--release', store_true,
@@ -215,10 +228,13 @@ def main():
     option('--build-dir', store_path,
            default=default_build_dir,
            help='the path where the build products will be placed. (default = %s)' % default_build_dir)
+    option('--architectures', store,
+           default=default_architectures,
+           help='space-separated list of architectures to build for. (default = %s)' % default_architectures)
     option('--install-symroot', store_path,
            help='the path to install debug symbols into')
     option('--install-destdir', store_path,
-           help='the path to use as the filesystem root for the installation')
+           help='the path to use as the filesystem root for the installation (default = \'$(build_dir)/install\')')
     option('--install-prefix', store,
            default = default_install_prefix,
            help='the install prefix to use (default = %s)' % default_install_prefix)
@@ -230,6 +246,49 @@ def main():
 
     parser = optbuilder.build()
     args = parser.parse_args()
+
+    if not args.install_destdir:
+        args.install_destdir = os.path.join(args.build_dir, 'install')
+
+    if isDarwin:
+        architectures = args.architectures.split(" ")
+        architectures = [arch for arch in architectures if arch != platform.machine() and arch != ""]
+        if platform.machine() in architectures: architectures = [platform.machine()] + architectures
+        architectures = [platform.machine()] + architectures
+
+        objroot = args.build_dir
+        dstroot = args.install_destdir
+        symroot = args.install_symroot
+        prefix = args.install_prefix
+
+        for arch in architectures:
+            native = platform.machine() == arch
+
+            args.build_dir = os.path.join(objroot, arch, "obj")
+            args.install_destdir = os.path.join(objroot, arch, "dst")
+            args.install_prefix = "/"
+
+            native_build_dir = None if native else os.path.join(objroot, platform.machine(), "obj")
+
+            profile_data = None
+            if args.pgo_type:
+                profile_dir = os.path.join(objroot, platform.machine()+'-profiling')
+                if native:
+                    builder = Builder(toolchain, args)
+                    builder.get_profile_data(profile_dir)
+                profile_data = os.path.join(profile_dir, "profdata.prof")
+
+            builder = Builder(toolchain, args, profile_data=profile_data, arch=arch, native_build_dir=native_build_dir)
+            builder.run()
+
+        lipo = os.path.join(SWIFT_SOURCE_ROOT, "swift", "utils", "recursive-lipo")
+        dst_dirs = [os.path.join(objroot, arch, "dst") for arch in architectures]
+        shell.call([lipo, "-v", "--destination", os.path.join(dstroot, "./"+prefix)] + dst_dirs)
+
+        if args.install_symroot:
+            extract_symbols(dstroot, prefix, symroot, args.build_jobs)
+
+        return 0
 
     builder = Builder(toolchain, args)
     builder.run()

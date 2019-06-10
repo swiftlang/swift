@@ -35,7 +35,7 @@
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
-#include "swift/AST/PropertyDelegates.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ResilienceExpansion.h"
 #include "swift/AST/Stmt.h"
@@ -441,7 +441,7 @@ SourceRange Decl::getSourceRangeIncludingAttrs() const {
   }
 
   // Attributes on VarDecl syntactically belong to PatternBindingDecl.
-  if (isa<VarDecl>(this))
+  if (isa<VarDecl>(this) && !isa<ParamDecl>(this))
     return Range;
 
   // Attributes on PatternBindingDecls are attached to VarDecls in AST.
@@ -1386,9 +1386,9 @@ bool PatternBindingEntry::isInitialized() const {
   if (getInit())
     return true;
 
-  // Initialized via a property delegate.
+  // Initialized via a property wrapper.
   if (auto var = getPattern()->getSingleVar()) {
-    if (auto customAttr = var->getAttachedPropertyDelegate()) {
+    if (auto customAttr = var->getAttachedPropertyWrapper()) {
       if (customAttr->getArg() != nullptr)
         return true;
     }
@@ -1516,7 +1516,8 @@ bool VarDecl::isInitExposedToClients() const {
   if (!parent) return false;
   if (!hasInitialValue()) return false;
   if (isStatic()) return false;
-  return parent->getAttrs().hasAttribute<FixedLayoutAttr>();
+  return parent->getAttrs().hasAttribute<FrozenAttr>() ||
+         parent->getAttrs().hasAttribute<FixedLayoutAttr>();
 }
 
 /// Check whether the given type representation will be
@@ -1580,11 +1581,11 @@ bool PatternBindingDecl::isDefaultInitializable(unsigned i) const {
   if (entry.isInitialized())
     return true;
 
-  // If it has an attached property delegate that vends an `init()`, use that
+  // If it has an attached property wrapper that vends an `init()`, use that
   // for default initialization.
   if (auto singleVar = getSingleVar()) {
-    if (auto delegateInfo = singleVar->getAttachedPropertyDelegateTypeInfo()) {
-      if (delegateInfo.defaultInit)
+    if (auto wrapperInfo = singleVar->getAttachedPropertyWrapperTypeInfo()) {
+      if (wrapperInfo.defaultInit)
         return true;
     }
   }
@@ -2757,6 +2758,11 @@ bool ValueDecl::shouldHideFromEditor() const {
   if (getBaseName().isEditorPlaceholder())
     return true;
 
+  // '$__' names are reserved by compiler internal.
+  if (!getBaseName().isSpecial() &&
+      getBaseName().getIdentifier().str().startswith("$__"))
+    return true;
+
   return false;
 }
 
@@ -3188,7 +3194,7 @@ bool NominalTypeDecl::isFormallyResilient() const {
                             /*treatUsableFromInlineAsPublic=*/true).isPublic())
     return false;
 
-  // Check for an explicit @_fixed_layout or @_frozen attribute.
+  // Check for an explicit @_fixed_layout or @frozen attribute.
   if (getAttrs().hasAttribute<FixedLayoutAttr>() ||
       getAttrs().hasAttribute<FrozenAttr>()) {
     return false;
@@ -3370,6 +3376,14 @@ void NominalTypeDecl::addExtension(ExtensionDecl *extension) {
 
 auto NominalTypeDecl::getStoredProperties(bool skipInaccessible) const
     -> StoredPropertyRange {
+  // This should be called at most once per SIL instruction that accesses a
+  // VarDecl.
+  //
+  // FIXME: Once VarDecl itself caches its field index, it should be called at
+  // most once per finalized VarDecl.
+  if (getASTContext().Stats)
+    getASTContext().Stats->getFrontendCounters().NumStoredPropertiesQueries++;
+
   // Clang-imported classes never have stored properties.
   if (hasClangNode() && isa<ClassDecl>(this))
     return StoredPropertyRange(DeclRange(nullptr, nullptr),
@@ -3395,12 +3409,12 @@ Optional<KeyPathTypeKind> NominalTypeDecl::getKeyPathTypeKind() const {
   return None;
 }
 
-PropertyDelegateTypeInfo NominalTypeDecl::getPropertyDelegateTypeInfo() const {
+PropertyWrapperTypeInfo NominalTypeDecl::getPropertyWrapperTypeInfo() const {
   ASTContext &ctx = getASTContext();
   auto mutableThis = const_cast<NominalTypeDecl *>(this);
   return evaluateOrDefault(ctx.evaluator,
-                           PropertyDelegateTypeInfoRequest{mutableThis},
-                           PropertyDelegateTypeInfo());
+                           PropertyWrapperTypeInfoRequest{mutableThis},
+                           PropertyWrapperTypeInfo());
 }
 
 GenericTypeDecl::GenericTypeDecl(DeclKind K, DeclContext *DC,
@@ -3531,7 +3545,7 @@ SourceRange GenericTypeParamDecl::getSourceRange() const {
 
 AssociatedTypeDecl::AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc,
                                        Identifier name, SourceLoc nameLoc,
-                                       TypeLoc defaultDefinition,
+                                       TypeRepr *defaultDefinition,
                                        TrailingWhereClause *trailingWhere)
     : AbstractTypeParamDecl(DeclKind::AssociatedType, dc, name, nameLoc),
       KeywordLoc(keywordLoc), DefaultDefinition(defaultDefinition),
@@ -3544,8 +3558,9 @@ AssociatedTypeDecl::AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc,
                                        LazyMemberLoader *definitionResolver,
                                        uint64_t resolverData)
     : AbstractTypeParamDecl(DeclKind::AssociatedType, dc, name, nameLoc),
-      KeywordLoc(keywordLoc), TrailingWhere(trailingWhere),
-      Resolver(definitionResolver), ResolverContextData(resolverData) {
+      KeywordLoc(keywordLoc), DefaultDefinition(nullptr),
+      TrailingWhere(trailingWhere), Resolver(definitionResolver),
+      ResolverContextData(resolverData) {
   assert(Resolver && "missing resolver");
 }
 
@@ -3558,21 +3573,17 @@ void AssociatedTypeDecl::computeType() {
 }
 
 Type AssociatedTypeDecl::getDefaultDefinitionType() const {
-  if (Resolver) {
-    const_cast<AssociatedTypeDecl *>(this)->DefaultDefinition
-      = TypeLoc::withoutLoc(
-        Resolver->loadAssociatedTypeDefault(this, ResolverContextData));
-    const_cast<AssociatedTypeDecl *>(this)->Resolver = nullptr;
-  }
-  return DefaultDefinition.getType();
+  return evaluateOrDefault(getASTContext().evaluator,
+           DefaultDefinitionTypeRequest{const_cast<AssociatedTypeDecl *>(this)},
+           Type());
 }
 
 SourceRange AssociatedTypeDecl::getSourceRange() const {
   SourceLoc endLoc;
   if (auto TWC = getTrailingWhereClause()) {
     endLoc = TWC->getSourceRange().End;
-  } else if (getDefaultDefinitionLoc().hasLocation()) {
-    endLoc = getDefaultDefinitionLoc().getSourceRange().End;
+  } else if (auto defaultDefinition = getDefaultDefinitionTypeRepr()) {
+    endLoc = defaultDefinition->getEndLoc();
   } else if (!getInherited().empty()) {
     endLoc = getInherited().back().getSourceRange().End;
   } else {
@@ -4569,20 +4580,19 @@ void ProtocolDecl::createGenericParamsIfMissing() {
   setGenericParams(result);
 }
 
-void ProtocolDecl::computeRequirementSignature() {
-  assert(!RequirementSignature && "already computed requirement signature");
+ArrayRef<Requirement> ProtocolDecl::getRequirementSignature() const {
+  return evaluateOrDefault(getASTContext().evaluator,
+               RequirementSignatureRequest { const_cast<ProtocolDecl *>(this) },
+               None);
+}
 
-  // Compute and record the signature.
-  auto requirementSig =
-    GenericSignatureBuilder::computeRequirementSignature(this);
-  RequirementSignature = requirementSig->getRequirements().data();
-  assert(RequirementSignature != nullptr);
-  Bits.ProtocolDecl.NumRequirementsInSignature =
-    requirementSig->getRequirements().size();
+bool ProtocolDecl::isComputingRequirementSignature() const {
+  return getASTContext().evaluator.hasActiveRequest(
+                 RequirementSignatureRequest{const_cast<ProtocolDecl*>(this)});
 }
 
 void ProtocolDecl::setRequirementSignature(ArrayRef<Requirement> requirements) {
-  assert(!RequirementSignature && "already computed requirement signature");
+  assert(!RequirementSignature && "requirement signature already set");
   if (requirements.empty()) {
     RequirementSignature = reinterpret_cast<Requirement *>(this + 1);
     Bits.ProtocolDecl.NumRequirementsInSignature = 0;
@@ -4590,6 +4600,13 @@ void ProtocolDecl::setRequirementSignature(ArrayRef<Requirement> requirements) {
     RequirementSignature = getASTContext().AllocateCopy(requirements).data();
     Bits.ProtocolDecl.NumRequirementsInSignature = requirements.size();
   }
+}
+
+ArrayRef<Requirement> ProtocolDecl::getCachedRequirementSignature() const {
+  assert(RequirementSignature &&
+         "getting requirement signature before computing it");
+  return llvm::makeArrayRef(RequirementSignature,
+                            Bits.ProtocolDecl.NumRequirementsInSignature);
 }
 
 void ProtocolDecl::computeKnownProtocolKind() const {
@@ -5288,9 +5305,9 @@ bool VarDecl::isSelfParameter() const {
 
 /// Whether the given variable is the backing storage property for
 /// a declared property that is either `lazy` or has an attached
-/// property delegate.
+/// property wrapper.
 static bool isBackingStorageForDeclaredProperty(const VarDecl *var) {
-  if (var->getOriginalDelegatedProperty())
+  if (var->getOriginalWrappedProperty())
     return true;
 
   auto name = var->getName();
@@ -5305,7 +5322,7 @@ static bool isDeclaredPropertyWithBackingStorage(const VarDecl *var) {
   if (var->getAttrs().hasAttribute<LazyAttr>())
     return true;
 
-  if (var->getAttachedPropertyDelegate())
+  if (var->getAttachedPropertyWrapper())
     return true;
 
   return false;
@@ -5326,7 +5343,7 @@ bool VarDecl::isMemberwiseInitialized(bool preferDeclaredProperties) const {
 
   // If this is a computed property, it's not memberwise initialized unless
   // the caller has asked for the declared properties and it is either a
-  // `lazy` property or a property with an attached delegate.
+  // `lazy` property or a property with an attached wrapper.
   if (!hasStorage() &&
       !(preferDeclaredProperties &&
         isDeclaredPropertyWithBackingStorage(this)))
@@ -5338,15 +5355,15 @@ bool VarDecl::isMemberwiseInitialized(bool preferDeclaredProperties) const {
   if (isLet() && isParentInitialized())
     return false;
 
-  // Properties with attached delegates that have an access level < internal
+  // Properties with attached wrappers that have an access level < internal
   // but do have an initializer don't participate in the memberwise
   // initializer, because they would arbitrarily lower the access of the
   // memberwise initializer.
   auto origVar = this;
-  if (auto origDelegate = getOriginalDelegatedProperty())
-    origVar = origDelegate;
+  if (auto origWrapped = getOriginalWrappedProperty())
+    origVar = origWrapped;
   if (origVar->getFormalAccess() < AccessLevel::Internal &&
-      origVar->getAttachedPropertyDelegate() &&
+      origVar->getAttachedPropertyWrapper() &&
       (origVar->isParentInitialized() ||
        (origVar->getParentPatternBinding() &&
         origVar->getParentPatternBinding()->isDefaultInitializable())))
@@ -5388,85 +5405,85 @@ StaticSpellingKind AbstractStorageDecl::getCorrectStaticSpelling() const {
   return getCorrectStaticSpellingForDecl(this);
 }
 
-CustomAttr *VarDecl::getAttachedPropertyDelegate() const {
+CustomAttr *VarDecl::getAttachedPropertyWrapper() const {
   auto &ctx = getASTContext();
   if (!ctx.getLazyResolver())
     return nullptr;
 
   auto mutableThis = const_cast<VarDecl *>(this);
   return evaluateOrDefault(ctx.evaluator,
-                           AttachedPropertyDelegateRequest{mutableThis},
+                           AttachedPropertyWrapperRequest{mutableThis},
                            nullptr);
 }
 
-PropertyDelegateTypeInfo VarDecl::getAttachedPropertyDelegateTypeInfo() const {
-  auto attr = getAttachedPropertyDelegate();
+PropertyWrapperTypeInfo VarDecl::getAttachedPropertyWrapperTypeInfo() const {
+  auto attr = getAttachedPropertyWrapper();
   if (!attr)
-    return PropertyDelegateTypeInfo();
+    return PropertyWrapperTypeInfo();
 
   auto dc = getDeclContext();
   ASTContext &ctx = getASTContext();
   auto nominal = evaluateOrDefault(
       ctx.evaluator, CustomAttrNominalRequest{attr, dc}, nullptr);
   if (!nominal)
-    return PropertyDelegateTypeInfo();
+    return PropertyWrapperTypeInfo();
 
-  return nominal->getPropertyDelegateTypeInfo();
+  return nominal->getPropertyWrapperTypeInfo();
 }
 
-Type VarDecl::getAttachedPropertyDelegateType() const {
+Type VarDecl::getAttachedPropertyWrapperType() const {
   auto &ctx = getASTContext();
   if (!ctx.getLazyResolver())
     return nullptr;
 
   auto mutableThis = const_cast<VarDecl *>(this);
   return evaluateOrDefault(ctx.evaluator,
-                           AttachedPropertyDelegateTypeRequest{mutableThis},
+                           AttachedPropertyWrapperTypeRequest{mutableThis},
                            Type());
 }
 
-Type VarDecl::getPropertyDelegateBackingPropertyType() const {
+Type VarDecl::getPropertyWrapperBackingPropertyType() const {
   ASTContext &ctx = getASTContext();
   if (!ctx.getLazyResolver())
     return nullptr;
 
   auto mutableThis = const_cast<VarDecl *>(this);
   return evaluateOrDefault(
-      ctx.evaluator, PropertyDelegateBackingPropertyTypeRequest{mutableThis},
+      ctx.evaluator, PropertyWrapperBackingPropertyTypeRequest{mutableThis},
       Type());
 }
 
-PropertyDelegateBackingPropertyInfo
-VarDecl::getPropertyDelegateBackingPropertyInfo() const {
+PropertyWrapperBackingPropertyInfo
+VarDecl::getPropertyWrapperBackingPropertyInfo() const {
   auto &ctx = getASTContext();
   if (!ctx.getLazyResolver())
-    return PropertyDelegateBackingPropertyInfo();
+    return PropertyWrapperBackingPropertyInfo();
 
   auto mutableThis = const_cast<VarDecl *>(this);
   return evaluateOrDefault(
       ctx.evaluator,
-      PropertyDelegateBackingPropertyInfoRequest{mutableThis},
-      PropertyDelegateBackingPropertyInfo());
+      PropertyWrapperBackingPropertyInfoRequest{mutableThis},
+      PropertyWrapperBackingPropertyInfo());
 }
 
-VarDecl *VarDecl::getPropertyDelegateBackingProperty() const {
-  return getPropertyDelegateBackingPropertyInfo().backingVar;
+VarDecl *VarDecl::getPropertyWrapperBackingProperty() const {
+  return getPropertyWrapperBackingPropertyInfo().backingVar;
 }
 
-bool VarDecl::isPropertyDelegateInitializedWithInitialValue() const {
+bool VarDecl::isPropertyWrapperInitializedWithInitialValue() const {
   auto &ctx = getASTContext();
   if (!ctx.getLazyResolver())
     return false;
 
   // If there is no initializer, the initialization form depends on
-  // whether the property delegate type has an init(initialValue:).
+  // whether the property wrapper type has an init(initialValue:).
   if (!isParentInitialized()) {
-    auto delegateTypeInfo = getAttachedPropertyDelegateTypeInfo();
-    return delegateTypeInfo.initialValueInit != nullptr;
+    auto wrapperTypeInfo = getAttachedPropertyWrapperTypeInfo();
+    return wrapperTypeInfo.initialValueInit != nullptr;
   }
 
   // Otherwise, check whether the '=' initialization form was used.
-  return getPropertyDelegateBackingPropertyInfo().originalInitialValue
+  return getPropertyWrapperBackingPropertyInfo().originalInitialValue
       != nullptr;
 }
 
@@ -5667,6 +5684,21 @@ Type ParamDecl::getVarargBaseTy(Type VarArgT) {
   return T;
 }
 
+AnyFunctionType::Param ParamDecl::toFunctionParam(Type type) const {
+  if (!type)
+    type = getInterfaceType();
+
+  if (isVariadic())
+    type = ParamDecl::getVarargBaseTy(type);
+
+  auto label = getArgumentName();
+  auto flags = ParameterTypeFlags::fromParameterType(type,
+                                                     isVariadic(),
+                                                     isAutoClosure(),
+                                                     getValueOwnership());
+  return AnyFunctionType::Param(type, label, flags);
+}
+
 void ParamDecl::setDefaultValue(Expr *E) {
   if (!DefaultValueAndFlags.getPointer()) {
     if (!E) return;
@@ -5694,10 +5726,10 @@ void ParamDecl::setDefaultArgumentInitContext(Initializer *initContext) {
   DefaultValueAndFlags.getPointer()->InitContext = initContext;
 }
 
-Expr *swift::findOriginalPropertyDelegateInitialValue(VarDecl *var,
+Expr *swift::findOriginalPropertyWrapperInitialValue(VarDecl *var,
                                                       Expr *init) {
-  auto attr = var->getAttachedPropertyDelegate();
-  assert(attr && "No attached property delegate?");
+  auto attr = var->getAttachedPropertyWrapper();
+  assert(attr && "No attached property wrapper?");
 
   // Direct initialization implies no original initial value.
   if (attr->getArg())
@@ -5750,8 +5782,8 @@ ParamDecl::getDefaultValueStringRepresentation(
       return existing;
     auto var = getStoredProperty();
 
-    if (auto original = var->getOriginalDelegatedProperty()) {
-      if (auto attr = original->getAttachedPropertyDelegate()) {
+    if (auto original = var->getOriginalWrappedProperty()) {
+      if (auto attr = original->getAttachedPropertyWrapper()) {
         if (auto arg = attr->getArg()) {
           SourceRange fullRange(attr->getTypeLoc().getSourceRange().Start,
                                 arg->getEndLoc());
@@ -5763,7 +5795,7 @@ ParamDecl::getDefaultValueStringRepresentation(
         // If there is no parent initializer, we used the default initializer.
         auto parentInit = original->getParentInitializer();
         if (!parentInit) {
-          if (auto type = original->getPropertyDelegateBackingPropertyType()) {
+          if (auto type = original->getPropertyWrapperBackingPropertyType()) {
             if (auto nominal = type->getAnyNominal()) {
               scratch.clear();
               auto typeName = nominal->getName().str();
@@ -5778,7 +5810,7 @@ ParamDecl::getDefaultValueStringRepresentation(
         }
 
         auto init =
-            findOriginalPropertyDelegateInitialValue(original, parentInit);
+            findOriginalPropertyWrapperInitialValue(original, parentInit);
         return extractInlinableText(getASTContext().SourceMgr, init, scratch);
       }
     }
@@ -6234,6 +6266,12 @@ static bool requiresNewVTableEntry(const AbstractFunctionDecl *decl) {
     }
   }
 
+  // If the base is less visible than the override, we might need a vtable
+  // entry since callers of the override might not be able to see the base
+  // at all.
+  if (decl->isEffectiveLinkageMoreVisibleThan(base))
+    return true;
+
   // If the method overrides something, we only need a new entry if the
   // override has a more general AST type. However an abstraction
   // change is OK; we don't want to add a whole new vtable entry just
@@ -6434,6 +6472,7 @@ bool AbstractFunctionDecl::hasInlinableBodyText() const {
   case BodyKind::MemberwiseInitializer:
     return false;
   }
+  llvm_unreachable("covered switch");
 }
 
 StringRef AbstractFunctionDecl::getInlinableBodyText(
@@ -6835,7 +6874,13 @@ Type ConstructorDecl::getInitializerInterfaceType() {
     return InitializerInterfaceType;
 
   // Lazily calculate initializer type.
-  auto funcTy = getInterfaceType()->castTo<AnyFunctionType>()->getResult();
+  auto allocatorTy = getInterfaceType();
+  if (!allocatorTy->is<AnyFunctionType>()) {
+    InitializerInterfaceType = ErrorType::get(getASTContext());
+    return InitializerInterfaceType;
+  }
+
+  auto funcTy = allocatorTy->castTo<AnyFunctionType>()->getResult();
   assert(funcTy->is<FunctionType>());
 
   // Constructors have an initializer type that takes an instance

@@ -20,6 +20,7 @@ static StringRef getAttrName(DeclAttrKind Kind) {
   case DAK_Count:
     llvm_unreachable("unrecognized attribute kind.");
   }
+  llvm_unreachable("covered switch");
 }
 } // End of anonymous namespace.
 
@@ -89,7 +90,9 @@ SDKNodeDecl::SDKNodeDecl(SDKNodeInitInfo Info, SDKNodeKind Kind)
         IsOpen(Info.IsOpen),
         IsInternal(Info.IsInternal), IsABIPlaceholder(Info.IsABIPlaceholder),
         ReferenceOwnership(uint8_t(Info.ReferenceOwnership)),
-        GenericSig(Info.GenericSig), FixedBinaryOrder(Info.FixedBinaryOrder) {}
+        GenericSig(Info.GenericSig), FixedBinaryOrder(Info.FixedBinaryOrder),
+        introVersions({Info.IntromacOS, Info.IntroiOS, Info.IntrotvOS,
+                       Info.IntrowatchOS, Info.Introswift}){}
 
 SDKNodeType::SDKNodeType(SDKNodeInitInfo Info, SDKNodeKind Kind):
   SDKNode(Info, Kind), TypeAttributes(Info.TypeAttrs),
@@ -108,11 +111,11 @@ SDKNodeTypeAlias::SDKNodeTypeAlias(SDKNodeInitInfo Info):
 SDKNodeDeclType::SDKNodeDeclType(SDKNodeInitInfo Info):
   SDKNodeDecl(Info, SDKNodeKind::DeclType), SuperclassUsr(Info.SuperclassUsr),
   SuperclassNames(Info.SuperclassNames),
-  EnumRawTypeName(Info.EnumRawTypeName) {}
+  EnumRawTypeName(Info.EnumRawTypeName), IsExternal(Info.IsExternal) {}
 
 SDKNodeConformance::SDKNodeConformance(SDKNodeInitInfo Info):
   SDKNode(Info, SDKNodeKind::Conformance),
-  IsABIPlaceholder(Info.IsABIPlaceholder) {}
+  Usr(Info.Usr), IsABIPlaceholder(Info.IsABIPlaceholder) {}
 
 SDKNodeTypeWitness::SDKNodeTypeWitness(SDKNodeInitInfo Info):
   SDKNode(Info, SDKNodeKind::TypeWitness) {}
@@ -383,7 +386,15 @@ StringRef SDKNodeDecl::getScreenInfo() const {
     OS << "(" << HeaderName << ")";
   if (!OS.str().empty())
     OS << ": ";
-  OS << getDeclKind() << " " << getFullyQualifiedName();
+  bool IsExtension = false;
+  if (auto *TD = dyn_cast<SDKNodeDeclType>(this)) {
+    IsExtension = TD->isExternal();
+  }
+  if (IsExtension)
+    OS << "Extension";
+  else
+    OS << getDeclKind();
+  OS << " " << getFullyQualifiedName();
   return Ctx.buffer(OS.str());
 }
 
@@ -495,6 +506,7 @@ bool SDKNodeDeclType::isConformingTo(swift::ide::api::KnownProtocolKind Kind) co
           Conformances.end();
 #include "swift/IDE/DigesterEnums.def"
   }
+  llvm_unreachable("covered switch");
 }
 
 StringRef SDKNodeDeclAbstractFunc::getTypeRoleDescription(SDKContext &Ctx,
@@ -845,10 +857,7 @@ static bool isSDKNodeEqual(SDKContext &Ctx, const SDKNode &L, const SDKNode &R) 
 }
 
 bool SDKContext::isEqual(const SDKNode &Left, const SDKNode &Right) {
-  if (!EqualCache[&Left].count(&Right)) {
-    EqualCache[&Left][&Right] = isSDKNodeEqual(*this, Left, Right);
-  }
-  return EqualCache[&Left][&Right];
+  return isSDKNodeEqual(*this, Left, Right);
 }
 
 AccessLevel SDKContext::getAccessLevel(const ValueDecl *VD) const {
@@ -1137,6 +1146,32 @@ static bool isABIPlaceholderRecursive(Decl *D) {
   return false;
 }
 
+StringRef SDKContext::getPlatformIntroVersion(Decl *D, PlatformKind Kind) {
+  if (!D)
+    return StringRef();
+  for (auto *ATT: D->getAttrs()) {
+    if (auto *AVA = dyn_cast<AvailableAttr>(ATT)) {
+      if (AVA->Platform == Kind && AVA->Introduced) {
+        return buffer(AVA->Introduced->getAsString());
+      }
+    }
+  }
+  return getPlatformIntroVersion(D->getDeclContext()->getAsDecl(), Kind);
+}
+
+StringRef SDKContext::getLanguageIntroVersion(Decl *D) {
+  if (!D)
+    return StringRef();
+  for (auto *ATT: D->getAttrs()) {
+    if (auto *AVA = dyn_cast<AvailableAttr>(ATT)) {
+      if (AVA->isLanguageVersionSpecific() && AVA->Introduced) {
+        return buffer(AVA->Introduced->getAsString());
+      }
+    }
+  }
+  return getLanguageIntroVersion(D->getDeclContext()->getAsDecl());
+}
+
 SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Type Ty, TypeInitInfo Info) :
     Ctx(Ctx), Name(getTypeName(Ctx, Ty, Info.IsImplicitlyUnwrappedOptional)),
     PrintedName(getPrintedName(Ctx, Ty, Info.IsImplicitlyUnwrappedOptional)),
@@ -1155,6 +1190,11 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Decl *D):
       Location(calculateLocation(Ctx, D)),
       ModuleName(D->getModuleContext()->getName().str()),
       GenericSig(printGenericSignature(Ctx, D)),
+      IntromacOS(Ctx.getPlatformIntroVersion(D, PlatformKind::OSX)),
+      IntroiOS(Ctx.getPlatformIntroVersion(D, PlatformKind::iOS)),
+      IntrotvOS(Ctx.getPlatformIntroVersion(D, PlatformKind::tvOS)),
+      IntrowatchOS(Ctx.getPlatformIntroVersion(D, PlatformKind::watchOS)),
+      Introswift(Ctx.getLanguageIntroVersion(D)),
       IsImplicit(D->isImplicit()),
       IsDeprecated(D->getAttrs().getDeprecated(D->getASTContext())),
       IsABIPlaceholder(isABIPlaceholderRecursive(D)) {
@@ -1280,6 +1320,7 @@ case SDKNodeKind::X:                                                           \
   break;
 #include "swift/IDE/DigesterEnums.def"
   }
+  llvm_unreachable("covered switch");
 }
 
 // Recursively construct a node that represents a type, for instance,
@@ -1457,7 +1498,9 @@ SwiftDeclCollector::constructTypeDeclNode(NominalTypeDecl *NTD) {
 SDKNode *swift::ide::api::
 SwiftDeclCollector::constructExternalExtensionNode(NominalTypeDecl *NTD,
                                             ArrayRef<ExtensionDecl*> AllExts) {
-  auto *TypeNode = SDKNodeInitInfo(Ctx, NTD).createSDKNode(SDKNodeKind::DeclType);
+  SDKNodeInitInfo initInfo(Ctx, NTD);
+  initInfo.IsExternal = true;
+  auto *TypeNode = initInfo.createSDKNode(SDKNodeKind::DeclType);
   addConformancesToTypeDecl(cast<SDKNodeDeclType>(TypeNode), NTD);
 
   bool anyConformancesAdded = false;
@@ -1556,6 +1599,8 @@ SwiftDeclCollector::addMembersToRoot(SDKNode *Root, IterableDeclContext *Context
       // All containing variables should have been handled.
     } else if (isa<DestructorDecl>(Member)) {
       // deinit has no impact.
+    } else if (isa<MissingMemberDecl>(Member)) {
+      // avoid adding MissingMemberDecl
     } else {
       llvm_unreachable("unhandled member decl kind.");
     }
@@ -1613,7 +1658,8 @@ void SwiftDeclCollector::lookupVisibleDecls(ArrayRef<ModuleDecl *> Modules) {
         continue;
       KnownDecls.insert(D);
       if (auto VD = dyn_cast<ValueDecl>(D))
-        foundDecl(VD, DeclVisibilityKind::DynamicLookup);
+        foundDecl(VD, DeclVisibilityKind::DynamicLookup,
+                  DynamicLookupInfo::AnyObject);
       else
         processDecl(D);
     }
@@ -1676,7 +1722,8 @@ void SwiftDeclCollector::processValueDecl(ValueDecl *VD) {
   }
 }
 
-void SwiftDeclCollector::foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) {
+void SwiftDeclCollector::foundDecl(ValueDecl *VD, DeclVisibilityKind Reason,
+                                   DynamicLookupInfo) {
   if (VD->getClangMacro()) {
     // Collect macros, we will sort them afterwards.
     ClangMacros.push_back(VD);
@@ -1706,6 +1753,7 @@ void SDKNode::jsonize(json::Output &out) {
 
 void SDKNodeConformance::jsonize(json::Output &out) {
   SDKNode::jsonize(out);
+  output(out, KeyKind::KK_usr, Usr);
   output(out, KeyKind::KK_isABIPlaceholder, IsABIPlaceholder);
 }
 
@@ -1724,6 +1772,11 @@ void SDKNodeDecl::jsonize(json::Output &out) {
   output(out, KeyKind::KK_isOpen, IsOpen);
   output(out, KeyKind::KK_isInternal, IsInternal);
   output(out, KeyKind::KK_isABIPlaceholder, IsABIPlaceholder);
+  output(out, KeyKind::KK_intro_Macosx, introVersions.macos);
+  output(out, KeyKind::KK_intro_iOS, introVersions.ios);
+  output(out, KeyKind::KK_intro_tvOS, introVersions.tvos);
+  output(out, KeyKind::KK_intro_watchOS, introVersions.watchos);
+  output(out, KeyKind::KK_intro_swift, introVersions.swift);
   out.mapOptional(getKeyContent(Ctx, KeyKind::KK_declAttributes).data(), DeclAttributes);
   out.mapOptional(getKeyContent(Ctx, KeyKind::KK_fixedbinaryorder).data(), FixedBinaryOrder);
   // Strong reference is implied, no need for serialization.
@@ -1749,6 +1802,7 @@ void SDKNodeDeclType::jsonize(json::Output &out) {
   SDKNodeDecl::jsonize(out);
   output(out, KeyKind::KK_superclassUsr, SuperclassUsr);
   output(out, KeyKind::KK_enumRawTypeName, EnumRawTypeName);
+  output(out, KeyKind::KK_isExternal, IsExternal);
   out.mapOptional(getKeyContent(Ctx, KeyKind::KK_superclassNames).data(), SuperclassNames);
   out.mapOptional(getKeyContent(Ctx, KeyKind::KK_conformances).data(), Conformances);
 }

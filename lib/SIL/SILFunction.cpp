@@ -151,9 +151,10 @@ SILFunction::~SILFunction() {
          "Function cannot be deleted while function_ref's still exist");
 }
 
-void SILFunction::createProfiler(ASTNode Root, ForDefinition_t forDefinition) {
+void SILFunction::createProfiler(ASTNode Root, SILDeclRef forDecl,
+                                 ForDefinition_t forDefinition) {
   assert(!Profiler && "Function already has a profiler");
-  Profiler = SILProfiler::create(Module, forDefinition, Root);
+  Profiler = SILProfiler::create(Module, forDefinition, Root, forDecl);
 }
 
 bool SILFunction::hasForeignBody() const {

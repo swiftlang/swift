@@ -78,8 +78,8 @@ namespace swift {
   class ParameterTypeFlags;
   class Pattern;
   struct PrintOptions;
-  struct PropertyDelegateBackingPropertyInfo;
-  struct PropertyDelegateTypeInfo;
+  struct PropertyWrapperBackingPropertyInfo;
+  struct PropertyWrapperTypeInfo;
   class ProtocolDecl;
   class ProtocolType;
   struct RawComment;
@@ -391,8 +391,8 @@ protected:
     /// FIXME: Remove this once LLDB has proper support for resilience.
     IsREPLVar : 1,
 
-    /// Whether this is the backing storage for a property delegate.
-    IsPropertyDelegateBackingProperty : 1
+    /// Whether this is the backing storage for a property wrapper.
+    IsPropertyWrapperBackingProperty : 1
   );
 
   SWIFT_INLINE_BITFIELD(ParamDecl, VarDecl, 1 + NumDefaultArgumentKindBits,
@@ -602,7 +602,7 @@ protected:
     HasAnyUnavailableValues : 1
   );
 
-  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1,
     /// If the module was or is being compiled with `-enable-testing`.
     TestingEnabled : 1,
 
@@ -621,7 +621,10 @@ protected:
     PrivateImportsEnabled : 1,
 
     // If the module is compiled with `-enable-implicit-dynamic`.
-    ImplicitDynamicEnabled : 1
+    ImplicitDynamicEnabled : 1,
+
+    // Whether the module is a system module.
+    IsSystemModule : 1
   );
 
   SWIFT_INLINE_BITFIELD(PrecedenceGroupDecl, Decl, 1+2,
@@ -3042,7 +3045,7 @@ class AssociatedTypeDecl : public AbstractTypeParamDecl {
   SourceLoc KeywordLoc;
 
   /// The default definition.
-  TypeLoc DefaultDefinition;
+  TypeRepr *DefaultDefinition;
 
   /// The where clause attached to the associated type.
   TrailingWhereClause *TrailingWhere;
@@ -3050,9 +3053,11 @@ class AssociatedTypeDecl : public AbstractTypeParamDecl {
   LazyMemberLoader *Resolver = nullptr;
   uint64_t ResolverContextData;
 
+  friend class DefaultDefinitionTypeRequest;
+
 public:
   AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc, Identifier name,
-                     SourceLoc nameLoc, TypeLoc defaultDefinition,
+                     SourceLoc nameLoc, TypeRepr *defaultDefinition,
                      TrailingWhereClause *trailingWhere);
   AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc, Identifier name,
                      SourceLoc nameLoc, TrailingWhereClause *trailingWhere,
@@ -3068,17 +3073,14 @@ public:
   bool hasDefaultDefinitionType() const {
     // If we have a TypeRepr, return true immediately without kicking off
     // a request.
-    return !DefaultDefinition.isNull() || getDefaultDefinitionType();
+    return DefaultDefinition || getDefaultDefinitionType();
   }
 
   /// Retrieve the default definition type.
   Type getDefaultDefinitionType() const;
 
-  TypeLoc &getDefaultDefinitionLoc() {
-    return DefaultDefinition;
-  }
-
-  const TypeLoc &getDefaultDefinitionLoc() const {
+  /// Retrieve the default definition as written in the source.
+  TypeRepr *getDefaultDefinitionTypeRepr() const {
     return DefaultDefinition;
   }
 
@@ -3392,8 +3394,8 @@ public:
   /// Is this a key path type?
   Optional<KeyPathTypeKind> getKeyPathTypeKind() const;
 
-  /// Retrieve information about this type as a property delegate.
-  PropertyDelegateTypeInfo getPropertyDelegateTypeInfo() const;
+  /// Retrieve information about this type as a property wrapper.
+  PropertyWrapperTypeInfo getPropertyWrapperTypeInfo() const;
 
 private:
   /// Predicate used to filter StoredPropertyRange.
@@ -4081,6 +4083,7 @@ class ProtocolDecl final : public NominalTypeDecl {
 
   friend class SuperclassDeclRequest;
   friend class SuperclassTypeRequest;
+  friend class RequirementSignatureRequest;
   friend class TypeChecker;
 
 public:
@@ -4302,22 +4305,22 @@ public:
   /// protocol. Requirements implied via any other protocol (e.g., inherited
   /// protocols of the inherited protocols) are not mentioned. The conformance
   /// requirements listed here become entries in the witness table.
-  ArrayRef<Requirement> getRequirementSignature() const {
-    assert(isRequirementSignatureComputed() &&
-           "getting requirement signature before computing it");
-    return llvm::makeArrayRef(RequirementSignature,
-                              Bits.ProtocolDecl.NumRequirementsInSignature);
-  }
+  ArrayRef<Requirement> getRequirementSignature() const;
+
+  /// Is the requirement signature currently being computed?
+  bool isComputingRequirementSignature() const;
 
   /// Has the requirement signature been computed yet?
   bool isRequirementSignatureComputed() const {
     return RequirementSignature != nullptr;
   }
 
-  void computeRequirementSignature();
-
   void setRequirementSignature(ArrayRef<Requirement> requirements);
 
+private:
+  ArrayRef<Requirement> getCachedRequirementSignature() const;
+
+public:
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::Protocol;
@@ -4742,14 +4745,14 @@ public:
 };
 
 /// Describes which synthesized property for a property with an attached
-/// delegate is being referenced.
-enum class PropertyDelegateSynthesizedPropertyKind {
+/// wrapper is being referenced.
+enum class PropertyWrapperSynthesizedPropertyKind {
   /// The backing storage property, which is a stored property of the
-  /// delegate type.
+  /// wrapper type.
   Backing,
-  /// A storage delegate (e.g., `$foo`), which is a wrapper over the
-  /// delegate instance's `delegateValue` property.
-  StorageDelegate,
+  /// A storage wrapper (e.g., `$foo`), which is a wrapper over the
+  /// wrapper instance's `wrapperValue` property.
+  StorageWrapper,
 };
 
 /// VarDecl - 'var' and 'let' declarations.
@@ -4782,7 +4785,7 @@ protected:
     Bits.VarDecl.IsDebuggerVar = false;
     Bits.VarDecl.IsREPLVar = false;
     Bits.VarDecl.HasNonPatternBindingInit = false;
-    Bits.VarDecl.IsPropertyDelegateBackingProperty = false;
+    Bits.VarDecl.IsPropertyWrapperBackingProperty = false;
   }
 
   /// This is the type specified, including location information.
@@ -5061,7 +5064,7 @@ public:
   /// exposed to clients.
   /// There's a very narrow case when we would: if the decl is an instance
   /// member with an initializer expression and the parent type is
-  /// @_fixed_layout and resides in a resilient module.
+  /// @frozen and resides in a resilient module.
   bool isInitExposedToClients() const;
   
   /// Is this a special debugger variable?
@@ -5077,64 +5080,64 @@ public:
     Bits.VarDecl.IsREPLVar = IsREPLVar;
   }
 
-  /// Retrieve the custom attribute that attaches a property delegate to this
+  /// Retrieve the custom attribute that attaches a property wrapper to this
   /// property.
-  CustomAttr *getAttachedPropertyDelegate() const;
+  CustomAttr *getAttachedPropertyWrapper() const;
 
-  /// Retrieve the type of the attached property delegate as a contextual
+  /// Retrieve the type of the attached property wrapper as a contextual
   /// type.
   ///
-  /// \returns a NULL type for properties without attached delegates,
-  /// an error type when the property delegate type itself is erroneous,
-  /// or the delegate type itself, which may involve unbound generic
+  /// \returns a NULL type for properties without attached wrappers,
+  /// an error type when the property wrapper type itself is erroneous,
+  /// or the wrapper type itself, which may involve unbound generic
   /// types.
-  Type getAttachedPropertyDelegateType() const;
+  Type getAttachedPropertyWrapperType() const;
 
-  /// Retrieve information about the attached property delegate type.
-  PropertyDelegateTypeInfo getAttachedPropertyDelegateTypeInfo() const;
+  /// Retrieve information about the attached property wrapper type.
+  PropertyWrapperTypeInfo getAttachedPropertyWrapperTypeInfo() const;
 
-  /// Retrieve the fully resolved attached property delegate type.
+  /// Retrieve the fully resolved attached property wrapper type.
   ///
   /// This type will be the fully-resolved form of
-  /// \c getAttachedPropertyDelegateType(), which will not contain any
+  /// \c getAttachedPropertyWrapperType(), which will not contain any
   /// unbound generic types. It will be the type of the backing property.
-  Type getPropertyDelegateBackingPropertyType() const;
+  Type getPropertyWrapperBackingPropertyType() const;
 
   /// Retrieve information about the backing properties of the attached
-  /// property delegate.
-  PropertyDelegateBackingPropertyInfo
-      getPropertyDelegateBackingPropertyInfo() const;
+  /// property wrapper.
+  PropertyWrapperBackingPropertyInfo
+      getPropertyWrapperBackingPropertyInfo() const;
 
   /// Retrieve the backing storage property for a property that has an
-  /// attached property delegate.
+  /// attached property wrapper.
   ///
   /// The backing storage property will be a stored property of the
-  /// delegate's type. This will be equivalent to
-  /// \c getAttachedPropertyDelegateType() when it is fully-specified;
-  /// if \c getAttachedPropertyDelegateType() involves an unbound
+  /// wrapper's type. This will be equivalent to
+  /// \c getAttachedPropertyWrapperType() when it is fully-specified;
+  /// if \c getAttachedPropertyWrapperType() involves an unbound
   /// generic type, the backing storage property will be the appropriate
   /// bound generic version.
-  VarDecl *getPropertyDelegateBackingProperty() const;
+  VarDecl *getPropertyWrapperBackingProperty() const;
 
-  /// Whether this is a property with a property delegate that was initialized
+  /// Whether this is a property with a property wrapper that was initialized
   /// via a value of the original type, e.g.,
   ///
   /// \code
   /// @Lazy var i = 17
   /// \end
-  bool isPropertyDelegateInitializedWithInitialValue() const;
+  bool isPropertyWrapperInitializedWithInitialValue() const;
 
   /// If this property is the backing storage for a property with an attached
-  /// property delegate, return the original property.
+  /// property wrapper, return the original property.
   ///
   /// \param kind If not \c None, only returns the original property when
   /// \c this property is the specified synthesized property.
-  VarDecl *getOriginalDelegatedProperty(
-      Optional<PropertyDelegateSynthesizedPropertyKind> kind = None) const;
+  VarDecl *getOriginalWrappedProperty(
+      Optional<PropertyWrapperSynthesizedPropertyKind> kind = None) const;
 
-  /// Set the property that delegates to this property as it's backing
+  /// Set the property that wraps to this property as it's backing
   /// property.
-  void setOriginalDelegatedProperty(VarDecl *originalProperty);
+  void setOriginalWrappedProperty(VarDecl *originalProperty);
 
   /// Return the Objective-C runtime name for this property.
   Identifier getObjCPropertyName() const;
@@ -5161,7 +5164,7 @@ public:
   /// initializer.
   ///
   /// \param preferDeclaredProperties When encountering a `lazy` property
-  /// or a property that has an attached property delegate, prefer the
+  /// or a property that has an attached property wrapper, prefer the
   /// actual declared property (which may or may not be considered "stored"
   /// as the moment) to the backing storage property. Otherwise, the stored
   /// backing property will be treated as the member-initialized property.
@@ -5318,6 +5321,8 @@ public:
   }
   
   SourceRange getSourceRange() const;
+
+  AnyFunctionType::Param toFunctionParam(Type type = Type()) const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) { 
@@ -5733,6 +5738,11 @@ public:
     return Bits.AbstractFunctionDecl.NeedsNewVTableEntry;
   }
 
+  bool isEffectiveLinkageMoreVisibleThan(ValueDecl *other) const {
+    return (std::min(getEffectiveAccess(), AccessLevel::Public) >
+            std::min(other->getEffectiveAccess(), AccessLevel::Public));
+  }
+
   bool isSynthesized() const {
     return Bits.AbstractFunctionDecl.Synthesized;
   }
@@ -6059,8 +6069,8 @@ public:
   /// True if the function is a defer body.
   bool isDeferBody() const;
 
-  /// Perform basic checking to determine whether the @IBAction attribute can
-  /// be applied to this function.
+  /// Perform basic checking to determine whether the @IBAction or
+  /// @IBSegueAction attribute can be applied to this function.
   bool isPotentialIBActionTarget() const;
 };
 

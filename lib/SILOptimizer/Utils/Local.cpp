@@ -170,16 +170,8 @@ namespace {
   using CallbackTy = llvm::function_ref<void(SILInstruction *)>;
 } // end anonymous namespace
 
-void swift::
-recursivelyDeleteTriviallyDeadInstructions(ArrayRef<SILInstruction *> IA,
-                                           bool Force, CallbackTy Callback) {
-  SILBasicBlock::iterator instIter;
-  recursivelyDeleteTriviallyDeadInstructions(IA, instIter, Force, Callback);
-}
-
 void swift::recursivelyDeleteTriviallyDeadInstructions(
-    ArrayRef<SILInstruction *> IA, SILBasicBlock::iterator &InstIter,
-    bool Force, CallbackTy Callback) {
+    ArrayRef<SILInstruction *> IA, bool Force, CallbackTy Callback) {
   // Delete these instruction and others that become dead after it's deleted.
   llvm::SmallPtrSet<SILInstruction *, 8> DeadInsts;
   for (auto I : IA) {
@@ -216,21 +208,21 @@ void swift::recursivelyDeleteTriviallyDeadInstructions(
       // If we have a function ref inst, we need to especially drop its function
       // argument so that it gets a proper ref decrement.
       auto *FRI = dyn_cast<FunctionRefInst>(I);
-      if (FRI && FRI->getReferencedFunction())
+      if (FRI && FRI->getInitiallyReferencedFunction())
         FRI->dropReferencedFunction();
 
       auto *DFRI = dyn_cast<DynamicFunctionRefInst>(I);
-      if (DFRI && DFRI->getReferencedFunction())
+      if (DFRI && DFRI->getInitiallyReferencedFunction())
         DFRI->dropReferencedFunction();
 
       auto *PFRI = dyn_cast<PreviousDynamicFunctionRefInst>(I);
-      if (PFRI && PFRI->getReferencedFunction())
+      if (PFRI && PFRI->getInitiallyReferencedFunction())
         PFRI->dropReferencedFunction();
     }
 
     for (auto I : DeadInsts) {
       // This will remove this instruction and all its uses.
-      eraseFromParentWithDebugInsts(I, InstIter);
+      eraseFromParentWithDebugInsts(I, Callback);
     }
 
     NextInsts.swap(DeadInsts);
@@ -244,13 +236,11 @@ void swift::recursivelyDeleteTriviallyDeadInstructions(
 /// \param I The instruction to be deleted.
 /// \param Force If Force is set, don't check if the top level instruction is
 ///        considered dead - delete it regardless.
-SILBasicBlock::iterator
-swift::recursivelyDeleteTriviallyDeadInstructions(SILInstruction *I, bool Force,
-                                                  CallbackTy Callback) {
-  SILBasicBlock::iterator nextI = std::next(I->getIterator());
+void swift::recursivelyDeleteTriviallyDeadInstructions(SILInstruction *I,
+                                                       bool Force,
+                                                       CallbackTy Callback) {
   ArrayRef<SILInstruction *> AI = ArrayRef<SILInstruction *>(I);
-  recursivelyDeleteTriviallyDeadInstructions(AI, nextI, Force, Callback);
-  return nextI;
+  recursivelyDeleteTriviallyDeadInstructions(AI, Force, Callback);
 }
 
 void swift::eraseUsesOfInstruction(SILInstruction *Inst,
@@ -750,7 +740,7 @@ public:
 /// Returns false if optimization is not possible.
 /// Returns true and initializes internal fields if optimization is possible.
 bool StringConcatenationOptimizer::extractStringConcatOperands() {
-  auto *Fn = AI->getReferencedFunction();
+  auto *Fn = AI->getReferencedFunctionOrNull();
   if (!Fn)
     return false;
 
@@ -770,8 +760,8 @@ bool StringConcatenationOptimizer::extractStringConcatOperands() {
   if (!FRILeft || !FRIRight)
     return false;
 
-  auto *FRILeftFun = FRILeft->getReferencedFunction();
-  auto *FRIRightFun = FRIRight->getReferencedFunction();
+  auto *FRILeftFun = FRILeft->getReferencedFunctionOrNull();
+  auto *FRIRightFun = FRIRight->getReferencedFunctionOrNull();
 
   if (FRILeftFun->getEffectsKind() >= EffectsKind::ReleaseNone ||
       FRIRightFun->getEffectsKind() >= EffectsKind::ReleaseNone)

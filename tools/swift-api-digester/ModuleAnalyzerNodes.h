@@ -145,6 +145,7 @@ struct CheckerOptions {
   bool AbortOnModuleLoadFailure;
   bool PrintModule;
   bool SwiftOnly;
+  bool SkipOSCheck;
   StringRef LocationFilter;
 };
 
@@ -160,8 +161,6 @@ class SDKContext {
 
   CheckerOptions Opts;
   std::vector<BreakingAttributeInfo> BreakingAttrs;
-  /// This is to cache the equal comparison results between nodes.
-  llvm::DenseMap<const SDKNode*, llvm::DenseMap<const SDKNode*, bool>> EqualCache;
 
 public:
   SDKContext(CheckerOptions Options);
@@ -189,6 +188,8 @@ public:
   DiagnosticEngine &getDiags() {
     return Diags;
   }
+  StringRef getPlatformIntroVersion(Decl *D, PlatformKind Kind);
+  StringRef getLanguageIntroVersion(Decl *D);
   bool isEqual(const SDKNode &Left, const SDKNode &Right);
   bool checkingABI() const { return Opts.ABI; }
   AccessLevel getAccessLevel(const ValueDecl *VD) const;
@@ -287,6 +288,17 @@ public:
   }
 };
 
+struct PlatformIntroVersion {
+  StringRef macos;
+  StringRef ios;
+  StringRef tvos;
+  StringRef watchos;
+  StringRef swift;
+  bool hasOSAvailability() const {
+    return !macos.empty() || !ios.empty() || !tvos.empty() || !watchos.empty();
+  }
+};
+
 class SDKNodeDecl: public SDKNode {
   DeclKind DKind;
   StringRef Usr;
@@ -304,6 +316,7 @@ class SDKNodeDecl: public SDKNode {
   uint8_t ReferenceOwnership;
   StringRef GenericSig;
   Optional<uint8_t> FixedBinaryOrder;
+  PlatformIntroVersion introVersions;
 
 protected:
   SDKNodeDecl(SDKNodeInitInfo Info, SDKNodeKind Kind);
@@ -338,6 +351,7 @@ public:
   StringRef getScreenInfo() const;
   bool hasFixedBinaryOrder() const { return FixedBinaryOrder.hasValue(); }
   uint8_t getFixedBinaryOrder() const { return *FixedBinaryOrder; }
+  PlatformIntroVersion getIntroducingVersion() const { return introVersions; }
   virtual void jsonize(json::Output &Out) override;
   virtual void diagnose(SDKNode *Right) override;
 
@@ -460,6 +474,9 @@ class SDKNodeDeclType: public SDKNodeDecl {
   std::vector<StringRef> SuperclassNames;
   std::vector<SDKNode*> Conformances;
   StringRef EnumRawTypeName;
+  // Check whether the type declaration is pulled from an external module so we
+  // can incorporate extensions in the interested module.
+  bool IsExternal;
 public:
   SDKNodeDeclType(SDKNodeInitInfo Info);
   static bool classof(const SDKNode *N);
@@ -468,6 +485,7 @@ public:
   void addConformance(SDKNode *Conf);
   ArrayRef<SDKNode*> getConformances() const { return Conformances; }
   NodeVector getConformances() { return Conformances; }
+  bool isExternal() const { return IsExternal; }
   StringRef getSuperClassName() const {
     return SuperclassNames.empty() ? StringRef() : SuperclassNames.front();
   };
@@ -499,11 +517,13 @@ public:
 /// The SDKNode part of the conformance node is constructed using the protocol
 /// in the conformance, thus getName() will give us the name of the protocol.
 class SDKNodeConformance: public SDKNode {
+  StringRef Usr;
   SDKNodeDeclType *TypeDecl;
   friend class SDKNodeDeclType;
   bool IsABIPlaceholder;
 public:
   SDKNodeConformance(SDKNodeInitInfo Info);
+  StringRef getUsr() const { return Usr; }
   ArrayRef<SDKNode*> getTypeWitnesses() const { return Children; }
   SDKNodeDeclType *getNominalTypeDecl() const { return TypeDecl; }
   bool isABIPlaceholder() const { return IsABIPlaceholder; }
@@ -690,7 +710,8 @@ public:
   std::vector<SDKNode*> createParameterNodes(ParameterList *PL);
   SDKNode *constructTypeNode(Type T, TypeInitInfo Info = TypeInitInfo());
   void processValueDecl(ValueDecl *VD);
-  void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override;
+  void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason,
+                 DynamicLookupInfo dynamicLookupInfo = {}) override;
   void processDecl(Decl *D);
 public:
   void lookupVisibleDecls(ArrayRef<ModuleDecl *> Modules);

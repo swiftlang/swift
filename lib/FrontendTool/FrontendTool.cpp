@@ -509,7 +509,6 @@ static void countStatsPostSema(UnifiedStatsReporter &Stats,
 
   auto const &AST = Instance.getASTContext();
   C.NumLoadedModules = AST.LoadedModules.size();
-  C.NumImportedExternalDefinitions = AST.ExternalDefinitions.size();
 
   if (auto *D = Instance.getDependencyTracker()) {
     C.NumDependencies = D->getDependencies().size();
@@ -598,11 +597,13 @@ static bool buildModuleFromParseableInterface(CompilerInvocation &Invocation,
   StringRef InputPath = FEOpts.InputsAndOutputs.getFilenameOfFirstInput();
   StringRef PrebuiltCachePath = FEOpts.PrebuiltModuleCachePath;
   return ParseableInterfaceModuleLoader::buildSwiftModuleFromSwiftInterface(
-      Instance.getASTContext(), Invocation.getClangModuleCachePath(),
+      Instance.getSourceMgr(), Instance.getDiags(),
+      Invocation.getSearchPathOptions(), Invocation.getLangOptions(),
+      Invocation.getClangModuleCachePath(),
       PrebuiltCachePath, Invocation.getModuleName(), InputPath,
       Invocation.getOutputFilename(),
       FEOpts.SerializeModuleInterfaceDependencyHashes,
-      FEOpts.TrackSystemDeps);
+      FEOpts.TrackSystemDeps, FEOpts.RemarkOnRebuildFromModuleInterface);
 }
 
 static bool compileLLVMIR(CompilerInvocation &Invocation,
@@ -1005,6 +1006,9 @@ static bool performCompile(CompilerInstance &Instance,
   if (Action == FrontendOptions::ActionType::ResolveImports)
     return Context.hadError();
 
+  if (observer)
+    observer->performedSemanticAnalysis(Instance);
+
   if (Stats)
     countStatsPostSema(*Stats, Instance);
 
@@ -1238,6 +1242,9 @@ static bool performCompileStepsPostSILGen(
   if (auto *SF = MSF.dyn_cast<SourceFile *>())
     ricd.emplace(*SF);
 
+  if (observer)
+    observer->performedSILGeneration(*SM);
+
   if (Stats)
     countStatsPostSILGen(*Stats, *SM);
 
@@ -1283,6 +1290,9 @@ static bool performCompileStepsPostSILGen(
   // Perform optimizations and mandatory/diagnostic passes.
   if (Instance.performSILProcessing(SM.get(), Stats))
     return true;
+
+  if (observer)
+    observer->performedSILProcessing(*SM);
 
   emitAnyWholeModulePostTypeCheckSupplementaryOutputs(Instance, Invocation,
                                                       moduleIsPublic);
@@ -1847,3 +1857,6 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
 void FrontendObserver::parsedArgs(CompilerInvocation &invocation) {}
 void FrontendObserver::configuredCompiler(CompilerInstance &instance) {}
+void FrontendObserver::performedSemanticAnalysis(CompilerInstance &instance) {}
+void FrontendObserver::performedSILGeneration(SILModule &module) {}
+void FrontendObserver::performedSILProcessing(SILModule &module) {}

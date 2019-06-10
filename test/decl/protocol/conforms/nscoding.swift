@@ -2,15 +2,15 @@
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -parse-as-library -swift-version 4 %s -verify
 // RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -parse-as-library -swift-version 4 %s -disable-nskeyedarchiver-diagnostics 2>&1 | %FileCheck -check-prefix CHECK-NO-DIAGS %s
-
-// RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -parse-as-library -swift-version 4 %s -dump-ast -target x86_64-apple-macosx10.14.3 > %t/old.ast
-// RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -parse-as-library -swift-version 4 %s -dump-ast -target x86_64-apple-macosx10.14.4 > %t/new.ast
+// RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -parse-as-library -swift-version 4 %s -dump-ast -target %target-pre-stable-abi-triple > %t/old.ast
 
 // RUN: %FileCheck --check-prefix=CHECK-OLD %s < %t/old.ast
 // RUN: %FileCheck --check-prefix=NEGATIVE %s < %t/old.ast
-// RUN: %FileCheck --check-prefix=NEGATIVE --check-prefix=NEGATIVE-NEW %s < %t/new.ast
 
-// REQUIRES: OS=macosx
+// REQUIRES: objc_interop
+
+// See also nscoding_stable_abi.swift, for the stable ABI deployment
+// target test.
 
 // CHECK-NO-DIAGS-NOT: NSCoding
 // CHECK-NO-DIAGS-NOT: unstable

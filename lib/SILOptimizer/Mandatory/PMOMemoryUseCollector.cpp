@@ -310,6 +310,7 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
           case StoreOwnershipQualifier::Trivial:
             return PMOUseKind::InitOrAssign;
           }
+          llvm_unreachable("covered switch");
         })();
         Uses.emplace_back(si, kind);
         continue;

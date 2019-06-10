@@ -20,6 +20,10 @@ import NSSlowString
 import Foundation  // For NSRange
 #endif
 
+#if os(Windows)
+import ucrt
+#endif
+
 extension Collection {
   internal func index(_nth n: Int) -> Index {
     precondition(n >= 0)

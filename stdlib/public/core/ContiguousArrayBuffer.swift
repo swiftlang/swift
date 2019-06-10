@@ -171,7 +171,7 @@ internal final class _ContiguousArrayStorage<
 }
 
 @usableFromInline
-@_fixed_layout
+@frozen
 internal struct _ContiguousArrayBuffer<Element> : _ArrayBufferProtocol {
 
   /// Make a buffer with uninitialized elements.  After using this
@@ -652,7 +652,7 @@ internal func _copyCollectionToContiguousArray<
 /// element-by-element. The type is unsafe because it cannot be deinitialized
 /// until the buffer has been finalized by a call to `finish`.
 @usableFromInline
-@_fixed_layout
+@frozen
 internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
   @usableFromInline
   internal var result: _ContiguousArrayBuffer<Element>

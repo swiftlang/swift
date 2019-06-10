@@ -57,6 +57,8 @@ enum class FixKind : uint8_t {
 
   /// Introduce a '&' to take the address of an lvalue.
   AddressOf,
+  /// Remove extraneous use of `&`.
+  RemoveAddressOf,
 
   /// Replace a coercion ('as') with a forced checked cast ('as!').
   CoerceToCheckedCast,
@@ -123,6 +125,11 @@ enum class FixKind : uint8_t {
   /// referenced constructor must be required.
   AllowInvalidInitRef,
 
+  /// Allow an invalid member access on a value of protocol type as if
+  /// that protocol type were a generic constraint requiring conformance
+  /// to that protocol.
+  AllowMemberRefOnExistential,
+
   /// If there are fewer arguments than parameters, let's fix that up
   /// by adding new arguments to the list represented as type variables.
   AddMissingArguments,
@@ -147,6 +154,15 @@ enum class FixKind : uint8_t {
   /// Allow an invalid reference to a member declaration as part
   /// of a key path component.
   AllowInvalidRefInKeyPath,
+
+  /// Remove `return` or default last expression of single expression
+  /// function to `Void` to conform to expected result type.
+  RemoveReturn,
+
+  /// Generic parameters could not be inferred and have to be explicitly
+  /// specified in the source. This fix groups all of the missing arguments
+  /// associated with single declaration.
+  ExplicitlySpecifyGenericArguments,
 };
 
 class ConstraintFix {
@@ -357,13 +373,19 @@ private:
 
 /// Add a new conformance to the type to satisfy a requirement.
 class MissingConformance final : public ConstraintFix {
-  Type NonConformingType;
-  ProtocolDecl *Protocol;
+  // Determines whether given protocol type comes from the context e.g.
+  // assignment destination or argument comparison.
+  bool IsContextual;
 
-  MissingConformance(ConstraintSystem &cs, Type type, ProtocolDecl *protocol,
-                     ConstraintLocator *locator)
+  Type NonConformingType;
+  // This could either be a protocol or protocol composition.
+  Type ProtocolType;
+
+  MissingConformance(ConstraintSystem &cs, bool isContextual, Type type,
+                     Type protocolType, ConstraintLocator *locator)
       : ConstraintFix(cs, FixKind::AddConformance, locator),
-        NonConformingType(type), Protocol(protocol) {}
+        IsContextual(isContextual), NonConformingType(type),
+        ProtocolType(protocolType) {}
 
 public:
   std::string getName() const override {
@@ -372,13 +394,17 @@ public:
 
   bool diagnose(Expr *root, bool asNote = false) const override;
 
-  static MissingConformance *create(ConstraintSystem &cs, Type type,
-                                    ProtocolDecl *protocol,
-                                    ConstraintLocator *locator);
+  static MissingConformance *forRequirement(ConstraintSystem &cs, Type type,
+                                            Type protocolType,
+                                            ConstraintLocator *locator);
+
+  static MissingConformance *forContextual(ConstraintSystem &cs, Type type,
+                                           Type protocolType,
+                                           ConstraintLocator *locator);
 
   Type getNonConformingType() { return NonConformingType; }
 
-  ProtocolDecl *getProtocol() { return Protocol; }
+  Type getProtocolType() { return ProtocolType; }
 };
 
 /// Skip same-type generic requirement constraint,
@@ -576,16 +602,46 @@ public:
                                         DeclName member,
                                         ConstraintLocator *locator);
 };
-	
-class AllowTypeOrInstanceMember final : public ConstraintFix {
+
+class AllowMemberRefOnExistential final : public ConstraintFix {
   Type BaseType;
   DeclName Name;
 
+  AllowMemberRefOnExistential(ConstraintSystem &cs, Type baseType,
+                              DeclName memberName, ValueDecl *member,
+                              ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowMemberRefOnExistential, locator),
+        BaseType(baseType), Name(memberName) {}
+
 public:
-  AllowTypeOrInstanceMember(ConstraintSystem &cs, Type baseType, DeclName member,
+  std::string getName() const override {
+    llvm::SmallVector<char, 16> scratch;
+    auto memberName = Name.getString(scratch);
+    return "allow access to invalid member '" + memberName.str() +
+           "' on value of protocol type";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static AllowMemberRefOnExistential *create(ConstraintSystem &cs,
+                                             Type baseType, ValueDecl *member,
+                                             DeclName memberName,
+                                             ConstraintLocator *locator);
+};
+
+class AllowTypeOrInstanceMember final : public ConstraintFix {
+  Type BaseType;
+  ValueDecl *Member;
+  DeclName UsedName;
+
+public:
+  AllowTypeOrInstanceMember(ConstraintSystem &cs, Type baseType,
+                            ValueDecl *member, DeclName name,
                             ConstraintLocator *locator)
       : ConstraintFix(cs, FixKind::AllowTypeOrInstanceMember, locator),
-        BaseType(baseType), Name(member) {}
+        BaseType(baseType), Member(member), UsedName(name) {
+    assert(member);
+  }
 
   std::string getName() const override {
     return "allow access to instance member on type or a type member on instance";
@@ -594,7 +650,7 @@ public:
   bool diagnose(Expr *root, bool asNote = false) const override;
 
   static AllowTypeOrInstanceMember *create(ConstraintSystem &cs, Type baseType,
-                                           DeclName member,
+                                           ValueDecl *member, DeclName usedName,
                                            ConstraintLocator *locator);
 };
 
@@ -839,6 +895,7 @@ public:
     case RefKind::Method:
       return "allow reference to a method as a key path component";
     }
+    llvm_unreachable("covered switch");
   }
 
   bool diagnose(Expr *root, bool asNote = false) const override;
@@ -851,6 +908,89 @@ private:
   static AllowInvalidRefInKeyPath *create(ConstraintSystem &cs, RefKind kind,
                                           ValueDecl *member,
                                           ConstraintLocator *locator);
+};
+
+class RemoveAddressOf final : public ConstraintFix {
+  RemoveAddressOf(ConstraintSystem &cs, ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::RemoveAddressOf, locator) {}
+
+public:
+  std::string getName() const override {
+    return "remove extraneous use of `&`";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static RemoveAddressOf *create(ConstraintSystem &cs,
+                                 ConstraintLocator *locator);
+};
+
+class RemoveReturn final : public ConstraintFix {
+  RemoveReturn(ConstraintSystem &cs, ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::RemoveReturn, locator) {}
+
+public:
+  std::string getName() const override { return "remove or omit return type"; }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static RemoveReturn *create(ConstraintSystem &cs, ConstraintLocator *locator);
+};
+
+class CollectionElementContextualMismatch final : public ContextualMismatch {
+  CollectionElementContextualMismatch(ConstraintSystem &cs, Type srcType,
+                                      Type dstType, ConstraintLocator *locator)
+      : ContextualMismatch(cs, srcType, dstType, locator) {}
+
+public:
+  std::string getName() const override {
+    return "fix collection element contextual mismatch";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static CollectionElementContextualMismatch *
+  create(ConstraintSystem &cs, Type srcType, Type dstType,
+         ConstraintLocator *locator);
+};
+
+class ExplicitlySpecifyGenericArguments final
+    : public ConstraintFix,
+      private llvm::TrailingObjects<ExplicitlySpecifyGenericArguments,
+                                    GenericTypeParamType *> {
+  friend TrailingObjects;
+
+  unsigned NumMissingParams;
+
+  ExplicitlySpecifyGenericArguments(ConstraintSystem &cs,
+                                    ArrayRef<GenericTypeParamType *> params,
+                                    ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::ExplicitlySpecifyGenericArguments, locator),
+        NumMissingParams(params.size()) {
+    assert(!params.empty());
+    std::uninitialized_copy(params.begin(), params.end(),
+                            getParametersBuf().begin());
+  }
+
+public:
+  std::string getName() const override {
+    return "default missing generic arguments to `Any`";
+  }
+
+  ArrayRef<GenericTypeParamType *> getParameters() const {
+    return {getTrailingObjects<GenericTypeParamType *>(), NumMissingParams};
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static ExplicitlySpecifyGenericArguments *
+  create(ConstraintSystem &cs, ArrayRef<GenericTypeParamType *> params,
+         ConstraintLocator *locator);
+
+private:
+  MutableArrayRef<GenericTypeParamType *> getParametersBuf() {
+    return {getTrailingObjects<GenericTypeParamType *>(), NumMissingParams};
+  }
 };
 
 } // end namespace constraints

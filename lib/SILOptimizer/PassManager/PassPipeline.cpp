@@ -81,6 +81,7 @@ static void addDefiniteInitialization(SILPassPipelinePlan &P) {
 
 static void addMandatoryOptPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("Guaranteed Passes");
+  P.addSILGenCleanup();
   P.addDiagnoseInvalidEscapingCaptures();
   P.addDiagnoseStaticExclusivity();
   P.addCapturePromotion();
@@ -127,6 +128,11 @@ static void addMandatoryOptPipeline(SILPassPipelinePlan &P) {
   P.addDiagnoseInfiniteRecursion();
   P.addYieldOnceCheck();
   P.addEmitDFDiagnostics();
+
+  // This phase performs optimizations necessary for correct interoperation of
+  // Swift os log APIs with C os_log ABIs.
+  P.addOSLogOptimization();
+
   // Canonical swift requires all non cond_br critical edges to be split.
   P.addSplitNonCondBrCriticalEdges();
 }

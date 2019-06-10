@@ -538,9 +538,7 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
   
   ctorDecl->setBody(body);
   ctorDecl->setBodyTypeCheckedIfPresent();
-  
-  Impl.registerExternalDecl(ctorDecl);
-  
+
   return ctorDecl;
 }
 
@@ -616,7 +614,7 @@ static AccessorDecl *makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
   
   getterDecl->setBody(body);
   getterDecl->setBodyTypeCheckedIfPresent();
-  Impl.registerExternalDecl(getterDecl);
+
   return getterDecl;
 }
 
@@ -694,7 +692,6 @@ static AccessorDecl *makeStructRawValueGetter(
   getterDecl->setBody(body);
   getterDecl->setBodyTypeCheckedIfPresent();
 
-  Impl.registerExternalDecl(getterDecl);
   return getterDecl;
 }
 
@@ -838,18 +835,22 @@ makeIndirectFieldAccessors(ClangImporter::Implementation &Impl,
     auto selfDecl = getterDecl->getImplicitSelfDecl();
     Expr *expr = new (C) DeclRefExpr(selfDecl, DeclNameLoc(),
                                      /*implicit*/true);
+    expr->setType(selfDecl->getInterfaceType());
+
     expr = new (C) MemberRefExpr(expr, SourceLoc(), anonymousFieldDecl,
                                  DeclNameLoc(), /*implicit*/true);
+    expr->setType(anonymousFieldDecl->getInterfaceType());
 
     expr = new (C) MemberRefExpr(expr, SourceLoc(), anonymousInnerFieldDecl,
                                  DeclNameLoc(), /*implicit*/true);
+    expr->setType(anonymousInnerFieldDecl->getInterfaceType());
 
     auto ret = new (C) ReturnStmt(SourceLoc(), expr);
     auto body = BraceStmt::create(C, SourceLoc(), ASTNode(ret), SourceLoc(),
                                   /*implicit*/ true);
     getterDecl->setBody(body);
+    getterDecl->setBodyTypeCheckedIfPresent();
     getterDecl->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
-    Impl.registerExternalDecl(getterDecl);
   }
 
   // Synthesize the setter body
@@ -857,24 +858,30 @@ makeIndirectFieldAccessors(ClangImporter::Implementation &Impl,
     auto selfDecl = setterDecl->getImplicitSelfDecl();
     Expr *lhs = new (C) DeclRefExpr(selfDecl, DeclNameLoc(),
                                      /*implicit*/true);
+    lhs->setType(LValueType::get(selfDecl->getInterfaceType()));
+
     lhs = new (C) MemberRefExpr(lhs, SourceLoc(), anonymousFieldDecl,
-                                 DeclNameLoc(), /*implicit*/true);
+                                DeclNameLoc(), /*implicit*/true);
+    lhs->setType(LValueType::get(anonymousFieldDecl->getInterfaceType()));
 
     lhs = new (C) MemberRefExpr(lhs, SourceLoc(), anonymousInnerFieldDecl,
                                 DeclNameLoc(), /*implicit*/true);
+    lhs->setType(LValueType::get(anonymousInnerFieldDecl->getInterfaceType()));
 
     auto newValueDecl = setterDecl->getParameters()->get(0);
 
     auto rhs = new (C) DeclRefExpr(newValueDecl, DeclNameLoc(),
                                    /*implicit*/ true);
+    rhs->setType(newValueDecl->getInterfaceType());
 
     auto assign = new (C) AssignExpr(lhs, SourceLoc(), rhs, /*implicit*/true);
+    assign->setType(TupleType::getEmpty(C));
 
     auto body = BraceStmt::create(C, SourceLoc(), { assign }, SourceLoc(),
                                   /*implicit*/ true);
     setterDecl->setBody(body);
+    setterDecl->setBodyTypeCheckedIfPresent();
     setterDecl->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
-    Impl.registerExternalDecl(setterDecl);
   }
 
   return { getterDecl, setterDecl };
@@ -922,20 +929,36 @@ makeUnionFieldAccessors(ClangImporter::Implementation &Impl,
 
     auto selfRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(),
                                        /*implicit*/ true);
+    selfRef->setType(selfDecl->getInterfaceType());
+
     auto reinterpretCast = cast<FuncDecl>(getBuiltinValueDecl(
         C, C.getIdentifier("reinterpretCast")));
-    auto reinterpretCastRef
-      = new (C) DeclRefExpr(reinterpretCast, DeclNameLoc(), /*implicit*/ true);
-    auto reinterpreted = CallExpr::createImplicit(C, reinterpretCastRef,
+
+    ConcreteDeclRef reinterpretCastRef(
+      reinterpretCast,
+      SubstitutionMap::get(reinterpretCast->getGenericSignature(),
+                           {selfDecl->getInterfaceType(),
+                            importedFieldDecl->getInterfaceType()},
+                           ArrayRef<ProtocolConformanceRef>()));
+    auto reinterpretCastRefExpr
+      = new (C) DeclRefExpr(reinterpretCastRef, DeclNameLoc(),
+                            /*implicit*/ true);
+    reinterpretCastRefExpr->setType(
+      FunctionType::get(
+        AnyFunctionType::Param(selfDecl->getInterfaceType()),
+        importedFieldDecl->getInterfaceType()));
+  
+    auto reinterpreted = CallExpr::createImplicit(C, reinterpretCastRefExpr,
                                                   { selfRef },
                                                   { Identifier() });
+    reinterpreted->setType(importedFieldDecl->getInterfaceType());
     reinterpreted->setThrows(false);
     auto ret = new (C) ReturnStmt(SourceLoc(), reinterpreted);
     auto body = BraceStmt::create(C, SourceLoc(), ASTNode(ret), SourceLoc(),
                                   /*implicit*/ true);
     getterDecl->setBody(body);
+    getterDecl->setBodyTypeCheckedIfPresent();
     getterDecl->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
-    Impl.registerExternalDecl(getterDecl);
   }
 
   // Synthesize the setter body
@@ -944,32 +967,59 @@ makeUnionFieldAccessors(ClangImporter::Implementation &Impl,
 
     auto inoutSelfRef = new (C) DeclRefExpr(inoutSelfDecl, DeclNameLoc(),
                                             /*implicit*/ true);
+    inoutSelfRef->setType(LValueType::get(inoutSelfDecl->getInterfaceType()));
     auto inoutSelf = new (C) InOutExpr(SourceLoc(), inoutSelfRef,
       importedUnionDecl->getDeclaredType(), /*implicit*/ true);
+    inoutSelf->setType(InOutType::get(inoutSelfDecl->getInterfaceType()));
 
     auto newValueDecl = setterDecl->getParameters()->get(0);
 
     auto newValueRef = new (C) DeclRefExpr(newValueDecl, DeclNameLoc(),
                                            /*implicit*/ true);
+    newValueRef->setType(newValueDecl->getInterfaceType());
+
     auto addressofFn = cast<FuncDecl>(getBuiltinValueDecl(
       C, C.getIdentifier("addressof")));
-    auto addressofFnRef
-      = new (C) DeclRefExpr(addressofFn, DeclNameLoc(), /*implicit*/ true);
-    auto selfPointer = CallExpr::createImplicit(C, addressofFnRef,
+    ConcreteDeclRef addressofFnRef(addressofFn,
+        SubstitutionMap::get(addressofFn->getGenericSignature(),
+                             {inoutSelfDecl->getInterfaceType()},
+                             ArrayRef<ProtocolConformanceRef>()));
+    auto addressofFnRefExpr
+      = new (C) DeclRefExpr(addressofFnRef, DeclNameLoc(), /*implicit*/ true);
+    addressofFnRefExpr->setType(
+      FunctionType::get(AnyFunctionType::Param(inoutSelfDecl->getInterfaceType(),
+                                               Identifier(),
+                                               ParameterTypeFlags().withInOut(true)),
+                        C.TheRawPointerType));
+    auto selfPointer = CallExpr::createImplicit(C, addressofFnRefExpr,
                                                 { inoutSelf },
                                                 { Identifier() });
+    selfPointer->setType(C.TheRawPointerType);
+    selfPointer->setThrows(false);
+
     auto initializeFn = cast<FuncDecl>(getBuiltinValueDecl(
       C, C.getIdentifier("initialize")));
-    auto initializeFnRef
-      = new (C) DeclRefExpr(initializeFn, DeclNameLoc(), /*implicit*/ true);
-    auto initialize = CallExpr::createImplicit(C, initializeFnRef,
+    ConcreteDeclRef initializeFnRef(initializeFn,
+        SubstitutionMap::get(initializeFn->getGenericSignature(),
+                             {newValueDecl->getInterfaceType()},
+                             ArrayRef<ProtocolConformanceRef>()));
+    auto initializeFnRefExpr
+      = new (C) DeclRefExpr(initializeFnRef, DeclNameLoc(), /*implicit*/ true);
+    initializeFnRefExpr->setType(
+        FunctionType::get({AnyFunctionType::Param(newValueDecl->getInterfaceType()),
+                           AnyFunctionType::Param(C.TheRawPointerType)},
+                          TupleType::getEmpty(C)));
+    auto initialize = CallExpr::createImplicit(C, initializeFnRefExpr,
                                                { newValueRef, selfPointer },
                                                { Identifier(), Identifier() });
+    initialize->setType(TupleType::getEmpty(C));
+    initialize->setThrows(false);
+
     auto body = BraceStmt::create(C, SourceLoc(), { initialize }, SourceLoc(),
                                   /*implicit*/ true);
     setterDecl->setBody(body);
+    setterDecl->setBodyTypeCheckedIfPresent();
     setterDecl->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
-    Impl.registerExternalDecl(setterDecl);
   }
 
   return { getterDecl, setterDecl };
@@ -1103,8 +1153,6 @@ makeBitFieldAccessors(ClangImporter::Implementation &Impl,
                                                    cGetterExpr,
                                                    nullptr);
     cGetterDecl->setBody(cGetterBody);
-
-    Impl.registerExternalDecl(getterDecl);
   }
 
   // Synthesize the setter body
@@ -1161,8 +1209,6 @@ makeBitFieldAccessors(ClangImporter::Implementation &Impl,
                                                        clang::FPOptions());
     
     cSetterDecl->setBody(cSetterExpr);
-
-    Impl.registerExternalDecl(setterDecl);
   }
 
   return { getterDecl, setterDecl };
@@ -1238,9 +1284,6 @@ createDefaultConstructor(ClangImporter::Implementation &Impl,
                                 SourceLoc());
   constructor->setBody(body);
   constructor->setBodyTypeCheckedIfPresent();
-
-  // Add this as an external definition.
-  Impl.registerExternalDecl(constructor);
 
   // We're done.
   return constructor;
@@ -1362,9 +1405,6 @@ createValueConstructor(ClangImporter::Implementation &Impl,
     constructor->setBodyTypeCheckedIfPresent();
   }
 
-  // Add this as an external definition.
-  Impl.registerExternalDecl(constructor);
-
   // We're done.
   return constructor;
 }
@@ -1444,15 +1484,19 @@ static void makeStructRawValued(
         createValueConstructor(Impl, structDecl, var,
                                /*wantCtorParamNames=*/false,
                                /*wantBody=*/!Impl.hasFinishedTypeChecking()));
-  structDecl->addMember(
+
+  auto *initRawValue =
       createValueConstructor(Impl, structDecl, var,
                              /*wantCtorParamNames=*/true,
-                             /*wantBody=*/!Impl.hasFinishedTypeChecking()));
+                             /*wantBody=*/!Impl.hasFinishedTypeChecking());
+  structDecl->addMember(initRawValue);
   structDecl->addMember(patternBinding);
   structDecl->addMember(var);
   structDecl->addMember(varGetter);
 
   addSynthesizedTypealias(structDecl, ctx.Id_RawValue, underlyingType);
+  Impl.RawTypes[structDecl] = underlyingType;
+  Impl.RawInits[structDecl] = initRawValue;
 }
 
 /// Create a rawValue-ed constructor that bridges to its underlying storage.
@@ -1595,6 +1639,8 @@ static void makeStructRawValuedWithBridge(
   structDecl->addMember(computedVarGetter);
 
   addSynthesizedTypealias(structDecl, ctx.Id_RawValue, bridgedType);
+  Impl.RawTypes[structDecl] = bridgedType;
+  Impl.RawInits[structDecl] = init;
 }
 
 /// Build a declaration for an Objective-C subscript getter.
@@ -1833,6 +1879,8 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
 
   DeclRefExpr *domainDeclRef = new (C)
       DeclRefExpr(ConcreteDeclRef(swiftValueDecl), {}, isImplicit);
+  domainDeclRef->setType(swiftValueDecl->getInterfaceType());
+
   auto *params = ParameterList::createEmpty(C);
 
   auto getterDecl = AccessorDecl::create(C,
@@ -1864,7 +1912,8 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
   auto ret = new (C) ReturnStmt(SourceLoc(), domainDeclRef);
   getterDecl->setBody(
       BraceStmt::create(C, SourceLoc(), {ret}, SourceLoc(), isImplicit));
-  importer.registerExternalDecl(getterDecl);
+  getterDecl->setBodyTypeCheckedIfPresent();
+
   return true;
 }
 
@@ -2663,7 +2712,7 @@ namespace {
           errorWrapper->setAddedImplicitInitializers();
           errorWrapper->setAccess(AccessLevel::Public);
           errorWrapper->getAttrs().add(
-            new (Impl.SwiftContext) FixedLayoutAttr(/*IsImplicit*/true));
+            new (Impl.SwiftContext) FrozenAttr(/*IsImplicit*/true));
 
           StringRef nameForMangling;
           ClangImporterSynthesizedTypeAttr::Kind relatedEntityKind;
@@ -2793,6 +2842,8 @@ namespace {
         enumDecl->addMember(rawValueBinding);
 
         addSynthesizedTypealias(enumDecl, C.Id_RawValue, underlyingType);
+        Impl.RawTypes[enumDecl] = underlyingType;
+        Impl.RawInits[enumDecl] = rawValueConstructor;
 
         // If we have an error wrapper, finish it up now that its
         // nested enum has been constructed.
@@ -3011,12 +3062,6 @@ namespace {
         }
       }
 
-      // Add the type decl to ExternalDefinitions so that we can type-check
-      // raw values and SILGen can emit witness tables for derived conformances.
-      // FIXME: There might be better ways to do this.
-      Impl.registerExternalDecl(result);
-      if (errorWrapper)
-        Impl.registerExternalDecl(errorWrapper);
       return result;
     }
 
@@ -3258,11 +3303,6 @@ namespace {
 
       result->setHasUnreferenceableStorage(hasUnreferenceableStorage);
 
-      // Add the struct decl to ExternalDefinitions so that IRGen can emit
-      // metadata for it.
-      // FIXME: There might be better ways to do this.
-      Impl.registerExternalDecl(result);
-
       return result;
     }
 
@@ -3322,7 +3362,7 @@ namespace {
         // Create the global constant.
         auto result = Impl.createConstant(name, dc, type,
                                           clang::APValue(decl->getInitVal()),
-                                          ConstantConvertKind::Coerce,
+                                          ConstantConvertKind::None,
                                           /*static*/dc->isTypeContext(), decl);
         Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
 
@@ -3575,14 +3615,6 @@ namespace {
 
     void finishFuncDecl(const clang::FunctionDecl *decl,
                         AbstractFunctionDecl *result) {
-      // Keep track of inline function bodies so that we can generate
-      // IR from them using Clang's IR generator.
-      if ((decl->isInlined() || decl->hasAttr<clang::AlwaysInlineAttr>() ||
-           !decl->isExternallyVisible()) &&
-          decl->hasBody()) {
-        Impl.registerExternalDecl(result);
-      }
-
       // Set availability.
       if (decl->isVariadic()) {
         Impl.markUnavailable(result, "Variadic function is unavailable");
@@ -3749,9 +3781,6 @@ namespace {
       if (dc->getSelfClassDecl())
         result->getAttrs().add(new (Impl.SwiftContext)
                                  FinalAttr(/*IsImplicit=*/true));
-
-      if (!decl->hasExternalStorage())
-        Impl.registerExternalDecl(result);
 
       // If this is a compatibility stub, mark it as such.
       if (correctSwiftName)
@@ -4140,6 +4169,8 @@ namespace {
             new (Impl.SwiftContext) IBActionAttr(/*IsImplicit=*/false));
       }
 
+      // FIXME: Is there an IBSegueAction equivalent?
+
       // Check whether there's some special method to import.
       if (!forceClassMethod) {
         if (dc == Impl.importDeclContextOf(decl, decl->getDeclContext()) &&
@@ -4462,16 +4493,7 @@ namespace {
                           inheritedTypes);
       result->setInherited(Impl.SwiftContext.AllocateCopy(inheritedTypes));
 
-      // Compute the requirement signature.
-      if (!result->isRequirementSignatureComputed())
-        result->computeRequirementSignature();
-
       result->setMemberLoader(&Impl, 0);
-
-      // Add the protocol decl to ExternalDefinitions so that IRGen can emit
-      // metadata for it.
-      // FIXME: There might be better ways to do this.
-      Impl.registerExternalDecl(result);
 
       return result;
     }
@@ -5084,7 +5106,6 @@ SwiftDeclConverter::importCFClassType(const clang::TypedefNameDecl *decl,
   theClass->setAddedImplicitInitializers(); // suppress all initializers
   theClass->setForeignClassKind(ClassDecl::ForeignKind::CFType);
   addObjCAttribute(theClass, None);
-  Impl.registerExternalDecl(theClass);
 
   if (superclass) {
     SmallVector<TypeLoc, 4> inheritedTypes;
@@ -5373,7 +5394,6 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
   }
 
   Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = structDecl;
-  Impl.registerExternalDecl(structDecl);
   return structDecl;
 }
 
@@ -5491,11 +5511,15 @@ Decl *SwiftDeclConverter::importEnumCaseAlias(
   auto constantRef =
       new (Impl.SwiftContext) DeclRefExpr(original, DeclNameLoc(),
                                           /*implicit*/ true);
+  constantRef->setType(original->getInterfaceType());
+
   Type importedEnumTy = importedEnum->getDeclaredInterfaceType();
+
   auto typeRef = TypeExpr::createImplicit(importedEnumTy, Impl.SwiftContext);
   auto instantiate = new (Impl.SwiftContext)
       DotSyntaxCallExpr(constantRef, SourceLoc(), typeRef);
   instantiate->setType(importedEnumTy);
+  instantiate->setThrows(false);
 
   Decl *CD = Impl.createConstant(name, importIntoDC, importedEnumTy,
                                  instantiate, ConstantConvertKind::None,
@@ -6271,9 +6295,6 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
 
   // If this constructor overrides another constructor, mark it as such.
   recordObjCOverride(result);
-
-  // Inform the context that we have external definitions.
-  Impl.registerExternalDecl(result);
 
   return result;
 }
@@ -7662,64 +7683,39 @@ static void finishTypeWitnesses(
   auto *proto = conformance->getProtocol();
   auto selfType = conformance->getType();
 
-  for (auto *req : proto->getMembers()) {
-    if (auto *assocType = dyn_cast<AssociatedTypeDecl>(req)) {
-      // FIXME: This should not happen?
-      if (conformance->hasTypeWitness(assocType)) continue;
+  for (auto *assocType : proto->getAssociatedTypeMembers()) {
+    // FIXME: This should not happen?
+    if (conformance->hasTypeWitness(assocType)) continue;
 
-      bool satisfied = false;
+    bool satisfied = false;
 
-      SmallVector<ValueDecl *, 4> lookupResults;
-      NLOptions options = (NL_QualifiedDefault |
-                           NL_OnlyTypes |
-                           NL_ProtocolMembers);
+    SmallVector<ValueDecl *, 4> lookupResults;
+    NLOptions options = (NL_QualifiedDefault |
+                          NL_OnlyTypes |
+                          NL_ProtocolMembers);
 
-      dc->lookupQualified(nominal, assocType->getFullName(), options,
-                          lookupResults);
-      for (auto member : lookupResults) {
-        auto typeDecl = cast<TypeDecl>(member);
-        if (isa<AssociatedTypeDecl>(typeDecl)) continue;
+    dc->lookupQualified(nominal, assocType->getFullName(), options,
+                        lookupResults);
+    for (auto member : lookupResults) {
+      auto typeDecl = cast<TypeDecl>(member);
+      if (isa<AssociatedTypeDecl>(typeDecl)) continue;
 
-        auto memberType = typeDecl->getDeclaredInterfaceType();
-        auto subMap = selfType->getContextSubstitutionMap(
-            module, typeDecl->getDeclContext());
-        memberType = memberType.subst(subMap);
-        conformance->setTypeWitness(assocType, memberType, typeDecl);
-        satisfied = true;
-        break;
-      }
-
-      if (!satisfied) {
-        llvm::errs() << ("Cannot look up associated type for "
-                         "imported conformance:\n");
-        conformance->getType().dump(llvm::errs());
-        assocType->dump(llvm::errs());
-        abort();
-      }
+      auto memberType = typeDecl->getDeclaredInterfaceType();
+      auto subMap = selfType->getContextSubstitutionMap(
+          module, typeDecl->getDeclContext());
+      memberType = memberType.subst(subMap);
+      conformance->setTypeWitness(assocType, memberType, typeDecl);
+      satisfied = true;
+      break;
     }
-  }
-}
 
-/// Make sure any inherited conformances also get completed, if necessary.
-static void finishInheritedConformances(
-    NormalProtocolConformance *conformance) {
-  auto *proto = conformance->getProtocol();
-
-  SmallVector<ProtocolDecl *, 2> inheritedProtos;
-  for (auto *inherited : proto->getInheritedProtocols())
-    inheritedProtos.push_back(inherited);
-
-  // Sort for deterministic import.
-  ProtocolType::canonicalizeProtocols(inheritedProtos);
-
-  // Schedule any that aren't complete.
-  for (auto *inherited : inheritedProtos) {
-    ModuleDecl *M = conformance->getDeclContext()->getParentModule();
-    auto inheritedConformance = M->lookupConformance(conformance->getType(),
-                                                     inherited);
-    assert(inheritedConformance && inheritedConformance->isConcrete() &&
-           "inherited conformance not found");
-    (void)inheritedConformance;
+    if (!satisfied) {
+      llvm::errs() << ("Cannot look up associated type for "
+                        "imported conformance:\n");
+      conformance->getType().dump(llvm::errs());
+      assocType->dump(llvm::errs());
+      abort();
+    }
   }
 }
 
@@ -7819,11 +7815,7 @@ void ClangImporter::Implementation::finishNormalConformance(
   PrettyStackTraceConformance trace(SwiftContext, "completing import of",
                                     conformance);
 
-  if (!proto->isRequirementSignatureComputed())
-    proto->computeRequirementSignature();
-
   finishTypeWitnesses(conformance);
-  finishInheritedConformances(conformance);
   finishSignatureConformances(conformance);
 
   // Imported conformances to @objc protocols also require additional
@@ -8087,6 +8079,21 @@ ClangImporter::Implementation::importDeclContextOf(
   return ext;
 }
 
+static Type getConstantLiteralType(ClangImporter::Implementation &Impl,
+                                   Type type, ConstantConvertKind convertKind) {
+  switch (convertKind) {
+  case ConstantConvertKind::Construction:
+  case ConstantConvertKind::ConstructionWithUnwrap: {
+    auto found = Impl.RawTypes.find(type->getAnyNominal());
+    assert(found != Impl.RawTypes.end());
+    return found->second;
+  }
+
+  default:
+    return type;
+  }
+}
+
 ValueDecl *
 ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
                                               Type type,
@@ -8128,20 +8135,49 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
     if (isNegative)
       printedValue = printedValue.drop_front();
 
+    auto literalType = getConstantLiteralType(*this, type, convertKind);
+
     // Create the expression node.
     StringRef printedValueCopy(context.AllocateCopy(printedValue));
     if (value.getKind() == clang::APValue::Int) {
       if (type->getCanonicalType()->isBool()) {
-        expr = new (context) BooleanLiteralExpr(value.getInt().getBoolValue(),
-                                                SourceLoc(),
-                                                /**Implicit=*/true);
+        auto *boolExpr =
+            new (context) BooleanLiteralExpr(value.getInt().getBoolValue(),
+                                             SourceLoc(),
+                                             /**Implicit=*/true);
+
+        boolExpr->setBuiltinInitializer(
+          context.getBoolBuiltinInitDecl());
+        boolExpr->setType(literalType);
+
+        expr = boolExpr;
       } else {
-        expr = new (context) IntegerLiteralExpr(printedValueCopy, SourceLoc(),
-                                                /*Implicit=*/true);
+        auto *intExpr =
+            new (context) IntegerLiteralExpr(printedValueCopy, SourceLoc(),
+                                             /*Implicit=*/true);
+
+        auto *intDecl = literalType->getAnyNominal();
+        intExpr->setBuiltinInitializer(
+          context.getIntBuiltinInitDecl(intDecl));
+        intExpr->setType(literalType);
+
+        expr = intExpr;
       }
     } else {
-      expr = new (context) FloatLiteralExpr(printedValueCopy, SourceLoc(),
-                                            /*Implicit=*/true);
+      auto *floatExpr =
+          new (context) FloatLiteralExpr(printedValueCopy, SourceLoc(),
+                                         /*Implicit=*/true);
+
+      auto maxFloatTypeDecl = context.get_MaxBuiltinFloatTypeDecl();
+      floatExpr->setBuiltinType(
+          maxFloatTypeDecl->getUnderlyingTypeLoc().getType());
+
+      auto *floatDecl = literalType->getAnyNominal();
+      floatExpr->setBuiltinInitializer(
+        context.getFloatBuiltinInitDecl(floatDecl));
+      floatExpr->setType(literalType);
+
+      expr = floatExpr;
     }
 
     if (isNegative)
@@ -8163,6 +8199,13 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
                                               bool isStatic,
                                               ClangNode ClangN) {
   auto expr = new (SwiftContext) StringLiteralExpr(value, SourceRange());
+
+  auto literalType = getConstantLiteralType(*this, type, convertKind);
+  auto *stringDecl = literalType->getAnyNominal();
+  expr->setBuiltinInitializer(
+      SwiftContext.getStringBuiltinInitDecl(stringDecl));
+  expr->setType(literalType);
+
   return createConstant(name, dc, type, expr, convertKind, isStatic, ClangN);
 }
 
@@ -8227,20 +8270,42 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
     case ConstantConvertKind::Construction:
     case ConstantConvertKind::ConstructionWithUnwrap: {
       auto typeRef = TypeExpr::createImplicit(type, C);
-      
-      expr = CallExpr::createImplicit(C, typeRef, { expr }, { C.Id_rawValue });
-      if (convertKind == ConstantConvertKind::ConstructionWithUnwrap)
+
+      // Reference init(rawValue: T)
+      auto found = RawInits.find(type->getAnyNominal());
+      assert(found != RawInits.end());
+
+      auto *init = found->second;
+      auto initTy = init->getInterfaceType()->removeArgumentLabels(1);
+      auto declRef =
+          new (C) DeclRefExpr(init, DeclNameLoc(), /*Implicit=*/true,
+                              AccessSemantics::Ordinary, initTy);
+
+      // (Self) -> ...
+      initTy = initTy->castTo<FunctionType>()->getResult();
+      auto initRef = new (C) DotSyntaxCallExpr(declRef, SourceLoc(),
+                                               typeRef, initTy);
+      initRef->setThrows(false);
+
+      // (rawValue: T) -> ...
+      initTy = initTy->castTo<FunctionType>()->getResult();
+
+      auto initCall = CallExpr::createImplicit(C, initRef, { expr },
+                                               { C.Id_rawValue });
+      initCall->setType(initTy);
+      initCall->setThrows(false);
+
+      expr = initCall;
+
+      // Force unwrap if our init(rawValue:) is failable, which is currently
+      // the case with enums.
+      if (convertKind == ConstantConvertKind::ConstructionWithUnwrap) {
+        initTy = initTy->getOptionalObjectType();
         expr = new (C) ForceValueExpr(expr, SourceLoc());
-      break;
-    }
+        expr->setType(initTy);
+      }
 
-    case ConstantConvertKind::Coerce:
-      break;
-
-    case ConstantConvertKind::Downcast: {
-      expr = new (C) ForcedCheckedCastExpr(expr, SourceLoc(), SourceLoc(),
-                                           TypeLoc::withoutLoc(type));
-      expr->setImplicit();
+      assert(initTy->isEqual(type));
       break;
     }
     }
@@ -8252,6 +8317,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
     func->setBody(BraceStmt::create(C, SourceLoc(),
                                     ASTNode(ret),
                                     SourceLoc()));
+    func->setBodyTypeCheckedIfPresent();
   }
 
   // Mark the function transparent so that we inline it away completely.
@@ -8259,9 +8325,6 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   
   // Set the function up as the getter.
   makeComputed(var, func, nullptr);
-
-  // Register this thunk as an external definition.
-  registerExternalDecl(func);
 
   return var;
 }

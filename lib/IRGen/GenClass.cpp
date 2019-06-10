@@ -1211,7 +1211,6 @@ namespace {
       // hierarchy crosses resilience domains, we use a
       // slightly different query here.
       if (theClass->checkAncestry(AncestryFlags::ResilientOther)) {
-        assert(IGM.Context.LangOpts.EnableObjCResilientClassStubs);
         return IGM.getAddrOfObjCResilientClassStub(theClass, NotForDefinition,
                                              TypeMetadataAddress::AddressPoint);
       }
@@ -2072,9 +2071,7 @@ static llvm::Function *emitObjCMetadataUpdateFunction(IRGenModule &IGM,
 /// does not have statically-emitted metadata.
 bool irgen::hasObjCResilientClassStub(IRGenModule &IGM, ClassDecl *D) {
   assert(IGM.getClassMetadataStrategy(D) == ClassMetadataStrategy::Resilient);
-  return (!D->isGenericContext() &&
-          IGM.ObjCInterop &&
-          IGM.Context.LangOpts.EnableObjCResilientClassStubs);
+  return IGM.ObjCInterop && !D->isGenericContext();
 }
 
 void irgen::emitObjCResilientClassStub(IRGenModule &IGM, ClassDecl *D) {

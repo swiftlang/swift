@@ -15,8 +15,9 @@
 #ifndef SWIFT_SIL_MEMACCESSUTILS_H
 #define SWIFT_SIL_MEMACCESSUTILS_H
 
-#include "swift/SIL/Projection.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILInstruction.h"
 #include "llvm/ADT/DenseMap.h"
 
@@ -27,47 +28,6 @@ namespace swift {
 inline bool accessKindMayConflict(SILAccessKind a, SILAccessKind b) {
   return !(a == SILAccessKind::Read && b == SILAccessKind::Read);
 }
-
-/// Represents the identity of a stored class property as a combination
-/// of a base, projection and projection path.
-/// we pre-compute the base and projection path, even though we can
-/// lazily do so, because it is more expensive otherwise
-/// We lazily compute the projection path,
-/// In the rare occasions we need it, because of Its destructor and
-/// its non-trivial copy constructor
-class ObjectProjection {
-  SILValue object;
-  const RefElementAddrInst *REA;
-  Projection proj;
-
-public:
-  ObjectProjection(const RefElementAddrInst *REA)
-      : object(stripBorrow(REA->getOperand())), REA(REA),
-        proj(Projection(REA)) {}
-
-  ObjectProjection(SILValue object, const RefElementAddrInst *REA)
-      : object(object), REA(REA), proj(Projection(REA)) {}
-
-  const RefElementAddrInst *getInstr() const { return REA; }
-
-  SILValue getObject() const { return object; }
-
-  const Projection &getProjection() const { return proj; }
-
-  const Optional<ProjectionPath> getProjectionPath() const {
-    return ProjectionPath::getProjectionPath(stripBorrow(REA->getOperand()),
-                                             REA);
-  }
-
-  bool operator==(const ObjectProjection &other) const {
-    return getObject() == other.getObject() &&
-           getProjection() == other.getProjection();
-  }
-
-  bool operator!=(const ObjectProjection &other) const {
-    return !operator==(other);
-  }
-};
 
 /// Represents the identity of a storage object being accessed.
 ///
@@ -106,11 +66,15 @@ public:
   /// Enumerate over all valid begin_access bases. Clients can use a covered
   /// switch to warn if findAccessedAddressBase ever adds a case.
   enum Kind : uint8_t {
-#define ACCESSED_STORAGE(Name) Name,
-#define ACCESSED_STORAGE_RANGE(Name, Start, End)                               \
-  First_##Name = Start, Last_##Name = End,
-#include "swift/SIL/AccessedStorage.def"
-    NumKindBits = countBitsUsed(unsigned(Last_AccessedStorageKind))
+    Box,
+    Stack,
+    Global,
+    Class,
+    Argument,
+    Yield,
+    Nested,
+    Unidentified,
+    NumKindBits = countBitsUsed(static_cast<unsigned>(Unidentified))
   };
 
   static const char *getKindName(Kind k);
@@ -119,7 +83,23 @@ public:
   /// of access base. Otherwise, return Unidentified.
   static AccessedStorage::Kind classify(SILValue base);
 
+  /// Directly create an AccessedStorage for class property access.
+  static AccessedStorage forClass(SILValue object, unsigned propertyIndex) {
+    AccessedStorage storage;
+    storage.initKind(Class, propertyIndex);
+    storage.value = object;
+    return storage;
+  }
+
 protected:
+  // Checking the storage kind is far more common than other fields. Make sure
+  // it can be byte load with no shift.
+  static const int ReservedKindBits = 8;
+  static_assert(ReservedKindBits >= NumKindBits, "Too many storage kinds.");
+
+  static const unsigned InvalidElementIndex =
+      (1 << (32 - ReservedKindBits)) - 1;
+
   // Form a bitfield that is effectively a union over any pass-specific data
   // with the fields used within this class as a common prefix.
   //
@@ -134,9 +114,13 @@ protected:
   // each begin_access to its storage object, unique access index, and summary
   // info for that access.
   union {
-    uint64_t OpaqueBits;
-    SWIFT_INLINE_BITFIELD_BASE(AccessedStorage, bitmax(NumKindBits, 8),
-                               Kind : bitmax(NumKindBits, 8));
+    uint64_t opaqueBits;
+    // elementIndex can overflow while gracefully degrading analysis. For now,
+    // reserve an absurd number of bits at a nice alignment boundary, but this
+    // can be reduced.
+    SWIFT_INLINE_BITFIELD_BASE(AccessedStorage, 32, kind
+                               : ReservedKindBits,
+                                 elementIndex : 32 - ReservedKindBits);
 
     // Define bits for use in AccessedStorageAnalysis. Each identified storage
     // object is mapped to one instance of this subclass.
@@ -159,7 +143,8 @@ protected:
     SWIFT_INLINE_BITFIELD_FULL(AccessEnforcementOptsInfo, AccessedStorage,
                                64 - NumAccessedStorageBits,
                                seenNestedConflict : 1,
-                               beginAccessIndex : 63 - NumAccessedStorageBits);
+                               seenIdenticalStorage : 1,
+                               beginAccessIndex : 62 - NumAccessedStorageBits);
 
     // Define data flow bits for use in the AccessEnforcementDom pass. Each
     // begin_access in the function is mapped to one instance of this subclass.
@@ -169,15 +154,22 @@ protected:
 
 private:
   union {
+    // For non-class storage, 'value' is the access base. For class storage
+    // 'value' is the object base, where the access base is the class' stored
+    // property.
     SILValue value;
-    unsigned paramIndex;
     SILGlobalVariable *global;
-    ObjectProjection objProj;
   };
 
-  void initKind(Kind k) {
-    Bits.OpaqueBits = 0;
-    Bits.AccessedStorage.Kind = k;
+  void initKind(Kind k, unsigned elementIndex = InvalidElementIndex) {
+    Bits.opaqueBits = 0;
+    Bits.AccessedStorage.kind = k;
+    Bits.AccessedStorage.elementIndex = elementIndex;
+  }
+
+  unsigned getElementIndex() const { return Bits.AccessedStorage.elementIndex; }
+  void setElementIndex(unsigned elementIndex) {
+    Bits.AccessedStorage.elementIndex = elementIndex;
   }
 
 public:
@@ -185,33 +177,30 @@ public:
 
   AccessedStorage(SILValue base, Kind kind);
 
-  AccessedStorage(SILValue object, const RefElementAddrInst *REA)
-      : objProj(object, REA) {
-    initKind(Class);
-  }
-
   // Return true if this is a valid storage object.
   operator bool() const { return getKind() != Unidentified || value; }
 
-  Kind getKind() const { return static_cast<Kind>(Bits.AccessedStorage.Kind); }
+  Kind getKind() const { return static_cast<Kind>(Bits.AccessedStorage.kind); }
 
   // Clear any bits reserved for subclass data. Useful for up-casting back to
   // the base class.
-  void resetSubclassData() { initKind(getKind()); }
+  void resetSubclassData() {
+    initKind(getKind(), Bits.AccessedStorage.elementIndex);
+  }
 
   SILValue getValue() const {
-    assert(getKind() != Argument && getKind() != Global && getKind() != Class);
+    assert(getKind() != Global && getKind() != Class);
     return value;
   }
 
   unsigned getParamIndex() const {
     assert(getKind() == Argument);
-    return paramIndex;
+    return getElementIndex();
   }
 
-  SILArgument *getArgument(SILFunction *F) const {
+  SILArgument *getArgument() const {
     assert(getKind() == Argument);
-    return F->getArgument(paramIndex);
+    return cast<SILArgument>(value);
   }
 
   SILGlobalVariable *getGlobal() const {
@@ -219,9 +208,13 @@ public:
     return global;
   }
 
-  const ObjectProjection &getObjectProjection() const {
+  SILValue getObject() const {
     assert(getKind() == Class);
-    return objProj;
+    return value;
+  }
+  unsigned getPropertyIndex() const {
+    assert(getKind() == Class);
+    return getElementIndex();
   }
 
   /// Return true if the given storage objects have identical storage locations.
@@ -235,17 +228,18 @@ public:
     switch (getKind()) {
     case Box:
     case Stack:
+    case Argument:
     case Yield:
     case Nested:
     case Unidentified:
       return value == other.value;
-    case Argument:
-      return paramIndex == other.paramIndex;
     case Global:
       return global == other.global;
     case Class:
-      return objProj == other.objProj;
+      return value == other.value
+             && getElementIndex() == other.getElementIndex();
     }
+    llvm_unreachable("covered switch");
   }
 
   /// Return true if the storage is guaranteed local.
@@ -291,26 +285,26 @@ public:
     if (isUniquelyIdentified() && other.isUniquelyIdentified()) {
       return !hasIdenticalBase(other);
     }
-    if (getKind() != Class || other.getKind() != Class) {
+    if (getKind() != Class || other.getKind() != Class)
+      // At least one side is an Argument or Yield, or is unidentified.
       return false;
+
+    // Classes are not uniquely identified by their base. However, if the
+    // underling objects have identical types and distinct property indices then
+    // they are distinct storage locations.
+    if (getObject()->getType() == other.getObject()->getType()
+        && getPropertyIndex() != other.getPropertyIndex()) {
+      return true;
     }
-    if (getObjectProjection().getProjection() ==
-        other.getObjectProjection().getProjection()) {
-      return false;
-    }
-    auto projPath = getObjectProjection().getProjectionPath();
-    auto otherProjPath = other.getObjectProjection().getProjectionPath();
-    if (!projPath.hasValue() || !otherProjPath.hasValue()) {
-      return false;
-    }
-    return projPath.getValue().hasNonEmptySymmetricDifference(
-        otherProjPath.getValue());
+    return false;
   }
 
   /// Returns the ValueDecl for the underlying storage, if it can be
-  /// determined. Otherwise returns null. For diagnostics and checking via the
-  /// ValueDecl if we are processing a `let` variable.
-  const ValueDecl *getDecl(SILFunction *F) const;
+  /// determined. Otherwise returns null.
+  ///
+  /// WARNING: This is not a constant-time operation. It is for diagnostics and
+  /// checking via the ValueDecl if we are processing a `let` variable.
+  const ValueDecl *getDecl() const;
 
   void print(raw_ostream &os) const;
   void dump() const;
@@ -322,26 +316,6 @@ private:
   bool operator==(const AccessedStorage &) const = delete;
   bool operator!=(const AccessedStorage &) const = delete;
 };
-
-template <class ImplTy, class ResultTy = void, typename... ArgTys>
-class AccessedStorageVisitor {
-  ImplTy &asImpl() { return static_cast<ImplTy &>(*this); }
-
-public:
-#define ACCESSED_STORAGE(Name)                                                 \
-  ResultTy visit##Name(const AccessedStorage &storage, ArgTys &&... args);
-#include "swift/SIL/AccessedStorage.def"
-
-  ResultTy visit(const AccessedStorage &storage, ArgTys &&... args) {
-    switch (storage.getKind()) {
-#define ACCESSED_STORAGE(Name)                                                 \
-  case AccessedStorage::Name:                                                  \
-    return asImpl().visit##Name(storage, std::forward<ArgTys>(args)...);
-#include "swift/SIL/AccessedStorage.def"
-    }
-  }
-};
-
 } // end namespace swift
 
 namespace llvm {
@@ -375,8 +349,8 @@ template <> struct DenseMapInfo<swift::AccessedStorage> {
     case swift::AccessedStorage::Global:
       return DenseMapInfo<void *>::getHashValue(storage.getGlobal());
     case swift::AccessedStorage::Class: {
-      const swift::ObjectProjection &P = storage.getObjectProjection();
-      return llvm::hash_combine(P.getObject(), P.getProjection());
+      return llvm::hash_combine(storage.getObject(),
+                                storage.getPropertyIndex());
     }
     }
     llvm_unreachable("Unhandled AccessedStorageKind");

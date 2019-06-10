@@ -160,16 +160,35 @@ RelabelArguments::create(ConstraintSystem &cs,
 }
 
 bool MissingConformance::diagnose(Expr *root, bool asNote) const {
-  MissingConformanceFailure failure(root, getConstraintSystem(), getLocator(),
-                                    {NonConformingType, Protocol});
+  auto &cs = getConstraintSystem();
+  auto *locator = getLocator();
+
+  if (IsContextual) {
+    auto context = cs.getContextualTypePurpose();
+    MissingContextualConformanceFailure failure(
+        root, cs, context, NonConformingType, ProtocolType, locator);
+    return failure.diagnose(asNote);
+  }
+
+  MissingConformanceFailure failure(
+      root, cs, locator, std::make_pair(NonConformingType, ProtocolType));
   return failure.diagnose(asNote);
 }
 
-MissingConformance *MissingConformance::create(ConstraintSystem &cs, Type type,
-                                               ProtocolDecl *protocol,
-                                               ConstraintLocator *locator) {
-  return new (cs.getAllocator())
-      MissingConformance(cs, type, protocol, locator);
+MissingConformance *
+MissingConformance::forContextual(ConstraintSystem &cs, Type type,
+                                  Type protocolType,
+                                  ConstraintLocator *locator) {
+  return new (cs.getAllocator()) MissingConformance(
+      cs, /*isContextual=*/true, type, protocolType, locator);
+}
+
+MissingConformance *
+MissingConformance::forRequirement(ConstraintSystem &cs, Type type,
+                                   Type protocolType,
+                                   ConstraintLocator *locator) {
+  return new (cs.getAllocator()) MissingConformance(
+      cs, /*isContextual=*/false, type, protocolType, locator);
 }
 
 bool SkipSameTypeRequirement::diagnose(Expr *root, bool asNote) const {
@@ -264,18 +283,34 @@ DefineMemberBasedOnUse::create(ConstraintSystem &cs, Type baseType,
       DefineMemberBasedOnUse(cs, baseType, member, locator);
 }
 
-bool AllowTypeOrInstanceMember::diagnose(Expr *root, bool asNote) const {
-  auto failure = AllowTypeOrInstanceMemberFailure(root, getConstraintSystem(),
-                                                  BaseType, Name, getLocator());
+AllowMemberRefOnExistential *
+AllowMemberRefOnExistential::create(ConstraintSystem &cs, Type baseType,
+                                    ValueDecl *member, DeclName memberName,
+                                    ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowMemberRefOnExistential(cs, baseType, memberName, member, locator);
+}
+
+bool AllowMemberRefOnExistential::diagnose(Expr *root, bool asNote) const {
+  auto failure = InvalidMemberRefOnExistential(root, getConstraintSystem(),
+                                               BaseType, Name, getLocator());
   return failure.diagnose(asNote);
 }
 
-AllowTypeOrInstanceMember *AllowTypeOrInstanceMember::create(ConstraintSystem &cs,
-                                                             Type baseType,
-                                                             DeclName member,
-                                                             ConstraintLocator *locator) {
-  return new (cs.getAllocator()) AllowTypeOrInstanceMember(cs, baseType, member, locator);
+bool AllowTypeOrInstanceMember::diagnose(Expr *root, bool asNote) const {
+  auto failure = AllowTypeOrInstanceMemberFailure(
+      root, getConstraintSystem(), BaseType, Member, UsedName, getLocator());
+  return failure.diagnose(asNote);
 }
+
+AllowTypeOrInstanceMember *
+AllowTypeOrInstanceMember::create(ConstraintSystem &cs, Type baseType,
+                                  ValueDecl *member, DeclName usedName,
+                                  ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowTypeOrInstanceMember(cs, baseType, member, usedName, locator);
+}
+
 bool AllowInvalidPartialApplication::diagnose(Expr *root, bool asNote) const {
   auto failure = PartialApplicationFailure(root, isWarning(),
                                            getConstraintSystem(), getLocator());
@@ -310,6 +345,7 @@ bool AllowInvalidInitRef::diagnose(Expr *root, bool asNote) const {
     return failure.diagnose(asNote);
   }
   }
+  llvm_unreachable("covered switch");
 }
 
 AllowInvalidInitRef *AllowInvalidInitRef::dynamicOnMetatype(
@@ -443,6 +479,7 @@ bool AllowInvalidRefInKeyPath::diagnose(Expr *root, bool asNote) const {
     return failure.diagnose(asNote);
   }
   }
+  llvm_unreachable("covered switch");
 }
 
 AllowInvalidRefInKeyPath *
@@ -483,4 +520,56 @@ KeyPathContextualMismatch::create(ConstraintSystem &cs, Type lhs, Type rhs,
                                   ConstraintLocator *locator) {
   return new (cs.getAllocator())
       KeyPathContextualMismatch(cs, lhs, rhs, locator);
+}
+
+bool RemoveAddressOf::diagnose(Expr *root, bool asNote) const {
+  InvalidUseOfAddressOf failure(root, getConstraintSystem(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+RemoveAddressOf *RemoveAddressOf::create(ConstraintSystem &cs,
+                                         ConstraintLocator *locator) {
+  return new (cs.getAllocator()) RemoveAddressOf(cs, locator);
+}
+
+bool RemoveReturn::diagnose(Expr *root, bool asNote) const {
+  ExtraneousReturnFailure failure(root, getConstraintSystem(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+RemoveReturn *RemoveReturn::create(ConstraintSystem &cs,
+                                   ConstraintLocator *locator) {
+  return new (cs.getAllocator()) RemoveReturn(cs, locator);
+}
+
+bool CollectionElementContextualMismatch::diagnose(Expr *root,
+                                                   bool asNote) const {
+  CollectionElementContextualFailure failure(
+      root, getConstraintSystem(), getFromType(), getToType(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+CollectionElementContextualMismatch *
+CollectionElementContextualMismatch::create(ConstraintSystem &cs, Type srcType,
+                                            Type dstType,
+                                            ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      CollectionElementContextualMismatch(cs, srcType, dstType, locator);
+}
+
+bool ExplicitlySpecifyGenericArguments::diagnose(Expr *root,
+                                                 bool asNote) const {
+  auto &cs = getConstraintSystem();
+  MissingGenericArgumentsFailure failure(root, cs, getParameters(),
+                                         getLocator());
+  return failure.diagnose(asNote);
+}
+
+ExplicitlySpecifyGenericArguments *ExplicitlySpecifyGenericArguments::create(
+    ConstraintSystem &cs, ArrayRef<GenericTypeParamType *> params,
+    ConstraintLocator *locator) {
+  unsigned size = totalSizeToAlloc<GenericTypeParamType *>(params.size());
+  void *mem = cs.getAllocator().Allocate(
+      size, alignof(ExplicitlySpecifyGenericArguments));
+  return new (mem) ExplicitlySpecifyGenericArguments(cs, params, locator);
 }

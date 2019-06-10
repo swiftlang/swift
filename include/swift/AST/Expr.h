@@ -953,15 +953,25 @@ public:
 class InterpolatedStringLiteralExpr : public LiteralExpr {
   /// Points at the beginning quote.
   SourceLoc Loc;
+  /// Points at the ending quote.
+  /// Needed for the upcoming \c ASTScope subsystem because lookups can be
+  /// targeted to inside an \c InterpolatedStringLiteralExpr. It would be nicer
+  /// to use \c EndLoc for this value, but then \c Lexer::getLocForEndOfToken()
+  /// would not work for \c stringLiteral->getEndLoc().
+  SourceLoc TrailingQuoteLoc;
   TapExpr *AppendingExpr;
   Expr *SemanticExpr;
   
 public:
-  InterpolatedStringLiteralExpr(SourceLoc Loc, unsigned LiteralCapacity, 
+  InterpolatedStringLiteralExpr(SourceLoc Loc,
+                                SourceLoc TrailingQuoteLoc,
+                                unsigned LiteralCapacity,
                                 unsigned InterpolationCount,
                                 TapExpr *AppendingExpr)
       : LiteralExpr(ExprKind::InterpolatedStringLiteral, /*Implicit=*/false),
-        Loc(Loc), AppendingExpr(AppendingExpr), SemanticExpr() {
+        Loc(Loc),
+        TrailingQuoteLoc(TrailingQuoteLoc),
+        AppendingExpr(AppendingExpr), SemanticExpr() {
     Bits.InterpolatedStringLiteralExpr.InterpolationCount = InterpolationCount;
     Bits.InterpolatedStringLiteralExpr.LiteralCapacity = LiteralCapacity;
   }
@@ -997,6 +1007,11 @@ public:
     // SourceLocs are token based, and the interpolated string is one string
     // token, so the range should be (Start == End).
     return Loc;
+  }
+  SourceLoc getTrailingQuoteLoc() const {
+    // Except when computing a SourceRange for an ASTScope. Then the range
+    // must be (Start - TrainingQuoteLoc).
+    return TrailingQuoteLoc;
   }
 
   /// Call the \c callback with information about each segment in turn.
@@ -2377,14 +2392,30 @@ public:
                                                  : FunctionRefKind::Unapplied);
   }
   
-  SourceLoc getLoc() const { return NameLoc.getBaseNameLoc(); }
+  SourceLoc getLoc() const {
+    if (NameLoc.isValid())
+      return NameLoc.getBaseNameLoc();
+    else if (DotLoc.isValid())
+      return DotLoc;
+    else
+      return SubExpr->getEndLoc();
+  }
 
   SourceLoc getStartLoc() const {
-    return (DotLoc.isInvalid() ? NameLoc.getSourceRange().End 
-                               : SubExpr->getStartLoc());
+    if (SubExpr->getStartLoc().isValid())
+      return SubExpr->getStartLoc();
+    else if (DotLoc.isValid())
+      return DotLoc;
+    else
+      return NameLoc.getSourceRange().Start;
   }
   SourceLoc getEndLoc() const {
-    return NameLoc.getSourceRange().End;
+    if (NameLoc.isValid())
+      return NameLoc.getSourceRange().End;
+    else if (DotLoc.isValid())
+      return DotLoc;
+    else
+      return SubExpr->getEndLoc();
   }
 
   SourceLoc getDotLoc() const { return DotLoc; }
@@ -4654,6 +4685,9 @@ public:
   SourceRange getSourceRange() const { return Loc; }
   TypeLoc &getTypeLoc() { return PlaceholderTy; }
   TypeLoc getTypeLoc() const { return PlaceholderTy; }
+  SourceLoc getTrailingAngleBracketLoc() const {
+    return Loc.getAdvancedLoc(Placeholder.getLength() - 1);
+  }
 
   /// The TypeRepr to be considered for placeholder expansion.
   TypeRepr *getTypeForExpansion() const { return ExpansionTyR; }

@@ -622,9 +622,9 @@ namespace {
     unsigned numFavoredConstraints = 0;
     Constraint *firstFavored = nullptr;
     for (auto constraint : disjunction->getNestedConstraints()) {
-      if (!constraint->getOverloadChoice().isDecl())
+      auto *decl = constraint->getOverloadChoice().getDeclOrNull();
+      if (!decl)
         continue;
-      auto decl = constraint->getOverloadChoice().getDecl();
 
       if (mustConsider && mustConsider(decl)) {
         // Roll back any constraints we favored.
@@ -641,6 +641,7 @@ namespace {
         continue;
 
       if (!decl->getAttrs().isUnavailable(CS.getASTContext()) &&
+          !decl->getAttrs().hasAttribute<DisfavoredOverloadAttr>() &&
           isFavored(decl, overloadType)) {
         // If we might need to roll back the favored constraints, keep
         // track of those we are favoring.
@@ -1292,7 +1293,7 @@ namespace {
       AnyFunctionType::decomposeInput(constrParamType, params);
 
       ::matchCallArguments(
-          CS, args, params,
+          CS, args, params, ConstraintKind::ArgumentConversion,
           CS.getConstraintLocator(expr, ConstraintLocator::ApplyArgument));
 
       Type result = tv;
@@ -1773,11 +1774,7 @@ namespace {
       }
 
       // Assume that ExpressibleByArrayLiteral contains a single associated type.
-      AssociatedTypeDecl *elementAssocTy = nullptr;
-      for (auto decl : arrayProto->getMembers()) {
-        if ((elementAssocTy = dyn_cast<AssociatedTypeDecl>(decl)))
-          break;
-      }
+      auto *elementAssocTy = arrayProto->getAssociatedTypeMembers()[0];
       if (!elementAssocTy)
         return Type();
 
@@ -1837,10 +1834,8 @@ namespace {
       }
 
       // The array element type defaults to 'Any'.
-      if (arrayElementTy->isTypeVariableOrMember()) {
-        CS.addConstraint(ConstraintKind::Defaultable, arrayElementTy,
-                         tc.Context.TheAnyType, locator);
-      }
+      CS.addConstraint(ConstraintKind::Defaultable, arrayElementTy,
+                       tc.Context.TheAnyType, locator);
 
       return arrayTy;
     }
@@ -2036,7 +2031,8 @@ namespace {
                           SmallVectorImpl<AnyFunctionType::Param> &params) {
       auto *paramList = closureExpr->getParameters();
       unsigned i = 0;
-      paramList->getParams(params, [&](ParamDecl *param) {
+
+      for (auto *param : *paramList) {
         auto *locator = CS.getConstraintLocator(
             closureExpr, LocatorPathElt::getTupleElement(i++));
         Type paramType, internalType;
@@ -2058,8 +2054,8 @@ namespace {
                            locator);
         }
         CS.setType(param, internalType);
-        return paramType;
-      });
+        params.push_back(param->toFunctionParam(paramType));
+      }
     }
 
     /// Produces a type for the given pattern, filling in any missing
@@ -2105,7 +2101,7 @@ namespace {
         // Otherwise, create a new type variable.
         auto ty = Type();
         if (!var->hasNonPatternBindingInit() &&
-            !var->getAttachedPropertyDelegate()) {
+            !var->getAttachedPropertyWrapper()) {
           if (auto boundExpr = locator.trySimplifyToExpr()) {
             if (!boundExpr->isSemanticallyInOutExpr())
               ty = CS.getType(boundExpr)->getRValueType();
@@ -2886,9 +2882,7 @@ namespace {
     }
 
     Type visitLazyInitializerExpr(LazyInitializerExpr *expr) {
-      auto type = expr->getType();
-      assert(type && "LazyInitializerExpr should always have type set");
-      return type;
+      llvm_unreachable("Already type-checked");
     }
 
     Type visitEditorPlaceholderExpr(EditorPlaceholderExpr *E) {

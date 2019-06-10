@@ -636,7 +636,9 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
     invocationArgStrs.back().append(moduleCachePath);
   }
 
-  if (!importerOpts.DisableModulesValidateSystemHeaders) {
+  if (importerOpts.DisableModulesValidateSystemHeaders) {
+    invocationArgStrs.push_back("-fno-modules-validate-system-headers");
+  } else {
     invocationArgStrs.push_back("-fmodules-validate-system-headers");
   }
 
@@ -1494,9 +1496,22 @@ ClangImporter::emitBridgingPCH(StringRef headerPath,
   return false;
 }
 
+void ClangImporter::collectVisibleTopLevelModuleNames(
+    SmallVectorImpl<Identifier> &names) const {
+  SmallVector<clang::Module *, 32> Modules;
+  Impl.getClangPreprocessor().getHeaderSearchInfo().collectAllModules(Modules);
+  for (auto &M : Modules) {
+    if (!M->isAvailable())
+      continue;
+
+    names.push_back(
+        Impl.SwiftContext.getIdentifier(M->getTopLevelModuleName()));
+  }
+}
+
 void ClangImporter::collectSubModuleNames(
     ArrayRef<std::pair<Identifier, SourceLoc>> path,
-    std::vector<std::string> &names) {
+    std::vector<std::string> &names) const {
   auto &clangHeaderSearch = Impl.getClangPreprocessor().getHeaderSearchInfo();
 
   // Look up the top-level module first.
@@ -1656,6 +1671,7 @@ ModuleDecl *ClangImporter::Implementation::finishLoadingClangModule(
     // but that's not correct for submodules.
     Identifier name = SwiftContext.getIdentifier((*clangModule).Name);
     result = ModuleDecl::create(name, SwiftContext);
+    result->setIsSystemModule(clangModule->IsSystem);
     // Silence error messages about testably importing a Clang module.
     result->setTestingEnabled();
     result->setHasResolvedImports();
@@ -1822,6 +1838,7 @@ ClangModuleUnit *ClangImporter::Implementation::getWrapperForModule(
   // FIXME: Handle hierarchical names better.
   Identifier name = SwiftContext.getIdentifier(underlying->Name);
   auto wrapper = ModuleDecl::create(name, SwiftContext);
+  wrapper->setIsSystemModule(underlying->IsSystem);
   // Silence error messages about testably importing a Clang module.
   wrapper->setTestingEnabled();
   wrapper->setHasResolvedImports();
@@ -2225,9 +2242,10 @@ public:
     assert(CMU);
   }
 
-  void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
+  void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason,
+                 DynamicLookupInfo dynamicLookupInfo) override {
     if (isVisibleFromModule(ModuleFilter, VD))
-      NextConsumer.foundDecl(VD, Reason);
+      NextConsumer.foundDecl(VD, Reason, dynamicLookupInfo);
   }
 };
 
@@ -2242,9 +2260,10 @@ public:
     assert(CMU);
   }
 
-  void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
+  void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason,
+                 DynamicLookupInfo dynamicLookupInfo) override {
     if (isDeclaredInModule(ModuleFilter, VD))
-      NextConsumer.foundDecl(VD, Reason);
+      NextConsumer.foundDecl(VD, Reason, dynamicLookupInfo);
   }
 };
 
@@ -2307,9 +2326,10 @@ public:
                               topLevelModule->Name == "CoreServices");
   }
 
-  void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
+  void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason,
+                 DynamicLookupInfo dynamicLookupInfo) override {
     if (!shouldDiscard(VD))
-      NextConsumer.foundDecl(VD, Reason);
+      NextConsumer.foundDecl(VD, Reason, dynamicLookupInfo);
   }
 };
 
@@ -2551,7 +2571,8 @@ public:
   explicit VectorDeclPtrConsumer(SmallVectorImpl<Decl *> &Decls)
     : Results(Decls) {}
 
-  void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
+  void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason,
+                 DynamicLookupInfo) override {
     Results.push_back(VD);
   }
 };
@@ -3526,14 +3547,16 @@ void ClangImporter::Implementation::lookupObjCMembers(
       // FIXME: If we didn't need to check alternate decls here, we could avoid
       // importing the member at all by checking importedName ahead of time.
       if (decl->getFullName().matchesRef(name)) {
-        consumer.foundDecl(decl, DeclVisibilityKind::DynamicLookup);
+        consumer.foundDecl(decl, DeclVisibilityKind::DynamicLookup,
+                           DynamicLookupInfo::AnyObject);
       }
 
       // Check for an alternate declaration; if its name matches,
       // report it.
       for (auto alternate : getAlternateDecls(decl)) {
         if (alternate->getFullName().matchesRef(name)) {
-          consumer.foundDecl(alternate, DeclVisibilityKind::DynamicLookup);
+          consumer.foundDecl(alternate, DeclVisibilityKind::DynamicLookup,
+                             DynamicLookupInfo::AnyObject);
         }
       }
       return true;

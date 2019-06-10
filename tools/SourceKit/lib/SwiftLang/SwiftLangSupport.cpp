@@ -665,6 +665,10 @@ Optional<UIdent> SwiftLangSupport::getUIDForDeclAttribute(const swift::DeclAttri
     case DAK_IBAction: {
       return Attr_IBAction;
     }
+    case DAK_IBSegueAction: {
+      static UIdent Attr_IBSegueAction("source.decl.attribute.ibsegueaction");
+      return Attr_IBSegueAction;
+    }
     case DAK_IBOutlet: {
       return Attr_IBOutlet;
     }
@@ -861,17 +865,17 @@ std::string SwiftLangSupport::resolvePathSymlinks(StringRef FilePath) {
   if (fileHandle == INVALID_HANDLE_VALUE)
     return InputPath;
 
-  bool success = GetFinalPathNameByHandleW(fileHandle, full_path, MAX_PATH,
+  DWORD numChars = GetFinalPathNameByHandleW(fileHandle, full_path, MAX_PATH,
                                             FILE_NAME_NORMALIZED);
   CloseHandle(fileHandle);
   std::string utf8Path;
-  if (success) {
+  if (numChars > 0 && numChars <= MAX_PATH) {
     llvm::ArrayRef<char> pathRef((const char *)full_path,
-                                 (const char *)(full_path + MAX_PATH));
-    success &= llvm::convertUTF16ToUTF8String(pathRef, utf8Path);
+                                 (const char *)(full_path + numChars));
+    return llvm::convertUTF16ToUTF8String(pathRef, utf8Path) ? utf8Path
+                                                             : InputPath;
   }
-
-  return (success ? utf8Path : InputPath);
+  return InputPath;
 #endif
 }
 

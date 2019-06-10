@@ -447,6 +447,23 @@ ERROR(cannot_convert_assign_protocol,none,
 ERROR(cannot_convert_assign_nil,none,
       "'nil' cannot be assigned to type %0", (Type))
 
+// Subscript Assign Expr
+ERROR(cannot_convert_subscript_assign,none,
+      "cannot assign value of type %0 to subscript of type %1",
+      (Type,Type))
+ERROR(cannot_convert_subscript_assign_protocol,none,
+      "value of type %0 does not conform to %1 in subscript assignment",
+      (Type, Type))
+ERROR(cannot_convert_subscript_assign_nil,none,
+      "'nil' cannot be assigned to subscript of type %0", (Type))
+
+// for ... in expression
+ERROR(cannot_convert_sequence_element_value,none,
+      "cannot convert sequence element type %0 to expected type %1",
+      (Type, Type))
+ERROR(cannot_convert_sequence_element_protocol,none,
+      "sequence element type %0 does not conform to expected protocol %1",
+      (Type, Type))
 
 ERROR(throws_functiontype_mismatch,none,
       "invalid conversion from throwing function of type %0 to "
@@ -625,7 +642,7 @@ ERROR(serialization_missing_dependencies,Fatal,
 ERROR(serialization_circular_dependency,Fatal,
       "circular dependency between modules '%0' and %1",
       (StringRef, Identifier))
-ERROR(serialization_missing_shadowed_module,Fatal,
+ERROR(serialization_missing_underlying_module,Fatal,
       "cannot load underlying module for %0", (Identifier))
 ERROR(serialization_name_mismatch,Fatal,
       "cannot load module '%0' as '%1'", (StringRef, StringRef))
@@ -857,6 +874,10 @@ ERROR(did_not_call_method,none,
       "method %0 was used as a property; add () to call it",
       (Identifier))
 
+ERROR(init_not_instance_member_use_assignment,none,
+      "'init' is a member of the type; use assignment "
+      "to initalize the value instead", ())
+
 ERROR(init_not_instance_member,none,
       "'init' is a member of the type; use 'type(of: ...)' to initialize "
       "a new object of the same dynamic type", ())
@@ -916,6 +937,8 @@ NOTE(note_call_to_operator,none,
      "in call to operator %0", (DeclName))
 NOTE(note_call_to_func,none,
      "in call to function %0", (DeclName))
+NOTE(note_call_to_subscript,none,
+     "in call to %0", (DeclName))
 NOTE(note_call_to_initializer,none,
      "in call to initializer", ())
 NOTE(note_init_parameter,none,
@@ -1156,17 +1179,25 @@ ERROR(invalid_ibdesignable_extension,none,
 ERROR(invalid_ibinspectable,none,
       "only instance properties can be declared @%0", (StringRef))
 ERROR(invalid_ibaction_decl,none,
-      "only instance methods can be declared @IBAction", ())
+      "only instance methods can be declared @%0", (StringRef))
 ERROR(invalid_ibaction_result,none,
-      "methods declared @IBAction must return 'Void' (not %0)", (Type))
+      "methods declared @%0 must %select{|not }1return a value", (StringRef, bool))
 ERROR(invalid_ibaction_argument_count,none,
-      "@IBAction methods %select{must have a single argument"
-      "|can only have up to 2 arguments}0", (bool))
-ERROR(ibaction_nonobjc_class_argument,none,
-      "argument to @IBAction method cannot have non-'@objc' class type %0",
-      (Type))
-ERROR(ibaction_nonobject_argument,none,
-      "argument to @IBAction method cannot have non-object type %0", (Type))
+      "@%0 methods must have %1 to %2 arguments",
+      (StringRef, int, int))
+ERROR(invalid_ibaction_argument_count_exact,none,
+      "@%0 methods must have %2 argument%s2",
+      (StringRef, int, int))
+ERROR(invalid_ibaction_argument_count_max,none,
+      "@%0 methods must have at most %2 argument%s2",
+      (StringRef, int, int))
+ERROR(ibsegueaction_objc_method_family,none,
+      "@%0 method cannot have selector %1 because it has special memory "
+      "management behavior", (StringRef, ObjCSelector))
+NOTE(fixit_rename_in_swift,none,
+     "change Swift name to %0", (DeclName))
+NOTE(fixit_rename_in_objc,none,
+     "change Objective-C selector to %0", (ObjCSelector))
 ERROR(no_objc_tagged_pointer_not_class_protocol,none,
       "@unsafe_no_objc_tagged_pointer can only be applied to class protocols",
       ())
@@ -1377,8 +1408,8 @@ WARNING(pattern_type_not_usable_from_inline_warn,none,
         "%select{%select{variable|constant}0|property}1 "
         "should be '@usableFromInline' or public",
         (bool, bool))
-ERROR(pattern_type_not_usable_from_inline_fixed_layout,none,
-      "type referenced from a stored property in a '@_fixed_layout' struct must "
+ERROR(pattern_type_not_usable_from_inline_frozen,none,
+      "type referenced from a stored property in a '@frozen' struct must "
       "be '@usableFromInline' or public",
       (/*ignored*/bool, /*ignored*/bool))
 ERROR(pattern_type_not_usable_from_inline_inferred,none,
@@ -1393,9 +1424,9 @@ WARNING(pattern_type_not_usable_from_inline_inferred_warn,none,
         "with inferred type %2 "
         "should be '@usableFromInline' or public",
         (bool, bool, Type))
-ERROR(pattern_type_not_usable_from_inline_inferred_fixed_layout,none,
+ERROR(pattern_type_not_usable_from_inline_inferred_frozen,none,
       "type referenced from a stored property with inferred type %2 in a "
-      "'@_fixed_layout' struct must be '@usableFromInline' or public",
+      "'@frozen' struct must be '@usableFromInline' or public",
       (/*ignored*/bool, /*ignored*/bool, Type))
 
 ERROR(pattern_binds_no_variables,none,
@@ -2425,16 +2456,27 @@ NOTE(construct_raw_representable_from_unwrapped_value,none,
      "construct %0 from unwrapped %1 value", (Type, Type))
 
 ERROR(decl_from_implementation_only_module,none,
-      "cannot use %0 %1 here; %2 has been imported as implementation-only",
-      (DescriptiveDeclKind, DeclName, Identifier))
+      "cannot use %0 %1 %select{here|"
+      "in an extension with public or '@usableFromInline' members|"
+      "in an extension with conditional conformances}2; %3 has been imported "
+      "as implementation-only",
+      (DescriptiveDeclKind, DeclName, unsigned, Identifier))
 ERROR(conformance_from_implementation_only_module,none,
-      "cannot use conformance of %0 to %1 here; %2 has been imported as "
-      "implementation-only",
-      (Type, DeclName, Identifier))
+      "cannot use conformance of %0 to %1 %select{here|"
+      "in an extension with public or '@usableFromInline' members|"
+      "in an extension with conditional conformances}2; %3 has been imported "
+      "as implementation-only",
+      (Type, DeclName, unsigned, Identifier))
 ERROR(assoc_conformance_from_implementation_only_module,none,
       "cannot use conformance of %0 to %1 in associated type %3 (inferred as "
       "%4); %2 has been imported as implementation-only",
       (Type, DeclName, Identifier, Type, Type))
+
+WARNING(warn_implementation_only_conflict,none,
+        "%0 inconsistently imported as implementation-only",
+        (Identifier))
+NOTE(implementation_only_conflict_here,none,
+     "imported as implementation-only here", ())
 
 // Derived conformances
 ERROR(cannot_synthesize_init_in_extension_of_nonfinal,none,
@@ -2790,8 +2832,6 @@ ERROR(object_literal_broken_proto,none,
 ERROR(discard_expr_outside_of_assignment,none,
       "'_' can only appear in a pattern or on the left side of an assignment",
       ())
-ERROR(inout_expr_outside_of_call,none,
-      "'&' can only appear immediately in a call argument list", ())
 ERROR(collection_literal_heterogeneous,none,
       "heterogeneous collection literal could only be inferred to %0; add"
       " explicit type annotation if this is intentional", (Type))
@@ -3075,10 +3115,15 @@ NOTE(silence_debug_description_in_interpolation_segment_call,none,
 NOTE(noescape_parameter,none,
     "parameter %0 is implicitly non-escaping",
      (Identifier))
+NOTE(generic_parameters_always_escaping,none,
+     "generic parameters are always considered '@escaping'", ())
 
 ERROR(passing_noescape_to_escaping,none,
       "passing non-escaping parameter %0 to function expecting an @escaping closure",
       (Identifier))
+ERROR(converting_noespace_param_to_generic_type,none,
+      "converting non-escaping parameter %0 to generic parameter %1 may allow it to escape",
+      (Identifier, Type))
 ERROR(assigning_noescape_to_escaping,none,
       "assigning non-escaping parameter %0 to an @escaping closure",
       (Identifier))
@@ -3498,6 +3543,8 @@ ERROR(tuple_single_element,none,
       "cannot create a single-element tuple with an element label", ())
 ERROR(tuple_ellipsis,none,
       "cannot create a variadic tuple", ())
+ERROR(tuple_duplicate_label,none,
+      "cannot create a tuple with a duplicate element label", ())
 ERROR(enum_element_ellipsis,none,
       "variadic enum cases are not supported", ())
 
@@ -3635,8 +3682,8 @@ ERROR(objc_in_generic_extension,none,
       "extensions of %select{classes from generic context|generic classes}0 "
       "cannot contain '@objc' members", (bool))
 ERROR(objc_in_resilient_extension,none,
-      "extensions of classes built with library evolution support "
-      "cannot contain '@objc' members", ())
+      "'@objc' %0 in extension of subclass of %1 requires %2 %3",
+      (DescriptiveDeclKind, Identifier, StringRef, llvm::VersionTuple))
 ERROR(objc_operator, none,
       "operator methods cannot be declared @objc", ())
 ERROR(objc_operator_proto, none,
@@ -3658,9 +3705,8 @@ ERROR(objc_for_generic_class,none,
       "generic subclasses of '@objc' classes cannot have an explicit '@objc' "
       "because they are not directly visible from Objective-C", ())
 ERROR(objc_for_resilient_class,none,
-      "classes built with library evolution support cannot have explicit "
-      "'@objc' subclasses because they are not directly "
-      "visible from Objective-C", ())
+      "explicit '@objc' on subclass of %0 requires %1 %2",
+      (Identifier, StringRef, llvm::VersionTuple))
 ERROR(objc_getter_for_nonobjc_property,none,
       "'@objc' getter for non-'@objc' property", ())
 ERROR(objc_getter_for_nonobjc_subscript,none,
@@ -3701,7 +3747,7 @@ ERROR(objc_extension_not_class,none,
       "'@objc' can only be applied to an extension of a class", ())
 
 // If you change this, also change enum ObjCReason
-#define OBJC_ATTR_SELECT "select{marked @_cdecl|marked dynamic|marked @objc|marked @IBOutlet|marked @IBAction|marked @NSManaged|a member of an @objc protocol|implicitly @objc|an @objc override|an implementation of an @objc requirement|marked @IBInspectable|marked @GKInspectable|in an @objc extension of a class (without @nonobjc)}"
+#define OBJC_ATTR_SELECT "select{marked @_cdecl|marked dynamic|marked @objc|marked @IBOutlet|marked @IBAction|marked @IBSegueAction|marked @NSManaged|a member of an @objc protocol|implicitly @objc|an @objc override|an implementation of an @objc requirement|marked @IBInspectable|marked @GKInspectable|in an @objc extension of a class (without @nonobjc)}"
 
 WARNING(attribute_meaningless_when_nonobjc,none,
         "'@%0' attribute is meaningless on a property that cannot be "
@@ -3926,17 +3972,9 @@ ERROR(borrowed_on_objc_protocol_requirement,none,
 // MARK: dynamic
 //------------------------------------------------------------------------------
 
-ERROR(dynamic_not_in_class,none,
-      "only members of classes may be dynamic", ())
-ERROR(dynamic_with_nonobjc,none,
-      "a declaration cannot be both '@nonobjc' and 'dynamic'",
-      ())
 ERROR(dynamic_with_transparent,none,
       "a declaration cannot be both '@_tranparent' and 'dynamic'",
       ())
-ERROR(dynamic_requires_objc,none,
-      "'dynamic' %0 %1 must also be '@objc'",
-      (DescriptiveDeclKind, DeclName))
 
 //------------------------------------------------------------------------------
 // MARK: @_dynamicReplacement(for:)
@@ -3981,8 +4019,9 @@ ERROR(dynamic_replacement_replaced_constructor_is_not_convenience, none,
 //------------------------------------------------------------------------------
 
 ERROR(availability_decl_unavailable, none,
-      "%select{getter for |setter for |}0%1 is unavailable",
-      (unsigned, DeclName))
+      "%select{getter for |setter for |}0%1 is unavailable"
+      "%select{ in %3|}2",
+      (unsigned, DeclName, bool, StringRef))
 
 #define REPLACEMENT_DECL_KIND_SELECT "select{| instance method| property}"
 ERROR(availability_decl_unavailable_rename, none,
@@ -3998,16 +4037,9 @@ ERROR(availability_decl_unavailable_rename_msg, none,
       (unsigned, DeclName, bool, unsigned, StringRef, StringRef))
 
 ERROR(availability_decl_unavailable_msg, none,
-      "%select{getter for |setter for |}0%1 is unavailable: %2",
-      (unsigned, DeclName, StringRef))
-
-ERROR(availability_decl_unavailable_in_swift, none,
-      "%select{getter for |setter for |}0%1 is unavailable in Swift",
-      (unsigned, DeclName))
-
-ERROR(availability_decl_unavailable_in_swift_msg, none,
-      "%select{getter for |setter for |}0%1 is unavailable in Swift: %2",
-      (unsigned, DeclName, StringRef))
+      "%select{getter for |setter for |}0%1 is unavailable"
+      "%select{ in %3|}2: %4",
+      (unsigned, DeclName, bool, StringRef, StringRef))
 
 NOTE(availability_marked_unavailable, none,
      "%select{getter for |setter for |}0%1 has been explicitly marked "
@@ -4023,18 +4055,18 @@ NOTE(availability_obsoleted, none,
 
 WARNING(availability_deprecated, none,
         "%select{getter for |setter for |}0%1 %select{is|%select{is|was}4}2 "
-        "deprecated%select{| %select{on|in}4 %3%select{| %5}4}2",
+        "deprecated%select{| in %3%select{| %5}4}2",
         (unsigned, DeclName, bool, StringRef, bool, llvm::VersionTuple))
 
 WARNING(availability_deprecated_msg, none,
         "%select{getter for |setter for |}0%1 %select{is|%select{is|was}4}2 "
-        "deprecated%select{| %select{on|in}4 %3%select{| %5}4}2: %6",
+        "deprecated%select{| in %3%select{| %5}4}2: %6",
         (unsigned, DeclName, bool, StringRef, bool, llvm::VersionTuple,
          StringRef))
 
 WARNING(availability_deprecated_rename, none,
         "%select{getter for |setter for |}0%1 %select{is|%select{is|was}4}2 "
-        "deprecated%select{| %select{on|in}4 %3%select{| %5}4}2: "
+        "deprecated%select{| in %3%select{| %5}4}2: "
         "%select{renamed to|replaced by}6%" REPLACEMENT_DECL_KIND_SELECT "7 "
         "'%8'",
         (unsigned, DeclName, bool, StringRef, bool, llvm::VersionTuple, bool,
@@ -4051,8 +4083,12 @@ NOTE(availability_decl_more_than_enclosing_enclosing_here, none,
      "enclosing scope here", ())
 
 ERROR(availability_decl_only_version_newer, none,
-      "%0 is only available on %1 %2 or newer",
+      "%0 is only available in %1 %2 or newer",
       (DeclName, StringRef, llvm::VersionTuple))
+
+ERROR(availability_opaque_types_only_version_newer, none,
+      "'some' return types are only available in %0 %1 or newer",
+      (StringRef, llvm::VersionTuple))
 
 NOTE(availability_guard_with_version_check, none,
      "add 'if #available' version check", ())
@@ -4061,13 +4097,13 @@ NOTE(availability_add_attribute, none,
      "add @available attribute to enclosing %0", (DescriptiveDeclKind))
 
 ERROR(availability_accessor_only_version_newer, none,
-      "%select{getter|setter}0 for %1 is only available on %2 %3"
+      "%select{getter|setter}0 for %1 is only available in %2 %3"
       " or newer",
       (/*AccessorKind*/unsigned, DeclName, StringRef, llvm::VersionTuple))
 
 ERROR(availability_inout_accessor_only_version_newer, none,
       "cannot pass as inout because %select{getter|setter}0 for %1 is only "
-      "available on %2 %3 or newer",
+      "available in %2 %3 or newer",
       (/*AccessorKind*/unsigned, DeclName, StringRef, llvm::VersionTuple))
 
 ERROR(availability_query_required_for_platform, none,
@@ -4089,7 +4125,7 @@ ERROR(availability_stored_property_no_potential,
       "'@available'", ())
 
 ERROR(availability_protocol_requires_version,
-      none, "protocol %0 requires %1 to be available on %2 %3 and newer",
+      none, "protocol %0 requires %1 to be available in %2 %3 and newer",
       (DeclName, DeclName, StringRef, llvm::VersionTuple))
 
 NOTE(availability_protocol_requirement_here, none,
@@ -4119,6 +4155,15 @@ ERROR(fixed_layout_attr_on_internal_type,
       "%select{private|fileprivate|internal|%error|%error}1",
       (DeclName, AccessLevel))
 
+WARNING(fixed_layout_struct,
+      none, "'@frozen' attribute is now used for fixed-layout structs", ())
+
+ERROR(frozen_attr_on_internal_type,
+      none, "'@frozen' attribute can only be applied to '@usableFromInline' "
+      "or public declarations, but %0 is "
+      "%select{private|fileprivate|internal|%error|%error}1",
+      (DeclName, AccessLevel))
+
 ERROR(usable_from_inline_attr_with_explicit_access,
       none, "'@usableFromInline' attribute can only be applied to internal "
       "declarations, but %0 is %select{private|fileprivate|%error|public|open}1",
@@ -4135,7 +4180,7 @@ ERROR(usable_from_inline_attr_in_protocol,none,
   "an '@inlinable' function|" \
   "an '@_alwaysEmitIntoClient' function|" \
   "a default argument value|" \
-  "a property initializer in a '@_fixed_layout' type}"
+  "a property initializer in a '@frozen' type}"
 
 #define DECL_OR_ACCESSOR "%select{%0|%0 for}"
 
@@ -4323,85 +4368,88 @@ WARNING(hashvalue_implementation,none,
         (Type))
 
 //------------------------------------------------------------------------------
-// MARK: property delegate diagnostics
+// MARK: property wrapper diagnostics
 //------------------------------------------------------------------------------
-ERROR(property_delegate_no_value_property, none,
-  "property delegate type %0 does not contain a non-static property "
+ERROR(property_wrapper_no_value_property, none,
+  "property wrapper type %0 does not contain a non-static property "
   "named %1", (Type, Identifier))
-ERROR(property_delegate_ambiguous_value_property, none,
-  "property delegate type %0 has multiple non-static properties "
+ERROR(property_wrapper_ambiguous_value_property, none,
+  "property wrapper type %0 has multiple non-static properties "
   "named %1", (Type, Identifier))
-ERROR(property_delegate_wrong_initial_value_init, none,
+ERROR(property_wrapper_wrong_initial_value_init, none,
       "'init(initialValue:)' parameter type (%0) must be the same as its "
       "'value' property type (%1) or an @autoclosure thereof", (Type, Type))
-ERROR(property_delegate_failable_init, none,
+ERROR(property_wrapper_failable_init, none,
       "%0 cannot be failable", (DeclName))
-ERROR(property_delegate_ambiguous_initial_value_init, none,
-  "property delegate type %0 has multiple initial-value initializers", (Type))
-ERROR(property_delegate_ambiguous_default_value_init, none,
-  "property delegate type %0 has multiple default-value initializers", (Type))
-ERROR(property_delegate_type_requirement_not_accessible,none,
+ERROR(property_wrapper_ambiguous_initial_value_init, none,
+  "property wrapper type %0 has multiple initial-value initializers", (Type))
+ERROR(property_wrapper_ambiguous_default_value_init, none,
+  "property wrapper type %0 has multiple default-value initializers", (Type))
+ERROR(property_wrapper_type_requirement_not_accessible,none,
       "%select{private|fileprivate|internal|public|open}0 %1 %2 cannot have "
-      "more restrictive access than its enclosing property delegate type %3 "
+      "more restrictive access than its enclosing property wrapper type %3 "
       "(which is %select{private|fileprivate|internal|public|open}4)",
       (AccessLevel, DescriptiveDeclKind, DeclName, Type, AccessLevel))
-ERROR(property_delegate_reserved_name,none,
-      "property delegate type name must start with an uppercase letter", ())
 
-ERROR(property_delegate_attribute_not_on_property, none,
-      "property delegate attribute %0 can only be applied to a property",
+ERROR(property_wrapper_attribute_not_on_property, none,
+      "property wrapper attribute %0 can only be applied to a property",
       (DeclName))
+NOTE(property_wrapper_declared_here,none,
+     "property wrapper type %0 declared here", (DeclName))
 
-ERROR(property_delegate_multiple,none,
-      "only one property delegate can be attached to a given property", ())
-NOTE(previous_property_delegate_here,none,
-      "previous property delegate specified here", ())
+ERROR(property_wrapper_multiple,none,
+      "only one property wrapper can be attached to a given property", ())
+NOTE(previous_property_wrapper_here,none,
+      "previous property wrapper specified here", ())
 
-ERROR(property_delegate_local,none,
-      "property delegates are not yet supported on local properties", ())
-ERROR(property_delegate_let, none,
-      "property delegate can only be applied to a 'var'",
+ERROR(property_wrapper_local,none,
+      "property wrappers are not yet supported on local properties", ())
+ERROR(property_wrapper_let, none,
+      "property wrapper can only be applied to a 'var'",
+      ())
+ERROR(property_wrapper_computed, none,
+      "property wrapper cannot be applied to a computed property",
       ())
 
-ERROR(property_with_delegate_conflict_attribute,none,
-      "property %0 with a delegate cannot also be "
+ERROR(property_with_wrapper_conflict_attribute,none,
+      "property %0 with a wrapper cannot also be "
       "%select{lazy|@NSCopying|@NSManaged|weak|unowned|unmanaged}1",
       (DeclName, int))
-ERROR(property_delegate_not_single_var, none,
-      "property delegate can only apply to a single variable", ())
-ERROR(property_with_delegate_in_bad_context,none,
+ERROR(property_wrapper_not_single_var, none,
+      "property wrapper can only apply to a single variable", ())
+ERROR(property_with_wrapper_in_bad_context,none,
       "%select{|non-static |non-static }1property %0 declared inside "
-      "%select{a protocol|an extension|an enum}1 cannot have a delegate",
+      "%select{a protocol|an extension|an enum}1 cannot have a wrapper",
       (DeclName, int))
-ERROR(property_with_delegate_overrides,none,
-      "property %0 with attached delegate cannot override another property",
+ERROR(property_with_wrapper_overrides,none,
+      "property %0 with attached wrapper cannot override another property",
       (DeclName))
 
-ERROR(property_delegate_and_normal_init,none,
-      "property %0 with attached delegate cannot initialize both the "
-      "delegate type and the property", (DeclName))
-ERROR(property_delegate_init_without_initial_value, none,
-      "initializing property %0 with delegate %1 that lacks "
+ERROR(property_wrapper_and_normal_init,none,
+      "property %0 with attached wrapper cannot initialize both the "
+      "wrapper type and the property", (DeclName))
+ERROR(property_wrapper_init_without_initial_value, none,
+      "initializing property %0 with wrapper %1 that lacks "
       "an 'init(initialValue:)' initializer", (DeclName, Type))
-NOTE(property_delegate_direct_init,none,
-     "initialize the property delegate type directly with "
+NOTE(property_wrapper_direct_init,none,
+     "initialize the property wrapper type directly with "
      "'(...') on the attribute", ())
 
-ERROR(property_delegate_incompatible_unbound, none,
-      "property delegate type %0 must either specify all generic arguments "
-      "or require only a single generic argument", (Type))
+ERROR(property_wrapper_incompatible_property, none,
+      "property type %0 does not match that of the 'value' property of "
+      "its wrapper type %1", (Type, Type))
 
-ERROR(property_delegate_type_access,none,
+ERROR(property_wrapper_type_access,none,
       "%select{%select{variable|constant}0|property}1 "
       "%select{must be declared %select{"
       "%select{private|fileprivate|internal|%error|%error}3|private or fileprivate}4"
       "|cannot be declared "
       "%select{in this context|fileprivate|internal|public|open}3}2 "
-      "because its property delegate type uses "
+      "because its property wrapper type uses "
       "%select{a private|a fileprivate|an internal|%error|%error}5 type",
       (bool, bool, bool, AccessLevel, bool, AccessLevel))
-ERROR(property_delegate_type_not_usable_from_inline,none,
-      "property delegate type referenced from a '@usableFromInline' "
+ERROR(property_wrapper_type_not_usable_from_inline,none,
+      "property wrapper type referenced from a '@usableFromInline' "
       "%select{%select{variable|constant}0|property}1 "
       "must be '@usableFromInline' or public",
       (bool, bool))

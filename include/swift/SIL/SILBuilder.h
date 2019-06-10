@@ -837,13 +837,13 @@ public:
                                  Qualifier));
   }
 
-  AssignByDelegateInst *createAssignByDelegate(SILLocation Loc,
+  AssignByWrapperInst *createAssignByWrapper(SILLocation Loc,
                                                SILValue Src, SILValue Dest,
                                                SILValue Initializer,
                                                SILValue Setter,
                                           AssignOwnershipQualifier Qualifier) {
     return insert(new (getModule())
-                  AssignByDelegateInst(getSILDebugLocation(Loc), Src, Dest,
+                  AssignByWrapperInst(getSILDebugLocation(Loc), Src, Dest,
                                        Initializer, Setter, Qualifier));
   }
 
@@ -1938,11 +1938,7 @@ public:
                           SILType destTy, SILBasicBlock *successBB,
                           SILBasicBlock *failureBB,
                           ProfileCounter Target1Count = ProfileCounter(),
-                          ProfileCounter Target2Count = ProfileCounter()) {
-    return insertTerminator(CheckedCastBranchInst::create(
-        getSILDebugLocation(Loc), isExact, op, destTy, successBB, failureBB,
-        getFunction(), C.OpenedArchetypes, Target1Count, Target2Count));
-  }
+                          ProfileCounter Target2Count = ProfileCounter());
 
   CheckedCastValueBranchInst *
   createCheckedCastValueBranch(SILLocation Loc, SILValue op, SILType destTy,

@@ -294,7 +294,6 @@ static void bindExtensions(SourceFile &SF, TypeChecker &TC) {
 
 static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) {
   unsigned currentFunctionIdx = 0;
-  unsigned currentExternalDef = TC.Context.LastCheckedExternalDefinition;
   unsigned currentSynthesizedDecl = SF.LastCheckedSynthesizedDecl;
   do {
     // Type check conformance contexts.
@@ -321,34 +320,6 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
       auto *AFD = TC.definedFunctions[currentFunctionIdx];
 
       TC.typeCheckAbstractFunctionBody(AFD);
-    }
-
-    // Type check external definitions.
-    for (unsigned n = TC.Context.ExternalDefinitions.size();
-         currentExternalDef != n;
-         ++currentExternalDef) {
-      auto decl = TC.Context.ExternalDefinitions[currentExternalDef];
-
-      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(decl)) {
-        TC.typeCheckAbstractFunctionBody(AFD);
-        TC.checkFunctionErrorHandling(AFD);
-        continue;
-      }
-      if (isa<NominalTypeDecl>(decl))
-        continue;
-      if (isa<VarDecl>(decl))
-        continue;
-      llvm_unreachable("Unhandled external definition kind");
-    }
-
-    // Complete any protocol requirement signatures that were delayed
-    // because the protocol was validated via validateDeclForNameLookup().
-    while (!TC.DelayedRequirementSignatures.empty()) {
-      auto decl = TC.DelayedRequirementSignatures.pop_back_val();
-      if (decl->isInvalid() || TC.Context.hadError())
-        continue;
-
-      TC.validateDecl(decl);
     }
 
     // Validate any referenced declarations for SIL's purposes.
@@ -385,25 +356,13 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
     }
     TC.PartiallyCheckedConformances.clear();
 
-    // Complete any conformances that we used.
-    for (unsigned i = 0; i != TC.UsedConformances.size(); ++i) {
-      auto conformance = TC.UsedConformances[i];
-      if (conformance->isIncomplete())
-        TC.checkConformance(conformance);
-    }
-    TC.UsedConformances.clear();
-
   } while (currentFunctionIdx < TC.definedFunctions.size() ||
-           currentExternalDef < TC.Context.ExternalDefinitions.size() ||
            currentSynthesizedDecl < SF.SynthesizedDecls.size() ||
            TC.NextDeclToFinalize < TC.DeclsToFinalize.size() ||
            !TC.ConformanceContexts.empty() ||
-           !TC.DelayedRequirementSignatures.empty() ||
-           !TC.UsedConformances.empty() ||
            !TC.PartiallyCheckedConformances.empty());
 
   // FIXME: Horrible hack. Store this somewhere more appropriate.
-  TC.Context.LastCheckedExternalDefinition = currentExternalDef;
   SF.LastCheckedSynthesizedDecl = currentSynthesizedDecl;
 
   // Now that all types have been finalized, run any delayed
@@ -582,6 +541,81 @@ void swift::performWholeModuleTypeChecking(SourceFile &SF) {
     Ctx.verifyAllLoadedModules();
   }
 #endif
+}
+
+void swift::checkInconsistentImplementationOnlyImports(ModuleDecl *MainModule) {
+  bool hasAnyImplementationOnlyImports =
+      llvm::any_of(MainModule->getFiles(), [](const FileUnit *F) -> bool {
+    auto *SF = dyn_cast<SourceFile>(F);
+    return SF && SF->hasImplementationOnlyImports();
+  });
+  if (!hasAnyImplementationOnlyImports)
+    return;
+
+  auto diagnose = [MainModule](const ImportDecl *normalImport,
+                               const ImportDecl *implementationOnlyImport) {
+    auto &diags = MainModule->getDiags();
+    {
+      InFlightDiagnostic warning =
+          diags.diagnose(normalImport, diag::warn_implementation_only_conflict,
+                         normalImport->getModule()->getName());
+      if (normalImport->getAttrs().isEmpty()) {
+        // Only try to add a fix-it if there's no other annotations on the
+        // import to avoid creating things like
+        // `@_implementationOnly @_exported import Foo`. The developer can
+        // resolve those manually.
+        warning.fixItInsert(normalImport->getStartLoc(),
+                            "@_implementationOnly ");
+      }
+    }
+    diags.diagnose(implementationOnlyImport,
+                   diag::implementation_only_conflict_here);
+  };
+
+  llvm::DenseMap<ModuleDecl *, std::vector<const ImportDecl *>> normalImports;
+  llvm::DenseMap<ModuleDecl *, const ImportDecl *> implementationOnlyImports;
+
+  for (const FileUnit *file : MainModule->getFiles()) {
+    auto *SF = dyn_cast<SourceFile>(file);
+    if (!SF)
+      continue;
+
+    for (auto *topLevelDecl : SF->Decls) {
+      auto *nextImport = dyn_cast<ImportDecl>(topLevelDecl);
+      if (!nextImport)
+        continue;
+
+      ModuleDecl *module = nextImport->getModule();
+      if (nextImport->getAttrs().hasAttribute<ImplementationOnlyAttr>()) {
+        // We saw an implementation-only import.
+        bool isNew =
+            implementationOnlyImports.insert({module, nextImport}).second;
+        if (!isNew)
+          continue;
+
+        auto seenNormalImportPosition = normalImports.find(module);
+        if (seenNormalImportPosition != normalImports.end()) {
+          for (auto *seenNormalImport : seenNormalImportPosition->getSecond())
+            diagnose(seenNormalImport, nextImport);
+
+          // We're done with these; keep the map small if possible.
+          normalImports.erase(seenNormalImportPosition);
+        }
+        continue;
+      }
+
+      // We saw a non-implementation-only import. Is that in conflict with what
+      // we've seen?
+      if (auto *seenImplementationOnlyImport =
+            implementationOnlyImports.lookup(module)) {
+        diagnose(nextImport, seenImplementationOnlyImport);
+        continue;
+      }
+
+      // Otherwise, record it for later.
+      normalImports[module].push_back(nextImport);
+    }
+  }
 }
 
 bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,

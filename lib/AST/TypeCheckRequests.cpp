@@ -14,7 +14,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/Module.h"
-#include "swift/AST/PropertyDelegates.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
@@ -285,6 +285,47 @@ void IsDynamicRequest::cacheResult(bool value) const {
 }
 
 //----------------------------------------------------------------------------//
+// RequirementSignatureRequest computation.
+//----------------------------------------------------------------------------//
+
+void RequirementSignatureRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  auto decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::circular_reference);
+}
+
+void RequirementSignatureRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  auto decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::circular_reference_through);
+}
+
+Optional<ArrayRef<Requirement>> RequirementSignatureRequest::getCachedResult() const {
+  auto proto = std::get<0>(getStorage());
+  if (proto->isRequirementSignatureComputed())
+    return proto->getCachedRequirementSignature();
+
+  return None;
+}
+
+void RequirementSignatureRequest::cacheResult(ArrayRef<Requirement> value) const {
+  auto proto = std::get<0>(getStorage());
+  proto->setRequirementSignature(value);
+}
+
+//----------------------------------------------------------------------------//
+// DefaultDefinitionTypeRequest computation.
+//----------------------------------------------------------------------------//
+
+void DefaultDefinitionTypeRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  auto decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::circular_reference);
+}
+
+void DefaultDefinitionTypeRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  auto decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::circular_reference_through);
+}
+
+//----------------------------------------------------------------------------//
 // Requirement computation.
 //----------------------------------------------------------------------------//
 
@@ -548,90 +589,90 @@ bool DefaultTypeRequest::getPerformLocalLookup(const KnownProtocolKind knownProt
   }
 }
 
-bool PropertyDelegateTypeInfoRequest::isCached() const {
+bool PropertyWrapperTypeInfoRequest::isCached() const {
   auto nominal = std::get<0>(getStorage());
-  return nominal->getAttrs().hasAttribute<PropertyDelegateAttr>();;
+  return nominal->getAttrs().hasAttribute<PropertyWrapperAttr>();;
 }
 
-void PropertyDelegateTypeInfoRequest::diagnoseCycle(
+void PropertyWrapperTypeInfoRequest::diagnoseCycle(
     DiagnosticEngine &diags) const {
   std::get<0>(getStorage())->diagnose(diag::circular_reference);
 }
 
-void PropertyDelegateTypeInfoRequest::noteCycleStep(
+void PropertyWrapperTypeInfoRequest::noteCycleStep(
     DiagnosticEngine &diags) const {
   std::get<0>(getStorage())->diagnose(diag::circular_reference_through);
 }
 
-bool AttachedPropertyDelegateRequest::isCached() const {
+bool AttachedPropertyWrapperRequest::isCached() const {
   auto var = std::get<0>(getStorage());
   return !var->getAttrs().isEmpty();
 }
 
-void AttachedPropertyDelegateRequest::diagnoseCycle(
+void AttachedPropertyWrapperRequest::diagnoseCycle(
     DiagnosticEngine &diags) const {
   std::get<0>(getStorage())->diagnose(diag::circular_reference);
 }
 
-void AttachedPropertyDelegateRequest::noteCycleStep(
+void AttachedPropertyWrapperRequest::noteCycleStep(
     DiagnosticEngine &diags) const {
   std::get<0>(getStorage())->diagnose(diag::circular_reference_through);
 }
 
-bool AttachedPropertyDelegateTypeRequest::isCached() const {
+bool AttachedPropertyWrapperTypeRequest::isCached() const {
   auto var = std::get<0>(getStorage());
   return !var->getAttrs().isEmpty();
 }
 
-void AttachedPropertyDelegateTypeRequest::diagnoseCycle(
+void AttachedPropertyWrapperTypeRequest::diagnoseCycle(
     DiagnosticEngine &diags) const {
   std::get<0>(getStorage())->diagnose(diag::circular_reference);
 }
 
-void AttachedPropertyDelegateTypeRequest::noteCycleStep(
+void AttachedPropertyWrapperTypeRequest::noteCycleStep(
     DiagnosticEngine &diags) const {
   std::get<0>(getStorage())->diagnose(diag::circular_reference_through);
 }
 
-bool PropertyDelegateBackingPropertyTypeRequest::isCached() const {
+bool PropertyWrapperBackingPropertyTypeRequest::isCached() const {
   auto var = std::get<0>(getStorage());
   return !var->getAttrs().isEmpty();
 }
 
-void PropertyDelegateBackingPropertyTypeRequest::diagnoseCycle(
+void PropertyWrapperBackingPropertyTypeRequest::diagnoseCycle(
     DiagnosticEngine &diags) const {
   std::get<0>(getStorage())->diagnose(diag::circular_reference);
 }
 
-void PropertyDelegateBackingPropertyTypeRequest::noteCycleStep(
+void PropertyWrapperBackingPropertyTypeRequest::noteCycleStep(
     DiagnosticEngine &diags) const {
   std::get<0>(getStorage())->diagnose(diag::circular_reference_through);
 }
-bool PropertyDelegateBackingPropertyInfoRequest::isCached() const {
+bool PropertyWrapperBackingPropertyInfoRequest::isCached() const {
   auto var = std::get<0>(getStorage());
   return !var->getAttrs().isEmpty();
 }
 
-void PropertyDelegateBackingPropertyInfoRequest::diagnoseCycle(
+void PropertyWrapperBackingPropertyInfoRequest::diagnoseCycle(
     DiagnosticEngine &diags) const {
   std::get<0>(getStorage())->diagnose(diag::circular_reference);
 }
 
-void PropertyDelegateBackingPropertyInfoRequest::noteCycleStep(
+void PropertyWrapperBackingPropertyInfoRequest::noteCycleStep(
     DiagnosticEngine &diags) const {
   std::get<0>(getStorage())->diagnose(diag::circular_reference_through);
 }
 
 void swift::simple_display(
-    llvm::raw_ostream &out, const PropertyDelegateTypeInfo &propertyDelegate) {
+    llvm::raw_ostream &out, const PropertyWrapperTypeInfo &propertyWrapper) {
   out << "{ ";
-  if (propertyDelegate.valueVar)
-    out << propertyDelegate.valueVar->printRef();
+  if (propertyWrapper.valueVar)
+    out << propertyWrapper.valueVar->printRef();
   else
     out << "null";
   out << ", ";
-  if (propertyDelegate.initialValueInit)
-    out << propertyDelegate.initialValueInit->printRef();
+  if (propertyWrapper.initialValueInit)
+    out << propertyWrapper.initialValueInit->printRef();
   else
     out << "null";
   out << " }";
@@ -639,7 +680,7 @@ void swift::simple_display(
 
 void swift::simple_display(
     llvm::raw_ostream &out,
-    const PropertyDelegateBackingPropertyInfo &backingInfo) {
+    const PropertyWrapperBackingPropertyInfo &backingInfo) {
   out << "{ ";
   if (backingInfo.backingVar)
     backingInfo.backingVar->dumpRef(out);

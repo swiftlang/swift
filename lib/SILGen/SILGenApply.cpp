@@ -1047,7 +1047,9 @@ public:
     // Directly dispatch to calls of the replaced function inside of
     // '@_dynamicReplacement(for:)' methods.
     bool isObjCReplacementCall = false;
-    if (isCallToReplacedInDynamicReplacement(SGF, afd, isObjCReplacementCall) &&
+    if (SGF.getOptions()
+            .EnableDynamicReplacementCanCallPreviousImplementation &&
+        isCallToReplacedInDynamicReplacement(SGF, afd, isObjCReplacementCall) &&
         thisCallSite->getArg()->isSelfExprOf(
             cast<AbstractFunctionDecl>(SGF.FunctionDC->getAsDecl()), false)) {
       auto constant = SILDeclRef(afd).asForeign(
@@ -1118,6 +1120,8 @@ public:
     ApplyExpr *thisCallSite = callSites.back();
     bool isObjCReplacementSelfCall = false;
     bool isSelfCallToReplacedInDynamicReplacement =
+        SGF.getOptions()
+            .EnableDynamicReplacementCanCallPreviousImplementation &&
         isCallToReplacedInDynamicReplacement(
             SGF, cast<AbstractFunctionDecl>(constant.getDecl()),
             isObjCReplacementSelfCall) &&
@@ -1452,6 +1456,8 @@ public:
 
     bool isObjCReplacementSelfCall = false;
     bool isSelfCallToReplacedInDynamicReplacement =
+        SGF.getOptions()
+            .EnableDynamicReplacementCanCallPreviousImplementation &&
         isCallToReplacedInDynamicReplacement(
             SGF, cast<AbstractFunctionDecl>(constant.getDecl()),
             isObjCReplacementSelfCall) &&
@@ -4893,14 +4899,14 @@ RValue SILGenFunction::emitApplyAllocatingInitializer(SILLocation loc,
   return result;
 }
 
-RValue SILGenFunction::emitApplyPropertyDelegateAllocator(SILLocation loc,
+RValue SILGenFunction::emitApplyPropertyWrapperAllocator(SILLocation loc,
                                                           SubstitutionMap subs,
                                                           SILDeclRef ctorRef,
-                                                          Type delegateTy,
+                                                          Type wrapperTy,
                                                     CanAnyFunctionType funcTy) {
   Callee callee = Callee::forDirect(*this, ctorRef, subs, loc);
 
-  MetatypeType *MTty = MetatypeType::get(delegateTy);
+  MetatypeType *MTty = MetatypeType::get(wrapperTy);
   auto metatypeVal = B.createMetatype(loc, getLoweredType(MTty));
   ManagedValue mtManagedVal = ManagedValue::forUnmanaged(metatypeVal);
   RValue metatypeRVal(*this, loc, MTty->getCanonicalType(), mtManagedVal);
@@ -5119,8 +5125,11 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &SGF,
   auto *decl = cast<AbstractFunctionDecl>(constant.getDecl());
 
   bool isObjCReplacementSelfCall = false;
-  if (isOnSelfParameter && isCallToReplacedInDynamicReplacement(
-                               SGF, decl, isObjCReplacementSelfCall)) {
+  if (isOnSelfParameter &&
+      SGF.getOptions()
+          .EnableDynamicReplacementCanCallPreviousImplementation &&
+      isCallToReplacedInDynamicReplacement(SGF, decl,
+                                           isObjCReplacementSelfCall)) {
     return Callee::forDirect(
         SGF,
         SILDeclRef(cast<AbstractFunctionDecl>(SGF.FunctionDC->getAsDecl()),

@@ -14,7 +14,7 @@ import SwiftShims
 
 // Generic functions implementable directly on FloatingPoint.
 @_transparent
-@available(swift, deprecated: 4.2, obsoleted: 5.1, renamed: "abs")
+@available(swift, deprecated: 4.2/*, obsoleted: 5.1*/, renamed: "abs")
 public func fabs<T: FloatingPoint>(_ x: T) -> T {
   return x.magnitude
 }
@@ -112,7 +112,7 @@ public func isnan<T: FloatingPoint>(_ value: T) -> Bool { fatalError() }
 @available(*, unavailable, message: "use the sign property.")
 public func signbit<T: FloatingPoint>(_ value: T) -> Int { fatalError() }
 
-@available(swift, deprecated: 4.2, obsoleted: 5.1, message: "use the exponent property.")
+@available(swift, deprecated: 4.2/*, obsoleted: 5.1*/, message: "use the exponent property.")
 public func ilogb<T: BinaryFloatingPoint>(_ x: T) -> Int {
   return Int(x.exponent)
 }
@@ -352,7 +352,7 @@ public func remquo(_ x: ${T}, _ y: ${T}) -> (${T}, Int) {
 %  if T == 'Float80':
 #if (arch(i386) || arch(x86_64)) && !os(Windows)
 %  end
-@available(swift, deprecated: 4.2, obsoleted: 5.1, message:
+@available(swift, deprecated: 4.2/*, obsoleted: 5.1*/, message:
            "use ${T}(nan: ${T}.RawSignificand).")
 @_transparent
 public func nan(_ tag: String) -> ${T} {

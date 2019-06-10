@@ -228,8 +228,13 @@ Type TypeResolution::resolveDependentMemberType(
   auto lazyResolver = ctx.getLazyResolver();
   if (lazyResolver)
     lazyResolver->resolveDeclSignature(concrete);
-  if (!concrete->hasInterfaceType())
+  if (!concrete->hasInterfaceType()) {
+    ctx.Diags.diagnose(ref->getIdLoc(), diag::recursive_decl_reference,
+                       concrete->getDescriptiveKind(), concrete->getName());
+    concrete->diagnose(diag::kind_declared_here,
+                       DescriptiveDeclKind::Type);
     return ErrorType::get(ctx);
+  }
 
   // Make sure that base type didn't get replaced along the way.
   assert(baseTy->isTypeParameter());
@@ -800,7 +805,10 @@ Type TypeChecker::applyUnboundGenericArguments(
   // generic arguments.
   auto resultType = decl->getDeclaredInterfaceType();
 
-  bool hasTypeVariable = false;
+  // If types involved in requirements check have either type variables
+  // or unbound generics, let's skip the check here, and let the solver
+  // do it when missing types are deduced.
+  bool skipRequirementsCheck = false;
 
   // Get the substitutions for outer generic parameters from the parent
   // type.
@@ -817,7 +825,7 @@ Type TypeChecker::applyUnboundGenericArguments(
     }
 
     subs = parentType->getContextSubstitutions(decl->getDeclContext());
-    hasTypeVariable |= parentType->hasTypeVariable();
+    skipRequirementsCheck |= parentType->hasTypeVariable();
   }
 
   SourceLoc noteLoc = decl->getLoc();
@@ -834,20 +842,21 @@ Type TypeChecker::applyUnboundGenericArguments(
     subs[origTy->getCanonicalType()->castTo<GenericTypeParamType>()] =
       substTy;
 
-    hasTypeVariable |= substTy->hasTypeVariable();
+    skipRequirementsCheck |=
+        substTy->hasTypeVariable() || substTy->hasUnboundGenericType();
   }
 
   // Check the generic arguments against the requirements of the declaration's
   // generic signature.
   auto dc = resolution.getDeclContext();
-  if (!hasTypeVariable &&
+  if (!skipRequirementsCheck &&
       resolution.getStage() > TypeResolutionStage::Structural) {
     auto result =
       checkGenericArguments(dc, loc, noteLoc, unboundType,
                             genericSig->getGenericParams(),
                             genericSig->getRequirements(),
                             QueryTypeSubstitutionMap{subs},
-                            LookUpConformance(dc));
+                            LookUpConformance(dc), None);
 
     switch (result) {
     case RequirementCheckResult::Failure:
@@ -3140,7 +3149,10 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
                                     TypeResolutionOptions options) {
   SmallVector<TupleTypeElt, 8> elements;
   elements.reserve(repr->getNumElements());
-  
+
+  llvm::SmallDenseSet<Identifier> seenEltNames;
+  seenEltNames.reserve(repr->getNumElements());
+
   auto elementOptions = options;
   if (!repr->isParenType()) {
     elementOptions = elementOptions.withoutContext(true);
@@ -3155,6 +3167,7 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
   }
 
   bool hadError = false;
+  bool foundDupLabel = false;
   for (unsigned i = 0, end = repr->getNumElements(); i != end; ++i) {
     auto *tyR = repr->getElementType(i);
 
@@ -3162,7 +3175,18 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
     if (!ty || ty->hasError())
       hadError = true;
 
-    elements.emplace_back(ty, repr->getElementName(i), ParameterTypeFlags());
+    auto eltName = repr->getElementName(i);
+
+    elements.emplace_back(ty, eltName, ParameterTypeFlags());
+
+    if (eltName.empty())
+      continue;
+
+    if (seenEltNames.count(eltName) == 1) {
+      foundDupLabel = true;
+    }
+
+    seenEltNames.insert(eltName);
   }
 
   if (hadError)
@@ -3179,6 +3203,11 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
     }
 
     elements[0] = TupleTypeElt(elements[0].getType());
+  }
+
+  // Tuples with duplicate element labels are not permitted
+  if (foundDupLabel) {
+    diagnose(repr->getLoc(), diag::tuple_duplicate_label);
   }
 
   return TupleType::get(elements, Context);

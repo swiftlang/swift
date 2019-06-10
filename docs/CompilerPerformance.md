@@ -717,7 +717,6 @@ $ cat /tmp/stats/*.json
   "AST.NumSourceLinesPerSecond": 3,
   "AST.NumLinkLibraries": 0,
   "AST.NumLoadedModules": 4,
-  "AST.NumImportedExternalDefinitions": 0,
   "AST.NumTotalClangImportedEntities": 0,
   ...
   "time.swift.Parsing.wall": 5.038023e-03,

@@ -189,8 +189,8 @@ def _apply_default_arguments(args):
     if args.test_optimize_for_size:
         args.test = True
 
-    # --test-optimize-none-implicit-dynamic implies --test.
-    if args.test_optimize_none_implicit_dynamic:
+    # --test-optimize-none-with-implicit-dynamic implies --test.
+    if args.test_optimize_none_with_implicit_dynamic:
         args.test = True
 
     # If none of tests specified skip swift stdlib test on all platforms
@@ -287,6 +287,10 @@ def create_argument_parser():
     option(['-n', '--dry-run'], store_true,
            help='print the commands that would be executed, but do not '
                 'execute them')
+    option('--dump-config', toggle_true,
+           help='instead of building, write JSON to stdout containing '
+                'various values used to build in this configuration')
+
     option('--legacy-impl', store_true('legacy_impl'),
            help='use legacy implementation')
 
@@ -659,12 +663,12 @@ def create_argument_parser():
         set_defaults(assertions=True)
 
         # TODO: Convert to store_true
-        option('--assertions', store,
+        option(['-a', '--assertions'], store,
                const=True,
                help='enable assertions in all projects')
 
         # TODO: Convert to store_false
-        option('--no-assertions', store('assertions'),
+        option(['-A', '--no-assertions'], store('assertions'),
                const=False,
                help='disable assertions in all projects')
 
@@ -756,10 +760,10 @@ def create_argument_parser():
                 '(implies --test)')
 
     # FIXME: Convert to store_true action
-    option('-y', store('test_optimize_none_implicit_dynamic', const=True),
+    option('-y', store('test_optimize_none_with_implicit_dynamic', const=True),
            help='run the test suite in optimize none with implicit dynamic'
                 ' mode too (implies --test)')
-    option('--test-optimize-none-implicit-dynamic', toggle_true,
+    option('--test-optimize-none-with-implicit-dynamic', toggle_true,
            help='run the test suite in optimize none with implicit dynamic'
                 'mode too (implies --test)')
 
@@ -771,6 +775,10 @@ def create_argument_parser():
 
     option('--host-test', toggle_true,
            help='run executable tests on host devices (such as iOS or tvOS)')
+
+    option('--only-executable-test', toggle_true,
+           help='Only run executable tests. Does nothing if host-test is not '
+                'allowed')
 
     option('--test-paths', append,
            type=argparse.ShellSplitType(),
@@ -787,6 +795,15 @@ def create_argument_parser():
            default=3,
            help='if the Swift Benchmark Suite is run after building, run N '
                 'iterations with -Onone')
+
+    # We want to run the TSan (compiler-rt) libdispatch tests on Linux, where
+    # libdispatch is just another library and not available by default. To do
+    # so we build Clang/LLVM/libdispatch and use it to compile/run the TSan
+    # libdispatch tests.
+    option('--tsan-libdispatch-test', toggle_true,
+           help='Builds a new toolchain including the libdispatch C library. '
+                'Then re-builds the TSan runtime (compiler-rt) using this '
+                'freshly-built Clang and runs the TSan libdispatch tests.')
 
     option('--skip-test-osx', toggle_false('test_osx'),
            help='skip testing Swift stdlibs for Mac OS X')
@@ -980,7 +997,7 @@ def create_argument_parser():
     option('--common-cmake-options', unsupported)
     option('--only-execute', unsupported)
     option('--skip-test-optimize-for-size', unsupported)
-    option('--skip-test-optimize-none-implicit-dynamic', unsupported)
+    option('--skip-test-optimize-none-with-implicit-dynamic', unsupported)
     option('--skip-test-optimized', unsupported)
 
     # -------------------------------------------------------------------------

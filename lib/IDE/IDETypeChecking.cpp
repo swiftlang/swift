@@ -39,6 +39,9 @@ static bool shouldPrintAsFavorable(const Decl *D, const PrintOptions &Options) {
   const auto *FD = dyn_cast<FuncDecl>(D);
   if (!FD)
     return true;
+  // Don't check overload choices for accessor decls.
+  if (isa<AccessorDecl>(FD))
+    return true;
   ResolvedMemberResult Result =
       resolveValueMember(*DC, BaseTy, FD->getEffectiveFullName());
   return !(Result.hasBestOverload() && Result.getBestOverload() != D);
@@ -267,8 +270,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
 
   unsigned countInherits(ExtensionDecl *ED) {
     SmallVector<TypeLoc, 4> Results;
-    getInheritedForPrinting(
-        ED, [&](const Decl *D) { return Options.shouldPrint(D); }, Results);
+    getInheritedForPrinting(ED, Options, Results);
     return Results.size();
   }
 

@@ -12,7 +12,7 @@
 import resilient_struct
 import resilient_protocol
 
-// Size is not @_fixed_layout, so we cannot define a new designated initializer
+// Size is not @frozen, so we cannot define a new designated initializer
 extension Size {
   init(ww: Int, hh: Int) {
     self.w = ww

@@ -1,11 +1,11 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %S/Inputs/specialize_opaque_type_archetypes_2.swift -module-name External -emit-module -emit-module-path %t/External.swiftmodule
-// RUN: %target-swift-frontend %S/Inputs/specialize_opaque_type_archetypes_3.swift -enable-library-evolution -module-name External2 -emit-module -emit-module-path %t/External2.swiftmodule
-// RUN: %target-swift-frontend %S/Inputs/specialize_opaque_type_archetypes_4.swift -I %t -enable-library-evolution -module-name External3 -emit-module -emit-module-path %t/External3.swiftmodule
-// RUN: %target-swift-frontend %S/Inputs/specialize_opaque_type_archetypes_3.swift -I %t -enable-library-evolution -module-name External2 -Osize -emit-module -o - | %target-sil-opt -module-name External2 | %FileCheck --check-prefix=RESILIENT %s
-// RUN: %target-swift-frontend -I %t -module-name A -enforce-exclusivity=checked -Osize -emit-sil -sil-verify-all %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
-// RUN: %target-swift-frontend -I %t -module-name A -enforce-exclusivity=checked -Osize -emit-sil  -sil-verify-all %s | %FileCheck %s
-// RUN: %target-swift-frontend -I %t -module-name A -enforce-exclusivity=checked -enable-library-evolution -Osize -emit-sil -sil-verify-all %s | %FileCheck %s
+// RUN: %target-swift-frontend -disable-availability-checking %S/Inputs/specialize_opaque_type_archetypes_2.swift -module-name External -emit-module -emit-module-path %t/External.swiftmodule
+// RUN: %target-swift-frontend -disable-availability-checking %S/Inputs/specialize_opaque_type_archetypes_3.swift -enable-library-evolution -module-name External2 -emit-module -emit-module-path %t/External2.swiftmodule
+// RUN: %target-swift-frontend -disable-availability-checking %S/Inputs/specialize_opaque_type_archetypes_4.swift -I %t -enable-library-evolution -module-name External3 -emit-module -emit-module-path %t/External3.swiftmodule
+// RUN: %target-swift-frontend -disable-availability-checking %S/Inputs/specialize_opaque_type_archetypes_3.swift -I %t -enable-library-evolution -module-name External2 -Osize -emit-module -o - | %target-sil-opt -module-name External2 | %FileCheck --check-prefix=RESILIENT %s
+// RUN: %target-swift-frontend -disable-availability-checking -I %t -module-name A -enforce-exclusivity=checked -Osize -emit-sil -sil-verify-all %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -disable-availability-checking -I %t -module-name A -enforce-exclusivity=checked -Osize -emit-sil  -sil-verify-all %s | %FileCheck %s
+// RUN: %target-swift-frontend -disable-availability-checking -I %t -module-name A -enforce-exclusivity=checked -enable-library-evolution -Osize -emit-sil -sil-verify-all %s | %FileCheck %s
 
 import External
 import External2
@@ -477,4 +477,65 @@ extension PA {
     useP(p.0(5))
     useP(p.1(5))
   }
+}
+
+public struct Foo {
+  var id : Int = 0
+  var p : Int64 = 1
+}
+
+struct Test : RandomAccessCollection {
+    struct Index : Comparable, Hashable {
+        var identifier: AnyHashable?
+        var offset: Int
+
+        static func < (lhs: Index, rhs: Index) -> Bool {
+            return lhs.offset < rhs.offset
+        }
+
+        func hash(into hasher: inout Hasher) {
+            hasher.combine(identifier)
+            hasher.combine(offset)
+        }
+    }
+
+    let foos: [Foo]
+    let ids: [AnyHashable]
+
+    init(foos: [Foo]) {
+        self.foos = foos
+        self.ids = foos.map { $0.id }
+    }
+
+    func _index(atOffset n: Int) -> Index {
+        return Index(identifier: ids.isEmpty ? nil : ids[n], offset: n)
+    }
+
+    var startIndex: Index {
+        return _index(atOffset: 0)
+    }
+
+    var endIndex: Index {
+        return Index(identifier: nil, offset: ids.endIndex)
+    }
+
+    func index(after i: Index) -> Index {
+        return _index(atOffset: i.offset + 1)
+    }
+
+    func index(before i: Index) -> Index {
+        return _index(atOffset: i.offset - 1)
+    }
+
+    func distance(from start: Index, to end: Index) -> Int {
+        return end.offset - start.offset
+    }
+
+    func index(_ i: Index, offsetBy n: Int) -> Index {
+        return _index(atOffset: i.offset + n)
+    }
+
+   subscript(i: Index) -> some P {
+        return foos[i.offset].p
+    }
 }

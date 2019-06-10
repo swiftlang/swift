@@ -2722,6 +2722,14 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     if (parseSILFunctionRef(InstLoc, Fn) ||
         parseSILDebugLocation(InstLoc, B))
       return true;
+    // Set a forward reference's dynamic property for the first time.
+    if (!Fn->isDynamicallyReplaceable()) {
+      if (!Fn->empty()) {
+        P.diagnose(P.Tok, diag::expected_dynamic_func_attr);
+        return true;
+      }
+      Fn->setIsDynamic();
+    }
     ResultVal = B.createDynamicFunctionRef(InstLoc, Fn);
     break;
   }
@@ -3540,7 +3548,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     break;
   }
 
-  case SILInstructionKind::AssignByDelegateInst: {
+  case SILInstructionKind::AssignByWrapperInst: {
     SILValue Src, DestAddr, InitFn, SetFn;
     SourceLoc DestLoc;
     AssignOwnershipQualifier AssignQualifier;
@@ -3563,7 +3571,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
       return true;
     }
 
-    ResultVal = B.createAssignByDelegate(InstLoc, Src, DestAddr, InitFn, SetFn,
+    ResultVal = B.createAssignByWrapper(InstLoc, Src, DestAddr, InitFn, SetFn,
                                          AssignQualifier);
     break;
   }

@@ -206,7 +206,7 @@ static bool partialApplyEscapes(SILValue V, bool examineApply);
 /// Could this operand to an apply escape that function by being
 /// stored or returned?
 static bool applyArgumentEscapes(FullApplySite Apply, Operand *O) {
-  SILFunction *F = Apply.getReferencedFunction();
+  SILFunction *F = Apply.getReferencedFunctionOrNull();
   // If we cannot examine the function body, assume the worst.
   if (!F || F->empty())
     return true;
@@ -283,7 +283,7 @@ static SILInstruction *findUnexpectedBoxUse(SILValue Box,
 /// disqualify it from being promoted to a stack location.  Return
 /// true if this partial apply will not block our promoting the box.
 static bool checkPartialApplyBody(Operand *O) {
-  SILFunction *F = ApplySite(O->getUser()).getReferencedFunction();
+  SILFunction *F = ApplySite(O->getUser()).getReferencedFunctionOrNull();
   // If we cannot examine the function body, assume the worst.
   if (!F || F->empty())
     return false;
@@ -743,7 +743,7 @@ specializePartialApply(SILOptFunctionBuilder &FuncBuilder,
                        AllocBoxToStackState &pass) {
   auto *FRI = cast<FunctionRefInst>(PartialApply->getCallee());
   assert(FRI && "Expected a direct partial_apply!");
-  auto *F = FRI->getReferencedFunction();
+  auto *F = FRI->getReferencedFunctionOrNull();
   assert(F && "Expected a referenced function!");
 
   IsSerialized_t Serialized = IsNotSerialized;

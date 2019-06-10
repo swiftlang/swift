@@ -60,7 +60,7 @@
 /// `Stride` types, they cannot be used as the bounds of a countable range. If
 /// you need to iterate over consecutive floating-point values, see the
 /// `stride(from:through:by:)` function.
-@_fixed_layout
+@frozen
 public struct ClosedRange<Bound: Comparable> {
   /// The range's lower bound.
   public let lowerBound: Bound
@@ -127,7 +127,7 @@ where Bound: Strideable, Bound.Stride: SignedInteger {
 }
 
 extension ClosedRange where Bound : Strideable, Bound.Stride : SignedInteger {
-  @_frozen // FIXME(resilience)
+  @frozen // FIXME(resilience)
   public enum Index {
     case pastEnd
     case inRange(Bound)
@@ -444,7 +444,12 @@ extension ClosedRange where Bound: Strideable, Bound.Stride : SignedInteger {
 extension ClosedRange {
   @inlinable
   public func overlaps(_ other: ClosedRange<Bound>) -> Bool {
-    return self.contains(other.lowerBound) || other.contains(lowerBound)
+    // Disjoint iff the other range is completely before or after our range.
+    // Unlike a `Range`, a `ClosedRange` can *not* be empty, so no check for
+    // that case is needed here.
+    let isDisjoint = other.upperBound < self.lowerBound
+      || self.upperBound < other.lowerBound
+    return !isDisjoint
   }
 
   @inlinable

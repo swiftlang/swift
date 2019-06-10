@@ -1,7 +1,5 @@
 set(sources
-  Accelerate.apinotes
   Dispatch.apinotes
-  ScriptingBridge.apinotes
   os.apinotes
 )
 
@@ -23,7 +21,7 @@ add_custom_command(
     COMMAND
       "${CMAKE_COMMAND}" "-E" "copy_if_different" ${inputs} "${output_dir}/")
 
-add_custom_target("copy_apinotes"
+add_custom_target("copy_apinotes" ALL
     DEPENDS "${outputs}" "${output_dir}"
     COMMENT "Copying API notes to ${output_dir}"
     SOURCES "${sources}")

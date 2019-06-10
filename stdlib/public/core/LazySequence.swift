@@ -176,7 +176,7 @@ extension LazySequenceProtocol where Elements: LazySequenceProtocol {
 /// implemented lazily.
 ///
 /// - See also: `LazySequenceProtocol`
-@_fixed_layout // lazy-performance
+@frozen // lazy-performance
 public struct LazySequence<Base : Sequence> {
   @usableFromInline
   internal var _base: Base

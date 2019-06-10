@@ -1930,7 +1930,19 @@ public:
   }
   void visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E) {
     printCommon(E, "interpolated_string_literal_expr");
-    PrintWithColorRAII(OS, LiteralValueColor) << " literal_capacity=" 
+    
+    // Print the trailing quote location
+    if (auto Ty = GetTypeOfExpr(E)) {
+      auto &Ctx = Ty->getASTContext();
+      auto TQL = E->getTrailingQuoteLoc();
+      if (TQL.isValid()) {
+        PrintWithColorRAII(OS, LocationColor) << " trailing_quote_loc=";
+        TQL.print(PrintWithColorRAII(OS, LocationColor).getOS(),
+                  Ctx.SourceMgr);
+      }
+    }
+    PrintWithColorRAII(OS, LiteralValueColor)
+      << " literal_capacity="
       << E->getLiteralCapacity() << " interpolation_count="
       << E->getInterpolationCount() << '\n';
     printRec(E->getAppendingExpr());
@@ -2623,7 +2635,19 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitEditorPlaceholderExpr(EditorPlaceholderExpr *E) {
-    printCommon(E, "editor_placeholder_expr") << '\n';
+    printCommon(E, "editor_placeholder_expr") << ' ';
+
+    // Print the trailing angle bracket location
+    if (auto Ty = GetTypeOfExpr(E)) {
+      auto &Ctx = Ty->getASTContext();
+      auto TABL = E->getTrailingAngleBracketLoc();
+      if (TABL.isValid()) {
+        PrintWithColorRAII(OS, LocationColor) << " trailing_angle_bracket_loc=";
+        TABL.print(PrintWithColorRAII(OS, LocationColor).getOS(),
+                   Ctx.SourceMgr);
+      }
+    }
+    OS << '\n';
     auto *TyR = E->getTypeLoc().getTypeRepr();
     auto *ExpTyR = E->getTypeForExpansion();
     if (TyR)

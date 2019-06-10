@@ -98,10 +98,8 @@ public:
     ParentType,
     /// The instance of a metatype type.
     InstanceType,
-    /// The generic type of a sequence.
-    SequenceIteratorProtocol,
-    /// The element type of a generator.
-    GeneratorElementType,
+    /// The element type of a sequence in a for ... in ... loop.
+    SequenceElementType,
     /// An argument passed in an autoclosure parameter
     /// position, which must match the autoclosure return type.
     AutoclosureResult,
@@ -161,8 +159,7 @@ public:
     case ClosureResult:
     case ParentType:
     case InstanceType:
-    case SequenceIteratorProtocol:
-    case GeneratorElementType:
+    case SequenceElementType:
     case AutoclosureResult:
     case Requirement:
     case Witness:
@@ -211,8 +208,7 @@ public:
     case ApplyArgument:
     case ApplyFunction:
     case ApplyArgToParam:
-    case SequenceIteratorProtocol:
-    case GeneratorElementType:
+    case SequenceElementType:
     case ClosureResult:
     case ConstructorMember:
     case InstanceType:
@@ -567,6 +563,19 @@ public:
   /// Determine whether this locator points to one of the key path
   /// components.
   bool isForKeyPathComponent() const;
+
+  /// Determine whether this locator points to the generic parameter.
+  bool isForGenericParameter() const;
+
+  /// Determine whether this locator points to the element type of a
+  /// sequence in a for ... in ... loop.
+  bool isForSequenceElementType() const;
+
+  /// Determine whether this locator points to the contextual type.
+  bool isForContextualType() const;
+
+  /// If this locator points to generic parameter return its type.
+  GenericTypeParamType *getGenericParameter() const;
 
   /// Produce a profile of this locator, for use in a folding set.
   static void Profile(llvm::FoldingSetNodeID &id, Expr *anchor,

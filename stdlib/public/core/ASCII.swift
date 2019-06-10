@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 extension Unicode {
-  @_frozen
+  @frozen
   public enum ASCII {}
 }
 
@@ -68,7 +68,7 @@ extension Unicode.ASCII : Unicode.Encoding {
     return encode(FromEncoding.decode(content))
   }
 
-  @_fixed_layout
+  @frozen
   public struct Parser {
     @inlinable
     public init() { }

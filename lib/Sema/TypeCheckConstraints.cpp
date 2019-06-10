@@ -30,7 +30,7 @@
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
-#include "swift/AST/PropertyDelegates.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeCheckerDebugConsumer.h"
@@ -80,12 +80,9 @@ GenericTypeParamType *
 TypeVariableType::Implementation::getGenericParameter() const {
   // Check whether we have a path that terminates at a generic parameter
   // locator.
-  if (!locator || locator->getPath().empty() ||
-      locator->getPath().back().getKind() != ConstraintLocator::GenericParameter)
-    return nullptr;
-
-  // Retrieve the archetype.
-  return locator->getPath().back().getGenericParameter();
+  return locator && locator->isForGenericParameter()
+             ? locator->getGenericParameter()
+             : nullptr;
 }
 
 // Only allow allocation of resolved overload set list items using the
@@ -952,6 +949,107 @@ namespace {
     /// the type conforms to the expected literal protocol.
     Expr *simplifyTypeConstructionWithLiteralArg(Expr *E);
 
+    /// In Swift < 5, diagnose and correct invalid multi-argument or
+    /// argument-labeled interpolations.
+    void correctInterpolationIfStrange(InterpolatedStringLiteralExpr *ISLE) {
+      // These expressions are valid in Swift 5+.
+      if (TC.Context.isSwiftVersionAtLeast(5))
+        return;
+
+      /// Diagnoses appendInterpolation(...) calls with multiple
+      /// arguments or argument labels and corrects them.
+      class StrangeInterpolationRewriter : public ASTWalker {
+        TypeChecker &TC;
+
+      public:
+        StrangeInterpolationRewriter(TypeChecker &TC) : TC(TC) { }
+
+        virtual bool walkToDeclPre(Decl *D) {
+          // We don't want to look inside decls.
+          return false;
+        }
+
+        virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) {
+          // One InterpolatedStringLiteralExpr should never be nested inside
+          // another except as a child of a CallExpr, and we don't recurse into
+          // the children of CallExprs.
+          assert(!isa<InterpolatedStringLiteralExpr>(E) &&
+                 "StrangeInterpolationRewriter found nested interpolation?");
+
+          // We only care about CallExprs.
+          if (!isa<CallExpr>(E))
+            return { true, E };
+
+          auto call = cast<CallExpr>(E);
+          if (auto callee = dyn_cast<UnresolvedDotExpr>(call->getFn())) {
+            if (callee->getName().getBaseName() ==
+                    TC.Context.Id_appendInterpolation) {
+              Expr *newArg = nullptr;
+              SourceLoc lParen, rParen;
+
+              if (call->getNumArguments() > 1) {
+                auto *args = cast<TupleExpr>(call->getArg());
+
+                lParen = args->getLParenLoc();
+                rParen = args->getRParenLoc();
+                Expr *secondArg = args->getElement(1);
+
+                TC.diagnose(secondArg->getLoc(),
+                            diag::string_interpolation_list_changing)
+                  .highlightChars(secondArg->getLoc(), rParen);
+                TC.diagnose(secondArg->getLoc(),
+                            diag::string_interpolation_list_insert_parens)
+                  .fixItInsertAfter(lParen, "(")
+                  .fixItInsert(rParen, ")");
+
+                newArg = args;
+              }
+              else if(call->getNumArguments() == 1 &&
+                      call->getArgumentLabels().front() != Identifier()) {
+                auto *args = cast<TupleExpr>(call->getArg());
+                newArg = args->getElement(0);
+
+                lParen = args->getLParenLoc();
+                rParen = args->getRParenLoc();
+
+                SourceLoc argLabelLoc = call->getArgumentLabelLoc(0),
+                          argLoc = newArg->getStartLoc();
+
+                TC.diagnose(argLabelLoc,
+                            diag::string_interpolation_label_changing)
+                  .highlightChars(argLabelLoc, argLoc);
+                TC.diagnose(argLabelLoc,
+                            diag::string_interpolation_remove_label,
+                            call->getArgumentLabels().front())
+                  .fixItRemoveChars(argLabelLoc, argLoc);
+              }
+
+              // If newArg is no longer null, we need to build a new
+              // appendInterpolation(_:) call that takes it to replace the bad
+              // appendInterpolation(...) call.
+              if (newArg) {
+                auto newCallee = new (TC.Context) UnresolvedDotExpr(
+                    callee->getBase(), /*dotloc=*/SourceLoc(),
+                    DeclName(TC.Context.Id_appendInterpolation),
+                    /*nameloc=*/DeclNameLoc(), /*Implicit=*/true);
+
+                E = CallExpr::create(TC.Context, newCallee, lParen,
+                    { newArg }, { Identifier() }, { SourceLoc() },
+                    rParen, /*trailingClosure=*/nullptr, /*implicit=*/false);
+              }
+            }
+          }
+
+          // There is never a CallExpr between an InterpolatedStringLiteralExpr
+          // and an un-typechecked appendInterpolation(...) call, so whether we
+          // changed E or not, we don't need to recurse any deeper.
+          return { false, E };
+        }
+      };
+      
+      ISLE->getAppendingExpr()->walk(StrangeInterpolationRewriter(TC));
+    }
+
   public:
     PreCheckExpression(TypeChecker &tc, DeclContext *dc, Expr *parent)
         : TC(tc), DC(dc), ParentExpr(parent) {}
@@ -1085,6 +1183,9 @@ namespace {
         TC.diagnose(expr->getStartLoc(), diag::extraneous_address_of);
         return finish(false, nullptr);
       }
+
+      if (auto *ISLE = dyn_cast<InterpolatedStringLiteralExpr>(expr))
+        correctInterpolationIfStrange(ISLE);
 
       return finish(true, expr);
     }
@@ -2473,28 +2574,29 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
     /// The type of the initializer.
     Type initType;
 
-    /// Whether we applied a property delegate to the initializer expression.
-    PropertyDelegateTypeInfo appliedPropertyDelegate;
+    /// Whether we applied a property wrapper to the initializer expression.
+    PropertyWrapperTypeInfo appliedPropertyWrapper;
 
   public:
     explicit BindingListener(TypeChecker &tc, Pattern *&pattern,
                              Expr *&initializer, DeclContext *dc)
       : tc(tc), pattern(pattern), initializer(initializer),
         Locator(nullptr), dc(dc) {
-      maybeApplyPropertyDelegate();
+      maybeApplyPropertyWrapper();
     }
 
     /// Retrieve the type to which the pattern should be coerced.
     Type getPatternInitType() const {
-      if (!appliedPropertyDelegate || initType->hasError())
+      if (!appliedPropertyWrapper || initType->hasError() ||
+          initType->is<TypeVariableType>())
         return initType;
 
-      // We applied a property delegate, so dig the pattern initialization
-      // type out of the value property of the delegate.
+      // We applied a property wrapper, so dig the pattern initialization
+      // type out of the value property of the wrapper.
       return initType->getTypeOfMember(
           dc->getParentModule(),
-          appliedPropertyDelegate.valueVar,
-          appliedPropertyDelegate.valueVar->getValueInterfaceType());
+          appliedPropertyWrapper.valueVar,
+          appliedPropertyWrapper.valueVar->getValueInterfaceType());
     }
 
     bool builtConstraints(ConstraintSystem &cs, Expr *expr) override {
@@ -2509,13 +2611,13 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
       if (!patternType)
         return true;
 
-      if (appliedPropertyDelegate) {
-        // When we have applied a property delegate, the initializer type
-        // is the initialization of the property delegate instance.
+      if (appliedPropertyWrapper) {
+        // When we have applied a property wrapper, the initializer type
+        // is the initialization of the property wrapper instance.
         initType = cs.getType(expr);
 
         // Add a conversion constraint between the pattern type and the
-        // property delegate's "value" type.
+        // property wrapper's "value" type.
         cs.addConstraint(ConstraintKind::Conversion, patternType,
                          getPatternInitType(), Locator, /*isFavored*/true);
       } else {
@@ -2550,16 +2652,16 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
 
       assert(solution.getConstraintSystem().getType(expr)->isEqual(initType));
 
-      // Record the property delegate type and note that the initializer has
+      // Record the property wrapper type and note that the initializer has
       // been subsumed by the backing property.
-      if (appliedPropertyDelegate) {
+      if (appliedPropertyWrapper) {
         auto var = pattern->getSingleVar();
         var->getParentPatternBinding()->setInitializerSubsumed(0);
-        tc.Context.setSideCachedPropertyDelegateBackingPropertyType(
+        tc.Context.setSideCachedPropertyWrapperBackingPropertyType(
             var, initType->mapTypeOutOfContext());
 
         // Record the semantic initializer.
-        var->getAttachedPropertyDelegate()->setSemanticInit(expr);
+        var->getAttachedPropertyWrapper()->setSemanticInit(expr);
       }
 
       initializer = expr;
@@ -2568,72 +2670,73 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
 
   private:
     // If the pattern contains a single variable that has an attached
-    // property delegate, set up the initializer expression to initialize
+    // property wrapper, set up the initializer expression to initialize
     // the backing storage.
-    void maybeApplyPropertyDelegate() {
+    void maybeApplyPropertyWrapper() {
       auto singleVar = pattern->getSingleVar();
       if (!singleVar)
         return;
 
-      auto delegateAttr = singleVar->getAttachedPropertyDelegate();
-      if (!delegateAttr)
+      auto wrapperAttr = singleVar->getAttachedPropertyWrapper();
+      if (!wrapperAttr)
         return;
 
-      auto delegateNominal = evaluateOrDefault(
-          tc.Context.evaluator, CustomAttrNominalRequest{delegateAttr, dc},
+      auto wrapperNominal = evaluateOrDefault(
+          tc.Context.evaluator, CustomAttrNominalRequest{wrapperAttr, dc},
           nullptr);
-      if (!delegateNominal)
+      if (!wrapperNominal)
         return;
 
-      auto delegateInfo = delegateNominal->getPropertyDelegateTypeInfo();
-      if (!delegateInfo)
+      auto wrapperInfo = wrapperNominal->getPropertyWrapperTypeInfo();
+      if (!wrapperInfo)
         return;
 
-      Type delegateType = singleVar->getAttachedPropertyDelegateType();
-      if (!delegateType)
+      Type wrapperType = singleVar->getAttachedPropertyWrapperType();
+      if (!wrapperType)
         return;
 
-      // If the property delegate is directly initialized, form the
+      // If the property wrapper is directly initialized, form the
       // call.
       auto &ctx = singleVar->getASTContext();
       auto typeExpr =
-          TypeExpr::createImplicitHack(delegateAttr->getTypeLoc().getLoc(),
-                                       Type(delegateType), ctx);
-      if (delegateAttr->getArg() != nullptr) {
+          TypeExpr::createImplicitHack(wrapperAttr->getTypeLoc().getLoc(),
+                                       Type(wrapperType), ctx);
+      if (wrapperAttr->getArg() != nullptr) {
         if (initializer) {
-          singleVar->diagnose(diag::property_delegate_and_normal_init,
+          singleVar->diagnose(diag::property_wrapper_and_normal_init,
                               singleVar->getFullName())
-            .highlight(delegateAttr->getRange())
+            .highlight(wrapperAttr->getRange())
             .highlight(initializer->getSourceRange());
         }
 
         initializer = CallExpr::create(
-            ctx, typeExpr, delegateAttr->getArg(),
-            delegateAttr->getArgumentLabels(),
-            delegateAttr->getArgumentLabelLocs(), /*hasTrailingClosure=*/false,
+            ctx, typeExpr, wrapperAttr->getArg(),
+            wrapperAttr->getArgumentLabels(),
+            wrapperAttr->getArgumentLabelLocs(), /*hasTrailingClosure=*/false,
             /*implicit=*/false);
-      } else if (delegateInfo.initialValueInit) {
+      } else if (wrapperInfo.initialValueInit) {
         // FIXME: we want to use the initialValueInit we found.
         assert(initializer);
         initializer = CallExpr::createImplicit(
             ctx, typeExpr, {initializer}, {ctx.Id_initialValue});
       } else {
-        singleVar->diagnose(diag::property_delegate_init_without_initial_value,
-                            singleVar->getFullName(), delegateType)
+        singleVar->diagnose(diag::property_wrapper_init_without_initial_value,
+                            singleVar->getFullName(), wrapperType)
           .highlight(initializer->getSourceRange());
-        ctx.Diags.diagnose(delegateAttr->getLocation(),
-                           diag::property_delegate_direct_init)
+        ctx.Diags.diagnose(wrapperAttr->getLocation(),
+                           diag::property_wrapper_direct_init)
           .fixItInsertAfter(initializer->getSourceRange().End,
                             "(<# initializer args #>)");
-        delegateNominal->diagnose(diag::kind_declname_declared_here,
-                                  delegateNominal->getDescriptiveKind(),
-                                  delegateNominal->getFullName());
+        wrapperNominal->diagnose(diag::kind_declname_declared_here,
+                                  wrapperNominal->getDescriptiveKind(),
+                                  wrapperNominal->getFullName());
         return;
       }
+      wrapperAttr->setSemanticInit(initializer);
 
-      // Note that we have applied to property delegate, so we can adjust
+      // Note that we have applied to property wrapper, so we can adjust
       // the initializer type later.
-      appliedPropertyDelegate = delegateInfo;
+      appliedPropertyWrapper = wrapperInfo;
     }
 
   };
@@ -2646,9 +2749,12 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
   auto contextualPurpose = CTP_Unused;
   TypeCheckExprOptions flags = TypeCheckExprFlags::ConvertTypeIsOnlyAHint;
 
+  // Set the contextual purpose even if the pattern doesn't have a type so
+  // if there's an error we can use that information to inform diagnostics.
+  contextualPurpose = CTP_Initialization;
+
   if (pattern->hasType()) {
     contextualType = TypeLoc::withoutLoc(pattern->getType());
-    contextualPurpose = CTP_Initialization;
 
     // If we already had an error, don't repeat the problem.
     if (contextualType.getType()->hasError())
@@ -2774,85 +2880,29 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
         return true;
       }
 
+      auto elementAssocType =
+        cast<AssociatedTypeDecl>(
+          sequenceProto->lookupDirect(tc.Context.Id_Element).front());
+
       SequenceType = cs.createTypeVariable(Locator, TVO_CanBindToNoEscape);
       cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
                        SequenceType, Locator);
       cs.addConstraint(ConstraintKind::ConformsTo, SequenceType,
                        sequenceProto->getDeclaredType(), Locator);
 
-      auto iteratorLocator =
-        cs.getConstraintLocator(Locator,
-                                ConstraintLocator::SequenceIteratorProtocol);
       auto elementLocator =
-        cs.getConstraintLocator(iteratorLocator,
-                                ConstraintLocator::GeneratorElementType);
+        cs.getConstraintLocator(Locator,
+                                ConstraintLocator::SequenceElementType);
 
       // Collect constraints from the element pattern.
       auto pattern = Stmt->getPattern();
       InitType = cs.generateConstraints(pattern, elementLocator);
       if (!InitType)
         return true;
-      
-      // Manually search for the iterator witness. If no iterator/element pair
-      // exists, solve for them.
-      Type iteratorType;
-      Type elementType;
-      
-      NameLookupOptions lookupOptions = defaultMemberTypeLookupOptions;
-      if (isa<AbstractFunctionDecl>(cs.DC))
-        lookupOptions |= NameLookupFlags::KnownPrivate;
-
-      auto sequenceType = cs.getType(expr)->getRValueType();
-
-      // Look through one level of optional; this improves recovery but doesn't
-      // change the result.
-      if (auto sequenceObjectType = sequenceType->getOptionalObjectType())
-        sequenceType = sequenceObjectType;
-
-      // If the sequence type is an existential, we should not attempt to
-      // look up the member type at all, since we cannot represent associated
-      // types of existentials.
-      //
-      // We will diagnose it later.
-      if (!sequenceType->isExistentialType() &&
-          (sequenceType->mayHaveMembers() ||
-           sequenceType->isTypeVariableOrMember())) {
-        ASTContext &ctx = tc.Context;
-        auto iteratorAssocType =
-          cast<AssociatedTypeDecl>(
-            sequenceProto->lookupDirect(ctx.Id_Iterator).front());
-
-        auto subs = sequenceType->getContextSubstitutionMap(
-          cs.DC->getParentModule(),
-          sequenceProto);
-        iteratorType = iteratorAssocType->getDeclaredInterfaceType()
-          .subst(subs);
-
-        if (iteratorType) {
-          auto iteratorProto =
-            tc.getProtocol(Stmt->getForLoc(),
-                           KnownProtocolKind::IteratorProtocol);
-          if (!iteratorProto)
-            return true;
-
-          auto elementAssocType =
-            cast<AssociatedTypeDecl>(
-              iteratorProto->lookupDirect(ctx.Id_Element).front());
-
-          elementType = iteratorType->getTypeOfMember(
-                          cs.DC->getParentModule(),
-                          elementAssocType,
-                          elementAssocType->getDeclaredInterfaceType());
-        }
-      }
-
-      if (elementType.isNull()) {
-        elementType = cs.createTypeVariable(elementLocator,
-                                            TVO_CanBindToNoEscape);
-      }
 
       // Add a conversion constraint between the element type of the sequence
       // and the type of the element pattern.
+      auto elementType = DependentMemberType::get(SequenceType, elementAssocType);
       cs.addConstraint(ConstraintKind::Conversion, elementType, InitType,
                        elementLocator);
 
@@ -4326,8 +4376,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   if (Context.LangOpts.EnableObjCInterop) {
     if (auto errorTypeProto = Context.getProtocol(KnownProtocolKind::Error)) {
       if (conformsToProtocol(toType, errorTypeProto, dc,
-                             (ConformanceCheckFlags::InExpression|
-                              ConformanceCheckFlags::Used))) {
+                             ConformanceCheckFlags::InExpression)) {
         auto nsError = Context.getNSErrorDecl();
         if (nsError) {
           if (!nsError->hasInterfaceType()) {

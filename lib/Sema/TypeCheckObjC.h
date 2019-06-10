@@ -49,6 +49,8 @@ public:
     ExplicitlyIBOutlet,
     /// Has an explicit '@IBAction' attribute.
     ExplicitlyIBAction,
+    /// Has an explicit '@IBSegueAction' attribute.
+    ExplicitlyIBSegueAction,
     /// Has an explicit '@NSManaged' attribute.
     ExplicitlyNSManaged,
     /// Is a member of an @objc protocol.

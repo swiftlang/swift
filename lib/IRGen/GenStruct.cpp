@@ -626,7 +626,6 @@ public:
       TotalStride(Size(ClangLayout.getSize().getQuantity())),
       TotalAlignment(IGM.getCappedAlignment(
                                        Alignment(ClangLayout.getAlignment()))) {
-    SpareBits.reserve(TotalStride.getValue() * 8);
   }
 
   void collectRecordFields() {
@@ -885,7 +884,10 @@ void IRGenModule::maybeEmitOpaqueTypeDecl(OpaqueTypeDecl *opaque) {
     // then emit all opaque type descriptors and make them runtime-discoverable
     // so that remote ast/mirror can recover them.
     addRuntimeResolvableType(opaque);
-    emitOpaqueTypeDecl(opaque);
+    if (IRGen.hasLazyMetadata(opaque))
+      IRGen.noteUseOfOpaqueTypeDescriptor(opaque);
+    else
+      emitOpaqueTypeDecl(opaque);
   } else if (!IRGen.hasLazyMetadata(opaque)) {
     emitOpaqueTypeDecl(opaque);
   }

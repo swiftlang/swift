@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-build-swift -emit-executable %s -g -o %t/opaque_return_type -emit-module
+// RUN: %target-build-swift -Xfrontend -disable-availability-checking -emit-executable %s -g -o %t/opaque_return_type -emit-module
 // RUN: sed -ne '/\/\/ *DEMANGLE: /s/\/\/ *DEMANGLE: *//p' < %s > %t/input
 // RUN: %lldb-moduleimport-test %t/opaque_return_type -type-from-mangled=%t/input | %FileCheck %s
 

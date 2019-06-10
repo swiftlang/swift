@@ -55,7 +55,7 @@
 @_silgen_name("unknown")
 public func unknown() -> ()
 
-@_fixed_layout
+@frozen
 public struct X {
   @inlinable
   public func test() {

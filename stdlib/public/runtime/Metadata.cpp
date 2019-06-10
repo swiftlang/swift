@@ -2698,8 +2698,8 @@ _swift_initClassMetadataImpl(ClassMetadata *self,
 
   initClassFieldOffsetVector(self, numFields, fieldTypes, fieldOffsets);
 
-  auto *description = self->getDescription();
 #if SWIFT_OBJC_INTEROP
+  auto *description = self->getDescription();
   if (description->isGeneric()) {
     assert(!description->hasObjCResilientClassStub());
     initGenericObjCClass(self, numFields, fieldTypes, fieldOffsets);
@@ -2711,19 +2711,26 @@ _swift_initClassMetadataImpl(ClassMetadata *self,
     // globals. Note that the field offset vector is *not* updated;
     // however we should not be using it for anything in a non-generic
     // class.
-    if (auto *stub = description->getObjCResilientClassStub()) {
-      if (_objc_realizeClassFromSwift == nullptr ||
-          objc_loadClassref == nullptr) {
-        fatalError(0, "class %s requires missing Objective-C runtime feature; "
-                  "the deployment target was newer than this OS\n",
-                  self->getDescription()->Name.get());
-      }
+    auto *stub = description->getObjCResilientClassStub();
+
+    // On a new enough runtime, register the class as a replacement for
+    // its stub if we have one, which attaches any categories referencing
+    // the stub.
+    //
+    // On older runtimes, just register the class via the usual mechanism.
+    // The compiler enforces that @objc methods in extensions of classes
+    // with resilient ancestry have the correct availability, so it should
+    // be safe to ignore the stub in this case.
+    if (stub != nullptr &&
+        objc_loadClassref != nullptr &&
+        _objc_realizeClassFromSwift != nullptr) {
       _objc_realizeClassFromSwift((Class) self, const_cast<void *>(stub));
-    } else
+    } else {
       swift_instantiateObjCClass(self);
+    }
   }
 #else
-  assert(!description->hasObjCResilientClassStub());
+  assert(!self->getDescription()->hasObjCResilientClassStub());
 #endif
 
   return MetadataDependency();
@@ -3842,24 +3849,6 @@ static const WitnessTable *_getForeignWitnessTable(
 /***************************************************************************/
 /*** Other metadata routines ***********************************************/
 /***************************************************************************/
-
-template<> const ClassMetadata *
-Metadata::getClassObject() const {
-  switch (getKind()) {
-  case MetadataKind::Class: {
-    // Native Swift class metadata is also the class object.
-    return static_cast<const ClassMetadata *>(this);
-  }
-  case MetadataKind::ObjCClassWrapper: {
-    // Objective-C class objects are referenced by their Swift metadata wrapper.
-    auto wrapper = static_cast<const ObjCClassWrapperMetadata *>(this);
-    return wrapper->Class;
-  }
-  // Other kinds of types don't have class objects.
-  default:
-    return nullptr;
-  }
-}
 
 template <> OpaqueValue *Metadata::allocateBoxForExistentialIn(ValueBuffer *buffer) const {
   auto *vwt = getValueWitnesses();

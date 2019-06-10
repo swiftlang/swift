@@ -155,7 +155,9 @@ Type ASTBuilder::createNominalType(GenericTypeDecl *decl, Type parent) {
   // Imported types can be renamed to be members of other (non-generic)
   // types, but the mangling does not have a parent type. Just use the
   // declared type directly in this case and skip the parent check below.
-  if (nominalDecl->hasClangNode() && !nominalDecl->isGenericContext())
+  bool isImported = nominalDecl->hasClangNode() ||
+      nominalDecl->getAttrs().hasAttribute<ClangImporterSynthesizedTypeAttr>();
+  if (isImported && !nominalDecl->isGenericContext())
     return nominalDecl->getDeclaredType();
 
   // Validate the parent type.
@@ -177,7 +179,9 @@ Type ASTBuilder::createTypeAliasType(GenericTypeDecl *decl, Type parent) {
   // Imported types can be renamed to be members of other (non-generic)
   // types, but the mangling does not have a parent type. Just use the
   // declared type directly in this case and skip the parent check below.
-  if (aliasDecl->hasClangNode() && !aliasDecl->isGenericContext())
+  bool isImported = aliasDecl->hasClangNode() ||
+      aliasDecl->getAttrs().hasAttribute<ClangImporterSynthesizedTypeAttr>();
+  if (isImported && !aliasDecl->isGenericContext())
     return aliasDecl->getDeclaredInterfaceType();
 
   // Validate the parent type.
@@ -424,6 +428,7 @@ getParameterConvention(ImplParameterConvention conv) {
   case Demangle::ImplParameterConvention::Direct_Guaranteed:
     return ParameterConvention::Direct_Guaranteed;
   }
+  llvm_unreachable("covered switch");
 }
 
 static ResultConvention getResultConvention(ImplResultConvention conv) {
@@ -439,6 +444,7 @@ static ResultConvention getResultConvention(ImplResultConvention conv) {
   case Demangle::ImplResultConvention::Autoreleased:
     return ResultConvention::Autoreleased;
   }
+  llvm_unreachable("covered switch");
 }
 
 Type ASTBuilder::createImplFunctionType(
@@ -535,6 +541,7 @@ getMetatypeRepresentation(ImplMetatypeRepresentation repr) {
   case Demangle::ImplMetatypeRepresentation::ObjC:
     return MetatypeRepresentation::ObjC;
   }
+  llvm_unreachable("covered switch");
 }
 
 Type ASTBuilder::createExistentialMetatypeType(Type instance,
@@ -1041,7 +1048,8 @@ ASTBuilder::findForeignTypeDecl(StringRef name,
 
     explicit Consumer(Demangle::Node::Kind kind) : ExpectedKind(kind) {}
 
-    void foundDecl(ValueDecl *decl, DeclVisibilityKind reason) override {
+    void foundDecl(ValueDecl *decl, DeclVisibilityKind reason,
+                   DynamicLookupInfo dynamicLookupInfo = {}) override {
       if (HadError) return;
       if (decl == Result) return;
       if (!Result) {

@@ -33,6 +33,11 @@ private func target_library_name(_ name: String) -> String {
 #endif
 }
 
+func testAssociatedType<T: Assoc> (_ t: T) {
+  print(T.A.self)
+}
+
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
 func test() {
   print(MemoryLayout.size(ofValue: bar(5)))
   print(MemoryLayout.size(ofValue: Container().bar(5)))
@@ -52,7 +57,11 @@ func test() {
 // CHECK: 2
 // CHECK: 8
 // CHECK: 2
-test()
+if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+  test()
+} else {
+  print("8 8 5 5 8 2 8 2")
+}
 
 var executablePath = CommandLine.arguments[0]
 executablePath.removeLast(4)
@@ -73,4 +82,10 @@ executablePath.removeLast(4)
 // CHECK: 1
 // CHECK: 16
 // CHECK: 1
-test()
+// CHECK: NewType
+if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+  test()
+  testAssociatedType(Test())
+} else {
+  print("16 16 1 1 16 1 16 1 NewType")
+}

@@ -69,7 +69,7 @@ class TypeSubstCloner : public SILClonerWithScopes<ImplClass> {
 
       if (!Cloner.Inlining) {
         FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(AI.getCallee());
-        if (FRI && FRI->getReferencedFunction() == AI.getFunction() &&
+        if (FRI && FRI->getInitiallyReferencedFunction() == AI.getFunction() &&
             Subs == Cloner.SubsMap) {
           // Handle recursions by replacing the apply to the callee with an
           // apply to the newly specialized function, but only if substitutions
@@ -193,6 +193,13 @@ protected:
                                  Helper.getArguments(), Inst->isNonThrowing(),
                                  GenericSpecializationInformation::create(
                                    Inst, getBuilder()));
+    // Specialization can return noreturn applies that were not identified as
+    // such before.
+    if (N->isCalleeNoReturn() &&
+        !isa<UnreachableInst>(*std::next(SILBasicBlock::iterator(Inst)))) {
+      noReturnApplies.push_back(N);
+    }
+
     recordClonedInstruction(Inst, N);
   }
 
@@ -381,6 +388,9 @@ protected:
   SILFunction &Original;
   /// True, if used for inlining.
   bool Inlining;
+  // Generic specialization can create noreturn applications that where
+  // previously not identifiable as such.
+  SmallVector<ApplyInst *, 16> noReturnApplies;
 };
 
 } // end namespace swift

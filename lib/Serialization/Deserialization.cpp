@@ -22,7 +22,9 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Serialization/BCReadingExtras.h"
@@ -2008,14 +2010,14 @@ ModuleDecl *ModuleFile::getModule(ArrayRef<Identifier> name,
   // FIXME: duplicated from NameBinder::getModule
   if (name.size() == 1 &&
       name.front() == FileContext->getParentModule()->getName()) {
-    if (!ShadowedModule && allowLoading) {
+    if (!UnderlyingModule && allowLoading) {
       auto importer = getContext().getClangModuleLoader();
       assert(importer && "no way to import shadowed module");
-      ShadowedModule = importer->loadModule(SourceLoc(),
-                                            { { name.front(), SourceLoc() } });
+      UnderlyingModule = importer->loadModule(SourceLoc(),
+                                              {{name.front(), SourceLoc()}});
     }
 
-    return ShadowedModule;
+    return UnderlyingModule;
   }
 
   SmallVector<ImportDecl::AccessPathElement, 4> importPath;
@@ -2299,13 +2301,23 @@ class swift::DeclDeserializer {
     AttrsNext = Attr->getMutableNext();
   };
 
-  void handleInherited(TypeDecl *nominal, ArrayRef<uint64_t> rawInheritedIDs) {
-    auto inheritedTypes = ctx.Allocate<TypeLoc>(rawInheritedIDs.size());
-    for_each(inheritedTypes, rawInheritedIDs,
-             [this](TypeLoc &tl, uint64_t rawID) {
-       tl = TypeLoc::withoutLoc(MF.getType(rawID));
-    });
-    nominal->setInherited(inheritedTypes);
+  void handleInherited(llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
+                       ArrayRef<uint64_t> rawInheritedIDs) {
+    SmallVector<TypeLoc, 2> inheritedTypes;
+    for (auto rawID : rawInheritedIDs) {
+      auto maybeType = MF.getTypeChecked(rawID);
+      if (!maybeType) {
+        llvm::consumeError(maybeType.takeError());
+        continue;
+      }
+      inheritedTypes.push_back(TypeLoc::withoutLoc(MF.getType(rawID)));
+    }
+
+    auto inherited = ctx.AllocateCopy(inheritedTypes);
+    if (auto *typeDecl = decl.dyn_cast<TypeDecl *>())
+      typeDecl->setInherited(inherited);
+    else
+      decl.get<ExtensionDecl *>()->setInherited(inherited);
   }
 
 public:
@@ -2486,14 +2498,25 @@ public:
     bool isObjC;
     GenericEnvironmentID genericEnvID;
     uint8_t rawAccessLevel;
-    unsigned numConformances;
-    ArrayRef<uint64_t> rawInheritedIDs;
+    unsigned numConformances, numInheritedTypes;
+    ArrayRef<uint64_t> rawInheritedAndDependencyIDs;
 
     decls_block::StructLayout::readRecord(scratch, nameID, contextID,
                                           isImplicit, isObjC, genericEnvID,
                                           rawAccessLevel,
-                                          numConformances,
-                                          rawInheritedIDs);
+                                          numConformances, numInheritedTypes,
+                                          rawInheritedAndDependencyIDs);
+
+    Identifier name = MF.getIdentifier(nameID);
+
+    for (TypeID dependencyID :
+           rawInheritedAndDependencyIDs.slice(numInheritedTypes)) {
+      auto dependency = MF.getTypeChecked(dependencyID);
+      if (!dependency) {
+        return llvm::make_error<TypeError>(
+            name, takeErrorInfo(dependency.takeError()));
+      }
+    }
 
     auto DC = MF.getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -2503,10 +2526,8 @@ public:
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto theStruct = MF.createDecl<StructDecl>(SourceLoc(),
-                                               MF.getIdentifier(nameID),
-                                               SourceLoc(), None, genericParams,
-                                               DC);
+    auto theStruct = MF.createDecl<StructDecl>(SourceLoc(), name, SourceLoc(),
+                                               None, genericParams, DC);
     declOrOffset = theStruct;
 
     // Read the generic environment.
@@ -2526,7 +2547,8 @@ public:
 
     theStruct->computeType();
 
-    handleInherited(theStruct, rawInheritedIDs);
+    handleInherited(theStruct,
+                    rawInheritedAndDependencyIDs.slice(0, numInheritedTypes));
 
     theStruct->setMemberLoader(&MF, MF.DeclTypeCursor.GetCurrentBitNo());
     skipRecord(MF.DeclTypeCursor, decls_block::MEMBERS);
@@ -2664,13 +2686,13 @@ public:
     DeclContextID contextID;
     bool isImplicit, isObjC, isStatic, hasNonPatternBindingInit;
     bool isGetterMutating, isSetterMutating;
-    unsigned rawSpecifier, numAccessors;
+    unsigned rawSpecifier, numAccessors, numBackingProperties;
     uint8_t readImpl, writeImpl, readWriteImpl, opaqueReadOwnership;
     uint8_t rawAccessLevel, rawSetterAccessLevel;
     TypeID interfaceTypeID;
     ModuleFile::AccessorRecord accessors;
     DeclID overriddenID, opaqueReturnTypeID;
-    ArrayRef<uint64_t> accessorAndDependencyIDs;
+    ArrayRef<uint64_t> arrayFieldIDs;
 
     decls_block::VarLayout::readRecord(scratch, nameID, contextID,
                                        isImplicit, isObjC, isStatic, rawSpecifier,
@@ -2683,7 +2705,8 @@ public:
                                        overriddenID,
                                        rawAccessLevel, rawSetterAccessLevel,
                                        opaqueReturnTypeID,
-                                       accessorAndDependencyIDs);
+                                       numBackingProperties,
+                                       arrayFieldIDs);
 
     Identifier name = MF.getIdentifier(nameID);
 
@@ -2693,13 +2716,17 @@ public:
       return llvm::make_error<OverrideError>(name);
     }
 
-    // Exctract the accessor IDs.
-    for (DeclID accessorID : accessorAndDependencyIDs.slice(0, numAccessors)) {
+    // Extract the accessor IDs.
+    for (DeclID accessorID : arrayFieldIDs.slice(0, numAccessors)) {
       accessors.IDs.push_back(accessorID);
     }
-    accessorAndDependencyIDs = accessorAndDependencyIDs.slice(numAccessors);
+    arrayFieldIDs = arrayFieldIDs.slice(numAccessors);
 
-    for (TypeID dependencyID : accessorAndDependencyIDs) {
+    // Extract the backing property IDs.
+    auto backingPropertyIDs = arrayFieldIDs.slice(0, numBackingProperties);
+    arrayFieldIDs = arrayFieldIDs.slice(numBackingProperties);
+
+    for (TypeID dependencyID : arrayFieldIDs) {
       auto dependency = MF.getTypeChecked(dependencyID);
       if (!dependency) {
         // Stored properties in classes still impact class object layout because
@@ -2787,7 +2814,28 @@ public:
       var->setOpaqueResultTypeDecl(
                          cast<OpaqueTypeDecl>(MF.getDecl(opaqueReturnTypeID)));
     }
-    
+
+    // If there are any backing properties, record the
+    if (numBackingProperties > 0) {
+      VarDecl *backingVar = cast<VarDecl>(MF.getDecl(backingPropertyIDs[0]));
+      VarDecl *storageWrapperVar = nullptr;
+      if (numBackingProperties > 1) {
+        storageWrapperVar = cast<VarDecl>(MF.getDecl(backingPropertyIDs[1]));
+      }
+
+      PropertyWrapperBackingPropertyInfo info(
+          backingVar, storageWrapperVar, nullptr, nullptr, nullptr);
+      ctx.evaluator.cacheOutput(
+          PropertyWrapperBackingPropertyInfoRequest{var}, std::move(info));
+      ctx.evaluator.cacheOutput(
+          PropertyWrapperBackingPropertyTypeRequest{var},
+          backingVar->getInterfaceType());
+      backingVar->setOriginalWrappedProperty(var);
+
+      if (storageWrapperVar)
+        storageWrapperVar->setOriginalWrappedProperty(var);
+    }
+
     return var;
   }
 
@@ -3390,15 +3438,27 @@ public:
     GenericEnvironmentID genericEnvID;
     TypeID superclassID;
     uint8_t rawAccessLevel;
-    unsigned numConformances;
-    ArrayRef<uint64_t> rawInheritedIDs;
+    unsigned numConformances, numInheritedTypes;
+    ArrayRef<uint64_t> rawInheritedAndDependencyIDs;
     decls_block::ClassLayout::readRecord(scratch, nameID, contextID,
                                          isImplicit, isObjC,
                                          requiresStoredPropertyInits,
                                          inheritsSuperclassInitializers,
                                          genericEnvID, superclassID,
                                          rawAccessLevel, numConformances,
-                                         rawInheritedIDs);
+                                         numInheritedTypes,
+                                         rawInheritedAndDependencyIDs);
+
+    Identifier name = MF.getIdentifier(nameID);
+
+    for (TypeID dependencyID :
+           rawInheritedAndDependencyIDs.slice(numInheritedTypes)) {
+      auto dependency = MF.getTypeChecked(dependencyID);
+      if (!dependency) {
+        return llvm::make_error<TypeError>(
+            name, takeErrorInfo(dependency.takeError()));
+      }
+    }
 
     auto DC = MF.getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -3408,10 +3468,8 @@ public:
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto theClass = MF.createDecl<ClassDecl>(SourceLoc(),
-                                             MF.getIdentifier(nameID),
-                                             SourceLoc(), None, genericParams,
-                                             DC);
+    auto theClass = MF.createDecl<ClassDecl>(SourceLoc(), name, SourceLoc(),
+                                             None, genericParams, DC);
     declOrOffset = theClass;
 
     MF.configureGenericEnvironment(theClass, genericEnvID);
@@ -3435,7 +3493,8 @@ public:
 
     theClass->computeType();
 
-    handleInherited(theClass, rawInheritedIDs);
+    handleInherited(theClass,
+                    rawInheritedAndDependencyIDs.slice(0, numInheritedTypes));
 
     theClass->setMemberLoader(&MF, MF.DeclTypeCursor.GetCurrentBitNo());
     theClass->setHasDestructor();
@@ -3458,13 +3517,13 @@ public:
     GenericEnvironmentID genericEnvID;
     TypeID rawTypeID;
     uint8_t rawAccessLevel;
-    unsigned numConformances, numInheritedTypes;
+    unsigned numConformances, numInherited;
     ArrayRef<uint64_t> rawInheritedAndDependencyIDs;
 
     decls_block::EnumLayout::readRecord(scratch, nameID, contextID,
                                         isImplicit, isObjC, genericEnvID,
                                         rawTypeID, rawAccessLevel,
-                                        numConformances, numInheritedTypes,
+                                        numConformances, numInherited,
                                         rawInheritedAndDependencyIDs);
 
     auto DC = MF.getDeclContext(contextID);
@@ -3473,7 +3532,7 @@ public:
 
     Identifier name = MF.getIdentifier(nameID);
     for (TypeID dependencyID :
-           rawInheritedAndDependencyIDs.slice(numInheritedTypes)) {
+           rawInheritedAndDependencyIDs.slice(numInherited)) {
       auto dependency = MF.getTypeChecked(dependencyID);
       if (!dependency) {
         return llvm::make_error<TypeError>(
@@ -3508,8 +3567,8 @@ public:
 
     theEnum->computeType();
 
-    handleInherited(theEnum,
-                    rawInheritedAndDependencyIDs.slice(0, numInheritedTypes));
+    auto rawInheritedIDs = rawInheritedAndDependencyIDs.slice(0, numInherited);
+    handleInherited(theEnum, rawInheritedIDs);
 
     theEnum->setMemberLoader(&MF, MF.DeclTypeCursor.GetCurrentBitNo());
     skipRecord(MF.DeclTypeCursor, decls_block::MEMBERS);
@@ -3767,12 +3826,8 @@ public:
     if (isImplicit)
       extension->setImplicit();
 
-    auto inheritedTypes = ctx.Allocate<TypeLoc>(numInherited);
-    for_each(inheritedTypes, inheritedAndDependencyIDs.slice(0, numInherited),
-             [this](TypeLoc &tl, uint64_t rawID) {
-      tl = TypeLoc::withoutLoc(MF.getType(rawID));
-    });
-    extension->setInherited(inheritedTypes);
+    auto rawInheritedIDs = inheritedAndDependencyIDs.slice(0, numInherited);
+    handleInherited(extension, rawInheritedIDs);
 
     extension->setMemberLoader(&MF, MF.DeclTypeCursor.GetCurrentBitNo());
     skipRecord(MF.DeclTypeCursor, decls_block::MEMBERS);

@@ -685,8 +685,13 @@ private:
                                     PotentialReason::forDefaultArgument());
     }
 
-    // If this argument is `nil` literal or `.none`,
-    // it doesn't cause the call to throw.
+    // If this argument is `nil` literal, it doesn't cause the call to throw.
+    if (isa<NilLiteralExpr>(arg)) {
+      if (arg->getType()->getOptionalObjectType())
+        return Classification();
+    }
+
+    // Neither does 'Optional<T>.none'.
     if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(arg)) {
       if (auto *DE = dyn_cast<DeclRefExpr>(DSCE->getFn())) {
         auto &ctx = paramType->getASTContext();
@@ -1664,7 +1669,7 @@ void TypeChecker::checkEnumElementErrorHandling(EnumElementDecl *elt) {
   }
 }
 
-void TypeChecker::checkPropertyDelegateErrorHandling(
+void TypeChecker::checkPropertyWrapperErrorHandling(
     PatternBindingDecl *binding, Expr *expr) {
   CheckErrorCoverage checker(*this, Context::forPatternBinding(binding));
   expr->walk(checker);

@@ -1274,9 +1274,10 @@ public:
   }
 
   StringRef getObjCSelectorName(const Decl *D, SmallString<64> &Buf) {
-    // We only vend the selector name for @IBAction methods.
+    // We only vend the selector name for @IBAction and @IBSegueAction methods.
     if (auto FuncD = dyn_cast_or_null<FuncDecl>(D)) {
-      if (FuncD->getAttrs().hasAttribute<IBActionAttr>())
+      if (FuncD->getAttrs().hasAttribute<IBActionAttr>() ||
+          FuncD->getAttrs().hasAttribute<IBSegueActionAttr>())
         return FuncD->getObjCSelector().getString(Buf);
     }
     return StringRef();
@@ -1904,10 +1905,12 @@ void SwiftEditorDocument::applyFormatOptions(OptionsDictionary &FmtOptions) {
   static UIdent KeyUseTabs("key.editor.format.usetabs");
   static UIdent KeyIndentWidth("key.editor.format.indentwidth");
   static UIdent KeyTabWidth("key.editor.format.tabwidth");
+  static UIdent KeyIndentSwitchCase("key.editor.format.indent_switch_case");
 
   FmtOptions.valueForOption(KeyUseTabs, Impl.FormatOptions.UseTabs);
   FmtOptions.valueForOption(KeyIndentWidth, Impl.FormatOptions.IndentWidth);
   FmtOptions.valueForOption(KeyTabWidth, Impl.FormatOptions.TabWidth);
+  FmtOptions.valueForOption(KeyIndentSwitchCase, Impl.FormatOptions.IndentSwitchCase);
 }
 
 const CodeFormatOptions &SwiftEditorDocument::getFormatOptions() {

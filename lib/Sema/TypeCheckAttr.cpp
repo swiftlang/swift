@@ -25,13 +25,14 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
-#include "swift/AST/PropertyDelegates.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "clang/Basic/CharInfo.h"
 #include "llvm/Support/Debug.h"
+#include "clang/Basic/CharInfo.h"
 
 using namespace swift;
 
@@ -129,7 +130,8 @@ public:
   IGNORED_ATTR(DynamicReplacement)
   IGNORED_ATTR(PrivateImport)
   IGNORED_ATTR(Custom)
-  IGNORED_ATTR(PropertyDelegate)
+  IGNORED_ATTR(PropertyWrapper)
+  IGNORED_ATTR(DisfavoredOverload)
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
@@ -223,6 +225,7 @@ public:
   }
 
   void visitIBActionAttr(IBActionAttr *attr);
+  void visitIBSegueActionAttr(IBSegueActionAttr *attr);
   void visitLazyAttr(LazyAttr *attr);
   void visitIBDesignableAttr(IBDesignableAttr *attr);
   void visitIBInspectableAttr(IBInspectableAttr *attr);
@@ -327,22 +330,26 @@ void AttributeEarlyChecker::visitMutationAttr(DeclAttribute *attr) {
 }
 
 void AttributeEarlyChecker::visitDynamicAttr(DynamicAttr *attr) {
-  // Members cannot be both dynamic and @nonobjc.
-  if (D->getAttrs().hasAttribute<NonObjCAttr>())
-    diagnoseAndRemoveAttr(attr, diag::dynamic_with_nonobjc);
-
   // Members cannot be both dynamic and @_transparent.
-  if (D->getASTContext().LangOpts.isSwiftVersionAtLeast(5) &&
-      D->getAttrs().hasAttribute<TransparentAttr>())
+  if (D->getAttrs().hasAttribute<TransparentAttr>())
     diagnoseAndRemoveAttr(attr, diag::dynamic_with_transparent);
 }
 
 
 void AttributeEarlyChecker::visitIBActionAttr(IBActionAttr *attr) {
-  // Only instance methods returning () can be IBActions.
+  // Only instance methods can be IBActions.
   const FuncDecl *FD = cast<FuncDecl>(D);
   if (!FD->isPotentialIBActionTarget())
-    diagnoseAndRemoveAttr(attr, diag::invalid_ibaction_decl);
+    diagnoseAndRemoveAttr(attr, diag::invalid_ibaction_decl,
+                          attr->getAttrName());
+}
+
+void AttributeEarlyChecker::visitIBSegueActionAttr(IBSegueActionAttr *attr) {
+  // Only instance methods can be IBActions.
+  const FuncDecl *FD = cast<FuncDecl>(D);
+  if (!FD->isPotentialIBActionTarget())
+    diagnoseAndRemoveAttr(attr, diag::invalid_ibaction_decl,
+                          attr->getAttrName());
 }
 
 void AttributeEarlyChecker::visitIBDesignableAttr(IBDesignableAttr *attr) {
@@ -724,25 +731,6 @@ void TypeChecker::checkDeclAttributesEarly(Decl *D) {
   }
 }
 
-/// Determine whether the given string is an attribute name that is
-/// reserved for the implementation.
-static bool isReservedAttributeName(StringRef name) {
-  for (unsigned i : indices(name)) {
-    if (name[i] == '_')
-      continue;
-
-    // First character is lowercase; reserved.
-    if (clang::isLowercase(name[i]))
-      return true;
-
-    // Everything else is reserved.
-    return false;
-  }
-
-  // All underscores is reserved.
-  return true;
-}
-
 namespace {
 class AttributeChecker : public AttributeVisitor<AttributeChecker> {
   TypeChecker &TC;
@@ -812,6 +800,7 @@ public:
     IGNORED_ATTR(Transparent)
     IGNORED_ATTR(WarnUnqualifiedAccess)
     IGNORED_ATTR(WeakLinked)
+    IGNORED_ATTR(DisfavoredOverload)
 #undef IGNORED_ATTR
 
   void visitAvailableAttr(AvailableAttr *attr);
@@ -824,6 +813,7 @@ public:
   
   void visitFinalAttr(FinalAttr *attr);
   void visitIBActionAttr(IBActionAttr *attr);
+  void visitIBSegueActionAttr(IBSegueActionAttr *attr);
   void visitNSCopyingAttr(NSCopyingAttr *attr);
   void visitRequiredAttr(RequiredAttr *attr);
   void visitRethrowsAttr(RethrowsAttr *attr);
@@ -863,38 +853,10 @@ public:
 
   void visitNonOverrideAttr(NonOverrideAttr *attr);
   void visitCustomAttr(CustomAttr *attr);
-  void visitPropertyDelegateAttr(PropertyDelegateAttr *attr);
+  void visitPropertyWrapperAttr(PropertyWrapperAttr *attr);
 };
 } // end anonymous namespace
 
-
-static bool checkObjectOrOptionalObjectType(TypeChecker &TC, Decl *D,
-                                            ParamDecl *param) {
-  Type ty = param->getType();
-  if (auto unwrapped = ty->getOptionalObjectType())
-    ty = unwrapped;
-
-  if (auto classDecl = ty->getClassOrBoundGenericClass()) {
-    // @objc class types are okay.
-    if (!classDecl->isObjC()) {
-      TC.diagnose(D, diag::ibaction_nonobjc_class_argument,
-                  param->getType())
-        .highlight(param->getSourceRange());
-      return true;
-    }
-  } else if (ty->isObjCExistentialType() || ty->isAny()) {
-    // @objc existential types are okay, as is Any.
-    // Nothing to do.
-  } else {
-    // No other types are permitted.
-    TC.diagnose(D, diag::ibaction_nonobject_argument,
-                param->getType())
-      .highlight(param->getSourceRange());
-    return true;
-  }
-
-  return false;
-}
 
 static bool isiOS(TypeChecker &TC) {
   return TC.getLangOpts().Target.isiOS();
@@ -1122,72 +1084,124 @@ visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
   }
 }
 
+static bool
+validateIBActionSignature(TypeChecker &TC, DeclAttribute *attr, FuncDecl *FD,
+                          unsigned minParameters, unsigned maxParameters,
+                          bool hasVoidResult = true) {
+  bool valid = true;
+
+  auto arity = FD->getParameters()->size();
+  auto resultType = FD->getResultInterfaceType();
+
+  if (arity < minParameters || arity > maxParameters) {
+    auto diagID = diag::invalid_ibaction_argument_count;
+    if (minParameters == maxParameters)
+      diagID = diag::invalid_ibaction_argument_count_exact;
+    else if (minParameters == 0)
+      diagID = diag::invalid_ibaction_argument_count_max;
+    TC.diagnose(FD, diagID, attr->getAttrName(), minParameters, maxParameters);
+    valid = false;
+  }
+
+  if (resultType->isVoid() != hasVoidResult) {
+    TC.diagnose(FD, diag::invalid_ibaction_result, attr->getAttrName(),
+                hasVoidResult);
+    valid = false;
+  }
+
+  // We don't need to check here that parameter or return types are
+  // ObjC-representable; IsObjCRequest will validate that.
+
+  if (!valid)
+    attr->setInvalid();
+  return valid;
+}
+
 void AttributeChecker::visitIBActionAttr(IBActionAttr *attr) {
-  // IBActions instance methods must have type Class -> (...) -> ().
   auto *FD = cast<FuncDecl>(D);
-  Type CurriedTy = FD->getMethodInterfaceType();
-  Type ResultTy = CurriedTy->castTo<AnyFunctionType>()->getResult();
-  if (!ResultTy->isEqual(TupleType::getEmpty(TC.Context))) {
-    TC.diagnose(D, diag::invalid_ibaction_result, ResultTy);
-    attr->setInvalid();
+
+  if (isRelaxedIBAction(TC))
+    // iOS, tvOS, and watchOS allow 0-2 parameters to an @IBAction method.
+    validateIBActionSignature(TC, attr, FD, /*minParams=*/0, /*maxParams=*/2);
+  else
+    // macOS allows 1 parameter to an @IBAction method.
+    validateIBActionSignature(TC, attr, FD, /*minParams=*/1, /*maxParams=*/1);
+}
+
+void AttributeChecker::visitIBSegueActionAttr(IBSegueActionAttr *attr) {
+  auto *FD = cast<FuncDecl>(D);
+  if (!validateIBActionSignature(TC, attr, FD,
+                                 /*minParams=*/1, /*maxParams=*/3,
+                                 /*hasVoidResult=*/false))
     return;
-  }
 
-  auto paramList = FD->getParameters();
-  bool relaxedIBActionUsedOnOSX = false;
-  bool Valid = true;
-  switch (paramList->size()) {
-  case 0:
-    // (iOS only) No arguments.
-    if (!isRelaxedIBAction(TC)) {
-      relaxedIBActionUsedOnOSX = true;
-      break;
-    }
+  // If the IBSegueAction method's selector belongs to one of the ObjC method
+  // families (like -newDocumentSegue: or -copyScreen), it would return the
+  // object at +1, but the caller would expect it to be +0 and would therefore
+  // leak it.
+  //
+  // To prevent that, diagnose if the selector belongs to one of the method
+  // families and suggest that the user change the Swift name or Obj-C selector.
+  auto currentSelector = FD->getObjCSelector();
+
+  SmallString<32> prefix("make");
+
+  switch (currentSelector.getSelectorFamily()) {
+  case ObjCSelectorFamily::None:
+    // No error--exit early.
+    return;
+
+  case ObjCSelectorFamily::Alloc:
+  case ObjCSelectorFamily::Init:
+  case ObjCSelectorFamily::New:
+    // Fix-it will replace the "alloc"/"init"/"new" in the selector with "make".
     break;
-  case 1:
-    // One argument. May be a scalar on iOS/watchOS (because of WatchKit).
-    if (isRelaxedIBAction(TC)) {
-      // Do a rough check to allow any ObjC-representable struct or enum type
-      // on iOS.
-      Type ty = paramList->get(0)->getType();
-      if (auto nominal = ty->getAnyNominal())
-        if (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal))
-          if (!nominal->isOptionalDecl())
-            if (ty->isTriviallyRepresentableIn(ForeignLanguage::ObjectiveC,
-                                               cast<FuncDecl>(D)))
-              break;  // Looks ok.
-    }
-    if (checkObjectOrOptionalObjectType(TC, D, paramList->get(0)))
-      Valid = false;
+
+  case ObjCSelectorFamily::Copy:
+    // Fix-it will replace the "copy" in the selector with "makeCopy".
+    prefix += "Copy";
     break;
-  case 2:
-    // (iOS/watchOS only) Two arguments, the second of which is a UIEvent.
-    // We don't currently enforce the UIEvent part.
-    if (!isRelaxedIBAction(TC)) {
-      relaxedIBActionUsedOnOSX = true;
-      break;
-    }
-    if (checkObjectOrOptionalObjectType(TC, D, paramList->get(0)))
-      Valid = false;
-    if (checkObjectOrOptionalObjectType(TC, D, paramList->get(1)))
-      Valid = false;
-    break;
-  default:
-    // No platform allows an action signature with more than two arguments.
-    TC.diagnose(D, diag::invalid_ibaction_argument_count,
-                isRelaxedIBAction(TC));
-    Valid = false;
+
+  case ObjCSelectorFamily::MutableCopy:
+    // Fix-it will replace the "mutable" in the selector with "makeMutable".
+    prefix += "Mutable";
     break;
   }
 
-  if (relaxedIBActionUsedOnOSX) {
-    TC.diagnose(D, diag::invalid_ibaction_argument_count,
-                /*relaxedIBAction=*/false);
-    Valid = false;
+  // Emit the actual error.
+  TC.diagnose(FD, diag::ibsegueaction_objc_method_family,
+              attr->getAttrName(), currentSelector);
+
+  // The rest of this is just fix-it generation.
+
+  /// Replaces the first word of \c oldName with the prefix, where "word" is a
+  /// sequence of lowercase characters.
+  auto replacingPrefix = [&](Identifier oldName) -> Identifier {
+    SmallString<32> scratch = prefix;
+    scratch += oldName.str().drop_while(clang::isLowercase);
+    return TC.Context.getIdentifier(scratch);
+  };
+
+  // Suggest changing the Swift name of the method, unless there is already an
+  // explicit selector.
+  if (!FD->getAttrs().hasAttribute<ObjCAttr>() ||
+      !FD->getAttrs().getAttribute<ObjCAttr>()->hasName()) {
+    auto newSwiftBaseName = replacingPrefix(FD->getBaseName().getIdentifier());
+    auto argumentNames = FD->getFullName().getArgumentNames();
+    DeclName newSwiftName(TC.Context, newSwiftBaseName, argumentNames);
+
+    auto diag = TC.diagnose(FD, diag::fixit_rename_in_swift, newSwiftName);
+    fixDeclarationName(diag, FD, newSwiftName);
   }
 
-  if (!Valid)
-    attr->setInvalid();
+  // Suggest changing just the selector to one with a different first piece.
+  auto oldPieces = currentSelector.getSelectorPieces();
+  SmallVector<Identifier, 4> newPieces(oldPieces.begin(), oldPieces.end());
+  newPieces[0] = replacingPrefix(newPieces[0]);
+  ObjCSelector newSelector(TC.Context, currentSelector.getNumArgs(), newPieces);
+
+  auto diag = TC.diagnose(FD, diag::fixit_rename_in_objc, newSelector);
+  fixDeclarationObjCName(diag, FD, currentSelector, newSelector);
 }
 
 /// Get the innermost enclosing declaration for a declaration.
@@ -1410,7 +1424,7 @@ void AttributeChecker::visitNSCopyingAttr(NSCopyingAttr *attr) {
   }
 
   if (VD->hasInterfaceType()) {
-    if (TC.checkConformanceToNSCopying(VD)) {
+    if (!TC.checkConformanceToNSCopying(VD)) {
       attr->setInvalid();
       return;
     }
@@ -1960,6 +1974,11 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
 }
 
 void AttributeChecker::visitFixedLayoutAttr(FixedLayoutAttr *attr) {
+  if (isa<StructDecl>(D)) {
+    TC.diagnose(attr->getLocation(), diag::fixed_layout_struct)
+      .fixItReplace(attr->getRange(), "@frozen");
+  }  
+
   auto *VD = cast<ValueDecl>(D);
 
   if (VD->getFormalAccess() < AccessLevel::Public &&
@@ -2465,16 +2484,25 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
 }
 
 void AttributeChecker::visitFrozenAttr(FrozenAttr *attr) {
-  auto *ED = cast<EnumDecl>(D);
+  if (auto *ED = dyn_cast<EnumDecl>(D)) {
+    if (!ED->getModuleContext()->isResilient()) {
+      diagnoseAndRemoveAttr(attr, diag::enum_frozen_nonresilient, attr);
+      return;
+    }
 
-  if (!ED->getModuleContext()->isResilient()) {
-    diagnoseAndRemoveAttr(attr, diag::enum_frozen_nonresilient, attr);
-    return;
+    if (ED->getFormalAccess() < AccessLevel::Public &&
+        !ED->getAttrs().hasAttribute<UsableFromInlineAttr>()) {
+      diagnoseAndRemoveAttr(attr, diag::enum_frozen_nonpublic, attr);
+      return;
+    }
   }
 
-  if (ED->getFormalAccess() < AccessLevel::Public &&
-      !ED->getAttrs().hasAttribute<UsableFromInlineAttr>()) {
-    diagnoseAndRemoveAttr(attr, diag::enum_frozen_nonpublic, attr);
+  auto *VD = cast<ValueDecl>(D);
+
+  if (VD->getFormalAccess() < AccessLevel::Public &&
+      !VD->getAttrs().hasAttribute<UsableFromInlineAttr>()) {
+    diagnoseAndRemoveAttr(attr, diag::frozen_attr_on_internal_type,
+                          VD->getFullName(), VD->getFormalAccess());
   }
 }
 
@@ -2508,26 +2536,26 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
     return;
   }
 
-  // If the nominal type is a property delegate type, we can be delegating
+  // If the nominal type is a property wrapper type, we can be delegating
   // through a property.
-  if (nominal->getPropertyDelegateTypeInfo()) {
-    // Property delegates can only be applied to variables
+  if (nominal->getPropertyWrapperTypeInfo()) {
+    // property wrappers can only be applied to variables
     if (!isa<VarDecl>(D) || isa<ParamDecl>(D)) {
       TC.diagnose(attr->getLocation(),
-                  diag::property_delegate_attribute_not_on_property,
+                  diag::property_wrapper_attribute_not_on_property,
                   nominal->getFullName());
       attr->setInvalid();
       return;
     }
 
-    // If this attribute isn't the one that attached a property delegate to
+    // If this attribute isn't the one that attached a property wrapper to
     // this property, complain.
     auto var = cast<VarDecl>(D);
-    if (auto attached = var->getAttachedPropertyDelegate()) {
+    if (auto attached = var->getAttachedPropertyWrapper()) {
       if (attached != attr) {
-        TC.diagnose(attr->getLocation(), diag::property_delegate_multiple);
+        TC.diagnose(attr->getLocation(), diag::property_wrapper_multiple);
         TC.diagnose(attached->getLocation(),
-                    diag::previous_property_delegate_here);
+                    diag::previous_property_wrapper_here);
         return;
       }
     }
@@ -2548,18 +2576,13 @@ void TypeChecker::checkParameterAttributes(ParameterList *params) {
   }
 }
 
-void AttributeChecker::visitPropertyDelegateAttr(PropertyDelegateAttr *attr) {
+void AttributeChecker::visitPropertyWrapperAttr(PropertyWrapperAttr *attr) {
   auto nominal = dyn_cast<NominalTypeDecl>(D);
   if (!nominal)
     return;
 
-  // Force checking of the property delegate type.
-  (void)nominal->getPropertyDelegateTypeInfo();
-
-  // Make sure the name isn't reserved.
-  if (isReservedAttributeName(nominal->getName().str())) {
-    nominal->diagnose(diag::property_delegate_reserved_name);
-  }
+  // Force checking of the property wrapper type.
+  (void)nominal->getPropertyWrapperTypeInfo();
 }
 
 void TypeChecker::checkDeclAttributes(Decl *D) {
@@ -2709,6 +2732,14 @@ TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D) {
   return None;
 }
 
+static bool shouldBlockImplicitDynamic(Decl *D) {
+  if (D->getAttrs().hasAttribute<NonObjCAttr>() ||
+      D->getAttrs().hasAttribute<SILGenNameAttr>() ||
+      D->getAttrs().hasAttribute<TransparentAttr>() ||
+      D->getAttrs().hasAttribute<InlinableAttr>())
+    return true;
+  return false;
+}
 void TypeChecker::addImplicitDynamicAttribute(Decl *D) {
   if (!D->getModuleContext()->isImplicitDynamicEnabled())
     return;
@@ -2719,10 +2750,9 @@ void TypeChecker::addImplicitDynamicAttribute(Decl *D) {
       isa<AccessorDecl>(D))
     return;
 
-  if (D->getAttrs().hasAttribute<NonObjCAttr>() ||
-      D->getAttrs().hasAttribute<TransparentAttr>() ||
-      D->getAttrs().hasAttribute<InlinableAttr>())
-    return;
+  // Don't add dynamic if decl is inlinable or tranparent.
+  if (shouldBlockImplicitDynamic(D))
+   return;
 
   if (auto *FD = dyn_cast<FuncDecl>(D)) {
     // Don't add dynamic to defer bodies.
@@ -2731,6 +2761,18 @@ void TypeChecker::addImplicitDynamicAttribute(Decl *D) {
     // Don't add dynamic to functions with a cdecl.
     if (FD->getAttrs().hasAttribute<CDeclAttr>())
       return;
+    // Don't add dynamic to local function definitions.
+    if (!FD->getDeclContext()->isTypeContext() &&
+        FD->getDeclContext()->isLocalContext())
+      return;
+  }
+
+  // Don't add dynamic if accessor is inlinable or tranparent.
+  if (auto *asd = dyn_cast<AbstractStorageDecl>(D)) {
+    for (auto *accessor : asd->getAllAccessors()) {
+      if (!accessor->isImplicit() && shouldBlockImplicitDynamic(accessor))
+        return;
+    }
   }
 
   if (auto *VD = dyn_cast<VarDecl>(D)) {

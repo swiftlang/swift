@@ -229,7 +229,8 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   }
 
   // Register the defaulted type variables.
-  DefaultedConstraints.append(solution.DefaultedConstraints.begin(),
+  DefaultedConstraints.insert(DefaultedConstraints.end(),
+                              solution.DefaultedConstraints.begin(),
                               solution.DefaultedConstraints.end());
 
   // Register the conformances checked along the way to arrive to solution.
@@ -309,6 +310,12 @@ bool ConstraintSystem::simplify(bool ContinueAfterFailures) {
 }
 
 namespace {
+
+template<typename T>
+void truncate(std::vector<T> &vec, unsigned newSize) {
+  assert(newSize <= vec.size() && "Not a truncation!");
+  vec.erase(vec.begin() + newSize, vec.end());
+}
 
 /// Truncate the given small vector to the given new size.
 template<typename T>
@@ -1995,6 +2002,9 @@ static Constraint *tryOptimizeGenericDisjunction(
     if (!AFD || !AFD->isGeneric())
       return false;
 
+    if (AFD->getAttrs().hasAttribute<DisfavoredOverloadAttr>())
+      return false;
+
     auto funcType = AFD->getInterfaceType();
     auto hasAnyOrOptional = funcType.findIf([](Type type) -> bool {
       if (type->getOptionalObjectType())
@@ -2025,6 +2035,7 @@ static Constraint *tryOptimizeGenericDisjunction(
   case Comparison::Unordered:
     return nullptr;
   }
+  llvm_unreachable("covered switch");
 }
 
 void ConstraintSystem::partitionDisjunction(
@@ -2082,11 +2093,9 @@ void ConstraintSystem::partitionDisjunction(
     forEachChoice(Choices, [&](unsigned index, Constraint *constraint) -> bool {
       if (constraint->getKind() != ConstraintKind::BindOverload)
         return false;
-      if (!constraint->getOverloadChoice().isDecl())
-        return false;
 
-      auto *decl = constraint->getOverloadChoice().getDecl();
-      auto *funcDecl = dyn_cast<FuncDecl>(decl);
+      auto *decl = constraint->getOverloadChoice().getDeclOrNull();
+      auto *funcDecl = dyn_cast_or_null<FuncDecl>(decl);
       if (!funcDecl)
         return false;
 
