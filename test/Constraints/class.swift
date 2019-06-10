@@ -39,3 +39,15 @@ class X {
 var x0 = X()
 var x1 = X(x: 1, y: "2")
 
+func rdar_51528927() {
+  class A {}
+
+  class B : A {}
+  class C : A {}
+  class D : B {}
+
+  func test<T: A>(_ arr: [T.Type]) {}
+
+  test([B.self, C.self]) // Ok (since B and C have a common supertype A)
+  test([B.self, C.self, D.self]) // Ok
+}

@@ -2531,14 +2531,18 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       // P.Type < Q.Type if P < Q, both P and Q are protocols, and P.Type
       // and Q.Type are both existential metatypes
       auto subKind = std::min(kind, ConstraintKind::Subtype);
-      // If instance types can't have a subtype relationship
-      // it means that such types can be simply equated.
       auto instanceType1 = meta1->getInstanceType();
       auto instanceType2 = meta2->getInstanceType();
+
       if (isa<MetatypeType>(meta1) &&
-          !(instanceType1->mayHaveSuperclass() &&
-            instanceType2->getClassOrBoundGenericClass())) {
-        subKind = ConstraintKind::Bind;
+          !(instanceType1->isTypeVariableOrMember() ||
+            instanceType2->isTypeVariableOrMember())) {
+        // If instance types can't have a subtype relationship
+        // it means that such types can be simply equated.
+        if (!(instanceType1->mayHaveSuperclass() &&
+              instanceType2->getClassOrBoundGenericClass())) {
+          subKind = ConstraintKind::Bind;
+        }
       }
 
       return matchTypes(
