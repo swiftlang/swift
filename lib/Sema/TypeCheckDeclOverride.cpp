@@ -1331,7 +1331,7 @@ namespace  {
     UNINTERESTING_ATTR(HasInitialValue)
     UNINTERESTING_ATTR(ImplementationOnly)
     UNINTERESTING_ATTR(Custom)
-    UNINTERESTING_ATTR(PropertyDelegate)
+    UNINTERESTING_ATTR(PropertyWrapper)
     UNINTERESTING_ATTR(DisfavoredOverload)
 
 #undef UNINTERESTING_ATTR

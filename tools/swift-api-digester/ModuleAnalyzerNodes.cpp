@@ -20,6 +20,7 @@ static StringRef getAttrName(DeclAttrKind Kind) {
   case DAK_Count:
     llvm_unreachable("unrecognized attribute kind.");
   }
+  llvm_unreachable("covered switch");
 }
 } // End of anonymous namespace.
 
@@ -385,7 +386,15 @@ StringRef SDKNodeDecl::getScreenInfo() const {
     OS << "(" << HeaderName << ")";
   if (!OS.str().empty())
     OS << ": ";
-  OS << getDeclKind() << " " << getFullyQualifiedName();
+  bool IsExtension = false;
+  if (auto *TD = dyn_cast<SDKNodeDeclType>(this)) {
+    IsExtension = TD->isExternal();
+  }
+  if (IsExtension)
+    OS << "Extension";
+  else
+    OS << getDeclKind();
+  OS << " " << getFullyQualifiedName();
   return Ctx.buffer(OS.str());
 }
 
@@ -497,6 +506,7 @@ bool SDKNodeDeclType::isConformingTo(swift::ide::api::KnownProtocolKind Kind) co
           Conformances.end();
 #include "swift/IDE/DigesterEnums.def"
   }
+  llvm_unreachable("covered switch");
 }
 
 StringRef SDKNodeDeclAbstractFunc::getTypeRoleDescription(SDKContext &Ctx,
@@ -1137,6 +1147,8 @@ static bool isABIPlaceholderRecursive(Decl *D) {
 }
 
 StringRef SDKContext::getPlatformIntroVersion(Decl *D, PlatformKind Kind) {
+  if (!D)
+    return StringRef();
   for (auto *ATT: D->getAttrs()) {
     if (auto *AVA = dyn_cast<AvailableAttr>(ATT)) {
       if (AVA->Platform == Kind && AVA->Introduced) {
@@ -1144,10 +1156,12 @@ StringRef SDKContext::getPlatformIntroVersion(Decl *D, PlatformKind Kind) {
       }
     }
   }
-  return StringRef();
+  return getPlatformIntroVersion(D->getDeclContext()->getAsDecl(), Kind);
 }
 
 StringRef SDKContext::getLanguageIntroVersion(Decl *D) {
+  if (!D)
+    return StringRef();
   for (auto *ATT: D->getAttrs()) {
     if (auto *AVA = dyn_cast<AvailableAttr>(ATT)) {
       if (AVA->isLanguageVersionSpecific() && AVA->Introduced) {
@@ -1155,7 +1169,7 @@ StringRef SDKContext::getLanguageIntroVersion(Decl *D) {
       }
     }
   }
-  return StringRef();
+  return getLanguageIntroVersion(D->getDeclContext()->getAsDecl());
 }
 
 SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Type Ty, TypeInitInfo Info) :
@@ -1306,6 +1320,7 @@ case SDKNodeKind::X:                                                           \
   break;
 #include "swift/IDE/DigesterEnums.def"
   }
+  llvm_unreachable("covered switch");
 }
 
 // Recursively construct a node that represents a type, for instance,

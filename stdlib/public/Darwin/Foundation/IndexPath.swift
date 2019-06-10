@@ -218,8 +218,8 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
                     }
                 case .single(let index):
                     switch (range.lowerBound, range.upperBound) {
-                    case (0, 0): fallthrough
-                    case (1, 1):
+                    case (0, 0),
+                         (1, 1):
                         return .empty
                     case (0, 1):
                         return .single(index)
@@ -228,11 +228,9 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
                     }
                 case .pair(let first, let second):
                     switch (range.lowerBound, range.upperBound) {
-                    case (0, 0):
-                        fallthrough
-                    case (1, 1):
-                        fallthrough
-                    case (2, 2):
+                    case (0, 0),
+                         (1, 1),
+                         (2, 2):
                         return .empty
                     case (0, 1):
                         return .single(first)
@@ -264,9 +262,8 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
                     self = newValue
                 case .single(let index):
                     switch (range.lowerBound, range.upperBound, newValue) {
-                    case (0, 0, .empty):
-                        fallthrough
-                    case (1, 1, .empty):
+                    case (0, 0, .empty),
+                         (1, 1, .empty):
                         break
                     case (0, 0, .single(let other)):
                         self = .pair(other, index)
@@ -274,13 +271,10 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
                         self = .array([first, second, index])
                     case (0, 0, .array(let other)):
                         self = .array(other + [index])
-                    case (0, 1, .empty):
-                        fallthrough
-                    case (0, 1, .single):
-                        fallthrough
-                    case (0, 1, .pair):
-                        fallthrough
-                    case (0, 1, .array):
+                    case (0, 1, .empty),
+                         (0, 1, .single),
+                         (0, 1, .pair),
+                         (0, 1, .array):
                         self = newValue
                     case (1, 1, .single(let other)):
                         self = .pair(index, other)

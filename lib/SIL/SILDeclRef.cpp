@@ -323,13 +323,14 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
   if (isStoredPropertyInitializer()) {
     // Three cases:
     //
-    // 1) Type is formally @_fixed_layout. Root initializers can be declared
-    //    @inlinable. The property initializer must only reference
+    // 1) Type is formally @_fixed_layout/@frozen. Root initializers can be
+    //    declared @inlinable. The property initializer must only reference
     //    public symbols, and is serialized, so we give it PublicNonABI linkage.
     //
-    // 2) Type is not formally @_fixed_layout and the module is not resilient.
-    //    Root initializers can be declared @inlinable. This is the annoying
-    //    case. We give the initializer public linkage if the type is public.
+    // 2) Type is not formally @_fixed_layout/@frozen and the module is not
+    //    resilient. Root initializers can be declared @inlinable. This is the 
+    //    annoying case. We give the initializer public linkage if the type is
+    //    public.
     //
     // 3) Type is resilient. The property initializer is never public because
     //    root initializers cannot be @inlinable.
@@ -497,7 +498,7 @@ IsSerialized_t SILDeclRef::isSerialized() const {
   }
 
   // Stored property initializers are inlinable if the type is explicitly
-  // marked as @_fixed_layout.
+  // marked as @frozen.
   if (isStoredPropertyInitializer()) {
     auto *nominal = cast<NominalTypeDecl>(d->getDeclContext());
     auto scope =
@@ -873,6 +874,8 @@ SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
     if (overridden.kind == SILDeclRef::Kind::Initializer) {
       return SILDeclRef();
     }
+
+    // Overrides of @objc dynamic declarations are not in the vtable.
     if (overridden.getDecl()->isObjCDynamic()) {
       return SILDeclRef();
     }

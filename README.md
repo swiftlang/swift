@@ -105,26 +105,26 @@ more environments.
 
 To build using Ninja, run:
 
-    utils/build-script --enable-tensorflow --release-debuginfo
+    swift/utils/build-script --enable-tensorflow --release-debuginfo
 
 When developing Swift, it helps to build what you're working on in a debug
 configuration while building the rest of the project with optimizations. Below
 are some examples of using debug variants:
 
-    utils/build-script --enable-tensorflow --release-debuginfo --debug-swift # Swift frontend built in debug
-    utils/build-script --enable-tensorflow --release-debuginfo --debug-swift-stdlib # Standard library built in debug
-    utils/build-script --enable-tensorflow --release-debuginfo --debug-swift --force-optimized-typechecker # Swift frontend sans type checker built in debug
+    swift/utils/build-script --enable-tensorflow --release-debuginfo --debug-swift # Swift frontend built in debug
+    swift/utils/build-script --enable-tensorflow --release-debuginfo --debug-swift-stdlib # Standard library built in debug
+    swift/utils/build-script --enable-tensorflow --release-debuginfo --debug-swift --force-optimized-typechecker # Swift frontend sans type checker built in debug
 
 Limiting the amount of debug code in the compiler has a very large impact on
 Swift compile times, and in turn the test execution time. If you want to build
 the entire project in debug, you can run:
 
-    utils/build-script  --enable-tensorflow --debug
+    swift/utils/build-script  --enable-tensorflow --debug
 
 For documentation of all available arguments, as well as additional usage
 information, see the inline help:
 
-    utils/build-script -h
+    swift/utils/build-script -h
 
 ### Customize TensorFlow support
 
@@ -217,7 +217,7 @@ This script is used by swift.org's CI to produce snapshots and can allow for one
 locally reproduce such builds for development or distribution purposes. E.x.:
 
 ```
-  $ ./utils/build-toolchain-tensorflow $BUNDLE_PREFIX
+  $ ./swift/utils/build-toolchain-tensorflow $BUNDLE_PREFIX
 ```
 
 where ``$BUNDLE_PREFIX`` is a string that will be prepended to the build

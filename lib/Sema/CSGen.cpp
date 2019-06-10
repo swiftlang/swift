@@ -1774,11 +1774,7 @@ namespace {
       }
 
       // Assume that ExpressibleByArrayLiteral contains a single associated type.
-      AssociatedTypeDecl *elementAssocTy = nullptr;
-      for (auto decl : arrayProto->getMembers()) {
-        if ((elementAssocTy = dyn_cast<AssociatedTypeDecl>(decl)))
-          break;
-      }
+      auto *elementAssocTy = arrayProto->getAssociatedTypeMembers()[0];
       if (!elementAssocTy)
         return Type();
 
@@ -1838,10 +1834,8 @@ namespace {
       }
 
       // The array element type defaults to 'Any'.
-      if (arrayElementTy->isTypeVariableOrMember()) {
-        CS.addConstraint(ConstraintKind::Defaultable, arrayElementTy,
-                         tc.Context.TheAnyType, locator);
-      }
+      CS.addConstraint(ConstraintKind::Defaultable, arrayElementTy,
+                       tc.Context.TheAnyType, locator);
 
       return arrayTy;
     }
@@ -2107,7 +2101,7 @@ namespace {
         // Otherwise, create a new type variable.
         auto ty = Type();
         if (!var->hasNonPatternBindingInit() &&
-            !var->getAttachedPropertyDelegate()) {
+            !var->getAttachedPropertyWrapper()) {
           if (auto boundExpr = locator.trySimplifyToExpr()) {
             if (!boundExpr->isSemanticallyInOutExpr())
               ty = CS.getType(boundExpr)->getRValueType();

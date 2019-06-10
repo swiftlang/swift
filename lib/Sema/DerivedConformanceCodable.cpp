@@ -89,9 +89,8 @@ static CodableConformanceType typeConformsToCodable(TypeChecker &tc,
     return typeConformsToCodable(tc, context, target->getOptionalObjectType(),
                                  false, proto);
 
-  return tc.conformsToProtocol(target, proto, context,
-                               ConformanceCheckFlags::Used) ? Conforms
-                                                            : DoesNotConform;
+  return tc.conformsToProtocol(target, proto, context, None) ? Conforms
+                                                             : DoesNotConform;
 }
 
 /// Returns whether the given variable conforms to the given {En,De}codable
@@ -136,6 +135,14 @@ static CodableConformanceType varConformsToCodable(TypeChecker &tc,
                                isIUO, proto);
 }
 
+/// Retrieve the variable name for the purposes of encoding/decoding.
+static Identifier getVarNameForCoding(VarDecl *var) {
+  if (auto originalVar = var->getOriginalWrappedProperty())
+    return originalVar->getName();
+
+  return var->getName();
+}
+
 /// Validates the given CodingKeys enum decl by ensuring its cases are a 1-to-1
 /// match with the stored vars of the given type.
 ///
@@ -162,7 +169,7 @@ static bool validateCodingKeysEnum(DerivedConformance &derived,
     if (varDecl->getAttrs().hasAttribute<LazyAttr>())
       continue;
 
-    properties[varDecl->getName()] = varDecl;
+    properties[getVarNameForCoding(varDecl)] = varDecl;
   }
 
   bool propertiesAreValid = true;
@@ -282,7 +289,7 @@ static CodingKeysValidity hasValidCodingKeysEnum(DerivedConformance &derived) {
   auto *codingKeyProto = C.getProtocol(KnownProtocolKind::CodingKey);
   if (!tc.conformsToProtocol(codingKeysType, codingKeyProto,
                              derived.getConformanceContext(),
-                             ConformanceCheckFlags::Used)) {
+                             None)) {
     // If CodingKeys is a typealias which doesn't point to a valid nominal type,
     // codingKeysTypeDecl will be nullptr here. In that case, we need to warn on
     // the location of the usage, since there isn't an underlying type to
@@ -365,7 +372,8 @@ static EnumDecl *synthesizeCodingKeysEnum(DerivedConformance &derived) {
     switch (conformance) {
       case Conforms:
       {
-        auto *elt = new (C) EnumElementDecl(SourceLoc(), varDecl->getName(),
+        auto *elt = new (C) EnumElementDecl(SourceLoc(),
+                                            getVarNameForCoding(varDecl),
                                             nullptr, SourceLoc(), nullptr,
                                             enumDecl);
         elt->setImplicit();
@@ -518,6 +526,11 @@ lookupVarDeclForCodingKeysCase(DeclContext *conformanceDC,
                                NominalTypeDecl *targetDecl) {
   for (auto decl : targetDecl->lookupDirect(DeclName(elt->getName()))) {
     if (auto *vd = dyn_cast<VarDecl>(decl)) {
+      // If we found a property with an attached wrapper, retrieve the
+      // backing property.
+      if (auto backingVar = vd->getPropertyWrapperBackingProperty())
+        vd = backingVar;
+
       if (!vd->isStatic()) {
         // This is the VarDecl we're looking for.
 
@@ -1069,8 +1082,7 @@ static bool canSynthesize(DerivedConformance &derived, ValueDecl *requirement) {
     if (auto *superclassDecl = classDecl->getSuperclassDecl()) {
       DeclName memberName;
       auto superType = superclassDecl->getDeclaredInterfaceType();
-      if (tc.conformsToProtocol(superType, proto, superclassDecl,
-                                ConformanceCheckFlags::Used)) {
+      if (tc.conformsToProtocol(superType, proto, superclassDecl, None)) {
         // super.init(from:) must be accessible.
         memberName = cast<ConstructorDecl>(requirement)->getFullName();
       } else {

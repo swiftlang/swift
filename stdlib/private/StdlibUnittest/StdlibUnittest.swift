@@ -16,6 +16,7 @@ import SwiftPrivateThreadExtras
 import SwiftPrivateLibcExtras
 
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+import Foundation
 import Darwin
 #elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
 import Glibc
@@ -117,6 +118,10 @@ fileprivate struct AtomicBool {
     func orAndFetch(_ b: Bool) -> Bool {
         return _value.orAndFetch(b ? 1 : 0) != 0
     }
+
+    func fetchAndClear() -> Bool {
+        return _value.fetchAndAnd(0) != 0
+    }
 }
 
 func _printStackTrace(_ stackTrace: SourceLocStack?) {
@@ -139,11 +144,9 @@ public func expectFailure(
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
   file: String = #file, line: UInt = #line, invoking body: () -> Void) {
-  let startAnyExpectFailed = _anyExpectFailed.load()
-  _anyExpectFailed.store(false)
+  let startAnyExpectFailed = _anyExpectFailed.fetchAndClear()
   body()
-  let endAnyExpectFailed = _anyExpectFailed.load()
-  _anyExpectFailed.store(false)
+  let endAnyExpectFailed = _anyExpectFailed.fetchAndClear()
   expectTrue(
     endAnyExpectFailed, "running `body` should produce an expected failure",
     stackTrace: stackTrace.pushIf(showFrame, file: file, line: line)
@@ -1712,13 +1715,8 @@ public final class TestSuite {
 }
 
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-@_silgen_name("getSystemVersionPlistProperty")
-func _getSystemVersionPlistPropertyImpl(
-  _ propertyName: UnsafePointer<CChar>) -> UnsafePointer<CChar>?
-
 func _getSystemVersionPlistProperty(_ propertyName: String) -> String? {
-  let cs = _getSystemVersionPlistPropertyImpl(propertyName)
-  return cs.map(String.init(cString:))
+  return NSDictionary(contentsOfFile: "/System/Library/CoreServices/SystemVersion.plist")?[propertyName] as? String
 }
 #endif
 

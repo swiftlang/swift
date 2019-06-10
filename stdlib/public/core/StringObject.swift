@@ -61,14 +61,14 @@
   `_discriminator`'s `b6`.
 */
 
-@_fixed_layout @usableFromInline
+@frozen @usableFromInline
 internal struct _StringObject {
   // Namespace to hold magic numbers
-  @usableFromInline @_frozen
+  @usableFromInline @frozen
   enum Nibbles {}
 
   // Abstract the count and performance-flags containing word
-  @_fixed_layout @usableFromInline
+  @frozen @usableFromInline
   struct CountAndFlags {
     @usableFromInline
     var _storage: UInt64
@@ -78,7 +78,7 @@ internal struct _StringObject {
   }
 
 #if arch(i386) || arch(arm)
-  @usableFromInline @_frozen
+  @usableFromInline @frozen
   internal enum Variant {
     case immortal(UInt)
     case native(AnyObject)

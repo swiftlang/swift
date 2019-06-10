@@ -1,7 +1,7 @@
 
 #if BEFORE
 
-@_fixed_layout
+@frozen
 public struct ChangeStoredToComputed {
   public static var celsius: Int = 0
 
@@ -17,7 +17,7 @@ public struct ChangeStoredToComputed {
 
 #else
 
-@_fixed_layout
+@frozen
 public struct ChangeStoredToComputed {
   public static var celsius: Int {
     get {

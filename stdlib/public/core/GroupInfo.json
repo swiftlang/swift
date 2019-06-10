@@ -144,7 +144,6 @@
     "VarArgs.swift",
     "CTypes.swift",
     "MemoryLayout.swift",
-    "SmallBuffer.swift"
   ],
   "KeyPaths": [
     "KeyPath.swift",

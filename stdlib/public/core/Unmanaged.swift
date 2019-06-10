@@ -14,7 +14,7 @@
 ///
 /// When you use this type, you become partially responsible for
 /// keeping the object alive.
-@_fixed_layout
+@frozen
 public struct Unmanaged<Instance : AnyObject> {
   @usableFromInline
   internal unowned(unsafe) var _value: Instance

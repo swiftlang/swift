@@ -125,6 +125,11 @@ enum class FixKind : uint8_t {
   /// referenced constructor must be required.
   AllowInvalidInitRef,
 
+  /// Allow an invalid member access on a value of protocol type as if
+  /// that protocol type were a generic constraint requiring conformance
+  /// to that protocol.
+  AllowMemberRefOnExistential,
+
   /// If there are fewer arguments than parameters, let's fix that up
   /// by adding new arguments to the list represented as type variables.
   AddMissingArguments,
@@ -153,6 +158,11 @@ enum class FixKind : uint8_t {
   /// Remove `return` or default last expression of single expression
   /// function to `Void` to conform to expected result type.
   RemoveReturn,
+
+  /// Generic parameters could not be inferred and have to be explicitly
+  /// specified in the source. This fix groups all of the missing arguments
+  /// associated with single declaration.
+  ExplicitlySpecifyGenericArguments,
 };
 
 class ConstraintFix {
@@ -592,7 +602,33 @@ public:
                                         DeclName member,
                                         ConstraintLocator *locator);
 };
-	
+
+class AllowMemberRefOnExistential final : public ConstraintFix {
+  Type BaseType;
+  DeclName Name;
+
+  AllowMemberRefOnExistential(ConstraintSystem &cs, Type baseType,
+                              DeclName memberName, ValueDecl *member,
+                              ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowMemberRefOnExistential, locator),
+        BaseType(baseType), Name(memberName) {}
+
+public:
+  std::string getName() const override {
+    llvm::SmallVector<char, 16> scratch;
+    auto memberName = Name.getString(scratch);
+    return "allow access to invalid member '" + memberName.str() +
+           "' on value of protocol type";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static AllowMemberRefOnExistential *create(ConstraintSystem &cs,
+                                             Type baseType, ValueDecl *member,
+                                             DeclName memberName,
+                                             ConstraintLocator *locator);
+};
+
 class AllowTypeOrInstanceMember final : public ConstraintFix {
   Type BaseType;
   ValueDecl *Member;
@@ -859,6 +895,7 @@ public:
     case RefKind::Method:
       return "allow reference to a method as a key path component";
     }
+    llvm_unreachable("covered switch");
   }
 
   bool diagnose(Expr *root, bool asNote = false) const override;
@@ -915,6 +952,45 @@ public:
   static CollectionElementContextualMismatch *
   create(ConstraintSystem &cs, Type srcType, Type dstType,
          ConstraintLocator *locator);
+};
+
+class ExplicitlySpecifyGenericArguments final
+    : public ConstraintFix,
+      private llvm::TrailingObjects<ExplicitlySpecifyGenericArguments,
+                                    GenericTypeParamType *> {
+  friend TrailingObjects;
+
+  unsigned NumMissingParams;
+
+  ExplicitlySpecifyGenericArguments(ConstraintSystem &cs,
+                                    ArrayRef<GenericTypeParamType *> params,
+                                    ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::ExplicitlySpecifyGenericArguments, locator),
+        NumMissingParams(params.size()) {
+    assert(!params.empty());
+    std::uninitialized_copy(params.begin(), params.end(),
+                            getParametersBuf().begin());
+  }
+
+public:
+  std::string getName() const override {
+    return "default missing generic arguments to `Any`";
+  }
+
+  ArrayRef<GenericTypeParamType *> getParameters() const {
+    return {getTrailingObjects<GenericTypeParamType *>(), NumMissingParams};
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static ExplicitlySpecifyGenericArguments *
+  create(ConstraintSystem &cs, ArrayRef<GenericTypeParamType *> params,
+         ConstraintLocator *locator);
+
+private:
+  MutableArrayRef<GenericTypeParamType *> getParametersBuf() {
+    return {getTrailingObjects<GenericTypeParamType *>(), NumMissingParams};
+  }
 };
 
 } // end namespace constraints

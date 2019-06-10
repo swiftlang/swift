@@ -191,8 +191,8 @@ def _apply_default_arguments(args):
     if args.test_optimize_for_size:
         args.test = True
 
-    # --test-optimize-none-implicit-dynamic implies --test.
-    if args.test_optimize_none_implicit_dynamic:
+    # --test-optimize-none-with-implicit-dynamic implies --test.
+    if args.test_optimize_none_with_implicit_dynamic:
         args.test = True
 
     # SWIFT_ENABLE_TENSORFLOW
@@ -777,10 +777,10 @@ def create_argument_parser():
                 '(implies --test)')
 
     # FIXME: Convert to store_true action
-    option('-y', store('test_optimize_none_implicit_dynamic', const=True),
+    option('-y', store('test_optimize_none_with_implicit_dynamic', const=True),
            help='run the test suite in optimize none with implicit dynamic'
                 ' mode too (implies --test)')
-    option('--test-optimize-none-implicit-dynamic', toggle_true,
+    option('--test-optimize-none-with-implicit-dynamic', toggle_true,
            help='run the test suite in optimize none with implicit dynamic'
                 'mode too (implies --test)')
 
@@ -792,6 +792,10 @@ def create_argument_parser():
 
     option('--host-test', toggle_true,
            help='run executable tests on host devices (such as iOS or tvOS)')
+
+    option('--only-executable-test', toggle_true,
+           help='Only run executable tests. Does nothing if host-test is not '
+                'allowed')
 
     option('--test-paths', append,
            type=argparse.ShellSplitType(),
@@ -1014,7 +1018,7 @@ def create_argument_parser():
     option('--common-cmake-options', unsupported)
     option('--only-execute', unsupported)
     option('--skip-test-optimize-for-size', unsupported)
-    option('--skip-test-optimize-none-implicit-dynamic', unsupported)
+    option('--skip-test-optimize-none-with-implicit-dynamic', unsupported)
     option('--skip-test-optimized', unsupported)
 
     # -------------------------------------------------------------------------

@@ -893,4 +893,8 @@ def vfsoverlay : JoinedOrSeparate<["-"], "vfsoverlay">,
 def vfsoverlay_EQ : Joined<["-"], "vfsoverlay=">,
   Alias<vfsoverlay>;
 
+// Runtime compatibility version
+def runtime_compatibility_version : Separate<["-"], "runtime-compatibility-version">,
+  Flags<[FrontendOption]>,
+  HelpText<"Link compatibility library for Swift runtime version, or 'none'">;
 include "FrontendOptions.td"

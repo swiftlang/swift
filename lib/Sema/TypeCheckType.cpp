@@ -805,7 +805,10 @@ Type TypeChecker::applyUnboundGenericArguments(
   // generic arguments.
   auto resultType = decl->getDeclaredInterfaceType();
 
-  bool hasTypeVariable = false;
+  // If types involved in requirements check have either type variables
+  // or unbound generics, let's skip the check here, and let the solver
+  // do it when missing types are deduced.
+  bool skipRequirementsCheck = false;
 
   // Get the substitutions for outer generic parameters from the parent
   // type.
@@ -822,7 +825,7 @@ Type TypeChecker::applyUnboundGenericArguments(
     }
 
     subs = parentType->getContextSubstitutions(decl->getDeclContext());
-    hasTypeVariable |= parentType->hasTypeVariable();
+    skipRequirementsCheck |= parentType->hasTypeVariable();
   }
 
   SourceLoc noteLoc = decl->getLoc();
@@ -839,20 +842,21 @@ Type TypeChecker::applyUnboundGenericArguments(
     subs[origTy->getCanonicalType()->castTo<GenericTypeParamType>()] =
       substTy;
 
-    hasTypeVariable |= substTy->hasTypeVariable();
+    skipRequirementsCheck |=
+        substTy->hasTypeVariable() || substTy->hasUnboundGenericType();
   }
 
   // Check the generic arguments against the requirements of the declaration's
   // generic signature.
   auto dc = resolution.getDeclContext();
-  if (!hasTypeVariable &&
+  if (!skipRequirementsCheck &&
       resolution.getStage() > TypeResolutionStage::Structural) {
     auto result =
       checkGenericArguments(dc, loc, noteLoc, unboundType,
                             genericSig->getGenericParams(),
                             genericSig->getRequirements(),
                             QueryTypeSubstitutionMap{subs},
-                            LookUpConformance(dc));
+                            LookUpConformance(dc), None);
 
     switch (result) {
     case RequirementCheckResult::Failure:

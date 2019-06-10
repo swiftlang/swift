@@ -131,7 +131,7 @@ extension RandomNumberGenerator {
 /// - Apple platforms use `arc4random_buf(3)`.
 /// - Linux platforms use `getrandom(2)` when available; otherwise, they read
 ///   from `/dev/urandom`.
-@_fixed_layout
+@frozen
 public struct SystemRandomNumberGenerator : RandomNumberGenerator {
   /// Creates a new instance of the system's default random number generator.
   @inlinable

@@ -31,7 +31,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
-#include "swift/AST/PropertyDelegates.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/RawComment.h"
 #include "swift/AST/SubstitutionMap.h"
@@ -276,11 +276,11 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
       DefaultTypeRequestCaches;
 
   /// Mapping from property declarations to the backing variable types.
-  llvm::DenseMap<const VarDecl *, Type> PropertyDelegateBackingVarTypes;
+  llvm::DenseMap<const VarDecl *, Type> PropertyWrapperBackingVarTypes;
 
-  /// A mapping from the backing storage of a property that has a delegate
-  /// to the original property with the delegate.
-  llvm::DenseMap<const VarDecl *, VarDecl *> OriginalDelegatedProperties;
+  /// A mapping from the backing storage of a property that has a wrapper
+  /// to the original property with the wrapper.
+  llvm::DenseMap<const VarDecl *, VarDecl *> OriginalWrappedProperties;
 
   /// The builtin initializer witness for a literal. Used when building
   /// LiteralExprs in fully-checked AST.
@@ -1456,20 +1456,10 @@ bool ASTContext::hasArrayLiteralIntrinsics() const {
     && getDeallocateUninitializedArray();
 }
 
-void ASTContext::addExternalDecl(Decl *decl) {
-  ExternalDefinitions.insert(decl);
-}
-
 void ASTContext::addSynthesizedDecl(Decl *decl) {
-  auto *mod = cast<FileUnit>(decl->getDeclContext()->getModuleScopeContext());
-  if (mod->getKind() == FileUnitKind::ClangModule ||
-      mod->getKind() == FileUnitKind::DWARFModule ||
-      mod->getKind() == FileUnitKind::SerializedAST) {
-    ExternalDefinitions.insert(decl);
-    return;
-  }
-
-  cast<SourceFile>(mod)->SynthesizedDecls.push_back(decl);
+  auto *fileUnit = decl->getDeclContext()->getModuleScopeContext();
+  if (auto *sf = dyn_cast<SourceFile>(fileUnit))
+    sf->SynthesizedDecls.push_back(decl);
 }
 
 void ASTContext::addCleanup(std::function<void(void)> cleanup) {
@@ -2144,7 +2134,6 @@ ASTContext::takeDelayedConformanceDiags(NormalProtocolConformance *conformance){
 size_t ASTContext::getTotalMemory() const {
   size_t Size = sizeof(*this) +
     // LoadedModules ?
-    // ExternalDefinitions ?
     llvm::capacity_in_bytes(CanonicalGenericTypeParamTypeNames) +
     // RemappedTypes ?
     sizeof(getImpl()) +
@@ -4555,44 +4544,45 @@ Type &ASTContext::getDefaultTypeRequestCache(SourceFile *SF,
   return getImpl().DefaultTypeRequestCaches[SF][size_t(kind)];
 }
 
-Type ASTContext::getSideCachedPropertyDelegateBackingPropertyType(
+Type ASTContext::getSideCachedPropertyWrapperBackingPropertyType(
     VarDecl *var) const {
-  return getImpl().PropertyDelegateBackingVarTypes[var];
+  return getImpl().PropertyWrapperBackingVarTypes[var];
 }
 
-void ASTContext::setSideCachedPropertyDelegateBackingPropertyType(
+void ASTContext::setSideCachedPropertyWrapperBackingPropertyType(
     VarDecl *var, Type type) {
-  assert(!getImpl().PropertyDelegateBackingVarTypes[var] ||
-         getImpl().PropertyDelegateBackingVarTypes[var]->isEqual(type));
-  getImpl().PropertyDelegateBackingVarTypes[var] = type;
+  assert(!getImpl().PropertyWrapperBackingVarTypes[var] ||
+         getImpl().PropertyWrapperBackingVarTypes[var]->isEqual(type));
+  getImpl().PropertyWrapperBackingVarTypes[var] = type;
 }
 
-VarDecl *VarDecl::getOriginalDelegatedProperty(
-    Optional<PropertyDelegateSynthesizedPropertyKind> kind) const {
-  if (!Bits.VarDecl.IsPropertyDelegateBackingProperty)
+VarDecl *VarDecl::getOriginalWrappedProperty(
+    Optional<PropertyWrapperSynthesizedPropertyKind> kind) const {
+  if (!Bits.VarDecl.IsPropertyWrapperBackingProperty)
     return nullptr;
 
   ASTContext &ctx = getASTContext();
-  assert(ctx.getImpl().OriginalDelegatedProperties.count(this) > 0);
-  auto original = ctx.getImpl().OriginalDelegatedProperties[this];
+  assert(ctx.getImpl().OriginalWrappedProperties.count(this) > 0);
+  auto original = ctx.getImpl().OriginalWrappedProperties[this];
   if (!kind)
     return original;
 
-  auto delegateInfo = original->getPropertyDelegateBackingPropertyInfo();
+  auto wrapperInfo = original->getPropertyWrapperBackingPropertyInfo();
   switch (*kind) {
-  case PropertyDelegateSynthesizedPropertyKind::Backing:
-    return this == delegateInfo.backingVar ? original : nullptr;
+  case PropertyWrapperSynthesizedPropertyKind::Backing:
+    return this == wrapperInfo.backingVar ? original : nullptr;
 
-  case PropertyDelegateSynthesizedPropertyKind::StorageDelegate:
-    return this == delegateInfo.storageDelegateVar ? original : nullptr;
+  case PropertyWrapperSynthesizedPropertyKind::StorageWrapper:
+    return this == wrapperInfo.storageWrapperVar ? original : nullptr;
   }
+  llvm_unreachable("covered switch");
 }
 
-void VarDecl::setOriginalDelegatedProperty(VarDecl *originalProperty) {
-  Bits.VarDecl.IsPropertyDelegateBackingProperty = true;
+void VarDecl::setOriginalWrappedProperty(VarDecl *originalProperty) {
+  Bits.VarDecl.IsPropertyWrapperBackingProperty = true;
   ASTContext &ctx = getASTContext();
-  assert(ctx.getImpl().OriginalDelegatedProperties.count(this) == 0);
-  ctx.getImpl().OriginalDelegatedProperties[this] = originalProperty;
+  assert(ctx.getImpl().OriginalWrappedProperties.count(this) == 0);
+  ctx.getImpl().OriginalWrappedProperties[this] = originalProperty;
 }
 
 // SWIFT_ENABLE_TENSORFLOW

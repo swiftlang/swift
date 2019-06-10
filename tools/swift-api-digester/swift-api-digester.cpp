@@ -128,6 +128,12 @@ SwiftOnly("swift-only",
           llvm::cl::cat(Category));
 
 static llvm::cl::opt<bool>
+DisableOSChecks("disable-os-checks",
+                llvm::cl::desc("Skip OS related diagnostics"),
+                llvm::cl::init(false),
+                llvm::cl::cat(Category));
+
+static llvm::cl::opt<bool>
 PrintModule("print-module", llvm::cl::desc("Print module names in diagnostics"),
             llvm::cl::cat(Category));
 
@@ -1003,6 +1009,14 @@ public:
           if (D->hasFixedBinaryOrder()) {
             D->emitDiag(diag::decl_added);
           }
+          // Diagnose the missing of @available attributes.
+          // Decls with @_alwaysEmitIntoClient aren't required to have an
+          // @available attribute.
+          if (!Ctx.getOpts().SkipOSCheck &&
+              !D->getIntroducingVersion().hasOSAvailability() &&
+              !D->hasDeclAttribute(DeclAttrKind::DAK_AlwaysEmitIntoClient)) {
+            D->emitDiag(diag::new_decl_without_intro);
+          }
         }
       }
       // Complain about added protocol requirements
@@ -1038,7 +1052,6 @@ public:
           }
         }
       }
-
       return;
     case NodeMatchReason::Removed:
       assert(!Right);
@@ -2371,6 +2384,7 @@ static CheckerOptions getCheckOpts() {
   Opts.LocationFilter = options::LocationFilter;
   Opts.PrintModule = options::PrintModule;
   Opts.SwiftOnly = options::SwiftOnly;
+  Opts.SkipOSCheck = options::DisableOSChecks;
   return Opts;
 }
 

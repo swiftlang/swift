@@ -4709,6 +4709,9 @@ public:
   SourceRange getSourceRange() const { return Loc; }
   TypeLoc &getTypeLoc() { return PlaceholderTy; }
   TypeLoc getTypeLoc() const { return PlaceholderTy; }
+  SourceLoc getTrailingAngleBracketLoc() const {
+    return Loc.getAdvancedLoc(Placeholder.getLength() - 1);
+  }
 
   /// The TypeRepr to be considered for placeholder expansion.
   TypeRepr *getTypeForExpansion() const { return ExpansionTyR; }

@@ -126,7 +126,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   //                               Attributes
   //===--------------------------------------------------------------------===//
   bool visitCustomAttributes(Decl *D) {
-    for (auto *customAttr : D->getAttrs().getAttributes<CustomAttr>()) {
+    for (auto *customAttr : D->getAttrs().getAttributes<CustomAttr, true>()) {
       CustomAttr *mutableCustomAttr = const_cast<CustomAttr *>(customAttr);
       if (doIt(mutableCustomAttr->getTypeLoc()))
         return true;
@@ -177,13 +177,13 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
 
   bool visitPatternBindingDecl(PatternBindingDecl *PBD) {
     // If there is a single variable, walk it's attributes.
-    bool isPropertyDelegateBackingProperty = false;
+    bool isPropertyWrapperBackingProperty = false;
     if (auto singleVar = PBD->getSingleVar()) {
       if (visitCustomAttributes(singleVar))
         return true;
 
-      isPropertyDelegateBackingProperty =
-        singleVar->getOriginalDelegatedProperty() != nullptr;
+      isPropertyWrapperBackingProperty =
+        singleVar->getOriginalWrappedProperty() != nullptr;
     }
 
     unsigned idx = 0U-1;
@@ -194,7 +194,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       else
         return true;
       if (entry.getInit() &&
-          !isPropertyDelegateBackingProperty &&
+          !isPropertyWrapperBackingProperty &&
           (!entry.isInitializerSubsumed() ||
            Walker.shouldWalkIntoLazyInitializers())) {
 #ifndef NDEBUG

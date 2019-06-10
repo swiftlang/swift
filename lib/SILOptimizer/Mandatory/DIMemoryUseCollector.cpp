@@ -356,7 +356,7 @@ DIMemoryObjectInfo::getPathStringToElement(unsigned Element,
             getElementCountRec(Module, FieldType, false);
         if (Element < NumFieldElements) {
           Result += '.';
-          auto originalProperty = VD->getOriginalDelegatedProperty();
+          auto originalProperty = VD->getOriginalWrappedProperty();
           if (originalProperty) {
             Result += originalProperty->getName().str();
           } else {
@@ -423,9 +423,9 @@ bool DIMemoryObjectInfo::isElementLetProperty(unsigned Element) const {
 /// have trivial type and the access itself is a trivial instruction.
 bool DIMemoryUse::onlyTouchesTrivialElements(
     const DIMemoryObjectInfo &MI) const {
-  // assign_by_delegate calls functions to assign a value. This is not
+  // assign_by_wrapper calls functions to assign a value. This is not
   // considered as trivial.
-  if (isa<AssignByDelegateInst>(Inst))
+  if (isa<AssignByWrapperInst>(Inst))
     return false;
 
   auto *F = Inst->getFunction();
@@ -752,11 +752,11 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
 
     // Stores *to* the allocation are writes.
     if ((isa<StoreInst>(User) || isa<AssignInst>(User) ||
-         isa<AssignByDelegateInst>(User)) &&
+         isa<AssignByWrapperInst>(User)) &&
         Op->getOperandNumber() == 1) {
       if (PointeeType.is<TupleType>()) {
-        assert(!isa<AssignByDelegateInst>(User) &&
-               "cannot assign a typle with assign_by_delegate");
+        assert(!isa<AssignByWrapperInst>(User) &&
+               "cannot assign a typle with assign_by_wrapper");
         UsesToScalarize.push_back(User);
         continue;
       }
@@ -766,7 +766,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       DIUseKind Kind;
       if (InStructSubElement)
         Kind = DIUseKind::PartialStore;
-      else if (isa<AssignInst>(User) || isa<AssignByDelegateInst>(User))
+      else if (isa<AssignInst>(User) || isa<AssignByWrapperInst>(User))
         Kind = DIUseKind::InitOrAssign;
       else if (PointeeType.isTrivial(*User->getFunction()))
         Kind = DIUseKind::InitOrAssign;
@@ -1004,7 +1004,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
     }
 
     if (auto *PAI = dyn_cast<PartialApplyInst>(User)) {
-      if (onlyUsedByAssignByDelegate(PAI))
+      if (onlyUsedByAssignByWrapper(PAI))
         continue;
     }
 
@@ -1229,7 +1229,7 @@ static bool isSuperInitUse(SILInstruction *User) {
     // super.init call as a hack to allow us to write testcases.
     auto *AI = dyn_cast<ApplyInst>(User);
     if (AI && AI->getLoc().isSILFile())
-      if (auto *Fn = AI->getReferencedFunction())
+      if (auto *Fn = AI->getReferencedFunctionOrNull())
         if (Fn->getName() == "superinit")
           return true;
     return false;
@@ -1311,7 +1311,7 @@ static bool isSelfInitUse(SILInstruction *I) {
   // self.init call as a hack to allow us to write testcases.
   if (I->getLoc().isSILFile()) {
     if (auto *AI = dyn_cast<ApplyInst>(I))
-      if (auto *Fn = AI->getReferencedFunction())
+      if (auto *Fn = AI->getReferencedFunctionOrNull())
         if (Fn->getName().startswith("selfinit"))
           return true;
 
@@ -1485,7 +1485,7 @@ void ElementUseCollector::collectClassSelfUses(
     // If this is a partial application of self, then this is an escape point
     // for it.
     if (auto *PAI = dyn_cast<PartialApplyInst>(User)) {
-      if (onlyUsedByAssignByDelegate(PAI))
+      if (onlyUsedByAssignByWrapper(PAI))
         continue;
       Kind = DIUseKind::Escape;
     }

@@ -28,6 +28,11 @@
 
 using namespace swift;
 
+static llvm::cl::opt<bool>
+EnableExistentialSpecializer("enable-existential-specializer",
+                             llvm::cl::Hidden,
+                             llvm::cl::init(true));
+
 STATISTIC(NumFunctionsWithExistentialArgsSpecialized,
           "Number of functions with existential args specialized");
 
@@ -66,7 +71,7 @@ public:
     auto *F = getFunction();
 
     /// Don't optimize functions that should not be optimized.
-    if (!F->shouldOptimize() || !F->getModule().getOptions().ExistentialSpecializer) {
+    if (!F->shouldOptimize() || !EnableExistentialSpecializer) {
       return;
     }
 
@@ -110,19 +115,6 @@ bool ExistentialSpecializer::findConcreteTypeFromSoleConformingType(
   return true;
 }
 
-/// Check if the argument Arg is used in a destroy_use instruction.
-static void
-findIfCalleeUsesArgInDestroyUse(SILValue Arg,
-                                ExistentialTransformArgumentDescriptor &ETAD) {
-  for (Operand *ArgUse : Arg->getUses()) {
-    auto *ArgUser = ArgUse->getUser();
-    if (isa<DestroyAddrInst>(ArgUser)) {
-      ETAD.DestroyAddrUse = true;
-      break;
-    }
-  }
-}
-
 /// Helper function to ensure that the argument is not InOut or InOut_Aliasable
 static bool isNonInoutIndirectArgument(SILValue Arg,
                                        SILArgumentConvention ArgConvention) {
@@ -137,7 +129,7 @@ bool ExistentialSpecializer::canSpecializeExistentialArgsInFunction(
     FullApplySite &Apply,
     llvm::SmallDenseMap<int, ExistentialTransformArgumentDescriptor>
         &ExistentialArgDescriptor) {
-  auto *F = Apply.getReferencedFunction();
+  auto *F = Apply.getReferencedFunctionOrNull();
   auto CalleeArgs = F->begin()->getFunctionArguments();
   bool returnFlag = false;
 
@@ -188,24 +180,27 @@ bool ExistentialSpecializer::canSpecializeExistentialArgsInFunction(
       continue;
     }
 
-    /// Determine attributes of the existential addr arguments such as
-    /// destroy_use, immutable_access. 
+    /// Determine attributes of the existential addr argument.
     ExistentialTransformArgumentDescriptor ETAD;
     auto paramInfo = origCalleeConv.getParamInfoForSILArg(Idx);
-    ETAD.AccessType = (paramInfo.isIndirectMutating() || paramInfo.isConsumed())
+    // The ExistentialSpecializerCloner copies the incoming generic argument
+    // into an existential. This won't work if the original argument is
+    // mutated. Furthermore, SILCombine would not be able to replace a mutated
+    // existential with a concrete value, so the specialization thunk could not
+    // be optimized away.
+    if (paramInfo.isIndirectMutating())
+      continue;
+
+    ETAD.AccessType = paramInfo.isConsumed()
                           ? OpenedExistentialAccess::Mutable
                           : OpenedExistentialAccess::Immutable;
-    ETAD.DestroyAddrUse = false;
-    if ((CalleeArgs[Idx]->getType().getPreferredExistentialRepresentation(
-            F->getModule()))
-        != ExistentialRepresentation::Class)
-      findIfCalleeUsesArgInDestroyUse(CalleeArg, ETAD);
+    ETAD.isConsumed = paramInfo.isConsumed();
 
     /// Save the attributes
     ExistentialArgDescriptor[Idx] = ETAD;
     LLVM_DEBUG(llvm::dbgs()
                << "ExistentialSpecializer Pass:Function: " << F->getName()
-               << " Arg:" << Idx << "has a concrete type.\n");
+               << " Arg:" << Idx << " has a concrete type.\n");
     returnFlag |= true;
   }
   return returnFlag;
@@ -215,7 +210,7 @@ bool ExistentialSpecializer::canSpecializeExistentialArgsInFunction(
 bool ExistentialSpecializer::canSpecializeCalleeFunction(FullApplySite &Apply) {
 
   /// Determine the caller of the apply.
-  auto *Callee = Apply.getReferencedFunction();
+  auto *Callee = Apply.getReferencedFunctionOrNull();
   if (!Callee)
     return false;
 
@@ -278,7 +273,7 @@ void ExistentialSpecializer::specializeExistentialArgsInAppliesWithinFunction(
         continue;
       }
 
-      auto *Callee = Apply.getReferencedFunction();
+      auto *Callee = Apply.getReferencedFunctionOrNull();
 
       /// Handle recursion! Do not modify F right now.
       if (Callee == &F) {

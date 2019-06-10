@@ -1699,7 +1699,7 @@ public:
     // Note: in SingleFunction mode, we relax some of these checks because
     // we may not have linked everything yet.
 
-    SILFunction *RefF = FRI->getReferencedFunction();
+    SILFunction *RefF = FRI->getInitiallyReferencedFunction();
 
     if (isa<FunctionRefInst>(FRI))
       require(
@@ -2018,7 +2018,7 @@ public:
             "Store operand type and dest type mismatch");
   }
 
-  void checkAssignByDelegateInst(AssignByDelegateInst *AI) {
+  void checkAssignByWrapperInst(AssignByWrapperInst *AI) {
     SILValue Src = AI->getSrc(), Dest = AI->getDest();
     require(AI->getModule().getStage() == SILStage::Raw,
             "assign instruction can only exist in raw SIL");

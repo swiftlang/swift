@@ -44,6 +44,10 @@ open class ManagedBuffer<Header, Element> {
   /// reading the `header` property during `ManagedBuffer.create` is undefined.
   public final var header: Header
 
+  // This is really unfortunate. In Swift 5.0, the method descriptor for this
+  // initializer was public and subclasses would "inherit" it, referencing its
+  // method descriptor from their class override table.
+  @usableFromInline
   internal init(_doNotCallMe: ()) {
     _internalInvariantFailure("Only initialize these by calling create")
   }
@@ -171,7 +175,7 @@ extension ManagedBuffer {
 ///        }
 ///      }
 ///
-@_fixed_layout
+@frozen
 public struct ManagedBufferPointer<Header, Element> {
 
   @usableFromInline

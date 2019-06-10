@@ -30,7 +30,7 @@
 namespace swift {
 
 class GenericParamList;
-struct PropertyDelegateBackingPropertyInfo;
+struct PropertyWrapperBackingPropertyInfo;
 class RequirementRepr;
 class SpecializeAttr;
 class TypeAliasDecl;
@@ -476,11 +476,11 @@ private:
   Type &getCache() const;
 };
 
-/// Retrieve information about a property delegate type.
-class PropertyDelegateTypeInfoRequest
-  : public SimpleRequest<PropertyDelegateTypeInfoRequest,
+/// Retrieve information about a property wrapper type.
+class PropertyWrapperTypeInfoRequest
+  : public SimpleRequest<PropertyWrapperTypeInfoRequest,
                          CacheKind::Cached,
-                         PropertyDelegateTypeInfo,
+                         PropertyWrapperTypeInfo,
                          NominalTypeDecl *> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -489,7 +489,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<PropertyDelegateTypeInfo>
+  llvm::Expected<PropertyWrapperTypeInfo>
       evaluate(Evaluator &eval, NominalTypeDecl *nominal) const;
 
 public:
@@ -503,8 +503,8 @@ public:
 
 /// Request the nominal type declaration to which the given custom attribute
 /// refers.
-class AttachedPropertyDelegateRequest :
-    public SimpleRequest<AttachedPropertyDelegateRequest,
+class AttachedPropertyWrapperRequest :
+    public SimpleRequest<AttachedPropertyWrapperRequest,
                          CacheKind::Cached,
                          CustomAttr *,
                          VarDecl *> {
@@ -527,10 +527,10 @@ public:
   void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
-/// Request the raw (possibly unbound generic) type of the property delegate
+/// Request the raw (possibly unbound generic) type of the property wrapper
 /// that is attached to the given variable.
-class AttachedPropertyDelegateTypeRequest :
-    public SimpleRequest<AttachedPropertyDelegateTypeRequest,
+class AttachedPropertyWrapperTypeRequest :
+    public SimpleRequest<AttachedPropertyWrapperTypeRequest,
                          CacheKind::Cached,
                          Type,
                          VarDecl *> {
@@ -555,8 +555,8 @@ public:
 
 /// Request the nominal type declaration to which the given custom attribute
 /// refers.
-class PropertyDelegateBackingPropertyTypeRequest :
-    public SimpleRequest<PropertyDelegateBackingPropertyTypeRequest,
+class PropertyWrapperBackingPropertyTypeRequest :
+    public SimpleRequest<PropertyWrapperBackingPropertyTypeRequest,
                          CacheKind::Cached,
                          Type,
                          VarDecl *> {
@@ -580,11 +580,11 @@ public:
 };
 
 /// Request information about the backing property for properties that have
-/// attached property delegates.
-class PropertyDelegateBackingPropertyInfoRequest :
-    public SimpleRequest<PropertyDelegateBackingPropertyInfoRequest,
+/// attached property wrappers.
+class PropertyWrapperBackingPropertyInfoRequest :
+    public SimpleRequest<PropertyWrapperBackingPropertyInfoRequest,
                          CacheKind::Cached,
-                         PropertyDelegateBackingPropertyInfo,
+                         PropertyWrapperBackingPropertyInfo,
                          VarDecl *> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -593,7 +593,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<PropertyDelegateBackingPropertyInfo>
+  llvm::Expected<PropertyWrapperBackingPropertyInfo>
   evaluate(Evaluator &evaluator, VarDecl *var) const;
 
 public:

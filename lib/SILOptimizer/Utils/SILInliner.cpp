@@ -50,7 +50,7 @@ static bool canInlineBeginApply(BeginApplyInst *BA) {
   // potentially after the resumption site when there are un-mergeable
   // values alive across it.
   bool hasYield = false;
-  for (auto &B : BA->getReferencedFunction()->getBlocks()) {
+  for (auto &B : BA->getReferencedFunctionOrNull()->getBlocks()) {
     if (isa<YieldInst>(B.getTerminator())) {
       if (hasYield) return false;
       hasYield = true;
@@ -341,6 +341,7 @@ std::pair<SILBasicBlock::iterator, SILBasicBlock *>
 SILInliner::inlineFullApply(FullApplySite apply,
                             SILInliner::InlineKind inlineKind,
                             SILOptFunctionBuilder &funcBuilder) {
+  assert(apply.canOptimize());
   SmallVector<SILValue, 8> appliedArgs;
   for (const auto &arg : apply.getArguments())
     appliedArgs.push_back(arg);
@@ -355,7 +356,7 @@ SILInliner::inlineFullApply(FullApplySite apply,
 
   SILInliner Inliner(funcBuilder, inlineKind, apply.getSubstitutionMap(),
                      OpenedArchetypesTracker);
-  return Inliner.inlineFunction(apply.getReferencedFunction(), apply,
+  return Inliner.inlineFunction(apply.getReferencedFunctionOrNull(), apply,
                                 appliedArgs);
 }
 
@@ -761,7 +762,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::ValueMetatypeInst:
   case SILInstructionKind::WitnessMethodInst:
   case SILInstructionKind::AssignInst:
-  case SILInstructionKind::AssignByDelegateInst:
+  case SILInstructionKind::AssignByWrapperInst:
   case SILInstructionKind::BranchInst:
   case SILInstructionKind::CheckedCastBranchInst:
   case SILInstructionKind::CheckedCastValueBranchInst:

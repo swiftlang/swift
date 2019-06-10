@@ -183,15 +183,18 @@ public:
   CallSiteDescriptor &operator=(CallSiteDescriptor &&) =default;
 
   SILFunction *getApplyCallee() const {
-    return cast<FunctionRefInst>(AI.getCallee())->getReferencedFunction();
+    return cast<FunctionRefInst>(AI.getCallee())
+        ->getInitiallyReferencedFunction();
   }
 
   SILFunction *getClosureCallee() const {
     if (auto *PAI = dyn_cast<PartialApplyInst>(getClosure()))
-      return cast<FunctionRefInst>(PAI->getCallee())->getReferencedFunction();
+      return cast<FunctionRefInst>(PAI->getCallee())
+          ->getInitiallyReferencedFunction();
 
     auto *TTTFI = cast<ThinToThickFunctionInst>(getClosure());
-    return cast<FunctionRefInst>(TTTFI->getCallee())->getReferencedFunction();
+    return cast<FunctionRefInst>(TTTFI->getCallee())
+        ->getInitiallyReferencedFunction();
   }
 
   bool closureHasRefSemanticContext() const {
@@ -553,7 +556,7 @@ static bool isSupportedClosure(const SILInstruction *Closure) {
   // function_ref).
   //
   // TODO: We can probably handle other partial applies here.
-  auto *FRI = dyn_cast<FunctionRefInst>(Callee);
+  auto *FRI = dyn_cast_or_null<FunctionRefInst>(Callee);
   if (!FRI)
     return false;
 
@@ -561,7 +564,7 @@ static bool isSupportedClosure(const SILInstruction *Closure) {
     // Bail if any of the arguments are passed by address and
     // are not @inout.
     // This is a temporary limitation.
-    auto ClosureCallee = FRI->getReferencedFunction();
+    auto ClosureCallee = FRI->getReferencedFunctionOrNull();
     assert(ClosureCallee);
     auto ClosureCalleeConv = ClosureCallee->getConventions();
     unsigned ClosureArgIdx =
@@ -730,8 +733,9 @@ SILValue ClosureSpecCloner::cloneCalleeConversion(
     SILValue origCalleeValue = calleeValue;
     calleeValue = cloneCalleeConversion(PAI->getArgument(0), NewClosure,
                                         Builder, NeedsRelease, CapturedMap);
-    auto FunRef = Builder.createFunctionRef(CallSiteDesc.getLoc(),
-                                            PAI->getReferencedFunction());
+    auto origRef = PAI->getReferencedFunctionOrNull();
+    assert(origRef);
+    auto FunRef = Builder.createFunctionRef(CallSiteDesc.getLoc(), origRef);
     auto NewPA = Builder.createPartialApply(
         CallSiteDesc.getLoc(), FunRef, {}, {calleeValue},
         PAI->getType().getAs<SILFunctionType>()->getCalleeConvention(),
@@ -1022,12 +1026,12 @@ static bool isClosureAppliedIn(SILFunction *Callee, unsigned closureArgIdx,
       assert(UserAI.isArgumentOperand(*ArgUse) &&
              "any other non-argument operands than the callee?");
 
-      SILFunction *ApplyCallee = UserAI.getReferencedFunction();
+      SILFunction *ApplyCallee = UserAI.getReferencedFunctionOrNull();
       if (ApplyCallee && !ApplyCallee->isExternalDeclaration() &&
           HandledFuncs.count(ApplyCallee) == 0 &&
           HandledFuncs.size() < RecursionBudget) {
         HandledFuncs.insert(ApplyCallee);
-        if (isClosureAppliedIn(UserAI.getReferencedFunction(),
+        if (isClosureAppliedIn(UserAI.getReferencedFunctionOrNull(),
                                UserAI.getCalleeArgIndex(*ArgUse), HandledFuncs))
           return true;
       }
@@ -1044,6 +1048,7 @@ static bool canSpecializeFullApplySite(FullApplySiteKind kind) {
   case FullApplySiteKind::BeginApplyInst:
     return false;
   }
+  llvm_unreachable("covered switch");
 }
 
 bool SILClosureSpecializerTransform::gatherCallSites(
@@ -1166,7 +1171,7 @@ bool SILClosureSpecializerTransform::gatherCallSites(
 
         // If AI does not have a function_ref definition as its callee, we can
         // not do anything here... so continue...
-        SILFunction *ApplyCallee = AI.getReferencedFunction();
+        SILFunction *ApplyCallee = AI.getReferencedFunctionOrNull();
         if (!ApplyCallee || ApplyCallee->isExternalDeclaration())
           continue;
 

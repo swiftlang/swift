@@ -90,8 +90,7 @@ SubstitutionMap Solution::computeSubstitutions(
 
     return tc.conformsToProtocol(replacement, protoType,
                                  getConstraintSystem().DC,
-                                 (ConformanceCheckFlags::InExpression|
-                                  ConformanceCheckFlags::Used));
+                                 ConformanceCheckFlags::InExpression);
   };
 
   return SubstitutionMap::get(sig,
@@ -428,8 +427,7 @@ namespace {
             auto conformance =
               tc.conformsToProtocol(
                         baseTy, proto, cs.DC,
-                        (ConformanceCheckFlags::InExpression|
-                         ConformanceCheckFlags::Used));
+                        ConformanceCheckFlags::InExpression);
             if (conformance && conformance->isConcrete()) {
               if (auto witness =
                       conformance->getConcrete()->getWitnessDecl(decl, &tc)) {
@@ -1699,8 +1697,7 @@ namespace {
         = tc.conformsToProtocol(valueType,
                                 bridgedProto,
                                 cs.DC,
-                                (ConformanceCheckFlags::InExpression|
-                                 ConformanceCheckFlags::Used));
+                                ConformanceCheckFlags::InExpression);
 
       FuncDecl *fn = nullptr;
 
@@ -4576,9 +4573,6 @@ namespace {
       auto hashable =
           cs.getASTContext().getProtocol(KnownProtocolKind::Hashable);
 
-      auto equatable =
-          cs.getASTContext().getProtocol(KnownProtocolKind::Equatable);
-
       auto &TC = cs.getTypeChecker();
       auto fnType = overload.openedType->castTo<FunctionType>();
       for (const auto &param : fnType->getParams()) {
@@ -4588,19 +4582,8 @@ namespace {
         // with all of the generic parameters resolved.
         auto hashableConformance =
             TC.conformsToProtocol(indexType, hashable, cs.DC,
-                                  (ConformanceCheckFlags::Used |
-                                   ConformanceCheckFlags::InExpression));
+                                  ConformanceCheckFlags::InExpression);
         assert(hashableConformance.hasValue());
-
-        // FIXME: Hashable implies Equatable, but we need to make sure the
-        // Equatable conformance is forced into existence during type
-        // checking so that it's available for SILGen.
-        auto eqConformance =
-            TC.conformsToProtocol(indexType, equatable, cs.DC,
-                                  (ConformanceCheckFlags::Used |
-                                   ConformanceCheckFlags::InExpression));
-        assert(eqConformance.hasValue());
-        (void)eqConformance;
 
         conformances.push_back(*hashableConformance);
       }
@@ -5153,8 +5136,7 @@ collectExistentialConformances(TypeChecker &tc, Type fromType, Type toType,
   for (auto proto : layout.getProtocols()) {
     conformances.push_back(
       *tc.containsProtocol(fromType, proto->getDecl(), DC,
-                           (ConformanceCheckFlags::InExpression|
-                            ConformanceCheckFlags::Used)));
+                           ConformanceCheckFlags::InExpression));
   }
 
   return tc.Context.AllocateCopy(conformances);
@@ -6263,8 +6245,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       auto conformance =
         tc.conformsToProtocol(
                         cs.getType(expr), hashable, cs.DC,
-                        (ConformanceCheckFlags::InExpression |
-                         ConformanceCheckFlags::Used));
+                        ConformanceCheckFlags::InExpression);
       assert(conformance && "must conform to Hashable");
 
       return cs.cacheType(
@@ -7673,10 +7654,6 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
       return nullptr;
     }
   }
-
-  // Mark any normal conformances used in this solution as "used".
-  for (auto &e : solution.Conformances)
-    TC.markConformanceUsed(e.second, DC);
 
   ExprRewriter rewriter(*this, solution, shouldSuppressDiagnostics());
   ExprWalker walker(rewriter);

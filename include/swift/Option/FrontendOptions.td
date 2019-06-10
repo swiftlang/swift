@@ -357,6 +357,11 @@ def enable_implicit_dynamic : Flag<["-"], "enable-implicit-dynamic">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
   HelpText<"Add 'dynamic' to all declarations">;
 
+def disable_previous_implementation_calls_in_dynamic_replacements :
+  Flag<["-"], "disable-previous-implementation-calls-in-dynamic-replacements">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
+  HelpText<"Disable calling the previous implementation in dynamic replacements">;
+
 def enable_dynamic_replacement_chaining :
   Flag<["-"], "enable-dynamic-replacement-chaining">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
@@ -466,9 +471,6 @@ def sil_inline_caller_benefit_reduction_factor : Separate<["-"], "sil-inline-cal
 def sil_unroll_threshold : Separate<["-"], "sil-unroll-threshold">,
   MetaVarName<"<250>">,
   HelpText<"Controls the aggressiveness of loop unrolling">;
-
-def sil_existential_specializer : Flag<["-"], "sil-existential-specializer">,
-  HelpText<"Enable SIL existential specializer optimization">;
 
 def sil_merge_partial_modules : Flag<["-"], "sil-merge-partial-modules">,
   HelpText<"Merge SIL from all partial swiftmodules into the final module">;

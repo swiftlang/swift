@@ -72,9 +72,8 @@ extension _AbstractStringStorage {
     _ outputPtr: UnsafeMutablePointer<UInt8>, _ maxLength: Int, _ encoding: UInt
   ) -> Int8 {
     switch (encoding, isASCII) {
-    case (_cocoaASCIIEncoding, true):
-      fallthrough
-    case (_cocoaUTF8Encoding, _):
+    case (_cocoaASCIIEncoding, true),
+         (_cocoaUTF8Encoding, _):
       guard maxLength >= count + 1 else { return 0 }
       outputPtr.initialize(from: start, count: count)
       outputPtr[count] = 0
@@ -88,9 +87,8 @@ extension _AbstractStringStorage {
   @_effects(readonly)
   internal func _cString(encoding: UInt) -> UnsafePointer<UInt8>? {
     switch (encoding, isASCII) {
-    case (_cocoaASCIIEncoding, true):
-      fallthrough
-    case (_cocoaUTF8Encoding, _):
+    case (_cocoaASCIIEncoding, true),
+         (_cocoaUTF8Encoding, _):
       return start
     default:
       return _cocoaCStringUsingEncodingTrampoline(self, encoding)

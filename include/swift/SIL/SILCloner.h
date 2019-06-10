@@ -982,7 +982,8 @@ visitAutoDiffFunctionExtractInst(AutoDiffFunctionExtractInst *Inst) {
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitFunctionRefInst(FunctionRefInst *Inst) {
-  SILFunction *OpFunction = getOpFunction(Inst->getReferencedFunction());
+  SILFunction *OpFunction =
+      getOpFunction(Inst->getInitiallyReferencedFunction());
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(Inst, getBuilder().createFunctionRef(
                                     getOpLocation(Inst->getLoc()), OpFunction));
@@ -991,7 +992,8 @@ SILCloner<ImplClass>::visitFunctionRefInst(FunctionRefInst *Inst) {
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitDynamicFunctionRefInst(DynamicFunctionRefInst *Inst) {
-  SILFunction *OpFunction = getOpFunction(Inst->getReferencedFunction());
+  SILFunction *OpFunction =
+      getOpFunction(Inst->getInitiallyReferencedFunction());
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(Inst, getBuilder().createDynamicFunctionRef(
                                     getOpLocation(Inst->getLoc()), OpFunction));
@@ -1000,7 +1002,8 @@ SILCloner<ImplClass>::visitDynamicFunctionRefInst(DynamicFunctionRefInst *Inst) 
 template <typename ImplClass>
 void SILCloner<ImplClass>::visitPreviousDynamicFunctionRefInst(
     PreviousDynamicFunctionRefInst *Inst) {
-  SILFunction *OpFunction = getOpFunction(Inst->getReferencedFunction());
+  SILFunction *OpFunction =
+      getOpFunction(Inst->getInitiallyReferencedFunction());
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(Inst, getBuilder().createPreviousDynamicFunctionRef(
                                     getOpLocation(Inst->getLoc()), OpFunction));
@@ -1240,10 +1243,10 @@ void SILCloner<ImplClass>::visitAssignInst(AssignInst *Inst) {
 }
 
 template <typename ImplClass>
-void SILCloner<ImplClass>::visitAssignByDelegateInst(AssignByDelegateInst *Inst) {
+void SILCloner<ImplClass>::visitAssignByWrapperInst(AssignByWrapperInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(
-      Inst, getBuilder().createAssignByDelegate(getOpLocation(Inst->getLoc()),
+      Inst, getBuilder().createAssignByWrapper(getOpLocation(Inst->getLoc()),
                                       getOpValue(Inst->getSrc()),
                                       getOpValue(Inst->getDest()),
                                       getOpValue(Inst->getInitializer()),

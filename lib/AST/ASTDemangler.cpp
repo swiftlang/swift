@@ -434,6 +434,7 @@ getParameterConvention(ImplParameterConvention conv) {
   case Demangle::ImplParameterConvention::Direct_Guaranteed:
     return ParameterConvention::Direct_Guaranteed;
   }
+  llvm_unreachable("covered switch");
 }
 
 static ResultConvention getResultConvention(ImplResultConvention conv) {
@@ -449,6 +450,7 @@ static ResultConvention getResultConvention(ImplResultConvention conv) {
   case Demangle::ImplResultConvention::Autoreleased:
     return ResultConvention::Autoreleased;
   }
+  llvm_unreachable("covered switch");
 }
 
 Type ASTBuilder::createImplFunctionType(
@@ -545,6 +547,7 @@ getMetatypeRepresentation(ImplMetatypeRepresentation repr) {
   case Demangle::ImplMetatypeRepresentation::ObjC:
     return MetatypeRepresentation::ObjC;
   }
+  llvm_unreachable("covered switch");
 }
 
 Type ASTBuilder::createExistentialMetatypeType(Type instance,

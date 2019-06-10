@@ -358,7 +358,7 @@ SILValue swift::isPartialApplyOfReabstractionThunk(PartialApplyInst *PAI) {
       PAI->getNumArguments() != 2)
     return SILValue();
 
-  auto *Fun = PAI->getReferencedFunction();
+  auto *Fun = PAI->getReferencedFunctionOrNull();
   if (!Fun)
     return SILValue();
 
@@ -377,19 +377,19 @@ SILValue swift::isPartialApplyOfReabstractionThunk(PartialApplyInst *PAI) {
   return Arg;
 }
 
-bool swift::onlyUsedByAssignByDelegate(PartialApplyInst *PAI) {
-  bool usedByAssignByDelegate = false;
+bool swift::onlyUsedByAssignByWrapper(PartialApplyInst *PAI) {
+  bool usedByAssignByWrapper = false;
   for (Operand *Op : PAI->getUses()) {
     SILInstruction *User = Op->getUser();
-    if (isa<AssignByDelegateInst>(User) && Op->getOperandNumber() >= 2) {
-      usedByAssignByDelegate = true;
+    if (isa<AssignByWrapperInst>(User) && Op->getOperandNumber() >= 2) {
+      usedByAssignByWrapper = true;
       continue;
     }
     if (isa<DestroyValueInst>(User))
       continue;
     return false;
   }
-  return usedByAssignByDelegate;
+  return usedByAssignByWrapper;
 }
 
 /// Given a block used as a noescape function argument, attempt to find all

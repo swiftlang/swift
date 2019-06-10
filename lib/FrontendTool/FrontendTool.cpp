@@ -509,7 +509,6 @@ static void countStatsPostSema(UnifiedStatsReporter &Stats,
 
   auto const &AST = Instance.getASTContext();
   C.NumLoadedModules = AST.LoadedModules.size();
-  C.NumImportedExternalDefinitions = AST.ExternalDefinitions.size();
 
   if (auto *D = Instance.getDependencyTracker()) {
     C.NumDependencies = D->getDependencies().size();
@@ -598,7 +597,9 @@ static bool buildModuleFromParseableInterface(CompilerInvocation &Invocation,
   StringRef InputPath = FEOpts.InputsAndOutputs.getFilenameOfFirstInput();
   StringRef PrebuiltCachePath = FEOpts.PrebuiltModuleCachePath;
   return ParseableInterfaceModuleLoader::buildSwiftModuleFromSwiftInterface(
-      Instance.getASTContext(), Invocation.getClangModuleCachePath(),
+      Instance.getSourceMgr(), Instance.getDiags(),
+      Invocation.getSearchPathOptions(), Invocation.getLangOptions(),
+      Invocation.getClangModuleCachePath(),
       PrebuiltCachePath, Invocation.getModuleName(), InputPath,
       Invocation.getOutputFilename(),
       FEOpts.SerializeModuleInterfaceDependencyHashes,

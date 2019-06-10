@@ -632,7 +632,8 @@ bool FunctionSignatureTransform::run(bool hasCaller) {
     return false;
   }
 
-  if (!hasCaller && canBeCalledIndirectly(F->getRepresentation())) {
+  if (!hasCaller && (F->getDynamicallyReplacedFunction() ||
+                     canBeCalledIndirectly(F->getRepresentation()))) {
     LLVM_DEBUG(llvm::dbgs() << "  function has no caller -> abort\n");
     return false;
   }

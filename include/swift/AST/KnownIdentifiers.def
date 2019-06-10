@@ -116,6 +116,7 @@ IDENTIFIER(WinSDK)
 IDENTIFIER(with)
 IDENTIFIER(withArguments)
 IDENTIFIER(withKeywordArguments)
+IDENTIFIER(wrapperValue)
 
 // SWIFT_ENABLE_TENSORFLOW
 IDENTIFIER(TensorFlow)

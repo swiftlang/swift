@@ -239,7 +239,8 @@ CalleeList CalleeCache::getCalleeListForCalleeKind(SILValue Callee) const {
     return CalleeList();
 
   case ValueKind::FunctionRefInst:
-    return CalleeList(cast<FunctionRefInst>(Callee)->getReferencedFunction());
+    return CalleeList(
+        cast<FunctionRefInst>(Callee)->getInitiallyReferencedFunction());
 
   case ValueKind::DynamicFunctionRefInst:
   case ValueKind::PreviousDynamicFunctionRefInst:

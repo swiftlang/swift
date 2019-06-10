@@ -323,7 +323,7 @@ bb0(%0 : $C_PQ):
   strong_retain %0 : $C_PQ
   %3 = init_existential_ref %0 : $C_PQ : $C_PQ, $P & Q
   %5 = open_existential_ref %3 : $P & Q to $@opened("044D530E-7327-11E8-A998-ACDE48001122") P & Q
-  // function_ref P<>.witnessComposition()
+  // function_ref P<>.witnessCompositionOwned()
   %6 = function_ref @$s32sil_combine_concrete_existential1PPA2A1QRzrlE18witnessCompositionyyF : $@convention(method) <τ_0_0 where τ_0_0 : P, τ_0_0 : Q> (@guaranteed τ_0_0) -> ()
   %7 = apply %6<@opened("044D530E-7327-11E8-A998-ACDE48001122") P & Q>(%5) : $@convention(method) <τ_0_0 where τ_0_0 : P, τ_0_0 : Q> (@guaranteed τ_0_0) -> ()
   strong_release %3 : $P & Q
@@ -509,12 +509,17 @@ extension InGuaranteedArgTestNativeObjectWrapper : InGuaranteedArgTestProtocol {
 
 sil @in_guaranteed_arg_test_callee : $@convention(thin) <τ_0_0 where τ_0_0 : InGuaranteedArgTestProtocol> (@in τ_0_0) -> ()
 
-// The current transformation is not smart enough to remove the
-// destroy_addr. Simply substituting the copy source for the apply argument
-// would introduce a use-after-free. = (.
-//
 // CHECK-LABEL: sil @in_guaranteed_arg_test_caller : $@convention(thin) <τ_0_0 where τ_0_0 : InGuaranteedArgTestProtocol> (@in τ_0_0) -> () {
-// CHECK: apply {{%.*}}<@opened("C494A60E-71EA-11E9-B8C0-D0817AD3F8AD") InGuaranteedArgTestProtocol>
+// CHECK: bb0(%0 : $*τ_0_0):
+// CHECK: [[ALLOC1:%.*]] = alloc_stack $τ_0_0
+// CHECK: copy_addr [take] %0 to [initialization] [[ALLOC1]] : $*τ_0_0
+// CHECK: [[F:%.*]] = function_ref @in_guaranteed_arg_test_callee : $@convention(thin) <τ_0_0 where τ_0_0 : InGuaranteedArgTestProtocol> (@in τ_0_0) -> ()
+// CHECK: [[ALLOC2:%.*]] = alloc_stack $τ_0_0
+// CHECK: copy_addr %1 to [initialization] [[ALLOC2]] : $*τ_0_0
+// CHECK: apply [[F]]<τ_0_0>(%4) : $@convention(thin) <τ_0_0 where τ_0_0 : InGuaranteedArgTestProtocol> (@in τ_0_0) -> ()
+// CHECK: dealloc_stack [[ALLOC2]] : $*τ_0_0
+// CHECK: destroy_addr [[ALLOC1]] : $*τ_0_0
+// CHECK: dealloc_stack [[ALLOC1]] : $*τ_0_0
 // CHECK: } // end sil function 'in_guaranteed_arg_test_caller'
 sil @in_guaranteed_arg_test_caller : $@convention(thin) <τ_0_0 where τ_0_0 : InGuaranteedArgTestProtocol> (@in τ_0_0) -> () {
 bb0(%0 : $*τ_0_0):
@@ -531,4 +536,37 @@ bb0(%0 : $*τ_0_0):
   dealloc_stack %1 : $*InGuaranteedArgTestProtocol
   %9999 = tuple()
   return %9999 : $()
+}
+
+//===----------------------------------------------------------------------===//
+// Test concrete substitution for an owned references.
+//===----------------------------------------------------------------------===//
+
+extension P {
+  public func witnessOwned()
+}
+
+extension C {
+  public func witnessOwned()
+}
+
+sil @$s32sil_combine_concrete_existential1PPAAE12witnessOwnedyyF : $@convention(method) <Self where Self : P> (@owned Self) -> ()
+
+// CHECK-LABEL: sil hidden @$s1t12testOwnedRef1cyAA1CC_tF : $@convention(thin) (@guaranteed C) -> () {
+// CHECK: bb0(%0 : $C):
+// CHECK:   strong_retain %0 : $C                           // id: %1
+// CHECK:   [[F:%.*]] = function_ref @$s32sil_combine_concrete_existential1PPAAE12witnessOwnedyyF : $@convention(method) <τ_0_0 where τ_0_0 : P> (@owned τ_0_0) -> ()
+// CHECK:   apply [[F]]<C>(%0) : $@convention(method) <τ_0_0 where τ_0_0 : P> (@owned τ_0_0) -> ()
+// CHECK-NEXT:   tuple
+// CHECK-NEXT:   return
+// CHECK-LABEL: } // end sil function '$s1t12testOwnedRef1cyAA1CC_tF'
+sil hidden @$s1t12testOwnedRef1cyAA1CC_tF : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : $C):
+  strong_retain %0 : $C
+  %3 = init_existential_ref %0 : $C : $C, $P
+  %5 = open_existential_ref %3 : $P to $@opened("044D530E-7327-11E8-A998-ACDE48001133") P
+  %6 = function_ref @$s32sil_combine_concrete_existential1PPAAE12witnessOwnedyyF : $@convention(method) <τ_0_0 where τ_0_0 : P> (@owned τ_0_0) -> ()
+  %7 = apply %6<@opened("044D530E-7327-11E8-A998-ACDE48001133") P>(%5) : $@convention(method) <τ_0_0 where τ_0_0 : P> (@owned τ_0_0) -> ()
+  %9 = tuple ()
+  return %9 : $()
 }

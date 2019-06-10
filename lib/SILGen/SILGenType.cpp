@@ -42,8 +42,8 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
                                SILDeclRef derived, SILDeclRef base) {
   assert(base.kind == derived.kind);
 
-  auto *baseDecl = base.getDecl();
-  auto *derivedDecl = derived.getDecl();
+  auto *baseDecl = cast<AbstractFunctionDecl>(base.getDecl());
+  auto *derivedDecl = cast<AbstractFunctionDecl>(derived.getDecl());
 
   // Note: We intentionally don't support extension members here.
   //
@@ -80,8 +80,11 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
   // If the member is dynamic, reference its dynamic dispatch thunk so that
   // it will be redispatched, funneling the method call through the runtime
   // hook point.
-  if (derivedDecl->isObjCDynamic()
-      && derived.kind != SILDeclRef::Kind::Allocator) {
+  bool usesObjCDynamicDispatch =
+      (derivedDecl->isObjCDynamic() &&
+       derived.kind != SILDeclRef::Kind::Allocator);
+
+  if (usesObjCDynamicDispatch) {
     implFn = getDynamicThunk(derived, Types.getConstantInfo(derived).SILFnType);
     implLinkage = SILLinkage::Public;
   } else {
@@ -92,6 +95,12 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
   // As a fast path, if there is no override, definitely no thunk is necessary.
   if (derived == base)
     return SILVTable::Entry(base, implFn, implKind, implLinkage);
+
+  // If the base method is less visible than the derived method, we need
+  // a thunk.
+  bool baseLessVisibleThanDerived =
+    (derivedDecl->isEffectiveLinkageMoreVisibleThan(baseDecl) &&
+     !usesObjCDynamicDispatch);
 
   // Determine the derived thunk type by lowering the derived type against the
   // abstraction pattern of the base.
@@ -104,7 +113,8 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
   // The override member type is semantically a subtype of the base
   // member type. If the override is ABI compatible, we do not need
   // a thunk.
-  if (M.Types.checkFunctionForABIDifferences(derivedInfo.SILFnType,
+  if (!baseLessVisibleThanDerived &&
+      M.Types.checkFunctionForABIDifferences(derivedInfo.SILFnType,
                                              overrideInfo.SILFnType)
       == TypeConverter::ABIDifference::Trivial)
     return SILVTable::Entry(base, implFn, implKind, implLinkage);
@@ -138,10 +148,13 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
       IsBare, IsNotTransparent, IsNotSerialized, IsNotDynamic);
   thunk->setDebugScope(new (M) SILDebugScope(loc, thunk));
 
+  PrettyStackTraceSILFunction trace("generating vtable thunk", thunk);
+
   SILGenFunction(*this, *thunk, theClass)
-    .emitVTableThunk(derived, implFn, basePattern,
+    .emitVTableThunk(base, derived, implFn, basePattern,
                      overrideInfo.LoweredType,
-                     derivedInfo.LoweredType);
+                     derivedInfo.LoweredType,
+                     baseLessVisibleThanDerived);
   emitLazyConformancesForFunction(thunk);
 
   return SILVTable::Entry(base, thunk, implKind, implLinkage);

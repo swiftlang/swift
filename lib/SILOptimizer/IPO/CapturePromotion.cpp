@@ -976,7 +976,7 @@ bool isPartialApplyNonEscapingUser(Operand *CurrentOp, PartialApplyInst *PAI,
   // index so is not stored separately);
   unsigned Index = OpNo - 1 + closureConv.getNumSILArguments();
 
-  auto *Fn = PAI->getReferencedFunction();
+  auto *Fn = PAI->getReferencedFunctionOrNull();
 
   // It is not safe to look at the content of dynamically replaceable functions
   // since this pass looks at the content of Fn.
@@ -1153,7 +1153,7 @@ constructClonedFunction(SILOptFunctionBuilder &FuncBuilder,
   SILFunction *F = PAI->getFunction();
 
   // Create the Cloned Name for the function.
-  SILFunction *Orig = FRI->getReferencedFunction();
+  SILFunction *Orig = FRI->getReferencedFunctionOrNull();
 
   IsSerialized_t Serialized = IsNotSerialized;
   if (F->isSerialized() && Orig->isSerialized())

@@ -219,13 +219,13 @@ extension r25271859 {
   func map<U>(f: (T) -> U) -> r25271859<U> {
   }
 
-  func andThen<U>(f: (T) -> r25271859<U>) {
+  func andThen<U>(f: (T) -> r25271859<U>) { // expected-note {{in call to function 'andThen(f:)'}}
   }
 }
 
 func f(a : r25271859<(Float, Int)>) {
-  a.map { $0.0 }
-    .andThen { _ in   // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{18-18=-> r25271859<String> }}
+  a.map { $0.0 } // expected-error {{generic parameter 'U' could not be inferred}} (This is related to how solver is setup with multiple statements)
+    .andThen { _ in
       print("hello") // comment this out and it runs, leave any form of print in and it doesn't
       return r25271859<String>()
   }

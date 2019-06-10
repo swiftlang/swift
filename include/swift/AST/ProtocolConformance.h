@@ -27,6 +27,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/TinyPtrVector.h"
 #include <utility>
 
 namespace swift {
@@ -174,9 +175,8 @@ public:
   template<typename F>
   bool forEachTypeWitness(LazyResolver *resolver, F f) const {
     const ProtocolDecl *protocol = getProtocol();
-    for (auto req : protocol->getMembers()) {
-      auto assocTypeReq = dyn_cast<AssociatedTypeDecl>(req);
-      if (!assocTypeReq || req->isInvalid())
+    for (auto assocTypeReq : protocol->getAssociatedTypeMembers()) {
+      if (assocTypeReq->isInvalid())
         continue;
 
       // If we don't have and cannot resolve witnesses, skip it.

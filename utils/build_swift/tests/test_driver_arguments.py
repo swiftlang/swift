@@ -640,10 +640,10 @@ class TestDriverArgumentParser(unittest.TestCase):
             namespace = self.parse_default_args(['--test-optimize-for-size'])
             self.assertTrue(namespace.test)
 
-    def test_implied_defaults_test_optimize_none_implicit_dynamic(self):
+    def test_implied_defaults_test_optimize_none_with_implicit_dynamic(self):
         with self.assertNotRaises(ParserError):
             namespace = self.parse_default_args(
-                ['--test-optimize-none-implicit-dynamic'])
+                ['--test-optimize-none-with-implicit-dynamic'])
             self.assertTrue(namespace.test)
 
     def test_implied_defaults_skip_all_tests(self):

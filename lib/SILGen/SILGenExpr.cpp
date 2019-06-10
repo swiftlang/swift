@@ -3253,6 +3253,7 @@ static ProtocolConformance *mapConformanceOutOfContext(
                .mapReplacementTypesOutOfContext());
   }
   }
+  llvm_unreachable("covered switch");
 }
 
 /// Map the given protocol conformance out of context, replacing archetypes

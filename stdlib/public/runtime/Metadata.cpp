@@ -2698,8 +2698,8 @@ _swift_initClassMetadataImpl(ClassMetadata *self,
 
   initClassFieldOffsetVector(self, numFields, fieldTypes, fieldOffsets);
 
-  auto *description = self->getDescription();
 #if SWIFT_OBJC_INTEROP
+  auto *description = self->getDescription();
   if (description->isGeneric()) {
     assert(!description->hasObjCResilientClassStub());
     initGenericObjCClass(self, numFields, fieldTypes, fieldOffsets);
@@ -2730,7 +2730,7 @@ _swift_initClassMetadataImpl(ClassMetadata *self,
     }
   }
 #else
-  assert(!description->hasObjCResilientClassStub());
+  assert(!self->getDescription()->hasObjCResilientClassStub());
 #endif
 
   return MetadataDependency();
@@ -3849,24 +3849,6 @@ static const WitnessTable *_getForeignWitnessTable(
 /***************************************************************************/
 /*** Other metadata routines ***********************************************/
 /***************************************************************************/
-
-template<> const ClassMetadata *
-Metadata::getClassObject() const {
-  switch (getKind()) {
-  case MetadataKind::Class: {
-    // Native Swift class metadata is also the class object.
-    return static_cast<const ClassMetadata *>(this);
-  }
-  case MetadataKind::ObjCClassWrapper: {
-    // Objective-C class objects are referenced by their Swift metadata wrapper.
-    auto wrapper = static_cast<const ObjCClassWrapperMetadata *>(this);
-    return wrapper->Class;
-  }
-  // Other kinds of types don't have class objects.
-  default:
-    return nullptr;
-  }
-}
 
 template <> OpaqueValue *Metadata::allocateBoxForExistentialIn(ValueBuffer *buffer) const {
   auto *vwt = getValueWitnesses();

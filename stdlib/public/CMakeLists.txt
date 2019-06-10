@@ -61,6 +61,7 @@ if(SWIFT_BUILD_STDLIB)
   add_subdirectory(stubs)
   add_subdirectory(core)
   add_subdirectory(SwiftOnoneSupport)
+  add_subdirectory(Compatibility50)
 endif()
 
 # SWIFT_ENABLE_TENSORFLOW
