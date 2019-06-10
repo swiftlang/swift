@@ -1,3 +1,6 @@
+
+#if _runtime(_ObjC)
+
 import Swift
 import SwiftPrivate
 import Darwin
@@ -1002,3 +1005,6 @@ func getBridgedNSArrayOfValueTypeCustomBridged(
 
   return bridged
 }
+
+#endif
+
