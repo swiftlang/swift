@@ -531,6 +531,17 @@ bool AbstractFunctionDecl::isTransparent() const {
   return false;
 }
 
+bool ParameterList::hasInternalParameter(StringRef Prefix) const {
+  for (auto param : *this) {
+    if (param->hasName() && param->getNameStr().startswith(Prefix))
+      return true;
+    auto argName = param->getArgumentName();
+    if (!argName.empty() && argName.str().startswith(Prefix))
+      return true;
+  }
+  return false;
+}
+
 bool Decl::isPrivateStdlibDecl(bool treatNonBuiltinProtocolsAsPublic) const {
   const Decl *D = this;
   if (auto ExtD = dyn_cast<ExtensionDecl>(D)) {
@@ -552,26 +563,15 @@ bool Decl::isPrivateStdlibDecl(bool treatNonBuiltinProtocolsAsPublic) const {
       FU->getKind() != FileUnitKind::SerializedAST)
     return false;
 
-  auto hasInternalParameter = [](const ParameterList *params) -> bool {
-    for (auto param : *params) {
-      if (param->hasName() && param->getNameStr().startswith("_"))
-        return true;
-      auto argName = param->getArgumentName();
-      if (!argName.empty() && argName.str().startswith("_"))
-        return true;
-    }
-    return false;
-  };
-
   if (auto AFD = dyn_cast<AbstractFunctionDecl>(D)) {
     // If it's a function with a parameter with leading underscore, it's a
     // private function.
-    if (hasInternalParameter(AFD->getParameters()))
+    if (AFD->getParameters()->hasInternalParameter("_"))
       return true;
   }
 
   if (auto SubscriptD = dyn_cast<SubscriptDecl>(D)) {
-    if (hasInternalParameter(SubscriptD->getIndices()))
+    if (SubscriptD->getIndices()->hasInternalParameter("_"))
       return true;
   }
 
