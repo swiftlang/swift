@@ -129,10 +129,12 @@ public protocol AdditiveArithmetic : Equatable {
 }
 
 public extension AdditiveArithmetic {
+  @_alwaysEmitIntoClient
   static func +=(lhs: inout Self, rhs: Self) {
     lhs = lhs + rhs
   }
 
+  @_alwaysEmitIntoClient
   static func -=(lhs: inout Self, rhs: Self) {
     lhs = lhs - rhs
   }
