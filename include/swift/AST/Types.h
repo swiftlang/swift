@@ -2867,8 +2867,8 @@ public:
     // and NumMaskBits must be updated, and they must match.
     //
     //   SWIFT_ENABLE_TENSORFLOW
-    //   |representation|noEscape|throws|differentiability|
-    //   |    0 .. 3    |    4   |   5  |      6 .. 7     |
+    //   |representation|noEscape|throws|differentiability| ? |
+    //   |    0 .. 3    |    4   |   5  |      6 .. 7     | 8 |
     //
     enum : unsigned {
       RepresentationMask           = 0xF << 0,
@@ -2877,7 +2877,7 @@ public:
       // SWIFT_ENABLE_TENSORFLOW
       DifferentiabilityMaskOffset  = 6,
       DifferentiabilityMask        = 0x3 << DifferentiabilityMaskOffset,
-      NumDifferentiabilityMaskBits = 3,
+      NumDifferentiabilityMaskBits = 2,
       NumMaskBits                  = 8
     };
 
@@ -2915,8 +2915,7 @@ public:
     bool throws() const { return Bits & ThrowsMask; }
     // SWIFT_ENABLE_TENSORFLOW
     bool isDifferentiable() const {
-      llvm::errs() << (unsigned)DifferentiabilityMask << "\n";
-      llvm::errs() << (unsigned)getDifferentiabilityKind() << "\n";
+//      llvm::errs() << "( " << (unsigned)getDifferentiabilityKind() << " )" << "\n";
       return getDifferentiabilityKind() >= DifferentiabilityKind::Normal;
     }
     DifferentiabilityKind getDifferentiabilityKind() const {
