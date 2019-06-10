@@ -1006,10 +1006,13 @@ protected:
 /// we allocate a matrushka of these.
 class ConditionalClauseScope final : public ASTScopeImpl {
 public:
-  const StmtConditionElement &stmtConditionElement;
+  LabeledConditionalStmt *const stmt;
+  const unsigned index;
+  const SourceLoc endLoc; // cannot get it from the stmt
 
-  ConditionalClauseScope(const StmtConditionElement &sce)
-      : stmtConditionElement(sce) {}
+  ConditionalClauseScope(LabeledConditionalStmt * stmt,
+   unsigned index, SourceLoc endLoc) : stmt(stmt), index(index), endLoc(endLoc) {}
+
   virtual ~ConditionalClauseScope() {}
 
   ASTScopeImpl *expandMe(ScopeCreator &scopeCreator) override;
@@ -1024,10 +1027,12 @@ protected:
   void printSpecifics(llvm::raw_ostream &out) const override;
 
 public:
-  NullablePtr<const void> addressForPrinting() const override {
-    return &stmtConditionElement;
-  }
   SourceRange getChildlessSourceRange() const override;
+  
+private:
+  ArrayRef<StmtConditionElement> getCond() const;
+  const StmtConditionElement &getStmtConditionElement() const;
+  SourceLoc startLocAccordingToCondition() const;
 };
 
 /// If, while, & guard statements all start with a conditional clause, then some
@@ -1288,7 +1293,7 @@ public:
 
 protected:
   /// Return the lookupParent required to search these.
-  ASTScopeImpl *createNestedConditionalClauseScopes(ScopeCreator &);
+  ASTScopeImpl *createNestedConditionalClauseScopes(ScopeCreator &, const Stmt* afterConds);
 };
 
 class IfStmtScope final : public LabeledConditionalStmtScope {

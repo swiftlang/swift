@@ -346,9 +346,30 @@ SourceRange BraceStmtScope::getChildlessSourceRange() const {
 }
 
 
-SourceRange ConditionalClauseScope::getChildlessSourceRange() const {
-  return stmtConditionElement.getSourceRange();
+SourceLoc ConditionalClauseScope::startLocAccordingToCondition() const {
+  // Determine the start location if the condition can provide it.
+  auto conditionals = getCond();
+  const StmtConditionElement cond = conditionals[index];
+  switch (cond.getKind()) {
+  case StmtConditionElement::CK_Boolean:
+  case StmtConditionElement::CK_Availability:
+    return cond.getStartLoc();
+  case StmtConditionElement::CK_PatternBinding:
+  return cond.getStartLoc();
+//    return index + 1 < conditionals.size()
+//               ? conditionals[index + 1].getStartLoc()
+//               : SourceLoc();
+  }
 }
+
+SourceRange ConditionalClauseScope::getChildlessSourceRange() const {
+  // From the start of this particular condition to the start of the
+  // then/body part.
+  const auto startLoc = startLocAccordingToCondition();
+  return startLoc.isValid() ? SourceRange(startLoc, endLoc)
+                            : SourceRange(endLoc);
+}
+
 
 SourceRange ConditionalClausePatternUseScope::getChildlessSourceRange() const {
   // For a guard continuation, the scope extends from the end of the 'else'

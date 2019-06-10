@@ -169,18 +169,10 @@ void AbstractPatternEntryScope::printSpecifics(llvm::raw_ostream &out) const {
 
 void ConditionalClauseScope::printSpecifics(llvm::raw_ostream &out) const {
   ASTScopeImpl::printSpecifics(out);
-  switch (stmtConditionElement.getKind()) {
-
-  case StmtConditionElement::CK_Boolean:
-    out << " boolean ";
-    break;
-  case StmtConditionElement::CK_PatternBinding:
-    out << " pattern-binding ";
-    break;
-  case StmtConditionElement::CK_Availability:
-    out << " availability ";
-    break;
-  }
+  out << " in ";
+  printSourceRange(out, stmt->getSourceRange(), getSourceManager());
+  out << " index " << index;
+  out << "  ";
 }
 
 void SubscriptDeclScope::printSpecifics(llvm::raw_ostream &out) const {

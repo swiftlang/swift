@@ -239,3 +239,11 @@ void ASTScopeImpl::postOrderDo(function_ref<void(ASTScopeImpl *)> fn) {
     child->postOrderDo(fn);
   fn(this);
 }
+
+ArrayRef<StmtConditionElement> ConditionalClauseScope::getCond() const {
+  return stmt->getCond();
+}
+
+const StmtConditionElement &ConditionalClauseScope::getStmtConditionElement() const {
+  return getCond()[index];
+}

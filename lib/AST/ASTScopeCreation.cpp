@@ -675,19 +675,19 @@ ASTScopeImpl *PatternEntryUseScope::expandAScopeThatCreatesANewInsertionPoint(
 
 ASTScopeImpl *ConditionalClauseScope::expandAScopeThatCreatesANewInsertionPoint(
     ScopeCreator &scopeCreator) {
-  switch (stmtConditionElement.getKind()) {
+  const StmtConditionElement &sec = getStmtConditionElement();
+  switch (sec.getKind()) {
   case StmtConditionElement::CK_Availability:
     return this;
   case StmtConditionElement::CK_Boolean:
-    ASTVisitorForScopeCreation().visitExpr(stmtConditionElement.getBoolean(),
+    ASTVisitorForScopeCreation().visitExpr(sec.getBoolean(),
                                            this, scopeCreator);
     return this;
   case StmtConditionElement::CK_PatternBinding:
     ASTVisitorForScopeCreation().visitExpr(
-        stmtConditionElement.getInitializer(), this, scopeCreator);
+        sec.getInitializer(), this, scopeCreator);
     return scopeCreator.createSubtree<ConditionalClausePatternUseScope>(
-        this, stmtConditionElement.getPattern(),
-        stmtConditionElement.getEndLoc());
+        this, sec.getPattern(), endLoc);
   }
 }
 
@@ -695,7 +695,7 @@ ASTScopeImpl *GuardStmtScope::expandAScopeThatCreatesANewInsertionPoint(
     ScopeCreator &scopeCreator) {
 
   ASTScopeImpl *conditionLookupParent =
-      createNestedConditionalClauseScopes(scopeCreator);
+      createNestedConditionalClauseScopes(scopeCreator, stmt->getBody());
   // Add a child for the 'guard' body, which always exits.
   // Parent is whole guard stmt scope, NOT the cond scopes
   scopeCreator.createScopeFor(stmt->getBody(), this);
@@ -762,7 +762,7 @@ void AbstractFunctionBodyScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
 void IfStmtScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
     ScopeCreator &scopeCreator) {
   ASTScopeImpl *insertionPoint =
-      createNestedConditionalClauseScopes(scopeCreator);
+      createNestedConditionalClauseScopes(scopeCreator, stmt->getThenStmt());
 
   // The 'then' branch
   scopeCreator.createScopeFor(stmt->getThenStmt(), insertionPoint);
@@ -774,7 +774,7 @@ void IfStmtScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
 void WhileStmtScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
     ScopeCreator &scopeCreator) {
   ASTScopeImpl *insertionPoint =
-      createNestedConditionalClauseScopes(scopeCreator);
+      createNestedConditionalClauseScopes(scopeCreator, stmt->getBody());
   scopeCreator.createScopeFor(stmt->getBody(), insertionPoint);
 }
 
@@ -981,12 +981,12 @@ TypeAliasScope::createTrailingWhereClauseScope(ASTScopeImpl *parent,
 #pragma mark misc
 
 ASTScopeImpl *LabeledConditionalStmtScope::createNestedConditionalClauseScopes(
-    ScopeCreator &scopeCreator) {
+    ScopeCreator &scopeCreator, const Stmt *const afterConds) {
   auto *stmt = getLabeledConditionalStmt();
   ASTScopeImpl *insertionPoint = this;
-  for (const auto &stmtConditionElement : stmt->getCond()) {
+  for (unsigned i = 0; i < stmt->getCond().size(); ++i) {
     insertionPoint = scopeCreator.createSubtree<ConditionalClauseScope>(
-        insertionPoint, stmtConditionElement);
+        insertionPoint, stmt, i, afterConds->getStartLoc());
   }
   return insertionPoint;
 }
