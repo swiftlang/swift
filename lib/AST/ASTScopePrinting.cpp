@@ -170,16 +170,16 @@ void AbstractPatternEntryScope::printSpecifics(llvm::raw_ostream &out) const {
 void ConditionalClauseScope::printSpecifics(llvm::raw_ostream &out) const {
   ASTScopeImpl::printSpecifics(out);
   switch (stmtConditionElement.getKind()) {
-  
-    case StmtConditionElement::CK_Boolean:
-      out << " boolean ";
-      break;
-    case StmtConditionElement::CK_PatternBinding:
-      out << " pattern-binding ";
-      break;
-    case StmtConditionElement::CK_Availability:
-      out << " availability ";
-      break;
+
+  case StmtConditionElement::CK_Boolean:
+    out << " boolean ";
+    break;
+  case StmtConditionElement::CK_PatternBinding:
+    out << " pattern-binding ";
+    break;
+  case StmtConditionElement::CK_Availability:
+    out << " availability ";
+    break;
   }
 }
 
@@ -193,7 +193,8 @@ void VarDeclScope::printSpecifics(llvm::raw_ostream &out) const {
   decl->dumpRef(out);
 }
 
-void ConditionalClausePatternUseScope::printSpecifics(llvm::raw_ostream &out) const {
+void ConditionalClausePatternUseScope::printSpecifics(
+    llvm::raw_ostream &out) const {
   pattern->print(out);
   out << "  ";
 }

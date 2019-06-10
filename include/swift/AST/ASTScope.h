@@ -1008,7 +1008,7 @@ class ConditionalClauseScope final : public ASTScopeImpl {
 public:
   const StmtConditionElement &stmtConditionElement;
 
-  ConditionalClauseScope(const StmtConditionElement & sce)
+  ConditionalClauseScope(const StmtConditionElement &sce)
       : stmtConditionElement(sce) {}
   virtual ~ConditionalClauseScope() {}
 
@@ -1341,18 +1341,21 @@ public:
 
 /// A scope after a guard statement that follows lookups into the conditions
 class GuardStmtUseScope final : public ASTScopeImpl {
-  public:
+public:
   ASTScopeImpl *const lookupParent;
   const SourceLoc startLoc;
-  
-  GuardStmtUseScope(ASTScopeImpl* lookupParent, SourceLoc startLoc) : lookupParent(lookupParent), startLoc(startLoc) {}
-  
+
+  GuardStmtUseScope(ASTScopeImpl *lookupParent, SourceLoc startLoc)
+      : lookupParent(lookupParent), startLoc(startLoc) {}
+
   SourceRange getChildlessSourceRange() const override;
   std::string getClassName() const override;
   ASTScopeImpl *expandMe(ScopeCreator &) override;
-  
+
 protected:
-  NullablePtr<const ASTScopeImpl> getLookupParent() const override { return lookupParent; }
+  NullablePtr<const ASTScopeImpl> getLookupParent() const override {
+    return lookupParent;
+  }
 };
 
 class RepeatWhileScope final : public AbstractStmtScope {

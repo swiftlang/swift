@@ -462,8 +462,10 @@ bool ClosureParametersScope::lookupLocalBindings(Optional<bool> isCascadingUse,
   return false;
 }
 
-bool ConditionalClausePatternUseScope::lookupLocalBindings(Optional<bool> isCascadingUse, DeclConsumer consumer) const {
-  return lookupLocalBindingsInPattern(pattern, isCascadingUse, DeclVisibilityKind::LocalVariable, consumer);
+bool ConditionalClausePatternUseScope::lookupLocalBindings(
+    Optional<bool> isCascadingUse, DeclConsumer consumer) const {
+  return lookupLocalBindingsInPattern(
+      pattern, isCascadingUse, DeclVisibilityKind::LocalVariable, consumer);
 }
 
 bool ASTScopeImpl::lookupLocalBindingsInPattern(Pattern *p,
