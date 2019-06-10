@@ -3168,25 +3168,20 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     attr->setVJPFunction(vjp);
   }
 
-  auto insertion = ctx.DifferentiableAttrs.try_emplace(
-      {D, attr->getParameterIndices()}, attr);
-  // `@differentiable` attributes are uniqued by their parameter indices.
-  // Reject duplicate attributes for the same decl and parameter indices pair.
-  if (!insertion.second && insertion.first->getSecond() != attr) {
-    diagnoseAndRemoveAttr(attr, diag::differentiable_attr_duplicate);
-    TC.diagnose(insertion.first->getSecond()->getLocation(),
-                diag::differentiable_attr_duplicate_note);
-    return;
-  }
   if (auto *asd = dyn_cast<AbstractStorageDecl>(D)) {
     // Remove `@differentiable` attribute from storage declaration to prevent
     // duplicate attribute registration during SILGen.
     D->getAttrs().removeAttribute(attr);
     // Transfer `@differentiable` attribute from storage declaration to
     // getter accessor.
-    attr->setImplicit();
+    auto *newAttr = DifferentiableAttr::create(
+        ctx, /*implicit*/ true, attr->AtLoc, attr->getRange(), attr->isLinear(),
+        attr->getParameterIndices(), attr->getJVP(), attr->getVJP(),
+        attr->getRequirements());
+    newAttr->setJVPFunction(attr->getJVPFunction());
+    newAttr->setVJPFunction(attr->getVJPFunction());
     auto insertion = ctx.DifferentiableAttrs.try_emplace(
-        {asd->getGetter(), attr->getParameterIndices()}, attr);
+        {asd->getGetter(), newAttr->getParameterIndices()}, newAttr);
     // Valid `@differentiable` attributes are uniqued by their parameter
     // indices. Reject duplicate attributes for the same decl and parameter
     // indices pair.
@@ -3196,6 +3191,18 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
                   diag::differentiable_attr_duplicate_note);
       return;
     }
+    asd->getGetter()->getAttrs().add(newAttr);
+    return;
+  }
+  auto insertion = ctx.DifferentiableAttrs.try_emplace(
+      {D, attr->getParameterIndices()}, attr);
+  // `@differentiable` attributes are uniqued by their parameter indices.
+  // Reject duplicate attributes for the same decl and parameter indices pair.
+  if (!insertion.second && insertion.first->getSecond() != attr) {
+    diagnoseAndRemoveAttr(attr, diag::differentiable_attr_duplicate);
+    TC.diagnose(insertion.first->getSecond()->getLocation(),
+                diag::differentiable_attr_duplicate_note);
+    return;
   }
 }
 

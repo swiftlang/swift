@@ -106,7 +106,7 @@ struct DiffComputedProp : Differentiable & AdditiveArithmetic {
 // CHECK-AST: }
 
 // CHECK-SIL-LABEL: DiffComputedProp.computedProp.getter
-// CHECK-SIL-NOT: [differentiable source 0 wrt 0 jvp @computedPropJVP vjp @computedPropVJP]
+// CHECK-SIL-NEXT: [differentiable source 0 wrt 0 jvp @computedPropJVP vjp @computedPropVJP]
 
 public struct MyLayer: Differentiable {
   @differentiable

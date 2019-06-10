@@ -209,7 +209,6 @@ SILFunctionBuilder::getOrCreateFunction(SILLocation loc, SILDeclRef constant,
       // SWIFT_ENABLE_TENSORFLOW
       addFunctionAttributes(F, storage->getAttrs(), mod, constant);
     }
-    // SWIFT_ENABLE_TENSORFLOW
     addFunctionAttributes(F, decl->getAttrs(), mod, constant);
   }
 
