@@ -96,7 +96,7 @@ void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
       auto silDiffAttr = SILDifferentiableAttr::create(
           M, indices, A->getRequirements(), M.allocateCopy(jvpName),
           M.allocateCopy(vjpName));
-#if NDEBUG
+#ifndef NDEBUG
       // Verify that no existing attributes have the same indices.
       for (auto *existingAttr : F->getDifferentiableAttrs()) {
         bool sameAttributeConfig =
