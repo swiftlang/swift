@@ -348,10 +348,9 @@ SourceRange BraceStmtScope::getChildlessSourceRange() const {
 SourceRange ConditionalClauseScope::getChildlessSourceRange() const {
   // From the start of this particular condition to the start of the
   // then/body part.
-  const auto startLoc = getStmtConditionElement()->getStartLoc();
+  const auto startLoc = getStmtConditionElement().getStartLoc();
   return SourceRange(startLoc, endLoc);
 }
-
 
 SourceRange ConditionalClausePatternUseScope::getChildlessSourceRange() const {
   // For a guard continuation, the scope extends from the end of the 'else'

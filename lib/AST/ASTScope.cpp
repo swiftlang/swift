@@ -244,6 +244,7 @@ ArrayRef<StmtConditionElement> ConditionalClauseScope::getCond() const {
   return stmt->getCond();
 }
 
-const StmtConditionElement &ConditionalClauseScope::getStmtConditionElement() const {
+const StmtConditionElement &
+ConditionalClauseScope::getStmtConditionElement() const {
   return getCond()[index];
 }

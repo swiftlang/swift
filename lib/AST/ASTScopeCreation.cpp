@@ -588,7 +588,6 @@ CREATES_NEW_INSERTION_POINT(GenericTypeOrExtensionScope)
 CREATES_NEW_INSERTION_POINT(BraceStmtScope)
 CREATES_NEW_INSERTION_POINT(TopLevelCodeScope)
 
-
 NO_NEW_INSERTION_POINT(AbstractFunctionBodyScope)
 NO_NEW_INSERTION_POINT(AbstractFunctionDeclScope)
 NO_NEW_INSERTION_POINT(CaptureListScope)
@@ -681,12 +680,12 @@ ASTScopeImpl *ConditionalClauseScope::expandAScopeThatCreatesANewInsertionPoint(
   case StmtConditionElement::CK_Availability:
     return this;
   case StmtConditionElement::CK_Boolean:
-    ASTVisitorForScopeCreation().visitExpr(sec.getBoolean(),
-                                           this, scopeCreator);
+    ASTVisitorForScopeCreation().visitExpr(sec.getBoolean(), this,
+                                           scopeCreator);
     return this;
   case StmtConditionElement::CK_PatternBinding:
-    ASTVisitorForScopeCreation().visitExpr(
-        sec.getInitializer(), this, scopeCreator);
+    ASTVisitorForScopeCreation().visitExpr(sec.getInitializer(), this,
+                                           scopeCreator);
     return scopeCreator.createSubtree<ConditionalClausePatternUseScope>(
         this, sec.getPattern(), endLoc);
   }
@@ -720,7 +719,6 @@ ASTScopeImpl *TopLevelCodeScope::expandAScopeThatCreatesANewInsertionPoint(
     ScopeCreator &scopeCreator) {
   return scopeCreator.createSubtree<BraceStmtScope>(this, decl->getBody());
 }
-
 
 #pragma mark expandAScopeThatDoesNotCreateANewInsertionPoint
 

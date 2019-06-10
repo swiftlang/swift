@@ -1010,8 +1010,9 @@ public:
   const unsigned index;
   const SourceLoc endLoc; // cannot get it from the stmt
 
-  ConditionalClauseScope(LabeledConditionalStmt * stmt,
-   unsigned index, SourceLoc endLoc) : stmt(stmt), index(index), endLoc(endLoc) {}
+  ConditionalClauseScope(LabeledConditionalStmt *stmt, unsigned index,
+                         SourceLoc endLoc)
+      : stmt(stmt), index(index), endLoc(endLoc) {}
 
   virtual ~ConditionalClauseScope() {}
 
@@ -1028,7 +1029,7 @@ protected:
 
 public:
   SourceRange getChildlessSourceRange() const override;
-  
+
 private:
   ArrayRef<StmtConditionElement> getCond() const;
   const StmtConditionElement &getStmtConditionElement() const;
@@ -1292,7 +1293,8 @@ public:
 
 protected:
   /// Return the lookupParent required to search these.
-  ASTScopeImpl *createNestedConditionalClauseScopes(ScopeCreator &, const Stmt* afterConds);
+  ASTScopeImpl *createNestedConditionalClauseScopes(ScopeCreator &,
+                                                    const Stmt *afterConds);
 };
 
 class IfStmtScope final : public LabeledConditionalStmtScope {
