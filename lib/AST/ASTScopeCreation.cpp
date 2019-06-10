@@ -586,6 +586,8 @@ CREATES_NEW_INSERTION_POINT(PatternEntryInitializerScope)
 CREATES_NEW_INSERTION_POINT(PatternEntryUseScope)
 CREATES_NEW_INSERTION_POINT(GenericTypeOrExtensionScope)
 CREATES_NEW_INSERTION_POINT(BraceStmtScope)
+CREATES_NEW_INSERTION_POINT(TopLevelCodeScope)
+
 
 NO_NEW_INSERTION_POINT(AbstractFunctionBodyScope)
 NO_NEW_INSERTION_POINT(AbstractFunctionDeclScope)
@@ -601,7 +603,6 @@ NO_NEW_INSERTION_POINT(IfStmtScope)
 NO_NEW_INSERTION_POINT(RepeatWhileScope)
 NO_NEW_INSERTION_POINT(SubscriptDeclScope)
 NO_NEW_INSERTION_POINT(SwitchStmtScope)
-NO_NEW_INSERTION_POINT(TopLevelCodeScope)
 NO_NEW_INSERTION_POINT(VarDeclScope)
 NO_NEW_INSERTION_POINT(WhileStmtScope)
 NO_NEW_INSERTION_POINT(WholeClosureScope)
@@ -714,6 +715,12 @@ ASTScopeImpl *BraceStmtScope::expandAScopeThatCreatesANewInsertionPoint(
     ScopeCreator &scopeCreator) {
   return scopeCreator.addScopesToTree(this, stmt->getElements());
 }
+
+ASTScopeImpl *TopLevelCodeScope::expandAScopeThatCreatesANewInsertionPoint(
+    ScopeCreator &scopeCreator) {
+  return scopeCreator.createSubtree<BraceStmtScope>(this, decl->getBody());
+}
+
 
 #pragma mark expandAScopeThatDoesNotCreateANewInsertionPoint
 
@@ -884,11 +891,6 @@ void CaptureListScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
 void ClosureBodyScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
     ScopeCreator &scopeCreator) {
   scopeCreator.createSubtree<BraceStmtScope>(this, closureExpr->getBody());
-}
-
-void TopLevelCodeScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
-    ScopeCreator &scopeCreator) {
-  scopeCreator.createSubtree<BraceStmtScope>(this, decl->getBody());
 }
 
 void DefaultArgumentInitializerScope::

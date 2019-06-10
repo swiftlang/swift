@@ -1170,7 +1170,7 @@ public:
   ASTScopeImpl *expandMe(ScopeCreator &scopeCreator) override;
 
 private:
-  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
+  ASTScopeImpl *expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
 
 public:
   std::string getClassName() const override;
