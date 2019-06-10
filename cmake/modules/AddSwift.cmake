@@ -927,6 +927,17 @@ function(_add_swift_library_single target name)
     endif()
   endif()
 
+  # Only build the modules for any arch listed in the *_MODULE_ARCHITECTURES.
+  if(SWIFTLIB_SINGLE_SDK IN_LIST SWIFT_APPLE_PLATFORMS
+      AND SWIFTLIB_SINGLE_ARCHITECTURE IN_LIST SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_MODULE_ARCHITECTURES)
+    # Create dummy target to hook up the module target dependency.
+    add_custom_target("${target}"
+      DEPENDS
+        "${swift_module_dependency_target}")
+
+    return()
+  endif()
+
   set(SWIFTLIB_INCORPORATED_OBJECT_LIBRARIES_EXPRESSIONS)
   foreach(object_library ${SWIFTLIB_SINGLE_INCORPORATE_OBJECT_LIBRARIES})
     list(APPEND SWIFTLIB_INCORPORATED_OBJECT_LIBRARIES_EXPRESSIONS
@@ -1846,8 +1857,13 @@ function(add_swift_target_library name)
       list(APPEND swiftlib_link_flags_all "-Wl,-z,defs")
     endif()
 
+    set(sdk_supported_archs
+      ${SWIFT_SDK_${sdk}_ARCHITECTURES}
+      ${SWIFT_SDK_${sdk}_MODULE_ARCHITECTURES})
+    list(REMOVE_DUPLICATES sdk_supported_archs)
+
     # For each architecture supported by this SDK
-    foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
+    foreach(arch ${sdk_supported_archs})
       # Configure variables for this subdirectory.
       set(VARIANT_SUFFIX "-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
       set(VARIANT_NAME "${name}${VARIANT_SUFFIX}")
@@ -1969,10 +1985,37 @@ function(add_swift_target_library name)
           endforeach()
         endif()
 
-        # Note this thin library.
-        list(APPEND THIN_INPUT_TARGETS ${VARIANT_NAME})
+        if(arch IN_LIST SWIFT_SDK_${sdk}_ARCHITECTURES)
+          # Note this thin library.
+          list(APPEND THIN_INPUT_TARGETS ${VARIANT_NAME})
+        endif()
       endif()
     endforeach()
+
+    # Configure module-only targets
+    if(NOT SWIFT_SDK_${sdk}_ARCHITECTURES
+        AND SWIFT_SDK_${sdk}_MODULE_ARCHITECTURES)
+      set(_target "${name}-${SWIFT_SDK_${sdk}_LIB_SUBDIR}")
+
+      # Create unified sdk target
+      add_custom_target("${_target}")
+
+      foreach(_arch ${SWIFT_SDK_${sdk}_MODULE_ARCHITECTURES})
+        set(_variant_suffix "-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${_arch}")
+        set(_module_variant_name "${name}-swiftmodule-${_variant_suffix}")
+
+        add_dependencies("${_target}" ${_module_variant_name})
+
+        # Add Swift standard library targets as dependencies to the top-level
+        # convenience target.
+        if(TARGET "swift-stdlib${_variant_suffix}")
+          add_dependencies("swift-stdlib${_variant_suffix}"
+            "${_target}")
+        endif()
+      endforeach()
+
+      return()
+    endif()
 
     if(NOT SWIFTLIB_OBJECT_LIBRARY)
       # Determine the name of the universal library.
@@ -2064,12 +2107,35 @@ function(add_swift_target_library name)
         endforeach()
       endif()
 
-      swift_is_installing_component("${SWIFTLIB_INSTALL_IN_COMPONENT}" is_installing)
-      if(NOT is_installing)
-        set_property(GLOBAL APPEND PROPERTY SWIFT_BUILDTREE_EXPORTS ${VARIANT_NAME})
-      else()
-        set_property(GLOBAL APPEND PROPERTY SWIFT_EXPORTS ${VARIANT_NAME})
-      endif()
+      swift_is_installing_component(
+        "${SWIFTLIB_INSTALL_IN_COMPONENT}"
+        is_installing)
+
+      # Add the arch-specific library targets to the global exports.
+      foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
+        set(_variant_name "${name}-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
+        if(NOT TARGET "${_variant_name}")
+          continue()
+        endif()
+
+        if(is_installing)
+          set_property(GLOBAL APPEND
+            PROPERTY SWIFT_EXPORTS ${_variant_name})
+        else()
+          set_property(GLOBAL APPEND
+            PROPERTY SWIFT_BUILDTREE_EXPORTS ${_variant_name})
+        endif()
+      endforeach()
+
+      # Add the swiftmodule-only targets to the lipo target depdencies.
+      foreach(arch ${SWIFT_SDK_${sdk}_MODULE_ARCHITECTURES})
+        set(_variant_name "${name}-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-${arch}")
+        if(NOT TARGET "${_variant_name}")
+          continue()
+        endif()
+
+        add_dependencies("${lipo_target}" "${_variant_name}")
+      endforeach()
 
       # If we built static variants of the library, create a lipo target for
       # them.
