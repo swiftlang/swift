@@ -72,7 +72,7 @@ internal extension ElementaryFunctions where Self: BinaryFloatingPoint {
     expectEqualWithTolerance(-1.415037499278843818546261056052183491, Self.log2(0.375))
     expectEqualWithTolerance(0.3184537311185346158102472135905995955, Self.log1p(0.375))
     expectEqualWithTolerance(-0.425968732272281148346188780918363771, Self.log10(0.375))
-    expectEqualWithTolerance(0.7211247851537041911608191553900547941, Self.root(0.375, 3))
+    expectEqualWithTolerance(-0.7211247851537041911608191553900547941, Self.root(-0.375, 3))
     expectEqualWithTolerance(0.6123724356957945245493210186764728479, Self.sqrt(0.375))
     expectEqualWithTolerance(0.54171335479545025876069682133938570, Self.pow(0.375, 0.625))
     expectEqualWithTolerance(-0.052734375, Self.pow(-0.375, 3))
