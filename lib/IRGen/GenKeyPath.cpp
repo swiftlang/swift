@@ -777,11 +777,14 @@ emitKeyPathComponent(IRGenModule &IGM,
       assert(currentBaseTy->getClassOrBoundGenericClass() == propertyBaseDecl);
       loweredClassTy =
           IGM.getLoweredType(AbstractionPattern::getOpaque(), currentBaseTy);
-      
-      auto loweredBaseContextTy = SILType::getPrimitiveObjectType(
+
+      auto loweredBaseContextTy =
+          SILType::getPrimitiveObjectType(loweredClassTy.getASTType());
+      if (!loweredClassTy.getASTType()->hasArchetype())
+        loweredBaseContextTy = SILType::getPrimitiveObjectType(
             GenericEnvironment::mapTypeIntoContext(genericEnv,
                                                    loweredClassTy.getASTType())
-              ->getCanonicalType());
+                ->getCanonicalType());
 
       switch (getClassFieldAccess(IGM, loweredBaseContextTy, property)) {
       case FieldAccess::ConstantDirect: {
