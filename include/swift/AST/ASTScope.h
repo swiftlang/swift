@@ -408,14 +408,14 @@ class ASTSourceFileScope final : public ASTScopeImpl {
 public:
   SourceFile *const SF;
   ScopeCreator *const scopeCreator;
+  ASTScopeImpl *insertionPoint;
 
   /// The number of \c Decls in the \c SourceFile that were already seen.
   /// Since parsing can be interleaved with type-checking, on every
   /// lookup, look at creating scopes for any \c Decls beyond this number.
   int numberOfDeclsAlreadySeen = 0;
 
-  ASTSourceFileScope(SourceFile *SF, ScopeCreator *scopeCreator)
-      : SF(SF), scopeCreator(scopeCreator) {}
+  ASTSourceFileScope(SourceFile *SF, ScopeCreator *scopeCreator);
 
   std::string getClassName() const override;
   SourceRange getChildlessSourceRange() const override;
@@ -461,7 +461,7 @@ public:
       return Mem;
     }
 
-    /// Return the new injection point
+    /// Return the new insertion point
     virtual ASTScopeImpl *expandScope(GenericTypeOrExtensionScope *,
                                       ScopeCreator &) const = 0;
 
@@ -1531,7 +1531,7 @@ public:
   ASTScopeImpl *expandMe(ScopeCreator &scopeCreator) override;
 
 private:
-  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
+  ASTScopeImpl *expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
 
 public:
   std::string getClassName() const override;

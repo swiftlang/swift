@@ -47,10 +47,6 @@ public:
   ASTSourceFileScope *const sourceFileScope;
 
 private:
-  /// When adding \c Decls to a scope tree that have been created since the tree
-  /// was originally built, add them as children of this scope.
-  ASTScopeImpl *newNodeInjectionPoint;
-
   /// Catch duplicate nodes in the AST
   /// TODO: better to use a shared pointer? Unique pointer?
   Optional<llvm::DenseSet<void*>> _astDuplicates;
@@ -60,7 +56,6 @@ public:
   ScopeCreator(SourceFile *SF)
       : ctx(SF->getASTContext()),
         sourceFileScope(constructInContext<ASTSourceFileScope>(SF, this)),
-        newNodeInjectionPoint(sourceFileScope),
         _astDuplicates(llvm::DenseSet<void *>()),
         astDuplicates(_astDuplicates.getValue()) {}
 
@@ -75,19 +70,22 @@ public:
   }
 
   /// Given an array of ASTNodes or Decl pointers, add them
+  /// Return the resultant insertionPoint
   template <typename ASTNode_or_DeclPtr>
-  void addScopesToTree(ArrayRef<ASTNode_or_DeclPtr> nodesOrDeclsToAdd) {
+  ASTScopeImpl *
+  addScopesToTree(ASTScopeImpl *const insertionPoint,
+                  ArrayRef<ASTNode_or_DeclPtr> nodesOrDeclsToAdd) {
     // Save source range recalculation work if possible
     if (nodesOrDeclsToAdd.empty())
-      return;
-
-    newNodeInjectionPoint->ensureSourceRangesAreCorrectWhenAddingDescendants(
-        [&] {
-          for (auto nd : nodesOrDeclsToAdd) {
-            if (shouldThisNodeBeScopedWhenEncountered(nd))
-              newNodeInjectionPoint = createScopeFor(nd, newNodeInjectionPoint);
-          }
-        });
+      return insertionPoint;
+    auto *ip = insertionPoint;
+    ip->ensureSourceRangesAreCorrectWhenAddingDescendants([&] {
+      for (auto nd : nodesOrDeclsToAdd) {
+        if (shouldThisNodeBeScopedWhenEncountered(nd))
+          ip = createScopeFor(nd, ip);
+      }
+    });
+    return ip;
   }
 
 public:
@@ -276,24 +274,11 @@ public:
     return astDuplicates.count(p);
   }
 
-private:
-  // Maintain last adopter so that when we reenter scope tree building
-  // after the parser has added more decls to the source file,
-  // we can resume building the scope tree where we left off.
-
-  void setNewNodeInjectionPoint(ASTScopeImpl *s) {
-    // We get here for any scope that wants to add a deferred node as a child.
-    // But after creating a deeper node that has registered as last adopter,
-    newNodeInjectionPoint = s;
-  }
-
 public:
   void dump() const { print(llvm::errs()); }
 
   void print(raw_ostream &out) const {
-    out << "injection point ";
-    newNodeInjectionPoint->print(out);
-    out << "\n";
+    out << "(swift::ASTSourceFileScope*) " << sourceFileScope << "\n";
   }
 
   // Make vanilla new illegal for ASTScopes.
@@ -322,17 +307,21 @@ ASTScope *ASTScope::createScopeTreeFor(SourceFile *SF) {
   return scope;
 }
 
-void ASTSourceFileScope::addNewDeclsToTree() {
-  ArrayRef<Decl *> decls = SF->Decls;
-  ArrayRef<Decl *> newDecls = decls.slice(numberOfDeclsAlreadySeen);
-  scopeCreator->addScopesToTree(newDecls);
-  numberOfDeclsAlreadySeen = SF->Decls.size();
-}
-
 void ASTScope::addAnyNewScopesToTree() {
   assert(impl->SF && impl->scopeCreator);
   impl->scopeCreator->sourceFileScope->addNewDeclsToTree();
 }
+
+void ASTSourceFileScope::addNewDeclsToTree() {
+  ArrayRef<Decl *> decls = SF->Decls;
+  ArrayRef<Decl *> newDecls = decls.slice(numberOfDeclsAlreadySeen);
+  insertionPoint = scopeCreator->addScopesToTree(insertionPoint, newDecls);
+  numberOfDeclsAlreadySeen = SF->Decls.size();
+}
+
+ASTSourceFileScope::ASTSourceFileScope(SourceFile *SF,
+                                       ScopeCreator *scopeCreator)
+    : SF(SF), scopeCreator(scopeCreator), insertionPoint(this) {}
 
 void ASTScopeImpl::ensureSourceRangesAreCorrectWhenAddingDescendants(
     function_ref<void()> modify) {
@@ -595,10 +584,10 @@ CREATES_NEW_INSERTION_POINT(PatternEntryDeclScope)
 CREATES_NEW_INSERTION_POINT(PatternEntryInitializerScope)
 CREATES_NEW_INSERTION_POINT(PatternEntryUseScope)
 CREATES_NEW_INSERTION_POINT(GenericTypeOrExtensionScope)
+CREATES_NEW_INSERTION_POINT(BraceStmtScope)
 
 NO_NEW_INSERTION_POINT(AbstractFunctionBodyScope)
 NO_NEW_INSERTION_POINT(AbstractFunctionDeclScope)
-NO_NEW_INSERTION_POINT(BraceStmtScope)
 NO_NEW_INSERTION_POINT(CaptureListScope)
 NO_NEW_INSERTION_POINT(CaseStmtScope)
 NO_NEW_INSERTION_POINT(CatchStmtScope)
@@ -703,6 +692,11 @@ ASTScopeImpl *
 GenericTypeOrExtensionScope::expandAScopeThatCreatesANewInsertionPoint(
     ScopeCreator &scopeCreator) {
   return portion->expandScope(this, scopeCreator);
+}
+
+ASTScopeImpl *BraceStmtScope::expandAScopeThatCreatesANewInsertionPoint(
+    ScopeCreator &scopeCreator) {
+  return scopeCreator.addScopesToTree(this, stmt->getElements());
 }
 
 #pragma mark expandAScopeThatDoesNotCreateANewInsertionPoint
@@ -885,11 +879,6 @@ void DefaultArgumentInitializerScope::
   auto *initExpr = decl->getDefaultValue();
   assert(initExpr);
   ASTVisitorForScopeCreation().visitExpr(initExpr, this, scopeCreator);
-}
-
-void BraceStmtScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
-    ScopeCreator &scopeCreator) {
-  scopeCreator.addScopesToTree(stmt->getElements());
 }
 
 #pragma mark expandScope
