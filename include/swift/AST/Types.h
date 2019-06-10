@@ -2871,13 +2871,14 @@ public:
     //   |    0 .. 3    |    4   |   5  |      6 .. 7     |
     //
     enum : unsigned {
-      RepresentationMask       = 0xF << 0,
-      NoEscapeMask             = 1 << 4,
-      ThrowsMask               = 1 << 5,
+      RepresentationMask           = 0xF << 0,
+      NoEscapeMask                 = 1 << 4,
+      ThrowsMask                   = 1 << 5,
       // SWIFT_ENABLE_TENSORFLOW
-      DifferentiableMaskOffset = 6,
-      DifferentiableMask       = 0x3 << DifferentiableMaskOffset,
-      NumMaskBits              = 8
+      DifferentiabilityMaskOffset  = 6,
+      DifferentiabilityMask        = 0x3 << DifferentiabilityMaskOffset,
+      NumDifferentiabilityMaskBits = 3,
+      NumMaskBits                  = 8
     };
 
     unsigned Bits; // Naturally sized for speed.
@@ -2906,18 +2907,21 @@ public:
       Bits |= (IsNoEscape ? NoEscapeMask : 0);
       // SWIFT_ENABLE_TENSORFLOW
       Bits |=
-          ((unsigned)diffKind << DifferentiableMaskOffset) & DifferentiableMask;
+          ((unsigned)diffKind << DifferentiabilityMaskOffset)
+          & DifferentiabilityMask;
     }
 
     bool isNoEscape() const { return Bits & NoEscapeMask; }
     bool throws() const { return Bits & ThrowsMask; }
     // SWIFT_ENABLE_TENSORFLOW
     bool isDifferentiable() const {
-      return (getDifferentiabilityKind() == DifferentiabilityKind::Normal) ||
-          (getDifferentiabilityKind() == DifferentiabilityKind::Linear);
+      llvm::errs() << (unsigned)DifferentiabilityMask << "\n";
+      llvm::errs() << (unsigned)getDifferentiabilityKind() << "\n";
+      return getDifferentiabilityKind() >= DifferentiabilityKind::Normal;
     }
     DifferentiabilityKind getDifferentiabilityKind() const {
-      return DifferentiabilityKind(DifferentiableMask >> DifferentiableMaskOffset);
+      return DifferentiabilityKind((Bits & DifferentiabilityMask) >>
+                                   DifferentiabilityMaskOffset);
     }
     Representation getRepresentation() const {
       unsigned rawRep = Bits & RepresentationMask;
@@ -2986,9 +2990,9 @@ public:
     LLVM_NODISCARD
     ExtInfo withDifferentiable(bool isDifferentiable = true) const {
       if (isDifferentiable)
-        return ExtInfo(Bits | DifferentiableMask);
+        return ExtInfo(Bits | DifferentiabilityMask);
       else
-        return ExtInfo(Bits & ~DifferentiableMask);
+        return ExtInfo(Bits & ~DifferentiabilityMask);
     }
 
     unsigned getFuncAttrKey() const {
