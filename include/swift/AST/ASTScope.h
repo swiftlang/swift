@@ -1032,7 +1032,6 @@ public:
 private:
   ArrayRef<StmtConditionElement> getCond() const;
   const StmtConditionElement &getStmtConditionElement() const;
-  SourceLoc startLocAccordingToCondition() const;
 };
 
 /// If, while, & guard statements all start with a conditional clause, then some
