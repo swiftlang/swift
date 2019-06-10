@@ -2262,7 +2262,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       }
       
       DifferentiabilityKind diffkind =
-      (attrs.has(TAK_autodiff) || attrs.has(TAK_differentiable)
+      (attrs.has(TAK_differentiable)
        ? (attrs.linear
           ? DifferentiabilityKind::Linear
           : DifferentiabilityKind::Normal)
