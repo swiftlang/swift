@@ -3150,7 +3150,7 @@ ERROR(jump_out_of_defer,none,
       (StringRef))
 
 WARNING(defer_stmt_at_block_end,none,
-     "'defer' statement before end of scope always executes immediately; "
+     "'defer' statement at end of scope always executes immediately; "
      "replace with 'do' statement to silence this warning", ())
 
 ERROR(return_invalid_outside_func,none,
