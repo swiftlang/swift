@@ -244,15 +244,11 @@ private:
   llvm::raw_ostream &verificationError() const;
 
 #pragma mark - Scope tree creation
-protected:
-  /// expandScope me, sending deferred nodes to my descendants.
-  /// Return the new scope into which to place decls, if any.
-  virtual NullablePtr<ASTScopeImpl> expandMe(ScopeCreator &);
-
-  /// ExpandMe for scopes that do not split scopes by introducing decls.
-  virtual void expandNonSplittingMe(ScopeCreator &);
-
 public:
+  /// expandScope me, sending deferred nodes to my descendants.
+  /// Return the scope into which to place subsequent decls
+  virtual ASTScopeImpl *expandMe(ScopeCreator &) = 0;
+
   // Some nodes (VarDecls and Accessors) are created directly from
   // pattern scope code and should neither be deferred nor should
   // contribute to widenSourceRangeForIgnoredASTNode.
@@ -262,6 +258,10 @@ public:
 
   virtual NullablePtr<AbstractStorageDecl>
   getEnclosingAbstractStorageDecl() const;
+
+  bool isATypeDeclScope() const;
+
+  virtual ASTScopeImpl *getStatementConditionIfAny();
 
 #pragma mark - - creation queries
 protected:
@@ -433,8 +433,12 @@ public:
   const SourceFile *getSourceFile() const override;
   NullablePtr<const void> addressForPrinting() const override { return SF; }
 
-protected:
-  void expandNonSplittingMe(ScopeCreator &) override;
+  ASTScopeImpl *expandMe(ScopeCreator &scopeCreator) override;
+
+private:
+  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
+
+public:
   };
 
   class Portion {
@@ -543,7 +547,12 @@ public:
   }
   virtual bool shouldHaveABody() const { return false; }
 
-  void expandNonSplittingMe(ScopeCreator &) override;
+  ASTScopeImpl *expandMe(ScopeCreator &scopeCreator) override;
+
+private:
+  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
+
+public:
   SourceRange getChildlessSourceRange() const override;
 
   std::pair<bool, Optional<bool>>
@@ -564,10 +573,9 @@ public:
       Optional<bool> isCascadingUse) const override;
 
   // Only for DeclScope, not BodyScope
+  // Returns the where clause scope, or the parent if none
   virtual ASTScopeImpl *createTrailingWhereClauseScope(ASTScopeImpl *parent,
-                                                       ScopeCreator &) {
-    return parent;
-  }
+                                                       ScopeCreator &);
   NullablePtr<DeclContext> getDeclContext() const override;
   virtual NullablePtr<NominalTypeDecl> getCorrespondingNominalTypeDecl() const {
     return nullptr;
@@ -615,8 +623,8 @@ public:
   NullablePtr<const ASTScopeImpl> getLookupLimitForDecl() const override;
 
   void createBodyScope(ASTScopeImpl *leaf, ScopeCreator &) override;
-  void createTrailingWhereClauseScope(ASTScopeImpl *parent,
-                                      ScopeCreator &) override;
+  ASTScopeImpl *createTrailingWhereClauseScope(ASTScopeImpl *parent,
+                                               ScopeCreator &) override;
 };
 
 class ExtensionScope final : public IterableTypeScope {
@@ -633,8 +641,8 @@ public:
   NullablePtr<NominalTypeDecl> getCorrespondingNominalTypeDecl() const override;
   std::string declKindName() const override { return "Extension"; }
   SourceRange getBraces() const override;
-  void createTrailingWhereClauseScope(ASTScopeImpl *parent,
-                                      ScopeCreator &) override;
+  ASTScopeImpl *createTrailingWhereClauseScope(ASTScopeImpl *parent,
+                                               ScopeCreator &) override;
   void createBodyScope(ASTScopeImpl *leaf, ScopeCreator &) override;
   NullablePtr<Decl> getDecl() const override { return decl; }
 };
@@ -647,8 +655,8 @@ public:
   virtual ~TypeAliasScope() {}
 
   std::string declKindName() const override { return "TypeAlias"; }
-  void createTrailingWhereClauseScope(ASTScopeImpl *parent,
-                                      ScopeCreator &) override;
+  ASTScopeImpl *createTrailingWhereClauseScope(ASTScopeImpl *parent,
+                                               ScopeCreator &) override;
   GenericContext *getGenericContext() const override { return decl; }
   NullablePtr<Decl> getDecl() const override { return decl; }
 };
@@ -692,6 +700,8 @@ public:
   std::string getClassName() const override;
   SourceRange getChildlessSourceRange() const override;
 
+  ASTScopeImpl *expandMe(ScopeCreator &) override;
+
 protected:
   void printSpecifics(llvm::raw_ostream &out) const override;
 
@@ -717,7 +727,12 @@ public:
   AbstractFunctionDeclScope(AbstractFunctionDecl *e) : decl(e) {}
   virtual ~AbstractFunctionDeclScope() {}
 
-  void expandNonSplittingMe(ScopeCreator &) override;
+  ASTScopeImpl *expandMe(ScopeCreator &scopeCreator) override;
+
+private:
+  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
+
+public:
   std::string getClassName() const override;
   SourceRange getChildlessSourceRange() const override;
 
@@ -754,7 +769,12 @@ public:
       : params(params), matchingContext(matchingContext) {}
   virtual ~AbstractFunctionParamsScope() {}
 
-  NullablePtr<ASTScopeImpl> expandMe(ScopeCreator &) override;
+  ASTScopeImpl *expandMe(ScopeCreator &scopeCreator) override;
+
+private:
+  ASTScopeImpl *expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
+
+public:
   std::string getClassName() const override;
   SourceRange getChildlessSourceRange() const override;
   virtual NullablePtr<DeclContext> getDeclContext() const override;
@@ -771,7 +791,12 @@ public:
   AbstractFunctionBodyScope(AbstractFunctionDecl *e) : decl(e) {}
   virtual ~AbstractFunctionBodyScope() {}
 
-  void expandNonSplittingMe(ScopeCreator &) override;
+  ASTScopeImpl *expandMe(ScopeCreator &scopeCreator) override;
+
+private:
+  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
+
+public:
   SourceRange getChildlessSourceRange() const override;
   virtual NullablePtr<DeclContext> getDeclContext() const override {
     return decl;
@@ -816,7 +841,8 @@ public:
   DefaultArgumentInitializerScope(ParamDecl *e) : decl(e) {}
   ~DefaultArgumentInitializerScope() {}
 
-  void expandNonSplittingMe(ScopeCreator &) override;
+  ASTScopeImpl *expandMe(ScopeCreator &scopeCreator) override;
+  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
   std::string getClassName() const override;
   SourceRange getChildlessSourceRange() const override;
   virtual NullablePtr<DeclContext> getDeclContext() const override;
@@ -844,6 +870,7 @@ public:
   AttachedPropertyWrapperScope(VarDecl *e) : decl(e) {}
   virtual ~AttachedPropertyWrapperScope() {}
 
+  ASTScopeImpl *expandMe(ScopeCreator &) override;
   std::string getClassName() const override;
   SourceRange getChildlessSourceRange() const override;
   NullablePtr<const void> addressForPrinting() const override { return decl; }
@@ -903,7 +930,12 @@ public:
       : AbstractPatternEntryScope(pbDecl, entryIndex, vis) {}
   virtual ~PatternEntryDeclScope() {}
 
-  NullablePtr<ASTScopeImpl> expandMe(ScopeCreator &) override;
+  ASTScopeImpl *expandMe(ScopeCreator &scopeCreator) override;
+
+private:
+  ASTScopeImpl *expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
+
+public:
   std::string getClassName() const override;
   SourceRange getChildlessSourceRange() const override;
 
@@ -917,7 +949,12 @@ public:
       : AbstractPatternEntryScope(pbDecl, entryIndex, vis) {}
   virtual ~PatternEntryInitializerScope() {}
 
-  NullablePtr<ASTScopeImpl> expandMe(ScopeCreator &) override;
+  ASTScopeImpl *expandMe(ScopeCreator &scopeCreator) override;
+
+private:
+  ASTScopeImpl *expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
+
+public:
   std::string getClassName() const override;
   SourceRange getChildlessSourceRange() const override;
   virtual NullablePtr<DeclContext> getDeclContext() const override;
@@ -945,7 +982,12 @@ public:
         initializerEnd(initializerEnd) {}
   virtual ~PatternEntryUseScope() {}
 
-  NullablePtr<ASTScopeImpl> expandMe(ScopeCreator &) override;
+  ASTScopeImpl *expandMe(ScopeCreator &scopeCreator) override;
+
+private:
+  ASTScopeImpl *expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
+
+public:
   std::string getClassName() const override;
   SourceRange getChildlessSourceRange() const override;
 
@@ -967,8 +1009,7 @@ public:
   /// The statement after the conditions: body or then.
   Stmt *const stmtAfterAllConditions;
 
-  NullablePtr<StatementConditionElementPatternScope>
-      statementConditionElementPatternScope;
+  NullablePtr<ASTScopeImpl> statementConditionElementPatternScope;
 
   ConditionalClauseScope(LabeledConditionalStmt *enclosingStmt, unsigned index,
                          Stmt *stmtAfterAllConditions)
@@ -976,7 +1017,12 @@ public:
         stmtAfterAllConditions(stmtAfterAllConditions) {}
   virtual ~ConditionalClauseScope() {}
 
-  NullablePtr<ASTScopeImpl> expandMe(ScopeCreator &) override;
+  ASTScopeImpl *expandMe(ScopeCreator &scopeCreator) override;
+
+private:
+  ASTScopeImpl *expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
+
+public:
   std::string getClassName() const override;
 
 protected:
@@ -989,8 +1035,8 @@ public:
   void createSubtreeForCondition(ScopeCreator &);
   SourceLoc startLocAccordingToCondition() const;
 
-  NullablePtr<StatementConditionElementPatternScope>
-  getStatementConditionElementPatternScope() const;
+  ASTScopeImpl *getStatementConditionIfAny() override;
+
   SourceRange getChildlessSourceRange() const override;
 };
 
@@ -1008,6 +1054,8 @@ public:
 
   SourceRange getChildlessSourceRange() const override;
   std::string getClassName() const override;
+
+  ASTScopeImpl *expandMe(ScopeCreator &) override;
 
 protected:
   void printSpecifics(llvm::raw_ostream &out) const override;
@@ -1033,6 +1081,8 @@ public:
   std::string getClassName() const override;
   SourceRange getChildlessSourceRange() const override;
 
+  ASTScopeImpl *expandMe(ScopeCreator &) override;
+
 protected:
   void printSpecifics(llvm::raw_ostream &out) const override;
 
@@ -1054,7 +1104,12 @@ public:
   CaptureListScope(CaptureListExpr *e) : expr(e) {}
   virtual ~CaptureListScope() {}
 
-  void expandNonSplittingMe(ScopeCreator &) override;
+  ASTScopeImpl *expandMe(ScopeCreator &scopeCreator) override;
+
+private:
+  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
+
+public:
   std::string getClassName() const override;
   SourceRange getChildlessSourceRange() const override;
   NullablePtr<const void> addressForPrinting() const override { return expr; }
@@ -1090,7 +1145,12 @@ public:
       : AbstractClosureScope(closureExpr, captureList) {}
   virtual ~WholeClosureScope() {}
 
-  void expandNonSplittingMe(ScopeCreator &) override;
+  ASTScopeImpl *expandMe(ScopeCreator &scopeCreator) override;
+
+private:
+  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
+
+public:
   std::string getClassName() const override;
   SourceRange getChildlessSourceRange() const override;
 };
@@ -1107,6 +1167,8 @@ public:
   std::string getClassName() const override;
   SourceRange getChildlessSourceRange() const override;
 
+  ASTScopeImpl *expandMe(ScopeCreator &) override;
+
 protected:
   bool lookupLocalBindings(Optional<bool>, DeclConsumer) const override;
   Optional<bool> resolveIsCascadingUseForThisScope(
@@ -1122,7 +1184,12 @@ public:
       : AbstractClosureScope(closureExpr, captureList) {}
   virtual ~ClosureBodyScope() {}
 
-  void expandNonSplittingMe(ScopeCreator &) override;
+  ASTScopeImpl *expandMe(ScopeCreator &scopeCreator) override;
+
+private:
+  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
+
+public:
   std::string getClassName() const override;
   SourceRange getChildlessSourceRange() const override;
 
@@ -1137,7 +1204,12 @@ public:
   TopLevelCodeScope(TopLevelCodeDecl *e) : decl(e) {}
   virtual ~TopLevelCodeScope() {}
 
-  void expandNonSplittingMe(ScopeCreator &) override;
+  ASTScopeImpl *expandMe(ScopeCreator &scopeCreator) override;
+
+private:
+  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
+
+public:
   std::string getClassName() const override;
   SourceRange getChildlessSourceRange() const override;
   virtual NullablePtr<DeclContext> getDeclContext() const override {
@@ -1164,6 +1236,8 @@ public:
     return specializeAttr;
   }
 
+  ASTScopeImpl *expandMe(ScopeCreator &) override;
+
   NullablePtr<AbstractStorageDecl>
   getEnclosingAbstractStorageDecl() const override;
 
@@ -1178,7 +1252,12 @@ public:
   SubscriptDeclScope(SubscriptDecl *e) : decl(e) {}
   virtual ~SubscriptDeclScope() {}
 
-  void expandNonSplittingMe(ScopeCreator &) override;
+  ASTScopeImpl *expandMe(ScopeCreator &scopeCreator) override;
+
+private:
+  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
+
+public:
   std::string getClassName() const override;
   SourceRange getChildlessSourceRange() const override;
 
@@ -1210,7 +1289,12 @@ public:
   VarDeclScope(VarDecl *e) : decl(e) {}
   virtual ~VarDeclScope() {}
 
-  void expandNonSplittingMe(ScopeCreator &) override;
+  ASTScopeImpl *expandMe(ScopeCreator &scopeCreator) override;
+
+private:
+  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
+
+public:
   std::string getClassName() const override;
   SourceRange getChildlessSourceRange() const override;
 
@@ -1256,7 +1340,12 @@ public:
   IfStmtScope(IfStmt *e) : stmt(e) {}
   virtual ~IfStmtScope() {}
 
-  void expandNonSplittingMe(ScopeCreator &) override;
+  ASTScopeImpl *expandMe(ScopeCreator &scopeCreator) override;
+
+private:
+  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
+
+public:
   std::string getClassName() const override;
   LabeledConditionalStmt *getLabeledConditionalStmt() const override;
 
@@ -1270,7 +1359,12 @@ public:
   WhileStmtScope(WhileStmt *e) : stmt(e) {}
   virtual ~WhileStmtScope() {}
 
-  void expandNonSplittingMe(ScopeCreator &) override;
+  ASTScopeImpl *expandMe(ScopeCreator &scopeCreator) override;
+
+private:
+  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
+
+public:
   std::string getClassName() const override;
   LabeledConditionalStmt *getLabeledConditionalStmt() const override;
 
@@ -1284,7 +1378,12 @@ public:
   GuardStmtScope(GuardStmt *e) : stmt(e) {}
   virtual ~GuardStmtScope() {}
 
-  NullablePtr<ASTScopeImpl> expandMe(ScopeCreator &) override;
+  ASTScopeImpl *expandMe(ScopeCreator &scopeCreator) override;
+
+private:
+  ASTScopeImpl *expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
+
+public:
   std::string getClassName() const override;
   LabeledConditionalStmt *getLabeledConditionalStmt() const override;
 
@@ -1298,7 +1397,12 @@ public:
   RepeatWhileScope(RepeatWhileStmt *e) : stmt(e) {}
   virtual ~RepeatWhileScope() {}
 
-  void expandNonSplittingMe(ScopeCreator &) override;
+  ASTScopeImpl *expandMe(ScopeCreator &scopeCreator) override;
+
+private:
+  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
+
+public:
   std::string getClassName() const override;
   Stmt *getStmt() const override { return stmt; }
 };
@@ -1309,7 +1413,12 @@ public:
   DoCatchStmtScope(DoCatchStmt *e) : stmt(e) {}
   virtual ~DoCatchStmtScope() {}
 
-  void expandNonSplittingMe(ScopeCreator &) override;
+  ASTScopeImpl *expandMe(ScopeCreator &scopeCreator) override;
+
+private:
+  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
+
+public:
   std::string getClassName() const override;
   Stmt *getStmt() const override { return stmt; }
 };
@@ -1320,7 +1429,12 @@ public:
   SwitchStmtScope(SwitchStmt *e) : stmt(e) {}
   virtual ~SwitchStmtScope() {}
 
-  void expandNonSplittingMe(ScopeCreator &) override;
+  ASTScopeImpl *expandMe(ScopeCreator &scopeCreator) override;
+
+private:
+  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
+
+public:
   std::string getClassName() const override;
   Stmt *getStmt() const override { return stmt; }
 };
@@ -1331,7 +1445,12 @@ public:
   ForEachStmtScope(ForEachStmt *e) : stmt(e) {}
   virtual ~ForEachStmtScope() {}
 
-  void expandNonSplittingMe(ScopeCreator &) override;
+  ASTScopeImpl *expandMe(ScopeCreator &scopeCreator) override;
+
+private:
+  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
+
+public:
   std::string getClassName() const override;
   Stmt *getStmt() const override { return stmt; }
 };
@@ -1342,7 +1461,12 @@ public:
   ForEachPatternScope(ForEachStmt *e) : stmt(e) {}
   virtual ~ForEachPatternScope() {}
 
-  void expandNonSplittingMe(ScopeCreator &) override;
+  ASTScopeImpl *expandMe(ScopeCreator &scopeCreator) override;
+
+private:
+  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
+
+public:
   std::string getClassName() const override;
   Stmt *getStmt() const override { return stmt; }
   SourceRange getChildlessSourceRange() const override;
@@ -1357,7 +1481,12 @@ public:
   CatchStmtScope(CatchStmt *e) : stmt(e) {}
   virtual ~CatchStmtScope() {}
 
-  void expandNonSplittingMe(ScopeCreator &) override;
+  ASTScopeImpl *expandMe(ScopeCreator &scopeCreator) override;
+
+private:
+  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
+
+public:
   std::string getClassName() const override;
   SourceRange getChildlessSourceRange() const override;
   Stmt *getStmt() const override { return stmt; }
@@ -1373,7 +1502,12 @@ public:
   CaseStmtScope(CaseStmt *e) : stmt(e) {}
   virtual ~CaseStmtScope() {}
 
-  void expandNonSplittingMe(ScopeCreator &) override;
+  ASTScopeImpl *expandMe(ScopeCreator &scopeCreator) override;
+
+private:
+  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
+
+public:
   std::string getClassName() const override;
   SourceRange getChildlessSourceRange() const override;
   Stmt *getStmt() const override { return stmt; }
@@ -1389,7 +1523,12 @@ public:
   BraceStmtScope(BraceStmt *e) : stmt(e) {}
   virtual ~BraceStmtScope() {}
 
-  NullablePtr<ASTScopeImpl> expandMe(ScopeCreator &) override;
+  ASTScopeImpl *expandMe(ScopeCreator &scopeCreator) override;
+
+private:
+  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
+
+public:
   std::string getClassName() const override;
   SourceRange getChildlessSourceRange() const override;
   virtual NullablePtr<DeclContext> getDeclContext() const override;
