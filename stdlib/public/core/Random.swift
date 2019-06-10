@@ -94,6 +94,18 @@ extension RandomNumberGenerator {
     upperBound: T
   ) -> T {
     _precondition(upperBound != 0, "upperBound cannot be zero.")
+#if arch(i386) || arch(arm)
+    let tmp = (T.max % upperBound) + 1
+    let range = tmp == upperBound ? 0 : tmp
+    var random: T = 0
+
+    repeat {
+      random = next()
+    } while random < range
+
+    return random % upperBound
+#endif
+#if arch(x86_64) || arch(arm64)
     var random: T = next()
     var m = random.multipliedFullWidth(by: upperBound)
     if m.low < upperBound {
@@ -104,6 +116,7 @@ extension RandomNumberGenerator {
       }
     }
     return m.high
+#endif
   }
 }
 
