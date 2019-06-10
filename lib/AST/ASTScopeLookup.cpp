@@ -342,13 +342,6 @@ bool PatternEntryUseScope::lookupLocalBindings(Optional<bool> isCascadingUse,
                                       consumer);
 }
 
-#error use scope stuff here
-bool StatementConditionElementPatternScope::lookupLocalBindings(
-    Optional<bool> isCascadingUse, DeclConsumer consumer) const {
-  return lookupLocalBindingsInPattern(
-      pattern, isCascadingUse, DeclVisibilityKind::LocalVariable, consumer);
-}
-
 bool ForEachPatternScope::lookupLocalBindings(Optional<bool> isCascadingUse,
                                               DeclConsumer consumer) const {
   return lookupLocalBindingsInPattern(stmt->getPattern(), isCascadingUse,
@@ -469,11 +462,8 @@ bool ClosureParametersScope::lookupLocalBindings(Optional<bool> isCascadingUse,
   return false;
 }
 
-bool ConditionalClauseUseScope::lookupLocalBindings(Optional<bool> isCascadingUse, DeclConsumer consumer) const {
-  if (auto *pattern = lookupParent->pattern.getPtrOrNull()) {
-    return lookupLocalBindingsInPattern(pattern, isCascadingUse, DeclVisibilityKind::LocalVariable, consumer);
-  }
-  return false;
+bool ConditionalClausePatternUseScope::lookupLocalBindings(Optional<bool> isCascadingUse, DeclConsumer consumer) const {
+  return lookupLocalBindingsInPattern(pattern, isCascadingUse, DeclVisibilityKind::LocalVariable, consumer);
 }
 
 bool ASTScopeImpl::lookupLocalBindingsInPattern(Pattern *p,

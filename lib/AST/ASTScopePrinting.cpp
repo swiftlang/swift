@@ -167,18 +167,20 @@ void AbstractPatternEntryScope::printSpecifics(llvm::raw_ostream &out) const {
   });
 }
 
-#error ruse scope
-void StatementConditionElementPatternScope::printSpecifics(
-    llvm::raw_ostream &out) const {
-  pattern->print(out);
-}
-
 void ConditionalClauseScope::printSpecifics(llvm::raw_ostream &out) const {
   ASTScopeImpl::printSpecifics(out);
-  out << " in ";
-  printSourceRange(out, enclosingStmt->getSourceRange(), getSourceManager());
-  out << " index " << index;
-  out << "  ";
+  switch (stmtConditionElement.getKind()) {
+  
+    case StmtConditionElement::CK_Boolean:
+      out << " boolean ";
+      break;
+    case StmtConditionElement::CK_PatternBinding:
+      out << " pattern-binding ";
+      break;
+    case StmtConditionElement::CK_Availability:
+      out << " availability ";
+      break;
+  }
 }
 
 void SubscriptDeclScope::printSpecifics(llvm::raw_ostream &out) const {
@@ -191,9 +193,8 @@ void VarDeclScope::printSpecifics(llvm::raw_ostream &out) const {
   decl->dumpRef(out);
 }
 
-void ConditionalClauseUseScope::printSpecifics(llvm::raw_ostream &out) const {
-  out << " lookup parent: ";
-  lookupParent->printRange(out);
+void ConditionalClausePatternUseScope::printSpecifics(llvm::raw_ostream &out) const {
+  pattern->print(out);
   out << "  ";
 }
 

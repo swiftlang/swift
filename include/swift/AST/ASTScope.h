@@ -65,6 +65,7 @@ class PatternBindingEntry;
 class SpecializeAttr;
 class GenericContext;
 class DeclName;
+class StmtConditionElement;
 
 namespace ast_scope {
 class ASTScopeImpl;
@@ -1005,20 +1006,10 @@ protected:
 /// we allocate a matrushka of these.
 class ConditionalClauseScope final : public ASTScopeImpl {
 public:
-  LabeledConditionalStmt *const enclosingStmt;
+  const StmtConditionElement &stmtConditionElement;
 
-  /// The index of the conditional clause.
-  const unsigned index;
-
-  const SourceLoc useScopeStart;
-
-  /// If I have a let ..., this holds the pattern
-  NullablePtr<Pattern> pattern;
-
-  ConditionalClauseScope(LabeledConditionalStmt *enclosingStmt, unsigned index,
-                         SourceLoc useScopeStart)
-      : enclosingStmt(enclosingStmt), index(index),
-        useScopeStart(useScopeStart) {}
+  ConditionalClauseScope(const StmtConditionElement & sce)
+      : stmtConditionElement(sce) {}
   virtual ~ConditionalClauseScope() {}
 
   ASTScopeImpl *expandMe(ScopeCreator &scopeCreator) override;
@@ -1034,7 +1025,7 @@ protected:
 
 public:
   NullablePtr<const void> addressForPrinting() const override {
-    return enclosingStmt;
+    return &stmtConditionElement;
   }
   SourceRange getChildlessSourceRange() const override;
 };
@@ -1043,13 +1034,13 @@ public:
 /// later part of the statement, (then, body, or after the guard) circumvents
 /// the normal lookup rule to pass the lookup scope into the deepest conditional
 /// clause.
-class ConditionalClauseUseScope final : public ASTScopeImpl {
-  ConditionalClauseScope *const lookupParent;
+class ConditionalClausePatternUseScope final : public ASTScopeImpl {
+  Pattern *const pattern;
   const SourceLoc startLoc;
 
 public:
-  ConditionalClauseUseScope(ConditionalClauseScope *lookupParent, SourceLoc startLoc)
-      : lookupParent(lookupParent), startLoc(startLoc) {}
+  ConditionalClausePatternUseScope(Pattern *pattern, SourceLoc startLoc)
+      : pattern(pattern), startLoc(startLoc) {}
 
   SourceRange getChildlessSourceRange() const override;
   std::string getClassName() const override;
@@ -1057,12 +1048,8 @@ public:
   ASTScopeImpl *expandMe(ScopeCreator &) override;
 
 protected:
- bool lookupLocalBindings(Optional<bool>, DeclConsumer) const override;
- 
+  bool lookupLocalBindings(Optional<bool>, DeclConsumer) const override;
   void printSpecifics(llvm::raw_ostream &out) const override;
-  NullablePtr<const ASTScopeImpl> getLookupParent() const override {
-    return lookupParent;
-  }
 };
 
 
@@ -1301,8 +1288,7 @@ public:
 
 protected:
   /// Return the lookupParent required to search these.
-  ASTScopeImpl *createNestedConditionalClauseScopes(ScopeCreator &, SourceLoc lastUseScopeStart);
-  virtual Stmt *getStmtAfterTheConditions() const = 0;
+  ASTScopeImpl *createNestedConditionalClauseScopes(ScopeCreator &);
 };
 
 class IfStmtScope final : public LabeledConditionalStmtScope {
@@ -1319,9 +1305,6 @@ private:
 public:
   std::string getClassName() const override;
   LabeledConditionalStmt *getLabeledConditionalStmt() const override;
-
-protected:
-  Stmt *getStmtAfterTheConditions() const override;
 };
 
 class WhileStmtScope final : public LabeledConditionalStmtScope {
@@ -1338,9 +1321,6 @@ private:
 public:
   std::string getClassName() const override;
   LabeledConditionalStmt *getLabeledConditionalStmt() const override;
-
-protected:
-  Stmt *getStmtAfterTheConditions() const override;
 };
 
 class GuardStmtScope final : public LabeledConditionalStmtScope {
@@ -1357,9 +1337,22 @@ private:
 public:
   std::string getClassName() const override;
   LabeledConditionalStmt *getLabeledConditionalStmt() const override;
+};
 
+/// A scope after a guard statement that follows lookups into the conditions
+class GuardStmtUseScope final : public ASTScopeImpl {
+  public:
+  ASTScopeImpl *const lookupParent;
+  const SourceLoc startLoc;
+  
+  GuardStmtUseScope(ASTScopeImpl* lookupParent, SourceLoc startLoc) : lookupParent(lookupParent), startLoc(startLoc) {}
+  
+  SourceRange getChildlessSourceRange() const override;
+  std::string getClassName() const override;
+  ASTScopeImpl *expandMe(ScopeCreator &) override;
+  
 protected:
-  Stmt *getStmtAfterTheConditions() const override;
+  NullablePtr<const ASTScopeImpl> getLookupParent() const override { return lookupParent; }
 };
 
 class RepeatWhileScope final : public AbstractStmtScope {

@@ -347,15 +347,10 @@ SourceRange BraceStmtScope::getChildlessSourceRange() const {
 
 
 SourceRange ConditionalClauseScope::getChildlessSourceRange() const {
-  // From the start of this particular condition to the start of the
-  // then/body part.
-  const auto startLoc = enclosingStmt->getCond()[index].getStartLoc();
-  const auto endLoc = useScopeStart;
-  return startLoc.isValid() ? SourceRange(startLoc, endLoc)
-                            : SourceRange(endLoc);
+  return stmtConditionElement.getSourceRange();
 }
 
-SourceRange ConditionalClauseUseScope::getChildlessSourceRange() const {
+SourceRange ConditionalClausePatternUseScope::getChildlessSourceRange() const {
   // For a guard continuation, the scope extends from the end of the 'else'
   // to the end of the continuation.
   return SourceRange(startLoc);
@@ -382,6 +377,10 @@ SourceRange ClosureBodyScope::getChildlessSourceRange() const {
 
 SourceRange AttachedPropertyWrapperScope::getChildlessSourceRange() const {
   return getCustomAttributesSourceRange(decl);
+}
+
+SourceRange GuardStmtUseScope::getChildlessSourceRange() const {
+  return SourceRange(startLoc);
 }
 
 #pragma mark source range caching
