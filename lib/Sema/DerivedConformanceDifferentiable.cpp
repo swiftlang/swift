@@ -736,6 +736,16 @@ getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived,
     // call to the getter.
     if (member->getEffectiveAccess() > AccessLevel::Internal &&
         !member->getAttrs().hasAttribute<DifferentiableAttr>()) {
+      // If getter does not exist, trigger synthesis and compute type.
+      if (!member->getGetter())
+        addExpectedOpaqueAccessorsToStorage(member, C);
+      if (!member->getGetter()->hasInterfaceType())
+        TC.resolveDeclSignature(member->getGetter());
+      // If member or its getter already has a `@differentiable` attribute,
+      // continue.
+      if (member->getAttrs().hasAttribute<DifferentiableAttr>() ||
+          member->getGetter()->getAttrs().hasAttribute<DifferentiableAttr>())
+        continue;
       ArrayRef<Requirement> requirements;
       // If the parent declaration context is an extension, the nominal type may
       // conditionally conform to `Differentiable`. Use the conditional
@@ -746,11 +756,6 @@ getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived,
           C, /*implicit*/ true, SourceLoc(), SourceLoc(),
           /*linear*/ false, {}, None, None, requirements);
       member->getAttrs().add(diffableAttr);
-      // If getter does not exist, trigger synthesis and compute type.
-      if (!member->getGetter())
-        addExpectedOpaqueAccessorsToStorage(member, C);
-      if (!member->getGetter()->hasInterfaceType())
-        TC.resolveDeclSignature(member->getGetter());
       // Compute getter parameter indices.
       auto *getterType =
           member->getGetter()->getInterfaceType()->castTo<AnyFunctionType>();
