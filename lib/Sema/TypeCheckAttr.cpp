@@ -32,7 +32,6 @@
 #include "swift/Sema/IDETypeChecking.h"
 #include "clang/Basic/CharInfo.h"
 #include "llvm/Support/Debug.h"
-#include "clang/Basic/CharInfo.h"
 
 using namespace swift;
 
@@ -41,7 +40,7 @@ namespace {
   template<typename ...ArgTypes>
   void diagnoseAndRemoveAttr(TypeChecker &TC, Decl *D, DeclAttribute *attr,
                              ArgTypes &&...Args) {
-    assert(!D->hasClangNode() && "Clang imported propagated a bogus attribute");
+    assert(!D->hasClangNode() && "Clang importer propagated a bogus attribute");
     if (!D->hasClangNode()) {
       SourceLoc loc = attr->getLocation();
       assert(loc.isValid() && "Diagnosing attribute with invalid location");
@@ -1433,9 +1432,9 @@ void AttributeChecker::visitNSCopyingAttr(NSCopyingAttr *attr) {
   assert(VD->getOverriddenDecl() == nullptr &&
          "Can't have value with storage that is an override");
 
-  // Check the type.  It must be must be [unchecked]optional, weak, a normal
+  // Check the type.  It must be an [unchecked]optional, weak, a normal
   // class, AnyObject, or classbound protocol.
-  // must conform to the NSCopying protocol.
+  // It must conform to the NSCopying protocol.
   
 }
 
@@ -2675,6 +2674,15 @@ void TypeChecker::checkReferenceOwnershipAttr(VarDecl *var,
     }
 
     diagnose(var->getStartLoc(), D, ownershipKind, underlyingType);
+    attr->setInvalid();
+  }
+
+  ClassDecl *underlyingClass = underlyingType->getClassOrBoundGenericClass();
+  if (underlyingClass && underlyingClass->isIncompatibleWithWeakReferences()) {
+    diagnose(attr->getLocation(),
+             diag::invalid_ownership_incompatible_class,
+             underlyingType, ownershipKind)
+      .fixItRemove(attr->getRange());
     attr->setInvalid();
   }
 
