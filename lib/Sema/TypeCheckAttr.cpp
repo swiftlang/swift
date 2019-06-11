@@ -2567,10 +2567,9 @@ static bool conformsToDifferentiable(Type type, DeclContext *DC) {
   auto &ctx = type->getASTContext();
   auto *differentiableProto =
       ctx.getProtocol(KnownProtocolKind::Differentiable);
-  return TypeChecker::conformsToProtocol(
-      type, differentiableProto, DC,
-      ConformanceCheckFlags::Used | ConformanceCheckFlags::InExpression)
-          .hasValue();
+  return TypeChecker::conformsToProtocol(type, differentiableProto, DC,
+                                         ConformanceCheckFlags::InExpression)
+      .hasValue();
 };
 
 // SWIFT_ENABLE_TENSORFLOW
