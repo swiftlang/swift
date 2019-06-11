@@ -168,7 +168,7 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
     auto proto = ctx.getProtocol(kind);
     if (!proto) return nullptr;
 
-    if (auto conformance = tc.conformsToProtocol(
+    if (auto conformance = TypeChecker::conformsToProtocol(
             nominal->getDeclaredInterfaceType(), proto, nominal,
             ConformanceCheckFlags::SkipConditionalRequirements)) {
       auto DC = conformance->getConcrete()->getDeclContext();
