@@ -2351,7 +2351,11 @@ extension FixedWidthInteger {
     // products carrying high words in as we go. We use the wrapping operators
     // and `truncatingIfNeeded` inits purely as an optimization hint to the
     // compiler; none of these operations will ever wrap due to the constraints
-    // on the arithmetic. The bounds are documented before each line.
+    // on the arithmetic. The bounds are documented before each line for signed
+    // types. For unsigned types, the bounds are much more well known and
+    // easier to derive, so I haven't bothered to document them here, but they
+    // all boil down to the fact that a*b + c + d cannot overflow a double-
+    // width result with unsigned a, b, c, d.
     let (x1, x0) = split(self)
     let (y1, y0) = split(other)
     // If B is 2^bitWidth/2, x0 and y0 are in 0 ... B-1, so their product is
