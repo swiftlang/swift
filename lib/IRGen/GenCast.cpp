@@ -159,6 +159,7 @@ getDynamicCastArguments(IRGenFunction &IGF,
     return llvm::makeArrayRef(argsBuf, n-3);
     break;
   }
+  llvm_unreachable("covered switch");
 }
 
 /// Emit a checked unconditional downcast of a class value.

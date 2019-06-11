@@ -50,7 +50,7 @@ protocol HasDefault {
 
 extension HasDefault where Self == SillyClass {
   func foo() {}
-  // expected-note@-1 {{candidate has non-matching type '<Self> () -> ()'}}
+  // expected-note@-1 {{candidate would match if 'SillyClass' conformed to 'HasDefault'}}
 }
 
 extension SillyClass : HasDefault {}

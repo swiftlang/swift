@@ -16,7 +16,7 @@
 //  0xFF
 //
 //===----------------------------------------------------------------------===//
-@_fixed_layout
+@frozen
 public struct _ValidUTF8Buffer {
   public typealias Element = Unicode.UTF8.CodeUnit
 
@@ -39,7 +39,7 @@ public struct _ValidUTF8Buffer {
 extension _ValidUTF8Buffer : Sequence {
   public typealias SubSequence = Slice<_ValidUTF8Buffer>
 
-  @_fixed_layout
+  @frozen
   public struct Iterator : IteratorProtocol, Sequence {
     @inlinable
     public init(_ x: _ValidUTF8Buffer) { _biasedBits = x._biasedBits }
@@ -61,7 +61,7 @@ extension _ValidUTF8Buffer : Sequence {
 }
 
 extension _ValidUTF8Buffer : Collection {
-  @_fixed_layout
+  @frozen
   public struct Index : Comparable {
     @usableFromInline
     internal var _biasedBits: UInt32

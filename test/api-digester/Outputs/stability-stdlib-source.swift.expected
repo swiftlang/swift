@@ -1,1 +1,2 @@
-
+TypeAlias FlattenSequence.Indices has generic signature change from <Base where Base : BidirectionalCollection, Base.Element : BidirectionalCollection> to <Base where Base : Collection, Base.Element : Collection>
+TypeAlias FlattenSequence.SubSequence has generic signature change from <Base where Base : BidirectionalCollection, Base.Element : BidirectionalCollection> to <Base where Base : Collection, Base.Element : Collection>

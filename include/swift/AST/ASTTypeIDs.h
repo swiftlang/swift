@@ -22,8 +22,8 @@ namespace swift {
 
 class CustomAttr;
 class NominalTypeDecl;
-struct PropertyDelegateBackingPropertyInfo;
-struct PropertyDelegateTypeInfo;
+struct PropertyWrapperBackingPropertyInfo;
+struct PropertyWrapperTypeInfo;
 class Type;
 class VarDecl;
 class TypeAliasDecl;

@@ -52,8 +52,8 @@ using namespace swift;
 
 #ifndef NDEBUG
 /// Determine whether the given context is for the backing property of a
-/// property delegate.
-static bool isPropertyDelegateBackingInitContext(DeclContext *dc) {
+/// property wrapper.
+static bool isPropertyWrapperBackingInitContext(DeclContext *dc) {
   auto initContext = dyn_cast<Initializer>(dc);
   if (!initContext) return false;
 
@@ -66,7 +66,7 @@ static bool isPropertyDelegateBackingInitContext(DeclContext *dc) {
   auto singleVar = binding->getSingleVar();
   if (!singleVar) return false;
 
-  return singleVar->getOriginalDelegatedProperty() != nullptr;
+  return singleVar->getOriginalWrappedProperty() != nullptr;
 }
 #endif
 
@@ -132,7 +132,7 @@ namespace {
             // its parent to the auto closure parent.
             assert((ParentDC->getContextKind() ==
                       DeclContextKind::AbstractClosureExpr ||
-                    isPropertyDelegateBackingInitContext(ParentDC)) &&
+                    isPropertyWrapperBackingInitContext(ParentDC)) &&
                    "Incorrect parent decl context for closure");
             CE->setParent(ParentDC);
           }

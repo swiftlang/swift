@@ -682,11 +682,17 @@ public:
   /// \param inputOrigType Abstraction pattern of base class method
   /// \param inputSubstType Formal AST type of base class method
   /// \param outputSubstType Formal AST type of derived class method
-  void emitVTableThunk(SILDeclRef derived,
+  /// \param baseLessVisibleThanDerived If true, the thunk does a
+  /// double dispatch to the derived method's vtable entry, so that if
+  /// the derived method has an override that cannot access the base,
+  /// calls to the base dispatch to the correct method.
+  void emitVTableThunk(SILDeclRef base,
+                       SILDeclRef derived,
                        SILFunction *implFn,
                        AbstractionPattern inputOrigType,
                        CanAnyFunctionType inputSubstType,
-                       CanAnyFunctionType outputSubstType);
+                       CanAnyFunctionType outputSubstType,
+                       bool baseLessVisibleThanDerived);
   
   //===--------------------------------------------------------------------===//
   // Control flow
@@ -1471,10 +1477,10 @@ public:
                                         PreparedArguments &&args, Type overriddenSelfType,
                                         SGFContext ctx);
 
-  RValue emitApplyPropertyDelegateAllocator(SILLocation loc,
+  RValue emitApplyPropertyWrapperAllocator(SILLocation loc,
                                             SubstitutionMap subs,
                                             SILDeclRef ctorRef,
-                                            Type delegateTy,
+                                            Type wrapperTy,
                                             CanAnyFunctionType funcTy);
 
   CleanupHandle emitBeginApply(SILLocation loc, ManagedValue fn,

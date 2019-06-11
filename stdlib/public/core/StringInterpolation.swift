@@ -59,7 +59,7 @@
 /// 
 /// `DefaultStringInterpolation` extensions should add only `mutating` members
 /// and should not copy `self` or capture it in an escaping closure.
-@_fixed_layout
+@frozen
 public struct DefaultStringInterpolation: StringInterpolationProtocol {
   /// The string contents accumulated by this instance.
   @usableFromInline

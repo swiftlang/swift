@@ -424,7 +424,7 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
 // classes, so it was renamed. The old names must not be used in the new
 // runtime.
 @usableFromInline
-@_fixed_layout
+@frozen
 internal struct __CocoaDictionary {
   @usableFromInline
   internal let object: AnyObject
@@ -567,7 +567,7 @@ extension __CocoaDictionary {
 }
 
 extension __CocoaDictionary {
-  @_fixed_layout
+  @frozen
   @usableFromInline
   internal struct Index {
     internal var _storage: Builtin.BridgeObject

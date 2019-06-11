@@ -47,7 +47,9 @@
 // Ensure the testable import showed up mangled correctly.
 // RUN: ls %t.ccp/Darwin-testable*
 // RUN: ls %t.ccp/AppKit-private*
+
 // REQUIRES: executable_test
+// REQUIRES: swift_tools_extra
 
 import macros
 import ctypes

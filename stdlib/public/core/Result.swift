@@ -12,7 +12,7 @@
 
 /// A value that represents either a success or a failure, including an
 /// associated value in each case.
-@_frozen
+@frozen
 public enum Result<Success, Failure: Error> {
   /// A success, storing a `Success` value.
   case success(Success)

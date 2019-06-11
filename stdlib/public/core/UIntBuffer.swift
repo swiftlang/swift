@@ -14,7 +14,7 @@
 //  255 elements.
 //
 //===----------------------------------------------------------------------===//
-@_fixed_layout
+@frozen
 public struct _UIntBuffer<Element: UnsignedInteger & FixedWidthInteger> {
   public typealias Storage = UInt32
   public var _storage: Storage
@@ -38,7 +38,7 @@ public struct _UIntBuffer<Element: UnsignedInteger & FixedWidthInteger> {
 extension _UIntBuffer : Sequence {
   public typealias SubSequence = Slice<_UIntBuffer>
   
-  @_fixed_layout
+  @frozen
   public struct Iterator : IteratorProtocol, Sequence {
     @inlinable
     @inline(__always)
@@ -66,7 +66,7 @@ extension _UIntBuffer : Sequence {
 }
 
 extension _UIntBuffer : Collection {  
-  @_fixed_layout
+  @frozen
   public struct Index : Comparable {
     @usableFromInline
     internal var bitOffset: UInt8

@@ -1,5 +1,6 @@
 // RUN: %target-swift-emit-silgen -swift-version 5 %s | %FileCheck %s
 // RUN: %target-swift-emit-silgen -swift-version 5 %s -enable-implicit-dynamic | %FileCheck %s --check-prefix=IMPLICIT
+// RUN: %target-swift-emit-silgen -swift-version 5 %s -disable-previous-implementation-calls-in-dynamic-replacements | %FileCheck %s --check-prefix=NOPREVIOUS
 
 // CHECK-LABEL: sil hidden [ossa] @$s23dynamically_replaceable014maybe_dynamic_B0yyF : $@convention(thin) () -> () {
 // IMPLICIT-LABEL: sil hidden [dynamically_replacable] [ossa] @$s23dynamically_replaceable014maybe_dynamic_B0yyF : $@convention(thin) () -> () {
@@ -122,6 +123,12 @@ extension Klass {
   // CHECK: [[METHOD:%.*]] = class_method %0 : $Klass, #Klass.dynamic_replaceable2!1
   // CHECK: = apply [[METHOD]](%0) : $@convention(method) (@guaranteed Klass) -> ()
   // CHECK: return
+  // NOPREVIOUS-LABEL: sil hidden [dynamic_replacement_for "$s23dynamically_replaceable5KlassC08dynamic_B0yyF"] [ossa] @$s23dynamically_replaceable5KlassC11replacementyyF : $@convention(method) (@guaranteed Klass) -> () {
+  // NOPREVIOUS: [[FN:%.*]] = class_method %0 : $Klass, #Klass.dynamic_replaceable
+  // NOPREVIOUS: apply [[FN]](%0) : $@convention(method) (@guaranteed Klass) -> ()
+  // NOPREVIOUS: [[METHOD:%.*]] = class_method %0 : $Klass, #Klass.dynamic_replaceable2!1
+  // NOPREVIOUS: = apply [[METHOD]](%0) : $@convention(method) (@guaranteed Klass) -> ()
+  // NOPREVIOUS: return
   @_dynamicReplacement(for: dynamic_replaceable())
   func replacement() {
     dynamic_replaceable()
@@ -131,6 +138,9 @@ extension Klass {
   // CHECK-LABEL: sil hidden [dynamic_replacement_for "$s23dynamically_replaceable5KlassC1cACSi_tcfC"] [ossa] @$s23dynamically_replaceable5KlassC2crACSi_tcfC : $@convention(method) (Int, @thick Klass.Type) -> @owned Klass {
   // CHECK:  [[FUN:%.*]] = prev_dynamic_function_ref @$s23dynamically_replaceable5KlassC2crACSi_tcfC
   // CHECK:  apply [[FUN]]({{.*}}, %1)
+  // NOPREVIOUS-LABEL: sil hidden [dynamic_replacement_for "$s23dynamically_replaceable5KlassC1cACSi_tcfC"] [ossa] @$s23dynamically_replaceable5KlassC2crACSi_tcfC : $@convention(method) (Int, @thick Klass.Type) -> @owned Klass {
+  // NOPREVIOUS:  [[FUN:%.*]] = dynamic_function_ref @$s23dynamically_replaceable5KlassC1cACSi_tcfC
+  // NOPREVIOUS:  apply [[FUN]]({{.*}}, %1)
   @_dynamicReplacement(for: init(c:))
   convenience init(cr: Int) {
     self.init(c: cr + 1)
@@ -140,7 +150,11 @@ extension Klass {
   // CHECK: // dynamic_function_ref Klass.__allocating_init(c:)
   // CHECK: [[FUN:%.*]] = dynamic_function_ref @$s23dynamically_replaceable5KlassC1cACSi_tcfC
   // CHECK: apply [[FUN]]({{.*}}, %2)
-  @_dynamicReplacement(for: init(a: b:))
+  // NOPREVIOUS-LABEL: sil hidden [dynamic_replacement_for "$s23dynamically_replaceable5KlassC1a1bACSi_SitcfC"] [ossa] @$s23dynamically_replaceable5KlassC2ar2brACSi_SitcfC
+  // NOPREVIOUS: // dynamic_function_ref Klass.__allocating_init(c:)
+  // NOPREVIOUS: [[FUN:%.*]] = dynamic_function_ref @$s23dynamically_replaceable5KlassC1cACSi_tcfC
+  // NOPREVIOUS: apply [[FUN]]({{.*}}, %2)
+	@_dynamicReplacement(for: init(a: b:))
   convenience init(ar: Int, br: Int) {
     self.init(c: ar + br)
   }
@@ -153,11 +167,19 @@ extension Klass {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $Klass):
 // CHECK:   [[ORIG:%.*]] = prev_dynamic_function_ref  @$s23dynamically_replaceable5KlassC1rSivg
 // CHECK:   apply [[ORIG]]([[ARG]]) : $@convention(method) (@guaranteed Klass) -> Int
+// NOPREVIOUS-LABEL: sil hidden [dynamic_replacement_for "$s23dynamically_replaceable5KlassC08dynamic_B4_varSivg"] [ossa] @$s23dynamically_replaceable5KlassC1rSivg : $@convention(method) (@guaranteed Klass) -> Int {
+// NOPREVIOUS: bb0([[ARG:%.*]] : @guaranteed $Klass):
+// NOPREVIOUS:   [[ORIG:%.*]] = class_method [[ARG]] : $Klass, #Klass.dynamic_replaceable_var!getter.1
+// NOPREVIOUS:   apply [[ORIG]]([[ARG]]) : $@convention(method) (@guaranteed Klass) -> Int
 
 // CHECK-LABEL: sil hidden [dynamic_replacement_for "$s23dynamically_replaceable5KlassC08dynamic_B4_varSivs"] [ossa] @$s23dynamically_replaceable5KlassC1rSivs : $@convention(method) (Int, @guaranteed Klass) -> () {
 // CHECK: bb0({{.*}} : $Int, [[SELF:%.*]] : @guaranteed $Klass):
 // CHECK:   [[ORIG:%.*]] = prev_dynamic_function_ref @$s23dynamically_replaceable5KlassC1rSivs
 // CHECK:   apply [[ORIG]]({{.*}}, [[SELF]]) : $@convention(method)
+// NOPREVIOUS-LABEL: sil hidden [dynamic_replacement_for "$s23dynamically_replaceable5KlassC08dynamic_B4_varSivs"] [ossa] @$s23dynamically_replaceable5KlassC1rSivs : $@convention(method) (Int, @guaranteed Klass) -> () {
+// NOPREVIOUS: bb0({{.*}} : $Int, [[SELF:%.*]] : @guaranteed $Klass):
+// NOPREVIOUS:   [[ORIG:%.*]] = class_method [[SELF]] : $Klass, #Klass.dynamic_replaceable_var!setter
+// NOPREVIOUS:   apply [[ORIG]]({{.*}}, [[SELF]]) : $@convention(method)
   @_dynamicReplacement(for: dynamic_replaceable_var)
   var r : Int {
     get {
@@ -366,4 +388,19 @@ func foobar() {
 var x = 10
 defer {
   let y = x
+}
+
+// IMPLICIT-LABEL: sil [dynamically_replacable] [ossa] @$s23dynamically_replaceable16testWithLocalFunyyF
+// IMPLICIT-LABEL: sil private [ossa] @$s23dynamically_replaceable16testWithLocalFunyyF05localF0L_yyF
+// IMPLICIT-LABEL: sil private [ossa] @$s23dynamically_replaceable16testWithLocalFunyyF05localF0L_yyF0geF0L_yyF
+// IMPLICIT-LABEL: sil private [ossa] @$s23dynamically_replaceable16testWithLocalFunyyFyycfU_
+public func testWithLocalFun() {
+  func localFun() {
+    func localLocalFun() { print("bar") }
+    print("foo")
+    localLocalFun()
+  }
+  localFun()
+  let unamedClosure = { print("foo") }
+  unamedClosure()
 }

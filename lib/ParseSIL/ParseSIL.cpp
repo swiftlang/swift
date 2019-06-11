@@ -3837,7 +3837,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     break;
   }
 
-  case SILInstructionKind::AssignByDelegateInst: {
+  case SILInstructionKind::AssignByWrapperInst: {
     SILValue Src, DestAddr, InitFn, SetFn;
     SourceLoc DestLoc;
     AssignOwnershipQualifier AssignQualifier;
@@ -3860,7 +3860,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
       return true;
     }
 
-    ResultVal = B.createAssignByDelegate(InstLoc, Src, DestAddr, InitFn, SetFn,
+    ResultVal = B.createAssignByWrapper(InstLoc, Src, DestAddr, InitFn, SetFn,
                                          AssignQualifier);
     break;
   }

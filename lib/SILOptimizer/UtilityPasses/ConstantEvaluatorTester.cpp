@@ -43,7 +43,7 @@ class ConstantEvaluatorTester : public SILFunctionTransform {
     if (!applyInst)
       return false;
 
-    auto *callee = applyInst->getReferencedFunction();
+    auto *callee = applyInst->getReferencedFunctionOrNull();
     if (!callee)
       return false;
 

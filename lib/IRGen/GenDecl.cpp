@@ -75,6 +75,10 @@
 using namespace swift;
 using namespace irgen;
 
+llvm::cl::opt<bool> UseBasicDynamicReplacement(
+    "basic-dynamic-replacement", llvm::cl::init(false),
+    llvm::cl::desc("Basic implementation of dynamic replacement"));
+
 namespace {
   
 /// Add methods, properties, and protocol conformances from a JITed extension
@@ -2175,6 +2179,79 @@ static llvm::GlobalVariable *createGlobalForDynamicReplacementFunctionKey(
   return key;
 }
 
+/// Creates the prolog for a dynamically replaceable function.
+/// It checks if the replaced function or the original function should be called
+/// (by calling the swift_getFunctionReplacement runtime function). In case of
+/// the original function, it just jumps to the "real" code of the function,
+/// otherwise it tail calls the replacement.
+void IRGenModule::createReplaceableProlog(IRGenFunction &IGF, SILFunction *f) {
+  LinkEntity varEntity =
+      LinkEntity::forDynamicallyReplaceableFunctionVariable(f);
+  LinkEntity keyEntity =
+      LinkEntity::forDynamicallyReplaceableFunctionKey(f);
+  Signature signature = getSignature(f->getLoweredFunctionType());
+
+  // Create and initialize the first link entry for the chain of replacements.
+  // The first implementation is initialized with 'implFn'.
+  auto linkEntry = getChainEntryForDynamicReplacement(*this, varEntity, IGF.CurFn);
+
+  // Create the key data structure. This is used from other modules to refer to
+  // the chain of replacements.
+  createGlobalForDynamicReplacementFunctionKey(*this, keyEntity, linkEntry);
+
+  llvm::Constant *indices[] = {llvm::ConstantInt::get(Int32Ty, 0),
+                               llvm::ConstantInt::get(Int32Ty, 0)};
+
+  auto *fnPtrAddr =
+      llvm::ConstantExpr::getInBoundsGetElementPtr(nullptr, linkEntry, indices);
+
+  auto *ReplAddr =
+    llvm::ConstantExpr::getPointerBitCastOrAddrSpaceCast(fnPtrAddr,
+      FunctionPtrTy->getPointerTo());
+
+  auto *FnAddr = llvm::ConstantExpr::getPointerBitCastOrAddrSpaceCast(
+      IGF.CurFn, FunctionPtrTy);
+
+  llvm::Value *ReplFn = nullptr, *rhs = nullptr;
+
+  if (UseBasicDynamicReplacement) {
+    ReplFn = IGF.Builder.CreateLoad(fnPtrAddr, getPointerAlignment());
+    rhs = FnAddr;
+  } else {
+    // Call swift_getFunctionReplacement to check which function to call.
+    auto *callRTFunc = IGF.Builder.CreateCall(getGetReplacementFn(),
+                                             { ReplAddr, FnAddr });
+    callRTFunc->setDoesNotThrow();
+    ReplFn = callRTFunc;
+    rhs = llvm::ConstantExpr::getNullValue(ReplFn->getType());
+  }
+  auto *hasReplFn = IGF.Builder.CreateICmpEQ(ReplFn, rhs);
+
+  auto *replacedBB = IGF.createBasicBlock("forward_to_replaced");
+  auto *origEntryBB = IGF.createBasicBlock("original_entry");
+  IGF.Builder.CreateCondBr(hasReplFn, origEntryBB, replacedBB);
+
+  IGF.Builder.emitBlock(replacedBB);
+
+  // Call the replacement function.
+  SmallVector<llvm::Value *, 16> forwardedArgs;
+  for (auto &arg : IGF.CurFn->args())
+    forwardedArgs.push_back(&arg);
+  auto *fnType = signature.getType()->getPointerTo();
+  auto *realReplFn = IGF.Builder.CreateBitCast(ReplFn, fnType);
+
+  auto *Res = IGF.Builder.CreateCall(FunctionPointer(realReplFn, signature),
+                                     forwardedArgs);
+  Res->setTailCall();
+  if (IGF.CurFn->getReturnType()->isVoidTy())
+    IGF.Builder.CreateRetVoid();
+  else
+    IGF.Builder.CreateRet(Res);
+
+  IGF.Builder.emitBlock(origEntryBB);
+
+}
+
 /// Emit the thunk that dispatches to the dynamically replaceable function.
 static void emitDynamicallyReplaceableThunk(IRGenModule &IGM,
                                             LinkEntity varEntity,
@@ -2279,6 +2356,9 @@ void IRGenModule::emitOpaqueTypeDescriptorAccessor(OpaqueTypeDecl *opaque) {
 void IRGenModule::emitDynamicReplacementOriginalFunctionThunk(SILFunction *f) {
   assert(f->getDynamicallyReplacedFunction());
 
+  if (UseBasicDynamicReplacement)
+    return;
+
   auto entity = LinkEntity::forSILFunction(f, true);
 
   Signature signature = getSignature(f->getLoweredFunctionType());
@@ -2303,11 +2383,17 @@ void IRGenModule::emitDynamicReplacementOriginalFunctionThunk(SILFunction *f) {
   llvm::Constant *indices[] = {llvm::ConstantInt::get(Int32Ty, 0),
                                llvm::ConstantInt::get(Int32Ty, 0)};
 
-  auto *fnPtr = IGF.Builder.CreateLoad(
+  auto *fnPtrAddr =
+    llvm::ConstantExpr::getPointerBitCastOrAddrSpaceCast(
       llvm::ConstantExpr::getInBoundsGetElementPtr(nullptr, linkEntry, indices),
-      getPointerAlignment());
+      FunctionPtrTy->getPointerTo());
+
+  auto *OrigFn = IGF.Builder.CreateCall(getGetOrigOfReplaceableFn(),
+                                        { fnPtrAddr });
+  OrigFn->setDoesNotThrow();
+
   auto *typeFnPtr =
-      IGF.Builder.CreateBitOrPointerCast(fnPtr, implFn->getType());
+      IGF.Builder.CreateBitOrPointerCast(OrigFn, implFn->getType());
 
   SmallVector<llvm::Value *, 16> forwardedArgs;
   for (auto &arg : implFn->args())
@@ -2338,25 +2424,6 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
   if (fn) {
     if (forDefinition) {
       updateLinkageForDefinition(*this, fn, entity);
-      if (isDynamicallyReplaceableImplementation) {
-        // Create the dynamically replacement thunk.
-        LinkEntity implEntity = LinkEntity::forSILFunction(f, true);
-        auto existingImpl = Module.getFunction(implEntity.mangleAsString());
-        assert(!existingImpl);
-        (void) existingImpl;
-        Signature signature = getSignature(f->getLoweredFunctionType());
-        addLLVMFunctionAttributes(f, signature);
-        LinkInfo implLink = LinkInfo::get(*this, implEntity, forDefinition);
-        auto implFn = createFunction(*this, implLink, signature, fn,
-                                     f->getOptimizationMode());
-        LinkEntity varEntity =
-            LinkEntity::forDynamicallyReplaceableFunctionVariable(f);
-        LinkEntity keyEntity =
-            LinkEntity::forDynamicallyReplaceableFunctionKey(f);
-        emitDynamicallyReplaceableThunk(*this, varEntity, keyEntity, fn, implFn,
-                                        signature);
-        return implFn;
-      }
     }
     return fn;
   }
@@ -2430,20 +2497,6 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
   // If we have an order number for this function, set it up as appropriate.
   if (hasOrderNumber) {
     EmittedFunctionsByOrder.insert(orderNumber, fn);
-  }
-
-  if (isDynamicallyReplaceableImplementation && forDefinition) {
-    LinkEntity implEntity = LinkEntity::forSILFunction(f, true);
-    LinkInfo implLink = LinkInfo::get(*this, implEntity, forDefinition);
-    auto implFn = createFunction(*this, implLink, signature, insertBefore,
-                                 f->getOptimizationMode());
-
-    LinkEntity varEntity =
-        LinkEntity::forDynamicallyReplaceableFunctionVariable(f);
-    LinkEntity keyEntity = LinkEntity::forDynamicallyReplaceableFunctionKey(f);
-    emitDynamicallyReplaceableThunk(*this, varEntity, keyEntity, fn, implFn,
-                                    signature);
-    return implFn;
   }
   return fn;
 }

@@ -208,15 +208,15 @@ void swift::recursivelyDeleteTriviallyDeadInstructions(
       // If we have a function ref inst, we need to especially drop its function
       // argument so that it gets a proper ref decrement.
       auto *FRI = dyn_cast<FunctionRefInst>(I);
-      if (FRI && FRI->getReferencedFunction())
+      if (FRI && FRI->getInitiallyReferencedFunction())
         FRI->dropReferencedFunction();
 
       auto *DFRI = dyn_cast<DynamicFunctionRefInst>(I);
-      if (DFRI && DFRI->getReferencedFunction())
+      if (DFRI && DFRI->getInitiallyReferencedFunction())
         DFRI->dropReferencedFunction();
 
       auto *PFRI = dyn_cast<PreviousDynamicFunctionRefInst>(I);
-      if (PFRI && PFRI->getReferencedFunction())
+      if (PFRI && PFRI->getInitiallyReferencedFunction())
         PFRI->dropReferencedFunction();
     }
 
@@ -740,7 +740,7 @@ public:
 /// Returns false if optimization is not possible.
 /// Returns true and initializes internal fields if optimization is possible.
 bool StringConcatenationOptimizer::extractStringConcatOperands() {
-  auto *Fn = AI->getReferencedFunction();
+  auto *Fn = AI->getReferencedFunctionOrNull();
   if (!Fn)
     return false;
 
@@ -760,8 +760,8 @@ bool StringConcatenationOptimizer::extractStringConcatOperands() {
   if (!FRILeft || !FRIRight)
     return false;
 
-  auto *FRILeftFun = FRILeft->getReferencedFunction();
-  auto *FRIRightFun = FRIRight->getReferencedFunction();
+  auto *FRILeftFun = FRILeft->getReferencedFunctionOrNull();
+  auto *FRIRightFun = FRIRight->getReferencedFunctionOrNull();
 
   if (FRILeftFun->getEffectsKind() >= EffectsKind::ReleaseNone ||
       FRIRightFun->getEffectsKind() >= EffectsKind::ReleaseNone)

@@ -79,7 +79,7 @@ ColdBlockInfo::BranchHint ColdBlockInfo::getBranchHint(SILValue Cond,
   if (!AI)
     return BranchHint::None;
 
-  if (auto *F = AI->getReferencedFunction()) {
+  if (auto *F = AI->getReferencedFunctionOrNull()) {
     if (F->hasSemanticsAttrs()) {
       // fastpath/slowpath attrs are untested because the inliner luckily
       // inlines them before the downstream calls.

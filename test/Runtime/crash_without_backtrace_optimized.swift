@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -O %s -o %t/out
-// RUN: %{python} %S/../Inputs/not.py "%target-run %t/out" 2>&1 | %FileCheck %s
+// RUN: %{python} %S/../Inputs/not.py "%target-run %t/out" 2>&1 | %FileCheck --allow-empty %s
 
 // NOTE: not.py is used above instead of "not --crash" because %target-run
 // doesn't pass through the crash, and `not` may not be available when running
@@ -23,21 +23,8 @@
 
 import Swift
 
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
-  import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
-  import Glibc
-#elseif os(Windows)
-  import MSVCRT
-#else
-#error("Unsupported platform")
-#endif
-
 func foo() -> Int {
   return UnsafePointer<Int>(bitPattern: 0)!.pointee
 }
 
-// Give FileCheck something to look at to keep it happy. It fails on
-// empty output even if the only directive is a CHECK-NOT.
-fputs("Running test.\n", stderr)
 foo()

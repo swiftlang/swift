@@ -1703,8 +1703,11 @@ llvm::Value *IRGenFunction::getLocalSelfMetadata() {
   // with the correct value.
 
   llvm::IRBuilderBase::InsertPointGuard guard(Builder);
-  Builder.SetInsertPoint(&CurFn->getEntryBlock(),
-                         CurFn->getEntryBlock().begin());
+  auto insertPt = isa<llvm::Instruction>(LocalSelf)
+                      ? std::next(llvm::BasicBlock::iterator(
+                            cast<llvm::Instruction>(LocalSelf)))
+                      : CurFn->getEntryBlock().begin();
+  Builder.SetInsertPoint(&CurFn->getEntryBlock(), insertPt);
 
   switch (SelfKind) {
   case SwiftMetatype:

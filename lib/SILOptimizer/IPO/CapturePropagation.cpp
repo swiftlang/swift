@@ -373,7 +373,7 @@ static SILFunction *getSpecializedWithDeadParams(
       if (Specialized)
         return nullptr;
 
-      Specialized = FAS.getReferencedFunction();
+      Specialized = FAS.getReferencedFunctionOrNull();
       if (!Specialized)
         return nullptr;
 
@@ -440,7 +440,7 @@ static SILFunction *getSpecializedWithDeadParams(
 }
 
 bool CapturePropagation::optimizePartialApply(PartialApplyInst *PAI) {
-  SILFunction *SubstF = PAI->getReferencedFunction();
+  SILFunction *SubstF = PAI->getReferencedFunctionOrNull();
   if (!SubstF)
     return false;
   if (SubstF->isExternalDeclaration())

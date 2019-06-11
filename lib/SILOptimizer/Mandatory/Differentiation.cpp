@@ -103,7 +103,7 @@ static void createEntryArguments(SILFunction *f) {
 
 static bool isWithoutDerivative(SILValue v) {
   if (auto *fnRef = dyn_cast<FunctionRefInst>(v))
-    return fnRef->getReferencedFunction()->hasSemanticsAttr(
+    return fnRef->getReferencedFunctionOrNull()->hasSemanticsAttr(
         "autodiff.nonvarying");
   return false;
 }
@@ -2006,7 +2006,7 @@ emitAssociatedFunctionReference(
   if (auto *originalFRI =
           peerThroughFunctionConversions<FunctionRefInst>(original)) {
     auto loc = originalFRI->getLoc();
-    auto *originalFn = originalFRI->getReferencedFunction();
+    auto *originalFn = originalFRI->getReferencedFunctionOrNull();
     auto substMap = getSubstitutionMap(original);
     // Attempt to look up a `[differentiable]` attribute that minimally
     // satisfies the specified indices.
@@ -2130,7 +2130,7 @@ emitAssociatedFunctionReference(
     }
     if (initialFnRef) {
       assert(initVal);
-      auto *initialFn = initialFnRef->getReferencedFunction();
+      auto *initialFn = initialFnRef->getReferencedFunctionOrNull();
       auto *minimalAttr =
           context.lookUpMinimalDifferentiableAttr(initialFn, desiredIndices);
       if (!minimalAttr) {
@@ -6068,7 +6068,7 @@ ADContext::getOrCreateSubsetParametersThunkForAssociatedFunction(
   StringRef origName;
   if (auto *origFnRef =
           peerThroughFunctionConversions<FunctionRefInst>(origFnOperand)) {
-    origName = origFnRef->getReferencedFunction()->getName();
+    origName = origFnRef->getReferencedFunctionOrNull()->getName();
   } else if (auto *origMethodInst =
                  peerThroughFunctionConversions<MethodInst>(origFnOperand)) {
     origName = origMethodInst->getMember().getAnyFunctionRef()
@@ -6121,7 +6121,7 @@ ADContext::getOrCreateSubsetParametersThunkForAssociatedFunction(
   SILValue assocRef;
   if (auto *assocFnRef =
           peerThroughFunctionConversions<FunctionRefInst>(assocFn)) {
-    auto *assoc = assocFnRef->getReferencedFunction();
+    auto *assoc = assocFnRef->getReferencedFunctionOrNull();
     assocRef = builder.createFunctionRef(loc, assoc);
   } else if (auto *assocMethodInst =
                  peerThroughFunctionConversions<WitnessMethodInst>(assocFn)) {
@@ -6187,7 +6187,7 @@ SILValue ADContext::promoteToDifferentiableFunction(
   if (auto *ai = dyn_cast<ApplyInst>(origFnOperand)) {
     if (auto *thunkRef = dyn_cast<FunctionRefInst>(ai->getCallee())) {
       SILAutoDiffIndices desiredIndices(resultIndex, parameterIndices);
-      auto *thunk = thunkRef->getReferencedFunction();
+      auto *thunk = thunkRef->getReferencedFunctionOrNull();
       auto newThunkName = "AD__" + thunk->getName().str() +
           "__cloned_curry_thunk_" + desiredIndices.mangle();
 

@@ -46,6 +46,10 @@ class OwnedString {
       return new (data) TextOwner(Text);
     }
 
+    /// Disable sized deallocation for TextOwner, because it has tail-allocated
+    /// data.
+    void operator delete(void *p) { ::operator delete(p); }
+
     const char *getText() const { return getTrailingObjects<char>(); }
   };
 

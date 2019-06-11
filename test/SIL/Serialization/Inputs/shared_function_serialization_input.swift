@@ -1,4 +1,4 @@
-@_fixed_layout
+@frozen
 public struct X {
   @inlinable
   public init() { }

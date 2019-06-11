@@ -118,7 +118,7 @@
 ///
 /// Unconditionally unwrapping a `nil` instance with `!` triggers a runtime
 /// error.
-@_frozen
+@frozen
 public enum Optional<Wrapped> : ExpressibleByNilLiteral {
   // The compiler has special knowledge of Optional<Wrapped>, including the fact
   // that it is an `enum` with cases named `none` and `some`.
@@ -390,7 +390,7 @@ extension Optional: Hashable where Wrapped: Hashable {
 
 // Enable pattern matching against the nil literal, even if the element type
 // isn't equatable.
-@_fixed_layout
+@frozen
 public struct _OptionalNilComparisonType : ExpressibleByNilLiteral {
   /// Create an instance initialized with `nil`.
   @_transparent

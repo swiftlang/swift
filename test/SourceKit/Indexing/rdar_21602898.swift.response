@@ -57,7 +57,7 @@
           ],
           key.attributes: [
             {
-              key.attribute: source.decl.attribute._fixed_layout
+              key.attribute: source.decl.attribute.frozen
             }
           ]
         },
