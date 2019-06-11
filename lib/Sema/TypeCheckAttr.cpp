@@ -2584,6 +2584,61 @@ static bool conformsToDifferentiable(TypeChecker &TC, Type type,
 };
 
 // SWIFT_ENABLE_TENSORFLOW
+/// Creates a `AutoDiffParameterIndices` for the given function type,
+/// inferring all differentiation parameters.
+/// The differentiation parameters are inferred to be:
+/// - All parameters of the function type that conform to `Differentiable`.
+/// - If the function type's result is a function type, then also all
+///   parameters of the function result type that conform to `Differentiable`.
+static AutoDiffParameterIndices *
+inferParameters(AnyFunctionType *functionType, TypeChecker &TC,
+                DeclContext *DC, GenericEnvironment *derivativeGenEnv) {
+  AutoDiffParameterIndicesBuilder builder(functionType);
+  SmallVector<Type, 4> allParamTypes;
+
+  // Returns true if the i-th parameter type is differentiable.
+  auto isDifferentiableParam = [&](unsigned i) -> bool {
+    if (i >= allParamTypes.size())
+      return false;
+    auto paramType = allParamTypes[i];
+    if (!paramType->hasTypeParameter())
+      paramType = paramType->mapTypeOutOfContext();
+    if (derivativeGenEnv)
+      paramType = derivativeGenEnv->mapTypeIntoContext(paramType);
+    else
+      paramType = DC->mapTypeIntoContext(paramType);
+    // Return false for class/existential types.
+    if ((!paramType->hasTypeParameter() &&
+         paramType->isAnyClassReferenceType()) ||
+        paramType->isExistentialType())
+      return false;
+    // Return false for function types.
+    if (paramType->is<AnyFunctionType>())
+      return false;
+    // Return true if the type conforms to `Differentiable`.
+    return conformsToDifferentiable(TC, paramType, DC);
+  };
+
+  // Get all parameter types.
+  // NOTE: To be robust, result function type parameters should be added only if
+  // `functionType` comes from a static/instance method, and not a free function
+  // returning a function type. In practice, this code path should not be
+  // reachable for free functions returning a function type.
+  if (auto resultFnType = functionType->getResult()->getAs<AnyFunctionType>())
+    for (auto &param : resultFnType->getParams())
+      allParamTypes.push_back(param.getPlainType());
+  for (auto &param : functionType->getParams())
+    allParamTypes.push_back(param.getPlainType());
+
+  // Set differentiation parameters.
+  for (unsigned i : range(builder.size()))
+    if (isDifferentiableParam(i))
+      builder.setParameter(i);
+
+  return builder.build(TC.Context);
+}
+
+// SWIFT_ENABLE_TENSORFLOW
 static FuncDecl *resolveAutoDiffAssociatedFunction(
     TypeChecker &TC, DeclNameWithLoc specifier, AbstractFunctionDecl *original,
     Type expectedTy, std::function<bool(FuncDecl *)> isValid) {
@@ -2765,11 +2820,8 @@ static AutoDiffParameterIndices *computeDifferentiationParameters(
 
   // If parsed differentiation parameters are empty, infer parameter indices
   // from the function type.
-  if (parsedWrtParams.empty()) {
-    return AutoDiffParameterIndicesBuilder::inferParameters(
-        functionType, function->getModuleContext())
-        .build(TC.Context);
-  }
+  if (parsedWrtParams.empty())
+    return inferParameters(functionType, TC, function, derivativeGenEnv);
 
   // Otherwise, build parameter indices from parsed differentiation parameters.
   AutoDiffParameterIndicesBuilder builder(functionType);
