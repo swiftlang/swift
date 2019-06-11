@@ -1,4 +1,4 @@
-//===--- ReplaceSubrange.swift -------------------------------------------===//
+//===--- StringReplaceSubrange.swift -------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -12,7 +12,7 @@
 
 import TestsUtils
 
-public let ReplaceSubrange = [
+public let StringReplaceSubrange = [
   BenchmarkInfo(name: "ReplaceSubrangeWithSmallLiteralString", runFunction: run_ReplaceSubrangeWithSmallLiteralString, tags: [.validation, .api]),
   BenchmarkInfo(name: "ReplaceSubrangeWithLargeLiteralString", runFunction: run_ReplaceSubrangeWithLargeLiteralString, tags: [.validation, .api]),
   BenchmarkInfo(name: "ReplaceSubrangeWithLargeManagedString", runFunction: run_ReplaceSubrangeWithLargeManagedString, tags: [.validation, .api], setUpFunction: setupLargeManagedString),

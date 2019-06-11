@@ -138,7 +138,6 @@ import RangeReplaceableCollectionPlusDefault
 import RecursiveOwnedParameter
 import ReduceInto
 import RemoveWhere
-import ReplaceSubrange
 import ReversedCollections
 import RomanNumbers
 import SequenceAlgos
@@ -160,6 +159,7 @@ import StringEnum
 import StringInterpolation
 import StringMatch
 import StringRemoveDupes
+import StringReplaceSubrange
 import StringTests
 import StringWalk
 import Substring
@@ -315,7 +315,6 @@ registerBenchmark(RangeReplaceableCollectionPlusDefault)
 registerBenchmark(RecursiveOwnedParameter)
 registerBenchmark(ReduceInto)
 registerBenchmark(RemoveWhere)
-registerBenchmark(ReplaceSubrange)
 registerBenchmark(ReversedCollections)
 registerBenchmark(RomanNumbers)
 registerBenchmark(SequenceAlgos)
@@ -341,6 +340,7 @@ registerBenchmark(StringInterpolationManySmallSegments)
 registerBenchmark(StringMatch)
 registerBenchmark(StringNormalization)
 registerBenchmark(StringRemoveDupes)
+registerBenchmark(StringReplaceSubrange)
 registerBenchmark(StringTests)
 registerBenchmark(StringWalk)
 registerBenchmark(SubstringTest)
