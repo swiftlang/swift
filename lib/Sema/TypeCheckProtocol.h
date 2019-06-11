@@ -406,7 +406,7 @@ struct RequirementMatch {
 
   // SWIFT_ENABLE_TENSORFLOW
   /// Attribute not met.
-  const DeclAttribute * UnmetAttribute = nullptr;
+  const DeclAttribute *UnmetAttribute = nullptr;
 
   /// The requirement environment to use for the witness thunk.
   Optional<RequirementEnvironment> ReqEnv;
