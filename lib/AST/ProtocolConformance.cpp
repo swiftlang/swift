@@ -1120,11 +1120,6 @@ SpecializedProtocolConformance::getWitnessDeclRef(
   auto witnessMap = baseWitness.getSubstitutions();
 
   auto combinedMap = witnessMap.subst(specializationMap);
-
-  // Fast path if the substitutions didn't change.
-  if (combinedMap == baseWitness.getSubstitutions())
-    return baseWitness;
-
   return ConcreteDeclRef(witnessDecl, combinedMap);
 }
 
