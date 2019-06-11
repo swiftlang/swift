@@ -93,7 +93,7 @@ void ASTScopeImpl::print(llvm::raw_ostream &out, unsigned level, bool lastChild,
     out << " " << a;
   out << ", ";
   printRange(out);
-  out << "  ";
+  out << " ";
   printSpecifics(out);
   out << "\n";
 
@@ -107,19 +107,24 @@ void ASTScopeImpl::print(llvm::raw_ostream &out, unsigned level, bool lastChild,
 
 static void printSourceRange(llvm::raw_ostream &out, const SourceRange range,
                              SourceManager &SM) {
-  range.print(out, SM, false);
+  if (range.isInvalid()) {
+    out << "[invalid source range]";
+    return;
+  }
+
+  auto startLineAndCol = SM.getLineAndColumn(range.Start);
+  auto endLineAndCol = SM.getLineAndColumn(range.End);
+
+  out << "[" << startLineAndCol.first << ":" << startLineAndCol.second << " - "
+      << endLineAndCol.first << ":" << endLineAndCol.second << "]";
 }
 
 void ASTScopeImpl::printRange(llvm::raw_ostream &out) const {
   if (!cachedSourceRange)
-    out << " (uncached)";
+    out << "(uncached) ";
   SourceRange range = cachedSourceRange
                           ? getSourceRange(/*forDebugging=*/true)
                           : getUncachedSourceRange(/*forDebugging=*/true);
-  if (range.isInvalid()) {
-    out << " [invalid source range]";
-    return;
-  }
   printSourceRange(out, range, getSourceManager());
 }
 
@@ -128,7 +133,7 @@ void ASTScopeImpl::printRange(llvm::raw_ostream &out) const {
 
 void ASTSourceFileScope::printSpecifics(
     llvm::raw_ostream &out) const {
-  out << " '" << SF->getFilename() << "'";
+  out << "'" << SF->getFilename() << "'";
 }
 
 NullablePtr<const void> ASTScopeImpl::addressForPrinting() const {
@@ -138,10 +143,8 @@ NullablePtr<const void> ASTScopeImpl::addressForPrinting() const {
 }
 
 void GenericTypeOrExtensionScope::printSpecifics(llvm::raw_ostream &out) const {
-  out << " ";
   if (shouldHaveABody() && !doesDeclHaveABody())
     out << "<no body>";
-
   else if (auto *n = getCorrespondingNominalTypeDecl().getPtrOrNull())
     out << "'" << n->getFullName() << "'";
   else
@@ -149,7 +152,7 @@ void GenericTypeOrExtensionScope::printSpecifics(llvm::raw_ostream &out) const {
 }
 
 void GenericParamScope::printSpecifics(llvm::raw_ostream &out) const {
-  out << " param " << index;
+  out << "param " << index;
   auto *genericTypeParamDecl = paramList->getParams()[index];
   out << " '";
   genericTypeParamDecl->print(out);
@@ -157,11 +160,11 @@ void GenericParamScope::printSpecifics(llvm::raw_ostream &out) const {
 }
 
 void AbstractFunctionDeclScope::printSpecifics(llvm::raw_ostream &out) const {
-  out << " '" << decl->getFullName() << "'";
+  out << "'" << decl->getFullName() << "'";
 }
 
 void AbstractPatternEntryScope::printSpecifics(llvm::raw_ostream &out) const {
-  out << " entry " << patternEntryIndex;
+  out << "entry " << patternEntryIndex;
   getPattern()->forEachVariable([&](VarDecl *vd) {
     out << " '" << vd->getName() << "'";
   });
@@ -169,26 +172,20 @@ void AbstractPatternEntryScope::printSpecifics(llvm::raw_ostream &out) const {
 
 void ConditionalClauseScope::printSpecifics(llvm::raw_ostream &out) const {
   ASTScopeImpl::printSpecifics(out);
-  out << " in ";
-  printSourceRange(out, stmt->getSourceRange(), getSourceManager());
-  out << " index " << index;
-  out << "  ";
+  out << "index " << index;
 }
 
 void SubscriptDeclScope::printSpecifics(llvm::raw_ostream &out) const {
-  out << " ";
   decl->dumpRef(out);
 }
 
 void VarDeclScope::printSpecifics(llvm::raw_ostream &out) const {
-  out << " ";
   decl->dumpRef(out);
 }
 
 void ConditionalClausePatternUseScope::printSpecifics(
     llvm::raw_ostream &out) const {
   pattern->print(out);
-  out << "  ";
 }
 
 bool GenericTypeOrExtensionScope::doesDeclHaveABody() const { return false; }

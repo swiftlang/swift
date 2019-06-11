@@ -26,40 +26,39 @@ var i: Int = b.my_identity()
 
 
 // CHECK-EXPANDED:      ***Complete scope map***
-// CHECK-EXPANDED-NEXT: ASTSourceFileScope {{.*}} '{{.*}}' [1:1 - 6{{[0-9]}}:1]
-// CHECK-EXPANDED-NEXT: |-NominalTypeDeclScope {{.*}}, [/s/exp-dep/swift/test/NameBinding/scope_map_top_level.swift:4:1 - line:4:13]   'S0'
-// CHECK-EXPANDED-NEXT:   `-NominalTypeBodyScope {{.*}}, [/s/exp-dep/swift/test/NameBinding/scope_map_top_level.swift:4:11 - line:4:13]   'S0'
-// CHECK-EXPANDED-NEXT: `-TopLevelCodeScope {{.*}}, [/s/exp-dep/swift/test/NameBinding/scope_map_top_level.swift:6:1 - line:21:28]
-// CHECK-EXPANDED-NEXT:   `-BraceStmtScope {{.*}}, [/s/exp-dep/swift/test/NameBinding/scope_map_top_level.swift:6:1 - line:21:28]
-// CHECK-EXPANDED-NEXT:     `-PatternEntryDeclScope {{.*}}, [/s/exp-dep/swift/test/NameBinding/scope_map_top_level.swift:6:5 - line:21:28]   entry 0 'a'
-// CHECK-EXPANDED-NEXT:       |-PatternEntryInitializerScope {{.*}}, [/s/exp-dep/swift/test/NameBinding/scope_map_top_level.swift:6:15 - line:6:15]   entry 0 'a'
-// CHECK-EXPANDED-NEXT:       `-PatternEntryUseScope {{.*}}, [/s/exp-dep/swift/test/NameBinding/scope_map_top_level.swift:6:15 - line:21:28]   entry 0 'a'
-// CHECK-EXPANDED-NEXT:         `-TopLevelCodeScope {{.*}}, [/s/exp-dep/swift/test/NameBinding/scope_map_top_level.swift:8:1 - line:21:28]
-// CHECK-EXPANDED-NEXT:           `-BraceStmtScope {{.*}}, [/s/exp-dep/swift/test/NameBinding/scope_map_top_level.swift:8:1 - line:21:28]
-// CHECK-EXPANDED-NEXT:             `-GuardStmtScope {{.*}}, [/s/exp-dep/swift/test/NameBinding/scope_map_top_level.swift:8:1 - line:21:28]
-// CHECK-EXPANDED-NEXT:               |-ConditionalClauseScope, [/s/exp-dep/swift/test/NameBinding/scope_map_top_level.swift:8:7 - line:8:22] {{.*}}}} index 0
-// CHECK-EXPANDED-NEXT:                 `-ConditionalClausePatternUseScope, [/s/exp-dep/swift/test/NameBinding/scope_map_top_level.swift:8:22 - line:8:22]  let b?
-// CHECK-EXPANDED-NEXT:               |-BraceStmtScope {{.*}}, [/s/exp-dep/swift/test/NameBinding/scope_map_top_level.swift:8:22 - line:9:1]
-// CHECK-EXPANDED-NEXT:               `-GuardStmtUseScope, [/s/exp-dep/swift/test/NameBinding/scope_map_top_level.swift:9:1 - line:21:28]
-// CHECK-EXPANDED-NEXT:                 |-AbstractFunctionDeclScope {{.*}}, [/s/exp-dep/swift/test/NameBinding/scope_map_top_level.swift:11:1 - line:11:13]   'foo()'
-// CHECK-EXPANDED-NEXT:                   `-AbstractFunctionParamsScope {{.*}}, [/s/exp-dep/swift/test/NameBinding/scope_map_top_level.swift:11:9 - line:11:13]
-// CHECK-EXPANDED-NEXT:                     `-PureFunctionBodyScope {{.*}}, [/s/exp-dep/swift/test/NameBinding/scope_map_top_level.swift:11:12 - line:11:13]
-// CHECK-EXPANDED-NEXT:                       `-BraceStmtScope {{.*}}, [/s/exp-dep/swift/test/NameBinding/scope_map_top_level.swift:11:12 - line:11:13]
-// CHECK-EXPANDED-NEXT:                 `-TopLevelCodeScope {{.*}}, [/s/exp-dep/swift/test/NameBinding/scope_map_top_level.swift:13:1 - line:21:28]
-// CHECK-EXPANDED-NEXT:                   `-BraceStmtScope {{.*}}, [/s/exp-dep/swift/test/NameBinding/scope_map_top_level.swift:13:1 - line:21:28]
-// CHECK-EXPANDED-NEXT:                     `-PatternEntryDeclScope {{.*}}, [/s/exp-dep/swift/test/NameBinding/scope_map_top_level.swift:13:5 - line:21:28]   entry 0 'c'
-// CHECK-EXPANDED-NEXT:                       |-PatternEntryInitializerScope {{.*}}, [/s/exp-dep/swift/test/NameBinding/scope_map_top_level.swift:13:9 - line:13:9]   entry 0 'c'
-// CHECK-EXPANDED-NEXT:                       `-PatternEntryUseScope {{.*}}, [/s/exp-dep/swift/test/NameBinding/scope_map_top_level.swift:13:9 - line:21:28]   entry 0 'c'
-// CHECK-EXPANDED-NEXT:                         |-TypeAliasDeclScope {{.*}}, [/s/exp-dep/swift/test/NameBinding/scope_map_top_level.swift:15:1 - line:15:15]   <no extended nominal?!>
-// CHECK-EXPANDED-NEXT:                         |-ExtensionDeclScope {{.*}}, [/s/exp-dep/swift/test/NameBinding/scope_map_top_level.swift:17:1 - line:19:1]   'Int'
-// CHECK-EXPANDED-NEXT:                           `-ExtensionBodyScope {{.*}}, [/s/exp-dep/swift/test/NameBinding/scope_map_top_level.swift:17:15 - line:19:1]   'Int'
-// CHECK-EXPANDED-NEXT:                             `-AbstractFunctionDeclScope {{.*}}, [/s/exp-dep/swift/test/NameBinding/scope_map_top_level.swift:18:3 - line:18:43]   'my_identity()'
-// CHECK-EXPANDED-NEXT:                               `-AbstractFunctionParamsScope {{.*}}, [/s/exp-dep/swift/test/NameBinding/scope_map_top_level.swift:18:19 - line:18:43]
-// CHECK-EXPANDED-NEXT:                                 `-MethodBodyScope {{.*}}, [/s/exp-dep/swift/test/NameBinding/scope_map_top_level.swift:18:29 - line:18:43]
-// CHECK-EXPANDED-NEXT:                                   `-BraceStmtScope {{.*}}, [/s/exp-dep/swift/test/NameBinding/scope_map_top_level.swift:18:29 - line:18:43]
-// CHECK-EXPANDED-NEXT:                         `-TopLevelCodeScope {{.*}}, [/s/exp-dep/swift/test/NameBinding/scope_map_top_level.swift:21:1 - line:21:28]
-// CHECK-EXPANDED-NEXT:                           `-BraceStmtScope {{.*}}, [/s/exp-dep/swift/test/NameBinding/scope_map_top_level.swift:21:1 - line:21:28]
-// CHECK-EXPANDED-NEXT:                             `-PatternEntryDeclScope {{.*}}, [/s/exp-dep/swift/test/NameBinding/scope_map_top_level.swift:21:5 - line:21:28]   entry 0 'i'
-// CHECK-EXPANDED-NEXT:                               |-PatternEntryInitializerScope {{.*}}, [/s/exp-dep/swift/test/NameBinding/scope_map_top_level.swift:21:14 - line:21:28]   entry 0 'i'
-// CHECK-EXPANDED-NEXT:                               `-PatternEntryUseScope {{.*}}, [/s/exp-dep/swift/test/NameBinding/scope_map_top_level.swift:21:28 - line:21:28]   entry 0 'i'
-
+// CHECK-EXPANDED-NEXT: ASTSourceFileScope {{.*}}, [1:1 - 65:1] 'SOURCE_DIR/test/NameBinding/scope_map_top_level.swift'
+// CHECK-EXPANDED-NEXT: |-NominalTypeDeclScope {{.*}}, [4:1 - 4:13] 'S0'
+// CHECK-EXPANDED-NEXT:   `-NominalTypeBodyScope {{.*}}, [4:11 - 4:13] 'S0'
+// CHECK-EXPANDED-NEXT: `-TopLevelCodeScope {{.*}}, [6:1 - 21:28]
+// CHECK-EXPANDED-NEXT:   `-BraceStmtScope {{.*}}, [6:1 - 21:28]
+// CHECK-EXPANDED-NEXT:     `-PatternEntryDeclScope {{.*}}, [6:5 - 21:28] entry 0 'a'
+// CHECK-EXPANDED-NEXT:       |-PatternEntryInitializerScope {{.*}}, [6:15 - 6:15] entry 0 'a'
+// CHECK-EXPANDED-NEXT:       `-PatternEntryUseScope {{.*}}, [6:15 - 21:28] entry 0 'a'
+// CHECK-EXPANDED-NEXT:         `-TopLevelCodeScope {{.*}}, [8:1 - 21:28]
+// CHECK-EXPANDED-NEXT:           `-BraceStmtScope {{.*}}, [8:1 - 21:28]
+// CHECK-EXPANDED-NEXT:             `-GuardStmtScope {{.*}}, [8:1 - 21:28]
+// CHECK-EXPANDED-NEXT:               |-ConditionalClauseScope, [8:7 - 8:22] index 0
+// CHECK-EXPANDED-NEXT:                 `-ConditionalClausePatternUseScope, [8:22 - 8:22] let b?
+// CHECK-EXPANDED-NEXT:               |-BraceStmtScope {{.*}}, [8:22 - 9:1]
+// CHECK-EXPANDED-NEXT:               `-GuardStmtUseScope, [9:1 - 21:28]
+// CHECK-EXPANDED-NEXT:                 |-AbstractFunctionDeclScope {{.*}}, [11:1 - 11:13] 'foo()'
+// CHECK-EXPANDED-NEXT:                   `-AbstractFunctionParamsScope {{.*}}, [11:9 - 11:13]
+// CHECK-EXPANDED-NEXT:                     `-PureFunctionBodyScope {{.*}}, [11:12 - 11:13]
+// CHECK-EXPANDED-NEXT:                       `-BraceStmtScope {{.*}}, [11:12 - 11:13]
+// CHECK-EXPANDED-NEXT:                 `-TopLevelCodeScope {{.*}}, [13:1 - 21:28]
+// CHECK-EXPANDED-NEXT:                   `-BraceStmtScope {{.*}}, [13:1 - 21:28]
+// CHECK-EXPANDED-NEXT:                     `-PatternEntryDeclScope {{.*}}, [13:5 - 21:28] entry 0 'c'
+// CHECK-EXPANDED-NEXT:                       |-PatternEntryInitializerScope {{.*}}, [13:9 - 13:9] entry 0 'c'
+// CHECK-EXPANDED-NEXT:                       `-PatternEntryUseScope {{.*}}, [13:9 - 21:28] entry 0 'c'
+// CHECK-EXPANDED-NEXT:                         |-TypeAliasDeclScope {{.*}}, [15:1 - 15:15] <no extended nominal?!>
+// CHECK-EXPANDED-NEXT:                         |-ExtensionDeclScope {{.*}}, [17:1 - 19:1] 'Int'
+// CHECK-EXPANDED-NEXT:                           `-ExtensionBodyScope {{.*}}, [17:15 - 19:1] 'Int'
+// CHECK-EXPANDED-NEXT:                             `-AbstractFunctionDeclScope {{.*}}, [18:3 - 18:43] 'my_identity()'
+// CHECK-EXPANDED-NEXT:                               `-AbstractFunctionParamsScope {{.*}}, [18:19 - 18:43]
+// CHECK-EXPANDED-NEXT:                                 `-MethodBodyScope {{.*}}, [18:29 - 18:43]
+// CHECK-EXPANDED-NEXT:                                   `-BraceStmtScope {{.*}}, [18:29 - 18:43]
+// CHECK-EXPANDED-NEXT:                         `-TopLevelCodeScope {{.*}}, [21:1 - 21:28]
+// CHECK-EXPANDED-NEXT:                           `-BraceStmtScope {{.*}}, [21:1 - 21:28]
+// CHECK-EXPANDED-NEXT:                             `-PatternEntryDeclScope {{.*}}, [21:5 - 21:28] entry 0 'i'
+// CHECK-EXPANDED-NEXT:                               |-PatternEntryInitializerScope {{.*}}, [21:14 - 21:28] entry 0 'i'
+// CHECK-EXPANDED-NEXT:                               `-PatternEntryUseScope {{.*}}, [21:28 - 21:28] entry 0 'i'
