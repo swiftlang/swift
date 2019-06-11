@@ -2591,8 +2591,11 @@ static bool conformsToDifferentiable(TypeChecker &TC, Type type,
 /// - If the function type's result is a function type, then also all
 ///   parameters of the function result type that conform to `Differentiable`.
 static AutoDiffParameterIndices *
-inferParameters(AnyFunctionType *functionType, TypeChecker &TC,
-                DeclContext *DC, GenericEnvironment *derivativeGenEnv) {
+inferDifferentiableParameters(TypeChecker &TC,
+                              AbstractFunctionDecl *AFD,
+                              GenericEnvironment *derivativeGenEnv) {
+  auto *functionType = AFD->getInterfaceType()->eraseDynamicSelfType()
+      ->castTo<AnyFunctionType>();
   AutoDiffParameterIndicesBuilder builder(functionType);
   SmallVector<Type, 4> allParamTypes;
 
@@ -2606,7 +2609,7 @@ inferParameters(AnyFunctionType *functionType, TypeChecker &TC,
     if (derivativeGenEnv)
       paramType = derivativeGenEnv->mapTypeIntoContext(paramType);
     else
-      paramType = DC->mapTypeIntoContext(paramType);
+      paramType = AFD->mapTypeIntoContext(paramType);
     // Return false for class/existential types.
     if ((!paramType->hasTypeParameter() &&
          paramType->isAnyClassReferenceType()) ||
@@ -2616,7 +2619,7 @@ inferParameters(AnyFunctionType *functionType, TypeChecker &TC,
     if (paramType->is<AnyFunctionType>())
       return false;
     // Return true if the type conforms to `Differentiable`.
-    return conformsToDifferentiable(TC, paramType, DC);
+    return conformsToDifferentiable(TC, paramType, AFD);
   };
 
   // Get all parameter types.
@@ -2821,7 +2824,7 @@ static AutoDiffParameterIndices *computeDifferentiationParameters(
   // If parsed differentiation parameters are empty, infer parameter indices
   // from the function type.
   if (parsedWrtParams.empty())
-    return inferParameters(functionType, TC, function, derivativeGenEnv);
+    return inferDifferentiableParameters(TC, function, derivativeGenEnv);
 
   // Otherwise, build parameter indices from parsed differentiation parameters.
   AutoDiffParameterIndicesBuilder builder(functionType);
