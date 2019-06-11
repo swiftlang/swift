@@ -2569,6 +2569,7 @@ void AttributeChecker::visitPropertyDelegateAttr(PropertyDelegateAttr *attr) {
     nominal->diagnose(diag::property_delegate_reserved_name);
   }
 }
+
 // SWIFT_ENABLE_TENSORFLOW
 /// Returns true if the given type conforms to `Differentiable` in the given
 /// module.
@@ -2753,7 +2754,7 @@ static AutoDiffParameterIndices *computeDifferentiationParameters(
         selfType =
             derivativeGenEnv->mapTypeIntoContext(selfInterfaceType);
       }
-      if (!conformsToDifferentiable(TC, selfType, function->getDeclContext())) {
+      if (!conformsToDifferentiable(TC, selfType, function)) {
         TC.diagnose(attrLoc, diag::diff_function_no_parameters,
                     function->getFullName())
             .highlight(function->getSignatureSourceRange());
@@ -2843,13 +2844,11 @@ static bool checkDifferentiationParameters(
     auto wrtParamType = wrtParamTypes[i];
     if (!wrtParamType->hasTypeParameter())
       wrtParamType = wrtParamType->mapTypeOutOfContext();
-    wrtParamType = AFD->mapTypeIntoContext(wrtParamType);
-    if (derivativeGenEnv) {
-      if (!wrtParamType->hasTypeParameter())
-        wrtParamType = wrtParamType->mapTypeOutOfContext();
+    if (derivativeGenEnv)
       wrtParamType =
           derivativeGenEnv->mapTypeIntoContext(wrtParamType);
-    }
+    else
+      wrtParamType = AFD->mapTypeIntoContext(wrtParamType);
     SourceLoc loc = parsedWrtParams.empty()
         ? attrLoc
         : parsedWrtParams[i].getLoc();
@@ -2870,7 +2869,7 @@ static bool checkDifferentiationParameters(
       return true;
     }
     // Parameter must conform to `Differentiable`.
-    if (!conformsToDifferentiable(TC, wrtParamType, AFD->getDeclContext())) {
+    if (!conformsToDifferentiable(TC, wrtParamType, AFD)) {
       TC.diagnose(loc, diag::diff_params_clause_param_not_differentiable,
                   wrtParamType);
       return true;
@@ -3051,13 +3050,13 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   originalResultTy = originalResultTy->hasTypeParameter()
       ? originalResultTy
       : originalResultTy->mapTypeOutOfContext();
-  originalResultTy = original->mapTypeIntoContext(originalResultTy);
-  // Check that original function's result type conforms to `Differentiable`.
   if (whereClauseGenEnv)
     originalResultTy =
         whereClauseGenEnv->mapTypeIntoContext(originalResultTy);
-  if (!conformsToDifferentiable(TC, originalResultTy,
-                                original)) {
+  else
+    originalResultTy = original->mapTypeIntoContext(originalResultTy);
+  // Check that original function's result type conforms to `Differentiable`.
+  if (!conformsToDifferentiable(TC, originalResultTy, original)) {
     TC.diagnose(attr->getLocation(),
                 diag::differentiable_attr_result_not_differentiable,
                 originalResultTy);
