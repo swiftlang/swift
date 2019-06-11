@@ -522,8 +522,8 @@ public:
       highlightOffendingType(TC, diag, complainRepr);
     });
 
-    // Check the property delegate type.
-    if (auto attr = anyVar->getAttachedPropertyDelegate()) {
+    // Check the property wrapper type.
+    if (auto attr = anyVar->getAttachedPropertyWrapper()) {
       checkTypeAccess(attr->getTypeLoc(), anyVar,
                       /*mayBeInferred=*/false,
                       [&](AccessScope typeAccessScope,
@@ -536,7 +536,7 @@ public:
         auto anyVarAccess =
             isExplicit ? anyVar->getFormalAccess()
                        : typeAccessScope.requiredAccessForDiagnostics();
-        auto diag = anyVar->diagnose(diag::property_delegate_type_access,
+        auto diag = anyVar->diagnose(diag::property_wrapper_type_access,
                                      anyVar->isLet(),
                                      isTypeContext,
                                      isExplicit,
@@ -1059,7 +1059,8 @@ public:
     auto *parentStruct = dyn_cast<StructDecl>(PBD->getDeclContext());
     if (!parentStruct)
       return nullptr;
-    if (!parentStruct->getAttrs().hasAttribute<FixedLayoutAttr>() ||
+    if (!(parentStruct->getAttrs().hasAttribute<FrozenAttr>() ||         
+          parentStruct->getAttrs().hasAttribute<FixedLayoutAttr>()) ||
         PBD->isStatic() || !PBD->hasStorage()) {
       return nullptr;
     }
@@ -1091,7 +1092,7 @@ public:
       auto diagID = diag::pattern_type_not_usable_from_inline_inferred;
       if (fixedLayoutStructContext) {
         diagID =
-            diag::pattern_type_not_usable_from_inline_inferred_fixed_layout;
+            diag::pattern_type_not_usable_from_inline_inferred_frozen;
       } else if (!TC.Context.isSwiftVersionAtLeast(5)) {
         diagID = diag::pattern_type_not_usable_from_inline_inferred_warn;
       }
@@ -1127,7 +1128,7 @@ public:
                         DowngradeToWarning downgradeToWarning) {
       auto diagID = diag::pattern_type_not_usable_from_inline;
       if (fixedLayoutStructContext)
-        diagID = diag::pattern_type_not_usable_from_inline_fixed_layout;
+        diagID = diag::pattern_type_not_usable_from_inline_frozen;
       else if (!TC.Context.isSwiftVersionAtLeast(5))
         diagID = diag::pattern_type_not_usable_from_inline_warn;
       auto diag = TC.diagnose(TP->getLoc(), diagID, anyVar->isLet(),
@@ -1135,7 +1136,7 @@ public:
       highlightOffendingType(TC, diag, complainRepr);
     });
 
-    if (auto attr = anyVar->getAttachedPropertyDelegate()) {
+    if (auto attr = anyVar->getAttachedPropertyWrapper()) {
       checkTypeAccess(attr->getTypeLoc(),
                       fixedLayoutStructContext ? fixedLayoutStructContext
                                                : anyVar,
@@ -1144,7 +1145,7 @@ public:
                           const TypeRepr *complainRepr,
                           DowngradeToWarning downgradeToWarning) {
         auto diag = anyVar->diagnose(
-            diag::property_delegate_type_not_usable_from_inline,
+            diag::property_wrapper_type_not_usable_from_inline,
             anyVar->isLet(), isTypeContext);
         highlightOffendingType(TC, diag, complainRepr);
       });

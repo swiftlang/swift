@@ -38,7 +38,7 @@ var x: Int
 // CHECK1-NEXT: <Group>Math/Integers</Group>
 // CHECK1-NEXT: /<interface-gen>{{$}}
 // CHECK1-NEXT: SYSTEM
-// CHECK1-NEXT: <Declaration>struct Int : <Type usr="s:s17FixedWidthIntegerP">FixedWidthInteger</Type>{{.*}}<Type usr="s:SZ">SignedInteger</Type>{{.*}}</Declaration>
+// CHECK1-NEXT: <Declaration>@frozen struct Int : <Type usr="s:s17FixedWidthIntegerP">FixedWidthInteger</Type>{{.*}}<Type usr="s:SZ">SignedInteger</Type>{{.*}}</Declaration>
 
 // RUN: %sourcekitd-test -req=module-groups -module Swift | %FileCheck -check-prefix=GROUP1 %s
 // GROUP1: <GROUPS>

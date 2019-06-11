@@ -109,11 +109,9 @@ add_swift_host_library(swiftBasic STATIC
 target_include_directories(swiftBasic PRIVATE
   ${UUID_INCLUDE})
 
-if(NOT SWIFT_BUILD_ONLY_SYNTAXPARSERLIB)
-  target_link_libraries(swiftBasic PRIVATE
-    swiftDemangling
-    ${UUID_LIBRARIES})
-endif()
+target_link_libraries(swiftBasic PRIVATE
+  swiftDemangling
+  ${UUID_LIBRARIES})
 
 message(STATUS "Swift version: ${SWIFT_VERSION}")
 message(STATUS "Swift vendor: ${SWIFT_VENDOR}")

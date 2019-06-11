@@ -34,7 +34,7 @@ extension A: K {
 
 struct B {
     let v: String
-    func f1<T, E>(block: (T) -> E) -> B {
+    func f1<T, E>(block: (T) -> E) -> B { // expected-note {{in call to function 'f1(block:)'}}
         return self
     }
 

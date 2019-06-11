@@ -23,7 +23,7 @@
 /// * `s.joined()` does not create new storage
 /// * `s.joined().map(f)` maps eagerly and returns a new array
 /// * `s.lazy.joined().map(f)` maps lazily and returns a `LazyMapSequence`
-@_fixed_layout // lazy-performance
+@frozen // lazy-performance
 public struct FlattenSequence<Base: Sequence> where Base.Element: Sequence {
 
   @usableFromInline // lazy-performance
@@ -39,7 +39,7 @@ public struct FlattenSequence<Base: Sequence> where Base.Element: Sequence {
 }
 
 extension FlattenSequence {
-  @_fixed_layout // lazy-performance
+  @frozen // lazy-performance
   public struct Iterator {
     @usableFromInline // lazy-performance
     internal var _base: Base.Iterator
@@ -138,7 +138,7 @@ public typealias FlattenCollection<T: Collection> = FlattenSequence<T> where T.E
 
 extension FlattenSequence where Base: Collection, Base.Element: Collection {
   /// A position in a FlattenCollection
-  @_fixed_layout // lazy-performance
+  @frozen // lazy-performance
   public struct Index {
     /// The position in the outer collection of collections.
     @usableFromInline // lazy-performance
@@ -394,7 +394,7 @@ extension FlattenCollection: Collection {
   }
 
   @inlinable // lazy-performance
-  public subscript(bounds: Range<Index>) -> SubSequence {
+  public subscript(bounds: Range<Index>) -> Slice<FlattenCollection<Base>> {
     return Slice(base: self, bounds: bounds)
   }
 }

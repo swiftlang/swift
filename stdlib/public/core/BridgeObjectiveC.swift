@@ -356,7 +356,7 @@ public func _getBridgedNonVerbatimObjectiveCType<T>(_: T.Type) -> Any.Type?
 /// This type does not carry an owner pointer unlike the other C*Pointer types
 /// because it only needs to reference the results of inout conversions, which
 /// already have writeback-scoped lifetime.
-@_fixed_layout
+@frozen
 public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   :  _Pointer {
 

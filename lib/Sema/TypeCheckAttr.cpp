@@ -25,7 +25,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
-#include "swift/AST/PropertyDelegates.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Parse/Lexer.h"
@@ -129,7 +129,7 @@ public:
   IGNORED_ATTR(DynamicReplacement)
   IGNORED_ATTR(PrivateImport)
   IGNORED_ATTR(Custom)
-  IGNORED_ATTR(PropertyDelegate)
+  IGNORED_ATTR(PropertyWrapper)
   IGNORED_ATTR(DisfavoredOverload)
   // SWIFT_ENABLE_TENSORFLOW
   IGNORED_ATTR(Differentiable)
@@ -725,25 +725,6 @@ void TypeChecker::checkDeclAttributesEarly(Decl *D) {
   }
 }
 
-/// Determine whether the given string is an attribute name that is
-/// reserved for the implementation.
-static bool isReservedAttributeName(StringRef name) {
-  for (unsigned i : indices(name)) {
-    if (name[i] == '_')
-      continue;
-
-    // First character is lowercase; reserved.
-    if (clang::isLowercase(name[i]))
-      return true;
-
-    // Everything else is reserved.
-    return false;
-  }
-
-  // All underscores is reserved.
-  return true;
-}
-
 namespace {
 class AttributeChecker : public AttributeVisitor<AttributeChecker> {
   TypeChecker &TC;
@@ -865,7 +846,7 @@ public:
 
   void visitNonOverrideAttr(NonOverrideAttr *attr);
   void visitCustomAttr(CustomAttr *attr);
-  void visitPropertyDelegateAttr(PropertyDelegateAttr *attr);
+  void visitPropertyWrapperAttr(PropertyWrapperAttr *attr);
 
   // SWIFT_ENABLE_TENSORFLOW
   void visitDifferentiableAttr(DifferentiableAttr *attr);
@@ -1968,6 +1949,11 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
 }
 
 void AttributeChecker::visitFixedLayoutAttr(FixedLayoutAttr *attr) {
+  if (isa<StructDecl>(D)) {
+    TC.diagnose(attr->getLocation(), diag::fixed_layout_struct)
+      .fixItReplace(attr->getRange(), "@frozen");
+  }  
+
   auto *VD = cast<ValueDecl>(D);
 
   if (VD->getFormalAccess() < AccessLevel::Public &&
@@ -2473,16 +2459,25 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
 }
 
 void AttributeChecker::visitFrozenAttr(FrozenAttr *attr) {
-  auto *ED = cast<EnumDecl>(D);
+  if (auto *ED = dyn_cast<EnumDecl>(D)) {
+    if (!ED->getModuleContext()->isResilient()) {
+      diagnoseAndRemoveAttr(attr, diag::enum_frozen_nonresilient, attr);
+      return;
+    }
 
-  if (!ED->getModuleContext()->isResilient()) {
-    diagnoseAndRemoveAttr(attr, diag::enum_frozen_nonresilient, attr);
-    return;
+    if (ED->getFormalAccess() < AccessLevel::Public &&
+        !ED->getAttrs().hasAttribute<UsableFromInlineAttr>()) {
+      diagnoseAndRemoveAttr(attr, diag::enum_frozen_nonpublic, attr);
+      return;
+    }
   }
 
-  if (ED->getFormalAccess() < AccessLevel::Public &&
-      !ED->getAttrs().hasAttribute<UsableFromInlineAttr>()) {
-    diagnoseAndRemoveAttr(attr, diag::enum_frozen_nonpublic, attr);
+  auto *VD = cast<ValueDecl>(D);
+
+  if (VD->getFormalAccess() < AccessLevel::Public &&
+      !VD->getAttrs().hasAttribute<UsableFromInlineAttr>()) {
+    diagnoseAndRemoveAttr(attr, diag::frozen_attr_on_internal_type,
+                          VD->getFullName(), VD->getFormalAccess());
   }
 }
 
@@ -2516,26 +2511,26 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
     return;
   }
 
-  // If the nominal type is a property delegate type, we can be delegating
+  // If the nominal type is a property wrapper type, we can be delegating
   // through a property.
-  if (nominal->getPropertyDelegateTypeInfo()) {
-    // Property delegates can only be applied to variables
+  if (nominal->getPropertyWrapperTypeInfo()) {
+    // property wrappers can only be applied to variables
     if (!isa<VarDecl>(D) || isa<ParamDecl>(D)) {
       TC.diagnose(attr->getLocation(),
-                  diag::property_delegate_attribute_not_on_property,
+                  diag::property_wrapper_attribute_not_on_property,
                   nominal->getFullName());
       attr->setInvalid();
       return;
     }
 
-    // If this attribute isn't the one that attached a property delegate to
+    // If this attribute isn't the one that attached a property wrapper to
     // this property, complain.
     auto var = cast<VarDecl>(D);
-    if (auto attached = var->getAttachedPropertyDelegate()) {
+    if (auto attached = var->getAttachedPropertyWrapper()) {
       if (attached != attr) {
-        TC.diagnose(attr->getLocation(), diag::property_delegate_multiple);
+        TC.diagnose(attr->getLocation(), diag::property_wrapper_multiple);
         TC.diagnose(attached->getLocation(),
-                    diag::previous_property_delegate_here);
+                    diag::previous_property_wrapper_here);
         return;
       }
     }
@@ -2556,18 +2551,13 @@ void TypeChecker::checkParameterAttributes(ParameterList *params) {
   }
 }
 
-void AttributeChecker::visitPropertyDelegateAttr(PropertyDelegateAttr *attr) {
+void AttributeChecker::visitPropertyWrapperAttr(PropertyWrapperAttr *attr) {
   auto nominal = dyn_cast<NominalTypeDecl>(D);
   if (!nominal)
     return;
 
-  // Force checking of the property delegate type.
-  (void)nominal->getPropertyDelegateTypeInfo();
-
-  // Make sure the name isn't reserved.
-  if (isReservedAttributeName(nominal->getName().str())) {
-    nominal->diagnose(diag::property_delegate_reserved_name);
-  }
+  // Force checking of the property wrapper type.
+  (void)nominal->getPropertyWrapperTypeInfo();
 }
 
 // SWIFT_ENABLE_TENSORFLOW
@@ -2935,6 +2925,14 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   auto &ctx = TC.Context;
   auto lookupConformance =
       LookUpConformanceInModule(D->getDeclContext()->getParentModule());
+  
+  // If functions is marked as linear, you cannot have a custom VJP and/or
+  // a JVP.
+  if (attr->isLinear() && (attr->getVJP() || attr->getJVP())) {
+    diagnoseAndRemoveAttr(attr,
+                          diag::attr_differentiable_no_vjp_or_jvp_when_linear);
+    return;
+  }
 
   AbstractFunctionDecl *original = dyn_cast<AbstractFunctionDecl>(D);
   if (auto *asd = dyn_cast<AbstractStorageDecl>(D)) {
@@ -3305,7 +3303,7 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
     valueResultType = derivative->mapTypeIntoContext(valueResultType);
   auto valueResultConf = TC.conformsToProtocol(valueResultType, diffableProto,
                                                derivative->getDeclContext(),
-                                               ConformanceCheckFlags::Used);
+                                               None);
   if (!valueResultConf) {
     TC.diagnose(attr->getLocation(),
                 diag::differentiating_attr_result_value_not_differentiable,
@@ -3335,7 +3333,7 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
                      source->getGenericParams(), target->getRequirements(),
                      [](SubstitutableType *dependentType) {
                        return Type(dependentType);
-                     }, lookupConformance) == RequirementCheckResult::Success;
+                     }, lookupConformance, None) == RequirementCheckResult::Success;
   };
 
   auto isValidOriginal = [&](FuncDecl *originalCandidate) {
@@ -3444,7 +3442,7 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
         if (paramType->hasTypeParameter())
           paramType = derivative->mapTypeIntoContext(paramType);
         auto conf = TC.conformsToProtocol(paramType, diffableProto, derivative,
-                                          ConformanceCheckFlags::Used);
+                                          None);
         assert(conf &&
                "Expected checked parameter to conform to `Differentiable`");
         auto paramAssocType = conf->getTypeWitnessByName(
@@ -3850,6 +3848,10 @@ void TypeChecker::addImplicitDynamicAttribute(Decl *D) {
       return;
     // Don't add dynamic to functions with a cdecl.
     if (FD->getAttrs().hasAttribute<CDeclAttr>())
+      return;
+    // Don't add dynamic to local function definitions.
+    if (!FD->getDeclContext()->isTypeContext() &&
+        FD->getDeclContext()->isLocalContext())
       return;
   }
 

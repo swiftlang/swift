@@ -606,11 +606,6 @@ public:
   bool shouldIgnoreBridgeHeaderTopLevelDecl(clang::Decl *D);
 
 public:
-  void registerExternalDecl(Decl *D) {
-    if (!hasFinishedTypeChecking())
-      SwiftContext.addExternalDecl(D);
-  }
-
   void recordImplicitUnwrapForDecl(Decl *decl, bool isIUO) {
 #if !defined(NDEBUG)
     Type ty;

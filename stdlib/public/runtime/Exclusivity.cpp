@@ -223,6 +223,18 @@ public:
 #endif
 };
 
+class SwiftTLSContext {
+public:
+  /// The set of tracked accesses.
+  AccessSet accessSet;
+
+  // The "implicit" boolean parameter which is passed to a dynamically
+  // replaceable function.
+  // If true, the original function should be executed instead of the
+  // replacement function.
+  bool CallOriginalOfReplacedFunction = false;
+};
+
 } // end anonymous namespace
 
 // Each of these cases should define a function with this prototype:
@@ -231,40 +243,40 @@ public:
 #if SWIFT_TLS_HAS_RESERVED_PTHREAD_SPECIFIC
 // Use the reserved TSD key if possible.
 
-static AccessSet &getAccessSet() {
-  AccessSet *set = static_cast<AccessSet*>(
-    SWIFT_THREAD_GETSPECIFIC(SWIFT_EXCLUSIVITY_TLS_KEY));
-  if (set)
-    return *set;
+static SwiftTLSContext &getTLSContext() {
+  SwiftTLSContext *ctx = static_cast<SwiftTLSContext*>(
+    SWIFT_THREAD_GETSPECIFIC(SWIFT_RUNTIME_TLS_KEY));
+  if (ctx)
+    return *ctx;
   
   static OnceToken_t setupToken;
   SWIFT_ONCE_F(setupToken, [](void *) {
-    pthread_key_init_np(SWIFT_EXCLUSIVITY_TLS_KEY, [](void *pointer) {
-      delete static_cast<AccessSet*>(pointer);
+    pthread_key_init_np(SWIFT_RUNTIME_TLS_KEY, [](void *pointer) {
+      delete static_cast<SwiftTLSContext*>(pointer);
     });
   }, nullptr);
   
-  set = new AccessSet();
-  SWIFT_THREAD_SETSPECIFIC(SWIFT_EXCLUSIVITY_TLS_KEY, set);
-  return *set;
+  ctx = new SwiftTLSContext();
+  SWIFT_THREAD_SETSPECIFIC(SWIFT_RUNTIME_TLS_KEY, ctx);
+  return *ctx;
 }
 
 #elif SWIFT_TLS_HAS_THREADLOCAL
 // Second choice is direct language support for thread-locals.
 
-static LLVM_THREAD_LOCAL AccessSet ExclusivityAccessSet;
+static LLVM_THREAD_LOCAL SwiftTLSContext TLSContext;
 
-static AccessSet &getAccessSet() {
-  return ExclusivityAccessSet;
+static SwiftTLSContext &getTLSContext() {
+  return TLSContext;
 }
 
 #else
 // Use the platform thread-local data API.
 
-static __swift_thread_key_t createAccessSetThreadKey() {
+static __swift_thread_key_t createSwiftThreadKey() {
   __swift_thread_key_t key;
   int result = SWIFT_THREAD_KEY_CREATE(&key, [](void *pointer) {
-    delete static_cast<AccessSet*>(pointer);
+    delete static_cast<SwiftTLSContext*>(pointer);
   });
 
   if (result != 0) {
@@ -274,15 +286,15 @@ static __swift_thread_key_t createAccessSetThreadKey() {
   return key;
 }
 
-static AccessSet &getAccessSet() {
-  static __swift_thread_key_t key = createAccessSetThreadKey();
+static SwiftTLSContext &getTLSContext() {
+  static __swift_thread_key_t key = createSwiftThreadKey();
 
-  AccessSet *set = static_cast<AccessSet*>(SWIFT_THREAD_GETSPECIFIC(key));
-  if (!set) {
-    set = new AccessSet();
-    SWIFT_THREAD_SETSPECIFIC(key, set);
+  SwiftTLSContext *ctx = static_cast<SwiftTLSContext*>(SWIFT_THREAD_GETSPECIFIC(key));
+  if (!ctx) {
+    ctx = new SwiftTLSContext();
+    SWIFT_THREAD_SETSPECIFIC(key, ctx);
   }
-  return *set;
+  return *ctx;
 }
 
 #endif
@@ -309,7 +321,7 @@ void swift::swift_beginAccess(void *pointer, ValueBuffer *buffer,
   if (!pc)
     pc = get_return_address();
 
-  if (!getAccessSet().insert(access, pc, pointer, flags))
+  if (!getTLSContext().accessSet.insert(access, pc, pointer, flags))
     access->Pointer = nullptr;
 }
 
@@ -324,7 +336,25 @@ void swift::swift_endAccess(ValueBuffer *buffer) {
     return;
   }
 
-  getAccessSet().remove(access);
+  getTLSContext().accessSet.remove(access);
+}
+
+char *swift::swift_getFunctionReplacement(char **ReplFnPtr, char *CurrFn) {
+  char *ReplFn = *ReplFnPtr;
+  if (ReplFn == CurrFn)
+    return nullptr;
+  SwiftTLSContext &ctx = getTLSContext();
+  if (ctx.CallOriginalOfReplacedFunction) {
+    ctx.CallOriginalOfReplacedFunction = false;
+    return nullptr;
+  }
+  return ReplFn;
+}
+
+char *swift::swift_getOrigOfReplaceable(char **OrigFnPtr) {
+  char *OrigFn = *OrigFnPtr;
+  getTLSContext().CallOriginalOfReplacedFunction = true;
+  return OrigFn;
 }
 
 #ifndef NDEBUG
@@ -333,7 +363,7 @@ void swift::swift_endAccess(ValueBuffer *buffer) {
 //
 // This is only intended to be used in the debugger.
 void swift::swift_dumpTrackedAccesses() {
-  getAccessSet().forEach([](Access *a) {
+  getTLSContext().accessSet.forEach([](Access *a) {
       fprintf(stderr, "Access. Pointer: %p. PC: %p. AccessAction: %s\n",
               a->Pointer, a->PC, getAccessName(a->getAccessAction()));
   });

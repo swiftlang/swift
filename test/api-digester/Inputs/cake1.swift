@@ -37,7 +37,7 @@ public class C5 {
 
 public struct C6 {}
 
-@_frozen
+@frozen
 public enum IceKind {}
 
 public protocol P1 {}
@@ -48,7 +48,7 @@ public extension P1 where Self: P2 {
   func P1Constraint() {}
 }
 
-@_fixed_layout
+@frozen
 public struct fixedLayoutStruct {
   public var b = 2
   public func foo() {}
@@ -56,13 +56,13 @@ public struct fixedLayoutStruct {
 }
 
 @usableFromInline
-@_fixed_layout
+@frozen
 struct fixedLayoutStruct2 {
   public private(set) var NoLongerWithFixedBinaryOrder = 1
   public var BecomeFixedBinaryOrder: Int { return 1 }
 }
 
-@_frozen
+@frozen
 public enum FrozenKind {
   case Unchanged
   case Fixed
@@ -167,4 +167,8 @@ public protocol HasMutatingMethod {
 public protocol HasMutatingMethodClone: HasMutatingMethod {
   mutating func foo()
   var bar: Int { mutating get }
+}
+
+public extension Int {
+  public func IntEnhancer() {}
 }

@@ -117,6 +117,9 @@ else:
     # even if SWIFT_ENABLE_GOLD_LINKER isn't set, we cannot use BFD for Android
     config.android_linker_name = "gold"
 
+if '@SWIFT_INCLUDE_TOOLS@' == 'TRUE':
+    config.available_features.add('swift_tools_extra')
+
 if "@SWIFT_SOURCEKIT_USE_INPROC_LIBRARY@" == "TRUE":
     config.available_features.add('sourcekit_use_inproc_library')
 

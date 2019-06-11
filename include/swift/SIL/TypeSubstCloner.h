@@ -69,7 +69,7 @@ class TypeSubstCloner : public SILClonerWithScopes<ImplClass> {
 
       if (!Cloner.Inlining) {
         FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(AI.getCallee());
-        if (FRI && FRI->getReferencedFunction() == AI.getFunction() &&
+        if (FRI && FRI->getInitiallyReferencedFunction() == AI.getFunction() &&
             Subs == Cloner.SubsMap) {
           // Handle recursions by replacing the apply to the callee with an
           // apply to the newly specialized function, but only if substitutions

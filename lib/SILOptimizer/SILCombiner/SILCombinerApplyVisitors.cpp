@@ -641,7 +641,7 @@ static SILValue createKeypathProjections(SILValue keyPath, SILValue root,
 ///   ...
 ///   load/store %addr
 bool SILCombiner::tryOptimizeKeypath(ApplyInst *AI) {
-  SILFunction *callee = AI->getReferencedFunction();
+  SILFunction *callee = AI->getReferencedFunctionOrNull();
   if (!callee)
     return false;
 
@@ -695,7 +695,7 @@ bool SILCombiner::tryOptimizeKeypath(ApplyInst *AI) {
 ///   %addr = struct_element_addr/ref_element_addr %root_object
 ///   // use %inout_addr
 bool SILCombiner::tryOptimizeInoutKeypath(BeginApplyInst *AI) {
-  SILFunction *callee = AI->getReferencedFunction();
+  SILFunction *callee = AI->getReferencedFunctionOrNull();
   if (!callee)
     return false;
 
@@ -1375,7 +1375,7 @@ static bool knowHowToEmitReferenceCountInsts(ApplyInst *Call) {
   FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(Call->getCallee());
   if (!FRI)
     return false;
-  SILFunction *F = FRI->getReferencedFunction();
+  SILFunction *F = FRI->getReferencedFunctionOrNull();
   auto FnTy = F->getLoweredFunctionType();
 
   // Look at the result type.
@@ -1398,7 +1398,7 @@ static bool knowHowToEmitReferenceCountInsts(ApplyInst *Call) {
 /// Add reference counting operations equal to the effect of the call.
 static void emitMatchingRCAdjustmentsForCall(ApplyInst *Call, SILValue OnX) {
   FunctionRefInst *FRI = cast<FunctionRefInst>(Call->getCallee());
-  SILFunction *F = FRI->getReferencedFunction();
+  SILFunction *F = FRI->getReferencedFunctionOrNull();
   auto FnTy = F->getLoweredFunctionType();
   assert(FnTy->getNumResults() == 1);
   auto ResultInfo = FnTy->getResults()[0];
@@ -1529,7 +1529,7 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
     return nullptr;
 
   // Optimize readonly functions with no meaningful users.
-  SILFunction *SF = AI->getReferencedFunction();
+  SILFunction *SF = AI->getReferencedFunctionOrNull();
   if (SF && SF->getEffectsKind() < EffectsKind::ReleaseNone) {
     UserListTy Users;
     if (recursivelyCollectARCUsers(Users, AI)) {
@@ -1660,7 +1660,7 @@ SILInstruction *SILCombiner::visitTryApplyInst(TryApplyInst *AI) {
   }
 
   // Optimize readonly functions with no meaningful users.
-  SILFunction *Fn = AI->getReferencedFunction();
+  SILFunction *Fn = AI->getReferencedFunctionOrNull();
   if (Fn && Fn->getEffectsKind() < EffectsKind::ReleaseNone) {
     UserListTy Users;
     if (isTryApplyResultNotUsed(Users, AI)) {

@@ -14,7 +14,7 @@
 /// `Sequence` passed through a transform function returning `Element`.
 /// These elements are computed lazily, each time they're read, by
 /// calling the transform function on a base element.
-@_fixed_layout
+@frozen
 public struct LazyMapSequence<Base : Sequence, Element> {
 
   public typealias Elements = LazyMapSequence
@@ -34,7 +34,7 @@ public struct LazyMapSequence<Base : Sequence, Element> {
 }
 
 extension LazyMapSequence {
-  @_fixed_layout
+  @frozen
   public struct Iterator {
     @usableFromInline
     internal var _base: Base.Iterator

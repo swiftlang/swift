@@ -60,7 +60,7 @@ public func do_switch(u u: MaybePair) {
   e()
 }
 
-@_fixed_layout
+@frozen
 public struct Wrapper {
   public var value: Int32
   

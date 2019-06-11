@@ -11,7 +11,7 @@
 // RUN: %target-swift-frontend -build-module-from-parseable-interface %t/TestResilient.swiftinterface -o %t/TestResilient.swiftmodule
 // RUN: %target-swift-frontend -emit-module -o /dev/null -merge-modules -emit-parseable-module-interface-path - %t/TestResilient.swiftmodule -module-name TestResilient | %FileCheck %s --check-prefix CHECK --check-prefix RESILIENT
 
-// CHECK: @_fixed_layout public struct HasLazyVarsFixedLayout {
+// CHECK: @frozen public struct HasLazyVarsFixedLayout {
 // CHECK-NEXT: public var foo: [[INT:(Swift\.)?Int]] {
 // CHECK-NEXT:   mutating get
 // CHECK-NEXT:   set
@@ -20,7 +20,7 @@
 // CHECK-NOT: private var bar
 // CHECK: private var $__lazy_storage_$_bar: [[INT]]?
 // CHECK-NEXT: }
-@_fixed_layout
+@frozen
 public struct HasLazyVarsFixedLayout {
   public lazy var foo: Int = 0
   private lazy var bar: Int = 0

@@ -1114,7 +1114,8 @@ ERROR(numeric_literal_numeric_member,none,
 ERROR(standalone_dollar_identifier,none,
      "'$' is not an identifier; use backticks to escape it", ())
 ERROR(dollar_identifier_decl,none,
-     "cannot declare entity %0 with a '$' prefix", (Identifier))
+     "cannot declare entity named %0; the '$' prefix is reserved for "
+     "implicitly-synthesized declarations", (Identifier))
 
 ERROR(anon_closure_arg_not_in_closure,none,
       "anonymous closure argument not contained in a closure", ())
@@ -1500,6 +1501,9 @@ ERROR(attr_differentiable_missing_label,PointsToFirstBadToken,
 ERROR(attr_differentiable_expected_label,none,
       "expected either 'wrt:' or a function specifier label, e.g. 'jvp:', "
       "or 'vjp:'", ())
+ERROR(attr_differentiable_no_vjp_or_jvp_when_linear,none,
+      "cannot specify 'vjp:' or 'jvp:' for linear functions; use "
+      "'transpose:' instead", ())
 
 // differentiating
 ERROR(attr_differentiating_expected_original_name,PointsToFirstBadToken,

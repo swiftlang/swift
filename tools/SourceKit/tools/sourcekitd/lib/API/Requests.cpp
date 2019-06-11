@@ -151,13 +151,14 @@ static sourcekitd_response_t reportDocInfo(llvm::MemoryBuffer *InputBuf,
                                            StringRef ModuleName,
                                            ArrayRef<const char *> Args);
 
-static void reportCursorInfo(const CursorInfoData &Info, ResponseReceiver Rec);
+static void reportCursorInfo(const RequestResult<CursorInfoData> &Result, ResponseReceiver Rec);
 
-static void reportExpressionTypeInfo(const ExpressionTypesInFile &Info, ResponseReceiver Rec);
+static void reportExpressionTypeInfo(const RequestResult<ExpressionTypesInFile> &Result,
+                                     ResponseReceiver Rec);
 
-static void reportRangeInfo(const RangeInfo &Info, ResponseReceiver Rec);
+static void reportRangeInfo(const RequestResult<RangeInfo> &Result, ResponseReceiver Rec);
 
-static void reportNameInfo(const NameTranslatingInfo &Info, ResponseReceiver Rec);
+static void reportNameInfo(const RequestResult<NameTranslatingInfo> &Result, ResponseReceiver Rec);
 
 static void findRelatedIdents(StringRef Filename,
                               int64_t Offset,
@@ -253,8 +254,8 @@ buildRenameLocationsFromDict(RequestDict &Req, bool UseNewName,
                              llvm::SmallString<64> &Error);
 
 static sourcekitd_response_t
-createCategorizedEditsResponse(ArrayRef<CategorizedEdits> AllEdits,
-                               StringRef Error);
+createCategorizedEditsResponse(
+    const RequestResult<ArrayRef<CategorizedEdits>> &Result);
 
 static sourcekitd_response_t
 syntacticRename(llvm::MemoryBuffer *InputBuf,
@@ -262,8 +263,8 @@ syntacticRename(llvm::MemoryBuffer *InputBuf,
                 ArrayRef<const char*> Args);
 
 static sourcekitd_response_t
-createCategorizedRenameRangesResponse(ArrayRef<CategorizedRenameRanges> Ranges,
-                                      StringRef Error);
+createCategorizedRenameRangesResponse(
+    const RequestResult<ArrayRef<CategorizedRenameRanges>> &Result);
 
 static sourcekitd_response_t
 findRenameRanges(llvm::MemoryBuffer *InputBuf,
@@ -976,12 +977,16 @@ static void handleSemanticRequest(
       return Lang.getCursorInfo(
           *SourceFile, Offset, Length, Actionables, CancelOnSubsequentRequest,
           Args, FileSystem,
-          [Rec](const CursorInfoData &Info) { reportCursorInfo(Info, Rec); });
+          [Rec](const RequestResult<CursorInfoData> &Result) {
+            reportCursorInfo(Result, Rec);
+          });
     }
     if (auto USR = Req.getString(KeyUSR)) {
       return Lang.getCursorInfoFromUSR(
           *SourceFile, *USR, CancelOnSubsequentRequest, Args, FileSystem,
-          [Rec](const CursorInfoData &Info) { reportCursorInfo(Info, Rec); });
+          [Rec](const RequestResult<CursorInfoData> &Result) {
+            reportCursorInfo(Result, Rec);
+          });
     }
 
     return Rec(createErrorRequestInvalid(
@@ -1000,7 +1005,9 @@ static void handleSemanticRequest(
       if (!Req.getInt64(KeyLength, Length, /*isOptional=*/false)) {
         return Lang.getRangeInfo(*SourceFile, Offset, Length,
                                  CancelOnSubsequentRequest, Args,
-          [Rec](const RangeInfo &Info) { reportRangeInfo(Info, Rec); });
+          [Rec](const RequestResult<RangeInfo> &Result) {
+            reportRangeInfo(Result, Rec);
+          });
       }
     }
 
@@ -1036,8 +1043,8 @@ static void handleSemanticRequest(
         Info.Column = Column;
         Info.Length = Length;
         return Lang.semanticRefactoring(*SourceFile, Info, Args,
-          [Rec](ArrayRef<CategorizedEdits> CategorizedEdits, StringRef Error) {
-            Rec(createCategorizedEditsResponse(CategorizedEdits, Error));
+          [Rec](const RequestResult<ArrayRef<CategorizedEdits>> &Result) {
+            Rec(createCategorizedEditsResponse(Result));
         });
       }
     }
@@ -1051,8 +1058,8 @@ static void handleSemanticRequest(
     if (Req.getStringArray(KeyExpectedTypes, ExpectedProtocols, true))
       return Rec(createErrorRequestInvalid("invalid 'key.interested_protocols'"));
     return Lang.collectExpressionTypes(*SourceFile, Args, ExpectedProtocols,
-      [Rec](const ExpressionTypesInFile &Info) {
-        reportExpressionTypeInfo(Info, Rec);
+      [Rec](const RequestResult<ExpressionTypesInFile> &Result) {
+        reportExpressionTypeInfo(Result, Rec);
       });
   }
 
@@ -1067,8 +1074,8 @@ static void handleSemanticRequest(
     LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
     return Lang.findLocalRenameRanges(
         *SourceFile, Line, Column, Length, Args,
-        [Rec](ArrayRef<CategorizedRenameRanges> Ranges, StringRef Error) {
-          Rec(createCategorizedRenameRangesResponse(Ranges, Error));
+        [Rec](const RequestResult<ArrayRef<CategorizedRenameRanges>> &Result) {
+          Rec(createCategorizedRenameRangesResponse(Result));
         });
   }
 
@@ -1111,7 +1118,9 @@ static void handleSemanticRequest(
                    std::back_inserter(Input.ArgNames),
                    [](const char *C) { return StringRef(C); });
     return Lang.getNameInfo(*SourceFile, Offset, Input, Args,
-      [Rec](const NameTranslatingInfo &Info) { reportNameInfo(Info, Rec); });
+      [Rec](const RequestResult<NameTranslatingInfo> &Result) {
+        reportNameInfo(Result, Rec);
+      });
   }
 
   if (ReqUID == RequestRelatedIdents) {
@@ -1649,12 +1658,21 @@ bool SKDocConsumer::handleDiagnostic(const DiagnosticEntryInfo &Info) {
 // ReportCursorInfo
 //===----------------------------------------------------------------------===//
 
-static void reportCursorInfo(const CursorInfoData &Info, ResponseReceiver Rec) {
-
-  if (Info.IsCancelled)
+static void reportCursorInfo(const RequestResult<CursorInfoData> &Result,
+                             ResponseReceiver Rec) {
+  if (Result.isCancelled())
     return Rec(createErrorRequestCancelled());
+  if (Result.isError())
+    return Rec(createErrorRequestFailed(Result.getError()));
+
+  const CursorInfoData &Info = Result.value();
 
   ResponseBuilder RespBuilder;
+  if (!Info.InternalDiagnostic.empty()) {
+    auto Elem = RespBuilder.getDictionary();
+    Elem.set(KeyInternalDiagnostic, Info.InternalDiagnostic);
+    return Rec(RespBuilder.createResponse());
+  }
   if (Info.Kind.isInvalid())
     return Rec(RespBuilder.createResponse());
 
@@ -1735,9 +1753,15 @@ static void reportCursorInfo(const CursorInfoData &Info, ResponseReceiver Rec) {
 // ReportRangeInfo
 //===----------------------------------------------------------------------===//
 
-static void reportRangeInfo(const RangeInfo &Info, ResponseReceiver Rec) {
-  if (Info.IsCancelled)
+static void reportRangeInfo(const RequestResult<RangeInfo> &Result,
+                            ResponseReceiver Rec) {
+  if (Result.isCancelled())
     return Rec(createErrorRequestCancelled());
+  if (Result.isError())
+    return Rec(createErrorRequestFailed(Result.getError()));
+
+  const RangeInfo &Info = Result.value();
+
   ResponseBuilder RespBuilder;
   auto Elem = RespBuilder.getDictionary();
   Elem.set(KeyKind, Info.RangeKind);
@@ -1750,11 +1774,21 @@ static void reportRangeInfo(const RangeInfo &Info, ResponseReceiver Rec) {
 // ReportNameInfo
 //===----------------------------------------------------------------------===//
 
-static void reportNameInfo(const NameTranslatingInfo &Info, ResponseReceiver Rec) {
-  if (Info.IsCancelled)
+static void reportNameInfo(const RequestResult<NameTranslatingInfo> &Result,
+                           ResponseReceiver Rec) {
+  if (Result.isCancelled())
     return Rec(createErrorRequestCancelled());
+  if (Result.isError())
+    return Rec(createErrorRequestFailed(Result.getError()));
+
+  const NameTranslatingInfo &Info = Result.value();
 
   ResponseBuilder RespBuilder;
+  if (!Info.InternalDiagnostic.empty()) {
+    auto Elem = RespBuilder.getDictionary();
+    Elem.set(KeyInternalDiagnostic, Info.InternalDiagnostic);
+    return Rec(RespBuilder.createResponse());
+  }
   if (Info.NameKind.isInvalid())
     return Rec(RespBuilder.createResponse());
   if (Info.BaseName.empty() && Info.ArgNames.empty())
@@ -1784,8 +1818,15 @@ static void reportNameInfo(const NameTranslatingInfo &Info, ResponseReceiver Rec
 //===----------------------------------------------------------------------===//
 // ReportExpressionTypeInfo
 //===----------------------------------------------------------------------===//
-static void reportExpressionTypeInfo(const ExpressionTypesInFile &Info,
+static void reportExpressionTypeInfo(const RequestResult<ExpressionTypesInFile> &Result,
                                      ResponseReceiver Rec) {
+  if (Result.isCancelled())
+    return Rec(createErrorRequestCancelled());
+  if (Result.isError())
+    return Rec(createErrorRequestFailed(Result.getError()));
+
+  const ExpressionTypesInFile &Info = Result.value();
+
   ResponseBuilder Builder;
   auto Dict = Builder.getDictionary();
   ExpressionTypeArrayBuilder ArrBuilder(Info.TypeBuffer);
@@ -1808,9 +1849,14 @@ static void findRelatedIdents(StringRef Filename,
                               ResponseReceiver Rec) {
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
   Lang.findRelatedIdentifiersInFile(Filename, Offset, CancelOnSubsequentRequest,
-                                    Args, [Rec](const RelatedIdentsInfo &Info) {
-    if (Info.IsCancelled)
-      return Rec(createErrorRequestCancelled());
+                                    Args,
+                                    [Rec](const RequestResult<RelatedIdentsInfo> &Result) {
+  if (Result.isCancelled())
+    return Rec(createErrorRequestCancelled());
+  if (Result.isError())
+    return Rec(createErrorRequestFailed(Result.getError()));
+
+  const RelatedIdentsInfo &Info = Result.value();
 
     ResponseBuilder RespBuilder;
     auto Arr = RespBuilder.getDictionary().setArray(KeyResults);
@@ -2784,12 +2830,17 @@ editorFindInterfaceDoc(StringRef ModuleName, ArrayRef<const char *> Args) {
   sourcekitd_response_t Resp;
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
   Lang.findInterfaceDocument(ModuleName, Args,
-    [&](const InterfaceDocInfo &Info) {
-      if (!Info.Error.empty()) {
-        SmallString<128> Err(Info.Error);
-        Resp = createErrorRequestFailed(Err.c_str());
+    [&](const RequestResult<InterfaceDocInfo> &Result) {
+      if (Result.isCancelled()) {
+        Resp = createErrorRequestCancelled();
         return;
       }
+      if (Result.isError()) {
+        Resp = createErrorRequestFailed(Result.getError());
+        return;
+      }
+
+      const InterfaceDocInfo &Info = Result.value();
 
       auto Elem = RespBuilder.getDictionary();
       if (!Info.ModuleInterfaceName.empty())
@@ -2808,11 +2859,18 @@ editorFindModuleGroups(StringRef ModuleName, ArrayRef<const char *> Args) {
   sourcekitd_response_t Resp;
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
   Lang.findModuleGroups(ModuleName, Args,
-                        [&](ArrayRef<StringRef> Groups, StringRef Error) {
-    if (!Error.empty()) {
-      Resp = createErrorRequestFailed(Error.str().c_str());
+                        [&](const RequestResult<ArrayRef<StringRef>> &Result) {
+    if (Result.isCancelled()) {
+      Resp = createErrorRequestCancelled();
       return;
     }
+    if (Result.isError()) {
+      Resp = createErrorRequestFailed(Result.getError());
+      return;
+    }
+
+    ArrayRef<StringRef> Groups = Result.value();
+
     auto Dict = RespBuilder.getDictionary();
     auto Arr = Dict.setArray(KeyModuleGroups);
     for (auto G : Groups) {
@@ -2909,11 +2967,14 @@ buildRenameLocationsFromDict(RequestDict &Req, bool UseNewName,
 }
 
 static sourcekitd_response_t
-createCategorizedEditsResponse(ArrayRef<CategorizedEdits> AllEdits,
-                               StringRef Error) {
-  if (!Error.empty()) {
-    return createErrorRequestFailed(Error.str().c_str());
-  }
+createCategorizedEditsResponse(const RequestResult<ArrayRef<CategorizedEdits>> &Result) {
+  if (Result.isCancelled())
+    return createErrorRequestCancelled();
+  if (Result.isError())
+    return createErrorRequestFailed(Result.getError());
+
+  const ArrayRef<CategorizedEdits> &AllEdits = Result.value();
+
   ResponseBuilder RespBuilder;
   auto Dict = RespBuilder.getDictionary();
   auto Arr = Dict.setArray(KeyCategorizedEdits);
@@ -2953,18 +3014,21 @@ syntacticRename(llvm::MemoryBuffer *InputBuf,
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
   sourcekitd_response_t Result;
   Lang.syntacticRename(InputBuf, RenameLocations, Args,
-    [&](ArrayRef<CategorizedEdits> AllEdits, StringRef Error) {
-      Result = createCategorizedEditsResponse(AllEdits, Error);
+    [&](const RequestResult<ArrayRef<CategorizedEdits>> &ReqResult) {
+      Result = createCategorizedEditsResponse(ReqResult);
   });
   return Result;
 }
 
 static sourcekitd_response_t
-createCategorizedRenameRangesResponse(ArrayRef<CategorizedRenameRanges> Ranges,
-                                      StringRef Error) {
-  if (!Error.empty()) {
-    return createErrorRequestFailed(Error.str().c_str());
-  }
+createCategorizedRenameRangesResponse(const RequestResult<ArrayRef<CategorizedRenameRanges>> &Result) {
+  if (Result.isCancelled())
+    return createErrorRequestCancelled();
+  if (Result.isError())
+    return createErrorRequestFailed(Result.getError());
+
+  const ArrayRef<CategorizedRenameRanges> &Ranges = Result.value();
+
   ResponseBuilder RespBuilder;
   auto Dict = RespBuilder.getDictionary();
   auto Arr = Dict.setArray(KeyCategorizedRanges);
@@ -2995,8 +3059,8 @@ findRenameRanges(llvm::MemoryBuffer *InputBuf,
   sourcekitd_response_t Result;
   Lang.findRenameRanges(
       InputBuf, RenameLocations, Args,
-      [&](ArrayRef<CategorizedRenameRanges> Ranges, StringRef Error) {
-        Result = createCategorizedRenameRangesResponse(Ranges, Error);
+      [&](const RequestResult<ArrayRef<CategorizedRenameRanges>> &ReqResult) {
+        Result = createCategorizedRenameRangesResponse(ReqResult);
       });
   return Result;
 }

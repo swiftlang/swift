@@ -91,7 +91,7 @@ public func max<T : Comparable>(_ x: T, _ y: T, _ z: T, _ rest: T...) -> T {
 ///     }
 ///     // Prints "0: foo"
 ///     // Prints "1: bar"
-@_fixed_layout
+@frozen
 public struct EnumeratedSequence<Base: Sequence> {
   @usableFromInline
   internal var _base: Base
@@ -118,7 +118,7 @@ extension EnumeratedSequence {
   ///
   /// To create an instance, call
   /// `enumerated().makeIterator()` on a sequence or collection.
-  @_fixed_layout
+  @frozen
   public struct Iterator {
     @usableFromInline
     internal var _base: Base.Iterator

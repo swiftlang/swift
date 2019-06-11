@@ -22,7 +22,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
-#include "swift/AST/PropertyDelegates.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ResilienceExpansion.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -1218,13 +1218,13 @@ emitStoredPropertyInitialization(PatternBindingDecl *pbd, unsigned i) {
   auto *initDC = pbdEntry.getInitContext();
   assert(!pbdEntry.isInitializerSubsumed());
 
-  // If this is the backing storage for a property with an attached delegate
+  // If this is the backing storage for a property with an attached wrapper
   // that was initialized with `=`, use that expression as the initializer.
-  if (auto originalProperty = var->getOriginalDelegatedProperty()) {
-    auto delegateInfo =
-        originalProperty->getPropertyDelegateBackingPropertyInfo();
-    if (delegateInfo.originalInitialValue)
-      init = delegateInfo.originalInitialValue;
+  if (auto originalProperty = var->getOriginalWrappedProperty()) {
+    auto wrapperInfo =
+        originalProperty->getPropertyWrapperBackingPropertyInfo();
+    if (wrapperInfo.originalInitialValue)
+      init = wrapperInfo.originalInitialValue;
   }
 
   SILDeclRef constant(var, SILDeclRef::Kind::StoredPropertyInitializer);
@@ -1432,6 +1432,7 @@ void SILGenModule::visitVarDecl(VarDecl *vd) {
 #include "swift/AST/AccessorKinds.def"
         llvm_unreachable("not an opaque accessor");
       }
+      llvm_unreachable("covered switch");
     }();
     if (!shouldEmit) return;
 

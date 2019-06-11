@@ -20,7 +20,7 @@ fg({x in x}) // expected-error {{generic parameter 'T' could not be inferred}}
 
 
 struct S {
-  func f<T>(_ i: (T) -> T, _ j: Int) -> Void {}
+  func f<T>(_ i: (T) -> T, _ j: Int) -> Void {} // expected-note {{in call to function 'f'}}
   func f(_ d: (Double) -> Double) -> Void {}
   func test() -> Void {
     f({x in x}, 2) // expected-error {{generic parameter 'T' could not be inferred}}

@@ -283,6 +283,20 @@ DefineMemberBasedOnUse::create(ConstraintSystem &cs, Type baseType,
       DefineMemberBasedOnUse(cs, baseType, member, locator);
 }
 
+AllowMemberRefOnExistential *
+AllowMemberRefOnExistential::create(ConstraintSystem &cs, Type baseType,
+                                    ValueDecl *member, DeclName memberName,
+                                    ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowMemberRefOnExistential(cs, baseType, memberName, member, locator);
+}
+
+bool AllowMemberRefOnExistential::diagnose(Expr *root, bool asNote) const {
+  auto failure = InvalidMemberRefOnExistential(root, getConstraintSystem(),
+                                               BaseType, Name, getLocator());
+  return failure.diagnose(asNote);
+}
+
 bool AllowTypeOrInstanceMember::diagnose(Expr *root, bool asNote) const {
   auto failure = AllowTypeOrInstanceMemberFailure(
       root, getConstraintSystem(), BaseType, Member, UsedName, getLocator());
@@ -331,6 +345,7 @@ bool AllowInvalidInitRef::diagnose(Expr *root, bool asNote) const {
     return failure.diagnose(asNote);
   }
   }
+  llvm_unreachable("covered switch");
 }
 
 AllowInvalidInitRef *AllowInvalidInitRef::dynamicOnMetatype(
@@ -464,6 +479,7 @@ bool AllowInvalidRefInKeyPath::diagnose(Expr *root, bool asNote) const {
     return failure.diagnose(asNote);
   }
   }
+  llvm_unreachable("covered switch");
 }
 
 AllowInvalidRefInKeyPath *
@@ -539,4 +555,21 @@ CollectionElementContextualMismatch::create(ConstraintSystem &cs, Type srcType,
                                             ConstraintLocator *locator) {
   return new (cs.getAllocator())
       CollectionElementContextualMismatch(cs, srcType, dstType, locator);
+}
+
+bool ExplicitlySpecifyGenericArguments::diagnose(Expr *root,
+                                                 bool asNote) const {
+  auto &cs = getConstraintSystem();
+  MissingGenericArgumentsFailure failure(root, cs, getParameters(),
+                                         getLocator());
+  return failure.diagnose(asNote);
+}
+
+ExplicitlySpecifyGenericArguments *ExplicitlySpecifyGenericArguments::create(
+    ConstraintSystem &cs, ArrayRef<GenericTypeParamType *> params,
+    ConstraintLocator *locator) {
+  unsigned size = totalSizeToAlloc<GenericTypeParamType *>(params.size());
+  void *mem = cs.getAllocator().Allocate(
+      size, alignof(ExplicitlySpecifyGenericArguments));
+  return new (mem) ExplicitlySpecifyGenericArguments(cs, params, locator);
 }
