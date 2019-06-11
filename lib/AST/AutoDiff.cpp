@@ -273,17 +273,6 @@ static unsigned getNumAutoDiffParameterIndices(AnyFunctionType *fnTy) {
   return numParameters;
 }
 
-/// Returns true if the given type conforms to `Differentiable` in the given
-/// module.
-static bool conformsToDifferentiableInModule(Type type, ModuleDecl *module) {
-  auto &ctx = module->getASTContext();
-  auto *differentiableProto =
-      ctx.getProtocol(KnownProtocolKind::Differentiable);
-  return LookUpConformanceInModule(module)(
-      differentiableProto->getDeclaredInterfaceType()->getCanonicalType(),
-      type, differentiableProto).hasValue();
-};
-
 AutoDiffParameterIndicesBuilder::AutoDiffParameterIndicesBuilder(
     AnyFunctionType *functionType)
     : parameters(getNumAutoDiffParameterIndices(functionType)) {}
