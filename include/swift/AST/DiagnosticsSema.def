@@ -2740,7 +2740,7 @@ ERROR(differentiable_attr_stored_property_variable_unsupported,none,
 NOTE(protocol_witness_missing_specific_differentiable_attr,none,
      "candidate is missing attribute '%0'", (StringRef))
 ERROR(linear_differentiable_type_disabled,none,
-      "cannot mark functions as linear differentiable", ())
+      "cannot mark types as linear differentiable", ())
 
 // @differentiating
 ERROR(differentiating_attr_expected_result_tuple,none,
