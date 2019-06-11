@@ -17,6 +17,7 @@
 #include "swift/Basic/Lazy.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Debug.h"
+#include "swift/Runtime/DynamicReplaceable.h"
 #include "swift/Runtime/Exclusivity.h"
 #include "swift/Runtime/Metadata.h"
 #include "ThreadLocalStorage.h"
@@ -158,13 +159,21 @@ static_assert(sizeof(Access) <= sizeof(ValueBuffer) &&
 
 /// A set of accesses that we're tracking.  Just a singly-linked list.
 class AccessSet {
+
+  // Bit 0 stores an extra bit which is used by the dynamic-replaceable runtime.
+  // It is an "implicit" boolean parameter which is passed to a dynamically
+  // replaceable function.
+  // If true, the original function should be executed instead of the
+  // replacement function.
   Access *Head = nullptr;
+
 public:
   constexpr AccessSet() {}
 
   bool insert(Access *access, void *pc, void *pointer, ExclusivityFlags flags) {
     auto action = getAccessAction(flags);
 
+    assert(!testExtraBit());
     for (Access *cur = Head; cur != nullptr; cur = cur->getNext()) {
       // Ignore accesses to different values.
       if (cur->Pointer != pointer)
@@ -192,6 +201,7 @@ public:
   }
 
   void remove(Access *access) {
+    assert(!testExtraBit());
     auto cur = Head;
     // Fast path: stack discipline.
     if (cur == access) {
@@ -212,6 +222,18 @@ public:
     swift_runtime_unreachable("access not found in set");
   }
 
+  void setExtraBit() {
+    Head = (Access *)((intptr_t)Head | 1);
+  }
+
+  void clearExtraBit() {
+    Head = (Access *)((intptr_t)Head & ~1);
+  }
+
+  bool testExtraBit() const {
+    return (bool)((intptr_t)Head & 1);
+  }
+
 #ifndef NDEBUG
   /// Only available with asserts. Intended to be used with
   /// swift_dumpTrackedAccess().
@@ -227,12 +249,6 @@ class SwiftTLSContext {
 public:
   /// The set of tracked accesses.
   AccessSet accessSet;
-
-  // The "implicit" boolean parameter which is passed to a dynamically
-  // replaceable function.
-  // If true, the original function should be executed instead of the
-  // replacement function.
-  bool CallOriginalOfReplacedFunction = false;
 };
 
 } // end anonymous namespace
@@ -343,9 +359,12 @@ char *swift::swift_getFunctionReplacement(char **ReplFnPtr, char *CurrFn) {
   char *ReplFn = *ReplFnPtr;
   if (ReplFn == CurrFn)
     return nullptr;
+
+  // The "implicit" boolean parameter, which inidicates if the original function
+  // should be called, is passed in the extra bit of the AccessSet.
   SwiftTLSContext &ctx = getTLSContext();
-  if (ctx.CallOriginalOfReplacedFunction) {
-    ctx.CallOriginalOfReplacedFunction = false;
+  if (ctx.accessSet.testExtraBit()) {
+    ctx.accessSet.clearExtraBit();
     return nullptr;
   }
   return ReplFn;
@@ -353,7 +372,12 @@ char *swift::swift_getFunctionReplacement(char **ReplFnPtr, char *CurrFn) {
 
 char *swift::swift_getOrigOfReplaceable(char **OrigFnPtr) {
   char *OrigFn = *OrigFnPtr;
-  getTLSContext().CallOriginalOfReplacedFunction = true;
+
+  // Use the extra bit of the AccessSet to pass the "implicit" parameter.
+  SwiftTLSContext &ctx = getTLSContext();
+  assert(!ctx.accessSet.testExtraBit());
+  ctx.accessSet.setExtraBit();
+
   return OrigFn;
 }
 
