@@ -69,4 +69,4 @@ func inferredConformancesGenericResult<T, U>() -> @differentiable (Vector<T>) ->
 //
 
 // expected-error @+1 {{cannot mark functions as linear differentiable}}
-let _: @differentiable(Float) (Float) -> Float
+let _: @differentiable(linear) (Float) -> Float

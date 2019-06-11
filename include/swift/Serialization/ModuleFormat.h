@@ -1662,7 +1662,6 @@ namespace decls_block {
   >;
 
   // SWIFT_ENABLE_TENSORFLOW
-  // TODO: why didn't I add a bit for linear flag here?
   using DifferentiatingDeclAttrLayout = BCRecordLayout<
     Differentiating_DECL_ATTR,
     BCFixed<1>, // Implicit flag.

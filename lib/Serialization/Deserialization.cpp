@@ -4718,7 +4718,7 @@ public:
                                                   rawDiffKind);
       diffKind = DifferentiabilityKind(rawDiffKind);
       
-    } else { // TODO: Handle generic func type
+    } else {
       GenericSignatureID rawGenericSig;
       decls_block::GenericFunctionTypeLayout::readRecord(scratch,
                                                          resultID,
