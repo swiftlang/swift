@@ -386,7 +386,7 @@ static std::string getDifferentiationParametersClauseString(
 // Print the arguments of the given `@differentiable` attribute.
 static void printDifferentiableAttrArguments(
     const DifferentiableAttr *attr, ASTPrinter &printer, PrintOptions Options,
-    const Decl *D, bool omitDifferentiationParametersClause = false) {
+    const Decl *D, bool omitWrtClause = false) {
   // Create a temporary string for the attribute argument text.
   std::string attrArgText;
   llvm::raw_string_ostream stream(attrArgText);
@@ -414,7 +414,7 @@ static void printDifferentiableAttrArguments(
   }
 
   // Print differentiation parameters, unless they are to be omitted.
-  if (!omitDifferentiationParametersClause) {
+  if (!omitWrtClause) {
     auto diffParamsString = getDifferentiationParametersClauseString(
         original, attr->getParameterIndices(), attr->getParsedParameters());
     printCommaIfNecessary();
@@ -1380,11 +1380,10 @@ void DifferentiableAttr::setVJPFunction(FuncDecl *decl) {
 }
 
 void DifferentiableAttr::print(llvm::raw_ostream &OS, const Decl *D,
-                               bool omitDifferentiationParametersClause) const {
+                               bool omitWrtClause) const {
   StreamPrinter P(OS);
   P << "@" << getAttrName();
-  printDifferentiableAttrArguments(this, P, PrintOptions(), D,
-                                   omitDifferentiationParametersClause);
+  printDifferentiableAttrArguments(this, P, PrintOptions(), D, omitWrtClause);
 }
 
 // SWIFT_ENABLE_TENSORFLOW
