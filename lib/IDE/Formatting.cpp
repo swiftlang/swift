@@ -481,6 +481,24 @@ public:
       }
     }
 
+    // Chained trailing closures shouldn't require additional indentation.
+    // a.map {
+    //  ...
+    // }.filter { <--- No indentation here.
+    //  ...
+    // }.map { <--- No indentation here.
+    //  ...
+    // }
+    if (AtExprEnd && AtCursorExpr && isa<CallExpr>(AtExprEnd)) {
+      if (auto *UDE = dyn_cast<UnresolvedDotExpr>(AtCursorExpr)) {
+        if (auto *Base = UDE->getBase()) {
+          if (exprEndAtLine(Base, Line))
+            return false;
+        }
+      }
+    }
+
+
     // Indent another level from the outer context by default.
     return true;
   }
