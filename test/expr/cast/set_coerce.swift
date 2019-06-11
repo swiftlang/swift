@@ -18,4 +18,5 @@ var setD = Set<D>()
 
 // Test set upcasts
 setC = setD
-setD = setC // expected-error{{cannot convert value of type 'Set<C>' to 'Set<D>' in assignment, arguments to generic parameter 'Element' ('C' and 'D') are expected to be equal}}
+setD = setC // expected-error{{cannot assign value of type 'Set<C>' to type 'Set<D>'}}
+// expected-note@-1 {{arguments to generic parameter 'Element' ('C' and 'D') are expected to be equal}}

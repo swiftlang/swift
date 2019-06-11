@@ -1613,7 +1613,7 @@ static ConstraintSystem::TypeMatchResult matchDeepTypeArguments(
     if (result.isFailure()) {
       if (!cs.shouldAttemptFixes())
         return result;
-        
+
       fullMatchResult = result;
       recordMismatch(i);
     }
@@ -1674,8 +1674,7 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
     if (result.isFailure())
       return result;
   }
-  
-  
+
   bool forRequirement = false;
   if (auto last = locator.last()) {
     forRequirement =
@@ -1688,17 +1687,19 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
   // new framework.
   bool isOptional = bound1->getDecl()->isOptionalDecl();
   bool isArray = isArrayType(bound1).hasValue();
-  
+
   auto args1 = bound1->getGenericArgs();
   auto args2 = bound2->getGenericArgs();
-  
+
   SmallVector<unsigned, 4> failedArguments;
-    // Match up the generic arguments, exactly.
-  auto result = matchDeepTypeArguments(*this, subflags, args1, args2, locator,
-                                       [&failedArguments, forRequirement, isOptional, isArray] (unsigned position) {
-                                         if (!(forRequirement || isOptional || isArray))
-                                           failedArguments.push_back(position); 
-                                        });
+  // Match up the generic arguments, exactly.
+  auto result =
+      matchDeepTypeArguments(*this, subflags, args1, args2, locator,
+                             [&failedArguments, forRequirement, isOptional,
+                              isArray](unsigned position) {
+                               if (!(forRequirement || isOptional || isArray))
+                                 failedArguments.push_back(position);
+                             });
   if (!failedArguments.empty()) {
     auto *fix = GenericArgumentsMismatch::create(
         *this, bound1, bound2, failedArguments, getConstraintLocator(locator));
@@ -2150,7 +2151,7 @@ bool ConstraintSystem::repairFailures(
 
     return false;
   }
-  
+
   auto hasConversionOrRestriction = [&](ConversionRestrictionKind kind) {
     return llvm::any_of(
         conversionsOrFixes, [](const RestrictionOrFix possibleRestriction) {

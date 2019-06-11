@@ -384,8 +384,7 @@ bool MissingConformanceFailure::diagnoseAsError() {
   return RequirementFailure::diagnoseAsError();
 }
 
-Optional<Diag<Type, Type>>
-GenericArgumentsMismatchFailure::getDiagnosticFor(
+Optional<Diag<Type, Type>> GenericArgumentsMismatchFailure::getDiagnosticFor(
     ContextualTypePurpose context) {
   switch (context) {
   case CTP_Initialization:
@@ -434,7 +433,7 @@ void GenericArgumentsMismatchFailure::emitNoteForMismatch(int position) {
                  ->reconstituteSugar(/*recursive=*/false);
 
   auto noteLocation = param->getLoc();
-  
+
   if (!noteLocation.isValid()) {
     noteLocation = getAnchor()->getLoc();
   }
@@ -485,12 +484,10 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
   if (!diagnostic)
     return false;
 
-  emitDiagnostic(getAnchor()->getLoc(), *diagnostic,
-                 resolveType(getActual())->reconstituteSugar(/*recursive=*/false),
-                 resolveType(getRequired())->reconstituteSugar(/*recursive=*/false));
-                 
-  
-  
+  emitDiagnostic(
+      getAnchor()->getLoc(), *diagnostic,
+      resolveType(getActual())->reconstituteSugar(/*recursive=*/false),
+      resolveType(getRequired())->reconstituteSugar(/*recursive=*/false));
   emitNotesForMismatches();
   return true;
 }

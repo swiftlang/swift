@@ -87,9 +87,11 @@ func unsafePointerConversionAvailability(
   _ = UnsafePointer<Int>(omrp) // expected-error {{cannot convert value of type 'UnsafeMutableRawPointer?' to expected argument type 'RawPointer'}}
 
   _ = UnsafePointer<Int>(ups) // expected-error {{cannot convert value of type 'UnsafePointer<String>' to expected argument type 'RawPointer'}}
-  _ = UnsafeMutablePointer<Int>(umps) // expected-error {{cannot convert 'UnsafeMutablePointer<String>' to expected argument type 'UnsafeMutablePointer<_>', arguments to generic parameter 'Pointee' ('String' and '_') are expected to be equal}}
+  _ = UnsafeMutablePointer<Int>(umps) // expected-error {{cannot convert value of type 'UnsafeMutablePointer<String>' to expected argument type 'UnsafeMutablePointer<_>'}}
+  // expected-note@-1 {{arguments to generic parameter 'Pointee' ('String' and '_') are expected to be equal}}
   _ = UnsafePointer<String>(upi) // expected-error {{cannot convert value of type 'UnsafePointer<Int>' to expected argument type 'RawPointer'}}
-  _ = UnsafeMutablePointer<String>(umpi) // expected-error {{cannot convert 'UnsafeMutablePointer<Int>' to expected argument type 'UnsafeMutablePointer<_>', arguments to generic parameter 'Pointee' ('Int' and '_') are expected to be equal}}
+  _ = UnsafeMutablePointer<String>(umpi) // expected-error {{cannot convert value of type 'UnsafeMutablePointer<Int>' to expected argument type 'UnsafeMutablePointer<_>'}}
+  // expected-note@-1 {{arguments to generic parameter 'Pointee' ('Int' and '_') are expected to be equal}}
 }
 
 func unsafeRawBufferPointerConversions(

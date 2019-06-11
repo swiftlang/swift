@@ -228,8 +228,8 @@ extension GS {
   }
 }
 
-struct HasNested<T> { // expected-note {{generic parameter 'T' declared here}}
-// expected-note@-1 {{generic parameter 'T' declared here}}
+struct HasNested<T> { // expected-note {{arguments to generic parameter 'T' ('Int' and 'Float') are expected to be equal}}
+// expected-note@-1 {{arguments to generic parameter 'T' ('Float' and 'Int') are expected to be equal}}
   init<U>(_ t: T, _ u: U) {}
   func f<U>(_ t: T, u: U) -> (T, U) {}
 
@@ -251,7 +251,7 @@ func useNested(_ ii: Int, hni: HasNested<Int>,
   typealias InnerI = HasNested<Int>.Inner
   var innerI = InnerI(5)
   typealias InnerF = HasNested<Float>.Inner
-  var innerF : InnerF = innerI // expected-error{{cannot convert parent type 'HasNested<Int>' to expected type 'HasNested<Float>', arguments to generic parameter 'T' ('Int' and 'Float') are expected to be equal}}
+  var innerF : InnerF = innerI // expected-error{{cannot convert parent type 'HasNested<Int>' to expected type 'HasNested<Float>'}}
 
   _ = innerI.identity(i)
   i = innerI.identity(i)
@@ -271,7 +271,7 @@ func useNested(_ ii: Int, hni: HasNested<Int>,
   var ids = xis.g(1, u: "Hello", v: 3.14159)
   ids = (2, "world", 2.71828)
 
-  xis = xfs // expected-error{{cannot convert parent type 'HasNested<Float>' to expected type 'HasNested<Int>', arguments to generic parameter 'T' ('Float' and 'Int') are expected to be equal}}
+  xis = xfs // expected-error{{cannot convert parent type 'HasNested<Float>' to expected type 'HasNested<Int>'}}
 }
 
 // Extensions of nested generic types

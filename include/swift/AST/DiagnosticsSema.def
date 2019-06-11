@@ -425,7 +425,7 @@ ERROR(cannot_convert_generic_type_coerce,none,
       "cannot convert value of type %0 to type %1 in coercion",
       (Type, Type))
 ERROR(cannot_convert_generic_type_assign,none,
-      "cannot convert value of type %0 to %1 in assignment",
+      "cannot assign value of type %0 to type %1",
       (Type, Type))
 ERROR(cannot_convert_generic_type_parent_type,none,
       "cannot convert parent type %0 to expected type %1",

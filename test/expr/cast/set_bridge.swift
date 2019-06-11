@@ -61,7 +61,8 @@ func testUpcastBridge() {
   setB = setO // expected-error{{cannot assign value of type 'Set<ObjC>' to type 'Set<BridgedToObjC>'}}
 
   // Failed upcast
-  setD = setB // expected-error{{cannot convert value of type 'Set<BridgedToObjC>' to 'Set<DerivesObjC>' in assignment, arguments to generic parameter 'Element' ('BridgedToObjC' and 'DerivesObjC') are expected to be equal}}
+  setD = setB // expected-error{{cannot assign value of type 'Set<BridgedToObjC>' to type 'Set<DerivesObjC>'}}
+  // expected-note@-1 {{arguments to generic parameter 'Element' ('BridgedToObjC' and 'DerivesObjC') are expected to be equal}}
 }
 
 func testForcedDowncastBridge() {

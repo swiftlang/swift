@@ -500,13 +500,12 @@ public:
 /// ```
 class GenericArgumentsMismatch final
     : public ConstraintFix,
-      private llvm::TrailingObjects<GenericArgumentsMismatch,
-                                    unsigned> {
+      private llvm::TrailingObjects<GenericArgumentsMismatch, unsigned> {
   friend TrailingObjects;
-  
+
   BoundGenericType *Actual;
   BoundGenericType *Required;
-  
+
   unsigned NumMismatches;
 
 protected:
@@ -539,7 +538,7 @@ public:
                                           BoundGenericType *required,
                                           llvm::ArrayRef<unsigned> mismatches,
                                           ConstraintLocator *locator);
-                                          
+
 private:
   MutableArrayRef<unsigned> getMismatchesBuf() {
     return {getTrailingObjects<unsigned>(), NumMismatches};

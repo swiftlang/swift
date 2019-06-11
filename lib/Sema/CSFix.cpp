@@ -239,7 +239,8 @@ GenericArgumentsMismatch *GenericArgumentsMismatch::create(
     ConstraintSystem &cs, BoundGenericType *actual, BoundGenericType *required,
     llvm::ArrayRef<unsigned> mismatches, ConstraintLocator *locator) {
   unsigned size = totalSizeToAlloc<unsigned>(mismatches.size());
-  void *mem = cs.getAllocator().Allocate(size, alignof(GenericArgumentsMismatch));
+  void *mem =
+      cs.getAllocator().Allocate(size, alignof(GenericArgumentsMismatch));
   return new (mem)
       GenericArgumentsMismatch(cs, actual, required, mismatches, locator);
 }
