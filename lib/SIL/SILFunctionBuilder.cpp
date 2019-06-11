@@ -88,7 +88,10 @@ void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
         vjpName = SILDeclRef(vjpFn).mangle();
       // Get lowered argument indices.
       auto paramIndices = A->getParameterIndices();
-      assert(paramIndices && "Parameter indices should have been resolved");
+      // NOTE: If `A->getParameterIndices()` is `nullptr`, continue. This is a
+      // necessary hack regarding deserialization.
+      if (!paramIndices)
+        continue;
       auto loweredParamIndices = paramIndices->getLowered(
           F->getASTContext(),
           decl->getInterfaceType()->castTo<AnyFunctionType>());
