@@ -3,7 +3,7 @@
 // REQUIRES: executable_test
 // REQUIRES: stress_test
 // REQUIRES: tsan_runtime
-// REQUIRES: objc_interop
+// REQUIRES: foundation
 
 // Check that TSan ignores the retain count update locks in the runtime.
 
