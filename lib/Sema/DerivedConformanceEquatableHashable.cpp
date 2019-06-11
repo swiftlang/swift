@@ -1125,41 +1125,18 @@ deriveBodyHashable_hashValue(AbstractFunctionDecl *hashValueDecl, void *) {
 
   // return _hashValue(for: self)
   auto *hashFunc = C.getHashValueForDecl();
-  if (!hashFunc->hasInterfaceType())
-    C.getLazyResolver()->resolveDeclSignature(hashFunc);
-
-  auto selfType = hashValueDecl->mapTypeIntoContext(
-    parentDC->getSelfInterfaceType());
-  auto hashableProto = C.getProtocol(KnownProtocolKind::Hashable);
-  auto conformance = TypeChecker::conformsToProtocol(selfType, hashableProto,
-                                                     parentDC, None);
-  auto subs = SubstitutionMap::get(hashFunc->getGenericSignature(),
-                                   ArrayRef<Type>(selfType),
-                                   ArrayRef<ProtocolConformanceRef>(*conformance));
-  ConcreteDeclRef hashRef(hashFunc, subs);
-
-  auto hashExpr = new (C) DeclRefExpr(hashRef, DeclNameLoc(),
+  auto hashExpr = new (C) DeclRefExpr(hashFunc, DeclNameLoc(),
                                       /*implicit*/ true);
-
-  Type intType = C.getIntDecl()->getDeclaredType();
-  hashExpr->setType(FunctionType::get(AnyFunctionType::Param(selfType),
-                                      intType));
-
   auto selfDecl = hashValueDecl->getImplicitSelfDecl();
   auto selfRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(),
                                      /*implicit*/ true);
-  selfRef->setType(selfType);
-
-  auto callExpr = CallExpr::createImplicit(C, hashExpr, { selfRef }, { });
-  callExpr->setType(intType);
-  callExpr->setThrows(false);
-
+  auto callExpr = CallExpr::createImplicit(C, hashExpr,
+                                           { selfRef }, { C.Id_for });
   auto returnStmt = new (C) ReturnStmt(SourceLoc(), callExpr);
 
   auto body = BraceStmt::create(C, SourceLoc(), {returnStmt}, SourceLoc(),
                                 /*implicit*/ true);
   hashValueDecl->setBody(body);
-  hashValueDecl->setBodyTypeCheckedIfPresent();
 }
 
 /// Derive a 'hashValue' implementation.
