@@ -2706,6 +2706,8 @@ ERROR(differentiable_attr_associated_function_protocol,none,
       "requirement", ())
 ERROR(differentiable_attr_overload_not_found,none,
       "%0 does not have expected type %1", (DeclName, Type))
+ERROR(linear_differentiable_type_disabled,none,
+      "cannot mark functions as linear differentiable", ())
 ERROR(differentiable_attr_no_currying,none,
       "'@differentiable' cannot be defined on functions that return functions", ())
 ERROR(differentiable_attr_duplicate,none,

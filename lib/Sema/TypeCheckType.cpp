@@ -2273,6 +2273,8 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       DifferentiabilityKind diffkind = DifferentiabilityKind::NonDifferentiable;
       if (attrs.has(TAK_differentiable)) {
         if (attrs.linear) {
+          diagnose(attrs.getLoc(TAK_differentiable),
+                   diag::linear_differentiable_type_disabled);
           diffkind = DifferentiabilityKind::Linear;
         } else {
           diffkind = DifferentiabilityKind::Normal;
