@@ -104,8 +104,7 @@ extension RandomNumberGenerator {
     } while random < range
 
     return random % upperBound
-#endif
-#if arch(x86_64) || arch(arm64)
+#else
     var random: T = next()
     var m = random.multipliedFullWidth(by: upperBound)
     if m.low < upperBound {
