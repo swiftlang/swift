@@ -201,7 +201,6 @@ namespace sil_block {
     SIL_VTABLE_ENTRY,
     DeclIDField,  // SILFunction name
     SILVTableEntryKindField,  // Kind
-    SILLinkageField,      // Linkage
     BCArray<ValueIDField> // SILDeclRef
   >;
   

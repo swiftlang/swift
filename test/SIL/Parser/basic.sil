@@ -1650,12 +1650,10 @@ bb0:
 }
 
 // CHECK-LABEL: sil_vtable Foo {
-// CHECK: #Foo.subscript!getter.1: {{.*}} : hidden @Foo_subscript_getter
-// CHECK: #Foo.subscript!setter.1: {{.*}} : @Foo_subscript_setter
+// CHECK: #Foo.subscript!getter.1: {{.*}} : @Foo_subscript_getter
+// CHECK: #Foo.subscript!setter.1: {{.*}} : @Foo_subscript_setter [override]
 // CHECK: }
 sil_vtable Foo {
-  // Override the linkage to check if it is parsed correctly.
-  #Foo.subscript!getter.1: hidden @Foo_subscript_getter
-  // The public linkage is the same as the function's linkage and should not be printed.
-  #Foo.subscript!setter.1: public @Foo_subscript_setter
+  #Foo.subscript!getter.1: @Foo_subscript_getter
+  #Foo.subscript!setter.1: @Foo_subscript_setter [override]
 }

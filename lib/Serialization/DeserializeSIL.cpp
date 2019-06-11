@@ -2733,17 +2733,8 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
            "Content of Vtable should be in SIL_VTABLE_ENTRY.");
     ArrayRef<uint64_t> ListOfValues;
     DeclID NameID;
-    unsigned RawLinkage;
     unsigned RawEntryKind;
-    VTableEntryLayout::readRecord(scratch, NameID, RawEntryKind, RawLinkage, ListOfValues);
-
-    auto Linkage = fromStableSILLinkage(RawLinkage);
-    if (!Linkage) {
-      LLVM_DEBUG(llvm::dbgs() << "invalid linkage code " << RawLinkage
-                              << " for VTable Entry\n");
-      MF->error();
-      return nullptr;
-    }
+    VTableEntryLayout::readRecord(scratch, NameID, RawEntryKind, ListOfValues);
 
     auto EntryKind = fromStableVTableEntryKind(RawEntryKind);
 
@@ -2751,7 +2742,7 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
     if (Func) {
       unsigned NextValueIndex = 0;
       vtableEntries.emplace_back(getSILDeclRef(MF, ListOfValues, NextValueIndex),
-                                 Func, EntryKind.getValue(), Linkage.getValue());
+                                 Func, EntryKind.getValue());
     }
 
     // Fetch the next record.
