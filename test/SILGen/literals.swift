@@ -320,3 +320,26 @@ struct FileReference: _ExpressibleByFileReferenceLiteral {
 func makeFileReferenceLiteral() -> FileReference {
   return #fileLiteral(resourceName: makeTmpString())
 }
+
+class ReferenceColor<T> { required init() {} }
+
+protocol Silly {
+  init()
+  init(_colorLiteralRed red: Float, green: Float, blue: Float, alpha: Float)
+}
+
+extension Silly {
+  init(_colorLiteralRed red: Float, green: Float, blue: Float, alpha: Float) {
+    self.init()
+  }
+}
+
+extension ReferenceColor : Silly, _ExpressibleByColorLiteral {}
+
+func makeColorLiteral<T>() -> ReferenceColor<T> {
+  return #colorLiteral(red: 1.358, green: -0.074, blue: -0.012, alpha: 1.0)
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s8literals16makeColorLiteralAA09ReferenceC0CyxGylF : $@convention(thin) <T> () -> @owned ReferenceColor<T>
+// CHECK: [[FN:%.*]] = function_ref @$s8literals5SillyPAAE16_colorLiteralRed5green4blue5alphaxSf_S3ftcfC : $@convention(method) <τ_0_0 where τ_0_0 : Silly> (Float, Float, Float, Float, @thick τ_0_0.Type) -> @out τ_0_0
+// CHECK: apply [[FN]]<ReferenceColor<T>>(
