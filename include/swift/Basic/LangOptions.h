@@ -240,6 +240,9 @@ namespace swift {
 
     /// Should we use \c ASTScope-based resolution for unqualified name lookup?
     bool EnableASTScopeLookup = false;
+    
+    /// Someday, ASTScopeLookup will supplant lookup in the parser
+    bool DisableParserLookup = false;
 
     /// Sound we compare to ASTScope-based resolution for debugging?
     bool CompareToASTScopeLookup = false;

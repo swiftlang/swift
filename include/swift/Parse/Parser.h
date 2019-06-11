@@ -714,17 +714,15 @@ public:
 
   /// Add the given Decl to the current scope.
   void addToScope(ValueDecl *D, bool diagnoseRedefinitions = true) {
-    // FIXME: ASTScope lookup is not yet ready for this.
-    //    if (Context.LangOpts.EnableASTScopeLookup)
-    //      return;
+    if (Context.LangOpts.DisableParserLookup)
+      return;
 
     getScopeInfo().addToScope(D, *this, diagnoseRedefinitions);
   }
 
   ValueDecl *lookupInScope(DeclName Name) {
-    // FIXME: ASTScope lookup is not yet ready for this.
-    //    if (Context.LangOpts.EnableASTScopeLookup)
-    //      return nullptr;
+    if (Context.LangOpts.DisableParserLookup)
+          return nullptr;
 
     return getScopeInfo().lookupValueName(Name);
   }
