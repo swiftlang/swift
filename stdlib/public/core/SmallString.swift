@@ -23,7 +23,7 @@
 //  ↑                             ↑
 //  first (leftmost) code unit    discriminator (incl. count)
 //
-@_fixed_layout @usableFromInline
+@frozen @usableFromInline
 internal struct _SmallString {
   @usableFromInline
   internal typealias RawBitPattern = (UInt64, UInt64)

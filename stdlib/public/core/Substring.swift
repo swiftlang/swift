@@ -92,7 +92,7 @@ extension String {
 ///   when there is no other reference to the original string. Storing
 ///   substrings may, therefore, prolong the lifetime of string data that is
 ///   no longer otherwise accessible, which can appear to be memory leakage.
-@_fixed_layout
+@frozen
 public struct Substring {
   @usableFromInline
   internal var _slice: Slice<String>
@@ -322,7 +322,7 @@ extension Substring : LosslessStringConvertible {
 }
 
 extension Substring {
-  @_fixed_layout
+  @frozen
   public struct UTF8View {
     @usableFromInline
     internal var _slice: Slice<String.UTF8View>
@@ -448,7 +448,7 @@ extension String {
   }
 }
 extension Substring {
-  @_fixed_layout
+  @frozen
   public struct UTF16View {
     @usableFromInline
     internal var _slice: Slice<String.UTF16View>
@@ -574,7 +574,7 @@ extension String {
   }
 }
 extension Substring {
-  @_fixed_layout
+  @frozen
   public struct UnicodeScalarView {
     @usableFromInline
     internal var _slice: Slice<String.UnicodeScalarView>

@@ -18,7 +18,7 @@
 //===----------------------------------------------------------------------===//
 
 /// A collection whose element type is `Element` but that is always empty.
-@_fixed_layout // trivial-implementation
+@frozen // trivial-implementation
 public struct EmptyCollection<Element> {
   // no properties
 
@@ -29,7 +29,7 @@ public struct EmptyCollection<Element> {
 
 extension EmptyCollection {
   /// An iterator that never produces an element.
-  @_fixed_layout // trivial-implementation
+  @frozen // trivial-implementation
   public struct Iterator {
     // no properties
   

@@ -95,7 +95,11 @@ foreach(sdk ${SWIFT_SDKS})
       set(GLIBC_ARCH_INCLUDE_PATH "${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH}${GLIBC_ARCH_INCLUDE_PATH}")
     endif()
 
-    set(glibc_modulemap_source "glibc.modulemap.gyb")
+    if(sdk STREQUAL ANDROID)
+      set(glibc_modulemap_source "bionic.modulemap.gyb")
+    else()
+      set(glibc_modulemap_source "glibc.modulemap.gyb")
+    endif()
     set(glibc_modulemap_out "${module_dir}/glibc.modulemap")
 
     # Configure the module map based on the target. Each platform needs to

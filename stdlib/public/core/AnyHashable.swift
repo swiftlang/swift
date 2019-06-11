@@ -123,7 +123,7 @@ internal struct _ConcreteHashableBox<Base : Hashable> : _AnyHashableBox {
 ///     print(descriptions[AnyHashable(43)])       // prints "nil"
 ///     print(descriptions[AnyHashable(Int8(43))]!) // prints "an Int8"
 ///     print(descriptions[AnyHashable(Set(["a", "b"]))]!) // prints "a set of strings"
-@_fixed_layout
+@frozen
 public struct AnyHashable {
   internal var _box: _AnyHashableBox
 

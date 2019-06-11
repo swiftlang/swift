@@ -18,7 +18,7 @@
 #include "llvm/Support/Regex.h"
 
 #define SWIFT_INTERFACE_FORMAT_VERSION_KEY "swift-interface-format-version"
-#define SWIFT_TOOLS_VERSION_KEY "swift-tools-version"
+#define SWIFT_COMPILER_VERSION_KEY "swift-compiler-version"
 #define SWIFT_MODULE_FLAGS_KEY "swift-module-flags"
 
 namespace swift {

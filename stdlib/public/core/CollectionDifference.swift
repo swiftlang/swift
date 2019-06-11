@@ -15,7 +15,7 @@
 @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) // FIXME(availability-5.1)
 public struct CollectionDifference<ChangeElement> {
   /// A single change to a collection.
-  @_frozen
+  @frozen
   public enum Change {
     /// An insertion.
     ///
@@ -89,7 +89,7 @@ public struct CollectionDifference<ChangeElement> {
   private static func _validateChanges<Changes: Collection>(
     _ changes : Changes
   ) -> Bool where Changes.Element == Change {
-    if changes.count == 0 { return true }
+    if changes.isEmpty { return true }
 
     var insertAssocToOffset = Dictionary<Int,Int>()
     var removeOffsetToAssoc = Dictionary<Int,Int>()
@@ -181,7 +181,7 @@ public struct CollectionDifference<ChangeElement> {
 
     // Find first insertion via binary search
     let firstInsertIndex: Int
-    if sortedChanges.count == 0 {
+    if sortedChanges.isEmpty {
       firstInsertIndex = 0
     } else {
       var range = 0...sortedChanges.count
@@ -227,7 +227,7 @@ extension CollectionDifference: Collection {
   public typealias Element = Change
 
   /// The position of a collection difference.
-  @_fixed_layout
+  @frozen
   public struct Index {
     // Opaque index type is isomorphic to Int
     @usableFromInline

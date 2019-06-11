@@ -137,7 +137,7 @@ bool ExistentialSpecializer::canSpecializeExistentialArgsInFunction(
     FullApplySite &Apply,
     llvm::SmallDenseMap<int, ExistentialTransformArgumentDescriptor>
         &ExistentialArgDescriptor) {
-  auto *F = Apply.getReferencedFunction();
+  auto *F = Apply.getReferencedFunctionOrNull();
   auto CalleeArgs = F->begin()->getFunctionArguments();
   bool returnFlag = false;
 
@@ -215,7 +215,7 @@ bool ExistentialSpecializer::canSpecializeExistentialArgsInFunction(
 bool ExistentialSpecializer::canSpecializeCalleeFunction(FullApplySite &Apply) {
 
   /// Determine the caller of the apply.
-  auto *Callee = Apply.getReferencedFunction();
+  auto *Callee = Apply.getReferencedFunctionOrNull();
   if (!Callee)
     return false;
 
@@ -278,7 +278,7 @@ void ExistentialSpecializer::specializeExistentialArgsInAppliesWithinFunction(
         continue;
       }
 
-      auto *Callee = Apply.getReferencedFunction();
+      auto *Callee = Apply.getReferencedFunctionOrNull();
 
       /// Handle recursion! Do not modify F right now.
       if (Callee == &F) {

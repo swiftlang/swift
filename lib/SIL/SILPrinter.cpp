@@ -851,15 +851,15 @@ public:
   void print(const SILInstruction *I) {
     if (auto *FRI = dyn_cast<FunctionRefInst>(I))
       *this << "  // function_ref "
-            << demangleSymbol(FRI->getReferencedFunction()->getName())
+            << demangleSymbol(FRI->getInitiallyReferencedFunction()->getName())
             << "\n";
     else if (auto *FRI = dyn_cast<DynamicFunctionRefInst>(I))
       *this << "  // dynamic_function_ref "
-            << demangleSymbol(FRI->getReferencedFunction()->getName())
+            << demangleSymbol(FRI->getInitiallyReferencedFunction()->getName())
             << "\n";
     else if (auto *FRI = dyn_cast<PreviousDynamicFunctionRefInst>(I))
       *this << "  // prev_dynamic_function_ref "
-            << demangleSymbol(FRI->getReferencedFunction()->getName())
+            << demangleSymbol(FRI->getInitiallyReferencedFunction()->getName())
             << "\n";
 
     *this << "  ";
@@ -1199,16 +1199,16 @@ public:
   }
 
   void visitFunctionRefInst(FunctionRefInst *FRI) {
-    FRI->getReferencedFunction()->printName(PrintState.OS);
+    FRI->getInitiallyReferencedFunction()->printName(PrintState.OS);
     *this << " : " << FRI->getType();
   }
   void visitDynamicFunctionRefInst(DynamicFunctionRefInst *FRI) {
-    FRI->getReferencedFunction()->printName(PrintState.OS);
+    FRI->getInitiallyReferencedFunction()->printName(PrintState.OS);
     *this << " : " << FRI->getType();
   }
   void
   visitPreviousDynamicFunctionRefInst(PreviousDynamicFunctionRefInst *FRI) {
-    FRI->getReferencedFunction()->printName(PrintState.OS);
+    FRI->getInitiallyReferencedFunction()->printName(PrintState.OS);
     *this << " : " << FRI->getType();
   }
 
@@ -1367,7 +1367,7 @@ public:
     *this << getIDAndType(AI->getDest());
   }
 
-  void visitAssignByDelegateInst(AssignByDelegateInst *AI) {
+  void visitAssignByWrapperInst(AssignByWrapperInst *AI) {
     *this << getIDAndType(AI->getSrc()) << " to ";
     printAssignOwnershipQualifier(AI->getOwnershipQualifier());
     *this << getIDAndType(AI->getDest())

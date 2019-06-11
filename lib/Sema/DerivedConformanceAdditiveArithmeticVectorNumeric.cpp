@@ -87,7 +87,7 @@ static Type getVectorNumericScalarAssocType(VarDecl *varDecl, DeclContext *DC) {
     return nullptr;
   auto varType = DC->mapTypeIntoContext(varDecl->getValueInterfaceType());
   auto conf = TypeChecker::conformsToProtocol(varType, vectorNumericProto, DC,
-                                              ConformanceCheckFlags::Used);
+                                              None);
   if (!conf)
     return nullptr;
   Type scalarType = conf->getTypeWitnessByName(varType, C.Id_Scalar);
@@ -157,7 +157,7 @@ bool DerivedConformance::canDeriveAdditiveArithmetic(NominalTypeDecl *nominal,
       return false;
     auto varType = DC->mapTypeIntoContext(v->getValueInterfaceType());
     return (bool)TypeChecker::conformsToProtocol(varType, addArithProto, DC,
-                                                 ConformanceCheckFlags::Used);
+                                                 None);
   });
 }
 

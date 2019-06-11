@@ -356,6 +356,7 @@ static LexerMode sourceFileKindToLexerMode(SourceFileKind kind) {
     case swift::SourceFileKind::REPL:
       return LexerMode::Swift;
   }
+  llvm_unreachable("covered switch");
 }
 
 Parser::Parser(unsigned BufferID, SourceFile &SF, SILParserTUStateBase *SIL,

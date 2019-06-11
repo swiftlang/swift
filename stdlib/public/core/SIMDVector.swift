@@ -607,7 +607,7 @@ where Scalar: BinaryFloatingPoint, Scalar.RawSignificand: FixedWidthInteger {
   }
 }
 
-@_fixed_layout
+@frozen
 public struct SIMDMask<Storage>: SIMD
                   where Storage: SIMD,
                  Storage.Scalar: FixedWidthInteger & SignedInteger {

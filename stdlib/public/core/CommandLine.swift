@@ -13,7 +13,7 @@
 import SwiftShims
 
 /// Command-line arguments for the current process.
-@_frozen // namespace
+@frozen // namespace
 public enum CommandLine {
   /// The backing static variable for argument count may come either from the
   /// entry point or it may need to be computed e.g. if we're in the REPL.

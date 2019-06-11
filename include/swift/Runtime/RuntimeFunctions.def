@@ -1225,6 +1225,16 @@ FUNCTION(EndAccess, swift_endAccess, C_CC, AlwaysAvailable,
          ARGS(getFixedBufferTy()->getPointerTo()),
          ATTRS(NoUnwind))
 
+FUNCTION(GetOrigOfReplaceable, swift_getOrigOfReplaceable, C_CC, AlwaysAvailable,
+         RETURNS(FunctionPtrTy),
+         ARGS(FunctionPtrTy->getPointerTo()),
+         ATTRS(NoUnwind))
+
+FUNCTION(GetReplacement, swift_getFunctionReplacement, C_CC, AlwaysAvailable,
+         RETURNS(FunctionPtrTy),
+         ARGS(FunctionPtrTy->getPointerTo(), FunctionPtrTy),
+         ATTRS(NoUnwind))
+
 FUNCTION(InstantiateObjCClass, swift_instantiateObjCClass,
          C_CC, AlwaysAvailable,
          RETURNS(VoidTy),

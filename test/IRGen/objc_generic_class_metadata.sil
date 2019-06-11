@@ -112,3 +112,18 @@ bb0(%0 :  $@objc_metatype K<P>.Type):
   %3 = apply %2<P>() : $@convention(thin) <τ_0_0 > () -> ()
   return undef : $()
 }
+
+public class D {
+}
+
+// CHECK: define void @testDynamicSelfMetatype(i8*, i8*)
+// CHECK:   [[C:%.*]] = bitcast i8* %0 to %T27objc_generic_class_metadata1DC*
+// CHECK:   [[O:%.*]] = bitcast %T27objc_generic_class_metadata1DC* [[C]] to %objc_object*
+// CHECK:   call %swift.type* @swift_getObjectType(%objc_object* [[O]]
+sil @testDynamicSelfMetatype : $@convention(objc_method) (@owned D) -> () {
+bb0(%0 : $D):
+  %1 = metatype $@thick @dynamic_self D.Type
+  return undef : $()
+}
+
+sil_vtable D {}

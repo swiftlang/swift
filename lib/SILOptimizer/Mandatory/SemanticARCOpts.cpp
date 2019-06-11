@@ -388,6 +388,7 @@ static bool isWrittenTo(SILFunction &f, SILValue value) {
   case AccessedStorage::Argument:
     return mayFunctionMutateArgument(storage, f);
   }
+  llvm_unreachable("covered switch");
 }
 
 // Convert a load [copy] from unique storage [read] that has all uses that can

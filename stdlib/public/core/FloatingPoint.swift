@@ -1210,7 +1210,7 @@ public protocol FloatingPoint : SignedNumeric, Strideable, Hashable
 }
 
 /// The sign of a floating-point value.
-@_frozen // FIXME(sil-serialize-all)
+@frozen
 public enum FloatingPointSign: Int {
   /// The sign for a positive value.
   case plus
@@ -1259,7 +1259,7 @@ public enum FloatingPointSign: Int {
 }
 
 /// The IEEE 754 floating-point classes.
-@_frozen // FIXME(sil-serialize-all)
+@frozen
 public enum FloatingPointClassification {
   /// A signaling NaN ("not a number").
   ///

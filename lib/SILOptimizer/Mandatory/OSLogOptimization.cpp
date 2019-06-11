@@ -617,7 +617,7 @@ class OSLogOptimization : public SILFunctionTransform {
   /// \param oslogCall log call instruction to inline.
   /// \returns last instruction of the callee after inlining.
   SILBasicBlock::iterator inlineLogCallAndGetLast(ApplyInst *oslogCall) {
-    SILFunction *callee = oslogCall->getReferencedFunction();
+    SILFunction *callee = oslogCall->getReferencedFunctionOrNull();
     assert(callee);
 
     // Load and link the called os log function before inlining. This is needed

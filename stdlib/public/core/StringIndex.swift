@@ -35,7 +35,7 @@ the default value being `0`.
 */
 extension String {
   /// A position of a character or code unit in a string.
-  @_fixed_layout
+  @frozen
   public struct Index {
     @usableFromInline
     internal var _rawBits: UInt64

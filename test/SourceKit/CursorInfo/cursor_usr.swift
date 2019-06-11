@@ -25,12 +25,15 @@ func foo(x: FooStruct1) -> S1 {}
 // CHECK_SANITY1-NEXT: <decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>S1</decl.name></decl.struct>
 
 // Bogus USR.
-// RUN: %sourcekitd-test -req=cursor -usr "s:blahblahblah" %s -- -I %t -F %S/../Inputs/libIDE-mock-sdk %mcp_opt %s | %FileCheck %s -check-prefix=EMPTY
+// RUN: %sourcekitd-test -req=cursor -usr "s:blahblahblah" %s -- -I %t -F %S/../Inputs/libIDE-mock-sdk %mcp_opt %s | %FileCheck %s -check-prefix=RESOLVE
 // Missing s: prefix.
-// RUN: %sourcekitd-test -req=cursor -usr "10cursor_usr6globalSivp" %s -- -I %t -F %S/../Inputs/libIDE-mock-sdk %mcp_opt %s | %FileCheck %s -check-prefix=EMPTY
+// RUN: %sourcekitd-test -req=cursor -usr "10cursor_usr6globalSivp" %s -- -I %t -F %S/../Inputs/libIDE-mock-sdk %mcp_opt %s | %FileCheck %s -check-prefix=RESOLVE
+// RESOLVE: <empty cursor info; internal diagnostic: "Unable to resolve type from USR.">
+
 // FIXME: no support for clang USRs.
-// RUN: %sourcekitd-test -req=cursor -usr "c:@S@FooStruct1" %s -- -I %t -F %S/../Inputs/libIDE-mock-sdk %mcp_opt %s | %FileCheck %s -check-prefix=EMPTY
-// EMPTY: <empty cursor info>
+// RUN: %sourcekitd-test -req=cursor -usr "c:@S@FooStruct1" %s -- -I %t -F %S/../Inputs/libIDE-mock-sdk %mcp_opt %s | %FileCheck %s -check-prefix=CSUPPORT
+// CSUPPORT: <empty cursor info; internal diagnostic: "Lookup for C/C++/ObjC USRs not implemented.">
+
 // RUN: %sourcekitd-test -req=cursor -usr "s:10cursor_usr2S1V" %s -- -I %t -F %S/../Inputs/libIDE-mock-sdk %mcp_opt %s | %FileCheck %s -check-prefix=CHECK1
 // CHECK1: source.lang.swift.decl.struct (5:8-5:10)
 // CHECK1: s1

@@ -1367,6 +1367,13 @@ static void notification_receiver(sourcekitd_response_t resp) {
 
 static void printNameTranslationInfo(sourcekitd_variant_t Info,
                                      llvm::raw_ostream &OS) {
+  const char *InternalDiagnostic =
+      sourcekitd_variant_dictionary_get_string(Info, KeyInternalDiagnostic);
+  if (InternalDiagnostic) {
+    OS << "<empty name translation info; internal diagnostic: \""
+       << InternalDiagnostic << "\">\n";
+    return;
+  }
   sourcekitd_uid_t KindUID = sourcekitd_variant_dictionary_get_uid(Info,
                                                                    KeyNameKind);
   if (KindUID == nullptr) {
@@ -1427,6 +1434,13 @@ static void printNameTranslationInfo(sourcekitd_variant_t Info,
 static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
                             const llvm::StringMap<std::string> &VFSFiles,
                             llvm::raw_ostream &OS) {
+  const char *InternalDiagnostic =
+      sourcekitd_variant_dictionary_get_string(Info, KeyInternalDiagnostic);
+  if (InternalDiagnostic) {
+    OS << "<empty cursor info; internal diagnostic: \""
+       << InternalDiagnostic << "\">\n";
+    return;
+  }
   sourcekitd_uid_t KindUID = sourcekitd_variant_dictionary_get_uid(Info,
                                       sourcekitd_uid_get_from_cstr("key.kind"));
   if (KindUID == nullptr) {

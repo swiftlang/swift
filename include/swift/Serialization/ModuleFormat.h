@@ -1071,7 +1071,7 @@ namespace decls_block {
     AccessLevelField, // access level
     AccessLevelField, // setter access, if applicable
     DeclIDField, // opaque return type decl
-    BCFixed<2>,  // # of property delegate backing properties
+    BCFixed<2>,  // # of property wrapper backing properties
     BCArray<TypeIDField> // accessors, backing properties, and dependencies
   >;
 

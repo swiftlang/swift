@@ -1114,7 +1114,8 @@ ERROR(numeric_literal_numeric_member,none,
 ERROR(standalone_dollar_identifier,none,
      "'$' is not an identifier; use backticks to escape it", ())
 ERROR(dollar_identifier_decl,none,
-     "cannot declare entity %0 with a '$' prefix", (Identifier))
+     "cannot declare entity named %0; the '$' prefix is reserved for "
+     "implicitly-synthesized declarations", (Identifier))
 
 ERROR(anon_closure_arg_not_in_closure,none,
       "anonymous closure argument not contained in a closure", ())

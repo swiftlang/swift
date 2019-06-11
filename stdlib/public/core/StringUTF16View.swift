@@ -98,7 +98,7 @@ extension String {
   ///         print(snowy[range])
   ///     }
   ///     // Prints "Let it snow!"
-  @_fixed_layout
+  @frozen
   public struct UTF16View {
     @usableFromInline
     internal var _guts: _StringGuts
@@ -256,7 +256,7 @@ extension String.UTF16View: BidirectionalCollection {
 }
 
 extension String.UTF16View {
-  @_fixed_layout
+  @frozen
   public struct Iterator: IteratorProtocol {
     @usableFromInline
     internal var _guts: _StringGuts

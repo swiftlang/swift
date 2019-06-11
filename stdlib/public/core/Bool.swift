@@ -60,7 +60,7 @@
 /// bridged into Swift as `Bool`. The single `Bool` type in Swift guarantees
 /// that functions, methods, and properties imported from C and Objective-C
 /// have a consistent type interface.
-@_fixed_layout
+@frozen
 public struct Bool {
   @usableFromInline
   internal var _value: Builtin.Int1

@@ -214,7 +214,7 @@ extension String: BidirectionalCollection {
 }
 
 extension String {
-  @_fixed_layout
+  @frozen
   public struct Iterator: IteratorProtocol {
     @usableFromInline
     internal var _guts: _StringGuts

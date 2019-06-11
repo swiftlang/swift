@@ -389,7 +389,7 @@ extension Sequence where Self.Iterator == Self {
 /// `Base` iterator before possibly returning the first available element.
 ///
 /// The underlying iterator's sequence may be infinite.
-@_fixed_layout
+@frozen
 public struct DropFirstSequence<Base: Sequence> {
   @usableFromInline
   internal let _base: Base
@@ -433,7 +433,7 @@ extension DropFirstSequence: Sequence {
 /// `Base` iterator.
 ///
 /// The underlying iterator's sequence may be infinite.
-@_fixed_layout
+@frozen
 public struct PrefixSequence<Base: Sequence> {
   @usableFromInline
   internal var _base: Base
@@ -449,7 +449,7 @@ public struct PrefixSequence<Base: Sequence> {
 }
 
 extension PrefixSequence {
-  @_fixed_layout
+  @frozen
   public struct Iterator {
     @usableFromInline
     internal var _base: Base.Iterator
@@ -496,7 +496,7 @@ extension PrefixSequence: Sequence {
 /// `Base` iterator before possibly returning the first available element.
 ///
 /// The underlying iterator's sequence may be infinite.
-@_fixed_layout
+@frozen
 public struct DropWhileSequence<Base: Sequence> {
   public typealias Element = Base.Element
   
@@ -522,7 +522,7 @@ public struct DropWhileSequence<Base: Sequence> {
 }
 
 extension DropWhileSequence {
-  @_fixed_layout
+  @frozen
   public struct Iterator {
     @usableFromInline
     internal var _iterator: Base.Iterator
@@ -1122,7 +1122,7 @@ extension Sequence {
 /// given just an iterator `i`:
 ///
 ///     for x in IteratorSequence(i) { ... }
-@_fixed_layout
+@frozen
 public struct IteratorSequence<Base : IteratorProtocol> {
   @usableFromInline
   internal var _base: Base
