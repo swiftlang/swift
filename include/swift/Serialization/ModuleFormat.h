@@ -851,7 +851,7 @@ namespace decls_block {
     FunctionTypeRepresentationField, // representation
     BCFixed<1>,          // throws?
     // SWIFT_ENABLE_TENSORFLOW
-    BCFixed<1>,          // differentiable?
+    BCFixed<2>,          // differentiable & linear?
     GenericSignatureIDField // generic signture
 
     // trailed by parameters

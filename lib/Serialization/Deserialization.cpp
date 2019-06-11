@@ -4704,7 +4704,7 @@ public:
     uint8_t rawRepresentation;
 
     // SWIFT_ENABLE_TENSORFLOW
-    bool noescape = false, throws = false, differentiable = false;
+    bool noescape = false, throws = false;
     uint8_t rawDiffKind;
     DifferentiabilityKind diffKind = DifferentiabilityKind::NonDifferentiable;
     GenericSignature *genericSig = nullptr;
@@ -4725,13 +4725,10 @@ public:
                                                          rawRepresentation,
                                                          throws,
                                                          // SWIFT_ENABLE_TENSORFLOW
-                                                         differentiable,
+                                                         rawDiffKind,
                                                          rawGenericSig);
       genericSig = MF.getGenericSignature(rawGenericSig);
-      // TODO: temporary while I handle generic functions
-      if (differentiable) {
-        diffKind = DifferentiabilityKind::Normal;
-      }
+      diffKind = DifferentiabilityKind(rawDiffKind);
     }
 
     auto representation = getActualFunctionTypeRepresentation(rawRepresentation);
