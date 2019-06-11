@@ -34,6 +34,8 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/SaveAndRestore.h"
+//#include <bitset>
+//#include <iostream>
 
 using namespace swift;
 using namespace swift::Lowering;
@@ -124,7 +126,8 @@ CanSILFunctionType SILFunctionType::getWithDifferentiability(
                 : SILParameterDifferentiability::NotDifferentiable));
   }
 
-  auto newExtInfo = getExtInfo().withDifferentiabilityKind();
+  auto newExtInfo = getExtInfo().withDifferentiabilityKind(DifferentiabilityKind
+                                                               ::Normal);
 
   return get(getGenericSignature(), newExtInfo, getCoroutineKind(),
              getCalleeConvention(), newParameters, getYields(), getResults(),
@@ -1228,9 +1231,13 @@ static CanSILFunctionType getSILFunctionType(
     .withIsPseudogeneric(pseudogeneric)
     // SWIFT_ENABLE_TENSORFLOW
     .withNoEscape(extInfo.isNoEscape())
-  .withDifferentiabilityKind(extInfo.isDifferentiable()
-                                 ? DifferentiabilityKind::Normal
-                                 : DifferentiabilityKind::NonDifferentiable);
+    .withDifferentiabilityKind(extInfo.getDifferentiabilityKind());
+//  unsigned a = extInfo.Bits;
+//  std::bitset<8> x(a);
+//  unsigned b = silExtInfo.Bits;
+//  std::bitset<8> y(b);
+//  bool t = (a & 0b11) == (b & 0b11);
+//  std::cout << "extInfo: " << x << " | silExtInfo: " << y << " -> last two bits equal: " << t << "\n";
   
   return SILFunctionType::get(genericSig, silExtInfo, coroutineKind,
                               calleeConvention, inputs, yields,

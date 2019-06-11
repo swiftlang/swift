@@ -2221,15 +2221,21 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
               SourceLoc(), Context.getIdentifier(protocolName));
         }
       }
+      
+      DifferentiabilityKind diffkind = DifferentiabilityKind::NonDifferentiable;
+      if (attrs.has(TAK_differentiable)) {
+        if (attrs.linear) {
+          diffkind = DifferentiabilityKind::Linear;
+        } else {
+          diffkind = DifferentiabilityKind::Normal;
+        }
+      }
 
       // Resolve the function type directly with these attributes.
       SILFunctionType::ExtInfo extInfo(rep, attrs.has(TAK_pseudogeneric),
                                        // SWIFT_ENABLE_TENSORFLOW
                                        attrs.has(TAK_noescape),
-                                       attrs.has(TAK_differentiable)
-                                           ? DifferentiabilityKind::Normal
-                                           : DifferentiabilityKind
-                                                 ::NonDifferentiable);
+                                       diffkind);
 
       ty = resolveSILFunctionType(fnRepr, options, coroutineKind, extInfo,
                                   calleeConvention, witnessMethodProtocol);
@@ -2264,13 +2270,15 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
         attrs.clearAttribute(TAK_autoclosure);
       }
       
-      DifferentiabilityKind diffkind =
-      (attrs.has(TAK_differentiable)
-       ? (attrs.linear
-          ? DifferentiabilityKind::Linear
-          : DifferentiabilityKind::Normal)
-       : DifferentiabilityKind::NonDifferentiable);
-
+      DifferentiabilityKind diffkind = DifferentiabilityKind::NonDifferentiable;
+      if (attrs.has(TAK_differentiable)) {
+        if (attrs.linear) {
+          diffkind = DifferentiabilityKind::Linear;
+        } else {
+          diffkind = DifferentiabilityKind::Normal;
+        }
+      }
+      
       // Resolve the function type directly with these attributes.
       FunctionType::ExtInfo extInfo(rep, /*noescape=*/false,
                                     // SWIFT_ENABLE_TENSORFLOW

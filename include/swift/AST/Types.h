@@ -2907,6 +2907,7 @@ public:
       // SWIFT_ENABLE_TENSORFLOW
       Bits |= ((unsigned)diffKind << DifferentiabilityMaskOffset)
               & DifferentiabilityMask;
+//      llvm::errs() << "[" << (unsigned)diffKind << "|" << isDifferentiable() << "]" << "\n";
     }
 
     bool isNoEscape() const { return Bits & NoEscapeMask; }
@@ -2985,16 +2986,11 @@ public:
     // SWIFT_ENABLE_TENSORFLOW
     LLVM_NODISCARD
     ExtInfo withDifferentiabilityKind(
-        DifferentiabilityKind differentiability = DifferentiabilityKind::Normal)
+        DifferentiabilityKind differentiability)
     const {
-      switch (differentiability) {
-        case DifferentiabilityKind::NonDifferentiable:
-          return ExtInfo(Bits & ~DifferentiabilityMask);
-        case DifferentiabilityKind::Normal:
-          return ExtInfo(Bits & ~(0b10 << DifferentiabilityMaskOffset));
-        case DifferentiabilityKind::Linear:
-          return ExtInfo(Bits | DifferentiabilityMask);
-      }
+      unsigned clearedBits = Bits & ~(0b11 << DifferentiabilityMaskOffset);
+      unsigned shiftedKind = (unsigned)differentiability << DifferentiabilityMaskOffset;
+      return ExtInfo(clearedBits | shiftedKind);
     }
 
     unsigned getFuncAttrKey() const {
@@ -3780,7 +3776,6 @@ public:
       NumDifferentiabilityMaskBits = 2,
       NumMaskBits                  = 8
     };
-
     unsigned Bits; // Naturally sized for speed.
 
     ExtInfo(unsigned Bits) : Bits(Bits) {}
@@ -3801,6 +3796,8 @@ public:
              (isNoEscape ? NoEscapeMask : 0) |
              (((unsigned)diffKind << DifferentiabilityMaskOffset)
               & DifferentiabilityMask);
+      
+//      llvm::errs() << "(" << (unsigned)diffKind << "|" << isDifferentiable() << ")" << "\n";
     }
 
     /// Is this function pseudo-generic?  A pseudo-generic function
@@ -3883,16 +3880,11 @@ public:
     }
     // SWIFT_ENABLE_TENSORFLOW
     ExtInfo withDifferentiabilityKind(
-        DifferentiabilityKind differentiability = DifferentiabilityKind::Normal)
+        DifferentiabilityKind differentiability)
     const {
-      switch (differentiability) {
-        case DifferentiabilityKind::NonDifferentiable:
-          return ExtInfo(Bits & ~DifferentiabilityMask);
-        case DifferentiabilityKind::Normal:
-          return ExtInfo(Bits & ~(0b10 << DifferentiabilityMaskOffset));
-        case DifferentiabilityKind::Linear:
-          return ExtInfo(Bits | DifferentiabilityMask);
-      }
+      unsigned clearedBits = Bits & ~(0b11 << DifferentiabilityMaskOffset);
+      unsigned shiftedKind = (unsigned)differentiability << DifferentiabilityMaskOffset;
+      return ExtInfo(clearedBits | shiftedKind);
     }
 
     unsigned getFuncAttrKey() const {
