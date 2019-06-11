@@ -758,3 +758,13 @@ struct UsesWrapperRequiringP {
   // expected-error@-2{{expected declaration}}
   // expected-error@-3{{type annotation missing in pattern}}
 }
+
+// SR-10899 / rdar://problem/51588022
+@_propertyWrapper
+struct SR_10899_Wrapper { // expected-note{{property wrapper type 'SR_10899_Wrapper' declared here}}
+  var value: String { "hi" }
+}
+
+struct SR_10899_Usage {
+  @SR_10899_Wrapper var thing: Bool // expected-error{{property type 'Bool' does not match that of the 'value' property of its wrapper type 'SR_10899_Wrapper'}}
+}
