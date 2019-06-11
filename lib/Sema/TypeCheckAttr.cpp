@@ -2573,11 +2573,11 @@ void AttributeChecker::visitPropertyDelegateAttr(PropertyDelegateAttr *attr) {
 // SWIFT_ENABLE_TENSORFLOW
 /// Returns true if the given type conforms to `Differentiable` in the given
 /// module.
-static bool conformsToDifferentiable(TypeChecker &TC, Type type,
-                                     DeclContext *DC) {
+static bool conformsToDifferentiable(Type type, DeclContext *DC) {
+  auto &ctx = type->getASTContext();
   auto *differentiableProto =
-      TC.Context.getProtocol(KnownProtocolKind::Differentiable);
-  return TC.conformsToProtocol(
+      ctx.getProtocol(KnownProtocolKind::Differentiable);
+  return TypeChecker::conformsToProtocol(
       type, differentiableProto, DC,
       ConformanceCheckFlags::Used | ConformanceCheckFlags::InExpression)
           .hasValue();
@@ -2590,10 +2590,10 @@ static bool conformsToDifferentiable(TypeChecker &TC, Type type,
 /// - All parameters of the function type that conform to `Differentiable`.
 /// - If the function type's result is a function type, then also all
 ///   parameters of the function result type that conform to `Differentiable`.
-static AutoDiffParameterIndices *
-inferDifferentiableParameters(TypeChecker &TC,
-                              AbstractFunctionDecl *AFD,
-                              GenericEnvironment *derivativeGenEnv) {
+AutoDiffParameterIndices *
+TypeChecker::inferDifferentiableParameters(
+    AbstractFunctionDecl *AFD, GenericEnvironment *derivativeGenEnv) {
+  auto &ctx = AFD->getASTContext();
   auto *functionType = AFD->getInterfaceType()->eraseDynamicSelfType()
       ->castTo<AnyFunctionType>();
   AutoDiffParameterIndicesBuilder builder(functionType);
@@ -2604,22 +2604,18 @@ inferDifferentiableParameters(TypeChecker &TC,
     if (i >= allParamTypes.size())
       return false;
     auto paramType = allParamTypes[i];
-    if (!paramType->hasTypeParameter())
-      paramType = paramType->mapTypeOutOfContext();
     if (derivativeGenEnv)
       paramType = derivativeGenEnv->mapTypeIntoContext(paramType);
     else
       paramType = AFD->mapTypeIntoContext(paramType);
     // Return false for class/existential types.
-    if ((!paramType->hasTypeParameter() &&
-         paramType->isAnyClassReferenceType()) ||
-        paramType->isExistentialType())
+    if (paramType->isAnyClassReferenceType() || paramType->isExistentialType())
       return false;
     // Return false for function types.
     if (paramType->is<AnyFunctionType>())
       return false;
     // Return true if the type conforms to `Differentiable`.
-    return conformsToDifferentiable(TC, paramType, AFD);
+    return conformsToDifferentiable(paramType, AFD);
   };
 
   // Get all parameter types.
@@ -2638,7 +2634,7 @@ inferDifferentiableParameters(TypeChecker &TC,
     if (isDifferentiableParam(i))
       builder.setParameter(i);
 
-  return builder.build(TC.Context);
+  return builder.build(ctx);
 }
 
 // SWIFT_ENABLE_TENSORFLOW
@@ -2812,7 +2808,7 @@ static AutoDiffParameterIndices *computeDifferentiationParameters(
         selfType =
             derivativeGenEnv->mapTypeIntoContext(selfInterfaceType);
       }
-      if (!conformsToDifferentiable(TC, selfType, function)) {
+      if (!conformsToDifferentiable(selfType, function)) {
         TC.diagnose(attrLoc, diag::diff_function_no_parameters,
                     function->getFullName())
             .highlight(function->getSignatureSourceRange());
@@ -2824,7 +2820,8 @@ static AutoDiffParameterIndices *computeDifferentiationParameters(
   // If parsed differentiation parameters are empty, infer parameter indices
   // from the function type.
   if (parsedWrtParams.empty())
-    return inferDifferentiableParameters(TC, function, derivativeGenEnv);
+    return TypeChecker::inferDifferentiableParameters(
+        function, derivativeGenEnv);
 
   // Otherwise, build parameter indices from parsed differentiation parameters.
   AutoDiffParameterIndicesBuilder builder(functionType);
@@ -2924,7 +2921,7 @@ static bool checkDifferentiationParameters(
       return true;
     }
     // Parameter must conform to `Differentiable`.
-    if (!conformsToDifferentiable(TC, wrtParamType, AFD)) {
+    if (!conformsToDifferentiable(wrtParamType, AFD)) {
       TC.diagnose(loc, diag::diff_params_clause_param_not_differentiable,
                   wrtParamType);
       return true;
@@ -3103,16 +3100,13 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   // Set the checked differentiation parameter indices in the attribute.
   attr->setParameterIndices(checkedWrtParamIndices);
 
-  originalResultTy = originalResultTy->hasTypeParameter()
-      ? originalResultTy
-      : originalResultTy->mapTypeOutOfContext();
   if (whereClauseGenEnv)
     originalResultTy =
         whereClauseGenEnv->mapTypeIntoContext(originalResultTy);
   else
     originalResultTy = original->mapTypeIntoContext(originalResultTy);
   // Check that original function's result type conforms to `Differentiable`.
-  if (!conformsToDifferentiable(TC, originalResultTy, original)) {
+  if (!conformsToDifferentiable(originalResultTy, original)) {
     TC.diagnose(attr->getLocation(),
                 diag::differentiable_attr_result_not_differentiable,
                 originalResultTy);
@@ -3673,7 +3667,7 @@ void AttributeChecker::visitNoDerivativeAttr(NoDerivativeAttr *attr) {
     return;
   }
   if (!conformsToDifferentiable(
-          TC, structDecl->getDeclaredInterfaceType(),
+          structDecl->getDeclaredInterfaceType(),
           structDecl->getDeclContext())) {
     diagnoseAndRemoveAttr(attr,
         diag::noderivative_only_on_stored_properties_in_differentiable_structs);

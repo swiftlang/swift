@@ -2127,6 +2127,17 @@ public:
       NameLookupOptions lookupOptions = defaultMemberLookupOptions,
       const Optional<std::function<bool(FuncDecl *)>> &hasValidTypeCtx = None,
       const Optional<std::function<void()>> &invalidTypeCtxDiagnostic = None);
+
+  /// SWIFT_ENABLE_TENSORFLOW
+  /// Creates a `AutoDiffParameterIndices *` for the given function type,
+  /// representing all inferred differentiation parameters.
+  /// The differentiation parameters are inferred to be:
+  /// - All parameters of the function type that conform to `Differentiable`.
+  /// - If the function type's result is a function type, then also all
+  ///   parameters of the function result type that conform to `Differentiable`.
+  static AutoDiffParameterIndices *
+  inferDifferentiableParameters(AbstractFunctionDecl *AFD,
+                                GenericEnvironment *derivativeGenEnv);
 };
 
 /// Temporary on-stack storage and unescaping for encoded diagnostic
