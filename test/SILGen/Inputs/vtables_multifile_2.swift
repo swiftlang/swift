@@ -104,10 +104,10 @@ open class OtherDerived : Derived {
 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_vtable [serialized] OtherDerived {
-// CHECK-NEXT:  #Base.privateMethod1!1: <T> (Base<T>) -> () -> () : hidden @$s17vtables_multifile7DerivedC14privateMethod1yyFAA4BaseCAD33_63E5F2521A3C787F5F9EFD57FB9237EALLyyFTV [inherited] // vtable thunk for Base.privateMethod1() dispatching to Derived.privateMethod1()
-// CHECK-NEXT:  #Base.privateMethod2!1: <T> (Base<T>) -> (AnyObject) -> () : hidden @$s17vtables_multifile7DerivedC14privateMethod2yyyXlSgFAA4BaseCAD33_63E5F2521A3C787F5F9EFD57FB9237EALLyyyXlFTV [inherited]        // vtable thunk for Base.privateMethod2(_:) dispatching to Derived.privateMethod2(_:)
-// CHECK-NEXT:  #Base.privateMethod3!1: <T> (Base<T>) -> (Int) -> () : hidden @$s17vtables_multifile7DerivedC14privateMethod3yySiSgFAA4BaseCAD33_63E5F2521A3C787F5F9EFD57FB9237EALLyySiFTV [inherited]        // vtable thunk for Base.privateMethod3(_:) dispatching to Derived.privateMethod3(_:)
-// CHECK-NEXT:  #Base.privateMethod4!1: <T> (Base<T>) -> (T) -> () : hidden @$s17vtables_multifile7DerivedC14privateMethod4yySiFAA4BaseCAD33_63E5F2521A3C787F5F9EFD57FB9237EALLyyxFTV [inherited]     // vtable thunk for Base.privateMethod4(_:) dispatching to Derived.privateMethod4(_:)
+// CHECK-NEXT:  #Base.privateMethod1!1: <T> (Base<T>) -> () -> () : @$s17vtables_multifile7DerivedC14privateMethod1yyFAA4BaseCAD33_63E5F2521A3C787F5F9EFD57FB9237EALLyyFTV [inherited] // vtable thunk for Base.privateMethod1() dispatching to Derived.privateMethod1()
+// CHECK-NEXT:  #Base.privateMethod2!1: <T> (Base<T>) -> (AnyObject) -> () : @$s17vtables_multifile7DerivedC14privateMethod2yyyXlSgFAA4BaseCAD33_63E5F2521A3C787F5F9EFD57FB9237EALLyyyXlFTV [inherited]        // vtable thunk for Base.privateMethod2(_:) dispatching to Derived.privateMethod2(_:)
+// CHECK-NEXT:  #Base.privateMethod3!1: <T> (Base<T>) -> (Int) -> () : @$s17vtables_multifile7DerivedC14privateMethod3yySiSgFAA4BaseCAD33_63E5F2521A3C787F5F9EFD57FB9237EALLyySiFTV [inherited]        // vtable thunk for Base.privateMethod3(_:) dispatching to Derived.privateMethod3(_:)
+// CHECK-NEXT:  #Base.privateMethod4!1: <T> (Base<T>) -> (T) -> () : @$s17vtables_multifile7DerivedC14privateMethod4yySiFAA4BaseCAD33_63E5F2521A3C787F5F9EFD57FB9237EALLyyxFTV [inherited]     // vtable thunk for Base.privateMethod4(_:) dispatching to Derived.privateMethod4(_:)
 // CHECK-NEXT:  #Base.init!allocator.1: <T> (Base<T>.Type) -> () -> Base<T> : @$s17vtables_multifile12OtherDerivedCACycfC [override]  // OtherDerived.__allocating_init()
 // CHECK-NEXT:  #Derived.privateMethod1!1: (Derived) -> () -> () : @$s17vtables_multifile12OtherDerivedC14privateMethod1yyF [override]        // OtherDerived.privateMethod1()
 // CHECK-NEXT:  #Derived.privateMethod2!1: (Derived) -> (AnyObject?) -> () : @$s17vtables_multifile12OtherDerivedC14privateMethod2yyyXlSgF [override] // OtherDerived.privateMethod2(_:)
