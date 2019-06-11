@@ -489,7 +489,8 @@ public:
     // }.map { <--- No indentation here.
     //  ...
     // }
-    if (AtExprEnd && AtCursorExpr && isa<CallExpr>(AtExprEnd)) {
+    if (AtExprEnd && AtCursorExpr &&
+        (isa<CallExpr>(AtExprEnd) || isa<SubscriptExpr>(AtExprEnd))) {
       if (auto *UDE = dyn_cast<UnresolvedDotExpr>(AtCursorExpr)) {
         if (auto *Base = UDE->getBase()) {
           if (exprEndAtLine(Base, Line))
