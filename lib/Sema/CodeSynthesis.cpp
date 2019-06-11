@@ -1756,11 +1756,32 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
   auto dc = var->getDeclContext();
   Type storageInterfaceType = wrapperType;
 
-  Type storageType =
-      var->getDeclContext()->mapTypeIntoContext(storageInterfaceType);
+  Type storageType = dc->mapTypeIntoContext(storageInterfaceType);
   if (!storageType) {
     storageType = ErrorType::get(ctx);
     isInvalid = true;
+  }
+
+  // Make sure that the property type matches the value of the
+  // wrapper type.
+  if (!storageType->hasError()) {
+    Type expectedPropertyType =
+        storageType->getTypeOfMember(
+          dc->getParentModule(),
+          wrapperInfo.valueVar,
+          wrapperInfo.valueVar->getValueInterfaceType());
+    Type propertyType =
+        dc->mapTypeIntoContext(var->getValueInterfaceType());
+    if (!expectedPropertyType->hasError() &&
+        !propertyType->hasError() &&
+        !propertyType->isEqual(expectedPropertyType)) {
+      var->diagnose(diag::property_wrapper_incompatible_property,
+                    propertyType, wrapperType);
+      if (auto nominalWrapper = wrapperType->getAnyNominal()) {
+        nominalWrapper->diagnose(diag::property_wrapper_declared_here,
+                                 nominalWrapper->getFullName());
+      }
+    }
   }
 
   // Create the backing storage property and note it in the cache.
