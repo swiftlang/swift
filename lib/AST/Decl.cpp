@@ -5444,9 +5444,6 @@ PropertyWrapperTypeInfo VarDecl::getAttachedPropertyWrapperTypeInfo() const {
 
 Type VarDecl::getAttachedPropertyWrapperType() const {
   auto &ctx = getASTContext();
-  if (!ctx.getLazyResolver())
-    return nullptr;
-
   auto mutableThis = const_cast<VarDecl *>(this);
   return evaluateOrDefault(ctx.evaluator,
                            AttachedPropertyWrapperTypeRequest{mutableThis},
@@ -5455,9 +5452,6 @@ Type VarDecl::getAttachedPropertyWrapperType() const {
 
 Type VarDecl::getPropertyWrapperBackingPropertyType() const {
   ASTContext &ctx = getASTContext();
-  if (!ctx.getLazyResolver())
-    return nullptr;
-
   auto mutableThis = const_cast<VarDecl *>(this);
   return evaluateOrDefault(
       ctx.evaluator, PropertyWrapperBackingPropertyTypeRequest{mutableThis},
@@ -5467,9 +5461,6 @@ Type VarDecl::getPropertyWrapperBackingPropertyType() const {
 PropertyWrapperBackingPropertyInfo
 VarDecl::getPropertyWrapperBackingPropertyInfo() const {
   auto &ctx = getASTContext();
-  if (!ctx.getLazyResolver())
-    return PropertyWrapperBackingPropertyInfo();
-
   auto mutableThis = const_cast<VarDecl *>(this);
   return evaluateOrDefault(
       ctx.evaluator,
