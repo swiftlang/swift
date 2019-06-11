@@ -2328,23 +2328,25 @@ extension FixedWidthInteger {
   // that it needs to generate efficient code.
   @inlinable
   public func multipliedFullWidth(by other: Self) -> (high: Self, low: Magnitude) {
-    // We define two utility functions for working with the high and low parts
-    // of the integer. Note that the low part is always unsigned, while the
-    // high part may be either signed or unsigned. Note also that we *represent*
-    // both in containers that are the full width of the original number, and
-    // let the compiler propagate the information about the ranges to which
-    // the values are clamped by the algorithm. There are likely some
-    // opportunities for improvement here, but there's no "half-width" type
-    // that we can access in a generic context to use here.
+    // We define a utility function for splitting an integer into high and low
+    // halves. Note that the low part is always unsigned, while the high part
+    // matches the signedness of the input type. Both result types are the
+    // full width of the original number; this may be surprising at first, but
+    // there are two reasons for it:
+    //
+    // - we're going to use these as inputs to a multiplication operation, and
+    //   &* is quite a bit less verbose than `multipliedFullWidth`, so it makes
+    //   the rest of the code in this function somewhat easier to read.
+    //
+    // - there's no "half width type" that we can get at from this generic
+    //   context, so there's not really another option anyway.
+    //
+    // Fortunately, the compiler is pretty good about propagating the necessary
+    // information to optimize away unnecessary arithmetic.
     func split<T: FixedWidthInteger>(_ x: T) -> (high: T, low: T.Magnitude) {
       let n = T.bitWidth/2
-      return (x &>> n, T.Magnitude(truncatingIfNeeded: x) & ((1 &<< n) &- 1))
+      return (x >> n, T.Magnitude(truncatingIfNeeded: x) & ((1 &<< n) &- 1))
     }
-    func merge<T: FixedWidthInteger>(_ high: T, _ low: T.Magnitude) -> T {
-      let n = T.bitWidth/2
-      return high &<< n | T(truncatingIfNeeded: low)
-    }
-    // With those two functions defined, the math is pretty straightforward.
     // Split `self` and `other` into high and low parts, compute the partial
     // products carrying high words in as we go. We use the wrapping operators
     // and `truncatingIfNeeded` inits purely as an optimization hint to the
@@ -2359,16 +2361,16 @@ extension FixedWidthInteger {
     // x1 is in -B/2 ... B/2-1, so the product x1*y0 is in
     // -(B^2-B)/2 ... (B^2-3B+2)/2; after adding the high word of p00, the
     // result is in -(B^2-B)/2 ... (B^2-B-2)/2.
-    let p01 = x1 &* Self(truncatingIfNeeded: y0) &+ Self(truncatingIfNeeded: split(p00).high)
+    let p01 = x1 &* Self(y0) &+ Self(split(p00).high)
     // The previous analysis holds for this product as well, and the sum is
     // in -(B^2-B)/2 ... (B^2-B)/2.
-    let p10 = Self(truncatingIfNeeded: x0) &* y1 &+ Self(truncatingIfNeeded: split(p01).low)
+    let p10 = Self(x0) &* y1 &+ Self(split(p01).low)
     // No analysis is necessary for this term, because we know the product as
     // a whole cannot overflow, and this term is the final high word of the
     // product.
     let p11 = x1 &* y1 &+ split(p01).high &+ split(p10).high
     // Now we only need to assemble the low word of the product.
-    return (p11, merge(split(p10).low, split(p00).low))
+    return (p11, split(p10).low << (bitWidth/2) | split(p00).low)
   }
 
   /// Returns the result of shifting a value's binary representation the
