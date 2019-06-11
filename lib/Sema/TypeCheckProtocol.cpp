@@ -2269,17 +2269,27 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     break;
   // SWIFT_ENABLE_TENSORFLOW
   case MatchKind::DifferentiableConflict: {
+    // Emit a note specifying the missing `@differentiable` attribute from the
+    // requirement.
+    // FIXME(TF-564): Diagnose a specific unfulfilled `@differentiable`
+    // attribute.
     for (auto *attr : req->getAttrs()
              .getAttributes<DifferentiableAttr, /*allowInvalid*/ true>()) {
       assert(attr);
+      // Omit printing differentiation parameters clause if attribute
+      // differentiation parameters match inferred differentiation parameters.
       auto *original = cast<AbstractFunctionDecl>(match.Witness);
       auto *whereClauseGenEnv =
           computeDerivativeGenericEnvironment(attr, original);
       auto *inferredParameters = TypeChecker::inferDifferentiableParameters(
           original, whereClauseGenEnv);
+      bool omitDifferentiationParametersClause =
+          attr->getParameterIndices()->parameters.count() ==
+          inferredParameters->parameters.count();
+      // Get `@differentiable` attribute description.
       std::string diffAttrReq;
       llvm::raw_string_ostream stream(diffAttrReq);
-      attr->print(stream, req, inferredParameters);
+      attr->print(stream, req, omitDifferentiationParametersClause);
       diags.diagnose(match.Witness,
           diag::protocol_witness_missing_specific_differentiable_attr,
           StringRef(stream.str()).trim());

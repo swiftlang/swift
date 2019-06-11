@@ -331,26 +331,11 @@ static void printShortFormAvailable(ArrayRef<const DeclAttribute *> Attrs,
 
 // SWIFT_ENABLE_TENSORFLOW
 // Returns the differentiation parameters clause string for the given function,
-// parameter indices, and parsed parameters. If inferred parameters are
-// specified, pretty-print parameters.
+// parameter indices, and parsed parameters.
 static std::string getDifferentiationParametersClauseString(
     const AbstractFunctionDecl *function, AutoDiffParameterIndices *indices,
-    ArrayRef<ParsedAutoDiffParameter> parsedParams,
-    AutoDiffParameterIndices *inferredParametersForPrettyPrinting = nullptr) {
+    ArrayRef<ParsedAutoDiffParameter> parsedParams) {
   bool isInstanceMethod = function && function->isInstanceMember();
-
-  // If pretty-printing, and the number of specified parameters is equal to the
-  // number of inferred differentiation parameters, then return an empty
-  // string. Otherwise, return the explicit differentiation parameters clause
-  // string.
-  if (inferredParametersForPrettyPrinting) {
-    auto parameterCount =
-        indices ? indices->parameters.count() : parsedParams.size();
-    auto inferredParametersCount =
-        inferredParametersForPrettyPrinting->parameters.count();
-    if (parameterCount == inferredParametersCount)
-      return "";
-  }
 
   std::string result;
   llvm::raw_string_ostream printer(result);
@@ -401,8 +386,7 @@ static std::string getDifferentiationParametersClauseString(
 // Print the arguments of the given `@differentiable` attribute.
 static void printDifferentiableAttrArguments(
     const DifferentiableAttr *attr, ASTPrinter &printer, PrintOptions Options,
-    const Decl *D,
-    AutoDiffParameterIndices *inferredParametersForPrettyPrinting = nullptr) {
+    const Decl *D, bool omitDifferentiationParametersClause = false) {
   // Create a temporary string for the attribute argument text.
   std::string attrArgText;
   llvm::raw_string_ostream stream(attrArgText);
@@ -429,11 +413,10 @@ static void printDifferentiableAttrArguments(
     stream << "linear";
   }
 
-  // Print differentiation parameters, if any.
-  auto diffParamsString = getDifferentiationParametersClauseString(
-      original, attr->getParameterIndices(), attr->getParsedParameters(),
-      inferredParametersForPrettyPrinting);
-  if (!diffParamsString.empty()) {
+  // Print differentiation parameters, unless they are to be omitted.
+  if (!omitDifferentiationParametersClause) {
+    auto diffParamsString = getDifferentiationParametersClauseString(
+        original, attr->getParameterIndices(), attr->getParsedParameters());
     printCommaIfNecessary();
     stream << diffParamsString;
   }
@@ -1396,13 +1379,12 @@ void DifferentiableAttr::setVJPFunction(FuncDecl *decl) {
     VJP = {decl->getFullName(), DeclNameLoc(decl->getNameLoc())};
 }
 
-void DifferentiableAttr::print(
-    llvm::raw_ostream &OS, const Decl *D,
-    AutoDiffParameterIndices *inferredParametersForPrettyPrinting) const {
+void DifferentiableAttr::print(llvm::raw_ostream &OS, const Decl *D,
+                               bool omitDifferentiationParametersClause) const {
   StreamPrinter P(OS);
   P << "@" << getAttrName();
   printDifferentiableAttrArguments(this, P, PrintOptions(), D,
-                                   inferredParametersForPrettyPrinting);
+                                   omitDifferentiationParametersClause);
 }
 
 // SWIFT_ENABLE_TENSORFLOW
