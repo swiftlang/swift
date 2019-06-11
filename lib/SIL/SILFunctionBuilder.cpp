@@ -88,8 +88,7 @@ void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
         vjpName = SILDeclRef(vjpFn).mangle();
       // Get lowered argument indices.
       auto paramIndices = A->getParameterIndices();
-      if (!paramIndices)
-        continue;
+      assert(paramIndices && "Parameter indices should have been resolved");
       auto loweredParamIndices = paramIndices->getLowered(
           F->getASTContext(),
           decl->getInterfaceType()->castTo<AnyFunctionType>());
@@ -97,6 +96,15 @@ void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
       auto silDiffAttr = SILDifferentiableAttr::create(
           M, indices, A->getRequirements(), M.allocateCopy(jvpName),
           M.allocateCopy(vjpName));
+#ifndef NDEBUG
+      // Verify that no existing attributes have the same indices.
+      for (auto *existingAttr : F->getDifferentiableAttrs()) {
+        bool sameAttributeConfig =
+            silDiffAttr->getIndices() == existingAttr->getIndices();
+        assert(!sameAttributeConfig &&
+               "Duplicate `[differentiable]` attribute");
+      }
+#endif
       F->addDifferentiableAttr(silDiffAttr);
     }
   }
@@ -201,7 +209,6 @@ SILFunctionBuilder::getOrCreateFunction(SILLocation loc, SILDeclRef constant,
       // SWIFT_ENABLE_TENSORFLOW
       addFunctionAttributes(F, storage->getAttrs(), mod, constant);
     }
-    // SWIFT_ENABLE_TENSORFLOW
     addFunctionAttributes(F, decl->getAttrs(), mod, constant);
   }
 

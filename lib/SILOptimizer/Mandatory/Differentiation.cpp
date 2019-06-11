@@ -2010,6 +2010,9 @@ emitAssociatedFunctionReference(
     auto substMap = getSubstitutionMap(original);
     // Attempt to look up a `[differentiable]` attribute that minimally
     // satisfies the specified indices.
+    // TODO(TF-482): Change `lookupMinimalDifferentiableAttr` to additionally
+    // check whether `[differentiable]` attribute generic requirements are
+    // satisfied.
     auto *minimalAttr =
         context.lookUpMinimalDifferentiableAttr(originalFn, desiredIndices);
     if (!minimalAttr) {
@@ -2061,7 +2064,8 @@ emitAssociatedFunctionReference(
       minimalAttr = newAttr;
     }
     assert(minimalAttr);
-    // TODO(TF-482): Change `lookupMinimalDifferentiableAttr`.
+    // TODO(TF-482): Move generic requirement checking logic to
+    // `lookupMinimalDifferentiableAttr`.
     if (!checkRequirementsSatisfied(
             minimalAttr->getRequirements(),
             substMap, originalFn, context.getModule().getSwiftModule())) {
