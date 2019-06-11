@@ -87,7 +87,6 @@ class BugReducerTester : public SILFunctionTransform {
                                           false /*isPseudoGeneric*/,
                                           // SWIFT_ENABLE_TENSORFLOW
                                           false /*noescape*/,
-                                          /*differentiable*/
                                           DifferentiabilityKind
                                               ::NonDifferentiable),
         SILCoroutineKind::None, ParameterConvention::Direct_Unowned,

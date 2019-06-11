@@ -2325,8 +2325,7 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
   // Ok, it is a valid attribute, eat it, and then process it.
   StringRef Text = Tok.getText();
   SourceLoc Loc = consumeToken();
-  
-  bool linear = false;
+
   StringRef conventionName;
   StringRef witnessMethodProtocol;
 
@@ -2378,6 +2377,7 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
   }
   
   // SWIFT_ENABLE_TENSORFLOW
+  bool linear = false;
   if (attr == TAK_differentiable) {
     // Check if there is a 'linear' argument.
     if (Tok.is(tok::l_paren) && peekToken().is(tok::identifier) && peekToken().getText() == "linear") {

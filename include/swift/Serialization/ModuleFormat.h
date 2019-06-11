@@ -276,8 +276,6 @@ enum class SILParameterDifferentiability : uint8_t {
   DifferentiableOrNotApplicable,
   NotDifferentiable,
 };
-// TODO: description and better(?) location
-using DifferentiabilityKindField = BCFixed<2>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
@@ -779,7 +777,7 @@ namespace decls_block {
     BCFixed<1>,  // noescape?
     // SWIFT_ENABLE_TENSORFLOW
     BCFixed<1>,  // throws?
-    DifferentiabilityKindField // differentiable & linear?
+    BCFixed<2> // differentiable & linear?
     // trailed by parameters
   >;
 

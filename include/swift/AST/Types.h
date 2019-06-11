@@ -2907,7 +2907,6 @@ public:
       // SWIFT_ENABLE_TENSORFLOW
       Bits |= ((unsigned)diffKind << DifferentiabilityMaskOffset)
               & DifferentiabilityMask;
-//      llvm::errs() << "[" << (unsigned)diffKind << "|" << isDifferentiable() << "]" << "\n";
     }
 
     bool isNoEscape() const { return Bits & NoEscapeMask; }
@@ -3796,8 +3795,6 @@ public:
              (isNoEscape ? NoEscapeMask : 0) |
              (((unsigned)diffKind << DifferentiabilityMaskOffset)
               & DifferentiabilityMask);
-      
-//      llvm::errs() << "(" << (unsigned)diffKind << "|" << isDifferentiable() << ")" << "\n";
     }
 
     /// Is this function pseudo-generic?  A pseudo-generic function

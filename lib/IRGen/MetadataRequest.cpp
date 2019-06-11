@@ -1072,7 +1072,7 @@ namespace {
                           .withParameterFlags(hasFlags)
                           // SWIFT_ENABLE_TENSORFLOW
                           .withEscaping(isEscaping)
-                          .withDifferentiable(type->isDifferentiable()); // ???
+                          .withDifferentiable(type->isDifferentiable());
 
       auto flags = llvm::ConstantInt::get(IGF.IGM.SizeTy,
                                           flagsVal.getIntValue());
