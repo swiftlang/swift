@@ -62,6 +62,11 @@ func foo9(input: [Int]){
     }
 }
 
+func foo10() {
+    Something() [
+    ].whatever
+}
+
 // RUN: %sourcekitd-test -req=format -line=3 -length=1 %s >%t.response
 // RUN: %sourcekitd-test -req=format -line=4 -length=1 %s >>%t.response
 // RUN: %sourcekitd-test -req=format -line=5 -length=1 %s >>%t.response
@@ -88,6 +93,9 @@ func foo9(input: [Int]){
 // RUN: %sourcekitd-test -req=format -line=61 -length=1 %s >>%t.response
 // RUN: %sourcekitd-test -req=format -line=62 -length=1 %s >>%t.response
 // RUN: %sourcekitd-test -req=format -line=63 -length=1 %s >>%t.response
+
+// RUN: %sourcekitd-test -req=format -line=66 -length=1 %s >>%t.response
+// RUN: %sourcekitd-test -req=format -line=67 -length=1 %s >>%t.response
 
 // RUN: %FileCheck --strict-whitespace %s <%t.response
 
@@ -125,3 +133,6 @@ func foo9(input: [Int]){
 // CHECK: key.sourcetext: "        return ele + 1"
 // CHECK: key.sourcetext: "    }"
 // CHECK: key.sourcetext: "}"
+
+// CHECK: key.sourcetext: "    Something() ["
+// CHECK: key.sourcetext: "    ].whatever"
