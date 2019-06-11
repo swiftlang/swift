@@ -686,3 +686,16 @@ func member_ref_with_explicit_init() {
   _ = S.init(42)
   // expected-error@-1 {{generic struct 'S' requires that 'Int' conform to 'P'}}
 }
+
+func rdar_50007727() {
+  struct A<T> { // expected-note {{'T' declared as parameter to type 'A'}}
+    struct B<U> : ExpressibleByStringLiteral {
+      init(stringLiteral value: String) {}
+    }
+  }
+
+  struct S {}
+  let _ = A.B<S>("hello")
+  // expected-error@-1 {{generic parameter 'T' could not be inferred in cast to 'A<_>.B<S>'}}
+  // expected-note@-2 {{explicitly specify the generic arguments to fix this issue}} {{12-12=<Any>}}
+}
