@@ -2538,6 +2538,12 @@ NOTE(decodable_suggest_overriding_init_here,none,
 NOTE(codable_suggest_overriding_init_here,none,
      "did you mean to override 'init(from:)' and 'encode(to:)'?", ())
 
+NOTE(missing_member_type_conformance_prevents_synthesis, none,
+     "%select{associated value|stored property}0 type %1 does not conform to "
+     "protocol %2, preventing synthesized conformance "
+     "of %3 to %2",
+     (unsigned, Type, Type, Type))
+
 // Dynamic Self
 ERROR(dynamic_self_non_method,none,
       "%select{global|local}0 function cannot return 'Self'", (bool))
