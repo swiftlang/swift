@@ -2988,9 +2988,9 @@ public:
     ExtInfo withDifferentiabilityKind(
         DifferentiabilityKind differentiability)
     const {
-      unsigned clearedBits = Bits & ~(0b11 << DifferentiabilityMaskOffset);
-      unsigned shiftedKind = (unsigned)differentiability << DifferentiabilityMaskOffset;
-      return ExtInfo(clearedBits | shiftedKind);
+      return ExtInfo((Bits & ~DifferentiabilityMask) |
+                     ((unsigned)differentiability <<
+                      DifferentiabilityMaskOffset));
     }
 
     unsigned getFuncAttrKey() const {
@@ -3882,9 +3882,9 @@ public:
     ExtInfo withDifferentiabilityKind(
         DifferentiabilityKind differentiability)
     const {
-      unsigned clearedBits = Bits & ~(0b11 << DifferentiabilityMaskOffset);
-      unsigned shiftedKind = (unsigned)differentiability << DifferentiabilityMaskOffset;
-      return ExtInfo(clearedBits | shiftedKind);
+      return ExtInfo((Bits & ~DifferentiabilityMask) |
+                     ((unsigned)differentiability <<
+                      DifferentiabilityMaskOffset));
     }
 
     unsigned getFuncAttrKey() const {
