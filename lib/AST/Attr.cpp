@@ -331,25 +331,23 @@ static void printShortFormAvailable(ArrayRef<const DeclAttribute *> Attrs,
 
 // SWIFT_ENABLE_TENSORFLOW
 // Returns the differentiation parameters clause string for the given function,
-// parameter indices, and parsed parameters.
+// parameter indices, and parsed parameters. If inferred parameters are
+// specified, pretty-print parameters.
 static std::string getDifferentiationParametersClauseString(
     const AbstractFunctionDecl *function, AutoDiffParameterIndices *indices,
     ArrayRef<ParsedAutoDiffParameter> parsedParams,
-    ModuleDecl *prettyPrintInModule = nullptr) {
-  auto *functionType = function->getInterfaceType()->eraseDynamicSelfType()
-      ->castTo<AnyFunctionType>();
+    AutoDiffParameterIndices *inferredParametersForPrettyPrinting = nullptr) {
   bool isInstanceMethod = function && function->isInstanceMember();
 
   // If pretty-printing, and the number of specified parameters is equal to the
   // number of inferred differentiation parameters, then return an empty
   // string. Otherwise, return the explicit differentiation parameters clause
   // string.
-  if (prettyPrintInModule) {
+  if (inferredParametersForPrettyPrinting) {
     auto parameterCount =
         indices ? indices->parameters.count() : parsedParams.size();
     auto inferredParametersCount =
-        AutoDiffParameterIndicesBuilder::inferParameters(
-            functionType, prettyPrintInModule).count();
+        inferredParametersForPrettyPrinting->parameters.count();
     if (parameterCount == inferredParametersCount)
       return "";
   }
@@ -403,7 +401,8 @@ static std::string getDifferentiationParametersClauseString(
 // Print the arguments of the given `@differentiable` attribute.
 static void printDifferentiableAttrArguments(
     const DifferentiableAttr *attr, ASTPrinter &printer, PrintOptions Options,
-    const Decl *D, ModuleDecl *prettyPrintInModule = nullptr) {
+    const Decl *D,
+    AutoDiffParameterIndices *inferredParametersForPrettyPrinting = nullptr) {
   // Create a temporary string for the attribute argument text.
   std::string attrArgText;
   llvm::raw_string_ostream stream(attrArgText);
@@ -433,7 +432,7 @@ static void printDifferentiableAttrArguments(
   // Print differentiation parameters, if any.
   auto diffParamsString = getDifferentiationParametersClauseString(
       original, attr->getParameterIndices(), attr->getParsedParameters(),
-      prettyPrintInModule);
+      inferredParametersForPrettyPrinting);
   if (!diffParamsString.empty()) {
     printCommaIfNecessary();
     stream << diffParamsString;
@@ -1397,12 +1396,13 @@ void DifferentiableAttr::setVJPFunction(FuncDecl *decl) {
     VJP = {decl->getFullName(), DeclNameLoc(decl->getNameLoc())};
 }
 
-void DifferentiableAttr::print(llvm::raw_ostream &OS, const Decl *D,
-                               ModuleDecl *prettyPrintInModule) const {
+void DifferentiableAttr::print(
+    llvm::raw_ostream &OS, const Decl *D,
+    AutoDiffParameterIndices *inferredParametersForPrettyPrinting) const {
   StreamPrinter P(OS);
   P << "@" << getAttrName();
   printDifferentiableAttrArguments(this, P, PrintOptions(), D,
-                                   prettyPrintInModule);
+                                   inferredParametersForPrettyPrinting);
 }
 
 // SWIFT_ENABLE_TENSORFLOW

@@ -1595,7 +1595,8 @@ public:
 
   // Print the attribute to the given stream.
   void print(llvm::raw_ostream &OS, const Decl *D,
-             ModuleDecl *prettyPrintInModule = nullptr) const;
+             AutoDiffParameterIndices *inferredParametersForPrettyPrinting =
+                 nullptr) const;
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Differentiable;

@@ -288,48 +288,6 @@ AutoDiffParameterIndicesBuilder::AutoDiffParameterIndicesBuilder(
     AnyFunctionType *functionType)
     : parameters(getNumAutoDiffParameterIndices(functionType)) {}
 
-AutoDiffParameterIndicesBuilder
-AutoDiffParameterIndicesBuilder::inferParameters(AnyFunctionType *functionType,
-                                                 ModuleDecl *module) {
-  AutoDiffParameterIndicesBuilder builder(functionType);
-  SmallVector<Type, 4> allParamTypes;
-
-  // Returns true if the i-th parameter type is differentiable.
-  auto isDifferentiableParam = [&](unsigned i) -> bool {
-    if (i >= allParamTypes.size())
-      return false;
-    auto paramType = allParamTypes[i];
-    // Return false for class/existential types.
-    if ((!paramType->hasTypeParameter() &&
-         paramType->isAnyClassReferenceType()) ||
-        paramType->isExistentialType())
-      return false;
-    // Return false for function types.
-    if (paramType->is<AnyFunctionType>())
-      return false;
-    // Return true if the type conforms to `Differentiable`.
-    return conformsToDifferentiableInModule(paramType, module);
-  };
-
-  // Get all parameter types.
-  // NOTE: To be robust, result function type parameters should be added only if
-  // `functionType` comes from a static/instance method, and not a free function
-  // returning a function type. In practice, this code path should not be
-  // reachable for free functions returning a function type.
-  if (auto resultFnType = functionType->getResult()->getAs<AnyFunctionType>())
-    for (auto &param : resultFnType->getParams())
-      allParamTypes.push_back(param.getPlainType());
-  for (auto &param : functionType->getParams())
-    allParamTypes.push_back(param.getPlainType());
-
-  // Set differentiation parameters.
-  for (unsigned i : range(builder.parameters.size()))
-    if (isDifferentiableParam(i))
-      builder.setParameter(i);
-
-  return builder;
-}
-
 AutoDiffParameterIndices *
 AutoDiffParameterIndicesBuilder::build(ASTContext &C) const {
   return AutoDiffParameterIndices::get(parameters, C);
