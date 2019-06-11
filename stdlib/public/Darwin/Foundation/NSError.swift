@@ -489,10 +489,6 @@ extension _BridgedStoredNSError {
   public func hash(into hasher: inout Hasher) {
     hasher.combine(_nsError)
   }
-
-  @_alwaysEmitIntoClient public var hashValue: Int {
-    return _nsError.hashValue
-  }
 }
 
 /// Describes the code of an error.
