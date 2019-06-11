@@ -411,6 +411,8 @@ Optional<Diag<Type, Type>> GenericArgumentsMismatchFailure::getDiagnosticFor(
     return diag::cannot_convert_generic_type_dict_value;
   case CTP_CoerceOperand:
     return diag::cannot_convert_generic_type_coerce;
+  case CTP_SubscriptAssignSource:
+    return diag::cannot_convert_generic_type_subscript_assign;
 
   case CTP_ThrowStmt:
   case CTP_Unused:

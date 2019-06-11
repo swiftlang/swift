@@ -398,7 +398,10 @@ NOTE(generic_argument_mismatch,none,
      "arguments to generic parameter %0 (%1 and %2) are expected to be equal",
      (Identifier, Type, Type))
 ERROR(cannot_convert_generic_type_argument,none,
-      "cannot convert value of type %0 to expected argument type %1, ",
+      "cannot convert value of type %0 to expected argument type %1",
+      (Type, Type))
+ERROR(cannot_convert_generic_type_subscript_assign,none,
+      "cannot convert value of type %0 to expected subscript type %1",
       (Type, Type))
 ERROR(cannot_convert_generic_type_default_argument,none,
       "default argument value of type %0 cannot be converted to type %1",
