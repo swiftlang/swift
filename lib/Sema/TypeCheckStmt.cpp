@@ -739,9 +739,9 @@ public:
     {
       Type sequenceType = sequence->getType();
       auto conformance =
-        TC.conformsToProtocol(sequenceType, sequenceProto, DC,
-                              ConformanceCheckFlags::InExpression,
-                              sequence->getLoc());
+        TypeChecker::conformsToProtocol(sequenceType, sequenceProto, DC,
+                                        ConformanceCheckFlags::InExpression,
+                                        sequence->getLoc());
       if (!conformance)
         return nullptr;
 
@@ -789,9 +789,9 @@ public:
     // FIXME: Would like to customize the diagnostic emitted in
     // conformsToProtocol().
     auto genConformance =
-      TC.conformsToProtocol(generatorTy, generatorProto, DC,
-                            ConformanceCheckFlags::InExpression,
-                            sequence->getLoc());
+      TypeChecker::conformsToProtocol(generatorTy, generatorProto, DC,
+                                      ConformanceCheckFlags::InExpression,
+                                      sequence->getLoc());
     if (!genConformance)
       return nullptr;
 

@@ -1488,7 +1488,8 @@ static void checkEnumRawValues(TypeChecker &TC, EnumDecl *ED) {
   // primitive literal protocols.
   auto conformsToProtocol = [&](KnownProtocolKind protoKind) {
       ProtocolDecl *proto = TC.getProtocol(ED->getLoc(), protoKind);
-      return TC.conformsToProtocol(rawTy, proto, ED->getDeclContext(), None);
+      return TypeChecker::conformsToProtocol(rawTy, proto,
+                                             ED->getDeclContext(), None);
   };
 
   static auto otherLiteralProtocolKinds = {
@@ -4486,7 +4487,7 @@ static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
     TC.requestSuperclassLayout(CD);
 
     auto forceConformance = [&](ProtocolDecl *protocol) {
-      if (auto ref = TC.conformsToProtocol(
+      if (auto ref = TypeChecker::conformsToProtocol(
             CD->getDeclaredInterfaceType(), protocol, CD,
             ConformanceCheckFlags::SkipConditionalRequirements,
             SourceLoc())) {
@@ -4949,10 +4950,10 @@ static void diagnoseClassWithoutInitializers(TypeChecker &tc,
     ASTContext &C = tc.Context;
     auto *decodableProto = C.getProtocol(KnownProtocolKind::Decodable);
     auto superclassType = superclassDecl->getDeclaredInterfaceType();
-    if (auto ref = tc.conformsToProtocol(superclassType, decodableProto,
-                                         superclassDecl,
-                                         ConformanceCheckOptions(),
-                                         SourceLoc())) {
+    if (auto ref = TypeChecker::conformsToProtocol(superclassType, decodableProto,
+                                                   superclassDecl,
+                                                   ConformanceCheckOptions(),
+                                                   SourceLoc())) {
       // super conforms to Decodable, so we've failed to inherit init(from:).
       // Let's suggest overriding it here.
       //

@@ -2627,10 +2627,10 @@ static bool isIntegerOrFloatingPointType(Type ty, DeclContext *DC,
   if (!integerType || !floatingType) return false;
 
   return
-    TC.conformsToProtocol(ty, integerType, DC,
-                          ConformanceCheckFlags::InExpression) ||
-    TC.conformsToProtocol(ty, floatingType, DC,
-                          ConformanceCheckFlags::InExpression);
+    TypeChecker::conformsToProtocol(ty, integerType, DC,
+                                    ConformanceCheckFlags::InExpression) ||
+    TypeChecker::conformsToProtocol(ty, floatingType, DC,
+                                    ConformanceCheckFlags::InExpression);
 }
 
 

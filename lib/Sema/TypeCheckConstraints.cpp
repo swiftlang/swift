@@ -1993,7 +1993,7 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
   options |= ConformanceCheckFlags::InExpression;
   options |= ConformanceCheckFlags::SkipConditionalRequirements;
 
-  auto result = TC.conformsToProtocol(type, protocol, DC, options);
+  auto result = TypeChecker::conformsToProtocol(type, protocol, DC, options);
   if (!result || !result->isConcrete())
     return nullptr;
 
