@@ -1059,8 +1059,8 @@ bool CalleeCandidateInfo::diagnoseGenericParameterErrors(Expr *badArgExpr) {
     // FIXME: Add specific error for not subclass, if the archetype has a superclass?
     
     for (auto proto : paramArchetype->getConformsTo()) {
-      if (!CS.TC.conformsToProtocol(substitution, proto, CS.DC,
-                                    ConformanceCheckFlags::InExpression)) {
+      if (!TypeChecker::conformsToProtocol(substitution, proto, CS.DC,
+                                           ConformanceCheckFlags::InExpression)) {
         if (substitution->isEqual(argType)) {
           CS.TC.diagnose(badArgExpr->getLoc(),
                          diag::cannot_convert_argument_value_protocol,

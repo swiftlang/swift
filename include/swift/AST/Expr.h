@@ -1135,6 +1135,7 @@ private:
   Expr *Arg;
   Expr *SemanticExpr;
   SourceLoc PoundLoc;
+  ConcreteDeclRef Initializer;
 
   ObjectLiteralExpr(SourceLoc PoundLoc, LiteralKind LitKind,
                     Expr *Arg,
@@ -1194,6 +1195,15 @@ public:
   StringRef getLiteralKindRawName() const;
 
   StringRef getLiteralKindPlainName() const;
+
+  /// Retrieve the initializer that will be used to construct the 'object'
+  /// literal from the result of the initializer.
+  ConcreteDeclRef getInitializer() const { return Initializer; }
+
+  /// Set the initializer that will be used to construct the 'object' literal.
+  void setInitializer(ConcreteDeclRef initializer) {
+    Initializer = initializer;
+  }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::ObjectLiteral;

@@ -1125,18 +1125,41 @@ deriveBodyHashable_hashValue(AbstractFunctionDecl *hashValueDecl, void *) {
 
   // return _hashValue(for: self)
   auto *hashFunc = C.getHashValueForDecl();
-  auto hashExpr = new (C) DeclRefExpr(hashFunc, DeclNameLoc(),
+  if (!hashFunc->hasInterfaceType())
+    C.getLazyResolver()->resolveDeclSignature(hashFunc);
+
+  auto selfType = hashValueDecl->mapTypeIntoContext(
+    parentDC->getSelfInterfaceType());
+  auto hashableProto = C.getProtocol(KnownProtocolKind::Hashable);
+  auto conformance = TypeChecker::conformsToProtocol(selfType, hashableProto,
+                                                     parentDC, None);
+  auto subs = SubstitutionMap::get(hashFunc->getGenericSignature(),
+                                   ArrayRef<Type>(selfType),
+                                   ArrayRef<ProtocolConformanceRef>(*conformance));
+  ConcreteDeclRef hashRef(hashFunc, subs);
+
+  auto hashExpr = new (C) DeclRefExpr(hashRef, DeclNameLoc(),
                                       /*implicit*/ true);
+
+  Type intType = C.getIntDecl()->getDeclaredType();
+  hashExpr->setType(FunctionType::get(AnyFunctionType::Param(selfType),
+                                      intType));
+
   auto selfDecl = hashValueDecl->getImplicitSelfDecl();
   auto selfRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(),
                                      /*implicit*/ true);
-  auto callExpr = CallExpr::createImplicit(C, hashExpr,
-                                           { selfRef }, { C.Id_for });
+  selfRef->setType(selfType);
+
+  auto callExpr = CallExpr::createImplicit(C, hashExpr, { selfRef }, { });
+  callExpr->setType(intType);
+  callExpr->setThrows(false);
+
   auto returnStmt = new (C) ReturnStmt(SourceLoc(), callExpr);
 
   auto body = BraceStmt::create(C, SourceLoc(), {returnStmt}, SourceLoc(),
                                 /*implicit*/ true);
   hashValueDecl->setBody(body);
+  hashValueDecl->setBodyTypeCheckedIfPresent();
 }
 
 /// Derive a 'hashValue' implementation.
@@ -1152,18 +1175,19 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
 
   // We can't form a Hashable conformance if Int isn't Hashable or
   // ExpressibleByIntegerLiteral.
-  if (!tc.conformsToProtocol(intType,
-                             C.getProtocol(KnownProtocolKind::Hashable),
-                             parentDC, None)) {
-    tc.diagnose(derived.ConformanceDecl, diag::broken_int_hashable_conformance);
+  if (!TypeChecker::conformsToProtocol(intType,
+                                       C.getProtocol(KnownProtocolKind::Hashable),
+                                       parentDC, None)) {
+    derived.ConformanceDecl->diagnose(diag::broken_int_hashable_conformance);
     return nullptr;
   }
 
   ProtocolDecl *intLiteralProto =
       C.getProtocol(KnownProtocolKind::ExpressibleByIntegerLiteral);
-  if (!tc.conformsToProtocol(intType, intLiteralProto, parentDC, None)) {
-    tc.diagnose(derived.ConformanceDecl,
-                diag::broken_int_integer_literal_convertible_conformance);
+  if (!TypeChecker::conformsToProtocol(intType, intLiteralProto,
+                                       parentDC, None)) {
+    derived.ConformanceDecl->diagnose(
+      diag::broken_int_integer_literal_convertible_conformance);
     return nullptr;
   }
 

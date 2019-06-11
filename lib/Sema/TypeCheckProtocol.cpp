@@ -1718,7 +1718,7 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
   // Check that T conforms to all inherited protocols.
   for (auto InheritedProto : Proto->getInheritedProtocols()) {
     auto InheritedConformance =
-    TC.conformsToProtocol(
+      TypeChecker::conformsToProtocol(
                         T, InheritedProto, DC,
                         ConformanceCheckFlags::SkipConditionalRequirements,
                         ComplainLoc);
@@ -2932,7 +2932,8 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
       // a member that could in turn satisfy *this* requirement.
       auto derivableProto = cast<ProtocolDecl>(derivable->getDeclContext());
       if (auto conformance =
-            TC.conformsToProtocol(Adoptee, derivableProto, DC, None)) {
+            TypeChecker::conformsToProtocol(Adoptee, derivableProto,
+                                            DC, None)) {
         if (conformance->isConcrete())
           (void)conformance->getConcrete()->getWitnessDecl(derivable, &TC);
       }
@@ -3316,7 +3317,7 @@ CheckTypeWitnessResult swift::checkTypeWitness(TypeChecker &tc, DeclContext *dc,
 
   // Check protocol conformances.
   for (auto reqProto : genericSig->getConformsTo(depTy)) {
-    if (!tc.conformsToProtocol(
+    if (!TypeChecker::conformsToProtocol(
                           contextType, reqProto, dc,
                           ConformanceCheckFlags::SkipConditionalRequirements))
       return CheckTypeWitnessResult(reqProto->getDeclaredType());
