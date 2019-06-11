@@ -1,9 +1,6 @@
 // RUN: %target-resilience-test --no-symbol-diff
 // REQUIRES: executable_test
 
-// Uses swift-version 4.
-// UNSUPPORTED: swift_test_mode_optimize_none_with_implicit_dynamic
-
 import StdlibUnittest
 import conformance_reference
 
