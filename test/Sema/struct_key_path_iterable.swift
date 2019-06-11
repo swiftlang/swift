@@ -34,7 +34,7 @@ struct TensorParameters : KeyPathIterable {
   typealias Foo = Int
 }
 
-extension TensorParameters : VectorNumeric {
+extension TensorParameters : VectorProtocol {
   static var zero: TensorParameters {
     return TensorParameters(w: Tensor(0), b: Tensor(0))
   }
@@ -89,7 +89,7 @@ func pow<T : BinaryFloatingPoint>(_ x: T, _ y: T) -> T {
 }
 
 struct AdamOptimizer<P : KeyPathIterable, Scalar : BinaryFloatingPoint>
-  where P : VectorNumeric, P.Scalar == Tensor<Scalar>
+  where P : VectorProtocol, P.Scalar == Tensor<Scalar>
 {
   let learningRate: Scalar
   var beta1: Scalar
@@ -134,7 +134,7 @@ struct AdamOptimizer<P : KeyPathIterable, Scalar : BinaryFloatingPoint>
 func testOptimizer<P : KeyPathIterable, Scalar : BinaryFloatingPoint>(
   parameters: inout P, withGradients gradients: P
 )
-  where P : VectorNumeric, P.Scalar == Tensor<Scalar>
+  where P : VectorProtocol, P.Scalar == Tensor<Scalar>
 {
   var optimizer = AdamOptimizer<P, Scalar>()
   print(parameters)

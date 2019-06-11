@@ -131,7 +131,7 @@ IDENTIFIER_(unpackTensorHandles)
 IDENTIFIER_(tensorHandleCount)
 // TensorGroup
 IDENTIFIER_(typeList)
-// AdditiveArithmetic, VectorNumeric
+// AdditiveArithmetic, VectorProtocol
 IDENTIFIER(zero)
 IDENTIFIER(Scalar)
 // Differentiable

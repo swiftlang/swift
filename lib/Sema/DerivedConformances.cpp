@@ -79,8 +79,8 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
     return canDeriveAdditiveArithmetic(Nominal, DC);
 
   // SWIFT_ENABLE_TENSORFLOW
-  if (*knownProtocol == KnownProtocolKind::VectorNumeric)
-    return canDeriveVectorNumeric(Nominal, DC);
+  if (*knownProtocol == KnownProtocolKind::VectorProtocol)
+    return canDeriveVectorProtocol(Nominal, DC);
 
   // SWIFT_ENABLE_TENSORFLOW
   if (*knownProtocol == KnownProtocolKind::Differentiable)
@@ -279,11 +279,11 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
     }
 
     // SWIFT_ENABLE_TENSORFLOW
-    // VectorNumeric.*
+    // VectorProtocol.*
     if (func->isOperator() && name.getBaseName() == "*") {
       auto argumentNames = name.getArgumentNames();
       if (argumentNames.size() == 2) {
-        return getRequirement(KnownProtocolKind::VectorNumeric);
+        return getRequirement(KnownProtocolKind::VectorProtocol);
       }
     }
 
@@ -369,9 +369,9 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
       return getRequirement(KnownProtocolKind::Differentiable);
 
     // SWIFT_ENABLE_TENSORFLOW
-    // VectorNumeric.Scalar
+    // VectorProtocol.Scalar
     if (name.isSimpleName(ctx.Id_Scalar))
-      return getRequirement(KnownProtocolKind::VectorNumeric);
+      return getRequirement(KnownProtocolKind::VectorProtocol);
 
     return nullptr;
   }

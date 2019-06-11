@@ -179,7 +179,7 @@ static CanType joinElementTypesFromValues(SILValueRange &&range,
 static FuncDecl *findOperatorDeclInProtocol(DeclName operatorName,
                                             ProtocolDecl *protocol) {
   assert(operatorName.isOperator());
-  // Find the operator requirement in the `VectorNumeric` protocol
+  // Find the operator requirement in the `VectorProtocol` protocol
   // declaration and cache it.
   auto opLookup = protocol->lookupDirect(operatorName);
   // Find the `+` with type siguature `(Self, Self) -> Self`.
@@ -865,9 +865,9 @@ private:
   /// Saved for deletion during cleanup.
   SmallVector<SILValue, 32> generatedAssociatedFunctionReferences;
 
-  /// The VectorNumeric protocol in the standard library.
-  ProtocolDecl *vectorNumericProtocol =
-      astCtx.getProtocol(KnownProtocolKind::VectorNumeric);
+  /// The VectorProtocol protocol in the standard library.
+  ProtocolDecl *vectorProtocolProtocol =
+      astCtx.getProtocol(KnownProtocolKind::VectorProtocol);
   /// The Numeric protocol in the standard library.
   ProtocolDecl *numericProtocol =
       astCtx.getProtocol(KnownProtocolKind::Numeric);
@@ -926,8 +926,8 @@ public:
     return generatedAssociatedFunctionReferences;
   }
 
-  ProtocolDecl *getVectorNumericProtocol() const {
-    return vectorNumericProtocol;
+  ProtocolDecl *getVectorProtocolProtocol() const {
+    return vectorProtocolProtocol;
   }
 
   ProtocolDecl *getNumericProtocol() const {

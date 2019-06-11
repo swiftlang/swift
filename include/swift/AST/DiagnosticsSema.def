@@ -2514,8 +2514,8 @@ ERROR(parameterized_invalid_parameters_struct,none,
       "invalid", (Type))
 ERROR(broken_additive_arithmetic_requirement,none,
       "AdditiveArithmetic protocol is broken: unexpected requirement", ())
-ERROR(broken_vector_numeric_requirement,none,
-      "VectorNumeric protocol is broken: unexpected requirement", ())
+ERROR(broken_vector_protocol_requirement,none,
+      "VectorProtocol protocol is broken: unexpected requirement", ())
 ERROR(broken_differentiable_requirement,none,
       "Differentiable protocol is broken: unexpected requirement", ())
 WARNING(differentiable_nondiff_type_implicit_noderivative_fixit,none,

@@ -1873,10 +1873,10 @@ extension ${Self} : Strideable {
 
 // SWIFT_ENABLE_TENSORFLOW
 //===----------------------------------------------------------------------===//
-// VectorNumeric Conformance
+// VectorProtocol Conformance
 //===----------------------------------------------------------------------===//
 
-extension ${Self} : VectorNumeric {
+extension ${Self} : VectorProtocol {
   public typealias Scalar = ${Self}
 }
 

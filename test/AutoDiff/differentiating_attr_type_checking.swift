@@ -256,7 +256,7 @@ func bar<T>(_ x: T) -> T {
   return x
 }
 @differentiating(bar)
-func vjpBar<T : Differentiable & VectorNumeric>(_ x: T) -> (value: T, pullback: (T.TangentVector) -> T.TangentVector) {
+func vjpBar<T : Differentiable & VectorProtocol>(_ x: T) -> (value: T, pullback: (T.TangentVector) -> T.TangentVector) {
   return (x, { $0 })
 }
 
@@ -264,7 +264,7 @@ func baz<T, U>(_ x: T, _ y: U) -> T {
   return x
 }
 @differentiating(baz)
-func vjpBaz<T : Differentiable & VectorNumeric, U : Differentiable>(_ x: T, _ y: U)
+func vjpBaz<T : Differentiable & VectorProtocol, U : Differentiable>(_ x: T, _ y: U)
     -> (value: T, pullback: (T) -> (T, U))
   where T == T.TangentVector, U == U.TangentVector
 {
