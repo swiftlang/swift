@@ -33,7 +33,7 @@ namespace swift {
 /// to transformation.
 struct ExistentialTransformArgumentDescriptor {
   OpenedExistentialAccess AccessType;
-  bool isConsumed;
+  bool DestroyAddrUse;
 };
 
 /// ExistentialTransform creates a protocol constrained generic and a thunk.
