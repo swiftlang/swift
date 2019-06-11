@@ -300,8 +300,13 @@ void AttributedTypeRepr::printAttrs(ASTPrinter &Printer,
     Printer.printSimpleAttr("@escaping") << " ";
 
   // SWIFT_ENABLE_TENSORFLOW
-  if (hasAttr(TAK_differentiable))
-    Printer.printSimpleAttr("@differentiable") << " ";
+  if (hasAttr(TAK_differentiable)) {
+    if (Attrs.isLinear()) {
+      Printer.printSimpleAttr("@differentiable(linear)") << " ";
+    } else {
+      Printer.printSimpleAttr("@differentiable") << " ";
+    }
+  }
 
   if (hasAttr(TAK_thin))
     Printer.printSimpleAttr("@thin") << " ";

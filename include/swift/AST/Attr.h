@@ -88,6 +88,9 @@ public:
   
   bool isValid() const { return AtLoc.isValid(); }
   
+  // SWIFT_ENABLE_TENSORFLOW
+  bool isLinear() const { return linear; }
+  
   void clearAttribute(TypeAttrKind A) {
     AttrLocs[A] = SourceLoc();
   }
