@@ -124,4 +124,20 @@ E2EDifferentiablePropertyTests.test("fieldwise product space, other tangent") {
   expectEqual(expectedGrad, actualGrad)
 }
 
+E2EDifferentiablePropertyTests.test("computed property") {
+  struct TF_544 : Differentiable {
+    var value: Float
+    @differentiable
+    var computed: Float {
+      get { value }
+      set { value = newValue }
+    }
+  }
+  let actualGrad = gradient(at: TF_544(value: 2.4)) { x in
+    return x.computed * x.computed
+  }
+  let expectedGrad = TF_544.AllDifferentiableVariables(value: 4.8)
+  expectEqual(expectedGrad, actualGrad)
+}
+
 runAllTests()

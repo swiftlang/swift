@@ -2711,7 +2711,9 @@ ERROR(linear_differentiable_type_disabled,none,
 ERROR(differentiable_attr_no_currying,none,
       "'@differentiable' cannot be defined on functions that return functions", ())
 ERROR(differentiable_attr_duplicate,none,
-      "duplicate '@differentiable' attribute", ())
+      "duplicate '@differentiable' attribute with same parameter indices", ())
+NOTE(differentiable_attr_duplicate_note,none,
+     "other attribute declared here", ())
 ERROR(differentiable_attr_function_not_same_type_context,none,
       "%0 is not defined in the current type context", (DeclName))
 ERROR(differentiable_attr_specified_not_function,none,

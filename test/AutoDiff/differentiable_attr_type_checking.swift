@@ -29,15 +29,36 @@ func no_jvp_or_vjp(_ x: Float) -> Float {
   return x * x
 }
 
+// Test duplicated `@differentiable` attributes.
+
 @differentiable // expected-error {{duplicate '@differentiable' attribute}}
-@differentiable
+@differentiable // expected-note {{other attribute declared here}}
 func dupe_attributes(arg: Float) -> Float { return arg }
 
-@differentiable(wrt: arg1) // expected-error {{duplicate '@differentiable' attribute}}
 @differentiable(wrt: arg1)
 @differentiable(wrt: arg2) // expected-error {{duplicate '@differentiable' attribute}}
-@differentiable(wrt: arg2)
+@differentiable(wrt: arg2) // expected-note {{other attribute declared here}}
 func dupe_attributes(arg1: Float, arg2: Float) -> Float { return arg1 }
+
+struct ComputedPropertyDupeAttributes<T : Differentiable> : Differentiable {
+  var value: T
+
+  @differentiable // expected-error {{duplicate '@differentiable' attribute}}
+  var computed1: T {
+    @differentiable // expected-note {{other attribute declared here}}
+    get { value }
+    set { value = newValue }
+  }
+
+  // TODO(TF-482): Remove diagnostics when `@differentiable` attributes are
+  // also uniqued based on generic requirements.
+  @differentiable(where T == Float) // expected-error {{duplicate '@differentiable' attribute}}
+  @differentiable(where T == Double) // expected-note {{other attribute declared here}}
+  var computed2: T {
+    get { value }
+    set { value = newValue }
+  }
+}
 
 class Class {}
 // expected-error @+1 {{class objects and protocol existentials ('Class') cannot be differentiated with respect to}}
@@ -722,4 +743,19 @@ struct NonDiffableStruct {
   func fn(_ b: Float) -> Float {
     return a + b
   }
+}
+
+@differentiable(linear, wrt: x, vjp: const3) // expected-error {{cannot specify 'vjp:' or 'jvp:' for linear functions; use 'transpose:' instead}}
+func slope1(_ x: Float) -> Float {
+  return 3 * x
+}
+
+ @differentiable(linear, wrt: x, jvp: const3) // expected-error {{cannot specify 'vjp:' or 'jvp:' for linear functions; use 'transpose:' instead}}
+func slope2(_ x: Float) -> Float {
+  return 3 * x
+}
+
+ @differentiable(linear, jvp: const3, vjp: const3) // expected-error {{cannot specify 'vjp:' or 'jvp:' for linear functions; use 'transpose:' instead}}
+func slope3(_ x: Float) -> Float {
+  return 3 * x
 }

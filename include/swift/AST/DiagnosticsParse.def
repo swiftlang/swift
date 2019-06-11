@@ -1504,6 +1504,9 @@ ERROR(differentiable_type_invalid_argument,PointsToFirstBadToken,
       "invalid argument '%0' in 'differentiable' attribute", (StringRef))
 ERROR(differentiable_attribute_expected_rparen,none,
       "expected ')' after 'convention' attribute", ())
+ERROR(attr_differentiable_no_vjp_or_jvp_when_linear,none,
+      "cannot specify 'vjp:' or 'jvp:' for linear functions; use "
+      "'transpose:' instead", ())
 
 // differentiating
 ERROR(attr_differentiating_expected_original_name,PointsToFirstBadToken,

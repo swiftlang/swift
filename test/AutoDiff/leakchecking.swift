@@ -92,7 +92,7 @@ LeakCheckingTests.test("ControlFlow") {
   // FIXME: Fix control flow AD memory leaks.
   // See related FIXME comments in adjoint value/buffer propagation in
   // lib/SILOptimizer/Mandatory/Differentiation.cpp.
-  testWithLeakChecking(expectedLeakCount: 74) {
+  testWithLeakChecking(expectedLeakCount: 41) {
     func cond_nestedtuple_var(_ x: Tracked<Float>) -> Tracked<Float> {
       // Convoluted function returning `x + x`.
       var y = (x + x, x - x)
@@ -116,7 +116,7 @@ LeakCheckingTests.test("ControlFlow") {
   // FIXME: Fix control flow AD memory leaks.
   // See related FIXME comments in adjoint value/buffer propagation in
   // lib/SILOptimizer/Mandatory/Differentiation.cpp.
-  testWithLeakChecking(expectedLeakCount: 300) {
+  testWithLeakChecking(expectedLeakCount: 193) {
     func cond_nestedstruct_var(_ x: Tracked<Float>) -> Tracked<Float> {
       // Convoluted function returning `x + x`.
       var y = FloatPair(x + x, x - x)
@@ -157,7 +157,7 @@ LeakCheckingTests.test("ControlFlow") {
   // FIXME: Fix control flow AD memory leaks.
   // See related FIXME comments in adjoint value/buffer propagation in
   // lib/SILOptimizer/Mandatory/Differentiation.cpp.
-  testWithLeakChecking(expectedLeakCount: 6) {
+  testWithLeakChecking(expectedLeakCount: 3) {
     var model = ExampleLeakModel()
     let x: Tracked<Float> = 1.0
     _ = model.gradient(at: x) { m, x in
