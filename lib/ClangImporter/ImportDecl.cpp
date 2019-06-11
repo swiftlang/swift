@@ -4691,6 +4691,9 @@ namespace {
   }
 #include "InferredAttributes.def"
 
+      if (decl->isArcWeakrefUnavailable())
+        result->setIsIncompatibleWithWeakReferences();
+
       result->setMemberLoader(&Impl, 0);
       result->addImplicitDestructor();
 
