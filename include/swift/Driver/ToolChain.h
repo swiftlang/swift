@@ -158,10 +158,10 @@ protected:
   virtual InvocationInfo
   constructInvocation(const AutolinkExtractJobAction &job,
                       const JobContext &context) const;
-  virtual InvocationInfo constructInvocation(const LinkJobAction &job,
+  virtual InvocationInfo constructInvocation(const DynamicLinkJobAction &job,
                                              const JobContext &context) const;
 
-  virtual InvocationInfo constructInvocation(const ArchiveJobAction &job,
+  virtual InvocationInfo constructInvocation(const StaticLinkJobAction &job,
                                              const JobContext &context) const;
 
   /// Searches for the given executable in appropriate paths relative to the

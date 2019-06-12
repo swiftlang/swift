@@ -114,7 +114,7 @@ bool toolchains::GenericUnix::shouldProvideRPathToLinker() const {
 }
 
 ToolChain::InvocationInfo
-toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
+toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
                                              const JobContext &context) const {
   assert(context.Output.getPrimaryOutputType() == file_types::TY_Image &&
          "Invalid linker output type.");
@@ -324,7 +324,7 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
 
 
 ToolChain::InvocationInfo
-toolchains::GenericUnix::constructInvocation(const ArchiveJobAction &job,
+toolchains::GenericUnix::constructInvocation(const StaticLinkJobAction &job,
                                const JobContext &context) const {
    assert(context.Output.getPrimaryOutputType() == file_types::TY_Image &&
          "Invalid linker output type.");
