@@ -256,6 +256,39 @@ func throwingElement<T : FooProtocol>() throws -> [T] {
   return try [makeBasic(), makeThrowing()]
 }
 
+class TakesDictionaryLiteral<Key, Value> : ExpressibleByDictionaryLiteral {
+  required init(dictionaryLiteral elements: (Key, Value)...) {}
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s8literals23returnsCustomDictionaryAA05TakesD7LiteralCyS2iGyF : $@convention(thin) () -> @owned TakesDictionaryLiteral<Int, Int> {
+// CHECK: [[TMP:%.*]] = apply %2(%0, %1) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
+// CHECK: [[ARRAY_LENGTH:%.*]] = integer_literal $Builtin.Word, 2
+// CHECK: // function_ref _allocateUninitializedArray<A>(_:)
+// CHECK: [[ALLOCATE_VARARGS:%.*]] = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
+// CHECK: [[ARR_TMP:%.*]] = apply [[ALLOCATE_VARARGS]]<(Int, Int)>([[ARRAY_LENGTH]])
+// CHECK: ([[ARR:%.*]], [[ADDRESS:%.*]]) = destructure_tuple [[ARR_TMP]]
+// CHECK: [[TUPLE_ADDR:%.*]] = pointer_to_address %9 : $Builtin.RawPointer to [strict] $*(Int, Int)
+// CHECK: [[KEY_ADDR:%.*]] = tuple_element_addr [[TUPLE_ADDR]] : $*(Int, Int), 0
+// CHECK: [[VALUE_ADDR:%.*]] = tuple_element_addr [[TUPLE_ADDR]] : $*(Int, Int), 1
+// CHECK: store [[TMP]] to [trivial] [[KEY_ADDR]] : $*Int
+// CHECK: store [[TMP]] to [trivial] [[VALUE_ADDR]] : $*Int
+// CHECK: [[IDX1:%.*]] = integer_literal $Builtin.Word, 1
+// CHECK: [[TUPLE_ADDR1:%.*]] = index_addr [[TUPLE_ADDR]] : $*(Int, Int), [[IDX1]] : $Builtin.Word
+// CHECK: [[KEY_ADDR:%.*]] = tuple_element_addr [[TUPLE_ADDR1]] : $*(Int, Int), 0
+// CHECK: [[VALUE_ADDR:%.*]] = tuple_element_addr [[TUPLE_ADDR1]] : $*(Int, Int), 1
+// CHECK: store [[TMP]] to [trivial] [[KEY_ADDR]] : $*Int
+// CHECK: store [[TMP]] to [trivial] [[VALUE_ADDR]] : $*Int
+// CHECK: [[METATYPE:%.*]] = metatype $@thick TakesDictionaryLiteral<Int, Int>.Type
+// CHECK: [[CTOR:%.*]] = class_method [[METATYPE]] : $@thick TakesDictionaryLiteral<Int, Int>.Type, #TakesDictionaryLiteral.init!allocator.1 : <Key, Value> (TakesDictionaryLiteral<Key, Value>.Type) -> ((Key, Value)...) -> TakesDictionaryLiteral<Key, Value>, $@convention(method) <τ_0_0, τ_0_1> (@owned Array<(τ_0_0, τ_0_1)>, @thick TakesDictionaryLiteral<τ_0_0, τ_0_1>.Type) -> @owned TakesDictionaryLiteral<τ_0_0, τ_0_1>
+// CHECK: [[RESULT:%.*]] = apply [[CTOR]]<Int, Int>(%8, %21)
+// CHECK: return [[RESULT]]
+
+func returnsCustomDictionary() -> TakesDictionaryLiteral<Int, Int> {
+  // Use temporary to simplify generated_sil
+  let tmp = 77
+  return [tmp: tmp, tmp : tmp]
+}
+
 struct Color: _ExpressibleByColorLiteral {
   init(_colorLiteralRed red: Float, green: Float, blue: Float, alpha: Float) {}
 }
