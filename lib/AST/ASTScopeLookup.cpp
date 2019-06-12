@@ -171,12 +171,11 @@ bool GenericParamScope::doesContextMatchStartingContext(
 
 #pragma mark lookup methods that run once per scope
 
-Optional<bool>
-ASTScopeImpl::lookup(const NullablePtr<DeclContext> selfDC,
-                     const NullablePtr<const ASTScopeImpl> limit,
-                     const NullablePtr<const Decl> haveAlreadyLookedHere,
-                     const Optional<bool> isCascadingUseArg,
-                     DeclConsumer consumer) const {
+Optional<bool> ASTScopeImpl::lookup(
+    const NullablePtr<DeclContext> selfDC,
+    const NullablePtr<const ASTScopeImpl> limit,
+    const NullablePtr<const Decl> scopeWhoseTypeWasAlreadySearched,
+    const Optional<bool> isCascadingUseArg, DeclConsumer consumer) const {
 #ifndef NDEBUG
   consumer.stopForDebuggingIfTargetLookup();
 #endif
@@ -193,55 +192,56 @@ ASTScopeImpl::lookup(const NullablePtr<DeclContext> selfDC,
     return isCascadingUseForThisScope;
 
   /// Because a body scope nests in a generic param scope, etc, we might look in
-  /// the self type twice. That's why we pass haveAlreadyLookedHere.
+  /// the self type twice. That's why we pass scopeWhoseTypeWasAlreadySearched.
   /// Look in the generics and self type only iff haven't already looked there.
-  bool isDone;
-  Optional<bool> isCascadingUseResult;
-  std::tie(isDone, isCascadingUseResult) =
-      haveAlreadyLookedHere && haveAlreadyLookedHere == getDecl().getPtrOrNull()
-          ? std::make_pair(false, isCascadingUseForThisScope)
-          : lookInGenericsAndSelfType(selfDC, isCascadingUseForThisScope,
-                                      consumer);
-  if (isDone || !getParent())
-    return isCascadingUseResult;
+  const bool shouldSearchGenericsAndMembers =
+      scopeWhoseTypeWasAlreadySearched &&
+      scopeWhoseTypeWasAlreadySearched == getDecl().getPtrOrNull();
 
-  return lookupInParent(selfDC, limit, haveAlreadyLookedHere,
+  // Look for generics before members in violation of lexical ordering because
+  // you can say "self.name" to get a name shadowed by a generic but you
+  // can't do the opposite to get a generic shadowed by a name.
+  if (shouldSearchGenericsAndMembers &&
+      lookInGenericParameters(isCascadingUseForThisScope, consumer))
+    return isCascadingUseForThisScope;
+
+  // Dig out the type we're looking into.
+  // Perform lookup into the type
+  Optional<bool> isCascadingUseResult = isCascadingUseForThisScope;
+  if (shouldSearchGenericsAndMembers) {
+    bool isDone;
+    std::tie(isDone, isCascadingUseResult) =
+        lookupInSelfType(selfDC, isCascadingUseResult, consumer);
+    if (isDone)
+      return isCascadingUseResult;
+  }
+
+  return lookupInParent(selfDC, limit, scopeWhoseTypeWasAlreadySearched,
                         isCascadingUseResult, consumer);
 }
 
 Optional<bool> ASTScopeImpl::lookupInParent(
     const NullablePtr<DeclContext> selfDC,
     const NullablePtr<const ASTScopeImpl> limit,
-    const NullablePtr<const Decl> haveAlreadyLookedHere,
+    const NullablePtr<const Decl> scopeWhoseTypeWasAlreadySearched,
     const Optional<bool> isCascadingUse, DeclConsumer consumer) const {
+
+  const auto *const lookupParent = getLookupParent().getPtrOrNull();
+  if (!lookupParent)
+    return isCascadingUse;
 
   // If this scope has an associated Decl, we have already searched its generics
   // and selfType, so no need to look again.
   NullablePtr<const Decl> haveAlreadyLookedHereForParent =
-      getDecl() ? getDecl().getPtrOrNull() : haveAlreadyLookedHere;
+      getDecl() ? getDecl().getPtrOrNull() : scopeWhoseTypeWasAlreadySearched;
 
   // If there is no limit and this scope induces one, pass that on.
   const NullablePtr<const ASTScopeImpl> limitForParent =
       limit ? limit : getLookupLimit();
 
-  return getLookupParent().get()->lookup(
-      computeSelfDCForParent(selfDC), limitForParent,
-      haveAlreadyLookedHereForParent, isCascadingUse, consumer);
-}
-
-std::pair<bool, Optional<bool>>
-ASTScopeImpl::lookInGenericsAndSelfType(const NullablePtr<DeclContext> selfDC,
-                                        const Optional<bool> isCascadingUse,
-                                        DeclConsumer consumer) const {
-  // Look for generics before members in violation of lexical ordering because
-  // you can say "self.name" to get a name shadowed by a generic but you
-  // can't do the opposite to get a generic shadowed by a name.
-
-  if (lookInGenericParameters(isCascadingUse, consumer))
-    return {true, isCascadingUse};
-  // Dig out the type we're looking into.
-  // Perform lookup into the type
-  return lookupInSelfType(selfDC, isCascadingUse, consumer);
+  return lookupParent->lookup(computeSelfDCForParent(selfDC), limitForParent,
+                              haveAlreadyLookedHereForParent, isCascadingUse,
+                              consumer);
 }
 
 #pragma mark lookInGenericParameters

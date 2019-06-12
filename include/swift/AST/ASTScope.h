@@ -313,34 +313,27 @@ protected:
   /// (Names in extensions never depend on self.)
   ///
   /// Because a body scope nests in a generic param scope, etc, we might look in
-  /// the self type twice. That's why we pass haveAlreadyLookedHere.
+  /// the self type twice. That's why we pass scopeWhoseTypeWasAlreadySearched.
   ///
   /// Look in this scope.
   /// \p selfDC is the context for names dependent on dynamic self,
   /// \p limit is a scope into which lookup should not go. See \ref
-  /// getLookupLimit. \p haveAlreadyLookedHere is a Decl whose generics and self
-  /// type has already been searched, \p isCascadingUse indicates whether the
-  /// lookup results will need a cascading dependency or not \p consumer is the
-  /// object to which found decls are reported. Returns the isCascadingUse
-  /// information.
-  Optional<bool> lookup(NullablePtr<DeclContext> selfDC,
-                        NullablePtr<const ASTScopeImpl> limit,
-                        NullablePtr<const Decl> haveAlreadyLookedHere,
-                        Optional<bool> isCascadingUse,
-                        DeclConsumer consumer) const;
+  /// getLookupLimit. \p scopeWhoseTypeWasAlreadySearched is a Decl whose
+  /// generics and self type has already been searched, \p isCascadingUse
+  /// indicates whether the lookup results will need a cascading dependency or
+  /// not \p consumer is the object to which found decls are reported. Returns
+  /// the isCascadingUse information.
+  Optional<bool>
+  lookup(NullablePtr<DeclContext> selfDC, NullablePtr<const ASTScopeImpl> limit,
+         NullablePtr<const Decl> scopeWhoseTypeWasAlreadySearched,
+         Optional<bool> isCascadingUse, DeclConsumer consumer) const;
 
   /// Same as lookup, but handles the steps to recurse into the parent scope.
-  Optional<bool> lookupInParent(NullablePtr<DeclContext> selfDC,
-                                NullablePtr<const ASTScopeImpl> limit,
-                                NullablePtr<const Decl> haveAlreadyLookedHere,
-                                Optional<bool> isCascadingUse,
-                                DeclConsumer) const;
-
-  /// Return isDone and isCascadingUse
-  std::pair<bool, Optional<bool>>
-  lookInGenericsAndSelfType(const NullablePtr<DeclContext> selfDC,
-                            const Optional<bool> isCascadingUse,
-                            DeclConsumer consumer) const;
+  Optional<bool>
+  lookupInParent(NullablePtr<DeclContext> selfDC,
+                 NullablePtr<const ASTScopeImpl> limit,
+                 NullablePtr<const Decl> scopeWhoseTypeWasAlreadySearched,
+                 Optional<bool> isCascadingUse, DeclConsumer) const;
 
   virtual NullablePtr<DeclContext>
       computeSelfDCForParent(NullablePtr<DeclContext>) const;
