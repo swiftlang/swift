@@ -21,10 +21,17 @@ namespace swift {
 
 using ConformsToProtocol_t =
   const WitnessTable *(const Metadata *, const ProtocolDescriptor *);
-
+using GetKeyPath_t =
+  const HeapObject *(const void *, const void *);
+  
 const WitnessTable *
 swift50override_conformsToProtocol(const Metadata * const type,
   const ProtocolDescriptor *protocol,
   ConformsToProtocol_t *original);
 
+extern "C"
+const HeapObject *swift50override_getKeyPath(const void *pattern,
+  const void *arguments,
+  GetKeyPath_t *original);
+  
 }

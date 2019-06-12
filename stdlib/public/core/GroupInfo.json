@@ -146,7 +146,8 @@
     "MemoryLayout.swift",
   ],
   "KeyPaths": [
-    "KeyPath.swift"
+    "KeyPath.swift",
+    "KeyPathInstantiation.swift"
   ],
   "Reflection": [
     "Dump.swift",

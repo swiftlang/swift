@@ -81,6 +81,7 @@ set(SWIFTLIB_ESSENTIAL
   Integers.swift
   Join.swift
   KeyPath.swift
+  KeyPathInstantiation.swift
   KeyValuePairs.swift
   LazyCollection.swift
   LazySequence.swift

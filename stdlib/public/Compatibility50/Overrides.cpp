@@ -30,6 +30,7 @@ OverrideSection Overrides
 __attribute__((used, section("__DATA,__swift_hooks"))) = {
   .version = 0,
   .conformsToProtocol = swift50override_conformsToProtocol,
+  .getKeyPath = swift50override_getKeyPath,
 };
 
 // Allow this library to get force-loaded by autolinking

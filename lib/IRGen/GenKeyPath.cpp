@@ -1090,6 +1090,10 @@ emitKeyPathComponent(IRGenModule &IGM,
     auto elementOffset = getStaticTupleElementOffset(IGM,
                                                      loweredTy,
                                                      component.getTupleIndex());
+      
+    // Tuple metadata currently stores its offsets as 64 bit, but the key path
+    // runtime wants to do a 32-bit load from structs. On big endian platforms,
+    // this requires an adjustment
 
     auto header = KeyPathComponentHeader
       ::forStructComponentWithUnresolvedFieldOffset(/*isLet*/ false);

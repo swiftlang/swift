@@ -297,10 +297,8 @@ function(_compile_swift_files
     # Determine the directory where the module file should be placed.
     if(SWIFTFILE_MODULE_DIR)
       set(module_dir "${SWIFTFILE_MODULE_DIR}")
-    elseif(SWIFTFILE_IS_STDLIB)
-      set(module_dir "${SWIFTLIB_DIR}/${library_subdir}")
     else()
-      message(FATAL_ERROR "Don't know where to put the module files")
+      set(module_dir "${SWIFTLIB_DIR}/${library_subdir}")
     endif()
 
     list(APPEND swift_flags "-parse-as-library")
