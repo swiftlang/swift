@@ -1247,6 +1247,7 @@ namespace  {
 #define UNINTERESTING_ATTR(CLASS)                                              \
     void visit##CLASS##Attr(CLASS##Attr *) {}
 
+    // Please keep these alphabetical.
     UNINTERESTING_ATTR(AccessControl)
     UNINTERESTING_ATTR(Alignment)
     UNINTERESTING_ATTR(AlwaysEmitIntoClient)
@@ -1264,6 +1265,7 @@ namespace  {
     UNINTERESTING_ATTR(IBDesignable)
     UNINTERESTING_ATTR(IBInspectable)
     UNINTERESTING_ATTR(IBOutlet)
+    UNINTERESTING_ATTR(IBSegueAction)
     UNINTERESTING_ATTR(Indirect)
     UNINTERESTING_ATTR(Inline)
     UNINTERESTING_ATTR(Optimize)

@@ -1639,8 +1639,8 @@ ERROR(avail_query_expected_version_number,PointsToFirstBadToken,
 ERROR(avail_query_expected_rparen,PointsToFirstBadToken,
       "expected ')' in availability query", ())
 
-ERROR(avail_query_unrecognized_platform_name,
-      PointsToFirstBadToken, "unrecognized platform name %0", (Identifier))
+WARNING(avail_query_unrecognized_platform_name,
+        PointsToFirstBadToken, "unrecognized platform name %0", (Identifier))
 
 ERROR(avail_query_disallowed_operator, PointsToFirstBadToken,
       "'%0' cannot be used in an availability condition", (StringRef))

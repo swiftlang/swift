@@ -2832,7 +2832,11 @@ bool MissingContextualConformanceFailure::diagnoseAsError() {
   Optional<Diag<Type, Type>> diagnostic;
   if (path.empty()) {
     assert(isa<AssignExpr>(anchor));
-    diagnostic = getDiagnosticFor(CTP_AssignSource);
+    if (isa<SubscriptExpr>(cast<AssignExpr>(anchor)->getDest())) {
+      diagnostic = getDiagnosticFor(CTP_SubscriptAssignSource);
+    } else {
+      diagnostic = getDiagnosticFor(CTP_AssignSource);
+    }
   } else {
     const auto &last = path.back();
     switch (last.getKind()) {
@@ -2899,6 +2903,8 @@ MissingContextualConformanceFailure::getDiagnosticFor(
     return diag::cannot_convert_coerce_protocol;
   case CTP_AssignSource:
     return diag::cannot_convert_assign_protocol;
+  case CTP_SubscriptAssignSource:
+    return diag::cannot_convert_subscript_assign_protocol;
 
   case CTP_ThrowStmt:
   case CTP_Unused:

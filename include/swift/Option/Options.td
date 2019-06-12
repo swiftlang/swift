@@ -897,4 +897,9 @@ def vfsoverlay_EQ : Joined<["-"], "vfsoverlay=">,
 def runtime_compatibility_version : Separate<["-"], "runtime-compatibility-version">,
   Flags<[FrontendOption]>,
   HelpText<"Link compatibility library for Swift runtime version, or 'none'">;
+
+def disable_autolinking_runtime_compatibility : Flag<["-"], "disable-autolinking-runtime-compatibility">,
+  Flags<[FrontendOption]>,
+  HelpText<"Do not use autolinking for runtime compatibility libraries">;
+
 include "FrontendOptions.td"

@@ -2289,8 +2289,12 @@ SILType irgen::getSingletonAggregateFieldType(IRGenModule &IGM, SILType t,
     auto allFields = structDecl->getStoredProperties();
     
     auto field = allFields.begin();
-    if (!allFields.empty() && std::next(field) == allFields.end())
-      return t.getFieldType(*field, IGM.getSILModule());
+    if (!allFields.empty() && std::next(field) == allFields.end()) {
+      auto fieldTy = t.getFieldType(*field, IGM.getSILModule());
+      if (!IGM.isTypeABIAccessible(fieldTy))
+        return SILType();
+      return fieldTy;
+    }
 
     return SILType();
   }
@@ -2305,8 +2309,12 @@ SILType irgen::getSingletonAggregateFieldType(IRGenModule &IGM, SILType t,
     
     auto theCase = allCases.begin();
     if (!allCases.empty() && std::next(theCase) == allCases.end()
-        && (*theCase)->hasAssociatedValues())
-      return t.getEnumElementType(*theCase, IGM.getSILModule());
+        && (*theCase)->hasAssociatedValues()) {
+      auto enumEltTy = t.getEnumElementType(*theCase, IGM.getSILModule());
+      if (!IGM.isTypeABIAccessible(enumEltTy))
+        return SILType();
+      return enumEltTy;
+    }
 
     return SILType();
   }

@@ -594,6 +594,11 @@ private:
     } else if (clangMethod && isNSUInteger(clangMethod->getReturnType())) {
       os << "NSUInteger";
     } else {
+      // IBSegueAction is placed before whatever return value is chosen.
+      if (AFD->getAttrs().hasAttribute<IBSegueActionAttr>()) {
+        os << "IBSegueAction ";
+      }
+
       OptionalTypeKind kind;
       Type objTy;
       std::tie(objTy, kind) = getObjectTypeAndOptionality(AFD, resultTy);
@@ -2735,6 +2740,9 @@ public:
            "# define SWIFT_DEPRECATED_OBJC(Msg) __attribute__((diagnose_if(1, Msg, \"warning\")))\n"
            "#else\n"
            "# define SWIFT_DEPRECATED_OBJC(Msg) SWIFT_DEPRECATED_MSG(Msg)\n"
+           "#endif\n"
+           "#if !defined(IBSegueAction)\n"
+           "# define IBSegueAction\n"
            "#endif\n"
            ;
     static_assert(SWIFT_MAX_IMPORTED_SIMD_ELEMENTS == 4,

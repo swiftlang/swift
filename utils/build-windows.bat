@@ -37,10 +37,15 @@ set source_root=%current_directory%\..\..
 cd %source_root%
 set source_root=%CD%
 
-set build_root=%source_root%\build
+set full_build_root=%source_root%\build
 set install_directory=%build_root%\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr
 
-mkdir %build_root%
+mkdir %full_build_root%
+:: Use the shortest path we can for the build directory, to avoid Windows
+:: path problems as much as we can.
+subst S: /d
+subst S: %full_build_root% %exitOnError%
+set build_root=S:
 
 call :clone_repositories %exitOnError%
 call :download_icu %exitOnError%
