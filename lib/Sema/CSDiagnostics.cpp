@@ -757,44 +757,6 @@ bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
                                            resultIsOptional, SourceRange());
 }
 
-Optional<AnyFunctionType::Param>
-MissingOptionalUnwrapFailure::getOperatorParameterFor(Expr *expr) const {
-  auto *parentExpr = findParentExpr(expr);
-  if (!parentExpr)
-    return None;
-
-  auto getArgIdx = [](TupleExpr *tuple, Expr *argExpr) -> unsigned {
-    for (unsigned i = 0, n = tuple->getNumElements(); i != n; ++i) {
-      if (tuple->getElement(i) == argExpr)
-        return i;
-    }
-    llvm_unreachable("argument is not in enclosing tuple?!");
-  };
-
-  auto *tupleExpr = dyn_cast<TupleExpr>(parentExpr);
-  if (!(tupleExpr && tupleExpr->isImplicit()))
-    return None;
-
-  parentExpr = findParentExpr(tupleExpr);
-  if (!(parentExpr && isa<ApplyExpr>(parentExpr)))
-    return None;
-
-  auto &cs = getConstraintSystem();
-  auto *fnExpr = cast<ApplyExpr>(parentExpr)->getFn();
-  if (auto overload =
-          getOverloadChoiceIfAvailable(cs.getConstraintLocator(fnExpr))) {
-    if (auto *decl = overload->choice.getDecl()) {
-      if (!decl->isOperator())
-        return None;
-
-      auto *fnType = overload->openedType->castTo<FunctionType>();
-      return fnType->getParams()[getArgIdx(tupleExpr, expr)];
-    }
-  }
-
-  return None;
-}
-
 void MissingOptionalUnwrapFailure::offerDefaultValueUnwrapFixIt(
     DeclContext *DC, Expr *expr) const {
   auto *anchor = getAnchor();
@@ -805,10 +767,9 @@ void MissingOptionalUnwrapFailure::offerDefaultValueUnwrapFixIt(
   if (isa<InOutExpr>(anchor))
     return;
 
-  if (auto param = getOperatorParameterFor(anchor)) {
-    if (param->isInOut())
+  if (auto argApplyInfo = getFunctionArgApplyInfo(getLocator()))
+    if (argApplyInfo->getParameterFlags().isInOut())
       return;
-  }
 
   auto diag = emitDiagnostic(expr->getLoc(), diag::unwrap_with_default_value);
 

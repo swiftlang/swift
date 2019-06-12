@@ -593,10 +593,6 @@ private:
   void offerDefaultValueUnwrapFixIt(DeclContext *DC, Expr *expr) const;
   /// Suggest a force optional unwrap via `!`
   void offerForceUnwrapFixIt(Expr *expr) const;
-
-  /// Determine whether given expression is an argument used in the
-  /// operator invocation, and if so return corresponding parameter.
-  Optional<AnyFunctionType::Param> getOperatorParameterFor(Expr *expr) const;
 };
 
 /// Diagnose errors associated with rvalues in positions
