@@ -5473,10 +5473,6 @@ VarDecl *VarDecl::getPropertyWrapperBackingProperty() const {
 }
 
 bool VarDecl::isPropertyWrapperInitializedWithInitialValue() const {
-  auto &ctx = getASTContext();
-  if (!ctx.getLazyResolver())
-    return false;
-
   auto customAttr = getAttachedPropertyWrapper();
   if (!customAttr)
     return false;
@@ -5495,9 +5491,33 @@ bool VarDecl::isPropertyWrapperInitializedWithInitialValue() const {
   if (customAttr->getArg() != nullptr)
     return false;
 
-  // If the property wrapper is default-initializable, it's the wrapper
-  // being initialized.
-  if (PBD->isDefaultInitializable(0))
+  // Default initialization does not use a value.
+  auto wrapperTypeInfo = getAttachedPropertyWrapperTypeInfo();
+  if (wrapperTypeInfo.defaultInit)
+    return false;
+
+  // There is no initializer, so the initialization form depends on
+  // whether the property wrapper type has an init(initialValue:).
+  return wrapperTypeInfo.initialValueInit != nullptr;
+}
+
+bool VarDecl::isPropertyMemberwiseInitializedWithWrappedType() const {
+  auto customAttr = getAttachedPropertyWrapper();
+  if (!customAttr)
+    return false;
+
+  auto *PBD = getParentPatternBinding();
+  if (!PBD)
+    return false;
+
+  // If there was an initializer on the original property, initialize
+  // via the initial value.
+  if (PBD->getPatternList()[0].getEqualLoc().isValid())
+    return true;
+
+  // If there was an initializer on the attribute itself, initialize
+  // via the full wrapper.
+  if (customAttr->getArg() != nullptr)
     return false;
 
   // There is no initializer, so the initialization form depends on
