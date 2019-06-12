@@ -210,9 +210,11 @@ private:
   /// node.
   void widenSourceRangeForIgnoredASTNode(ASTNode);
 
-  // InterpolatedStringLiteralExprs and EditorPlaceHolders respond to
-  // getSourceRange with the starting point. But we might be asked to lookup an
-  // identifer within one of them. So, find the real source range of them here.
+  /// InterpolatedStringLiteralExprs and EditorPlaceHolders respond to
+  /// getSourceRange with the starting point. But we might be asked to lookup an
+  /// identifer within one of them. So, find the real source range of them here.
+  ///
+  /// FIXME: Alter how these are parsed so getSourceRange is enough.
   SourceRange getEffectiveSourceRange(ASTNode) const;
 
 public:

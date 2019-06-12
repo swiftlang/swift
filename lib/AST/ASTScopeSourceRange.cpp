@@ -460,6 +460,8 @@ public:
 };
 } // namespace
 
+// FIXME: Alter how EditorPlaceHolder and InterpolgatedStringLiteralExpr are
+// parsed so getSourceRange is enough.
 SourceRange ASTScopeImpl::getEffectiveSourceRange(const ASTNode n) const {
   if (const auto *d = n.dyn_cast<Decl *>())
     return d->getSourceRange();
