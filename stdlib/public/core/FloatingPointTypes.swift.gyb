@@ -1878,6 +1878,10 @@ extension ${Self} : Strideable {
 
 extension ${Self} : VectorProtocol {
   public typealias VectorSpaceScalar = ${Self}
+
+  public func scaled(by scalar: ${Self}) -> ${Self} {
+    return self * scalar
+  }
 }
 
 extension ${Self} : Differentiable {

@@ -75,8 +75,11 @@ static void maybeMarkAsInlinable(DerivedConformance &derived, ValueDecl *decl) {
 // Synthesize body for the `allKeyPaths` computed property getter.
 static void
 deriveBodyKeyPathIterable_allKeyPaths(AbstractFunctionDecl *funcDecl, void *) {
-  auto *nominal = funcDecl->getDeclContext()->getSelfNominalTypeDecl();
+  auto *parentDC = funcDecl->getDeclContext();
+  auto *nominal = parentDC->getSelfNominalTypeDecl();
   auto &C = nominal->getASTContext();
+  auto allKeyPathsInterfaceType = computeAllKeyPathsType(nominal);
+  auto allKeyPathsType = parentDC->mapTypeIntoContext(allKeyPathsInterfaceType);
 
   auto *nominalTypeExpr = TypeExpr::createForDecl(SourceLoc(), nominal,
                                                   funcDecl, /*Implicit*/ true);
@@ -99,8 +102,12 @@ deriveBodyKeyPathIterable_allKeyPaths(AbstractFunctionDecl *funcDecl, void *) {
     keyPathExprs.push_back(keyPathExpr);
   }
   // Return array of all key path expressions.
-  auto keyPathsArrayExpr =
+  Expr *keyPathsArrayExpr =
       ArrayExpr::create(C, SourceLoc(), keyPathExprs, {}, SourceLoc());
+  // NOTE(TF-575): Adding an explicit coercion expression here is necessary due
+  // to a missing regression.
+  keyPathsArrayExpr = new (C) CoerceExpr(
+      keyPathsArrayExpr, SourceLoc(), TypeLoc::withoutLoc(allKeyPathsType));
   auto *returnStmt = new (C) ReturnStmt(SourceLoc(), keyPathsArrayExpr);
   auto *body = BraceStmt::create(C, SourceLoc(), {returnStmt}, SourceLoc(),
                                  /*Implicit*/ true);

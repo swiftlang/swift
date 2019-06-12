@@ -1,4 +1,4 @@
-//===--- DerivedConformanceAdditiveArithmeticVectorProtocol.cpp -----------===//
+//===--- DerivedConformanceAdditiveArithmetic.cpp -------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file implements explicit derivation of the AdditiveArithmetic and
-// VectorProtocol protocols for struct types.
+// This file implements explicit derivation of the AdditiveArithmetic protocol
+// for struct types.
 //
 //===----------------------------------------------------------------------===//
 
@@ -32,12 +32,10 @@ using namespace swift;
 
 // Represents synthesizable math operators.
 enum MathOperator {
-  // `+(Self, Self)`, `AdditiveArithmetic` requirement
+  // `+(Self, Self)`
   Add,
-  // `-(Self, Self)`, `AdditiveArithmetic` requirement
+  // `-(Self, Self)`
   Subtract,
-  // `*(VectorSpaceScalar, Self)`, `VectorProtocol` requirement
-  ScalarMultiply
 };
 
 static StringRef getMathOperatorName(MathOperator op) {
@@ -46,19 +44,6 @@ static StringRef getMathOperatorName(MathOperator op) {
     return "+";
   case Subtract:
     return "-";
-  case ScalarMultiply:
-    return "*";
-  }
-}
-
-// Return the protocol associated with a math operator.
-static ProtocolDecl *getAssociatedProtocol(MathOperator op, ASTContext &C) {
-  switch (op) {
-  case Add:
-  case Subtract:
-    return C.getProtocol(KnownProtocolKind::AdditiveArithmetic);
-  case ScalarMultiply:
-    return C.getProtocol(KnownProtocolKind::VectorProtocol);
   }
 }
 
@@ -74,59 +59,6 @@ static ValueDecl *getProtocolRequirement(ProtocolDecl *proto, Identifier name) {
                lookup.end());
   assert(lookup.size() == 1 && "Ambiguous protocol requirement");
   return lookup.front();
-}
-
-// Return the `VectorSpaceScalar` associated type for the given `ValueDecl` if
-// it conforms to `VectorProtocol` in the given context. Otherwise, return
-// `nullptr`.
-static Type getVectorProtocolVectorSpaceScalarAssocType(
-    VarDecl *varDecl, DeclContext *DC) {
-  auto &C = varDecl->getASTContext();
-  auto *vectorProto = C.getProtocol(KnownProtocolKind::VectorProtocol);
-  if (!varDecl->hasInterfaceType())
-    C.getLazyResolver()->resolveDeclSignature(varDecl);
-  if (!varDecl->hasInterfaceType())
-    return nullptr;
-  auto varType = DC->mapTypeIntoContext(varDecl->getValueInterfaceType());
-  auto conf = TypeChecker::conformsToProtocol(varType, vectorProto, DC, None);
-  if (!conf)
-    return nullptr;
-  return conf->getTypeWitnessByName(varType, C.Id_VectorSpaceScalar);
-}
-
-// Return the `VectorSpaceScalar` associated type for the given nominal type in
-// the given context, or `nullptr` if `VectorSpaceScalar` cannot be derived.
-static Type deriveVectorProtocol_VectorSpaceScalar(NominalTypeDecl *nominal,
-                                                   DeclContext *DC) {
-  auto &C = DC->getASTContext();
-  // Nominal type must be a struct. (Zero stored properties is okay.)
-  if (!isa<StructDecl>(nominal))
-    return nullptr;
-  // If all stored properties conform to `VectorProtocol` and have the same
-  // `VectorSpaceScalar` associated type, return that `VectorSpaceScalar`
-  // associated type. Otherwise, the `VectorSpaceScalar` type cannot be derived.
-  Type sameScalarType;
-  for (auto member : nominal->getStoredProperties()) {
-    if (!member->hasInterfaceType())
-      C.getLazyResolver()->resolveDeclSignature(member);
-    if (!member->hasInterfaceType())
-      return nullptr;
-    auto scalarType = getVectorProtocolVectorSpaceScalarAssocType(member, DC);
-    // If stored property does not conform to `VectorProtocol`, return nullptr.
-    if (!scalarType)
-      return nullptr;
-    // If same `VectorSpaceScalar` type has not been set, set it for the first
-    // time.
-    if (!sameScalarType) {
-      sameScalarType = scalarType;
-      continue;
-    }
-    // If stored property `VectorSpaceScalar` types do not match, return
-    // nullptr.
-    if (!scalarType->isEqual(sameScalarType))
-      return nullptr;
-  }
-  return sameScalarType;
 }
 
 // Return true if given nominal type has a `let` stored with an initial value.
@@ -162,18 +94,6 @@ bool DerivedConformance::canDeriveAdditiveArithmetic(NominalTypeDecl *nominal,
   });
 }
 
-bool DerivedConformance::canDeriveVectorProtocol(NominalTypeDecl *nominal,
-                                                 DeclContext *DC) {
-  // Must not have any `let` stored properties with an initial value.
-  // - This restriction may be lifted later with support for "true" memberwise
-  //   initializers that initialize all stored properties, including initial
-  //   value information.
-  if (hasLetStoredPropertyWithInitialValue(nominal))
-    return false;
-  // Must be able to derive `VectorSpaceScalar` associated type.
-  return bool(deriveVectorProtocol_VectorSpaceScalar(nominal, DC));
-}
-
 // Synthesize body for the given math operator.
 static void deriveBodyMathOperator(AbstractFunctionDecl *funcDecl,
                                    MathOperator op) {
@@ -192,9 +112,9 @@ static void deriveBodyMathOperator(AbstractFunctionDecl *funcDecl,
   auto *initExpr = new (C) ConstructorRefCallExpr(initDRE, nominalTypeExpr);
 
   // Get operator protocol requirement.
-  auto *proto = getAssociatedProtocol(op, C);
+  auto *addArithProto = C.getProtocol(KnownProtocolKind::AdditiveArithmetic);
   auto operatorId = C.getIdentifier(getMathOperatorName(op));
-  auto *operatorReq = getProtocolRequirement(proto, operatorId);
+  auto *operatorReq = getProtocolRequirement(addArithProto, operatorId);
 
   // Create reference to operator parameters: lhs and rhs.
   auto params = funcDecl->getParameters();
@@ -208,7 +128,7 @@ static void deriveBodyMathOperator(AbstractFunctionDecl *funcDecl,
     auto module = nominal->getModuleContext();
     auto memberType =
         parentDC->mapTypeIntoContext(member->getValueInterfaceType());
-    auto confRef = module->lookupConformance(memberType, proto);
+    auto confRef = module->lookupConformance(memberType, addArithProto);
     assert(confRef && "Member does not conform to math protocol");
 
     // Get member type's math operator, e.g. `Member.+`.
@@ -227,24 +147,11 @@ static void deriveBodyMathOperator(AbstractFunctionDecl *funcDecl,
     auto memberOpExpr =
         new (C) DotSyntaxCallExpr(memberOpDRE, SourceLoc(), memberTypeExpr);
 
-    // Create lhs argument.
-    // For `AdditiveArithmetic` operators: use `lhs.member`.
-    // For `VectorProtocol.*`: use `lhs` directly.
-    Expr *lhsArg = nullptr;
-    switch (op) {
-    case Add:
-    case Subtract:
-      lhsArg = new (C) MemberRefExpr(lhsDRE, SourceLoc(), member, DeclNameLoc(),
-                                     /*Implicit*/ true);
-      break;
-    case ScalarMultiply:
-      lhsArg = lhsDRE;
-      break;
-    }
-    // Create rhs argument: `rhs.member`.
+    // Create expression `lhs.member <op> rhs.member`.
+    Expr *lhsArg = new (C) MemberRefExpr(lhsDRE, SourceLoc(), member,
+                                         DeclNameLoc(), /*Implicit*/ true);
     auto *rhsArg = new (C) MemberRefExpr(rhsDRE, SourceLoc(), member,
                                          DeclNameLoc(), /*Implicit*/ true);
-    // Create expression `lhsArg <op> rhsArg`.
     auto *memberOpArgs =
         TupleExpr::create(C, SourceLoc(), {lhsArg, rhsArg}, {}, {}, SourceLoc(),
                           /*HasTrailingClosure*/ false,
@@ -281,34 +188,13 @@ deriveBodyAdditiveArithmetic_subtract(AbstractFunctionDecl *funcDecl, void *) {
   deriveBodyMathOperator(funcDecl, Subtract);
 }
 
-// Synthesize body for `VectorProtocol.*` operator.
-static void
-deriveBodyVectorProtocol_scalarMultiply(AbstractFunctionDecl *funcDecl, void *) {
-  deriveBodyMathOperator(funcDecl, ScalarMultiply);
-}
-
-// Synthesize the function declaration for the given math operator.
+// Synthesize function declaration for the given math operator.
 static ValueDecl *deriveMathOperator(DerivedConformance &derived,
                                      MathOperator op) {
   auto nominal = derived.Nominal;
   auto parentDC = derived.getConformanceContext();
   auto &C = derived.TC.Context;
   auto selfInterfaceType = parentDC->getDeclaredInterfaceType();
-
-  // Return tuple of the lhs and rhs parameter types for the given math
-  // operator.
-  auto getParameterTypes = [&](MathOperator op) -> std::pair<Type, Type> {
-    switch (op) {
-    case Add:
-    case Subtract:
-      return std::make_pair(selfInterfaceType, selfInterfaceType);
-    case ScalarMultiply:
-      return std::make_pair(
-          deriveVectorProtocol_VectorSpaceScalar(nominal, parentDC)
-              ->mapTypeOutOfContext(),
-          selfInterfaceType);
-    }
-  };
 
   // Create parameter declaration with the given name and type.
   auto createParamDecl = [&](StringRef name, Type type) -> ParamDecl * {
@@ -319,12 +205,11 @@ static ValueDecl *deriveMathOperator(DerivedConformance &derived,
     return param;
   };
 
-  auto paramTypes = getParameterTypes(op);
   ParameterList *params =
-      ParameterList::create(C, {createParamDecl("lhs", paramTypes.first),
-                                createParamDecl("rhs", paramTypes.second)});
+      ParameterList::create(C, {createParamDecl("lhs", selfInterfaceType),
+                                createParamDecl("rhs", selfInterfaceType)});
 
-  Identifier operatorId = C.getIdentifier(getMathOperatorName(op));
+  auto operatorId = C.getIdentifier(getMathOperatorName(op));
   DeclName operatorDeclName(C, operatorId, params);
   auto operatorDecl =
       FuncDecl::create(C, SourceLoc(), StaticSpellingKind::KeywordStatic,
@@ -340,10 +225,6 @@ static ValueDecl *deriveMathOperator(DerivedConformance &derived,
   case Subtract:
     operatorDecl->setBodySynthesizer(
         deriveBodyAdditiveArithmetic_subtract, nullptr);
-    break;
-  case ScalarMultiply:
-    operatorDecl->setBodySynthesizer(
-        deriveBodyVectorProtocol_scalarMultiply, nullptr);
     break;
   }
   if (auto env = parentDC->getGenericEnvironmentOfContext())
@@ -465,26 +346,5 @@ DerivedConformance::deriveAdditiveArithmetic(ValueDecl *requirement) {
     return deriveAdditiveArithmetic_zero(*this);
   TC.diagnose(requirement->getLoc(),
               diag::broken_additive_arithmetic_requirement);
-  return nullptr;
-}
-
-ValueDecl *DerivedConformance::deriveVectorProtocol(ValueDecl *requirement) {
-  // Diagnose conformances in disallowed contexts.
-  if (checkAndDiagnoseDisallowedContext(requirement))
-    return nullptr;
-  if (requirement->getBaseName() == TC.Context.getIdentifier("*"))
-    return deriveMathOperator(*this, ScalarMultiply);
-  TC.diagnose(requirement->getLoc(), diag::broken_vector_protocol_requirement);
-  return nullptr;
-}
-
-Type DerivedConformance::deriveVectorProtocol(AssociatedTypeDecl *requirement) {
-  // Diagnose conformances in disallowed contexts.
-  if (checkAndDiagnoseDisallowedContext(requirement))
-    return nullptr;
-  if (requirement->getBaseName() == TC.Context.Id_VectorSpaceScalar)
-    return deriveVectorProtocol_VectorSpaceScalar(
-        Nominal, getConformanceContext());
-  TC.diagnose(requirement->getLoc(), diag::broken_vector_protocol_requirement);
   return nullptr;
 }
