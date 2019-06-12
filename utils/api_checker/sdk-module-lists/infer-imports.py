@@ -3,7 +3,11 @@
 import os
 import sys
 
-blacklist = ["Kernel", "Ruby", "Tk"]
+blacklist = [
+    "Kernel", "Ruby", "Tk",
+    "DriverKit", "HIDDriverKit", "SkywalkDriverKit",  # has C++ code
+    "NetworkingDriverKit", "USBSerialDriverKit",  # has C++ code
+]
 
 
 def get_immediate_subdirectories(a_dir):
@@ -16,11 +20,19 @@ def get_frameworks(sdk_path):
     names = []
     for frame in os.listdir(frameworks_path):
         if frame.endswith(".framework"):
+            name = frame[:-len(".framework")]
             header_dir_path = frameworks_path + '/' + frame + '/Headers'
             module_dir_path = frameworks_path + '/' + frame + '/Modules'
+            swiftmodule_path = module_dir_path + '/' + name + '.swiftmodule'
             old_modulemap_path = frameworks_path + '/' + frame + '/module.map'
             old_modulemap_private_path = frameworks_path + '/' + frame + \
                 '/module_private.map'
+
+            if os.path.exists(swiftmodule_path):
+                if name not in blacklist:
+                    names.append(name)
+                continue
+
             if not os.path.exists(header_dir_path):
                 if os.path.exists(module_dir_path):
                     print >>sys.stderr, header_dir_path, \
@@ -36,7 +48,6 @@ def get_frameworks(sdk_path):
             if should_exclude_framework(frameworks_path + '/' + frame):
                 continue
 
-            name = frame[:-len(".framework")]
             if name in blacklist:
                 continue
             names.append(name)
