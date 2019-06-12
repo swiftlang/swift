@@ -705,7 +705,8 @@ function(_add_swift_library_single target name)
         OBJECT_LIBRARY
         SHARED
         STATIC
-        TARGET_LIBRARY)
+        TARGET_LIBRARY
+        INSTALL_WITH_SHARED)
   set(SWIFTLIB_SINGLE_single_parameter_options
         ARCHITECTURE
         DEPLOYMENT_VERSION_IOS
@@ -1083,18 +1084,24 @@ function(_add_swift_library_single target name)
         BINARY_DIR ${SWIFT_RUNTIME_OUTPUT_INTDIR}
         LIBRARY_DIR ${SWIFT_LIBRARY_OUTPUT_INTDIR})
 
+    if(SWIFTLIB_INSTALL_WITH_SHARED)
+      set(swift_lib_dir ${SWIFTLIB_DIR})
+    else()
+      set(swift_lib_dir ${SWIFTSTATICLIB_DIR})
+    endif()
+
     foreach(config ${CMAKE_CONFIGURATION_TYPES})
       string(TOUPPER ${config} config_upper)
       escape_path_for_xcode(
-          "${config}" "${SWIFTSTATICLIB_DIR}" config_lib_dir)
+          "${config}" "${swift_lib_dir}" config_lib_dir)
       set_target_properties(${target_static} PROPERTIES
         LIBRARY_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${SWIFTLIB_SINGLE_SUBDIR}
         ARCHIVE_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${SWIFTLIB_SINGLE_SUBDIR})
     endforeach()
 
     set_target_properties(${target_static} PROPERTIES
-      LIBRARY_OUTPUT_DIRECTORY ${SWIFTSTATICLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}
-      ARCHIVE_OUTPUT_DIRECTORY ${SWIFTSTATICLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR})
+      LIBRARY_OUTPUT_DIRECTORY ${swift_lib_dir}/${SWIFTLIB_SINGLE_SUBDIR}
+      ARCHIVE_OUTPUT_DIRECTORY ${swift_lib_dir}/${SWIFTLIB_SINGLE_SUBDIR})
   endif()
 
   set_target_properties(${target}
@@ -1353,8 +1360,14 @@ function(_add_swift_library_single target name)
     set_property(TARGET "${target_static}" APPEND_STRING PROPERTY
         COMPILE_FLAGS " ${c_compile_flags}")
     # FIXME: The fallback paths here are going to be dynamic libraries.
+
+    if(SWIFTLIB_INSTALL_WITH_SHARED)
+      set(search_base_dir ${SWIFTLIB_DIR})
+    else()
+      set(search_base_dir ${SWIFTSTATICLIB_DIR})
+    endif()
     set(library_search_directories
-        "${SWIFTSTATICLIB_DIR}/${SWIFTLIB_SINGLE_SUBDIR}"
+        "${search_base_dir}/${SWIFTLIB_SINGLE_SUBDIR}"
         "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFTLIB_SINGLE_SUBDIR}"
         "${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/../lib/swift/${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}")
     swift_target_link_search_directories("${target_static}" "${library_search_directories}")
@@ -1503,6 +1516,7 @@ endfunction()
 #     [IS_STDLIB]
 #     [IS_STDLIB_CORE]
 #     [TARGET_LIBRARY]
+#     [INSTALL_WITH_SHARED]
 #     INSTALL_IN_COMPONENT comp
 #     DEPLOYMENT_VERSION_OSX version
 #     DEPLOYMENT_VERSION_IOS version
@@ -1609,6 +1623,9 @@ endfunction()
 # DEPLOYMENT_VERSION_WATCHOS
 #   The minimum deployment version to build for if this is an WATCHOS library.
 #
+# INSTALL_WITH_SHARED
+#   Install a static library target alongside shared libraries
+#
 # source1 ...
 #   Sources to add into this library.
 function(add_swift_target_library name)
@@ -1623,7 +1640,8 @@ function(add_swift_target_library name)
         OBJECT_LIBRARY
         SHARED
         STATIC
-        TARGET_LIBRARY)
+        TARGET_LIBRARY
+        INSTALL_WITH_SHARED)
   set(SWIFTLIB_single_parameter_options
         DEPLOYMENT_VERSION_IOS
         DEPLOYMENT_VERSION_OSX
@@ -1913,6 +1931,7 @@ function(add_swift_target_library name)
         ${SWIFTLIB_SHARED_keyword}
         ${SWIFTLIB_STATIC_keyword}
         ${SWIFTLIB_OBJECT_LIBRARY_keyword}
+        ${SWIFTLIB_INSTALL_WITH_SHARED_keyword}
         ${SWIFTLIB_SOURCES}
         MODULE_TARGET ${MODULE_VARIANT_NAME}
         SDK ${sdk}
@@ -2039,7 +2058,7 @@ function(add_swift_target_library name)
       set(resource_dir_sdk_subdir "${SWIFT_SDK_${sdk}_LIB_SUBDIR}")
       precondition(resource_dir_sdk_subdir)
 
-      if(SWIFTLIB_SHARED)
+      if(SWIFTLIB_SHARED OR SWIFTLIB_INSTALL_WITH_SHARED)
         set(resource_dir "swift")
         set(file_permissions
             OWNER_READ OWNER_WRITE OWNER_EXECUTE
@@ -2124,10 +2143,18 @@ function(add_swift_target_library name)
           list(APPEND THIN_INPUT_TARGETS_STATIC "${TARGET}-static")
         endforeach()
 
+        if(SWIFTLIB_INSTALL_WITH_SHARED)
+          set(install_subdir "swift")
+          set(universal_subdir ${SWIFTLIB_DIR})
+        else()
+          set(install_subdir "swift_static")
+          set(universal_subdir ${SWIFTSTATICLIB_DIR})
+        endif()
+
         set(lipo_target_static
             "${name}-${SWIFT_SDK_${sdk}_LIB_SUBDIR}-static")
         set(UNIVERSAL_LIBRARY_NAME
-            "${SWIFTSTATICLIB_DIR}/${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${CMAKE_STATIC_LIBRARY_PREFIX}${name}${CMAKE_STATIC_LIBRARY_SUFFIX}")
+            "${universal_subdir}/${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${CMAKE_STATIC_LIBRARY_PREFIX}${name}${CMAKE_STATIC_LIBRARY_SUFFIX}")
         _add_swift_lipo_target(SDK
                                  ${sdk}
                                TARGET
@@ -2137,7 +2164,7 @@ function(add_swift_target_library name)
                                ${THIN_INPUT_TARGETS_STATIC})
         swift_install_in_component("${SWIFTLIB_INSTALL_IN_COMPONENT}"
             FILES "${UNIVERSAL_LIBRARY_NAME}"
-            DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift_static/${resource_dir_sdk_subdir}"
+            DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${install_subdir}/${resource_dir_sdk_subdir}"
             PERMISSIONS
               OWNER_READ OWNER_WRITE
               GROUP_READ

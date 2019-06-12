@@ -33,6 +33,7 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/Program.h"
+#include "llvm/Support/VersionTuple.h"
 
 using namespace swift;
 using namespace swift::driver;
@@ -230,7 +231,8 @@ static bool wantsObjCRuntime(const llvm::Triple &triple) {
 
 ToolChain::InvocationInfo
 toolchains::Darwin::constructInvocation(const LinkJobAction &job,
-                                        const JobContext &context) const {
+                                        const JobContext &context) const
+{
   assert(context.Output.getPrimaryOutputType() == file_types::TY_Image &&
          "Invalid linker output type.");
 
@@ -399,6 +401,39 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
   SmallString<128> RuntimeLibPath;
   getRuntimeLibraryPath(RuntimeLibPath, context.Args, /*Shared=*/true);
 
+  // Link compatibility libraries, if we're deploying back to OSes that
+  // have an older Swift runtime.
+  Optional<llvm::VersionTuple> runtimeCompatibilityVersion;
+  
+  if (context.Args.hasArg(options::OPT_runtime_compatibility_version)) {
+    auto value = context.Args.getLastArgValue(
+                                    options::OPT_runtime_compatibility_version);
+    if (value.equals("5.0")) {
+      runtimeCompatibilityVersion = llvm::VersionTuple(5, 0);
+    } else if (value.equals("none")) {
+      runtimeCompatibilityVersion = None;
+    } else {
+      // TODO: diagnose unknown runtime compatibility version?
+    }
+  } else if (job.getKind() == LinkKind::Executable) {
+    runtimeCompatibilityVersion
+                         = getSwiftRuntimeCompatibilityVersionForTarget(Triple);
+  }
+  
+  if (runtimeCompatibilityVersion) {
+    if (*runtimeCompatibilityVersion <= llvm::VersionTuple(5, 0)) {
+      // Swift 5.0 compatibility library
+      SmallString<128> BackDeployLib;
+      BackDeployLib.append(RuntimeLibPath);
+      llvm::sys::path::append(BackDeployLib, "libswiftCompatibility50.a");
+      
+      if (llvm::sys::fs::exists(BackDeployLib)) {
+        Arguments.push_back("-force_load");
+        Arguments.push_back(context.Args.MakeArgString(BackDeployLib));
+      }
+    }
+  }
+    
   // Link the standard library.
   Arguments.push_back("-L");
   if (context.Args.hasFlag(options::OPT_static_stdlib,
