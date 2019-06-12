@@ -232,7 +232,7 @@ Optional<bool> ASTScopeImpl::lookupInParent(
 
   // If this scope has an associated Decl, we have already searched its generics
   // and selfType, so no need to look again.
-  NullablePtr<const Decl> haveAlreadyLookedHereForParent =
+  NullablePtr<const Decl> scopeWhoseTypeWasAlreadySearchedForParent =
       getDecl() ? getDecl().getPtrOrNull() : scopeWhoseTypeWasAlreadySearched;
 
   // If there is no limit and this scope induces one, pass that on.
@@ -240,8 +240,8 @@ Optional<bool> ASTScopeImpl::lookupInParent(
       limit ? limit : getLookupLimit();
 
   return lookupParent->lookup(computeSelfDCForParent(selfDC), limitForParent,
-                              haveAlreadyLookedHereForParent, isCascadingUse,
-                              consumer);
+                              scopeWhoseTypeWasAlreadySearchedForParent,
+                              isCascadingUse, consumer);
 }
 
 #pragma mark lookInMyGenericParameters

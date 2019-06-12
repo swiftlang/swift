@@ -327,13 +327,13 @@ protected:
   /// the self type twice. That's why we pass scopeWhoseTypeWasAlreadySearched.
   ///
   /// Look in this scope.
-  /// \p selfDC is the context for names dependent on dynamic self,
-  /// \p limit is a scope into which lookup should not go. See \ref
-  /// getLookupLimit. \p scopeWhoseTypeWasAlreadySearched is a Decl whose
-  /// generics and self type has already been searched, \p isCascadingUse
-  /// indicates whether the lookup results will need a cascading dependency or
-  /// not \p consumer is the object to which found decls are reported. Returns
-  /// the isCascadingUse information.
+  /// \param selfDC The context for names dependent on dynamic self,
+  /// \param limit A scope into which lookup should not go. See \c getLookupLimit.
+  /// \param scopeWhoseTypeWasAlreadySearched A \c Decl whose generics and self type have
+  /// already been searched.
+  /// \param isCascadingUse Whether the lookup results will need a cascading dependency or not.
+  /// \param consumer is the object to which found decls are reported.
+  /// \returns \c isCascadingUse
   Optional<bool>
   lookup(NullablePtr<DeclContext> selfDC, NullablePtr<const ASTScopeImpl> limit,
          NullablePtr<const Decl> scopeWhoseTypeWasAlreadySearched,
