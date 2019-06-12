@@ -28,8 +28,8 @@ struct S {
   let p: Float
 }
 
-extension S : Differentiable, VectorNumeric {
-  struct TangentVector: Differentiable, VectorNumeric {
+extension S : Differentiable, VectorProtocol {
+  struct TangentVector: Differentiable, VectorProtocol {
     var dp: Float
   }
   typealias AllDifferentiableVariables = S

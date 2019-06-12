@@ -1,4 +1,4 @@
-//===--- DerivedConformanceAdditiveArithmeticVectorNumeric.cpp ------------===//
+//===--- DerivedConformanceAdditiveArithmeticVectorProtocol.cpp -----------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 // This file implements explicit derivation of the AdditiveArithmetic and
-// VectorNumeric protocols for struct types.
+// VectorProtocol protocols for struct types.
 //
 //===----------------------------------------------------------------------===//
 
@@ -36,7 +36,7 @@ enum MathOperator {
   Add,
   // `-(Self, Self)`, `AdditiveArithmetic` requirement
   Subtract,
-  // `*(Scalar, Self)`, `VectorNumeric` requirement
+  // `*(Scalar, Self)`, `VectorProtocol` requirement
   ScalarMultiply
 };
 
@@ -58,7 +58,7 @@ static ProtocolDecl *getAssociatedProtocol(MathOperator op, ASTContext &C) {
   case Subtract:
     return C.getProtocol(KnownProtocolKind::AdditiveArithmetic);
   case ScalarMultiply:
-    return C.getProtocol(KnownProtocolKind::VectorNumeric);
+    return C.getProtocol(KnownProtocolKind::VectorProtocol);
   }
 }
 
@@ -77,10 +77,10 @@ static ValueDecl *getProtocolRequirement(ProtocolDecl *proto, Identifier name) {
 }
 
 // Return the `Scalar` associated type for the given `ValueDecl` if it conforms
-// to `VectorNumeric` in the given context. Otherwise, return `nullptr`.
-static Type getVectorNumericScalarAssocType(VarDecl *varDecl, DeclContext *DC) {
+// to `VectorProtocol` in the given context. Otherwise, return `nullptr`.
+static Type getVectorProtocolScalarAssocType(VarDecl *varDecl, DeclContext *DC) {
   auto &C = varDecl->getASTContext();
-  auto *vectorNumericProto = C.getProtocol(KnownProtocolKind::VectorNumeric);
+  auto *vectorNumericProto = C.getProtocol(KnownProtocolKind::VectorProtocol);
   if (!varDecl->hasInterfaceType())
     C.getLazyResolver()->resolveDeclSignature(varDecl);
   if (!varDecl->hasInterfaceType())
@@ -97,13 +97,13 @@ static Type getVectorNumericScalarAssocType(VarDecl *varDecl, DeclContext *DC) {
 
 // Return the `Scalar` associated type for the given nominal type in the given
 // context, or `nullptr` if `Scalar` cannot be derived.
-static Type deriveVectorNumeric_Scalar(NominalTypeDecl *nominal,
-                                       DeclContext *DC) {
+static Type deriveVectorProtocol_Scalar(NominalTypeDecl *nominal,
+                                        DeclContext *DC) {
   auto &C = DC->getASTContext();
   // Nominal type must be a struct. (Zero stored properties is okay.)
   if (!isa<StructDecl>(nominal))
     return nullptr;
-  // If all stored properties conform to `VectorNumeric` and have the same
+  // If all stored properties conform to `VectorProtocol` and have the same
   // `Scalar` associated type, return that `Scalar` associated type.
   // Otherwise, the `Scalar` type cannot be derived.
   Type sameScalarType;
@@ -112,8 +112,8 @@ static Type deriveVectorNumeric_Scalar(NominalTypeDecl *nominal,
       C.getLazyResolver()->resolveDeclSignature(member);
     if (!member->hasInterfaceType())
       return nullptr;
-    auto scalarType = getVectorNumericScalarAssocType(member, DC);
-    // If stored property does not conform to `VectorNumeric`, return nullptr.
+    auto scalarType = getVectorProtocolScalarAssocType(member, DC);
+    // If stored property does not conform to `VectorProtocol`, return nullptr.
     if (!scalarType)
       return nullptr;
     // If same `Scalar` type has not been set, set it for the first time.
@@ -161,8 +161,8 @@ bool DerivedConformance::canDeriveAdditiveArithmetic(NominalTypeDecl *nominal,
   });
 }
 
-bool DerivedConformance::canDeriveVectorNumeric(NominalTypeDecl *nominal,
-                                                DeclContext *DC) {
+bool DerivedConformance::canDeriveVectorProtocol(NominalTypeDecl *nominal,
+                                                 DeclContext *DC) {
   // Must not have any `let` stored properties with an initial value.
   // - This restriction may be lifted later with support for "true" memberwise
   //   initializers that initialize all stored properties, including initial
@@ -170,7 +170,7 @@ bool DerivedConformance::canDeriveVectorNumeric(NominalTypeDecl *nominal,
   if (hasLetStoredPropertyWithInitialValue(nominal))
     return false;
   // Must be able to derive `Scalar` associated type.
-  return bool(deriveVectorNumeric_Scalar(nominal, DC));
+  return bool(deriveVectorProtocol_Scalar(nominal, DC));
 }
 
 // Synthesize body for the given math operator.
@@ -228,7 +228,7 @@ static void deriveBodyMathOperator(AbstractFunctionDecl *funcDecl,
 
     // Create lhs argument.
     // For `AdditiveArithmetic` operators: use `lhs.member`.
-    // For `VectorNumeric.*`: use `lhs` directly.
+    // For `VectorProtocol.*`: use `lhs` directly.
     Expr *lhsArg = nullptr;
     switch (op) {
     case Add:
@@ -280,9 +280,9 @@ deriveBodyAdditiveArithmetic_subtract(AbstractFunctionDecl *funcDecl, void *) {
   deriveBodyMathOperator(funcDecl, Subtract);
 }
 
-// Synthesize body for `VectorNumeric.*` operator.
+// Synthesize body for `VectorProtocol.*` operator.
 static void
-deriveBodyVectorNumeric_scalarMultiply(AbstractFunctionDecl *funcDecl, void *) {
+deriveBodyVectorProtocol_scalarMultiply(AbstractFunctionDecl *funcDecl, void *) {
   deriveBodyMathOperator(funcDecl, ScalarMultiply);
 }
 
@@ -303,7 +303,7 @@ static ValueDecl *deriveMathOperator(DerivedConformance &derived,
       return std::make_pair(selfInterfaceType, selfInterfaceType);
     case ScalarMultiply:
       return std::make_pair(
-          deriveVectorNumeric_Scalar(nominal, parentDC)->mapTypeOutOfContext(),
+          deriveVectorProtocol_Scalar(nominal, parentDC)->mapTypeOutOfContext(),
           selfInterfaceType);
     }
   };
@@ -341,7 +341,7 @@ static ValueDecl *deriveMathOperator(DerivedConformance &derived,
     break;
   case ScalarMultiply:
     operatorDecl->setBodySynthesizer(
-        deriveBodyVectorNumeric_scalarMultiply, nullptr);
+        deriveBodyVectorProtocol_scalarMultiply, nullptr);
     break;
   }
   if (auto env = parentDC->getGenericEnvironmentOfContext())
@@ -466,22 +466,22 @@ DerivedConformance::deriveAdditiveArithmetic(ValueDecl *requirement) {
   return nullptr;
 }
 
-ValueDecl *DerivedConformance::deriveVectorNumeric(ValueDecl *requirement) {
+ValueDecl *DerivedConformance::deriveVectorProtocol(ValueDecl *requirement) {
   // Diagnose conformances in disallowed contexts.
   if (checkAndDiagnoseDisallowedContext(requirement))
     return nullptr;
   if (requirement->getBaseName() == TC.Context.getIdentifier("*"))
     return deriveMathOperator(*this, ScalarMultiply);
-  TC.diagnose(requirement->getLoc(), diag::broken_vector_numeric_requirement);
+  TC.diagnose(requirement->getLoc(), diag::broken_vector_protocol_requirement);
   return nullptr;
 }
 
-Type DerivedConformance::deriveVectorNumeric(AssociatedTypeDecl *requirement) {
+Type DerivedConformance::deriveVectorProtocol(AssociatedTypeDecl *requirement) {
   // Diagnose conformances in disallowed contexts.
   if (checkAndDiagnoseDisallowedContext(requirement))
     return nullptr;
   if (requirement->getBaseName() == TC.Context.Id_Scalar)
-    return deriveVectorNumeric_Scalar(Nominal, getConformanceContext());
-  TC.diagnose(requirement->getLoc(), diag::broken_vector_numeric_requirement);
+    return deriveVectorProtocol_Scalar(Nominal, getConformanceContext());
+  TC.diagnose(requirement->getLoc(), diag::broken_vector_protocol_requirement);
   return nullptr;
 }

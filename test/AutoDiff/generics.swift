@@ -18,7 +18,7 @@ _ = gradient(at: Float(1), in: { x in identity(x) })
 // CHECK-SIL-NEXT: end_access [[ORIG_COTAN_BEGIN]]
 // CHECK-SIL: }
 
-struct Tensor<Scalar : FloatingPoint & Differentiable> : VectorNumeric, Differentiable {
+struct Tensor<Scalar : FloatingPoint & Differentiable> : VectorProtocol, Differentiable {
   // NOTE: `value` must have type with known size (e.g. `Float`, not `Scalar`)
   // until differentiation has indirect passing support.
   var value: Float

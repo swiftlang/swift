@@ -5343,8 +5343,8 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
     return derived.deriveAdditiveArithmetic(Requirement);
 
   // SWIFT_ENABLE_TENSORFLOW
-  case KnownProtocolKind::VectorNumeric:
-    return derived.deriveVectorNumeric(Requirement);
+  case KnownProtocolKind::VectorProtocol:
+    return derived.deriveVectorProtocol(Requirement);
 
   // SWIFT_ENABLE_TENSORFLOW
   case KnownProtocolKind::Differentiable:
@@ -5376,8 +5376,8 @@ Type TypeChecker::deriveTypeWitness(DeclContext *DC,
   // SWIFT_ENABLE_TENSORFLOW
   case KnownProtocolKind::KeyPathIterable:
     return derived.deriveKeyPathIterable(AssocType);
-  case KnownProtocolKind::VectorNumeric:
-    return derived.deriveVectorNumeric(AssocType);
+  case KnownProtocolKind::VectorProtocol:
+    return derived.deriveVectorProtocol(AssocType);
   case KnownProtocolKind::Differentiable:
     return derived.deriveDifferentiable(AssocType);
   default:

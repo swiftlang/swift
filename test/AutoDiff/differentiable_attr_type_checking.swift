@@ -265,7 +265,7 @@ extension JVPStruct {
   }
 }
 
-extension JVPStruct : VectorNumeric {
+extension JVPStruct : VectorProtocol {
   static var zero: JVPStruct { fatalError("unimplemented") }
   static func + (lhs: JVPStruct, rhs: JVPStruct) -> JVPStruct {
     fatalError("unimplemented")
@@ -413,7 +413,7 @@ extension VJPStruct {
   }
 }
 
-extension VJPStruct : VectorNumeric {
+extension VJPStruct : VectorProtocol {
   static var zero: VJPStruct { fatalError("unimplemented") }
   static func + (lhs: VJPStruct, rhs: VJPStruct) -> VJPStruct {
     fatalError("unimplemented")

@@ -45,7 +45,7 @@ extension Parameter {
   }
 }
 
-extension Parameter : Differentiable, VectorNumeric {
+extension Parameter : Differentiable, VectorProtocol {
   typealias TangentVector = Parameter
   typealias Scalar = Float
   typealias Shape = ()
@@ -177,7 +177,7 @@ struct CustomParameter : Equatable {
   }
 }
 
-extension CustomParameter : Differentiable, VectorNumeric {
+extension CustomParameter : Differentiable, VectorProtocol {
   typealias TangentVector = CustomParameter
   typealias Scalar = Float
   typealias Shape = ()

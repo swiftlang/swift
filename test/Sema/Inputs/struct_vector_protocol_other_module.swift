@@ -6,7 +6,7 @@ struct OtherFileNonconforming : AdditiveArithmetic {
 }
 
 // expected-note @+1 {{type declared here}}
-struct GenericOtherFileNonconforming<T : VectorNumeric> : AdditiveArithmetic {
+struct GenericOtherFileNonconforming<T : VectorProtocol> : AdditiveArithmetic {
   var x: T
   var y: T
 }

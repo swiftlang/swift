@@ -6,7 +6,7 @@ public class NonTrivialStuff : Equatable {
 }
 
 @_fixed_layout
-public struct Vector : AdditiveArithmetic, VectorNumeric, Differentiable, Equatable {
+public struct Vector : AdditiveArithmetic, VectorProtocol, Differentiable, Equatable {
   public var x: Float
   public var y: Float
   public var nonTrivialStuff = NonTrivialStuff()
