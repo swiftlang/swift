@@ -1877,7 +1877,7 @@ extension ${Self} : Strideable {
 //===----------------------------------------------------------------------===//
 
 extension ${Self} : VectorProtocol {
-  public typealias Scalar = ${Self}
+  public typealias VectorSpaceScalar = ${Self}
 }
 
 extension ${Self} : Differentiable {

@@ -369,8 +369,8 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
       return getRequirement(KnownProtocolKind::Differentiable);
 
     // SWIFT_ENABLE_TENSORFLOW
-    // VectorProtocol.Scalar
-    if (name.isSimpleName(ctx.Id_Scalar))
+    // VectorProtocol.VectorSpaceScalar
+    if (name.isSimpleName(ctx.Id_VectorSpaceScalar))
       return getRequirement(KnownProtocolKind::VectorProtocol);
 
     return nullptr;

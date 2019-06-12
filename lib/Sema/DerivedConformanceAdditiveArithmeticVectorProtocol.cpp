@@ -36,7 +36,7 @@ enum MathOperator {
   Add,
   // `-(Self, Self)`, `AdditiveArithmetic` requirement
   Subtract,
-  // `*(Scalar, Self)`, `VectorProtocol` requirement
+  // `*(VectorSpaceScalar, Self)`, `VectorProtocol` requirement
   ScalarMultiply
 };
 
@@ -76,52 +76,54 @@ static ValueDecl *getProtocolRequirement(ProtocolDecl *proto, Identifier name) {
   return lookup.front();
 }
 
-// Return the `Scalar` associated type for the given `ValueDecl` if it conforms
-// to `VectorProtocol` in the given context. Otherwise, return `nullptr`.
-static Type getVectorProtocolScalarAssocType(VarDecl *varDecl, DeclContext *DC) {
+// Return the `VectorSpaceScalar` associated type for the given `ValueDecl` if
+// it conforms to `VectorProtocol` in the given context. Otherwise, return
+// `nullptr`.
+static Type getVectorProtocolVectorSpaceScalarAssocType(
+    VarDecl *varDecl, DeclContext *DC) {
   auto &C = varDecl->getASTContext();
-  auto *vectorNumericProto = C.getProtocol(KnownProtocolKind::VectorProtocol);
+  auto *vectorProto = C.getProtocol(KnownProtocolKind::VectorProtocol);
   if (!varDecl->hasInterfaceType())
     C.getLazyResolver()->resolveDeclSignature(varDecl);
   if (!varDecl->hasInterfaceType())
     return nullptr;
   auto varType = DC->mapTypeIntoContext(varDecl->getValueInterfaceType());
-  auto conf = TypeChecker::conformsToProtocol(varType, vectorNumericProto, DC,
-                                              None);
+  auto conf = TypeChecker::conformsToProtocol(varType, vectorProto, DC, None);
   if (!conf)
     return nullptr;
-  Type scalarType = conf->getTypeWitnessByName(varType, C.Id_Scalar);
-  assert(scalarType && "'Scalar' associated type not found");
-  return scalarType;
+  conf->dump();
+  return conf->getTypeWitnessByName(varType, C.Id_VectorSpaceScalar);
 }
 
-// Return the `Scalar` associated type for the given nominal type in the given
-// context, or `nullptr` if `Scalar` cannot be derived.
-static Type deriveVectorProtocol_Scalar(NominalTypeDecl *nominal,
-                                        DeclContext *DC) {
+// Return the `VectorSpaceScalar` associated type for the given nominal type in
+// the given context, or `nullptr` if `VectorSpaceScalar` cannot be derived.
+static Type deriveVectorProtocol_VectorSpaceScalar(NominalTypeDecl *nominal,
+                                                   DeclContext *DC) {
   auto &C = DC->getASTContext();
   // Nominal type must be a struct. (Zero stored properties is okay.)
   if (!isa<StructDecl>(nominal))
     return nullptr;
   // If all stored properties conform to `VectorProtocol` and have the same
-  // `Scalar` associated type, return that `Scalar` associated type.
-  // Otherwise, the `Scalar` type cannot be derived.
+  // `VectorSpaceScalar` associated type, return that `VectorSpaceScalar`
+  // associated type. Otherwise, the `VectorSpaceScalar` type cannot be derived.
   Type sameScalarType;
   for (auto member : nominal->getStoredProperties()) {
     if (!member->hasInterfaceType())
       C.getLazyResolver()->resolveDeclSignature(member);
     if (!member->hasInterfaceType())
       return nullptr;
-    auto scalarType = getVectorProtocolScalarAssocType(member, DC);
+    auto scalarType = getVectorProtocolVectorSpaceScalarAssocType(member, DC);
     // If stored property does not conform to `VectorProtocol`, return nullptr.
     if (!scalarType)
       return nullptr;
-    // If same `Scalar` type has not been set, set it for the first time.
+    // If same `VectorSpaceScalar` type has not been set, set it for the first
+    // time.
     if (!sameScalarType) {
       sameScalarType = scalarType;
       continue;
     }
-    // If stored property `Scalar` types do not match, return nullptr.
+    // If stored property `VectorSpaceScalar` types do not match, return
+    // nullptr.
     if (!scalarType->isEqual(sameScalarType))
       return nullptr;
   }
@@ -169,8 +171,8 @@ bool DerivedConformance::canDeriveVectorProtocol(NominalTypeDecl *nominal,
   //   value information.
   if (hasLetStoredPropertyWithInitialValue(nominal))
     return false;
-  // Must be able to derive `Scalar` associated type.
-  return bool(deriveVectorProtocol_Scalar(nominal, DC));
+  // Must be able to derive `VectorSpaceScalar` associated type.
+  return bool(deriveVectorProtocol_VectorSpaceScalar(nominal, DC));
 }
 
 // Synthesize body for the given math operator.
@@ -303,7 +305,8 @@ static ValueDecl *deriveMathOperator(DerivedConformance &derived,
       return std::make_pair(selfInterfaceType, selfInterfaceType);
     case ScalarMultiply:
       return std::make_pair(
-          deriveVectorProtocol_Scalar(nominal, parentDC)->mapTypeOutOfContext(),
+          deriveVectorProtocol_VectorSpaceScalar(nominal, parentDC)
+              ->mapTypeOutOfContext(),
           selfInterfaceType);
     }
   };
@@ -480,8 +483,9 @@ Type DerivedConformance::deriveVectorProtocol(AssociatedTypeDecl *requirement) {
   // Diagnose conformances in disallowed contexts.
   if (checkAndDiagnoseDisallowedContext(requirement))
     return nullptr;
-  if (requirement->getBaseName() == TC.Context.Id_Scalar)
-    return deriveVectorProtocol_Scalar(Nominal, getConformanceContext());
+  if (requirement->getBaseName() == TC.Context.Id_VectorSpaceScalar)
+    return deriveVectorProtocol_VectorSpaceScalar(
+        Nominal, getConformanceContext());
   TC.diagnose(requirement->getLoc(), diag::broken_vector_protocol_requirement);
   return nullptr;
 }

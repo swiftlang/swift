@@ -625,8 +625,8 @@ getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived,
   auto diffableType = TypeLoc::withoutLoc(diffableProto->getDeclaredType());
   auto *addArithProto = C.getProtocol(KnownProtocolKind::AdditiveArithmetic);
   auto addArithType = TypeLoc::withoutLoc(addArithProto->getDeclaredType());
-  auto *vecNumProto = C.getProtocol(KnownProtocolKind::VectorProtocol);
-  auto vecNumType = TypeLoc::withoutLoc(vecNumProto->getDeclaredType());
+  auto *vectorProto = C.getProtocol(KnownProtocolKind::VectorProtocol);
+  auto vectorType = TypeLoc::withoutLoc(vectorProto->getDeclaredType());
   auto *kpIterableProto = C.getProtocol(KnownProtocolKind::KeyPathIterable);
   auto kpIterableType = TypeLoc::withoutLoc(kpIterableProto->getDeclaredType());
 
@@ -651,17 +651,18 @@ getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived,
         });
 
   // Associated struct can derive `VectorProtocol` if the associated types of
-  // all members conform to `VectorProtocol` and share the same scalar type.
+  // all members conform to `VectorProtocol` and share the same
+  // `VectorSpaceScalar` type.
   Type sameScalarType;
   bool canDeriveVectorProtocol =
       canDeriveAdditiveArithmetic && !diffProperties.empty() &&
       llvm::all_of(diffProperties, [&](VarDecl *vd) {
         auto conf = TC.conformsToProtocol(getAssociatedType(vd, parentDC, id),
-                                          vecNumProto, nominal,
-                                          None);
+                                          vectorProto, nominal, None);
         if (!conf)
           return false;
-        Type scalarType = conf->getTypeWitnessByName(vd->getType(), C.Id_Scalar);
+        auto scalarType =
+            conf->getTypeWitnessByName(vd->getType(), C.Id_VectorSpaceScalar);
         if (!sameScalarType) {
           sameScalarType = scalarType;
           return true;
@@ -685,7 +686,7 @@ getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived,
   // type, make the associated struct conform to `VectorProtocol` instead of
   // just `AdditiveArithmetic`.
   if (canDeriveVectorProtocol)
-    inherited.push_back(vecNumType);
+    inherited.push_back(vectorType);
 
   auto *structDecl = new (C) StructDecl(SourceLoc(), id, SourceLoc(),
                                         /*Inherited*/ C.AllocateCopy(inherited),
