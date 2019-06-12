@@ -129,6 +129,79 @@ func test_passing_noescape_function_to_dependent_member() {
 
   func test(_ s: S<Q>, fn: () -> Int) {
     s.foo(fn)
-    // expected-error@-1 {{converting non-escaping parameter 'fn' to generic parameter 'Q.U' (aka '() -> Int') may allow it to escape}}
+    // expected-error@-1 {{converting non-escaping parameter 'fn' to generic parameter 'T.U' may allow it to escape}}
   }
+}
+
+protocol Q {
+  associatedtype U : P
+}
+
+func sr10811(_ fn: () -> Int) {
+  struct S1 : P {
+    typealias U = () -> Int
+  }
+
+  struct S2 : Q {
+    typealias U = S1
+  }
+
+  struct S<T : Q> { // expected-note {{generic parameters are always considered '@escaping'}}
+    func foo(_ x: T.U.U) {}
+  }
+
+  S<S2>().foo(fn) // expected-error {{converting non-escaping parameter 'fn' to generic parameter 'T.U.U' may allow it to escape}}
+}
+
+struct Wrapper<U> {
+  var value: U
+  init(_ value: U) { self.value = value }
+}
+
+func with<T>(_ x: T, body: (T) -> Void) {}
+func takesGeneric<T>(_ x: T) {}
+func takesEscapingFn(_ fn: @escaping () -> Int) {}
+func returnsTakesEscapingFn() -> (@escaping () -> Int) -> Void { takesEscapingFn }
+
+prefix operator ^^^
+prefix func ^^^(_ x: Int) -> (@escaping () -> Int) -> Void { takesEscapingFn }
+
+func testWeirdFnExprs<T>(_ fn: () -> Int, _ cond: Bool, _ any: Any, genericArg: T) { // expected-note 11{{parameter 'fn' is implicitly non-escaping}}
+  (any as! (@escaping () -> Int) -> Void)(fn)
+  // expected-error@-1 {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
+
+  let wrapped = Wrapper<(@escaping () -> Int) -> Void>({ x in })
+  (wrapped[keyPath: \.value] as (@escaping () -> Int) -> Void)(fn)
+  // expected-error@-1 {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
+
+  (cond ? returnsTakesEscapingFn() : returnsTakesEscapingFn())(fn)
+  // expected-error@-1 {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
+
+  (^^^5)(fn)
+  // expected-error@-1 {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
+
+  var optFn: Optional = takesEscapingFn
+  optFn?(fn)
+  // expected-error@-1 {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
+
+  [takesEscapingFn][0](fn)
+  // expected-error@-1 {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
+
+  (takesEscapingFn, "").0(fn)
+  // expected-error@-1 {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
+
+  with({ (x: @escaping () -> Int) in }) { y in
+    Wrapper(y).value(fn)
+    // expected-error @-1{{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
+  }
+
+  _ = { x in (x({ 0 }), x(fn)) }(takesGeneric)
+  // expected-error@-1 {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
+
+  _ = { (a: (@escaping () -> Int), b) in () }(fn, genericArg)
+  // expected-error@-1 {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
+
+  func returnsVeryCurried() -> () throws -> (@escaping () -> Int) -> Void { { { x in } } }
+  (try? returnsVeryCurried()())?(fn)
+  // expected-error@-1 {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
 }

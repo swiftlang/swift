@@ -489,10 +489,6 @@ private:
   /// passing such parameter as an @escaping argument, or trying to
   /// assign it to a variable which expects @escaping function.
   bool diagnoseParameterUse() const;
-
-  /// Retrieve a type of the parameter at give index for call or
-  /// subscript invocation represented by given expression node.
-  Type getParameterTypeFor(Expr *expr, unsigned paramIdx) const;
 };
 
 class MissingForcedDowncastFailure final : public FailureDiagnostic {

@@ -555,18 +555,7 @@ bool NoEscapeFuncToTypeConversionFailure::diagnoseParameterUse() const {
     return false;
 
   auto *anchor = getAnchor();
-  auto *locator = getLocator();
   auto diagnostic = diag::general_noescape_to_escaping;
-
-  auto getGenericParamType =
-      [](TypeVariableType *typeVar) -> GenericTypeParamType * {
-    auto *locator = typeVar->getImpl().getLocator();
-    if (locator->isForGenericParameter()) {
-      const auto &GP = locator->getPath().back();
-      return GP.getGenericParameter();
-    }
-    return nullptr;
-  };
 
   ParamDecl *PD = nullptr;
   if (auto *DRE = dyn_cast<DeclRefExpr>(anchor)) {
@@ -580,37 +569,29 @@ bool NoEscapeFuncToTypeConversionFailure::diagnoseParameterUse() const {
     // Let's check whether this is a function parameter passed
     // as an argument to another function which accepts @escaping
     // function at that position.
-    auto path = locator->getPath();
-    if (!path.empty() &&
-        (path.back().getKind() == ConstraintLocator::ApplyArgToParam)) {
-      if (auto paramType =
-              getParameterTypeFor(getRawAnchor(), path.back().getValue2())) {
-        if (paramType->isTypeVariableOrMember()) {
-          auto diagnoseGenericParamFailure = [&](Type genericParam,
-                                                 GenericTypeParamDecl *decl) {
-            emitDiagnostic(anchor->getLoc(),
-                           diag::converting_noespace_param_to_generic_type,
-                           PD->getName(), genericParam);
+    if (auto argApplyInfo = getFunctionArgApplyInfo(getLocator())) {
+      auto paramInterfaceTy = argApplyInfo->getParamInterfaceType();
+      if (paramInterfaceTy->isTypeParameter()) {
+        auto diagnoseGenericParamFailure = [&](GenericTypeParamDecl *decl) {
+          emitDiagnostic(anchor->getLoc(),
+                         diag::converting_noespace_param_to_generic_type,
+                         PD->getName(), paramInterfaceTy);
 
-            emitDiagnostic(decl, diag::generic_parameters_always_escaping);
-          };
+          emitDiagnostic(decl, diag::generic_parameters_always_escaping);
+        };
 
-          // If this is a situation when non-escaping parameter is passed
-          // to the argument which represents generic parameter, there is
-          // a tailored diagnostic for that.
+        // If this is a situation when non-escaping parameter is passed
+        // to the argument which represents generic parameter, there is
+        // a tailored diagnostic for that.
 
-          if (auto *DMT = paramType->getAs<DependentMemberType>()) {
-            auto baseTy = DMT->getBase()->castTo<TypeVariableType>();
-            diagnoseGenericParamFailure(resolveType(DMT),
-                                        getGenericParamType(baseTy)->getDecl());
-            return true;
-          }
+        if (auto *DMT = paramInterfaceTy->getAs<DependentMemberType>()) {
+          diagnoseGenericParamFailure(DMT->getRootGenericParam()->getDecl());
+          return true;
+        }
 
-          auto *typeVar = paramType->getAs<TypeVariableType>();
-          if (auto *GP = getGenericParamType(typeVar)) {
-            diagnoseGenericParamFailure(GP, GP->getDecl());
-            return true;
-          }
+        if (auto *GP = paramInterfaceTy->getAs<GenericTypeParamType>()) {
+          diagnoseGenericParamFailure(GP->getDecl());
+          return true;
         }
       }
 
@@ -639,20 +620,6 @@ bool NoEscapeFuncToTypeConversionFailure::diagnoseParameterUse() const {
   } // TODO: add in a fixit for autoclosure
 
   return true;
-}
-
-Type NoEscapeFuncToTypeConversionFailure::getParameterTypeFor(
-    Expr *expr, unsigned paramIdx) const {
-  auto choice = getChoiceFor(expr);
-  if (!choice)
-    return Type();
-
-  if (auto *fnType = choice->openedType->getAs<FunctionType>()) {
-    const auto &param = fnType->getParams()[paramIdx];
-    return param.getPlainType();
-  }
-
-  return Type();
 }
 
 bool MissingForcedDowncastFailure::diagnoseAsError() {
