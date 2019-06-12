@@ -621,33 +621,6 @@ void swift::simple_display(
 }
 
 //----------------------------------------------------------------------------//
-// CustomAttrTypeRequest.
-//----------------------------------------------------------------------------//
-
-void CustomAttrTypeRequest::diagnoseCycle(DiagnosticEngine &diags) const {
-  auto attr = std::get<0>(getStorage());
-  diags.diagnose(attr->getLocation(), diag::circular_reference);
-}
-
-void CustomAttrTypeRequest::noteCycleStep(DiagnosticEngine &diags) const {
-  auto attr = std::get<0>(getStorage());
-  diags.diagnose(attr->getLocation(), diag::circular_reference_through);
-}
-
-void swift::simple_display(llvm::raw_ostream &out, CustomAttrTypeKind value) {
-  switch (value) {
-  case CustomAttrTypeKind::NonGeneric:
-    out << "non-generic";
-    return;
-
-  case CustomAttrTypeKind::PropertyDelegate:
-    out << "property-delegate";
-    return;
-  }
-  llvm_unreachable("bad kind");
-}
-
-//----------------------------------------------------------------------------//
 // FunctionBuilder-related requests.
 //----------------------------------------------------------------------------//
 

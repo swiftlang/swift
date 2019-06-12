@@ -576,7 +576,11 @@ public:
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>
-bool AnyValue::Holder<Type>::equals(const HolderBase &other) const;
+inline bool AnyValue::Holder<Type>::equals(const HolderBase &other) const {
+  assert(typeID == other.typeID && "Caller should match type IDs");
+  return value.getPointer() ==
+      static_cast<const Holder<Type> &>(other).value.getPointer();
+}
 
 void simple_display(llvm::raw_ostream &out, Type value);
 
