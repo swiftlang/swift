@@ -571,21 +571,22 @@ swift::matchWitness(
   if (result.isViable()) {
     // '@differentiable' attributes must match completely.
     for (auto *reqDiffAttr : reqAttrs.getAttributes<DifferentiableAttr>()) {
-      auto witnessDiffAttrs =
-      witnessAttrs.getAttributes<DifferentiableAttr, /*AllowInvalid*/ true>();
+      auto witnessDiffAttrs = witnessAttrs
+          .getAttributes<DifferentiableAttr, /*AllowInvalid*/ true>();
       bool reqDiffAttrMatch = llvm::any_of(
           witnessDiffAttrs, [&](const DifferentiableAttr *witnessDiffAttr) {
             return witnessDiffAttr->getParameterIndices() &&
-            reqDiffAttr->getParameterIndices() &&
-            witnessDiffAttr->parametersMatch(*reqDiffAttr);
+                   reqDiffAttr->getParameterIndices() &&
+                   witnessDiffAttr->parametersMatch(*reqDiffAttr);
           });
       if (!reqDiffAttrMatch) {
         if (auto *vdWitness = dyn_cast<VarDecl>(witness))
           return RequirementMatch(
               getStandinForAccessor(vdWitness, AccessorKind::Get),
-              MatchKind::DifferentiableConflict);
+              MatchKind::DifferentiableConflict, reqDiffAttr);
         else
-          return RequirementMatch(witness, MatchKind::DifferentiableConflict);
+          return RequirementMatch(witness, MatchKind::DifferentiableConflict,
+                                  reqDiffAttr);
       }
     }
   }
@@ -2171,30 +2172,26 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
   // SWIFT_ENABLE_TENSORFLOW
   case MatchKind::DifferentiableConflict: {
     // Emit a note showing the missing requirement `@differentiable` attribute.
-    // FIXME(TF-564): Diagnose a specific unfulfilled `@differentiable`
-    // attribute.
-    for (auto *attr : req->getAttrs()
-             .getAttributes<DifferentiableAttr, /*allowInvalid*/ true>()) {
-      assert(attr);
-      // Omit printing wrt clause if attribute differentiation parameters match
-      // inferred differentiation parameters.
-      auto *original = cast<AbstractFunctionDecl>(match.Witness);
-      auto *whereClauseGenEnv =
-          computeDerivativeGenericEnvironment(attr, original);
-      auto *inferredParameters = TypeChecker::inferDifferentiableParameters(
-          original, whereClauseGenEnv);
-      bool omitWrtClause = attr->getParameterIndices()->parameters.count() ==
-                           inferredParameters->parameters.count();
-      // Get `@differentiable` attribute description.
-      std::string diffAttrReq;
-      llvm::raw_string_ostream stream(diffAttrReq);
-      attr->print(stream, req, omitWrtClause);
-      diags.diagnose(match.Witness,
-          diag::protocol_witness_missing_specific_differentiable_attr,
-          StringRef(stream.str()).trim());
-      }
-    }
+    auto *reqAttr = cast<DifferentiableAttr>(match.UnmetAttribute);
+    assert(reqAttr);
+    // Omit printing wrt clause if attribute differentiation parameters match
+    // inferred differentiation parameters.
+    auto *original = cast<AbstractFunctionDecl>(match.Witness);
+    auto *whereClauseGenEnv =
+        computeDerivativeGenericEnvironment(reqAttr, original);
+    auto *inferredParameters = TypeChecker::inferDifferentiableParameters(
+        original, whereClauseGenEnv);
+    bool omitWrtClause = reqAttr->getParameterIndices()->parameters.count() ==
+                         inferredParameters->parameters.count();
+    // Get `@differentiable` attribute description.
+    std::string reqDiffAttrString;
+    llvm::raw_string_ostream stream(reqDiffAttrString);
+    reqAttr->print(stream, req, omitWrtClause);
+    diags.diagnose(match.Witness,
+                   diag::protocol_witness_missing_differentiable_attr,
+                   StringRef(stream.str()).trim());
     break;
+  }
   }
 }
 

@@ -2526,8 +2526,6 @@ WARNING(differentiable_constant_property_implicit_noderivative_fixit,none,
       "'let' properties with a default value do not have a derivative; add "
       "'@noDerivative' to make it explicit, or change it to 'var' to allow "
       "derivatives", ())
-NOTE(protocol_witness_missing_differentiable_attr,none,
-     "candidate is missing attribute '%0'", (StringRef))
 
 NOTE(codable_extraneous_codingkey_case_here,none,
      "CodingKey case %0 does not match any stored properties", (Identifier))
@@ -2739,7 +2737,7 @@ ERROR(differentiable_attr_class_unsupported,none,
       "class members cannot be marked with '@differentiable'", ())
 ERROR(differentiable_attr_stored_property_variable_unsupported,none,
       "'jvp:' or 'vjp:' cannot be specified for stored properties", ())
-NOTE(protocol_witness_missing_specific_differentiable_attr,none,
+NOTE(protocol_witness_missing_differentiable_attr,none,
      "candidate is missing attribute '%0'", (StringRef))
 
 // @differentiating

@@ -722,8 +722,6 @@ protocol TF285 : Differentiable {
 struct TF285MissingOneDiffAttr : TF285 {
   // Requirement is missing an attribute.
   @differentiable(wrt: x)
-  // FIXME(TF-564): Do not diagnose fulfilled `@differentiable(wrt: x)` attribute.
-  // expected-note @+2 {{candidate is missing attribute '@differentiable(wrt: x)}}
   // expected-note @+1 {{candidate is missing attribute '@differentiable(wrt: (x, y))}}
   func foo(x: Float, y: Float) -> Float {
     return x

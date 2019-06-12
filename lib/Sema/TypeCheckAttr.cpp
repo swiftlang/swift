@@ -2790,13 +2790,11 @@ static AutoDiffParameterIndices *computeDifferentiationParameters(
     // conform to `Differentiable`.
     else {
       auto selfType = function->getImplicitSelfDecl()->getInterfaceType();
-      if (derivativeGenEnv) {
-        auto selfInterfaceType = selfType->hasTypeParameter()
-            ? selfType
-            : selfType->mapTypeOutOfContext();
-        selfType =
-            derivativeGenEnv->mapTypeIntoContext(selfInterfaceType);
-      }
+      if (derivativeGenEnv)
+        selfType = derivativeGenEnv->mapTypeIntoContext(selfType);
+      // FIXME(TF-568): `Differentiable`-conforming protocols cannot define
+      // `@differentiable` computed properties because the check below returns
+      // false.
       if (!conformsToDifferentiable(selfType, function)) {
         TC.diagnose(attrLoc, diag::diff_function_no_parameters,
                     function->getFullName())
