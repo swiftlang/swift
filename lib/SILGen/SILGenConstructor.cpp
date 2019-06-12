@@ -112,7 +112,7 @@ static bool maybeEmitPropertyWrapperInitFromValue(
     llvm::function_ref<void(Expr *)> body) {
   auto originalProperty = field->getOriginalWrappedProperty();
   if (!originalProperty ||
-      !originalProperty->isPropertyWrapperInitializedWithInitialValue())
+      !originalProperty->isPropertyMemberwiseInitializedWithWrappedType())
     return false;
 
   auto wrapperInfo = originalProperty->getPropertyWrapperBackingPropertyInfo();
@@ -981,11 +981,15 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
         // property wrapper initialized with `=`, inject the value into an
         // instance of the wrapper.
         if (auto singleVar = pbd->getSingleVar()) {
-          (void)maybeEmitPropertyWrapperInitFromValue(
-              *this, init, singleVar, std::move(result),
-              [&](Expr *expr) {
-                result = emitRValue(expr);
-              });
+          auto originalVar = singleVar->getOriginalWrappedProperty();
+          if (originalVar &&
+              originalVar->isPropertyWrapperInitializedWithInitialValue()) {
+            (void)maybeEmitPropertyWrapperInitFromValue(
+                *this, init, singleVar, std::move(result),
+                [&](Expr *expr) {
+                  result = emitRValue(expr);
+                });
+          }
         }
 
         emitMemberInit(*this, selfDecl, entry.getPattern(), std::move(result));
