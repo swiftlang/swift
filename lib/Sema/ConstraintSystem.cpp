@@ -409,6 +409,12 @@ ConstraintLocator *ConstraintSystem::getConstraintLocator(
 }
 
 ConstraintLocator *ConstraintSystem::getCalleeLocator(Expr *expr) {
+  // Make sure we handle subscripts before looking at apply exprs. We don't
+  // want to return a subscript member locator for an expression such as x[](y),
+  // as its callee is not the subscript, but rather the function it returns.
+  if (isa<SubscriptExpr>(expr))
+    return getConstraintLocator(expr, ConstraintLocator::SubscriptMember);
+
   if (auto *applyExpr = dyn_cast<ApplyExpr>(expr)) {
     auto *fnExpr = applyExpr->getFn();
     // For an apply of a metatype, we have a short-form constructor. Unlike
@@ -436,9 +442,6 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(Expr *expr) {
 
   if (isa<UnresolvedMemberExpr>(expr))
     return getConstraintLocator(locator, ConstraintLocator::UnresolvedMember);
-
-  if (isa<SubscriptExpr>(expr))
-    return getConstraintLocator(locator, ConstraintLocator::SubscriptMember);
 
   if (isa<MemberRefExpr>(expr))
     return getConstraintLocator(locator, ConstraintLocator::Member);
