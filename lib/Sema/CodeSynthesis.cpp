@@ -2247,12 +2247,18 @@ static void maybeAddMemberwiseDefaultArg(ParamDecl *arg, VarDecl *var,
   if (!var->getParentPattern()->getSingleVar())
     return;
 
-  // If we don't have an expression initializer or silgen can't assign a default
-  // initializer, then we can't generate a default value. An example of where
-  // silgen can assign a default is var x: Int? where the default is nil.
-  // If the variable is lazy, go ahead and give it a default value.
-  if (!var->getAttrs().hasAttribute<LazyAttr>() &&
-      !var->getParentPatternBinding()->isDefaultInitializable())
+  // Determine whether this variable will be 'nil' initialized.
+  bool isNilInitialized =
+    (isa<OptionalType>(var->getValueInterfaceType().getPointer()) &&
+     !var->isParentInitialized()) ||
+    var->getAttrs().hasAttribute<LazyAttr>();
+
+  // Whether we have explicit initialization.
+  bool isExplicitlyInitialized = var->isParentInitialized();
+
+  // If this is neither nil-initialized nor explicitly initialized, don't add
+  // anything.
+  if (!isNilInitialized && !isExplicitlyInitialized)
     return;
 
   // We can add a default value now.
@@ -2268,12 +2274,13 @@ static void maybeAddMemberwiseDefaultArg(ParamDecl *arg, VarDecl *var,
   // default arg. All lazy variables return a nil literal as well. *Note* that
   // the type will always be a sugared T? because we don't default init an
   // explicit Optional<T>.
-  if ((isa<OptionalType>(var->getValueInterfaceType().getPointer()) &&
-      !var->isParentInitialized()) ||
-      var->getAttrs().hasAttribute<LazyAttr>()) {
+  if (isNilInitialized) {
     arg->setDefaultArgumentKind(DefaultArgumentKind::NilLiteral);
     return;
   }
+
+ // Explicitly initialize.
+ assert(isExplicitlyInitialized);
 
   // If there's a backing storage property, the memberwise initializer
   // will be in terms of that.
@@ -2334,7 +2341,7 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
         // accept a value of the original property type. Otherwise, the
         // memberwise initializer will be in terms of the backing storage
         // type.
-        if (!var->isPropertyWrapperInitializedWithInitialValue()) {
+        if (!var->isPropertyMemberwiseInitializedWithWrappedType()) {
           varInterfaceType = backingPropertyType;
         }
       }
