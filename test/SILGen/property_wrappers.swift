@@ -1,12 +1,12 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-silgen | %FileCheck %s
 // FIXME: switch to %target-swift-emit-silgen once we have syntax tree support
 
-@_propertyWrapper
+@propertyWrapper
 struct Wrapper<T> {
   var value: T
 }
 
-@_propertyWrapper
+@propertyWrapper
 struct WrapperWithInitialValue<T> {
   var value: T
 
@@ -107,7 +107,7 @@ func forceHasMemberwiseInit() {
 // CHECK: bb0:
 // CHECK: function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF
 struct HasNested<T> {
-  @_propertyWrapper
+  @propertyWrapper
   private struct PrivateWrapper<U> {
     var value: U
     init(initialValue: U) {
@@ -180,7 +180,7 @@ struct WrapperWithDidSetWillSet {
   }
 }
 
-@_propertyWrapper
+@propertyWrapper
 struct WrapperWithStorageValue<T> {
   var value: T
 
@@ -201,7 +201,7 @@ struct UseWrapperWithStorageValue {
   }
 }
 
-@_propertyWrapper
+@propertyWrapper
 enum Lazy<Value> {
   case uninitialized(() -> Value)
   case initialized(Value)
@@ -270,7 +270,7 @@ extension ClassUsingWrapper {
 }
 
 // 
-@_propertyWrapper
+@propertyWrapper
 struct WrapperWithDefaultInit<T> {
   private var storage: T?
 

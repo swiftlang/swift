@@ -3,12 +3,12 @@
 // ---------------------------------------------------------------------------
 // Property wrapper type definitions
 // ---------------------------------------------------------------------------
-@_propertyWrapper
+@propertyWrapper
 struct Wrapper<T> {
   var value: T
 }
 
-@_propertyWrapper
+@propertyWrapper
 struct WrapperWithInitialValue<T> {
   var value: T
 
@@ -17,7 +17,7 @@ struct WrapperWithInitialValue<T> {
   }
 }
 
-@_propertyWrapper
+@propertyWrapper
 struct WrapperAcceptingAutoclosure<T> {
   private let fn: () -> T
 
@@ -34,30 +34,30 @@ struct WrapperAcceptingAutoclosure<T> {
   }
 }
 
-@_propertyWrapper
+@propertyWrapper
 struct MissingValue<T> { }
 // expected-error@-1{{property wrapper type 'MissingValue' does not contain a non-static property named 'value'}}
 
-@_propertyWrapper
+@propertyWrapper
 struct StaticValue {
   static var value: Int = 17
 }
 // expected-error@-3{{property wrapper type 'StaticValue' does not contain a non-static property named 'value'}}
 
 
-// expected-error@+1{{'@_propertyWrapper' attribute cannot be applied to this declaration}}
-@_propertyWrapper
+// expected-error@+1{{'@propertyWrapper' attribute cannot be applied to this declaration}}
+@propertyWrapper
 protocol CannotBeAWrapper {
   associatedtype Value
   var value: Value { get set }
 }
 
-@_propertyWrapper
+@propertyWrapper
 struct NonVisibleValueWrapper<Value> {
   private var value: Value // expected-error{{private property 'value' cannot have more restrictive access than its enclosing property wrapper type 'NonVisibleValueWrapper' (which is internal)}}
 }
 
-@_propertyWrapper
+@propertyWrapper
 struct NonVisibleInitWrapper<Value> {
   var value: Value
 
@@ -66,7 +66,7 @@ struct NonVisibleInitWrapper<Value> {
   }
 }
 
-@_propertyWrapper
+@propertyWrapper
 struct InitialValueTypeMismatch<Value> {
   var value: Value // expected-note{{'value' declared here}}
 
@@ -75,7 +75,7 @@ struct InitialValueTypeMismatch<Value> {
   }
 }
 
-@_propertyWrapper
+@propertyWrapper
 struct MultipleInitialValues<Value> { // expected-error{{property wrapper type 'MultipleInitialValues' has multiple initial-value initializers}}
   var value: Value? = nil
 
@@ -86,7 +86,7 @@ struct MultipleInitialValues<Value> { // expected-error{{property wrapper type '
   }
 }
 
-@_propertyWrapper
+@propertyWrapper
 struct InitialValueFailable<Value> {
   var value: Value
 
@@ -95,7 +95,7 @@ struct InitialValueFailable<Value> {
   }
 }
 
-@_propertyWrapper
+@propertyWrapper
 struct InitialValueFailableIUO<Value> {
   var value: Value
 
@@ -107,12 +107,12 @@ struct InitialValueFailableIUO<Value> {
 // ---------------------------------------------------------------------------
 // Property wrapper type definitions
 // ---------------------------------------------------------------------------
-@_propertyWrapper
+@propertyWrapper
 struct _lowercaseWrapper<T> {
   var value: T
 }
 
-@_propertyWrapper
+@propertyWrapper
 struct _UppercaseWrapper<T> {
   var value: T
 }
@@ -235,17 +235,17 @@ struct Initialization {
 // ---------------------------------------------------------------------------
 // Wrapper type formation
 // ---------------------------------------------------------------------------
-@_propertyWrapper
+@propertyWrapper
 struct IntWrapper {
   var value: Int
 }
 
-@_propertyWrapper
+@propertyWrapper
 struct WrapperForHashable<T: Hashable> { // expected-note{{property wrapper type 'WrapperForHashable' declared here}}
   var value: T
 }
 
-@_propertyWrapper
+@propertyWrapper
 struct WrapperWithTwoParams<T, U> {
   var value: (T, U)
 }
@@ -277,7 +277,7 @@ struct UseWrappersWithDifferentForm {
   var wOkay2: Int
 }
 
-@_propertyWrapper
+@propertyWrapper
 struct Function<T, U> { // expected-note{{property wrapper type 'Function' declared here}}
   var value: (T) -> U?
 }
@@ -296,7 +296,7 @@ struct TestFunction {
 // Nested wrappers
 // ---------------------------------------------------------------------------
 struct HasNestedWrapper<T> {
-  @_propertyWrapper
+  @propertyWrapper
   struct NestedWrapper<U> { // expected-note{{property wrapper type 'NestedWrapper' declared here}}
     var value: U
     init(initialValue: U) {
@@ -304,7 +304,7 @@ struct HasNestedWrapper<T> {
     }
   }
 
-  @_propertyWrapper
+  @propertyWrapper
   struct ConcreteNestedWrapper {
     var value: T
     init(initialValue: T) {
@@ -385,7 +385,7 @@ struct UseWillSetDidSet {
 // ---------------------------------------------------------------------------
 // Mutating/nonmutating
 // ---------------------------------------------------------------------------
-@_propertyWrapper
+@propertyWrapper
 struct WrapperWithNonMutatingSetter<Value> {
   class Box {
     var value: Value
@@ -406,7 +406,7 @@ struct WrapperWithNonMutatingSetter<Value> {
   }
 }
 
-@_propertyWrapper
+@propertyWrapper
 struct WrapperWithMutatingGetter<Value> {
   var readCount = 0
   var writeCount = 0
@@ -428,7 +428,7 @@ struct WrapperWithMutatingGetter<Value> {
   }
 }
 
-@_propertyWrapper
+@propertyWrapper
 class ClassWrapper<Value> {
   var value: Value
 
@@ -487,7 +487,7 @@ func testMutatingness() {
 // Access control
 // ---------------------------------------------------------------------------
 struct HasPrivateWrapper<T> {
-  @_propertyWrapper
+  @propertyWrapper
   private struct PrivateWrapper<U> { // expected-note{{type declared here}}
     var value: U
     init(initialValue: U) {
@@ -505,7 +505,7 @@ struct HasPrivateWrapper<T> {
 }
 
 public struct HasUsableFromInlineWrapper<T> {
-  @_propertyWrapper
+  @propertyWrapper
   struct InternalWrapper<U> { // expected-note{{type declared here}}
     var value: U
     init(initialValue: U) {
@@ -519,7 +519,7 @@ public struct HasUsableFromInlineWrapper<T> {
   // expected-error@-1{{property wrapper type referenced from a '@usableFromInline' property must be '@usableFromInline' or public}}
 }
 
-@_propertyWrapper
+@propertyWrapper
 class Box<Value> {
   private(set) var value: Value
 
@@ -642,7 +642,7 @@ func testDefaultedPrivateMemberwiseLets() {
 // ---------------------------------------------------------------------------
 // Storage references
 // ---------------------------------------------------------------------------
-@_propertyWrapper
+@propertyWrapper
 struct WrapperWithStorageRef<T> {
   var value: T
 
@@ -681,7 +681,7 @@ func testStorageRef(tsr: TestStorageRef) {
 
 // rdar://problem/50873275 - crash when using wrapper with wrapperValue in
 // generic type.
-@_propertyWrapper
+@propertyWrapper
 struct InitialValueWrapperWithStorageRef<T> {
   var value: T
 
@@ -702,7 +702,7 @@ struct TestGenericStorageRef<T> {
 // ---------------------------------------------------------------------------
 // Misc. semantic issues
 // ---------------------------------------------------------------------------
-@_propertyWrapper
+@propertyWrapper
 struct BrokenLazy { }
 // expected-error@-1{{property wrapper type 'BrokenLazy' does not contain a non-static property named 'value'}}
 // expected-note@-2{{'BrokenLazy' declared here}}
@@ -728,7 +728,7 @@ struct UsesExplicitClosures {
 // ---------------------------------------------------------------------------
 
 // rdar://problem/50822051 - compiler assertion / hang
-@_propertyWrapper
+@propertyWrapper
 struct PD<Value> {
   var value: Value
 
@@ -744,7 +744,7 @@ struct TestPD {
 
 protocol P { }
 
-@_propertyWrapper
+@propertyWrapper
 struct WrapperRequiresP<T: P> {
   var value: T
   var wrapperValue: T { return value }
@@ -760,7 +760,7 @@ struct UsesWrapperRequiringP {
 }
 
 // SR-10899 / rdar://problem/51588022
-@_propertyWrapper
+@propertyWrapper
 struct SR_10899_Wrapper { // expected-note{{property wrapper type 'SR_10899_Wrapper' declared here}}
   var value: String { "hi" }
 }

@@ -225,7 +225,7 @@ static ConstructorDecl *findDefaultInit(ASTContext &ctx,
 llvm::Expected<PropertyWrapperTypeInfo>
 PropertyWrapperTypeInfoRequest::evaluate(
     Evaluator &eval, NominalTypeDecl *nominal) const {
-  // We must have the @_propertyWrapper attribute to continue.
+  // We must have the @propertyWrapper attribute to continue.
   if (!nominal->getAttrs().hasAttribute<PropertyWrapperAttr>()) {
     return PropertyWrapperTypeInfo();
   }
@@ -271,7 +271,7 @@ AttachedPropertyWrapperRequest::evaluate(Evaluator &evaluator,
     auto nominal = evaluateOrDefault(
       ctx.evaluator, CustomAttrNominalRequest{mutableAttr, dc}, nullptr);
 
-    // If we didn't find a nominal type with a @_propertyWrapper attribute,
+    // If we didn't find a nominal type with a @propertyWrapper attribute,
     // skip this custom attribute.
     if (!nominal || !nominal->getAttrs().hasAttribute<PropertyWrapperAttr>())
       continue;

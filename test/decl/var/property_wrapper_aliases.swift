@@ -2,7 +2,7 @@
 
 // expect-no-diagnostics
 
-@propertyDelegate
+@propertyDelegate // expected-warning{{'@propertyDelegate' has been renamed to '@propertyWrapper'}}{{2-18=propertyWrapper}}
 struct Delegate<T> {
   var value: T
 
@@ -19,7 +19,7 @@ struct TestDelegateValue {
   }
 }
 
-@propertyWrapper
+@_propertyWrapper // expected-warning{{'@_propertyWrapper' has been renamed to '@propertyWrapper'}}{{2-18=propertyWrapper}}
 struct Wrapper<T> {
   var value: T
 }
