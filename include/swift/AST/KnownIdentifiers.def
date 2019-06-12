@@ -133,7 +133,7 @@ IDENTIFIER_(tensorHandleCount)
 IDENTIFIER_(typeList)
 // AdditiveArithmetic, VectorProtocol
 IDENTIFIER(zero)
-IDENTIFIER(Scalar)
+IDENTIFIER(VectorSpaceScalar)
 // Differentiable
 IDENTIFIER(AllDifferentiableVariables)
 IDENTIFIER(TangentVector)

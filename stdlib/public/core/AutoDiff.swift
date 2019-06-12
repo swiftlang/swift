@@ -24,18 +24,18 @@
 /// elements in this vector space and have either no shape or a static shape.
 public protocol VectorProtocol : AdditiveArithmetic {
   /// The type of scalars in the vector space.
-  associatedtype Scalar : AdditiveArithmetic
+  associatedtype VectorSpaceScalar : AdditiveArithmetic
 
-  static func * (lhs: Scalar, rhs: Self) -> Self
-  static func *= (lhs: inout Self, rhs: Scalar)
+  static func * (lhs: VectorSpaceScalar, rhs: Self) -> Self
+  static func *= (lhs: inout Self, rhs: VectorSpaceScalar)
 }
 
 public extension VectorProtocol {
-  static func * (lhs: Self, rhs: Scalar) -> Self {
+  static func * (lhs: Self, rhs: VectorSpaceScalar) -> Self {
     return rhs * lhs
   }
 
-  static func *= (lhs: inout Self, rhs: Scalar) {
+  static func *= (lhs: inout Self, rhs: VectorSpaceScalar) {
     lhs = rhs * lhs
   }
 }
