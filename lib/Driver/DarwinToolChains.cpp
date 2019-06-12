@@ -223,9 +223,8 @@ static bool wantsObjCRuntime(const llvm::Triple &triple) {
 }
 
 ToolChain::InvocationInfo
-toolchains::Darwin::constructInvocation(const LinkJobAction &job,
-                                        const JobContext &context) const
-{
+toolchains::Darwin::constructInvocation(const DynamicLinkJobAction &job,
+                                        const JobContext &context) const {
   assert(context.Output.getPrimaryOutputType() == file_types::TY_Image &&
          "Invalid linker output type.");
 
@@ -531,7 +530,7 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
 
 
 ToolChain::InvocationInfo
-toolchains::Darwin::constructInvocation(const ArchiveJobAction &job,
+toolchains::Darwin::constructInvocation(const StaticLinkJobAction &job,
                                         const JobContext &context) const {
    assert(context.Output.getPrimaryOutputType() == file_types::TY_Image &&
          "Invalid linker output type.");

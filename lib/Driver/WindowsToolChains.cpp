@@ -45,7 +45,7 @@ std::string toolchains::Windows::sanitizerRuntimeLibName(StringRef Sanitizer,
 }
 
 ToolChain::InvocationInfo
-toolchains::Windows::constructInvocation(const LinkJobAction &job,
+toolchains::Windows::constructInvocation(const DynamicLinkJobAction &job,
                                          const JobContext &context) const {
   assert(context.Output.getPrimaryOutputType() == file_types::TY_Image &&
          "Invalid linker output type.");
@@ -197,7 +197,7 @@ toolchains::Windows::constructInvocation(const LinkJobAction &job,
 }
 
 ToolChain::InvocationInfo
-toolchains::Windows::constructInvocation(const ArchiveJobAction &job,
+toolchains::Windows::constructInvocation(const StaticLinkJobAction &job,
                                          const JobContext &context) const {
    assert(context.Output.getPrimaryOutputType() == file_types::TY_Image &&
          "Invalid linker output type.");

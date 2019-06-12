@@ -1964,10 +1964,10 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
     JobAction *LinkAction = nullptr;
 
     if (OI.LinkAction == LinkKind::StaticLibrary) {
-      LinkAction = C.createAction<ArchiveJobAction>(AllLinkerInputs,
+      LinkAction = C.createAction<StaticLinkJobAction>(AllLinkerInputs,
                                                     OI.LinkAction);
     } else {
-      LinkAction = C.createAction<LinkJobAction>(AllLinkerInputs,
+      LinkAction = C.createAction<DynamicLinkJobAction>(AllLinkerInputs,
                                                  OI.LinkAction);
     }
 
@@ -2197,14 +2197,14 @@ static StringRef baseNameForImage(const JobAction *JA, const OutputInfo &OI,
   if (JA->size() == 1 && OI.ModuleNameIsFallback && BaseInput != "-")
     return llvm::sys::path::stem(BaseInput);
   
-  if (auto link = dyn_cast<ArchiveJobAction>(JA)) {
+  if (auto link = dyn_cast<StaticLinkJobAction>(JA)) {
     Buffer = "lib";
     Buffer.append(BaseName);
     Buffer.append(Triple.isOSWindows() ? ".lib" : ".a");
     return Buffer.str();
   }
   
-  auto link = dyn_cast<LinkJobAction>(JA);
+  auto link = dyn_cast<DynamicLinkJobAction>(JA);
   if (!link)
     return BaseName;
   if (link->getKind() != LinkKind::DynamicLibrary)

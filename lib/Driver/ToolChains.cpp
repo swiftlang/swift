@@ -1087,13 +1087,13 @@ ToolChain::constructInvocation(const AutolinkExtractJobAction &job,
 }
 
 ToolChain::InvocationInfo
-ToolChain::constructInvocation(const LinkJobAction &job,
+ToolChain::constructInvocation(const DynamicLinkJobAction &job,
                                const JobContext &context) const {
   llvm_unreachable("linking not implemented for this toolchain");
 }
 
 ToolChain::InvocationInfo
-ToolChain::constructInvocation(const ArchiveJobAction &job,
+ToolChain::constructInvocation(const StaticLinkJobAction &job,
                                const JobContext &context) const {
    llvm_unreachable("archiving not implemented for this toolchain");
 }
