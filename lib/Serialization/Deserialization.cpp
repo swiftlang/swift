@@ -4726,9 +4726,8 @@ public:
                                                          // SWIFT_ENABLE_TENSORFLOW
                                                          rawDiffKind,
                                                          rawGenericSig);
-      genericSig = MF.getGenericSignature(rawGenericSig);
-      // SWIFT_ENABLE_TENSORFLOW
       diffKind = DifferentiabilityKind(rawDiffKind);
+      genericSig = MF.getGenericSignature(rawGenericSig);
     }
 
     auto representation = getActualFunctionTypeRepresentation(rawRepresentation);
