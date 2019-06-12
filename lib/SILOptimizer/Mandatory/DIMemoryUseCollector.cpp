@@ -1568,11 +1568,15 @@ collectDelegatingInitUses(const DIMemoryObjectInfo &TheMemory,
     // be an end_borrow use in addition to the value_metatype.
     if (isa<LoadBorrowInst>(User)) {
       auto UserVal = cast<SingleValueInstruction>(User);
-      bool onlyUseIsValueMetatype = true;
+      bool onlyUseIsValueMetatype = false;
       for (auto use : UserVal->getUses()) {
-        if (isa<EndBorrowInst>(use->getUser())
-            || isa<ValueMetatypeInst>(use->getUser()))
+        auto *user = use->getUser();
+        if (isa<EndBorrowInst>(user))
           continue;
+        if (isa<ValueMetatypeInst>(user)) {
+          onlyUseIsValueMetatype = true;
+          continue;
+        }
         onlyUseIsValueMetatype = false;
         break;
       }

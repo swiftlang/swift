@@ -1579,3 +1579,12 @@ class WeakCycle {
     self.d = 10
   }
 }
+
+// <rdar://51198592> DI was crashing as it wrongly detected a `type(of: self)`
+// use in a delegating initializer, when there was none.
+class DelegatingInitTest {
+  convenience init(x: Int) {
+    self // expected-warning {{expression of type 'DelegatingInitTest' is unused}}
+      // expected-error@-1 {{'self' used before 'self.init' call or assignment to 'self'}}
+  } // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
+}
