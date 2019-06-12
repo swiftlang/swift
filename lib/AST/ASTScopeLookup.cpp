@@ -209,6 +209,26 @@ ASTScopeImpl::lookup(const NullablePtr<DeclContext> selfDC,
                         isCascadingUseResult, consumer);
 }
 
+Optional<bool> ASTScopeImpl::lookupInParent(
+    const NullablePtr<DeclContext> selfDC,
+    const NullablePtr<const ASTScopeImpl> limit,
+    const NullablePtr<const Decl> haveAlreadyLookedHere,
+    const Optional<bool> isCascadingUse, DeclConsumer consumer) const {
+
+  // If this scope has an associated Decl, we have already searched its generics
+  // and selfType, so no need to look again.
+  NullablePtr<const Decl> haveAlreadyLookedHereForParent =
+      getDecl() ? getDecl().getPtrOrNull() : haveAlreadyLookedHere;
+
+  // If there is no limit and this scope induces one, pass that on.
+  const NullablePtr<const ASTScopeImpl> limitForParent =
+      limit ? limit : getLookupLimit();
+
+  return getLookupParent().get()->lookup(
+      computeSelfDCForParent(selfDC), limitForParent,
+      haveAlreadyLookedHereForParent, isCascadingUse, consumer);
+}
+
 std::pair<bool, Optional<bool>>
 ASTScopeImpl::lookInGenericsAndSelfType(const NullablePtr<DeclContext> selfDC,
                                         const Optional<bool> isCascadingUse,
@@ -222,25 +242,6 @@ ASTScopeImpl::lookInGenericsAndSelfType(const NullablePtr<DeclContext> selfDC,
   // Dig out the type we're looking into.
   // Perform lookup into the type
   return lookupInSelfType(selfDC, isCascadingUse, consumer);
-}
-
-Optional<bool> ASTScopeImpl::lookupInParent(
-    const NullablePtr<DeclContext> selfDC,
-    const NullablePtr<const ASTScopeImpl> limit,
-    const NullablePtr<const Decl> haveAlreadyLookedHere,
-    const Optional<bool> isCascadingUse, DeclConsumer consumer) const {
-  // If this scope has an associated Decl, we have already searched its generics
-  // and selfType, so no need to look again.
-  NullablePtr<const Decl> haveAlreadyLookedHereForParent =
-      getDecl() ? getDecl().getPtrOrNull() : haveAlreadyLookedHere;
-
-  // If there is no limit and this scope induces one, pass that on.
-  const NullablePtr<const ASTScopeImpl> limitForParent =
-      limit ? limit : getLookupLimit();
-
-  return getLookupParent().get()->lookup(
-      computeSelfDCForParent(selfDC), limitForParent,
-      haveAlreadyLookedHereForParent, isCascadingUse, consumer);
 }
 
 #pragma mark lookInGenericParameters
@@ -295,7 +296,7 @@ std::pair<bool, Optional<bool>>
 ASTScopeImpl::lookupInSelfType(NullablePtr<DeclContext>,
                                const Optional<bool> isCascadingUse,
                                DeclConsumer) const {
-  return dontLookupInSelfType(isCascadingUse);
+  return doNotLookupInSelfType(isCascadingUse);
 }
 
 std::pair<bool, Optional<bool>> GenericTypeOrExtensionScope::lookupInSelfType(
@@ -307,7 +308,7 @@ std::pair<bool, Optional<bool>> GenericTypeOrExtensionScope::lookupInSelfType(
 std::pair<bool, Optional<bool>> Portion::lookupInSelfTypeOf(
     const GenericTypeOrExtensionScope *scope, NullablePtr<DeclContext> selfDC,
     const Optional<bool> isCascadingUse, ASTScopeImpl::DeclConsumer) const {
-  return scope->dontLookupInSelfType(isCascadingUse);
+  return scope->doNotLookupInSelfType(isCascadingUse);
 }
 
 std::pair<bool, Optional<bool>>
@@ -453,7 +454,7 @@ bool ClosureParametersScope::lookupLocalBindings(Optional<bool> isCascadingUse,
         const_cast<CaptureListExpr *>(captureList.get());
     for (auto &e : mutableCL->getCaptureList()) {
       if (consumer.consume({e.Var}, DeclVisibilityKind::LocalVariable,
-                           isCascadingUse)) // or FunctionParamter??
+                           isCascadingUse)) // or FunctionParameter??
         return true;
     }
   }

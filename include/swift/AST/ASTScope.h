@@ -317,11 +317,12 @@ protected:
   ///
   /// Look in this scope.
   /// \p selfDC is the context for names dependent on dynamic self,
-  /// \p limit is a scope into which lookup should not go,
-  /// \p haveAlreadyLookedHere is a Decl whose generics and self type has
-  /// already been searched, \p isCascadingUse indicates whether the lookup
-  /// results will need a cascading dependency or not \p consumer is the object
-  /// to which found decls are reported. Returns the isCascadingUse information.
+  /// \p limit is a scope into which lookup should not go. See \ref
+  /// getLookupLimit. \p haveAlreadyLookedHere is a Decl whose generics and self
+  /// type has already been searched, \p isCascadingUse indicates whether the
+  /// lookup results will need a cascading dependency or not \p consumer is the
+  /// object to which found decls are reported. Returns the isCascadingUse
+  /// information.
   Optional<bool> lookup(NullablePtr<DeclContext> selfDC,
                         NullablePtr<const ASTScopeImpl> limit,
                         NullablePtr<const Decl> haveAlreadyLookedHere,
@@ -351,7 +352,7 @@ protected:
   /// The default for anything that does not do the lookup.
   /// Returns isFinished and isCascadingUse
   static std::pair<bool, Optional<bool>>
-  dontLookupInSelfType(Optional<bool> isCascadingUse) {
+  doNotLookupInSelfType(Optional<bool> isCascadingUse) {
     return {false, isCascadingUse};
   }
 
@@ -395,6 +396,10 @@ protected:
   /// When lookup must stop before the outermost scope, return the scope to stop
   /// at. Example, if a protocol is nested in a struct, we must stop before
   /// looking into the struct.
+  ///
+  /// Ultimately, the task of rejecting results found in inapplicable outer
+  /// scopes is best moved to the clients of the ASTScope lookup subsystem. It
+  /// seems out of place here.
   virtual NullablePtr<const ASTScopeImpl> getLookupLimit() const;
 
   NullablePtr<const ASTScopeImpl>
