@@ -4,7 +4,7 @@
 
 // REQUIRES: executable_test
 
-@_propertyWrapper
+@propertyWrapper
 struct Wrapper<T> {
   var value: T {
     didSet {
@@ -304,7 +304,7 @@ func testGenericClass() {
   }
 }
 
-@_propertyWrapper
+@propertyWrapper
 struct WrapperWithDefaultInit<Value> {
   private var _value: Value? = nil
 
