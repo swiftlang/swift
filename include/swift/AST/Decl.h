@@ -5125,6 +5125,10 @@ public:
   /// \end
   bool isPropertyWrapperInitializedWithInitialValue() const;
 
+  /// Whether the memberwise initializer parameter for a property with a property wrapper type
+  /// uses the wrapped type.
+  bool isPropertyMemberwiseInitializedWithWrappedType() const;
+
   /// If this property is the backing storage for a property with an attached
   /// property wrapper, return the original property.
   ///
