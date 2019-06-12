@@ -800,7 +800,7 @@ void SwitchStmtScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
                                          scopeCreator);
 
   for (auto caseStmt : stmt->getCases()) {
-    if (!scopeCreator.isDuplicate(caseStmt)) {
+    if (!scopeCreator.isDuplicate(caseStmt) && !caseStmt->isImplicit()) {
       scopeCreator.createSubtree<CaseStmtScope>(this, caseStmt);
     }
   }
@@ -812,7 +812,12 @@ void ForEachStmtScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
                                          scopeCreator);
 
   // Add a child describing the scope of the pattern.
-  scopeCreator.createSubtree<ForEachPatternScope>(this, stmt);
+  // In error cases such as:
+  //    let v: C { for b : Int -> S((array: P { }
+  // the body is implicit and it would overlap the source range of the expr
+  // above.
+  if (!stmt->getBody()->isImplicit())
+    scopeCreator.createSubtree<ForEachPatternScope>(this, stmt);
 }
 
 void ForEachPatternScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
