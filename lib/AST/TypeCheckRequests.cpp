@@ -59,6 +59,13 @@ void swift::simple_display(llvm::raw_ostream &out,
   }
 }
 
+void swift::simple_display(llvm::raw_ostream &out, Type type) {
+  if (type)
+    type.print(out);
+  else
+    out << "null";
+}
+
 //----------------------------------------------------------------------------//
 // Inherited type computation.
 //----------------------------------------------------------------------------//
@@ -688,13 +695,6 @@ void swift::simple_display(
   out << " }";
 }
 
-void swift::simple_display(llvm::raw_ostream &out, const Type &type) {
-  if (type)
-    type.print(out);
-  else
-    out << "null";
-}
-
 //----------------------------------------------------------------------------//
 // StructuralTypeRequest.
 //----------------------------------------------------------------------------//
@@ -705,4 +705,32 @@ void StructuralTypeRequest::diagnoseCycle(DiagnosticEngine &diags) const {
 
 void StructuralTypeRequest::noteCycleStep(DiagnosticEngine &diags) const {
   diags.diagnose(SourceLoc(), diag::circular_reference_through);
+}
+
+//----------------------------------------------------------------------------//
+// FunctionBuilder-related requests.
+//----------------------------------------------------------------------------//
+
+bool AttachedFunctionBuilderRequest::isCached() const {
+  // Only needs to be cached if there are any custom attributes.
+  auto var = std::get<0>(getStorage());
+  return var->getAttrs().hasAttribute<CustomAttr>();
+}
+
+void AttachedFunctionBuilderRequest::diagnoseCycle(
+    DiagnosticEngine &diags) const {
+  std::get<0>(getStorage())->diagnose(diag::circular_reference);
+}
+
+void AttachedFunctionBuilderRequest::noteCycleStep(
+    DiagnosticEngine &diags) const {
+  std::get<0>(getStorage())->diagnose(diag::circular_reference_through);
+}
+
+void FunctionBuilderTypeRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  std::get<0>(getStorage())->diagnose(diag::circular_reference);
+}
+
+void FunctionBuilderTypeRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  std::get<0>(getStorage())->diagnose(diag::circular_reference_through);
 }

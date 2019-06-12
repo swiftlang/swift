@@ -573,3 +573,19 @@ ExplicitlySpecifyGenericArguments *ExplicitlySpecifyGenericArguments::create(
       size, alignof(ExplicitlySpecifyGenericArguments));
   return new (mem) ExplicitlySpecifyGenericArguments(cs, params, locator);
 }
+
+SkipUnhandledConstructInFunctionBuilder *
+SkipUnhandledConstructInFunctionBuilder::create(ConstraintSystem &cs,
+                                                UnhandledNode unhandled,
+                                                NominalTypeDecl *builder,
+                                                ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+    SkipUnhandledConstructInFunctionBuilder(cs, unhandled, builder, locator);
+}
+
+bool SkipUnhandledConstructInFunctionBuilder::diagnose(Expr *root,
+                                                       bool asNote) const {
+  SkipUnhandledConstructInFunctionBuilderFailure failure(
+      root, getConstraintSystem(), unhandled, builder, getLocator());
+  return failure.diagnose(asNote);
+}
