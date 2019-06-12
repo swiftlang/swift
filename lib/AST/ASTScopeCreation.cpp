@@ -55,7 +55,7 @@ private:
 public:
   ScopeCreator(SourceFile *SF)
       : ctx(SF->getASTContext()),
-        sourceFileScope(constructInContext<ASTSourceFileScope>(SF, this)),
+        sourceFileScope(new (ctx) ASTSourceFileScope(SF, this)),
         _astDuplicates(llvm::DenseSet<void *>()),
         astDuplicates(_astDuplicates.getValue()) {}
 
@@ -64,11 +64,6 @@ public:
   ScopeCreator(const ScopeCreator &&) = delete; // ensure no moves
 
 public:
-  template <typename ClassToConstruct, typename... Args>
-  ClassToConstruct *constructInContext(Args... args) {
-    return new (ctx) ClassToConstruct(args...);
-  }
-
   /// Given an array of ASTNodes or Decl pointers, add them
   /// Return the resultant insertionPoint
   template <typename ASTNode_or_DeclPtr>
@@ -145,14 +140,14 @@ public:
   /// add it as a child of the receiver, and return the child and the scope to
   /// receive more decls.
   ASTScopeImpl *createSubtree(ASTScopeImpl *parent, Args... args) {
-    auto *child = constructInContext<Scope>(args...);
+    auto *child = new (ctx) Scope(args...);
     parent->addChild(child, ctx);
     return child->expandMe(*this);
   }
 
-  template <typename Scope, typename Portion, typename... Args>
+  template <typename Scope, typename PortionClass, typename... Args>
   ASTScopeImpl *createSubtree2D(ASTScopeImpl *parent, Args... args) {
-    const Portion *portion = constructInContext<Portion>();
+    const Portion *portion = new (ctx) PortionClass();
     return createSubtree<Scope>(parent, portion, args...);
   }
 
