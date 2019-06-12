@@ -2289,17 +2289,23 @@ static void maybeAddMemberwiseDefaultArg(ParamDecl *arg, VarDecl *var,
 ///
 /// \param decl The struct or class for which a constructor will be created.
 /// \param ICK The kind of implicit constructor to create.
+/// \param parentDC The parent context for the constructor. If nullptr, `decl`
+/// will be used as the parent context.
 ///
 /// \returns The newly-created constructor, which has already been type-checked
 /// (but has not been added to the containing struct or class).
 ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
                                                   NominalTypeDecl *decl,
-                                                  ImplicitConstructorKind ICK) {
+                                                  ImplicitConstructorKind ICK,
+                                                  DeclContext *parentDC);
   assert(!decl->hasClangNode());
 
   ASTContext &ctx = tc.Context;
   SourceLoc Loc = decl->getLoc();
   auto accessLevel = AccessLevel::Internal;
+
+  if (!parentDC)
+    parentDC = decl;
 
   // Determine the parameter type of the implicit constructor.
   SmallVector<ParamDecl*, 8> params;
@@ -2342,7 +2348,7 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
       // Create the parameter.
       auto *arg = new (ctx)
           ParamDecl(VarDecl::Specifier::Default, SourceLoc(), Loc,
-                    var->getName(), Loc, var->getName(), decl);
+                    var->getName(), Loc, var->getName(), parentDC);
       arg->setInterfaceType(varInterfaceType);
       arg->setImplicit();
       
