@@ -44,8 +44,8 @@ extension TensorParameters : VectorProtocol {
   static func - (lhs: TensorParameters, rhs: TensorParameters) -> TensorParameters {
     return TensorParameters(w: lhs.w + rhs.w, b: lhs.b + rhs.b)
   }
-  typealias Scalar = Tensor<Float>
-  static func * (lhs: Scalar, rhs: TensorParameters) -> TensorParameters { 
+  typealias VectorSpaceScalar = Tensor<Float>
+  static func * (lhs: VectorSpaceScalar, rhs: TensorParameters) -> TensorParameters {
     return TensorParameters(w: lhs + rhs.w, b: lhs + rhs.b)
   }
 }
@@ -89,7 +89,7 @@ func pow<T : BinaryFloatingPoint>(_ x: T, _ y: T) -> T {
 }
 
 struct AdamOptimizer<P : KeyPathIterable, Scalar : BinaryFloatingPoint>
-  where P : VectorProtocol, P.Scalar == Tensor<Scalar>
+  where P : VectorProtocol, P.VectorSpaceScalar == Tensor<Scalar>
 {
   let learningRate: Scalar
   var beta1: Scalar
@@ -134,7 +134,7 @@ struct AdamOptimizer<P : KeyPathIterable, Scalar : BinaryFloatingPoint>
 func testOptimizer<P : KeyPathIterable, Scalar : BinaryFloatingPoint>(
   parameters: inout P, withGradients gradients: P
 )
-  where P : VectorProtocol, P.Scalar == Tensor<Scalar>
+  where P : VectorProtocol, P.VectorSpaceScalar == Tensor<Scalar>
 {
   var optimizer = AdamOptimizer<P, Scalar>()
   print(parameters)
