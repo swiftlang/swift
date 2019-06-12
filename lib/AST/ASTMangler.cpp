@@ -1485,10 +1485,16 @@ ASTMangler::getSpecialManglingContext(const ValueDecl *decl,
       else
         hasNameForLinkage = !clangDecl->getDeclName().isEmpty();
       if (hasNameForLinkage) {
-        auto *clangDC = clangDecl->getDeclContext();
-        assert(clangDC->getRedeclContext()->isTranslationUnit() &&
-               "non-top-level Clang types not supported yet");
-        (void)clangDC;
+        if (!decl->getASTContext().LangOpts.EnableCXXInterop) {
+          // TODO: Mangle namespaces into these ObjC names.
+          // TODO: https://bugs.swift.org/browse/TF-560
+          // Skip checks for c++ interop. This doesn't mangle the names right
+          // though.
+          auto *clangDC = clangDecl->getDeclContext();
+          assert(clangDC->getRedeclContext()->isTranslationUnit() &&
+                 "non-top-level Clang types not supported yet");
+          (void)clangDC;
+        }
         return ASTMangler::ObjCContext;
       }
     }
