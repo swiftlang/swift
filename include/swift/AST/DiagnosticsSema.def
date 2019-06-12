@@ -3963,6 +3963,11 @@ ERROR(dynamic_with_transparent,none,
       "a declaration cannot be both '@_tranparent' and 'dynamic'",
       ())
 
+ERROR(dynamic_and_library_evolution_not_supported,none,
+      "marking non-'@objc' Swift declaration 'dynamic' in library evolution mode is not supported",
+      ())
+
+
 //------------------------------------------------------------------------------
 // MARK: @_dynamicReplacement(for:)
 //------------------------------------------------------------------------------
