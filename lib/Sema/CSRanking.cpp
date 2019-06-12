@@ -249,7 +249,7 @@ computeSelfTypeRelationship(TypeChecker &tc, DeclContext *dc, ValueDecl *decl1,
 
   // If the model type does not conform to the protocol, the bases are
   // unrelated.
-  auto conformance = tc.conformsToProtocol(
+  auto conformance = TypeChecker::conformsToProtocol(
                          modelTy, proto, dc,
                          (ConformanceCheckFlags::InExpression|
                           ConformanceCheckFlags::SkipConditionalRequirements));
@@ -341,10 +341,7 @@ static bool isProtocolExtensionAsSpecializedAs(TypeChecker &tc,
   // the second protocol extension.
   ConstraintSystem cs(tc, dc1, None);
   OpenedTypeMap replacements;
-  cs.openGeneric(dc2, dc2, sig2,
-                 /*skipProtocolSelfConstraint=*/false,
-                 ConstraintLocatorBuilder(nullptr),
-                 replacements);
+  cs.openGeneric(dc2, sig2, ConstraintLocatorBuilder(nullptr), replacements);
 
   // Bind the 'Self' type from the first extension to the type parameter from
   // opening 'Self' of the second extension.
@@ -507,54 +504,33 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
           checkKind = CheckAll;
       }
 
+      auto openType = [&](ConstraintSystem &cs, DeclContext *innerDC,
+                          DeclContext *outerDC, Type type,
+                          OpenedTypeMap &replacements,
+                          ConstraintLocator *locator) -> Type {
+        if (auto *funcType = type->getAs<AnyFunctionType>()) {
+          return cs.openFunctionType(funcType, locator, replacements, outerDC);
+        }
+
+        cs.openGeneric(outerDC, innerDC->getGenericSignatureOfContext(),
+                       locator, replacements);
+
+        return cs.openType(type, replacements);
+      };
+
       // Construct a constraint system to compare the two declarations.
       ConstraintSystem cs(tc, dc, ConstraintSystemOptions());
       bool knownNonSubtype = false;
 
-      auto locator = cs.getConstraintLocator(nullptr);
+      auto *locator = cs.getConstraintLocator(nullptr);
       // FIXME: Locator when anchored on a declaration.
       // Get the type of a reference to the second declaration.
-      OpenedTypeMap unused;
-      Type openedType2;
-      if (auto *funcType = type2->getAs<AnyFunctionType>()) {
-        openedType2 = cs.openFunctionType(
-            funcType, /*numArgumentLabelsToRemove=*/0, locator,
-            /*replacements=*/unused,
-            innerDC2,
-            outerDC2,
-            /*skipProtocolSelfConstraint=*/false);
-      } else {
-        cs.openGeneric(innerDC2,
-                       outerDC2,
-                       innerDC2->getGenericSignatureOfContext(),
-                       /*skipProtocolSelfConstraint=*/false,
-                       locator,
-                       unused);
 
-        openedType2 = cs.openType(type2, unused);
-      }
-
-      // Get the type of a reference to the first declaration, swapping in
-      // archetypes for the dependent types.
-      OpenedTypeMap replacements;
-      Type openedType1;
-      if (auto *funcType = type1->getAs<AnyFunctionType>()) {
-        openedType1 = cs.openFunctionType(
-            funcType, /*numArgumentLabelsToRemove=*/0, locator,
-            replacements,
-            innerDC1,
-            outerDC1,
-            /*skipProtocolSelfConstraint=*/false);
-      } else {
-        cs.openGeneric(innerDC1,
-                       outerDC1,
-                       innerDC1->getGenericSignatureOfContext(),
-                       /*skipProtocolSelfConstraint=*/false,
-                       locator,
-                       replacements);
-
-        openedType1 = cs.openType(type1, replacements);
-      }
+      OpenedTypeMap unused, replacements;
+      auto openedType2 =
+          openType(cs, innerDC1, outerDC2, type2, unused, locator);
+      auto openedType1 =
+          openType(cs, innerDC2, outerDC1, type1, replacements, locator);
 
       for (const auto &replacement : replacements) {
         if (auto mapped = innerDC1->mapTypeIntoContext(replacement.first)) {

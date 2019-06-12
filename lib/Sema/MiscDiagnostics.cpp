@@ -124,6 +124,10 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       if (isa<TypeExpr>(Base))
         checkUseOfMetaTypeName(Base);
 
+      if (auto *OLE = dyn_cast<ObjectLiteralExpr>(E)) {
+        CallArgs.insert(OLE->getArg());
+      }
+
       if (auto *SE = dyn_cast<SubscriptExpr>(E))
         CallArgs.insert(SE->getIndex());
 

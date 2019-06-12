@@ -32,7 +32,6 @@
 #include "swift/Sema/IDETypeChecking.h"
 #include "clang/Basic/CharInfo.h"
 #include "llvm/Support/Debug.h"
-#include "clang/Basic/CharInfo.h"
 
 using namespace swift;
 
@@ -41,7 +40,7 @@ namespace {
   template<typename ...ArgTypes>
   void diagnoseAndRemoveAttr(TypeChecker &TC, Decl *D, DeclAttribute *attr,
                              ArgTypes &&...Args) {
-    assert(!D->hasClangNode() && "Clang imported propagated a bogus attribute");
+    assert(!D->hasClangNode() && "Clang importer propagated a bogus attribute");
     if (!D->hasClangNode()) {
       SourceLoc loc = attr->getLocation();
       assert(loc.isValid() && "Diagnosing attribute with invalid location");
@@ -909,8 +908,8 @@ bool swift::isValidDynamicCallableMethod(FuncDecl *decl, DeclContext *DC,
   if (!hasKeywordArguments) {
     auto arrayLitProto =
       TC.Context.getProtocol(KnownProtocolKind::ExpressibleByArrayLiteral);
-    return TC.conformsToProtocol(argType, arrayLitProto, DC,
-                                 ConformanceCheckOptions()).hasValue();
+    return TypeChecker::conformsToProtocol(argType, arrayLitProto, DC,
+                                           ConformanceCheckOptions()).hasValue();
   }
   // If keyword arguments, check that argument type conforms to
   // `ExpressibleByDictionaryLiteral` and that the `Key` associated type
@@ -919,15 +918,15 @@ bool swift::isValidDynamicCallableMethod(FuncDecl *decl, DeclContext *DC,
     TC.Context.getProtocol(KnownProtocolKind::ExpressibleByStringLiteral);
   auto dictLitProto =
     TC.Context.getProtocol(KnownProtocolKind::ExpressibleByDictionaryLiteral);
-  auto dictConf = TC.conformsToProtocol(argType, dictLitProto, DC,
-                                        ConformanceCheckOptions());
+  auto dictConf = TypeChecker::conformsToProtocol(argType, dictLitProto, DC,
+                                                  ConformanceCheckOptions());
   if (!dictConf) return false;
   auto lookup = dictLitProto->lookupDirect(TC.Context.Id_Key);
   auto keyAssocType =
     cast<AssociatedTypeDecl>(lookup[0])->getDeclaredInterfaceType();
   auto keyType = dictConf.getValue().getAssociatedType(argType, keyAssocType);
-  return TC.conformsToProtocol(keyType, stringLitProtocol, DC,
-                               ConformanceCheckOptions()).hasValue();
+  return TypeChecker::conformsToProtocol(keyType, stringLitProtocol, DC,
+                                         ConformanceCheckOptions()).hasValue();
 }
 
 /// Returns true if the given nominal type has a valid implementation of a
@@ -1016,8 +1015,8 @@ bool swift::isValidStringDynamicMemberLookup(SubscriptDecl *decl,
     TC.Context.getProtocol(KnownProtocolKind::ExpressibleByStringLiteral);
 
   // If this is `subscript(dynamicMember: String*)`
-  return bool(TC.conformsToProtocol(paramType, stringLitProto, DC,
-                                    ConformanceCheckOptions()));
+  return bool(TypeChecker::conformsToProtocol(paramType, stringLitProto, DC,
+                                              ConformanceCheckOptions()));
 }
 
 bool swift::isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl,
@@ -1444,9 +1443,9 @@ void AttributeChecker::visitNSCopyingAttr(NSCopyingAttr *attr) {
   assert(VD->getOverriddenDecl() == nullptr &&
          "Can't have value with storage that is an override");
 
-  // Check the type.  It must be must be [unchecked]optional, weak, a normal
+  // Check the type.  It must be an [unchecked]optional, weak, a normal
   // class, AnyObject, or classbound protocol.
-  // must conform to the NSCopying protocol.
+  // It must conform to the NSCopying protocol.
   
 }
 
@@ -1502,8 +1501,9 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
   }
 
   if (!ApplicationDelegateProto ||
-      !TC.conformsToProtocol(CD->getDeclaredType(), ApplicationDelegateProto,
-                             CD, None)) {
+      !TypeChecker::conformsToProtocol(CD->getDeclaredType(),
+                                       ApplicationDelegateProto,
+                                       CD, None)) {
     TC.diagnose(attr->getLocation(),
                 diag::attr_ApplicationMain_not_ApplicationDelegate,
                 applicationMainKind);
@@ -3714,6 +3714,15 @@ void TypeChecker::checkReferenceOwnershipAttr(VarDecl *var,
     }
 
     diagnose(var->getStartLoc(), D, ownershipKind, underlyingType);
+    attr->setInvalid();
+  }
+
+  ClassDecl *underlyingClass = underlyingType->getClassOrBoundGenericClass();
+  if (underlyingClass && underlyingClass->isIncompatibleWithWeakReferences()) {
+    diagnose(attr->getLocation(),
+             diag::invalid_ownership_incompatible_class,
+             underlyingType, ownershipKind)
+      .fixItRemove(attr->getRange());
     attr->setInvalid();
   }
 

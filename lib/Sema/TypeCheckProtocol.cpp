@@ -1739,7 +1739,7 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
   // Check that T conforms to all inherited protocols.
   for (auto InheritedProto : Proto->getInheritedProtocols()) {
     auto InheritedConformance =
-    TC.conformsToProtocol(
+      TypeChecker::conformsToProtocol(
                         T, InheritedProto, DC,
                         ConformanceCheckFlags::SkipConditionalRequirements,
                         ComplainLoc);
@@ -2968,7 +2968,8 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
       // a member that could in turn satisfy *this* requirement.
       auto derivableProto = cast<ProtocolDecl>(derivable->getDeclContext());
       if (auto conformance =
-            TC.conformsToProtocol(Adoptee, derivableProto, DC, None)) {
+            TypeChecker::conformsToProtocol(Adoptee, derivableProto,
+                                            DC, None)) {
         if (conformance->isConcrete())
           (void)conformance->getConcrete()->getWitnessDecl(derivable, &TC);
       }
@@ -3235,8 +3236,11 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
     // Save the missing requirement for later diagnosis.
     GlobalMissingWitnesses.insert(requirement);
     diagnoseOrDefer(requirement, true,
-      [requirement, matches](NormalProtocolConformance *conformance) {
+      [requirement, matches, nominal](NormalProtocolConformance *conformance) {
         auto dc = conformance->getDeclContext();
+        auto *protocol = conformance->getProtocol();
+        // Possibly diagnose reason for automatic derivation failure
+        DerivedConformance::tryDiagnoseFailedDerivation(dc, nominal, protocol);
         // Diagnose each of the matches.
         for (const auto &match : matches)
           diagnoseMatch(dc->getParentModule(), conformance, requirement, match);
@@ -3349,7 +3353,7 @@ CheckTypeWitnessResult swift::checkTypeWitness(TypeChecker &tc, DeclContext *dc,
 
   // Check protocol conformances.
   for (auto reqProto : genericSig->getConformsTo(depTy)) {
-    if (!tc.conformsToProtocol(
+    if (!TypeChecker::conformsToProtocol(
                           contextType, reqProto, dc,
                           ConformanceCheckFlags::SkipConditionalRequirements))
       return CheckTypeWitnessResult(reqProto->getDeclaredType());

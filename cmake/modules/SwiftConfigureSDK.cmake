@@ -51,6 +51,9 @@ function(_report_sdk prefix)
     message(STATUS "  Triple name: ${SWIFT_SDK_${prefix}_TRIPLE_NAME}")
   endif()
   message(STATUS "  Architectures: ${SWIFT_SDK_${prefix}_ARCHITECTURES}")
+  if(SWIFT_SDK_${prefix}_MODULE_ARCHITECTURES)
+    message(STATUS "  Module Architectures: ${SWIFT_SDK_${prefix}_MODULE_ARCHITECTURES}")
+  endif()
   if(NOT prefix IN_LIST SWIFT_APPLE_PLATFORMS)
     if(SWIFT_BUILD_STDLIB)
       foreach(arch ${SWIFT_SDK_${prefix}_ARCHITECTURES})
@@ -141,9 +144,30 @@ macro(configure_sdk_darwin
   set(SWIFT_SDK_${prefix}_LIB_SUBDIR "${xcrun_name}")
   set(SWIFT_SDK_${prefix}_VERSION_MIN_NAME "${version_min_name}")
   set(SWIFT_SDK_${prefix}_TRIPLE_NAME "${triple_name}")
-  set(SWIFT_SDK_${prefix}_ARCHITECTURES "${architectures}")
   set(SWIFT_SDK_${prefix}_OBJECT_FORMAT "MACHO")
 
+  set(SWIFT_SDK_${prefix}_ARCHITECTURES ${architectures})
+  if(SWIFT_DARWIN_SUPPORTED_ARCHS)
+    list_intersect(
+      "${architectures}"                  # lhs
+      "${SWIFT_DARWIN_SUPPORTED_ARCHS}"   # rhs
+      SWIFT_SDK_${prefix}_ARCHITECTURES)  # result
+  endif()
+
+  list_intersect(
+    "${SWIFT_DARWIN_MODULE_ARCHS}"            # lhs
+    "${architectures}"                        # rhs
+    SWIFT_SDK_${prefix}_MODULE_ARCHITECTURES) # result
+
+  # Ensure the architectures and module-only architectures lists are mutually
+  # exclusive.
+  list_subtract(
+    "${SWIFT_SDK_${prefix}_MODULE_ARCHITECTURES}" # lhs
+    "${SWIFT_SDK_${prefix}_ARCHITECTURES}"        # rhs
+    SWIFT_SDK_${prefix}_MODULE_ARCHITECTURES)     # result
+
+  # Configure variables for _all_ architectures even if we aren't "building"
+  # them because they aren't supported.
   foreach(arch ${architectures})
     # On Darwin, all archs share the same SDK path.
     set(SWIFT_SDK_${prefix}_ARCH_${arch}_PATH "${SWIFT_SDK_${prefix}_PATH}")

@@ -2351,7 +2351,14 @@ visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
 
 RValue RValueEmitter::
 visitObjectLiteralExpr(ObjectLiteralExpr *E, SGFContext C) {
-  return visit(E->getSemanticExpr(), C);
+  ConcreteDeclRef init = E->getInitializer();
+  auto *decl = cast<ConstructorDecl>(init.getDecl());
+  AnyFunctionType *fnTy = decl->getMethodInterfaceType()
+                              .subst(init.getSubstitutions())
+                              ->getAs<AnyFunctionType>();
+  PreparedArguments args(fnTy->getParams(), E->getArg());
+  return SGF.emitApplyAllocatingInitializer(SILLocation(E), init,
+                                            std::move(args), E->getType(), C);
 }
 
 RValue RValueEmitter::
