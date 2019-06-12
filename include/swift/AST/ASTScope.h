@@ -360,14 +360,13 @@ protected:
     return {false, isCascadingUse};
   }
 
-
-  virtual bool lookInGenericParameters(Optional<bool> isCascadingUse,
-                                       DeclConsumer) const;
+  virtual bool lookInMyGenericParameters(Optional<bool> isCascadingUse,
+                                         DeclConsumer) const;
 
   // Consume the generic parameters in the context and its outer contexts
-  static bool lookInMyAndOuterGenericParameters(const GenericContext *,
-                                                Optional<bool> isCascadingUse,
-                                                DeclConsumer);
+  static bool lookInGenericParametersOf(NullablePtr<const GenericParamList>,
+                                        Optional<bool> isCascadingUse,
+                                        DeclConsumer);
 
   NullablePtr<const ASTScopeImpl> parentIfNotChildOfTopScope() const {
     const auto *p = getParent().get();
@@ -579,8 +578,6 @@ public:
   virtual std::string declKindName() const = 0;
   virtual bool doesDeclHaveABody() const;
   const char *portionName() const { return portion->portionName; }
-  bool lookInGenericParameters(Optional<bool> isCascadingUse,
-                               DeclConsumer) const override;
   NullablePtr<DeclContext>
       computeSelfDCForParent(NullablePtr<DeclContext>) const override;
   Optional<bool> resolveIsCascadingUseForThisScope(
@@ -605,9 +602,18 @@ public:
   virtual NullablePtr<const ASTScopeImpl> getLookupLimitForDecl() const;
 };
 
-class IterableTypeScope : public GenericTypeOrExtensionScope {
+class GenericTypeScope : public GenericTypeOrExtensionScope {
 public:
-  IterableTypeScope(const Portion *p) : GenericTypeOrExtensionScope(p) {}
+  GenericTypeScope(const Portion *p) : GenericTypeOrExtensionScope(p) {}
+  virtual ~GenericTypeScope() {}
+
+  bool lookInMyGenericParameters(Optional<bool> isCascadingUse,
+                                 DeclConsumer) const override;
+};
+
+class IterableTypeScope : public GenericTypeScope {
+public:
+  IterableTypeScope(const Portion *p) : GenericTypeScope(p) {}
   virtual ~IterableTypeScope() {}
 
   virtual SourceRange getBraces() const = 0;
@@ -659,13 +665,15 @@ public:
                                                ScopeCreator &) override;
   void createBodyScope(ASTScopeImpl *leaf, ScopeCreator &) override;
   NullablePtr<Decl> getDecl() const override { return decl; }
+  bool lookInMyGenericParameters(Optional<bool> isCascadingUse,
+                                 DeclConsumer) const override;
 };
 
-class TypeAliasScope final : public GenericTypeOrExtensionScope {
+class TypeAliasScope final : public GenericTypeScope {
 public:
   TypeAliasDecl *const decl;
   TypeAliasScope(const Portion *p, TypeAliasDecl *e)
-      : GenericTypeOrExtensionScope(p), decl(e) {}
+      : GenericTypeScope(p), decl(e) {}
   virtual ~TypeAliasScope() {}
 
   std::string declKindName() const override { return "TypeAlias"; }
@@ -675,11 +683,11 @@ public:
   NullablePtr<Decl> getDecl() const override { return decl; }
 };
 
-class OpaqueTypeScope final : public GenericTypeOrExtensionScope {
+class OpaqueTypeScope final : public GenericTypeScope {
 public:
   OpaqueTypeDecl *const decl;
   OpaqueTypeScope(const Portion *p, OpaqueTypeDecl *e)
-      : GenericTypeOrExtensionScope(p), decl(e) {}
+      : GenericTypeScope(p), decl(e) {}
   virtual ~OpaqueTypeScope() {}
 
   std::string declKindName() const override { return "OpaqueType"; }
@@ -764,8 +772,8 @@ public:
 
 protected:
   Decl *getEnclosingAbstractFunctionOrSubscriptDecl() const override;
-  bool lookInGenericParameters(Optional<bool> isCascadingUse,
-                               DeclConsumer) const override;
+  bool lookInMyGenericParameters(Optional<bool> isCascadingUse,
+                                 DeclConsumer) const override;
   Optional<bool>
   resolveIsCascadingUseForThisScope(Optional<bool>) const override;
 };
@@ -1246,8 +1254,8 @@ public:
 
 protected:
   Decl *getEnclosingAbstractFunctionOrSubscriptDecl() const override;
-  bool lookInGenericParameters(Optional<bool> isCascadingUse,
-                               DeclConsumer) const override;
+  bool lookInMyGenericParameters(Optional<bool> isCascadingUse,
+                                 DeclConsumer) const override;
   NullablePtr<AbstractStorageDecl>
   getEnclosingAbstractStorageDecl() const override {
     return decl;

@@ -202,7 +202,7 @@ Optional<bool> ASTScopeImpl::lookup(
   // you can say "self.name" to get a name shadowed by a generic but you
   // can't do the opposite to get a generic shadowed by a name.
   if (!skipSearchForGenericsAndMembers) {
-    if (lookInGenericParameters(isCascadingUseForThisScope, consumer))
+    if (lookInMyGenericParameters(isCascadingUseForThisScope, consumer))
       return isCascadingUseForThisScope;
   }
   // Dig out the type we're looking into.
@@ -244,23 +244,26 @@ Optional<bool> ASTScopeImpl::lookupInParent(
                               consumer);
 }
 
-#pragma mark lookInGenericParameters
+#pragma mark lookInMyGenericParameters
 
-bool ASTScopeImpl::lookInGenericParameters(Optional<bool> isCascadingUse,
-                                           ASTScopeImpl::DeclConsumer) const {
+bool ASTScopeImpl::lookInMyGenericParameters(Optional<bool> isCascadingUse,
+                                             ASTScopeImpl::DeclConsumer) const {
   return false;
 }
 
-bool AbstractFunctionDeclScope::lookInGenericParameters(
+bool AbstractFunctionDeclScope::lookInMyGenericParameters(
     Optional<bool> isCascadingUse, ASTScopeImpl::DeclConsumer consumer) const {
-  return lookInMyAndOuterGenericParameters(decl, isCascadingUse, consumer);
-}
-bool SubscriptDeclScope::lookInGenericParameters(
-    Optional<bool> isCascadingUse, ASTScopeImpl::DeclConsumer consumer) const {
-  return lookInMyAndOuterGenericParameters(decl, isCascadingUse, consumer);
+  return lookInGenericParametersOf(decl->getGenericParams(), isCascadingUse,
+                                   consumer);
 }
 
-bool GenericTypeOrExtensionScope::lookInGenericParameters(
+bool SubscriptDeclScope::lookInMyGenericParameters(
+    Optional<bool> isCascadingUse, ASTScopeImpl::DeclConsumer consumer) const {
+  return lookInGenericParametersOf(decl->getGenericParams(), isCascadingUse,
+                                   consumer);
+}
+
+bool GenericTypeScope::lookInMyGenericParameters(
     Optional<bool> isCascadingUse, ASTScopeImpl::DeclConsumer consumer) const {
   // For Decls:
   // WAIT, WHAT?! Isn't this covered by the GenericParamScope
@@ -271,22 +274,32 @@ bool GenericTypeOrExtensionScope::lookInGenericParameters(
   // Sigh... These must be here so that from body, we search generics before
   // members. But they also must be on the Decl scope for lookups starting from
   // generic parameters, where clauses, etc.
-  return lookInMyAndOuterGenericParameters(getGenericContext(), isCascadingUse,
-                                           consumer);
+  return lookInGenericParametersOf(getGenericContext()->getGenericParams(),
+                                   isCascadingUse, consumer);
 }
 
-bool ASTScopeImpl::lookInMyAndOuterGenericParameters(
-    const GenericContext *const gc, Optional<bool> isCascadingUse,
-    ASTScopeImpl::DeclConsumer consumer) {
-  for (auto *params = gc->getGenericParams(); params;
+bool ExtensionScope::lookInMyGenericParameters(
+    Optional<bool> isCascadingUse, ASTScopeImpl::DeclConsumer consumer) const {
+  // For extensions of nested types, must check outer parameters
+  for (auto *params = decl->getGenericParams(); params;
        params = params->getOuterParameters()) {
-    SmallVector<ValueDecl *, 32> bindings;
-    for (auto *param : params->getParams())
-      bindings.push_back(param);
-    if (consumer.consume(bindings, DeclVisibilityKind::GenericParameter,
-                         isCascadingUse))
+    if (lookInGenericParametersOf(params, isCascadingUse, consumer))
       return true;
   }
+  return false;
+}
+
+bool ASTScopeImpl::lookInGenericParametersOf(
+    const NullablePtr<const GenericParamList> paramList,
+    Optional<bool> isCascadingUse, ASTScopeImpl::DeclConsumer consumer) {
+  if (!paramList)
+    return false;
+  SmallVector<ValueDecl *, 32> bindings;
+  for (auto *param : paramList.get()->getParams())
+    bindings.push_back(param);
+  if (consumer.consume(bindings, DeclVisibilityKind::GenericParameter,
+                       isCascadingUse))
+    return true;
   return false;
 }
 
