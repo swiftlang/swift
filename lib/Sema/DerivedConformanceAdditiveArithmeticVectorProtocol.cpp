@@ -91,7 +91,6 @@ static Type getVectorProtocolVectorSpaceScalarAssocType(
   auto conf = TypeChecker::conformsToProtocol(varType, vectorProto, DC, None);
   if (!conf)
     return nullptr;
-  conf->dump();
   return conf->getTypeWitnessByName(varType, C.Id_VectorSpaceScalar);
 }
 
