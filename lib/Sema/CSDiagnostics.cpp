@@ -143,6 +143,37 @@ Type FailureDiagnostic::resolveInterfaceType(Type type,
                            : resolvedType;
 }
 
+/// Given an apply expr, returns true if it is expected to have a direct callee
+/// overload, resolvable using `getChoiceFor`. Otherwise, returns false.
+static bool shouldHaveDirectCalleeOverload(const ApplyExpr *apply) {
+  auto *fnExpr = apply->getFn()->getValueProvidingExpr();
+
+  // An apply of an apply/subscript doesn't have a direct callee.
+  if (isa<ApplyExpr>(fnExpr) || isa<SubscriptExpr>(fnExpr))
+    return false;
+
+  // Applies of closures don't have callee overloads.
+  if (isa<ClosureExpr>(fnExpr))
+    return false;
+
+  // If the optionality changes, there's no direct callee.
+  if (isa<BindOptionalExpr>(fnExpr) || isa<ForceValueExpr>(fnExpr) ||
+      isa<OptionalTryExpr>(fnExpr)) {
+    return false;
+  }
+
+  // If we have an intermediate cast, there's no direct callee.
+  if (isa<ExplicitCastExpr>(fnExpr))
+    return false;
+
+  // No direct callee for an if expr.
+  if (isa<IfExpr>(fnExpr))
+    return false;
+
+  // Assume that anything else would have a direct callee.
+  return true;
+}
+
 Optional<FunctionArgApplyInfo>
 FailureDiagnostic::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
   auto &cs = getConstraintSystem();
@@ -189,9 +220,11 @@ FailureDiagnostic::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
     rawFnType = overload->openedType;
   } else {
     // If we didn't resolve an overload for the callee, we must be dealing with
-    // an apply of an arbitrary function expr.
-    auto *fnExpr = cast<CallExpr>(anchor)->getFn();
-    rawFnType = cs.getType(fnExpr)->getRValueType();
+    // a call of an arbitrary function expr.
+    auto *call = cast<CallExpr>(anchor);
+    assert(!shouldHaveDirectCalleeOverload(call) &&
+           "Should we have resolved a callee for this?");
+    rawFnType = cs.getType(call->getFn())->getRValueType();
   }
 
   auto *fnType = resolveType(rawFnType)->getAs<FunctionType>();
