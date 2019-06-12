@@ -427,7 +427,7 @@ static ValueDecl *deriveAdditiveArithmetic_zero(DerivedConformance &derived) {
   if (!nominal->getEffectiveMemberwiseInitializer()) {
     auto *initDecl = createImplicitConstructor(
         TC, nominal, ImplicitConstructorKind::Memberwise);
-    derived.addMembersToConformanceContext(initDecl);
+    nominal->addMember(initDecl);
     C.addSynthesizedDecl(initDecl);
   }
 

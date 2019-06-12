@@ -96,11 +96,21 @@ struct InvalidMixedScalar: VectorProtocol { // expected-error {{type 'InvalidMix
   var double: Double
 }
 
-// Test initializer that is not a memberwise initializer because of stored property name vs parameter label mismatch.
-struct HasCustomNonMemberwiseInitializer<T : VectorProtocol>: VectorProtocol {
+// Test memberwise initializer synthesis.
+struct NoMemberwiseInitializer<T : VectorProtocol> : VectorProtocol {
   var value: T
   init(randomLabel value: T) { self.value = value }
 }
+struct NoMemberwiseInitializerExtended<T> {
+  var value: T
+  init(_ value: T) {
+    self.value = value
+  }
+}
+extension NoMemberwiseInitializerExtended : Equatable, AdditiveArithmetic
+  where T : AdditiveArithmetic {}
+extension NoMemberwiseInitializerExtended : VectorProtocol
+  where T : VectorProtocol {}
 
 // Test derived conformances in disallowed contexts.
 

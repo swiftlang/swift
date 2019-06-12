@@ -386,11 +386,7 @@ static ValueDecl *deriveDifferentiable_method(
     // constructor is synthesized during SILGen, which is too late.
     auto *initDecl = createImplicitConstructor(
         TC, returnNominal, ImplicitConstructorKind::Memberwise);
-    initDecl->setDeclContext(parentDC);
-    if (nominal == returnNominal)
-      derived.addMembersToConformanceContext(initDecl);
-    else
-      returnNominal->addMember(initDecl);
+    returnNominal->addMember(initDecl);
     C.addSynthesizedDecl(initDecl);
   }
 

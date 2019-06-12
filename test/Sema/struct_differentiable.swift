@@ -331,6 +331,18 @@ struct InvalidInitializer : Differentiable {
   init(filterShape: (Int, Int, Int, Int), blah: NonExistentType) {} // expected-error {{use of undeclared type 'NonExistentType'}}
 }
 
+// Test memberwise initializer synthesis.
+struct NoMemberwiseInitializerExtended<T> {
+  var value: T
+  init(_ value: T) {
+    self.value = value
+  }
+}
+extension NoMemberwiseInitializerExtended: Equatable, AdditiveArithmetic
+  where T : AdditiveArithmetic {}
+extension NoMemberwiseInitializerExtended: Differentiable
+  where T : Differentiable & AdditiveArithmetic {}
+
 // Test derived conformances in disallowed contexts.
 
 // expected-error @+2 {{type 'OtherFileNonconforming' does not conform to protocol 'Differentiable'}}
