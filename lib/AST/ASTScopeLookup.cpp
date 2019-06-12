@@ -377,16 +377,22 @@ bool AbstractFunctionBodyScope::lookupLocalBindings(
                            isCascadingUse))
         return true;
   }
-  if (auto *s = decl->getImplicitSelfDecl()) {
-    if (consumer.consume({s}, DeclVisibilityKind::FunctionParameter,
-                         isCascadingUse))
-      return true;
-  }
   return false;
+}
+
+bool MethodBodyScope::lookupLocalBindings(Optional<bool> isCascadingUse,
+                                          DeclConsumer consumer) const {
+  assert(decl->getImplicitSelfDecl());
+  if (AbstractFunctionBodyScope::lookupLocalBindings(isCascadingUse, consumer))
+    return true;
+  return consumer.consume({decl->getImplicitSelfDecl()},
+                          DeclVisibilityKind::FunctionParameter,
+                          isCascadingUse);
 }
 
 bool PureFunctionBodyScope::lookupLocalBindings(Optional<bool> isCascadingUse,
                                                 DeclConsumer consumer) const {
+  assert(!decl->getImplicitSelfDecl());
   if (AbstractFunctionBodyScope::lookupLocalBindings(isCascadingUse, consumer))
     return true;
 

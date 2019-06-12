@@ -828,6 +828,8 @@ class MethodBodyScope final : public AbstractFunctionBodyScope {
 public:
   MethodBodyScope(AbstractFunctionDecl *e) : AbstractFunctionBodyScope(e) {}
   std::string getClassName() const override;
+  bool lookupLocalBindings(Optional<bool>,
+                           DeclConsumer consumer) const override;
 
 protected:
   NullablePtr<DeclContext>
