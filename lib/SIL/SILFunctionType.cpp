@@ -124,8 +124,8 @@ CanSILFunctionType SILFunctionType::getWithDifferentiability(
                 : SILParameterDifferentiability::NotDifferentiable));
   }
 
-  auto newExtInfo = getExtInfo().withDifferentiabilityKind(DifferentiabilityKind
-                                                               ::Normal);
+  auto newExtInfo = getExtInfo().withDifferentiabilityKind(
+      DifferentiabilityKind::Normal);
 
   return get(getGenericSignature(), newExtInfo, getCoroutineKind(),
              getCalleeConvention(), newParameters, getYields(), getResults(),
@@ -137,7 +137,7 @@ CanSILFunctionType SILFunctionType::getWithoutDifferentiability() {
   if (!isDifferentiable())
     return CanSILFunctionType(this);
   auto nondiffExtInfo = getExtInfo().withDifferentiabilityKind(
-                            DifferentiabilityKind::NonDifferentiable);
+      DifferentiabilityKind::NonDifferentiable);
   SmallVector<SILParameterInfo, 8> newParams;
   for (auto &param : getParameters())
     newParams.push_back(param.getWithDifferentiability(

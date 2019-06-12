@@ -69,8 +69,8 @@ public:
   Optional<StringRef> conventionWitnessMethodProtocol = None;
   
   // SWIFT_ENABLE_TENSORFLOW
-  // indicates whether the type's '@differentiable' attribute has a 'linear'
-  // argument
+  // Indicates whether the type's '@differentiable' attribute has a 'linear'
+  // argument.
   bool linear = false;
 
   // For an opened existential type, the known ID.

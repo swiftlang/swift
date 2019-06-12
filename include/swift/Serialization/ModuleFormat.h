@@ -777,7 +777,7 @@ namespace decls_block {
     BCFixed<1>,  // noescape?
     // SWIFT_ENABLE_TENSORFLOW
     BCFixed<1>,  // throws?
-    BCFixed<2> // differentiable & linear?
+    BCFixed<2> // differentiability kind
     // trailed by parameters
   >;
 

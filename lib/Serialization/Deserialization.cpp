@@ -4705,8 +4705,8 @@ public:
 
     // SWIFT_ENABLE_TENSORFLOW
     bool noescape = false, throws = false;
-    uint8_t rawDiffKind;
-    DifferentiabilityKind diffKind = DifferentiabilityKind::NonDifferentiable;
+    uint8_t rawDiffKind = 0;
+    auto diffKind = DifferentiabilityKind::NonDifferentiable;
     GenericSignature *genericSig = nullptr;
 
     if (!isGeneric) {
@@ -4717,7 +4717,7 @@ public:
                                                   throws,
                                                   rawDiffKind);
       diffKind = DifferentiabilityKind(rawDiffKind);
-      
+
     } else {
       GenericSignatureID rawGenericSig;
       decls_block::GenericFunctionTypeLayout::readRecord(scratch,
@@ -4728,6 +4728,7 @@ public:
                                                          rawDiffKind,
                                                          rawGenericSig);
       genericSig = MF.getGenericSignature(rawGenericSig);
+      // SWIFT_ENABLE_TENSORFLOW
       diffKind = DifferentiabilityKind(rawDiffKind);
     }
 
@@ -5117,8 +5118,7 @@ public:
       return nullptr;
     }
     // SWIFT_ENABLE_TENSORFLOW
-    DifferentiabilityKind kind =
-        DifferentiabilityKind((unsigned)differentiable);
+    auto kind = DifferentiabilityKind((unsigned)differentiable);
     SILFunctionType::ExtInfo extInfo(*representation, pseudogeneric,
                                      noescape, kind);
 

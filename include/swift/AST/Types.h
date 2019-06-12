@@ -3877,8 +3877,7 @@ public:
     }
     // SWIFT_ENABLE_TENSORFLOW
     ExtInfo withDifferentiabilityKind(
-        DifferentiabilityKind differentiability)
-    const {
+        DifferentiabilityKind differentiability) const {
       return ExtInfo((Bits & ~DifferentiabilityMask) |
                      ((unsigned)differentiability <<
                       DifferentiabilityMaskOffset));

@@ -6495,7 +6495,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
     // SWIFT_ENABLE_TENSORFLOW
     auto toEINoADConversion =
-    toEI.withDifferentiabilityKind(fromEI.getDifferentiabilityKind());
+        toEI.withDifferentiabilityKind(fromEI.getDifferentiabilityKind());
     auto toFuncNoADConversion = toFunc->withExtInfo(toEINoADConversion);
     if (toEI.isDifferentiable() && !fromEI.isDifferentiable())
       toFuncNoADConversion =
