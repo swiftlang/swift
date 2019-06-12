@@ -2326,7 +2326,7 @@ extension FixedWidthInteger {
   // surely be improved on even for Int64, but that is mostly an optimization
   // problem; the basic algorithm here gives the compiler all the information
   // that it needs to generate efficient code.
-  @inlinable
+  @_alwaysEmitIntoClient
   public func multipliedFullWidth(by other: Self) -> (high: Self, low: Magnitude) {
     // We define a utility function for splitting an integer into high and low
     // halves. Note that the low part is always unsigned, while the high part
