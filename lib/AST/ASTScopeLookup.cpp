@@ -194,21 +194,21 @@ Optional<bool> ASTScopeImpl::lookup(
   /// Because a body scope nests in a generic param scope, etc, we might look in
   /// the self type twice. That's why we pass scopeWhoseTypeWasAlreadySearched.
   /// Look in the generics and self type only iff haven't already looked there.
-  const bool shouldSearchGenericsAndMembers =
+  const bool skipSearchForGenericsAndMembers =
       scopeWhoseTypeWasAlreadySearched &&
       scopeWhoseTypeWasAlreadySearched == getDecl().getPtrOrNull();
 
   // Look for generics before members in violation of lexical ordering because
   // you can say "self.name" to get a name shadowed by a generic but you
   // can't do the opposite to get a generic shadowed by a name.
-  if (shouldSearchGenericsAndMembers &&
-      lookInGenericParameters(isCascadingUseForThisScope, consumer))
-    return isCascadingUseForThisScope;
-
+  if (!skipSearchForGenericsAndMembers) {
+    if (lookInGenericParameters(isCascadingUseForThisScope, consumer))
+      return isCascadingUseForThisScope;
+  }
   // Dig out the type we're looking into.
   // Perform lookup into the type
   Optional<bool> isCascadingUseResult = isCascadingUseForThisScope;
-  if (shouldSearchGenericsAndMembers) {
+  if (!skipSearchForGenericsAndMembers) {
     bool isDone;
     std::tie(isDone, isCascadingUseResult) =
         lookupInSelfType(selfDC, isCascadingUseResult, consumer);
