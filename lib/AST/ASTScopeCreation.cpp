@@ -462,8 +462,8 @@ public:
 
   ASTScopeImpl *visitBraceStmt(BraceStmt *bs, ASTScopeImpl *p,
                                ScopeCreator &scopeCreator) {
-    auto *insertionPoint = scopeCreator.createSubtree<BraceStmtScope>(p, bs);
-    return p->doISplitAScope() ? insertionPoint : p;
+    scopeCreator.createSubtree<BraceStmtScope>(p, bs);
+    return p;
   }
 
   ASTScopeImpl *visitPatternBindingDecl(PatternBindingDecl *patternBinding,

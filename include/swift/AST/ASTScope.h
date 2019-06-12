@@ -277,13 +277,6 @@ public:
 
 
 #pragma mark - - creation queries
-protected:
-  /// In other words, does this scope introduce a new definition
-  bool doISplitAScope() const {
-    // Before an abstract storage decl, the decl is inaccessible.
-    // After an abstract storage decl, it is now accessible.
-    return isThisAnAbstractStorageDecl();
-  }
 public:
   virtual bool isThisAnAbstractStorageDecl() const { return false; }
 
