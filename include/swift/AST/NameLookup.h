@@ -640,9 +640,7 @@ class ASTScope {
   ast_scope::ASTSourceFileScope *const impl;
 
 public:
-  ASTScope(ast_scope::ASTSourceFileScope *sfs) : impl(sfs) {}
-  static ASTScope *createScopeTreeFor(SourceFile *);
-  void addAnyNewScopesToTree();
+  ASTScope(SourceFile *);
   static Optional<bool>
   unqualifiedLookup(SourceFile *, DeclName, SourceLoc,
                     const DeclContext *startingContext,
@@ -667,6 +665,9 @@ public:
     assert(Mem);
     return Mem;
   }
+
+private:
+  static ast_scope::ASTSourceFileScope *createScopeTree(SourceFile *);
 };
 
 } // end namespace swift

@@ -664,17 +664,17 @@ static void verifyGenericSignaturesIfNeeded(CompilerInvocation &Invocation,
 
 static void dumpAndPrintScopeMap(CompilerInvocation &Invocation,
                                  CompilerInstance &Instance, SourceFile *SF) {
-  const ASTScope *scope = SF->getScope();
+  const ASTScope &scope = SF->getScope();
 
   if (Invocation.getFrontendOptions().DumpScopeMapLocations.empty()) {
     llvm::errs() << "***Complete scope map***\n";
-    scope->print(llvm::errs());
+    scope.print(llvm::errs());
     return;
   }
   // Probe each of the locations, and dump what we find.
   for (auto lineColumn :
        Invocation.getFrontendOptions().DumpScopeMapLocations)
-    scope->dumpOneScopeMapLocation(lineColumn);
+    scope.dumpOneScopeMapLocation(lineColumn);
 }
 
 static SourceFile *getPrimaryOrMainSourceFile(CompilerInvocation &Invocation,

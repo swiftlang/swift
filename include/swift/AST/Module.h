@@ -992,7 +992,7 @@ private:
   bool HasImplementationOnlyImports = false;
 
   /// The scope map that describes this source file.
-  ASTScope *Scope = nullptr;
+  std::unique_ptr<ASTScope> Scope;
 
   friend ASTContext;
   friend Impl;
@@ -1192,7 +1192,7 @@ public:
   StringRef getFilename() const;
 
   /// Retrieve the scope that describes this source file.
-  ASTScope *getScope();
+  ASTScope &getScope();
 
   void dump() const;
   void dump(raw_ostream &os) const;

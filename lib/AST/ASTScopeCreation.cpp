@@ -295,19 +295,16 @@ public:
 
 #pragma mark Scope tree creation and extension
 
-ASTScope *ASTScope::createScopeTreeFor(SourceFile *SF) {
-  ScopeCreator *scopeCreator = new (SF->getASTContext()) ScopeCreator(SF);
-  auto *scope = new (SF->getASTContext()) ASTScope(scopeCreator->sourceFileScope);
-  scopeCreator->sourceFileScope->addNewDeclsToTree();
-  return scope;
-}
+ASTScope::ASTScope(SourceFile *SF) : impl(createScopeTree(SF)) {}
 
-void ASTScope::addAnyNewScopesToTree() {
-  assert(impl->SF && impl->scopeCreator);
-  impl->scopeCreator->sourceFileScope->addNewDeclsToTree();
+ASTSourceFileScope *ASTScope::createScopeTree(SourceFile *SF) {
+  ScopeCreator *scopeCreator = new (SF->getASTContext()) ScopeCreator(SF);
+  scopeCreator->sourceFileScope->addNewDeclsToTree();
+  return scopeCreator->sourceFileScope;
 }
 
 void ASTSourceFileScope::addNewDeclsToTree() {
+  assert(SF && scopeCreator);
   ArrayRef<Decl *> decls = SF->Decls;
   ArrayRef<Decl *> newDecls = decls.slice(numberOfDeclsAlreadySeen);
   // Save source range recalculation work if possible

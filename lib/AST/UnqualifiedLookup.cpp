@@ -1232,7 +1232,7 @@ void UnqualifiedLookupFactory::ResultFinderForTypeContext::dump() const {
 
 void UnqualifiedLookupFactory::dumpScopes() const {
   llvm::errs() << "\n\nScopes:\n";
-  DC->getParentSourceFile()->getScope()->print(llvm::errs());
+  DC->getParentSourceFile()->getScope().print(llvm::errs());
   llvm::errs() << "\n";
 }
 

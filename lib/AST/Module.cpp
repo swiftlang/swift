@@ -1695,9 +1695,10 @@ StringRef SourceFile::getFilename() const {
   return SM.getIdentifierForBuffer(BufferID);
 }
 
-ASTScope *SourceFile::getScope() {
-  if (!Scope) Scope = ASTScope::createScopeTreeFor(this);
-  return Scope;
+ASTScope &SourceFile::getScope() {
+  if (!Scope)
+    Scope = std::unique_ptr<ASTScope>(new (getASTContext()) ASTScope(this));
+  return *Scope.get();
 }
 
 
