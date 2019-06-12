@@ -4717,7 +4717,6 @@ public:
                                                   throws,
                                                   rawDiffKind);
       diffKind = DifferentiabilityKind(rawDiffKind);
-
     } else {
       GenericSignatureID rawGenericSig;
       decls_block::GenericFunctionTypeLayout::readRecord(scratch,
