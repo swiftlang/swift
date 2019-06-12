@@ -757,3 +757,16 @@ func test_generic_subscript_with_missing_arg() {
     _ = s[0] // expected-error {{generic parameter 'U' could not be inferred}}
   }
 }
+
+func rdar_50007727() {
+  struct A<T> { // expected-note {{'T' declared as parameter to type 'A'}}
+    struct B<U> : ExpressibleByStringLiteral {
+      init(stringLiteral value: String) {}
+    }
+  }
+
+  struct S {}
+  let _ = A.B<S>("hello")
+  // expected-error@-1 {{generic parameter 'T' could not be inferred in cast to 'A.B'}}
+  // expected-note@-2 {{explicitly specify the generic arguments to fix this issue}} {{12-12=<Any>}}
+}
