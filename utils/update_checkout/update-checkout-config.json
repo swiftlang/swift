@@ -349,7 +349,7 @@
                 "clang-tools-extra": "swift-DEVELOPMENT-SNAPSHOT-2019-06-02-a",
                 "libcxx": "swift-DEVELOPMENT-SNAPSHOT-2019-06-02-a",
                 "tensorflow": "ebc41609e27dcf0998d8970e77a2e1f53e13ac86",
-                "tensorflow-swift-apis": "b9bcebc7dfd1497e324c24f4c0d8c0b212580d1f",
+                "tensorflow-swift-apis": "55ddd7ccedf46a3a480ded0affa067eadd91bae0",
                 "indexstore-db": "swift-DEVELOPMENT-SNAPSHOT-2019-06-02-a",
                 "sourcekit-lsp": "swift-DEVELOPMENT-SNAPSHOT-2019-06-02-a"
             }
