@@ -17,7 +17,7 @@
 /// itself and its children, obtaining its SourceRange (for lookup), and looking
 /// up names accessible from that scope.
 ///
-/// Invarients:
+/// Invariants:
 ///   a child's source range is a subset (proper or improper) of its parent's,
 ///   children are ordered by source range, and do not overlap,
 ///   all the names visible within a parent are visible within the child, unless
