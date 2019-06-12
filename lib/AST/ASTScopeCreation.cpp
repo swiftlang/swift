@@ -66,10 +66,11 @@ public:
 public:
   /// Given an array of ASTNodes or Decl pointers, add them
   /// Return the resultant insertionPoint
-  template <typename ASTNode_or_DeclPtr>
-  ASTScopeImpl *
-  addScopesToTree(ASTScopeImpl *const insertionPoint,
-                  ArrayRef<ASTNode_or_DeclPtr> nodesOrDeclsToAdd) {
+  /// Use a template in order to be able to pass in either an array of ASTNodes
+  /// or an array of Decl*s.
+  template <typename NodeType>
+  ASTScopeImpl *addScopesToTree(ASTScopeImpl *const insertionPoint,
+                                ArrayRef<NodeType> nodesOrDeclsToAdd) {
     auto *ip = insertionPoint;
     for (auto nd : nodesOrDeclsToAdd) {
       if (shouldThisNodeBeScopedWhenEncountered(nd))
