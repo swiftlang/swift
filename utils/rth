@@ -15,6 +15,7 @@ import argparse
 import glob
 import os
 import pipes
+import platform
 import shlex
 import shutil
 import subprocess
@@ -224,6 +225,10 @@ class ResilienceTest(object):
                 os.path.join(self.tmp_dir, self.config_dir_map[config1], '*'))
             command = self.target_run + [output_obj] + tmp_dir_contents
             verbose_print_command(command)
+            # Windows does not have RPATH, make sure that we change the current
+            # working directory before we execute the test.
+            if platform.system() == 'Windows':
+                os.chdir(self.config_dir_map[config1])
             returncode = subprocess.call(command)
             assert returncode == 0, str(command)
 
