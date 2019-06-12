@@ -821,6 +821,13 @@ Type TypeChecker::applyUnboundGenericArguments(
 
     subs = parentType->getContextSubstitutions(decl->getDeclContext());
     skipRequirementsCheck |= parentType->hasTypeVariable();
+  } else if (auto genericEnv =
+                 decl->getDeclContext()->getGenericEnvironmentOfContext()) {
+    auto subMap = genericEnv->getForwardingSubstitutionMap();
+    for (auto gp : subMap.getGenericSignature()->getGenericParams()) {
+      subs[gp->getCanonicalType()->castTo<GenericTypeParamType>()] =
+        Type(gp).subst(subMap);
+    }
   }
 
   SourceLoc noteLoc = decl->getLoc();
