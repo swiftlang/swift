@@ -41,6 +41,7 @@ add_swift_target_library(swiftFoundation ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES
   NSItemProvider.swift
   NSNumber.swift
   NSObject.swift
+  NSOrderedCollectionDifference.swift
   NSPredicate.swift
   NSRange.swift
   NSSet.swift
