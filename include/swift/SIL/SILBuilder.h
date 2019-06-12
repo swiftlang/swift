@@ -2249,6 +2249,9 @@ public:
   explicit SILBuilderWithScope(SILBasicBlock::iterator I, SILBuilder &B)
       : SILBuilder(&*I, &*I->getDebugScope(), B.getBuilderContext()) {}
 
+  explicit SILBuilderWithScope(SILBasicBlock::reverse_iterator I)
+      : SILBuilderWithScope(SILBasicBlock::iterator(I)) {}
+
   explicit SILBuilderWithScope(SILInstruction *I,
                                SILInstruction *InheritScopeFrom)
       : SILBuilderWithScope(I) {

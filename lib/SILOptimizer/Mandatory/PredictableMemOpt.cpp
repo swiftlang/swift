@@ -611,6 +611,9 @@ AvailableValueAggregator::aggregateFullyAvailableValue(SILType loadTy,
 
   // If we only are tracking a singular value, we do not need to construct
   // SSA. Just return that value.
+  //
+  // The reason why this is optional is since in the case where we do not have
+  // any insertion points, we will have nil.
   if (auto val = singularValue.getValueOr(SILValue()))
     return val;
 
@@ -775,14 +778,13 @@ AvailableValueAggregator::addMissingDestroysForCopiedValues(
     // Clear our state.
     visitedBlocks.clear();
     leakingBlocks.clear();
+
     // The linear lifetime checker doesn't care if the passed in load is
     // actually a user of our copy_value. What we care about is that the load is
     // guaranteed to be in the block where we have reformed the tuple in a
     // consuming manner. This means if we add it as the consuming use of the
-    // copy, we can find the leaking places if any exist.
-    //
-    // Then perform the linear lifetime check. If we succeed, continue. We have
-    // no further work to do.
+    // copy, we can find the leaking places if any exist. Otherwise, if we have
+    // a linear lifetime already, we can just return.
     auto errorKind = ownership::ErrorBehaviorKind::ReturnFalse;
     LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
     auto error = checker.checkValue(
@@ -794,13 +796,25 @@ AvailableValueAggregator::addMissingDestroysForCopiedValues(
     // Ok, we found some leaking blocks. Since we are using the linear lifetime
     // checker with memory, we do not have any guarantees that the store is out
     // side of a loop and a load is in a loop. In such a case, we want to
-    // replace the load with a copy_value.
+    // replace the load with a copy_value inside of the loop.
     foundLoop |= error.getFoundOverConsume();
 
     // Ok, we found some leaking blocks. Insert destroys at the
-    // beginning of these blocks for our copy_value.
+    // beginning of these blocks for our in-loop copy_value.
     for (auto *bb : leakingBlocks) {
-      SILBuilderWithScope b(bb->begin());
+      auto iter = bb->getTerminator()->getReverseIterator();
+      auto prevIter = std::next(iter);
+
+      if (isa<UnreachableInst>(&*iter) && prevIter != bb->rend()) {
+        if (auto applySite = FullApplySite::isa(&*prevIter)) {
+          if (applySite.isCalleeNoReturn()) {
+            prevIter = std::next(prevIter);
+          }
+        }
+      }
+
+      // NOTE: This is taking a reverse iterator.
+      SILBuilderWithScope b(prevIter);
       b.emitDestroyValueOperation(loc, cvi);
     }
   }
