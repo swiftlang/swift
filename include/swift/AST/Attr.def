@@ -401,11 +401,9 @@ SIMPLE_DECL_ATTR(_implementationOnly, ImplementationOnly,
 DECL_ATTR(_custom, Custom,
   OnAnyDecl | UserInaccessible,
   85)
-SIMPLE_DECL_ATTR(_propertyWrapper, PropertyWrapper,
+SIMPLE_DECL_ATTR(propertyWrapper, PropertyWrapper,
   OnStruct | OnClass | OnEnum,
   86)
-DECL_ATTR_ALIAS(propertyDelegate, PropertyWrapper)
-DECL_ATTR_ALIAS(propertyWrapper, PropertyWrapper)
 SIMPLE_DECL_ATTR(_disfavoredOverload, DisfavoredOverload,
   OnAbstractFunction | OnVar | OnSubscript | UserInaccessible,
   87)
