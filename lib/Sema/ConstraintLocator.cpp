@@ -81,7 +81,6 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
     case KeyPathType:
     case KeyPathRoot:
     case KeyPathValue:
-    case SingleExprFuncResultType:
       if (unsigned numValues = numNumericValuesInPathElement(elt.getKind())) {
         id.AddInteger(elt.getValue());
         if (numValues > 1)
@@ -351,7 +350,10 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
       break;
 
     case ContextualType:
-      out << "contextual type";
+      if (elt.isResultOfSingleExprFunction())
+        out << "expected result type of the function with a single expression";
+      else
+        out << "contextual type";
       break;
 
     case SynthesizedArgument:
@@ -372,10 +374,6 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
 
     case KeyPathValue:
       out << " keypath value";
-      break;
-
-    case SingleExprFuncResultType:
-      out << " expected result type of the function with a single expression";
       break;
     }
   }

@@ -379,3 +379,18 @@ struct OtherGeneric<X, Y, Z> {
   var y: GenericWithOpaqueAssoc<Y>.Assoc
   var z: GenericWithOpaqueAssoc<Z>.Assoc
 }
+
+
+protocol P_51641323 {
+  associatedtype T
+
+  var foo: Self.T { get }
+}
+
+func rdar_51641323() {
+  struct Foo: P_51641323 {
+    var foo: some P_51641323 { {} }
+    // expected-error@-1 {{return type of property 'foo' requires that '() -> ()' conform to 'P_51641323'}}
+    // expected-note@-2 {{opaque return type declared here}}
+  }
+}
