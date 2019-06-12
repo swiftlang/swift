@@ -239,7 +239,7 @@ namespace swift {
     bool EnableDeserializationRecovery = true;
 
     /// Should we use \c ASTScope-based resolution for unqualified name lookup?
-    bool EnableASTScopeLookup = false;
+    bool EnableASTScopeLookup = true;
     
     /// Someday, ASTScopeLookup will supplant lookup in the parser
     bool DisableParserLookup = false;
