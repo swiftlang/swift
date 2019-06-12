@@ -66,9 +66,11 @@ const ASTScopeImpl *ASTScopeImpl::findStartingScopeForLookup(
   const auto innermost = fileScope->findInnermostEnclosingScope(loc);
 
   // The legacy lookup code gets passed both a SourceLoc and a starting context.
-  // Someday, we might get away with just a SourceLoc.
-  // For now, to ensure compatibility, start with the scope that matches the
-  // starting context and includes the starting location.
+  // However, our ultimate intent is for clients to not have to pass in a
+  // DeclContext at all, since the SourceLoc should be enough. While we are
+  // debugging the new ASTScope lookup code, we can catch bugs by comparing the
+  // DeclContext of the ASTScope found from the desired SourceLoc to the
+  // DeclContext passed in by the client.
 
   const auto *startingScope = innermost;
   for (; startingScope &&
