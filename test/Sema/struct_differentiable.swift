@@ -8,8 +8,8 @@ func assertAllDifferentiableVariablesEqualsTangentVector<T>(_: T.Type)
 // Verify that a type `T` conforms to `AdditiveArithmetic`.
 func assertConformsToAdditiveArithmetic<T>(_: T.Type) where T : AdditiveArithmetic {}
 
-// Verify that a type `T` conforms to `VectorNumeric`.
-func assertConformsToVectorNumeric<T>(_: T.Type) where T : VectorNumeric {}
+// Verify that a type `T` conforms to `VectorProtocol`.
+func assertConformsToVectorProtocol<T>(_: T.Type) where T : VectorProtocol {}
 
 struct Empty : Differentiable {}
 func testEmpty() {
@@ -121,20 +121,20 @@ func testAllMembersAdditiveArithmetic() {
   assertAllDifferentiableVariablesEqualsTangentVector(AllMembersAdditiveArithmetic.self)
 }
 
-// Test type `AllMembersVectorNumeric` whose members conforms to `VectorNumeric`,
+// Test type `AllMembersVectorProtocol` whose members conforms to `VectorProtocol`,
 // in which case we should make `TangentVector` and `TangentVector` conform to
-// `VectorNumeric`.
-struct MyVector : VectorNumeric, Differentiable {
+// `VectorProtocol`.
+struct MyVector : VectorProtocol, Differentiable {
   var w: Float
   var b: Float
 }
-struct AllMembersVectorNumeric : Differentiable {
+struct AllMembersVectorProtocol : Differentiable {
   var w: MyVector
   var b: MyVector
 }
-func testAllMembersVectorNumeric() {
-  assertConformsToVectorNumeric(AllMembersVectorNumeric.TangentVector.self)
-  assertConformsToVectorNumeric(AllMembersVectorNumeric.TangentVector.self)
+func testAllMembersVectorProtocol() {
+  assertConformsToVectorProtocol(AllMembersVectorProtocol.TangentVector.self)
+  assertConformsToVectorProtocol(AllMembersVectorProtocol.TangentVector.self)
 }
 
 // Test type with immutable, differentiable stored property.
@@ -155,7 +155,7 @@ struct DifferentiableSubset : Differentiable {
 }
 func testDifferentiableSubset() {
   assertConformsToAdditiveArithmetic(DifferentiableSubset.AllDifferentiableVariables.self)
-  assertConformsToVectorNumeric(DifferentiableSubset.AllDifferentiableVariables.self)
+  assertConformsToVectorProtocol(DifferentiableSubset.AllDifferentiableVariables.self)
   assertAllDifferentiableVariablesEqualsTangentVector(DifferentiableSubset.self)
   _ = DifferentiableSubset.TangentVector(w: 1, b: 1)
   _ = DifferentiableSubset.TangentVector(w: 1, b: 1)

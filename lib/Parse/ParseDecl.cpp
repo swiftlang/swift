@@ -2533,9 +2533,6 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
     break;
   }
   // SWIFT_ENABLE_TENSORFLOW
-  // @autodiff(...) attribute.
-  case TAK_autodiff:
-  // SWIFT_ENABLE_TENSORFLOW
   // @differentiable(...) attribute.
   case TAK_differentiable:
     break;

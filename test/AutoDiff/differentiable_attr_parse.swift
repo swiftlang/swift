@@ -67,11 +67,6 @@ func slope2(_ x: Float) -> Float {
   return 2 * x
 }
 
-@differentiable(linear, wrt: x, vjp: const3) // okay
-func slope3(_ x: Float) -> Float {
-  return 3 * x
-}
-
 /// Bad
 
 @differentiable(3) // expected-error {{expected either 'wrt:' or a function specifier label, e.g. 'jvp:', or 'vjp:'}}

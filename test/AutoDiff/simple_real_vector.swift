@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
 
 @_fixed_layout
-public struct Vector : AdditiveArithmetic, VectorNumeric, Differentiable {
+public struct Vector : AdditiveArithmetic, VectorProtocol, Differentiable {
   public var x: Float
   public var y: Float
 

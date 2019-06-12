@@ -8,7 +8,7 @@ import StdlibUnittest
 
 var E2EDifferentiablePropertyTests = TestSuite("E2EDifferentiableProperty")
 
-struct TangentSpace : VectorNumeric {
+struct TangentSpace : VectorProtocol {
   let x, y: Float
 }
 
@@ -81,7 +81,7 @@ E2EDifferentiablePropertyTests.test("generic stored property") {
   expectEqual(expectedGrad, actualGrad)
 }
 
-struct ProductSpaceSelfTangent : VectorNumeric {
+struct ProductSpaceSelfTangent : VectorProtocol {
   let x, y: Float
 }
 
@@ -97,7 +97,7 @@ E2EDifferentiablePropertyTests.test("fieldwise product space, self tangent") {
   expectEqual(expectedGrad, actualGrad)
 }
 
-struct ProductSpaceOtherTangentTangentSpace : VectorNumeric {
+struct ProductSpaceOtherTangentTangentSpace : VectorProtocol {
   let x, y: Float
 }
 
@@ -121,6 +121,22 @@ E2EDifferentiablePropertyTests.test("fieldwise product space, other tangent") {
     return 7 * point.y
   }
   let expectedGrad = ProductSpaceOtherTangentTangentSpace(x: 0, y: 7)
+  expectEqual(expectedGrad, actualGrad)
+}
+
+E2EDifferentiablePropertyTests.test("computed property") {
+  struct TF_544 : Differentiable {
+    var value: Float
+    @differentiable
+    var computed: Float {
+      get { value }
+      set { value = newValue }
+    }
+  }
+  let actualGrad = gradient(at: TF_544(value: 2.4)) { x in
+    return x.computed * x.computed
+  }
+  let expectedGrad = TF_544.AllDifferentiableVariables(value: 4.8)
   expectEqual(expectedGrad, actualGrad)
 }
 

@@ -197,15 +197,6 @@ public:
   /// Creates a `AutoDiffParameterIndicesBuilder` for the given function type.
   AutoDiffParameterIndicesBuilder(AnyFunctionType *functionType);
 
-  /// Creates a `AutoDiffParameterIndicesBuilder` for the given function type,
-  /// inferring all differentiation parameters.
-  /// The differentiation parameters are inferred to be:
-  /// - All parameters of the function type that conform to `Differentiable`.
-  /// - If the function type's result is a function type, then also all
-  ///   parameters of the function result type that conform to `Dfiferentiable`.
-  static AutoDiffParameterIndicesBuilder inferParameters(
-      AnyFunctionType *functionType, ModuleDecl *module);
-
   /// Builds the `AutoDiffParameterIndices`, returning a pointer to an existing
   /// one if it has already been allocated in the `ASTContext`.
   AutoDiffParameterIndices *build(ASTContext &C) const;

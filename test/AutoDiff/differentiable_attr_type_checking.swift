@@ -29,15 +29,36 @@ func no_jvp_or_vjp(_ x: Float) -> Float {
   return x * x
 }
 
+// Test duplicated `@differentiable` attributes.
+
 @differentiable // expected-error {{duplicate '@differentiable' attribute}}
-@differentiable
+@differentiable // expected-note {{other attribute declared here}}
 func dupe_attributes(arg: Float) -> Float { return arg }
 
-@differentiable(wrt: arg1) // expected-error {{duplicate '@differentiable' attribute}}
 @differentiable(wrt: arg1)
 @differentiable(wrt: arg2) // expected-error {{duplicate '@differentiable' attribute}}
-@differentiable(wrt: arg2)
+@differentiable(wrt: arg2) // expected-note {{other attribute declared here}}
 func dupe_attributes(arg1: Float, arg2: Float) -> Float { return arg1 }
+
+struct ComputedPropertyDupeAttributes<T : Differentiable> : Differentiable {
+  var value: T
+
+  @differentiable // expected-error {{duplicate '@differentiable' attribute}}
+  var computed1: T {
+    @differentiable // expected-note {{other attribute declared here}}
+    get { value }
+    set { value = newValue }
+  }
+
+  // TODO(TF-482): Remove diagnostics when `@differentiable` attributes are
+  // also uniqued based on generic requirements.
+  @differentiable(where T == Float) // expected-error {{duplicate '@differentiable' attribute}}
+  @differentiable(where T == Double) // expected-note {{other attribute declared here}}
+  var computed2: T {
+    get { value }
+    set { value = newValue }
+  }
+}
 
 class Class {}
 // expected-error @+1 {{class objects and protocol existentials ('Class') cannot be differentiated with respect to}}
@@ -244,7 +265,7 @@ extension JVPStruct {
   }
 }
 
-extension JVPStruct : VectorNumeric {
+extension JVPStruct : VectorProtocol {
   static var zero: JVPStruct { fatalError("unimplemented") }
   static func + (lhs: JVPStruct, rhs: JVPStruct) -> JVPStruct {
     fatalError("unimplemented")
@@ -392,7 +413,7 @@ extension VJPStruct {
   }
 }
 
-extension VJPStruct : VectorNumeric {
+extension VJPStruct : VectorProtocol {
   static var zero: VJPStruct { fatalError("unimplemented") }
   static func + (lhs: VJPStruct, rhs: VJPStruct) -> VJPStruct {
     fatalError("unimplemented")
@@ -583,7 +604,7 @@ func vjpNonvariadic(_ x: Float, indices: [Int32]) -> (Float, (Float) -> Float) {
 }
 
 // expected-error @+3 {{type 'Scalar' constrained to non-protocol, non-class type 'Float'}}
-// expected-error @+2 {{can only differentiate with respect to parameters that conform to 'Differentiable', but 'Scalar' does not conform to 'Differentiable'}}
+// expected-error @+2 {{no differentiation parameters could be inferred; must differentiate with respect to at least one parameter conforming to 'Differentiable'}}
 // expected-note @+1 {{use 'Scalar == Float' to require 'Scalar' to be 'Float'}}
 @differentiable(where Scalar : Float)
 func invalidRequirementConformance<Scalar>(x: Scalar) -> Scalar {
@@ -597,7 +618,23 @@ func invalidRequirementLayout<Scalar>(x: Scalar) -> Scalar {
   return x
 }
 
-protocol DiffReq : Differentiable {
+protocol DifferentiableAttrRequirements : Differentiable {
+  // expected-note @+2 {{protocol requires initializer 'init(x:y:)' with type '(x: Float, y: Float)'}}
+  @differentiable
+  init(x: Float, y: Float)
+
+  // expected-note @+2 {{protocol requires initializer 'init(x:y:)' with type '(x: Float, y: Int)'}}
+  @differentiable(wrt: x)
+  init(x: Float, y: Int)
+
+  // expected-note @+2 {{protocol requires function 'amb(x:y:)' with type '(Float, Float) -> Float';}}
+  @differentiable
+  func amb(x: Float, y: Float) -> Float
+
+  // expected-note @+2 {{protocol requires function 'amb(x:y:)' with type '(Float, Int) -> Float';}}
+  @differentiable(wrt: x)
+  func amb(x: Float, y: Int) -> Float
+
   // expected-note @+2 {{protocol requires function 'f1'}}
   @differentiable(wrt: (self, x))
   func f1(_ x: Float) -> Float
@@ -611,8 +648,39 @@ protocol DiffReq : Differentiable {
   func generic<T>(_ x: T) -> T
 }
 
-// expected-error @+1 {{does not conform to protocol 'DiffReq'}}
-struct ConformingWithErrors : DiffReq {
+// expected-error @+1 {{does not conform to protocol 'DifferentiableAttrRequirements'}}
+struct DiffAttrConformanceErrors : DifferentiableAttrRequirements {
+  var x: Float
+  var y: Float
+
+  // FIXME(TF-284): Fix unexpected diagnostic.
+  // expected-note @+2 {{candidate is missing attribute '@differentiable'}}
+  // expected-note @+1 {{candidate has non-matching type '(x: Float, y: Float)'}}
+  init(x: Float, y: Float) {
+    self.x = x
+    self.y = y
+  }
+
+  // FIXME(TF-284): Fix unexpected diagnostic.
+  // expected-note @+2 {{candidate is missing attribute '@differentiable'}}
+  // expected-note @+1 {{candidate has non-matching type '(x: Float, y: Int)'}}
+  init(x: Float, y: Int) {
+    self.x = x
+    self.y = Float(y)
+  }
+
+  // expected-note @+2 {{candidate is missing attribute '@differentiable'}}
+  // expected-note @+1 {{candidate has non-matching type '(Float, Float) -> Float'}}
+  func amb(x: Float, y: Float) -> Float {
+    return x
+  }
+
+  // expected-note @+2 {{candidate is missing attribute '@differentiable(wrt: x)'}}
+  // expected-note @+1 {{candidate has non-matching type '(Float, Int) -> Float'}}
+  func amb(x: Float, y: Int) -> Float {
+    return x
+  }
+
   // expected-note @+1 {{candidate is missing attribute '@differentiable'}}
   func f1(_ x: Float) -> Float {
     return x
@@ -630,38 +698,6 @@ struct ConformingWithErrors : DiffReq {
   }
 }
 
-protocol DifferentiableInit : Differentiable {
-  // expected-note @+2 {{protocol requires initializer 'init(x:y:)' with type '(x: Float, y: Float)'}}
-  @differentiable
-  init(x: Float, y: Float)
-
-  // expected-note @+2 {{protocol requires initializer 'init(x:y:)' with type '(x: Float, y: Int)'}}
-  @differentiable(wrt: x)
-  init(x: Float, y: Int)
-}
-// expected-error @+1 {{does not conform to protocol 'DifferentiableInit'}}
-struct DifferentiableInitStruct : DifferentiableInit {
-  var x: Float
-  var y: Float
-
-  // FIXME(TF-284): Fix unexpected diagnostic.
-  // expected-note @+2 {{candidate is missing attribute '@differentiable'}}
-  // expected-note @+1 {{candidate is missing attribute '@differentiable'}}
-  init(x: Float, y: Float) {
-    self.x = x
-    self.y = y
-  }
-
-  // FIXME(TF-284): Fix unexpected diagnostic.
-  // expected-note @+2 {{candidate is missing attribute '@differentiable'}}
-  // expected-note @+1 {{candidate is missing attribute '@differentiable'}}
-  init(x: Float, y: Int) {
-    self.x = x
-    self.y = Float(y)
-  }
-}
-
-
 protocol NotRefiningDiffable {
   @differentiable(wrt: x)
   // expected-note @+1 {{protocol requires function 'a' with type '(Float) -> Float'; do you want to add a stub?}}
@@ -670,7 +706,7 @@ protocol NotRefiningDiffable {
 
 // expected-error @+1 {{type 'CertainlyNotDiffableWrtSelf' does not conform to protocol 'NotRefiningDiffable'}}
 struct CertainlyNotDiffableWrtSelf : NotRefiningDiffable {
-  // expected-note @+1 {{candidate is missing attribute '@differentiable(wrt: x)'}}
+  // expected-note @+1 {{candidate is missing attribute '@differentiable'}}
   func a(_ x: Float) -> Float { return x * 5.0 }
 }
 
@@ -686,7 +722,6 @@ protocol TF285 : Differentiable {
 struct TF285MissingOneDiffAttr : TF285 {
   // Requirement is missing an attribute.
   @differentiable(wrt: x)
-  // expected-note @+2 {{candidate is missing attribute '@differentiable(wrt: x)}}
   // expected-note @+1 {{candidate is missing attribute '@differentiable(wrt: (x, y))}}
   func foo(x: Float, y: Float) -> Float {
     return x
@@ -722,4 +757,19 @@ struct NonDiffableStruct {
   func fn(_ b: Float) -> Float {
     return a + b
   }
+}
+
+@differentiable(linear, wrt: x, vjp: const3) // expected-error {{cannot specify 'vjp:' or 'jvp:' for linear functions; use 'transpose:' instead}}
+func slope1(_ x: Float) -> Float {
+  return 3 * x
+}
+
+ @differentiable(linear, wrt: x, jvp: const3) // expected-error {{cannot specify 'vjp:' or 'jvp:' for linear functions; use 'transpose:' instead}}
+func slope2(_ x: Float) -> Float {
+  return 3 * x
+}
+
+ @differentiable(linear, jvp: const3, vjp: const3) // expected-error {{cannot specify 'vjp:' or 'jvp:' for linear functions; use 'transpose:' instead}}
+func slope3(_ x: Float) -> Float {
+  return 3 * x
 }

@@ -565,29 +565,32 @@ swift::matchWitness(
     }
   }
 
+  // Now finalize the match.
   // SWIFT_ENABLE_TENSORFLOW
-  // '@differentiable' attributes must match completely.
-  for (auto *reqDiffAttr : reqAttrs.getAttributes<DifferentiableAttr>()) {
-    auto witnessDiffAttrs =
-        witnessAttrs.getAttributes<DifferentiableAttr, /*AllowInvalid*/ true>();
-    bool reqDiffAttrMatch = llvm::any_of(
-        witnessDiffAttrs, [&](const DifferentiableAttr *witnessDiffAttr) {
-          return witnessDiffAttr->getParameterIndices() &&
-                 reqDiffAttr->getParameterIndices() &&
-                 witnessDiffAttr->parametersMatch(*reqDiffAttr);
-        });
-    if (!reqDiffAttrMatch) {
-      if (auto *vdWitness = dyn_cast<VarDecl>(witness))
-        return RequirementMatch(
-            getStandinForAccessor(vdWitness, AccessorKind::Get),
-            MatchKind::DifferentiableConflict);
-      else
-        return RequirementMatch(witness, MatchKind::DifferentiableConflict);
+  auto result = finalize(anyRenaming, optionalAdjustments);
+  if (result.isViable()) {
+    // '@differentiable' attributes must match completely.
+    for (auto *reqDiffAttr : reqAttrs.getAttributes<DifferentiableAttr>()) {
+      auto witnessDiffAttrs = witnessAttrs
+          .getAttributes<DifferentiableAttr, /*AllowInvalid*/ true>();
+      bool reqDiffAttrMatch = llvm::any_of(
+          witnessDiffAttrs, [&](const DifferentiableAttr *witnessDiffAttr) {
+            return witnessDiffAttr->getParameterIndices() &&
+                   reqDiffAttr->getParameterIndices() &&
+                   witnessDiffAttr->parametersMatch(*reqDiffAttr);
+          });
+      if (!reqDiffAttrMatch) {
+        if (auto *vdWitness = dyn_cast<VarDecl>(witness))
+          return RequirementMatch(
+              getStandinForAccessor(vdWitness, AccessorKind::Get),
+              MatchKind::DifferentiableConflict, reqDiffAttr);
+        else
+          return RequirementMatch(witness, MatchKind::DifferentiableConflict,
+                                  reqDiffAttr);
+      }
     }
   }
-
-  // Now finalize the match.
-  return finalize(anyRenaming, optionalAdjustments);
+  return result;
 }
 
 /// Checks \p reqEnvCache for a requirement environment appropriate for
@@ -1997,6 +2000,30 @@ static void addOptionalityFixIts(
 
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+// Compute the derivative generic environment for the given `@differentiable`
+// attribute and original function.
+static GenericEnvironment * computeDerivativeGenericEnvironment(
+    const DifferentiableAttr *attr, AbstractFunctionDecl *original) {
+  // If `@differentiable` attribute has no requirements, return original
+  // function's generic environment.
+  if (attr->getRequirements().empty())
+    return original->getGenericEnvironment();
+  // Otherwise, build derivative generic sigunature.
+  GenericSignatureBuilder builder(original->getASTContext());
+  // Add original function's generic signature.
+  builder.addGenericSignature(original->getGenericSignature());
+  using FloatingRequirementSource =
+      GenericSignatureBuilder::FloatingRequirementSource;
+  // Add `@differentiable` attribute requirements.
+  for (auto req : attr->getRequirements())
+    builder.addRequirement(req, FloatingRequirementSource::forAbstract(),
+                           original->getModuleContext());
+  auto *derivativeGenSig = std::move(builder).computeGenericSignature(
+      attr->getLocation(), /*allowConcreteGenericParams=*/true);
+  return derivativeGenSig->createGenericEnvironment();
+}
+
 /// Diagnose a requirement match, describing what went wrong (or not).
 static void
 diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
@@ -2144,17 +2171,25 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     break;
   // SWIFT_ENABLE_TENSORFLOW
   case MatchKind::DifferentiableConflict: {
-    for (auto *da : req->getAttrs()
-             .getAttributes<DifferentiableAttr, /*allowInvalid*/ true>()) {
-      assert(da);
-      std::string diffAttrReq;
-      llvm::raw_string_ostream stream(diffAttrReq);
-      da->print(stream, req,
-                /*prettyPrintInModule*/ match.Witness->getModuleContext());
-      diags.diagnose(match.Witness,
-          diag::protocol_witness_missing_specific_differentiable_attr,
-          StringRef(stream.str()).trim());
-    }
+    // Emit a note showing the missing requirement `@differentiable` attribute.
+    auto *reqAttr = cast<DifferentiableAttr>(match.UnmetAttribute);
+    assert(reqAttr);
+    // Omit printing wrt clause if attribute differentiation parameters match
+    // inferred differentiation parameters.
+    auto *original = cast<AbstractFunctionDecl>(match.Witness);
+    auto *whereClauseGenEnv =
+        computeDerivativeGenericEnvironment(reqAttr, original);
+    auto *inferredParameters = TypeChecker::inferDifferentiableParameters(
+        original, whereClauseGenEnv);
+    bool omitWrtClause = reqAttr->getParameterIndices()->parameters.count() ==
+                         inferredParameters->parameters.count();
+    // Get `@differentiable` attribute description.
+    std::string reqDiffAttrString;
+    llvm::raw_string_ostream stream(reqDiffAttrString);
+    reqAttr->print(stream, req, omitWrtClause);
+    diags.diagnose(match.Witness,
+                   diag::protocol_witness_missing_differentiable_attr,
+                   StringRef(stream.str()).trim());
     break;
   }
   }
@@ -5312,8 +5347,8 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
     return derived.deriveAdditiveArithmetic(Requirement);
 
   // SWIFT_ENABLE_TENSORFLOW
-  case KnownProtocolKind::VectorNumeric:
-    return derived.deriveVectorNumeric(Requirement);
+  case KnownProtocolKind::VectorProtocol:
+    return derived.deriveVectorProtocol(Requirement);
 
   // SWIFT_ENABLE_TENSORFLOW
   case KnownProtocolKind::Differentiable:
@@ -5345,8 +5380,8 @@ Type TypeChecker::deriveTypeWitness(DeclContext *DC,
   // SWIFT_ENABLE_TENSORFLOW
   case KnownProtocolKind::KeyPathIterable:
     return derived.deriveKeyPathIterable(AssocType);
-  case KnownProtocolKind::VectorNumeric:
-    return derived.deriveVectorNumeric(AssocType);
+  case KnownProtocolKind::VectorProtocol:
+    return derived.deriveVectorProtocol(AssocType);
   case KnownProtocolKind::Differentiable:
     return derived.deriveDifferentiable(AssocType);
   default:

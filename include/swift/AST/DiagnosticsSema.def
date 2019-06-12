@@ -2532,8 +2532,8 @@ ERROR(parameterized_invalid_parameters_struct,none,
       "invalid", (Type))
 ERROR(broken_additive_arithmetic_requirement,none,
       "AdditiveArithmetic protocol is broken: unexpected requirement", ())
-ERROR(broken_vector_numeric_requirement,none,
-      "VectorNumeric protocol is broken: unexpected requirement", ())
+ERROR(broken_vector_protocol_requirement,none,
+      "VectorProtocol protocol is broken: unexpected requirement", ())
 ERROR(broken_differentiable_requirement,none,
       "Differentiable protocol is broken: unexpected requirement", ())
 WARNING(differentiable_nondiff_type_implicit_noderivative_fixit,none,
@@ -2544,8 +2544,6 @@ WARNING(differentiable_constant_property_implicit_noderivative_fixit,none,
       "'let' properties with a default value do not have a derivative; add "
       "'@noDerivative' to make it explicit, or change it to 'var' to allow "
       "derivatives", ())
-NOTE(protocol_witness_missing_differentiable_attr,none,
-     "candidate is missing attribute '%0'", (StringRef))
 
 NOTE(codable_extraneous_codingkey_case_here,none,
      "CodingKey case %0 does not match any stored properties", (Identifier))
@@ -2735,7 +2733,9 @@ ERROR(differentiable_attr_overload_not_found,none,
 ERROR(differentiable_attr_no_currying,none,
       "'@differentiable' cannot be defined on functions that return functions", ())
 ERROR(differentiable_attr_duplicate,none,
-      "duplicate '@differentiable' attribute", ())
+      "duplicate '@differentiable' attribute with same parameter indices", ())
+NOTE(differentiable_attr_duplicate_note,none,
+     "other attribute declared here", ())
 ERROR(differentiable_attr_function_not_same_type_context,none,
       "%0 is not defined in the current type context", (DeclName))
 ERROR(differentiable_attr_specified_not_function,none,
@@ -2761,7 +2761,7 @@ ERROR(differentiable_attr_class_unsupported,none,
       "class members cannot be marked with '@differentiable'", ())
 ERROR(differentiable_attr_stored_property_variable_unsupported,none,
       "'jvp:' or 'vjp:' cannot be specified for stored properties", ())
-NOTE(protocol_witness_missing_specific_differentiable_attr,none,
+NOTE(protocol_witness_missing_differentiable_attr,none,
      "candidate is missing attribute '%0'", (StringRef))
 
 // @differentiating

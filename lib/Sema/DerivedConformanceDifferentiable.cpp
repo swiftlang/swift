@@ -625,8 +625,8 @@ getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived,
   auto diffableType = TypeLoc::withoutLoc(diffableProto->getDeclaredType());
   auto *addArithProto = C.getProtocol(KnownProtocolKind::AdditiveArithmetic);
   auto addArithType = TypeLoc::withoutLoc(addArithProto->getDeclaredType());
-  auto *vecNumProto = C.getProtocol(KnownProtocolKind::VectorNumeric);
-  auto vecNumType = TypeLoc::withoutLoc(vecNumProto->getDeclaredType());
+  auto *vectorProto = C.getProtocol(KnownProtocolKind::VectorProtocol);
+  auto vectorType = TypeLoc::withoutLoc(vectorProto->getDeclaredType());
   auto *kpIterableProto = C.getProtocol(KnownProtocolKind::KeyPathIterable);
   auto kpIterableType = TypeLoc::withoutLoc(kpIterableProto->getDeclaredType());
 
@@ -650,18 +650,19 @@ getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived,
                                      None);
         });
 
-  // Associated struct can derive `VectorNumeric` if the associated types of all
-  // members conform to `VectorNumeric` and share the same scalar type.
+  // Associated struct can derive `VectorProtocol` if the associated types of
+  // all members conform to `VectorProtocol` and share the same
+  // `VectorSpaceScalar` type.
   Type sameScalarType;
-  bool canDeriveVectorNumeric =
+  bool canDeriveVectorProtocol =
       canDeriveAdditiveArithmetic && !diffProperties.empty() &&
       llvm::all_of(diffProperties, [&](VarDecl *vd) {
         auto conf = TC.conformsToProtocol(getAssociatedType(vd, parentDC, id),
-                                          vecNumProto, nominal,
-                                          None);
+                                          vectorProto, nominal, None);
         if (!conf)
           return false;
-        Type scalarType = conf->getTypeWitnessByName(vd->getType(), C.Id_Scalar);
+        auto scalarType =
+            conf->getTypeWitnessByName(vd->getType(), C.Id_VectorSpaceScalar);
         if (!sameScalarType) {
           sameScalarType = scalarType;
           return true;
@@ -681,11 +682,11 @@ getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived,
                               None))
       inherited.push_back(kpIterableType);
   }
-  // If all members also conform to `VectorNumeric` with the same `Scalar` type,
-  // make the associated struct conform to `VectorNumeric` instead of just
-  // `AdditiveArithmetic`.
-  if (canDeriveVectorNumeric)
-    inherited.push_back(vecNumType);
+  // If all members also conform to `VectorProtocol` with the same `Scalar`
+  // type, make the associated struct conform to `VectorProtocol` instead of
+  // just `AdditiveArithmetic`.
+  if (canDeriveVectorProtocol)
+    inherited.push_back(vectorType);
 
   auto *structDecl = new (C) StructDecl(SourceLoc(), id, SourceLoc(),
                                         /*Inherited*/ C.AllocateCopy(inherited),
@@ -736,6 +737,16 @@ getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived,
     // call to the getter.
     if (member->getEffectiveAccess() > AccessLevel::Internal &&
         !member->getAttrs().hasAttribute<DifferentiableAttr>()) {
+      // If getter does not exist, trigger synthesis and compute type.
+      if (!member->getGetter())
+        addExpectedOpaqueAccessorsToStorage(member, C);
+      if (!member->getGetter()->hasInterfaceType())
+        TC.resolveDeclSignature(member->getGetter());
+      // If member or its getter already has a `@differentiable` attribute,
+      // continue.
+      if (member->getAttrs().hasAttribute<DifferentiableAttr>() ||
+          member->getGetter()->getAttrs().hasAttribute<DifferentiableAttr>())
+        continue;
       ArrayRef<Requirement> requirements;
       // If the parent declaration context is an extension, the nominal type may
       // conditionally conform to `Differentiable`. Use the conditional
@@ -746,11 +757,6 @@ getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived,
           C, /*implicit*/ true, SourceLoc(), SourceLoc(),
           /*linear*/ false, {}, None, None, requirements);
       member->getAttrs().add(diffableAttr);
-      // If getter does not exist, trigger synthesis and compute type.
-      if (!member->getGetter())
-        addExpectedOpaqueAccessorsToStorage(member, C);
-      if (!member->getGetter()->hasInterfaceType())
-        TC.resolveDeclSignature(member->getGetter());
       // Compute getter parameter indices.
       auto *getterType =
           member->getGetter()->getInterfaceType()->castTo<AnyFunctionType>();
