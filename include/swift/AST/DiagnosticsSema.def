@@ -4440,6 +4440,9 @@ ERROR(property_wrapper_type_not_usable_from_inline,none,
       "%select{%select{variable|constant}0|property}1 "
       "must be '@usableFromInline' or public",
       (bool, bool))
+WARNING(property_wrapper_delegateValue,none,
+        "property wrapper's `delegateValue` property should be renamed to "
+        "'wrapperValue'; use of 'delegateValue' is deprecated", ())
 
 //------------------------------------------------------------------------------
 // MARK: function builder diagnostics
