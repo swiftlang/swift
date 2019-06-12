@@ -2,13 +2,13 @@
 // RUN: %target-swift-frontend -typecheck -verify -primary-file %s %S/Inputs/struct_vector_protocol_other_module.swift
 
 func testVectorProtocol<T : VectorProtocol>(
-_ x: inout T, scalar: T.Scalar
+_ x: inout T, scalar: T.VectorSpaceScalar
 ) {
   // Test `AdditiveArithmetic` requirements: `zero`, `+`, `-`.
   let zero = T.zero
   x += x + zero
   x -= x - zero
-  // Test `VectorProtocol` requirements: `Scalar`, `*`.
+  // Test `VectorProtocol` requirements: `VectorSpaceScalar`, `*`.
   x *= scalar
   _ = scalar * x
   _ = x * scalar
@@ -32,7 +32,7 @@ func testVector2(float2: Float2) {
   _ = Vector2<Double>(x: 1, y: 1)
   _ = Vector2<Float2>(x: float2, y: float2)
 }
-func testGeneric<T : VectorProtocol>(vec2: inout Vector2<T>, scalar: T.Scalar) {
+func testGeneric<T : VectorProtocol>(vec2: inout Vector2<T>, scalar: T.VectorSpaceScalar) {
   testVectorProtocol(&vec2, scalar: scalar)
 }
 
@@ -90,7 +90,7 @@ extension GenericExtended : Equatable, AdditiveArithmetic, VectorProtocol where 
 struct Empty : VectorProtocol {} // expected-error {{type 'Empty' does not conform to protocol 'VectorProtocol'}}
 
 // Test type whose members conform to `VectorProtocol`
-// but have different `Scalar` associated type.
+// but have different `VectorSpaceScalar` associated type.
 struct InvalidMixedScalar: VectorProtocol { // expected-error {{type 'InvalidMixedScalar' does not conform to protocol 'VectorProtocol'}}
   var float: Float
   var double: Double
