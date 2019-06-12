@@ -2998,7 +2998,10 @@ Parser::parseDecl(ParseDeclOptions Flags,
 
   if (AttrStatus.hasCodeCompletion()) {
     if (CodeCompletion) {
-      CodeCompletion->setAttrTargetDecl(DeclResult.getPtrOrNull());
+      Optional<DeclKind> DK;
+      if (DeclResult.isNonNull())
+        DK = DeclResult.get()->getKind();
+      CodeCompletion->setAttrTargetDeclKind(DK);
     } else {
       delayParseFromBeginningToHere(BeginParserPosition, Flags);
       return makeParserError();

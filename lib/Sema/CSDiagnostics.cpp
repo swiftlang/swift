@@ -3157,3 +3157,33 @@ bool MissingGenericArgumentsFailure::findArgumentLocations(
   typeLoc.getTypeRepr()->walk(associator);
   return associator.allParamsAssigned();
 }
+
+void SkipUnhandledConstructInFunctionBuilderFailure::diagnosePrimary(
+    bool asNote) {
+  if (auto stmt = unhandled.dyn_cast<Stmt *>()) {
+    emitDiagnostic(stmt->getStartLoc(),
+                   asNote? diag::note_function_builder_control_flow
+                         : diag::function_builder_control_flow,
+                   builder->getFullName());
+  } else {
+    auto decl = unhandled.get<Decl *>();
+    emitDiagnostic(decl,
+                   asNote ? diag::note_function_builder_decl
+                          : diag::function_builder_decl,
+                   builder->getFullName());
+  }
+}
+
+bool SkipUnhandledConstructInFunctionBuilderFailure::diagnoseAsError() {
+  diagnosePrimary(/*asNote=*/false);
+  emitDiagnostic(builder,
+                 diag::kind_declname_declared_here,
+                 builder->getDescriptiveKind(),
+                 builder->getFullName());
+  return true;
+}
+
+bool SkipUnhandledConstructInFunctionBuilderFailure::diagnoseAsNote() {
+  diagnosePrimary(/*asNote=*/true);
+  return true;
+}
