@@ -245,6 +245,18 @@ PropertyWrapperTypeInfoRequest::evaluate(
   result.wrapperValueVar =
     findValueProperty(ctx, nominal, ctx.Id_wrapperValue, /*allowMissing=*/true);
 
+  // If there was no wrapperValue property, but there is a delegateValue
+  // property, use that and warn.
+  if (!result.wrapperValueVar) {
+    result.wrapperValueVar =
+      findValueProperty(ctx, nominal, ctx.Id_delegateValue,
+                        /*allowMissing=*/true);
+    if (result.wrapperValueVar) {
+      result.wrapperValueVar->diagnose(diag::property_wrapper_delegateValue)
+        .fixItReplace(result.wrapperValueVar->getNameLoc(), "wrapperValue");
+    }
+  }
+
   return result;
 }
 
