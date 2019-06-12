@@ -30,3 +30,14 @@ struct A {
   // expected-error @+1 {{expected ')' after 'linear' in '@differentiable' attribute}}
   let property: @differentiable(linear (linear) -> Float
 }
+
+// Using 'linear' as a typealias
+struct B {
+  typealias linear = (Float) -> Float
+  let property: @differentiable (linear) -> Float // okay
+  let property: @differentiable(linear) (linear) -> linear // okay
+  let property: @differentiable linear // okay
+  let property: linear // okay
+  // FIXME(bartchr): TF-576 have this able to be parsed.
+  //let property: @differentiable(linear) linear // okay
+}

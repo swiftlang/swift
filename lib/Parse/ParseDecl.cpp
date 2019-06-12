@@ -2407,7 +2407,6 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
       // Determine if we have '@differentiable(linear) (T) -> U'
       // or '@differentiable (linear) -> U'.
       if (Tok.getText() == "linear" && consumeIf(tok::identifier)) {
-        
         if (Tok.is(tok::r_paren) && peekToken().is(tok::l_paren)) {
           // It is being used as an attribute argument, so cancel backtrack
           // as function is linear differentiable.
