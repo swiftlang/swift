@@ -123,8 +123,8 @@ void ASTScopeImpl::printRange(llvm::raw_ostream &out) const {
   if (!cachedSourceRange)
     out << "(uncached) ";
   SourceRange range = cachedSourceRange
-                          ? getSourceRange(/*forDebugging=*/true)
-                          : getUncachedSourceRange(/*forDebugging=*/true);
+                          ? getSourceRange(/*omitAssertions=*/true)
+                          : getUncachedSourceRange(/*omitAssertions=*/true);
   printSourceRange(out, range, getSourceManager());
 }
 

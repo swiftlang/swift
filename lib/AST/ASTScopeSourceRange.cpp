@@ -35,32 +35,55 @@ using namespace ast_scope;
 
 static SourceLoc getStartOfFirstParam(ClosureExpr *closure);
 
-SourceRange ASTScopeImpl::getSourceRange(bool forDebugging) const {
-  if (forDebugging && !cachedSourceRange)
+SourceRange ASTScopeImpl::getSourceRange(const bool omitAssertions) const {
+  if (omitAssertions && !cachedSourceRange)
     return SourceRange();
   assert(cachedSourceRange && "should have been cached after last expandMe");
   return *cachedSourceRange;
 }
 
-SourceRange ASTScopeImpl::getUncachedSourceRange(bool forDebugging) const {
-  auto childlessRange = getChildlessSourceRange();
+SourceRange
+ASTScopeImpl::getUncachedSourceRange(const bool omitAssertions) const {
+  const auto childlessRange = getChildlessSourceRange();
+  const auto rangeIncludingIgnoredNodes =
+      widenSourceRangeForIgnoredASTNodes(childlessRange);
+  return widenSourceRangeForChildren(rangeIncludingIgnoredNodes,
+                                     omitAssertions);
+}
+
+SourceRange ASTScopeImpl::widenSourceRangeForIgnoredASTNodes(
+    const SourceRange range) const {
+  if (range.isInvalid())
+    return sourceRangeOfIgnoredASTNodes;
+  auto r = range;
   if (sourceRangeOfIgnoredASTNodes.isValid())
-    childlessRange.widen(sourceRangeOfIgnoredASTNodes);
+    r.widen(sourceRangeOfIgnoredASTNodes);
+  return r;
+}
+
+SourceRange
+ASTScopeImpl::widenSourceRangeForChildren(const SourceRange range,
+                                          bool omitAssertions) const {
   if (getChildren().empty()) {
-    assert(childlessRange.Start.isValid());
-    return childlessRange;
+    assert(omitAssertions || range.Start.isValid());
+    return range;
   }
+  // If we change the caching to compute the source range lazily,
+  // the only children required here would be the first and last.
   for (auto *c: getChildren())
     c->cacheSourceRange();
+
   const auto childStart =
-      getChildren().front()->getSourceRange(forDebugging).Start;
-  assert(forDebugging || childStart.isValid());
-  const auto childEnd = getChildren().back()->getSourceRange(forDebugging).End;
+      getChildren().front()->getSourceRange(omitAssertions).Start;
+  const auto childEnd =
+      getChildren().back()->getSourceRange(omitAssertions).End;
   auto childRange = SourceRange(childStart, childEnd);
-  if (childlessRange.Start.isInvalid())
+  assert(omitAssertions || childRange.isValid());
+
+  if (range.isInvalid())
     return childRange;
-  auto r = childRange;
-  r.widen(childlessRange);
+  auto r = range;
+  r.widen(childRange);
   return r;
 }
 

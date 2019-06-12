@@ -169,7 +169,7 @@ public:
 #pragma mark - source ranges
 
 public:
-  SourceRange getSourceRange(bool forDebugging = false) const;
+  SourceRange getSourceRange(bool omitAssertions = false) const;
 
 protected:
   SourceManager &getSourceManager() const;
@@ -186,7 +186,18 @@ public:
   virtual NullablePtr<ClosureExpr> getClosureIfClosureScope() const;
 
 private:
-  SourceRange getUncachedSourceRange(bool forDebugging = false) const;
+  SourceRange getUncachedSourceRange(bool omitAssertions = false) const;
+  SourceRange widenSourceRangeForIgnoredASTNodes(SourceRange range) const;
+
+  /// If the scope refers to a Decl whose source range tells the whole story,
+  /// for example a NominalTypeScope, it is not necessary to widen the source
+  /// range by examining the children. In that case we could just return
+  /// the childlessRange here.
+  /// But, we have not marked such scopes yet. Doing so would be an
+  /// optimization.
+  SourceRange widenSourceRangeForChildren(SourceRange range,
+                                          bool omitAssertions) const;
+
 public: // for PatternEntryDeclScope::expandMe
   void cacheSourceRange();
 private:
