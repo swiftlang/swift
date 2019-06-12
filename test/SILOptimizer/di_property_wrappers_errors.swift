@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil -verify %s
-@_propertyWrapper
+@propertyWrapper
 final class ClassWrapper<T> {
   var value: T {
     didSet {

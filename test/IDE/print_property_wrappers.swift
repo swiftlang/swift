@@ -3,7 +3,7 @@
 // Directly printing the type-checked AST
 // RUN: %target-swift-ide-test -print-ast-typechecked -source-filename %s | %FileCheck %s
 
-@_propertyWrapper
+@propertyWrapper
 struct Wrapper<Value> {
   var _stored: Value?
 
