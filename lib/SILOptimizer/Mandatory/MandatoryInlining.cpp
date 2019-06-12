@@ -945,6 +945,7 @@ class MandatoryInlining : public SILModuleTransform {
     ClassHierarchyAnalysis *CHA = getAnalysis<ClassHierarchyAnalysis>();
     SILModule *M = getModule();
     bool ShouldCleanup = !getOptions().DebugSerialization;
+    bool SILVerifyAll = getOptions().VerifyAll;
     DenseFunctionSet FullyInlinedSet;
     ImmutableFunctionSet::Factory SetFactory;
 
@@ -965,6 +966,13 @@ class MandatoryInlining : public SILModuleTransform {
       // The inliner splits blocks at call sites. Re-merge trivial branches
       // to reestablish a canonical CFG.
       mergeBasicBlocks(&F);
+
+      // If we are asked to perform SIL verify all, perform that now so that we
+      // can discover the immediate inlining trigger of the problematic
+      // function.
+      if (SILVerifyAll) {
+        F.verify();
+      }
     }
 
     if (!ShouldCleanup)
