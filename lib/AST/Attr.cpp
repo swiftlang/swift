@@ -334,25 +334,8 @@ static void printShortFormAvailable(ArrayRef<const DeclAttribute *> Attrs,
 // parameter indices, and parsed parameters.
 static std::string getDifferentiationParametersClauseString(
     const AbstractFunctionDecl *function, AutoDiffParameterIndices *indices,
-    ArrayRef<ParsedAutoDiffParameter> parsedParams,
-    ModuleDecl *prettyPrintInModule = nullptr) {
-  auto *functionType = function->getInterfaceType()->eraseDynamicSelfType()
-      ->castTo<AnyFunctionType>();
+    ArrayRef<ParsedAutoDiffParameter> parsedParams) {
   bool isInstanceMethod = function && function->isInstanceMember();
-
-  // If pretty-printing, and the number of specified parameters is equal to the
-  // number of inferred differentiation parameters, then return an empty
-  // string. Otherwise, return the explicit differentiation parameters clause
-  // string.
-  if (prettyPrintInModule) {
-    auto parameterCount =
-        indices ? indices->parameters.count() : parsedParams.size();
-    auto inferredParametersCount =
-        AutoDiffParameterIndicesBuilder::inferParameters(
-            functionType, prettyPrintInModule).count();
-    if (parameterCount == inferredParametersCount)
-      return "";
-  }
 
   std::string result;
   llvm::raw_string_ostream printer(result);
@@ -403,7 +386,7 @@ static std::string getDifferentiationParametersClauseString(
 // Print the arguments of the given `@differentiable` attribute.
 static void printDifferentiableAttrArguments(
     const DifferentiableAttr *attr, ASTPrinter &printer, PrintOptions Options,
-    const Decl *D, ModuleDecl *prettyPrintInModule = nullptr) {
+    const Decl *D, bool omitWrtClause = false) {
   // Create a temporary string for the attribute argument text.
   std::string attrArgText;
   llvm::raw_string_ostream stream(attrArgText);
@@ -430,11 +413,10 @@ static void printDifferentiableAttrArguments(
     stream << "linear";
   }
 
-  // Print differentiation parameters, if any.
-  auto diffParamsString = getDifferentiationParametersClauseString(
-      original, attr->getParameterIndices(), attr->getParsedParameters(),
-      prettyPrintInModule);
-  if (!diffParamsString.empty()) {
+  // Print differentiation parameters, unless they are to be omitted.
+  if (!omitWrtClause) {
+    auto diffParamsString = getDifferentiationParametersClauseString(
+        original, attr->getParameterIndices(), attr->getParsedParameters());
     printCommaIfNecessary();
     stream << diffParamsString;
   }
@@ -1398,11 +1380,10 @@ void DifferentiableAttr::setVJPFunction(FuncDecl *decl) {
 }
 
 void DifferentiableAttr::print(llvm::raw_ostream &OS, const Decl *D,
-                               ModuleDecl *prettyPrintInModule) const {
+                               bool omitWrtClause) const {
   StreamPrinter P(OS);
   P << "@" << getAttrName();
-  printDifferentiableAttrArguments(this, P, PrintOptions(), D,
-                                   prettyPrintInModule);
+  printDifferentiableAttrArguments(this, P, PrintOptions(), D, omitWrtClause);
 }
 
 // SWIFT_ENABLE_TENSORFLOW

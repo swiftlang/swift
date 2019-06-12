@@ -39,7 +39,7 @@ struct Quadratic : DiffReq, Equatable {
   }
 }
 
-extension Quadratic : VectorNumeric {
+extension Quadratic : VectorProtocol {
   static var zero: Quadratic { return Quadratic(0, 0, 0) }
   static func + (lhs: Quadratic, rhs: Quadratic) -> Quadratic {
     return Quadratic(lhs.a + rhs.a, lhs.b + rhs.b, lhs.c + rhs.c)

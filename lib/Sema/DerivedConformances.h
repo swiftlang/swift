@@ -215,21 +215,21 @@ public:
   /// \returns the derived member, which will also be added to the type.
   ValueDecl *deriveAdditiveArithmetic(ValueDecl *requirement);
 
-  /// Determine if a VectorNumeric requirement can be derived for a type.
+  /// Determine if a VectorProtocol requirement can be derived for a type.
   ///
   /// \returns True if the requirement can be derived.
-  static bool canDeriveVectorNumeric(NominalTypeDecl *type,
-                                     DeclContext *DC);
+  static bool canDeriveVectorProtocol(NominalTypeDecl *type,
+                                      DeclContext *DC);
 
-  /// Derive a VectorNumeric requirement for a nominal type.
+  /// Derive a VectorProtocol requirement for a nominal type.
   ///
   /// \returns the derived member, which will also be added to the type.
-  ValueDecl *deriveVectorNumeric(ValueDecl *requirement);
+  ValueDecl *deriveVectorProtocol(ValueDecl *requirement);
 
-  /// Derive a VectorNumeric type witness for a nominal type.
+  /// Derive a VectorProtocol type witness for a nominal type.
   ///
   /// \returns the derived member, which will also be added to the type.
-  Type deriveVectorNumeric(AssociatedTypeDecl *assocType);
+  Type deriveVectorProtocol(AssociatedTypeDecl *assocType);
 
   /// Determine if a Differentiable requirement can be derived for a type.
   ///

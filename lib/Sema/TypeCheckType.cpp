@@ -2129,7 +2129,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     TAK_convention, TAK_pseudogeneric,
     TAK_callee_owned, TAK_callee_guaranteed, TAK_noescape, TAK_autoclosure,
     // SWIFT_ENABLE_TENSORFLOW
-    TAK_escaping, TAK_autodiff, TAK_differentiable, TAK_yield_once, TAK_yield_many
+    TAK_escaping, TAK_differentiable, TAK_yield_once, TAK_yield_many
   };
 
   auto checkUnsupportedAttr = [&](TypeAttrKind attr) {

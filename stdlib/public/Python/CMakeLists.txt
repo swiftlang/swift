@@ -40,4 +40,7 @@ add_swift_target_library(swiftPython ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS
   SWIFT_MODULE_DEPENDS_CYGWIN Glibc
   SWIFT_MODULE_DEPENDS_HAIKU Glibc
   SWIFT_COMPILE_FLAGS "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}"
-  LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}")
+  LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
+  # NOTE: This is a workaround for https://github.com/apple/swift/pull/24382,
+  # which changed the default install_name_dir to `/usr/bin/swift`.
+  DARWIN_INSTALL_NAME_DIR "@rpath")

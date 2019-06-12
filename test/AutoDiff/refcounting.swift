@@ -6,12 +6,12 @@ public class NonTrivialStuff : Equatable {
 }
 
 @_fixed_layout
-public struct Vector : AdditiveArithmetic, VectorNumeric, Differentiable, Equatable {
+public struct Vector : AdditiveArithmetic, VectorProtocol, Differentiable, Equatable {
   public var x: Float
   public var y: Float
   public var nonTrivialStuff = NonTrivialStuff()
   public typealias TangentVector = Vector
-  public typealias Scalar = Float
+  public typealias VectorSpaceScalar = Float
   public static var zero: Vector { return Vector(0) }
   public init(_ scalar: Float) { self.x = scalar; self.y = scalar }
 

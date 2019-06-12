@@ -40,7 +40,7 @@ struct TestNoDerivative : Differentiable {
 // CHECK-AST:         var w: Float
 // CHECK-AST:         @noDerivative internal var technicallyDifferentiable: Float
 // CHECK-AST:         internal init(w: Float, technicallyDifferentiable: Float)
-// CHECK-AST:         internal struct AllDifferentiableVariables : Differentiable, AdditiveArithmetic, VectorNumeric
+// CHECK-AST:         internal struct AllDifferentiableVariables : Differentiable, AdditiveArithmetic, VectorProtocol
 // CHECK-AST:           internal typealias AllDifferentiableVariables = TestNoDerivative.AllDifferentiableVariables
 // CHECK-AST:           internal typealias TangentVector = TestNoDerivative.AllDifferentiableVariables
 // CHECK-AST:         internal typealias TangentVector = TestNoDerivative.AllDifferentiableVariables
@@ -54,7 +54,7 @@ struct TestKeyPathIterable : Differentiable, KeyPathIterable {
 // CHECK-AST:         var w: Float
 // CHECK-AST:         @noDerivative internal var technicallyDifferentiable: Float
 // CHECK-AST:         internal init(w: Float, technicallyDifferentiable: Float)
-// CHECK-AST:         internal struct AllDifferentiableVariables : Differentiable, AdditiveArithmetic, KeyPathIterable, VectorNumeric
+// CHECK-AST:         internal struct AllDifferentiableVariables : Differentiable, AdditiveArithmetic, KeyPathIterable, VectorProtocol
 // CHECK-AST:           internal typealias AllDifferentiableVariables = TestKeyPathIterable.AllDifferentiableVariables
 // CHECK-AST:           internal typealias TangentVector = TestKeyPathIterable.AllDifferentiableVariables
 // CHECK-AST:         internal typealias TangentVector = TestKeyPathIterable.AllDifferentiableVariables
