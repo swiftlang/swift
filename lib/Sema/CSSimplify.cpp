@@ -2950,8 +2950,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   // literals and expressions representing an implicit return type of the single
   // expression functions.
   if (auto elt = locator.last()) {
-    if (elt->getKind() == ConstraintLocator::ClosureResult ||
-        elt->getKind() == ConstraintLocator::SingleExprFuncResultType) {
+    if (elt->isClosureResult() || elt->isResultOfSingleExprFunction()) {
       if (kind >= ConstraintKind::Subtype &&
           (type1->isUninhabited() || type2->isVoid())) {
         increaseScore(SK_FunctionConversion);
@@ -5420,8 +5419,9 @@ done:
                                             {rootTy, valueTy});
   // Let's check whether deduced key path type would match
   // expected contextual one.
-  return matchTypes(resolvedKPTy, keyPathTy, ConstraintKind::Bind, subflags,
-                    locator.withPathElement(ConstraintLocator::ContextualType));
+  return matchTypes(
+      resolvedKPTy, keyPathTy, ConstraintKind::Bind, subflags,
+      locator.withPathElement(LocatorPathElt::getContextualType()));
 }
 
 ConstraintSystem::SolutionKind
