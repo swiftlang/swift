@@ -15,7 +15,7 @@ def get_immediate_subdirectories(a_dir):
             if os.path.isdir(os.path.join(a_dir, name))]
 
 
-def get_frameworks(sdk_path):
+def get_frameworks(sdk_path, swift_frameworks_only):
     frameworks_path = sdk_path + "/System/Library/Frameworks"
     names = []
     for frame in os.listdir(frameworks_path):
@@ -31,6 +31,9 @@ def get_frameworks(sdk_path):
             if os.path.exists(swiftmodule_path):
                 if name not in blacklist:
                     names.append(name)
+                continue
+            # We only care about Swift frameworks then we are done.
+            if swift_frameworks_only:
                 continue
 
             if not os.path.exists(header_dir_path):
@@ -95,7 +98,8 @@ def main():
     parser.add_option("-o", "--output", help="output mode",
                       type=str, dest="out_mode", default="list")
     parser.add_option("--hash", action="store_true", dest="use_hash")
-
+    parser.add_option("--swift-frameworks-only", action="store_true")
+    parser.add_option("--v", action="store_true")
     (opts, cmd) = parser.parse_args()
 
     if not opts.sdk:
@@ -105,7 +109,10 @@ def main():
         parser.error(
             "output mode not specified: 'clang-import'/'swift-import'/'list'")
 
-    frames = get_frameworks(opts.sdk)
+    frames = get_frameworks(opts.sdk, opts.swift_frameworks_only)
+    if opts.v:
+        for name in frames:
+            print >>sys.stderr, 'Including: ', name
     if opts.out_mode == "clang-import":
         print_clang_imports(frames, opts.use_hash)
     elif opts.out_mode == "swift-import":
