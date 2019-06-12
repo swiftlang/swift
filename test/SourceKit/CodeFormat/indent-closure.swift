@@ -67,6 +67,13 @@ func foo10() {
     ].whatever
 }
 
+func foo11() {
+    VStack {
+    }
+        .onAppear {
+    }
+}
+
 // RUN: %sourcekitd-test -req=format -line=3 -length=1 %s >%t.response
 // RUN: %sourcekitd-test -req=format -line=4 -length=1 %s >>%t.response
 // RUN: %sourcekitd-test -req=format -line=5 -length=1 %s >>%t.response
@@ -96,6 +103,7 @@ func foo10() {
 
 // RUN: %sourcekitd-test -req=format -line=66 -length=1 %s >>%t.response
 // RUN: %sourcekitd-test -req=format -line=67 -length=1 %s >>%t.response
+// RUN: %sourcekitd-test -req=format -line=73 -length=1 %s >>%t.response
 
 // RUN: %FileCheck --strict-whitespace %s <%t.response
 
@@ -136,3 +144,4 @@ func foo10() {
 
 // CHECK: key.sourcetext: "    Something() ["
 // CHECK: key.sourcetext: "    ].whatever"
+// CHECK: key.sourcetext: "    .onAppear {"

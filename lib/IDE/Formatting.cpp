@@ -289,6 +289,15 @@ public:
           isKeywordPossibleDeclStart(*TInfo.StartOfLineBeforeTarget) &&
           TInfo.StartOfLineBeforeTarget->isKeyword())
         return false;
+      // VStack {
+      //   ...
+      // }
+      // .onAppear { <---- No indentation here.
+      if (TInfo.StartOfLineTarget->getKind() == tok::period &&
+          TInfo.StartOfLineBeforeTarget->getKind() == tok::r_brace &&
+          TInfo.StartOfLineBeforeTarget + 1 == TInfo.StartOfLineTarget) {
+        return false;
+      }
     }
 
     // Handle switch / case, indent unless at a case label.
