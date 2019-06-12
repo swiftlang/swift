@@ -13,7 +13,7 @@
 @_exported import Foundation // Clang module
 
 // CollectionDifference<ChangeElement>.Change is conditionally bridged to NSOrderedCollectionChange
-@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension CollectionDifference.Change : _ObjectiveCBridgeable {
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSOrderedCollectionChange {
@@ -66,7 +66,7 @@ extension CollectionDifference.Change : _ObjectiveCBridgeable {
 }
 
 // CollectionDifference<ChangeElement> is conditionally bridged to NSOrderedCollectionDifference
-@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension CollectionDifference : _ObjectiveCBridgeable {
   @_semantics("convertToObjectiveC")
   public func _bridgeToObjectiveC() -> NSOrderedCollectionDifference {
