@@ -548,11 +548,7 @@ struct ResultLabelTest {
 }
 
 struct Tensor<Scalar> : AdditiveArithmetic {}
-extension Tensor : Differentiable where Scalar : Differentiable {
-  typealias TangentVector = Tensor
-  typealias AllDifferentiableVariables = Tensor
-  func moved(along direction: Tensor) -> Tensor { return self }
-}
+extension Tensor : Differentiable where Scalar : Differentiable {}
 @differentiable(where Scalar : Differentiable)
 func where2<Scalar : Numeric>(x: Tensor<Scalar>) -> Tensor<Scalar> {
   return x

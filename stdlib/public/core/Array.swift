@@ -1973,13 +1973,14 @@ extension Array where Element : Differentiable {
       }
     }
 
-    public func moved(along direction: TangentVector) -> DifferentiableView {
+    public mutating func move(along direction: TangentVector) {
       precondition(
         base.count == direction.base.count,
         "cannot move Array.DifferentiableView with count \(base.count) along " +
           "direction with different count \(direction.base.count)")
-      return DifferentiableView(
-        zip(base, direction.base).map { $0.moved(along: $1) })
+      for i in base.indices {
+        base[i].move(along: direction.base[i])
+      }
     }
   }
 }
@@ -2072,8 +2073,10 @@ extension Array : Differentiable where Element : Differentiable {
     }
   }
 
-  public func moved(along direction: TangentVector) -> Array {
-    return DifferentiableView(self).moved(along: direction).base
+  public mutating func move(along direction: TangentVector) {
+    var view = DifferentiableView(self)
+    view.move(along: direction)
+    self = view.base
   }
 }
 

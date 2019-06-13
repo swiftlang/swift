@@ -65,10 +65,9 @@ public protocol Differentiable {
   /// All differentiable variables of this value.
   var allDifferentiableVariables: AllDifferentiableVariables { get set }
 
-  /// Returns `self` moved along the value space towards the given tangent
-  /// vector. In Riemannian geometry (mathematics), this represents an
-  /// exponential map.
-  func moved(along direction: TangentVector) -> Self
+  /// Moves `self` along the value space towards the given tangent vector. In
+  /// Riemannian geometry (mathematics), this represents an exponential map.
+  mutating func move(along direction: TangentVector)
 
   @available(*, deprecated,
              message: "'CotangentVector' is now equal to 'TangentVector' and will be removed")
@@ -82,13 +81,9 @@ public extension Differentiable where AllDifferentiableVariables == Self {
   }
 }
 
-// FIXME: The `Self : AdditiveArithmetic` constraint should be implied by
-// `TangentVector == Self`, but the type checker errors out when it does not
-// exist.
-public extension Differentiable
-  where TangentVector == Self, Self : AdditiveArithmetic {
-  func moved(along direction: TangentVector) -> Self {
-    return self + direction
+public extension Differentiable where TangentVector == Self {
+  mutating func move(along direction: TangentVector) {
+    self += direction
   }
 }
 
@@ -451,7 +446,7 @@ internal protocol _AnyDerivativeBox {
 
   // `Differentiable` requirements.
   var _allDifferentiableVariables: _AnyDerivativeBox { get }
-  func _moved(along direction: _AnyDerivativeBox) -> _AnyDerivativeBox
+  mutating func _move(along direction: _AnyDerivativeBox)
 
   /// The underlying base value, type-erased to `Any`.
   var _typeErasedBase: Any { get }
@@ -555,18 +550,17 @@ internal struct _ConcreteDerivativeBox<T> : _AnyDerivativeBox
     return _ConcreteDerivativeBox(_base.allDifferentiableVariables)
   }
 
-  func _moved(along direction: _AnyDerivativeBox) -> _AnyDerivativeBox {
-    if _isOpaqueZero() {
-      return direction
-    }
+  mutating func _move(along direction: _AnyDerivativeBox) {
     if direction._isOpaqueZero() {
-      return self
+      return
     }
+    // The case where `self._isOpaqueZero()` returns true is handled in
+    // `AnyDerivative.move(along:)`.
     guard let directionBase =
       direction._unboxed(to: T.TangentVector.self) else {
       _derivativeTypeMismatch(T.self, type(of: direction._typeErasedBase))
     }
-    return _ConcreteDerivativeBox<T>(_base.moved(along: directionBase))
+    _base.move(along: directionBase)
   }
 }
 
@@ -661,7 +655,11 @@ public struct AnyDerivative : Differentiable & AdditiveArithmetic {
     get { return AnyDerivative(_box: _box._allDifferentiableVariables) }
     // set { _box._allDifferentiableVariables = newValue._box }
   }
-  public func moved(along direction: TangentVector) -> AnyDerivative {
-    return AnyDerivative(_box: _box._moved(along: direction._box))
+  public mutating func move(along direction: TangentVector) {
+    if _box._isOpaqueZero() {
+      _box = direction._box
+      return
+    }
+    _box._move(along: direction._box)
   }
 }

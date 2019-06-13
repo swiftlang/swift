@@ -6,10 +6,19 @@ import StdlibUnittest
 var AnyDerivativeTests = TestSuite("AnyDerivative")
 
 struct Vector : Differentiable {
-  let x, y: Float
+  var x, y: Float
 }
 struct Generic<T: Differentiable> : Differentiable {
-  let x: T
+  var x: T
+}
+
+extension AnyDerivative {
+  // This exists only to faciliate testing.
+  func moved(along direction: TangentVector) -> Self {
+    var result = self
+    result.move(along: direction)
+    return result
+  }
 }
 
 AnyDerivativeTests.test("Vector") {

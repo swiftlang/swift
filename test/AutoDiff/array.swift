@@ -29,8 +29,8 @@ ArrayAutodiffTests.test("ArraySubscript") {
 
 ArrayAutodiffTests.test("ArrayConcat") {
   struct TwoArrays : Differentiable {
-    let a: [Float]
-    let b: [Float]
+    var a: [Float]
+    var b: [Float]
   }
 
   func sumFirstThreeConcatted(_ arrs: TwoArrays) -> Float {

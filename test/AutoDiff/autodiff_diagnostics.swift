@@ -25,10 +25,10 @@ _ = gradient(at: 0, in: one_to_one_0) // okay!
 //===----------------------------------------------------------------------===//
 
 struct S {
-  let p: Float
+  var p: Float
 }
-
 extension S : Differentiable, VectorProtocol {
+  // Test custom `TangentVector` type with non-matching stored property name.
   struct TangentVector: Differentiable, VectorProtocol {
     var dp: Float
   }
@@ -39,8 +39,8 @@ extension S : Differentiable, VectorProtocol {
   static func - (lhs: S, rhs: S) -> S { return S(p: lhs.p - rhs.p) }
   static func * (lhs: Float, rhs: S) -> S { return S(p: lhs * rhs.p) }
 
-  func moved(along direction: TangentVector) -> S {
-    return S(p: p + direction.dp)
+  mutating func move(along direction: TangentVector) {
+    p.move(along: direction.dp)
   }
 }
 

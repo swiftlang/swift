@@ -2520,12 +2520,15 @@ ERROR(broken_differentiable_requirement,none,
       "Differentiable protocol is broken: unexpected requirement", ())
 WARNING(differentiable_nondiff_type_implicit_noderivative_fixit,none,
       "stored property %0 has no derivative because it does not conform to "
-      "'Differentiable'; add '@noDerivative' to make it explicit",
-      (Identifier))
-WARNING(differentiable_constant_property_implicit_noderivative_fixit,none,
-      "'let' properties with a default value do not have a derivative; add "
-      "'@noDerivative' to make it explicit, or change it to 'var' to allow "
-      "derivatives", ())
+      "'Differentiable'; add an explicit '@noDerivative' attribute"
+      "%select{|, or conform %1 to 'AdditiveArithmetic'}2",
+      (Identifier, Identifier, bool))
+WARNING(differentiable_let_property_implicit_noderivative_fixit,none,
+      "synthesis of the 'Differentiable.move(along:)' requirement for %1 "
+      "requires all stored properties to be mutable; use 'var' instead, or add "
+      "an explicit '@noDerivative' attribute"
+      "%select{|, or conform %1 to 'AdditiveArithmetic'}2",
+      (Identifier, Identifier, bool))
 
 NOTE(codable_extraneous_codingkey_case_here,none,
      "CodingKey case %0 does not match any stored properties", (Identifier))

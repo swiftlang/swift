@@ -20,20 +20,28 @@ func testEmpty() {
 // Previously, this crashed due to duplicate memberwise initializer synthesis.
 struct EmptyAdditiveArithmetic : AdditiveArithmetic, Differentiable {}
 
-// Test structs whose stored properties all have a default value.
-struct AllLetStoredPropertiesHaveInitialValue : Differentiable {
-  // expected-warning @+1 {{'let' properties with a default value do not have a derivative; add '@noDerivative' to make it explicit, or change it to 'var' to allow derivatives}} {{3-3=@noDerivative }}
-  let x = Float(1)
-  // expected-warning @+1 {{'let' properties with a default value do not have a derivative; add '@noDerivative' to make it explicit, or change it to 'var' to allow derivatives}} {{3-3=@noDerivative }}
-  let y = Float(1)
+// Test structs with `let` stored properties.
+// Derived conformances fail because `mutating func move` requires all stored
+// properties to be mutable.
+struct ImmutableStoredProperties : Differentiable {
+  var okay: Float
+
+  // expected-warning @+1 {{stored property 'nondiff' has no derivative because it does not conform to 'Differentiable'; add an explicit '@noDerivative' attribute, or conform 'ImmutableStoredProperties' to 'AdditiveArithmetic'}} {{3-3=@noDerivative }}
+  let nondiff: Int
+
+  // expected-warning @+1 {{synthesis of the 'Differentiable.move(along:)' requirement for 'ImmutableStoredProperties' requires all stored properties to be mutable; use 'var' instead, or add an explicit '@noDerivative' attribute, or conform 'ImmutableStoredProperties' to 'AdditiveArithmetic'}} {{3-3=@noDerivative }}
+  let diff: Float
 }
-struct AllVarStoredPropertiesHaveInitialValue : Differentiable {
+func testImmutableStoredProperties() {
+  _ = ImmutableStoredProperties.TangentVector(okay: 1)
+}
+struct MutableStoredPropertiesWithInitialValue : Differentiable {
   var x = Float(1)
-  var y = Float(1)
+  var y = Double(1)
 }
 // Test struct with both an empty constructor and memberwise initializer.
 struct AllMixedStoredPropertiesHaveInitialValue : Differentiable {
-  let x = Float(1) // expected-warning {{'let' properties with a default value do not have a derivative}} {{3-3=@noDerivative }}
+  let x = Float(1) // expected-warning {{synthesis of the 'Differentiable.move(along:)' requirement for 'AllMixedStoredPropertiesHaveInitialValue' requires all stored properties to be mutable; use 'var' instead, or add an explicit '@noDerivative' attribute}} {{3-3=@noDerivative }}
   var y = Float(1)
   // Memberwise initializer should be `init(y:)` since `x` is immutable.
   static func testMemberwiseInitializer() {
@@ -54,7 +62,7 @@ struct Simple : AdditiveArithmetic, Differentiable {
 func testSimple() {
   var simple = Simple(w: 1, b: 1)
   simple.allDifferentiableVariables = simple + simple
-  assert(simple.moved(along: simple) == simple + simple)
+  simple.move(along: simple)
 }
 
 // Test type with mixed members.
@@ -65,7 +73,7 @@ struct Mixed : AdditiveArithmetic, Differentiable {
 func testMixed(_ simple: Simple) {
   var mixed = Mixed(simple: simple, float: 1)
   mixed.allDifferentiableVariables = Mixed(simple: simple, float: 2)
-  assert(mixed.moved(along: mixed) == mixed + mixed)
+  mixed.move(along: mixed)
 }
 
 // Test type with manual definition of vector space types to `Self`.
@@ -87,7 +95,7 @@ struct GenericVectorSpacesEqualSelf<T> : AdditiveArithmetic, Differentiable
 func testGenericVectorSpacesEqualSelf() {
   var genericSame = GenericVectorSpacesEqualSelf<Double>(w: 1, b: 1)
   genericSame.allDifferentiableVariables = genericSame + genericSame
-  assert(genericSame.moved(along: genericSame) == genericSame + genericSame)
+  genericSame.move(along: genericSame)
 }
 
 // Test nested type.
@@ -100,8 +108,8 @@ func testNested(
   _ simple: Simple, _ mixed: Mixed,
   _ genericSame: GenericVectorSpacesEqualSelf<Double>
 ) {
-  let nested = Nested(simple: simple, mixed: mixed, generic: genericSame)
-  assert(nested.moved(along: nested) == nested + nested)
+  var nested = Nested(simple: simple, mixed: mixed, generic: genericSame)
+  nested.move(along: nested)
 
   _ = pullback(at: nested) { model in
     model.simple + model.simple
@@ -135,15 +143,6 @@ struct AllMembersVectorProtocol : Differentiable {
 func testAllMembersVectorProtocol() {
   assertConformsToVectorProtocol(AllMembersVectorProtocol.TangentVector.self)
   assertConformsToVectorProtocol(AllMembersVectorProtocol.TangentVector.self)
-}
-
-// Test type with immutable, differentiable stored property.
-struct ImmutableStoredProperty : Differentiable {
-  var w: Float
-  let fixedBias: Float = .pi // expected-warning {{'let' properties with a default value do not have a derivative}} {{3-3=@noDerivative }}
-}
-func testImmutableStoredProperty() {
-  _ = ImmutableStoredProperty.TangentVector(w: 1)
 }
 
 // Test type whose properties are not all differentiable.
@@ -200,14 +199,14 @@ func testKeyPathIterable(x: TestKeyPathIterable) {
 
 // Test type with user-defined memberwise initializer.
 struct TF_25: Differentiable {
-  public let bar: Float
+  public var bar: Float
   public init(bar: Float) {
     self.bar = bar
   }
 }
 // Test user-defined memberwise initializer.
 struct TF_25_Generic<T : Differentiable>: Differentiable {
-  public let bar: T
+  public var bar: T
   public init(bar: T) {
     self.bar = bar
   }
@@ -318,12 +317,12 @@ struct StaticMembersShouldNotAffectAnything : AdditiveArithmetic, Differentiable
 
 struct ImplicitNoDerivative : Differentiable {
   var a: Float
-  var b: Bool // expected-warning {{stored property 'b' has no derivative because it does not conform to 'Differentiable'; add '@noDerivative' to make it explicit}}
+  var b: Bool // expected-warning {{stored property 'b' has no derivative because it does not conform to 'Differentiable'; add an explicit '@noDerivative' attribute}}
 }
 
 struct ImplicitNoDerivativeWithSeparateTangent : Differentiable {
   var x: DifferentiableSubset
-  var b: Bool // expected-warning {{stored property 'b' has no derivative because it does not conform to 'Differentiable'; add '@noDerivative' to make it explicit}} {{3-3=@noDerivative }}
+  var b: Bool // expected-warning {{stored property 'b' has no derivative because it does not conform to 'Differentiable'; add an explicit '@noDerivative' attribute}} {{3-3=@noDerivative }}
 }
 
 // TF-265: Test invalid initializer (that uses a non-existent type).
