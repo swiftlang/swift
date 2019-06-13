@@ -305,10 +305,6 @@ namespace swift {
     /// set to true.
     bool ExperimentalDependenciesIncludeIntrafileOnes = false;
 
-    /// We disallow explicit dynamic on native swift declarations in
-    /// library-evolution-mode for now because the ABI is not fully baked.
-    bool DisallowDynamicOnNativeSwiftDeclarations = false;
-
     /// Sets the target we are building for and updates platform conditions
     /// to match.
     ///

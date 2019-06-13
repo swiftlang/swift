@@ -333,8 +333,8 @@ void AttributeEarlyChecker::visitDynamicAttr(DynamicAttr *attr) {
   // Members cannot be both dynamic and @_transparent.
   if (D->getAttrs().hasAttribute<TransparentAttr>())
     diagnoseAndRemoveAttr(attr, diag::dynamic_with_transparent);
-  if (!D->getAttrs().hasAttribute<ObjCAttr>()&&
-      TC.getLangOpts().DisallowDynamicOnNativeSwiftDeclarations)
+  if (!D->getAttrs().hasAttribute<ObjCAttr>() &&
+      D->getModuleContext()->isResilient())
     diagnoseAndRemoveAttr(attr,
                           diag::dynamic_and_library_evolution_not_supported);
 }

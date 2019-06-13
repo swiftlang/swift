@@ -261,10 +261,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableOpaqueResultTypes |=
       Args.hasArg(OPT_enable_opaque_result_types);
 
-  // We don't allow dynamic on native swift declarations.
-  Opts.DisallowDynamicOnNativeSwiftDeclarations |=
-      Args.hasArg(OPT_enable_library_evolution);
-
   // Always enable operator designated types for the standard library.
   Opts.EnableOperatorDesignatedTypes |= FrontendOpts.ParseStdlib;
 
