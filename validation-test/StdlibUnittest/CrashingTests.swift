@@ -19,8 +19,8 @@ TestSuiteCrashes.test("crashesUnexpectedly1") {
   print("crashesUnexpectedly1")
   fatalError("This should crash")
 }
-// CHECK: stdout>>> crashesUnexpectedly1
-// CHECK: stderr>>> Fatal error: This should crash:
+// CHECK-DAG: stdout>>> crashesUnexpectedly1
+// CHECK-DAG: stderr>>> Fatal error: This should crash:
 // CHECK: stderr>>> CRASHED: SIG
 // CHECK: [     FAIL ] TestSuiteCrashes.crashesUnexpectedly1
 
