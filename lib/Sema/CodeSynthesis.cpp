@@ -1625,7 +1625,9 @@ void swift::completeLazyVarImplementation(VarDecl *VD) {
                                         StorageName,
                                         VD->getDeclContext());
   Storage->setInterfaceType(StorageInterfaceTy);
+  Storage->setLazyStorageProperty(true);
   Storage->setUserAccessible(false);
+
   addMemberToContextIfNeeded(Storage, VD->getDeclContext(), VD);
 
   // Create the pattern binding decl for the storage decl.  This will get
@@ -1642,12 +1644,7 @@ void swift::completeLazyVarImplementation(VarDecl *VD) {
   VD->getGetter()->setBodySynthesizer(&synthesizeLazyGetterBody, Storage);
   VD->getSetter()->setBodySynthesizer(&synthesizeLazySetterBody, Storage);
 
-  // Mark the vardecl to be final, implicit, and private.  In a class, this
-  // prevents it from being dynamically dispatched.  Note that we do this after
-  // the accessors are set up, because we don't want the setter for the lazy
-  // property to inherit these properties from the storage.
-  if (VD->getDeclContext()->getSelfClassDecl())
-    makeFinal(Context, Storage);
+  // The storage is implicit and private.
   Storage->setImplicit();
   Storage->overwriteAccess(AccessLevel::Private);
   Storage->overwriteSetterAccess(AccessLevel::Private);
@@ -1796,6 +1793,11 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
   if (isInvalid)
     backingVar->setInvalid();
   backingVar->setOriginalWrappedProperty(var);
+
+  // The backing storage is 'private'.
+  backingVar->overwriteAccess(AccessLevel::Private);
+  backingVar->overwriteSetterAccess(AccessLevel::Private);
+
   addMemberToContextIfNeeded(backingVar, dc, var);
 
   // Create the pattern binding declaration for the backing property.
@@ -1819,15 +1821,6 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
 
     tc.typeCheckPatternBinding(parentPBD, patternNumber);
   }
-  // Mark the backing property as 'final'. There's no sensible way to override.
-  if (dc->getSelfClassDecl())
-    makeFinal(ctx, backingVar);
-
-  // The backing storage is 'private'.
-  backingVar->overwriteAccess(AccessLevel::Private);
-
-  // Determine setter access.
-  backingVar->overwriteSetterAccess(AccessLevel::Private);
 
   Expr *originalInitialValue = nullptr;
   if (Expr *init = parentPBD->getInit(patternNumber)) {

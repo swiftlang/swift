@@ -387,9 +387,8 @@ protected:
     /// It is up to the debugger to instruct SIL how to access this variable.
     IsDebuggerVar : 1,
 
-    /// Whether this is a property defined in the debugger's REPL.
-    /// FIXME: Remove this once LLDB has proper support for resilience.
-    IsREPLVar : 1,
+    /// Whether this is the backing storage for a lazy property.
+    IsLazyStorageProperty : 1,
 
     /// Whether this is the backing storage for a property wrapper.
     IsPropertyWrapperBackingProperty : 1
@@ -4806,7 +4805,7 @@ protected:
     Bits.VarDecl.Specifier = static_cast<unsigned>(Sp);
     Bits.VarDecl.IsCaptureList = IsCaptureList;
     Bits.VarDecl.IsDebuggerVar = false;
-    Bits.VarDecl.IsREPLVar = false;
+    Bits.VarDecl.IsLazyStorageProperty = false;
     Bits.VarDecl.HasNonPatternBindingInit = false;
     Bits.VarDecl.IsPropertyWrapperBackingProperty = false;
   }
@@ -5095,12 +5094,13 @@ public:
   void setDebuggerVar(bool IsDebuggerVar) {
     Bits.VarDecl.IsDebuggerVar = IsDebuggerVar;
   }
-  
-  /// Is this a special debugger REPL variable?
-  /// FIXME: Remove this once LLDB has proper support for resilience.
-  bool isREPLVar() const { return Bits.VarDecl.IsREPLVar; }
-  void setREPLVar(bool IsREPLVar) {
-    Bits.VarDecl.IsREPLVar = IsREPLVar;
+
+  /// Is this the synthesized storage for a 'lazy' property?
+  bool isLazyStorageProperty() const {
+    return Bits.VarDecl.IsLazyStorageProperty;
+  }
+  void setLazyStorageProperty(bool IsLazyStorage) {
+    Bits.VarDecl.IsLazyStorageProperty = IsLazyStorage;
   }
 
   /// Retrieve the custom attribute that attaches a property wrapper to this
