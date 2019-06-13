@@ -249,7 +249,7 @@ computeSelfTypeRelationship(TypeChecker &tc, DeclContext *dc, ValueDecl *decl1,
 
   // If the model type does not conform to the protocol, the bases are
   // unrelated.
-  auto conformance = tc.conformsToProtocol(
+  auto conformance = TypeChecker::conformsToProtocol(
                          modelTy, proto, dc,
                          (ConformanceCheckFlags::InExpression|
                           ConformanceCheckFlags::SkipConditionalRequirements));
@@ -341,10 +341,7 @@ static bool isProtocolExtensionAsSpecializedAs(TypeChecker &tc,
   // the second protocol extension.
   ConstraintSystem cs(tc, dc1, None);
   OpenedTypeMap replacements;
-  cs.openGeneric(dc2, dc2, sig2,
-                 /*skipProtocolSelfConstraint=*/false,
-                 ConstraintLocatorBuilder(nullptr),
-                 replacements);
+  cs.openGeneric(dc2, sig2, ConstraintLocatorBuilder(nullptr), replacements);
 
   // Bind the 'Self' type from the first extension to the type parameter from
   // opening 'Self' of the second extension.
@@ -478,54 +475,33 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
       if (!decl2->hasCurriedSelf())
         type2 = type2->addCurriedSelfType(outerDC2);
 
+      auto openType = [&](ConstraintSystem &cs, DeclContext *innerDC,
+                          DeclContext *outerDC, Type type,
+                          OpenedTypeMap &replacements,
+                          ConstraintLocator *locator) -> Type {
+        if (auto *funcType = type->getAs<AnyFunctionType>()) {
+          return cs.openFunctionType(funcType, locator, replacements, outerDC);
+        }
+
+        cs.openGeneric(outerDC, innerDC->getGenericSignatureOfContext(),
+                       locator, replacements);
+
+        return cs.openType(type, replacements);
+      };
+
       // Construct a constraint system to compare the two declarations.
       ConstraintSystem cs(tc, dc, ConstraintSystemOptions());
       bool knownNonSubtype = false;
 
-      auto locator = cs.getConstraintLocator(nullptr);
+      auto *locator = cs.getConstraintLocator(nullptr);
       // FIXME: Locator when anchored on a declaration.
       // Get the type of a reference to the second declaration.
-      OpenedTypeMap unused;
-      Type openedType2;
-      if (auto *funcType = type2->getAs<AnyFunctionType>()) {
-        openedType2 = cs.openFunctionType(
-            funcType, /*numArgumentLabelsToRemove=*/0, locator,
-            /*replacements=*/unused,
-            innerDC2,
-            outerDC2,
-            /*skipProtocolSelfConstraint=*/false);
-      } else {
-        cs.openGeneric(innerDC2,
-                       outerDC2,
-                       innerDC2->getGenericSignatureOfContext(),
-                       /*skipProtocolSelfConstraint=*/false,
-                       locator,
-                       unused);
 
-        openedType2 = cs.openType(type2, unused);
-      }
-
-      // Get the type of a reference to the first declaration, swapping in
-      // archetypes for the dependent types.
-      OpenedTypeMap replacements;
-      Type openedType1;
-      if (auto *funcType = type1->getAs<AnyFunctionType>()) {
-        openedType1 = cs.openFunctionType(
-            funcType, /*numArgumentLabelsToRemove=*/0, locator,
-            replacements,
-            innerDC1,
-            outerDC1,
-            /*skipProtocolSelfConstraint=*/false);
-      } else {
-        cs.openGeneric(innerDC1,
-                       outerDC1,
-                       innerDC1->getGenericSignatureOfContext(),
-                       /*skipProtocolSelfConstraint=*/false,
-                       locator,
-                       replacements);
-
-        openedType1 = cs.openType(type1, replacements);
-      }
+      OpenedTypeMap unused, replacements;
+      auto openedType2 =
+          openType(cs, innerDC1, outerDC2, type2, unused, locator);
+      auto openedType1 =
+          openType(cs, innerDC2, outerDC1, type1, replacements, locator);
 
       for (const auto &replacement : replacements) {
         if (auto mapped = innerDC1->mapTypeIntoContext(replacement.first)) {
@@ -661,7 +637,7 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
           return true;
         };
 
-        auto defaultMap = computeDefaultMap(
+        ParameterListInfo paramInfo(
             params2, decl2, decl2->hasCurriedSelf());
         auto params2ForMatching = params2;
         if (compareTrailingClosureParamsSeparately) {
@@ -669,7 +645,7 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
           params2ForMatching = params2.drop_back();
         }
 
-        InputMatcher IM(params2ForMatching, defaultMap);
+        InputMatcher IM(params2ForMatching, paramInfo);
         if (IM.match(numParams1, pairMatcher) != InputMatcher::IM_Succeeded)
           return false;
 
@@ -1434,8 +1410,8 @@ SolutionDiff::SolutionDiff(ArrayRef<Solution> solutions) {
 }
 
 InputMatcher::InputMatcher(const ArrayRef<AnyFunctionType::Param> params,
-                           const SmallBitVector &defaultValueMap)
-    : NumSkippedParameters(0), DefaultValueMap(defaultValueMap),
+                           const ParameterListInfo &paramInfo)
+    : NumSkippedParameters(0), ParamInfo(paramInfo),
       Params(params) {}
 
 InputMatcher::Result
@@ -1448,7 +1424,7 @@ InputMatcher::match(int numInputs,
     // If we've claimed all of the inputs, the rest of the parameters should
     // be either default or variadic.
     if (inputIdx == numInputs) {
-      if (!DefaultValueMap[i] && !Params[i].isVariadic())
+      if (!ParamInfo.hasDefaultArgument(i) && !Params[i].isVariadic())
         return IM_HasUnmatchedParam;
       ++NumSkippedParameters;
       continue;
@@ -1466,7 +1442,8 @@ InputMatcher::match(int numInputs,
     // params: (a: Int, b: Int = 0, c: Int)
     //
     // and we shouldn't claim any input and just skip such parameter.
-    if ((numInputs - inputIdx) < (numParams - i) && DefaultValueMap[i]) {
+    if ((numInputs - inputIdx) < (numParams - i) &&
+        ParamInfo.hasDefaultArgument(i)) {
       ++NumSkippedParameters;
       continue;
     }

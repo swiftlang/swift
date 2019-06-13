@@ -5,3 +5,4 @@ Struct _GlobalRuntimeFunctionCountersState is a new API without @available attri
 Struct _ObjectRuntimeFunctionCountersState is a new API without @available attribute
 Struct _RuntimeFunctionCounters is a new API without @available attribute
 Func _measureRuntimeFunctionCountersDiffs(objects:_:) is a new API without @available attribute
+Constructor ManagedBuffer.init(_doNotCallMe:) is a new API without @available attribute

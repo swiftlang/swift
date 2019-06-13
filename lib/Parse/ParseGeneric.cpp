@@ -64,8 +64,7 @@ Parser::parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
     DeclAttributes attributes;
     if (Tok.hasComment())
       attributes.add(new (Context) RawDocCommentAttr(Tok.getCommentRange()));
-    bool foundCCTokenInAttr;
-    parseDeclAttributeList(attributes, foundCCTokenInAttr);
+    parseDeclAttributeList(attributes);
 
     // Parse the name of the parameter.
     Identifier Name;

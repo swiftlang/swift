@@ -115,6 +115,9 @@ public:
     }
   };
 
+  /// Set target decl for attribute if the CC token is in attribute of the decl.
+  virtual void setAttrTargetDeclKind(Optional<DeclKind> DK) {}
+
   /// Complete the whole expression.  This is a fallback that should
   /// produce results when more specific completion methods failed.
   virtual void completeExpr() {};
@@ -186,7 +189,7 @@ public:
   virtual void completeAccessorBeginning(CodeCompletionExpr *E) {};
 
   /// Complete the keyword in attribute, for instance, @available.
-  virtual void completeDeclAttrKeyword(Decl *D, bool Sil, bool Param) {};
+  virtual void completeDeclAttrBeginning(bool Sil) {};
 
   /// Complete the parameters in attribute, for instance, version specifier for
   /// @available.

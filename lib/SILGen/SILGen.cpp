@@ -573,29 +573,6 @@ static bool haveProfiledAssociatedFunction(SILDeclRef constant) {
          constant.isCurried;
 }
 
-SILProfiler *
-SILGenModule::getOrCreateProfilerForConstructors(DeclContext *ctx,
-                                                 ConstructorDecl *cd) {
-  const auto &Opts = M.getOptions();
-  if (!Opts.GenerateProfile && Opts.UseProfile.empty())
-    return nullptr;
-
-  // Profile nominal types and extensions separately, as they may live in
-  // distinct files. For extensions, just pass in the constructor, because
-  // there are no stored property initializers to visit.
-  Decl *decl = nullptr;
-  if (isa<ExtensionDecl>(ctx))
-    decl = cd;
-  else
-    decl = ctx->getSelfNominalTypeDecl();
-  assert(decl && "No decl available for profiling in this context");
-
-  SILProfiler *&profiler = constructorProfilers[decl];
-  if (!profiler)
-    profiler = SILProfiler::create(M, ForDefinition, decl);
-  return profiler;
-}
-
 /// Set up the function for profiling instrumentation.
 static void setUpForProfiling(SILDeclRef constant, SILFunction *F,
                               ForDefinition_t forDefinition) {
@@ -607,12 +584,12 @@ static void setUpForProfiling(SILDeclRef constant, SILFunction *F,
     if (constant.hasDecl()) {
       if (auto *fd = constant.getFuncDecl()) {
         if (fd->hasBody()) {
-          F->createProfiler(fd, forDefinition);
+          F->createProfiler(fd, constant, forDefinition);
           profiledNode = fd->getBody(/*canSynthesize=*/false);
         }
       }
     } else if (auto *ace = constant.getAbstractClosureExpr()) {
-      F->createProfiler(ace, forDefinition);
+      F->createProfiler(ace, constant, forDefinition);
       profiledNode = ace;
     }
     // Set the function entry count for PGO.
@@ -915,12 +892,11 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
         SILDeclRef initConstant(decl, SILDeclRef::Kind::Initializer);
         emitOrDelayFunction(
             *this, initConstant,
-            [this, initConstant, decl, declCtx](SILFunction *initF) {
+            [this, initConstant, decl](SILFunction *initF) {
               preEmitFunction(initConstant, decl, initF, decl);
               PrettyStackTraceSILFunction X("silgen constructor initializer",
                                             initF);
-              initF->setProfiler(
-                  getOrCreateProfilerForConstructors(declCtx, decl));
+              initF->createProfiler(decl, initConstant, ForDefinition);
               SILGenFunction(*this, *initF, decl)
                 .emitClassConstructorInitializer(decl);
               postEmitFunction(initConstant, initF);
@@ -935,10 +911,10 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
   // non-@objc convenience initializers for classes.
   if (decl->hasBody()) {
     emitOrDelayFunction(
-        *this, constant, [this, constant, decl, declCtx](SILFunction *f) {
+        *this, constant, [this, constant, decl](SILFunction *f) {
           preEmitFunction(constant, decl, f, decl);
           PrettyStackTraceSILFunction X("silgen emitConstructor", f);
-          f->setProfiler(getOrCreateProfilerForConstructors(declCtx, decl));
+          f->createProfiler(decl, constant, ForDefinition);
           SILGenFunction(*this, *f, decl).emitValueConstructor(decl);
           postEmitFunction(constant, f);
         });
@@ -1026,7 +1002,7 @@ void SILGenModule::emitObjCAllocatorDestructor(ClassDecl *cd,
     SILFunction *f = getFunction(dealloc, ForDefinition);
     preEmitFunction(dealloc, dd, f, dd);
     PrettyStackTraceSILFunction X("silgen emitDestructor -dealloc", f);
-    f->createProfiler(dd, ForDefinition);
+    f->createProfiler(dd, dealloc, ForDefinition);
     SILGenFunction(*this, *f, dd).emitObjCDestructor(dealloc);
     postEmitFunction(dealloc, f);
   }
@@ -1096,7 +1072,7 @@ void SILGenModule::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
     SILFunction *f = getFunction(deallocator, ForDefinition);
     preEmitFunction(deallocator, dd, f, dd);
     PrettyStackTraceSILFunction X("silgen emitDeallocatingDestructor", f);
-    f->createProfiler(dd, ForDefinition);
+    f->createProfiler(dd, deallocator, ForDefinition);
     SILGenFunction(*this, *f, dd).emitDeallocatingDestructor(dd);
     f->setDebugScope(new (M) SILDebugScope(dd, f));
     postEmitFunction(deallocator, f);
@@ -1169,15 +1145,12 @@ emitStoredPropertyInitialization(PatternBindingDecl *pbd, unsigned i) {
 
   SILDeclRef constant(var, SILDeclRef::Kind::StoredPropertyInitializer);
   emitOrDelayFunction(*this, constant,
-                      [this,constant,init,initDC,var](SILFunction *f) {
+                      [this,constant,init,initDC](SILFunction *f) {
     preEmitFunction(constant, init, f, init);
     PrettyStackTraceSILFunction X("silgen emitStoredPropertyInitialization", f);
-
-    // Inherit a profiler instance from the constructor.
-    f->setProfiler(
-        getOrCreateProfilerForConstructors(var->getDeclContext(), nullptr));
-
-    SILGenFunction(*this, *f, initDC).emitGeneratorFunction(constant, init);
+    f->createProfiler(init, constant, ForDefinition);
+    SILGenFunction(*this, *f, initDC)
+        .emitGeneratorFunction(constant, init, /*EmitProfilerIncrement=*/true);
     postEmitFunction(constant, f);
   });
 }
@@ -1372,6 +1345,7 @@ void SILGenModule::visitVarDecl(VarDecl *vd) {
 #include "swift/AST/AccessorKinds.def"
         llvm_unreachable("not an opaque accessor");
       }
+      llvm_unreachable("covered switch");
     }();
     if (!shouldEmit) return;
 
@@ -1529,7 +1503,7 @@ void SILGenModule::visitTopLevelCodeDecl(TopLevelCodeDecl *td) {
   // A single SILFunction may be used to lower multiple top-level decls. When
   // this happens, fresh profile counters must be assigned to the new decl.
   TopLevelSGF->F.discardProfiler();
-  TopLevelSGF->F.createProfiler(td, ForDefinition);
+  TopLevelSGF->F.createProfiler(td, SILDeclRef(), ForDefinition);
 
   TopLevelSGF->emitProfilerIncrement(td->getBody());
  

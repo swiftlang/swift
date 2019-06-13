@@ -42,8 +42,8 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
                                SILDeclRef derived, SILDeclRef base) {
   assert(base.kind == derived.kind);
 
-  auto *baseDecl = base.getDecl();
-  auto *derivedDecl = derived.getDecl();
+  auto *baseDecl = cast<AbstractFunctionDecl>(base.getDecl());
+  auto *derivedDecl = cast<AbstractFunctionDecl>(derived.getDecl());
 
   // Note: We intentionally don't support extension members here.
   //
@@ -75,23 +75,29 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
   }
 
   SILFunction *implFn;
-  SILLinkage implLinkage;
 
   // If the member is dynamic, reference its dynamic dispatch thunk so that
   // it will be redispatched, funneling the method call through the runtime
   // hook point.
-  if (derivedDecl->isObjCDynamic()
-      && derived.kind != SILDeclRef::Kind::Allocator) {
+  bool usesObjCDynamicDispatch =
+      (derivedDecl->isObjCDynamic() &&
+       derived.kind != SILDeclRef::Kind::Allocator);
+
+  if (usesObjCDynamicDispatch) {
     implFn = getDynamicThunk(derived, Types.getConstantInfo(derived).SILFnType);
-    implLinkage = SILLinkage::Public;
   } else {
     implFn = getFunction(derived, NotForDefinition);
-    implLinkage = stripExternalFromLinkage(implFn->getLinkage());
   }
 
   // As a fast path, if there is no override, definitely no thunk is necessary.
   if (derived == base)
-    return SILVTable::Entry(base, implFn, implKind, implLinkage);
+    return SILVTable::Entry(base, implFn, implKind);
+
+  // If the base method is less visible than the derived method, we need
+  // a thunk.
+  bool baseLessVisibleThanDerived =
+    (derivedDecl->isEffectiveLinkageMoreVisibleThan(baseDecl) &&
+     !usesObjCDynamicDispatch);
 
   // Determine the derived thunk type by lowering the derived type against the
   // abstraction pattern of the base.
@@ -104,10 +110,11 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
   // The override member type is semantically a subtype of the base
   // member type. If the override is ABI compatible, we do not need
   // a thunk.
-  if (M.Types.checkFunctionForABIDifferences(derivedInfo.SILFnType,
+  if (!baseLessVisibleThanDerived &&
+      M.Types.checkFunctionForABIDifferences(derivedInfo.SILFnType,
                                              overrideInfo.SILFnType)
       == TypeConverter::ABIDifference::Trivial)
-    return SILVTable::Entry(base, implFn, implKind, implLinkage);
+    return SILVTable::Entry(base, implFn, implKind);
 
   // Generate the thunk name.
   std::string name;
@@ -127,7 +134,7 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
 
   // If we already emitted this thunk, reuse it.
   if (auto existingThunk = M.lookUpFunction(name))
-    return SILVTable::Entry(base, existingThunk, implKind, implLinkage);
+    return SILVTable::Entry(base, existingThunk, implKind);
 
   // Emit the thunk.
   SILLocation loc(derivedDecl);
@@ -138,13 +145,16 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
       IsBare, IsNotTransparent, IsNotSerialized, IsNotDynamic);
   thunk->setDebugScope(new (M) SILDebugScope(loc, thunk));
 
+  PrettyStackTraceSILFunction trace("generating vtable thunk", thunk);
+
   SILGenFunction(*this, *thunk, theClass)
-    .emitVTableThunk(derived, implFn, basePattern,
+    .emitVTableThunk(base, derived, implFn, basePattern,
                      overrideInfo.LoweredType,
-                     derivedInfo.LoweredType);
+                     derivedInfo.LoweredType,
+                     baseLessVisibleThanDerived);
   emitLazyConformancesForFunction(thunk);
 
-  return SILVTable::Entry(base, thunk, implKind, implLinkage);
+  return SILVTable::Entry(base, thunk, implKind);
 }
 
 bool SILGenModule::requiresObjCMethodEntryPoint(FuncDecl *method) {
@@ -219,17 +229,15 @@ public:
       auto *dtor = theClass->getDestructor();
       SILDeclRef dtorRef(dtor, SILDeclRef::Kind::Deallocator);
       auto *dtorFn = SGM.getFunction(dtorRef, NotForDefinition);
-      vtableEntries.push_back({dtorRef, dtorFn,
-                               SILVTable::Entry::Kind::Normal,
-                               dtorFn->getLinkage()});
+      vtableEntries.emplace_back(dtorRef, dtorFn,
+                                 SILVTable::Entry::Kind::Normal);
     }
 
     if (SGM.requiresIVarDestroyer(theClass)) {
       SILDeclRef dtorRef(theClass, SILDeclRef::Kind::IVarDestroyer);
       auto *dtorFn = SGM.getFunction(dtorRef, NotForDefinition);
-      vtableEntries.push_back({dtorRef, dtorFn,
-                               SILVTable::Entry::Kind::Normal,
-                               dtorFn->getLinkage()});
+      vtableEntries.emplace_back(dtorRef, dtorFn,
+                                 SILVTable::Entry::Kind::Normal);
     }
 
     IsSerialized_t serialized = IsNotSerialized;

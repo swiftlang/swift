@@ -2426,6 +2426,9 @@ TypeConverter::checkFunctionForABIDifferences(SILFunctionType *fnTy1,
   if (fnTy1->getNumResults() != fnTy2->getNumResults())
     return ABIDifference::NeedsThunk;
 
+  if (fnTy1->getNumYields() != fnTy2->getNumYields())
+    return ABIDifference::NeedsThunk;
+
   // If we don't have a context but the other type does, we'll return
   // ABIDifference::ThinToThick below.
   if (fnTy1->getExtInfo().hasContext() &&
@@ -2440,8 +2443,22 @@ TypeConverter::checkFunctionForABIDifferences(SILFunctionType *fnTy1,
       return ABIDifference::NeedsThunk;
 
     if (checkForABIDifferences(result1.getSILStorageType(),
-                             result2.getSILStorageType(),
-              /*thunk iuos*/ fnTy1->getLanguage() == SILFunctionLanguage::Swift)
+                               result2.getSILStorageType(),
+             /*thunk iuos*/ fnTy1->getLanguage() == SILFunctionLanguage::Swift)
+        != ABIDifference::Trivial)
+      return ABIDifference::NeedsThunk;
+  }
+
+  for (unsigned i : indices(fnTy1->getYields())) {
+    auto yield1 = fnTy1->getYields()[i];
+    auto yield2 = fnTy2->getYields()[i];
+
+    if (yield1.getConvention() != yield2.getConvention())
+      return ABIDifference::NeedsThunk;
+
+    if (checkForABIDifferences(yield1.getSILStorageType(),
+                               yield2.getSILStorageType(),
+             /*thunk iuos*/ fnTy1->getLanguage() == SILFunctionLanguage::Swift)
         != ABIDifference::Trivial)
       return ABIDifference::NeedsThunk;
   }

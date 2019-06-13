@@ -1,3 +1,6 @@
+
+#if __has_include(<Foundation/Foundation.h>)
+
 #import "NSSlowString.h"
 
 
@@ -41,3 +44,6 @@
 }
 
 @end
+
+#endif
+

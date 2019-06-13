@@ -1214,9 +1214,10 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
   }
 }
 
-/// Validate availability spec list, emitting diagnostics if necessary.
+/// Validate availability spec list, emitting diagnostics if necessary and removing
+/// specs for unrecognized platforms.
 static void validateAvailabilitySpecList(Parser &P,
-                                         ArrayRef<AvailabilitySpec *> Specs) {
+    SmallVectorImpl<AvailabilitySpec *> &Specs) {
   llvm::SmallSet<PlatformKind, 4> Platforms;
   bool HasOtherPlatformSpec = false;
 
@@ -1228,7 +1229,9 @@ static void validateAvailabilitySpecList(Parser &P,
     return;
   }
 
+  SmallVector<AvailabilitySpec *, 5> RecognizedSpecs;
   for (auto *Spec : Specs) {
+    RecognizedSpecs.push_back(Spec);
     if (isa<OtherPlatformAvailabilitySpec>(Spec)) {
       HasOtherPlatformSpec = true;
       continue;
@@ -1243,6 +1246,13 @@ static void validateAvailabilitySpecList(Parser &P,
     }
 
     auto *VersionSpec = cast<PlatformVersionConstraintAvailabilitySpec>(Spec);
+    // We keep specs for unrecognized platforms around for error recovery
+    // during parsing but remove them once parsing is completed.
+    if (VersionSpec->isUnrecognizedPlatform()) {
+      RecognizedSpecs.pop_back();
+      continue;
+    }
+
     bool Inserted = Platforms.insert(VersionSpec->getPlatform()).second;
     if (!Inserted) {
       // Rule out multiple version specs referring to the same platform.
@@ -1260,6 +1270,8 @@ static void validateAvailabilitySpecList(Parser &P,
     P.diagnose(InsertWildcardLoc, diag::availability_query_wildcard_required)
         .fixItInsertAfter(InsertWildcardLoc, ", *");
   }
+
+  Specs = RecognizedSpecs;
 }
 
 // #available(...)

@@ -26,11 +26,12 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Regex.h"
 #include "llvm/Support/Signals.h"
+#include "llvm/Support/Threading.h"
 #include "llvm/Support/raw_ostream.h"
 #include <fstream>
 #if defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
-#include <unistd.h>
 #include <sys/param.h>
+#include <unistd.h>
 #elif defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -211,18 +212,26 @@ static void printBufferedNotifications(bool syncWithService = true) {
   });
 }
 
-static int skt_main(int argc, const char **argv);
+struct skt_args {
+  int argc;
+  const char **argv;
+  int ret;
+};
+static void skt_main(skt_args *args);
 
 int main(int argc, const char **argv) {
   dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_HIGH, 0), ^{
-    int ret = skt_main(argc, argv);
-    exit(ret);
+    skt_args args = {argc, argv, 0};
+    llvm::llvm_execute_on_thread((void (*)(void *))skt_main, &args);
+    exit(args.ret);
   });
 
   dispatch_main();
 }
 
-static int skt_main(int argc, const char **argv) {
+static void skt_main(skt_args *args) {
+  int argc = args->argc;
+  const char **argv = args->argv;
   llvm::sys::PrintStackTraceOnErrorSignal(argv[0]);
 
   sourcekitd_initialize();
@@ -261,14 +270,16 @@ static int skt_main(int argc, const char **argv) {
       break;
     if (int ret = handleTestInvocation(Args.slice(0, i), InitOpts)) {
       sourcekitd_shutdown();
-      return ret;
+      args->ret = ret;
+      return;
     }
-    Args = Args.slice(i+1);
+    Args = Args.slice(i + 1);
   }
 
   if (int ret = handleTestInvocation(Args, InitOpts)) {
     sourcekitd_shutdown();
-    return ret;
+    args->ret = ret;
+    return;
   }
 
   for (auto &info : asyncResponses) {
@@ -279,13 +290,15 @@ static int skt_main(int argc, const char **argv) {
     if (handleResponse(info.response, info.options, info.sourceFilename,
                        std::move(info.sourceBuffer), nullptr)) {
       sourcekitd_shutdown();
-      return 1;
+      args->ret = 1;
+      return;
     }
   }
   printBufferedNotifications();
 
   sourcekitd_shutdown();
-  return 0;
+  args->ret = 0;
+  return;
 }
 
 static inline const char *getInterfaceGenDocumentName() {

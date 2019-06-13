@@ -169,8 +169,24 @@ Solution ConstraintSystem::finalize() {
   solution.DefaultedConstraints.insert(DefaultedConstraints.begin(),
                                        DefaultedConstraints.end());
 
+  for (auto &nodeType : addedNodeTypes) {
+    solution.addedNodeTypes.push_back(nodeType);
+  }
+
   for (auto &e : CheckedConformances)
     solution.Conformances.push_back({e.first, e.second});
+
+  for (const auto &transformed : builderTransformedClosures) {
+    auto known =
+        solution.builderTransformedClosures.find(std::get<0>(transformed));
+    if (known != solution.builderTransformedClosures.end()) {
+      assert(known->second.second == std::get<2>(transformed));
+    }
+    solution.builderTransformedClosures.insert(
+      std::make_pair(std::get<0>(transformed),
+                     std::make_pair(std::get<1>(transformed),
+                                    std::get<2>(transformed))));
+  }
 
   return solution;
 }
@@ -233,10 +249,23 @@ void ConstraintSystem::applySolution(const Solution &solution) {
                               solution.DefaultedConstraints.begin(),
                               solution.DefaultedConstraints.end());
 
+  // Add the node types back.
+  for (auto &nodeType : solution.addedNodeTypes) {
+    if (!hasType(nodeType.first))
+      setType(nodeType.first, nodeType.second);
+  }
+
   // Register the conformances checked along the way to arrive to solution.
   for (auto &conformance : solution.Conformances)
     CheckedConformances.push_back(conformance);
 
+  for (const auto &transformed : solution.builderTransformedClosures) {
+    builderTransformedClosures.push_back(
+      std::make_tuple(transformed.first,
+                      transformed.second.first,
+                      transformed.second.second));
+  }
+    
   // Register any fixes produced along this path.
   Fixes.append(solution.Fixes.begin(), solution.Fixes.end());
 
@@ -428,10 +457,12 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numOpenedTypes = cs.OpenedTypes.size();
   numOpenedExistentialTypes = cs.OpenedExistentialTypes.size();
   numDefaultedConstraints = cs.DefaultedConstraints.size();
+  numAddedNodeTypes = cs.addedNodeTypes.size();
   numCheckedConformances = cs.CheckedConformances.size();
   numMissingMembers = cs.MissingMembers.size();
   numDisabledConstraints = cs.solverState->getNumDisabledConstraints();
   numFavoredConstraints = cs.solverState->getNumFavoredConstraints();
+  numBuilderTransformedClosures = cs.builderTransformedClosures.size();
 
   PreviousScore = cs.CurrentScore;
 
@@ -480,11 +511,20 @@ ConstraintSystem::SolverScope::~SolverScope() {
   // Remove any defaulted type variables.
   truncate(cs.DefaultedConstraints, numDefaultedConstraints);
 
+  // Remove any node types we registered.
+  for (unsigned i : range(numAddedNodeTypes, cs.addedNodeTypes.size())) {
+    cs.eraseType(cs.addedNodeTypes[i].first);
+  }
+  truncate(cs.addedNodeTypes, numAddedNodeTypes);
+
   // Remove any conformances checked along the current path.
   truncate(cs.CheckedConformances, numCheckedConformances);
 
   // Remove any missing members found along the current path.
   truncate(cs.MissingMembers, numMissingMembers);
+
+  /// Remove any builder transformed closures.
+  truncate(cs.builderTransformedClosures, numBuilderTransformedClosures);
 
   // Reset the previous score.
   cs.CurrentScore = PreviousScore;
@@ -1671,11 +1711,11 @@ void ConstraintSystem::ArgumentInfoCollector::minimizeLiteralProtocols() {
     const auto &candidate = candidates[i];
 
     auto first =
-        CS.TC.conformsToProtocol(candidate.second, candidates[result].first,
-                                 CS.DC, ConformanceCheckFlags::InExpression);
+        TypeChecker::conformsToProtocol(candidate.second, candidates[result].first,
+                                        CS.DC, ConformanceCheckFlags::InExpression);
     auto second =
-        CS.TC.conformsToProtocol(candidates[result].second, candidate.first,
-                                 CS.DC, ConformanceCheckFlags::InExpression);
+        TypeChecker::conformsToProtocol(candidates[result].second, candidate.first,
+                                        CS.DC, ConformanceCheckFlags::InExpression);
     if ((first && second) || (!first && !second))
       return;
 
@@ -1878,8 +1918,8 @@ void ConstraintSystem::sortDesignatedTypes(
         ++nextType;
         break;
       } else if (auto *protoDecl = dyn_cast<ProtocolDecl>(nominalTypes[i])) {
-        if (TC.conformsToProtocol(argType, protoDecl, DC,
-                                  ConformanceCheckFlags::InExpression)) {
+        if (TypeChecker::conformsToProtocol(argType, protoDecl, DC,
+                                            ConformanceCheckFlags::InExpression)) {
           std::swap(nominalTypes[nextType], nominalTypes[i]);
           ++nextType;
           break;
@@ -2035,6 +2075,7 @@ static Constraint *tryOptimizeGenericDisjunction(
   case Comparison::Unordered:
     return nullptr;
   }
+  llvm_unreachable("covered switch");
 }
 
 void ConstraintSystem::partitionDisjunction(

@@ -273,7 +273,7 @@ CalleeCandidateInfo::ClosenessResultTy CalleeCandidateInfo::evaluateCloseness(
     return {CC_GeneralMismatch, {}};
 
   auto candArgs = candidate.getParameters();
-  auto candDefaultMap = candidate.getDefaultMap(candArgs);
+  auto candParamInfo = candidate.getParameterListInfo(candArgs);
 
   struct OurListener : public MatchCallArgumentListener {
     CandidateCloseness result = CC_ExactMatch;
@@ -318,7 +318,7 @@ CalleeCandidateInfo::ClosenessResultTy CalleeCandidateInfo::evaluateCloseness(
   // types of the arguments, looking only at the argument labels etc.
   SmallVector<ParamBinding, 4> paramBindings;
   if (matchCallArguments(actualArgs, candArgs,
-                         candDefaultMap,
+                         candParamInfo,
                          hasTrailingClosure,
                          /*allowFixes:*/ true,
                          listener, paramBindings))
@@ -1011,8 +1011,8 @@ bool CalleeCandidateInfo::diagnoseGenericParameterErrors(Expr *badArgExpr) {
     // FIXME: Add specific error for not subclass, if the archetype has a superclass?
     
     for (auto proto : paramArchetype->getConformsTo()) {
-      if (!CS.TC.conformsToProtocol(substitution, proto, CS.DC,
-                                    ConformanceCheckFlags::InExpression)) {
+      if (!TypeChecker::conformsToProtocol(substitution, proto, CS.DC,
+                                           ConformanceCheckFlags::InExpression)) {
         if (substitution->isEqual(argType)) {
           CS.TC.diagnose(badArgExpr->getLoc(),
                          diag::cannot_convert_argument_value_protocol,

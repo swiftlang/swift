@@ -189,6 +189,31 @@ class BuildScriptInvocation(object):
             args.android = True
             args.build_android = False
 
+        # Include the Darwin supported architectures in the CMake options.
+        if args.swift_darwin_supported_archs:
+            args.extra_cmake_options.append(
+                '-DSWIFT_DARWIN_SUPPORTED_ARCHS:STRING={}'.format(
+                    args.swift_darwin_supported_archs))
+
+            # Remove unsupported Darwin archs from the standard library
+            # deployment targets.
+            supported_archs = args.swift_darwin_supported_archs.split(';')
+            targets = StdlibDeploymentTarget.get_targets_by_name(
+                args.stdlib_deployment_targets)
+
+            args.stdlib_deployment_targets = [
+                target.name
+                for target in targets
+                if (target.platform.is_darwin and
+                    target.arch in supported_archs)
+            ]
+
+        # Include the Darwin module-only architectures in the CMake options.
+        if args.swift_darwin_module_archs:
+            args.extra_cmake_options.append(
+                '-DSWIFT_DARWIN_MODULE_ARCHS:STRING={}'.format(
+                    args.swift_darwin_module_archs))
+
 # ---
 
     def __init__(self, toolchain, args):
@@ -509,8 +534,8 @@ class BuildScriptInvocation(object):
             impl_args += ["--skip-test-optimized"]
         if not args.test_optimize_for_size:
             impl_args += ["--skip-test-optimize-for-size"]
-        if not args.test_optimize_none_implicit_dynamic:
-            impl_args += ["--skip-test-optimize-none-implicit-dynamic"]
+        if not args.test_optimize_none_with_implicit_dynamic:
+            impl_args += ["--skip-test-optimize-none-with-implicit-dynamic"]
         if args.build_libparser_only:
             impl_args += ["--build-libparser-only"]
         if args.android:
@@ -887,6 +912,11 @@ def main_preset():
              "various values used to build in this configuration",
         action="store_true",
         default=False)
+    parser.add_argument(
+        "--reconfigure",
+        help="Reconfigure all projects as we build",
+        action="store_true",
+        default=False)
     args = parser.parse_args()
     if len(args.preset_file_names) == 0:
         args.preset_file_names = [
@@ -954,14 +984,17 @@ def main_preset():
         build_script_args += ["--cmake-c-launcher", args.cmake_c_launcher]
     if args.cmake_cxx_launcher:
         build_script_args += ["--cmake-cxx-launcher", args.cmake_cxx_launcher]
-
     printable_command = shell.quote_command(build_script_args)
     if args.expand_invocation:
         print(printable_command)
-    else:
-        diagnostics.note('using preset "{}", which expands to \n\n{}\n'.format(
-            args.preset, printable_command))
-        shell.call_without_sleeping(build_script_args)
+        return 0
+
+    if args.reconfigure:
+        build_script_args += ["--reconfigure"]
+
+    diagnostics.note('using preset "{}", which expands to \n\n{}\n'.format(
+        args.preset, printable_command))
+    shell.call_without_sleeping(build_script_args)
     return 0
 
 

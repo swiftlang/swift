@@ -441,7 +441,7 @@ SourceRange Decl::getSourceRangeIncludingAttrs() const {
   }
 
   // Attributes on VarDecl syntactically belong to PatternBindingDecl.
-  if (isa<VarDecl>(this))
+  if (isa<VarDecl>(this) && !isa<ParamDecl>(this))
     return Range;
 
   // Attributes on PatternBindingDecls are attached to VarDecls in AST.
@@ -531,6 +531,17 @@ bool AbstractFunctionDecl::isTransparent() const {
   return false;
 }
 
+bool ParameterList::hasInternalParameter(StringRef Prefix) const {
+  for (auto param : *this) {
+    if (param->hasName() && param->getNameStr().startswith(Prefix))
+      return true;
+    auto argName = param->getArgumentName();
+    if (!argName.empty() && argName.str().startswith(Prefix))
+      return true;
+  }
+  return false;
+}
+
 bool Decl::isPrivateStdlibDecl(bool treatNonBuiltinProtocolsAsPublic) const {
   const Decl *D = this;
   if (auto ExtD = dyn_cast<ExtensionDecl>(D)) {
@@ -552,26 +563,15 @@ bool Decl::isPrivateStdlibDecl(bool treatNonBuiltinProtocolsAsPublic) const {
       FU->getKind() != FileUnitKind::SerializedAST)
     return false;
 
-  auto hasInternalParameter = [](const ParameterList *params) -> bool {
-    for (auto param : *params) {
-      if (param->hasName() && param->getNameStr().startswith("_"))
-        return true;
-      auto argName = param->getArgumentName();
-      if (!argName.empty() && argName.str().startswith("_"))
-        return true;
-    }
-    return false;
-  };
-
   if (auto AFD = dyn_cast<AbstractFunctionDecl>(D)) {
     // If it's a function with a parameter with leading underscore, it's a
     // private function.
-    if (hasInternalParameter(AFD->getParameters()))
+    if (AFD->getParameters()->hasInternalParameter("_"))
       return true;
   }
 
   if (auto SubscriptD = dyn_cast<SubscriptDecl>(D)) {
-    if (hasInternalParameter(SubscriptD->getIndices()))
+    if (SubscriptD->getIndices()->hasInternalParameter("_"))
       return true;
   }
 
@@ -2758,6 +2758,11 @@ bool ValueDecl::shouldHideFromEditor() const {
   if (getBaseName().isEditorPlaceholder())
     return true;
 
+  // '$__' names are reserved by compiler internal.
+  if (!getBaseName().isSpecial() &&
+      getBaseName().getIdentifier().str().startswith("$__"))
+    return true;
+
   return false;
 }
 
@@ -3686,6 +3691,7 @@ ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
   Bits.ClassDecl.AncestryComputed = 0;
   Bits.ClassDecl.HasMissingDesignatedInitializers = 0;
   Bits.ClassDecl.HasMissingVTableEntries = 0;
+  Bits.ClassDecl.IsIncompatibleWithWeakReferences = 0;
 }
 
 bool ClassDecl::hasResilientMetadata() const {
@@ -3767,6 +3773,16 @@ bool ClassDecl::hasMissingDesignatedInitializers() const {
 bool ClassDecl::hasMissingVTableEntries() const {
   (void)getMembers();
   return Bits.ClassDecl.HasMissingVTableEntries;
+}
+
+bool ClassDecl::isIncompatibleWithWeakReferences() const {
+  if (Bits.ClassDecl.IsIncompatibleWithWeakReferences) {
+    return true;
+  }
+  if (auto superclass = getSuperclassDecl()) {
+    return superclass->isIncompatibleWithWeakReferences();
+  }
+  return false;
 }
 
 bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {
@@ -5428,9 +5444,6 @@ PropertyWrapperTypeInfo VarDecl::getAttachedPropertyWrapperTypeInfo() const {
 
 Type VarDecl::getAttachedPropertyWrapperType() const {
   auto &ctx = getASTContext();
-  if (!ctx.getLazyResolver())
-    return nullptr;
-
   auto mutableThis = const_cast<VarDecl *>(this);
   return evaluateOrDefault(ctx.evaluator,
                            AttachedPropertyWrapperTypeRequest{mutableThis},
@@ -5439,9 +5452,6 @@ Type VarDecl::getAttachedPropertyWrapperType() const {
 
 Type VarDecl::getPropertyWrapperBackingPropertyType() const {
   ASTContext &ctx = getASTContext();
-  if (!ctx.getLazyResolver())
-    return nullptr;
-
   auto mutableThis = const_cast<VarDecl *>(this);
   return evaluateOrDefault(
       ctx.evaluator, PropertyWrapperBackingPropertyTypeRequest{mutableThis},
@@ -5451,9 +5461,6 @@ Type VarDecl::getPropertyWrapperBackingPropertyType() const {
 PropertyWrapperBackingPropertyInfo
 VarDecl::getPropertyWrapperBackingPropertyInfo() const {
   auto &ctx = getASTContext();
-  if (!ctx.getLazyResolver())
-    return PropertyWrapperBackingPropertyInfo();
-
   auto mutableThis = const_cast<VarDecl *>(this);
   return evaluateOrDefault(
       ctx.evaluator,
@@ -5470,16 +5477,33 @@ bool VarDecl::isPropertyWrapperInitializedWithInitialValue() const {
   if (!ctx.getLazyResolver())
     return false;
 
-  // If there is no initializer, the initialization form depends on
-  // whether the property wrapper type has an init(initialValue:).
-  if (!isParentInitialized()) {
-    auto wrapperTypeInfo = getAttachedPropertyWrapperTypeInfo();
-    return wrapperTypeInfo.initialValueInit != nullptr;
-  }
+  auto customAttr = getAttachedPropertyWrapper();
+  if (!customAttr)
+    return false;
 
-  // Otherwise, check whether the '=' initialization form was used.
-  return getPropertyWrapperBackingPropertyInfo().originalInitialValue
-      != nullptr;
+  auto *PBD = getParentPatternBinding();
+  if (!PBD)
+    return false;
+
+  // If there was an initializer on the original property, initialize
+  // via the initial value.
+  if (PBD->getPatternList()[0].getEqualLoc().isValid())
+    return true;
+
+  // If there was an initializer on the attribute itself, initialize
+  // via the full wrapper.
+  if (customAttr->getArg() != nullptr)
+    return false;
+
+  // If the property wrapper is default-initializable, it's the wrapper
+  // being initialized.
+  if (PBD->isDefaultInitializable(0))
+    return false;
+
+  // There is no initializer, so the initialization form depends on
+  // whether the property wrapper type has an init(initialValue:).
+  auto wrapperTypeInfo = getAttachedPropertyWrapperTypeInfo();
+  return wrapperTypeInfo.initialValueInit != nullptr;
 }
 
 Identifier VarDecl::getObjCPropertyName() const {
@@ -5714,6 +5738,30 @@ void ParamDecl::setStoredProperty(VarDecl *var) {
   }
 
   DefaultValueAndFlags.getPointer()->DefaultArg = var;
+}
+
+Type ValueDecl::getFunctionBuilderType() const {
+  // Fast path: most declarations (especially parameters, which is where
+  // this is hottest) do not have any custom attributes at all.
+  if (!getAttrs().hasAttribute<CustomAttr>()) return Type();
+
+  auto &ctx = getASTContext();
+  auto mutableThis = const_cast<ValueDecl *>(this);
+  return evaluateOrDefault(ctx.evaluator,
+                           FunctionBuilderTypeRequest{mutableThis},
+                           Type());
+}
+
+CustomAttr *ValueDecl::getAttachedFunctionBuilder() const {
+  // Fast path: most declarations (especially parameters, which is where
+  // this is hottest) do not have any custom attributes at all.
+  if (!getAttrs().hasAttribute<CustomAttr>()) return nullptr;
+
+  auto &ctx = getASTContext();
+  auto mutableThis = const_cast<ValueDecl *>(this);
+  return evaluateOrDefault(ctx.evaluator,
+                           AttachedFunctionBuilderRequest{mutableThis},
+                           nullptr);
 }
 
 void ParamDecl::setDefaultArgumentInitContext(Initializer *initContext) {
@@ -6261,6 +6309,12 @@ static bool requiresNewVTableEntry(const AbstractFunctionDecl *decl) {
     }
   }
 
+  // If the base is less visible than the override, we might need a vtable
+  // entry since callers of the override might not be able to see the base
+  // at all.
+  if (decl->isEffectiveLinkageMoreVisibleThan(base))
+    return true;
+
   // If the method overrides something, we only need a new entry if the
   // override has a more general AST type. However an abstraction
   // change is OK; we don't want to add a whole new vtable entry just
@@ -6461,6 +6515,7 @@ bool AbstractFunctionDecl::hasInlinableBodyText() const {
   case BodyKind::MemberwiseInitializer:
     return false;
   }
+  llvm_unreachable("covered switch");
 }
 
 StringRef AbstractFunctionDecl::getInlinableBodyText(

@@ -102,6 +102,7 @@ public:
     case ApplySiteKind::PartialApplyInst:
       return ApplySite(cast<PartialApplyInst>(node));
     }
+    llvm_unreachable("covered switch");
   }
 
   ApplySiteKind getKind() const { return ApplySiteKind(Inst->getKind()); }
@@ -126,6 +127,7 @@ public:
     case ApplySiteKind::TryApplyInst:                                          \
       return cast<TryApplyInst>(Inst)->OPERATION;                              \
     }                                                                          \
+    llvm_unreachable("covered switch");                                        \
   } while (0)
 
   /// Return the callee operand.
@@ -293,6 +295,7 @@ public:
       // apply pa2(a)
       return getSubstCalleeConv().getNumSILArguments() - getNumArguments();
     }
+    llvm_unreachable("covered switch");
   }
 
   /// Return the callee's function argument index corresponding to the given
@@ -325,6 +328,7 @@ public:
     case ApplySiteKind::PartialApplyInst:
       llvm_unreachable("unhandled case");
     }
+    llvm_unreachable("covered switch");
   }
 
   /// Return the applied 'self' argument value.
@@ -339,6 +343,7 @@ public:
     case ApplySiteKind::PartialApplyInst:
       llvm_unreachable("unhandled case");
     }
+    llvm_unreachable("covered switch");
   }
 
   /// Return the 'self' apply operand.
@@ -353,6 +358,7 @@ public:
     case ApplySiteKind::PartialApplyInst:
       llvm_unreachable("Unhandled cast");
     }
+    llvm_unreachable("covered switch");
   }
 
   /// Return a list of applied arguments without self.
@@ -367,6 +373,7 @@ public:
     case ApplySiteKind::PartialApplyInst:
       llvm_unreachable("Unhandled case");
     }
+    llvm_unreachable("covered switch");
   }
 
   /// Return whether the given apply is of a formally-throwing function
@@ -466,6 +473,7 @@ public:
     case FullApplySiteKind::TryApplyInst:
       return FullApplySite(cast<TryApplyInst>(node));
     }
+    llvm_unreachable("covered switch");
   }
 
   FullApplySiteKind getKind() const {

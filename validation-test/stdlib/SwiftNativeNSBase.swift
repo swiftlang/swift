@@ -22,9 +22,6 @@
 
 // REQUIRES: objc_interop
 
-// Requires swift-version 4
-// UNSUPPORTED: swift_test_mode_optimize_none_with_implicit_dynamic
-
 import Foundation
 import StdlibUnittest
 

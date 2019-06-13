@@ -16,8 +16,6 @@
 // REQUIRES: executable_test
 // REQUIRES: CPU=x86_64
 
-// Requires swift-version 4
-// UNSUPPORTED: swift_test_mode_optimize_none_with_implicit_dynamic
 import StdlibUnittest
 #if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
   import Darwin

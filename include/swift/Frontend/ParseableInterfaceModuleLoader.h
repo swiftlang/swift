@@ -116,6 +116,9 @@ namespace unittest {
 
 namespace swift {
 
+  class LangOptions;
+  class SearchPathOptions;
+
 /// A ModuleLoader that runs a subordinate \c CompilerInvocation and
 /// \c CompilerInstance to convert .swiftinterface files to .swiftmodule
 /// files on the fly, caching the resulting .swiftmodules in the module cache
@@ -162,10 +165,11 @@ public:
   /// Unconditionally build \p InPath (a swiftinterface file) to \p OutPath (as
   /// a swiftmodule file).
   ///
-  /// A simplified version of the core logic in #openModuleFiles, mostly for
-  /// testing purposes.
+  /// A simplified version of the core logic in #openModuleFiles.
   static bool buildSwiftModuleFromSwiftInterface(
-    ASTContext &Ctx, StringRef CacheDir, StringRef PrebuiltCacheDir,
+    SourceManager &SourceMgr, DiagnosticEngine &Diags,
+    const SearchPathOptions &SearchPathOpts, const LangOptions &LangOpts,
+    StringRef CacheDir, StringRef PrebuiltCacheDir,
     StringRef ModuleName, StringRef InPath, StringRef OutPath,
     bool SerializeDependencyHashes, bool TrackSystemDependencies,
     bool RemarkOnRebuildFromInterface);

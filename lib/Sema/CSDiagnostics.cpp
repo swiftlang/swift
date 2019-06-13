@@ -76,6 +76,10 @@ Type FailureDiagnostic::getType(Expr *expr) const {
   return resolveType(CS.getType(expr));
 }
 
+Type FailureDiagnostic::getType(const TypeLoc &loc) const {
+  return resolveType(CS.getType(loc));
+}
+
 template <typename... ArgTypes>
 InFlightDiagnostic
 FailureDiagnostic::emitDiagnostic(ArgTypes &&... Args) const {
@@ -107,9 +111,17 @@ Optional<SelectedOverload> FailureDiagnostic::getChoiceFor(Expr *expr) const {
 }
 
 Type RequirementFailure::getOwnerType() const {
-  return getType(getRawAnchor())
-      ->getInOutObjectType()
-      ->getMetatypeInstanceType();
+  auto *anchor = getRawAnchor();
+
+  // If diagnostic is anchored at assignment expression
+  // it means that requirement failure happend while trying
+  // to convert source to destination, which means that
+  // owner type is actually not an assignment expression
+  // itself but its source.
+  if (auto *assignment = dyn_cast<AssignExpr>(anchor))
+    anchor = assignment->getSrc();
+
+  return getType(anchor)->getInOutObjectType()->getMetatypeInstanceType();
 }
 
 const GenericContext *RequirementFailure::getGenericContext() const {
@@ -2828,7 +2840,11 @@ bool MissingContextualConformanceFailure::diagnoseAsError() {
   Optional<Diag<Type, Type>> diagnostic;
   if (path.empty()) {
     assert(isa<AssignExpr>(anchor));
-    diagnostic = getDiagnosticFor(CTP_AssignSource);
+    if (isa<SubscriptExpr>(cast<AssignExpr>(anchor)->getDest())) {
+      diagnostic = getDiagnosticFor(CTP_SubscriptAssignSource);
+    } else {
+      diagnostic = getDiagnosticFor(CTP_AssignSource);
+    }
   } else {
     const auto &last = path.back();
     switch (last.getKind()) {
@@ -2895,6 +2911,8 @@ MissingContextualConformanceFailure::getDiagnosticFor(
     return diag::cannot_convert_coerce_protocol;
   case CTP_AssignSource:
     return diag::cannot_convert_assign_protocol;
+  case CTP_SubscriptAssignSource:
+    return diag::cannot_convert_subscript_assign_protocol;
 
   case CTP_ThrowStmt:
   case CTP_Unused:
@@ -2904,4 +2922,268 @@ MissingContextualConformanceFailure::getDiagnosticFor(
     break;
   }
   return None;
+}
+
+bool MissingGenericArgumentsFailure::hasLoc(GenericTypeParamType *GP) const {
+  return GP->getDecl()->getStartLoc().isValid();
+}
+
+bool MissingGenericArgumentsFailure::diagnoseAsError() {
+  llvm::SmallDenseMap<TypeRepr *, SmallVector<GenericTypeParamType *, 4>>
+      scopedParameters;
+
+  auto isScoped =
+      findArgumentLocations([&](TypeRepr *base, GenericTypeParamType *GP) {
+        scopedParameters[base].push_back(GP);
+      });
+
+  if (!isScoped)
+    return diagnoseForAnchor(getAnchor(), Parameters);
+
+  bool diagnosed = false;
+  for (const auto &scope : scopedParameters)
+    diagnosed |= diagnoseForAnchor(scope.first, scope.second);
+  return diagnosed;
+}
+
+bool MissingGenericArgumentsFailure::diagnoseForAnchor(
+    Anchor anchor, ArrayRef<GenericTypeParamType *> params) const {
+  bool diagnosed = false;
+  for (auto *GP : params)
+    diagnosed |= diagnoseParameter(anchor, GP);
+
+  if (!diagnosed)
+    return false;
+
+  auto *DC = getDeclContext();
+  if (auto *SD = dyn_cast<SubscriptDecl>(DC)) {
+    emitDiagnostic(SD, diag::note_call_to_subscript, SD->getFullName());
+    return true;
+  }
+
+  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(DC)) {
+    if (isa<ConstructorDecl>(AFD)) {
+      emitDiagnostic(AFD, diag::note_call_to_initializer);
+    } else {
+      emitDiagnostic(AFD,
+                     AFD->isOperator() ? diag::note_call_to_operator
+                                       : diag::note_call_to_func,
+                     AFD->getFullName());
+    }
+    return true;
+  }
+
+  emitGenericSignatureNote(anchor);
+  return true;
+}
+
+bool MissingGenericArgumentsFailure::diagnoseParameter(
+    Anchor anchor, GenericTypeParamType *GP) const {
+  auto &cs = getConstraintSystem();
+
+  auto loc = anchor.is<Expr *>() ? anchor.get<Expr *>()->getLoc()
+                                 : anchor.get<TypeRepr *>()->getLoc();
+
+  auto *locator = getLocator();
+  // Type variables associated with missing generic parameters are
+  // going to be completely cut off from the rest of constraint system,
+  // that's why we'd get two fixes in this case which is not ideal.
+  if (locator->isForContextualType() &&
+      llvm::count_if(cs.DefaultedConstraints,
+                     [&GP](const ConstraintLocator *locator) {
+                       return locator->getGenericParameter() == GP;
+                     }) > 1) {
+    return false;
+  }
+
+  if (auto *CE = dyn_cast<ExplicitCastExpr>(getRawAnchor())) {
+    auto castTo = getType(CE->getCastTypeLoc());
+    auto *NTD = castTo->getAnyNominal();
+    emitDiagnostic(loc, diag::unbound_generic_parameter_cast, GP,
+                   NTD ? NTD->getDeclaredType() : castTo);
+  } else {
+    emitDiagnostic(loc, diag::unbound_generic_parameter, GP);
+  }
+
+  if (!hasLoc(GP))
+    return true;
+
+  Type baseTyForNote;
+  auto *DC = getDeclContext();
+
+  if (auto *NTD =
+          dyn_cast_or_null<NominalTypeDecl>(DC->getSelfNominalTypeDecl())) {
+    baseTyForNote = NTD->getDeclaredType();
+  } else if (auto *TAD = dyn_cast<TypeAliasDecl>(DC)) {
+    baseTyForNote = TAD->getUnboundGenericType();
+  } else {
+    return true;
+  }
+
+  emitDiagnostic(GP->getDecl(), diag::archetype_declared_in_type, GP,
+                 baseTyForNote);
+  return true;
+}
+
+void MissingGenericArgumentsFailure::emitGenericSignatureNote(
+    Anchor anchor) const {
+  auto &cs = getConstraintSystem();
+  auto &TC = getTypeChecker();
+  auto *paramDC = getDeclContext();
+
+  auto *GTD = dyn_cast<GenericTypeDecl>(paramDC);
+  if (!GTD || anchor.is<Expr *>())
+    return;
+
+  auto getParamDecl =
+      [](const ConstraintLocator *locator) -> GenericTypeParamDecl * {
+    return locator->isForGenericParameter()
+               ? locator->getGenericParameter()->getDecl()
+               : nullptr;
+  };
+
+  llvm::SmallDenseMap<GenericTypeParamDecl *, Type> params;
+  for (auto *typeVar : cs.getTypeVariables()) {
+    auto *GP = typeVar->getImpl().getGenericParameter();
+    if (!GP)
+      continue;
+
+    auto type = resolveType(typeVar);
+    // This could happen if the diagnostic is used by CSDiag.
+    if (type->is<TypeVariableType>())
+      continue;
+
+    // If this is one of the defaulted parameter types, attempt
+    // to emit placeholder for it instead of `Any`.
+    if (llvm::any_of(cs.DefaultedConstraints,
+                     [&](const ConstraintLocator *locator) {
+                       return GP->getDecl() == getParamDecl(locator);
+                     }))
+      continue;
+
+    params[GP->getDecl()] = type;
+  }
+
+  auto getPreferredType = [&](const GenericTypeParamDecl *GP) -> Type {
+    auto type = params.find(GP);
+    return (type == params.end()) ? Type() : type->second;
+  };
+
+  SmallString<64> paramsAsString;
+  auto baseType = anchor.get<TypeRepr *>();
+  if (TC.getDefaultGenericArgumentsString(paramsAsString, GTD,
+                                          getPreferredType)) {
+    auto diagnostic = emitDiagnostic(
+        baseType->getLoc(), diag::unbound_generic_parameter_explicit_fix);
+
+    if (auto *genericTy = dyn_cast<GenericIdentTypeRepr>(baseType)) {
+      // If some of the eneric arguments have been specified, we need to
+      // replace existing signature with a new one.
+      diagnostic.fixItReplace(genericTy->getAngleBrackets(), paramsAsString);
+    } else {
+      // Otherwise we can simply insert new generic signature.
+      diagnostic.fixItInsertAfter(baseType->getEndLoc(), paramsAsString);
+    }
+  }
+}
+
+bool MissingGenericArgumentsFailure::findArgumentLocations(
+    llvm::function_ref<void(TypeRepr *, GenericTypeParamType *)> callback) {
+  using Callback = llvm::function_ref<void(TypeRepr *, GenericTypeParamType *)>;
+
+  auto *anchor = getRawAnchor();
+
+  TypeLoc typeLoc;
+  if (auto *TE = dyn_cast<TypeExpr>(anchor))
+    typeLoc = TE->getTypeLoc();
+  else if (auto *ECE = dyn_cast<ExplicitCastExpr>(anchor))
+    typeLoc = ECE->getCastTypeLoc();
+
+  if (!typeLoc.hasLocation())
+    return false;
+
+  struct AssociateMissingParams : public ASTWalker {
+    llvm::SmallVector<GenericTypeParamType *, 4> Params;
+    Callback Fn;
+
+    AssociateMissingParams(ArrayRef<GenericTypeParamType *> params,
+                           Callback callback)
+        : Params(params.begin(), params.end()), Fn(callback) {}
+
+    bool walkToTypeReprPre(TypeRepr *T) override {
+      if (Params.empty())
+        return false;
+
+      auto *ident = dyn_cast<ComponentIdentTypeRepr>(T);
+      if (!ident)
+        return true;
+
+      auto *decl = dyn_cast_or_null<GenericTypeDecl>(ident->getBoundDecl());
+      if (!decl)
+        return true;
+
+      auto *paramList = decl->getGenericParams();
+      if (!paramList)
+        return true;
+
+      // There could a situation like `S<S>()`, so we need to be
+      // careful not to point at first `S` because it has all of
+      // its generic parameters specified.
+      if (auto *generic = dyn_cast<GenericIdentTypeRepr>(ident)) {
+        if (paramList->size() == generic->getNumGenericArgs())
+          return true;
+      }
+
+      for (auto *candidate : paramList->getParams()) {
+        auto result =
+            llvm::find_if(Params, [&](const GenericTypeParamType *param) {
+              return candidate == param->getDecl();
+            });
+
+        if (result != Params.end()) {
+          Fn(ident, *result);
+          Params.erase(result);
+        }
+      }
+
+      // Keep walking.
+      return true;
+    }
+
+    bool allParamsAssigned() const { return Params.empty(); }
+
+  } associator(Parameters, callback);
+
+  typeLoc.getTypeRepr()->walk(associator);
+  return associator.allParamsAssigned();
+}
+
+void SkipUnhandledConstructInFunctionBuilderFailure::diagnosePrimary(
+    bool asNote) {
+  if (auto stmt = unhandled.dyn_cast<Stmt *>()) {
+    emitDiagnostic(stmt->getStartLoc(),
+                   asNote? diag::note_function_builder_control_flow
+                         : diag::function_builder_control_flow,
+                   builder->getFullName());
+  } else {
+    auto decl = unhandled.get<Decl *>();
+    emitDiagnostic(decl,
+                   asNote ? diag::note_function_builder_decl
+                          : diag::function_builder_decl,
+                   builder->getFullName());
+  }
+}
+
+bool SkipUnhandledConstructInFunctionBuilderFailure::diagnoseAsError() {
+  diagnosePrimary(/*asNote=*/false);
+  emitDiagnostic(builder,
+                 diag::kind_declname_declared_here,
+                 builder->getDescriptiveKind(),
+                 builder->getFullName());
+  return true;
+}
+
+bool SkipUnhandledConstructInFunctionBuilderFailure::diagnoseAsNote() {
+  diagnosePrimary(/*asNote=*/true);
+  return true;
 }

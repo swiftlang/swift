@@ -159,10 +159,10 @@ class HostSpecificConfiguration(object):
                     self.swift_test_run_targets.append(
                         "check-swift{}-optimize_size-{}".format(
                             subset_suffix, name))
-                if args.test_optimize_none_implicit_dynamic and \
+                if args.test_optimize_none_with_implicit_dynamic and \
                         not test_host_only:
                     self.swift_test_run_targets.append(
-                        "check-swift{}-optimize_none_implicit_dynamic-{}"
+                        "check-swift{}-optimize_none_with_implicit_dynamic-{}"
                         .format(subset_suffix, name))
 
     def __platforms_to_skip_build(self, args):

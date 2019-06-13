@@ -484,9 +484,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.DisableConstraintSolverPerformanceHacks |=
       Args.hasArg(OPT_disable_constraint_solver_performance_hacks);
 
-  Opts.EnableObjCResilientClassStubs =
-      Args.hasArg(OPT_enable_objc_resilient_class_stubs);
-
   // Must be processed after any other language options that could affect
   // platform conditions.
   bool UnsupportedOS, UnsupportedArch;
@@ -701,9 +698,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
                      A->getAsString(Args), A->getValue());
       return true;
     }
-  }
-  if (Args.hasArg(OPT_sil_existential_specializer)) {
-    Opts.ExistentialSpecializer = true;
   }
   if (const Arg *A = Args.getLastArg(OPT_num_threads)) {
     if (StringRef(A->getValue()).getAsInteger(10, Opts.NumThreads)) {
@@ -1157,6 +1151,30 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
       Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                      A->getAsString(Args), A->getValue());
     }
+  }
+                             
+  // Autolink runtime compatibility libraries, if asked to.
+  if (!Args.hasArg(options::OPT_disable_autolinking_runtime_compatibility)) {
+    Optional<llvm::VersionTuple> runtimeCompatibilityVersion;
+    
+    if (auto versionArg = Args.getLastArg(
+                                  options::OPT_runtime_compatibility_version)) {
+      auto version = StringRef(versionArg->getValue());
+      if (version.equals("none")) {
+        runtimeCompatibilityVersion = None;
+      } else if (version.equals("5.0")) {
+        runtimeCompatibilityVersion = llvm::VersionTuple(5, 0);
+      } else {
+        Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                       versionArg->getAsString(Args), version);
+      }
+    } else {
+      runtimeCompatibilityVersion =
+                           getSwiftRuntimeCompatibilityVersionForTarget(Triple);
+    }
+      
+    Opts.AutolinkRuntimeCompatibilityLibraryVersion =
+                                                    runtimeCompatibilityVersion;
   }
 
   return false;

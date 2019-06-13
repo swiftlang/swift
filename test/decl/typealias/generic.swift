@@ -60,7 +60,7 @@ typealias B<T1> = MyType<T1, T1>  // expected-note {{'T1' declared as parameter 
 typealias C<T> = MyType<String, T>
 
 // Type aliases with unused generic params.
-typealias D<T1, T2, T3> = MyType<T2, T1>  // expected-note {{'T3' declared as parameter to type 'D'}}
+typealias D<T1, T2, T3> = MyType<T2, T1>  // expected-note 3 {{'T3' declared as parameter to type 'D'}}
 
 typealias E<T1, T2> = Int  // expected-note {{generic type 'E' declared here}}
 
@@ -72,17 +72,18 @@ typealias G<S1, S2> = A<S1, S2>
 let _ : E<Int, Float> = 42
 let _ : E<Float> = 42   // expected-error {{generic type 'E' specialized with too few type parameters (got 1, but expected 2)}}
 let _ : E = 42   // expected-error {{cannot convert value of type 'Int' to specified type 'E'}}
-let _ : D = D(a: 1, b: 2)  // expected-error {{cannot convert value of type 'MyType<Int, Int>' to specified type 'D'}}
+let _ : D = D(a: 1, b: 2)
+// expected-error@-1 {{generic parameter 'T3' could not be inferred}}
+// expected-note@-2 {{explicitly specify the generic arguments to fix this issue}} {{14-14=<Int, Int, Any>}}
 
 let _ : D<Int, Int, Float> = D<Int, Int, Float>(a: 1, b: 2)
 
-// FIXME: This is not a great error.
-// expected-error @+1 {{cannot convert value of type 'D<Int, Int, Float>' (aka 'MyType<Int, Int>') to specified type 'D'}}
 let _ : D = D<Int, Int, Float>(a: 1, b: 2)
+// expected-error@-1 {{generic parameter 'T3' could not be inferred}}
 
 
 // expected-error @+2 {{generic parameter 'T3' could not be inferred}}
-// expected-note @+1 {{explicitly specify the generic arguments to fix this issue}} {{31-31=<Any, Any, Any>}}
+// expected-note @+1 {{explicitly specify the generic arguments to fix this issue}} {{31-31=<Int, Int, Any>}}
 let _ : D<Int, Int, Float> = D(a: 1, b: 2)
 
 let _ : F = { (a : Int) -> Int in a }  // Infer the types of F

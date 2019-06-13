@@ -538,6 +538,9 @@ class d0170_TestAvailability {
   @IBAction func anAction(_: AnyObject) {}
 // PASS_COMMON-NEXT: {{^}}  @objc @IBAction func anAction(_: AnyObject){{$}}
 
+  @IBSegueAction func aSegueAction(_ coder: AnyObject, sender: AnyObject, identifier: AnyObject?) -> Any? { fatalError() }
+// PASS_COMMON-NEXT: {{^}}  @objc @IBSegueAction func aSegueAction(_ coder: AnyObject, sender: AnyObject, identifier: AnyObject?) -> Any?{{$}}
+
   @IBDesignable
   class ADesignableClass {}
 // PASS_COMMON-NEXT: {{^}}  @IBDesignable class ADesignableClass {{{$}}

@@ -970,7 +970,7 @@ Type AssociatedTypeInference::substCurrentTypeWitnesses(Type type) {
       // If that failed, check whether it's because of the conformance we're
       // evaluating.
       auto localConformance
-        = tc.conformsToProtocol(
+        = TypeChecker::conformsToProtocol(
                           baseTy, assocType->getProtocol(), dc,
                           ConformanceCheckFlags::SkipConditionalRequirements);
       if (!localConformance || localConformance->isAbstract() ||

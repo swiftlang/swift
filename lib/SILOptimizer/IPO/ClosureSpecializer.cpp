@@ -1048,6 +1048,7 @@ static bool canSpecializeFullApplySite(FullApplySiteKind kind) {
   case FullApplySiteKind::BeginApplyInst:
     return false;
   }
+  llvm_unreachable("covered switch");
 }
 
 bool SILClosureSpecializerTransform::gatherCallSites(

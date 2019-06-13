@@ -805,7 +805,10 @@ Type TypeChecker::applyUnboundGenericArguments(
   // generic arguments.
   auto resultType = decl->getDeclaredInterfaceType();
 
-  bool hasTypeVariable = false;
+  // If types involved in requirements check have either type variables
+  // or unbound generics, let's skip the check here, and let the solver
+  // do it when missing types are deduced.
+  bool skipRequirementsCheck = false;
 
   // Get the substitutions for outer generic parameters from the parent
   // type.
@@ -822,7 +825,7 @@ Type TypeChecker::applyUnboundGenericArguments(
     }
 
     subs = parentType->getContextSubstitutions(decl->getDeclContext());
-    hasTypeVariable |= parentType->hasTypeVariable();
+    skipRequirementsCheck |= parentType->hasTypeVariable();
   }
 
   SourceLoc noteLoc = decl->getLoc();
@@ -839,13 +842,14 @@ Type TypeChecker::applyUnboundGenericArguments(
     subs[origTy->getCanonicalType()->castTo<GenericTypeParamType>()] =
       substTy;
 
-    hasTypeVariable |= substTy->hasTypeVariable();
+    skipRequirementsCheck |=
+        substTy->hasTypeVariable() || substTy->hasUnboundGenericType();
   }
 
   // Check the generic arguments against the requirements of the declaration's
   // generic signature.
   auto dc = resolution.getDeclContext();
-  if (!hasTypeVariable &&
+  if (!skipRequirementsCheck &&
       resolution.getStage() > TypeResolutionStage::Structural) {
     auto result =
       checkGenericArguments(dc, loc, noteLoc, unboundType,
@@ -3575,4 +3579,28 @@ void TypeChecker::checkUnsupportedProtocolType(GenericParamList *genericParams) 
 
   UnsupportedProtocolVisitor visitor(*this, /*checkStatements=*/false);
   visitor.visitRequirements(genericParams->getRequirements());
+}
+
+Type swift::resolveCustomAttrType(CustomAttr *attr, DeclContext *dc,
+                                  CustomAttrTypeKind typeKind) {
+  auto resolution = TypeResolution::forContextual(dc);
+  TypeResolutionOptions options(TypeResolverContext::PatternBindingDecl);
+
+  // Property delegates allow their type to be an unbound generic.
+  if (typeKind == CustomAttrTypeKind::PropertyDelegate)
+    options |= TypeResolutionFlags::AllowUnboundGenerics;
+
+  ASTContext &ctx = dc->getASTContext();
+  auto &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
+  if (tc.validateType(attr->getTypeLoc(), resolution, options))
+    return Type();
+
+  // We always require the type to resolve to a nominal type.
+  Type type = attr->getTypeLoc().getType();
+  if (!type->getAnyNominal()) {
+    assert(ctx.Diags.hadAnyError());
+    return Type();
+  }
+
+  return type;
 }

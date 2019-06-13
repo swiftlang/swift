@@ -4189,6 +4189,10 @@ bool ASTContext::isTypeBridgedInExternalModule(
           nominal == getFloatDecl() ||
           nominal == getDoubleDecl() ||
           nominal == getArrayDecl() ||
+          nominal == getCollectionDifferenceDecl() ||
+          (nominal->getDeclContext()->getAsDecl() ==
+            getCollectionDifferenceDecl() &&
+            nominal->getBaseName() == Id_Change) ||
           nominal == getDictionaryDecl() ||
           nominal == getSetDecl() ||
           nominal == getStringDecl() ||
@@ -4470,6 +4474,7 @@ VarDecl *VarDecl::getOriginalWrappedProperty(
   case PropertyWrapperSynthesizedPropertyKind::StorageWrapper:
     return this == wrapperInfo.storageWrapperVar ? original : nullptr;
   }
+  llvm_unreachable("covered switch");
 }
 
 void VarDecl::setOriginalWrappedProperty(VarDecl *originalProperty) {

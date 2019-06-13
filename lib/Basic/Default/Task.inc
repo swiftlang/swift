@@ -84,7 +84,10 @@ bool Task::execute() {
   }
 
   Optional<StringRef> Redirects[] = {
-      None, {StdoutPath}, {SeparateErrors ? StderrPath : StdoutPath}};
+      None,
+      StringRef{StdoutPath},
+      StringRef{SeparateErrors ? StderrPath : StdoutPath},
+  };
 
   bool ExecutionFailed = false;
   PI = llvm::sys::ExecuteNoWait(ExecPath, llvm::toStringRefArray(Argv.data()),

@@ -13,6 +13,7 @@
 // This file implements semantic analysis for property wrappers.
 //
 //===----------------------------------------------------------------------===//
+#include "ConstraintSystem.h"
 #include "TypeChecker.h"
 #include "TypeCheckType.h"
 #include "swift/AST/ASTContext.h"
@@ -370,12 +371,15 @@ AttachedPropertyWrapperTypeRequest::evaluate(Evaluator &evaluator,
   if (!customAttr)
     return Type();
 
+  ASTContext &ctx = var->getASTContext();
+  if (!ctx.getLazyResolver())
+    return nullptr;
+
   auto resolution =
       TypeResolution::forContextual(var->getDeclContext());
   TypeResolutionOptions options(TypeResolverContext::PatternBindingDecl);
   options |= TypeResolutionFlags::AllowUnboundGenerics;
 
-  ASTContext &ctx = var->getASTContext();
   auto &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
   if (tc.validateType(customAttr->getTypeLoc(), resolution, options))
     return ErrorType::get(ctx);
@@ -408,10 +412,13 @@ PropertyWrapperBackingPropertyTypeRequest::evaluate(
   if (!binding)
     return Type();
 
+  ASTContext &ctx = var->getASTContext();
+  if (!ctx.getLazyResolver())
+    return Type();
+
   // If there's an initializer of some sort, checking it will determine the
   // property wrapper type.
   unsigned index = binding->getPatternEntryIndexForVarDecl(var);
-  ASTContext &ctx = var->getASTContext();
   TypeChecker &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
   if (binding->isInitialized(index)) {
     tc.validateDecl(var);
@@ -423,43 +430,39 @@ PropertyWrapperBackingPropertyTypeRequest::evaluate(
     return type;
   }
 
-  // Compose the type of property wrapper with the type of the property.
-
-  // We expect an unbound generic type here that refers to a single-parameter
-  // generic type.
-  auto wrapperAttr = var->getAttachedPropertyWrapper();
-  auto nominal = rawType->getAnyNominal();
-  auto unboundGeneric = rawType->getAs<UnboundGenericType>();
-  if (!unboundGeneric ||
-      unboundGeneric->getDecl() != nominal ||
-      !nominal->getGenericParams() ||
-      nominal->getGenericParams()->size() != 1) {
-    ctx.Diags.diagnose(wrapperAttr->getLocation(),
-                       diag::property_wrapper_incompatible_unbound,
-                       rawType)
-      .highlight(wrapperAttr->getTypeLoc().getSourceRange());
+  // Get information about the wrapper type itself.
+  auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo();
+  if (!wrapperInfo)
     return Type();
-  }
 
   // Compute the type of the property to plug in to the wrapper type.
   tc.validateDecl(var);
   Type propertyType = var->getType();
+  if (!propertyType || propertyType->hasError())
+    return Type();
 
-  // Form the specialized type.
-  Type wrapperType = tc.applyUnboundGenericArguments(
-      unboundGeneric, nominal, wrapperAttr->getLocation(),
-      TypeResolution::forContextual(var->getDeclContext()), { propertyType });
+  using namespace constraints;
+  auto dc = var->getInnermostDeclContext();
+  ConstraintSystem cs(tc, dc, None);
+  auto emptyLocator = cs.getConstraintLocator(nullptr);
+  Type openedWrapperType =
+    cs.openUnboundGenericType(rawType, emptyLocator);
+  Type valueMemberType = openedWrapperType->getTypeOfMember(
+      dc->getParentModule(), wrapperInfo.valueVar);
+  cs.addConstraint(ConstraintKind::Equal, valueMemberType,
+                   propertyType, emptyLocator);
 
-  // Make sure no unbound types remain; this could happen if there are outer
-  // unbound types that weren't resolved by the application of the property
-  // type.
-  if (wrapperType->hasUnboundGenericType()) {
-    ctx.Diags.diagnose(wrapperAttr->getLocation(),
-                       diag::property_wrapper_incompatible_unbound,
-                       wrapperType)
-      .highlight(wrapperAttr->getTypeLoc().getSourceRange());
+  SmallVector<Solution, 4> solutions;
+  if (cs.solve(nullptr, solutions) || solutions.size() != 1) {
+    var->diagnose(diag::property_wrapper_incompatible_property,
+                  propertyType, rawType);
+    if (auto nominalWrapper = rawType->getAnyNominal()) {
+      nominalWrapper->diagnose(diag::property_wrapper_declared_here,
+                               nominalWrapper->getFullName());
+    }
     return Type();
   }
 
+  Type wrapperType = solutions.front().simplifyType(openedWrapperType);
   return wrapperType->mapTypeOutOfContext();
 }

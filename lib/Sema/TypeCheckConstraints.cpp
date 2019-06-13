@@ -80,12 +80,9 @@ GenericTypeParamType *
 TypeVariableType::Implementation::getGenericParameter() const {
   // Check whether we have a path that terminates at a generic parameter
   // locator.
-  if (!locator || locator->getPath().empty() ||
-      locator->getPath().back().getKind() != ConstraintLocator::GenericParameter)
-    return nullptr;
-
-  // Retrieve the archetype.
-  return locator->getPath().back().getGenericParameter();
+  return locator && locator->isForGenericParameter()
+             ? locator->getGenericParameter()
+             : nullptr;
 }
 
 // Only allow allocation of resolved overload set list items using the
@@ -1996,7 +1993,7 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
   options |= ConformanceCheckFlags::InExpression;
   options |= ConformanceCheckFlags::SkipConditionalRequirements;
 
-  auto result = TC.conformsToProtocol(type, protocol, DC, options);
+  auto result = TypeChecker::conformsToProtocol(type, protocol, DC, options);
   if (!result || !result->isConcrete())
     return nullptr;
 
@@ -2735,6 +2732,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
                                   wrapperNominal->getFullName());
         return;
       }
+      wrapperAttr->setSemanticInit(initializer);
 
       // Note that we have applied to property wrapper, so we can adjust
       // the initializer type later.

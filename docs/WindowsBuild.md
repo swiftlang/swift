@@ -40,7 +40,7 @@ git clone https://github.com/apple/swift-cmark cmark
 git clone https://github.com/apple/swift-clang clang
 git clone https://github.com/apple/swift-llvm llvm
 git clone https://github.com/apple/swift-compiler-rt compiler-rt
-git clone -c core.autocrlf=input https://github.com/apple/swift
+git clone -c core.autocrlf=input -c core.symlinks=true https://github.com/apple/swift
 git clone https://github.com/apple/swift-corelibs-libdispatch
 git clone https://github.com/apple/swift-corelibs-foundation
 git clone https://github.com/apple/swift-corelibs-xctest
@@ -101,7 +101,7 @@ Warning: Creating the above links usually requires administrator privileges. The
 ## 6. Build LLVM/Clang
 - This must be done from within a developer command prompt. LLVM and Clang are
   large projects, so building might take a few hours. Make sure that the build
-  type for LLVM/Clang is compatbile with the build type for Swift. That is,
+  type for LLVM/Clang is compatible with the build type for Swift. That is,
   either build everything `Debug` or some variant of `Release` (e.g. `Release`,
   `RelWithDebInfo`).
 ```cmd
@@ -204,7 +204,7 @@ ninja
 Running the testsuite on Windows has additional external dependencies.
 
 ```cmd
-path S:\thirdparty\icu4c-63_1-Win64-MSVC2017\bin64;S:\b\swift\bin;S:\b\swift\libdispatch-prefix\bin;%PATH%;%ProgramFiles%\Git\usr\bin
+path S:\thirdparty\icu4c-64_2-Win64-MSVC2017\bin64;S:\b\swift\bin;S:\b\swift\libdispatch-prefix\bin;%PATH%;%ProgramFiles%\Git\usr\bin
 ninja -C S:\b\swift check-swift
 ```
 

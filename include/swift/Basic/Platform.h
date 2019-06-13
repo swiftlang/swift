@@ -19,6 +19,7 @@
 
 namespace llvm {
   class Triple;
+  class VersionTuple;
 }
 
 namespace swift {
@@ -85,6 +86,12 @@ namespace swift {
   /// The input triple should already be "normalized" in the sense that
   /// llvm::Triple::normalize() would not affect it.
   llvm::Triple getTargetSpecificModuleTriple(const llvm::Triple &triple);
+  
+  
+  /// Get the Swift runtime version to deploy back to, given a deployment target expressed as an
+  /// LLVM target triple.
+  Optional<llvm::VersionTuple>
+  getSwiftRuntimeCompatibilityVersionForTarget(const llvm::Triple &Triple);
 } // end namespace swift
 
 #endif // SWIFT_BASIC_PLATFORM_H

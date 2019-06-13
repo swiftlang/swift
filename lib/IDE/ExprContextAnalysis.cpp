@@ -57,14 +57,15 @@ void typeCheckContextImpl(DeclContext *DC, SourceLoc Loc) {
 
   case DeclContextKind::Initializer:
     if (auto *patternInit = dyn_cast<PatternBindingInitializer>(DC)) {
-      auto *PBD = patternInit->getBinding();
-      auto i = patternInit->getBindingIndex();
-      if (PBD->getInit(i)) {
-        PBD->getPattern(i)->forEachVariable([](VarDecl *VD) {
-          typeCheckCompletionDecl(VD);
-        });
-        if (!PBD->isInitializerChecked(i))
-          typeCheckPatternBinding(PBD, i);
+      if (auto *PBD = patternInit->getBinding()) {
+        auto i = patternInit->getBindingIndex();
+        if (PBD->getInit(i)) {
+          PBD->getPattern(i)->forEachVariable([](VarDecl *VD) {
+            typeCheckCompletionDecl(VD);
+          });
+          if (!PBD->isInitializerChecked(i))
+            typeCheckPatternBinding(PBD, i);
+        }
       }
     }
     break;

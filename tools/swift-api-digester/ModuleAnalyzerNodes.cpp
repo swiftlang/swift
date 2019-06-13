@@ -20,6 +20,7 @@ static StringRef getAttrName(DeclAttrKind Kind) {
   case DAK_Count:
     llvm_unreachable("unrecognized attribute kind.");
   }
+  llvm_unreachable("covered switch");
 }
 } // End of anonymous namespace.
 
@@ -505,6 +506,7 @@ bool SDKNodeDeclType::isConformingTo(swift::ide::api::KnownProtocolKind Kind) co
           Conformances.end();
 #include "swift/IDE/DigesterEnums.def"
   }
+  llvm_unreachable("covered switch");
 }
 
 StringRef SDKNodeDeclAbstractFunc::getTypeRoleDescription(SDKContext &Ctx,
@@ -1318,6 +1320,7 @@ case SDKNodeKind::X:                                                           \
   break;
 #include "swift/IDE/DigesterEnums.def"
   }
+  llvm_unreachable("covered switch");
 }
 
 // Recursively construct a node that represents a type, for instance,

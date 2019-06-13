@@ -108,7 +108,7 @@ struct InitialValueFailableIUO<Value> {
 // Property wrapper type definitions
 // ---------------------------------------------------------------------------
 @_propertyWrapper
-struct _lowercaseWrapper<T> { // expected-error{{property wrapper type name must start with an uppercase letter}}
+struct _lowercaseWrapper<T> {
   var value: T
 }
 
@@ -241,7 +241,7 @@ struct IntWrapper {
 }
 
 @_propertyWrapper
-struct WrapperForHashable<T: Hashable> {
+struct WrapperForHashable<T: Hashable> { // expected-note{{property wrapper type 'WrapperForHashable' declared here}}
   var value: T
 }
 
@@ -256,31 +256,58 @@ struct UseWrappersWithDifferentForm {
   @IntWrapper
   var x: Int
 
-  @WrapperForHashable // expected-error{{type 'NotHashable' does not conform to protocol 'Hashable'}}
-  var y: NotHashable
+  // FIXME: Diagnostic should be better here
+  @WrapperForHashable
+  var y: NotHashable // expected-error{{property type 'NotHashable' does not match that of the 'value' property of its wrapper type 'WrapperForHashable'}}
 
   @WrapperForHashable
   var yOkay: Int
 
-  @WrapperWithTwoParams // expected-error{{property wrapper type 'WrapperWithTwoParams' must either specify all generic arguments or require only a single generic argument}}
-  var z: Int
+  @WrapperWithTwoParams
+  var zOkay: (Int, Float)
 
-  @HasNestedWrapper.NestedWrapper // expected-error{{property wrapper type 'HasNestedWrapper.NestedWrapper<Int>' must either specify all generic arguments or require only a single generic argument}}
-  var w: Int
+  // FIXME: Need a better diagnostic here
+  @HasNestedWrapper.NestedWrapper
+  var w: Int // expected-error{{property type 'Int' does not match that of the 'value' property of its wrapper type 'HasNestedWrapper.NestedWrapper'}}
 
   @HasNestedWrapper<Double>.NestedWrapper
   var wOkay: Int
+
+  @HasNestedWrapper.ConcreteNestedWrapper
+  var wOkay2: Int
 }
 
+@_propertyWrapper
+struct Function<T, U> { // expected-note{{property wrapper type 'Function' declared here}}
+  var value: (T) -> U?
+}
+
+struct TestFunction {
+  @Function var f: (Int) -> Float?
+  
+  @Function var f2: (Int) -> Float // expected-error{{property type '(Int) -> Float' does not match that of the 'value' property of its wrapper type 'Function'}}
+
+  func test() {
+    let _: Int = $f // expected-error{{cannot convert value of type 'Function<Int, Float>' to specified type 'Int'}}
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Nested wrappers
 // ---------------------------------------------------------------------------
 struct HasNestedWrapper<T> {
   @_propertyWrapper
-  struct NestedWrapper<U> {
+  struct NestedWrapper<U> { // expected-note{{property wrapper type 'NestedWrapper' declared here}}
     var value: U
     init(initialValue: U) {
+      self.value = initialValue
+    }
+  }
+
+  @_propertyWrapper
+  struct ConcreteNestedWrapper {
+    var value: T
+    init(initialValue: T) {
       self.value = initialValue
     }
   }
@@ -713,4 +740,31 @@ struct PD<Value> {
 struct TestPD {
   @PD(a: "foo") var foo: Int = 42 // expected-error{{property 'foo' with attached wrapper cannot initialize both the wrapper type and the property}}
   // expected-error@-1{{missing argument for parameter 'initialValue' in call}}
+}
+
+protocol P { }
+
+@_propertyWrapper
+struct WrapperRequiresP<T: P> {
+  var value: T
+  var wrapperValue: T { return value }
+}
+
+struct UsesWrapperRequiringP {
+  // expected-note@-1{{in declaration of}}
+  
+  @WrapperRequiresP var x.: UsesWrapperRequiringP
+  // expected-error@-1{{expected member name following '.'}}
+  // expected-error@-2{{expected declaration}}
+  // expected-error@-3{{type annotation missing in pattern}}
+}
+
+// SR-10899 / rdar://problem/51588022
+@_propertyWrapper
+struct SR_10899_Wrapper { // expected-note{{property wrapper type 'SR_10899_Wrapper' declared here}}
+  var value: String { "hi" }
+}
+
+struct SR_10899_Usage {
+  @SR_10899_Wrapper var thing: Bool // expected-error{{property type 'Bool' does not match that of the 'value' property of its wrapper type 'SR_10899_Wrapper'}}
 }

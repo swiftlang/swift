@@ -541,8 +541,8 @@ class ToolchainTestCase(unittest.TestCase):
             'test_optimize_for_size')
     test_should_test_optimizations_none_implicit_dynamic =\
         generate_should_test_optimizations(
-            'optimize_none_implicit_dynamic',
-            'test_optimize_none_implicit_dynamic')
+            'optimize_none_with_implicit_dynamic',
+            'test_optimize_none_with_implicit_dynamic')
 
     def test_should_not_test_optimizations_when_testing_only_host(self):
         host_target = 'android-armv7'
@@ -554,7 +554,7 @@ class ToolchainTestCase(unittest.TestCase):
         args.build_stdlib_deployment_targets = 'all'
         args.test_optimized = True
         args.test_optimize_for_size = True
-        args.test_optimize_none_implicit_dynamic = True
+        args.test_optimize_none_with_implicit_dynamic = True
 
         before = HostSpecificConfiguration(host_target, args)
         self.assertIn('check-swift-optimize-android-armv7',
@@ -562,7 +562,7 @@ class ToolchainTestCase(unittest.TestCase):
         self.assertIn('check-swift-optimize_size-android-armv7',
                       before.swift_test_run_targets)
         self.assertIn(
-            'check-swift-optimize_none_implicit_dynamic-android-armv7',
+            'check-swift-optimize_none_with_implicit_dynamic-android-armv7',
             before.swift_test_run_targets)
 
         args.test_android_host = True
@@ -573,7 +573,7 @@ class ToolchainTestCase(unittest.TestCase):
             'check-swift-optimize_size-android-armv7',
             after.swift_test_run_targets)
         self.assertNotIn(
-            'check-swift-optimize_none_implicit_dynamic-android-armv7',
+            'check-swift-optimize_none_with_implicit_dynamic-android-armv7',
             after.swift_test_run_targets)
 
     def test_should_test_optimizations_with_subsets(self):
@@ -586,7 +586,7 @@ class ToolchainTestCase(unittest.TestCase):
         args.build_stdlib_deployment_targets = 'all'
         args.test_optimized = True
         args.test_optimize_for_size = True
-        args.test_optimize_none_implicit_dynamic = True
+        args.test_optimize_none_with_implicit_dynamic = True
         args.long_test = True
 
         target_name = 'check-swift-only_long-{}-android-armv7'
@@ -596,7 +596,8 @@ class ToolchainTestCase(unittest.TestCase):
                       before.swift_test_run_targets)
         self.assertIn(target_name.format('optimize_size'),
                       before.swift_test_run_targets)
-        self.assertIn(target_name.format('optimize_none_implicit_dynamic'),
+        self.assertIn(target_name.format(
+                      'optimize_none_with_implicit_dynamic'),
                       before.swift_test_run_targets)
 
     def default_args(self):
@@ -627,7 +628,7 @@ class ToolchainTestCase(unittest.TestCase):
             test_ios_32bit_simulator=False,
             test_linux=False,
             test_optimize_for_size=False,
-            test_optimize_none_implicit_dynamic=False,
+            test_optimize_none_with_implicit_dynamic=False,
             test_optimized=False,
             test_osx=False,
             test_tvos_host=False,

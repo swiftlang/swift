@@ -1721,6 +1721,7 @@ namespace {
       case SILLinkage::PublicNonABI:
         return false;
       }
+      llvm_unreachable("covered switch");
     }
     
     GenericSignature *getGenericSignature() {

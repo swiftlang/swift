@@ -158,6 +158,15 @@ enum class FixKind : uint8_t {
   /// Remove `return` or default last expression of single expression
   /// function to `Void` to conform to expected result type.
   RemoveReturn,
+
+  /// Generic parameters could not be inferred and have to be explicitly
+  /// specified in the source. This fix groups all of the missing arguments
+  /// associated with single declaration.
+  ExplicitlySpecifyGenericArguments,
+
+  /// Skip any unhandled constructs that occur within a closure argument that matches up with a
+  /// parameter that has a function builder.
+  SkipUnhandledConstructInFunctionBuilder,
 };
 
 class ConstraintFix {
@@ -890,6 +899,7 @@ public:
     case RefKind::Method:
       return "allow reference to a method as a key path component";
     }
+    llvm_unreachable("covered switch");
   }
 
   bool diagnose(Expr *root, bool asNote = false) const override;
@@ -946,6 +956,73 @@ public:
   static CollectionElementContextualMismatch *
   create(ConstraintSystem &cs, Type srcType, Type dstType,
          ConstraintLocator *locator);
+};
+
+class ExplicitlySpecifyGenericArguments final
+    : public ConstraintFix,
+      private llvm::TrailingObjects<ExplicitlySpecifyGenericArguments,
+                                    GenericTypeParamType *> {
+  friend TrailingObjects;
+
+  unsigned NumMissingParams;
+
+  ExplicitlySpecifyGenericArguments(ConstraintSystem &cs,
+                                    ArrayRef<GenericTypeParamType *> params,
+                                    ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::ExplicitlySpecifyGenericArguments, locator),
+        NumMissingParams(params.size()) {
+    assert(!params.empty());
+    std::uninitialized_copy(params.begin(), params.end(),
+                            getParametersBuf().begin());
+  }
+
+public:
+  std::string getName() const override {
+    return "default missing generic arguments to `Any`";
+  }
+
+  ArrayRef<GenericTypeParamType *> getParameters() const {
+    return {getTrailingObjects<GenericTypeParamType *>(), NumMissingParams};
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static ExplicitlySpecifyGenericArguments *
+  create(ConstraintSystem &cs, ArrayRef<GenericTypeParamType *> params,
+         ConstraintLocator *locator);
+
+private:
+  MutableArrayRef<GenericTypeParamType *> getParametersBuf() {
+    return {getTrailingObjects<GenericTypeParamType *>(), NumMissingParams};
+  }
+};
+
+class SkipUnhandledConstructInFunctionBuilder final : public ConstraintFix {
+public:
+  using UnhandledNode = llvm::PointerUnion<Stmt *, Decl *>;
+
+private:
+  UnhandledNode unhandled;
+  NominalTypeDecl *builder;
+
+  SkipUnhandledConstructInFunctionBuilder(ConstraintSystem &cs,
+                                          UnhandledNode unhandled,
+                                          NominalTypeDecl *builder,
+                                          ConstraintLocator *locator)
+    : ConstraintFix(cs, FixKind::SkipUnhandledConstructInFunctionBuilder,
+                    locator),
+      unhandled(unhandled), builder(builder) { }
+
+public:
+  std::string getName() const override {
+    return "skip unhandled constructs when applying a function builder";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static SkipUnhandledConstructInFunctionBuilder *
+  create(ConstraintSystem &cs, UnhandledNode unhandledNode,
+         NominalTypeDecl *builder, ConstraintLocator *locator);
 };
 
 } // end namespace constraints

@@ -1348,6 +1348,12 @@ public:
         Consumer(Consumer) {
   }
 
+  void setAttrTargetDeclKind(Optional<DeclKind> DK) override {
+    if (DK == DeclKind::PatternBinding)
+      DK = DeclKind::Var;
+    AttTargetDK = DK;
+  }
+
   void completeExpr() override;
   void completeDotExpr(Expr *E, SourceLoc DotLoc) override;
   void completeStmtOrExpr(CodeCompletionExpr *E) override;
@@ -1367,7 +1373,7 @@ public:
   void completeCaseStmtKeyword() override;
   void completeCaseStmtBeginning() override;
   void completeCaseStmtDotPrefix() override;
-  void completeDeclAttrKeyword(Decl *D, bool Sil, bool Param) override;
+  void completeDeclAttrBeginning(bool Sil) override;
   void completeDeclAttrParam(DeclAttrKind DK, int Index) override;
   void completeInPrecedenceGroup(SyntaxKind SK) override;
   void completeNominalMemberBeginning(
@@ -1457,10 +1463,10 @@ protocolForLiteralKind(CodeCompletionLiteralKind kind) {
 /// that is of type () -> ().
 static bool hasTrivialTrailingClosure(const FuncDecl *FD,
                                       AnyFunctionType *funcType) {
-  auto defaultMap = computeDefaultMap(funcType->getParams(), FD,
-                                      /*skipCurriedSelf*/ FD->hasCurriedSelf());
+  ParameterListInfo paramInfo(funcType->getParams(), FD,
+                              /*skipCurriedSelf*/ FD->hasCurriedSelf());
 
-  if (defaultMap.size() - defaultMap.count() == 1) {
+  if (paramInfo.size() - paramInfo.numNonDefaultedParameters() == 1) {
     auto param = funcType->getParams().back();
     if (!param.isAutoClosure()) {
       if (auto Fn = param.getOldType()->getAs<AnyFunctionType>()) {
@@ -4600,16 +4606,9 @@ void CodeCompletionCallbacksImpl::completeDeclAttrParam(DeclAttrKind DK,
   CurDeclContext = P.CurDeclContext;
 }
 
-void CodeCompletionCallbacksImpl::completeDeclAttrKeyword(Decl *D,
-                                                          bool Sil,
-                                                          bool Param) {
+void CodeCompletionCallbacksImpl::completeDeclAttrBeginning(bool Sil) {
   Kind = CompletionKind::AttributeBegin;
   IsInSil = Sil;
-  if (Param) {
-    AttTargetDK = DeclKind::Param;
-  } else if (D) {
-    AttTargetDK = D->getKind();
-  }
   CurDeclContext = P.CurDeclContext;
 }
 
@@ -5375,6 +5374,12 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
   case CompletionKind::AttributeBegin: {
     Lookup.getAttributeDeclCompletions(IsInSil, AttTargetDK);
+
+    // Provide any type name for property delegate.
+    if (!AttTargetDK || *AttTargetDK == DeclKind::Var ||
+        *AttTargetDK == DeclKind::Param)
+      Lookup.getTypeCompletionsInDeclContext(
+          P.Context.SourceMgr.getCodeCompletionLoc());
     break;
   }
   case CompletionKind::AttributeDeclParen: {
@@ -5685,7 +5690,6 @@ void swift::ide::copyCodeCompletionResults(CodeCompletionResultSink &targetSink,
       if (R->getKind() != CodeCompletionResult::Declaration)
         return false;
       switch(R->getAssociatedDeclKind()) {
-      case CodeCompletionDeclKind::PrecedenceGroup:
       case CodeCompletionDeclKind::Module:
       case CodeCompletionDeclKind::Class:
       case CodeCompletionDeclKind::Struct:
@@ -5695,6 +5699,7 @@ void swift::ide::copyCodeCompletionResults(CodeCompletionResultSink &targetSink,
       case CodeCompletionDeclKind::AssociatedType:
       case CodeCompletionDeclKind::GenericTypeParam:
         return true;
+      case CodeCompletionDeclKind::PrecedenceGroup:
       case CodeCompletionDeclKind::EnumElement:
       case CodeCompletionDeclKind::Constructor:
       case CodeCompletionDeclKind::Destructor:
