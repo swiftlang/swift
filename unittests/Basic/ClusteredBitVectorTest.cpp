@@ -115,22 +115,6 @@ TEST(ClusteredBitVector, AssignAfterGrowth) {
   EXPECT_EQ(false, vec[64]);
 }
 
-/// define == on llvm::Optional, you jerks
-template <class T> struct ComparableOptional {
-  Optional<T> Value;
-  ComparableOptional(const T &value) : Value(value) {}
-  ComparableOptional() : Value() {}
-
-  bool operator==(const Optional<T> &other) const {
-    if (Value.hasValue()) {
-      return other.hasValue()
-          && Value.getValue() == other.getValue();
-    } else {
-      return !other.hasValue();
-    }
-  }
-};
-
 TEST(ClusteredBitVector, SetClearBit) {
   ClusteredBitVector vec;
   vec.appendClearBits(64);

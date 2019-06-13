@@ -2,18 +2,23 @@
 // RUN: cd %t
 // RUN: %target-build-swift %S/Inputs/tsan-uninstrumented.swift -target %sanitizers-target-triple -module-name TSanUninstrumented -emit-module -emit-module-path %t/TSanUninstrumented.swiftmodule -parse-as-library
 // RUN: %target-build-swift %S/Inputs/tsan-uninstrumented.swift -target %sanitizers-target-triple -c -module-name TSanUninstrumented -parse-as-library -o %t/TSanUninstrumented.o
-// RUN: %target-swiftc_driver %s %t/TSanUninstrumented.o -target %sanitizers-target-triple -I%t -L%t -g -sanitize=thread -o %t/tsan-binary
+// RUN: %target-swiftc_driver %s %t/TSanUninstrumented.o -target %sanitizers-target-triple -I%t -L%t -g -sanitize=thread %import-libdispatch -o %t/tsan-binary
 // RUN: not env %env-TSAN_OPTIONS=abort_on_error=0 %target-run %t/tsan-binary 2>&1 | %FileCheck %s
 // RUN: not env %env-TSAN_OPTIONS=abort_on_error=0:ignore_interceptors_accesses=0 %target-run %t/tsan-binary 2>&1 | %FileCheck %s --check-prefix CHECK-INTERCEPTORS-ACCESSES
 // REQUIRES: executable_test
 // REQUIRES: stress_test
-// REQUIRES: objc_interop
 // REQUIRES: tsan_runtime
 
 // Test ThreadSanitizer execution end-to-end when calling
 // an uninstrumented module with inout parameters
 
-import Darwin
+#if canImport(Darwin)
+  import Darwin
+#elseif canImport(Glibc)
+  import Glibc
+#else
+#error("Unsupported platform")
+#endif
 import TSanUninstrumented
 
 // Globals to allow closures passed to pthread_create() to be thin.
@@ -23,8 +28,14 @@ var gInThread2: () -> () = { }
 // Spawn two threads, run the two passed in closures simultaneously, and
 // join them.
 func testRace(name: String, thread inThread1: @escaping () -> (), thread inThread2: @escaping () -> ()) {
+#if canImport(Darwin)
   var thread1: pthread_t?
   var thread2: pthread_t?
+#else
+  var thread1: pthread_t = 0
+  var thread2: pthread_t = 0
+  var t : pthread_t = 0
+#endif
   fputs("Running \(name)\n", stderr)
 
   // Store these in globals so the closure passed to pthread_create
@@ -41,8 +52,13 @@ func testRace(name: String, thread inThread1: @escaping () -> (), thread inThrea
     return nil
   }, nil)
 
+#if canImport(Darwin)
   _ = pthread_join(thread1!, nil)
   _ = pthread_join(thread2!, nil)
+#else
+  _ = pthread_join(thread1, nil)
+  _ = pthread_join(thread2, nil)
+#endif
 
   // TSan reports go to stderr
   fputs("Done \(name)\n", stderr)

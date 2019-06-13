@@ -84,7 +84,8 @@ static bool isUnitTest(const ValueDecl *D) {
 static void setFuncSymbolInfo(const FuncDecl *FD, SymbolInfo &sym) {
   sym.Kind = SymbolKind::Function;
 
-  if (FD->getAttrs().hasAttribute<IBActionAttr>())
+  if (FD->getAttrs().hasAttribute<IBActionAttr>() ||
+      FD->getAttrs().hasAttribute<IBSegueActionAttr>())
     sym.Properties |= SymbolProperty::IBAnnotated;
 
   if (isUnitTest(FD))

@@ -257,6 +257,31 @@ class BuildScriptInvocation(object):
             args.android = True
             args.build_android = False
 
+        # Include the Darwin supported architectures in the CMake options.
+        if args.swift_darwin_supported_archs:
+            args.extra_cmake_options.append(
+                '-DSWIFT_DARWIN_SUPPORTED_ARCHS:STRING={}'.format(
+                    args.swift_darwin_supported_archs))
+
+            # Remove unsupported Darwin archs from the standard library
+            # deployment targets.
+            supported_archs = args.swift_darwin_supported_archs.split(';')
+            targets = StdlibDeploymentTarget.get_targets_by_name(
+                args.stdlib_deployment_targets)
+
+            args.stdlib_deployment_targets = [
+                target.name
+                for target in targets
+                if (target.platform.is_darwin and
+                    target.arch in supported_archs)
+            ]
+
+        # Include the Darwin module-only architectures in the CMake options.
+        if args.swift_darwin_module_archs:
+            args.extra_cmake_options.append(
+                '-DSWIFT_DARWIN_MODULE_ARCHS:STRING={}'.format(
+                    args.swift_darwin_module_archs))
+
         # SWIFT_ENABLE_TENSORFLOW
         if args.enable_tensorflow_gpu:
            args.enable_tensorflow = True

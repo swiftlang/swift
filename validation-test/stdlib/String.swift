@@ -1,11 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: if [ %target-runtime == "objc" ]; \
-// RUN: then \
-// RUN:   %target-clang -fobjc-arc %S/Inputs/NSSlowString/NSSlowString.m -c -o %t/NSSlowString.o && \
-// RUN:   %target-build-swift -I %S/Inputs/NSSlowString/ %t/NSSlowString.o %s -Xfrontend -disable-access-control -o %t/String; \
-// RUN: else \
-// RUN:   %target-build-swift %s -Xfrontend -disable-access-control -o %t/String; \
-// RUN: fi
+// RUN: %target-clang -fobjc-arc %S/Inputs/NSSlowString/NSSlowString.m -c -o %t/NSSlowString.o
+// RUN: %target-build-swift -I %S/Inputs/NSSlowString/ %t/NSSlowString.o %s -Xfrontend -disable-access-control -o %t/String
 
 // RUN: %target-codesign %t/String
 // RUN: %target-run %t/String
@@ -18,6 +13,10 @@ import StdlibCollectionUnittest
 #if _runtime(_ObjC)
 import NSSlowString
 import Foundation  // For NSRange
+#endif
+
+#if os(Windows)
+import ucrt
 #endif
 
 extension Collection {

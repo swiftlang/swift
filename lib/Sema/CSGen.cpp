@@ -577,8 +577,8 @@ namespace {
       // the literal.
       if (otherArgTy && otherArgTy->getAnyNominal()) {
         if (otherArgTy->isEqual(paramTy) &&
-            tc.conformsToProtocol(otherArgTy, literalProto, CS.DC,
-                                  ConformanceCheckFlags::InExpression))
+            TypeChecker::conformsToProtocol(otherArgTy, literalProto, CS.DC,
+                                            ConformanceCheckFlags::InExpression))
           return true;
       } else if (Type defaultType = tc.getDefaultType(literalProto, CS.DC)) {
         // If there is a default type for the literal protocol, check whether

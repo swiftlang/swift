@@ -6,13 +6,14 @@
 // RUN: %target-build-swift-dylib(%t/%target-library-name(resilient_objc_class)) -I %t -L %t -lresilient_struct -enable-library-evolution %S/../Inputs/resilient_objc_class.swift -emit-module -emit-module-path %t/resilient_objc_class.swiftmodule
 // RUN: %target-codesign %t/%target-library-name(resilient_objc_class)
 
-// RUN: %target-build-swift %s -L %t -I %t -lresilient_struct -lresilient_objc_class -o %t/main %target-rpath(%t) -Xfrontend -enable-resilient-objc-class-stubs
+// RUN: %target-build-swift %s -L %t -I %t -lresilient_struct -lresilient_objc_class -o %t/main %target-rpath(%t) -target %target-next-stable-abi-triple
 // RUN: %target-codesign %t/main
 
 // RUN: %target-run %t/main %t/%target-library-name(resilient_struct) %t/%target-library-name(resilient_objc_class)
 
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
+// REQUIRES: swift_stable_abi
 
 import StdlibUnittest
 import Foundation

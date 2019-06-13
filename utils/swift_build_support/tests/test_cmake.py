@@ -9,6 +9,7 @@
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 import os
+import platform
 import unittest
 from argparse import Namespace
 
@@ -22,8 +23,11 @@ class CMakeTestCase(unittest.TestCase):
     def mock_distcc_path(self):
         """Return a path string of mock distcc executable
         """
-        return os.path.join(os.path.dirname(__file__),
-                            'mock-distcc')
+        if platform.system() == 'Windows':
+            executable = 'mock-distcc.cmd'
+        else:
+            executable = 'mock-distcc'
+        return os.path.join(os.path.dirname(__file__), executable)
 
     def default_args(self):
         """Return new args object with default values

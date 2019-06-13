@@ -447,6 +447,16 @@ ERROR(cannot_convert_assign_protocol,none,
 ERROR(cannot_convert_assign_nil,none,
       "'nil' cannot be assigned to type %0", (Type))
 
+// Subscript Assign Expr
+ERROR(cannot_convert_subscript_assign,none,
+      "cannot assign value of type %0 to subscript of type %1",
+      (Type,Type))
+ERROR(cannot_convert_subscript_assign_protocol,none,
+      "value of type %0 does not conform to %1 in subscript assignment",
+      (Type, Type))
+ERROR(cannot_convert_subscript_assign_nil,none,
+      "'nil' cannot be assigned to subscript of type %0", (Type))
+
 // for ... in expression
 ERROR(cannot_convert_sequence_element_value,none,
       "cannot convert sequence element type %0 to expected type %1",
@@ -1174,17 +1184,25 @@ ERROR(invalid_ibdesignable_extension,none,
 ERROR(invalid_ibinspectable,none,
       "only instance properties can be declared @%0", (StringRef))
 ERROR(invalid_ibaction_decl,none,
-      "only instance methods can be declared @IBAction", ())
+      "only instance methods can be declared @%0", (StringRef))
 ERROR(invalid_ibaction_result,none,
-      "methods declared @IBAction must return 'Void' (not %0)", (Type))
+      "methods declared @%0 must %select{|not }1return a value", (StringRef, bool))
 ERROR(invalid_ibaction_argument_count,none,
-      "@IBAction methods %select{must have a single argument"
-      "|can only have up to 2 arguments}0", (bool))
-ERROR(ibaction_nonobjc_class_argument,none,
-      "argument to @IBAction method cannot have non-'@objc' class type %0",
-      (Type))
-ERROR(ibaction_nonobject_argument,none,
-      "argument to @IBAction method cannot have non-object type %0", (Type))
+      "@%0 methods must have %1 to %2 arguments",
+      (StringRef, int, int))
+ERROR(invalid_ibaction_argument_count_exact,none,
+      "@%0 methods must have %2 argument%s2",
+      (StringRef, int, int))
+ERROR(invalid_ibaction_argument_count_max,none,
+      "@%0 methods must have at most %2 argument%s2",
+      (StringRef, int, int))
+ERROR(ibsegueaction_objc_method_family,none,
+      "@%0 method cannot have selector %1 because it has special memory "
+      "management behavior", (StringRef, ObjCSelector))
+NOTE(fixit_rename_in_swift,none,
+     "change Swift name to %0", (DeclName))
+NOTE(fixit_rename_in_objc,none,
+     "change Objective-C selector to %0", (ObjCSelector))
 ERROR(no_objc_tagged_pointer_not_class_protocol,none,
       "@unsafe_no_objc_tagged_pointer can only be applied to class protocols",
       ())
@@ -2555,6 +2573,12 @@ NOTE(decodable_suggest_overriding_init_here,none,
 NOTE(codable_suggest_overriding_init_here,none,
      "did you mean to override 'init(from:)' and 'encode(to:)'?", ())
 
+NOTE(missing_member_type_conformance_prevents_synthesis, none,
+     "%select{associated value|stored property}0 type %1 does not conform to "
+     "protocol %2, preventing synthesized conformance "
+     "of %3 to %2",
+     (unsigned, Type, Type, Type))
+
 // Dynamic Self
 ERROR(dynamic_self_non_method,none,
       "%select{global|local}0 function cannot return 'Self'", (bool))
@@ -3282,7 +3306,7 @@ ERROR(jump_out_of_defer,none,
       (StringRef))
 
 WARNING(defer_stmt_at_block_end,none,
-     "'defer' statement before end of scope always executes immediately; "
+     "'defer' statement at end of scope always executes immediately; "
      "replace with 'do' statement to silence this warning", ())
 
 ERROR(return_invalid_outside_func,none,
@@ -3697,6 +3721,9 @@ ERROR(invalid_ownership_protocol_type,none,
       "%0 must not be applied to non-class-bound %1; "
       "consider adding a protocol conformance that has a class bound",
       (ReferenceOwnership, Type))
+ERROR(invalid_ownership_incompatible_class,none,
+      "%0 is incompatible with %1 references",
+      (Type, ReferenceOwnership))
 ERROR(invalid_ownership_with_optional,none,
       "%0 variable cannot have optional type", (ReferenceOwnership))
 ERROR(invalid_ownership_not_optional,none,
@@ -3830,8 +3857,8 @@ ERROR(objc_in_generic_extension,none,
       "extensions of %select{classes from generic context|generic classes}0 "
       "cannot contain '@objc' members", (bool))
 ERROR(objc_in_resilient_extension,none,
-      "extensions of classes built with library evolution support "
-      "cannot contain '@objc' members", ())
+      "'@objc' %0 in extension of subclass of %1 requires %2 %3",
+      (DescriptiveDeclKind, Identifier, StringRef, llvm::VersionTuple))
 ERROR(objc_operator, none,
       "operator methods cannot be declared @objc", ())
 ERROR(objc_operator_proto, none,
@@ -3853,9 +3880,8 @@ ERROR(objc_for_generic_class,none,
       "generic subclasses of '@objc' classes cannot have an explicit '@objc' "
       "because they are not directly visible from Objective-C", ())
 ERROR(objc_for_resilient_class,none,
-      "classes built with library evolution support cannot have explicit "
-      "'@objc' subclasses because they are not directly "
-      "visible from Objective-C", ())
+      "explicit '@objc' on subclass of %0 requires %1 %2",
+      (Identifier, StringRef, llvm::VersionTuple))
 ERROR(objc_getter_for_nonobjc_property,none,
       "'@objc' getter for non-'@objc' property", ())
 ERROR(objc_getter_for_nonobjc_subscript,none,
@@ -3896,7 +3922,7 @@ ERROR(objc_extension_not_class,none,
       "'@objc' can only be applied to an extension of a class", ())
 
 // If you change this, also change enum ObjCReason
-#define OBJC_ATTR_SELECT "select{marked @_cdecl|marked dynamic|marked @objc|marked @IBOutlet|marked @IBAction|marked @NSManaged|a member of an @objc protocol|implicitly @objc|an @objc override|an implementation of an @objc requirement|marked @IBInspectable|marked @GKInspectable|in an @objc extension of a class (without @nonobjc)}"
+#define OBJC_ATTR_SELECT "select{marked @_cdecl|marked dynamic|marked @objc|marked @IBOutlet|marked @IBAction|marked @IBSegueAction|marked @NSManaged|a member of an @objc protocol|implicitly @objc|an @objc override|an implementation of an @objc requirement|marked @IBInspectable|marked @GKInspectable|in an @objc extension of a class (without @nonobjc)}"
 
 WARNING(attribute_meaningless_when_nonobjc,none,
         "'@%0' attribute is meaningless on a property that cannot be "

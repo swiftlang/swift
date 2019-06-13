@@ -1212,7 +1212,7 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
     }
 
     // Emit a conformance error through conformsToProtocol.
-    if (auto conformance = CS.TC.conformsToProtocol(
+    if (auto conformance = TypeChecker::conformsToProtocol(
             fromType, PT->getDecl(), CS.DC, ConformanceCheckFlags::InExpression,
             expr->getLoc())) {
       if (conformance->isAbstract() ||
@@ -1724,8 +1724,8 @@ static bool conformsToKnownProtocol(Type fromType, KnownProtocolKind kind,
   if (!proto)
     return false;
 
-  if (CS.TC.conformsToProtocol(fromType, proto, CS.DC,
-                               ConformanceCheckFlags::InExpression)) {
+  if (TypeChecker::conformsToProtocol(fromType, proto, CS.DC,
+                                      ConformanceCheckFlags::InExpression)) {
     return true;
   }
 
@@ -1745,7 +1745,7 @@ static Type isRawRepresentable(Type fromType, const ConstraintSystem &CS) {
   if (!rawReprType)
     return Type();
 
-  auto conformance = CS.TC.conformsToProtocol(
+  auto conformance = TypeChecker::conformsToProtocol(
       fromType, rawReprType, CS.DC, ConformanceCheckFlags::InExpression);
   if (!conformance)
     return Type();
@@ -2122,8 +2122,8 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
     if (auto errorCodeProtocol =
             TC.Context.getProtocol(KnownProtocolKind::ErrorCodeProtocol)) {
       if (auto conformance =
-              TC.conformsToProtocol(CS.getType(expr), errorCodeProtocol, CS.DC,
-                                    ConformanceCheckFlags::InExpression)) {
+            TypeChecker::conformsToProtocol(CS.getType(expr), errorCodeProtocol, CS.DC,
+                                            ConformanceCheckFlags::InExpression)) {
         Type errorCodeType = CS.getType(expr);
         Type errorType =
           conformance->getTypeWitnessByName(errorCodeType,
@@ -2203,6 +2203,10 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
   case CTP_AssignSource:
     diagID = diag::cannot_convert_assign;
     nilDiag = diag::cannot_convert_assign_nil;
+    break;
+  case CTP_SubscriptAssignSource:
+    diagID = diag::cannot_convert_subscript_assign;
+    nilDiag = diag::cannot_convert_subscript_assign_nil;
     break;
   }
 
@@ -2359,6 +2363,7 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
   case CTP_DictionaryKey:
   case CTP_DictionaryValue:
   case CTP_AssignSource:
+  case CTP_SubscriptAssignSource:
   case CTP_Initialization:
   case CTP_ReturnStmt:
     tryRawRepresentableFixIts(diag, CS, exprType, contextualType,
@@ -5398,7 +5403,9 @@ bool FailureDiagnosis::visitAssignExpr(AssignExpr *assignExpr) {
 
   auto *srcExpr = assignExpr->getSrc();
   auto contextualType = destType->getRValueType();
-
+  auto contextualTypePurpose = isa<SubscriptExpr>(destExpr)
+                                   ? CTP_SubscriptAssignSource
+                                   : CTP_AssignSource;
   // Let's try to type-check assignment source expression without using
   // destination as a contextual type, that allows us to diagnose
   // contextual problems related to source much easier.
@@ -5414,11 +5421,11 @@ bool FailureDiagnosis::visitAssignExpr(AssignExpr *assignExpr) {
 
     if (type && !type->isEqual(contextualType))
       return diagnoseContextualConversionError(
-          assignExpr->getSrc(), contextualType, CTP_AssignSource);
+          assignExpr->getSrc(), contextualType, contextualTypePurpose);
   }
 
   srcExpr = typeCheckChildIndependently(assignExpr->getSrc(), contextualType,
-                                        CTP_AssignSource);
+                                        contextualTypePurpose);
   if (!srcExpr)
     return true;
 
@@ -6267,8 +6274,8 @@ bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {
 
   // Check to see if the contextual type conforms.
   if (auto Conformance
-        = CS.TC.conformsToProtocol(contextualType, ALC, CS.DC,
-                                   ConformanceCheckFlags::InExpression)) {
+        = TypeChecker::conformsToProtocol(contextualType, ALC, CS.DC,
+                                          ConformanceCheckFlags::InExpression)) {
     Type contextualElementType =
         Conformance->getTypeWitnessByName(
           contextualType, CS.getASTContext().Id_ArrayLiteralElement)
@@ -6292,8 +6299,8 @@ bool FailureDiagnosis::visitArrayExpr(ArrayExpr *E) {
   if (!DLC)
     return visitExpr(E);
 
-  if (CS.TC.conformsToProtocol(contextualType, DLC, CS.DC,
-                               ConformanceCheckFlags::InExpression)) {
+  if (TypeChecker::conformsToProtocol(contextualType, DLC, CS.DC,
+                                      ConformanceCheckFlags::InExpression)) {
     // If the contextual type conforms to ExpressibleByDictionaryLiteral and
     // this is an empty array, then they meant "[:]".
     auto numElements = E->getNumElements();
@@ -6350,7 +6357,7 @@ bool FailureDiagnosis::visitDictionaryExpr(DictionaryExpr *E) {
 
     // Validate the contextual type conforms to ExpressibleByDictionaryLiteral
     // and figure out what the contextual Key/Value types are in place.
-    auto Conformance = CS.TC.conformsToProtocol(
+    auto Conformance = TypeChecker::conformsToProtocol(
         contextualType, DLC, CS.DC, ConformanceCheckFlags::InExpression);
     if (!Conformance) {
       diagnose(E->getStartLoc(), diag::type_is_not_dictionary, contextualType)

@@ -659,6 +659,7 @@ void PropertyWrapperBackingPropertyTypeRequest::noteCycleStep(
     DiagnosticEngine &diags) const {
   std::get<0>(getStorage())->diagnose(diag::circular_reference_through);
 }
+
 bool PropertyWrapperBackingPropertyInfoRequest::isCached() const {
   auto var = std::get<0>(getStorage());
   return !var->getAttrs().isEmpty();
