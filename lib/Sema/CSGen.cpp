@@ -3056,36 +3056,34 @@ namespace {
         // constraint system so we can find it later.
         CS.setType(E, i, base);
       }
-      
-      // If there was an optional chaining component, the end result must be
-      // optional.
-      if (didOptionalChain) {
-        auto objTy = CS.createTypeVariable(locator, TVO_CanBindToNoEscape);
-        auto optTy = OptionalType::get(objTy);
-        CS.addConstraint(ConstraintKind::Conversion, base, optTy,
-                         locator);
-        base = optTy;
-      }
 
-      auto baseLocator =
+      // Create the type variable for the Value generic type.
+      auto valueLocator =
           CS.getConstraintLocator(E, ConstraintLocator::KeyPathValue);
-      auto rvalueBase = CS.createTypeVariable(baseLocator,
-                                              TVO_CanBindToNoEscape);
-      CS.addConstraint(ConstraintKind::Equal, base, rvalueBase, locator);
-      
-      // The result is a KeyPath from the root to the end component.
-      Type kpTy;
+      Type valueTy = CS.createTypeVariable(valueLocator, TVO_CanBindToNoEscape);
       if (didOptionalChain) {
-        // Optional-chaining key paths are always read-only.
-        kpTy = BoundGenericType::get(kpDecl, Type(), {root, rvalueBase});
-      } else {
-        // The type of key path depends on the overloads chosen for the key
-        // path components.
-        auto typeLoc =
-            CS.getConstraintLocator(locator, ConstraintLocator::KeyPathType);
-        kpTy = CS.createTypeVariable(typeLoc, TVO_CanBindToNoEscape);
-        CS.addKeyPathConstraint(kpTy, root, rvalueBase, locator);
+        // If there was an optional chaining component, the end result must be
+        // optional. That means we want to leave the base type alone if it is
+        // already optional, but add a level of optionality if it isn't. We do
+        // this by constraining the last component's result type to convert to
+        // Optional<$Tn> and then using Optional<$Tn> as the value type.
+        valueTy = OptionalType::get(valueTy);
+        CS.addConstraint(ConstraintKind::Conversion, base, valueTy,
+                         valueLocator);
       }
+      else {
+        // If there wasn't an optional chaining component, we just want an
+        // rvalue version of the last component's result type.
+        CS.addConstraint(ConstraintKind::Equal, base, valueTy, valueLocator);
+      }
+      
+      // The result is a KeyPath from the root type to the value type.
+      // The type of key path depends on the overloads chosen for the key
+      // path components.
+      auto typeLoc =
+          CS.getConstraintLocator(locator, ConstraintLocator::KeyPathType);
+      Type kpTy = CS.createTypeVariable(typeLoc, TVO_CanBindToNoEscape);
+      CS.addKeyPathConstraint(kpTy, root, valueTy, locator);
       return kpTy;
     }
 
