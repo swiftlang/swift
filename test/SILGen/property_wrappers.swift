@@ -264,7 +264,7 @@ class ClassUsingWrapper {
 extension ClassUsingWrapper {
   // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers17ClassUsingWrapperC04testcdE01cyAC_tF : $@convention(method) (@guaranteed ClassUsingWrapper, @guaranteed ClassUsingWrapper) -> () {
   func testClassUsingWrapper(c: ClassUsingWrapper) {
-    // CHECK: class_method [[GETTER:%.*]] : $ClassUsingWrapper, #ClassUsingWrapper.$x!getter.1
+    // CHECK: ref_element_addr %1 : $ClassUsingWrapper, #ClassUsingWrapper.$x
     self.$x.test()
   }
 }
@@ -298,9 +298,9 @@ class UseWrapperWithDefaultInit {
 
 
 // CHECK-LABEL: sil_vtable ClassUsingWrapper {
-// CHECK:  #ClassUsingWrapper.x!getter.1: (ClassUsingWrapper) -> () -> Int : @$s17property_wrappers17ClassUsingWrapperC1xSivg   // ClassUsingWrapper.x.getter
-// CHECK:  #ClassUsingWrapper.x!setter.1: (ClassUsingWrapper) -> (Int) -> () : @$s17property_wrappers17ClassUsingWrapperC1xSivs // ClassUsingWrapper.x.setter
-// CHECK:  #ClassUsingWrapper.x!modify.1: (ClassUsingWrapper) -> () -> () : @$s17property_wrappers17ClassUsingWrapperC1xSivM    // ClassUsingWrapper.x.modify
-// CHECK:  #ClassUsingWrapper.$x!getter.1: (ClassUsingWrapper) -> () -> WrapperWithInitialValue<Int> : @$s17property_wrappers17ClassUsingWrapperC2$x33_{{.*}}16WithInitialValueVySiGvg       // ClassUsingWrapper.$x.getter
-// CHECK:  #ClassUsingWrapper.$x!setter.1: (ClassUsingWrapper) -> (WrapperWithInitialValue<Int>) -> () : @$s17property_wrappers17ClassUsingWrapperC2$x33_{{.*}}16WithInitialValueVySiGvs     // ClassUsingWrapper.$x.setter
-// CHECK:  #ClassUsingWrapper.$x!modify.1: (ClassUsingWrapper) -> () -> () : @$s17property_wrappers17ClassUsingWrapperC2$x33_{{.*}}16WithInitialValueVySiGvM // ClassUsingWrapper.$x.modify
+// CHECK-NEXT:  #ClassUsingWrapper.x!getter.1: (ClassUsingWrapper) -> () -> Int : @$s17property_wrappers17ClassUsingWrapperC1xSivg   // ClassUsingWrapper.x.getter
+// CHECK-NEXT:  #ClassUsingWrapper.x!setter.1: (ClassUsingWrapper) -> (Int) -> () : @$s17property_wrappers17ClassUsingWrapperC1xSivs // ClassUsingWrapper.x.setter
+// CHECK-NEXT:  #ClassUsingWrapper.x!modify.1: (ClassUsingWrapper) -> () -> () : @$s17property_wrappers17ClassUsingWrapperC1xSivM    // ClassUsingWrapper.x.modify
+// CHECK-NEXT:  #ClassUsingWrapper.init!allocator.1: (ClassUsingWrapper.Type) -> () -> ClassUsingWrapper : @$s17property_wrappers17ClassUsingWrapperCACycfC
+// CHECK-NEXT: #ClassUsingWrapper.deinit!deallocator.1: @$s17property_wrappers17ClassUsingWrapperCfD
+// CHECK-NEXT:  }

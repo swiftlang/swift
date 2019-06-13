@@ -1050,13 +1050,6 @@ static void validatePatternBindingEntries(TypeChecker &tc,
     validatePatternBindingEntry(tc, binding, i);
 }
 
-void swift::makeFinal(ASTContext &ctx, ValueDecl *D) {
-  if (D && !D->isFinal()) {
-    assert(isa<ClassDecl>(D) || D->isPotentiallyOverridable());
-    D->getAttrs().add(new (ctx) FinalAttr(/*IsImplicit=*/true));
-  }
-}
-
 namespace {
 // The raw values of this enum must be kept in sync with
 // diag::implicitly_final_cannot_be_open.
@@ -1070,12 +1063,8 @@ enum class ImplicitlyFinalReason : unsigned {
 };
 }
 
-static bool inferFinalAndDiagnoseIfNeeded(ValueDecl *D,
+static bool inferFinalAndDiagnoseIfNeeded(ValueDecl *D, ClassDecl *cls,
                                           StaticSpellingKind staticSpelling) {
-  auto cls = D->getDeclContext()->getSelfClassDecl();
-  if (!cls)
-    return false;
-
   // Are there any reasons to infer 'final'? Prefer 'static' over the class
   // being final for the purposes of diagnostics.
   Optional<ImplicitlyFinalReason> reason;
@@ -1186,15 +1175,28 @@ doesAccessorNeedDynamicAttribute(AccessorDecl *accessor, Evaluator &evaluator) {
 
 llvm::Expected<bool>
 IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
+  if (isa<ClassDecl>(decl))
+    return decl->getAttrs().hasAttribute<FinalAttr>();
+
+  auto cls = decl->getDeclContext()->getSelfClassDecl();
+  if (!cls)
+    return false;
+
   switch (decl->getKind()) {
     case DeclKind::Var: {
       // Properties are final if they are declared 'static' or a 'let'
       auto *VD = cast<VarDecl>(decl);
+
+      // Backing storage for 'lazy' or property wrappers is always final.
+      if (VD->isLazyStorageProperty() ||
+          VD->getOriginalWrappedProperty())
+        return true;
+
       if (auto *nominalDecl = VD->getDeclContext()->getSelfClassDecl()) {
         // If this variable is a class member, mark it final if the
         // class is final, or if it was declared with 'let'.
         auto *PBD = VD->getParentPatternBinding();
-        if (PBD && inferFinalAndDiagnoseIfNeeded(decl, PBD->getStaticSpelling()))
+        if (PBD && inferFinalAndDiagnoseIfNeeded(decl, cls, PBD->getStaticSpelling()))
           return true;
 
         if (VD->isLet()) {
@@ -1219,7 +1221,7 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     case DeclKind::Func: {
       // Methods declared 'static' are final.
       auto staticSpelling = cast<FuncDecl>(decl)->getStaticSpelling();
-      if (inferFinalAndDiagnoseIfNeeded(decl, staticSpelling))
+      if (inferFinalAndDiagnoseIfNeeded(decl, cls, staticSpelling))
         return true;
       break;
     }
@@ -1230,9 +1232,7 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
           case AccessorKind::DidSet:
           case AccessorKind::WillSet:
             // Observing accessors are marked final if in a class.
-            if (accessor->getDeclContext()->getSelfClassDecl())
-              return true;
-            break;
+            return true;
 
           case AccessorKind::Read:
           case AccessorKind::Modify:
@@ -1254,7 +1254,7 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     case DeclKind::Subscript: {
       // Member subscripts.
       auto staticSpelling = cast<SubscriptDecl>(decl)->getStaticSpelling();
-      if (inferFinalAndDiagnoseIfNeeded(decl, staticSpelling))
+      if (inferFinalAndDiagnoseIfNeeded(decl, cls, staticSpelling))
         return true;
       break;
     }
