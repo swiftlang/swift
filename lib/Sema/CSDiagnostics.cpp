@@ -115,11 +115,9 @@ Type FailureDiagnostic::resolveInterfaceType(Type type,
   auto &cs = getConstraintSystem();
   auto resolvedType = type.transform([&](Type type) -> Type {
     if (auto *tvt = type->getAs<TypeVariableType>()) {
-      auto *loc = tvt->getImpl().getLocator();
-
       // If this type variable is for a generic parameter, return that.
-      if (loc->isForGenericParameter())
-        return loc->getGenericParameter();
+      if (auto *gp = tvt->getImpl().getGenericParameter())
+        return gp;
 
       // Otherwise resolve its fixed type, mapped out of context.
       if (auto fixed = cs.getFixedType(tvt))
