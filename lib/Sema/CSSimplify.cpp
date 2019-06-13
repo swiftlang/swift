@@ -1603,8 +1603,6 @@ static ConstraintSystem::TypeMatchResult matchDeepTypeArguments(
     return cs.getTypeMatchFailure(locator);
   }
 
-  ConstraintSystem::TypeMatchResult fullMatchResult = cs.getTypeMatchSuccess();
-
   for (unsigned i = 0, n = args1.size(); i != n; ++i) {
     auto result = cs.matchTypes(
         args1[i], args2[i], ConstraintKind::Bind, subflags,
@@ -1613,13 +1611,11 @@ static ConstraintSystem::TypeMatchResult matchDeepTypeArguments(
     if (result.isFailure()) {
       if (!cs.shouldAttemptFixes())
         return result;
-
-      fullMatchResult = result;
       recordMismatch(i);
     }
   }
 
-  return fullMatchResult;
+  return cs.getTypeMatchSuccess();
 }
 
 ConstraintSystem::TypeMatchResult
@@ -1695,8 +1691,7 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
   // Match up the generic arguments, exactly.
   auto result =
       matchDeepTypeArguments(*this, subflags, args1, args2, locator,
-                             [&failedArguments, forRequirement, isOptional,
-                              isArray](unsigned position) {
+                             [&](unsigned position) {
                                if (!(forRequirement || isOptional || isArray))
                                  failedArguments.push_back(position);
                              });
@@ -2154,11 +2149,10 @@ bool ConstraintSystem::repairFailures(
 
   auto hasConversionOrRestriction = [&](ConversionRestrictionKind kind) {
     return llvm::any_of(
-        conversionsOrFixes, [](const RestrictionOrFix possibleRestriction) {
-          auto restriction = possibleRestriction.getRestriction();
-          if (!restriction)
-            return false;
-          return restriction == ConversionRestrictionKind::DeepEquality;
+        conversionsOrFixes, [kind](const RestrictionOrFix correction) {
+          if (auto restriction = correction.getRestriction())
+            return restriction == kind;
+          return false;
         });
   };
 
