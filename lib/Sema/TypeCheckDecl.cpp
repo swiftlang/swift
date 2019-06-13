@@ -1051,10 +1051,8 @@ static void validatePatternBindingEntries(TypeChecker &tc,
 }
 
 void swift::makeFinal(ASTContext &ctx, ValueDecl *D) {
-  if (D && !D->isFinal()) {
-    assert(isa<ClassDecl>(D) || D->isPotentiallyOverridable());
-    D->getAttrs().add(new (ctx) FinalAttr(/*IsImplicit=*/true));
-  }
+  assert(isa<ClassDecl>(D) || D->isPotentiallyOverridable());
+  D->getAttrs().add(new (ctx) FinalAttr(/*IsImplicit=*/true));
 }
 
 namespace {
