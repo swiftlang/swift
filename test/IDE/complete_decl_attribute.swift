@@ -75,7 +75,7 @@ class C {}
 // KEYWORD3-NEXT:             Keyword/None:                       objcMembers[#Class Attribute#]; name=objcMembers{{$}}
 // KEYWORD3-NEXT:             Keyword/None:                       NSApplicationMain[#Class Attribute#]; name=NSApplicationMain{{$}}
 // KEYWORD3-NEXT:             Keyword/None:                       usableFromInline[#Class Attribute#]; name=usableFromInline
-// KEYWORD3-NEXT:             Keyword/None:                       _propertyWrapper[#Class Attribute#]; name=_propertyWrapper
+// KEYWORD3-NEXT:             Keyword/None:                       propertyWrapper[#Class Attribute#]; name=propertyWrapper
 // KEYWORD3-NEXT:             Keyword/None:                       _functionBuilder[#Class Attribute#]; name=_functionBuilder
 // KEYWORD3-NEXT:             End completions
 
@@ -91,7 +91,7 @@ enum E {}
 // KEYWORD4-NEXT:             Keyword/None:                       dynamicCallable[#Enum Attribute#]; name=dynamicCallable
 // KEYWORD4-NEXT:             Keyword/None:                       dynamicMemberLookup[#Enum Attribute#]; name=dynamicMemberLookup
 // KEYWORD4-NEXT:             Keyword/None:                       usableFromInline[#Enum Attribute#]; name=usableFromInline
-// KEYWORD4-NEXT:             Keyword/None:                       _propertyWrapper[#Enum Attribute#]; name=_propertyWrapper
+// KEYWORD4-NEXT:             Keyword/None:                       propertyWrapper[#Enum Attribute#]; name=propertyWrapper
 // KEYWORD4-NEXT:             Keyword/None:                       _functionBuilder[#Enum Attribute#]; name=_functionBuilder
 // KEYWORD4-NEXT:             End completions
 
@@ -103,7 +103,7 @@ struct S{}
 // KEYWORD5-NEXT:             Keyword/None:                       dynamicCallable[#Struct Attribute#]; name=dynamicCallable
 // KEYWORD5-NEXT:             Keyword/None:                       dynamicMemberLookup[#Struct Attribute#]; name=dynamicMemberLookup
 // KEYWORD5-NEXT:             Keyword/None:                       usableFromInline[#Struct Attribute#]; name=usableFromInline
-// KEYWORD5-NEXT:             Keyword/None:                       _propertyWrapper[#Struct Attribute#]; name=_propertyWrapper
+// KEYWORD5-NEXT:             Keyword/None:                       propertyWrapper[#Struct Attribute#]; name=propertyWrapper
 // KEYWORD5-NEXT:             Keyword/None:                       _functionBuilder[#Struct Attribute#]; name=_functionBuilder
 // KEYWORD5-NEXT:             End completions
 
@@ -204,7 +204,7 @@ struct _S {
 // ON_MEMBER_LAST-DAG: Keyword/None:                       discardableResult[#Declaration Attribute#]; name=discardableResult
 // ON_MEMBER_LAST-DAG: Keyword/None:                       GKInspectable[#Declaration Attribute#]; name=GKInspectable
 // ON_MEMBER_LAST-DAG: Keyword/None:                       IBSegueAction[#Declaration Attribute#]; name=IBSegueAction
-// ON_MEMBER_LAST-DAG: Keyword/None:                       _propertyWrapper[#Declaration Attribute#]; name=_propertyWrapper
+// ON_MEMBER_LAST-DAG: Keyword/None:                       propertyWrapper[#Declaration Attribute#]; name=propertyWrapper
 // ON_MEMBER_LAST-DAG: Keyword/None:                       _functionBuilder[#Declaration Attribute#]; name=_functionBuilder
 // ON_MEMBER_LAST-NOT: Keyword
 // ON_MEMBER_LAST: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
@@ -236,7 +236,7 @@ struct _S {
 // KEYWORD_LAST-NEXT:             Keyword/None:                       usableFromInline[#Declaration Attribute#]; name=usableFromInline{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       discardableResult[#Declaration Attribute#]; name=discardableResult
 // KEYWORD_LAST-NEXT:             Keyword/None:                       GKInspectable[#Declaration Attribute#]; name=GKInspectable{{$}}
-// KEYWORD_LAST-NEXT:             Keyword/None:                       _propertyWrapper[#Declaration Attribute#]; name=_propertyWrapper
+// KEYWORD_LAST-NEXT:             Keyword/None:                       propertyWrapper[#Declaration Attribute#]; name=propertyWrapper
 // KEYWORD_LAST-NEXT:             Keyword/None:                       _functionBuilder[#Declaration Attribute#]; name=_functionBuilder{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       IBSegueAction[#Declaration Attribute#]; name=IBSegueAction{{$}}
 // KEYWORD_LAST-NOT:              Keyword

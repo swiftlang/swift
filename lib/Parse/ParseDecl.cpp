@@ -1800,6 +1800,12 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc At
     checkInvalidAttrName("_inlineable", "inlinable", DAK_Inlinable);
   }
 
+  // Other names of property wrappers...
+  checkInvalidAttrName("propertyDelegate", "propertyWrapper",
+                       DAK_PropertyWrapper, diag::attr_renamed_warning);
+  checkInvalidAttrName("_propertyWrapper", "propertyWrapper",
+                       DAK_PropertyWrapper, diag::attr_renamed_warning);
+
   if (DK == DAK_Count && Tok.getText() == "warn_unused_result") {
     // The behavior created by @warn_unused_result is now the default. Emit a
     // Fix-It to remove.
