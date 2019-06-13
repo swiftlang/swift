@@ -249,6 +249,8 @@ SYNTAX_TOKENS = [
 
     Punctuator('StringQuote', 'string_quote', text='\\\"',
                classification='StringLiteral', serialization_code=102),
+    Punctuator('SingleQuote', 'single_quote', text='\\\'',
+               classification='StringLiteral', serialization_code=120),
     Punctuator('MultilineStringQuote', 'multiline_string_quote',
                text='\\\"\\\"\\\"', classification='StringLiteral',
                serialization_code=103),
