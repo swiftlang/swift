@@ -412,7 +412,7 @@ bool swift::emitParseableInterface(raw_ostream &out,
   printImports(out, M);
 
   const PrintOptions printOptions = PrintOptions::printParseableInterfaceFile(
-      Opts.PreserveTypesAsWrittenInModuleInterface);
+      Opts.PreserveTypesAsWritten);
   InheritedProtocolCollector::PerTypeMap inheritedProtocolMap;
 
   SmallVector<Decl *, 16> topLevelDecls;

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -emit-module-interface-path - %s -enable-library-evolution -module-name PreferTypeRepr -preserve-types-as-written-in-module-interface | %FileCheck %s --check-prefix PREFER
+// RUN: %target-swift-frontend -typecheck -emit-module-interface-path - %s -enable-library-evolution -module-name PreferTypeRepr -module-interface-preserve-types-as-written | %FileCheck %s --check-prefix PREFER
 // RUN: %target-swift-frontend -typecheck -emit-module-interface-path - %s -enable-library-evolution -module-name PreferTypeRepr | %FileCheck %s --check-prefix DONTPREFER
 
 public protocol Pet {}
