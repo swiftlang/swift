@@ -13,6 +13,18 @@
 @_exported import ModelIO
 import simd
 
+extension Array {
+    fileprivate init(
+        unsafeUninitializedCount count: Int,
+        initializedWith initializer: (UnsafeMutablePointer<Element>) -> Void
+    ) {
+        self.init(unsafeUninitializedCapacity: count) { buffer, initializedCount in
+            initializer(buffer.baseAddress!)
+            initializedCount = count
+        }
+    }
+}
+
 @available(macOS, introduced: 10.13)
 @available(iOS, introduced: 11.0)
 @available(tvOS, introduced: 11.0)
@@ -20,9 +32,9 @@ extension MDLMatrix4x4Array {
     @nonobjc public var float4x4Array: [float4x4] {
         get {
             let count = elementCount
-            var values = [float4x4](repeating: float4x4(), count: Int(count))
-            __getFloat4x4Array(&values[0], maxCount: count)
-            return values
+            return [float4x4](unsafeUninitializedCount: count) { ptr in
+                __getFloat4x4Array(ptr, maxCount: count)
+            }
         }
         set(array) {
             __setFloat4x4(array, count: array.count)
@@ -32,9 +44,9 @@ extension MDLMatrix4x4Array {
     @nonobjc public var double4x4Array: [double4x4] {
         get {
             let count = elementCount
-            var values = [double4x4](repeating: double4x4(), count: Int(count))
-            __getDouble4x4Array(&values[0], maxCount: count)
-            return values
+            return [double4x4](unsafeUninitializedCount: count) { ptr in
+                __getDouble4x4Array(ptr, maxCount: count)
+            }
         }
         set(array) {
             __setDouble4x4(array, count: array.count)
@@ -50,9 +62,9 @@ extension MDLMatrix4x4Array {
 extension MDLAnimatedValue {
     @nonobjc public var times: [TimeInterval] {
         get {
-            var times = [TimeInterval](repeating: 0, count: Int(timeSampleCount))
-            __getTimes(&times[0], maxCount: timeSampleCount)
-            return times
+            return [TimeInterval](unsafeUninitializedCount: timeSampleCount) { ptr in
+                __getTimes(ptr, maxCount: timeSampleCount)
+            }
         }
     }
 }
@@ -70,15 +82,15 @@ extension MDLAnimatedScalarArray {
     }
     
     @nonobjc public func floatArray(atTime time: TimeInterval) -> [Float] {
-        var values = [Float](repeating: 0, count: Int(elementCount))
-        __getFloat(&values[0], maxCount: elementCount, atTime: time)
-        return values
+        return [Float](unsafeUninitializedCount: elementCount) { ptr in
+            __getFloat(ptr, maxCount: elementCount, atTime: time)
+        }
     }
 
     @nonobjc public func doubleArray(atTime time: TimeInterval) -> [Double] {
-        var values = [Double](repeating: 0, count: Int(elementCount))
-        __getDouble(&values[0], maxCount: elementCount, atTime: time)
-        return values
+        return [Double](unsafeUninitializedCount: elementCount) { ptr in
+            __getDouble(ptr, maxCount: elementCount, atTime: time)
+        }
     }
 
     @nonobjc public func reset(floatArray array:[Float], atTimes times: [TimeInterval]){
@@ -92,18 +104,18 @@ extension MDLAnimatedScalarArray {
     @nonobjc public var floatArray: [Float] {
         get {
             let count = elementCount * timeSampleCount
-            var values = [Float](repeating: 0, count: Int(count))
-            __getFloat(&values[0], maxCount: count)
-            return values
+            return [Float](unsafeUninitializedCount: count) { ptr in
+                __getFloat(ptr, maxCount: count)
+            }
         }
     }
 
     @nonobjc public var doubleArray: [Double] {
         get {
             let count = elementCount * timeSampleCount
-            var values = [Double](repeating: 0, count: Int(count))
-            __getDouble(&values[0], maxCount: count)
-            return values
+            return [Double](unsafeUninitializedCount: count) { ptr in
+                __getDouble(ptr, maxCount: count)
+            }
         }
     }
 }
@@ -121,15 +133,15 @@ extension MDLAnimatedVector3Array {
     }
     
     @nonobjc public func float3Array(atTime time: TimeInterval) -> [SIMD3<Float>] {
-        var values = [SIMD3<Float>](repeating: SIMD3<Float>(), count: Int(elementCount))
-        __getFloat3Array(&values[0], maxCount: elementCount, atTime: time)
-        return values
+        return [SIMD3<Float>](unsafeUninitializedCount: elementCount) { ptr in
+            __getFloat3Array(ptr, maxCount: elementCount, atTime: time)
+        }
     }
     
     @nonobjc public func double3Array(atTime time: TimeInterval) -> [SIMD3<Double>] {
-        var values = [SIMD3<Double>](repeating: SIMD3<Double>(), count: Int(elementCount))
-        __getDouble3Array(&values[0], maxCount: elementCount, atTime: time)
-        return values
+        return [SIMD3<Double>](unsafeUninitializedCount: elementCount) { ptr in
+            __getDouble3Array(ptr, maxCount: elementCount, atTime: time)
+        }
     }
     
     @nonobjc public func reset(float3Array array:[SIMD3<Float>], atTimes times: [TimeInterval]){
@@ -143,18 +155,18 @@ extension MDLAnimatedVector3Array {
     @nonobjc public var float3Array: [SIMD3<Float>] {
         get {
             let count = elementCount * timeSampleCount
-            var values = [SIMD3<Float>](repeating: SIMD3<Float>(), count: Int(count))
-            __getFloat3Array(&values[0], maxCount: count)
-            return values
+            return [SIMD3<Float>](unsafeUninitializedCount: count) { ptr in
+                __getFloat3Array(ptr, maxCount: count)
+            }
         }
     }
     
     @nonobjc public var double3Array: [SIMD3<Double>] {
         get {
             let count = elementCount * timeSampleCount
-            var values = [SIMD3<Double>](repeating: SIMD3<Double>(), count: Int(count))
-            __getDouble3Array(&values[0], maxCount: count)
-            return values
+            return [SIMD3<Double>](unsafeUninitializedCount: count) { ptr in
+                __getDouble3Array(ptr, maxCount: count)
+            }
         }
     }
 }
@@ -172,15 +184,15 @@ extension MDLAnimatedQuaternionArray {
     }
     
     @nonobjc public func floatQuaternionArray(atTime time: TimeInterval) -> [simd_quatf] {
-        var values = [simd_quatf](repeating: simd_quatf(), count: Int(elementCount))
-        __getFloat(&values[0], maxCount: elementCount, atTime: time)
-        return values
+        return [simd_quatf](unsafeUninitializedCount: elementCount) { ptr in
+            __getFloat(ptr, maxCount: elementCount, atTime: time)
+        }
     }
 
     @nonobjc public func doubleQuaternionArray(atTime time: TimeInterval) -> [simd_quatd] {
-        var values = [simd_quatd](repeating: simd_quatd(), count: Int(elementCount))
-        __getDouble(&values[0], maxCount: elementCount, atTime: time)
-        return values
+        return [simd_quatd](unsafeUninitializedCount: elementCount) { ptr in
+            __getDouble(ptr, maxCount: elementCount, atTime: time)
+        }
     }
 
     @nonobjc public func reset(floatQuaternionArray array:[simd_quatf], atTimes times: [TimeInterval]){
@@ -194,18 +206,18 @@ extension MDLAnimatedQuaternionArray {
     @nonobjc public var floatQuaternionArray : [simd_quatf] {
         get {
             let count = elementCount * timeSampleCount
-            var values = [simd_quatf](repeating: simd_quatf(), count: Int(count))
-            __getFloat(&values[0], maxCount: count)
-            return values
+            return [simd_quatf](unsafeUninitializedCount: count) { ptr in
+                __getFloat(ptr, maxCount: count)
+            }
         }
     }
 
     @nonobjc public var doubleQuaternionArray: [simd_quatd] {
         get {
             let count = elementCount * timeSampleCount
-            var values = [simd_quatd](repeating: simd_quatd(), count: Int(count))
-            __getDouble(&values[0], maxCount: count)
-            return values
+            return [simd_quatd](unsafeUninitializedCount: count) { ptr in
+                __getDouble(ptr, maxCount: count)
+            }
         }
     }
 }
@@ -224,17 +236,17 @@ extension MDLAnimatedScalar {
     
     @nonobjc public var floatArray: [Float] {
         get {
-            var values = [Float](repeating: 0, count: Int(timeSampleCount))
-            __getFloatArray(&values[0], maxCount: timeSampleCount)
-            return values
+            return [Float](unsafeUninitializedCount: timeSampleCount) { ptr in
+                __getFloatArray(ptr, maxCount: timeSampleCount)
+            }
         }
     }
 
     @nonobjc public var doubleArray: [Double] {
         get {
-            var values = [Double](repeating: 0, count: Int(timeSampleCount))
-            __getDoubleArray(&values[0], maxCount: timeSampleCount)
-            return values
+            return [Double](unsafeUninitializedCount: timeSampleCount) { ptr in
+                __getDoubleArray(ptr, maxCount: timeSampleCount)
+            }
         }
     }
 }
@@ -253,17 +265,17 @@ extension MDLAnimatedVector2 {
     
     @nonobjc public var float2Array: [SIMD2<Float>] {
         get {
-            var values = [SIMD2<Float>](repeating: SIMD2<Float>(), count: Int(timeSampleCount))
-            __getFloat2Array(&values[0], maxCount: timeSampleCount)
-            return values
+            return [SIMD2<Float>](unsafeUninitializedCount: timeSampleCount) { ptr in
+                __getFloat2Array(ptr, maxCount: timeSampleCount)
+            }
         }
     }
 
     @nonobjc public var double2Array: [SIMD2<Double>] {
         get {
-            var values = [SIMD2<Double>](repeating: SIMD2<Double>(), count: Int(timeSampleCount))
-            __getDouble2Array(&values[0], maxCount: timeSampleCount)
-            return values
+            return [SIMD2<Double>](unsafeUninitializedCount: timeSampleCount) { ptr in
+                __getDouble2Array(ptr, maxCount: timeSampleCount)
+            }
         }
     }
 }
@@ -282,17 +294,17 @@ extension MDLAnimatedVector3 {
     
     @nonobjc public var float3Array: [SIMD3<Float>] {
         get {
-            var values = [SIMD3<Float>](repeating: SIMD3<Float>(), count: Int(timeSampleCount))
-            __getFloat3Array(&values[0], maxCount: timeSampleCount)
-            return values
+            return [SIMD3<Float>](unsafeUninitializedCount: timeSampleCount) { ptr in
+                __getFloat3Array(ptr, maxCount: timeSampleCount)
+            }
         }
     }
 
     @nonobjc public var double3Array: [SIMD3<Double>] {
         get {
-            var values = [SIMD3<Double>](repeating: SIMD3<Double>(), count: Int(timeSampleCount))
-            __getDouble3Array(&values[0], maxCount: timeSampleCount)
-            return values
+            return [SIMD3<Double>](unsafeUninitializedCount: timeSampleCount) { ptr in
+                __getDouble3Array(ptr, maxCount: timeSampleCount)
+            }
         }
     }
 }
@@ -311,17 +323,17 @@ extension MDLAnimatedVector4 {
     
     @nonobjc public var float4Array: [SIMD4<Float>] {
         get {
-            var values = [SIMD4<Float>](repeating: SIMD4<Float>(), count: Int(timeSampleCount))
-            __getFloat4Array(&values[0], maxCount: timeSampleCount)
-            return values
+            return [SIMD4<Float>](unsafeUninitializedCount: timeSampleCount) { ptr in
+                __getFloat4Array(ptr, maxCount: timeSampleCount)
+            }
         }
     }
 
     @nonobjc public var double4Array: [SIMD4<Double>] {
         get {
-            var values = [SIMD4<Double>](repeating: SIMD4<Double>(), count: Int(timeSampleCount))
-            __getDouble4Array(&values[0], maxCount: timeSampleCount)
-            return values
+            return [SIMD4<Double>](unsafeUninitializedCount: timeSampleCount) { ptr in
+                __getDouble4Array(ptr, maxCount: timeSampleCount)
+            }
         }
     }
 }
@@ -340,18 +352,17 @@ extension MDLAnimatedMatrix4x4 {
     
     @nonobjc public var float4x4Array: [float4x4] {
         get {
-            var values = [float4x4](repeating: float4x4(), count: Int(timeSampleCount))
-            __getFloat4x4Array(&values[0], maxCount: timeSampleCount)
-            return values
+            return [float4x4](unsafeUninitializedCount: timeSampleCount) { ptr in
+                __getFloat4x4Array(ptr, maxCount: timeSampleCount)
+            }
         }
     }
     
     @nonobjc public var double4x4Array: [double4x4] {
         get {
-            var values = [double4x4](repeating: double4x4(), count: Int(timeSampleCount))
-            __getDouble4x4Array(&values[0], maxCount: timeSampleCount)
-            return values
+            return [double4x4](unsafeUninitializedCount: timeSampleCount) { ptr in
+                __getDouble4x4Array(ptr, maxCount: timeSampleCount)
+            }
         }
     }
 }
-
