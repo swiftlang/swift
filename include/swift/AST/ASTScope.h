@@ -847,10 +847,6 @@ public:
   std::string getClassName() const override;
   bool lookupLocalBindings(Optional<bool>,
                            DeclConsumer consumer) const override;
-
-protected:
-  NullablePtr<DeclContext>
-      computeSelfDCForParent(NullablePtr<DeclContext>) const override;
 };
 
 class DefaultArgumentInitializerScope final : public ASTScopeImpl {

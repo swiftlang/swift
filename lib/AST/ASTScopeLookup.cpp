@@ -597,10 +597,6 @@ MethodBodyScope::computeSelfDCForParent(NullablePtr<DeclContext> selfDC) const {
   assert(!selfDC && "Losing selfDC");
   return decl;
 }
-NullablePtr<DeclContext> PureFunctionBodyScope::computeSelfDCForParent(
-    NullablePtr<DeclContext> selfDC) const {
-  return selfDC;
-}
 
 #pragma mark ifUnknownIsCascadingUseAccordingTo
 
