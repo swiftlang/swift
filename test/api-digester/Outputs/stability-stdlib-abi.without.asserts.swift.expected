@@ -1,23 +1,6 @@
-
-// The init(signOf:magnitudeOf:) blames are false positives. They are not new APIs.
-Constructor Double.init(signOf:magnitudeOf:) is a new API without @available attribute
-Constructor Float.init(signOf:magnitudeOf:) is a new API without @available attribute
-Constructor Float80.init(signOf:magnitudeOf:) is a new API without @available attribute
-
+Constructor ManagedBuffer.init(_doNotCallMe:) is a new API without @available attribute
 Constructor __RawDictionaryStorage.init(coder:) is a new API without @available attribute
 Constructor __RawSetStorage.init(coder:) is a new API without @available attribute
 Constructor __SwiftNativeNSData.init(coder:) is a new API without @available attribute
 Constructor __SwiftNativeNSDictionary.init(coder:) is a new API without @available attribute
 Constructor __SwiftNativeNSSet.init(coder:) is a new API without @available attribute
-
-Func _cos(_:) has been removed
-Func _exp(_:) has been removed
-Func _exp2(_:) has been removed
-
-Func _log(_:) has been removed
-Func _log10(_:) has been removed
-Func _log2(_:) has been removed
-
-Func _nearbyint(_:) has been removed
-Func _rint(_:) has been removed
-Func _sin(_:) has been removed
