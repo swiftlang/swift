@@ -9,10 +9,10 @@ add_swift_target_library(swiftCoreAudio ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES}
   SWIFT_COMPILE_FLAGS "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}"
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
   TARGET_SDKS OSX IOS IOS_SIMULATOR TVOS TVOS_SIMULATOR WATCHOS WATCHOS_SIMULATOR
-  SWIFT_MODULE_DEPENDS_OSX Darwin CoreFoundation Dispatch ObjectiveC # auto-updated
-  SWIFT_MODULE_DEPENDS_IOS Darwin CoreFoundation Dispatch ObjectiveC # auto-updated
-  SWIFT_MODULE_DEPENDS_TVOS Darwin CoreFoundation Dispatch ObjectiveC # auto-updated
-  SWIFT_MODULE_DEPENDS_WATCHOS Darwin CoreFoundation Dispatch ObjectiveC # auto-updated
+  SWIFT_MODULE_DEPENDS_OSX Darwin Dispatch CoreFoundation ObjectiveC # auto-updated
+  SWIFT_MODULE_DEPENDS_IOS Darwin Dispatch CoreFoundation ObjectiveC # auto-updated
+  SWIFT_MODULE_DEPENDS_TVOS Darwin Dispatch CoreFoundation ObjectiveC # auto-updated
+  SWIFT_MODULE_DEPENDS_WATCHOS Darwin Dispatch CoreFoundation ObjectiveC # auto-updated
   FRAMEWORK_DEPENDS CoreAudio
 
   DEPLOYMENT_VERSION_OSX ${SWIFTLIB_DEPLOYMENT_VERSION_COREAUDIO_OSX}
