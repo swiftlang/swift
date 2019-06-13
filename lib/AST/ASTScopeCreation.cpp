@@ -526,7 +526,8 @@ void ScopeCreator::addChildrenForAllExplicitAccessors(AbstractStorageDecl *asd,
       // Accessors are always nested within their abstract storage
       // declaration. The nesting may not be immediate, because subscripts may
       // have intervening scopes for generics.
-      if (!isDuplicate(accessor) && parent->getEnclosingAbstractStorageDecl() == accessor->getStorage())
+      if (!isDuplicate(accessor) &&
+          parent->getEnclosingAbstractStorageDecl() == accessor->getStorage())
         ASTVisitorForScopeCreation().visitAbstractFunctionDecl(accessor, parent,
                                                                *this);
     }
