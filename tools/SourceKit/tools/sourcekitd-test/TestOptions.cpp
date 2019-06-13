@@ -367,6 +367,17 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       return true;
 #endif
 
+    // SWIFT_ENABLE_TENSORFLOW
+    case OPT_in_memory_clang_module_cache:
+#ifdef SWIFT_SOURCEKIT_USE_INPROC_LIBRARY
+      InMemoryClangModuleCache = true;
+      break;
+#else
+      llvm::errs() << "in-memory-clang-module-cache only supported when "
+                      "SWIFT_SOURCEKIT_USE_INPROC_LIBRARY is set";
+      return true;
+#endif
+
     case OPT_UNKNOWN:
       llvm::errs() << "error: unknown argument: "
                    << InputArg->getAsString(ParsedArgs) << '\n'

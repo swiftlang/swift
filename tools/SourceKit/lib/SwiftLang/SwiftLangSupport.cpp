@@ -211,6 +211,12 @@ SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
 SwiftLangSupport::~SwiftLangSupport() {
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+void SwiftLangSupport::setInMemoryOutputFileSystem(
+    llvm::IntrusiveRefCntPtr<clang::InMemoryOutputFileSystem> FS) {
+  ASTMgr->setInMemoryOutputFileSystem(std::move(FS));
+}
+
 std::unique_ptr<llvm::MemoryBuffer>
 SwiftLangSupport::makeCodeCompletionMemoryBuffer(
     const llvm::MemoryBuffer *origBuf, unsigned &Offset,

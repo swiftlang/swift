@@ -137,6 +137,10 @@ def repeat_request_EQ : Joined<["-"], "repeat-request=">, Alias<repeat_request>;
 def vfs_files : CommaJoined<["-"], "vfs-files=">,
   HelpText<"Injects a VFS into the request, overlaying files specified by the given <name>=<target> pairs over the real filesystem">;
 
+// SWIFT_ENABLE_TENSORFLOW
+def in_memory_clang_module_cache : Flag<["-"], "in-memory-clang-module-cache">,
+  HelpText<"Put the clang module cache in memory">;
+
 def help : Flag<["-", "--"], "help">,
   HelpText<"Display available options">;
 

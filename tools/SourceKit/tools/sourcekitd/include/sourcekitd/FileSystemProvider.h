@@ -14,6 +14,8 @@
 #define LLVM_SOURCEKITD_FILESYSTEMPROVIDER_H
 
 #include "SourceKit/Support/FileSystemProvider.h"
+#include "clang/Basic/InMemoryOutputFileSystem.h"
+#include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/StringRef.h"
 
 namespace SourceKit {
@@ -30,6 +32,16 @@ namespace SourceKit {
 /// \param FileSystemProvider must be non-null
 void setGlobalFileSystemProvider(
     llvm::StringRef Name, SourceKit::FileSystemProvider *FileSystemProvider);
+
+/// Subseqent requests will write temporary output files to this filesystem
+/// rather than to the real filesystem.
+///
+/// Is not threadsafe.
+///
+/// \param FS may be null, which makes subsequent requests start writing
+/// temporary output files to the real filesystem again.
+void setGlobalInMemoryOutputFileSystem(
+    llvm::IntrusiveRefCntPtr<clang::InMemoryOutputFileSystem> FS);
 
 } // namespace SourceKit
 

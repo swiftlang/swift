@@ -15,6 +15,8 @@
 
 #include "SwiftInvocation.h"
 #include "SourceKit/Core/LLVM.h"
+// SWIFT_ENABLE_TENSORFLOW
+#include "clang/Basic/InMemoryOutputFileSystem.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/StringRef.h"
@@ -92,6 +94,12 @@ public:
                            std::shared_ptr<SwiftStatistics> Stats,
                            StringRef RuntimeResourcePath);
   ~SwiftASTManager();
+
+  // SWIFT_ENABLE_TENSORFLOW
+  /// Subseqent requests will write temporary output files to this filesystem
+  /// rather than to the real filesystem.
+  void setInMemoryOutputFileSystem(
+      llvm::IntrusiveRefCntPtr<clang::InMemoryOutputFileSystem> FS);
 
   SwiftInvocationRef getInvocation(
       ArrayRef<const char *> Args, StringRef PrimaryFile, std::string &Error);

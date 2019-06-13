@@ -112,6 +112,8 @@ struct TestOptions {
   bool timeRequest = false;
   unsigned repeatRequest = 1;
   llvm::StringMap<std::string> VFSFiles;
+  // SWIFT_ENABLE_TENSORFLOW
+  bool InMemoryClangModuleCache;
   llvm::Optional<bool> CancelOnSubsequentRequest;
   bool parseArgs(llvm::ArrayRef<const char *> Args);
   void printHelp(bool ShowHidden) const;

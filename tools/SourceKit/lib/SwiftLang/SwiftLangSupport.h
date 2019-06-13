@@ -296,6 +296,10 @@ public:
   explicit SwiftLangSupport(SourceKit::Context &SKCtx);
   ~SwiftLangSupport();
 
+  // SWIFT_ENABLE_TENSORFLOW
+  void setInMemoryOutputFileSystem(
+      llvm::IntrusiveRefCntPtr<clang::InMemoryOutputFileSystem> FS) override;
+
   std::shared_ptr<NotificationCenter> getNotificationCenter() const {
     return NotificationCtr;
   }
