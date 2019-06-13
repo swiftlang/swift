@@ -535,10 +535,10 @@ def build_module_from_parseable_interface :
   Alias<compile_module_from_interface>,
   ModeOpt;
 
-def preserve_types_as_written_in_module_interface :
-  Flag<["-"], "preserve-types-as-written-in-module-interface">,
-  HelpText<"When emitting a module interface, preserve the types as they were "
-           "written in the source, rather than fully-qualifying them.">;
+def module_interface_preserve_types_as_written :
+  Flag<["-"], "module-interface-preserve-types-as-written">,
+  HelpText<"When emitting a module interface, preserve types as they were "
+           "written in the source">;
 
 def prebuilt_module_cache_path :
   Separate<["-"], "prebuilt-module-cache-path">,

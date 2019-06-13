@@ -201,8 +201,8 @@ static void ParseParseableInterfaceArgs(ParseableInterfaceOptions &Opts,
                                         ArgList &Args) {
   using namespace options;
 
-  Opts.PreserveTypesAsWrittenInModuleInterface |=
-    Args.hasArg(OPT_preserve_types_as_written_in_module_interface);
+  Opts.PreserveTypesAsWritten |=
+    Args.hasArg(OPT_module_interface_preserve_types_as_written);
 }
 
 /// Save a copy of any flags marked as ModuleInterfaceOption, if running
