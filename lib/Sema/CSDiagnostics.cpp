@@ -389,30 +389,30 @@ Optional<Diag<Type, Type>> GenericArgumentsMismatchFailure::getDiagnosticFor(
   switch (context) {
   case CTP_Initialization:
   case CTP_AssignSource:
-    return diag::cannot_convert_generic_type_assign;
+    return diag::cannot_convert_assign;
   case CTP_ReturnStmt:
   case CTP_ReturnSingleExpr:
-    return diag::cannot_convert_generic_type_return;
+    return diag::cannot_convert_to_return_type;
   case CTP_DefaultParameter:
-    return diag::cannot_convert_generic_type_default_argument;
+    return diag::cannot_convert_default_arg_value;
   case CTP_YieldByValue:
-    return diag::cannot_convert_generic_type_yield;
+    return diag::cannot_convert_yield_value;
   case CTP_CallArgument:
-    return diag::cannot_convert_generic_type_argument;
+    return diag::cannot_convert_argument_value;
   case CTP_ClosureResult:
-    return diag::cannot_convert_generic_type_closure_result;
+    return diag::cannot_convert_closure_result;
   case CTP_ArrayElement:
-    return diag::cannot_convert_generic_type_array_element;
+    return diag::cannot_convert_array_element;
   // TODO(diagnostics): Make dictionary related diagnostics take prescedence
   // over CSDiag. Currently these won't ever be produced.
   case CTP_DictionaryKey:
-    return diag::cannot_convert_generic_type_dict_key;
+    return diag::cannot_convert_dict_key;
   case CTP_DictionaryValue:
-    return diag::cannot_convert_generic_type_dict_value;
+    return diag::cannot_convert_dict_value;
   case CTP_CoerceOperand:
-    return diag::cannot_convert_generic_type_coerce;
+    return diag::cannot_convert_coerce;
   case CTP_SubscriptAssignSource:
-    return diag::cannot_convert_generic_type_subscript_assign;
+    return diag::cannot_convert_subscript_assign;
 
   case CTP_ThrowStmt:
   case CTP_Unused:
@@ -463,18 +463,19 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
     }
 
     case ConstraintLocator::AutoclosureResult:
+    case ConstraintLocator::ApplyArgToParam:
     case ConstraintLocator::ApplyArgument: {
-      diagnostic = diag::cannot_convert_generic_type_argument;
+      diagnostic = diag::cannot_convert_argument_value;
       break;
     }
 
     case ConstraintLocator::ParentType: {
-      diagnostic = diag::cannot_convert_generic_type_parent_type;
+      diagnostic = diag::cannot_convert_parent_type;
       break;
     }
 
     case ConstraintLocator::ClosureResult: {
-      diagnostic = diag::cannot_convert_generic_type_closure_result;
+      diagnostic = diag::cannot_convert_closure_result;
       break;
     }
 
