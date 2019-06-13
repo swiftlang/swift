@@ -560,7 +560,7 @@ SILValue SILInlineCloner::borrowFunctionArgument(SILValue callArg,
     return callArg;
   }
 
-  SILBuilderWithScope beginBuilder(AI.getInstruction());
+  SILBuilderWithScope beginBuilder(AI.getInstruction(), getBuilder());
   auto *borrow = beginBuilder.createBeginBorrow(AI.getLoc(), callArg);
   if (auto *tryAI = dyn_cast<TryApplyInst>(AI)) {
     SILBuilderWithScope returnBuilder(tryAI->getNormalBB()->begin());
