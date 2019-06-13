@@ -3986,7 +3986,7 @@ ERROR(dynamic_with_transparent,none,
       ())
 
 ERROR(dynamic_and_library_evolution_not_supported,none,
-      "marking non-'@objc' Swift declaration 'dynamic' in library evolution mode not supported",
+      "marking non-'@objc' Swift declaration 'dynamic' in library evolution mode is not supported",
       ())
 
 
