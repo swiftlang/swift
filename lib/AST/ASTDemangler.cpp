@@ -378,10 +378,14 @@ Type ASTBuilder::createFunctionType(
 
   auto einfo = AnyFunctionType::ExtInfo(representation,
                                         /*throws*/ flags.throws());
-  if (flags.isEscaping())
-    einfo = einfo.withNoEscape(false);
-  else
-    einfo = einfo.withNoEscape(true);
+
+  if (representation == FunctionTypeRepresentation::Swift ||
+      representation == FunctionTypeRepresentation::Block) {
+    if (flags.isEscaping())
+      einfo = einfo.withNoEscape(false);
+    else
+      einfo = einfo.withNoEscape(true);
+  }
 
   // The result type must be materializable.
   if (!output->isMaterializable()) return Type();
