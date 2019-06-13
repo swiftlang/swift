@@ -641,7 +641,7 @@ public:
   virtual ~LangSupport() { }
 
   // SWIFT_ENABLE_TENSORFLOW
-  /// Subseqent requests will write temporary output files to this filesystem
+  /// Subsequent requests will write temporary output files to this filesystem
   /// rather than to the real filesystem.
   virtual void setInMemoryOutputFileSystem(
       llvm::IntrusiveRefCntPtr<clang::InMemoryOutputFileSystem> FS) = 0;
