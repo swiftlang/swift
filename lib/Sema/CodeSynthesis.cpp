@@ -1628,10 +1628,6 @@ void swift::completeLazyVarImplementation(VarDecl *VD) {
   Storage->setLazyStorageProperty(true);
   Storage->setUserAccessible(false);
 
-  // Mark the backing property as 'final'. There's no sensible way to override.
-  if (VD->getDeclContext()->getSelfClassDecl())
-    makeFinal(Context, Storage);
-
   addMemberToContextIfNeeded(Storage, VD->getDeclContext(), VD);
 
   // Create the pattern binding decl for the storage decl.  This will get
@@ -1797,10 +1793,6 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
   if (isInvalid)
     backingVar->setInvalid();
   backingVar->setOriginalWrappedProperty(var);
-
-  // Mark the backing property as 'final'. There's no sensible way to override.
-  if (dc->getSelfClassDecl())
-    makeFinal(ctx, backingVar);
 
   // The backing storage is 'private'.
   backingVar->overwriteAccess(AccessLevel::Private);
