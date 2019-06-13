@@ -25,7 +25,7 @@ def tar(source, destination):
     #  - We wish to explicitly set the owner and group of the archive.
     args = ['tar', '-c', '-z', '-f', destination]
 
-    if platform.system() != 'Darwin':
+    if platform.system() != 'Darwin' and platform.system() != 'Windows':
         args += ['--owner=0', '--group=0']
 
     # Discard stderr output such as 'tar: Failed to open ...'. We'll detect

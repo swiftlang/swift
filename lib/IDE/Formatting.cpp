@@ -289,6 +289,15 @@ public:
           isKeywordPossibleDeclStart(*TInfo.StartOfLineBeforeTarget) &&
           TInfo.StartOfLineBeforeTarget->isKeyword())
         return false;
+      // VStack {
+      //   ...
+      // }
+      // .onAppear { <---- No indentation here.
+      if (TInfo.StartOfLineTarget->getKind() == tok::period &&
+          TInfo.StartOfLineBeforeTarget->getKind() == tok::r_brace &&
+          TInfo.StartOfLineBeforeTarget + 1 == TInfo.StartOfLineTarget) {
+        return false;
+      }
     }
 
     // Handle switch / case, indent unless at a case label.
@@ -480,6 +489,25 @@ public:
         }
       }
     }
+
+    // Chained trailing closures shouldn't require additional indentation.
+    // a.map {
+    //  ...
+    // }.filter { <--- No indentation here.
+    //  ...
+    // }.map { <--- No indentation here.
+    //  ...
+    // }
+    if (AtExprEnd && AtCursorExpr &&
+        (isa<CallExpr>(AtExprEnd) || isa<SubscriptExpr>(AtExprEnd))) {
+      if (auto *UDE = dyn_cast<UnresolvedDotExpr>(AtCursorExpr)) {
+        if (auto *Base = UDE->getBase()) {
+          if (exprEndAtLine(Base, Line))
+            return false;
+        }
+      }
+    }
+
 
     // Indent another level from the outer context by default.
     return true;

@@ -516,6 +516,7 @@ struct MappingTraits<swift::syntax::TriviaPiece> {
     }
 % end
     }
+    llvm_unreachable("covered switch");
   }
 };
 

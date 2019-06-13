@@ -518,7 +518,7 @@ func defer_in_closure_in_generic<T>(_ x: T) {
   // CHECK-LABEL: sil private [ossa] @$s10statements017defer_in_closure_C8_genericyyxlFyycfU_ : $@convention(thin) <T> () -> ()
   _ = {
     // CHECK-LABEL: sil private [ossa] @$s10statements017defer_in_closure_C8_genericyyxlFyycfU_6$deferL_yylF : $@convention(thin) <T> () -> ()
-    defer { generic_callee_1(T.self) } // expected-warning {{'defer' statement before end of scope always executes immediately}}{{5-10=do}}
+    defer { generic_callee_1(T.self) } // expected-warning {{'defer' statement at end of scope always executes immediately}}{{5-10=do}}
   }
 }
 
@@ -531,7 +531,7 @@ func defer_mutable(_ x: Int) {
   // CHECK: function_ref @$s10statements13defer_mutableyySiF6$deferL_yyF : $@convention(thin) (@inout_aliasable Int) -> ()
   // CHECK-NOT: [[BOX]]
   // CHECK: destroy_value [[BOX]]
-  defer { _ = x } // expected-warning {{'defer' statement before end of scope always executes immediately}}{{3-8=do}}
+  defer { _ = x } // expected-warning {{'defer' statement at end of scope always executes immediately}}{{3-8=do}}
 }
 
 protocol StaticFooProtocol { static func foo() }

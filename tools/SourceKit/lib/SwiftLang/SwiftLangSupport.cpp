@@ -671,6 +671,10 @@ Optional<UIdent> SwiftLangSupport::getUIDForDeclAttribute(const swift::DeclAttri
     case DAK_IBAction: {
       return Attr_IBAction;
     }
+    case DAK_IBSegueAction: {
+      static UIdent Attr_IBSegueAction("source.decl.attribute.ibsegueaction");
+      return Attr_IBSegueAction;
+    }
     case DAK_IBOutlet: {
       return Attr_IBOutlet;
     }

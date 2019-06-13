@@ -171,6 +171,8 @@ EXPECTED_DEFAULTS = {
     'swift_assertions': True,
     'swift_build_variant': 'Debug',
     'swift_compiler_version': None,
+    'swift_darwin_module_archs': None,
+    'swift_darwin_supported_archs': None,
     'swift_stdlib_assertions': True,
     'swift_stdlib_build_variant': 'Debug',
     'swift_tools_max_parallel_lto_link_jobs':
@@ -544,6 +546,8 @@ EXPECTED_OPTIONS = [
     StrOption('--host-target'),
     StrOption('--lit-args'),
     StrOption('--llvm-targets-to-build'),
+    StrOption('--swift-darwin-module-archs'),
+    StrOption('--swift-darwin-supported-archs'),
 
     PathOption('--android-deploy-device-path'),
     PathOption('--android-icu-i18n'),

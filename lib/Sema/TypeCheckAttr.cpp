@@ -40,7 +40,7 @@ namespace {
   template<typename ...ArgTypes>
   void diagnoseAndRemoveAttr(TypeChecker &TC, Decl *D, DeclAttribute *attr,
                              ArgTypes &&...Args) {
-    assert(!D->hasClangNode() && "Clang imported propagated a bogus attribute");
+    assert(!D->hasClangNode() && "Clang importer propagated a bogus attribute");
     if (!D->hasClangNode()) {
       SourceLoc loc = attr->getLocation();
       assert(loc.isValid() && "Diagnosing attribute with invalid location");
@@ -229,6 +229,7 @@ public:
   }
 
   void visitIBActionAttr(IBActionAttr *attr);
+  void visitIBSegueActionAttr(IBSegueActionAttr *attr);
   void visitLazyAttr(LazyAttr *attr);
   void visitIBDesignableAttr(IBDesignableAttr *attr);
   void visitIBInspectableAttr(IBInspectableAttr *attr);
@@ -340,10 +341,19 @@ void AttributeEarlyChecker::visitDynamicAttr(DynamicAttr *attr) {
 
 
 void AttributeEarlyChecker::visitIBActionAttr(IBActionAttr *attr) {
-  // Only instance methods returning () can be IBActions.
+  // Only instance methods can be IBActions.
   const FuncDecl *FD = cast<FuncDecl>(D);
   if (!FD->isPotentialIBActionTarget())
-    diagnoseAndRemoveAttr(attr, diag::invalid_ibaction_decl);
+    diagnoseAndRemoveAttr(attr, diag::invalid_ibaction_decl,
+                          attr->getAttrName());
+}
+
+void AttributeEarlyChecker::visitIBSegueActionAttr(IBSegueActionAttr *attr) {
+  // Only instance methods can be IBActions.
+  const FuncDecl *FD = cast<FuncDecl>(D);
+  if (!FD->isPotentialIBActionTarget())
+    diagnoseAndRemoveAttr(attr, diag::invalid_ibaction_decl,
+                          attr->getAttrName());
 }
 
 void AttributeEarlyChecker::visitIBDesignableAttr(IBDesignableAttr *attr) {
@@ -807,6 +817,7 @@ public:
   
   void visitFinalAttr(FinalAttr *attr);
   void visitIBActionAttr(IBActionAttr *attr);
+  void visitIBSegueActionAttr(IBSegueActionAttr *attr);
   void visitNSCopyingAttr(NSCopyingAttr *attr);
   void visitRequiredAttr(RequiredAttr *attr);
   void visitRethrowsAttr(RethrowsAttr *attr);
@@ -857,34 +868,6 @@ public:
 } // end anonymous namespace
 
 
-static bool checkObjectOrOptionalObjectType(TypeChecker &TC, Decl *D,
-                                            ParamDecl *param) {
-  Type ty = param->getType();
-  if (auto unwrapped = ty->getOptionalObjectType())
-    ty = unwrapped;
-
-  if (auto classDecl = ty->getClassOrBoundGenericClass()) {
-    // @objc class types are okay.
-    if (!classDecl->isObjC()) {
-      TC.diagnose(D, diag::ibaction_nonobjc_class_argument,
-                  param->getType())
-        .highlight(param->getSourceRange());
-      return true;
-    }
-  } else if (ty->isObjCExistentialType() || ty->isAny()) {
-    // @objc existential types are okay, as is Any.
-    // Nothing to do.
-  } else {
-    // No other types are permitted.
-    TC.diagnose(D, diag::ibaction_nonobject_argument,
-                param->getType())
-      .highlight(param->getSourceRange());
-    return true;
-  }
-
-  return false;
-}
-
 static bool isiOS(TypeChecker &TC) {
   return TC.getLangOpts().Target.isiOS();
 }
@@ -925,8 +908,8 @@ bool swift::isValidDynamicCallableMethod(FuncDecl *decl, DeclContext *DC,
   if (!hasKeywordArguments) {
     auto arrayLitProto =
       TC.Context.getProtocol(KnownProtocolKind::ExpressibleByArrayLiteral);
-    return TC.conformsToProtocol(argType, arrayLitProto, DC,
-                                 ConformanceCheckOptions()).hasValue();
+    return TypeChecker::conformsToProtocol(argType, arrayLitProto, DC,
+                                           ConformanceCheckOptions()).hasValue();
   }
   // If keyword arguments, check that argument type conforms to
   // `ExpressibleByDictionaryLiteral` and that the `Key` associated type
@@ -935,15 +918,15 @@ bool swift::isValidDynamicCallableMethod(FuncDecl *decl, DeclContext *DC,
     TC.Context.getProtocol(KnownProtocolKind::ExpressibleByStringLiteral);
   auto dictLitProto =
     TC.Context.getProtocol(KnownProtocolKind::ExpressibleByDictionaryLiteral);
-  auto dictConf = TC.conformsToProtocol(argType, dictLitProto, DC,
-                                        ConformanceCheckOptions());
+  auto dictConf = TypeChecker::conformsToProtocol(argType, dictLitProto, DC,
+                                                  ConformanceCheckOptions());
   if (!dictConf) return false;
   auto lookup = dictLitProto->lookupDirect(TC.Context.Id_Key);
   auto keyAssocType =
     cast<AssociatedTypeDecl>(lookup[0])->getDeclaredInterfaceType();
   auto keyType = dictConf.getValue().getAssociatedType(argType, keyAssocType);
-  return TC.conformsToProtocol(keyType, stringLitProtocol, DC,
-                               ConformanceCheckOptions()).hasValue();
+  return TypeChecker::conformsToProtocol(keyType, stringLitProtocol, DC,
+                                         ConformanceCheckOptions()).hasValue();
 }
 
 /// Returns true if the given nominal type has a valid implementation of a
@@ -1032,8 +1015,8 @@ bool swift::isValidStringDynamicMemberLookup(SubscriptDecl *decl,
     TC.Context.getProtocol(KnownProtocolKind::ExpressibleByStringLiteral);
 
   // If this is `subscript(dynamicMember: String*)`
-  return bool(TC.conformsToProtocol(paramType, stringLitProto, DC,
-                                    ConformanceCheckOptions()));
+  return bool(TypeChecker::conformsToProtocol(paramType, stringLitProto, DC,
+                                              ConformanceCheckOptions()));
 }
 
 bool swift::isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl,
@@ -1111,72 +1094,124 @@ visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
   }
 }
 
+static bool
+validateIBActionSignature(TypeChecker &TC, DeclAttribute *attr, FuncDecl *FD,
+                          unsigned minParameters, unsigned maxParameters,
+                          bool hasVoidResult = true) {
+  bool valid = true;
+
+  auto arity = FD->getParameters()->size();
+  auto resultType = FD->getResultInterfaceType();
+
+  if (arity < minParameters || arity > maxParameters) {
+    auto diagID = diag::invalid_ibaction_argument_count;
+    if (minParameters == maxParameters)
+      diagID = diag::invalid_ibaction_argument_count_exact;
+    else if (minParameters == 0)
+      diagID = diag::invalid_ibaction_argument_count_max;
+    TC.diagnose(FD, diagID, attr->getAttrName(), minParameters, maxParameters);
+    valid = false;
+  }
+
+  if (resultType->isVoid() != hasVoidResult) {
+    TC.diagnose(FD, diag::invalid_ibaction_result, attr->getAttrName(),
+                hasVoidResult);
+    valid = false;
+  }
+
+  // We don't need to check here that parameter or return types are
+  // ObjC-representable; IsObjCRequest will validate that.
+
+  if (!valid)
+    attr->setInvalid();
+  return valid;
+}
+
 void AttributeChecker::visitIBActionAttr(IBActionAttr *attr) {
-  // IBActions instance methods must have type Class -> (...) -> ().
   auto *FD = cast<FuncDecl>(D);
-  Type CurriedTy = FD->getMethodInterfaceType();
-  Type ResultTy = CurriedTy->castTo<AnyFunctionType>()->getResult();
-  if (!ResultTy->isEqual(TupleType::getEmpty(TC.Context))) {
-    TC.diagnose(D, diag::invalid_ibaction_result, ResultTy);
-    attr->setInvalid();
+
+  if (isRelaxedIBAction(TC))
+    // iOS, tvOS, and watchOS allow 0-2 parameters to an @IBAction method.
+    validateIBActionSignature(TC, attr, FD, /*minParams=*/0, /*maxParams=*/2);
+  else
+    // macOS allows 1 parameter to an @IBAction method.
+    validateIBActionSignature(TC, attr, FD, /*minParams=*/1, /*maxParams=*/1);
+}
+
+void AttributeChecker::visitIBSegueActionAttr(IBSegueActionAttr *attr) {
+  auto *FD = cast<FuncDecl>(D);
+  if (!validateIBActionSignature(TC, attr, FD,
+                                 /*minParams=*/1, /*maxParams=*/3,
+                                 /*hasVoidResult=*/false))
     return;
-  }
 
-  auto paramList = FD->getParameters();
-  bool relaxedIBActionUsedOnOSX = false;
-  bool Valid = true;
-  switch (paramList->size()) {
-  case 0:
-    // (iOS only) No arguments.
-    if (!isRelaxedIBAction(TC)) {
-      relaxedIBActionUsedOnOSX = true;
-      break;
-    }
+  // If the IBSegueAction method's selector belongs to one of the ObjC method
+  // families (like -newDocumentSegue: or -copyScreen), it would return the
+  // object at +1, but the caller would expect it to be +0 and would therefore
+  // leak it.
+  //
+  // To prevent that, diagnose if the selector belongs to one of the method
+  // families and suggest that the user change the Swift name or Obj-C selector.
+  auto currentSelector = FD->getObjCSelector();
+
+  SmallString<32> prefix("make");
+
+  switch (currentSelector.getSelectorFamily()) {
+  case ObjCSelectorFamily::None:
+    // No error--exit early.
+    return;
+
+  case ObjCSelectorFamily::Alloc:
+  case ObjCSelectorFamily::Init:
+  case ObjCSelectorFamily::New:
+    // Fix-it will replace the "alloc"/"init"/"new" in the selector with "make".
     break;
-  case 1:
-    // One argument. May be a scalar on iOS/watchOS (because of WatchKit).
-    if (isRelaxedIBAction(TC)) {
-      // Do a rough check to allow any ObjC-representable struct or enum type
-      // on iOS.
-      Type ty = paramList->get(0)->getType();
-      if (auto nominal = ty->getAnyNominal())
-        if (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal))
-          if (!nominal->isOptionalDecl())
-            if (ty->isTriviallyRepresentableIn(ForeignLanguage::ObjectiveC,
-                                               cast<FuncDecl>(D)))
-              break;  // Looks ok.
-    }
-    if (checkObjectOrOptionalObjectType(TC, D, paramList->get(0)))
-      Valid = false;
+
+  case ObjCSelectorFamily::Copy:
+    // Fix-it will replace the "copy" in the selector with "makeCopy".
+    prefix += "Copy";
     break;
-  case 2:
-    // (iOS/watchOS only) Two arguments, the second of which is a UIEvent.
-    // We don't currently enforce the UIEvent part.
-    if (!isRelaxedIBAction(TC)) {
-      relaxedIBActionUsedOnOSX = true;
-      break;
-    }
-    if (checkObjectOrOptionalObjectType(TC, D, paramList->get(0)))
-      Valid = false;
-    if (checkObjectOrOptionalObjectType(TC, D, paramList->get(1)))
-      Valid = false;
-    break;
-  default:
-    // No platform allows an action signature with more than two arguments.
-    TC.diagnose(D, diag::invalid_ibaction_argument_count,
-                isRelaxedIBAction(TC));
-    Valid = false;
+
+  case ObjCSelectorFamily::MutableCopy:
+    // Fix-it will replace the "mutable" in the selector with "makeMutable".
+    prefix += "Mutable";
     break;
   }
 
-  if (relaxedIBActionUsedOnOSX) {
-    TC.diagnose(D, diag::invalid_ibaction_argument_count,
-                /*relaxedIBAction=*/false);
-    Valid = false;
+  // Emit the actual error.
+  TC.diagnose(FD, diag::ibsegueaction_objc_method_family,
+              attr->getAttrName(), currentSelector);
+
+  // The rest of this is just fix-it generation.
+
+  /// Replaces the first word of \c oldName with the prefix, where "word" is a
+  /// sequence of lowercase characters.
+  auto replacingPrefix = [&](Identifier oldName) -> Identifier {
+    SmallString<32> scratch = prefix;
+    scratch += oldName.str().drop_while(clang::isLowercase);
+    return TC.Context.getIdentifier(scratch);
+  };
+
+  // Suggest changing the Swift name of the method, unless there is already an
+  // explicit selector.
+  if (!FD->getAttrs().hasAttribute<ObjCAttr>() ||
+      !FD->getAttrs().getAttribute<ObjCAttr>()->hasName()) {
+    auto newSwiftBaseName = replacingPrefix(FD->getBaseName().getIdentifier());
+    auto argumentNames = FD->getFullName().getArgumentNames();
+    DeclName newSwiftName(TC.Context, newSwiftBaseName, argumentNames);
+
+    auto diag = TC.diagnose(FD, diag::fixit_rename_in_swift, newSwiftName);
+    fixDeclarationName(diag, FD, newSwiftName);
   }
 
-  if (!Valid)
-    attr->setInvalid();
+  // Suggest changing just the selector to one with a different first piece.
+  auto oldPieces = currentSelector.getSelectorPieces();
+  SmallVector<Identifier, 4> newPieces(oldPieces.begin(), oldPieces.end());
+  newPieces[0] = replacingPrefix(newPieces[0]);
+  ObjCSelector newSelector(TC.Context, currentSelector.getNumArgs(), newPieces);
+
+  auto diag = TC.diagnose(FD, diag::fixit_rename_in_objc, newSelector);
+  fixDeclarationObjCName(diag, FD, currentSelector, newSelector);
 }
 
 /// Get the innermost enclosing declaration for a declaration.
@@ -1408,9 +1443,9 @@ void AttributeChecker::visitNSCopyingAttr(NSCopyingAttr *attr) {
   assert(VD->getOverriddenDecl() == nullptr &&
          "Can't have value with storage that is an override");
 
-  // Check the type.  It must be must be [unchecked]optional, weak, a normal
+  // Check the type.  It must be an [unchecked]optional, weak, a normal
   // class, AnyObject, or classbound protocol.
-  // must conform to the NSCopying protocol.
+  // It must conform to the NSCopying protocol.
   
 }
 
@@ -1466,8 +1501,9 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
   }
 
   if (!ApplicationDelegateProto ||
-      !TC.conformsToProtocol(CD->getDeclaredType(), ApplicationDelegateProto,
-                             CD, None)) {
+      !TypeChecker::conformsToProtocol(CD->getDeclaredType(),
+                                       ApplicationDelegateProto,
+                                       CD, None)) {
     TC.diagnose(attr->getLocation(),
                 diag::attr_ApplicationMain_not_ApplicationDelegate,
                 applicationMainKind);
@@ -3760,6 +3796,15 @@ void TypeChecker::checkReferenceOwnershipAttr(VarDecl *var,
     }
 
     diagnose(var->getStartLoc(), D, ownershipKind, underlyingType);
+    attr->setInvalid();
+  }
+
+  ClassDecl *underlyingClass = underlyingType->getClassOrBoundGenericClass();
+  if (underlyingClass && underlyingClass->isIncompatibleWithWeakReferences()) {
+    diagnose(attr->getLocation(),
+             diag::invalid_ownership_incompatible_class,
+             underlyingType, ownershipKind)
+      .fixItRemove(attr->getRange());
     attr->setInvalid();
   }
 

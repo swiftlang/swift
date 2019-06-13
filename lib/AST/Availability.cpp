@@ -220,13 +220,16 @@ AvailabilityContext AvailabilityInference::inferForType(Type t) {
 AvailabilityContext ASTContext::getOpaqueTypeAvailability() {
   auto target = LangOpts.Target;
   
-  if (target.isMacOSX()
-      || target.isiOS()
-      || target.isWatchOS()) {
-    // TODO: Update with OS versions that ship with runtime support
+  if (target.isMacOSX()) {
     return AvailabilityContext(
-                            VersionRange::allGTE(llvm::VersionTuple(9999,0,0)));
+                            VersionRange::allGTE(llvm::VersionTuple(10,15,0)));
+  } else if (target.isiOS()) {
+    return AvailabilityContext(
+                            VersionRange::allGTE(llvm::VersionTuple(13,0,0)));
+  } else if (target.isWatchOS()) {
+    return AvailabilityContext(
+                            VersionRange::allGTE(llvm::VersionTuple(6,0,0)));
+  } else {
+    return AvailabilityContext::alwaysAvailable();
   }
-  
-  return AvailabilityContext::alwaysAvailable();
 }

@@ -33,6 +33,7 @@ IDENTIFIER(atIndexedSubscript)
 IDENTIFIER_(bridgeToObjectiveC)
 // SWIFT_ENABLE_TENSORFLOW
 IDENTIFIER(callAsFunction)
+IDENTIFIER(Change)
 IDENTIFIER_WITH_NAME(code_, "_code")
 IDENTIFIER(CodingKeys)
 IDENTIFIER(combine)

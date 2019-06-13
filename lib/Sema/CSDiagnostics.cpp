@@ -111,9 +111,17 @@ Optional<SelectedOverload> FailureDiagnostic::getChoiceFor(Expr *expr) const {
 }
 
 Type RequirementFailure::getOwnerType() const {
-  return getType(getRawAnchor())
-      ->getInOutObjectType()
-      ->getMetatypeInstanceType();
+  auto *anchor = getRawAnchor();
+
+  // If diagnostic is anchored at assignment expression
+  // it means that requirement failure happend while trying
+  // to convert source to destination, which means that
+  // owner type is actually not an assignment expression
+  // itself but its source.
+  if (auto *assignment = dyn_cast<AssignExpr>(anchor))
+    anchor = assignment->getSrc();
+
+  return getType(anchor)->getInOutObjectType()->getMetatypeInstanceType();
 }
 
 const GenericContext *RequirementFailure::getGenericContext() const {
@@ -2832,7 +2840,11 @@ bool MissingContextualConformanceFailure::diagnoseAsError() {
   Optional<Diag<Type, Type>> diagnostic;
   if (path.empty()) {
     assert(isa<AssignExpr>(anchor));
-    diagnostic = getDiagnosticFor(CTP_AssignSource);
+    if (isa<SubscriptExpr>(cast<AssignExpr>(anchor)->getDest())) {
+      diagnostic = getDiagnosticFor(CTP_SubscriptAssignSource);
+    } else {
+      diagnostic = getDiagnosticFor(CTP_AssignSource);
+    }
   } else {
     const auto &last = path.back();
     switch (last.getKind()) {
@@ -2899,6 +2911,8 @@ MissingContextualConformanceFailure::getDiagnosticFor(
     return diag::cannot_convert_coerce_protocol;
   case CTP_AssignSource:
     return diag::cannot_convert_assign_protocol;
+  case CTP_SubscriptAssignSource:
+    return diag::cannot_convert_subscript_assign_protocol;
 
   case CTP_ThrowStmt:
   case CTP_Unused:

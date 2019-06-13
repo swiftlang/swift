@@ -371,12 +371,15 @@ AttachedPropertyWrapperTypeRequest::evaluate(Evaluator &evaluator,
   if (!customAttr)
     return Type();
 
+  ASTContext &ctx = var->getASTContext();
+  if (!ctx.getLazyResolver())
+    return nullptr;
+
   auto resolution =
       TypeResolution::forContextual(var->getDeclContext());
   TypeResolutionOptions options(TypeResolverContext::PatternBindingDecl);
   options |= TypeResolutionFlags::AllowUnboundGenerics;
 
-  ASTContext &ctx = var->getASTContext();
   auto &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
   if (tc.validateType(customAttr->getTypeLoc(), resolution, options))
     return ErrorType::get(ctx);
@@ -409,10 +412,13 @@ PropertyWrapperBackingPropertyTypeRequest::evaluate(
   if (!binding)
     return Type();
 
+  ASTContext &ctx = var->getASTContext();
+  if (!ctx.getLazyResolver())
+    return Type();
+
   // If there's an initializer of some sort, checking it will determine the
   // property wrapper type.
   unsigned index = binding->getPatternEntryIndexForVarDecl(var);
-  ASTContext &ctx = var->getASTContext();
   TypeChecker &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
   if (binding->isInitialized(index)) {
     tc.validateDecl(var);

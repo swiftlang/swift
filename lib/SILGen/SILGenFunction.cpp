@@ -612,7 +612,8 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
   }
 }
 
-void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value) {
+void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value,
+                                           bool EmitProfilerIncrement) {
   MagicFunctionName = SILGenModule::getMagicFunctionName(function);
 
   RegularLocation Loc(value);
@@ -635,6 +636,8 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value) {
   auto interfaceType = value->getType()->mapTypeOutOfContext();
   emitProlog(/*paramList=*/nullptr, /*selfParam=*/nullptr, interfaceType,
              dc, false);
+  if (EmitProfilerIncrement)
+    emitProfilerIncrement(value);
   prepareEpilog(value->getType(), false, CleanupLocation::get(Loc));
   emitReturnExpr(Loc, value);
   emitEpilog(Loc);

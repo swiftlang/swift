@@ -284,11 +284,24 @@ bool LangOptions::doesTargetSupportObjCMetadataUpdateCallback() const {
   if (Target.isWatchOS())
     return !Target.isOSVersionLT(5, 2);
 
-  // If we're running on a non-Apple platform, we still want to allow running
-  // tests that -enable-objc-interop.
+  // Don't assert if we're running on a non-Apple platform; we still
+  // want to allow running tests that -enable-objc-interop.
   return false;
 }
 
 bool LangOptions::doesTargetSupportObjCGetClassHook() const {
   return doesTargetSupportObjCMetadataUpdateCallback();
+}
+
+bool LangOptions::doesTargetSupportObjCClassStubs() const {
+  if (Target.isMacOSX())
+    return !Target.isMacOSXVersionLT(10, 15);
+  if (Target.isiOS()) // also returns true on tvOS
+    return !Target.isOSVersionLT(13);
+  if (Target.isWatchOS())
+    return !Target.isOSVersionLT(6);
+
+  // Don't assert if we're running on a non-Apple platform; we still
+  // want to allow running tests that -enable-objc-interop.
+  return false;
 }

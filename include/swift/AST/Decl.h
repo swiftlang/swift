@@ -553,7 +553,7 @@ protected:
     NumRequirementsInSignature : 16
   );
 
-  SWIFT_INLINE_BITFIELD(ClassDecl, NominalTypeDecl, 1+2+1+2+1+6+1+1+1,
+  SWIFT_INLINE_BITFIELD(ClassDecl, NominalTypeDecl, 1+2+1+2+1+6+1+1+1+1,
     /// Whether this class requires all of its instance variables to
     /// have in-class initializers.
     RequiresStoredPropertyInits : 1,
@@ -581,7 +581,11 @@ protected:
     AncestryComputed : 1,
 
     HasMissingDesignatedInitializers : 1,
-    HasMissingVTableEntries : 1
+    HasMissingVTableEntries : 1,
+
+    /// Whether instances of this class are incompatible
+    /// with weak and unowned references.
+    IsIncompatibleWithWeakReferences : 1
   );
 
   SWIFT_INLINE_BITFIELD(StructDecl, NominalTypeDecl, 1,
@@ -3870,6 +3874,17 @@ public:
     Bits.ClassDecl.HasMissingVTableEntries = newValue;
   }
 
+  /// Returns true if this class cannot be used with weak or unowned
+  /// references.
+  /// 
+  /// Note that this is true if this class or any of its ancestor classes
+  /// are marked incompatible.
+  bool isIncompatibleWithWeakReferences() const;
+
+  void setIsIncompatibleWithWeakReferences(bool newValue = true) {
+    Bits.ClassDecl.IsIncompatibleWithWeakReferences = newValue;
+  }
+
   /// Find a method of a class that overrides a given method.
   /// Return nullptr, if no such method exists.
   AbstractFunctionDecl *findOverridingDecl(
@@ -6082,8 +6097,8 @@ public:
   /// True if the function is a defer body.
   bool isDeferBody() const;
 
-  /// Perform basic checking to determine whether the @IBAction attribute can
-  /// be applied to this function.
+  /// Perform basic checking to determine whether the @IBAction or
+  /// @IBSegueAction attribute can be applied to this function.
   bool isPotentialIBActionTarget() const;
 };
 

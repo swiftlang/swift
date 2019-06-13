@@ -398,6 +398,7 @@ DECL_ATTR(_private, PrivateImport,
 SIMPLE_DECL_ATTR(_alwaysEmitIntoClient, AlwaysEmitIntoClient,
   OnVar | OnSubscript | OnAbstractFunction | UserInaccessible,
   83)
+
 SIMPLE_DECL_ATTR(_implementationOnly, ImplementationOnly,
   OnImport | UserInaccessible,
   84)
@@ -410,6 +411,10 @@ SIMPLE_DECL_ATTR(_propertyWrapper, PropertyWrapper,
 SIMPLE_DECL_ATTR(_disfavoredOverload, DisfavoredOverload,
   OnAbstractFunction | OnVar | OnSubscript | UserInaccessible,
   87)
+
+SIMPLE_DECL_ATTR(IBSegueAction, IBSegueAction,
+  OnFunc,
+  95)
 
 // SWIFT_ENABLE_TENSORFLOW
 DECL_ATTR(differentiable, Differentiable,

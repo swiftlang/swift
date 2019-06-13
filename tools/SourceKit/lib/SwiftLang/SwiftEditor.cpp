@@ -1278,9 +1278,10 @@ public:
   }
 
   StringRef getObjCSelectorName(const Decl *D, SmallString<64> &Buf) {
-    // We only vend the selector name for @IBAction methods.
+    // We only vend the selector name for @IBAction and @IBSegueAction methods.
     if (auto FuncD = dyn_cast_or_null<FuncDecl>(D)) {
-      if (FuncD->getAttrs().hasAttribute<IBActionAttr>())
+      if (FuncD->getAttrs().hasAttribute<IBActionAttr>() ||
+          FuncD->getAttrs().hasAttribute<IBSegueActionAttr>())
         return FuncD->getObjCSelector().getString(Buf);
     }
     return StringRef();
