@@ -214,7 +214,7 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
     return SymbolicValue::getString(sli->getValue(), evaluator.getAllocator());
 
   if (auto *fri = dyn_cast<FunctionRefInst>(value))
-    return SymbolicValue::getFunction(fri->getReferencedFunction());
+    return SymbolicValue::getFunction(fri->getInitiallyReferencedFunction());
 
   // If we have a reference to a metatype, constant fold any substitutable
   // types.
@@ -1359,14 +1359,31 @@ ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
                           injectEnumInst->getOperand());
   }
 
-  // If the instruction produces normal results, try constant folding it.
+  // If the instruction produces a result, try constant folding it.
   // If this fails, then we fail.
-  if (inst->getNumResults() != 0) {
+  if (isa<SingleValueInstruction>(inst)) {
     auto oneResultVal = inst->getResults()[0];
     auto result = getConstantValue(oneResultVal);
     if (!result.isConstant())
       return result;
     LLVM_DEBUG(llvm::dbgs() << "  RESULT: "; result.dump());
+    return None;
+  }
+
+  if (isa<DestructureTupleInst>(inst) || isa<DestructureStructInst>(inst)) {
+    auto *mvi = cast<MultipleValueInstruction>(inst);
+    SymbolicValue aggVal = getConstantValue(mvi->getOperand(0));
+    if (!aggVal.isConstant()) {
+      return aggVal;
+    }
+    assert(aggVal.getKind() == SymbolicValue::Aggregate);
+
+    ArrayRef<SymbolicValue> aggElems = aggVal.getAggregateValue();
+    assert(aggElems.size() == mvi->getNumResults());
+
+    for (unsigned i = 0; i < mvi->getNumResults(); ++i) {
+      setValue(mvi->getResult(i), aggElems[i]);
+    }
     return None;
   }
 

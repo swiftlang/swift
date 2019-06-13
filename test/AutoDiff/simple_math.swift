@@ -184,7 +184,8 @@ SimpleMathTests.test("StructMemberwiseInitializer") {
 
   let 𝛁foo = pullback(at: Float(4), in: { input -> Foo in
     let foo = Foo(stored: input)
-    return foo + foo
+    let foo2 = foo + foo
+    return Foo(stored: foo2.stored)
   })(Foo.TangentVector(stored: 1))
   expectEqual(2, 𝛁foo)
 

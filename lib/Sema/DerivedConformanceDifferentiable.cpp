@@ -65,7 +65,7 @@ getStoredPropertiesForDifferentiation(NominalTypeDecl *nominal,
       continue;
     auto varType = DC->mapTypeIntoContext(vd->getValueInterfaceType());
     if (!TypeChecker::conformsToProtocol(varType, diffableProto, nominal,
-                                         ConformanceCheckFlags::Used))
+                                         None))
       continue;
     result.push_back(vd);
   }
@@ -93,7 +93,7 @@ static Type getAssociatedType(VarDecl *decl, DeclContext *DC, Identifier id) {
     C.getLazyResolver()->resolveDeclSignature(decl);
   auto varType = DC->mapTypeIntoContext(decl->getValueInterfaceType());
   auto conf = TypeChecker::conformsToProtocol(varType, diffableProto, DC,
-                                              ConformanceCheckFlags::Used);
+                                              None);
   if (!conf)
     return nullptr;
   Type assocType = conf->getTypeWitnessByName(varType, id);
@@ -109,7 +109,7 @@ static StructDecl *getAssociatedStructDecl(DeclContext *DC, Identifier id) {
   assert(diffableProto && "`Differentiable` protocol not found");
   auto conf = TypeChecker::conformsToProtocol(DC->getSelfTypeInContext(),
                                               diffableProto,
-                                              DC, ConformanceCheckFlags::Used);
+                                              DC, None);
   assert(conf && "Nominal must conform to `Differentiable`");
   Type assocType = conf->getTypeWitnessByName(DC->getSelfTypeInContext(), id);
   assert(assocType && "`Differentiable` protocol associated type not found");
@@ -154,7 +154,7 @@ bool DerivedConformance::canDeriveDifferentiable(NominalTypeDecl *nominal,
     if (nominal->isImplicit() && structDecl == nominal->getDeclContext() &&
         TypeChecker::conformsToProtocol(structDecl->getDeclaredInterfaceType(),
                                         diffableProto, DC,
-                                        ConformanceCheckFlags::Used))
+                                        None))
       return structDecl;
     // 3. Equal nominal (and conform to `AdditiveArithmetic` if flag is true).
     if (structDecl == nominal) {
@@ -162,7 +162,7 @@ bool DerivedConformance::canDeriveDifferentiable(NominalTypeDecl *nominal,
         return structDecl;
       // Check conformance to `AdditiveArithmetic`.
       if (TypeChecker::conformsToProtocol(nominalTypeInContext, addArithProto,
-                                          DC, ConformanceCheckFlags::Used))
+                                          DC, None))
         return structDecl;
     }
     // Otherwise, candidate is invalid.
@@ -207,7 +207,7 @@ bool DerivedConformance::canDeriveDifferentiable(NominalTypeDecl *nominal,
       return false;
     auto varType = DC->mapTypeIntoContext(v->getValueInterfaceType());
     return (bool)TypeChecker::conformsToProtocol(varType, diffableProto, DC,
-                                                 ConformanceCheckFlags::Used);
+                                                 None);
   });
 }
 
@@ -625,8 +625,8 @@ getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived,
   auto diffableType = TypeLoc::withoutLoc(diffableProto->getDeclaredType());
   auto *addArithProto = C.getProtocol(KnownProtocolKind::AdditiveArithmetic);
   auto addArithType = TypeLoc::withoutLoc(addArithProto->getDeclaredType());
-  auto *vecNumProto = C.getProtocol(KnownProtocolKind::VectorNumeric);
-  auto vecNumType = TypeLoc::withoutLoc(vecNumProto->getDeclaredType());
+  auto *vectorProto = C.getProtocol(KnownProtocolKind::VectorProtocol);
+  auto vectorType = TypeLoc::withoutLoc(vectorProto->getDeclaredType());
   auto *kpIterableProto = C.getProtocol(KnownProtocolKind::KeyPathIterable);
   auto kpIterableType = TypeLoc::withoutLoc(kpIterableProto->getDeclaredType());
 
@@ -647,21 +647,22 @@ getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived,
       llvm::all_of(diffProperties, [&](VarDecl *vd) {
         return TC.conformsToProtocol(getAssociatedType(vd, parentDC, id),
                                      addArithProto, parentDC,
-                                     ConformanceCheckFlags::Used);
+                                     None);
         });
 
-  // Associated struct can derive `VectorNumeric` if the associated types of all
-  // members conform to `VectorNumeric` and share the same scalar type.
+  // Associated struct can derive `VectorProtocol` if the associated types of
+  // all members conform to `VectorProtocol` and share the same
+  // `VectorSpaceScalar` type.
   Type sameScalarType;
-  bool canDeriveVectorNumeric =
+  bool canDeriveVectorProtocol =
       canDeriveAdditiveArithmetic && !diffProperties.empty() &&
       llvm::all_of(diffProperties, [&](VarDecl *vd) {
         auto conf = TC.conformsToProtocol(getAssociatedType(vd, parentDC, id),
-                                          vecNumProto, nominal,
-                                          ConformanceCheckFlags::Used);
+                                          vectorProto, nominal, None);
         if (!conf)
           return false;
-        Type scalarType = conf->getTypeWitnessByName(vd->getType(), C.Id_Scalar);
+        auto scalarType =
+            conf->getTypeWitnessByName(vd->getType(), C.Id_VectorSpaceScalar);
         if (!sameScalarType) {
           sameScalarType = scalarType;
           return true;
@@ -678,20 +679,18 @@ getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived,
       inherited.push_back(addArithType);
     if (TC.conformsToProtocol(nominal->getDeclaredInterfaceType(),
                               kpIterableProto, parentDC,
-                              ConformanceCheckFlags::Used))
+                              None))
       inherited.push_back(kpIterableType);
   }
-  // If all members also conform to `VectorNumeric` with the same `Scalar` type,
-  // make the associated struct conform to `VectorNumeric` instead of just
-  // `AdditiveArithmetic`.
-  if (canDeriveVectorNumeric)
-    inherited.push_back(vecNumType);
+  // If all members also conform to `VectorProtocol` with the same `Scalar`
+  // type, make the associated struct conform to `VectorProtocol` instead of
+  // just `AdditiveArithmetic`.
+  if (canDeriveVectorProtocol)
+    inherited.push_back(vectorType);
 
   auto *structDecl = new (C) StructDecl(SourceLoc(), id, SourceLoc(),
                                         /*Inherited*/ C.AllocateCopy(inherited),
                                         /*GenericParams*/ {}, parentDC);
-  structDecl->getAttrs().add(
-      new (C) FieldwiseDifferentiableAttr(/*implicit*/ true));
   structDecl->setImplicit();
   structDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
 
@@ -738,6 +737,16 @@ getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived,
     // call to the getter.
     if (member->getEffectiveAccess() > AccessLevel::Internal &&
         !member->getAttrs().hasAttribute<DifferentiableAttr>()) {
+      // If getter does not exist, trigger synthesis and compute type.
+      if (!member->getGetter())
+        addExpectedOpaqueAccessorsToStorage(member, C);
+      if (!member->getGetter()->hasInterfaceType())
+        TC.resolveDeclSignature(member->getGetter());
+      // If member or its getter already has a `@differentiable` attribute,
+      // continue.
+      if (member->getAttrs().hasAttribute<DifferentiableAttr>() ||
+          member->getGetter()->getAttrs().hasAttribute<DifferentiableAttr>())
+        continue;
       ArrayRef<Requirement> requirements;
       // If the parent declaration context is an extension, the nominal type may
       // conditionally conform to `Differentiable`. Use the conditional
@@ -745,14 +754,9 @@ getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived,
       if (auto *extDecl = dyn_cast<ExtensionDecl>(parentDC->getAsDecl()))
         requirements = extDecl->getGenericRequirements();
       auto *diffableAttr = DifferentiableAttr::create(
-          C, /*implicit*/ true, SourceLoc(), SourceLoc(), {}, None,
-          None, requirements);
+          C, /*implicit*/ true, SourceLoc(), SourceLoc(),
+          /*linear*/ false, {}, None, None, requirements);
       member->getAttrs().add(diffableAttr);
-      // If getter does not exist, trigger synthesis and compute type.
-      if (!member->getGetter())
-        addExpectedOpaqueAccessorsToStorage(member, C);
-      if (!member->getGetter()->hasInterfaceType())
-        TC.resolveDeclSignature(member->getGetter());
       // Compute getter parameter indices.
       auto *getterType =
           member->getGetter()->getInterfaceType()->castTo<AnyFunctionType>();
@@ -840,7 +844,7 @@ static void checkAndDiagnoseImplicitNoDerivative(TypeChecker &TC,
     // Check whether to diagnose stored property.
     bool conformsToDifferentiable =
         TC.conformsToProtocol(varType, diffableProto, nominal,
-                              ConformanceCheckFlags::Used).hasValue();
+                              None).hasValue();
     bool isConstantProperty = vd->isLet() && vd->hasInitialValue();
     // If stored property should not be diagnosed, continue.
     if (conformsToDifferentiable && !isConstantProperty)
@@ -960,12 +964,6 @@ deriveDifferentiable_AssociatedStruct(DerivedConformance &derived,
     if (!getAssociatedType(member, parentDC, id))
       return nullptr;
 
-  // Since associated types will be derived, we make this struct a fieldwise
-  // differentiable type.
-  if (!nominal->getAttrs().hasAttribute<FieldwiseDifferentiableAttr>())
-    nominal->getAttrs().add(
-        new (C) FieldwiseDifferentiableAttr(/*implicit*/ true));
-
   // Prevent re-synthesis during repeated calls.
   // FIXME: Investigate why this is necessary to prevent duplicate synthesis.
   auto lookup = nominal->lookupDirect(id);
@@ -995,7 +993,7 @@ deriveDifferentiable_AssociatedStruct(DerivedConformance &derived,
   auto *addArithProto = C.getProtocol(KnownProtocolKind::AdditiveArithmetic);
   auto nominalConformsToAddArith =
       TC.conformsToProtocol(parentDC->getSelfTypeInContext(), addArithProto,
-                            parentDC, ConformanceCheckFlags::Used);
+                            parentDC, None);
 
   // Return `Self` if conditions are met.
   if (!hasNoDerivativeStoredProp &&

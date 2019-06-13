@@ -1720,7 +1720,7 @@ internal struct KeyPathBuffer {
 
     // fetch type, which is in the buffer unless it's the final component
     let nextType: Any.Type?
-    if data.count == 0 {
+    if data.isEmpty {
       nextType = nil
     } else {
       nextType = _pop(from: &data, as: Any.Type.self)
@@ -2244,7 +2244,7 @@ internal func _appendingKeyPaths<
           }
         }
         
-        _internalInvariant(destBuffer.count == 0,
+        _internalInvariant(destBuffer.isEmpty,
                      "did not fill entire result buffer")
       }
 

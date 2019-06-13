@@ -22,7 +22,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
-#include "swift/AST/PropertyDelegates.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -2818,22 +2818,22 @@ public:
     // If there are any backing properties, record the
     if (numBackingProperties > 0) {
       VarDecl *backingVar = cast<VarDecl>(MF.getDecl(backingPropertyIDs[0]));
-      VarDecl *storageDelegateVar = nullptr;
+      VarDecl *storageWrapperVar = nullptr;
       if (numBackingProperties > 1) {
-        storageDelegateVar = cast<VarDecl>(MF.getDecl(backingPropertyIDs[1]));
+        storageWrapperVar = cast<VarDecl>(MF.getDecl(backingPropertyIDs[1]));
       }
 
-      PropertyDelegateBackingPropertyInfo info(
-          backingVar, storageDelegateVar, nullptr, nullptr, nullptr);
+      PropertyWrapperBackingPropertyInfo info(
+          backingVar, storageWrapperVar, nullptr, nullptr, nullptr);
       ctx.evaluator.cacheOutput(
-          PropertyDelegateBackingPropertyInfoRequest{var}, std::move(info));
+          PropertyWrapperBackingPropertyInfoRequest{var}, std::move(info));
       ctx.evaluator.cacheOutput(
-          PropertyDelegateBackingPropertyTypeRequest{var},
+          PropertyWrapperBackingPropertyTypeRequest{var},
           backingVar->getInterfaceType());
-      backingVar->setOriginalDelegatedProperty(var);
+      backingVar->setOriginalWrappedProperty(var);
 
-      if (storageDelegateVar)
-        storageDelegateVar->setOriginalDelegatedProperty(var);
+      if (storageWrapperVar)
+        storageWrapperVar->setOriginalWrappedProperty(var);
     }
 
     return var;
@@ -4127,6 +4127,7 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
       // SWIFT_ENABLE_TENSORFLOW
       case decls_block::Differentiable_DECL_ATTR: {
         bool isImplicit;
+        bool linear;
         uint64_t jvpNameId;
         DeclID jvpDeclId;
         uint64_t vjpNameId;
@@ -4135,8 +4136,8 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         SmallVector<Requirement, 4> requirements;
 
         serialization::decls_block::DifferentiableDeclAttrLayout::readRecord(
-            scratch, isImplicit, jvpNameId, jvpDeclId, vjpNameId, vjpDeclId,
-            parameters);
+            scratch, isImplicit, linear, jvpNameId, jvpDeclId, vjpNameId,
+            vjpDeclId, parameters);
 
         Optional<DeclNameWithLoc> jvp;
         FuncDecl *jvpDecl = nullptr;
@@ -4160,7 +4161,7 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
 
         auto diffAttr =
             DifferentiableAttr::create(ctx, isImplicit, SourceLoc(),
-                                       SourceRange(), indices, jvp, vjp,
+                                       SourceRange(), linear, indices, jvp, vjp,
                                        requirements);
         diffAttr->setJVPFunction(jvpDecl);
         diffAttr->setVJPFunction(vjpDecl);

@@ -296,7 +296,7 @@
 /// - Note: The `ContiguousArray` and `ArraySlice` types are not bridged;
 ///   instances of those types always have a contiguous block of memory as
 ///   their storage.
-@_fixed_layout
+@frozen
 public struct Array<Element>: _DestructorSafeContainer {
   #if _runtime(_ObjC)
   @usableFromInline

@@ -58,9 +58,9 @@ extension Hasher {
   /// trailing bytes, while the most significant 8 bits hold the count of bytes
   /// appended so far, modulo 256. The count of bytes currently stored in the
   /// buffer is in the lower three bits of the byte count.)
-  // FIXME: Remove @usableFromInline and @_fixed_layout once Hasher is resilient.
+  // FIXME: Remove @usableFromInline and @frozen once Hasher is resilient.
   // rdar://problem/38549901
-  @usableFromInline @_fixed_layout
+  @usableFromInline @frozen
   internal struct _TailBuffer {
     // msb                                                             lsb
     // +---------+-------+-------+-------+-------+-------+-------+-------+
@@ -135,9 +135,9 @@ extension Hasher {
 }
 
 extension Hasher {
-  // FIXME: Remove @usableFromInline and @_fixed_layout once Hasher is resilient.
+  // FIXME: Remove @usableFromInline and @frozen once Hasher is resilient.
   // rdar://problem/38549901
-  @usableFromInline @_fixed_layout
+  @usableFromInline @frozen
   internal struct _Core {
     private var _buffer: _TailBuffer
     private var _state: Hasher._State
@@ -272,7 +272,7 @@ extension Hasher {
 ///   different values on every new execution of your program. The hash
 ///   algorithm implemented by `Hasher` may itself change between any two
 ///   versions of the standard library.
-@_fixed_layout // FIXME: Should be resilient (rdar://problem/38549901)
+@frozen // FIXME: Should be resilient (rdar://problem/38549901)
 public struct Hasher {
   internal var _core: _Core
 

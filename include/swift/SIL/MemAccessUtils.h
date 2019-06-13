@@ -239,6 +239,7 @@ public:
       return value == other.value
              && getElementIndex() == other.getElementIndex();
     }
+    llvm_unreachable("covered switch");
   }
 
   /// Return true if the storage is guaranteed local.

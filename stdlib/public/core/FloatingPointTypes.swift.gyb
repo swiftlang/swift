@@ -58,7 +58,7 @@ else:
 % end
 
 ${SelfDocComment}
-@_fixed_layout
+@frozen
 public struct ${Self} {
   public // @testable
   var _value: Builtin.FPIEEE${bits}
@@ -318,7 +318,7 @@ extension ${Self}: BinaryFloatingPoint {
   }
 %else:
   // Internal implementation details of x86 Float80
-  @_fixed_layout
+  @frozen
   @usableFromInline
   internal struct _Representation {
     @usableFromInline
@@ -1873,11 +1873,11 @@ extension ${Self} : Strideable {
 
 // SWIFT_ENABLE_TENSORFLOW
 //===----------------------------------------------------------------------===//
-// VectorNumeric Conformance
+// VectorProtocol Conformance
 //===----------------------------------------------------------------------===//
 
-extension ${Self} : VectorNumeric {
-  public typealias Scalar = ${Self}
+extension ${Self} : VectorProtocol {
+  public typealias VectorSpaceScalar = ${Self}
 }
 
 extension ${Self} : Differentiable {
@@ -1974,7 +1974,7 @@ internal struct _${Self}AnyHashableBox: _AnyHashableBox {
 #else
 
 ${SelfDocComment}
-@_fixed_layout
+@frozen
 @available(*, unavailable, message: "Float80 is only available on non-Windows x86 targets.")
 public struct ${Self} {
   /// Creates a value initialized to zero.

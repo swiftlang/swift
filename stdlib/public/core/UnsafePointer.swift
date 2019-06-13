@@ -204,7 +204,7 @@
 ///       var number = 5
 ///       let numberPointer = UnsafePointer<Int>(&number)
 ///       // Accessing 'numberPointer' is undefined behavior.
-@_fixed_layout // unsafe-performance
+@frozen // unsafe-performance
 public struct UnsafePointer<Pointee>: _Pointer {
 
   /// A type that represents the distance between two pointers.
@@ -510,7 +510,7 @@ public struct UnsafePointer<Pointee>: _Pointer {
 ///       var number = 5
 ///       let numberPointer = UnsafeMutablePointer<Int>(&number)
 ///       // Accessing 'numberPointer' is undefined behavior.
-@_fixed_layout // unsafe-performance
+@frozen // unsafe-performance
 public struct UnsafeMutablePointer<Pointee>: _Pointer {
 
   /// A type that represents the distance between two pointers.

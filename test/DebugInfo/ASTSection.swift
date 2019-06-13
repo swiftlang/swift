@@ -4,6 +4,7 @@
 // RUN: %lldb-moduleimport-test -verbose %t/ASTSection | %FileCheck %s
 
 // REQUIRES: executable_test
+// REQUIRES: swift_tools_extra
 
 // The test ASTSection_linker.swift builds this code with separate
 // compile and link steps.

@@ -207,6 +207,7 @@ FileSpecificDiagnosticConsumer::findSubconsumer(
   case DiagnosticKind::Note:
     return SubconsumerForSubsequentNotes;
   }
+  llvm_unreachable("covered switch");
 }
 
 Optional<FileSpecificDiagnosticConsumer::Subconsumer *>

@@ -1071,7 +1071,7 @@ namespace decls_block {
     AccessLevelField, // access level
     AccessLevelField, // setter access, if applicable
     DeclIDField, // opaque return type decl
-    BCFixed<2>,  // # of property delegate backing properties
+    BCFixed<2>,  // # of property wrapper backing properties
     BCArray<TypeIDField> // accessors, backing properties, and dependencies
   >;
 
@@ -1653,6 +1653,7 @@ namespace decls_block {
   using DifferentiableDeclAttrLayout = BCRecordLayout<
     Differentiable_DECL_ATTR,
     BCFixed<1>, // Implicit flag.
+    BCFixed<1>, // Linear flag.
     IdentifierIDField, // JVP name.
     DeclIDField, // JVP function declaration.
     IdentifierIDField, // VJP name.

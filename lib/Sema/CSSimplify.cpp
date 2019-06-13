@@ -1998,6 +1998,7 @@ static ConstraintFix *fixRequirementFailure(ConstraintSystem &cs, Type type1,
   case RequirementKind::Conformance:
     return MissingConformance::forRequirement(cs, type1, type2, reqLoc);
   }
+  llvm_unreachable("covered switch");
 }
 
 /// Attempt to repair typing failures and record fixes if needed.
@@ -4529,10 +4530,16 @@ fixMemberRef(ConstraintSystem &cs, Type baseTy,
       assert(choice.isDecl());
       return AllowInaccessibleMember::create(cs, choice.getDecl(), locator);
 
+    case MemberLookupResult::UR_UnavailableInExistential: {
+      return choice.isDecl()
+                 ? AllowMemberRefOnExistential::create(
+                       cs, baseTy, choice.getDecl(), memberName, locator)
+                 : nullptr;
+    }
+
     case MemberLookupResult::UR_MutatingMemberOnRValue:
     case MemberLookupResult::UR_MutatingGetterOnRValue:
     case MemberLookupResult::UR_LabelMismatch:
-    case MemberLookupResult::UR_UnavailableInExistential:
     // TODO(diagnostics): Add a new fix that is suggests to
     // add `subscript(dynamicMember: {Writable}KeyPath<T, U>)`
     // overload here, that would help if such subscript has
@@ -4751,6 +4758,19 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
     // Since member with given base and name doesn't exist, let's try to
     // fake its presence based on use, that makes it possible to diagnose
     // problems related to member lookup more precisely.
+
+    origBaseTy.transform([&](Type type) -> Type {
+      if (auto *typeVar = type->getAs<TypeVariableType>()) {
+        if (typeVar->getImpl().hasRepresentativeOrFixed())
+          return type;
+        // Default all of the generic parameters found in base to `Any`.
+        addConstraint(ConstraintKind::Defaultable, typeVar,
+                      getASTContext().TheAnyType,
+                      typeVar->getImpl().getLocator());
+      }
+      return type;
+    });
+
     auto *fix =
         DefineMemberBasedOnUse::create(*this, origBaseTy, member, locator);
     if (recordFix(fix))
@@ -5827,7 +5847,7 @@ ConstraintSystem::simplifyApplicableFnConstraint(
     auto &ctx = getASTContext();
     // Get all call methods of the nominal type.
     SmallVector<FuncDecl *, 4> callMethods;
-    auto candidates = lookupMember(desugar2, DeclName(ctx.Id_call));
+    auto candidates = lookupMember(desugar2, DeclName(ctx.Id_callAsFunction));
     for (auto entry : candidates) {
       auto callMethod = dyn_cast<FuncDecl>(entry.getValueDecl());
       if (!callMethod)
@@ -6691,6 +6711,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::RelabelArguments:
   case FixKind::RemoveUnwrap:
   case FixKind::DefineMemberBasedOnUse:
+  case FixKind::AllowMemberRefOnExistential:
   case FixKind::AllowTypeOrInstanceMember:
   case FixKind::AllowInvalidPartialApplication:
   case FixKind::AllowInvalidInitRef:
@@ -6700,6 +6721,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowAnyObjectKeyPathRoot:
   case FixKind::TreatKeyPathSubscriptIndexAsHashable:
   case FixKind::AllowInvalidRefInKeyPath:
+  case FixKind::ExplicitlySpecifyGenericArguments:
     llvm_unreachable("handled elsewhere");
   }
 

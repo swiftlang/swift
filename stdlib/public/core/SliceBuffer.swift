@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 /// Buffer type for `ArraySlice<Element>`.
-@_fixed_layout
+@frozen
 @usableFromInline
 internal struct _SliceBuffer<Element>
   : _ArrayBufferProtocol,

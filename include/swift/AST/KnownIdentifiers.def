@@ -32,7 +32,7 @@ IDENTIFIER(ArrayLiteralElement)
 IDENTIFIER(atIndexedSubscript)
 IDENTIFIER_(bridgeToObjectiveC)
 // SWIFT_ENABLE_TENSORFLOW
-IDENTIFIER(call)
+IDENTIFIER(callAsFunction)
 IDENTIFIER_WITH_NAME(code_, "_code")
 IDENTIFIER(CodingKeys)
 IDENTIFIER(combine)
@@ -116,6 +116,7 @@ IDENTIFIER(WinSDK)
 IDENTIFIER(with)
 IDENTIFIER(withArguments)
 IDENTIFIER(withKeywordArguments)
+IDENTIFIER(wrapperValue)
 
 // SWIFT_ENABLE_TENSORFLOW
 IDENTIFIER(TensorFlow)
@@ -130,9 +131,9 @@ IDENTIFIER_(unpackTensorHandles)
 IDENTIFIER_(tensorHandleCount)
 // TensorGroup
 IDENTIFIER_(typeList)
-// AdditiveArithmetic, VectorNumeric
+// AdditiveArithmetic, VectorProtocol
 IDENTIFIER(zero)
-IDENTIFIER(Scalar)
+IDENTIFIER(VectorSpaceScalar)
 // Differentiable
 IDENTIFIER(AllDifferentiableVariables)
 IDENTIFIER(TangentVector)

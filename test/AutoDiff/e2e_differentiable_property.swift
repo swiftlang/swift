@@ -8,8 +8,8 @@ import StdlibUnittest
 
 var E2EDifferentiablePropertyTests = TestSuite("E2EDifferentiableProperty")
 
-struct TangentSpace : VectorNumeric {
-  let dx, dy: Float
+struct TangentSpace : VectorProtocol {
+  let x, y: Float
 }
 
 extension TangentSpace : Differentiable {
@@ -26,18 +26,13 @@ struct Space {
   }
 
   func vjpX() -> (Float, (Float) -> TangentSpace) {
-    return (x, { v in TangentSpace(dx: v, dy: 0) } )
+    return (x, { v in TangentSpace(x: v, y: 0) } )
   }
 
   private let storedX: Float
 
-  /// `y` is a stored property with a custom vjp for its getter.
-  @differentiable(vjp: vjpY)
-  let y: Float
-
-  func vjpY() -> (Float, (Float) -> TangentSpace) {
-    return (y, { v in TangentSpace(dx: 0, dy: v) })
-  }
+  @differentiable
+  var y: Float
 
   init(x: Float, y: Float) {
     self.storedX = x
@@ -48,7 +43,7 @@ struct Space {
 extension Space : Differentiable {
   typealias TangentVector = TangentSpace
   func moved(along: TangentSpace) -> Space {
-    return Space(x: x + along.dx, y: y + along.dy)
+    return Space(x: x + along.x, y: y + along.y)
   }
 }
 
@@ -56,7 +51,7 @@ E2EDifferentiablePropertyTests.test("computed property") {
   let actualGrad = gradient(at: Space(x: 0, y: 0)) { (point: Space) -> Float in
     return 2 * point.x
   }
-  let expectedGrad = TangentSpace(dx: 2, dy: 0)
+  let expectedGrad = TangentSpace(x: 2, y: 0)
   expectEqual(expectedGrad, actualGrad)
 }
 
@@ -64,13 +59,13 @@ E2EDifferentiablePropertyTests.test("stored property") {
   let actualGrad = gradient(at: Space(x: 0, y: 0)) { (point: Space) -> Float in
     return 3 * point.y
   }
-  let expectedGrad = TangentSpace(dx: 0, dy: 3)
+  let expectedGrad = TangentSpace(x: 0, y: 3)
   expectEqual(expectedGrad, actualGrad)
 }
 
 struct GenericMemberWrapper<T : Differentiable> : Differentiable {
   // Stored property.
-  @differentiable(vjp: vjpX)
+  @differentiable
   var x: T
 
   func vjpX() -> (T, (T.TangentVector) -> GenericMemberWrapper.TangentVector) {
@@ -86,8 +81,7 @@ E2EDifferentiablePropertyTests.test("generic stored property") {
   expectEqual(expectedGrad, actualGrad)
 }
 
-@_fieldwiseDifferentiable
-struct ProductSpaceSelfTangent : VectorNumeric {
+struct ProductSpaceSelfTangent : VectorProtocol {
   let x, y: Float
 }
 
@@ -103,7 +97,7 @@ E2EDifferentiablePropertyTests.test("fieldwise product space, self tangent") {
   expectEqual(expectedGrad, actualGrad)
 }
 
-struct ProductSpaceOtherTangentTangentSpace : VectorNumeric {
+struct ProductSpaceOtherTangentTangentSpace : VectorProtocol {
   let x, y: Float
 }
 
@@ -111,7 +105,6 @@ extension ProductSpaceOtherTangentTangentSpace : Differentiable {
   typealias TangentVector = ProductSpaceOtherTangentTangentSpace
 }
 
-@_fieldwiseDifferentiable
 struct ProductSpaceOtherTangent {
   let x, y: Float
 }
@@ -128,6 +121,22 @@ E2EDifferentiablePropertyTests.test("fieldwise product space, other tangent") {
     return 7 * point.y
   }
   let expectedGrad = ProductSpaceOtherTangentTangentSpace(x: 0, y: 7)
+  expectEqual(expectedGrad, actualGrad)
+}
+
+E2EDifferentiablePropertyTests.test("computed property") {
+  struct TF_544 : Differentiable {
+    var value: Float
+    @differentiable
+    var computed: Float {
+      get { value }
+      set { value = newValue }
+    }
+  }
+  let actualGrad = gradient(at: TF_544(value: 2.4)) { x in
+    return x.computed * x.computed
+  }
+  let expectedGrad = TF_544.AllDifferentiableVariables(value: 4.8)
   expectEqual(expectedGrad, actualGrad)
 }
 

@@ -85,7 +85,7 @@ PROTOCOL(TensorArrayProtocol)
 PROTOCOL(TensorGroup)
 PROTOCOL_(TensorFlowDataTypeCompatible)
 PROTOCOL(TensorProtocol)
-PROTOCOL(VectorNumeric)
+PROTOCOL(VectorProtocol)
 PROTOCOL(Differentiable)
 
 PROTOCOL_(ObjectiveCBridgeable)

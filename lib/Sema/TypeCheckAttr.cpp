@@ -25,7 +25,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
-#include "swift/AST/PropertyDelegates.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Parse/Lexer.h"
@@ -129,13 +129,12 @@ public:
   IGNORED_ATTR(DynamicReplacement)
   IGNORED_ATTR(PrivateImport)
   IGNORED_ATTR(Custom)
-  IGNORED_ATTR(PropertyDelegate)
+  IGNORED_ATTR(PropertyWrapper)
   IGNORED_ATTR(DisfavoredOverload)
   // SWIFT_ENABLE_TENSORFLOW
   IGNORED_ATTR(Differentiable)
   IGNORED_ATTR(Differentiating)
   IGNORED_ATTR(CompilerEvaluable)
-  IGNORED_ATTR(FieldwiseDifferentiable)
   IGNORED_ATTR(NoDerivative)
 #undef IGNORED_ATTR
 
@@ -726,25 +725,6 @@ void TypeChecker::checkDeclAttributesEarly(Decl *D) {
   }
 }
 
-/// Determine whether the given string is an attribute name that is
-/// reserved for the implementation.
-static bool isReservedAttributeName(StringRef name) {
-  for (unsigned i : indices(name)) {
-    if (name[i] == '_')
-      continue;
-
-    // First character is lowercase; reserved.
-    if (clang::isLowercase(name[i]))
-      return true;
-
-    // Everything else is reserved.
-    return false;
-  }
-
-  // All underscores is reserved.
-  return true;
-}
-
 namespace {
 class AttributeChecker : public AttributeVisitor<AttributeChecker> {
   TypeChecker &TC;
@@ -866,13 +846,12 @@ public:
 
   void visitNonOverrideAttr(NonOverrideAttr *attr);
   void visitCustomAttr(CustomAttr *attr);
-  void visitPropertyDelegateAttr(PropertyDelegateAttr *attr);
+  void visitPropertyWrapperAttr(PropertyWrapperAttr *attr);
 
   // SWIFT_ENABLE_TENSORFLOW
   void visitDifferentiableAttr(DifferentiableAttr *attr);
   void visitDifferentiatingAttr(DifferentiatingAttr *attr);
   void visitCompilerEvaluableAttr(CompilerEvaluableAttr *attr);
-  void visitFieldwiseDifferentiableAttr(FieldwiseDifferentiableAttr *attr);
   void visitNoDerivativeAttr(NoDerivativeAttr *attr);
 };
 } // end anonymous namespace
@@ -1970,6 +1949,11 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
 }
 
 void AttributeChecker::visitFixedLayoutAttr(FixedLayoutAttr *attr) {
+  if (isa<StructDecl>(D)) {
+    TC.diagnose(attr->getLocation(), diag::fixed_layout_struct)
+      .fixItReplace(attr->getRange(), "@frozen");
+  }  
+
   auto *VD = cast<ValueDecl>(D);
 
   if (VD->getFormalAccess() < AccessLevel::Public &&
@@ -2475,16 +2459,25 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
 }
 
 void AttributeChecker::visitFrozenAttr(FrozenAttr *attr) {
-  auto *ED = cast<EnumDecl>(D);
+  if (auto *ED = dyn_cast<EnumDecl>(D)) {
+    if (!ED->getModuleContext()->isResilient()) {
+      diagnoseAndRemoveAttr(attr, diag::enum_frozen_nonresilient, attr);
+      return;
+    }
 
-  if (!ED->getModuleContext()->isResilient()) {
-    diagnoseAndRemoveAttr(attr, diag::enum_frozen_nonresilient, attr);
-    return;
+    if (ED->getFormalAccess() < AccessLevel::Public &&
+        !ED->getAttrs().hasAttribute<UsableFromInlineAttr>()) {
+      diagnoseAndRemoveAttr(attr, diag::enum_frozen_nonpublic, attr);
+      return;
+    }
   }
 
-  if (ED->getFormalAccess() < AccessLevel::Public &&
-      !ED->getAttrs().hasAttribute<UsableFromInlineAttr>()) {
-    diagnoseAndRemoveAttr(attr, diag::enum_frozen_nonpublic, attr);
+  auto *VD = cast<ValueDecl>(D);
+
+  if (VD->getFormalAccess() < AccessLevel::Public &&
+      !VD->getAttrs().hasAttribute<UsableFromInlineAttr>()) {
+    diagnoseAndRemoveAttr(attr, diag::frozen_attr_on_internal_type,
+                          VD->getFullName(), VD->getFormalAccess());
   }
 }
 
@@ -2518,26 +2511,26 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
     return;
   }
 
-  // If the nominal type is a property delegate type, we can be delegating
+  // If the nominal type is a property wrapper type, we can be delegating
   // through a property.
-  if (nominal->getPropertyDelegateTypeInfo()) {
-    // Property delegates can only be applied to variables
+  if (nominal->getPropertyWrapperTypeInfo()) {
+    // property wrappers can only be applied to variables
     if (!isa<VarDecl>(D) || isa<ParamDecl>(D)) {
       TC.diagnose(attr->getLocation(),
-                  diag::property_delegate_attribute_not_on_property,
+                  diag::property_wrapper_attribute_not_on_property,
                   nominal->getFullName());
       attr->setInvalid();
       return;
     }
 
-    // If this attribute isn't the one that attached a property delegate to
+    // If this attribute isn't the one that attached a property wrapper to
     // this property, complain.
     auto var = cast<VarDecl>(D);
-    if (auto attached = var->getAttachedPropertyDelegate()) {
+    if (auto attached = var->getAttachedPropertyWrapper()) {
       if (attached != attr) {
-        TC.diagnose(attr->getLocation(), diag::property_delegate_multiple);
+        TC.diagnose(attr->getLocation(), diag::property_wrapper_multiple);
         TC.diagnose(attached->getLocation(),
-                    diag::previous_property_delegate_here);
+                    diag::previous_property_wrapper_here);
         return;
       }
     }
@@ -2558,30 +2551,80 @@ void TypeChecker::checkParameterAttributes(ParameterList *params) {
   }
 }
 
-void AttributeChecker::visitPropertyDelegateAttr(PropertyDelegateAttr *attr) {
+void AttributeChecker::visitPropertyWrapperAttr(PropertyWrapperAttr *attr) {
   auto nominal = dyn_cast<NominalTypeDecl>(D);
   if (!nominal)
     return;
 
-  // Force checking of the property delegate type.
-  (void)nominal->getPropertyDelegateTypeInfo();
-
-  // Make sure the name isn't reserved.
-  if (isReservedAttributeName(nominal->getName().str())) {
-    nominal->diagnose(diag::property_delegate_reserved_name);
-  }
+  // Force checking of the property wrapper type.
+  (void)nominal->getPropertyWrapperTypeInfo();
 }
+
 // SWIFT_ENABLE_TENSORFLOW
 /// Returns true if the given type conforms to `Differentiable` in the given
 /// module.
-static bool conformsToDifferentiableInModule(Type type, ModuleDecl *module) {
-  auto &ctx = module->getASTContext();
+static bool conformsToDifferentiable(Type type, DeclContext *DC) {
+  auto &ctx = type->getASTContext();
   auto *differentiableProto =
       ctx.getProtocol(KnownProtocolKind::Differentiable);
-  return LookUpConformanceInModule(module)(
-      differentiableProto->getDeclaredInterfaceType()->getCanonicalType(),
-      type, differentiableProto).hasValue();
+  return TypeChecker::conformsToProtocol(type, differentiableProto, DC,
+                                         ConformanceCheckFlags::InExpression)
+      .hasValue();
 };
+
+// SWIFT_ENABLE_TENSORFLOW
+/// Creates a `AutoDiffParameterIndices` for the given function type,
+/// inferring all differentiation parameters.
+/// The differentiation parameters are inferred to be:
+/// - All parameters of the function type that conform to `Differentiable`.
+/// - If the function type's result is a function type, then also all
+///   parameters of the function result type that conform to `Differentiable`.
+AutoDiffParameterIndices *
+TypeChecker::inferDifferentiableParameters(
+    AbstractFunctionDecl *AFD, GenericEnvironment *derivativeGenEnv) {
+  auto &ctx = AFD->getASTContext();
+  auto *functionType = AFD->getInterfaceType()->eraseDynamicSelfType()
+      ->castTo<AnyFunctionType>();
+  AutoDiffParameterIndicesBuilder builder(functionType);
+  SmallVector<Type, 4> allParamTypes;
+
+  // Returns true if the i-th parameter type is differentiable.
+  auto isDifferentiableParam = [&](unsigned i) -> bool {
+    if (i >= allParamTypes.size())
+      return false;
+    auto paramType = allParamTypes[i];
+    if (derivativeGenEnv)
+      paramType = derivativeGenEnv->mapTypeIntoContext(paramType);
+    else
+      paramType = AFD->mapTypeIntoContext(paramType);
+    // Return false for class/existential types.
+    if (paramType->isAnyClassReferenceType() || paramType->isExistentialType())
+      return false;
+    // Return false for function types.
+    if (paramType->is<AnyFunctionType>())
+      return false;
+    // Return true if the type conforms to `Differentiable`.
+    return conformsToDifferentiable(paramType, AFD);
+  };
+
+  // Get all parameter types.
+  // NOTE: To be robust, result function type parameters should be added only if
+  // `functionType` comes from a static/instance method, and not a free function
+  // returning a function type. In practice, this code path should not be
+  // reachable for free functions returning a function type.
+  if (auto resultFnType = functionType->getResult()->getAs<AnyFunctionType>())
+    for (auto &param : resultFnType->getParams())
+      allParamTypes.push_back(param.getPlainType());
+  for (auto &param : functionType->getParams())
+    allParamTypes.push_back(param.getPlainType());
+
+  // Set differentiation parameters.
+  for (unsigned i : range(builder.size()))
+    if (isDifferentiableParam(i))
+      builder.setParameter(i);
+
+  return builder.build(ctx);
+}
 
 // SWIFT_ENABLE_TENSORFLOW
 static FuncDecl *resolveAutoDiffAssociatedFunction(
@@ -2747,15 +2790,12 @@ static AutoDiffParameterIndices *computeDifferentiationParameters(
     // conform to `Differentiable`.
     else {
       auto selfType = function->getImplicitSelfDecl()->getInterfaceType();
-      if (derivativeGenEnv) {
-        auto selfInterfaceType = selfType->hasTypeParameter()
-            ? selfType
-            : selfType->mapTypeOutOfContext();
-        selfType =
-            derivativeGenEnv->mapTypeIntoContext(selfInterfaceType);
-      }
-      if (!conformsToDifferentiableInModule(
-              selfType, function->getModuleContext())) {
+      if (derivativeGenEnv)
+        selfType = derivativeGenEnv->mapTypeIntoContext(selfType);
+      // FIXME(TF-568): `Differentiable`-conforming protocols cannot define
+      // `@differentiable` computed properties because the check below returns
+      // false.
+      if (!conformsToDifferentiable(selfType, function)) {
         TC.diagnose(attrLoc, diag::diff_function_no_parameters,
                     function->getFullName())
             .highlight(function->getSignatureSourceRange());
@@ -2766,11 +2806,9 @@ static AutoDiffParameterIndices *computeDifferentiationParameters(
 
   // If parsed differentiation parameters are empty, infer parameter indices
   // from the function type.
-  if (parsedWrtParams.empty()) {
-    return AutoDiffParameterIndicesBuilder::inferParameters(
-        functionType, function->getModuleContext())
-        .build(TC.Context);
-  }
+  if (parsedWrtParams.empty())
+    return TypeChecker::inferDifferentiableParameters(
+        function, derivativeGenEnv);
 
   // Otherwise, build parameter indices from parsed differentiation parameters.
   AutoDiffParameterIndicesBuilder builder(functionType);
@@ -2827,10 +2865,10 @@ static AutoDiffParameterIndices *computeDifferentiationParameters(
 // The parsed differentiation parameters and attribute location are used in
 // diagnostics.
 static bool checkDifferentiationParameters(
-    TypeChecker &TC, AutoDiffParameterIndices *indices,
-    AnyFunctionType *functionType, GenericEnvironment *derivativeGenEnv,
-    ModuleDecl *module, ArrayRef<ParsedAutoDiffParameter> parsedWrtParams,
-    SourceLoc attrLoc) {
+    TypeChecker &TC, AbstractFunctionDecl *AFD,
+    AutoDiffParameterIndices *indices, AnyFunctionType *functionType,
+    GenericEnvironment *derivativeGenEnv, ModuleDecl *module,
+    ArrayRef<ParsedAutoDiffParameter> parsedWrtParams, SourceLoc attrLoc) {
   // Diagnose empty parameter indices. This occurs when no `wrt` clause is
   // declared and no differentiation parameters can be inferred.
   if (indices->isEmpty()) {
@@ -2843,13 +2881,13 @@ static bool checkDifferentiationParameters(
   indices->getSubsetParameterTypes(functionType, wrtParamTypes);
   for (unsigned i : range(wrtParamTypes.size())) {
     auto wrtParamType = wrtParamTypes[i];
-    if (derivativeGenEnv) {
-      auto wrtParamInterfaceType = wrtParamType->hasTypeParameter()
-          ? wrtParamType
-          : wrtParamType->mapTypeOutOfContext();
+    if (!wrtParamType->hasTypeParameter())
+      wrtParamType = wrtParamType->mapTypeOutOfContext();
+    if (derivativeGenEnv)
       wrtParamType =
-          derivativeGenEnv->mapTypeIntoContext(wrtParamInterfaceType);
-    }
+          derivativeGenEnv->mapTypeIntoContext(wrtParamType);
+    else
+      wrtParamType = AFD->mapTypeIntoContext(wrtParamType);
     SourceLoc loc = parsedWrtParams.empty()
         ? attrLoc
         : parsedWrtParams[i].getLoc();
@@ -2870,7 +2908,7 @@ static bool checkDifferentiationParameters(
       return true;
     }
     // Parameter must conform to `Differentiable`.
-    if (!conformsToDifferentiableInModule(wrtParamType, module)) {
+    if (!conformsToDifferentiable(wrtParamType, AFD)) {
       TC.diagnose(loc, diag::diff_params_clause_param_not_differentiable,
                   wrtParamType);
       return true;
@@ -2884,13 +2922,28 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   auto &ctx = TC.Context;
   auto lookupConformance =
       LookUpConformanceInModule(D->getDeclContext()->getParentModule());
+  
+  // If functions is marked as linear, you cannot have a custom VJP and/or
+  // a JVP.
+  if (attr->isLinear() && (attr->getVJP() || attr->getJVP())) {
+    diagnoseAndRemoveAttr(attr,
+                          diag::attr_differentiable_no_vjp_or_jvp_when_linear);
+    return;
+  }
 
   AbstractFunctionDecl *original = dyn_cast<AbstractFunctionDecl>(D);
   if (auto *asd = dyn_cast<AbstractStorageDecl>(D)) {
+    if (asd->getImplInfo().isSimpleStored() &&
+        (attr->getJVP() || attr->getVJP())) {
+      diagnoseAndRemoveAttr(attr,
+          diag::differentiable_attr_stored_property_variable_unsupported);
+      return;
+    }
     // When used directly on a storage decl (stored/computed property or
     // subscript), the getter is currently inferred to be `@differentiable`.
     // TODO(TF-129): Infer setter to also be `@differentiable` after
-    // differentiation supports inout parameters.
+    // differentiation supports inout parameters. This requires refactoring to
+    // handle multiple `original` functions (both getter and setter).
     original = asd->getGetter();
   }
   // Setters are not yet supported.
@@ -3014,12 +3067,6 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   AutoDiffParameterIndices *checkedWrtParamIndices =
       attr->getParameterIndices();
 
-  // Returns true if a type conforms to `Differentiable`.
-  auto conformsToDifferentiable = [&](Type type) {
-    return conformsToDifferentiableInModule(
-        type, original->getModuleContext());
-  };
-
   // Compute the derivative function type.
   auto derivativeFnTy = originalFnTy;
   if (whereClauseGenEnv)
@@ -3039,7 +3086,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
 
   // Check if differentiation parameter indices are valid.
   if (checkDifferentiationParameters(
-          TC, checkedWrtParamIndices, derivativeFnTy, whereClauseGenEnv,
+          TC, original, checkedWrtParamIndices, derivativeFnTy, whereClauseGenEnv,
           original->getModuleContext(), parsedWrtParams, attr->getLocation())) {
     attr->setInvalid();
     return;
@@ -3048,15 +3095,13 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   // Set the checked differentiation parameter indices in the attribute.
   attr->setParameterIndices(checkedWrtParamIndices);
 
-  // Check that original function's result type conforms to `Differentiable`.
-  if (whereClauseGenEnv) {
-    auto originalResultInterfaceType = !originalResultTy->hasTypeParameter()
-        ? originalResultTy->mapTypeOutOfContext()
-        : originalResultTy;
+  if (whereClauseGenEnv)
     originalResultTy =
-        whereClauseGenEnv->mapTypeIntoContext(originalResultInterfaceType);
-  }
-  if (!conformsToDifferentiable(originalResultTy)) {
+        whereClauseGenEnv->mapTypeIntoContext(originalResultTy);
+  else
+    originalResultTy = original->mapTypeIntoContext(originalResultTy);
+  // Check that original function's result type conforms to `Differentiable`.
+  if (!conformsToDifferentiable(originalResultTy, original)) {
     TC.diagnose(attr->getLocation(),
                 diag::differentiable_attr_result_not_differentiable,
                 originalResultTy);
@@ -3163,12 +3208,40 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     attr->setVJPFunction(vjp);
   }
 
-  auto insertion =
-      ctx.DifferentiableAttrs.try_emplace({D, checkedWrtParamIndices}, attr);
+  if (auto *asd = dyn_cast<AbstractStorageDecl>(D)) {
+    // Remove `@differentiable` attribute from storage declaration to prevent
+    // duplicate attribute registration during SILGen.
+    D->getAttrs().removeAttribute(attr);
+    // Transfer `@differentiable` attribute from storage declaration to
+    // getter accessor.
+    auto *newAttr = DifferentiableAttr::create(
+        ctx, /*implicit*/ true, attr->AtLoc, attr->getRange(), attr->isLinear(),
+        attr->getParameterIndices(), attr->getJVP(), attr->getVJP(),
+        attr->getRequirements());
+    newAttr->setJVPFunction(attr->getJVPFunction());
+    newAttr->setVJPFunction(attr->getVJPFunction());
+    auto insertion = ctx.DifferentiableAttrs.try_emplace(
+        {asd->getGetter(), newAttr->getParameterIndices()}, newAttr);
+    // Valid `@differentiable` attributes are uniqued by their parameter
+    // indices. Reject duplicate attributes for the same decl and parameter
+    // indices pair.
+    if (!insertion.second) {
+      diagnoseAndRemoveAttr(attr, diag::differentiable_attr_duplicate);
+      TC.diagnose(insertion.first->getSecond()->getLocation(),
+                  diag::differentiable_attr_duplicate_note);
+      return;
+    }
+    asd->getGetter()->getAttrs().add(newAttr);
+    return;
+  }
+  auto insertion = ctx.DifferentiableAttrs.try_emplace(
+      {D, attr->getParameterIndices()}, attr);
   // `@differentiable` attributes are uniqued by their parameter indices.
   // Reject duplicate attributes for the same decl and parameter indices pair.
   if (!insertion.second && insertion.first->getSecond() != attr) {
     diagnoseAndRemoveAttr(attr, diag::differentiable_attr_duplicate);
+    TC.diagnose(insertion.first->getSecond()->getLocation(),
+                diag::differentiable_attr_duplicate_note);
     return;
   }
 }
@@ -3227,7 +3300,7 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
     valueResultType = derivative->mapTypeIntoContext(valueResultType);
   auto valueResultConf = TC.conformsToProtocol(valueResultType, diffableProto,
                                                derivative->getDeclContext(),
-                                               ConformanceCheckFlags::Used);
+                                               None);
   if (!valueResultConf) {
     TC.diagnose(attr->getLocation(),
                 diag::differentiating_attr_result_value_not_differentiable,
@@ -3257,7 +3330,7 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
                      source->getGenericParams(), target->getRequirements(),
                      [](SubstitutableType *dependentType) {
                        return Type(dependentType);
-                     }, lookupConformance) == RequirementCheckResult::Success;
+                     }, lookupConformance, None) == RequirementCheckResult::Success;
   };
 
   auto isValidOriginal = [&](FuncDecl *originalCandidate) {
@@ -3346,7 +3419,7 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
 
   // Check if differentiation parameter indices are valid.
   if (checkDifferentiationParameters(
-          TC, checkedWrtParamIndices, originalFnType,
+          TC, originalFn, checkedWrtParamIndices, originalFnType,
           derivative->getGenericEnvironment(), derivative->getModuleContext(),
           parsedWrtParams, attr->getLocation())) {
     attr->setInvalid();
@@ -3366,7 +3439,7 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
         if (paramType->hasTypeParameter())
           paramType = derivative->mapTypeIntoContext(paramType);
         auto conf = TC.conformsToProtocol(paramType, diffableProto, derivative,
-                                          ConformanceCheckFlags::Used);
+                                          None);
         assert(conf &&
                "Expected checked parameter to conform to `Differentiable`");
         auto paramAssocType = conf->getTypeWitnessByName(
@@ -3448,9 +3521,9 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
   // the same differentiation parameters, create one.
   if (!da) {
     da = DifferentiableAttr::create(ctx, /*implicit*/ true, attr->AtLoc,
-                                    attr->getRange(), checkedWrtParamIndices,
-                                    /*jvp*/ None, /*vjp*/ None,
-                                    derivativeRequirements);
+                                    attr->getRange(), attr->isLinear(),
+                                    checkedWrtParamIndices, /*jvp*/ None,
+                                    /*vjp*/ None, derivativeRequirements);
     switch (kind) {
     case AutoDiffAssociatedFunctionKind::JVP:
       da->setJVPFunction(derivative);
@@ -3466,6 +3539,8 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
     // indices pair.
     if (!insertion.second && insertion.first->getSecond() != da) {
       diagnoseAndRemoveAttr(da, diag::differentiable_attr_duplicate);
+      TC.diagnose(insertion.first->getSecond()->getLocation(),
+                  diag::differentiable_attr_duplicate_note);
       return;
     }
     originalFn->getAttrs().add(da);
@@ -3571,23 +3646,6 @@ void AttributeChecker::visitCompilerEvaluableAttr(CompilerEvaluableAttr *attr) {
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-void AttributeChecker::visitFieldwiseDifferentiableAttr(
-    FieldwiseDifferentiableAttr *attr) {
-  auto *structDecl = dyn_cast<StructDecl>(D);
-  if (!structDecl) {
-    diagnoseAndRemoveAttr(attr,
-        diag::fieldwise_differentiable_only_on_differentiable_structs);
-    return;
-  }
-  if (!conformsToDifferentiableInModule(
-          structDecl->getDeclaredInterfaceType(), D->getModuleContext())) {
-    diagnoseAndRemoveAttr(attr,
-        diag::fieldwise_differentiable_only_on_differentiable_structs);
-    return;
-  }
-}
-
-// SWIFT_ENABLE_TENSORFLOW
 void AttributeChecker::visitNoDerivativeAttr(NoDerivativeAttr *attr) {
   auto *vd = dyn_cast<VarDecl>(D);
   if (attr->isImplicit())
@@ -3603,8 +3661,9 @@ void AttributeChecker::visitNoDerivativeAttr(NoDerivativeAttr *attr) {
         diag::noderivative_only_on_stored_properties_in_differentiable_structs);
     return;
   }
-  if (!conformsToDifferentiableInModule(
-          structDecl->getDeclaredInterfaceType(), D->getModuleContext())) {
+  if (!conformsToDifferentiable(
+          structDecl->getDeclaredInterfaceType(),
+          structDecl->getDeclContext())) {
     diagnoseAndRemoveAttr(attr,
         diag::noderivative_only_on_stored_properties_in_differentiable_structs);
     return;
@@ -3786,6 +3845,10 @@ void TypeChecker::addImplicitDynamicAttribute(Decl *D) {
       return;
     // Don't add dynamic to functions with a cdecl.
     if (FD->getAttrs().hasAttribute<CDeclAttr>())
+      return;
+    // Don't add dynamic to local function definitions.
+    if (!FD->getDeclContext()->isTypeContext() &&
+        FD->getDeclContext()->isLocalContext())
       return;
   }
 

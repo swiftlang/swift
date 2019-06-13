@@ -3121,10 +3121,6 @@ struct MetadataCompletionContext {
 /// it may be called many times as successive dependencies are resolved.
 /// If the function ever completes successfully (by returning null), it
 /// will not be called again for the same type.
-///
-/// \return null to indicate that the type has been completed, or a non-null
-///   pointer to indicate that completion is blocked on the completion of
-///   some other type
 using MetadataCompleter =
   SWIFT_CC(swift)
   MetadataDependency(const Metadata *type,

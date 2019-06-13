@@ -1114,7 +1114,8 @@ ERROR(numeric_literal_numeric_member,none,
 ERROR(standalone_dollar_identifier,none,
      "'$' is not an identifier; use backticks to escape it", ())
 ERROR(dollar_identifier_decl,none,
-     "cannot declare entity %0 with a '$' prefix", (Identifier))
+     "cannot declare entity named %0; the '$' prefix is reserved for "
+     "implicitly-synthesized declarations", (Identifier))
 
 ERROR(anon_closure_arg_not_in_closure,none,
       "anonymous closure argument not contained in a closure", ())
@@ -1498,11 +1499,17 @@ ERROR(attr_differentiable_use_wrt_not_withrespectto,none,
 ERROR(attr_differentiable_missing_label,PointsToFirstBadToken,
       "missing label '%0:' in '@differentiable' attribute", (StringRef))
 ERROR(attr_differentiable_expected_label,none,
-      "expected a function specifier label, e.g. 'wrt:', 'jvp:', or 'vjp:'", ())
+      "expected either 'wrt:' or a function specifier label, e.g. 'jvp:', "
+      "or 'vjp:'", ())
+ERROR(attr_differentiable_no_vjp_or_jvp_when_linear,none,
+      "cannot specify 'vjp:' or 'jvp:' for linear functions; use "
+      "'transpose:' instead", ())
 
 // differentiating
 ERROR(attr_differentiating_expected_original_name,PointsToFirstBadToken,
       "expected an original function name", ())
+ERROR(attr_differentiating_expected_label_linear_or_wrt,none,
+      "expected either 'linear' or 'wrt:'", ())
 
 // differentiation `wrt` parameters clause
 ERROR(expected_colon_after_label,PointsToFirstBadToken,

@@ -202,14 +202,11 @@ FunctionSignatureSpecializationMangler::mangleConstantProp(LiteralInst *LI) {
   switch (LI->getKind()) {
   default:
     llvm_unreachable("unknown literal");
-  case SILInstructionKind::DynamicFunctionRefInst: {
-    SILFunction *F = cast<DynamicFunctionRefInst>(LI)->getReferencedFunction();
-    ArgOpBuffer << 'f';
-    appendIdentifier(F->getName());
-    break;
-  }
+  case SILInstructionKind::PreviousDynamicFunctionRefInst:
+  case SILInstructionKind::DynamicFunctionRefInst:
   case SILInstructionKind::FunctionRefInst: {
-    SILFunction *F = cast<FunctionRefInst>(LI)->getReferencedFunction();
+    SILFunction *F =
+        cast<FunctionRefBaseInst>(LI)->getInitiallyReferencedFunction();
     ArgOpBuffer << 'f';
     appendIdentifier(F->getName());
     break;
@@ -264,12 +261,12 @@ FunctionSignatureSpecializationMangler::mangleClosureProp(SILInstruction *Inst) 
   // restriction is removed, the assert here will fire.
   if (auto *TTTFI = dyn_cast<ThinToThickFunctionInst>(Inst)) {
     auto *FRI = cast<FunctionRefInst>(TTTFI->getCallee());
-    appendIdentifier(FRI->getReferencedFunction()->getName());
+    appendIdentifier(FRI->getInitiallyReferencedFunction()->getName());
     return;
   }
   auto *PAI = cast<PartialApplyInst>(Inst);
   auto *FRI = cast<FunctionRefInst>(PAI->getCallee());
-  appendIdentifier(FRI->getReferencedFunction()->getName());
+  appendIdentifier(FRI->getInitiallyReferencedFunction()->getName());
 
   // Then we mangle the types of the arguments that the partial apply is
   // specializing.

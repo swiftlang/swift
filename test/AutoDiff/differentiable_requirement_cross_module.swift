@@ -13,7 +13,7 @@ extension Empty : Differentiable {
 
 // expected-error @+1 {{type 'Conforming' does not conform to protocol 'DifferentiableRequirement'}}
 struct Conforming : DifferentiableRequirement {
-  // expected-note @+1 {{candidate is missing attribute '@differentiable(wrt: (self, float))'}}
+  // expected-note @+1 {{candidate is missing attribute '@differentiable(wrt: float)'}}
   func foo(float: Float, empty: Empty) -> Float {
     return float
   }

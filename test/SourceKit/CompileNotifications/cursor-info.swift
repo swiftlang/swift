@@ -8,5 +8,6 @@
 // COMPILE_1:   key.notification: source.notification.compile-did-finish,
 // COMPILE_1:   key.compileid: [[CID1]]
 // COMPILE_1: }
+// COMPILE_1: <empty cursor info; internal diagnostic: "Unable to resolve cursor info.">
 // COMPILE_1-NOT: compile-will-start
 // COMPILE_1-NOT: compile-did-finish

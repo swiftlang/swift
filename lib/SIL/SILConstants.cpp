@@ -139,6 +139,7 @@ SymbolicValue::Kind SymbolicValue::getKind() const {
   case RK_DerivedAddress:
     return Address;
   }
+  llvm_unreachable("covered switch");
 }
 
 /// Clone this SymbolicValue into the specified ASTContext and return the new
@@ -179,6 +180,7 @@ SymbolicValue::cloneInto(SymbolicValueAllocator &allocator) const {
     return getAddress(newMemObject, accessPath, allocator);
   }
   }
+  llvm_unreachable("covered switch");
 }
 
 //===----------------------------------------------------------------------===//

@@ -60,7 +60,7 @@ extension String {
   ///         print(asciiPrefix)
   ///     }
   ///     // Prints "My favorite emoji is "
-  @_fixed_layout
+  @frozen
   public struct UnicodeScalarView {
     @usableFromInline
     internal var _guts: _StringGuts
@@ -161,7 +161,7 @@ extension String.UnicodeScalarView: BidirectionalCollection {
 }
 
 extension String.UnicodeScalarView {
-  @_fixed_layout
+  @frozen
   public struct Iterator: IteratorProtocol {
     @usableFromInline
     internal var _guts: _StringGuts

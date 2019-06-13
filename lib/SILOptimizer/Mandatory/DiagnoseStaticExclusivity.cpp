@@ -594,7 +594,7 @@ static AccessedStorage findValidAccessedStorage(SILValue Source) {
 /// Used for fix-its to suggest replacing with Collection.swapAt()
 /// on exclusivity violations.
 static bool isCallToStandardLibrarySwap(ApplyInst *AI, ASTContext &Ctx) {
-  SILFunction *SF = AI->getReferencedFunction();
+  SILFunction *SF = AI->getReferencedFunctionOrNull();
   if (!SF)
     return false;
 

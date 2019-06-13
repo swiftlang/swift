@@ -66,7 +66,7 @@ static void printToolVersionAndFlagsComment(raw_ostream &out,
       Ctx.LangOpts.EffectiveLanguageVersion);
   out << "// " SWIFT_INTERFACE_FORMAT_VERSION_KEY ": "
       << InterfaceFormatVersion << "\n";
-  out << "// " SWIFT_TOOLS_VERSION_KEY ": "
+  out << "// " SWIFT_COMPILER_VERSION_KEY ": "
       << ToolsVersion << "\n";
   out << "// " SWIFT_MODULE_FLAGS_KEY ": "
       << Opts.ParseableInterfaceFlags << "\n";

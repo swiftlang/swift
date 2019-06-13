@@ -368,10 +368,11 @@ SIMPLE_DECL_ATTR(_weakLinked, WeakLinked,
   OnNominalType | OnAssociatedType | OnFunc | OnAccessor | OnVar |
   OnSubscript | OnConstructor | OnEnumElement | OnExtension | UserInaccessible,
   75)
-SIMPLE_DECL_ATTR(_frozen, Frozen,
-  OnEnum |
+SIMPLE_DECL_ATTR(frozen, Frozen,
+  OnEnum | OnStruct |
   UserInaccessible,
   76)
+DECL_ATTR_ALIAS(_frozen, Frozen)
 SIMPLE_DECL_ATTR(_forbidSerializingReference, ForbidSerializingReference,
   OnAnyDecl |
   LongAttribute | RejectByParser | UserInaccessible | NotSerialized,
@@ -403,7 +404,7 @@ SIMPLE_DECL_ATTR(_implementationOnly, ImplementationOnly,
 DECL_ATTR(_custom, Custom,
   OnAnyDecl | UserInaccessible,
   85)
-SIMPLE_DECL_ATTR(_propertyDelegate, PropertyDelegate,
+SIMPLE_DECL_ATTR(_propertyWrapper, PropertyWrapper,
   OnStruct | OnClass | OnEnum,
   86)
 SIMPLE_DECL_ATTR(_disfavoredOverload, DisfavoredOverload,
@@ -421,10 +422,8 @@ DECL_ATTR(differentiating, Differentiating,
 SIMPLE_DECL_ATTR(compilerEvaluable, CompilerEvaluable,
                  OnAccessor | OnFunc | OnConstructor | OnSubscript,
                  /* Not serialized */ 90)
-SIMPLE_DECL_ATTR(_fieldwiseDifferentiable, FieldwiseDifferentiable,
-                 OnNominalType | UserInaccessible, 91)
 SIMPLE_DECL_ATTR(noDerivative, NoDerivative,
-                 OnVar, 92)
+                 OnVar, 91)
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS

@@ -348,7 +348,7 @@ internal func unimplemented_utf8_32bit(
 /// [clusters]: http://www.unicode.org/glossary/#extended_grapheme_cluster
 /// [scalars]: http://www.unicode.org/glossary/#unicode_scalar_value
 /// [equivalence]: http://www.unicode.org/glossary/#canonical_equivalent
-@_fixed_layout
+@frozen
 public struct String {
   public // @SPI(Foundation)
   var _guts: _StringGuts

@@ -99,6 +99,12 @@ protected:
     if (F->isPossiblyUsedExternally())
       return true;
 
+    if (F->getDynamicallyReplacedFunction())
+      return true;
+
+    if (F->isDynamicallyReplaceable())
+      return true;
+
     // ObjC functions are called through the runtime and are therefore alive
     // even if not referenced inside SIL.
     if (F->getRepresentation() == SILFunctionTypeRepresentation::ObjCMethod)
@@ -352,11 +358,11 @@ protected:
           MethodInfo *mi = getMethodInfo(funcDecl, /*isWitnessTable*/ false);
           ensureAliveClassMethod(mi, dyn_cast<FuncDecl>(funcDecl), MethodCl);
         } else if (auto *FRI = dyn_cast<FunctionRefInst>(&I)) {
-          ensureAlive(FRI->getReferencedFunction());
+          ensureAlive(FRI->getInitiallyReferencedFunction());
         } else if (auto *FRI = dyn_cast<DynamicFunctionRefInst>(&I)) {
-          ensureAlive(FRI->getReferencedFunction());
+          ensureAlive(FRI->getInitiallyReferencedFunction());
         } else if (auto *FRI = dyn_cast<PreviousDynamicFunctionRefInst>(&I)) {
-          ensureAlive(FRI->getReferencedFunction());
+          ensureAlive(FRI->getInitiallyReferencedFunction());
         } else if (auto *KPI = dyn_cast<KeyPathInst>(&I)) {
           for (auto &component : KPI->getPattern()->getComponents())
             ensureKeyPathComponentIsAlive(component);

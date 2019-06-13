@@ -1303,7 +1303,6 @@ namespace  {
     UNINTERESTING_ATTR(Differentiable)
     UNINTERESTING_ATTR(Differentiating)
     UNINTERESTING_ATTR(CompilerEvaluable)
-    UNINTERESTING_ATTR(FieldwiseDifferentiable)
     UNINTERESTING_ATTR(NoDerivative)
 
     // These can't appear on overridable declarations.
@@ -1332,7 +1331,7 @@ namespace  {
     UNINTERESTING_ATTR(HasInitialValue)
     UNINTERESTING_ATTR(ImplementationOnly)
     UNINTERESTING_ATTR(Custom)
-    UNINTERESTING_ATTR(PropertyDelegate)
+    UNINTERESTING_ATTR(PropertyWrapper)
     UNINTERESTING_ATTR(DisfavoredOverload)
 
 #undef UNINTERESTING_ATTR

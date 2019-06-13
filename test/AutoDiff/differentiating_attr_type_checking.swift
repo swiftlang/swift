@@ -256,7 +256,7 @@ func bar<T>(_ x: T) -> T {
   return x
 }
 @differentiating(bar)
-func vjpBar<T : Differentiable & VectorNumeric>(_ x: T) -> (value: T, pullback: (T.TangentVector) -> T.TangentVector) {
+func vjpBar<T : Differentiable & VectorProtocol>(_ x: T) -> (value: T, pullback: (T.TangentVector) -> T.TangentVector) {
   return (x, { $0 })
 }
 
@@ -264,7 +264,7 @@ func baz<T, U>(_ x: T, _ y: U) -> T {
   return x
 }
 @differentiating(baz)
-func vjpBaz<T : Differentiable & VectorNumeric, U : Differentiable>(_ x: T, _ y: U)
+func vjpBaz<T : Differentiable & VectorProtocol, U : Differentiable>(_ x: T, _ y: U)
     -> (value: T, pullback: (T) -> (T, U))
   where T == T.TangentVector, U == U.TangentVector
 {
@@ -295,3 +295,23 @@ func jvpConsistent(_ x: Float) -> (value: Float, differential: (Float) -> Float)
 func vjpConsistent(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
   return (x, { $0 })
 }
+
+// Test usage of `@differentiable` on a stored property
+struct PropertyDiff : Differentiable & AdditiveArithmetic {
+    // expected-error @+1 {{'jvp:' or 'vjp:' cannot be specified for stored properties}}
+    @differentiable(vjp: vjpPropertyA)
+    var a: Float = 1
+    typealias TangentVector = PropertyDiff
+    typealias AllDifferentiableVariables = PropertyDiff
+    func vjpPropertyA() -> (Float, (Float) -> PropertyDiff) {
+        (.zero, { _ in .zero })
+    }
+}
+
+@differentiable
+func f(_ x: PropertyDiff) -> Float {
+    return x.a
+}
+
+let a = gradient(at: PropertyDiff(), in: f)
+print(a)

@@ -471,7 +471,7 @@ bool FunctionSideEffects::summarizeCall(FullApplySite fullApply) {
     }
   }
 
-  if (SILFunction *SingleCallee = fullApply.getReferencedFunction()) {
+  if (SILFunction *SingleCallee = fullApply.getReferencedFunctionOrNull()) {
     // Does the function have any @_effects?
     if (setDefinedEffects(SingleCallee))
       return true;

@@ -18,7 +18,7 @@ _ = gradient(at: Float(1), in: { x in identity(x) })
 // CHECK-SIL-NEXT: end_access [[ORIG_COTAN_BEGIN]]
 // CHECK-SIL: }
 
-struct Tensor<Scalar : FloatingPoint & Differentiable> : VectorNumeric, Differentiable {
+struct Tensor<Scalar : FloatingPoint & Differentiable> : VectorProtocol, Differentiable {
   // NOTE: `value` must have type with known size (e.g. `Float`, not `Scalar`)
   // until differentiation has indirect passing support.
   var value: Float
@@ -137,6 +137,18 @@ func TF_508() {
   _ = pullback(at: x, in: { (x: TF_508_Struct<Float>) -> TF_508_Struct<Float> in
     return x - x
   })
+}
+
+// TF-523
+struct TF_523_Struct : Differentiable & AdditiveArithmetic {
+  var a: Float = 1
+  typealias TangentVector = TF_523_Struct
+  typealias AllDifferentiableVariables = TF_523_Struct
+}
+
+@differentiable
+func TF_523_f(_ x: TF_523_Struct) -> Float {
+  return x.a * 2
 }
 
 // TODO: add more tests.

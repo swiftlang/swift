@@ -25,7 +25,7 @@ ordinalPositions = ['first', 'second', 'third', 'fourth']
 %for n in vectorscalarCounts:
 % storageN = 4 if n == 3 else n
 /// A vector of ${spelledNumbers[n]} scalar values.
-@_fixed_layout
+@frozen
 public struct SIMD${n}<Scalar>: SIMD where Scalar: SIMDScalar {
 
   public var _storage: Scalar.SIMD${storageN}Storage
@@ -245,7 +245,7 @@ extension ${Self}: SIMDScalar {
 % for n in storagescalarCounts:
 %  bytes = n * self_type.bits / 8
   /// Storage for a vector of ${spelledNumbers[n]} integers.
-  @_fixed_layout
+  @frozen
   @_alignment(${bytes if bytes <= 16 else 16})
   public struct SIMD${n}Storage: SIMDStorage {
 
@@ -290,7 +290,7 @@ extension ${Self}: SIMDScalar {
 % for n in storagescalarCounts:
 %  bytes = n * bits / 8
   /// Storage for a vector of ${spelledNumbers[n]} floating-point values.
-  @_fixed_layout
+  @frozen
   @_alignment(${bytes if bytes <= 16 else 16})
   public struct SIMD${n}Storage: SIMDStorage {
 

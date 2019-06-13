@@ -28,18 +28,24 @@ struct S {
   let p: Float
 }
 
-extension S : Differentiable, VectorNumeric {
+extension S : Differentiable, VectorProtocol {
+  struct TangentVector: Differentiable, VectorProtocol {
+    var dp: Float
+  }
+  typealias AllDifferentiableVariables = S
   static var zero: S { return S(p: 0) }
   typealias Scalar = Float
   static func + (lhs: S, rhs: S) -> S { return S(p: lhs.p + rhs.p) }
   static func - (lhs: S, rhs: S) -> S { return S(p: lhs.p - rhs.p) }
   static func * (lhs: Float, rhs: S) -> S { return S(p: lhs * rhs.p) }
 
-  typealias TangentVector = S
+  func moved(along direction: TangentVector) -> S {
+    return S(p: p + direction.dp)
+  }
 }
 
 // expected-error @+2 {{function is not differentiable}}
-// expected-note @+1 {{property is not differentiable}}
+// expected-note @+1 {{property cannot be differentiated because 'S.TangentVector' does not have a member named 'p'}}
 _ = gradient(at: S(p: 0)) { s in 2 * s.p }
 
 struct NoDerivativeProperty : Differentiable {
@@ -114,8 +120,6 @@ func calls_grad_of_nested(_ x: Float) -> Float {
 
 func if_else(_ x: Float, _ flag: Bool) -> Float {
   let y: Float
-  // expected-error @+2 {{expression is not differentiable}}
-  // expected-note @+1 {{differentiating control flow is not yet supported}}
   if flag {
     y = x + 1
   } else {

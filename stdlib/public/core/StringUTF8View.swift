@@ -88,7 +88,7 @@ extension String {
   ///     // Prints "-17"
   ///     print(String(s1.utf8.prefix(15)))
   ///     // Prints "They call me 'B"
-  @_fixed_layout
+  @frozen
   public struct UTF8View {
     @usableFromInline
     internal var _guts: _StringGuts

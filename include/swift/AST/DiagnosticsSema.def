@@ -927,6 +927,8 @@ NOTE(note_call_to_operator,none,
      "in call to operator %0", (DeclName))
 NOTE(note_call_to_func,none,
      "in call to function %0", (DeclName))
+NOTE(note_call_to_subscript,none,
+     "in call to %0", (DeclName))
 NOTE(note_call_to_initializer,none,
      "in call to initializer", ())
 NOTE(note_init_parameter,none,
@@ -1393,8 +1395,8 @@ WARNING(pattern_type_not_usable_from_inline_warn,none,
         "%select{%select{variable|constant}0|property}1 "
         "should be '@usableFromInline' or public",
         (bool, bool))
-ERROR(pattern_type_not_usable_from_inline_fixed_layout,none,
-      "type referenced from a stored property in a '@_fixed_layout' struct must "
+ERROR(pattern_type_not_usable_from_inline_frozen,none,
+      "type referenced from a stored property in a '@frozen' struct must "
       "be '@usableFromInline' or public",
       (/*ignored*/bool, /*ignored*/bool))
 ERROR(pattern_type_not_usable_from_inline_inferred,none,
@@ -1409,9 +1411,9 @@ WARNING(pattern_type_not_usable_from_inline_inferred_warn,none,
         "with inferred type %2 "
         "should be '@usableFromInline' or public",
         (bool, bool, Type))
-ERROR(pattern_type_not_usable_from_inline_inferred_fixed_layout,none,
+ERROR(pattern_type_not_usable_from_inline_inferred_frozen,none,
       "type referenced from a stored property with inferred type %2 in a "
-      "'@_fixed_layout' struct must be '@usableFromInline' or public",
+      "'@frozen' struct must be '@usableFromInline' or public",
       (/*ignored*/bool, /*ignored*/bool, Type))
 
 ERROR(pattern_binds_no_variables,none,
@@ -2512,8 +2514,8 @@ ERROR(parameterized_invalid_parameters_struct,none,
       "invalid", (Type))
 ERROR(broken_additive_arithmetic_requirement,none,
       "AdditiveArithmetic protocol is broken: unexpected requirement", ())
-ERROR(broken_vector_numeric_requirement,none,
-      "VectorNumeric protocol is broken: unexpected requirement", ())
+ERROR(broken_vector_protocol_requirement,none,
+      "VectorProtocol protocol is broken: unexpected requirement", ())
 ERROR(broken_differentiable_requirement,none,
       "Differentiable protocol is broken: unexpected requirement", ())
 WARNING(differentiable_nondiff_type_implicit_noderivative_fixit,none,
@@ -2524,8 +2526,6 @@ WARNING(differentiable_constant_property_implicit_noderivative_fixit,none,
       "'let' properties with a default value do not have a derivative; add "
       "'@noDerivative' to make it explicit, or change it to 'var' to allow "
       "derivatives", ())
-NOTE(protocol_witness_missing_differentiable_attr,none,
-     "candidate is missing attribute '%0'", (StringRef))
 
 NOTE(codable_extraneous_codingkey_case_here,none,
      "CodingKey case %0 does not match any stored properties", (Identifier))
@@ -2709,7 +2709,9 @@ ERROR(differentiable_attr_overload_not_found,none,
 ERROR(differentiable_attr_no_currying,none,
       "'@differentiable' cannot be defined on functions that return functions", ())
 ERROR(differentiable_attr_duplicate,none,
-      "duplicate '@differentiable' attribute", ())
+      "duplicate '@differentiable' attribute with same parameter indices", ())
+NOTE(differentiable_attr_duplicate_note,none,
+     "other attribute declared here", ())
 ERROR(differentiable_attr_function_not_same_type_context,none,
       "%0 is not defined in the current type context", (DeclName))
 ERROR(differentiable_attr_specified_not_function,none,
@@ -2733,7 +2735,9 @@ ERROR(differentiable_attr_unsupported_req_kind,none,
       "layout requirement are not supported by '@differentiable' attribute", ())
 ERROR(differentiable_attr_class_unsupported,none,
       "class members cannot be marked with '@differentiable'", ())
-NOTE(protocol_witness_missing_specific_differentiable_attr,none,
+ERROR(differentiable_attr_stored_property_variable_unsupported,none,
+      "'jvp:' or 'vjp:' cannot be specified for stored properties", ())
+NOTE(protocol_witness_missing_differentiable_attr,none,
      "candidate is missing attribute '%0'", (StringRef))
 
 // @differentiating
@@ -2805,11 +2809,6 @@ ERROR(compiler_evaluable_ref_non_compiler_evaluable,none,
 ERROR(noderivative_only_on_stored_properties_in_differentiable_structs,none,
       "'@noDerivative' is only allowed on stored properties in structure types "
       "that declare a conformance to 'Differentiable'", ())
-
-// @_fieldwiseDifferentiable attribute
-ERROR(fieldwise_differentiable_only_on_differentiable_structs,none,
-      "'@_fieldwiseDifferentiable' is only allowed on structure types that "
-      "conform to 'Differentiable'", ())
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Expressions
@@ -4297,6 +4296,15 @@ ERROR(fixed_layout_attr_on_internal_type,
       "%select{private|fileprivate|internal|%error|%error}1",
       (DeclName, AccessLevel))
 
+WARNING(fixed_layout_struct,
+      none, "'@frozen' attribute is now used for fixed-layout structs", ())
+
+ERROR(frozen_attr_on_internal_type,
+      none, "'@frozen' attribute can only be applied to '@usableFromInline' "
+      "or public declarations, but %0 is "
+      "%select{private|fileprivate|internal|%error|%error}1",
+      (DeclName, AccessLevel))
+
 ERROR(usable_from_inline_attr_with_explicit_access,
       none, "'@usableFromInline' attribute can only be applied to internal "
       "declarations, but %0 is %select{private|fileprivate|%error|public|open}1",
@@ -4313,7 +4321,7 @@ ERROR(usable_from_inline_attr_in_protocol,none,
   "an '@inlinable' function|" \
   "an '@_alwaysEmitIntoClient' function|" \
   "a default argument value|" \
-  "a property initializer in a '@_fixed_layout' type}"
+  "a property initializer in a '@frozen' type}"
 
 #define DECL_OR_ACCESSOR "%select{%0|%0 for}"
 
@@ -4501,85 +4509,88 @@ WARNING(hashvalue_implementation,none,
         (Type))
 
 //------------------------------------------------------------------------------
-// MARK: property delegate diagnostics
+// MARK: property wrapper diagnostics
 //------------------------------------------------------------------------------
-ERROR(property_delegate_no_value_property, none,
-  "property delegate type %0 does not contain a non-static property "
+ERROR(property_wrapper_no_value_property, none,
+  "property wrapper type %0 does not contain a non-static property "
   "named %1", (Type, Identifier))
-ERROR(property_delegate_ambiguous_value_property, none,
-  "property delegate type %0 has multiple non-static properties "
+ERROR(property_wrapper_ambiguous_value_property, none,
+  "property wrapper type %0 has multiple non-static properties "
   "named %1", (Type, Identifier))
-ERROR(property_delegate_wrong_initial_value_init, none,
+ERROR(property_wrapper_wrong_initial_value_init, none,
       "'init(initialValue:)' parameter type (%0) must be the same as its "
       "'value' property type (%1) or an @autoclosure thereof", (Type, Type))
-ERROR(property_delegate_failable_init, none,
+ERROR(property_wrapper_failable_init, none,
       "%0 cannot be failable", (DeclName))
-ERROR(property_delegate_ambiguous_initial_value_init, none,
-  "property delegate type %0 has multiple initial-value initializers", (Type))
-ERROR(property_delegate_ambiguous_default_value_init, none,
-  "property delegate type %0 has multiple default-value initializers", (Type))
-ERROR(property_delegate_type_requirement_not_accessible,none,
+ERROR(property_wrapper_ambiguous_initial_value_init, none,
+  "property wrapper type %0 has multiple initial-value initializers", (Type))
+ERROR(property_wrapper_ambiguous_default_value_init, none,
+  "property wrapper type %0 has multiple default-value initializers", (Type))
+ERROR(property_wrapper_type_requirement_not_accessible,none,
       "%select{private|fileprivate|internal|public|open}0 %1 %2 cannot have "
-      "more restrictive access than its enclosing property delegate type %3 "
+      "more restrictive access than its enclosing property wrapper type %3 "
       "(which is %select{private|fileprivate|internal|public|open}4)",
       (AccessLevel, DescriptiveDeclKind, DeclName, Type, AccessLevel))
-ERROR(property_delegate_reserved_name,none,
-      "property delegate type name must start with an uppercase letter", ())
 
-ERROR(property_delegate_attribute_not_on_property, none,
-      "property delegate attribute %0 can only be applied to a property",
+ERROR(property_wrapper_attribute_not_on_property, none,
+      "property wrapper attribute %0 can only be applied to a property",
       (DeclName))
+NOTE(property_wrapper_declared_here,none,
+     "property wrapper type %0 declared here", (DeclName))
 
-ERROR(property_delegate_multiple,none,
-      "only one property delegate can be attached to a given property", ())
-NOTE(previous_property_delegate_here,none,
-      "previous property delegate specified here", ())
+ERROR(property_wrapper_multiple,none,
+      "only one property wrapper can be attached to a given property", ())
+NOTE(previous_property_wrapper_here,none,
+      "previous property wrapper specified here", ())
 
-ERROR(property_delegate_local,none,
-      "property delegates are not yet supported on local properties", ())
-ERROR(property_delegate_let, none,
-      "property delegate can only be applied to a 'var'",
+ERROR(property_wrapper_local,none,
+      "property wrappers are not yet supported on local properties", ())
+ERROR(property_wrapper_let, none,
+      "property wrapper can only be applied to a 'var'",
+      ())
+ERROR(property_wrapper_computed, none,
+      "property wrapper cannot be applied to a computed property",
       ())
 
-ERROR(property_with_delegate_conflict_attribute,none,
-      "property %0 with a delegate cannot also be "
+ERROR(property_with_wrapper_conflict_attribute,none,
+      "property %0 with a wrapper cannot also be "
       "%select{lazy|@NSCopying|@NSManaged|weak|unowned|unmanaged}1",
       (DeclName, int))
-ERROR(property_delegate_not_single_var, none,
-      "property delegate can only apply to a single variable", ())
-ERROR(property_with_delegate_in_bad_context,none,
+ERROR(property_wrapper_not_single_var, none,
+      "property wrapper can only apply to a single variable", ())
+ERROR(property_with_wrapper_in_bad_context,none,
       "%select{|non-static |non-static }1property %0 declared inside "
-      "%select{a protocol|an extension|an enum}1 cannot have a delegate",
+      "%select{a protocol|an extension|an enum}1 cannot have a wrapper",
       (DeclName, int))
-ERROR(property_with_delegate_overrides,none,
-      "property %0 with attached delegate cannot override another property",
+ERROR(property_with_wrapper_overrides,none,
+      "property %0 with attached wrapper cannot override another property",
       (DeclName))
 
-ERROR(property_delegate_and_normal_init,none,
-      "property %0 with attached delegate cannot initialize both the "
-      "delegate type and the property", (DeclName))
-ERROR(property_delegate_init_without_initial_value, none,
-      "initializing property %0 with delegate %1 that lacks "
+ERROR(property_wrapper_and_normal_init,none,
+      "property %0 with attached wrapper cannot initialize both the "
+      "wrapper type and the property", (DeclName))
+ERROR(property_wrapper_init_without_initial_value, none,
+      "initializing property %0 with wrapper %1 that lacks "
       "an 'init(initialValue:)' initializer", (DeclName, Type))
-NOTE(property_delegate_direct_init,none,
-     "initialize the property delegate type directly with "
+NOTE(property_wrapper_direct_init,none,
+     "initialize the property wrapper type directly with "
      "'(...') on the attribute", ())
 
-ERROR(property_delegate_incompatible_unbound, none,
-      "property delegate type %0 must either specify all generic arguments "
-      "or require only a single generic argument", (Type))
+ERROR(property_wrapper_incompatible_property, none,
+      "property type %0 does not match that of the 'value' property of "
+      "its wrapper type %1", (Type, Type))
 
-ERROR(property_delegate_type_access,none,
+ERROR(property_wrapper_type_access,none,
       "%select{%select{variable|constant}0|property}1 "
       "%select{must be declared %select{"
       "%select{private|fileprivate|internal|%error|%error}3|private or fileprivate}4"
       "|cannot be declared "
       "%select{in this context|fileprivate|internal|public|open}3}2 "
-      "because its property delegate type uses "
+      "because its property wrapper type uses "
       "%select{a private|a fileprivate|an internal|%error|%error}5 type",
       (bool, bool, bool, AccessLevel, bool, AccessLevel))
-ERROR(property_delegate_type_not_usable_from_inline,none,
-      "property delegate type referenced from a '@usableFromInline' "
+ERROR(property_wrapper_type_not_usable_from_inline,none,
+      "property wrapper type referenced from a '@usableFromInline' "
       "%select{%select{variable|constant}0|property}1 "
       "must be '@usableFromInline' or public",
       (bool, bool))

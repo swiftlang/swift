@@ -79,7 +79,7 @@
 ///   collection type, don't use `Slice` as its subsequence type. Instead,
 ///   define your own subsequence type that takes your index invalidation
 ///   requirements into account.
-@_fixed_layout // generic-performance
+@frozen // generic-performance
 public struct Slice<Base: Collection> {
   public var _startIndex: Base.Index
   public var _endIndex: Base.Index

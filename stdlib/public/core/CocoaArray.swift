@@ -25,7 +25,7 @@ import SwiftShims
 /// `Collection` conformance.  Why not make `_NSArrayCore` conform directly?
 /// It's a class, and I don't want to pay for the dynamic dispatch overhead.
 @usableFromInline
-@_fixed_layout
+@frozen
 internal struct _CocoaArrayWrapper : RandomAccessCollection {
   @usableFromInline
   typealias Indices = Range<Int>

@@ -11,8 +11,7 @@ protocol Proto : Differentiable {
   func function3(_ x: Float, _ y: Double) -> Double
 }
 
-@_fieldwiseDifferentiable
-struct S : Proto, VectorNumeric {
+struct S : Proto, VectorProtocol {
   static var zero: S { return S(p: 0) }
   typealias Scalar = Float
   static func + (lhs: S, rhs: S) -> S { return S(p: lhs.p + rhs.p) }
@@ -21,11 +20,8 @@ struct S : Proto, VectorNumeric {
 
   typealias TangentVector = S
 
-  @differentiable(wrt: (self), vjp: vjpP)
+  @differentiable
   let p: Float
-  func vjpP() -> (Float, (Float) -> S) {
-    return (p, { dp in S(p: dp) })
-  }
 
   @differentiable(wrt: (x, y))
   func function1(_ x: Float, _ y: Double) -> Float {

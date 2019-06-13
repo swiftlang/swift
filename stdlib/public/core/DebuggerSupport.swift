@@ -12,7 +12,7 @@
 
 import SwiftShims
 
-@_frozen // namespace
+@frozen // namespace
 public enum _DebuggerSupport {
   private enum CollectionStatus {
     case notACollection
@@ -119,7 +119,7 @@ public enum _DebuggerSupport {
     isRoot: Bool
   ) -> Bool {
     if isRoot || collectionStatus.isCollection { return true }
-    if mirror.children.count > 0 { return true }
+    if !mirror.children.isEmpty { return true }
     if mirror.displayStyle == .`class` { return true }
     if let sc = mirror.superclassMirror { return ivarCount(mirror: sc) > 0 }
     return true

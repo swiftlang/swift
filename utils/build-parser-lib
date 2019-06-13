@@ -234,7 +234,7 @@ def main():
     option('--install-symroot', store_path,
            help='the path to install debug symbols into')
     option('--install-destdir', store_path,
-           help='the path to use as the filesystem root for the installation')
+           help='the path to use as the filesystem root for the installation (default = \'$(build_dir)/install\')')
     option('--install-prefix', store,
            default = default_install_prefix,
            help='the install prefix to use (default = %s)' % default_install_prefix)
@@ -246,6 +246,9 @@ def main():
 
     parser = optbuilder.build()
     args = parser.parse_args()
+
+    if not args.install_destdir:
+        args.install_destdir = os.path.join(args.build_dir, 'install')
 
     if isDarwin:
         architectures = args.architectures.split(" ")

@@ -67,4 +67,7 @@ add_swift_target_library(swiftTensorFlow ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_
   SWIFT_COMPILE_FLAGS "${swift_stdlib_compile_flags}"
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
   INSTALL_IN_COMPONENT stdlib
-  EXTRA_RPATHS "${SWIFT_TENSORFLOW_TARGET_LIB_DIR}")
+  EXTRA_RPATHS "${SWIFT_TENSORFLOW_TARGET_LIB_DIR}"
+  # NOTE: This is a workaround for https://github.com/apple/swift/pull/24382,
+  # which changed the default install_name_dir to `/usr/bin/swift`.
+  DARWIN_INSTALL_NAME_DIR "@rpath")

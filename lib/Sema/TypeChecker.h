@@ -488,29 +488,25 @@ enum class RequirementCheckResult {
 enum class ConformanceCheckFlags {
   /// Whether we're performing the check from within an expression.
   InExpression = 0x01,
-  /// Whether we will be using the conformance in the AST.
-  ///
-  /// This implies that the conformance will have to be complete.
-  Used = 0x02,
   /// Whether to suppress dependency tracking entirely.
   ///
   /// FIXME: This deals with some oddities with the
   /// _ObjectiveCBridgeable conformances.
-  SuppressDependencyTracking = 0x04,
+  SuppressDependencyTracking = 0x02,
   /// Whether to skip the check for any conditional conformances.
   ///
   /// When set, the caller takes responsibility for any
   /// conditional requirements required for the conformance to be
   /// correctly used. Otherwise (the default), all of the conditional
   /// requirements will be checked.
-  SkipConditionalRequirements = 0x08,
+  SkipConditionalRequirements = 0x04,
 
   /// Whether to require that the conditional requirements have been computed.
   ///
   /// When set, if the conditional requirements aren't available, they are just
   /// skipped, and the caller is responsible for detecting and handling this
   /// case (likely via another call to getConditionalRequirementsIfAvailable).
-  AllowUnavailableConditionalRequirements = 0x10,
+  AllowUnavailableConditionalRequirements = 0x08,
 };
 
 /// Options that control protocol conformance checking.
@@ -550,10 +546,6 @@ public:
 
   /// Declarations that need their conformances checked.
   llvm::SmallVector<Decl *, 8> ConformanceContexts;
-
-  /// The list of protocol conformances that were "used" and will need to be
-  /// completed before type checking is considered complete.
-  llvm::SetVector<NormalProtocolConformance *> UsedConformances;
 
   /// The list of protocol conformances whose requirements could not be
   /// fully checked and, therefore, should be checked again at the top
@@ -1191,7 +1183,7 @@ public:
       ArrayRef<Requirement> requirements,
       TypeSubstitutionFn substitutions,
       LookupConformanceFn conformances,
-      ConformanceCheckOptions conformanceOptions = ConformanceCheckFlags::Used,
+      ConformanceCheckOptions conformanceOptions,
       GenericRequirementsCheckListener *listener = nullptr,
       SubstOptions options = None);
 
@@ -1656,11 +1648,6 @@ public:
                                            ConformanceCheckOptions options,
                                            SourceLoc ComplainLoc = SourceLoc());
 
-  /// Mark the given protocol conformance as "used" from the given declaration
-  /// context.
-  void markConformanceUsed(ProtocolConformanceRef conformance,
-                           DeclContext *dc) override final;
-
   /// Functor class suitable for use as a \c LookupConformanceFn to look up a
   /// conformance through a particular declaration context using the given
   /// type checker.
@@ -1680,8 +1667,7 @@ public:
   void checkConformance(NormalProtocolConformance *conformance);
 
   /// Check the requirement signature of the given conformance.
-  void checkConformanceRequirements(NormalProtocolConformance *conformance)
-         override ;
+  void checkConformanceRequirements(NormalProtocolConformance *conformance);
 
   /// Check all of the conformances in the given context.
   void checkConformancesInContext(DeclContext *dc,
@@ -2034,7 +2020,7 @@ public:
   void checkFunctionErrorHandling(AbstractFunctionDecl *D);
   void checkInitializerErrorHandling(Initializer *I, Expr *E);
   void checkEnumElementErrorHandling(EnumElementDecl *D);
-  void checkPropertyDelegateErrorHandling(PatternBindingDecl *binding,
+  void checkPropertyWrapperErrorHandling(PatternBindingDecl *binding,
                                           Expr *expr);
 
   // SWIFT_ENABLE_TENSORFLOW
@@ -2127,6 +2113,17 @@ public:
       NameLookupOptions lookupOptions = defaultMemberLookupOptions,
       const Optional<std::function<bool(FuncDecl *)>> &hasValidTypeCtx = None,
       const Optional<std::function<void()>> &invalidTypeCtxDiagnostic = None);
+
+  /// SWIFT_ENABLE_TENSORFLOW
+  /// Creates a `AutoDiffParameterIndices *` for the given function type,
+  /// representing all inferred differentiation parameters.
+  /// The differentiation parameters are inferred to be:
+  /// - All parameters of the function type that conform to `Differentiable`.
+  /// - If the function type's result is a function type, then also all
+  ///   parameters of the function result type that conform to `Differentiable`.
+  static AutoDiffParameterIndices *
+  inferDifferentiableParameters(AbstractFunctionDecl *AFD,
+                                GenericEnvironment *derivativeGenEnv);
 };
 
 /// Temporary on-stack storage and unescaping for encoded diagnostic

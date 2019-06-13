@@ -28,7 +28,7 @@ public class Derived: Base {
   }
 
   // CHECK-NOT: init(convInit: Int = super)
-  // CHECK: override {{(public )?}}init(x: Int = super)
+  // CHECK: override {{(public )?}}init(x: {{(Swift.)?}}Int = super)
   // CHECK-NOT: init(convInit: Int = super)
 }
 

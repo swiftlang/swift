@@ -21,7 +21,7 @@
 
 // SWIFT_ENABLE_TENSORFLOW
 // This test is currently unsupported because the addition of `+` operators
-// to the stdlib (via `VectorNumeric`) causes type-checking to fail.
+// to the stdlib (via `VectorProtocol`) causes type-checking to fail.
 // Re-enable when type-checking no longer fails.
 // UNSUPPORTED: executable_test
 
@@ -102,7 +102,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
 
   /// A Boolean value indicating whether this instance is equal to zero.
   public var isZero: Bool {
-    return _data.count == 0
+    return _data.isEmpty
   }
 
   //===--- Numeric initializers -------------------------------------------===//
@@ -219,7 +219,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
   /// - `_data` has no trailing zero elements
   /// - If `self == 0`, then `isNegative == false`
   func _checkInvariants(source: String = #function) {
-    if _data.count == 0 {
+    if _data.isEmpty {
       assert(isNegative == false,
         "\(source): isNegative with zero length _data")
     }

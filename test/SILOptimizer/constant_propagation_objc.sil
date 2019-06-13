@@ -185,7 +185,7 @@ bb4:
 // CHECK:   apply {{%.*}}<Array<String>>([[CAST_TMP]], [[INPUT_VALUE]],
 // CHECK:   strong_release [[INPUT_VALUE]]
 // NOTE: When we perform take_always, this is the take of the cast.
-// CHECK:   release_value [[INPUT_VALUE]]
+// CHECK:   strong_release [[INPUT_VALUE]]
 // CHECK:   switch_enum_addr [[CAST_TMP]] : $*Optional<Array<String>>, case #Optional.none!enumelt: [[FAIL_BB]], default [[SUCCESS_TRAMPOLINE_BB:bb[0-9]+]]
 //
 // CHECK: [[SUCCESS_TRAMPOLINE_BB]]:

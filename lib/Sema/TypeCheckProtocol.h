@@ -359,6 +359,15 @@ struct RequirementMatch {
     assert(!hasWitnessType() && "Should have witness type");
   }
 
+  // SWIFT_ENABLE_TENSORFLOW
+  RequirementMatch(ValueDecl *witness, MatchKind kind,
+                   const DeclAttribute *attr)
+    : Witness(witness), Kind(kind), WitnessType(), UnmetAttribute(attr),
+      ReqEnv(None) {
+    assert(!hasWitnessType() && "Should have witness type");
+    assert(UnmetAttribute);
+  }
+
   RequirementMatch(ValueDecl *witness, MatchKind kind,
                    Type witnessType,
                    Optional<RequirementEnvironment> env = None,
@@ -394,6 +403,10 @@ struct RequirementMatch {
 
   /// Requirement not met.
   Optional<Requirement> MissingRequirement;
+
+  // SWIFT_ENABLE_TENSORFLOW
+  /// Attribute not met.
+  const DeclAttribute *UnmetAttribute = nullptr;
 
   /// The requirement environment to use for the witness thunk.
   Optional<RequirementEnvironment> ReqEnv;
@@ -469,6 +482,10 @@ struct RequirementMatch {
 
   /// Determine whether this requirement match has a requirement.
   bool hasRequirement() { return Kind == MatchKind::MissingRequirement; }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  /// Determine whether this requirement match has an unmet attribute.
+  bool hasUnmetAttribute() { return Kind == MatchKind::DifferentiableConflict; }
 
   swift::Witness getWitness(ASTContext &ctx) const;
 };
@@ -665,11 +682,6 @@ class ConformanceChecker : public WitnessChecker {
   void diagnoseOrDefer(
          ValueDecl *requirement, bool isError,
          std::function<void(NormalProtocolConformance *)> fn);
-
-  void
-  addUsedConformances(ProtocolConformance *conformance,
-                      llvm::SmallPtrSetImpl<ProtocolConformance *> &visited);
-  void addUsedConformances(ProtocolConformance *conformance);
 
   ArrayRef<ValueDecl*> getLocalMissingWitness() {
     return GlobalMissingWitnesses.getArrayRef().

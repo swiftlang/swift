@@ -90,6 +90,8 @@ public:
 };
 
 struct TestCursorInfo {
+  // Empty if no error.
+  std::string Error;
   std::string Name;
   std::string Typename;
   std::string Filename;
@@ -148,7 +150,14 @@ public:
     TestCursorInfo TestInfo;
     getLang().getCursorInfo(DocName, Offset, 0, false, false, Args,
                             llvm::vfs::getRealFileSystem(),
-      [&](const CursorInfoData &Info) {
+      [&](const RequestResult<CursorInfoData> &Result) {
+        assert(!Result.isCancelled());
+        if (Result.isError()) {
+          TestInfo.Error = Result.getError();
+          sema.signal();
+          return;
+        }
+        const CursorInfoData &Info = Result.value();
         TestInfo.Name = Info.Name;
         TestInfo.Typename = Info.TypeName;
         TestInfo.Filename = Info.Filename;

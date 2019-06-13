@@ -365,6 +365,10 @@ public:
                                       ArrayRef<TypeRepr*> GenericArgs,
                                       SourceRange AngleBrackets);
 
+  unsigned getNumGenericArgs() const {
+    return Bits.GenericIdentTypeRepr.NumGenericArgs;
+  }
+
   ArrayRef<TypeRepr*> getGenericArgs() const {
     return {getTrailingObjects<TypeRepr*>(),
             Bits.GenericIdentTypeRepr.NumGenericArgs};

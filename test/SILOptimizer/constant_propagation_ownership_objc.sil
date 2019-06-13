@@ -10,6 +10,7 @@ import Foundation
 import Builtin
 
 sil @$ss11AnyHashableVyABxcSHRzlufC : $@convention(method) <τ_0_0 where τ_0_0 : Hashable> (@in τ_0_0, @thin AnyHashable.Type) -> @out AnyHashable
+sil @guaranteed_swift_array_user : $@convention(thin) <τ_0_0> (@guaranteed Array<τ_0_0>) -> ()
 
 // CHECK-LABEL: sil [ossa] @bridged_cast_anyhashable : $@convention(method) (@guaranteed NSArray) -> @out Optional<AnyHashable> {
 // CHECK: [[FUNC:%.*]] = function_ref @$ss37_forceBridgeFromObjectiveC_bridgeableyx01_D5CTypeQz_xmts01_D11CBridgeableRzlF :
@@ -36,3 +37,97 @@ bb0(%0 : $*Optional<AnyHashable>, %1 : @guaranteed $NSArray):
   %19 = tuple ()
   return %19 : $()
 }
+
+// CHECK-LABEL: sil [ossa] @array_downcast_copyonsuccess : $@convention(thin) (@guaranteed NSArray) -> () {
+// CHECK-NOT: checked_cast_addr_br
+// CHECK: } // end sil function 'array_downcast_copyonsuccess'
+sil [ossa] @array_downcast_copyonsuccess : $@convention(thin) (@guaranteed NSArray) -> () {
+bb0(%0 : @guaranteed $NSArray):
+  %4 = alloc_stack $NSArray
+  %5 = copy_value %0 : $NSArray
+  store %5 to [init] %4 : $*NSArray
+  %7 = alloc_stack $Array<String>
+  checked_cast_addr_br copy_on_success NSArray in %4 : $*NSArray to Array<String> in %7 : $*Array<String>, bb2, bb3
+
+bb2:
+  %9 = load [take] %7 : $*Array<String>
+  %10 = function_ref @guaranteed_swift_array_user : $@convention(thin) <τ_0_0> (@guaranteed Array<τ_0_0>) -> ()
+  apply %10<String>(%9) : $@convention(thin) <τ_0_0> (@guaranteed Array<τ_0_0>) -> ()
+  destroy_value %9 : $Array<String>
+  dealloc_stack %7 : $*Array<String>
+  destroy_addr %4 : $*NSArray
+  dealloc_stack %4 : $*NSArray
+  br bb4
+
+bb3:
+  dealloc_stack %7 : $*Array<String>
+  destroy_addr %4 : $*NSArray
+  dealloc_stack %4 : $*NSArray
+  br bb4
+
+bb4:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @array_downcast_takeonsuccess : $@convention(thin) (@guaranteed NSArray) -> () {
+// CHECK-NOT: checked_cast_addr_br
+// CHECK: } // end sil function 'array_downcast_takeonsuccess'
+sil [ossa] @array_downcast_takeonsuccess : $@convention(thin) (@guaranteed NSArray) -> () {
+bb0(%0 : @guaranteed $NSArray):
+  %4 = alloc_stack $NSArray
+  %5 = copy_value %0 : $NSArray
+  store %5 to [init] %4 : $*NSArray
+  %7 = alloc_stack $Array<String>
+  checked_cast_addr_br take_on_success NSArray in %4 : $*NSArray to Array<String> in %7 : $*Array<String>, bb2, bb3
+
+bb2:
+  %9 = load [take] %7 : $*Array<String>
+  %10 = function_ref @guaranteed_swift_array_user : $@convention(thin) <τ_0_0> (@guaranteed Array<τ_0_0>) -> ()
+  apply %10<String>(%9) : $@convention(thin) <τ_0_0> (@guaranteed Array<τ_0_0>) -> ()
+  destroy_value %9 : $Array<String>
+  dealloc_stack %7 : $*Array<String>
+  dealloc_stack %4 : $*NSArray
+  br bb4
+
+bb3:
+  dealloc_stack %7 : $*Array<String>
+  destroy_addr %4 : $*NSArray
+  dealloc_stack %4 : $*NSArray
+  br bb4
+
+bb4:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @array_downcast_takealways : $@convention(thin) (@guaranteed NSArray) -> () {
+// CHECK-NOT: checked_cast_addr_br
+// CHECK: } // end sil function 'array_downcast_takealways'
+sil [ossa] @array_downcast_takealways : $@convention(thin) (@guaranteed NSArray) -> () {
+bb0(%0 : @guaranteed $NSArray):
+  %4 = alloc_stack $NSArray
+  %5 = copy_value %0 : $NSArray
+  store %5 to [init] %4 : $*NSArray
+  %7 = alloc_stack $Array<String>
+  checked_cast_addr_br take_always NSArray in %4 : $*NSArray to Array<String> in %7 : $*Array<String>, bb2, bb3
+
+bb2:
+  %9 = load [take] %7 : $*Array<String>
+  %10 = function_ref @guaranteed_swift_array_user : $@convention(thin) <τ_0_0> (@guaranteed Array<τ_0_0>) -> ()
+  apply %10<String>(%9) : $@convention(thin) <τ_0_0> (@guaranteed Array<τ_0_0>) -> ()
+  destroy_value %9 : $Array<String>
+  dealloc_stack %7 : $*Array<String>
+  dealloc_stack %4 : $*NSArray
+  br bb4
+
+bb3:
+  dealloc_stack %7 : $*Array<String>
+  dealloc_stack %4 : $*NSArray
+  br bb4
+
+bb4:
+  %9999 = tuple()
+  return %9999 : $()
+}
+

@@ -1496,6 +1496,8 @@ class DifferentiableAttr final
                                     ParsedAutoDiffParameter> {
   friend TrailingObjects;
 
+  /// Whether this function is linear (optional).
+  bool linear;
   /// The number of parsed parameters specified in 'wrt:'.
   unsigned NumParsedParameters = 0;
   /// The JVP function.
@@ -1520,6 +1522,7 @@ class DifferentiableAttr final
 
   explicit DifferentiableAttr(ASTContext &context, bool implicit,
                               SourceLoc atLoc, SourceRange baseRange,
+                              bool linear,
                               ArrayRef<ParsedAutoDiffParameter> parameters,
                               Optional<DeclNameWithLoc> jvp,
                               Optional<DeclNameWithLoc> vjp,
@@ -1527,6 +1530,7 @@ class DifferentiableAttr final
 
   explicit DifferentiableAttr(ASTContext &context, bool implicit,
                               SourceLoc atLoc, SourceRange baseRange,
+                              bool linear,
                               AutoDiffParameterIndices *indices,
                               Optional<DeclNameWithLoc> jvp,
                               Optional<DeclNameWithLoc> vjp,
@@ -1535,6 +1539,7 @@ class DifferentiableAttr final
 public:
   static DifferentiableAttr *create(ASTContext &context, bool implicit,
                                     SourceLoc atLoc, SourceRange baseRange,
+                                    bool linear,
                                     ArrayRef<ParsedAutoDiffParameter> params,
                                     Optional<DeclNameWithLoc> jvp,
                                     Optional<DeclNameWithLoc> vjp,
@@ -1542,6 +1547,7 @@ public:
 
   static DifferentiableAttr *create(ASTContext &context, bool implicit,
                                     SourceLoc atLoc, SourceRange baseRange,
+                                    bool linear,
                                     AutoDiffParameterIndices *indices,
                                     Optional<DeclNameWithLoc> jvp,
                                     Optional<DeclNameWithLoc> vjp,
@@ -1568,6 +1574,8 @@ public:
   size_t numTrailingObjects(OverloadToken<ParsedAutoDiffParameter>) const {
     return NumParsedParameters;
   }
+                                      
+  bool isLinear() const { return linear; }
 
   TrailingWhereClause *getWhereClause() const { return WhereClause; }
 
@@ -1587,7 +1595,7 @@ public:
 
   // Print the attribute to the given stream.
   void print(llvm::raw_ostream &OS, const Decl *D,
-             ModuleDecl *prettyPrintInModule = nullptr) const;
+             bool omitWrtClause = false) const;
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Differentiable;
@@ -1608,6 +1616,8 @@ class DifferentiatingAttr final
   DeclNameWithLoc Original;
   /// The original function, resolved by the type checker.
   FuncDecl *OriginalFunction = nullptr;
+  /// Whether this function is linear (optional).
+  bool linear;
   /// The number of parsed parameters specified in 'wrt:'.
   unsigned NumParsedParameters = 0;
   /// The differentiation parameters' indices, resolved by the type checker.
@@ -1615,26 +1625,28 @@ class DifferentiatingAttr final
 
   explicit DifferentiatingAttr(ASTContext &context, bool implicit,
                                SourceLoc atLoc, SourceRange baseRange,
-                               DeclNameWithLoc original,
+                               DeclNameWithLoc original, bool linear,
                                ArrayRef<ParsedAutoDiffParameter> params);
 
   explicit DifferentiatingAttr(ASTContext &context, bool implicit,
                                SourceLoc atLoc, SourceRange baseRange,
-                               DeclNameWithLoc original,
+                               DeclNameWithLoc original, bool linear,
                                AutoDiffParameterIndices *indices);
 
 public:
   static DifferentiatingAttr *create(ASTContext &context, bool implicit,
                                      SourceLoc atLoc, SourceRange baseRange,
-                                     DeclNameWithLoc original,
+                                     DeclNameWithLoc original, bool linear,
                                      ArrayRef<ParsedAutoDiffParameter> params);
 
   static DifferentiatingAttr *create(ASTContext &context, bool implicit,
                                      SourceLoc atLoc, SourceRange baseRange,
-                                     DeclNameWithLoc original,
+                                     DeclNameWithLoc original, bool linear,
                                      AutoDiffParameterIndices *indices);
 
   DeclNameWithLoc getOriginal() const { return Original; }
+                                      
+  bool isLinear() const { return linear; }
 
   FuncDecl *getOriginalFunction() const { return OriginalFunction; }
   void setOriginalFunction(FuncDecl *decl) { OriginalFunction = decl; }

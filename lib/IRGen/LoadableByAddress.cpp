@@ -2809,7 +2809,7 @@ void LoadableByAddress::run() {
     for (SILBasicBlock &BB : CurrF) {
       for (SILInstruction &I : BB) {
         if (auto *FRI = dyn_cast<FunctionRefBaseInst>(&I)) {
-          SILFunction *RefF = FRI->getReferencedFunction();
+          SILFunction *RefF = FRI->getInitiallyReferencedFunction();
           if (modFuncs.count(RefF) != 0) {
             // Go over the uses and add them to lists to modify
             //
@@ -2921,7 +2921,7 @@ void LoadableByAddress::run() {
   // They just contain a pointer to the function
   // The pointer does not change
   for (auto *instr : funcRefs) {
-    SILFunction *F = instr->getReferencedFunction();
+    SILFunction *F = instr->getInitiallyReferencedFunction();
     SILBuilderWithScope refBuilder(instr);
     SingleValueInstruction *newInstr =
         refBuilder.createFunctionRef(instr->getLoc(), F, instr->getKind());

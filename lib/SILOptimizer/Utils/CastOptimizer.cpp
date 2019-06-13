@@ -321,17 +321,45 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
   auto *CCABI = cast<CheckedCastAddrBranchInst>(Inst);
   switch (CCABI->getConsumptionKind()) {
   case CastConsumptionKind::TakeAlways:
-    Builder.createReleaseValue(Loc, srcOp, Builder.getDefaultAtomicity());
+    Builder.emitDestroyValueOperation(Loc, srcOp);
     break;
   case CastConsumptionKind::TakeOnSuccess: {
-    // Insert a release in the success BB.
-    SILBuilderWithScope SuccessBuilder(SuccessBB->begin());
-    SuccessBuilder.emitDestroyValueOperation(Loc, srcOp);
+    {
+      // Insert a release in the success BB.
+      SILBuilderWithScope successBuilder(SuccessBB->begin());
+      successBuilder.emitDestroyValueOperation(Loc, srcOp);
+    }
+    {
+      // And a store in the failure BB.
+      if (Builder.hasOwnership()) {
+        SILBuilderWithScope failureBuilder(FailureBB->begin());
+        SILValue writeback = srcOp;
+        SILType srcType = src->getType().getObjectType();
+        if (writeback->getType() != srcType) {
+          writeback =
+              failureBuilder.createUncheckedRefCast(Loc, writeback, srcType);
+        }
+        failureBuilder.emitStoreValueOperation(Loc, writeback, src,
+                                               StoreOwnershipQualifier::Init);
+      }
+    }
     break;
   }
   case CastConsumptionKind::BorrowAlways:
     llvm_unreachable("checked_cast_addr_br never has BorrowAlways");
   case CastConsumptionKind::CopyOnSuccess:
+    // If we are performing copy_on_success, store the value back into memory
+    // here since we loaded it. We may need to cast back to the actual
+    // underlying type.
+    if (Builder.hasOwnership()) {
+      SILValue writeback = srcOp;
+      SILType srcType = src->getType().getObjectType();
+      if (writeback->getType() != srcType) {
+        writeback = Builder.createUncheckedRefCast(Loc, writeback, srcType);
+      }
+      Builder.emitStoreValueOperation(Loc, writeback, src,
+                                      StoreOwnershipQualifier::Init);
+    }
     break;
   }
 

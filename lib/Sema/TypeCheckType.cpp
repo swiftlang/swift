@@ -805,7 +805,10 @@ Type TypeChecker::applyUnboundGenericArguments(
   // generic arguments.
   auto resultType = decl->getDeclaredInterfaceType();
 
-  bool hasTypeVariable = false;
+  // If types involved in requirements check have either type variables
+  // or unbound generics, let's skip the check here, and let the solver
+  // do it when missing types are deduced.
+  bool skipRequirementsCheck = false;
 
   // Get the substitutions for outer generic parameters from the parent
   // type.
@@ -822,7 +825,7 @@ Type TypeChecker::applyUnboundGenericArguments(
     }
 
     subs = parentType->getContextSubstitutions(decl->getDeclContext());
-    hasTypeVariable |= parentType->hasTypeVariable();
+    skipRequirementsCheck |= parentType->hasTypeVariable();
   }
 
   SourceLoc noteLoc = decl->getLoc();
@@ -839,20 +842,21 @@ Type TypeChecker::applyUnboundGenericArguments(
     subs[origTy->getCanonicalType()->castTo<GenericTypeParamType>()] =
       substTy;
 
-    hasTypeVariable |= substTy->hasTypeVariable();
+    skipRequirementsCheck |=
+        substTy->hasTypeVariable() || substTy->hasUnboundGenericType();
   }
 
   // Check the generic arguments against the requirements of the declaration's
   // generic signature.
   auto dc = resolution.getDeclContext();
-  if (!hasTypeVariable &&
+  if (!skipRequirementsCheck &&
       resolution.getStage() > TypeResolutionStage::Structural) {
     auto result =
       checkGenericArguments(dc, loc, noteLoc, unboundType,
                             genericSig->getGenericParams(),
                             genericSig->getRequirements(),
                             QueryTypeSubstitutionMap{subs},
-                            LookUpConformance(dc));
+                            LookUpConformance(dc), None);
 
     switch (result) {
     case RequirementCheckResult::Failure:
@@ -2125,7 +2129,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     TAK_convention, TAK_pseudogeneric,
     TAK_callee_owned, TAK_callee_guaranteed, TAK_noescape, TAK_autoclosure,
     // SWIFT_ENABLE_TENSORFLOW
-    TAK_escaping, TAK_autodiff, TAK_differentiable, TAK_yield_once, TAK_yield_many
+    TAK_escaping, TAK_differentiable, TAK_yield_once, TAK_yield_many
   };
 
   auto checkUnsupportedAttr = [&](TypeAttrKind attr) {
@@ -2226,7 +2230,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       SILFunctionType::ExtInfo extInfo(rep, attrs.has(TAK_pseudogeneric),
                                        // SWIFT_ENABLE_TENSORFLOW
                                        attrs.has(TAK_noescape),
-                                       attrs.has(TAK_autodiff) || attrs.has(TAK_differentiable));
+                                       attrs.has(TAK_differentiable));
 
       ty = resolveSILFunctionType(fnRepr, options, coroutineKind, extInfo,
                                   calleeConvention, witnessMethodProtocol);
@@ -2265,7 +2269,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
       FunctionType::ExtInfo extInfo(rep, /*noescape=*/false,
                                     // SWIFT_ENABLE_TENSORFLOW
                                     fnRepr->throws(),
-                                    attrs.has(TAK_autodiff) || attrs.has(TAK_differentiable));
+                                    attrs.has(TAK_differentiable));
 
       ty = resolveASTFunctionType(fnRepr, options, extInfo);
       if (!ty || ty->hasError())

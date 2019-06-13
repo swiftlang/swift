@@ -181,9 +181,10 @@ KNOWN_SETTINGS=(
     skip-test-benchmarks        ""               "set to skip running Swift Benchmark Suite"
     skip-test-optimized         ""               "set to skip testing the test suite in optimized mode"
     skip-test-optimize-for-size ""               "set to skip testing the test suite in optimize for size mode"
-    skip-test-optimize-none-implicit-dynamic ""  "set to skip testing the test suite in optimize none with implicit dynamic mode"
+    skip-test-optimize-none-with-implicit-dynamic ""  "set to skip testing the test suite in optimize none with implicit dynamic mode"
     skip-test-sourcekit         ""               "set to skip testing SourceKit"
     stress-test-sourcekit       ""               "set to run the stress-SourceKit target"
+    only-executable-test        ""               "only run the executable variant of the swift lit tests"
     workspace                   "${HOME}/src"    "source directory containing llvm, clang, swift"
     enable-llvm-assertions      "1"              "set to enable llvm assertions"
     build-llvm                  "1"              "set to 1 to build LLVM and Clang"
@@ -1569,6 +1570,8 @@ function calculate_targets_for_host() {
             test_target_suffix=""
             if [[ -n "${test_host_only}" ]] ; then
                 test_target_suffix="-only_non_executable"
+            elif [[ -n "${ONLY_EXECUTABLE_TEST}" ]] ; then
+                test_target_suffix="-only_executable"
             fi
 
             test_subset_target_suffix=""
@@ -1591,8 +1594,8 @@ function calculate_targets_for_host() {
             if [[ $(not ${SKIP_TEST_OPTIMIZE_FOR_SIZE}) && ! -n "${test_host_only}" ]] ; then
                 SWIFT_TEST_TARGETS+=("check-swift${test_subset_target_suffix}-optimize_size-${stdlib_deployment_target}")
             fi
-            if [[ $(not ${SKIP_TEST_OPTIMIZE_NONE_IMPLICIT_DYNAMIC}) && ! -n "${test_host_only}" ]] ; then
-                SWIFT_TEST_TARGETS+=("check-swift${test_subset_target_suffix}-optimize_none_implicit_dynamic-${stdlib_deployment_target}")
+            if [[ $(not ${SKIP_TEST_OPTIMIZE_NONE_WITH_IMPLICIT_DYNAMIC}) && ! -n "${test_host_only}" ]] ; then
+                SWIFT_TEST_TARGETS+=("check-swift${test_subset_target_suffix}-optimize_none_with_implicit_dynamic-${stdlib_deployment_target}")
             fi
         fi
     done
@@ -2223,7 +2226,11 @@ for host in "${ALL_HOSTS[@]}"; do
 
     for product in "${PRODUCTS[@]}"; do
         # Check if we should perform this action.
-        if ! [[ $(should_execute_action "${host}-${product}-build") ]]; then
+        tmp_product=${product}
+        if [[ ${tmp_product} == "libdispatch_static" ]]; then
+            tmp_product=libdispatch
+        fi
+        if ! [[ $(should_execute_action "${host}-${tmp_product}-build") ]]; then
             continue
         fi
 
@@ -2260,8 +2267,18 @@ for host in "${ALL_HOSTS[@]}"; do
                 fi
                 if [ "${SKIP_BUILD_LLVM}" ] ; then
                     # We can't skip the build completely because the standalone
-                    # build of Swift depend on these.
+                    # build of Swift depend on these for building and testing.
                     build_targets=(llvm-tblgen clang-headers intrinsics_gen clang-tablegen-targets)
+                    # If we are not performing a toolchain only build, then we
+                    # also want to include FileCheck and not for testing
+                    # purposes.
+                    if [[ ! "${BUILD_TOOLCHAIN_ONLY}" ]] ; then
+                      build_targets=(
+                          "${build_targets[@]}"
+                          FileCheck
+                          not
+                      )
+                    fi
                 fi
 
                 if [ "${HOST_LIBTOOL}" ] ; then
@@ -3675,7 +3692,11 @@ for host in "${ALL_HOSTS[@]}"; do
 
     for product in "${PRODUCTS[@]}"; do
         # Check if we should perform this action.
-        if ! [[ $(should_execute_action "${host}-${product}-install") ]]; then
+        tmp_product=${product}
+        if [[ ${tmp_product} == "libdispatch_static" ]]; then
+            tmp_product=libdispatch
+        fi
+        if ! [[ $(should_execute_action "${host}-${tmp_product}-install") ]]; then
             continue
         fi
 

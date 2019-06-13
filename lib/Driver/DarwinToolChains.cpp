@@ -221,9 +221,46 @@ static bool wantsObjCRuntime(const llvm::Triple &triple) {
   llvm_unreachable("unknown Darwin OS");
 }
 
+/// Return the earliest backward deployment compatibility version we need to
+/// link in for the given target triple, if any.
+static Optional<std::pair<unsigned, unsigned>>
+getSwiftRuntimeCompatibilityVersionForTarget(const llvm::Triple &Triple) {
+  unsigned Major, Minor, Micro;
+  
+  if (Triple.isMacOSX()) {
+    Triple.getMacOSXVersion(Major, Minor, Micro);
+    if (Major == 10) {
+      if (Minor <= 14) {
+        return std::make_pair(5u, 0u);
+      } else {
+        return None;
+      }
+    } else {
+      return None;
+    }
+  } else if (Triple.isiOS()) { // includes tvOS
+    Triple.getiOSVersion(Major, Minor, Micro);
+    if (Major <= 12) {
+      return std::make_pair(5u, 0u);
+    } else {
+      return None;
+    }
+  } else if (Triple.isWatchOS()) {
+    Triple.getWatchOSVersion(Major, Minor, Micro);
+    if (Major <= 5) {
+      return std::make_pair(5u, 0u);
+    } else {
+      return None;
+    }
+  } else {
+    return None;
+  }
+}
+
 ToolChain::InvocationInfo
 toolchains::Darwin::constructInvocation(const LinkJobAction &job,
-                                        const JobContext &context) const {
+                                        const JobContext &context) const
+{
   assert(context.Output.getPrimaryOutputType() == file_types::TY_Image &&
          "Invalid linker output type.");
 
@@ -392,6 +429,38 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
   SmallString<128> RuntimeLibPath;
   getRuntimeLibraryPath(RuntimeLibPath, context.Args, /*Shared=*/true);
 
+  // Link compatibility libraries, if we're deploying back to OSes that
+  // have an older Swift runtime.
+  Optional<std::pair<unsigned, unsigned>> runtimeCompatibilityVersion;
+  
+  if (context.Args.hasArg(options::OPT_runtime_compatibility_version)) {
+    auto value = context.Args.getLastArgValue(options::OPT_runtime_compatibility_version);
+    if (value.equals("5.0")) {
+      runtimeCompatibilityVersion = std::make_pair(5u, 0u);
+    } else if (value.equals("none")) {
+      runtimeCompatibilityVersion = None;
+    } else {
+      // TODO: diagnose unknown runtime compatibility version?
+    }
+  } else if (job.getKind() == LinkKind::Executable) {
+    runtimeCompatibilityVersion
+                         = getSwiftRuntimeCompatibilityVersionForTarget(Triple);
+  }
+  
+  if (runtimeCompatibilityVersion) {
+    if (*runtimeCompatibilityVersion <= std::make_pair(5u, 0u)) {
+      // Swift 5.0 compatibility library
+      SmallString<128> BackDeployLib;
+      BackDeployLib.append(RuntimeLibPath);
+      llvm::sys::path::append(BackDeployLib, "libswiftCompatibility50.a");
+      
+      if (llvm::sys::fs::exists(BackDeployLib)) {
+        Arguments.push_back("-force_load");
+        Arguments.push_back(context.Args.MakeArgString(BackDeployLib));
+      }
+    }
+  }
+    
   // Link the standard library.
   Arguments.push_back("-L");
   if (context.Args.hasFlag(options::OPT_static_stdlib,

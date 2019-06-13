@@ -6,12 +6,12 @@ public class NonTrivialStuff : Equatable {
 }
 
 @_fixed_layout
-public struct Vector : AdditiveArithmetic, VectorNumeric, Differentiable, Equatable {
+public struct Vector : AdditiveArithmetic, VectorProtocol, Differentiable, Equatable {
   public var x: Float
   public var y: Float
   public var nonTrivialStuff = NonTrivialStuff()
   public typealias TangentVector = Vector
-  public typealias Scalar = Float
+  public typealias VectorSpaceScalar = Float
   public static var zero: Vector { return Vector(0) }
   public init(_ scalar: Float) { self.x = scalar; self.y = scalar }
 
@@ -60,16 +60,16 @@ _ = pullback(at: Vector.zero, in: testOwnedVector)
 // CHECK:   return [[NEEDED_COTAN1]] : $Vector
 
 // CHECK-LABEL: sil hidden @{{.*}}side_effect_release_zero{{.*}}__adjoint_src_0_wrt_0
-// CHECK: bb0([[X:%.*]] : $Vector, %1 : ${{.*}}side_effect_release_zero{{.*}}_bb0__PB__src_0_wrt_0):
-// CHECK:   retain_value [[SEED:%.*]] : $Vector
+// CHECK: bb0([[SEED:%.*]] : $Vector, %1 : ${{.*}}side_effect_release_zero{{.*}}_bb0__PB__src_0_wrt_0):
 // CHECK:   [[BUF:%.*]] = alloc_stack $Vector
 // CHECK:   [[BUF_ACCESS:%.*]] = begin_access [init] [static] [no_nested_conflict] [[BUF]] : $*Vector
 // CHECK:   [[ZERO_GETTER:%.*]] = function_ref @$s11refcounting6VectorV4zeroACvgZ
 // CHECK:   [[ZERO:%.*]] = apply [[ZERO_GETTER]]({{%.*}}) : $@convention(method) (@thin Vector.Type) -> @owned Vector
 // CHECK:   store [[ZERO]] to [[BUF_ACCESS]] : $*Vector
+// CHECK:   retain_value [[SEED:%.*]] : $Vector
+// CHECK:   release_value [[SEED:%.*]] : $Vector
 // CHECK:   destroy_addr [[BUF]] : $*Vector
 // CHECK:   dealloc_stack [[BUF]] : $*Vector
-// CHECK:   release_value [[SEED:%.*]] : $Vector
 // CHECK: }
 
 // The vjp should not release pullback values.

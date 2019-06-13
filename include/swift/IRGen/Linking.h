@@ -480,11 +480,9 @@ class LinkEntity {
   static AssociatedTypeDecl *
   getAssociatedTypeByIndex(const ProtocolConformance *conformance,
                            unsigned index) {
-    for (auto requirement : conformance->getProtocol()->getMembers()) {
-      if (auto associate = dyn_cast<AssociatedTypeDecl>(requirement)) {
-        if (index == 0) return associate;
-        index--;
-      }
+    for (auto associate : conformance->getProtocol()->getAssociatedTypeMembers()) {
+      if (index == 0) return associate;
+      index--;
     }
     llvm_unreachable("didn't find associated type in protocol?");
   }
