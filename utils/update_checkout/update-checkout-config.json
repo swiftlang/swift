@@ -356,7 +356,7 @@
             "aliases": ["tensorflow"],
             "repos": {
                 "llvm": "swift-DEVELOPMENT-SNAPSHOT-2019-06-06-a",
-		"clang": "ea2e6942a25eb7201d32c7c21b1dd7e5658ba1e8",
+                "clang": "ea2e6942a25eb7201d32c7c21b1dd7e5658ba1e8",
                 "swift": "tensorflow",
                 "lldb": "4514d21fbe49a16baf26ba918c5a4906d54e8091",
                 "cmark": "swift-DEVELOPMENT-SNAPSHOT-2019-06-06-a",
