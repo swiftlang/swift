@@ -450,7 +450,7 @@ SILGenModule::getKeyPathProjectionCoroutine(bool isReadAccess,
                              /*pseudogeneric*/false,
                              // SWIFT_ENABLE_TENSORFLOW
                              /*non-escaping*/false,
-                             /*differentiable*/ false);
+                             DifferentiabilityKind::NonDifferentiable);
 
   auto functionTy = SILFunctionType::get(sig, extInfo,
                                          SILCoroutineKind::YieldOnce,

@@ -295,7 +295,7 @@ class alignas(1 << TypeAlignInBits) TypeBase {
 protected:
   // SWIFT_ENABLE_TENSORFLOW
   enum { NumAFTExtInfoBits = 8 };
-  enum { NumSILExtInfoBits = 7 };
+  enum { NumSILExtInfoBits = 8 };
   union { uint64_t OpaqueBits;
 
   SWIFT_INLINE_BITFIELD_BASE(TypeBase, bitmax(NumTypeKindBits,8) +
@@ -2867,15 +2867,17 @@ public:
     //
     //   SWIFT_ENABLE_TENSORFLOW
     //   |representation|noEscape|throws|differentiability|
-    //   |    0 .. 3    |    4   |   5  |      6 .. 8     |
+    //   |    0 .. 3    |    4   |   5  |      6 .. 7     |
     //
     enum : unsigned {
-      RepresentationMask     = 0xF << 0,
-      NoEscapeMask           = 1 << 4,
-      ThrowsMask             = 1 << 5,
+      RepresentationMask           = 0xF << 0,
+      NoEscapeMask                 = 1 << 4,
+      ThrowsMask                   = 1 << 5,
       // SWIFT_ENABLE_TENSORFLOW
-      DifferentiableMask     = 1 << 7,
-      NumMaskBits            = 8
+      DifferentiabilityMaskOffset  = 6,
+      DifferentiabilityMask        = 0x3 << DifferentiabilityMaskOffset,
+      NumDifferentiabilityMaskBits = 2,
+      NumMaskBits                  = 8
     };
 
     unsigned Bits; // Naturally sized for speed.
@@ -2899,17 +2901,24 @@ public:
     ExtInfo(Representation Rep,
             bool IsNoEscape,
             // SWIFT_ENABLE_TENSORFLOW
-            bool Throws, bool IsDifferentiable)
+            bool Throws, DifferentiabilityKind diffKind)
       : ExtInfo(Rep, Throws) {
       Bits |= (IsNoEscape ? NoEscapeMask : 0);
       // SWIFT_ENABLE_TENSORFLOW
-      Bits |= (IsDifferentiable ? DifferentiableMask : 0);
+      Bits |= ((unsigned)diffKind << DifferentiabilityMaskOffset)
+              & DifferentiabilityMask;
     }
 
     bool isNoEscape() const { return Bits & NoEscapeMask; }
     bool throws() const { return Bits & ThrowsMask; }
     // SWIFT_ENABLE_TENSORFLOW
-    bool isDifferentiable() const { return Bits & DifferentiableMask; }
+    bool isDifferentiable() const {
+      return getDifferentiabilityKind() >= DifferentiabilityKind::Normal;
+    }
+    DifferentiabilityKind getDifferentiabilityKind() const {
+      return DifferentiabilityKind((Bits & DifferentiabilityMask) >>
+                                   DifferentiabilityMaskOffset);
+    }
     Representation getRepresentation() const {
       unsigned rawRep = Bits & RepresentationMask;
       assert(rawRep <= unsigned(Representation::Last)
@@ -2975,11 +2984,12 @@ public:
     }
     // SWIFT_ENABLE_TENSORFLOW
     LLVM_NODISCARD
-    ExtInfo withDifferentiable(bool isDifferentiable = true) const {
-      if (isDifferentiable)
-        return ExtInfo(Bits | DifferentiableMask);
-      else
-        return ExtInfo(Bits & ~DifferentiableMask);
+    ExtInfo withDifferentiabilityKind(
+        DifferentiabilityKind differentiability)
+    const {
+      return ExtInfo((Bits & ~DifferentiabilityMask) |
+                     ((unsigned)differentiability <<
+                      DifferentiabilityMaskOffset));
     }
 
     unsigned getFuncAttrKey() const {
@@ -3107,6 +3117,9 @@ public:
   // SWIFT_ENABLE_TENSORFLOW
   bool isDifferentiable() const {
     return getExtInfo().isDifferentiable();
+  }
+  DifferentiabilityKind getDifferentiabilityKind() const {
+    return getExtInfo().getDifferentiabilityKind();
   }
 
   /// Returns a new function type exactly like this one but with the ExtInfo
@@ -3750,18 +3763,19 @@ public:
     // and NumMaskBits must be updated, and they must match.
 
     // SWIFT_ENABLE_TENSORFLOW
-    //   |representation|pseudogeneric| noescape | differentiability |
-    //   |    0 .. 3    |      4      |     5    |      6 .. 8       |
+    //   |representation|pseudogeneric|noescape|differentiability|
+    //   |    0 .. 3    |      4      |     5  |      6 .. 7     |
     //
     enum : unsigned {
-      RepresentationMask = 0xF << 0,
-      PseudogenericMask  = 1 << 4,
-      NoEscapeMask       = 1 << 5,
+      RepresentationMask           = 0xF << 0,
+      PseudogenericMask            = 1 << 4,
+      NoEscapeMask                 = 1 << 5,
       // SWIFT_ENABLE_TENSORFLOW
-      DifferentiableMask = 1 << 6,
-      NumMaskBits        = 7
+      DifferentiabilityMaskOffset  = 6,
+      DifferentiabilityMask        = 0x3 << DifferentiabilityMaskOffset,
+      NumDifferentiabilityMaskBits = 2,
+      NumMaskBits                  = 8
     };
-
     unsigned Bits; // Naturally sized for speed.
 
     ExtInfo(unsigned Bits) : Bits(Bits) {}
@@ -3775,12 +3789,13 @@ public:
     // Constructor for polymorphic type.
     // SWIFT_ENABLE_TENSORFLOW
     ExtInfo(Representation rep, bool isPseudogeneric, bool isNoEscape,
-            bool isDifferentiable) {
+            DifferentiabilityKind diffKind) {
       Bits = ((unsigned) rep) |
              (isPseudogeneric ? PseudogenericMask : 0) |
              // SWIFT_ENABLE_TENSORFLOW
              (isNoEscape ? NoEscapeMask : 0) |
-             (isDifferentiable ? DifferentiableMask : 0);
+             (((unsigned)diffKind << DifferentiabilityMaskOffset)
+              & DifferentiabilityMask);
     }
 
     /// Is this function pseudo-generic?  A pseudo-generic function
@@ -3791,7 +3806,14 @@ public:
     bool isNoEscape() const { return Bits & NoEscapeMask; }
     
     // SWIFT_ENABLE_TENSORFLOW
-    bool isDifferentiable() const { return Bits & DifferentiableMask; }
+    bool isDifferentiable() const {
+      return getDifferentiabilityKind() >= DifferentiabilityKind::Normal;
+    }
+    
+    DifferentiabilityKind getDifferentiabilityKind() const {
+      return DifferentiabilityKind((Bits & DifferentiabilityMask) >>
+                                   DifferentiabilityMaskOffset);
+    }
 
     /// What is the abstract representation of this function value?
     Representation getRepresentation() const {
@@ -3855,11 +3877,11 @@ public:
         return ExtInfo(Bits & ~NoEscapeMask);
     }
     // SWIFT_ENABLE_TENSORFLOW
-    ExtInfo withDifferentiable(bool isDifferentiable = true) const {
-      if (isDifferentiable)
-        return ExtInfo(Bits | DifferentiableMask);
-      else
-        return ExtInfo(Bits & ~DifferentiableMask);
+    ExtInfo withDifferentiabilityKind(
+        DifferentiabilityKind differentiability) const {
+      return ExtInfo((Bits & ~DifferentiabilityMask) |
+                     ((unsigned)differentiability <<
+                      DifferentiabilityMaskOffset));
     }
 
     unsigned getFuncAttrKey() const {

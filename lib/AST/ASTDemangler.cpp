@@ -385,7 +385,7 @@ Type ASTBuilder::createFunctionType(
 
   // SWIFT_ENABLE_TENSORFLOW
   if (flags.isDifferentiable())
-    einfo = einfo.withDifferentiable(true);
+    einfo = einfo.withDifferentiabilityKind(DifferentiabilityKind::Normal);
 
   // The result type must be materializable.
   if (!output->isMaterializable()) return Type();
@@ -495,7 +495,9 @@ Type ASTBuilder::createImplFunctionType(
 
   auto einfo = SILFunctionType::ExtInfo(representation,
                                         flags.isPseudogeneric(),
-                                        !flags.isEscaping(), false);
+                                        !flags.isEscaping(),
+                                        DifferentiabilityKind::
+                                            NonDifferentiable);
 
   llvm::SmallVector<SILParameterInfo, 8> funcParams;
   llvm::SmallVector<SILYieldInfo, 8> funcYields;

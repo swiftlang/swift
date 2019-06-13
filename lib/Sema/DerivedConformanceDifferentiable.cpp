@@ -326,7 +326,7 @@ static void deriveBodyDifferentiable_method(AbstractFunctionDecl *funcDecl,
     memberMethodCallExprs.push_back(createMemberMethodCallExpr(member));
     memberNames.push_back(member->getName());
   }
-  // Call memberwise initialier with member method call expressions.
+  // Call memberwise initializer with member method call expressions.
   auto *callExpr =
       CallExpr::createImplicit(C, initExpr, memberMethodCallExprs, memberNames);
   ASTNode returnStmt = new (C) ReturnStmt(SourceLoc(), callExpr, true);
@@ -386,11 +386,7 @@ static ValueDecl *deriveDifferentiable_method(
     // constructor is synthesized during SILGen, which is too late.
     auto *initDecl = createImplicitConstructor(
         TC, returnNominal, ImplicitConstructorKind::Memberwise);
-    initDecl->setDeclContext(parentDC);
-    if (nominal == returnNominal)
-      derived.addMembersToConformanceContext(initDecl);
-    else
-      returnNominal->addMember(initDecl);
+    returnNominal->addMember(initDecl);
     C.addSynthesizedDecl(initDecl);
   }
 

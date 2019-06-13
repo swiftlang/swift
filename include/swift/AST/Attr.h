@@ -67,6 +67,11 @@ public:
   SourceLoc AtLoc;
   Optional<StringRef> convention = None;
   Optional<StringRef> conventionWitnessMethodProtocol = None;
+  
+  // SWIFT_ENABLE_TENSORFLOW
+  // Indicates whether the type's '@differentiable' attribute has a 'linear'
+  // argument.
+  bool linear = false;
 
   // For an opened existential type, the known ID.
   Optional<UUID> OpenedID;
@@ -82,6 +87,9 @@ public:
   TypeAttributes() {}
   
   bool isValid() const { return AtLoc.isValid(); }
+  
+  // SWIFT_ENABLE_TENSORFLOW
+  bool isLinear() const { return linear; }
   
   void clearAttribute(TypeAttrKind A) {
     AttrLocs[A] = SourceLoc();

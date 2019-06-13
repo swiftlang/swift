@@ -2345,7 +2345,7 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
   // Ok, it is a valid attribute, eat it, and then process it.
   StringRef Text = Tok.getText();
   SourceLoc Loc = consumeToken();
-  
+
   StringRef conventionName;
   StringRef witnessMethodProtocol;
 
@@ -2394,6 +2394,52 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
     parseMatchingToken(tok::r_paren, RPLoc,
                        diag::convention_attribute_expected_rparen,
                        LPLoc);
+  }
+  
+  // SWIFT_ENABLE_TENSORFLOW
+  bool linear = false;
+  if (attr == TAK_differentiable) {
+    // Check if there is a 'linear' argument.
+    if (Tok.is(tok::l_paren) && peekToken().is(tok::identifier)) {
+      Parser::BacktrackingScope backtrack(*this);
+      consumeToken(tok::l_paren);
+      
+      // Determine if we have '@differentiable(linear) (T) -> U'
+      // or '@differentiable (linear) -> U'.
+      if (Tok.getText() == "linear" && consumeIf(tok::identifier)) {
+        if (Tok.is(tok::r_paren) && peekToken().is(tok::l_paren)) {
+          // It is being used as an attribute argument, so cancel backtrack
+          // as function is linear differentiable.
+          linear = true;
+          backtrack.cancelBacktrack();
+          consumeToken(tok::r_paren);
+        } else if (Tok.is(tok::l_paren)) {
+          // Handle invalid '@differentiable(linear (T) -> U'
+          if (!justChecking)
+            diagnose(Tok,
+                     diag::differentiable_attribute_expected_rparen);
+          backtrack.cancelBacktrack();
+          return false;
+        }
+      } else if (Tok.is(tok::identifier)) {
+        // No 'linear' arg or param type, but now checking if the token is being
+        // passed in as an invalid argument to '@differentiable'.
+        auto possibleArg = Tok.getText();
+        auto t = Tok; // get ref to the argument for clearer diagnostics.
+        consumeToken(tok::identifier);
+        // Check if there is an invalid argument getting passed into
+        // '@differentiable'.
+        if (Tok.is(tok::r_paren) && peekToken().is(tok::l_paren)) {
+          // Handling '@differentiable(wrong) (...'.
+          if (!justChecking)
+            diagnose(t, diag::unexpected_argument_differentiable,
+                     possibleArg);
+          consumeToken(tok::r_paren);
+          backtrack.cancelBacktrack();
+          return false;
+        }
+      }
+    }
   }
 
   // In just-checking mode, we only need to consume the tokens, and we don't
@@ -2535,6 +2581,7 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
   // SWIFT_ENABLE_TENSORFLOW
   // @differentiable(...) attribute.
   case TAK_differentiable:
+    Attributes.linear = linear;
     break;
   }
 

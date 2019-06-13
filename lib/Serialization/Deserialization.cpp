@@ -4704,7 +4704,9 @@ public:
     uint8_t rawRepresentation;
 
     // SWIFT_ENABLE_TENSORFLOW
-    bool noescape = false, throws = false, differentiable = false;
+    bool noescape = false, throws = false;
+    uint8_t rawDiffKind = 0;
+    auto diffKind = DifferentiabilityKind::NonDifferentiable;
     GenericSignature *genericSig = nullptr;
 
     if (!isGeneric) {
@@ -4713,7 +4715,8 @@ public:
                                                   noescape,
                                                   // SWIFT_ENABLE_TENSORFLOW
                                                   throws,
-                                                  differentiable);
+                                                  rawDiffKind);
+      diffKind = DifferentiabilityKind(rawDiffKind);
     } else {
       GenericSignatureID rawGenericSig;
       decls_block::GenericFunctionTypeLayout::readRecord(scratch,
@@ -4721,8 +4724,9 @@ public:
                                                          rawRepresentation,
                                                          throws,
                                                          // SWIFT_ENABLE_TENSORFLOW
-                                                         differentiable,
+                                                         rawDiffKind,
                                                          rawGenericSig);
+      diffKind = DifferentiabilityKind(rawDiffKind);
       genericSig = MF.getGenericSignature(rawGenericSig);
     }
 
@@ -4734,7 +4738,7 @@ public:
 
     auto info = FunctionType::ExtInfo(*representation, noescape,
                                       // SWIFT_ENABLE_TENSORFLOW
-                                      throws, differentiable);
+                                      throws, diffKind);
 
     auto resultTy = MF.getTypeChecked(resultID);
     if (!resultTy)
@@ -5112,8 +5116,9 @@ public:
       return nullptr;
     }
     // SWIFT_ENABLE_TENSORFLOW
-    SILFunctionType::ExtInfo extInfo(*representation, pseudogeneric, noescape,
-                                     differentiable);
+    auto kind = DifferentiabilityKind((unsigned)differentiable);
+    SILFunctionType::ExtInfo extInfo(*representation, pseudogeneric,
+                                     noescape, kind);
 
     // Process the coroutine kind.
     auto coroutineKind = getActualSILCoroutineKind(rawCoroutineKind);

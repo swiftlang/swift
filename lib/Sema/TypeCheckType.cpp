@@ -2225,12 +2225,20 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
               SourceLoc(), Context.getIdentifier(protocolName));
         }
       }
+      
+      // SWIFT_ENABLE_TENSORFLOW
+      auto diffkind = DifferentiabilityKind::NonDifferentiable;
+      if (attrs.has(TAK_differentiable)) {
+        diffkind = attrs.linear
+            ? DifferentiabilityKind::Linear
+            : DifferentiabilityKind::Normal;
+      }
 
       // Resolve the function type directly with these attributes.
       SILFunctionType::ExtInfo extInfo(rep, attrs.has(TAK_pseudogeneric),
                                        // SWIFT_ENABLE_TENSORFLOW
                                        attrs.has(TAK_noescape),
-                                       attrs.has(TAK_differentiable));
+                                       diffkind);
 
       ty = resolveSILFunctionType(fnRepr, options, coroutineKind, extInfo,
                                   calleeConvention, witnessMethodProtocol);
@@ -2264,12 +2272,26 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
                  "@autoclosure");
         attrs.clearAttribute(TAK_autoclosure);
       }
-
+      
+      // SWIFT_ENABLE_TENSORFLOW
+      DifferentiabilityKind diffkind = DifferentiabilityKind::NonDifferentiable;
+      if (attrs.has(TAK_differentiable)) {
+        if (attrs.linear) {
+          // FIXME(bartchr): allow types to be marked
+          // as `@differentiable(linear)`.
+          diagnose(attrs.getLoc(TAK_differentiable),
+                   diag::linear_differentiable_type_disabled);
+          attrs.clearAttribute(TAK_differentiable);
+        } else {
+          diffkind = DifferentiabilityKind::Normal;
+        }
+      }
+      
       // Resolve the function type directly with these attributes.
       FunctionType::ExtInfo extInfo(rep, /*noescape=*/false,
                                     // SWIFT_ENABLE_TENSORFLOW
                                     fnRepr->throws(),
-                                    attrs.has(TAK_differentiable));
+                                    diffkind);
 
       ty = resolveASTFunctionType(fnRepr, options, extInfo);
       if (!ty || ty->hasError())

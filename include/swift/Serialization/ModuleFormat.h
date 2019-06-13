@@ -777,16 +777,16 @@ namespace decls_block {
     BCFixed<1>,  // noescape?
     // SWIFT_ENABLE_TENSORFLOW
     BCFixed<1>,  // throws?
-    BCFixed<1>   // differentiable?
+    BCFixed<2> // differentiability kind
     // trailed by parameters
   >;
 
   using FunctionParamLayout = BCRecordLayout<
     FUNCTION_PARAM,
-    IdentifierIDField,  // name
-    TypeIDField,        // type
-    BCFixed<1>,         // vararg?
-    BCFixed<1>,         // autoclosure?
+    IdentifierIDField,   // name
+    TypeIDField,         // type
+    BCFixed<1>,          // vararg?
+    BCFixed<1>,          // autoclosure?
     ValueOwnershipField, // inout, shared or owned?
     BCFixed<1>           // nondifferentiable?
   >;
@@ -851,7 +851,7 @@ namespace decls_block {
     FunctionTypeRepresentationField, // representation
     BCFixed<1>,          // throws?
     // SWIFT_ENABLE_TENSORFLOW
-    BCFixed<1>,          // differentiable?
+    BCFixed<2>,          // differentiable & linear?
     GenericSignatureIDField // generic signture
 
     // trailed by parameters

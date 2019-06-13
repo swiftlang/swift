@@ -1,8 +1,18 @@
 // SWIFT_ENABLE_TENSORFLOW
 // RUN: %target-swift-frontend -typecheck -verify -primary-file %s %S/Inputs/struct_key_path_iterable_other_module.swift
-// REQUIRES: tensorflow
 
-import TensorFlow
+struct Tensor<Scalar> {
+  var scalar: Scalar
+  init(_ scalar: Scalar) {
+    self.scalar = scalar
+  }
+}
+extension Tensor : Equatable where Scalar : Equatable {}
+extension Tensor : AdditiveArithmetic where Scalar : AdditiveArithmetic {}
+extension Tensor : VectorProtocol where Scalar : AdditiveArithmetic {
+  typealias VectorSpaceScalar = Scalar
+  func scaled(by scalar: Scalar) -> Self { self }
+}
 
 // Synthesis should work for empty structs.
 // `allKeyPaths` simply returns `[]`.
@@ -28,7 +38,7 @@ struct TensorParameters : KeyPathIterable {
 
   // Non-stored-property members should not affect synthesis.
   var computed: Float {
-    return (w + b).scalarized()
+    return (w + b).scalar
   }
   func foo() {}
   typealias Foo = Int
@@ -44,9 +54,9 @@ extension TensorParameters : VectorProtocol {
   static func - (lhs: TensorParameters, rhs: TensorParameters) -> TensorParameters {
     return TensorParameters(w: lhs.w + rhs.w, b: lhs.b + rhs.b)
   }
-  typealias VectorSpaceScalar = Tensor<Float>
-  static func * (lhs: VectorSpaceScalar, rhs: TensorParameters) -> TensorParameters {
-    return TensorParameters(w: lhs + rhs.w, b: lhs + rhs.b)
+  typealias VectorSpaceScalar = Float
+  func scaled(by scalar: VectorSpaceScalar) -> TensorParameters {
+    return TensorParameters(w: w.scaled(by: scalar), b: b.scaled(by: scalar))
   }
 }
 
@@ -80,73 +90,20 @@ struct A<T> {
 
 // Test generic optimizer.
 
-// `pow` is defined in Darwin on `Float` and `Double`, but there doesn't exist
-// a generic version for `FloatingPoint`.
-// This is a manual definition.
-func pow<T : BinaryFloatingPoint>(_ x: T, _ y: T) -> T {
-  // return T(pow(Float(x), Float(y)))
-  return T(pow(Double(x), Double(y)))
-}
-
-struct AdamOptimizer<P : KeyPathIterable, Scalar : BinaryFloatingPoint>
-  where P : VectorProtocol, P.VectorSpaceScalar == Tensor<Scalar>
+struct DummyOptimizer<P : KeyPathIterable, Scalar : BinaryFloatingPoint>
+  where P : VectorProtocol, P.VectorSpaceScalar == Scalar
 {
   let learningRate: Scalar
-  var beta1: Scalar
-  var beta2: Scalar
-  var epsilon: Scalar
-
-  init(
-    learningRate: Scalar = 1e-3,
-    beta1: Scalar = 0.9,
-    beta2: Scalar = 0.999,
-    epsilon: Scalar = 1e-8
-  ) {
-    self.learningRate = learningRate
-    self.beta1 = beta1
-    self.beta2 = beta2
-    self.epsilon = epsilon
-  }
-
-  var step: Scalar = 0
   var firstMoments: P = P.zero
-  var secondMoments: P = P.zero
 
   mutating func fitParameters(
     parameters: inout P, withGradients gradients: P
   ) {
     for kp in parameters.recursivelyAllWritableKeyPaths(to: Tensor<Scalar>.self) {
-      firstMoments[keyPath: kp] =
-        firstMoments[keyPath: kp] * beta1 + (1 - beta1) * gradients[keyPath: kp]
-      secondMoments[keyPath: kp] =
-        firstMoments[keyPath: kp] * beta2 + (1 - beta2) * gradients[keyPath: kp] * gradients[keyPath: kp]
-
-      let denominator = sqrt(secondMoments[keyPath: kp]) + epsilon
-      step += 1
-      let biasCorrection1 = 1 - pow(beta1, step)
-      let biasCorrection2 = 1 - pow(beta2, step)
-      let stepSize = learningRate * sqrt(biasCorrection2) / biasCorrection1
-      parameters[keyPath: kp] -= stepSize * firstMoments[keyPath: kp] / denominator
+      firstMoments[keyPath: kp] *= learningRate
+      parameters[keyPath: kp] -= learningRate * parameters[keyPath: kp]
     }
   }
-}
-
-func testOptimizer<P : KeyPathIterable, Scalar : BinaryFloatingPoint>(
-  parameters: inout P, withGradients gradients: P
-)
-  where P : VectorProtocol, P.VectorSpaceScalar == Tensor<Scalar>
-{
-  var optimizer = AdamOptimizer<P, Scalar>()
-  print(parameters)
-  for _ in 0..<5 {
-    optimizer.fitParameters(parameters: &parameters, withGradients: gradients)
-    print(parameters)
-  }
-}
-func testOptimizerTensorParameters() {
-  var tensorParams = TensorParameters.zero
-  let gradients = TensorParameters(w: Tensor(10), b: Tensor(10))
-  testOptimizer(parameters: &tensorParams, withGradients: gradients)
 }
 
 // Test derived conformances in disallowed contexts.

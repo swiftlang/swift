@@ -4623,7 +4623,8 @@ AnyFunctionType *AnyFunctionType::getWithoutDifferentiability() const {
                    param.getParameterFlags().withNonDifferentiable(false));
     newParams.push_back(newParam);
   }
-  auto nonDiffExtInfo = getExtInfo().withDifferentiable(false);
+  auto nonDiffExtInfo = getExtInfo()
+      .withDifferentiabilityKind(DifferentiabilityKind::NonDifferentiable);
   if (isa<FunctionType>(this))
     return FunctionType::get(newParams, getResult(), nonDiffExtInfo);
   assert(isa<GenericFunctionType>(this));

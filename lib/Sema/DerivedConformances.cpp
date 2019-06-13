@@ -295,12 +295,12 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
     }
 
     // SWIFT_ENABLE_TENSORFLOW
-    // VectorProtocol.*
-    if (func->isOperator() && name.getBaseName() == "*") {
+    // VectorProtocol.scaled(by:)
+    if (name.isCompoundName() && name.getBaseName() == ctx.Id_scaled) {
       auto argumentNames = name.getArgumentNames();
-      if (argumentNames.size() == 2) {
+      if (argumentNames.size() == 1 &&
+          argumentNames[0] == ctx.getIdentifier("by"))
         return getRequirement(KnownProtocolKind::VectorProtocol);
-      }
     }
 
     // SWIFT_ENABLE_TENSORFLOW
