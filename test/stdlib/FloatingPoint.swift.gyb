@@ -762,13 +762,12 @@ FloatingPoint.test("${FloatSelf}/{Comparable,Hashable,Equatable}") {
       let max = ${FloatSelf}.maximum(lhs, rhs)
       let minMag = ${FloatSelf}.minimumMagnitude(lhs, rhs)
       let maxMag = ${FloatSelf}.maximumMagnitude(lhs, rhs)
-      //  If either lhs or rhs is signaling, or if both are quiet NaNs, the
-      //  result is a quiet NaN.
-      if lhs.isSignalingNaN || rhs.isSignalingNaN || (lhs.isNaN && rhs.isNaN) {
-        expectTrue(min.isQuietNaN)
-        expectTrue(max.isQuietNaN)
-        expectTrue(minMag.isQuietNaN)
-        expectTrue(maxMag.isQuietNaN)
+      //  If both are NaNs, the result is a NaN.
+      if lhs.isNaN && rhs.isNaN {
+        expectTrue(min.isNaN)
+        expectTrue(max.isNaN)
+        expectTrue(minMag.isNaN)
+        expectTrue(maxMag.isNaN)
       }
       //  If only one of lhs and rhs is NaN, the result of the min/max
       //  operations is always the other value.  While contrary to all other
