@@ -1978,15 +1978,21 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
   Type type;
   if (typeExpr->getTypeLoc().wasValidated()) {
     type = typeExpr->getTypeLoc().getType();
-  } else if (auto *rep = typeExpr->getTypeRepr()) {
+  } else {
     TypeResolutionOptions options(TypeResolverContext::InExpression);
     options |= TypeResolutionFlags::AllowUnboundGenerics;
-    auto resolution = TypeResolution::forContextual(DC);
-    type = resolution.resolveType(rep, options);
-    typeExpr->getTypeLoc().setType(type);
+
+    auto &typeLoc = typeExpr->getTypeLoc();
+    bool hadError =
+        TC.validateType(typeLoc, TypeResolution::forContextual(DC), options);
+
+    if (hadError)
+      return nullptr;
+
+    type = typeLoc.getType();
   }
 
-  if (!type)
+  if (!type || !type->getAnyNominal())
     return nullptr;
 
   // Don't bother to convert deprecated selector syntax.
@@ -1995,16 +2001,13 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
       return nullptr;
   }
 
-  ConformanceCheckOptions options;
-  options |= ConformanceCheckFlags::InExpression;
-  options |= ConformanceCheckFlags::SkipConditionalRequirements;
-
-  auto result = TC.conformsToProtocol(type, protocol, DC, options);
-  if (!result || !result->isConcrete())
-    return nullptr;
-
-  return CoerceExpr::forLiteralInit(TC.Context, argExpr, call->getSourceRange(),
-                                    typeExpr->getTypeLoc());
+  auto *NTD = type->getAnyNominal();
+  SmallVector<ProtocolConformance *, 2> conformances;
+  return NTD->lookupConformance(DC->getParentModule(), protocol, conformances)
+             ? CoerceExpr::forLiteralInit(TC.Context, argExpr,
+                                          call->getSourceRange(),
+                                          typeExpr->getTypeLoc())
+             : nullptr;
 }
 
 /// Pre-check the expression, validating any types that occur in the
