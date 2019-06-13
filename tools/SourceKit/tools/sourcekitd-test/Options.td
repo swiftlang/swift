@@ -139,7 +139,7 @@ def vfs_files : CommaJoined<["-"], "vfs-files=">,
 
 // SWIFT_ENABLE_TENSORFLOW
 def in_memory_clang_module_cache : Flag<["-"], "in-memory-clang-module-cache">,
-  HelpText<"Put the clang module cache in memory">;
+  HelpText<"Put the Clang module cache in memory">;
 
 def help : Flag<["-", "--"], "help">,
   HelpText<"Display available options">;
