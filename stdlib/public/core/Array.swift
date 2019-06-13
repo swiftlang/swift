@@ -1916,7 +1916,7 @@ internal struct _ArrayAnyHashableBox<Element: Hashable>
 extension Array where Element : Differentiable {
   /// The view of an array as the differentiable product manifold of `Element`
   /// multiplied with itself `count` times.
-  @_fixed_layout
+  @frozen
   public struct DifferentiableView : Differentiable {
     private var _base: [Element]
 
@@ -1924,7 +1924,7 @@ extension Array where Element : Differentiable {
     // I'm implementing this as a computed property instead of directly
     // exposing `_base` because the `@differentiable` annotation does not make
     // the stored property actually differentiable. I think this is a bug.
-    // Maybe it's related to `@_fixed_layout`?
+    // Maybe it's related to `@frozen`?
     // TODO: Determine if that is a bug, and fix.
     public var base: [Element] {
       @differentiable(wrt: self, vjp: _vjpBase)

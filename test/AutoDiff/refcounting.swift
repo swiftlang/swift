@@ -5,7 +5,7 @@ public class NonTrivialStuff : Equatable {
   public static func == (lhs: NonTrivialStuff, rhs: NonTrivialStuff) -> Bool { return true }
 }
 
-@_fixed_layout
+@frozen
 public struct Vector : AdditiveArithmetic, VectorProtocol, Differentiable, Equatable {
   public var x: Float
   public var y: Float

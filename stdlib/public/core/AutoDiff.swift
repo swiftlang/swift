@@ -619,7 +619,7 @@ public struct AnyDerivative : Differentiable & AdditiveArithmetic {
   // `AdditiveArithmetic` requirements.
 
   /// Internal struct representing an opaque zero value.
-  @_fixed_layout
+  @frozen
   @usableFromInline
   internal struct OpaqueZero : Differentiable & AdditiveArithmetic {}
 
