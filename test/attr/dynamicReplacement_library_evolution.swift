@@ -1,6 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-typecheck-verify-swift -swift-version 5 -enable-library-evolution  -I %t
 
+// REQUIRES: objc_interop
+
 struct Container {
   dynamic var property: Int { return 1 } // expected-error{{marking non-'@objc' Swift declaration 'dynamic' in library evolution mode is not supported}}
   dynamic func foo() {} // expected-error{{marking non-'@objc' Swift declaration 'dynamic' in library evolution mode is not supported}}
