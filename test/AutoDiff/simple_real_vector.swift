@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s
 
-@_fixed_layout
+@frozen
 public struct Vector : AdditiveArithmetic, VectorProtocol, Differentiable {
   public var x: Float
   public var y: Float
@@ -54,7 +54,7 @@ public func test1() -> Vector {
 // Should pass verification.
 @_fixed_layout
 public class NonTrivial {}
-@_fixed_layout
+@frozen
 public struct TF189: Differentiable {
   @noDerivative public let x: Double
   @noDerivative public let nonTrivial: NonTrivial
