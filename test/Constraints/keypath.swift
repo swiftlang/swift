@@ -30,10 +30,8 @@ class Demo {
   var here: (() -> Void)?
 }
 
-// FIXME: This error is better than it was, but the diagnosis should break it down more specifically to 'here's type.
-// TODO(diagnostics): Fix this regression, we want the following error message ideally
-// "cannot convert value of type 'ReferenceWritableKeyPath<Demo, (() -> Void)?>' to expected argument type 'KeyPath<_, ((_) -> Void)?>'"
 let some = Some(keyPath: \Demo.here)
-// expected-error@-1 {{generic parameter 'V' could not be inferred}}
-// expected-note@-2 {{explicitly specify the generic arguments to fix this issue}}
-
+// expected-error@-1 {{cannot convert value of type 'KeyPath<Demo, (() -> Void)?>' to expected argument type 'KeyPath<Demo, ((Any) -> Void)?>'}}
+// expected-note@-2 {{arguments to generic parameter 'Value' ('(() -> Void)?' and '((Any) -> Void)?') are expected to be equal}}
+// expected-error@-3 {{generic parameter 'V' could not be inferred}}
+// expected-note@-4 {{explicitly specify the generic arguments to fix this issue}}

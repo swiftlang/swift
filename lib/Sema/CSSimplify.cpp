@@ -1598,7 +1598,7 @@ static ConstraintSystem::TypeMatchResult matchDeepTypeArguments(
     ConstraintSystem &cs, ConstraintSystem::TypeMatchOptions subflags,
     ArrayRef<Type> args1, ArrayRef<Type> args2,
     ConstraintLocatorBuilder locator,
-    llvm::function_ref<void(unsigned)> recordMismatch = [](unsigned) {}) {
+    llvm::function_ref<bool(unsigned)> recordMismatch = [](unsigned) { return false; }) {
   if (args1.size() != args2.size()) {
     return cs.getTypeMatchFailure(locator);
   }
@@ -1609,9 +1609,8 @@ static ConstraintSystem::TypeMatchResult matchDeepTypeArguments(
         locator.withPathElement(LocatorPathElt::getGenericArgument(i)));
 
     if (result.isFailure()) {
-      if (!cs.shouldAttemptFixes())
+      if (!cs.shouldAttemptFixes() || !recordMismatch(i))
         return result;
-      recordMismatch(i);
     }
   }
 
@@ -1692,8 +1691,11 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
   auto result =
       matchDeepTypeArguments(*this, subflags, args1, args2, locator,
                              [&](unsigned position) {
-                               if (!(forRequirement || isOptional || isArray))
-                                 failedArguments.push_back(position);
+                                if (forRequirement || isOptional || isArray)
+                                  return false;
+                                
+                                failedArguments.push_back(position);
+                                return true;
                              });
   if (!failedArguments.empty()) {
     auto *fix = GenericArgumentsMismatch::create(
