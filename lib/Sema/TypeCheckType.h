@@ -377,6 +377,21 @@ public:
   bool areSameType(Type type1, Type type2) const;
 };
 
+/// Kinds of types for CustomAttr.
+enum class CustomAttrTypeKind {
+  /// The type is required to not be expressed in terms of
+  /// any contextual type parameters.
+  NonGeneric,
+
+  /// Property delegates have some funky rules, like allowing
+  /// unbound generic types.
+  PropertyDelegate,
+};
+
+/// Attempt to resolve a concrete type for a custom attribute.
+Type resolveCustomAttrType(CustomAttr *attr, DeclContext *dc,
+                           CustomAttrTypeKind typeKind);
+
 } // end namespace swift
 
 #endif /* SWIFT_SEMA_TYPE_CHECK_TYPE_H */

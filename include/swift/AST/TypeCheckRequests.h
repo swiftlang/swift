@@ -34,6 +34,7 @@ struct PropertyWrapperBackingPropertyInfo;
 class RequirementRepr;
 class SpecializeAttr;
 struct TypeLoc;
+class ValueDecl;
 
 /// Display a nominal type or extension thereof.
 void simple_display(
@@ -521,12 +522,67 @@ public:
   void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
+/// Request the custom attribute which attaches a function builder to the
+/// given declaration.
+class AttachedFunctionBuilderRequest :
+    public SimpleRequest<AttachedFunctionBuilderRequest,
+                         CacheKind::Cached,
+                         CustomAttr *,
+                         ValueDecl *> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<CustomAttr *>
+  evaluate(Evaluator &evaluator, ValueDecl *decl) const;
+
+public:
+  // Caching
+  bool isCached() const;
+
+  // Cycle handling
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+};
+
+/// Request the function builder type attached to the given declaration,
+/// if any.
+class FunctionBuilderTypeRequest :
+    public SimpleRequest<FunctionBuilderTypeRequest,
+                         CacheKind::Cached,
+                         Type,
+                         ValueDecl *> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  llvm::Expected<Type>
+  evaluate(Evaluator &evaluator, ValueDecl *decl) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+
+  // Cycle handling
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>
-bool AnyValue::Holder<Type>::equals(const HolderBase &other) const;
+inline bool AnyValue::Holder<Type>::equals(const HolderBase &other) const {
+  assert(typeID == other.typeID && "Caller should match type IDs");
+  return value.getPointer() ==
+      static_cast<const Holder<Type> &>(other).value.getPointer();
+}
 
-void simple_display(llvm::raw_ostream &out, const Type &type);
+void simple_display(llvm::raw_ostream &out, Type value);
 
 /// The zone number for the type checker.
 #define SWIFT_TYPE_CHECKER_REQUESTS_TYPEID_ZONE 10

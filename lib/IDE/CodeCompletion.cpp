@@ -1350,12 +1350,7 @@ public:
         Consumer(Consumer) {
   }
 
-  void setAttrTargetDecl(Decl *D) override {
-    if (D == nullptr) {
-      AttTargetDK = None;
-      return;
-    }
-    auto DK = D->getKind();
+  void setAttrTargetDeclKind(Optional<DeclKind> DK) override {
     if (DK == DeclKind::PatternBinding)
       DK = DeclKind::Var;
     AttTargetDK = DK;
@@ -1470,11 +1465,10 @@ protocolForLiteralKind(CodeCompletionLiteralKind kind) {
 /// that is of type () -> ().
 static bool hasTrivialTrailingClosure(const FuncDecl *FD,
                                       AnyFunctionType *funcType) {
-  SmallBitVector defaultMap =
-    computeDefaultMap(funcType->getParams(), FD,
-                      /*level*/ FD->isInstanceMember() ? 1 : 0);
+  ParameterListInfo paramInfo(funcType->getParams(), FD,
+                              /*level*/ FD->isInstanceMember() ? 1 : 0);
 
-  if (defaultMap.size() - defaultMap.count() == 1) {
+  if (paramInfo.size() - paramInfo.numNonDefaultedParameters() == 1) {
     auto param = funcType->getParams().back();
     if (!param.isAutoClosure()) {
       if (auto Fn = param.getOldType()->getAs<AnyFunctionType>()) {
@@ -5388,7 +5382,8 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     Lookup.getAttributeDeclCompletions(IsInSil, AttTargetDK);
 
     // Provide any type name for property delegate.
-    if (!AttTargetDK || *AttTargetDK == DeclKind::Var)
+    if (!AttTargetDK || *AttTargetDK == DeclKind::Var ||
+        *AttTargetDK == DeclKind::Param)
       Lookup.getTypeCompletionsInDeclContext(
           P.Context.SourceMgr.getCodeCompletionLoc());
     break;

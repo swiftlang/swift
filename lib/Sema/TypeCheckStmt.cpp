@@ -1937,6 +1937,20 @@ bool TypeChecker::typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD) {
   return false;
 }
 
+static Type getFunctionBuilderType(FuncDecl *FD) {
+  Type builderType = FD->getFunctionBuilderType();
+
+  // For getters, fall back on looking on the attribute on the storage.
+  if (!builderType) {
+    auto accessor = dyn_cast<AccessorDecl>(FD);
+    if (accessor && accessor->getAccessorKind() == AccessorKind::Get) {
+      builderType = accessor->getStorage()->getFunctionBuilderType();
+    }
+  }
+
+  return builderType;
+}
+
 // Type check a function body (defined with the func keyword) that is either a
 // named function or an anonymous func expression.
 bool TypeChecker::typeCheckFunctionBodyUntil(FuncDecl *FD,
@@ -1948,6 +1962,10 @@ bool TypeChecker::typeCheckFunctionBodyUntil(FuncDecl *FD,
 
   BraceStmt *BS = FD->getBody();
   assert(BS && "Should have a body");
+
+  if (Type builderType = getFunctionBuilderType(FD)) {
+    return typeCheckFunctionBuilderFuncBody(FD, builderType);
+  }
 
   if (FD->hasSingleExpressionBody()) {
     auto resultTypeLoc = FD->getBodyResultTypeLoc();

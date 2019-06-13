@@ -540,3 +540,19 @@ CollectionElementContextualMismatch::create(ConstraintSystem &cs, Type srcType,
   return new (cs.getAllocator())
       CollectionElementContextualMismatch(cs, srcType, dstType, locator);
 }
+
+SkipUnhandledConstructInFunctionBuilder *
+SkipUnhandledConstructInFunctionBuilder::create(ConstraintSystem &cs,
+                                                UnhandledNode unhandled,
+                                                NominalTypeDecl *builder,
+                                                ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+    SkipUnhandledConstructInFunctionBuilder(cs, unhandled, builder, locator);
+}
+
+bool SkipUnhandledConstructInFunctionBuilder::diagnose(Expr *root,
+                                                       bool asNote) const {
+  SkipUnhandledConstructInFunctionBuilderFailure failure(
+      root, getConstraintSystem(), unhandled, builder, getLocator());
+  return failure.diagnose(asNote);
+}

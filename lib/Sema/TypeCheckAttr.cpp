@@ -132,6 +132,7 @@ public:
   IGNORED_ATTR(Custom)
   IGNORED_ATTR(PropertyWrapper)
   IGNORED_ATTR(DisfavoredOverload)
+  IGNORED_ATTR(FunctionBuilder)
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
@@ -857,6 +858,7 @@ public:
   void visitNonOverrideAttr(NonOverrideAttr *attr);
   void visitCustomAttr(CustomAttr *attr);
   void visitPropertyWrapperAttr(PropertyWrapperAttr *attr);
+  void visitFunctionBuilderAttr(FunctionBuilderAttr *attr);
 };
 } // end anonymous namespace
 
@@ -2516,12 +2518,6 @@ void AttributeChecker::visitNonOverrideAttr(NonOverrideAttr *attr) {
 }
 
 
-void TypeChecker::checkParameterAttributes(ParameterList *params) {
-  for (auto param: *params) {
-    checkDeclAttributes(param);
-  }
-}
-
 void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
   auto dc = D->getInnermostDeclContext();
 
@@ -2573,6 +2569,59 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
     return;
   }
 
+  // If the nominal type is a function builder type, verify that D is a
+  // function, storage with an explicit getter, or parameter of function type.
+  if (nominal->getAttrs().hasAttribute<FunctionBuilderAttr>()) {
+    ValueDecl *decl;
+    if (auto param = dyn_cast<ParamDecl>(D)) {
+      decl = param;
+    } else if (auto func = dyn_cast<FuncDecl>(D)) {
+      decl = func;
+    } else if (auto storage = dyn_cast<AbstractStorageDecl>(D)) {
+      decl = storage;
+      auto getter = storage->getGetter();
+      if (!getter || getter->isImplicit() || !getter->hasBody()) {
+        TC.diagnose(attr->getLocation(),
+                    diag::function_builder_attribute_on_storage_without_getter,
+                    nominal->getFullName(),
+                    isa<SubscriptDecl>(storage) ? 0
+                      : storage->getDeclContext()->isTypeContext() ? 1
+                      : cast<VarDecl>(storage)->isLet() ? 2 : 3);
+        attr->setInvalid();
+        return;
+      }
+    } else {
+      TC.diagnose(attr->getLocation(),
+                  diag::function_builder_attribute_not_allowed_here,
+                  nominal->getFullName());
+      attr->setInvalid();
+      return;
+    }
+
+    // Diagnose and ignore arguments.
+    if (attr->getArg()) {
+      TC.diagnose(attr->getLocation(), diag::function_builder_arguments)
+        .highlight(attr->getArg()->getSourceRange());
+    }
+
+    // Complain if this isn't the primary function-builder attribute.
+    auto attached = decl->getAttachedFunctionBuilder();
+    if (attached != attr) {
+      TC.diagnose(attr->getLocation(), diag::function_builder_multiple,
+                  isa<ParamDecl>(decl));
+      TC.diagnose(attached->getLocation(),
+                  diag::previous_function_builder_here);
+      attr->setInvalid();
+      return;
+    } else {
+      // Force any diagnostics associated with computing the function-builder
+      // type.
+      (void) decl->getFunctionBuilderType();
+    }
+
+    return;
+  }
+
   TC.diagnose(attr->getLocation(), diag::nominal_type_not_attribute,
               nominal->getDescriptiveKind(), nominal->getFullName());
   nominal->diagnose(diag::decl_declared_here, nominal->getFullName());
@@ -2586,6 +2635,17 @@ void AttributeChecker::visitPropertyWrapperAttr(PropertyWrapperAttr *attr) {
 
   // Force checking of the property wrapper type.
   (void)nominal->getPropertyWrapperTypeInfo();
+}
+
+void AttributeChecker::visitFunctionBuilderAttr(FunctionBuilderAttr *attr) {
+  // TODO: check that the type at least provides a `sequence` factory?
+  // Any other validation?
+}
+
+void TypeChecker::checkParameterAttributes(ParameterList *params) {
+  for (auto param: *params) {
+    checkDeclAttributes(param);
+  }
 }
 
 void TypeChecker::checkDeclAttributes(Decl *D) {

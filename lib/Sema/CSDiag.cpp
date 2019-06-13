@@ -2732,10 +2732,12 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
     
     // If we have a candidate function around, compute the position of its
     // default arguments.
-    SmallBitVector defaultMap(params.size());
+    ParameterListInfo paramInfo;
     if (!candidates.empty()) {
-      defaultMap = computeDefaultMap(params, candidates[0].getDecl(),
-                                     candidates[0].skipCurriedSelf);
+      paramInfo = ParameterListInfo(params, candidates[0].getDecl(),
+                                    candidates[0].skipCurriedSelf);
+    } else {
+      paramInfo = ParameterListInfo(params, nullptr, /*skipCurriedSelf=*/false);
     }
 
     // Form a set of call arguments, using a dummy type (Void), because the
@@ -2754,7 +2756,7 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
     } listener;
 
     SmallVector<ParamBinding, 4> paramBindings;
-    if (!matchCallArguments(args, params, defaultMap,
+    if (!matchCallArguments(args, params, paramInfo,
                             callArgHasTrailingClosure(argExpr),
                             /*allowFixes=*/true,
                             listener, paramBindings)) {
@@ -3350,7 +3352,7 @@ class ArgumentMatcher : public MatchCallArgumentListener {
   Expr *FnExpr;
   Expr *ArgExpr;
   ArrayRef<AnyFunctionType::Param> &Parameters;
-  const SmallBitVector &DefaultMap;
+  const ParameterListInfo &ParamInfo;
   SmallVectorImpl<AnyFunctionType::Param> &Arguments;
 
   CalleeCandidateInfo CandidateInfo;
@@ -3366,11 +3368,11 @@ class ArgumentMatcher : public MatchCallArgumentListener {
 public:
   ArgumentMatcher(Expr *fnExpr, Expr *argExpr,
                   ArrayRef<AnyFunctionType::Param> &params,
-                  const SmallBitVector &defaultMap,
+                  const ParameterListInfo &paramInfo,
                   SmallVectorImpl<AnyFunctionType::Param> &args,
                   CalleeCandidateInfo &CCI, bool isSubscript)
       : TC(CCI.CS.TC), FnExpr(fnExpr), ArgExpr(argExpr), Parameters(params),
-        DefaultMap(defaultMap), Arguments(args), CandidateInfo(CCI),
+        ParamInfo(paramInfo), Arguments(args), CandidateInfo(CCI),
         IsSubscript(isSubscript) {}
 
   void extraArgument(unsigned extraArgIdx) override {
@@ -3572,7 +3574,7 @@ public:
     // Use matchCallArguments to determine how close the argument list is (in
     // shape) to the specified candidates parameters.  This ignores the
     // concrete types of the arguments, looking only at the argument labels.
-    matchCallArguments(Arguments, Parameters, DefaultMap,
+    matchCallArguments(Arguments, Parameters, ParamInfo,
                        CandidateInfo.hasTrailingClosure,
                        /*allowFixes:*/ true, *this, Bindings);
 
@@ -3599,9 +3601,8 @@ diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI, Expr *fnExpr,
     return false;
 
   auto params = candidate.getParameters();
-
-  SmallBitVector defaultMap =
-    computeDefaultMap(params, candidate.getDecl(), candidate.skipCurriedSelf);
+  ParameterListInfo paramInfo(params, candidate.getDecl(),
+                              candidate.skipCurriedSelf);
   auto args = decomposeArgType(CCI.CS.getType(argExpr), argLabels);
 
   // Check the case where a raw-representable type is constructed from an
@@ -3653,7 +3654,7 @@ diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI, Expr *fnExpr,
 
   // If we have a single candidate that failed to match the argument list,
   // attempt to use matchCallArguments to diagnose the problem.
-  return ArgumentMatcher(fnExpr, argExpr, params, defaultMap, args, CCI,
+  return ArgumentMatcher(fnExpr, argExpr, params, paramInfo, args, CCI,
                          isa<SubscriptExpr>(fnExpr))
       .diagnose();
 }
@@ -4247,13 +4248,13 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
     return false;
 
   auto params = candidate.getParameters();
-  SmallBitVector defaultMap =
-    computeDefaultMap(params, candidate.getDecl(), candidate.skipCurriedSelf);
+  ParameterListInfo paramInfo(params, candidate.getDecl(),
+                              candidate.skipCurriedSelf);
   auto args = decomposeArgType(CS.getType(argExpr), argLabels);
 
   SmallVector<ParamBinding, 4> bindings;
   MatchCallArgumentListener listener;
-  if (matchCallArguments(args, params, defaultMap,
+  if (matchCallArguments(args, params, paramInfo,
                          candidates.hasTrailingClosure,
                          /*allowFixes=*/false, listener, bindings))
     return false;
@@ -4720,8 +4721,8 @@ static bool isViableOverloadSet(const CalleeCandidateInfo &CCI,
       return true;
     };
 
-    auto defaultMap = computeDefaultMap(params, funcDecl, cand.skipCurriedSelf);
-    InputMatcher IM(params, defaultMap);
+    ParameterListInfo paramInfo(params, funcDecl, cand.skipCurriedSelf);
+    InputMatcher IM(params, paramInfo);
     auto result = IM.match(numArgs, pairMatcher);
     if (result == InputMatcher::IM_Succeeded)
       return true;

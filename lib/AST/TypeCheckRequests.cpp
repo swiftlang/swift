@@ -59,6 +59,13 @@ void swift::simple_display(llvm::raw_ostream &out,
   }
 }
 
+void swift::simple_display(llvm::raw_ostream &out, Type type) {
+  if (type)
+    type.print(out);
+  else
+    out << "null";
+}
+
 //----------------------------------------------------------------------------//
 // Inherited type computation.
 //----------------------------------------------------------------------------//
@@ -613,17 +620,30 @@ void swift::simple_display(
   out << " }";
 }
 
+//----------------------------------------------------------------------------//
+// FunctionBuilder-related requests.
+//----------------------------------------------------------------------------//
 
-template<>
-bool swift::AnyValue::Holder<Type>::equals(const HolderBase &other) const {
-  assert(typeID == other.typeID && "Caller should match type IDs");
-  return value.getPointer() ==
-  static_cast<const Holder<Type> &>(other).value.getPointer();
+bool AttachedFunctionBuilderRequest::isCached() const {
+  // Only needs to be cached if there are any custom attributes.
+  auto var = std::get<0>(getStorage());
+  return var->getAttrs().hasAttribute<CustomAttr>();
 }
 
-void swift::simple_display(llvm::raw_ostream &out, const Type &type) {
-  if (type)
-    type.print(out);
-  else
-    out << "null";
+void AttachedFunctionBuilderRequest::diagnoseCycle(
+    DiagnosticEngine &diags) const {
+  std::get<0>(getStorage())->diagnose(diag::circular_reference);
+}
+
+void AttachedFunctionBuilderRequest::noteCycleStep(
+    DiagnosticEngine &diags) const {
+  std::get<0>(getStorage())->diagnose(diag::circular_reference_through);
+}
+
+void FunctionBuilderTypeRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  std::get<0>(getStorage())->diagnose(diag::circular_reference);
+}
+
+void FunctionBuilderTypeRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  std::get<0>(getStorage())->diagnose(diag::circular_reference_through);
 }

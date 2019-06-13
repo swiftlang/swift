@@ -168,13 +168,12 @@ bool constraints::areConservativelyCompatibleArgumentLabels(
   }
 
   auto params = levelTy->getParams();
-  SmallBitVector defaultMap =
-    computeDefaultMap(params, decl, hasCurriedSelf);
+  ParameterListInfo paramInfo(params, decl, hasCurriedSelf);
 
   MatchCallArgumentListener listener;
   SmallVector<ParamBinding, 8> unusedParamBindings;
 
-  return !matchCallArguments(argInfos, params, defaultMap,
+  return !matchCallArguments(argInfos, params, paramInfo,
                              hasTrailingClosure,
                              /*allow fixes*/ false,
                              listener, unusedParamBindings);
@@ -211,12 +210,12 @@ static ConstraintSystem::TypeMatchOptions getDefaultDecompositionOptions(
 bool constraints::
 matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
                    ArrayRef<AnyFunctionType::Param> params,
-                   const SmallBitVector &defaultMap,
+                   const ParameterListInfo &paramInfo,
                    bool hasTrailingClosure,
                    bool allowFixes,
                    MatchCallArgumentListener &listener,
                    SmallVectorImpl<ParamBinding> &parameterBindings) {
-  assert(params.size() == defaultMap.size() && "Default map does not match");
+  assert(params.size() == paramInfo.size() && "Default map does not match");
 
   // Keep track of the parameter we're matching and what argument indices
   // got bound to each parameter.
@@ -233,10 +232,6 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
   // Indicates whether any of the arguments are potentially out-of-order,
   // requiring further checking at the end.
   bool potentiallyOutOfOrder = false;
-
-  auto hasDefault = [&defaultMap, &numParams](unsigned idx) -> bool {
-    return idx < numParams ? defaultMap.test(idx) : false;
-  };
 
   // Local function that claims the argument at \c argNumber, returning the
   // index of the claimed argument. This is primarily a helper for
@@ -327,7 +322,8 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
         // func foo(_ a: Int, _ b: Int = 0, c: Int = 0, _ d: Int) {}
         // foo(1, c: 2, 3) // -> `3` will be claimed as '_ b:'.
         // ```
-        if (argLabel.empty() && (hasDefault(i) || !forVariadic))
+        if (argLabel.empty() &&
+            (paramInfo.hasDefaultArgument(i) || !forVariadic))
           continue;
 
         potentiallyOutOfOrder = true;
@@ -531,7 +527,7 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
         // now if label doesn't match because it's incorrect
         // or argument belongs to some other parameter, so
         // we just leave this parameter unfulfilled.
-        if (defaultMap.test(i))
+        if (paramInfo.hasDefaultArgument(i))
           continue;
 
         // Looks like there was no parameter claimed at the same
@@ -568,7 +564,7 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
         continue;
 
       // Parameters with defaults can be unfulfilled.
-      if (hasDefault(paramIdx))
+      if (paramInfo.hasDefaultArgument(paramIdx))
         continue;
 
       listener.missingArgument(paramIdx);
@@ -601,7 +597,7 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
         // If we are moving the the position with a different label
         // and there is no default value for it, can't diagnose the
         // problem as a simple re-ordering.
-        if (!defaultMap.test(actualIndex))
+        if (!paramInfo.hasDefaultArgument(actualIndex))
           return false;
       }
 
@@ -609,7 +605,7 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
         if (oldLabel == params[i].getLabel())
           break;
 
-        if (!defaultMap.test(i))
+        if (!paramInfo.hasDefaultArgument(i))
           return false;
       }
 
@@ -700,7 +696,8 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
 
 /// Find the callee declaration and uncurry level for a given call
 /// locator.
-static std::tuple<ValueDecl *, bool, ArrayRef<Identifier>, bool>
+static std::tuple<ValueDecl *, bool, ArrayRef<Identifier>, bool,
+                  ConstraintLocator *>
 getCalleeDeclAndArgs(ConstraintSystem &cs,
                      ConstraintLocatorBuilder callLocator,
                      SmallVectorImpl<Identifier> &argLabelsScratch) {
@@ -712,14 +709,14 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
   auto callExpr = callLocator.getLocatorParts(path);
   if (!callExpr)
     return std::make_tuple(nullptr, /*hasCurriedSelf=*/false, argLabels,
-                           hasTrailingClosure);
+                           hasTrailingClosure, nullptr);
 
   // Our remaining path can only be 'ApplyArgument'.
   if (!path.empty() &&
       !(path.size() <= 2 &&
         path.back().getKind() == ConstraintLocator::ApplyArgument))
     return std::make_tuple(nullptr, /*hasCurriedSelf=*/false, argLabels,
-                           hasTrailingClosure);
+                           hasTrailingClosure, nullptr);
 
   // Dig out the callee.
   ConstraintLocator *targetLocator;
@@ -744,12 +741,12 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
         path[0].getKind() != ConstraintLocator::KeyPathComponent ||
         path[1].getKind() != ConstraintLocator::ApplyArgument)
       return std::make_tuple(nullptr, /*hasCurriedSelf=*/false, argLabels,
-                             hasTrailingClosure);
+                             hasTrailingClosure, nullptr);
 
     auto componentIndex = path[0].getValue();
     if (componentIndex >= keyPath->getComponents().size())
       return std::make_tuple(nullptr, /*hasCurriedSelf=*/false, argLabels,
-                             hasTrailingClosure);
+                             hasTrailingClosure, nullptr);
 
     auto &component = keyPath->getComponents()[componentIndex];
     switch (component.getKind()) {
@@ -769,7 +766,7 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
     case KeyPathExpr::Component::Kind::Identity:
     case KeyPathExpr::Component::Kind::TupleElement:
       return std::make_tuple(nullptr, /*hasCurriedSelf=*/false, argLabels,
-                             hasTrailingClosure);
+                             hasTrailingClosure, nullptr);
     }
 
   } else {
@@ -781,13 +778,14 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
       hasTrailingClosure = objectLiteral->hasTrailingClosure();
     }
     return std::make_tuple(nullptr, /*hasCurriedSelf=*/false, argLabels,
-                           hasTrailingClosure);
+                           hasTrailingClosure, nullptr);
   }
 
   // Find the overload choice corresponding to the callee locator.
   // FIXME: This linearly walks the list of resolved overloads, which is
   // potentially very expensive.
   Optional<OverloadChoice> choice;
+  ConstraintLocator *calleeLocator = nullptr;
   for (auto resolved = cs.getResolvedOverloadSets(); resolved;
        resolved = resolved->Previous) {
     // FIXME: Workaround null locators.
@@ -814,6 +812,7 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
     resolvedLocator = simplifyLocator(cs, resolvedLocator, range);
 
     if (resolvedLocator == targetLocator) {
+      calleeLocator = resolved->Locator;
       choice = resolved->Choice;
       break;
     }
@@ -822,7 +821,7 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
   // If we didn't find any matching overloads, we're done.
   if (!choice)
     return std::make_tuple(nullptr, /*hasCurriedSelf=*/false, argLabels,
-                           hasTrailingClosure);
+                           hasTrailingClosure, nullptr);
 
   // If there's a declaration, return it.
   if (choice->isDecl()) {
@@ -846,11 +845,12 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
       }
     }
 
-    return std::make_tuple(decl, hasCurriedSelf, argLabels, hasTrailingClosure);
+    return std::make_tuple(decl, hasCurriedSelf, argLabels, hasTrailingClosure,
+                           calleeLocator);
   }
 
   return std::make_tuple(nullptr, /*hasCurriedSelf=*/false, argLabels,
-                         hasTrailingClosure);
+                         hasTrailingClosure, calleeLocator);
 }
 
 class ArgumentFailureTracker : public MatchCallArgumentListener {
@@ -911,11 +911,12 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
   ArrayRef<Identifier> argLabels;
   SmallVector<Identifier, 2> argLabelsScratch;
   bool hasTrailingClosure = false;
-  std::tie(callee, hasCurriedSelf, argLabels, hasTrailingClosure) =
+  ConstraintLocator *calleeLocator;
+  std::tie(callee, hasCurriedSelf, argLabels, hasTrailingClosure,
+           calleeLocator) =
     getCalleeDeclAndArgs(cs, locator, argLabelsScratch);
 
-  SmallBitVector defaultMap =
-    computeDefaultMap(params, callee, hasCurriedSelf);
+  ParameterListInfo paramInfo(params, callee, hasCurriedSelf);
 
   // Apply labels to arguments.
   SmallVector<AnyFunctionType::Param, 8> argsWithLabels;
@@ -926,7 +927,7 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
   SmallVector<ParamBinding, 4> parameterBindings;
   ArgumentFailureTracker listener(cs, parameterBindings, locator);
   if (constraints::matchCallArguments(argsWithLabels, params,
-                                      defaultMap,
+                                      paramInfo,
                                       hasTrailingClosure,
                                       cs.shouldAttemptFixes(), listener,
                                       parameterBindings))
@@ -981,6 +982,20 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
           // in Swift <= 4 mode.
           cs.increaseScore(SK_FunctionConversion);
           matchingAutoClosureResult = false;
+        }
+      }
+
+      // If the parameter has a function builder type and the argument is a
+      // closure, apply the function builder transformation.
+      if (Type functionBuilderType
+              = paramInfo.getFunctionBuilderType(paramIdx)) {
+        Expr *arg = getArgumentExpr(locator.getAnchor(), argIdx);
+        if (auto closure = dyn_cast_or_null<ClosureExpr>(arg)) {
+          auto result =
+              cs.applyFunctionBuilder(closure, functionBuilderType,
+                                      calleeLocator, loc);
+          if (result.isFailure())
+            return result;
         }
       }
 
@@ -6599,7 +6614,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::SkipSameTypeRequirement:
   case FixKind::SkipSuperclassRequirement:
   case FixKind::ContextualMismatch:
-  case FixKind::AddMissingArguments: {
+  case FixKind::AddMissingArguments:
+  case FixKind::SkipUnhandledConstructInFunctionBuilder: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
 

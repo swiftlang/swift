@@ -2705,6 +2705,14 @@ public:
   /// `this` must be of a decl type that supports opaque return types, and
   /// must not have previously had an opaque result type set.
   void setOpaqueResultTypeDecl(OpaqueTypeDecl *D);
+
+  /// Retrieve the attribute associating this declaration with a
+  /// function builder, if there is one.
+  CustomAttr *getAttachedFunctionBuilder() const;
+
+  /// Retrieve the @functionBuilder type attached to this declaration,
+  /// if there is one.
+  Type getFunctionBuilderType() const;
 };
 
 /// This is a common base class for declarations which declare a type.
@@ -5309,7 +5317,7 @@ public:
     assert(isVariadic());
     return getVarargBaseTy(getInterfaceType());
   }
-  
+
   SourceRange getSourceRange() const;
 
   // Implement isa/cast/dyncast/etc.

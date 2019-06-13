@@ -669,6 +669,9 @@ private:
   /// when executing scripts.
   bool InImmediateMode = false;
 
+  /// Closure expressions that have already been prechecked.
+  llvm::SmallPtrSet<ClosureExpr *, 2> precheckedClosures;
+
   /// A helper to construct and typecheck call to super.init().
   ///
   /// \returns NULL if the constructed expression does not typecheck.
@@ -676,6 +679,7 @@ private:
 
   TypeChecker(ASTContext &Ctx);
   friend class ASTContext;
+  friend class constraints::ConstraintSystem;
 
 public:
   /// Create a new type checker instance for the given ASTContext, if it
@@ -1035,6 +1039,7 @@ public:
   bool typeCheckDestructorBodyUntil(DestructorDecl *DD,
                                     SourceLoc EndTypeCheckLoc);
 
+  bool typeCheckFunctionBuilderFuncBody(FuncDecl *FD, Type builderType);
   bool typeCheckClosureBody(ClosureExpr *closure);
 
   bool typeCheckTapBody(TapExpr *expr, DeclContext *DC);
