@@ -2300,7 +2300,7 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
         CS.TC.isConvertibleTo(srcFT->getResult(), contextualType, CS.DC)) {
 
       auto locator =
-          CS.getConstraintLocator(expr, ConstraintLocator::ContextualType);
+          CS.getConstraintLocator(expr, LocatorPathElt::getContextualType());
       ContextualFailure failure =
           ContextualFailure(nullptr, CS, srcFT, contextualType, locator);
       auto diagnosed = failure.diagnoseAsError();
@@ -2381,7 +2381,7 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
   if (contextualType->isExistentialType()) {
     MissingContextualConformanceFailure failure(
         expr, CS, CTP, exprType, contextualType,
-        CS.getConstraintLocator(expr, ConstraintLocator::ContextualType));
+        CS.getConstraintLocator(expr, LocatorPathElt::getContextualType()));
     return failure.diagnoseAsError();
   }
 
@@ -5724,7 +5724,7 @@ bool FailureDiagnosis::diagnoseClosureExpr(
 
       MissingArgumentsFailure failure(
           expr, CS, fnType, inferredArgCount - actualArgCount,
-          CS.getConstraintLocator(CE, ConstraintLocator::ContextualType));
+          CS.getConstraintLocator(CE, LocatorPathElt::getContextualType()));
       return failure.diagnoseAsError();
     }
 
