@@ -126,6 +126,11 @@ do {
   blackHole(c)
 }
 
+do {
+  let b: [(@escaping @convention(block) () -> (), @convention(block) () -> ()) -> ()] = []
+  blackHole(b)
+}
+
 // DEMANGLE: $syycD
 // DEMANGLE: $sySSzcD
 // DEMANGLE: $sySSncD
@@ -143,6 +148,7 @@ do {
 // DEMANGLE: $sSi1x_SfSim1ytD
 // DEMANGLE: $syyyccD
 // DEMANGLE: $sSayyyXCGD
+// DEMANGLE: $sSayyyyXL_yyXBtcGD
 
 // CHECK: () -> ()
 // CHECK: (inout String) -> ()
@@ -161,6 +167,7 @@ do {
 // CHECK: (x: Int, Float, y: Int.Type)
 // CHECK: (@escaping () -> ()) -> ()
 // CHECK: Array<@convention(c) () -> ()>
+// CHECK: Array<(@escaping @convention(block) () -> (), @convention(block) () -> ()) -> ()>
 
 // DEMANGLE: $sSimD
 // DEMANGLE: $syycmD
@@ -180,6 +187,7 @@ do {
 // DEMANGLE: $sSi1x_SfSim1ytmD
 // DEMANGLE: $syyyccmD
 // DEMANGLE: $sSayyyXCGmD
+// DEMANGLE: $sSayyyyXL_yyXBtcGmD
 
 // CHECK: Int.Type
 // CHECK: ((inout String) -> ()).Type
@@ -198,3 +206,4 @@ do {
 // CHECK: (x: Int, Float, y: Int.Type).Type
 // CHECK: ((@escaping () -> ()) -> ()).Type
 // CHECK: Array<@convention(c) () -> ()>.Type
+// CHECK: Array<(@escaping @convention(block) () -> (), @convention(block) () -> ()) -> ()>.Type
