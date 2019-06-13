@@ -370,7 +370,7 @@ protected:
     IsStatic : 1
   );
 
-  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 4+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 4+1+1+1+1+1,
     /// The specifier associated with this variable or parameter.  This
     /// determines the storage semantics of the value e.g. mutability.
     Specifier : 4,
@@ -387,6 +387,8 @@ protected:
     /// It is up to the debugger to instruct SIL how to access this variable.
     IsDebuggerVar : 1,
 
+    /// Whether this is the backing storage for a lazy property.
+    IsLazyStorageProperty : 1,
 
     /// Whether this is the backing storage for a property wrapper.
     IsPropertyWrapperBackingProperty : 1
@@ -4803,6 +4805,7 @@ protected:
     Bits.VarDecl.Specifier = static_cast<unsigned>(Sp);
     Bits.VarDecl.IsCaptureList = IsCaptureList;
     Bits.VarDecl.IsDebuggerVar = false;
+    Bits.VarDecl.IsLazyStorageProperty = false;
     Bits.VarDecl.HasNonPatternBindingInit = false;
     Bits.VarDecl.IsPropertyWrapperBackingProperty = false;
   }
@@ -5091,6 +5094,13 @@ public:
   void setDebuggerVar(bool IsDebuggerVar) {
     Bits.VarDecl.IsDebuggerVar = IsDebuggerVar;
   }
+
+  /// Is this the synthesized storage for a 'lazy' property?
+  bool isLazyStorageProperty() const {
+    return Bits.VarDecl.IsLazyStorageProperty;
+  }
+  void setLazyStorageProperty(bool IsLazyStorage) {
+    Bits.VarDecl.IsLazyStorageProperty = IsLazyStorage;
   }
 
   /// Retrieve the custom attribute that attaches a property wrapper to this

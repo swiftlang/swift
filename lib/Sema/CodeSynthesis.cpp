@@ -1625,6 +1625,7 @@ void swift::completeLazyVarImplementation(VarDecl *VD) {
                                         StorageName,
                                         VD->getDeclContext());
   Storage->setInterfaceType(StorageInterfaceTy);
+  Storage->setLazyStorageProperty(true);
   Storage->setUserAccessible(false);
 
   // Mark the backing property as 'final'. There's no sensible way to override.
