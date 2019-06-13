@@ -26,17 +26,28 @@ public protocol VectorProtocol : AdditiveArithmetic {
   /// The type of scalars in the vector space.
   associatedtype VectorSpaceScalar : AdditiveArithmetic
 
-  static func * (lhs: VectorSpaceScalar, rhs: Self) -> Self
-  static func *= (lhs: inout Self, rhs: VectorSpaceScalar)
+  /// Returns `self` multiplied by the given scalar.
+  func scaled(by scalar: VectorSpaceScalar) -> Self
+
+  /// Multiplies `self` by the given scalar.
+  mutating func scale(by scalar: VectorSpaceScalar)
 }
 
 public extension VectorProtocol {
+  mutating func scale(by scalar: VectorSpaceScalar) {
+    self = scaled(by: scalar)
+  }
+
   static func * (lhs: Self, rhs: VectorSpaceScalar) -> Self {
-    return rhs * lhs
+    return lhs.scaled(by: rhs)
+  }
+
+  static func * (lhs: VectorSpaceScalar, rhs: Self) -> Self {
+    return rhs.scaled(by: lhs)
   }
 
   static func *= (lhs: inout Self, rhs: VectorSpaceScalar) {
-    lhs = rhs * lhs
+    lhs.scale(by: rhs)
   }
 }
 
