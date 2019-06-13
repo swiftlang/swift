@@ -96,7 +96,7 @@ public:
   ~SwiftASTManager();
 
   // SWIFT_ENABLE_TENSORFLOW
-  /// Subseqent requests will write temporary output files to this filesystem
+  /// Subsequent requests will write temporary output files to this filesystem
   /// rather than to the real filesystem.
   void setInMemoryOutputFileSystem(
       llvm::IntrusiveRefCntPtr<clang::InMemoryOutputFileSystem> FS);
