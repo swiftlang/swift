@@ -42,6 +42,7 @@
 # include <objc/message.h>
 # include <objc/objc.h>
 # include "swift/Runtime/ObjCBridge.h"
+# include "swift/Runtime/Once.h"
 #endif
 #include "Leaks.h"
 
@@ -78,6 +79,34 @@ HeapObject *swift::swift_allocObject(HeapMetadata const *metadata,
   return _swift_allocObject(metadata, requiredSize, requiredAlignmentMask);
 }
 
+#if OBJC_SETASSOCIATEDOBJECTHOOK_DEFINED
+//We interpose objc_setAssociatedObject so that we can set a flag in
+//the refcount field of Swift objects to indicate that they have associations,
+//since we can't safely skip ObjC dealloc work if they do
+static objc_hook_setAssociatedObject originalAssocObjectFunc = nullptr;
+
+static void _swift_setAssociatedObject_hook(
+  id _Nonnull object,
+  const void * _Nonnull key,
+  id _Nullable value,
+  objc_AssociationPolicy policy
+) {
+  if (!isObjCTaggedPointerOrNull(object) &&
+      objectUsesNativeSwiftReferenceCounting(object)) {
+    auto heapObj = reinterpret_cast<HeapObject *>(object);
+    heapObj->refCounts.setPureSwiftDeallocation(false);
+  }
+  originalAssocObjectFunc(object, key, value, policy);
+}
+
+static void _interpose_objc_association(void *ctxt) {
+  if (__builtin_available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)) {
+    objc_setHook_setAssociatedObject(_swift_setAssociatedObject_hook,
+                                     &originalAssocObjectFunc);
+  }
+}
+#endif
+
 static HeapObject *_swift_allocObject_(HeapMetadata const *metadata,
                                        size_t requiredSize,
                                        size_t requiredAlignmentMask) {
@@ -89,6 +118,11 @@ static HeapObject *_swift_allocObject_(HeapMetadata const *metadata,
   // check on the placement new allocator which we have observed on Windows,
   // Linux, and macOS.
   new (object) HeapObject(metadata);
+
+#if OBJC_SETASSOCIATEDOBJECTHOOK_DEFINED
+  static swift_once_t associatedObjectHookOnce;
+  swift_once(&associatedObjectHookOnce, _interpose_objc_association, nullptr);
+#endif
 
   // If leak tracking is enabled, start tracking this object.
   SWIFT_LEAKS_START_TRACKING_OBJECT(object);
@@ -594,9 +628,14 @@ void swift::swift_rootObjCDealloc(HeapObject *self) {
 void swift::swift_deallocClassInstance(HeapObject *object,
                                        size_t allocatedSize,
                                        size_t allocatedAlignMask) {
-#if SWIFT_OBJC_INTEROP
+#if OBJC_SETASSOCIATEDOBJECTHOOK_DEFINED
   // We need to let the ObjC runtime clean up any associated objects or weak
   // references associated with this object.
+  if (originalAssocObjectFunc == nullptr ||
+      !object->refCounts.getPureSwiftDeallocation()) {
+    objc_destructInstance((id)object);
+  }
+#elif SWIFT_OBJC_INTEROP
   objc_destructInstance((id)object);
 #endif
   swift_deallocObject(object, allocatedSize, allocatedAlignMask);
