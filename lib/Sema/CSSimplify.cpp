@@ -5223,7 +5223,7 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
   
   keyPathTy = getFixedTypeRecursive(keyPathTy, /*want rvalue*/ true);
   auto tryMatchRootAndValueFromKeyPathType =
-    [&](BoundGenericType *bgt, bool allowPartial) -> SolutionKind {
+    [&](BoundGenericType *bgt) -> SolutionKind {
       Type boundRoot, boundValue;
       
       // We can get root and value from a concrete key path type.
@@ -5233,13 +5233,9 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
         boundRoot = bgt->getGenericArgs()[0];
         boundValue = bgt->getGenericArgs()[1];
       } else if (bgt->getDecl() == getASTContext().getPartialKeyPathDecl()) {
-        if (allowPartial) {
-          // We can still get the root from a PartialKeyPath.
-          boundRoot = bgt->getGenericArgs()[0];
-          boundValue = Type();
-        } else {
-          return SolutionKind::Error;
-        }
+        // We can still get the root from a PartialKeyPath.
+        boundRoot = bgt->getGenericArgs()[0];
+        boundValue = Type();
       } else {
         // We can't bind anything from this type.
         return SolutionKind::Solved;
@@ -5261,17 +5257,31 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
   // PartialKeyPath; we'd rather that be represented using an upcast conversion.
   auto keyPathBGT = keyPathTy->getAs<BoundGenericType>();
   if (keyPathBGT) {
-    if (tryMatchRootAndValueFromKeyPathType(keyPathBGT, /*allowPartial*/false)
-          == SolutionKind::Error)
+    if (keyPathBGT->getDecl() == getASTContext().getPartialKeyPathDecl()) {
+      // We don't want this; we want the type checker to select a subtype and
+      // use that instead.
+      // FIXME: Should we error out or let the loop below constrain it?
+      return SolutionKind::Error;
+    }
+
+    if (tryMatchRootAndValueFromKeyPathType(keyPathBGT) == SolutionKind::Error)
       return SolutionKind::Error;
   }
+
+  // Do we want to constrain the contextual type more tightly than it currently
+  // is?
+  bool needsMoreSpecificContextualType = true;
 
   // If the expression has contextual type information, try using that too.
   if (auto contextualTy = getContextualType(keyPath)) {
     if (auto contextualBGT = contextualTy->getAs<BoundGenericType>()) {
-      if (tryMatchRootAndValueFromKeyPathType(contextualBGT,
-                                              /*allowPartial*/true)
-            == SolutionKind::Error)
+      // If our current contextual type is PartialKeyPath, we want to at least
+      // constrain it to subtype of KeyPath.
+      needsMoreSpecificContextualType = (
+         contextualBGT->getDecl() == getASTContext().getPartialKeyPathDecl()
+      );
+
+      if (tryMatchRootAndValueFromKeyPathType(contextualBGT) == SolutionKind::Error)
         return SolutionKind::Error;
     }
   }
@@ -5298,11 +5308,27 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
       // If no choice was made, leave the constraint unsolved.
       if (choices[i].isInvalid()) {
         if (flags.contains(TMF_GenerateConstraints)) {
+          // Re-add the key path constraint so we try it again later.
           addUnsolvedConstraint(Constraint::create(*this,
                                                    ConstraintKind::KeyPath,
                                                    keyPathTy, rootTy, valueTy,
                                                    locator.getBaseLocator()));
-          return SolutionKind::Solved;
+
+          // If we're happy with our contextual type, we're done here.
+          if (!needsMoreSpecificContextualType)
+            return SolutionKind::Solved;
+
+          // If not, constrain the key path type to be a subtype of
+          // Swift.KeyPath; this will keep us from type-checking it as
+          // PartialKeyPath.
+          auto minimumKPTy = BoundGenericType::get(
+              getASTContext().getKeyPathDecl(), nullptr,
+              { rootTy, valueTy }
+          );
+          return matchTypes(
+              keyPathTy, minimumKPTy, ConstraintKind::Subtype, subflags,
+              locator.withPathElement(ConstraintLocator::ContextualType)
+          );
         }
         return SolutionKind::Unsolved;
       }

@@ -279,8 +279,8 @@ public func memoryLayoutDotAlignmentWithResilientStruct() -> Int {
 public func memoryLayoutDotOffsetOfWithResilientStruct() -> Int? {
   // CHECK-NEXT: entry:
   // CHECK: [[RAW_KEY_PATH:%.*]] = call %swift.refcounted* @swift_getKeyPath
-  // CHECK: [[WRITABLE_KEY_PATH:%.*]] = bitcast %swift.refcounted* [[RAW_KEY_PATH]] to %Ts15WritableKeyPathCy16resilient_struct4SizeVSiG*
-  // CHECK: [[PARTIAL_KEY_PATH:%.*]] = bitcast %Ts15WritableKeyPathCy16resilient_struct4SizeVSiG* [[WRITABLE_KEY_PATH]] to %Ts14PartialKeyPathCy16resilient_struct4SizeVG*
+  // CHECK: [[WRITABLE_KEY_PATH:%.*]] = bitcast %swift.refcounted* [[RAW_KEY_PATH]] to %Ts7KeyPathCy16resilient_struct4SizeVSiG*
+  // CHECK: [[PARTIAL_KEY_PATH:%.*]] = bitcast %Ts7KeyPathCy16resilient_struct4SizeVSiG* [[WRITABLE_KEY_PATH]] to %Ts14PartialKeyPathCy16resilient_struct4SizeVG*
   // CHECK: [[ANY_KEY_PATH:%.*]] = bitcast %Ts14PartialKeyPathCy16resilient_struct4SizeVG* [[PARTIAL_KEY_PATH]] to %Ts10AnyKeyPathC*
 
   // CHECK: [[STORED_INLINE_OFFSET:%.*]] = call swiftcc { [[INT]], i8 } @"$ss10AnyKeyPathC19_storedInlineOffsetSiSgvgTj"(%Ts10AnyKeyPathC* swiftself [[ANY_KEY_PATH]])

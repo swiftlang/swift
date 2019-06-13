@@ -128,8 +128,6 @@ func testKeyPath(sub: Sub, optSub: OptSub,
   let _: ReferenceWritableKeyPath<A, Prop> = \.property
   //expected-error@-1 {{cannot convert value of type 'WritableKeyPath<A, Prop>' to specified type 'ReferenceWritableKeyPath<A, Prop>'}}
 
-  // FIXME: shouldn't be ambiguous
-  // expected-error@+1{{ambiguous}}
   let _: PartialKeyPath<A> = \.[sub]
   let _: KeyPath<A, A> = \.[sub]
   let _: WritableKeyPath<A, A> = \.[sub]
@@ -175,13 +173,9 @@ func testKeyPath(sub: Sub, optSub: OptSub,
   var m = [\A.property, \A.[sub], \A.optProperty!]
   expect(&m, toHaveType: Exactly<[PartialKeyPath<A>]>.self)
 
-  // FIXME: shouldn't be ambiguous
-  // expected-error@+1{{ambiguous}}
   var n = [\A.property, \.optProperty, \.[sub], \.optProperty!]
   expect(&n, toHaveType: Exactly<[PartialKeyPath<A>]>.self)
 
-  // FIXME: shouldn't be ambiguous
-  // expected-error@+1{{ambiguous}}
   let _: [PartialKeyPath<A>] = [\.property, \.optProperty, \.[sub], \.optProperty!]
 
   var o = [\A.property, \C<A>.value]
@@ -537,22 +531,21 @@ func testImplicitConversionInSubscriptIndex() {
 }
 
 // Crash in diagnostics
-struct AmbiguousSubscript {
+// Note that these cases used to be considered ambiguous.
+struct FormerlyAmbiguousSubscript {
   subscript(sub: Sub) -> Int { get { } set { } }
-  // expected-note@-1 {{'subscript(_:)' declared here}}
 
   subscript(y y: Sub) -> Int { get { } set { } }
-  // expected-note@-1 {{'subscript(y:)' declared here}}
 }
 
-func useAmbiguousSubscript(_ sub: Sub) {
-  let _: PartialKeyPath<AmbiguousSubscript> = \.[sub]
-  // expected-error@-1 {{ambiguous reference to member 'subscript'}}
+func useFormerlyAmbiguousSubscript(_ sub: Sub) {
+  let _: PartialKeyPath<FormerlyAmbiguousSubscript> = \.[sub]
 }
 
 struct BothUnavailableSubscript {
   @available(*, unavailable)
   subscript(sub: Sub) -> Int { get { } set { } }
+  // expected-note@-1 {{'subscript(_:)' has been explicitly marked unavailable here}}
 
   @available(*, unavailable)
   subscript(y y: Sub) -> Int { get { } set { } }
@@ -560,7 +553,7 @@ struct BothUnavailableSubscript {
 
 func useBothUnavailableSubscript(_ sub: Sub) {
   let _: PartialKeyPath<BothUnavailableSubscript> = \.[sub]
-  // expected-error@-1 {{type of expression is ambiguous without more context}}
+  // expected-error@-1 {{'subscript(_:)' is unavailable}}
 }
 
 // SR-6106
