@@ -5,7 +5,7 @@ foo
 // CHECK-SOURCEKIT: source.lang.swift.ref.var.global (1:5-1:8)
 
 // Checks that nothing has been written into the module cache on the real
-// filesyustem.
+// filesystem.
 // CHECK-LS-NOT: ModuleCache
 
 // RUN: %empty-directory(%t)
