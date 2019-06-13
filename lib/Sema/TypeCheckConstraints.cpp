@@ -2190,6 +2190,9 @@ Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
   if (options.contains(TypeCheckExprFlags::ConvertTypeIsOpaqueReturnType))
     csOptions |= ConstraintSystemFlags::UnderlyingTypeForOpaqueReturnType;
 
+  if (options.contains(TypeCheckExprFlags::SubExpressionDiagnostics))
+    csOptions |= ConstraintSystemFlags::SubExpressionDiagnostics;
+
   ConstraintSystem cs(*this, dc, csOptions, expr);
   cs.baseCS = baseCS;
 
