@@ -29,7 +29,7 @@ class ModuleDecl;
 struct ParseableInterfaceOptions {
   /// Should we prefer printing TypeReprs when writing out types in a module
   /// interface, or should we fully-qualify them?
-  bool PreserveTypesAsWrittenInModuleInterface = false;
+  bool PreserveTypesAsWritten = false;
 
   /// Copy of all the command-line flags passed at .swiftinterface
   /// generation time, re-applied to CompilerInvocation when reading
