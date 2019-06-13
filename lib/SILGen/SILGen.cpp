@@ -1120,10 +1120,13 @@ emitStoredPropertyInitialization(PatternBindingDecl *pbd, unsigned i) {
   // If this is the backing storage for a property with an attached wrapper
   // that was initialized with `=`, use that expression as the initializer.
   if (auto originalProperty = var->getOriginalWrappedProperty()) {
-    auto wrapperInfo =
-        originalProperty->getPropertyWrapperBackingPropertyInfo();
-    if (wrapperInfo.originalInitialValue)
-      init = wrapperInfo.originalInitialValue;
+    if (originalProperty
+            ->isPropertyMemberwiseInitializedWithWrappedType()) {
+      auto wrapperInfo =
+          originalProperty->getPropertyWrapperBackingPropertyInfo();
+      if (wrapperInfo.originalInitialValue)
+        init = wrapperInfo.originalInitialValue;
+    }
   }
 
   SILDeclRef constant(var, SILDeclRef::Kind::StoredPropertyInitializer);
