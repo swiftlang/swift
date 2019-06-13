@@ -111,6 +111,10 @@ convertObjectToLoadableBridgeableType(SILBuilderWithScope &builder,
     return {cast, cast};
   }
 
+  SILBasicBlock *castSuccessBB =
+      f->createBasicBlockAfter(dynamicCast.getInstruction()->getParent());
+  castSuccessBB->createPhiArgument(silBridgedTy, ValueOwnershipKind::Owned);
+
   // If we /are/ conditional and we do not need to bridge the load to the sil,
   // then we just create our cast success block and branch from the end of the
   // cast instruction block to the cast success block. We leave our insertion
@@ -118,8 +122,7 @@ convertObjectToLoadableBridgeableType(SILBuilderWithScope &builder,
   // insert the bridge call/switch there. We return the argument of the cast
   // success block as the value to be passed to the bridging function.
   if (load->getType() == silBridgedTy) {
-    SILBasicBlock *castSuccessBB = f->createBasicBlock();
-    castSuccessBB->createPhiArgument(silBridgedTy, ValueOwnershipKind::Owned);
+    castSuccessBB->moveAfter(dynamicCast.getInstruction()->getParent());
     builder.createBranch(loc, castSuccessBB, load);
     builder.setInsertionPoint(castSuccessBB);
     return {castSuccessBB->getArgument(0), nullptr};
@@ -132,15 +135,51 @@ convertObjectToLoadableBridgeableType(SILBuilderWithScope &builder,
                                     nullptr, nullptr);
   }());
 
-  // Ok, we need to perform the full cast optimization. This means that we are
-  // going to replace the cast terminator in inst_block with a
-  // checked_cast_br. This in turn means
-  auto *castSuccessBB = f->createBasicBlock();
-  castSuccessBB->createPhiArgument(silBridgedTy, ValueOwnershipKind::Owned);
+  // Now that we have created the failure bb, move our cast success block right
+  // after the checked_cast_br bb.
+  castSuccessBB->moveAfter(dynamicCast.getInstruction()->getParent());
 
+  // Ok, we need to perform the full cast optimization. This means that we are
+  // going to replace the cast terminator in inst_block with a checked_cast_br.
   auto *ccbi = builder.createCheckedCastBranch(loc, false, load, silBridgedTy,
                                                castSuccessBB, castFailBB);
   splitEdge(ccbi, /* EdgeIdx to CastFailBB */ 1);
+
+  // Now that we have split the edge to cast fail bb, add the default argument
+  // for the checked_cast_br. Then we need to handle our error conditions,
+  // namely we destroy on take_always and otherwise store the value back into
+  // the memory location that we took it out of.
+  {
+    auto *newFailureBlock = ccbi->getFailureBB();
+    SILValue defaultArg;
+    if (builder.hasOwnership()) {
+      defaultArg = newFailureBlock->createPhiArgument(
+          load->getType(), ValueOwnershipKind::Owned);
+    } else {
+      defaultArg = ccbi->getOperand();
+    }
+
+    // This block should be properly terminated already due to our method of
+    // splitting the failure block, so we can use begin() safely.
+    SILBuilderWithScope failureBuilder(newFailureBlock->begin());
+
+    switch (dynamicCast.getBridgedConsumptionKind()) {
+    case CastConsumptionKind::TakeAlways:
+      failureBuilder.emitDestroyValueOperation(loc, defaultArg);
+      break;
+    case CastConsumptionKind::TakeOnSuccess:
+    case CastConsumptionKind::CopyOnSuccess:
+      // Without ownership, we do not need to consume the taken value.
+      if (failureBuilder.hasOwnership()) {
+        failureBuilder.emitStoreValueOperation(loc, defaultArg, src,
+                                               StoreOwnershipQualifier::Init);
+      }
+      break;
+    case CastConsumptionKind::BorrowAlways:
+      llvm_unreachable("this should never occur here");
+    }
+  }
+
   builder.setInsertionPoint(castSuccessBB);
   return {castSuccessBB->getArgument(0), ccbi};
 }
@@ -370,12 +409,13 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
     // Load from the optional.
     auto *SomeDecl = Builder.getASTContext().getOptionalSomeDecl();
 
-    SILBasicBlock *BridgeSuccessBB = Inst->getFunction()->createBasicBlock();
+    auto *BridgeSuccessBB =
+        Inst->getFunction()->createBasicBlockAfter(Builder.getInsertionBB());
     SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 2> CaseBBs;
+    CaseBBs.emplace_back(SomeDecl, BridgeSuccessBB);
     CaseBBs.emplace_back(mod.getASTContext().getOptionalNoneDecl(), FailureBB);
 
-    Builder.createSwitchEnumAddr(Loc, InOutOptionalParam, BridgeSuccessBB,
-                                 CaseBBs);
+    Builder.createSwitchEnumAddr(Loc, InOutOptionalParam, nullptr, CaseBBs);
 
     Builder.setInsertionPoint(FailureBB->begin());
     Builder.createDeallocStack(Loc, Tmp);
