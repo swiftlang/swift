@@ -794,8 +794,7 @@ static void checkAndDiagnoseImplicitNoDerivative(TypeChecker &TC,
     // Otherwise, add an implicit `@noDerivative` attribute.
     vd->getAttrs().add(
         new (TC.Context) NoDerivativeAttr(/*Implicit*/ true));
-    auto loc =
-        vd->getLoc().isValid() ? vd->getLoc() : DC->getAsDecl()->getLoc();
+    auto loc = vd->getAttributeInsertionLoc(/*forModifier*/ false);
     assert(loc.isValid() && "Expected valid source location");
     // If nominal type can conform to `AdditiveArithmetic`, suggest conforming
     // adding a conformance to `AdditiveArithmetic`.
@@ -809,16 +808,14 @@ static void checkAndDiagnoseImplicitNoDerivative(TypeChecker &TC,
                   diag::differentiable_nondiff_type_implicit_noderivative_fixit,
                   vd->getName(), nominal->getName(),
                   nominalCanDeriveAdditiveArithmetic)
-          .fixItInsert(vd->getAttributeInsertionLoc(/*forModifier*/ false),
-                       "@noDerivative ");
+          .fixItInsert(loc, "@noDerivative ");
       continue;
     }
     TC.diagnose(loc,
                 diag::differentiable_let_property_implicit_noderivative_fixit,
                 vd->getName(), nominal->getName(),
                 nominalCanDeriveAdditiveArithmetic)
-        .fixItInsert(vd->getAttributeInsertionLoc(/*forModifier*/ false),
-                     "@noDerivative ");
+        .fixItInsert(loc, "@noDerivative ");
 
   }
 }
