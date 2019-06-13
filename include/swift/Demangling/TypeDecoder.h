@@ -487,6 +487,7 @@ class TypeDecoder {
       auto index = Node->getChild(1)->getIndex();
       return Builder.createGenericTypeParameterType(depth, index);
     }
+    case NodeKind::EscapingObjCBlock:
     case NodeKind::ObjCBlock:
     case NodeKind::CFunctionPointer:
     case NodeKind::ThinFunctionType:
@@ -498,7 +499,8 @@ class TypeDecoder {
         return BuiltType();
 
       FunctionTypeFlags flags;
-      if (Node->getKind() == NodeKind::ObjCBlock) {
+      if (Node->getKind() == NodeKind::ObjCBlock ||
+          Node->getKind() == NodeKind::EscapingObjCBlock) {
         flags = flags.withConvention(FunctionMetadataConvention::Block);
       } else if (Node->getKind() == NodeKind::CFunctionPointer) {
         flags =
@@ -524,7 +526,8 @@ class TypeDecoder {
               .withParameterFlags(hasParamFlags)
               .withEscaping(
                           Node->getKind() == NodeKind::FunctionType ||
-                          Node->getKind() == NodeKind::EscapingAutoClosureType);
+                          Node->getKind() == NodeKind::EscapingAutoClosureType ||
+                          Node->getKind() == NodeKind::EscapingObjCBlock);
 
       auto result = decodeMangledType(Node->getChild(isThrow ? 2 : 1));
       if (!result) return BuiltType();
