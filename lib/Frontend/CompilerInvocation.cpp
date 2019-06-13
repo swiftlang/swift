@@ -197,6 +197,14 @@ static void PrintArg(raw_ostream &OS, const char *Arg, StringRef TempDir) {
   OS << '"';
 }
 
+static void ParseParseableInterfaceArgs(ParseableInterfaceOptions &Opts,
+                                        ArgList &Args) {
+  using namespace options;
+
+  Opts.PreserveTypesAsWrittenInModuleInterface |=
+    Args.hasArg(OPT_preserve_types_as_written_in_module_interface);
+}
+
 /// Save a copy of any flags marked as ModuleInterfaceOption, if running
 /// in a mode that is going to emit a .swiftinterface file.
 static void SaveParseableInterfaceArgs(ParseableInterfaceOptions &Opts,
@@ -1305,6 +1313,7 @@ bool CompilerInvocation::parseArgs(
     return true;
   }
 
+  ParseParseableInterfaceArgs(ParseableInterfaceOpts, ParsedArgs);
   SaveParseableInterfaceArgs(ParseableInterfaceOpts, FrontendOpts,
                              ParsedArgs, Diags);
 
