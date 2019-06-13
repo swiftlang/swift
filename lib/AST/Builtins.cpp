@@ -1336,6 +1336,7 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
   case IITDescriptor::HalfVecArgument:
   case IITDescriptor::VarArg:
   case IITDescriptor::Token:
+  case IITDescriptor::VecElementArgument:
   case IITDescriptor::VecOfAnyPtrsToElt:
     // These types cannot be expressed in swift yet.
     return Type();
