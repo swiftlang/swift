@@ -807,7 +807,7 @@ def resource_dir : Separate<["-"], "resource-dir">,
 
 def target : Separate<["-"], "target">,
   Flags<[FrontendOption, ModuleWrapOption, ModuleInterfaceOption]>,
-  HelpText<"Generate code for the given target">;
+  HelpText<"Generate code for the given target <triple>, such as x86_64-apple-macos10.9">, MetaVarName<"<triple>">;
 def target_legacy_spelling : Joined<["--"], "target=">,
   Flags<[FrontendOption]>, Alias<target>;
 
@@ -897,4 +897,9 @@ def vfsoverlay_EQ : Joined<["-"], "vfsoverlay=">,
 def runtime_compatibility_version : Separate<["-"], "runtime-compatibility-version">,
   Flags<[FrontendOption]>,
   HelpText<"Link compatibility library for Swift runtime version, or 'none'">;
+
+def disable_autolinking_runtime_compatibility : Flag<["-"], "disable-autolinking-runtime-compatibility">,
+  Flags<[FrontendOption]>,
+  HelpText<"Do not use autolinking for runtime compatibility libraries">;
+
 include "FrontendOptions.td"

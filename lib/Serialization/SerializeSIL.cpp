@@ -2304,7 +2304,6 @@ void SILSerializer::writeSILVTable(const SILVTable &vt) {
         // SILFunction name
         S.addUniquedStringRef(entry.Implementation->getName()),
         toStableVTableEntryKind(entry.TheKind),
-        toStableSILLinkage(entry.Linkage),
         ListOfValues);
   }
 }

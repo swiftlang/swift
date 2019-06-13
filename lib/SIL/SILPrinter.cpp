@@ -2855,10 +2855,6 @@ void SILVTable::print(llvm::raw_ostream &OS, bool Verbose) const {
                                                        QualifiedSILTypeOptions);
       OS << " : ";
     }
-    if (entry.Linkage !=
-        stripExternalFromLinkage(entry.Implementation->getLinkage())) {
-      OS << getLinkageString(entry.Linkage);
-    }
     OS << '@' << entry.Implementation->getName();
     switch (entry.TheKind) {
     case SILVTable::Entry::Kind::Normal:

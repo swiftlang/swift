@@ -627,7 +627,10 @@ public:
   void emitNativeToForeignThunk(SILDeclRef thunk);
   
   /// Generate a nullary function that returns the given value.
-  void emitGeneratorFunction(SILDeclRef function, Expr *value);
+  /// If \p emitProfilerIncrement is set, emit a profiler increment for
+  /// \p value.
+  void emitGeneratorFunction(SILDeclRef function, Expr *value,
+                             bool emitProfilerIncrement = false);
 
   /// Generate a nullary function that returns the value of the given variable's
   /// expression initializer.

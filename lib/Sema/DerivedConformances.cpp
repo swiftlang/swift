@@ -161,6 +161,22 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
   return false;
 }
 
+void DerivedConformance::tryDiagnoseFailedDerivation(DeclContext *DC,
+                                                     NominalTypeDecl *nominal,
+                                                     ProtocolDecl *protocol) {
+  auto knownProtocol = protocol->getKnownProtocolKind();
+  if (!knownProtocol)
+    return;
+
+  if (*knownProtocol == KnownProtocolKind::Equatable) {
+    tryDiagnoseFailedEquatableDerivation(DC, nominal);
+  }
+
+  if (*knownProtocol == KnownProtocolKind::Hashable) {
+    tryDiagnoseFailedHashableDerivation(DC, nominal);
+  }
+}
+
 ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
                                                        NominalTypeDecl *nominal,
                                                        ValueDecl *requirement) {
@@ -176,7 +192,7 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
     auto proto = ctx.getProtocol(kind);
     if (!proto) return nullptr;
 
-    if (auto conformance = tc.conformsToProtocol(
+    if (auto conformance = TypeChecker::conformsToProtocol(
             nominal->getDeclaredInterfaceType(), proto, nominal,
             ConformanceCheckFlags::SkipConditionalRequirements)) {
       auto DC = conformance->getConcrete()->getDeclContext();

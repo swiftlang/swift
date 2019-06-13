@@ -23,6 +23,7 @@ class Foo: Fooable {
   func bar() {}
   @objc func baz() {}
   @IBAction func garply(_: AnyObject?) {}
+  @IBSegueAction func harply(_: AnyObject?, _: AnyObject) -> AnyObject? {fatalError()}
   @objc func block(_: (Int) -> Int) {}
   @objc func block2(_: (Int,Int) -> Int) {}
 
@@ -44,14 +45,15 @@ class ObjcDestructible: NSObject {
 
 // CHECK: [[NO_ARGS_SIGNATURE:@.*]] = private unnamed_addr constant [8 x i8] c"v16@0:8\00"
 // CHECK: [[GARPLY_SIGNATURE:@.*]] = private unnamed_addr constant [11 x i8] c"v24@0:8@16\00"
+// CHECK: [[HARPLY_SIGNATURE:@.*]] = private unnamed_addr constant [14 x i8] c"@32@0:8@16@24\00"
 // CHECK: [[BLOCK_SIGNATURE_TRAD:@.*]] = private unnamed_addr constant [12 x i8] c"v24@0:8@?16\00"
 // CHECK-macosx: [[FAIL_SIGNATURE:@.*]] = private unnamed_addr constant [12 x i8] c"c24@0:8^@16\00"
 // CHECK-ios: [[FAIL_SIGNATURE:@.*]] = private unnamed_addr constant [12 x i8] c"B24@0:8^@16\00"
 // CHECK-tvos: [[FAIL_SIGNATURE:@.*]] = private unnamed_addr constant [12 x i8] c"B24@0:8^@16\00"
 // CHECK: @_INSTANCE_METHODS__TtC12objc_methods3Foo = private constant { {{.*}}] } {
 // CHECK:   i32 24,
-// CHECK:   i32 9,
-// CHECK:   [9 x { i8*, i8*, i8* }] [{
+// CHECK:   i32 10,
+// CHECK:   [10 x { i8*, i8*, i8* }] [{
 // CHECK:     i8* getelementptr inbounds ([4 x i8], [4 x i8]* @"\01L_selector_data(baz)", i64 0, i64 0),
 // CHECK:     i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[NO_ARGS_SIGNATURE]], i64 0, i64 0),
 // CHECK:     i8* bitcast (void (i8*, i8*)* @"$s12objc_methods3FooC3bazyyFTo" to i8*)
@@ -59,6 +61,10 @@ class ObjcDestructible: NSObject {
 // CHECK:     i8* getelementptr inbounds ([8 x i8], [8 x i8]* @"\01L_selector_data(garply:)", i64 0, i64 0),
 // CHECK:     i8* getelementptr inbounds ([11 x i8], [11 x i8]* [[GARPLY_SIGNATURE]], i64 0, i64 0),
 // CHECK:     i8* bitcast (void (i8*, i8*, i8*)* @"$s12objc_methods3FooC6garplyyyyXlSgFTo" to i8*)
+// CHECK:   }, {
+// CHECK:     i8* getelementptr inbounds ([9 x i8], [9 x i8]* @"\01L_selector_data(harply::)", i64 0, i64 0),
+// CHECK:     i8* getelementptr inbounds ([14 x i8], [14 x i8]* [[HARPLY_SIGNATURE]], i64 0, i64 0),
+// CHECK:     i8* bitcast (i8* (i8*, i8*, i8*, i8*)* @"$s12objc_methods3FooC6harplyyyXlSgAE_yXltFTo" to i8*)
 // CHECK:   }, {
 // CHECK:     i8* getelementptr inbounds ([7 x i8], [7 x i8]* @"\01L_selector_data(block:)", i64 0, i64 0),
 // CHECK:     i8* getelementptr inbounds ([12 x i8], [12 x i8]* [[BLOCK_SIGNATURE_TRAD]], i64 0, i64 0),

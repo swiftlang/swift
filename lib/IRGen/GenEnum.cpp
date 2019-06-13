@@ -3224,11 +3224,31 @@ namespace {
     getBitMaskForNoPayloadElements() const override {
       // Use the extra inhabitants mask from the payload.
       auto &payloadTI = getFixedPayloadTypeInfo();
-      ClusteredBitVector extraInhabitantsMask;
+      APInt extraInhabitantsMaskInt;
+
+      // If we used extra inhabitants from the payload, then we can use the
+      // payload's mask to find the bits we need to test.
+      auto extraDiscriminatorBits = (~APInt(8, 0));
+      if (payloadTI.getFixedSize().getValueInBits() != 0)
+        extraDiscriminatorBits =
+          extraDiscriminatorBits.zextOrTrunc(
+              payloadTI.getFixedSize().getValueInBits());
+      if (getNumExtraInhabitantTagValues() > 0) {
+        extraInhabitantsMaskInt = payloadTI.getFixedExtraInhabitantMask(IGM);
+        // If we have more no-payload cases than extra inhabitants, also
+        // mask in up to four bytes for discriminators we generate using
+        // extra tag bits.
+        if (ExtraTagBitCount > 0) {
+          extraInhabitantsMaskInt |= extraDiscriminatorBits;
+        }
+      } else {
+        // If we only use extra tag bits, then we need that extra tag plus
+        // up to four bytes of discriminator.
+        extraInhabitantsMaskInt = extraDiscriminatorBits;
+      }
+      auto extraInhabitantsMask
+        = getBitVectorFromAPInt(extraInhabitantsMaskInt);
       
-      if (!payloadTI.isKnownEmpty(ResilienceExpansion::Maximal))
-        extraInhabitantsMask =
-          getBitVectorFromAPInt(payloadTI.getFixedExtraInhabitantMask(IGM));
       // Extend to include the extra tag bits, which are always significant.
       unsigned totalSize
         = cast<FixedTypeInfo>(TI)->getFixedSize().getValueInBits();

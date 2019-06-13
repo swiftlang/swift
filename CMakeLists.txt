@@ -227,6 +227,17 @@ option(SWIFT_STDLIB_ENABLE_SIB_TARGETS
        "Should we generate sib targets for the stdlib or not?"
        FALSE)
 
+
+set(SWIFT_DARWIN_SUPPORTED_ARCHS "" CACHE STRING
+  "Semicolon-separated list of architectures to configure on Darwin platforms. \
+If left empty all default architectures are configured.")
+
+set(SWIFT_DARWIN_MODULE_ARCHS "" CACHE STRING
+  "Semicolon-separated list of architectures to configure Swift module-only \
+targets on Darwin platforms. These targets are in addition to the full \
+library targets.")
+
+
 #
 # User-configurable Android specific options.
 #

@@ -434,6 +434,17 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     Arguments.push_back("-debug-info-store-invocation");
   }
 
+  if (context.Args.hasArg(
+                      options::OPT_disable_autolinking_runtime_compatibility)) {
+    Arguments.push_back("-disable-autolinking-runtime-compatibility");
+  }
+                                 
+  if (auto arg = context.Args.getLastArg(
+                                  options::OPT_runtime_compatibility_version)) {
+    Arguments.push_back("-runtime-compatibility-version");
+    Arguments.push_back(arg->getValue());
+  }
+                                 
   return II;
 }
 

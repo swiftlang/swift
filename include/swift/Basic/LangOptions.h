@@ -310,11 +310,6 @@ namespace swift {
     /// set to true.
     bool ExperimentalDependenciesIncludeIntrafileOnes = false;
 
-    /// Enable experimental support for emitting Objective-C resilient class
-    /// stubs. This is a language option since it also determines if we admit
-    /// @objc members in extensions of classes with resilient ancestry.
-    bool EnableObjCResilientClassStubs = false;
-
     /// Sets the target we are building for and updates platform conditions
     /// to match.
     ///
@@ -407,6 +402,15 @@ namespace swift {
     // - tvOS 12.2
     // - watchOS 5.2
     bool doesTargetSupportObjCGetClassHook() const;
+
+    // The following deployment targets ship an Objective-C runtime supporting
+    // the objc_loadClassref() entry point:
+    //
+    // - macOS 10.15
+    // - iOS 13
+    // - tvOS 13
+    // - watchOS 6
+    bool doesTargetSupportObjCClassStubs() const;
 
     /// Returns true if the given platform condition argument represents
     /// a supported target operating system.
