@@ -3806,7 +3806,11 @@ public:
     // SWIFT_ENABLE_TENSORFLOW
     if (!Options.excludeAttrKind(TAK_differentiable) && info.isDifferentiable()) {
       // FIXME(rxwei): Print differentiation order.
-      Printer << "@differentiable ";
+      if (info.getDifferentiabilityKind() == DifferentiabilityKind::Linear) {
+        Printer << "@differentiable(linear) ";
+      } else {
+        Printer << "@differentiable ";
+      }
     }
 
     if (Options.PrintFunctionRepresentationAttrs &&
@@ -3856,7 +3860,11 @@ public:
     // SWIFT_ENABLE_TENSORFLOW
     if (!Options.excludeAttrKind(TAK_differentiable) && info.isDifferentiable()) {
       // FIXME(rxwei): Print differentiation order.
-      Printer << "@differentiable ";
+      if (info.getDifferentiabilityKind() == DifferentiabilityKind::Linear) {
+        Printer << "@differentiable(linear) ";
+      } else {
+        Printer << "@differentiable ";
+      }
     }
 
     if (Options.PrintFunctionRepresentationAttrs &&

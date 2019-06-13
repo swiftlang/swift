@@ -63,3 +63,10 @@ let diffVectorFunc: (Vector<Float>) -> Vector<Float>
 inferredConformancesGeneric(diffVectorFunc) // okay!
 
 func inferredConformancesGenericResult<T, U>() -> @differentiable (Vector<T>) -> Vector<U> {}
+
+//
+// linear function type
+//
+
+// expected-error @+1 {{cannot mark types as linear differentiable}}
+let _: @differentiable(linear) (Float) -> Float

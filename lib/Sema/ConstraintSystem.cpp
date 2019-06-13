@@ -1631,7 +1631,7 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
                               /*noescape*/ true,
                               // SWIFT_ENABLE_TENSORFLOW
                               /*throws*/ true,
-                              /*differentiable*/ false));
+                              DifferentiabilityKind::NonDifferentiable));
     FunctionType::Param args[] = {
       FunctionType::Param(noescapeClosure),
       FunctionType::Param(bodyClosure, CS.getASTContext().getIdentifier("do")),
@@ -1642,7 +1642,7 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
                             /*noescape*/ false,
                             // SWIFT_ENABLE_TENSORFLOW
                             /*throws*/ true,
-                            /*differentiable*/ false));
+                            DifferentiabilityKind::NonDifferentiable));
     openedFullType = refType;
     return true;
   }
@@ -1667,7 +1667,7 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
                               /*noescape*/ true,
                               // SWIFT_ENABLE_TENSORFLOW
                               /*throws*/ true,
-                              /*differentiability*/ false));
+                              DifferentiabilityKind::NonDifferentiable));
     FunctionType::Param args[] = {
       FunctionType::Param(existentialTy),
       FunctionType::Param(bodyClosure, CS.getASTContext().getIdentifier("do")),
@@ -1677,7 +1677,7 @@ resolveOverloadForDeclWithSpecialTypeCheckingSemantics(ConstraintSystem &CS,
                             /*noescape*/ false,
                             // SWIFT_ENABLE_TENSORFLOW
                             /*throws*/ true,
-                            /*differentiability*/ false));
+                            DifferentiabilityKind::NonDifferentiable));
     openedFullType = refType;
     return true;
   }

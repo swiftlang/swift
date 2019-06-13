@@ -4145,7 +4145,8 @@ public:
         getRawStableFunctionTypeRepresentation(fnTy->getRepresentation()),
         fnTy->isNoEscape(),
         // SWIFT_ENABLE_TENSORFLOW
-        fnTy->throws(), fnTy->isDifferentiable());
+        fnTy->throws(),
+        (uint8_t)fnTy->getDifferentiabilityKind());
 
     serializeFunctionTypeParams(fnTy);
   }

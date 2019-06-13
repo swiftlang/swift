@@ -2739,6 +2739,8 @@ ERROR(differentiable_attr_stored_property_variable_unsupported,none,
       "'jvp:' or 'vjp:' cannot be specified for stored properties", ())
 NOTE(protocol_witness_missing_differentiable_attr,none,
      "candidate is missing attribute '%0'", (StringRef))
+ERROR(linear_differentiable_type_disabled,none,
+      "cannot mark types as linear differentiable", ())
 
 // @differentiating
 ERROR(differentiating_attr_expected_result_tuple,none,
@@ -3761,6 +3763,9 @@ ERROR(autodiff_attr_result_not_differentiable,none,
 ERROR(nondiff_attr_invalid_on_nondifferentiable_function,none,
       "'nondiff' cannot be applied to arguments of a non-differentiable "
       "function", ())
+ERROR(attr_differentiable_no_vjp_or_jvp_when_linear,none,
+      "cannot specify 'vjp:' or 'jvp:' for linear functions; use "
+      "'transpose:' instead", ())
 
 // SIL
 ERROR(opened_non_protocol,none,
