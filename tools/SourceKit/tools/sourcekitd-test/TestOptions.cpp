@@ -362,6 +362,11 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       }
       break;
 #else
+      // The -vfs-files option operates by making a function call to a function
+      // defined in the SourceKit InProc library
+      // (SourceKit::setGlobalFileSystemProvider). So this option only works
+      // when sourcekitd-test is compiled using that library. It does not work
+      // when sourcekitd-test uses the XPC library.
       llvm::errs() << "vfs-files only supported when "
                       "SWIFT_SOURCEKIT_USE_INPROC_LIBRARY is set";
       return true;
@@ -373,6 +378,11 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       InMemoryClangModuleCache = true;
       break;
 #else
+      // The -in-memory-clang-module-cache option operates by making a function
+      // call to a function defined in the SourceKit InProc library
+      // (SourceKit::setGlobalInMemoryOutputFileSystem). So this option only
+      // works when sourcekitd-test is compiled using that library. It does not
+      // work when sourcekitd-test uses the XPC library.
       llvm::errs() << "in-memory-clang-module-cache only supported when "
                       "SWIFT_SOURCEKIT_USE_INPROC_LIBRARY is set";
       return true;

@@ -11,3 +11,5 @@ foo
 // RUN: %empty-directory(%t)
 // RUN: %sourcekitd-test -in-memory-clang-module-cache -req=cursor -pos=2:1 %s -- %s -module-cache-path %t/ModuleCache | %FileCheck --check-prefix=CHECK-SOURCEKIT %s
 // RUN: ls -l %t | %FileCheck --check-prefix=CHECK-LS %s
+
+// REQUIRES: sourcekit_use_inproc_library
