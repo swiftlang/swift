@@ -45,6 +45,10 @@ public struct SIMD${n}<Scalar>: SIMD where Scalar: SIMDScalar {
   }
 
   /// Accesses the scalar at the specified position.
+  // SWIFT_ENABLE_TENSORFLOW
+  @differentiable(vjp: _vjpSubscript
+    where Scalar : Differentiable & BinaryFloatingPoint,
+          Scalar.TangentVector : BinaryFloatingPoint)
   public subscript(index: Int) -> Scalar {
     @_transparent get {
       _precondition(indices.contains(index))
@@ -182,6 +186,33 @@ extension SIMD${n} where Scalar: BinaryFloatingPoint {
   where Other: BinaryFloatingPoint {
     self.init()
     for i in indices { self[i] = Scalar(other[i]) }
+  }
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+extension SIMD${n} : AdditiveArithmetic where Scalar : FloatingPoint {}
+
+extension SIMD${n} : Differentiable
+  where Scalar : Differentiable & BinaryFloatingPoint,
+        Scalar.TangentVector : BinaryFloatingPoint {
+  public typealias TangentVector = SIMD${n}
+  public typealias AllDifferentiableVariables = SIMD${n}
+  public func tangentVector(from cotangent: TangentVector) -> TangentVector {
+    return cotangent
+  }
+}
+
+extension SIMD${n}
+  where Scalar : Differentiable & BinaryFloatingPoint,
+        Scalar.TangentVector : BinaryFloatingPoint {
+  @usableFromInline
+  internal func _vjpSubscript(index: Int)
+  -> (Scalar, (Scalar.TangentVector) -> TangentVector) {
+    return (self[index], { v in
+      var zeros = Self.zero
+      zeros[index] = Scalar(v)
+      return zeros
+    })
   }
 }
 
