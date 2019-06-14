@@ -5413,12 +5413,13 @@ VarDecl *VarDecl::getPropertyWrapperBackingProperty() const {
   return getPropertyWrapperBackingPropertyInfo().backingVar;
 }
 
-bool VarDecl::isPropertyWrapperInitializedWithInitialValue() const {
-  auto customAttrs = getAttachedPropertyWrappers();
+static bool propertyWrapperInitializedViaInitialValue(
+   const VarDecl *var, bool checkDefaultInit) {
+  auto customAttrs = var->getAttachedPropertyWrappers();
   if (customAttrs.empty())
     return false;
 
-  auto *PBD = getParentPatternBinding();
+  auto *PBD = var->getParentPatternBinding();
   if (!PBD)
     return false;
 
@@ -5433,36 +5434,23 @@ bool VarDecl::isPropertyWrapperInitializedWithInitialValue() const {
     return false;
 
   // Default initialization does not use a value.
-  if (getAttachedPropertyWrapperTypeInfo(0).defaultInit)
+  if (checkDefaultInit &&
+      var->getAttachedPropertyWrapperTypeInfo(0).defaultInit)
     return false;
 
   // If all property wrappers have an initialValue initializer, the property
   // wrapper will be initialized that way.
-  return allAttachedPropertyWrappersHaveInitialValueInit();
+  return var->allAttachedPropertyWrappersHaveInitialValueInit();
+}
+
+bool VarDecl::isPropertyWrapperInitializedWithInitialValue() const {
+  return propertyWrapperInitializedViaInitialValue(
+      this, /*checkDefaultInit=*/true);
 }
 
 bool VarDecl::isPropertyMemberwiseInitializedWithWrappedType() const {
-  auto customAttrs = getAttachedPropertyWrappers();
-  if (customAttrs.empty())
-    return false;
-
-  auto *PBD = getParentPatternBinding();
-  if (!PBD)
-    return false;
-
-  // If there was an initializer on the original property, initialize
-  // via the initial value.
-  if (PBD->getPatternList()[0].getEqualLoc().isValid())
-    return true;
-
-  // If there was an initializer on the outermost wrapper, initialize
-  // via the full wrapper.
-  if (customAttrs[0]->getArg() != nullptr)
-    return false;
-
-  // If all property wrappers have an initialValue initializer, the property
-  // wrapper will be initialized that way.
-  return allAttachedPropertyWrappersHaveInitialValueInit();
+  return propertyWrapperInitializedViaInitialValue(
+      this, /*checkDefaultInit=*/false);
 }
 
 Identifier VarDecl::getObjCPropertyName() const {
