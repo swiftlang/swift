@@ -296,6 +296,60 @@ class UseWrapperWithDefaultInit {
 // CHECK: function_ref @$s17property_wrappers22WrapperWithDefaultInitVACyxGycfC
 // CHECK: return {{%.*}} : $WrapperWithDefaultInit<String>
 
+// Property wrapper composition.
+@propertyWrapper
+struct WrapperA<Value> {
+  var value: Value
+
+  init(initialValue: Value) {
+    value = initialValue
+  }
+}
+
+@propertyWrapper
+struct WrapperB<Value> {
+  var value: Value
+
+  init(initialValue: Value) {
+    value = initialValue
+  }
+}
+
+@propertyWrapper
+struct WrapperC<Value> {
+  var value: Value?
+
+  init(initialValue: Value?) {
+    value = initialValue
+  }
+}
+
+struct CompositionMembers {
+  // CompositionMembers.p1.getter
+  // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers18CompositionMembersV2p1SiSgvg : $@convention(method) (@guaranteed CompositionMembers) -> Optional<Int>
+  // CHECK: bb0([[SELF:%.*]] : @guaranteed $CompositionMembers):
+  // CHECK: [[P1:%.*]] = struct_extract [[SELF]] : $CompositionMembers, #CompositionMembers.$p1
+  // CHECK: [[P1_VALUE:%.*]] = struct_extract [[P1]] : $WrapperA<WrapperB<WrapperC<Int>>>, #WrapperA.value
+  // CHECK: [[P1_VALUE2:%.*]] = struct_extract [[P1_VALUE]] : $WrapperB<WrapperC<Int>>, #WrapperB.value
+  // CHECK: [[P1_VALUE3:%.*]] = struct_extract [[P1_VALUE2]] : $WrapperC<Int>, #WrapperC.value
+  // CHECK: return [[P1_VALUE3]] : $Optional<Int>
+  @WrapperA @WrapperB @WrapperC var p1: Int?
+  @WrapperA @WrapperB @WrapperC var p2 = "Hello"
+
+  // variable initialization expression of CompositionMembers.$p2
+  // CHECK-LABEL: sil hidden [transparent] [ossa] @$s17property_wrappers18CompositionMembersV3$p233_{{.*}}8WrapperAVyAA0N1BVyAA0N1CVySSGGGvpfi : $@convention(thin) () -> @owned Optional<String> {
+  // CHECK: %0 = string_literal utf8 "Hello"
+
+  // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers18CompositionMembersV2p12p2ACSiSg_SSSgtcfC : $@convention(method) (Optional<Int>, @owned Optional<String>, @thin CompositionMembers.Type) -> @owned CompositionMembers
+  // CHECK: function_ref @$s17property_wrappers8WrapperCV12initialValueACyxGxSg_tcfC
+  // CHECK: function_ref @$s17property_wrappers8WrapperBV12initialValueACyxGx_tcfC
+  // CHECK: function_ref @$s17property_wrappers8WrapperAV12initialValueACyxGx_tcfC
+}
+
+func testComposition() {
+  _ = CompositionMembers(p1: nil)
+}
+
 
 // CHECK-LABEL: sil_vtable ClassUsingWrapper {
 // CHECK:  #ClassUsingWrapper.x!getter.1: (ClassUsingWrapper) -> () -> Int : @$s17property_wrappers17ClassUsingWrapperC1xSivg   // ClassUsingWrapper.x.getter
