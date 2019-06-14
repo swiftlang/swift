@@ -522,8 +522,8 @@ public:
       highlightOffendingType(TC, diag, complainRepr);
     });
 
-    // Check the property wrapper type.
-    if (auto attr = anyVar->getAttachedPropertyWrapper()) {
+    // Check the property wrapper types.
+    for (auto attr : anyVar->getAttachedPropertyWrappers()) {
       checkTypeAccess(attr->getTypeLoc(), anyVar,
                       /*mayBeInferred=*/false,
                       [&](AccessScope typeAccessScope,
@@ -1136,7 +1136,7 @@ public:
       highlightOffendingType(TC, diag, complainRepr);
     });
 
-    if (auto attr = anyVar->getAttachedPropertyWrapper()) {
+    for (auto attr : anyVar->getAttachedPropertyWrappers()) {
       checkTypeAccess(attr->getTypeLoc(),
                       fixedLayoutStructContext ? fixedLayoutStructContext
                                                : anyVar,
