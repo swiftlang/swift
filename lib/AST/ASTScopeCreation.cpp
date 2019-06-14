@@ -932,7 +932,6 @@ IterableTypeBodyPortion::expandScope(GenericTypeOrExtensionScope *scope,
 ASTScopeImpl *GenericTypeOrExtensionWherePortion::expandScope(
     GenericTypeOrExtensionScope *scope, ScopeCreator &) const {
   return scope->getParent().get();
-  ;
 }
 
 #pragma mark createBodyScope
