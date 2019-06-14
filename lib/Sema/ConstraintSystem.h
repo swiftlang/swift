@@ -838,6 +838,14 @@ enum class ConstraintSystemFlags {
   /// If set, the top-level expression may be able to provide an underlying
   /// type for the contextual opaque archetype.
   UnderlyingTypeForOpaqueReturnType = 0x40,
+
+  /// FIXME(diagnostics): Once diagnostics are completely switched to new
+  /// framework, this flag could be removed as obsolete.
+  ///
+  /// If set, this identifies constraint system as being used to re-typecheck
+  /// one of the sub-expressions as part of the expression diagnostics, which
+  /// is attempting to narrow down failure location.
+  SubExpressionDiagnostics = 0x80,
 };
 
 /// Options that affect the constraint system as a whole.
