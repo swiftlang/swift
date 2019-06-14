@@ -463,9 +463,8 @@ function(_add_variant_link_flags)
     list(APPEND result "-Wl,-Bsymbolic")
   elseif("${LFLAGS_SDK}" STREQUAL "ANDROID")
     list(APPEND link_libraries "dl" "log" "atomic" "icudataswift" "icui18nswift" "icuucswift")
-    # We provide our own C++ below, so we ask the linker not to do it. However,
-    # we need to add the math library, which is linked implicitly by libc++.
-    list(APPEND result "-nostdlib++" "-lm")
+    # We need to add the math library, which is linked implicitly by libc++
+    list(APPEND result "-lm")
     if("${LFLAGS_ARCH}" MATCHES armv7)
       set(android_libcxx_path "${SWIFT_ANDROID_NDK_PATH}/sources/cxx-stl/llvm-libc++/libs/armeabi-v7a")
     elseif("${LFLAGS_ARCH}" MATCHES aarch64)
@@ -1371,8 +1370,16 @@ function(_add_swift_library_single target name)
         ${SWIFTLIB_SINGLE_PRIVATE_LINK_LIBRARIES})
   endif()
 
-  set_property(TARGET "${target}" PROPERTY
+  # NOTE(compnerd) use the C linker language to invoke `clang` rather than
+  # `clang++` as we explicitly link against the C++ runtime.  We were previously
+  # actually passing `-nostdlib++` to avoid the C++ runtime linkage.
+  if(SWIFTLIB_SINGLE_SDK STREQUAL ANDROID)
+    set_property(TARGET "${target}" PROPERTY
+      LINKER_LANGUAGE "C")
+  else()
+    set_property(TARGET "${target}" PROPERTY
       LINKER_LANGUAGE "CXX")
+  endif()
 
   if(target_static)
     set_property(TARGET "${target_static}" APPEND_STRING PROPERTY
