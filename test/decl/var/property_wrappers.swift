@@ -193,9 +193,9 @@ struct BadCombinations {
 }
 
 struct MultipleWrappers {
-  @Wrapper(value: 17) // expected-error{{only one property wrapper can be attached to a given property}}
-  @WrapperWithInitialValue // expected-note{{previous property wrapper specified here}}
-  var x: Int = 17
+  @Wrapper(value: 17) // expected-error{{cannot convert value of type 'Wrapper<Int>' to specified type 'Int'}}
+  @WrapperWithInitialValue
+  var x: Int = 17 // expected-error{{property 'x' with attached wrapper cannot initialize both the wrapper type and the property}}
 
   @WrapperWithInitialValue // expected-error 2{{property wrapper can only apply to a single variable}}
   var (y, z) = (1, 2)
@@ -767,4 +767,47 @@ struct SR_10899_Wrapper { // expected-note{{property wrapper type 'SR_10899_Wrap
 
 struct SR_10899_Usage {
   @SR_10899_Wrapper var thing: Bool // expected-error{{property type 'Bool' does not match that of the 'value' property of its wrapper type 'SR_10899_Wrapper'}}
+}
+
+// ---------------------------------------------------------------------------
+// Property wrapper composition
+// ---------------------------------------------------------------------------
+@propertyWrapper
+struct WrapperA<Value> {
+  var value: Value
+
+  init(initialValue: Value) {
+    value = initialValue
+  }
+}
+
+@propertyWrapper
+struct WrapperB<Value> {
+  var value: Value
+
+  init(initialValue: Value) {
+    value = initialValue
+  }
+}
+
+@propertyWrapper
+struct WrapperC<Value> {
+  var value: Value?
+
+  init(initialValue: Value?) {
+    value = initialValue
+  }
+}
+
+struct TestComposition {
+  @WrapperA @WrapperB @WrapperC var p1: Int?
+  @WrapperA @WrapperB @WrapperC var p2 = "Hello"
+
+	func triggerErrors(d: Double) {
+		p1 = d // expected-error{{cannot assign value of type 'Double' to type 'Int?'}}
+		p2 = d // expected-error{{cannot assign value of type 'Double' to type 'String?'}}
+
+		$p1 = d // expected-error{{cannot assign value of type 'Double' to type 'WrapperA<WrapperB<WrapperC<Int>>>'}}
+		$p2 = d // expected-error{{cannot assign value of type 'Double' to type 'WrapperA<WrapperB<WrapperC<String>>>'}}
+	}
 }

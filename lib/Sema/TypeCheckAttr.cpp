@@ -2556,22 +2556,10 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
       attr->setInvalid();
       return;
     }
-
-    // If this attribute isn't the one that attached a property wrapper to
-    // this property, complain.
-    auto var = cast<VarDecl>(D);
-    if (auto attached = var->getAttachedPropertyWrapper()) {
-      if (attached != attr) {
-        TC.diagnose(attr->getLocation(), diag::property_wrapper_multiple);
-        TC.diagnose(attached->getLocation(),
-                    diag::previous_property_wrapper_here);
-        return;
-      }
-    }
-
+    
     return;
   }
-
+  
   // If the nominal type is a function builder type, verify that D is a
   // function, storage with an explicit getter, or parameter of function type.
   if (nominal->getAttrs().hasAttribute<FunctionBuilderAttr>()) {

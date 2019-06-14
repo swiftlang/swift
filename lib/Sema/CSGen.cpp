@@ -2079,7 +2079,7 @@ namespace {
         // Otherwise, create a new type variable.
         auto ty = Type();
         if (!var->hasNonPatternBindingInit() &&
-            !var->getAttachedPropertyWrapper()) {
+            !var->hasAttachedPropertyWrapper()) {
           if (auto boundExpr = locator.trySimplifyToExpr()) {
             if (!boundExpr->isSemanticallyInOutExpr())
               ty = CS.getType(boundExpr)->getRValueType();

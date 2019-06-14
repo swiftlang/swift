@@ -536,17 +536,17 @@ void PropertyWrapperTypeInfoRequest::noteCycleStep(
   std::get<0>(getStorage())->diagnose(diag::circular_reference_through);
 }
 
-bool AttachedPropertyWrapperRequest::isCached() const {
+bool AttachedPropertyWrappersRequest::isCached() const {
   auto var = std::get<0>(getStorage());
   return !var->getAttrs().isEmpty();
 }
 
-void AttachedPropertyWrapperRequest::diagnoseCycle(
+void AttachedPropertyWrappersRequest::diagnoseCycle(
     DiagnosticEngine &diags) const {
   std::get<0>(getStorage())->diagnose(diag::circular_reference);
 }
 
-void AttachedPropertyWrapperRequest::noteCycleStep(
+void AttachedPropertyWrappersRequest::noteCycleStep(
     DiagnosticEngine &diags) const {
   std::get<0>(getStorage())->diagnose(diag::circular_reference_through);
 }
