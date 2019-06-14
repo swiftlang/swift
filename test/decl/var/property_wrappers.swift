@@ -799,15 +799,30 @@ struct WrapperC<Value> {
   }
 }
 
+@propertyWrapper
+struct WrapperD<Value, X, Y> { // expected-note{{property wrapper type 'WrapperD' declared here}}
+  var value: Value
+}
+
+@propertyWrapper
+struct WrapperE<Value> {
+  var value: Value
+}
+
 struct TestComposition {
   @WrapperA @WrapperB @WrapperC var p1: Int?
   @WrapperA @WrapperB @WrapperC var p2 = "Hello"
+  @WrapperD<WrapperE, Int, String> @WrapperE var p3: Int?
+  @WrapperD<WrapperC, Int, String> @WrapperC var p4: Int?
+  @WrapperD<WrapperC, Int, String> @WrapperE var p5: Int // expected-error{{property type 'Int' does not match that of the 'value' property of its wrapper type 'WrapperD<WrapperC, Int, String>'}}
 
 	func triggerErrors(d: Double) {
 		p1 = d // expected-error{{cannot assign value of type 'Double' to type 'Int?'}}
 		p2 = d // expected-error{{cannot assign value of type 'Double' to type 'String?'}}
+    p3 = d // expected-error{{cannot assign value of type 'Double' to type 'Int?'}}
 
 		$p1 = d // expected-error{{cannot assign value of type 'Double' to type 'WrapperA<WrapperB<WrapperC<Int>>>'}}
 		$p2 = d // expected-error{{cannot assign value of type 'Double' to type 'WrapperA<WrapperB<WrapperC<String>>>'}}
+    $p3 = d // expected-error{{cannot assign value of type 'Double' to type 'WrapperD<WrapperE<Int?>, Int, String>'}}
 	}
 }
