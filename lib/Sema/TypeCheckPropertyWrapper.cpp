@@ -261,7 +261,8 @@ PropertyWrapperTypeInfoRequest::evaluate(
       return PropertyWrapperTypeInfo();
     }
 
-    valueVar->diagnose(diag::property_wrapper_value);
+    valueVar->diagnose(diag::property_wrapper_value)
+      .fixItReplace(valueVar->getNameLoc(), "wrappedValue");
   }
 
   PropertyWrapperTypeInfo result;

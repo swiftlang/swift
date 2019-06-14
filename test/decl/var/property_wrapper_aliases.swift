@@ -26,7 +26,7 @@ struct Wrapper<T> {
 
 @propertyWrapper
 struct OldValue<T> {
-  var value: T // expected-warning{{property wrapper's `value` property should be renamed to 'wrappedValue'; use of 'value' is deprecated}}
+  var value: T // expected-warning{{property wrapper's `value` property should be renamed to 'wrappedValue'; use of 'value' is deprecated}}{{7-12=wrappedValue}}
 }
 
 struct TestOldValue {
