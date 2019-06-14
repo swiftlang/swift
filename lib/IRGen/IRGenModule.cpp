@@ -527,31 +527,6 @@ IRGenModule::~IRGenModule() {
 
 static bool isReturnAttribute(llvm::Attribute::AttrKind Attr);
 
-static AvailabilityContext
-getGetReplacementAvailability(ASTContext &context) {
-  auto target = context.LangOpts.Target;
-
-  if (target.isMacOSX()) {
-    return AvailabilityContext(
-        VersionRange::allGTE(llvm::VersionTuple(10, 15, 0)));
-  } else if (target.isiOS()) {
-    return AvailabilityContext(
-        VersionRange::allGTE(llvm::VersionTuple(13, 0, 0)));
-  } else if (target.isWatchOS()) {
-    return AvailabilityContext(
-        VersionRange::allGTE(llvm::VersionTuple(6, 0, 0)));
-  } else {
-    return AvailabilityContext::alwaysAvailable();
-  }
-}
-
-bool IRGenModule::isGetReplacementAvailable(ASTContext &Context) {
-  auto deploymentAvailability =
-      AvailabilityContext::forDeploymentTarget(Context);
-  auto featureAvailability = getGetReplacementAvailability(Context);
-  return deploymentAvailability.isContainedIn(featureAvailability);
-}
-
 // Explicitly listing these constants is an unfortunate compromise for
 // making the database file much more compact.
 //
@@ -564,22 +539,12 @@ namespace RuntimeConstants {
   const auto NoUnwind = llvm::Attribute::NoUnwind;
   const auto ZExt = llvm::Attribute::ZExt;
   const auto FirstParamReturned = llvm::Attribute::Returned;
-  
-  bool AlwaysAvailable(ASTContext &Context) {
-    return false;
-  }
-  
-  bool OpaqueTypeAvailability(ASTContext &Context) {
-    auto deploymentAvailability =
-      AvailabilityContext::forDeploymentTarget(Context);
-    auto featureAvailability = Context.getOpaqueTypeAvailability();
-    
-    return !deploymentAvailability.isContainedIn(featureAvailability);
-  }
 
-  bool GetReplacementAvailability(ASTContext &Context) {
-    return !IRGenModule::isGetReplacementAvailable(Context);
-  }
+  const auto AlwaysAvailable = RuntimeAvailability::AlwaysAvailable;
+  const auto AvailableByCompatibilityLibrary =
+      RuntimeAvailability::AvailableByCompatibilityLibrary;
+  const auto ConditionallyAvailable =
+      RuntimeAvailability::ConditionallyAvailable;
 } // namespace RuntimeConstants
 
 // We don't use enough attributes to justify generalizing the
@@ -623,13 +588,40 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
                       llvm::Constant *&cache,
                       const char *name,
                       llvm::CallingConv::ID cc,
-                      bool isWeakLinked,
+                      RuntimeAvailability availability,
+                      ASTContext *context,
                       llvm::ArrayRef<llvm::Type*> retTypes,
                       llvm::ArrayRef<llvm::Type*> argTypes,
                       ArrayRef<Attribute::AttrKind> attrs) {
+
   if (cache)
     return cache;
-  
+
+  bool isWeakLinked = false;
+  std::string functionName(name);
+
+  auto isFeatureAvailable = [&]() -> bool {
+    auto deploymentAvailability =
+        AvailabilityContext::forDeploymentTarget(*context);
+    auto featureAvailability = context->getSwift51Availability();
+    return deploymentAvailability.isContainedIn(featureAvailability);
+  };
+
+  switch (availability) {
+  case RuntimeAvailability::AlwaysAvailable:
+    // Nothing to do.
+    break;
+  case RuntimeAvailability::ConditionallyAvailable: {
+    isWeakLinked = !isFeatureAvailable();
+    break;
+  }
+  case RuntimeAvailability::AvailableByCompatibilityLibrary: {
+    if (!isFeatureAvailable())
+      functionName.append("50");
+    break;
+  }
+  }
+
   llvm::Type *retTy;
   if (retTypes.size() == 1)
     retTy = *retTypes.begin();
@@ -641,7 +633,7 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
                                       {argTypes.begin(), argTypes.end()},
                                       /*isVararg*/ false);
 
-  cache = Module.getOrInsertFunction(name, fnTy);
+  cache = Module.getOrInsertFunction(functionName.c_str(), fnTy);
 
   // Add any function attributes and set the calling convention.
   if (auto fn = dyn_cast<llvm::Function>(cache)) {
@@ -696,7 +688,7 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
   llvm::Constant *IRGenModule::get##ID##Fn() {                                 \
     using namespace RuntimeConstants;                                          \
     return getRuntimeFn(Module, ID##Fn, #NAME, CC,                             \
-                        (AVAILABILITY)(this->Context),                         \
+                        AVAILABILITY, &this->Context,                          \
                         RETURNS, ARGS, ATTRS);                                 \
   }
 

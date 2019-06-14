@@ -1441,7 +1441,6 @@ public:
 
   void emitOpaqueTypeDescriptorAccessor(OpaqueTypeDecl *);
 
-  static bool isGetReplacementAvailable(ASTContext &context);
 private:
   llvm::Constant *
   getAddrOfSharedContextDescriptor(LinkEntity entity,

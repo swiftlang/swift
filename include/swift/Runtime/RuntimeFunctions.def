@@ -638,7 +638,7 @@ FUNCTION(GetGenericMetadata, swift_getGenericMetadata,
 //                                     const OpaqueTypeDescriptor *descriptor,
 //                                     uintptr_t index);
 FUNCTION(GetOpaqueTypeMetadata, swift_getOpaqueTypeMetadata,
-         SwiftCC, OpaqueTypeAvailability,
+         SwiftCC, ConditionallyAvailable,
          RETURNS(TypeMetadataResponseTy),
          ARGS(SizeTy, Int8PtrTy, OpaqueTypeDescriptorPtrTy, SizeTy),
          ATTRS(NoUnwind, ReadOnly))
@@ -647,7 +647,7 @@ FUNCTION(GetOpaqueTypeMetadata, swift_getOpaqueTypeMetadata,
 //                                     const OpaqueTypeDescriptor *descriptor,
 //                                     uintptr_t index);
 FUNCTION(GetOpaqueTypeConformance, swift_getOpaqueTypeConformance,
-         SwiftCC, OpaqueTypeAvailability,
+         SwiftCC, ConditionallyAvailable,
          RETURNS(WitnessTablePtrTy),
          ARGS(Int8PtrTy, OpaqueTypeDescriptorPtrTy, SizeTy),
          ATTRS(NoUnwind, ReadOnly))
@@ -1226,25 +1226,13 @@ FUNCTION(EndAccess, swift_endAccess, C_CC, AlwaysAvailable,
          ATTRS(NoUnwind))
 
 FUNCTION(GetOrigOfReplaceable, swift_getOrigOfReplaceable, C_CC,
-         GetReplacementAvailability,
+         AvailableByCompatibilityLibrary,
          RETURNS(FunctionPtrTy),
          ARGS(FunctionPtrTy->getPointerTo()),
          ATTRS(NoUnwind))
 
 FUNCTION(GetReplacement, swift_getFunctionReplacement, C_CC,
-         GetReplacementAvailability,
-         RETURNS(FunctionPtrTy),
-         ARGS(FunctionPtrTy->getPointerTo(), FunctionPtrTy),
-         ATTRS(NoUnwind))
-
-FUNCTION(GetOrigOfReplaceable50, swift_getOrigOfReplaceable50, C_CC,
-         AlwaysAvailable,
-         RETURNS(FunctionPtrTy),
-         ARGS(FunctionPtrTy->getPointerTo()),
-         ATTRS(NoUnwind))
-
-FUNCTION(GetReplacement50, swift_getFunctionReplacement50, C_CC,
-         AlwaysAvailable,
+         AvailableByCompatibilityLibrary,
          RETURNS(FunctionPtrTy),
          ARGS(FunctionPtrTy->getPointerTo(), FunctionPtrTy),
          ATTRS(NoUnwind))
