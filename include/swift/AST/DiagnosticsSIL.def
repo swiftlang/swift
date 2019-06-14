@@ -424,6 +424,8 @@ WARNING(autodiff_nonvaried_result_fixit,none,
         "result does not depend on differentiation arguments and will always "
         "have a zero derivative; do you want to add '.withoutDerivative()'?",
         ())
+NOTE(autodiff_enums_unsupported,none,
+     "differentiating enum values is not yet supported", ())
 NOTE(autodiff_global_let_closure_not_differentiable,none,
      "global constant closure is not differentiable", ())
 NOTE(autodiff_cannot_differentiate_global_var_closures,none,
