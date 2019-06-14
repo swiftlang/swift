@@ -91,6 +91,13 @@ struct NoMemberwiseInitializer<T : AdditiveArithmetic> : AdditiveArithmetic {
   var value: T
   init(randomLabel value: T) { self.value = value }
 }
+struct NoMemberwiseInitializerCustomZero: AdditiveArithmetic {
+  var x: Float
+  static var zero: Self { return NoMemberwiseInitializerCustomZero(0) }
+  init(_ x: Float) {
+    self.x = x
+  }
+}
 struct NoMemberwiseInitializerExtended<T> {
   var value: T
   init(_ value: T) {

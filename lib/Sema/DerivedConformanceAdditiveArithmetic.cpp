@@ -61,6 +61,20 @@ static ValueDecl *getProtocolRequirement(ProtocolDecl *proto, Identifier name) {
   return lookup.front();
 }
 
+// Get the effective memberwise initializer of the given nominal type, or create
+// it if it does not exist.
+static ConstructorDecl *getOrCreateEffectiveMemberwiseInitializer(
+      TypeChecker &TC, NominalTypeDecl *nominal) {
+  auto &C = nominal->getASTContext();
+  if (auto *initDecl = nominal->getEffectiveMemberwiseInitializer())
+    return initDecl;
+  auto *initDecl = createImplicitConstructor(
+      TC, nominal, ImplicitConstructorKind::Memberwise);
+  nominal->addMember(initDecl);
+  C.addSynthesizedDecl(initDecl);
+  return initDecl;
+}
+
 // Return true if given nominal type has a `let` stored with an initial value.
 static bool hasLetStoredPropertyWithInitialValue(NominalTypeDecl *nominal) {
   return llvm::any_of(nominal->getStoredProperties(), [&](VarDecl *v) {
@@ -302,16 +316,6 @@ static ValueDecl *deriveAdditiveArithmetic_zero(DerivedConformance &derived) {
   auto &TC = derived.TC;
   auto &C = TC.Context;
 
-  // The implicit memberwise constructor must be explicitly created so that it
-  // can called when synthesizing the `zero` property getter. Normally, the
-  // memberwise constructor is synthesized during SILGen, which is too late.
-  if (!nominal->getEffectiveMemberwiseInitializer()) {
-    auto *initDecl = createImplicitConstructor(
-        TC, nominal, ImplicitConstructorKind::Memberwise);
-    nominal->addMember(initDecl);
-    C.addSynthesizedDecl(initDecl);
-  }
-
   auto returnInterfaceTy = nominal->getDeclaredInterfaceType();
   auto returnTy = parentDC->mapTypeIntoContext(returnInterfaceTy);
 
@@ -338,6 +342,8 @@ DerivedConformance::deriveAdditiveArithmetic(ValueDecl *requirement) {
   // Diagnose conformances in disallowed contexts.
   if (checkAndDiagnoseDisallowedContext(requirement))
     return nullptr;
+  // Create memberwise initializer for nominal type if it doesn't already exist.
+  getOrCreateEffectiveMemberwiseInitializer(TC, Nominal);
   if (requirement->getBaseName() == TC.Context.getIdentifier("+"))
     return deriveMathOperator(*this, Add);
   if (requirement->getBaseName() == TC.Context.getIdentifier("-"))
