@@ -833,6 +833,13 @@ public:
     return !(left == right);
   }
 };
+  
+/// Cast a pointer to \c U  to a pointer to a supertype \c T.
+/// Example:  Wobulator *w = up_cast<Wobulator>(coloredWobulator)
+/// Useful with ?: where each arm is a different subtype.
+/// If \c U is not a subtype of \c T, the compiler will complain.
+template <typename T, typename U>
+T *up_cast(U *ptr) { return ptr; }
 
 /// Removes all runs of values that match \p pred from the range of \p begin
 /// to \p end.
