@@ -1594,25 +1594,28 @@ ConstraintSystem::matchSuperclassTypes(Type type1, Type type2,
   return getTypeMatchFailure(locator);
 }
 
-static ConstraintSystem::TypeMatchResult
-matchDeepTypeArguments(ConstraintSystem &cs,
-                       ConstraintSystem::TypeMatchOptions subflags,
-                       ArrayRef<Type> args1,
-                       ArrayRef<Type> args2,
-                       ConstraintLocatorBuilder locator) {
+static ConstraintSystem::TypeMatchResult matchDeepTypeArguments(
+    ConstraintSystem &cs, ConstraintSystem::TypeMatchOptions subflags,
+    ArrayRef<Type> args1, ArrayRef<Type> args2,
+    ConstraintLocatorBuilder locator,
+    llvm::function_ref<void(unsigned)> recordMismatch = [](unsigned) {}) {
   if (args1.size() != args2.size()) {
     return cs.getTypeMatchFailure(locator);
   }
-  for (unsigned i = 0, n = args1.size(); i != n; ++i) {
-    auto result = cs.matchTypes(args1[i], args2[i], ConstraintKind::Bind,
-                                subflags, locator.withPathElement(
-                                        LocatorPathElt::getGenericArgument(i)));
 
-    if (result.isFailure())
-      return result;
+  auto allMatch = cs.getTypeMatchSuccess();
+  for (unsigned i = 0, n = args1.size(); i != n; ++i) {
+    auto result = cs.matchTypes(
+        args1[i], args2[i], ConstraintKind::Bind, subflags,
+        locator.withPathElement(LocatorPathElt::getGenericArgument(i)));
+
+    if (result.isFailure()) {
+      recordMismatch(i);
+      allMatch = result;
+    }
   }
 
-  return cs.getTypeMatchSuccess();
+  return allMatch;
 }
 
 ConstraintSystem::TypeMatchResult
@@ -1668,9 +1671,47 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
       return result;
   }
 
-  // Match up the generic arguments, exactly.
   auto args1 = bound1->getGenericArgs();
   auto args2 = bound2->getGenericArgs();
+
+  // Match up the generic arguments, exactly.
+
+  if (shouldAttemptFixes()) {
+    bool forRequirement = false;
+    if (auto last = locator.last()) {
+      forRequirement = last->isTypeParameterRequirement() ||
+                       last->isConditionalRequirement();
+    }
+
+    // Optionals and arrays have a lot of special diagnostics and only one
+    // generic argument so if we' re dealing with one, don't produce generic
+    // arguments mismatch fixes.
+    // TODO(diagnostics): Move Optional and Array diagnostics over to the
+    // new framework.
+    bool isOptional = bound1->getDecl()->isOptionalDecl();
+    bool isArray = isArrayType(bound1).hasValue();
+
+    if (forRequirement || isOptional || isArray)
+      return matchDeepTypeArguments(*this, subflags, args1, args2, locator);
+
+    SmallVector<unsigned, 4> mismatches;
+    auto result = matchDeepTypeArguments(
+        *this, subflags, args1, args2, locator,
+        [&mismatches](unsigned position) { mismatches.push_back(position); });
+
+    if (mismatches.empty())
+      return result;
+
+    auto *fix = GenericArgumentsMismatch::create(
+        *this, bound1, bound2, mismatches, getConstraintLocator(locator));
+
+    if (!recordFix(fix)) {
+      // Increase the solution's score for each mismtach this fixes.
+      increaseScore(SK_Fix, mismatches.size());
+      return getTypeMatchSuccess();
+    }
+    return result;
+  }
   return matchDeepTypeArguments(*this, subflags, args1, args2, locator);
 }
 
@@ -2111,6 +2152,15 @@ bool ConstraintSystem::repairFailures(
     return false;
   }
 
+  auto hasConversionOrRestriction = [&](ConversionRestrictionKind kind) {
+    return llvm::any_of(conversionsOrFixes,
+                        [kind](const RestrictionOrFix correction) {
+                          if (auto restriction = correction.getRestriction())
+                            return restriction == kind;
+                          return false;
+                        });
+  };
+
   auto &elt = path.back();
   switch (elt.getKind()) {
   case ConstraintLocator::LValueConversion:
@@ -2179,6 +2229,11 @@ bool ConstraintSystem::repairFailures(
   }
 
   case ConstraintLocator::ClosureResult: {
+    // If we could record a generic arguments mismatch instead of this fix,
+    // don't record a ContextualMismatch here.
+    if (hasConversionOrRestriction(ConversionRestrictionKind::DeepEquality))
+      break;
+
     auto *fix = ContextualMismatch::create(*this, lhs, rhs,
                                            getConstraintLocator(locator));
     conversionsOrFixes.push_back(fix);
@@ -2237,6 +2292,11 @@ bool ConstraintSystem::repairFailures(
 
   case ConstraintLocator::TupleElement: {
     if (anchor && (isa<ArrayExpr>(anchor) || isa<DictionaryExpr>(anchor))) {
+      // If we could record a generic arguments mismatch instead of this fix,
+      // don't record a ContextualMismatch here.
+      if (hasConversionOrRestriction(ConversionRestrictionKind::DeepEquality))
+        break;
+
       conversionsOrFixes.push_back(CollectionElementContextualMismatch::create(
           *this, lhs, rhs, getConstraintLocator(locator)));
     }
@@ -6684,6 +6744,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::TreatKeyPathSubscriptIndexAsHashable:
   case FixKind::AllowInvalidRefInKeyPath:
   case FixKind::ExplicitlySpecifyGenericArguments:
+  case FixKind::GenericArgumentsMismatch:
     llvm_unreachable("handled elsewhere");
   }
 

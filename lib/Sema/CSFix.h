@@ -88,6 +88,9 @@ enum class FixKind : uint8_t {
   /// like the types are aligned.
   ContextualMismatch,
 
+  /// Fix up the generic arguments of two types so they match each other.
+  GenericArgumentsMismatch,
+
   /// Fix up @autoclosure argument to the @autoclosure parameter,
   /// to for a call to be able to foward it properly, since
   /// @autoclosure conversions are unsupported starting from
@@ -164,7 +167,8 @@ enum class FixKind : uint8_t {
   /// associated with single declaration.
   ExplicitlySpecifyGenericArguments,
 
-  /// Skip any unhandled constructs that occur within a closure argument that matches up with a
+  /// Skip any unhandled constructs that occur within a closure argument that
+  /// matches up with a
   /// parameter that has a function builder.
   SkipUnhandledConstructInFunctionBuilder,
 };
@@ -486,6 +490,60 @@ public:
 
   static ContextualMismatch *create(ConstraintSystem &cs, Type lhs, Type rhs,
                                     ConstraintLocator *locator);
+};
+
+/// Detect situations where two type's generic arguments must
+/// match but are not convertible e.g.
+///
+/// ```swift
+/// struct F<G> {}
+/// let _:F<Int> = F<Bool>()
+/// ```
+class GenericArgumentsMismatch final
+    : public ConstraintFix,
+      private llvm::TrailingObjects<GenericArgumentsMismatch, unsigned> {
+  friend TrailingObjects;
+
+  BoundGenericType *Actual;
+  BoundGenericType *Required;
+
+  unsigned NumMismatches;
+
+protected:
+  GenericArgumentsMismatch(ConstraintSystem &cs, BoundGenericType *actual,
+                           BoundGenericType *required,
+                           llvm::ArrayRef<unsigned> mismatches,
+                           ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::GenericArgumentsMismatch, locator),
+        Actual(actual), Required(required), NumMismatches(mismatches.size()) {
+    std::uninitialized_copy(mismatches.begin(), mismatches.end(),
+                            getMismatchesBuf().begin());
+  }
+
+public:
+  std::string getName() const override {
+    return "fix generic argument mismatch";
+  }
+
+  BoundGenericType *getActual() const { return Actual; }
+  BoundGenericType *getRequired() const { return Required; }
+
+  ArrayRef<unsigned> getMismatches() const {
+    return {getTrailingObjects<unsigned>(), NumMismatches};
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static GenericArgumentsMismatch *create(ConstraintSystem &cs,
+                                          BoundGenericType *actual,
+                                          BoundGenericType *required,
+                                          llvm::ArrayRef<unsigned> mismatches,
+                                          ConstraintLocator *locator);
+
+private:
+  MutableArrayRef<unsigned> getMismatchesBuf() {
+    return {getTrailingObjects<unsigned>(), NumMismatches};
+  }
 };
 
 /// Detect situations where key path doesn't have capability required
