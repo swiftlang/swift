@@ -9,6 +9,9 @@
 // don't support TSan.
 // UNSUPPORTED: remote_run
 
+// rdar://51730684
+// REQUIRES: disable
+
 // Test ThreadSanitizer execution end-to-end with libdispatch.
 
 import Dispatch
