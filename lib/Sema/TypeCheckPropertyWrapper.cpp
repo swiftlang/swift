@@ -28,7 +28,8 @@ using namespace swift;
 /// Find the named property in a property wrapper to which access will
 /// be delegated.
 static VarDecl *findValueProperty(ASTContext &ctx, NominalTypeDecl *nominal,
-                                  Identifier name, bool allowMissing) {
+                                  Identifier name, bool allowMissing,
+                                  bool *diagnosed = nullptr) {
   SmallVector<VarDecl *, 2> vars;
   {
     SmallVector<ValueDecl *, 2> decls;
@@ -49,6 +50,8 @@ static VarDecl *findValueProperty(ASTContext &ctx, NominalTypeDecl *nominal,
     if (!allowMissing) {
       nominal->diagnose(diag::property_wrapper_no_value_property,
                         nominal->getDeclaredType(), name);
+      if (diagnosed)
+        *diagnosed = true;
     }
     return nullptr;
 
@@ -62,6 +65,8 @@ static VarDecl *findValueProperty(ASTContext &ctx, NominalTypeDecl *nominal,
       var->diagnose(diag::kind_declname_declared_here,
                     var->getDescriptiveKind(), var->getFullName());
     }
+    if (diagnosed)
+      *diagnosed = true;
     return nullptr;
   }
 
@@ -72,6 +77,8 @@ static VarDecl *findValueProperty(ASTContext &ctx, NominalTypeDecl *nominal,
                   var->getFormalAccess(), var->getDescriptiveKind(),
                   var->getFullName(), nominal->getDeclaredType(),
                   nominal->getFormalAccess());
+    if (diagnosed)
+      *diagnosed = true;
     return nullptr;
   }
 
@@ -230,13 +237,32 @@ PropertyWrapperTypeInfoRequest::evaluate(
     return PropertyWrapperTypeInfo();
   }
 
-  // Look for a non-static property named "value" in the property wrapper
-  // type.
+  // Look for a non-static property named "wrappedValue" in the property
+  // wrapper type.
   ASTContext &ctx = nominal->getASTContext();
+  bool diagnosed = false;
   auto valueVar =
-      findValueProperty(ctx, nominal, ctx.Id_value, /*allowMissing=*/false);
-  if (!valueVar)
-    return PropertyWrapperTypeInfo();
+      findValueProperty(ctx, nominal, ctx.Id_wrappedValue,
+                        /*allowMissing=*/true, &diagnosed);
+  if (!valueVar) {
+    if (!diagnosed) {
+      // Look for a non-static property named "value". This is the old name,
+      // but accept it with a warning.
+      valueVar = findValueProperty(ctx, nominal, ctx.Id_value,
+                                   /*allowMissing=*/true, &diagnosed);
+    }
+
+    if (!valueVar) {
+      if (!diagnosed) {
+        valueVar = findValueProperty(ctx, nominal, ctx.Id_wrappedValue,
+                                     /*allowMissing=*/false);
+      }
+
+      return PropertyWrapperTypeInfo();
+    }
+
+    valueVar->diagnose(diag::property_wrapper_value);
+  }
 
   PropertyWrapperTypeInfo result;
   result.valueVar = valueVar;

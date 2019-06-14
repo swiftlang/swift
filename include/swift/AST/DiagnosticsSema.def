@@ -4370,7 +4370,8 @@ ERROR(property_wrapper_ambiguous_value_property, none,
   "named %1", (Type, Identifier))
 ERROR(property_wrapper_wrong_initial_value_init, none,
       "'init(initialValue:)' parameter type (%0) must be the same as its "
-      "'value' property type (%1) or an @autoclosure thereof", (Type, Type))
+      "'wrappedValue' property type (%1) or an @autoclosure thereof",
+      (Type, Type))
 ERROR(property_wrapper_failable_init, none,
       "%0 cannot be failable", (DeclName))
 ERROR(property_wrapper_ambiguous_initial_value_init, none,
@@ -4423,7 +4424,7 @@ NOTE(property_wrapper_direct_init,none,
      "'(...') on the attribute", ())
 
 ERROR(property_wrapper_incompatible_property, none,
-      "property type %0 does not match that of the 'value' property of "
+      "property type %0 does not match that of the 'wrappedValue' property of "
       "its wrapper type %1", (Type, Type))
 
 ERROR(property_wrapper_type_access,none,
@@ -4443,6 +4444,9 @@ ERROR(property_wrapper_type_not_usable_from_inline,none,
 WARNING(property_wrapper_delegateValue,none,
         "property wrapper's `delegateValue` property should be renamed to "
         "'wrapperValue'; use of 'delegateValue' is deprecated", ())
+WARNING(property_wrapper_value,none,
+        "property wrapper's `value` property should be renamed to "
+        "'wrappedValue'; use of 'value' is deprecated", ())
 
 //------------------------------------------------------------------------------
 // MARK: function builder diagnostics
