@@ -43,7 +43,7 @@ extension ProtoRefinesClass {
     let _: BaseProto & Generic<Int> = self
     let _: BaseProto & Concrete = self
 
-    let _: Generic<String> = self;
+    let _: Generic<String> = self
     // expected-error@-1 {{cannot assign value of type 'Generic<Int>' to type 'Generic<String>'}}
   }
 }

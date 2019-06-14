@@ -167,7 +167,8 @@ enum class FixKind : uint8_t {
   /// associated with single declaration.
   ExplicitlySpecifyGenericArguments,
 
-  /// Skip any unhandled constructs that occur within a closure argument that matches up with a
+  /// Skip any unhandled constructs that occur within a closure argument that
+  /// matches up with a
   /// parameter that has a function builder.
   SkipUnhandledConstructInFunctionBuilder,
 };
