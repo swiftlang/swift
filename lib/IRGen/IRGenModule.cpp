@@ -527,6 +527,31 @@ IRGenModule::~IRGenModule() {
 
 static bool isReturnAttribute(llvm::Attribute::AttrKind Attr);
 
+static AvailabilityContext
+getGetReplacementAvailability(ASTContext &context) {
+  auto target = context.LangOpts.Target;
+
+  if (target.isMacOSX()) {
+    return AvailabilityContext(
+        VersionRange::allGTE(llvm::VersionTuple(10, 15, 0)));
+  } else if (target.isiOS()) {
+    return AvailabilityContext(
+        VersionRange::allGTE(llvm::VersionTuple(13, 0, 0)));
+  } else if (target.isWatchOS()) {
+    return AvailabilityContext(
+        VersionRange::allGTE(llvm::VersionTuple(6, 0, 0)));
+  } else {
+    return AvailabilityContext::alwaysAvailable();
+  }
+}
+
+bool IRGenModule::isGetReplacementAvailable(ASTContext &Context) {
+  auto deploymentAvailability =
+      AvailabilityContext::forDeploymentTarget(Context);
+  auto featureAvailability = getGetReplacementAvailability(Context);
+  return deploymentAvailability.isContainedIn(featureAvailability);
+}
+
 // Explicitly listing these constants is an unfortunate compromise for
 // making the database file much more compact.
 //
@@ -550,6 +575,10 @@ namespace RuntimeConstants {
     auto featureAvailability = Context.getOpaqueTypeAvailability();
     
     return !deploymentAvailability.isContainedIn(featureAvailability);
+  }
+
+  bool GetReplacementAvailability(ASTContext &Context) {
+    return !IRGenModule::isGetReplacementAvailable(Context);
   }
 } // namespace RuntimeConstants
 

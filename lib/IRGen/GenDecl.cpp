@@ -2239,8 +2239,12 @@ void IRGenModule::createReplaceableProlog(IRGenFunction &IGF, SILFunction *f) {
     rhs = FnAddr;
   } else {
     // Call swift_getFunctionReplacement to check which function to call.
-    auto *callRTFunc = IGF.Builder.CreateCall(getGetReplacementFn(),
-                                             { ReplAddr, FnAddr });
+    auto *getReplacementFn = IRGenModule::isGetReplacementAvailable(Context)
+                                 ? getGetReplacementFn()
+                                 : getGetReplacement50Fn();
+
+    auto *callRTFunc =
+        IGF.Builder.CreateCall(getReplacementFn, {ReplAddr, FnAddr});
     callRTFunc->setDoesNotThrow();
     ReplFn = callRTFunc;
     rhs = llvm::ConstantExpr::getNullValue(ReplFn->getType());
@@ -2408,8 +2412,11 @@ void IRGenModule::emitDynamicReplacementOriginalFunctionThunk(SILFunction *f) {
       llvm::ConstantExpr::getInBoundsGetElementPtr(nullptr, linkEntry, indices),
       FunctionPtrTy->getPointerTo());
 
-  auto *OrigFn = IGF.Builder.CreateCall(getGetOrigOfReplaceableFn(),
-                                        { fnPtrAddr });
+  auto *getOrigOfReplaceableFn = IRGenModule::isGetReplacementAvailable(Context)
+                                     ? getGetOrigOfReplaceableFn()
+                                     : getGetOrigOfReplaceable50Fn();
+  auto *OrigFn = IGF.Builder.CreateCall(getOrigOfReplaceableFn, {fnPtrAddr});
+
   OrigFn->setDoesNotThrow();
 
   auto *typeFnPtr =
