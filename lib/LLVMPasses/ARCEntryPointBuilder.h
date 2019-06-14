@@ -220,8 +220,8 @@ private:
     Retain = getRuntimeFn(
         getModule(), cache,
         isNonAtomic(OrigI) ? "swift_nonatomic_retain" : "swift_retain",
-        DefaultCC, false, {ObjectPtrTy}, {ObjectPtrTy},
-        {NoUnwind, FirstParamReturned});
+        DefaultCC, RuntimeAvailability::AlwaysAvailable, nullptr, {ObjectPtrTy},
+        {ObjectPtrTy}, {NoUnwind, FirstParamReturned});
 
     return Retain.get();
   }
@@ -234,10 +234,11 @@ private:
     auto *VoidTy = Type::getVoidTy(getModule().getContext());
 
     llvm::Constant *cache = nullptr;
-    Release = getRuntimeFn(
-        getModule(), cache,
-        isNonAtomic(OrigI) ? "swift_nonatomic_release" : "swift_release",
-        DefaultCC, false, {VoidTy}, {ObjectPtrTy}, {NoUnwind});
+    Release = getRuntimeFn(getModule(), cache,
+                           isNonAtomic(OrigI) ? "swift_nonatomic_release"
+                                              : "swift_release",
+                           DefaultCC, RuntimeAvailability::AlwaysAvailable,
+                           nullptr, {VoidTy}, {ObjectPtrTy}, {NoUnwind});
 
     return Release.get();
   }
@@ -272,8 +273,8 @@ private:
     RetainN = getRuntimeFn(
         getModule(), cache,
         isNonAtomic(OrigI) ? "swift_nonatomic_retain_n" : "swift_retain_n",
-        DefaultCC, false, {ObjectPtrTy}, {ObjectPtrTy, Int32Ty},
-        {NoUnwind, FirstParamReturned});
+        DefaultCC, RuntimeAvailability::AlwaysAvailable, nullptr, {ObjectPtrTy},
+        {ObjectPtrTy, Int32Ty}, {NoUnwind, FirstParamReturned});
 
     return RetainN.get();
   }
@@ -290,7 +291,8 @@ private:
     ReleaseN = getRuntimeFn(
         getModule(), cache,
         isNonAtomic(OrigI) ? "swift_nonatomic_release_n" : "swift_release_n",
-        DefaultCC, false, {VoidTy}, {ObjectPtrTy, Int32Ty}, {NoUnwind});
+        DefaultCC, RuntimeAvailability::AlwaysAvailable, nullptr, {VoidTy},
+        {ObjectPtrTy, Int32Ty}, {NoUnwind});
 
     return ReleaseN.get();
   }
@@ -304,13 +306,12 @@ private:
     auto *Int32Ty = Type::getInt32Ty(getModule().getContext());
 
     llvm::Constant *cache = nullptr;
-    UnknownObjectRetainN =
-        getRuntimeFn(getModule(), cache,
-                     isNonAtomic(OrigI)
-                       ? "swift_nonatomic_unknownObjectRetain_n"
-                       : "swift_unknownObjectRetain_n",
-                     DefaultCC, false, {ObjectPtrTy}, {ObjectPtrTy, Int32Ty},
-                     {NoUnwind, FirstParamReturned});
+    UnknownObjectRetainN = getRuntimeFn(
+        getModule(), cache,
+        isNonAtomic(OrigI) ? "swift_nonatomic_unknownObjectRetain_n"
+                           : "swift_unknownObjectRetain_n",
+        DefaultCC, RuntimeAvailability::AlwaysAvailable, nullptr, {ObjectPtrTy},
+        {ObjectPtrTy, Int32Ty}, {NoUnwind, FirstParamReturned});
 
     return UnknownObjectRetainN.get();
   }
@@ -324,13 +325,12 @@ private:
     auto *VoidTy = Type::getVoidTy(getModule().getContext());
 
     llvm::Constant *cache = nullptr;
-    UnknownObjectReleaseN =
-        getRuntimeFn(getModule(), cache,
-                     isNonAtomic(OrigI)
-                       ? "swift_nonatomic_unknownObjectRelease_n"
-                       : "swift_unknownObjectRelease_n",
-                     DefaultCC, false,
-                     {VoidTy}, {ObjectPtrTy, Int32Ty}, {NoUnwind});
+    UnknownObjectReleaseN = getRuntimeFn(
+        getModule(), cache,
+        isNonAtomic(OrigI) ? "swift_nonatomic_unknownObjectRelease_n"
+                           : "swift_unknownObjectRelease_n",
+        DefaultCC, RuntimeAvailability::AlwaysAvailable, nullptr, {VoidTy},
+        {ObjectPtrTy, Int32Ty}, {NoUnwind});
 
     return UnknownObjectReleaseN.get();
   }
@@ -343,12 +343,12 @@ private:
     auto *Int32Ty = Type::getInt32Ty(getModule().getContext());
 
     llvm::Constant *cache = nullptr;
-    BridgeRetainN =
-        getRuntimeFn(getModule(), cache,
-                     isNonAtomic(OrigI) ? "swift_nonatomic_bridgeObjectRetain_n"
-                                        : "swift_bridgeObjectRetain_n",
-                     DefaultCC, false, {BridgeObjectPtrTy},
-                     {BridgeObjectPtrTy, Int32Ty}, {NoUnwind});
+    BridgeRetainN = getRuntimeFn(
+        getModule(), cache,
+        isNonAtomic(OrigI) ? "swift_nonatomic_bridgeObjectRetain_n"
+                           : "swift_bridgeObjectRetain_n",
+        DefaultCC, RuntimeAvailability::AlwaysAvailable, nullptr,
+        {BridgeObjectPtrTy}, {BridgeObjectPtrTy, Int32Ty}, {NoUnwind});
     return BridgeRetainN.get();
   }
 
@@ -366,7 +366,8 @@ private:
         getModule(), cache,
         isNonAtomic(OrigI) ? "swift_nonatomic_bridgeObjectRelease_n"
                            : "swift_bridgeObjectRelease_n",
-        DefaultCC, false, {VoidTy}, {BridgeObjectPtrTy, Int32Ty}, {NoUnwind});
+        DefaultCC, RuntimeAvailability::AlwaysAvailable, nullptr, {VoidTy},
+        {BridgeObjectPtrTy, Int32Ty}, {NoUnwind});
     return BridgeReleaseN.get();
   }
 

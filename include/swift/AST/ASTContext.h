@@ -598,6 +598,10 @@ public:
   /// Get the runtime availability of the opaque types language feature for the target platform.
   AvailabilityContext getOpaqueTypeAvailability();
 
+  /// Get the runtime availability of features introduced in the Swift 5.1
+  /// compiler for the target platform.
+  AvailabilityContext getSwift51Availability();
+
   //===--------------------------------------------------------------------===//
   // Diagnostics Helper functions
   //===--------------------------------------------------------------------===//
