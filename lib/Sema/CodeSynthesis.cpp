@@ -1847,8 +1847,8 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
   }
 
   // Get the property wrapper information.
-  if (!var->allAttachedPropertyWrappersHaveInitialValueInit()) {
-    assert(!originalInitialValue);
+  if (!var->allAttachedPropertyWrappersHaveInitialValueInit() &&
+      !originalInitialValue) {
     return PropertyWrapperBackingPropertyInfo(
         backingVar, storageVar, nullptr, nullptr, nullptr);
   }
@@ -1859,9 +1859,10 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
       new (ctx) OpaqueValueExpr(var->getLoc(), var->getType(),
                                 /*isPlaceholder=*/true);
   Expr *initializer = buildPropertyWrapperInitialValueCall(
-      var, storageType, origValue);
-  typeCheckSynthesizedWrapperInitializer(pbd, backingVar, parentPBD,
-                                         initializer);
+      var, storageType, origValue,
+      /*ignoreAttributeArgs=*/!originalInitialValue);
+  typeCheckSynthesizedWrapperInitializer(
+      pbd, backingVar, parentPBD, initializer);
 
   return PropertyWrapperBackingPropertyInfo(
       backingVar, storageVar, originalInitialValue, initializer, origValue);

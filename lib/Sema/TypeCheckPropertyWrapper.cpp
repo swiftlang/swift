@@ -261,7 +261,8 @@ PropertyWrapperTypeInfoRequest::evaluate(
       return PropertyWrapperTypeInfo();
     }
 
-    valueVar->diagnose(diag::property_wrapper_value);
+    valueVar->diagnose(diag::property_wrapper_value)
+      .fixItReplace(valueVar->getNameLoc(), "wrappedValue");
   }
 
   PropertyWrapperTypeInfo result;
@@ -560,7 +561,8 @@ Type swift::computeWrappedValueType(VarDecl *var, Type backingStorageType,
 }
 
 Expr *swift::buildPropertyWrapperInitialValueCall(
-    VarDecl *var, Type backingStorageType, Expr *value) {
+    VarDecl *var, Type backingStorageType, Expr *value,
+    bool ignoreAttributeArgs) {
   // From the innermost wrapper type out, form init(initialValue:) calls.
   ASTContext &ctx = var->getASTContext();
   auto wrapperAttrs = var->getAttachedPropertyWrappers();
@@ -575,8 +577,39 @@ Expr *swift::buildPropertyWrapperInitialValueCall(
     auto typeExpr = TypeExpr::createImplicitHack(
         wrapperAttrs[i]->getTypeLoc().getLoc(),
         wrapperType, ctx);
+
+    // If there were no arguments provided for the attribute at this level,
+    // call `init(initialValue:)` directly.
+    auto attr = wrapperAttrs[i];
+    if (!attr->getArg() || ignoreAttributeArgs) {
+      initializer = CallExpr::createImplicit(
+          ctx, typeExpr, {initializer}, {ctx.Id_initialValue});
+      continue;
+    }
+
+    // Splice `initialValue:` into the argument list.
+    SmallVector<Expr *, 4> elements;
+    SmallVector<Identifier, 4> elementNames;
+    SmallVector<SourceLoc, 4> elementLocs;
+    elements.push_back(initializer);
+    elementNames.push_back(ctx.Id_initialValue);
+    elementLocs.push_back(SourceLoc());
+
+    if (auto tuple = dyn_cast<TupleExpr>(attr->getArg())) {
+      for (unsigned i : range(tuple->getNumElements())) {
+        elements.push_back(tuple->getElement(i));
+        elementNames.push_back(tuple->getElementName(i));
+        elementLocs.push_back(tuple->getElementNameLoc(i));
+      }
+    } else {
+      auto paren = cast<ParenExpr>(attr->getArg());
+      elements.push_back(paren->getSubExpr());
+      elementNames.push_back(Identifier());
+      elementLocs.push_back(SourceLoc());
+    }
+
     initializer = CallExpr::createImplicit(
-        ctx, typeExpr, {initializer}, {ctx.Id_initialValue});
+        ctx, typeExpr, elements, elementNames);
   }
   
   return initializer;

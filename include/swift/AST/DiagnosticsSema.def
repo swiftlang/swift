@@ -4430,12 +4430,6 @@ ERROR(property_with_wrapper_overrides,none,
       "property %0 with attached wrapper cannot override another property",
       (DeclName))
 
-ERROR(property_wrapper_and_normal_init,none,
-      "property %0 with attached wrapper cannot initialize both the "
-      "wrapper type and the property", (DeclName))
-ERROR(property_wrapper_init_without_initial_value, none,
-      "initializing property %0 with wrapper %1 that lacks "
-      "an 'init(initialValue:)' initializer", (DeclName, Type))
 NOTE(property_wrapper_direct_init,none,
      "initialize the property wrapper type directly with "
      "'(...') on the attribute", ())
