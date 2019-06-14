@@ -5103,26 +5103,39 @@ public:
     Bits.VarDecl.IsREPLVar = IsREPLVar;
   }
 
-  /// Retrieve the custom attribute that attaches a property wrapper to this
-  /// property.
-  CustomAttr *getAttachedPropertyWrapper() const;
+  /// Retrieve the custom attributes that attach property wrappers to this
+  /// property. The returned list contains all of the attached property wrapper attributes in source order,
+  /// which means the outermost wrapper attribute is provided first.
+  llvm::TinyPtrVector<CustomAttr *> getAttachedPropertyWrappers() const;
 
+  /// Whether this property has any attached property wrappers.
+  bool hasAttachedPropertyWrapper() const;
+  
+  /// Whether all of the attached property wrappers have an init(initialValue:) initializer.
+  bool allAttachedPropertyWrappersHaveInitialValueInit() const;
+  
   /// Retrieve the type of the attached property wrapper as a contextual
   /// type.
+  ///
+  /// \param index Which property wrapper type is being computed, where 0
+  /// indicates the first (outermost) attached property wrapper.
   ///
   /// \returns a NULL type for properties without attached wrappers,
   /// an error type when the property wrapper type itself is erroneous,
   /// or the wrapper type itself, which may involve unbound generic
   /// types.
-  Type getAttachedPropertyWrapperType() const;
+  Type getAttachedPropertyWrapperType(unsigned index) const;
 
   /// Retrieve information about the attached property wrapper type.
-  PropertyWrapperTypeInfo getAttachedPropertyWrapperTypeInfo() const;
+  ///
+  /// \param i Which attached property wrapper type is being queried, where 0 is the outermost (first)
+  /// attached property wrapper type.
+  PropertyWrapperTypeInfo getAttachedPropertyWrapperTypeInfo(unsigned i) const;
 
   /// Retrieve the fully resolved attached property wrapper type.
   ///
   /// This type will be the fully-resolved form of
-  /// \c getAttachedPropertyWrapperType(), which will not contain any
+  /// \c getAttachedPropertyWrapperType(0), which will not contain any
   /// unbound generic types. It will be the type of the backing property.
   Type getPropertyWrapperBackingPropertyType() const;
 
@@ -5136,8 +5149,8 @@ public:
   ///
   /// The backing storage property will be a stored property of the
   /// wrapper's type. This will be equivalent to
-  /// \c getAttachedPropertyWrapperType() when it is fully-specified;
-  /// if \c getAttachedPropertyWrapperType() involves an unbound
+  /// \c getAttachedPropertyWrapperType(0) when it is fully-specified;
+  /// if \c getAttachedPropertyWrapperType(0) involves an unbound
   /// generic type, the backing storage property will be the appropriate
   /// bound generic version.
   VarDecl *getPropertyWrapperBackingProperty() const;

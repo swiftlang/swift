@@ -497,10 +497,10 @@ public:
 
 /// Request the nominal type declaration to which the given custom attribute
 /// refers.
-class AttachedPropertyWrapperRequest :
-    public SimpleRequest<AttachedPropertyWrapperRequest,
+class AttachedPropertyWrappersRequest :
+    public SimpleRequest<AttachedPropertyWrappersRequest,
                          CacheKind::Cached,
-                         CustomAttr *,
+                         llvm::TinyPtrVector<CustomAttr *>,
                          VarDecl *> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -509,7 +509,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<CustomAttr *>
+  llvm::Expected<llvm::TinyPtrVector<CustomAttr *>>
   evaluate(Evaluator &evaluator, VarDecl *) const;
 
 public:
@@ -527,7 +527,7 @@ class AttachedPropertyWrapperTypeRequest :
     public SimpleRequest<AttachedPropertyWrapperTypeRequest,
                          CacheKind::Cached,
                          Type,
-                         VarDecl *> {
+                         VarDecl *, unsigned> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -536,7 +536,7 @@ private:
 
   // Evaluation.
   llvm::Expected<Type>
-  evaluate(Evaluator &evaluator, VarDecl *var) const;
+  evaluate(Evaluator &evaluator, VarDecl *var, unsigned i) const;
 
 public:
   // Caching

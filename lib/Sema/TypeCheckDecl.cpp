@@ -2039,10 +2039,10 @@ static bool computeIsGetterMutating(TypeChecker &TC,
   }
 
   // If we have an attached property wrapper, the getter is mutating if
-  // the "value" property of the wrapper type is mutating and we're in
-  // a context that has value semantics.
+  // the "value" property of the outermost wrapper type is mutating and we're
+  // in a context that has value semantics.
   if (auto var = dyn_cast<VarDecl>(storage)) {
-    if (auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo()) {
+    if (auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo(0)) {
       if (wrapperInfo.valueVar &&
           (!storage->getGetter() || storage->getGetter()->isImplicit())) {
         TC.validateDecl(wrapperInfo.valueVar);
@@ -2074,10 +2074,10 @@ static bool computeIsGetterMutating(TypeChecker &TC,
 static bool computeIsSetterMutating(TypeChecker &TC,
                                     AbstractStorageDecl *storage) {
   // If we have an attached property wrapper, the setter is mutating if
-  // the "value" property of the wrapper type is mutating and we're in
-  // a context that has value semantics.
+  // the "value" property of the outermost wrapper type is mutating and we're
+  // in a context that has value semantics.
   if (auto var = dyn_cast<VarDecl>(storage)) {
-    if (auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo()) {
+    if (auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo(0)) {
       if (wrapperInfo.valueVar &&
           (!storage->getSetter() || storage->getSetter()->isImplicit())) {
         TC.validateDecl(wrapperInfo.valueVar);
@@ -2557,7 +2557,7 @@ public:
         // by the backing storage property.
         if (!DC->isLocalContext() &&
             !(PBD->getSingleVar() &&
-              PBD->getSingleVar()->getAttachedPropertyWrapper())) {
+              PBD->getSingleVar()->hasAttachedPropertyWrapper())) {
           auto *initContext = cast_or_null<PatternBindingInitializer>(
               entry.getInitContext());
           if (initContext) {
@@ -4378,7 +4378,7 @@ static bool shouldValidateMemberDuringFinalization(NominalTypeDecl *nominal,
        !cast<VarDecl>(VD)->isStatic() &&
        (cast<VarDecl>(VD)->hasStorage() ||
         VD->getAttrs().hasAttribute<LazyAttr>() ||
-        cast<VarDecl>(VD)->getAttachedPropertyWrapper())))
+        cast<VarDecl>(VD)->hasAttachedPropertyWrapper())))
     return true;
 
   // For classes, we need to validate properties and functions,
@@ -4475,8 +4475,8 @@ static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
       completeLazyVarImplementation(prop);
     }
 
-    // Ensure that we create the backing variable for a property wrapper.
-    if (prop->getAttachedPropertyWrapper()) {
+    // Ensure that we create the backing variable for a wrapped property.
+    if (prop->hasAttachedPropertyWrapper()) {
       finalizeAbstractStorageDecl(TC, prop);
       (void)prop->getPropertyWrapperBackingProperty();
     }
