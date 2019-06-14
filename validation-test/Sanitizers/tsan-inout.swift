@@ -4,7 +4,6 @@
 // RUN: %target-build-swift %S/Inputs/tsan-uninstrumented.swift -target %sanitizers-target-triple -c -module-name TSanUninstrumented -parse-as-library -o %t/TSanUninstrumented.o
 // RUN: %target-swiftc_driver %s %t/TSanUninstrumented.o -target %sanitizers-target-triple -I%t -L%t -g -sanitize=thread %import-libdispatch -o %t/tsan-binary
 // RUN: not env %env-TSAN_OPTIONS=abort_on_error=0 %target-run %t/tsan-binary 2>&1 | %FileCheck %s
-// RUN: not env %env-TSAN_OPTIONS=abort_on_error=0:ignore_interceptors_accesses=0 %target-run %t/tsan-binary 2>&1 | %FileCheck %s --check-prefix CHECK-INTERCEPTORS-ACCESSES
 // REQUIRES: executable_test
 // REQUIRES: stress_test
 // REQUIRES: tsan_runtime
@@ -170,14 +169,12 @@ testRace(name: "InoutAccessToStoredGlobalInUninstrumentedModule",
 // CHECK: Location is global
 
 // These access a global declared in the TSanUninstrumented module.
-// This test requires ignore_interceptors_accesses=0 because
-// the read from the global is IRGen'd to a memcpy().
 testRace(name: "ReadAndWriteToStoredGlobalInUninstrumentedModule",
         thread: { storedGlobalInUninstrumentedModule2 = 7 },
         thread: { uninstrumentedBlackHole(storedGlobalInUninstrumentedModule2) } )
-// CHECK-INTERCEPTORS-ACCESSES-LABEL: Running ReadAndWriteToStoredGlobalInUninstrumentedModule
-// CHECK-INTERCEPTORS-ACCESSES: ThreadSanitizer: data race
-// CHECK-INTERCEPTORS-ACCESSES: Location is global
+// CHECK-LABEL: Running ReadAndWriteToStoredGlobalInUninstrumentedModule
+// CHECK: ThreadSanitizer: data race
+// CHECK: Location is global
 
 // These access a computed global declared in the TSanUninstrumented module
 testRace(name: "InoutAccessToComputedGlobalInUninstrumentedModule",
