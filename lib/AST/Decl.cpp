@@ -5794,25 +5794,71 @@ void ParamDecl::setDefaultArgumentInitContext(Initializer *initContext) {
 
 Expr *swift::findOriginalPropertyWrapperInitialValue(VarDecl *var,
                                                      Expr *init) {
-  auto attr = var->getAttachedPropertyWrappers().front();
-
-  // Direct initialization implies no original initial value.
-  if (attr->getArg())
+  auto *PBD = var->getParentPatternBinding();
+  if (!PBD)
     return nullptr;
 
-  // Look through any expressions wrapping the initializer.
-  init = init->getSemanticsProvidingExpr();
-  auto initCall = dyn_cast<CallExpr>(init);
-  if (!initCall)
+  // If there is no '=' on the pattern, there was no initial value.
+  if (PBD->getPatternList()[0].getEqualLoc().isInvalid())
     return nullptr;
 
-  auto initArg = cast<TupleExpr>(initCall->getArg())->getElement(0);
-  initArg = initArg->getSemanticsProvidingExpr();
-  if (auto autoclosure = dyn_cast<AutoClosureExpr>(initArg)) {
-    initArg =
-        autoclosure->getSingleExpressionBody()->getSemanticsProvidingExpr();
+  ASTContext &ctx = var->getASTContext();
+  auto dc = var->getInnermostDeclContext();
+  auto innermostAttr = var->getAttachedPropertyWrappers().back();
+  auto innermostNominal = evaluateOrDefault(
+      ctx.evaluator, CustomAttrNominalRequest{innermostAttr, dc}, nullptr);
+  if (!innermostNominal)
+    return nullptr;
+
+      // Walker
+  class Walker : public ASTWalker {
+  public:
+    NominalTypeDecl *innermostNominal;
+    Expr *initArg = nullptr;
+
+    Walker(NominalTypeDecl *innermostNominal)
+      : innermostNominal(innermostNominal) { }
+
+    virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      if (initArg)
+        return { false, E };
+
+      if (auto call = dyn_cast<CallExpr>(E)) {
+        // We're looking for an implicit call.
+        if (!call->isImplicit())
+          return { true, E };
+
+        // ... producing a value of the same nominal type as the innermost
+        // property wrapper.
+        if (call->getType()->getAnyNominal() != innermostNominal)
+          return { true, E };
+
+        // Find the implicit initialValue argument.
+        if (auto tuple = dyn_cast<TupleExpr>(call->getArg())) {
+          ASTContext &ctx = innermostNominal->getASTContext();
+          for (unsigned i : range(tuple->getNumElements())) {
+            if (tuple->getElementName(i) == ctx.Id_initialValue &&
+                tuple->getElementNameLoc(i).isInvalid()) {
+              initArg = tuple->getElement(i);
+              return { false, E };
+            }
+          }
+        }
+      }
+
+      return { true, E };
+    }
+  } walker(innermostNominal);
+  init->walk(walker);
+
+  Expr *initArg = walker.initArg;
+  if (initArg) {
+    initArg = initArg->getSemanticsProvidingExpr();
+    if (auto autoclosure = dyn_cast<AutoClosureExpr>(initArg)) {
+      initArg =
+          autoclosure->getSingleExpressionBody()->getSemanticsProvidingExpr();
+    }
   }
-
   return initArg;
 }
 
