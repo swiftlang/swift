@@ -1,4 +1,4 @@
-// XFAIL: enable-astscope-lookup
+// REQUIRES: enable-astscope-lookup
 // RUN: %target-swift-frontend -typecheck %s -module-name themodule -enable-source-import -I %S/../decl/enum -sdk "" -verify -show-diagnostics-after-fatal -verify-ignore-unknown
 
 // -verify-ignore-unknown is for
@@ -66,6 +66,8 @@ func test_varname_binding() {
 // We don't allow namebinding to look forward past a var declaration in the
 // main module
 var x : x_ty  // expected-error {{use of undeclared type 'x_ty'}}
+// expected-note@-1 {{did you mean 'x'?}}
+// FIXME: That's a terrible note!
 typealias x_ty = Int
 
 // We allow namebinding to look forward past a function declaration (and other
@@ -78,7 +80,8 @@ typealias y_ty = Int
 
 // FIXME: Should reject this (has infinite size or is tautological depend on
 // how you look at it).
-enum y {
+enum y { // expected-note {{did you mean 'y'?}}
+  // FIXME: That's a terrible note!
   case y
   case Int
 }
@@ -196,8 +199,8 @@ test+++
 //===----------------------------------------------------------------------===//
 
 func forwardReference() {
-  v = 0 // expected-error{{use of local variable 'v' before its declaration}}
-  var v: Float = 0.0 // expected-note{{'v' declared here}}
+  v = 0 // expected-error{{use of unresolved identifier 'v'}}
+  var v: Float = 0.0
 }
 
 class ForwardReference {

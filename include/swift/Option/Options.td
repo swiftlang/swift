@@ -853,6 +853,13 @@ def sanitize_coverage_EQ : CommaJoined<["-"], "sanitize-coverage=">,
   HelpText<"Specify the type of coverage instrumentation for Sanitizers and"
   " additional options separated by commas">;
 
+def enable_astscope_lookup : Flag<["-"], "enable-astscope-lookup">,
+  Flags<[FrontendOption]>,
+  HelpText<"Enable ASTScope-based unqualified name lookup">;
+
+def disable_parser_lookup : Flag<["-"], "disable_parser_lookup">,
+  HelpText<"Disable parser lookup & use ast scope lookup only (experimental)">;
+
 def index_file : Flag<["-"], "index-file">,
   HelpText<"Produce index data for a source file">, ModeOpt,
   Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild]>;

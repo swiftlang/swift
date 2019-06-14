@@ -22,6 +22,10 @@ add_swift_host_library(swiftAST STATIC
   ASTNode.cpp
   ASTPrinter.cpp
   ASTScope.cpp
+  ASTScopeCreation.cpp
+  ASTScopeLookup.cpp
+  ASTScopePrinting.cpp
+  ASTScopeSourceRange.cpp
   ASTVerifier.cpp
   ASTWalker.cpp
   Attr.cpp
