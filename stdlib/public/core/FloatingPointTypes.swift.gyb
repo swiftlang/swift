@@ -1887,6 +1887,10 @@ extension ${Self} : VectorProtocol {
 extension ${Self} : Differentiable {
   public typealias TangentVector = ${Self}
   public typealias AllDifferentiableVariables = ${Self}
+
+  public mutating func move(along direction: TangentVector) {
+    self += direction
+  }
 }
 
 //===----------------------------------------------------------------------===//

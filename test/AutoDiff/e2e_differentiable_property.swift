@@ -20,16 +20,15 @@ struct Space {
   /// `x` is a computed property with a custom vjp.
   var x: Float {
     @differentiable(vjp: vjpX)
-    get {
-      return storedX
-    }
+    get { storedX }
+    set { storedX = newValue }
   }
 
   func vjpX() -> (Float, (Float) -> TangentSpace) {
     return (x, { v in TangentSpace(x: v, y: 0) } )
   }
 
-  private let storedX: Float
+  private var storedX: Float
 
   @differentiable
   var y: Float
@@ -42,8 +41,9 @@ struct Space {
 
 extension Space : Differentiable {
   typealias TangentVector = TangentSpace
-  func moved(along: TangentSpace) -> Space {
-    return Space(x: x + along.x, y: y + along.y)
+  mutating func move(along direction: TangentSpace) {
+    x.move(along: direction.x)
+    y.move(along: direction.y)
   }
 }
 
@@ -106,13 +106,14 @@ extension ProductSpaceOtherTangentTangentSpace : Differentiable {
 }
 
 struct ProductSpaceOtherTangent {
-  let x, y: Float
+  var x, y: Float
 }
 
 extension ProductSpaceOtherTangent : Differentiable {
   typealias TangentVector = ProductSpaceOtherTangentTangentSpace
-  func moved(along: ProductSpaceOtherTangentTangentSpace) -> ProductSpaceOtherTangent {
-    return ProductSpaceOtherTangent(x: x + along.x, y: y + along.y)
+  mutating func move(along direction: ProductSpaceOtherTangentTangentSpace) {
+    x.move(along: direction.x)
+    y.move(along: direction.y)
   }
 }
 

@@ -57,7 +57,7 @@ getStoredPropertiesForDifferentiation(NominalTypeDecl *nominal,
   for (auto *vd : nominal->getStoredProperties()) {
     if (vd->getAttrs().hasAttribute<NoDerivativeAttr>())
       continue;
-    if (vd->isLet() && vd->hasInitialValue())
+    if (vd->isLet())
       continue;
     if (!vd->hasInterfaceType())
       C.getLazyResolver()->resolveDeclSignature(vd);
@@ -74,9 +74,9 @@ getStoredPropertiesForDifferentiation(NominalTypeDecl *nominal,
 // Convert the given `ValueDecl` to a `StructDecl` if it is a `StructDecl` or a
 // `TypeDecl` with an underlying struct type. Otherwise, return `nullptr`.
 static StructDecl *convertToStructDecl(ValueDecl *v) {
-  if (auto structDecl = dyn_cast<StructDecl>(v))
+  if (auto *structDecl = dyn_cast<StructDecl>(v))
     return structDecl;
-  auto typeDecl = dyn_cast<TypeDecl>(v);
+  auto *typeDecl = dyn_cast<TypeDecl>(v);
   if (!typeDecl)
     return nullptr;
   return dyn_cast_or_null<StructDecl>(
@@ -113,7 +113,7 @@ static StructDecl *getAssociatedStructDecl(DeclContext *DC, Identifier id) {
   assert(conf && "Nominal must conform to `Differentiable`");
   Type assocType = conf->getTypeWitnessByName(DC->getSelfTypeInContext(), id);
   assert(assocType && "`Differentiable` protocol associated type not found");
-  auto structDecl = dyn_cast<StructDecl>(assocType->getAnyNominal());
+  auto *structDecl = dyn_cast<StructDecl>(assocType->getAnyNominal());
   assert(structDecl && "Associated type must be a struct type");
   return structDecl;
 }
@@ -141,7 +141,7 @@ bool DerivedConformance::canDeriveDifferentiable(NominalTypeDecl *nominal,
   auto isValidAssocTypeCandidate =
       [&](ValueDecl *v, bool checkAdditiveArithmetic = false) -> StructDecl * {
     // Valid candidate must be a struct or a typealias to a struct.
-    auto structDecl = convertToStructDecl(v);
+    auto *structDecl = convertToStructDecl(v);
     if (!structDecl)
       return nullptr;
     // Valid candidate must either:
@@ -219,20 +219,6 @@ static void deriveBodyDifferentiable_method(AbstractFunctionDecl *funcDecl,
   auto *nominal = parentDC->getSelfNominalTypeDecl();
   auto &C = nominal->getASTContext();
 
-  // Create memberwise initializer for the returned nominal type:
-  // `Nominal.init(...)`.
-  auto retNominalInterfaceType =
-      funcDecl->getMethodInterfaceType()->getAs<AnyFunctionType>()->getResult();
-  auto *retNominal = retNominalInterfaceType->getAnyNominal();
-  auto retNominalType = funcDecl->mapTypeIntoContext(retNominalInterfaceType);
-  auto *retNominalTypeExpr = TypeExpr::createImplicit(retNominalType, C);
-  auto *memberwiseInitDecl = retNominal->getEffectiveMemberwiseInitializer();
-  assert(memberwiseInitDecl && "Memberwise initializer must exist");
-  auto *initDRE =
-      new (C) DeclRefExpr(memberwiseInitDecl, DeclNameLoc(), /*Implicit*/ true);
-  initDRE->setFunctionRefKind(FunctionRefKind::SingleApply);
-  auto *initExpr = new (C) ConstructorRefCallExpr(initDRE, retNominalTypeExpr);
-
   // Get method protocol requirement.
   auto *diffProto = C.getProtocol(KnownProtocolKind::Differentiable);
   auto *methodReq = getProtocolRequirement(diffProto, methodName);
@@ -245,36 +231,20 @@ static void deriveBodyDifferentiable_method(AbstractFunctionDecl *funcDecl,
   auto *paramDRE =
       new (C) DeclRefExpr(paramDecl, DeclNameLoc(), /*Implicit*/ true);
 
-  // Hash properties for differentiation into a set for fast lookup.
-  SmallVector<VarDecl *, 8> diffProps;
-  getStoredPropertiesForDifferentiation(nominal, parentDC, diffProps);
-  SmallPtrSet<VarDecl *, 8> diffPropsSet(diffProps.begin(), diffProps.end());
+  SmallVector<VarDecl *, 8> diffProperties;
+  getStoredPropertiesForDifferentiation(nominal, parentDC, diffProperties);
 
   // Create call expression applying a member method to a parameter member.
   // Format: `<member>.method(<parameter>.<member>)`.
-  // Example: `x.moved(along: direction.x)`.
-  auto createMemberMethodCallExpr = [&](VarDecl *retNominalMember) -> Expr * {
-    // Find `Self` member corresponding to member from returned nominal type.
-    VarDecl *selfMember = nullptr;
-    for (auto candidate : nominal->getStoredProperties()) {
-      if (candidate->getName() == retNominalMember->getName()) {
-        selfMember = candidate;
-        break;
-      }
-    }
-    assert(selfMember && "Could not find corresponding self member");
-    // If member is not for differentiation, create direct reference to member.
-    if (!diffPropsSet.count(selfMember))
-      return new (C) MemberRefExpr(selfDRE, SourceLoc(), selfMember,
-                                   DeclNameLoc(), /*Implicit*/ true);
-    // Otherwise, construct member method call.
-    auto module = nominal->getModuleContext();
-    auto selfMemberType =
-        parentDC->mapTypeIntoContext(selfMember->getValueInterfaceType());
-    auto confRef = module->lookupConformance(selfMemberType, diffProto);
+  // Example: `x.move(along: direction.x)`.
+  auto createMemberMethodCallExpr = [&](VarDecl *member) -> Expr * {
+    auto *module = nominal->getModuleContext();
+    auto memberType =
+        parentDC->mapTypeIntoContext(member->getValueInterfaceType());
+    auto confRef = module->lookupConformance(memberType, diffProto);
     assert(confRef && "Member does not conform to `Differentiable`");
 
-    // Get member type's method, e.g. `Member.moved(along:)`.
+    // Get member type's method, e.g. `Member.move(along:)`.
     // Use protocol requirement declaration for the method by default: this
     // will be dynamically dispatched.
     ValueDecl *memberMethodDecl = methodReq;
@@ -288,57 +258,49 @@ static void deriveBodyDifferentiable_method(AbstractFunctionDecl *funcDecl,
         new (C) DeclRefExpr(memberMethodDecl, DeclNameLoc(), /*Implicit*/ true);
     memberMethodDRE->setFunctionRefKind(FunctionRefKind::SingleApply);
 
-    // Create reference to member method: `x.moved(along:)`.
+    // Create reference to member method: `x.move(along:)`.
     auto memberExpr =
-        new (C) MemberRefExpr(selfDRE, SourceLoc(), selfMember, DeclNameLoc(),
+        new (C) MemberRefExpr(selfDRE, SourceLoc(), member, DeclNameLoc(),
                               /*Implicit*/ true);
     auto memberMethodExpr =
         new (C) DotSyntaxCallExpr(memberMethodDRE, SourceLoc(), memberExpr);
 
     // Create reference to parameter member: `direction.x`.
     VarDecl *paramMember = nullptr;
-    auto paramNominal = paramDecl->getType()->getAnyNominal();
+    auto *paramNominal = paramDecl->getType()->getAnyNominal();
     assert(paramNominal && "Parameter should have a nominal type");
     // Find parameter member corresponding to returned nominal member.
-    for (auto candidate : paramNominal->getStoredProperties()) {
-      if (candidate->getName() == retNominalMember->getName()) {
+    for (auto *candidate : paramNominal->getStoredProperties()) {
+      if (candidate->getName() == member->getName()) {
         paramMember = candidate;
         break;
       }
     }
     assert(paramMember && "Could not find corresponding parameter member");
-    auto paramMemberExpr =
+    auto *paramMemberExpr =
         new (C) MemberRefExpr(paramDRE, SourceLoc(), paramMember, DeclNameLoc(),
                               /*Implicit*/ true);
-    // Create expression: `x.moved(along: direction.x)`.
+    // Create expression: `x.move(along: direction.x)`.
     return CallExpr::createImplicit(C, memberMethodExpr, {paramMemberExpr},
                                     {methodParamLabel});
   };
 
   // Create array of member method call expressions.
-  llvm::SmallVector<Expr *, 2> memberMethodCallExprs;
+  llvm::SmallVector<ASTNode, 2> memberMethodCallExprs;
   llvm::SmallVector<Identifier, 2> memberNames;
-  for (auto *member : retNominal->getStoredProperties()) {
-    // Initialized `let` properties don't get an argument in memberwise
-    // initializers.
-    if (member->isLet() && member->getParentInitializer())
-      continue;
+  for (auto *member : diffProperties) {
     memberMethodCallExprs.push_back(createMemberMethodCallExpr(member));
     memberNames.push_back(member->getName());
   }
-  // Call memberwise initializer with member method call expressions.
-  auto *callExpr =
-      CallExpr::createImplicit(C, initExpr, memberMethodCallExprs, memberNames);
-  ASTNode returnStmt = new (C) ReturnStmt(SourceLoc(), callExpr, true);
-  funcDecl->setBody(
-      BraceStmt::create(C, SourceLoc(), returnStmt, SourceLoc(), true));
+  funcDecl->setBody(BraceStmt::create(
+      C, SourceLoc(), memberMethodCallExprs, SourceLoc(), true));
 }
 
-// Synthesize body for `moved(along:)`.
-static void deriveBodyDifferentiable_moved(AbstractFunctionDecl *funcDecl,
+// Synthesize body for `move(along:)`.
+static void deriveBodyDifferentiable_move(AbstractFunctionDecl *funcDecl,
                                            void *) {
   auto &C = funcDecl->getASTContext();
-  deriveBodyDifferentiable_method(funcDecl, C.Id_moved,
+  deriveBodyDifferentiable_method(funcDecl, C.Id_move,
                                   C.getIdentifier("along"));
 }
 
@@ -347,10 +309,9 @@ static ValueDecl *deriveDifferentiable_method(
     DerivedConformance &derived, Identifier methodName, Identifier argumentName,
     Identifier parameterName, Type parameterType, Type returnType,
     AbstractFunctionDecl::BodySynthesizer bodySynthesizer) {
-  auto nominal = derived.Nominal;
-  auto &TC = derived.TC;
+  auto *nominal = derived.Nominal;
   auto &C = derived.TC.Context;
-  auto parentDC = derived.getConformanceContext();
+  auto *parentDC = derived.getConformanceContext();
 
   auto *param =
       new (C) ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
@@ -359,15 +320,16 @@ static ValueDecl *deriveDifferentiable_method(
   ParameterList *params = ParameterList::create(C, {param});
 
   DeclName declName(C, methodName, params);
-  auto funcDecl = FuncDecl::create(C, SourceLoc(), StaticSpellingKind::None,
-                                   SourceLoc(), declName, SourceLoc(),
-                                   /*Throws*/ false, SourceLoc(),
-                                   /*GenericParams=*/nullptr, params,
-                                   TypeLoc::withoutLoc(returnType), parentDC);
+  auto *funcDecl = FuncDecl::create(C, SourceLoc(), StaticSpellingKind::None,
+                                    SourceLoc(), declName, SourceLoc(),
+                                    /*Throws*/ false, SourceLoc(),
+                                    /*GenericParams=*/nullptr, params,
+                                    TypeLoc::withoutLoc(returnType), parentDC);
+  funcDecl->setSelfAccessKind(SelfAccessKind::Mutating);
   funcDecl->setImplicit();
   funcDecl->setBodySynthesizer(bodySynthesizer.Fn, bodySynthesizer.Context);
 
-  if (auto env = parentDC->getGenericEnvironmentOfContext())
+  if (auto *env = parentDC->getGenericEnvironmentOfContext())
     funcDecl->setGenericEnvironment(env);
   funcDecl->computeType();
   funcDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
@@ -376,36 +338,21 @@ static ValueDecl *deriveDifferentiable_method(
   derived.addMembersToConformanceContext({funcDecl});
   C.addSynthesizedDecl(funcDecl);
 
-  // Returned nominal type must define a memberwise initializer.
-  // Add memberwise initializer if necessary.
-  auto returnNominal = returnType->getAnyNominal();
-  assert(returnNominal && "Return type must be a nominal type");
-  if (!returnNominal->getEffectiveMemberwiseInitializer()) {
-    // The implicit memberwise constructor must be explicitly created so that
-    // it can called in `Differentiable` methods. Normally, the memberwise
-    // constructor is synthesized during SILGen, which is too late.
-    auto *initDecl = createImplicitConstructor(
-        TC, returnNominal, ImplicitConstructorKind::Memberwise);
-    returnNominal->addMember(initDecl);
-    C.addSynthesizedDecl(initDecl);
-  }
-
   return funcDecl;
 }
 
-// Synthesize the `moved(along:)` function declaration.
-static ValueDecl *deriveDifferentiable_moved(DerivedConformance &derived) {
+// Synthesize the `move(along:)` function declaration.
+static ValueDecl *deriveDifferentiable_move(DerivedConformance &derived) {
   auto &C = derived.TC.Context;
-  auto parentDC = derived.getConformanceContext();
-  auto selfInterfaceType = parentDC->getDeclaredInterfaceType();
+  auto *parentDC = derived.getConformanceContext();
 
   auto *tangentDecl = getAssociatedStructDecl(parentDC, C.Id_TangentVector);
   auto tangentType = tangentDecl->getDeclaredInterfaceType();
 
   return deriveDifferentiable_method(
-      derived, C.Id_moved, C.getIdentifier("along"),
-      C.getIdentifier("direction"), tangentType, selfInterfaceType,
-      {deriveBodyDifferentiable_moved, nullptr});
+      derived, C.Id_move, C.getIdentifier("along"),
+      C.getIdentifier("direction"), tangentType, C.TheEmptyTupleType,
+      {deriveBodyDifferentiable_move, nullptr});
 }
 
 // Return the underlying `allDifferentiableVariables` of a VarDecl `x`.
@@ -416,7 +363,7 @@ static ValueDecl *getUnderlyingAllDiffableVariables(DeclContext *DC,
   auto *module = DC->getParentModule();
   auto &C = module->getASTContext();
   auto *diffableProto = C.getProtocol(KnownProtocolKind::Differentiable);
-  auto allDiffableVarsReq =
+  auto *allDiffableVarsReq =
       getProtocolRequirement(diffableProto, C.Id_allDifferentiableVariables);
   if (!varDecl->hasInterfaceType())
     C.getLazyResolver()->resolveDeclSignature(varDecl);
@@ -476,7 +423,7 @@ static void derivedBody_allDifferentiableVariablesGetter(
     Expr *memberExpr = new (C) MemberRefExpr(selfDRE, SourceLoc(), member,
                                              DeclNameLoc(), /*Implicit*/ true);
     member->setInterfaceType(member->getValueInterfaceType());
-    auto memberAllDiffableVarsDecl =
+    auto *memberAllDiffableVarsDecl =
         getUnderlyingAllDiffableVariables(parentDC, member);
     if (member != memberAllDiffableVarsDecl) {
       memberExpr = new (C) MemberRefExpr(memberExpr, SourceLoc(),
@@ -513,7 +460,7 @@ static void derivedBody_allDifferentiableVariablesSetter(
   // Map `AllDifferentiableVariables` struct members to their names for
   // efficient lookup.
   llvm::DenseMap<Identifier, VarDecl *> diffPropertyMap;
-  for (auto member : allDiffableVarsStruct->getStoredProperties())
+  for (auto *member : allDiffableVarsStruct->getStoredProperties())
     diffPropertyMap[member->getName()] = member;
 
   SmallVector<ASTNode, 2> assignExprs;
@@ -524,7 +471,7 @@ static void derivedBody_allDifferentiableVariablesSetter(
     if (member->isLet())
       continue;
     // Create lhs: either `self.x` or `self.x.allDifferentiableVariables`.
-    auto lhsAllDiffableVars =
+    auto *lhsAllDiffableVars =
          getUnderlyingAllDiffableVariables(parentDC, member);
     Expr *lhs;
     if (member == lhsAllDiffableVars) {
@@ -558,7 +505,7 @@ deriveDifferentiable_allDifferentiableVariables(DerivedConformance &derived) {
   auto &C = TC.Context;
 
   // Get `AllDifferentiableVariables` struct.
-  auto allDiffableVarsStruct =
+  auto *allDiffableVarsStruct =
       getAssociatedStructDecl(parentDC, C.Id_AllDifferentiableVariables);
 
   auto returnInterfaceTy = allDiffableVarsStruct->getDeclaredInterfaceType();
@@ -599,8 +546,8 @@ static std::pair<StructDecl *, bool>
 getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived,
                                       Identifier id) {
   auto &TC = derived.TC;
-  auto parentDC = derived.getConformanceContext();
-  auto nominal = derived.Nominal;
+  auto *parentDC = derived.getConformanceContext();
+  auto *nominal = derived.Nominal;
   auto &C = nominal->getASTContext();
 
   assert(id == C.Id_TangentVector || id == C.Id_AllDifferentiableVariables);
@@ -694,7 +641,7 @@ getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived,
   for (auto *member : diffProperties) {
     // Add this member's corresponding associated type to the parent's
     // associated struct.
-    auto newMember = new (C) VarDecl(
+    auto *newMember = new (C) VarDecl(
         member->isStatic(), member->getSpecifier(), member->isCaptureList(),
         /*NameLoc*/ SourceLoc(), member->getName(), structDecl);
     // NOTE: `newMember` is not marked as implicit here, because that affects
@@ -776,7 +723,7 @@ getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived,
   C.addSynthesizedDecl(initDecl);
 
   // After memberwise initializer is synthesized, mark members as implicit.
-  for (auto member : structDecl->getStoredProperties())
+  for (auto *member : structDecl->getStoredProperties())
     member->setImplicit();
 
   derived.addMembersToConformanceContext({structDecl});
@@ -792,7 +739,7 @@ static void addAssociatedTypeAliasDecl(Identifier name,
                                        StructDecl *target,
                                        TypeChecker &TC) {
   auto &C = TC.Context;
-  auto nominal = sourceDC->getSelfNominalTypeDecl();
+  auto *nominal = sourceDC->getSelfNominalTypeDecl();
   assert(nominal && "Expected `DeclContext` to be a nominal type");
   auto lookup = nominal->lookupDirect(name);
   assert(lookup.size() < 2 &&
@@ -806,7 +753,7 @@ static void addAssociatedTypeAliasDecl(Identifier name,
     return;
   }
   // Otherwise, create a new typealias.
-  auto aliasDecl = new (C)
+  auto *aliasDecl = new (C)
       TypeAliasDecl(SourceLoc(), SourceLoc(), name, SourceLoc(), {}, sourceDC);
   aliasDecl->setUnderlyingType(target->getDeclaredInterfaceType());
   aliasDecl->setImplicit();
@@ -822,7 +769,7 @@ static void addAssociatedTypeAliasDecl(Identifier name,
 // Diagnose stored properties in the nominal that do not have an explicit
 // `@noDerivative` attribute, but either:
 // - Do not conform to `Differentiable`.
-// - Are a `let` stored property with an initial value.
+// - Are a `let` stored property.
 // Emit a warning and a fixit so that users will make the attribute explicit.
 static void checkAndDiagnoseImplicitNoDerivative(TypeChecker &TC,
                                                  NominalTypeDecl *nominal,
@@ -841,30 +788,34 @@ static void checkAndDiagnoseImplicitNoDerivative(TypeChecker &TC,
     bool conformsToDifferentiable =
         TC.conformsToProtocol(varType, diffableProto, nominal,
                               None).hasValue();
-    bool isConstantProperty = vd->isLet() && vd->hasInitialValue();
     // If stored property should not be diagnosed, continue.
-    if (conformsToDifferentiable && !isConstantProperty)
+    if (conformsToDifferentiable && !vd->isLet())
       continue;
     // Otherwise, add an implicit `@noDerivative` attribute.
     vd->getAttrs().add(
         new (TC.Context) NoDerivativeAttr(/*Implicit*/ true));
-    auto loc =
-        vd->getLoc().isValid() ? vd->getLoc() : DC->getAsDecl()->getLoc();
+    auto loc = vd->getAttributeInsertionLoc(/*forModifier*/ false);
     assert(loc.isValid() && "Expected valid source location");
-    // Diagnose stored property with fixit.
+    // If nominal type can conform to `AdditiveArithmetic`, suggest conforming
+    // adding a conformance to `AdditiveArithmetic`.
+    // `Differentiable` protocol requirements all have default implementations
+    // when `Self` conforms to `AdditiveArithmetic`, so `Differentiable`
+    // derived conformances will no longer be necessary.
+    bool nominalCanDeriveAdditiveArithmetic =
+        DerivedConformance::canDeriveAdditiveArithmetic(nominal, DC);
     if (!conformsToDifferentiable) {
       TC.diagnose(loc,
                   diag::differentiable_nondiff_type_implicit_noderivative_fixit,
-                  vd->getName())
-          .fixItInsert(vd->getAttributeInsertionLoc(/*forModifier*/ false),
-                       "@noDerivative ");
+                  vd->getName(), nominal->getName(),
+                  nominalCanDeriveAdditiveArithmetic)
+          .fixItInsert(loc, "@noDerivative ");
       continue;
     }
-    TC.diagnose(
-          loc,
-          diag::differentiable_constant_property_implicit_noderivative_fixit)
-        .fixItInsert(vd->getAttributeInsertionLoc(/*forModifier*/ false),
-                     "@noDerivative ");
+    TC.diagnose(loc,
+                diag::differentiable_let_property_implicit_noderivative_fixit,
+                vd->getName(), nominal->getName(),
+                nominalCanDeriveAdditiveArithmetic)
+        .fixItInsert(loc, "@noDerivative ");
 
   }
 }
@@ -947,8 +898,8 @@ static Type
 deriveDifferentiable_AssociatedStruct(DerivedConformance &derived,
                                       Identifier id) {
   auto &TC = derived.TC;
-  auto parentDC = derived.getConformanceContext();
-  auto nominal = derived.Nominal;
+  auto *parentDC = derived.getConformanceContext();
+  auto *nominal = derived.Nominal;
   auto &C = nominal->getASTContext();
 
   // Get all stored properties for differentation.
@@ -1054,8 +1005,8 @@ ValueDecl *DerivedConformance::deriveDifferentiable(ValueDecl *requirement) {
   // Diagnose conformances in disallowed contexts.
   if (checkAndDiagnoseDisallowedContext(requirement))
     return nullptr;
-  if (requirement->getBaseName() == TC.Context.Id_moved)
-    return deriveDifferentiable_moved(*this);
+  if (requirement->getBaseName() == TC.Context.Id_move)
+    return deriveDifferentiable_move(*this);
   if (requirement->getBaseName() == TC.Context.Id_allDifferentiableVariables)
     return deriveDifferentiable_allDifferentiableVariables(*this);
   TC.diagnose(requirement->getLoc(), diag::broken_differentiable_requirement);

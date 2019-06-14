@@ -140,7 +140,7 @@ IDENTIFIER(scaled)
 IDENTIFIER(AllDifferentiableVariables)
 IDENTIFIER(TangentVector)
 IDENTIFIER(allDifferentiableVariables)
-IDENTIFIER(moved)
+IDENTIFIER(move)
 
 // Kinds of layout constraints
 IDENTIFIER_WITH_NAME(UnknownLayout, "_UnknownLayout")

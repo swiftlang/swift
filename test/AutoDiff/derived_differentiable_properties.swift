@@ -77,12 +77,12 @@ struct GenericTanMember<T : Differentiable> : Differentiable, AdditiveArithmetic
 // CHECK-AST:   @_implements(Equatable, ==(_:_:)) internal static func __derived_struct_equals(_ a: GenericTanMember<T>, _ b: GenericTanMember<T>) -> Bool
 
 public struct ConditionallyDifferentiable<T> {
-  public let x: T
+  public var x: T
 }
 extension ConditionallyDifferentiable : Differentiable where T : Differentiable {}
 
 // CHECK-AST-LABEL: public struct ConditionallyDifferentiable<T> {
 // CHECK-AST:         @differentiable(wrt: self where T : Differentiable)
-// CHECK-AST:         public let x: T
+// CHECK-AST:         public var x: T
 // CHECK-AST:         internal init(x: T)
 // CHECK-AST:       }

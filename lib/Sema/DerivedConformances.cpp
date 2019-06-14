@@ -315,9 +315,9 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
     }
 
     // SWIFT_ENABLE_TENSORFLOW
-    // Differentiable.moved(along:)
+    // Differentiable.move(along:)
     if (name.isCompoundName() &&
-        name.getBaseName() == ctx.Id_moved) {
+        name.getBaseName() == ctx.Id_move) {
       auto argumentNames = name.getArgumentNames();
       if (argumentNames.size() == 1 &&
           argumentNames[0] == ctx.getIdentifier("along")) {
