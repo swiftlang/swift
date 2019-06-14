@@ -72,9 +72,9 @@ namespace {
     llvm::SmallDenseMap<SILBasicBlock*, unsigned, 32> WorklistMap;
     // Keep track of loop headers - we don't want to jump-thread through them.
     SmallPtrSet<SILBasicBlock *, 32> LoopHeaders;
-    // The number of times jump threading was done through a block.
-    // Used to prevent infinite jump threading loops.
-    llvm::SmallDenseMap<SILBasicBlock*, unsigned, 8> JumpThreadedBlocks;
+    // The cost (~ number of copied instructions) of jump threading per basic
+    // block. Used to prevent infinite jump threading loops.
+    llvm::SmallDenseMap<SILBasicBlock *, int, 8> JumpThreadingCost;
 
     // Dominance and post-dominance info for the current function
     DominanceInfo *DT = nullptr;
@@ -1014,15 +1014,19 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
     }
   }
 
+  ThreadingBudget -= JumpThreadingCost[SrcBB];
+  ThreadingBudget -= JumpThreadingCost[DestBB];
+
   // If we don't have anything that we can simplify, don't do it.
-  if (ThreadingBudget == 0)
+  if (ThreadingBudget <= 0)
     return false;
 
   // If it looks potentially interesting, decide whether we *can* do the
   // operation and whether the block is small enough to be worth duplicating.
+  int copyCosts = 0;
   for (auto &Inst : *DestBB) {
-    ThreadingBudget -= getThreadingCost(&Inst);
-    if (ThreadingBudget <= 0)
+    copyCosts += getThreadingCost(&Inst);
+    if (ThreadingBudget <= copyCosts)
       return false;
 
     // We need to update ssa if a value is used outside the duplicated block.
@@ -1044,14 +1048,10 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
       return false;
   }
 
-  // Limit the number we jump-thread through a block.
-  // Otherwise we may end up with jump-threading indefinitely.
-  unsigned &NumThreaded = JumpThreadedBlocks[DestBB];
-  if (++NumThreaded > 16)
-    return false;
-
   LLVM_DEBUG(llvm::dbgs() << "jump thread from bb" << SrcBB->getDebugID()
                           << " to bb" << DestBB->getDebugID() << '\n');
+
+  JumpThreadingCost[DestBB] += copyCosts;
 
   // Okay, it looks like we want to do this and we can.  Duplicate the
   // destination block into this one, rewriting uses of the BBArgs to use the
@@ -1266,6 +1266,12 @@ bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
 
     if (LoopHeaders.count(DestBB))
       LoopHeaders.insert(BB);
+
+    auto Iter = JumpThreadingCost.find(DestBB);
+    if (Iter != JumpThreadingCost.end()) {
+      int costs = Iter->second;
+      JumpThreadingCost[BB] += costs;
+    }
 
     removeFromWorklist(DestBB);
     DestBB->eraseFromParent();
