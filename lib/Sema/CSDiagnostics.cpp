@@ -384,6 +384,117 @@ bool MissingConformanceFailure::diagnoseAsError() {
   return RequirementFailure::diagnoseAsError();
 }
 
+Optional<Diag<Type, Type>> GenericArgumentsMismatchFailure::getDiagnosticFor(
+    ContextualTypePurpose context) {
+  switch (context) {
+  case CTP_Initialization:
+  case CTP_AssignSource:
+    return diag::cannot_convert_assign;
+  case CTP_ReturnStmt:
+  case CTP_ReturnSingleExpr:
+    return diag::cannot_convert_to_return_type;
+  case CTP_DefaultParameter:
+    return diag::cannot_convert_default_arg_value;
+  case CTP_YieldByValue:
+    return diag::cannot_convert_yield_value;
+  case CTP_CallArgument:
+    return diag::cannot_convert_argument_value;
+  case CTP_ClosureResult:
+    return diag::cannot_convert_closure_result;
+  case CTP_ArrayElement:
+    return diag::cannot_convert_array_element;
+  // TODO(diagnostics): Make dictionary related diagnostics take prescedence
+  // over CSDiag. Currently these won't ever be produced.
+  case CTP_DictionaryKey:
+    return diag::cannot_convert_dict_key;
+  case CTP_DictionaryValue:
+    return diag::cannot_convert_dict_value;
+  case CTP_CoerceOperand:
+    return diag::cannot_convert_coerce;
+  case CTP_SubscriptAssignSource:
+    return diag::cannot_convert_subscript_assign;
+
+  case CTP_ThrowStmt:
+  case CTP_Unused:
+  case CTP_CannotFail:
+  case CTP_YieldByReference:
+  case CTP_CalleeResult:
+  case CTP_EnumCaseRawValue:
+    break;
+  }
+  return None;
+}
+
+void GenericArgumentsMismatchFailure::emitNoteForMismatch(int position) {
+  auto genericTypeDecl = getActual()->getCanonicalType()->getAnyGeneric();
+  auto param = genericTypeDecl->getGenericParams()->getParams()[position];
+
+  auto lhs = resolveType(getActual()->getGenericArgs()[position])
+                 ->reconstituteSugar(/*recursive=*/false);
+  auto rhs = resolveType(getRequired()->getGenericArgs()[position])
+                 ->reconstituteSugar(/*recursive=*/false);
+
+  auto noteLocation = param->getLoc();
+
+  if (!noteLocation.isValid()) {
+    noteLocation = getAnchor()->getLoc();
+  }
+
+  emitDiagnostic(noteLocation, diag::generic_argument_mismatch,
+                 param->getName(), lhs, rhs);
+}
+
+bool GenericArgumentsMismatchFailure::diagnoseAsError() {
+  auto *anchor = getAnchor();
+  auto path = getLocator()->getPath();
+
+  Optional<Diag<Type, Type>> diagnostic;
+  if (path.empty()) {
+    assert(isa<AssignExpr>(anchor));
+    diagnostic = getDiagnosticFor(CTP_AssignSource);
+  } else {
+    const auto &last = path.back();
+    switch (last.getKind()) {
+    case ConstraintLocator::ContextualType: {
+      auto purpose = getConstraintSystem().getContextualTypePurpose();
+      assert(purpose != CTP_Unused);
+      diagnostic = getDiagnosticFor(purpose);
+      break;
+    }
+
+    case ConstraintLocator::AutoclosureResult:
+    case ConstraintLocator::ApplyArgToParam:
+    case ConstraintLocator::ApplyArgument: {
+      diagnostic = diag::cannot_convert_argument_value;
+      break;
+    }
+
+    case ConstraintLocator::ParentType: {
+      diagnostic = diag::cannot_convert_parent_type;
+      break;
+    }
+
+    case ConstraintLocator::ClosureResult: {
+      diagnostic = diag::cannot_convert_closure_result;
+      break;
+    }
+
+    default:
+      break;
+    }
+  }
+
+  if (!diagnostic)
+    return false;
+
+  emitDiagnostic(
+      getAnchor()->getLoc(), *diagnostic,
+      resolveType(getActual())->reconstituteSugar(/*recursive=*/false),
+      resolveType(getRequired())->reconstituteSugar(/*recursive=*/false));
+  emitNotesForMismatches();
+  return true;
+}
+
 bool LabelingFailure::diagnoseAsError() {
   auto &cs = getConstraintSystem();
   auto *anchor = getRawAnchor();

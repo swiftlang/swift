@@ -393,6 +393,13 @@ ERROR(cannot_convert_closure_result_protocol,none,
       (Type, Type))
 ERROR(cannot_convert_closure_result_nil,none,
       "'nil' is not compatible with closure result type %0", (Type))
+ERROR(cannot_convert_parent_type,none,
+      "cannot convert parent type %0 to expected type %1",
+      (Type, Type))
+
+NOTE(generic_argument_mismatch,none,
+     "arguments to generic parameter %0 (%1 and %2) are expected to be equal",
+     (Identifier, Type, Type))
 
 ERROR(destructor_not_accessible,none,
       "deinitializers cannot be accessed", ())

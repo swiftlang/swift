@@ -228,6 +228,23 @@ ContextualMismatch *ContextualMismatch::create(ConstraintSystem &cs, Type lhs,
   return new (cs.getAllocator()) ContextualMismatch(cs, lhs, rhs, locator);
 }
 
+bool GenericArgumentsMismatch::diagnose(Expr *root, bool asNote) const {
+  auto failure = GenericArgumentsMismatchFailure(root, getConstraintSystem(),
+                                                 getActual(), getRequired(),
+                                                 getMismatches(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+GenericArgumentsMismatch *GenericArgumentsMismatch::create(
+    ConstraintSystem &cs, BoundGenericType *actual, BoundGenericType *required,
+    llvm::ArrayRef<unsigned> mismatches, ConstraintLocator *locator) {
+  unsigned size = totalSizeToAlloc<unsigned>(mismatches.size());
+  void *mem =
+      cs.getAllocator().Allocate(size, alignof(GenericArgumentsMismatch));
+  return new (mem)
+      GenericArgumentsMismatch(cs, actual, required, mismatches, locator);
+}
+
 bool AutoClosureForwarding::diagnose(Expr *root, bool asNote) const {
   auto failure =
       AutoClosureForwardingFailure(getConstraintSystem(), getLocator());
