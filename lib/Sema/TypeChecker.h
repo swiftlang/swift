@@ -2190,7 +2190,8 @@ Type computeWrappedValueType(VarDecl *var, Type backingStorageType,
 /// \c value as the original value.
 Expr *buildPropertyWrapperInitialValueCall(VarDecl *var,
                                            Type backingStorageType,
-                                           Expr *value);
+                                           Expr *value,
+                                           bool ignoreAttributeArgs);
   
 /// Whether an overriding declaration requires the 'override' keyword.
 enum class OverrideRequiresKeyword {

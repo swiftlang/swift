@@ -193,9 +193,9 @@ struct BadCombinations {
 }
 
 struct MultipleWrappers {
-  @Wrapper(wrappedValue: 17) // expected-error{{cannot convert value of type 'Wrapper<Int>' to specified type 'Int'}}
-  @WrapperWithInitialValue
-  var x: Int = 17 // expected-error{{property 'x' with attached wrapper cannot initialize both the wrapper type and the property}}
+  @Wrapper(wrappedValue: 17)
+  @WrapperWithInitialValue // expected-error{{extra argument 'initialValue' in call}}
+  var x: Int = 17
 
   @WrapperWithInitialValue // expected-error 2{{property wrapper can only apply to a single variable}}
   var (y, z) = (1, 2)
@@ -213,7 +213,7 @@ struct Initialization {
   var x2: Double
 
   @Wrapper(wrappedValue: 17)
-  var x3 = 42 // expected-error{{property 'x3' with attached wrapper cannot initialize both the wrapper type and the property}}
+  var x3 = 42 // expected-error{{extra argument 'initialValue' in call}}
 
   @Wrapper(wrappedValue: 17)
   var x4
@@ -230,6 +230,44 @@ struct Initialization {
     x4 = s // expected-error{{cannot assign value of type 'String' to type 'Int'}}
     y = s // expected-error{{cannot assign value of type 'String' to type 'Bool'}}
   }
+}
+
+@propertyWrapper
+struct Clamping<V: Comparable> {
+  var value: V
+  let min: V
+  let max: V
+
+  init(initialValue: V, min: V, max: V) {
+    value = initialValue
+    self.min = min
+    self.max = max
+    assert(value >= min && value <= max)
+  }
+
+  var wrappedValue: V {
+    get { return value }
+    set {
+      if newValue < min {
+        value = min
+      } else if newValue > max {
+        value = max
+      } else {
+        value = newValue
+      }
+    }
+  }
+}
+
+struct Color {
+  @Clamping(min: 0, max: 255) var red: Int = 127
+  @Clamping(min: 0, max: 255) var green: Int = 127
+  @Clamping(min: 0, max: 255) var blue: Int = 127
+  @Clamping(min: 0, max: 255) var alpha: Int = 255
+}
+
+func testColor() {
+  _ = Color(green: 17)
 }
 
 // ---------------------------------------------------------------------------
@@ -732,14 +770,13 @@ struct UsesExplicitClosures {
 struct PD<Value> {
   var wrappedValue: Value
 
-  init<A>(initialValue: Value, a: A) { // expected-note{{'init(initialValue:a:)' declared here}}
+  init<A>(initialValue: Value, a: A) {
     self.wrappedValue = initialValue
   }
 }
 
 struct TestPD {
-  @PD(a: "foo") var foo: Int = 42 // expected-error{{property 'foo' with attached wrapper cannot initialize both the wrapper type and the property}}
-  // expected-error@-1{{missing argument for parameter 'initialValue' in call}}
+  @PD(a: "foo") var foo: Int = 42
 }
 
 protocol P { }

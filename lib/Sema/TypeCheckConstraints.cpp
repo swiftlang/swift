@@ -2712,7 +2712,16 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
       // call.
       auto &ctx = singleVar->getASTContext();
       auto outermostWrapperAttr = wrapperAttrs.front();
-      if (auto outermostArg = outermostWrapperAttr->getArg()) {
+      if (initializer) {
+        // Form init(initialValue:) call(s).
+        Expr *wrappedInitializer =
+            buildPropertyWrapperInitialValueCall(
+                singleVar, Type(), initializer, /*ignoreAttributeArgs=*/false);
+        if (!wrappedInitializer)
+          return;
+
+        initializer = wrappedInitializer;
+      } else if (auto outermostArg = outermostWrapperAttr->getArg()) {
         Type outermostWrapperType =
             singleVar->getAttachedPropertyWrapperType(0);
         if (!outermostWrapperType)
@@ -2721,63 +2730,14 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
         auto typeExpr = TypeExpr::createImplicitHack(
             outermostWrapperAttr->getTypeLoc().getLoc(),
             outermostWrapperType, ctx);
-        if (initializer) {
-          singleVar->diagnose(diag::property_wrapper_and_normal_init,
-                              singleVar->getFullName())
-            .highlight(outermostWrapperAttr->getRange())
-            .highlight(initializer->getSourceRange());
-        }
-
         initializer = CallExpr::create(
             ctx, typeExpr, outermostArg,
             outermostWrapperAttr->getArgumentLabels(),
             outermostWrapperAttr->getArgumentLabelLocs(),
             /*hasTrailingClosure=*/false,
             /*implicit=*/false);
-      } else if (singleVar->allAttachedPropertyWrappersHaveInitialValueInit()) {
-        // FIXME: we want to use the initialValueInits we found.
-        assert(initializer);
-        
-        // Form init(initialValue:) call(s).
-        Expr *wrappedInitializer =
-            buildPropertyWrapperInitialValueCall(singleVar, Type(),
-                                                 initializer);
-        if (!wrappedInitializer)
-          return;
-        
-        initializer = wrappedInitializer;
       } else {
-        // Find the property wrapper that does not have an initialValue
-        // initializer and diagnose it.
-        for (unsigned i : indices(wrapperAttrs)) {
-          auto wrapperTypeInfo =
-              singleVar->getAttachedPropertyWrapperTypeInfo(i);
-          if (wrapperTypeInfo.initialValueInit)
-            continue;
-          
-          Type wrapperType = singleVar->getAttachedPropertyWrapperType(i);
-          if (!wrapperType)
-            return;
-          
-          auto wrapperNominal = wrapperType->getAnyNominal();
-          if (!wrapperNominal)
-            return;
-          
-          CustomAttr *wrapperAttr = wrapperAttrs[i];
-          singleVar->diagnose(diag::property_wrapper_init_without_initial_value,
-                              singleVar->getFullName(), wrapperType)
-            .highlight(initializer->getSourceRange());
-          ctx.Diags.diagnose(wrapperAttr->getLocation(),
-                             diag::property_wrapper_direct_init)
-            .fixItInsertAfter(initializer->getSourceRange().End,
-                              "(<# initializer args #>)");
-          wrapperNominal->diagnose(diag::kind_declname_declared_here,
-                                    wrapperNominal->getDescriptiveKind(),
-                                    wrapperNominal->getFullName());
-          return;
-        }
-        
-        llvm_unreachable("All wrappers had init(initialValue:)?");
+        llvm_unreachable("No initializer anywhere?");
       }
       wrapperAttrs[0]->setSemanticInit(initializer);
 
