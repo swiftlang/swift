@@ -831,10 +831,14 @@ static void checkOverrideAccessControl(ValueDecl *baseDecl, ValueDecl *decl,
   if (ctx.isAccessControlDisabled())
     return;
 
+  if (isa<ProtocolDecl>(decl->getDeclContext()))
+    return;
+
   auto &diags = ctx.Diags;
 
   auto dc = decl->getDeclContext();
   auto classDecl = dc->getSelfClassDecl();
+  assert(classDecl != nullptr && "Should have ruled out protocols above");
 
   bool isAccessor = isa<AccessorDecl>(decl);
 
@@ -851,8 +855,7 @@ static void checkOverrideAccessControl(ValueDecl *baseDecl, ValueDecl *decl,
   if (!isAccessor &&
       !baseHasOpenAccess &&
       baseDecl->getModuleContext() != decl->getModuleContext() &&
-      !isa<ConstructorDecl>(decl) &&
-      !isa<ProtocolDecl>(decl->getDeclContext())) {
+      !isa<ConstructorDecl>(decl)) {
     // NSObject.hashValue was made non-overridable in Swift 5; one should
     // override NSObject.hash instead.
     if (isNSObjectHashValue(baseDecl)) {
@@ -875,8 +878,7 @@ static void checkOverrideAccessControl(ValueDecl *baseDecl, ValueDecl *decl,
     }
     diags.diagnose(baseDecl, diag::overridden_here);
 
-  } else if (!isa<ConstructorDecl>(decl) &&
-             !isa<ProtocolDecl>(decl->getDeclContext())) {
+  } else if (!isa<ConstructorDecl>(decl)) {
     auto matchAccessScope =
       baseDecl->getFormalAccessScope(dc);
     auto classAccessScope =
