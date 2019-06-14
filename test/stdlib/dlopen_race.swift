@@ -30,6 +30,11 @@ func register_func_for_add_image(_ f: add_image_callback) {
 // for them to be used. rdar://problem/49742015
 var add_image_count = 0
 DlopenRaceTests.test("race") {
+  // This test is expected to fail unless the ObjC notification is supported.
+  let RTLD_DEFAULT = UnsafeMutableRawPointer(bitPattern: -2)
+  let objc_addLoadImageFunc = dlsym(RTLD_DEFAULT, "objc_addLoadImageFunc");
+  if objc_addLoadImageFunc == nil { return }
+  
   register_func_for_add_image({ header, slide in
     // The protocol conformance check in the print call is enough to trigger
     // ObjC class initialization in the newly opened image if Swift has
