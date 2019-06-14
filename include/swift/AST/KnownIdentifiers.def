@@ -120,6 +120,7 @@ IDENTIFIER_WITH_NAME(value_, "_value")
 IDENTIFIER(with)
 IDENTIFIER(withArguments)
 IDENTIFIER(withKeywordArguments)
+IDENTIFIER(wrappedValue)
 IDENTIFIER(wrapperValue)
 
 // Kinds of layout constraints
