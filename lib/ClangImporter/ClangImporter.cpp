@@ -1031,14 +1031,26 @@ ClangImporter::create(ASTContext &ctx,
 
   // Set up the file manager.
   {
-    if (ctx.SourceMgr.getFileSystem() != llvm::vfs::getRealFileSystem()) {
+    // SWIFT_ENABLE_TENSORFLOW
+    auto clangFileSystem = ctx.SourceMgr.getFileSystem();
+    if (importerOpts.InMemoryOutputFileSystem) {
+      instance.setInMemoryOutputFileSystem(
+          importerOpts.InMemoryOutputFileSystem);
+      llvm::IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem> overlayFileSystem(
+            new llvm::vfs::OverlayFileSystem(clangFileSystem));
+      overlayFileSystem->pushOverlay(importerOpts.InMemoryOutputFileSystem);
+      clangFileSystem = overlayFileSystem;
+    }
+    if (clangFileSystem != llvm::vfs::getRealFileSystem() ||
+        importerOpts.InMemoryOutputFileSystem) {
       // If the clang instance has overlays it means the user has provided
       // -ivfsoverlay options.  We're going to clobber their file system with
       // the Swift file system, so warn about it.
       if (!instance.getHeaderSearchOpts().VFSOverlayFiles.empty()) {
         ctx.Diags.diagnose(SourceLoc(), diag::clang_vfs_overlay_is_ignored);
       }
-      instance.setVirtualFileSystem(ctx.SourceMgr.getFileSystem());
+      // SWIFT_ENABLE_TENSORFLOW
+      instance.setVirtualFileSystem(clangFileSystem);
     }
     instance.createFileManager();
   }

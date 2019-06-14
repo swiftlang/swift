@@ -135,6 +135,10 @@ void setGlobalFileSystemProvider(StringRef Name,
   assert(FileSystemProvider);
   getGlobalContext().setFileSystemProvider(Name, FileSystemProvider);
 }
+
+void setGlobalInMemoryOutputFileSystem(IntrusiveRefCntPtr<clang::InMemoryOutputFileSystem> FS) {
+  getGlobalContext().getSwiftLangSupport().setInMemoryOutputFileSystem(std::move(FS));
+}
 } // namespace SourceKit
 
 static sourcekitd_response_t demangleNames(ArrayRef<const char *> MangledNames,

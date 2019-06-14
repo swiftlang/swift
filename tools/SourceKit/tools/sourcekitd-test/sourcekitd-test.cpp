@@ -506,6 +506,16 @@ static int setExpectedTypes(const sourcekitd_test::TestOptions &Opts,
 }
 
 static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
+  // SWIFT_ENABLE_TENSORFLOW
+#ifdef SWIFT_SOURCEKIT_USE_INPROC_LIBRARY
+  if (Opts.InMemoryClangModuleCache) {
+    SourceKit::setGlobalInMemoryOutputFileSystem(
+        new clang::InMemoryOutputFileSystem());
+  } else {
+    SourceKit::setGlobalInMemoryOutputFileSystem(nullptr);
+  }
+#endif
+
   if (!Opts.JsonRequestPath.empty())
     return handleJsonRequestPath(Opts.JsonRequestPath, Opts);
 

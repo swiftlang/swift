@@ -21,6 +21,8 @@
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallString.h"
 #include "swift/AST/Type.h"
+// SWIFT_ENABLE_TENSORFLOW
+#include "clang/Basic/InMemoryOutputFileSystem.h"
 #include "llvm/Support/VirtualFileSystem.h"
 #include <functional>
 #include <memory>
@@ -637,6 +639,12 @@ public:
   const static std::string SynthesizedUSRSeparator;
 
   virtual ~LangSupport() { }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  /// Subsequent requests will write temporary output files to this filesystem
+  /// rather than to the real filesystem.
+  virtual void setInMemoryOutputFileSystem(
+      llvm::IntrusiveRefCntPtr<clang::InMemoryOutputFileSystem> FS) = 0;
 
   virtual void indexSource(StringRef Filename,
                            IndexingConsumer &Consumer,

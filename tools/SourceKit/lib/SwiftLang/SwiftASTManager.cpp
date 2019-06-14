@@ -375,6 +375,12 @@ struct SwiftASTManager::Implementation {
   Cache<ASTKey, ASTProducerRef> ASTCache{ "sourcekit.swift.ASTCache" };
   llvm::sys::Mutex CacheMtx;
 
+  // SWIFT_ENABLE_TENSORFLOW
+  /// Requests will write temporary output files to this filesystem rather than
+  /// to the real filesystem.
+  llvm::IntrusiveRefCntPtr<clang::InMemoryOutputFileSystem>
+      InMemoryOutputFileSystem;
+
   WorkQueue ASTBuildQueue{ WorkQueue::Dequeuing::Serial,
                            "sourcekit.swift.ASTBuilding" };
 
@@ -399,6 +405,12 @@ SwiftASTManager::SwiftASTManager(
 
 SwiftASTManager::~SwiftASTManager() {
   delete &Impl;
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+void SwiftASTManager::setInMemoryOutputFileSystem(
+    llvm::IntrusiveRefCntPtr<clang::InMemoryOutputFileSystem> FS) {
+  Impl.InMemoryOutputFileSystem = std::move(FS);
 }
 
 std::unique_ptr<llvm::MemoryBuffer>
@@ -502,6 +514,9 @@ bool SwiftASTManager::initCompilerInvocation(
 
   ClangImporterOptions &ImporterOpts = Invocation.getClangImporterOptions();
   ImporterOpts.DetailedPreprocessingRecord = true;
+
+  // SWIFT_ENABLE_TENSORFLOW
+  ImporterOpts.InMemoryOutputFileSystem = Impl.InMemoryOutputFileSystem;
 
   assert(!Invocation.getModuleName().empty());
   Invocation.getLangOptions().AttachCommentsToDecls = true;
