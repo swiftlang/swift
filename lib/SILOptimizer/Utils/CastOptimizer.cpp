@@ -1532,7 +1532,7 @@ static bool optimizeStaticallyKnownProtocolConformance(
     if (!Conformance)
       return false;
 
-    SILBuilder B(Inst);
+    SILBuilderWithScope B(Inst);
     SmallVector<ProtocolConformanceRef, 1> NewConformances;
     NewConformances.push_back(Conformance.getValue());
     ArrayRef<ProtocolConformanceRef> Conformances =
