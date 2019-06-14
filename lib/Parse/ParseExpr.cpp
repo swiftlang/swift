@@ -2291,8 +2291,13 @@ Expr *Parser::parseExprIdentifier() {
     } else {
       for (auto activeVar : DisabledVars) {
         if (activeVar->getFullName() == name) {
-          diagnose(loc.getBaseNameLoc(), DisabledVarReason);
-          return new (Context) ErrorExpr(loc.getSourceRange());
+          if (DisabledVarReason.ID == diag::var_init_self_referential.ID) {
+            // This will be diagnosed in resolveDeclRefExpr()
+            continue;
+          } else {
+            diagnose(loc.getBaseNameLoc(), DisabledVarReason);
+            return new (Context) ErrorExpr(loc.getSourceRange());
+          }
         }
       }
     }

@@ -294,6 +294,8 @@ convertToUnqualifiedLookupOptions(NameLookupOptions options) {
     newOptions |= UnqualifiedLookup::Flags::IgnoreAccessControl;
   if (options.contains(NameLookupFlags::IncludeOuterResults))
     newOptions |= UnqualifiedLookup::Flags::IncludeOuterResults;
+  if (options.contains(NameLookupFlags::IgnoreLocalVariables))
+    newOptions |= UnqualifiedLookup::Flags::IgnoreLocalVariables;
 
   return newOptions;
 }
@@ -319,6 +321,14 @@ LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclName name,
       foundInType = dc->mapTypeIntoContext(
         baseDC->getDeclaredInterfaceType());
       assert(foundInType && "bogus base declaration?");
+    }
+
+    // This is a hack to filter out top level variables. If this flag is set
+    // then local variables are ignored, but for some reason, top level
+    // variables do not get ignored, so ignore them here.
+    if (options.contains(NameLookupFlags::IgnoreLocalVariables) &&
+        isa<VarDecl>(found.getValueDecl())) {
+      continue;
     }
 
     builder.add(found.getValueDecl(), found.getDeclContext(), foundInType,

@@ -466,8 +466,8 @@ static bool shouldConsiderOuterResultsFor(DeclName name) {
 /// Bind an UnresolvedDeclRefExpr by performing name lookup and
 /// returning the resultant expression. Context is the DeclContext used
 /// for the lookup.
-Expr *TypeChecker::
-resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
+Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
+                                      DeclContext *DC, bool ignoreLocalVars) {
   // Process UnresolvedDeclRefExpr by doing an unqualified lookup.
   DeclName Name = UDRE->getName();
   SourceLoc Loc = UDRE->getLoc();
@@ -478,6 +478,9 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
     lookupOptions |= NameLookupFlags::KnownPrivate;
   if (shouldConsiderOuterResultsFor(Name))
     lookupOptions |= NameLookupFlags::IncludeOuterResults;
+  if (ignoreLocalVars) {
+    lookupOptions |= NameLookupFlags::IgnoreLocalVariables;
+  }
 
   auto Lookup = lookupUnqualified(DC, Name, Loc, lookupOptions);
 
@@ -546,47 +549,122 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
         .highlight(UDRE->getSourceRange());
     };
 
-    if (!isConfused) {
-      if (Name == Context.Id_Self) {
-        if (DeclContext *typeContext = DC->getInnermostTypeContext()){
-          Type SelfType = typeContext->getSelfInterfaceType();
+    // Suppress diagnostics here because they will be incorrect when ignoring
+    // local variables
+    if (!ignoreLocalVars) {
 
-          if (typeContext->getSelfClassDecl())
-            SelfType = DynamicSelfType::get(SelfType, Context);
-          SelfType = DC->mapTypeIntoContext(SelfType);
-          return new (Context) TypeExpr(TypeLoc(new (Context)
-                                                FixedTypeRepr(SelfType, Loc)));
+      if (!isConfused) {
+        if (Name == Context.Id_Self) {
+          if (DeclContext *typeContext = DC->getInnermostTypeContext()) {
+            Type SelfType = typeContext->getSelfInterfaceType();
+
+            if (typeContext->getSelfClassDecl())
+              SelfType = DynamicSelfType::get(SelfType, Context);
+            SelfType = DC->mapTypeIntoContext(SelfType);
+            return new (Context)
+                TypeExpr(TypeLoc(new (Context) FixedTypeRepr(SelfType, Loc)));
+          }
         }
-      }
 
-      TypoCorrectionResults corrections(*this, Name, nameLoc);
-      performTypoCorrection(DC, UDRE->getRefKind(), Type(),
-                            lookupOptions, corrections);
+        TypoCorrectionResults corrections(*this, Name, nameLoc);
+        performTypoCorrection(DC, UDRE->getRefKind(), Type(), lookupOptions,
+                              corrections);
 
-      if (auto typo = corrections.claimUniqueCorrection()) {
-        auto diag = diagnose(Loc, diag::use_unresolved_identifier_corrected,
-                             Name, Name.isOperator(),
-                             typo->CorrectedName.getBaseIdentifier().str());
-        diag.highlight(UDRE->getSourceRange());
-        typo->addFixits(diag);
+        if (auto typo = corrections.claimUniqueCorrection()) {
+          auto diag = diagnose(Loc, diag::use_unresolved_identifier_corrected,
+                               Name, Name.isOperator(),
+                               typo->CorrectedName.getBaseIdentifier().str());
+          diag.highlight(UDRE->getSourceRange());
+          typo->addFixits(diag);
+        } else {
+          emitBasicError();
+        }
+
+        corrections.noteAllCandidates();
       } else {
         emitBasicError();
+
+        diagnose(Loc, diag::confusable_character, UDRE->getName().isOperator(),
+                 simpleName.str(), expectedIdentifier)
+            .fixItReplace(Loc, expectedIdentifier);
       }
-
-      corrections.noteAllCandidates();
-    } else {
-      emitBasicError();
-
-      diagnose(Loc, diag::confusable_character,
-               UDRE->getName().isOperator(), simpleName.str(),
-               expectedIdentifier)
-        .fixItReplace(Loc, expectedIdentifier);
     }
 
     // TODO: consider recovering from here.  We may want some way to suppress
     // downstream diagnostics, though.
 
     return new (Context) ErrorExpr(UDRE->getSourceRange());
+  }
+
+  // It is possible that we're trying to initialize a variable with itself.
+  if (Lookup.size() == 1) {
+    auto first = Lookup.front().getValueDecl();
+
+    if (first && isa<VarDecl>(first) && Name == first->getFullName()) {
+      auto var = cast<VarDecl>(first);
+      auto init = var->getParentInitializer();
+
+      bool foundSelfRef = false;
+
+      auto forEachChildExpr = [&](Expr *root,
+                                  llvm::function_ref<Expr *(Expr *)> callback) {
+        struct ChildWalker : ASTWalker {
+          llvm::function_ref<Expr *(Expr *)> callback;
+
+          ChildWalker(llvm::function_ref<Expr *(Expr *)> callback)
+              : callback(callback) {}
+
+          std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+            // Enumerate the node!
+            return {true, callback(E)};
+          }
+
+          std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+            return {true, S};
+          }
+
+          std::pair<bool, Pattern *> walkToPatternPre(Pattern *P) override {
+            return {true, P};
+          }
+          bool walkToDeclPre(Decl *D) override { return true; }
+          bool walkToTypeReprPre(TypeRepr *T) override { return false; }
+          bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
+        };
+
+        root->walk(ChildWalker(callback));
+      };
+
+      forEachChildExpr(init, [&](Expr *subExpr) -> Expr * {
+        if (auto decl = dyn_cast_or_null<UnresolvedDeclRefExpr>(subExpr)) {
+          if (decl->getName() == Name) {
+            foundSelfRef = true;
+          }
+        }
+
+        return subExpr;
+      });
+
+      // It is also possible that we're calling a function with the same
+      // name as the variable - in this case, as long as we're not passing
+      // the variable itself as an argument to the function, it's ok.
+      if (auto CE = dyn_cast_or_null<CallExpr>(init)) {
+        if (auto TE = dyn_cast_or_null<TupleExpr>(CE->getArg())) {
+          for (auto elem : TE->getElements()) {
+            if (UDRE == elem) {
+              foundSelfRef = true;
+              break;
+            } else {
+              foundSelfRef = false;
+            }
+          }
+        }
+      }
+
+      if (foundSelfRef) {
+        diagnose(Loc, diag::var_init_self_referential);
+        return new (Context) ErrorExpr(UDRE->getSourceRange());
+      }
+    }
   }
 
   // FIXME: Need to refactor the way we build an AST node from a lookup result!
@@ -785,7 +863,34 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
         BaseExpr, SourceLoc(), Name, UDRE->getNameLoc(), UDRE->isImplicit(),
         Context.AllocateCopy(outerAlternatives));
   }
-  
+
+  // Look into the Swift module as well. This is helpful when doing
+  // something like `var type = type(of: something)`.
+  SmallString<256> scratch;
+  SmallVector<ValueDecl *, 4> results;
+  UDRE->getName().getString(scratch);
+  Context.lookupInSwiftModule(scratch, results);
+
+  if (!results.empty()) {
+    return buildRefExpr(results, DC, UDRE->getNameLoc(), UDRE->isImplicit(),
+                        UDRE->getFunctionRefKind());
+  }
+
+  // Ignore local variables and try resolving again. This is to handle a
+  // special case where we might be trying to initialize a variable with a
+  // function which has the same name as the variable, for example:
+  // var foo = foo(bar: 1).
+
+  // Recurse once only.
+  if (!ignoreLocalVars) {
+    auto expr = resolveDeclRefExpr(UDRE, DC, /*ignoreLocalVars=*/true);
+
+    if (isa<DeclRefExpr>(expr) || isa<OverloadedDeclRefExpr>(expr) ||
+        isa<UnresolvedDotExpr>(expr)) {
+      return expr;
+    }
+  }
+
   // FIXME: If we reach this point, the program we're being handed is likely
   // very broken, but it's still conceivable that this may happen due to
   // invalid shadowed declarations.

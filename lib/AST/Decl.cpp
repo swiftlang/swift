@@ -2201,6 +2201,22 @@ bool swift::conflicting(ASTContext &ctx,
     return true;
   }
 
+  // Variables and functions do not conflict with each other as long as the
+  // function accepts at least one argument.
+  if (sig1.IsVariable && sig2.IsFunction) {
+    if (auto sig2FuncTy = dyn_cast<AnyFunctionType>(sig2Type)) {
+      if (sig2FuncTy->getNumParams() > 1) {
+        return false;
+      }
+    }
+  } else if (sig1.IsFunction && sig2.IsVariable) {
+    if (auto sig1FuncTy = dyn_cast<AnyFunctionType>(sig1Type)) {
+      if (sig1FuncTy->getNumParams() > 1) {
+        return false;
+      }
+    }
+  }
+
   // Functions always conflict with non-functions with the same signature.
   // In practice, this only applies for zero argument functions.
   if (sig1.IsFunction != sig2.IsFunction)
