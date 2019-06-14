@@ -2046,17 +2046,8 @@ TypeDecl *EquivalenceClass::lookupNestedType(
         continue;
       }
 
-      // If this is another type declaration, determine whether we should
-      // record it.
+      // If this is another type declaration, record it.
       if (auto type = dyn_cast<TypeDecl>(member)) {
-        // FIXME: Filter out type declarations that aren't in the same
-        // module as the protocol itself. This is an unprincipled hack, but
-        // provides consistent lookup semantics for the generic signature
-        // builder in all contents.
-        if (type->getDeclContext()->getParentModule()
-              != proto->getParentModule())
-          continue;
-
         concreteDecls.push_back(type);
         continue;
       }

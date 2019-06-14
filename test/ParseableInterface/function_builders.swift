@@ -8,7 +8,7 @@ public struct TupleBuilder {
   public static func buildBlock<T1, T2>(_ t1: T1, _ t2: T2) -> (T1, T2) {
     return (t1, t2)
   }
-  
+
   public static func buildBlock<T1, T2, T3>(_ t1: T1, _ t2: T2, _ t3: T3)
       -> (T1, T2, T3) {
     return (t1, t2, t3)
@@ -29,7 +29,7 @@ public struct TupleBuilder {
   public static func buildIf<T>(_ value: T?) -> T? { return value }
 }
 
-// CHECK-LABEL: public func tuplify<T>(_ cond: Bool, @FunctionBuilders.TupleBuilder body: (Bool) -> T)
+// CHECK-LABEL: public func tuplify<T>(_ cond: Swift.Bool, @FunctionBuilders.TupleBuilder body: (Swift.Bool) -> T)
 public func tuplify<T>(_ cond: Bool, @TupleBuilder body: (Bool) -> T) {
   print(body(cond))
 }

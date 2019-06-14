@@ -33,7 +33,7 @@ public struct C {
 
 // CHECK: public struct D {
 public struct D {
-  // CHECK: public typealias `Type` = Int
+  // CHECK: public typealias `Type` = Swift.Int
   public typealias `Type` = Int
 // CHECK-NEXT: }
 }
