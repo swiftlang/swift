@@ -191,14 +191,10 @@ struct WrapperWithStorageValue<T> {
 
 struct UseWrapperWithStorageValue {
   // UseWrapperWithStorageValue.$x.getter
-  // CHECK-LABEL: sil private [ossa] @$s17property_wrappers26UseWrapperWithStorageValueV2$x33_{{.*}}SiGvg : $@convention(method) (UseWrapperWithStorageValue) -> Wrapper<Int>
+  // CHECK-LABEL: sil hidden [transparent] [ossa] @$s17property_wrappers26UseWrapperWithStorageValueV2$xAA0D0VySiGvg : $@convention(method) (UseWrapperWithStorageValue) -> Wrapper<Int>
   // CHECK-NOT: return
   // CHECK: function_ref @$s17property_wrappers23WrapperWithStorageValueV07wrapperF0AA0C0VyxGvg
   @WrapperWithStorageValue(value: 17) var x: Int
-
-  func foo() {
-    _ = $x
-  }
 }
 
 @propertyWrapper
