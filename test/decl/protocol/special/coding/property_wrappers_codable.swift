@@ -2,15 +2,15 @@
 
 @propertyWrapper
 struct Wrapper<T: Codable> {
-  var value: T
+  var wrappedValue: T
 }
 
 @propertyWrapper
 struct WrapperWithInitialValue<T: Codable> {
-  var value: T
+  var wrappedValue: T
 
   init(initialValue: T) {
-    self.value = initialValue
+    self.wrappedValue = initialValue
   }
 }
 
