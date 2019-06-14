@@ -168,3 +168,7 @@ public protocol HasMutatingMethodClone: HasMutatingMethod {
   mutating func foo()
   var bar: Int { mutating get }
 }
+
+public extension Int {
+  public func IntEnhancer() {}
+}

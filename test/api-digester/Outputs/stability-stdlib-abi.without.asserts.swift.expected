@@ -1,0 +1,6 @@
+Constructor ManagedBuffer.init(_doNotCallMe:) is a new API without @available attribute
+Constructor __RawDictionaryStorage.init(coder:) is a new API without @available attribute
+Constructor __RawSetStorage.init(coder:) is a new API without @available attribute
+Constructor __SwiftNativeNSData.init(coder:) is a new API without @available attribute
+Constructor __SwiftNativeNSDictionary.init(coder:) is a new API without @available attribute
+Constructor __SwiftNativeNSSet.init(coder:) is a new API without @available attribute

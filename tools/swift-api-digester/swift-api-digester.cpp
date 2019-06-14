@@ -40,8 +40,7 @@ namespace  {
   enum class ActionType {
     None,
     DumpSDK,
-    DumpSwiftModules,
-    CompareSDKs,
+    MigratorGen,
     DiagnoseSDKs,
     // The following two are for testing purposes
     DeserializeDiffItems,
@@ -100,6 +99,10 @@ FrameworkPaths("F", llvm::cl::desc("add a directory to the framework search path
                llvm::cl::cat(Category));
 
 static llvm::cl::list<std::string>
+BaselineModuleInputPaths("BI", llvm::cl::desc("add a module for baseline input"),
+                         llvm::cl::cat(Category));
+
+static llvm::cl::list<std::string>
 ModuleInputPaths("I", llvm::cl::desc("add a module for input"),
                  llvm::cl::cat(Category));
 
@@ -128,6 +131,12 @@ SwiftOnly("swift-only",
           llvm::cl::cat(Category));
 
 static llvm::cl::opt<bool>
+DisableOSChecks("disable-os-checks",
+                llvm::cl::desc("Skip OS related diagnostics"),
+                llvm::cl::init(false),
+                llvm::cl::cat(Category));
+
+static llvm::cl::opt<bool>
 PrintModule("print-module", llvm::cl::desc("Print module names in diagnostics"),
             llvm::cl::cat(Category));
 
@@ -138,12 +147,9 @@ Action(llvm::cl::desc("Mode:"), llvm::cl::init(ActionType::None),
           clEnumValN(ActionType::DumpSDK,
                      "dump-sdk",
                      "Dump SDK content to JSON file"),
-          clEnumValN(ActionType::DumpSwiftModules,
-                     "dump-swift",
-                     "dump swift modules in SDK"),
-          clEnumValN(ActionType::CompareSDKs,
-                     "compare-sdk",
-                     "Compare SDK content in JSON file"),
+          clEnumValN(ActionType::MigratorGen,
+                     "generate-migration-script",
+                     "Compare SDK content in JSON file and generate migration script"),
           clEnumValN(ActionType::DiagnoseSDKs,
                      "diagnose-sdk",
                      "Diagnose SDK content in JSON file"),
@@ -1003,6 +1009,14 @@ public:
           if (D->hasFixedBinaryOrder()) {
             D->emitDiag(diag::decl_added);
           }
+          // Diagnose the missing of @available attributes.
+          // Decls with @_alwaysEmitIntoClient aren't required to have an
+          // @available attribute.
+          if (!Ctx.getOpts().SkipOSCheck &&
+              !D->getIntroducingVersion().hasOSAvailability() &&
+              !D->hasDeclAttribute(DeclAttrKind::DAK_AlwaysEmitIntoClient)) {
+            D->emitDiag(diag::new_decl_without_intro);
+          }
         }
       }
       // Complain about added protocol requirements
@@ -1038,7 +1052,6 @@ public:
           }
         }
       }
-
       return;
     case NodeMatchReason::Removed:
       assert(!Right);
@@ -2065,6 +2078,33 @@ static void findTypeMemberDiffs(NodePtr leftSDKRoot, NodePtr rightSDKRoot,
   }
 }
 
+static int diagnoseModuleChange(SDKContext &Ctx, SDKNodeRoot *LeftModule,
+                             SDKNodeRoot *RightModule, StringRef OutputPath,
+                             llvm::StringSet<> ProtocolReqWhitelist) {
+  assert(LeftModule);
+  assert(RightModule);
+  llvm::raw_ostream *OS = &llvm::errs();
+  std::unique_ptr<llvm::raw_ostream> FileOS;
+  if (!OutputPath.empty()) {
+    std::error_code EC;
+    FileOS.reset(new llvm::raw_fd_ostream(OutputPath, EC, llvm::sys::fs::F_None));
+    OS = FileOS.get();
+  }
+  ModuleDifferDiagsConsumer PDC(true, *OS);
+
+  Ctx.getDiags().addConsumer(PDC);
+  TypeAliasDiffFinder(LeftModule, RightModule,
+                      Ctx.getTypeAliasUpdateMap()).search();
+  PrunePass Prune(Ctx, std::move(ProtocolReqWhitelist));
+  Prune.pass(LeftModule, RightModule);
+  ChangeRefinementPass RefinementPass(Ctx.getNodeUpdateMap());
+  RefinementPass.pass(LeftModule, RightModule);
+  // Find member hoist changes to help refine diagnostics.
+  findTypeMemberDiffs(LeftModule, RightModule, Ctx.getTypeMemberDiffs());
+  DiagnosisEmitter::diagnosis(LeftModule, RightModule, Ctx);
+  return 0;
+}
+
 static int diagnoseModuleChange(StringRef LeftPath, StringRef RightPath,
                                 StringRef OutputPath,
                                 CheckerOptions Opts,
@@ -2077,33 +2117,13 @@ static int diagnoseModuleChange(StringRef LeftPath, StringRef RightPath,
     llvm::errs() << RightPath << " does not exist\n";
     return 1;
   }
-  llvm::raw_ostream *OS = &llvm::errs();
-  std::unique_ptr<llvm::raw_ostream> FileOS;
-  if (!OutputPath.empty()) {
-    std::error_code EC;
-    FileOS.reset(new llvm::raw_fd_ostream(OutputPath, EC, llvm::sys::fs::F_None));
-    OS = FileOS.get();
-  }
-  ModuleDifferDiagsConsumer PDC(true, *OS);
   SDKContext Ctx(Opts);
-  Ctx.getDiags().addConsumer(PDC);
-
   SwiftDeclCollector LeftCollector(Ctx);
   LeftCollector.deSerialize(LeftPath);
   SwiftDeclCollector RightCollector(Ctx);
   RightCollector.deSerialize(RightPath);
-  auto LeftModule = LeftCollector.getSDKRoot();
-  auto RightModule = RightCollector.getSDKRoot();
-  TypeAliasDiffFinder(LeftModule, RightModule,
-                      Ctx.getTypeAliasUpdateMap()).search();
-  PrunePass Prune(Ctx, std::move(ProtocolReqWhitelist));
-  Prune.pass(LeftModule, RightModule);
-  ChangeRefinementPass RefinementPass(Ctx.getNodeUpdateMap());
-  RefinementPass.pass(LeftModule, RightModule);
-  // Find member hoist changes to help refine diagnostics.
-  findTypeMemberDiffs(LeftModule, RightModule, Ctx.getTypeMemberDiffs());
-
-  DiagnosisEmitter::diagnosis(LeftModule, RightModule, Ctx);
+  diagnoseModuleChange(Ctx, LeftCollector.getSDKRoot(), RightCollector.getSDKRoot(),
+                       OutputPath, std::move(ProtocolReqWhitelist));
   return 0;
 }
 
@@ -2128,9 +2148,10 @@ static void populateAliasChanges(NodeMap &AliasMap, DiffVector &AllItems,
   }
 }
 
-static int compareSDKs(StringRef LeftPath, StringRef RightPath,
-                       StringRef DiffPath,
-                       llvm::StringSet<> &IgnoredRemoveUsrs, CheckerOptions Opts) {
+static int generateMigrationScript(StringRef LeftPath, StringRef RightPath,
+                                   StringRef DiffPath,
+                                   llvm::StringSet<> &IgnoredRemoveUsrs,
+                                   CheckerOptions Opts) {
   if (!fs::exists(LeftPath)) {
     llvm::errs() << LeftPath << " does not exist\n";
     return 1;
@@ -2251,7 +2272,8 @@ void anchorForGetMainExecutable() {}
 
 static int prepareForDump(const char *Main,
                           CompilerInvocation &InitInvok,
-                          llvm::StringSet<> &Modules) {
+                          llvm::StringSet<> &Modules,
+                          bool IsBaseline = false) {
   InitInvok.setMainExecutablePath(fs::getMainExecutable(Main,
     reinterpret_cast<void *>(&anchorForGetMainExecutable)));
   InitInvok.setModuleName("swift_ide_test");
@@ -2301,17 +2323,18 @@ static int prepareForDump(const char *Main,
     FramePaths.push_back({path, /*isSystem=*/true});
   }
   InitInvok.setFrameworkSearchPaths(FramePaths);
-  InitInvok.setImportSearchPaths(options::ModuleInputPaths);
-
+  if (IsBaseline) {
+    InitInvok.setImportSearchPaths(options::BaselineModuleInputPaths);
+  } else {
+    InitInvok.setImportSearchPaths(options::ModuleInputPaths);
+  }
   if (!options::ModuleList.empty()) {
     if (readFileLineByLine(options::ModuleList, Modules))
-        return 1;
+      return 1;
   }
-
   for (auto M : options::ModuleNames) {
     Modules.insert(M);
   }
-
   if (Modules.empty()) {
     llvm::errs() << "Need to specify -include-all or -module <name>\n";
     return 1;
@@ -2370,7 +2393,17 @@ static CheckerOptions getCheckOpts() {
   Opts.LocationFilter = options::LocationFilter;
   Opts.PrintModule = options::PrintModule;
   Opts.SwiftOnly = options::SwiftOnly;
+  Opts.SkipOSCheck = options::DisableOSChecks;
   return Opts;
+}
+
+static SDKNodeRoot *getSDKRoot(const char *Main, SDKContext &Ctx,
+                            CheckerOptions Opts, bool IsBaseline) {
+  CompilerInvocation Invok;
+  llvm::StringSet<> Modules;
+  if (prepareForDump(Main, Invok, Modules, IsBaseline))
+    return nullptr;
+  return getSDKNodeRoot(Ctx, Invok, Modules, Opts);
 }
 
 int main(int argc, char *argv[]) {
@@ -2389,15 +2422,13 @@ int main(int argc, char *argv[]) {
   for (auto Name : options::ApisPrintUsrs)
     PrintApis.push_back(Name);
   switch (options::Action) {
-  case ActionType::DumpSwiftModules:
-    return (prepareForDump(argv[0], InitInvok, Modules)) ? 1 :
-      dumpSwiftModules(InitInvok, Modules, options::OutputFile, PrintApis, Opts);
   case ActionType::DumpSDK:
     return (prepareForDump(argv[0], InitInvok, Modules)) ? 1 :
       dumpSDKContent(InitInvok, Modules, options::OutputFile, Opts);
-  case ActionType::CompareSDKs:
+  case ActionType::MigratorGen:
   case ActionType::DiagnoseSDKs: {
-    if (options::SDKJsonPaths.size() != 2) {
+    bool CompareJson = options::SDKJsonPaths.size() == 2;
+    if (!CompareJson && options::BaselineModuleInputPaths.empty()) {
       llvm::errs() << "Only two SDK versions can be compared\n";
       llvm::cl::PrintHelpMessage();
       return 1;
@@ -2407,14 +2438,22 @@ int main(int argc, char *argv[]) {
       if (readFileLineByLine(options::ProtReqWhiteList, protocolWhitelist))
           return 1;
     }
-    if (options::Action == ActionType::CompareSDKs)
-      return compareSDKs(options::SDKJsonPaths[0], options::SDKJsonPaths[1],
-                         options::OutputFile, IgnoredUsrs, Opts);
-    else
+    if (options::Action == ActionType::MigratorGen)
+      return generateMigrationScript(options::SDKJsonPaths[0],
+                                     options::SDKJsonPaths[1],
+                                     options::OutputFile, IgnoredUsrs, Opts);
+    else if (CompareJson)
       return diagnoseModuleChange(options::SDKJsonPaths[0],
                                   options::SDKJsonPaths[1],
                                   options::OutputFile, Opts,
                                   std::move(protocolWhitelist));
+    else {
+      SDKContext Ctx(Opts);
+      return diagnoseModuleChange(Ctx, getSDKRoot(argv[0], Ctx, Opts, true),
+                                  getSDKRoot(argv[0], Ctx, Opts, false),
+                                  options::OutputFile,
+                                  std::move(protocolWhitelist));
+    }
   }
   case ActionType::DeserializeSDK:
   case ActionType::DeserializeDiffItems: {
