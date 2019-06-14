@@ -695,7 +695,6 @@ extension Wrapper {
 
 struct TestStorageRef {
   @WrapperWithStorageRef var x: Int // expected-note{{'$$x' declared here}}
-  // expected-note@-1{{'$x' declared here}}
 
   init(x: Int) {
     self.$$x = WrapperWithStorageRef(wrappedValue: x)
@@ -713,9 +712,24 @@ struct TestStorageRef {
 }
 
 func testStorageRef(tsr: TestStorageRef) {
-  let _: Wrapper = tsr.$x // expected-error{{'$x' is inaccessible due to 'private' protection level}}
+  let _: Wrapper = tsr.$x
   _ = tsr.$$x // expected-error{{'$$x' is inaccessible due to 'private' protection level}}
 }
+
+struct TestStorageRefPrivate {
+  @WrapperWithStorageRef private(set) var x: Int
+
+  init() {
+    self.$$x = WrapperWithStorageRef(wrappedValue: 5)
+  }
+}
+
+func testStorageRefPrivate() {
+  var tsr = TestStorageRefPrivate()
+  let a = tsr.$x // okay, getter is internal
+  tsr.$x = a  // expected-error{{cannot assign to property: '$x' is immutable}}
+}
+
 
 // rdar://problem/50873275 - crash when using wrapper with wrapperValue in
 // generic type.

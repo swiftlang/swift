@@ -1523,9 +1523,15 @@ static VarDecl *synthesizePropertyWrapperStorageWrapperProperty(
   addMemberToContextIfNeeded(pbd, dc, var);
   pbd->setStatic(var->isStatic());
 
-  // The property is always private.
-  property->overwriteAccess(AccessLevel::Private);
-  property->overwriteSetterAccess(AccessLevel::Private);
+  // Determine the access level for the property.
+  AccessLevel access =
+    std::min(AccessLevel::Internal, var->getFormalAccess());
+  property->overwriteAccess(access);
+
+  // Determine setter access.
+  AccessLevel setterAccess =
+    std::min(AccessLevel::Internal, var->getSetterFormalAccess());
+  property->overwriteSetterAccess(setterAccess);
 
   // Add the accessors we need.
   bool hasSetter = wrapperVar->isSettable(nullptr) &&
