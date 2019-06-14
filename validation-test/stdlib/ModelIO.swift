@@ -12,7 +12,7 @@ var ModelIOTests = TestSuite("ModelIO")
 
 if #available(OSX 10.13, iOS 11.0, tvOS 11.0, *) {
     ModelIOTests.test("MDLAnimatedScalar/accessors")
-    .skip(.always("rdar://problem/50449570")) {
+    .skip(.always("rdar://problem/50449570")).code {
         let animatedVal = MDLAnimatedScalar()
         let testCount = 10
         let testTimeVal = 5.0
