@@ -462,9 +462,10 @@ function(_add_variant_link_flags)
     list(APPEND link_libraries "bsd" "atomic")
     list(APPEND result "-Wl,-Bsymbolic")
   elseif("${LFLAGS_SDK}" STREQUAL "ANDROID")
-    list(APPEND link_libraries "dl" "log" "atomic" "icudataswift" "icui18nswift" "icuucswift")
+    list(APPEND link_libraries "dl" "log" "atomic")
     # We need to add the math library, which is linked implicitly by libc++
     list(APPEND result "-lm")
+
     if("${LFLAGS_ARCH}" MATCHES armv7)
       set(android_libcxx_path "${SWIFT_ANDROID_NDK_PATH}/sources/cxx-stl/llvm-libc++/libs/armeabi-v7a")
     elseif("${LFLAGS_ARCH}" MATCHES aarch64)
@@ -476,8 +477,17 @@ function(_add_variant_link_flags)
     else()
       message(SEND_ERROR "unknown architecture (${LFLAGS_ARCH}) for android")
     endif()
-    list(APPEND link_libraries "${android_libcxx_path}/libc++abi.a")
-    list(APPEND link_libraries "${android_libcxx_path}/libc++_shared.so")
+
+    # link against the custom C++ library
+    list(APPEND link_libraries
+      ${android_libcxx_path}/libc++abi.a
+      ${android_libcxx_path}/libc++_shared.so)
+
+    # link against the ICU libraries
+    list(APPEND link_libraries
+      ${SWIFT_ANDROID_${LFLAGS_ARCH}_ICU_I18N}
+      ${SWIFT_ANDROID_${LFLAGS_ARCH}_ICU_UC})
+
     swift_android_lib_for_arch(${LFLAGS_ARCH} ${LFLAGS_ARCH}_LIB)
     foreach(path IN LISTS ${LFLAGS_ARCH}_LIB)
       list(APPEND library_search_directories ${path})
