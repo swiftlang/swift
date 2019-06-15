@@ -64,7 +64,7 @@ static ValueDecl *getProtocolRequirement(ProtocolDecl *proto, Identifier name) {
 // Get the effective memberwise initializer of the given nominal type, or create
 // it if it does not exist.
 static ConstructorDecl *getOrCreateEffectiveMemberwiseInitializer(
-      TypeChecker &TC, NominalTypeDecl *nominal) {
+    TypeChecker &TC, NominalTypeDecl *nominal) {
   auto &C = nominal->getASTContext();
   if (auto *initDecl = nominal->getEffectiveMemberwiseInitializer())
     return initDecl;
