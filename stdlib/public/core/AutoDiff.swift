@@ -52,7 +52,7 @@ public extension VectorProtocol {
 }
 
 extension VectorProtocol where VectorSpaceScalar: SignedNumeric {
-  prefix static func - (x: Self) -> Self {
+  static prefix func - (x: Self) -> Self {
     .zero - x
   }
 }
