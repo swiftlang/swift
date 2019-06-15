@@ -1497,7 +1497,7 @@ public protocol BinaryFloatingPoint: FloatingPoint, ExpressibleByFloatLiteral {
   /// - Parameter value: A floating-point value to be converted.
   init(_ value: Double)
 
-#if !os(Windows) && (arch(i386) || arch(x86_64))
+#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
   /// Creates a new instance from the given value, rounded to the closest
   /// possible representation.
   ///

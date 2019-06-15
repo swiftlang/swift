@@ -37,6 +37,10 @@
  #endif
 #endif
 
+#if defined(__ANDROID__) && (defined(__i386) || defined(__x86_64__))
+ #undef SWIFT_DTOA_FLOAT80_SUPPORT
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
