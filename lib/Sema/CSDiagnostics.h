@@ -89,6 +89,7 @@ public:
   ConstraintLocator *getLocator() const { return Locator; }
 
   Type getType(Expr *expr) const;
+  Type getType(const TypeLoc &loc) const;
 
   /// Resolve type variables present in the raw type, if any.
   Type resolveType(Type rawType, bool reconstituteSugar = false) const {
@@ -1245,6 +1246,51 @@ public:
 
   bool diagnoseAsError() override;
   bool diagnoseAsNote() override;
+};
+
+/// Diagnose generic argument omission e.g.
+///
+/// ```swift
+/// struct S<T> {}
+///
+/// _ = S()
+/// ```
+class MissingGenericArgumentsFailure final : public FailureDiagnostic {
+  using Anchor = llvm::PointerUnion<TypeRepr *, Expr *>;
+
+  SmallVector<GenericTypeParamType *, 4> Parameters;
+
+public:
+  MissingGenericArgumentsFailure(Expr *root, ConstraintSystem &cs,
+                                 ArrayRef<GenericTypeParamType *> missingParams,
+                                 ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator) {
+    assert(!missingParams.empty());
+    Parameters.append(missingParams.begin(), missingParams.end());
+  }
+
+  bool hasLoc(GenericTypeParamType *GP) const;
+
+  DeclContext *getDeclContext() const {
+    auto *GP = Parameters.front();
+    return GP->getDecl()->getDeclContext();
+  }
+
+  bool diagnoseAsError() override;
+
+  bool diagnoseForAnchor(Anchor anchor,
+                         ArrayRef<GenericTypeParamType *> params) const;
+
+  bool diagnoseParameter(Anchor anchor, GenericTypeParamType *GP) const;
+
+private:
+  void emitGenericSignatureNote(Anchor anchor) const;
+
+  /// Retrieve representative locations for associated generic prameters.
+  ///
+  /// \returns true if all of the parameters have been covered.
+  bool findArgumentLocations(
+      llvm::function_ref<void(TypeRepr *, GenericTypeParamType *)> callback);
 };
 
 } // end namespace constraints

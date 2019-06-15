@@ -556,3 +556,20 @@ bool SkipUnhandledConstructInFunctionBuilder::diagnose(Expr *root,
       root, getConstraintSystem(), unhandled, builder, getLocator());
   return failure.diagnose(asNote);
 }
+
+bool ExplicitlySpecifyGenericArguments::diagnose(Expr *root,
+                                                 bool asNote) const {
+  auto &cs = getConstraintSystem();
+  MissingGenericArgumentsFailure failure(root, cs, getParameters(),
+                                         getLocator());
+  return failure.diagnose(asNote);
+}
+
+ExplicitlySpecifyGenericArguments *ExplicitlySpecifyGenericArguments::create(
+    ConstraintSystem &cs, ArrayRef<GenericTypeParamType *> params,
+    ConstraintLocator *locator) {
+  unsigned size = totalSizeToAlloc<GenericTypeParamType *>(params.size());
+  void *mem = cs.getAllocator().Allocate(
+      size, alignof(ExplicitlySpecifyGenericArguments));
+  return new (mem) ExplicitlySpecifyGenericArguments(cs, params, locator);
+}
