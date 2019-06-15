@@ -28,6 +28,7 @@ add_swift_host_library(swiftSema STATIC
   DerivedConformanceError.cpp
   # SWIFT_ENABLE_TENSORFLOW
   DerivedConformanceAdditiveArithmetic.cpp
+  DerivedConformanceElementaryFunctions.cpp
   DerivedConformanceVectorProtocol.cpp
   DerivedConformanceDifferentiable.cpp
   DerivedConformanceKeyPathIterable.cpp

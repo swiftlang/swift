@@ -568,12 +568,14 @@ getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived,
   auto diffableType = TypeLoc::withoutLoc(diffableProto->getDeclaredType());
   auto *addArithProto = C.getProtocol(KnownProtocolKind::AdditiveArithmetic);
   auto addArithType = TypeLoc::withoutLoc(addArithProto->getDeclaredType());
+  auto *mathProto = C.getProtocol(KnownProtocolKind::ElementaryFunctions);
+  auto mathType = TypeLoc::withoutLoc(mathProto->getDeclaredType());
   auto *vectorProto = C.getProtocol(KnownProtocolKind::VectorProtocol);
   auto vectorType = TypeLoc::withoutLoc(vectorProto->getDeclaredType());
   auto *kpIterableProto = C.getProtocol(KnownProtocolKind::KeyPathIterable);
   auto kpIterableType = TypeLoc::withoutLoc(kpIterableProto->getDeclaredType());
 
-  SmallVector<TypeLoc, 3> inherited {diffableType};
+  SmallVector<TypeLoc, 3> inherited{diffableType};
 
   // Cache original members and their associated types for later use.
   SmallVector<VarDecl *, 8> diffProperties;
@@ -589,9 +591,16 @@ getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived,
   bool canDeriveAdditiveArithmetic =
       llvm::all_of(diffProperties, [&](VarDecl *vd) {
         return TC.conformsToProtocol(getAssociatedType(vd, parentDC, id),
-                                     addArithProto, parentDC,
-                                     None);
-        });
+                                     addArithProto, parentDC, None);
+      });
+
+  // Associated struct can derive `ElementaryFunctions` if the associated types
+  // of all stored properties conform to `ElementaryFunctions`.
+  bool canDeriveElementaryFunctions =
+      llvm::all_of(diffProperties, [&](VarDecl *vd) {
+        return TC.conformsToProtocol(getAssociatedType(vd, parentDC, id),
+                                     mathProto, parentDC, None);
+      });
 
   // Associated struct can derive `VectorProtocol` if the associated types of
   // all members conform to `VectorProtocol` and share the same
@@ -625,6 +634,10 @@ getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived,
                               None))
       inherited.push_back(kpIterableType);
   }
+  // If all members conform to `ElementaryFunctions`, make the associated struct
+  // conform to `ElementaryFunctions`.
+  if (canDeriveElementaryFunctions)
+    inherited.push_back(mathType);
   // If all members also conform to `VectorProtocol` with the same `Scalar`
   // type, make the associated struct conform to `VectorProtocol` instead of
   // just `AdditiveArithmetic`.

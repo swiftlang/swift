@@ -183,7 +183,7 @@ static void deriveBodyMathOperator(AbstractFunctionDecl *funcDecl,
     memberOpExprs.push_back(createMemberOpExpr(member));
     memberNames.push_back(member->getName());
   }
-  // Call memberwise initialier with member operator call expressions.
+  // Call memberwise initializer with member operator call expressions.
   auto *callExpr =
       CallExpr::createImplicit(C, initExpr, memberOpExprs, memberNames);
   ASTNode returnStmt = new (C) ReturnStmt(SourceLoc(), callExpr, true);

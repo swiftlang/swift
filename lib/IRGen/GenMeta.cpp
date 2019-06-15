@@ -4206,6 +4206,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::StringInterpolationProtocol:
   // SWIFT_ENABLE_TENSORFLOW
   case KnownProtocolKind::AdditiveArithmetic:
+  case KnownProtocolKind::ElementaryFunctions:
   case KnownProtocolKind::KeyPathIterable:
   case KnownProtocolKind::TensorArrayProtocol:
   case KnownProtocolKind::TensorGroup:

@@ -2532,6 +2532,8 @@ ERROR(parameterized_invalid_parameters_struct,none,
       "invalid", (Type))
 ERROR(broken_additive_arithmetic_requirement,none,
       "AdditiveArithmetic protocol is broken: unexpected requirement", ())
+ERROR(broken_elementary_functions_requirement,none,
+      "ElementaryFunctions protocol is broken: unexpected requirement", ())
 ERROR(broken_vector_protocol_requirement,none,
       "VectorProtocol protocol is broken: unexpected requirement", ())
 ERROR(broken_differentiable_requirement,none,
