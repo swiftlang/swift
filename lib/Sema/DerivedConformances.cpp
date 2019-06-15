@@ -193,7 +193,7 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
   // the provided requirement, but within the given known protocol.
   // SWIFT_ENABLE_TENSORFLOW
   auto getRequirement = [&](KnownProtocolKind kind,
-                            std::function<bool(ValueDecl *)> filter =
+                            llvm::function_ref<bool(ValueDecl *)> filter =
                                 nullptr) -> ValueDecl * {
     // Dig out the protocol.
     auto proto = ctx.getProtocol(kind);

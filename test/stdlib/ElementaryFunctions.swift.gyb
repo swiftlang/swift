@@ -34,9 +34,6 @@ func expectEqualWithNaNEquality<T>(
   _ expected: [T], _ actual: [T], file: String = #file, line: UInt = #line
 ) where T: BinaryFloatingPoint {
   for (x, y) in zip(expected, actual) {
-    if x == y || x.isNaN && y.isNaN {
-      continue
-    }
     expectTrue(x == y || x.isNaN && y.isNaN,
                "\(x) != \(y) for \(T.self).",
                file: file, line: line)
