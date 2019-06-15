@@ -7,6 +7,17 @@ include(AddSwiftStdlib)
 
 # Create convenience targets for the Swift standard library.
 
+# NOTE(compnerd) this will pass the *build* configuration to the *host*
+# libraries.  Explicitly indicate to CMake that it should **NOT** track the
+# implicit language runtimes.  This can go away once we migrate to an external
+# project with its own configure with the CMAKE_SYSTEM_NAME set rather than
+# using the custom cross-compilation solution
+set(CMAKE_C_IMPLICIT_LINK_LIBRARIES "")
+set(CMAKE_CXX_IMPLICIT_LINK_LIBRARIES "")
+
+set(CMAKE_C_IMPLICIT_LINK_DIRECTORIES "")
+set(CMAKE_CXX_IMPLICIT_LINK_DIRECTORIES "")
+
 # NOTE(compnerd) save the original compiler for the host swiftReflection that
 # we build
 set(HOST_CMAKE_CXX_COMPILER ${CMAKE_CXX_COMPILER})
