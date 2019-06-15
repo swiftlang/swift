@@ -34,6 +34,7 @@ class SemaAnnotator : public ASTWalker {
   SmallVector<ConstructorRefCallExpr *, 2> CtorRefs;
   SmallVector<ExtensionDecl *, 2> ExtDecls;
   llvm::SmallDenseMap<OpaqueValueExpr *, Expr *, 4> OpaqueValueMap;
+  llvm::SmallPtrSet<Expr *, 16> ExprsToSkip;
   bool Cancelled = false;
   Optional<AccessKind> OpAccess;
 
@@ -61,6 +62,7 @@ private:
   std::pair<bool, Pattern *> walkToPatternPre(Pattern *P) override;
 
   bool handleImports(ImportDecl *Import);
+  bool handleCustomAttributes(Decl *D);
   bool passModulePathElements(ArrayRef<ImportDecl::AccessPathElement> Path,
                               const clang::Module *ClangMod);
 
@@ -94,6 +96,11 @@ bool SemaAnnotator::walkToDeclPre(Decl *D) {
   bool ShouldVisitChildren;
   if (shouldIgnore(D, ShouldVisitChildren))
     return ShouldVisitChildren;
+
+  if (!handleCustomAttributes(D)) {
+    Cancelled = true;
+    return false;
+  }
 
   SourceLoc Loc = D->getLoc();
   unsigned NameLen = 0;
@@ -251,6 +258,9 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
 
   if (isDone())
     return { false, nullptr };
+
+  if (ExprsToSkip.count(E) != 0)
+    return { false, E };
 
   if (!SEWalker.walkToExprPre(E))
     return { false, E };
@@ -539,6 +549,36 @@ std::pair<bool, Pattern *> SemaAnnotator::walkToPatternPre(Pattern *P) {
   // subpattern.  The type will be walked as a part of another TypedPattern.
   TP->getSubPattern()->walk(*this);
   return { false, P };
+}
+
+bool SemaAnnotator::handleCustomAttributes(Decl *D) {
+  if (isa<VarDecl>(D) && !isa<ParamDecl>(D))
+    return true;
+  if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
+    if (auto *SingleVar = PBD->getSingleVar()) {
+      D = SingleVar;
+    } else {
+      return true;
+    }
+  }
+  for (auto *customAttr : D->getAttrs().getAttributes<CustomAttr, true>()) {
+    if (auto *Repr = customAttr->getTypeLoc().getTypeRepr()) {
+      if (!Repr->walk(*this))
+        return false;
+    }
+    if (auto *SemaInit = customAttr->getSemanticInit()) {
+      if (!SemaInit->isImplicit()) {
+        assert(customAttr->getArg());
+        if (!SemaInit->walk(*this))
+          return false;
+        ExprsToSkip.insert(SemaInit);
+      }
+    } else if (auto *Arg = customAttr->getArg()) {
+      if (!Arg->walk(*this))
+        return false;
+    }
+  }
+  return true;
 }
 
 bool SemaAnnotator::handleImports(ImportDecl *Import) {
