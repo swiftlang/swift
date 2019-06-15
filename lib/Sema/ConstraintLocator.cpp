@@ -167,16 +167,28 @@ bool ConstraintLocator::isForKeyPathComponent() const {
   });
 }
 
+static bool isLastElement(const ConstraintLocator *locator,
+                          ConstraintLocator::PathElementKind expectedKind) {
+  auto path = locator->getPath();
+  return !path.empty() && path.back().getKind() == expectedKind;
+}
+
 bool ConstraintLocator::isForGenericParameter() const {
-  auto path = getPath();
-  return !path.empty() &&
-         path.back().getKind() == ConstraintLocator::GenericParameter;
+  return isLastElement(this, ConstraintLocator::GenericParameter);
 }
 
 bool ConstraintLocator::isForSequenceElementType() const {
+  return isLastElement(this, ConstraintLocator::SequenceElementType);
+}
+
+bool ConstraintLocator::isForContextualType() const {
+  return isLastElement(this, ConstraintLocator::ContextualType);
+}
+
+GenericTypeParamType *ConstraintLocator::getGenericParameter() const {
+  assert(isForGenericParameter());
   auto path = getPath();
-  return !path.empty() &&
-         path.back().getKind() == ConstraintLocator::SequenceElementType;
+  return path.back().getGenericParameter();
 }
 
 void ConstraintLocator::dump(SourceManager *sm) {
