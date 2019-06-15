@@ -48,15 +48,15 @@ static StringRef getMathOperatorName(MathOperator op) {
 }
 
 // Return the protocol requirement with the specified name.
+// TODO: Move function to shared place for use with other derived conformances.
 static ValueDecl *getProtocolRequirement(ProtocolDecl *proto, Identifier name) {
   auto lookup = proto->lookupDirect(name);
-  lookup.erase(std::remove_if(lookup.begin(), lookup.end(),
-                              [](ValueDecl *v) {
-                                return !isa<ProtocolDecl>(
-                                           v->getDeclContext()) ||
-                                       !v->isProtocolRequirement();
-                              }),
-               lookup.end());
+  // Erase declarations that are not protocol requirements.
+  // This is important for removing default implementations of the same name.
+  llvm::erase_if(lookup, [](ValueDecl *v) {
+    return !isa<ProtocolDecl>(v->getDeclContext()) ||
+           !v->isProtocolRequirement();
+  });
   assert(lookup.size() == 1 && "Ambiguous protocol requirement");
   return lookup.front();
 }
@@ -76,6 +76,7 @@ static ConstructorDecl *getOrCreateEffectiveMemberwiseInitializer(
 }
 
 // Return true if given nominal type has a `let` stored with an initial value.
+// TODO: Move function to shared place for use with other derived conformances.
 static bool hasLetStoredPropertyWithInitialValue(NominalTypeDecl *nominal) {
   return llvm::any_of(nominal->getStoredProperties(), [&](VarDecl *v) {
     return v->isLet() && v->hasInitialValue();
