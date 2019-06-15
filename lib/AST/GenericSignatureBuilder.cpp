@@ -7433,9 +7433,46 @@ void GenericSignatureBuilder::verifyGenericSignature(ASTContext &context,
   sig->print(llvm::errs());
   llvm::errs() << "\n";
 
-  // Try removing each requirement in turn.
+  // Try building a new signature having the same requirements.
   auto genericParams = sig->getGenericParams();
   auto requirements = sig->getRequirements();
+
+  {
+    PrettyStackTraceGenericSignature debugStack("verifying", sig);
+
+    // Form a new generic signature builder.
+    GenericSignatureBuilder builder(context);
+
+    // Add the generic parameters.
+    for (auto gp : genericParams)
+      builder.addGenericParameter(gp);
+
+    // Add the requirements.
+    auto source = FloatingRequirementSource::forAbstract();
+    for (auto req : requirements)
+      builder.addRequirement(req, source, nullptr);
+
+    // If there were any errors, the signature was invalid.
+    if (builder.Impl->HadAnyError) {
+      context.Diags.diagnose(SourceLoc(), diag::generic_signature_not_valid,
+                             sig->getAsString());
+    }
+
+    // Form a generic signature from the result.
+    auto newSig =
+      std::move(builder).computeGenericSignature(
+                                      SourceLoc(),
+                                      /*allowConcreteGenericParams=*/true,
+                                      /*allowBuilderToMove=*/true);
+
+    // The new signature should be equal.
+    if (newSig->getCanonicalSignature() != sig->getCanonicalSignature()) {
+      context.Diags.diagnose(SourceLoc(), diag::generic_signature_not_equal,
+                             sig->getAsString(), newSig->getAsString());
+    }
+  }
+
+  // Try removing each requirement in turn.
   for (unsigned victimIndex : indices(requirements)) {
     PrettyStackTraceGenericSignature debugStack("verifying", sig, victimIndex);
 
@@ -7453,8 +7490,8 @@ void GenericSignatureBuilder::verifyGenericSignature(ASTContext &context,
         builder.addRequirement(requirements[i], source, nullptr);
     }
 
-    // Finalize the generic signature. If there were any errors, we formed
-    // an invalid signature, so just continue.
+    // If there were any errors, we formed an invalid signature, so
+    // just continue.
     if (builder.Impl->HadAnyError) continue;
 
     // Form a generic signature from the result.
