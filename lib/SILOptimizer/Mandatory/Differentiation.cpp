@@ -865,18 +865,12 @@ private:
   /// Saved for deletion during cleanup.
   SmallVector<SILValue, 32> generatedAssociatedFunctionReferences;
 
+  /// The AdditiveArithmetic protocol in the standard library.
+  ProtocolDecl *additiveArithmeticProtocol =
+      astCtx.getProtocol(KnownProtocolKind::AdditiveArithmetic);
   /// The VectorProtocol protocol in the standard library.
   ProtocolDecl *vectorProtocolProtocol =
       astCtx.getProtocol(KnownProtocolKind::VectorProtocol);
-  /// The Numeric protocol in the standard library.
-  ProtocolDecl *numericProtocol =
-      astCtx.getProtocol(KnownProtocolKind::Numeric);
-  /// The AdditiveArithmetic protocol in the standard library.
-  ProtocolDecl *additiveArithmeticProtocol =
-    astCtx.getProtocol(KnownProtocolKind::AdditiveArithmetic);
-  /// The FloatingPoint protocol in the stanard library.
-  ProtocolDecl *floatingPointProtocol =
-      astCtx.getProtocol(KnownProtocolKind::FloatingPoint);
 
   /// `AdditiveArithmetic.+` declaration.
   mutable FuncDecl *cachedPlusFn = nullptr;
@@ -926,20 +920,12 @@ public:
     return generatedAssociatedFunctionReferences;
   }
 
-  ProtocolDecl *getVectorProtocolProtocol() const {
-    return vectorProtocolProtocol;
-  }
-
-  ProtocolDecl *getNumericProtocol() const {
-    return numericProtocol;
-  }
-
   ProtocolDecl *getAdditiveArithmeticProtocol() const {
     return additiveArithmeticProtocol;
   }
 
-  ProtocolDecl *getFloatingPointProtocol() const {
-    return floatingPointProtocol;
+  ProtocolDecl *getVectorProtocolProtocol() const {
+    return vectorProtocolProtocol;
   }
 
   FuncDecl *getPlusDecl() const {
