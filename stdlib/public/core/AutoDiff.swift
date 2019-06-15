@@ -51,6 +51,12 @@ public extension VectorProtocol {
   }
 }
 
+public extension VectorProtocol where VectorSpaceScalar: SignedNumeric {
+  static prefix func - (x: Self) -> Self {
+    .zero - x
+  }
+}
+
 /// A type that mathematically represents a differentiable manifold whose
 /// tangent spaces are finite-dimensional.
 public protocol Differentiable {
