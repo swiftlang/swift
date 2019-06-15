@@ -555,7 +555,7 @@ void ProtocolTypeRepr::printImpl(ASTPrinter &Printer,
 
 void OpaqueReturnTypeRepr::printImpl(ASTPrinter &Printer,
                                      const PrintOptions &Opts) const {
-  Printer << "some ";
+  Printer.printKeyword("some", Opts, /*Suffix=*/" ");
   printTypeRepr(Constraint, Printer, Opts);
 }
 
