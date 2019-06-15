@@ -135,7 +135,7 @@ ResolvedCursorInfo CursorInfoResolver::resolve(SourceLoc Loc) {
 }
 
 bool CursorInfoResolver::walkToDeclPre(Decl *D, CharSourceRange Range) {
-  if (!rangeContainsLoc(D->getSourceRange()))
+  if (!rangeContainsLoc(D->getSourceRangeIncludingAttrs()))
     return false;
 
   if (isa<ExtensionDecl>(D))
@@ -354,6 +354,39 @@ static std::vector<CharSourceRange> getEnumParamListInfo(SourceManager &SM,
   return LabelRanges;
 }
 
+bool NameMatcher::handleCustomAttrs(Decl *D) {
+  // CustomAttrs of non-param VarDecls are handled by their containing
+  // PatternBindingDecl
+  if (isa<VarDecl>(D) && !isa<ParamDecl>(D))
+    return true;
+
+  if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
+    if (auto *SingleVar = PBD->getSingleVar()) {
+      D = SingleVar;
+    } else {
+        return true;
+    }
+  }
+
+  for (auto *customAttr : D->getAttrs().getAttributes<CustomAttr, true>()) {
+    if (shouldSkip(customAttr->getRangeWithAt()))
+      continue;
+    auto *Arg = customAttr->getArg();
+    if (auto *Repr = customAttr->getTypeLoc().getTypeRepr()) {
+      SWIFT_DEFER { CustomAttrDelayedArg = None; };
+      if (Arg && !Arg->isImplicit())
+        CustomAttrDelayedArg = {Repr->getLoc(), Arg};
+      if (!Repr->walk(*this))
+        return false;
+    }
+    if (Arg && !Arg->isImplicit()) {
+      if (!Arg->walk(*this))
+        return false;
+    }
+  }
+  return !isDone();
+}
+
 bool NameMatcher::walkToDeclPre(Decl *D) {
   // Handle occurrences in any preceding doc comments
   RawComment R = D->getRawComment();
@@ -369,9 +402,12 @@ bool NameMatcher::walkToDeclPre(Decl *D) {
   if (D->isImplicit())
     return !isDone();
 
-  if (shouldSkip(D->getSourceRange()))
+  if (shouldSkip(D->getSourceRangeIncludingAttrs()))
     return false;
   
+  if (!handleCustomAttrs(D))
+    return false;
+
   if (auto *ICD = dyn_cast<IfConfigDecl>(D)) {
     for (auto Clause : ICD->getClauses()) {
       if (!Clause.isActive)
@@ -575,8 +611,15 @@ bool NameMatcher::walkToTypeReprPre(TypeRepr *T) {
   if (isDone() || shouldSkip(T->getSourceRange()))
     return false;
 
-  if (isa<ComponentIdentTypeRepr>(T))
-    tryResolve(ASTWalker::ParentTy(T), T->getLoc());
+  if (isa<ComponentIdentTypeRepr>(T)) {
+    // Check if we're in a CustomAttr and have associated call arguments
+    if (CustomAttrDelayedArg.hasValue() && CustomAttrDelayedArg->first == T->getLoc()) {
+      tryResolve(ASTWalker::ParentTy(T), T->getLoc(), LabelRangeType::CallArg,
+                 getCallArgLabelRanges(getSourceMgr(), CustomAttrDelayedArg->second, LabelRangeEndAt::BeforeElemStart));
+    } else {
+      tryResolve(ASTWalker::ParentTy(T), T->getLoc());
+    }
+  }
   return !isDone();
 }
 

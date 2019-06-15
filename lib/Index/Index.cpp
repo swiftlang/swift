@@ -298,6 +298,10 @@ private:
     // Do not handle unavailable decls.
     if (AvailableAttr::isUnavailable(D))
       return false;
+
+    if (!handleCustomAttrInitRefs(D))
+      return false;
+
     if (auto *AD = dyn_cast<AccessorDecl>(D)) {
       if (ManuallyVisitedAccessorStack.empty() ||
           ManuallyVisitedAccessorStack.back() != AD)
@@ -319,6 +323,30 @@ private:
     if (getParentDecl() == D)
       return finishCurrentEntity();
 
+    return true;
+  }
+
+  bool handleCustomAttrInitRefs(Decl * D) {
+    for (auto *customAttr : D->getAttrs().getAttributes<CustomAttr, true>()) {
+      if (customAttr->isImplicit())
+        continue;
+
+      auto &Loc = customAttr->getTypeLoc();
+      if (auto *semanticInit = dyn_cast_or_null<CallExpr>(customAttr->getSemanticInit())) {
+        if (auto *CD = semanticInit->getCalledValue()) {
+          if (!shouldIndex(CD, /*IsRef*/true))
+            continue;
+          IndexSymbol Info;
+          if (initIndexSymbol(CD, Loc.getLoc(), /*IsRef=*/true, Info))
+            continue;
+          Info.roles |= (unsigned)SymbolRole::Call;
+          if (semanticInit->isImplicit())
+            Info.roles |= (unsigned)SymbolRole::Implicit;
+          if (!startEntity(CD, Info, /*IsRef=*/true) || !finishCurrentEntity())
+            return false;
+        }
+      }
+    }
     return true;
   }
 
@@ -432,9 +460,8 @@ private:
     Info.symInfo = getSymbolInfoForModule(Mod);
     getModuleNameAndUSR(Mod, Info.name, Info.USR);
 
-    auto Parent = getParentDecl();
-    if (Parent && isa<AbstractFunctionDecl>(Parent))
-      addRelation(Info, (unsigned)SymbolRole::RelationContainedBy, Parent);
+    if (auto Container = getContainingDecl())
+      addRelation(Info, (unsigned)SymbolRole::RelationContainedBy, Container);
 
     if (!IdxConsumer.startSourceEntity(Info)) {
       Cancelled = true;
@@ -447,6 +474,16 @@ private:
   Decl *getParentDecl() const {
     if (!EntitiesStack.empty())
       return EntitiesStack.back().D;
+    return nullptr;
+  }
+
+  Decl *getContainingDecl() const {
+    auto Containers = (SymbolRoleSet)SymbolRole::Definition | (SymbolRoleSet)SymbolRole::Declaration;
+    for (const auto &Entity: EntitiesStack) {
+      if (isa<AbstractFunctionDecl>(Entity.D) && (Entity.Roles & Containers)) {
+        return Entity.D;
+      }
+    }
     return nullptr;
   }
 
@@ -1161,9 +1198,8 @@ bool IndexSwiftASTWalker::initIndexSymbol(ValueDecl *D, SourceLoc Loc,
 
   if (IsRef) {
     Info.roles |= (unsigned)SymbolRole::Reference;
-    auto Parent = getParentDecl();
-    if (Parent && isa<AbstractFunctionDecl>(Parent))
-      addRelation(Info, (unsigned)SymbolRole::RelationContainedBy, Parent);
+    if (auto Container = getContainingDecl())
+      addRelation(Info, (unsigned)SymbolRole::RelationContainedBy, Container);
   } else {
     Info.roles |= (unsigned)SymbolRole::Definition;
     if (D->isImplicit())
