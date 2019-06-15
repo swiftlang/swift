@@ -34,7 +34,8 @@ import SwiftShims
 /// ElementaryFunctions and FloatingPoint.
 ///
 /// [elfn]: http://en.wikipedia.org/wiki/Elementary_function
-@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+// SWIFT_ENABLE_TENSORFLOW
+// @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
 public protocol ElementaryFunctions {
 
 %for func in ElementaryFunctions:
@@ -125,7 +126,8 @@ extension ${Self}: ElementaryFunctions {
 % end
 %end
 
-@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+// SWIFT_ENABLE_TENSORFLOW
+// @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
 extension SIMD where Scalar: ElementaryFunctions {
 % for func in ElementaryFunctions:
 
@@ -168,6 +170,7 @@ extension SIMD where Scalar: ElementaryFunctions {
 }
 
 %for n in [2,3,4,8,16,32,64]:
-@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+// SWIFT_ENABLE_TENSORFLOW
+// @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
 extension SIMD${n}: ElementaryFunctions where Scalar: ElementaryFunctions { }
 %end

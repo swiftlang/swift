@@ -1,0 +1,105 @@
+//===--- ElementaryFunctions.swift.gyb ------------------------*- swift -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+// SWIFT_ENABLE_TENSORFLOW
+// Runtime tests for ElementaryFunctions derived conformances.
+//===----------------------------------------------------------------------===//
+// -*- swift -*-
+// RUN: %empty-directory(%t)
+// RUN: %gyb %s -o %t/tgmath.swift
+// RUN: %line-directive %t/tgmath.swift -- %target-build-swift %t/tgmath.swift -o %t/a.out
+// RUN: %target-codesign %t/a.out
+// RUN: %line-directive %t/tgmath.swift -- %target-run %t/a.out
+// REQUIRES: executable_test
+
+#if (arch(i386) || arch(x86_64)) && !os(Windows)
+  typealias TestLiteralType = Float80
+#else
+  typealias TestLiteralType = Double
+#endif
+
+import StdlibUnittest
+
+let MathTests = TestSuite("Math")
+
+func expectEqualWithNaNEquality<T>(
+  _ expected: [T], _ actual: [T], file: String = #file, line: UInt = #line
+) where T: BinaryFloatingPoint {
+  for (x, y) in zip(expected, actual) {
+    if x == y || x.isNaN && y.isNaN {
+      continue
+    }
+    expectTrue(x == y || x.isNaN && y.isNaN,
+               "\(x) != \(y) for \(T.self).",
+               file: file, line: line)
+  }
+}
+
+%from SwiftMathFunctions import *
+
+struct Wrapper<T: ElementaryFunctions & Equatable>: ElementaryFunctions & Equatable {
+  var x, y: T
+  var values: [T] { [x, y] }
+}
+
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+internal extension ElementaryFunctions where Self: BinaryFloatingPoint {
+  static func elementaryFunctionTests() {
+    let values: [Self] = [-0.375, 0.375]
+    let wrapper = Wrapper<Self>(x: values[0], y: values[1])
+
+    expectEqualWithNaNEquality(values.map(Self.acos), Wrapper<Self>.acos(wrapper).values)
+    expectEqualWithNaNEquality(values.map(Self.asin), Wrapper<Self>.asin(wrapper).values)
+    expectEqualWithNaNEquality(values.map(Self.atan), Wrapper<Self>.atan(wrapper).values)
+    expectEqualWithNaNEquality(values.map(Self.cos), Wrapper<Self>.cos(wrapper).values)
+    expectEqualWithNaNEquality(values.map(Self.sin), Wrapper<Self>.sin(wrapper).values)
+    expectEqualWithNaNEquality(values.map(Self.tan), Wrapper<Self>.tan(wrapper).values)
+    expectEqualWithNaNEquality(values.map(Self.acosh), Wrapper<Self>.acosh(wrapper).values)
+    expectEqualWithNaNEquality(values.map(Self.asinh), Wrapper<Self>.asinh(wrapper).values)
+    expectEqualWithNaNEquality(values.map(Self.atanh), Wrapper<Self>.atanh(wrapper).values)
+    expectEqualWithNaNEquality(values.map(Self.cosh), Wrapper<Self>.cosh(wrapper).values)
+    expectEqualWithNaNEquality(values.map(Self.sinh), Wrapper<Self>.sinh(wrapper).values)
+    expectEqualWithNaNEquality(values.map(Self.tanh), Wrapper<Self>.tanh(wrapper).values)
+    expectEqualWithNaNEquality(values.map(Self.exp), Wrapper<Self>.exp(wrapper).values)
+    expectEqualWithNaNEquality(values.map(Self.exp2), Wrapper<Self>.exp2(wrapper).values)
+    expectEqualWithNaNEquality(values.map(Self.exp10), Wrapper<Self>.exp10(wrapper).values)
+    expectEqualWithNaNEquality(values.map(Self.expm1), Wrapper<Self>.expm1(wrapper).values)
+    expectEqualWithNaNEquality(values.map(Self.log), Wrapper<Self>.log(wrapper).values)
+    expectEqualWithNaNEquality(values.map(Self.log2), Wrapper<Self>.log2(wrapper).values)
+    expectEqualWithNaNEquality(values.map(Self.log10), Wrapper<Self>.log10(wrapper).values)
+    expectEqualWithNaNEquality(values.map(Self.log1p), Wrapper<Self>.log1p(wrapper).values)
+    expectEqualWithNaNEquality(values.map(Self.sqrt), Wrapper<Self>.sqrt(wrapper).values)
+    expectEqualWithNaNEquality(values.map { x in Self.root(x, 3) }, Wrapper<Self>.root(wrapper, 3).values)
+    expectEqualWithNaNEquality(values.map { x in Self.pow(x, x) }, Wrapper<Self>.pow(wrapper, wrapper).values)
+    expectEqualWithNaNEquality(values.map { x in Self.pow(x, 3) }, Wrapper<Self>.pow(wrapper, 3).values)
+  }
+}
+
+%for T in ['Float', 'Double', 'CGFloat', 'Float80']:
+% if T == 'Float80':
+#if (arch(i386) || arch(x86_64)) && !os(Windows)
+% elif T == 'CGFloat':
+#if canImport(CoreGraphics)
+  import CoreGraphics
+% end
+
+MathTests.test("${T}") {
+  if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+    ${T}.elementaryFunctionTests()
+  }
+}
+
+% if T in ['CGFloat', 'Float80']:
+#endif
+% end
+%end
+
+runAllTests()

@@ -243,6 +243,19 @@ public:
   /// \returns the derived member, which will also be added to the type.
   ValueDecl *deriveAdditiveArithmetic(ValueDecl *requirement);
 
+  // SWIFT_ENABLE_TENSORFLOW
+  /// Determine if an ElementaryFunctions requirement can be derived for a
+  /// type.
+  ///
+  /// \returns True if the requirement can be derived.
+  static bool canDeriveElementaryFunctions(NominalTypeDecl *type,
+                                           DeclContext *DC);
+
+  /// Derive an ElementaryFunctions requirement for a nominal type.
+  ///
+  /// \returns the derived member, which will also be added to the type.
+  ValueDecl *deriveElementaryFunctions(ValueDecl *requirement);
+
   /// Determine if a VectorProtocol requirement can be derived for a type.
   ///
   /// \returns True if the requirement can be derived.

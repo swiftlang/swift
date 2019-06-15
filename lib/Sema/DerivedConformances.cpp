@@ -63,6 +63,14 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
   }
 
   // SWIFT_ENABLE_TENSORFLOW
+  if (*knownProtocol == KnownProtocolKind::AdditiveArithmetic)
+    return canDeriveAdditiveArithmetic(Nominal, DC);
+
+  // SWIFT_ENABLE_TENSORFLOW
+  if (*knownProtocol == KnownProtocolKind::ElementaryFunctions)
+    return canDeriveElementaryFunctions(Nominal, DC);
+
+  // SWIFT_ENABLE_TENSORFLOW
   if (*knownProtocol == KnownProtocolKind::KeyPathIterable)
     return canDeriveKeyPathIterable(Nominal);
 
@@ -73,10 +81,6 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
   // SWIFT_ENABLE_TENSORFLOW
   if (*knownProtocol == KnownProtocolKind::TensorGroup)
     return canDeriveTensorGroup(Nominal, DC);
-  
-  // SWIFT_ENABLE_TENSORFLOW
-  if (*knownProtocol == KnownProtocolKind::AdditiveArithmetic)
-    return canDeriveAdditiveArithmetic(Nominal, DC);
 
   // SWIFT_ENABLE_TENSORFLOW
   if (*knownProtocol == KnownProtocolKind::VectorProtocol)
@@ -187,7 +191,10 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
 
   // Local function that retrieves the requirement with the same name as
   // the provided requirement, but within the given known protocol.
-  auto getRequirement = [&](KnownProtocolKind kind) -> ValueDecl * {
+  // SWIFT_ENABLE_TENSORFLOW
+  auto getRequirement = [&](KnownProtocolKind kind,
+                            std::function<bool(ValueDecl *)> filter =
+                                nullptr) -> ValueDecl * {
     // Dig out the protocol.
     auto proto = ctx.getProtocol(kind);
     if (!proto) return nullptr;
@@ -203,6 +210,14 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
 
     // Retrieve the requirement.
     auto results = proto->lookupDirect(name);
+    // SWIFT_ENABLE_TENSORFLOW
+    // Filter requirements, if `filter` function is specified.
+    if (filter) {
+      llvm::erase_if(results, [&](ValueDecl *v) {
+        return !isa<ProtocolDecl>(v->getDeclContext()) ||
+               !v->isProtocolRequirement() || !filter(v);
+      });
+    }
     return results.empty() ? nullptr : results.front();
   };
 
@@ -292,6 +307,34 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
       auto argumentNames = name.getArgumentNames();
       if (argumentNames.size() == 2)
         return getRequirement(KnownProtocolKind::AdditiveArithmetic);
+    }
+
+    // SWIFT_ENABLE_TENSORFLOW
+    // ElementaryFunctions requirements
+    if (name.isCompoundName()) {
+      auto argumentNames = name.getArgumentNames();
+      if (argumentNames.size() == 1 && (false
+#define ELEMENTARY_FUNCTION_UNARY(ID, NAME) || name.getBaseName() == NAME
+#include "DerivedConformanceElementaryFunctions.def"
+#undef ELEMENTARY_FUNCTION_UNARY
+                                        )) {
+        return getRequirement(KnownProtocolKind::ElementaryFunctions);
+      }
+      if (argumentNames.size() == 2) {
+        if (name.getBaseName() == "root")
+          return getRequirement(KnownProtocolKind::ElementaryFunctions);
+        if (name.getBaseName() == "pow") {
+          return getRequirement(
+              KnownProtocolKind::ElementaryFunctions,
+              [&](ValueDecl *v) {
+                auto *funcDecl = dyn_cast<FuncDecl>(v);
+                if (!funcDecl)
+                  return false;
+                return funcDecl->getParameters()->get(1)->getName() ==
+                       func->getParameters()->get(1)->getName();
+              });
+        }
+      }
     }
 
     // SWIFT_ENABLE_TENSORFLOW

@@ -5347,6 +5347,10 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
     return derived.deriveAdditiveArithmetic(Requirement);
 
   // SWIFT_ENABLE_TENSORFLOW
+  case KnownProtocolKind::ElementaryFunctions:
+    return derived.deriveElementaryFunctions(Requirement);
+
+  // SWIFT_ENABLE_TENSORFLOW
   case KnownProtocolKind::VectorProtocol:
     return derived.deriveVectorProtocol(Requirement);
 
