@@ -8,12 +8,18 @@ func assertAllDifferentiableVariablesEqualsTangentVector<T>(_: T.Type)
 // Verify that a type `T` conforms to `AdditiveArithmetic`.
 func assertConformsToAdditiveArithmetic<T>(_: T.Type) where T : AdditiveArithmetic {}
 
+// Verify that a type `T` conforms to `ElementaryFunctions`.
+func assertConformsToElementaryFunctions<T>(_: T.Type) where T : ElementaryFunctions {}
+
 // Verify that a type `T` conforms to `VectorProtocol`.
 func assertConformsToVectorProtocol<T>(_: T.Type) where T : VectorProtocol {}
 
 struct Empty : Differentiable {}
 func testEmpty() {
   assertConformsToAdditiveArithmetic(Empty.AllDifferentiableVariables.self)
+  assertConformsToAdditiveArithmetic(Empty.TangentVector.self)
+  assertConformsToElementaryFunctions(Empty.AllDifferentiableVariables.self)
+  assertConformsToElementaryFunctions(Empty.TangentVector.self)
 }
 
 // Test interaction with `AdditiveArithmetic` derived conformances.
@@ -130,19 +136,35 @@ func testAllMembersAdditiveArithmetic() {
 }
 
 // Test type `AllMembersVectorProtocol` whose members conforms to `VectorProtocol`,
-// in which case we should make `TangentVector` and `TangentVector` conform to
-// `VectorProtocol`.
+// in which case we should make `AllDifferentiableVariables` and `TangentVector`
+// conform to `VectorProtocol`.
 struct MyVector : VectorProtocol, Differentiable {
   var w: Float
   var b: Float
 }
 struct AllMembersVectorProtocol : Differentiable {
-  var w: MyVector
-  var b: MyVector
+  var v1: MyVector
+  var v2: MyVector
 }
 func testAllMembersVectorProtocol() {
+  assertConformsToVectorProtocol(AllMembersVectorProtocol.AllDifferentiableVariables.self)
   assertConformsToVectorProtocol(AllMembersVectorProtocol.TangentVector.self)
-  assertConformsToVectorProtocol(AllMembersVectorProtocol.TangentVector.self)
+}
+
+// Test type `AllMembersElementaryFunctions` whose members conforms to `ElementaryFunctions`,
+// in which case we should make `AllDifferentiableVariables` and `TangentVector`
+// conform to `ElementaryFunctions`.
+struct MyVector2 : ElementaryFunctions, Differentiable {
+  var w: Float
+  var b: Float
+}
+struct AllMembersElementaryFunctions : Differentiable {
+  var v1: MyVector2
+  var v2: MyVector2
+}
+func testAllMembersElementaryFunctions() {
+  assertConformsToElementaryFunctions(AllMembersElementaryFunctions.AllDifferentiableVariables.self)
+  assertConformsToElementaryFunctions(AllMembersElementaryFunctions.TangentVector.self)
 }
 
 // Test type whose properties are not all differentiable.
@@ -154,6 +176,7 @@ struct DifferentiableSubset : Differentiable {
 }
 func testDifferentiableSubset() {
   assertConformsToAdditiveArithmetic(DifferentiableSubset.AllDifferentiableVariables.self)
+  assertConformsToElementaryFunctions(DifferentiableSubset.AllDifferentiableVariables.self)
   assertConformsToVectorProtocol(DifferentiableSubset.AllDifferentiableVariables.self)
   assertAllDifferentiableVariablesEqualsTangentVector(DifferentiableSubset.self)
   _ = DifferentiableSubset.TangentVector(w: 1, b: 1)
