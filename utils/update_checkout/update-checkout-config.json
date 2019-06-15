@@ -44,7 +44,7 @@
         "llvm-project": {
             "remote": { "id": "swiftwasm/llvm-project" } }
     },
-    "default-branch-scheme": "master",
+    "default-branch-scheme": "wasm",
     "branch-schemes": {
         "wasm": {
             "aliases": ["wasm"],
