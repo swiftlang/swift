@@ -20,3 +20,5 @@ void swift_getWitnessTable(void) {}
 void swift_getObjCClassMetadata(void) {}
 void swift_addNewDSOImage(void) {}
 void swift_once() {}
+void swift_getFunctionReplacement() {}
+void swift_getOrigOfReplaceable() {}
