@@ -246,8 +246,11 @@ namespace swift {
     bool EnableDeserializationRecovery = true;
 
     /// Should we use \c ASTScope-based resolution for unqualified name lookup?
-    bool EnableASTScopeLookup = false;
-    
+    /// Default is in \c ParseLangArgs
+    ///
+    /// This is a staging flag; eventually it will be removed.
+    bool EnableASTScopeLookup;
+
     /// Someday, ASTScopeLookup will supplant lookup in the parser
     bool DisableParserLookup = false;
 

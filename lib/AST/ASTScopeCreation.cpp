@@ -132,6 +132,28 @@ public:
     // So, only check source ranges for PatternBindingDecls
     if (isa<PatternBindingDecl>(d) && (d->getStartLoc() == d->getEndLoc()))
       return false;
+    /// In
+    /// \code
+    /// @propertyWrapper
+    /// public struct Wrapper<T> {
+    ///   public var value: T
+    ///
+    ///   public init(body: () -> T) {
+    ///     self.value = body()
+    ///   }
+    /// }
+    ///
+    /// let globalInt = 17
+    ///
+    /// @Wrapper(body: { globalInt })
+    /// public var y: Int
+    /// \endcode
+    /// I'm seeing a dumped AST include:
+    /// (pattern_binding_decl range=[test.swift:13:8 - line:12:29]
+    const auto &SM = d->getASTContext().SourceMgr;
+    assert((d->getStartLoc().isInvalid() ||
+            !SM.isBeforeInBuffer(d->getEndLoc(), d->getStartLoc())) &&
+           "end-before-start will break tree search via location");
     return true;
   }
 
@@ -179,9 +201,10 @@ private:
       function_ref<void(NullablePtr<CaptureListExpr>, ClosureExpr *)>
           foundClosure);
 
+  // A safe way to discover this, without creating a circular request.
+  // Cannot call getAttachedPropertyWrappers.
   static bool hasCustomAttribute(VarDecl *vd) {
-    return AttachedPropertyWrapperScope::getCustomAttributesSourceRange(vd)
-        .isValid();
+    return vd->getAttrs().getAttribute<CustomAttr>();
   }
 
 public:
@@ -190,8 +213,9 @@ public:
 
   void createAttachedPropertyWrapperScope(PatternBindingDecl *patternBinding,
                                           ASTScopeImpl *parent) {
+ 
     patternBinding->getPattern(0)->forEachVariable([&](VarDecl *vd) {
-      // assume all same as first
+        // assume all same as first
       if (hasCustomAttribute(vd))
         createSubtree<AttachedPropertyWrapperScope>(parent, vd);
     });
@@ -221,7 +245,7 @@ public:
   void
   forEachSpecializeAttrInSourceOrder(Decl *declBeingSpecialized,
                                      function_ref<void(SpecializeAttr *)> fn) {
-    llvm::SmallVector<SpecializeAttr *, 8> sortedSpecializeAttrs;
+    SmallVector<SpecializeAttr *, 8> sortedSpecializeAttrs;
     for (auto *attr : declBeingSpecialized->getAttrs()) {
       if (auto *specializeAttr = dyn_cast<SpecializeAttr>(attr)) {
         if (!isDuplicate(specializeAttr))
@@ -584,6 +608,8 @@ CREATES_NEW_INSERTION_POINT(TopLevelCodeScope)
 
 NO_NEW_INSERTION_POINT(AbstractFunctionBodyScope)
 NO_NEW_INSERTION_POINT(AbstractFunctionDeclScope)
+NO_NEW_INSERTION_POINT(AttachedPropertyWrapperScope)
+
 NO_NEW_INSERTION_POINT(CaptureListScope)
 NO_NEW_INSERTION_POINT(CaseStmtScope)
 NO_NEW_INSERTION_POINT(CatchStmtScope)
@@ -606,7 +632,6 @@ NO_EXPANSION(ClosureParametersScope)
 NO_EXPANSION(SpecializeAttributeScope)
 // no accessors, unlike PatternEntryUseScope
 NO_EXPANSION(ConditionalClausePatternUseScope)
-NO_EXPANSION(AttachedPropertyWrapperScope)
 NO_EXPANSION(GuardStmtUseScope)
 
 #undef CREATES_NEW_INSERTION_POINT
@@ -744,8 +769,10 @@ void AbstractFunctionDeclScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
     }
   }
   // Create scope for the body.
-  if (decl->getBody()) {
-    if (decl->getDeclContext()->isTypeContext())
+  // We create body scopes when there is no body for source kit to complete
+  // erroneous code in bodies.
+  if (decl->getBodySourceRange().isValid()) {
+    if (AbstractFunctionBodyScope::isAMethod(decl))
       scopeCreator.createSubtree<MethodBodyScope>(leaf, decl);
     else
       scopeCreator.createSubtree<PureFunctionBodyScope>(leaf, decl);
@@ -754,8 +781,10 @@ void AbstractFunctionDeclScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
 
 void AbstractFunctionBodyScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
     ScopeCreator &scopeCreator) {
-  BraceStmt *braceStmt = decl->getBody();
-  ASTVisitorForScopeCreation().visitBraceStmt(braceStmt, this, scopeCreator);
+  // We create body scopes when there is no body for source kit to complete
+  // erroneous code in bodies.
+  if (BraceStmt *braceStmt = decl->getBody())
+    ASTVisitorForScopeCreation().visitBraceStmt(braceStmt, this, scopeCreator);
 }
 
 void IfStmtScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
@@ -898,6 +927,15 @@ void DefaultArgumentInitializerScope::
   ASTVisitorForScopeCreation().visitExpr(initExpr, this, scopeCreator);
 }
 
+void AttachedPropertyWrapperScope::
+    expandAScopeThatDoesNotCreateANewInsertionPoint(
+        ScopeCreator &scopeCreator) {
+  for (auto *attr : decl->getAttrs().getAttributes<CustomAttr>()) {
+    if (auto *expr = attr->getArg())
+      ASTVisitorForScopeCreation().visitExpr(expr, this, scopeCreator);
+  }
+}
+
 #pragma mark expandScope
 
 ASTScopeImpl *GenericTypeOrExtensionWholePortion::expandScope(
@@ -911,8 +949,7 @@ ASTScopeImpl *GenericTypeOrExtensionWholePortion::expandScope(
       scope->getDecl().get(), scope->getGenericContext()->getGenericParams(),
       scope);
   if (scope->getGenericContext()->getTrailingWhereClause())
-    deepestScope =
-        scope->createTrailingWhereClauseScope(deepestScope, scopeCreator);
+    scope->createTrailingWhereClauseScope(deepestScope, scopeCreator);
   scope->createBodyScope(deepestScope, scopeCreator);
   return scope->getParent().get();
 }

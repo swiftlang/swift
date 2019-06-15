@@ -869,7 +869,12 @@ def enable_astscope_lookup : Flag<["-"], "enable-astscope-lookup">,
   Flags<[FrontendOption]>,
   HelpText<"Enable ASTScope-based unqualified name lookup">;
 
-def disable_parser_lookup : Flag<["-"], "disable_parser_lookup">,
+def disable_astscope_lookup : Flag<["-"], "disable-astscope-lookup">,
+  Flags<[FrontendOption]>,
+  HelpText<"Disable ASTScope-based unqualified name lookup">;
+
+def disable_parser_lookup : Flag<["-"], "disable-parser-lookup">,
+  Flags<[FrontendOption]>,
   HelpText<"Disable parser lookup & use ast scope lookup only (experimental)">;
 
 def index_file : Flag<["-"], "index-file">,
