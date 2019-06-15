@@ -563,14 +563,16 @@ SILValue SILInlineCloner::borrowFunctionArgument(SILValue callArg,
   SILBuilderWithScope beginBuilder(AI.getInstruction(), getBuilder());
   auto *borrow = beginBuilder.createBeginBorrow(AI.getLoc(), callArg);
   if (auto *tryAI = dyn_cast<TryApplyInst>(AI)) {
-    SILBuilderWithScope returnBuilder(tryAI->getNormalBB()->begin());
+    SILBuilderWithScope returnBuilder(tryAI->getNormalBB()->begin(),
+                                      getBuilder());
     returnBuilder.createEndBorrow(AI.getLoc(), borrow, callArg);
 
-    SILBuilderWithScope throwBuilder(tryAI->getErrorBB()->begin());
+    SILBuilderWithScope throwBuilder(tryAI->getErrorBB()->begin(),
+                                     getBuilder());
     throwBuilder.createEndBorrow(AI.getLoc(), borrow, callArg);
   } else {
     SILBuilderWithScope returnBuilder(
-        std::next(AI.getInstruction()->getIterator()));
+        std::next(AI.getInstruction()->getIterator()), getBuilder());
     returnBuilder.createEndBorrow(AI.getLoc(), borrow, callArg);
   }
   return borrow;
