@@ -1,0 +1,52 @@
+@propertyWrapper
+struct /*wrapper:def*/<base>Foo</base><T> {
+    public var value: T
+    init(initialValue: T) {
+        value = initialValue
+    }
+    init(initialValue: T, otherThing: Bool) {
+        self.init(initialValue: initialValue)
+    }
+}
+
+@_functionBuilder
+struct /*builder:def*/Other {
+    public static func buildBlock(_ components: String...) -> String {
+        return components.joined()
+    }
+}
+
+struct Bar {
+    @/*wrapper*/<base>Foo</base>
+    var foo: Int = 10
+    @/*wrapper*/<base>Foo</base>(initialValue: "hello")
+    var bar: String
+    @/*wrapper*/<base>Foo</base>
+    var jim: String = {
+        struct Bar {
+            @/*wrapper*/<base>Foo</base>
+            var inner: String = "It's 42"
+        }
+        return Bar().inner
+    }()
+
+    func combined(@/*builder*/Other _ a: () -> String) -> String {
+        return a()
+    }
+
+     @/*builder*/Other
+    func hello() -> String {
+        "hello"
+        "there"
+    }
+
+    func baz() {
+        let _: /*wrapper*/<base>Foo</base><Int> = $foo
+        let _: Int = $foo.value
+        let _: Int = foo
+        let _: /*wrapper*/<base>Foo</base><String> = $bar
+        let _: String = $bar.value
+    }
+}
+
+
