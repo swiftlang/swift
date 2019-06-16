@@ -82,6 +82,10 @@ SDK("sdk", llvm::cl::desc("path to the SDK to build against"),
     llvm::cl::cat(Category));
 
 static llvm::cl::opt<std::string>
+BaselineSDK("bsdk", llvm::cl::desc("path to the baseline SDK to import frameworks"),
+    llvm::cl::cat(Category));
+
+static llvm::cl::opt<std::string>
 Triple("target", llvm::cl::desc("target triple"),
        llvm::cl::cat(Category));
 
@@ -97,6 +101,10 @@ ResourceDir("resource-dir",
 static llvm::cl::list<std::string>
 FrameworkPaths("F", llvm::cl::desc("add a directory to the framework search path"),
                llvm::cl::cat(Category));
+
+static llvm::cl::list<std::string>
+BaselineFrameworkPaths("BF", llvm::cl::desc("add a directory to the baseline framework search path"),
+                       llvm::cl::cat(Category));
 
 static llvm::cl::list<std::string>
 BaselineModuleInputPaths("BI", llvm::cl::desc("add a module for baseline input"),
@@ -2084,6 +2092,10 @@ static int diagnoseModuleChange(SDKContext &Ctx, SDKNodeRoot *LeftModule,
   assert(LeftModule);
   assert(RightModule);
   llvm::raw_ostream *OS = &llvm::errs();
+  if (!LeftModule || !RightModule) {
+    *OS << "Cannot diagnose null SDKNodeRoot";
+    exit(1);
+  }
   std::unique_ptr<llvm::raw_ostream> FileOS;
   if (!OutputPath.empty()) {
     std::error_code EC;
@@ -2270,6 +2282,26 @@ static int readFileLineByLine(StringRef Path, llvm::StringSet<> &Lines) {
 // without being given the address of a function in the main executable).
 void anchorForGetMainExecutable() {}
 
+static void setSDKPath(CompilerInvocation &InitInvok, bool IsBaseline) {
+  if (IsBaseline) {
+    // Set baseline SDK
+    if (!options::BaselineSDK.empty()) {
+      InitInvok.setSDKPath(options::BaselineSDK);
+    }
+  } else {
+    // Set current SDK
+    if (!options::SDK.empty()) {
+      InitInvok.setSDKPath(options::SDK);
+    } else if (const char *SDKROOT = getenv("SDKROOT")) {
+      InitInvok.setSDKPath(SDKROOT);
+    } else {
+      llvm::errs() << "Provide '-sdk <path>' option or run with 'xcrun -sdk <..>\
+      swift-api-digester'\n";
+      exit(1);
+    }
+  }
+}
+
 static int prepareForDump(const char *Main,
                           CompilerInvocation &InitInvok,
                           llvm::StringSet<> &Modules,
@@ -2277,15 +2309,7 @@ static int prepareForDump(const char *Main,
   InitInvok.setMainExecutablePath(fs::getMainExecutable(Main,
     reinterpret_cast<void *>(&anchorForGetMainExecutable)));
   InitInvok.setModuleName("swift_ide_test");
-  if (!options::SDK.empty()) {
-    InitInvok.setSDKPath(options::SDK);
-  } else if (const char *SDKROOT = getenv("SDKROOT")) {
-    InitInvok.setSDKPath(SDKROOT);
-  } else {
-    llvm::errs() << "Provide '-sdk <path>' option or run with 'xcrun -sdk <..>\
-    swift-api-digester'\n";
-    return 1;
-  }
+  setSDKPath(InitInvok, IsBaseline);
 
   if (!options::Triple.empty())
     InitInvok.setTargetTriple(options::Triple);
@@ -2308,7 +2332,7 @@ static int prepareForDump(const char *Main,
     }
     if (!isValid) {
       llvm::errs() << "Unsupported Swift Version.\n";
-      return 1;
+      exit(1);
     }
   }
 
@@ -2316,28 +2340,31 @@ static int prepareForDump(const char *Main,
     InitInvok.setRuntimeResourcePath(options::ResourceDir);
   }
   std::vector<SearchPathOptions::FrameworkSearchPath> FramePaths;
-  for (const auto &path : options::FrameworkPaths) {
-    FramePaths.push_back({path, /*isSystem=*/false});
-  }
   for (const auto &path : options::CCSystemFrameworkPaths) {
     FramePaths.push_back({path, /*isSystem=*/true});
   }
-  InitInvok.setFrameworkSearchPaths(FramePaths);
   if (IsBaseline) {
+    for (const auto &path : options::BaselineFrameworkPaths) {
+      FramePaths.push_back({path, /*isSystem=*/false});
+    }
     InitInvok.setImportSearchPaths(options::BaselineModuleInputPaths);
   } else {
+    for (const auto &path : options::FrameworkPaths) {
+      FramePaths.push_back({path, /*isSystem=*/false});
+    }
     InitInvok.setImportSearchPaths(options::ModuleInputPaths);
   }
+  InitInvok.setFrameworkSearchPaths(FramePaths);
   if (!options::ModuleList.empty()) {
     if (readFileLineByLine(options::ModuleList, Modules))
-      return 1;
+      exit(1);
   }
   for (auto M : options::ModuleNames) {
     Modules.insert(M);
   }
   if (Modules.empty()) {
     llvm::errs() << "Need to specify -include-all or -module <name>\n";
-    return 1;
+    exit(1);
   }
   return 0;
 }
@@ -2406,6 +2433,11 @@ static SDKNodeRoot *getSDKRoot(const char *Main, SDKContext &Ctx,
   return getSDKNodeRoot(Ctx, Invok, Modules, Opts);
 }
 
+static bool hasBaselineInput() {
+  return !options::BaselineModuleInputPaths.empty() ||
+    !options::BaselineFrameworkPaths.empty() || !options::BaselineSDK.empty();
+}
+
 int main(int argc, char *argv[]) {
   PROGRAM_START(argc, argv);
   INITIALIZE_LLVM();
@@ -2428,7 +2460,7 @@ int main(int argc, char *argv[]) {
   case ActionType::MigratorGen:
   case ActionType::DiagnoseSDKs: {
     bool CompareJson = options::SDKJsonPaths.size() == 2;
-    if (!CompareJson && options::BaselineModuleInputPaths.empty()) {
+    if (!CompareJson && !hasBaselineInput()) {
       llvm::errs() << "Only two SDK versions can be compared\n";
       llvm::cl::PrintHelpMessage();
       return 1;

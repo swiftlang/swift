@@ -1,0 +1,1 @@
+Foo(Foo.h): Func removedFunction() has been removed
