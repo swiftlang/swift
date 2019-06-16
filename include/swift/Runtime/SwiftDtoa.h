@@ -30,15 +30,13 @@
 #if defined(_WIN32)
  // Windows has `long double` == `double` on all platforms, so disable this.
  #undef SWIFT_DTOA_FLOAT80_SUPPORT
+#elif defined(__ANDROID__)
+ // At least for now Float80 is disabled. See: https://github.com/apple/swift/pull/25502
 #elif defined(__APPLE__) || defined(__linux__)
  // macOS and Linux support Float80 on X86 hardware but not on ARM
  #if defined(__x86_64__) || defined(__i386)
   #define SWIFT_DTOA_FLOAT80_SUPPORT 1
  #endif
-#endif
-
-#if defined(__ANDROID__) && (defined(__i386) || defined(__x86_64__))
- #undef SWIFT_DTOA_FLOAT80_SUPPORT
 #endif
 
 #ifdef __cplusplus
