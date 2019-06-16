@@ -258,7 +258,7 @@ ControlFlowTests.test("Conditionals") {
   }
   expectEqual((0, 10), gradient(at: 4, 5, in: guard3))
   expectCrash {
-    gradient(at: -3, -2, in: guard3)
+    _ = gradient(at: -3, -2, in: guard3)
   }
 
   func cond_empty(_ x: Float) -> Float {
@@ -422,6 +422,101 @@ ControlFlowTests.test("Recursion") {
   expectEqual(300, gradient(at: 10, in: { x in product(x, count: 3) }))
   expectEqual(-20, gradient(at: -10, in: { x in product(x, count: 2) }))
   expectEqual(1, gradient(at: 100, in: { x in product(x, count: 1) }))
+}
+
+ControlFlowTests.test("Enums") {
+  enum Enum {
+    case a(Float)
+    case b(Float, Float)
+
+    func enum_notactive1(_ x: Float) -> Float {
+      switch self {
+      case let .a(a): return x * a
+      case let .b(b1, b2): return x * b1 * b2
+      }
+    }
+  }
+
+  func enum_notactive1(_ e: Enum, _ x: Float) -> Float {
+    switch e {
+    case let .a(a): return x * a
+    case let .b(b1, b2): return x * b1 * b2
+    }
+  }
+  expectEqual(10, gradient(at: 2, in: { x in enum_notactive1(.a(10), x) }))
+  expectEqual(10, gradient(at: 2, in: { x in Enum.a(10).enum_notactive1(x) }))
+  expectEqual(20, gradient(at: 2, in: { x in enum_notactive1(.b(4, 5), x) }))
+  expectEqual(20, gradient(at: 2, in: { x in Enum.b(4, 5).enum_notactive1(x) }))
+
+  func enum_notactive2(_ e: Enum, _ x: Float) -> Float {
+    var y = x
+    if x > 0 {
+      var z = y + y
+      switch e {
+      case .a: z = z - y
+      case .b: y = y + x
+      }
+      var w = y
+      if case .a = e {
+        w = w + z
+      }
+      return w
+    } else if case .b = e {
+      return y + y
+    }
+    return x + y
+  }
+  expectEqual((8, 2), valueWithGradient(at: 4, in: { x in enum_notactive2(.a(10), x) }))
+  expectEqual((20, 2), valueWithGradient(at: 10, in: { x in enum_notactive2(.b(4, 5), x) }))
+  expectEqual((-20, 2), valueWithGradient(at: -10, in: { x in enum_notactive2(.a(10), x) }))
+  expectEqual((-2674, 2), valueWithGradient(at: -1337, in: { x in enum_notactive2(.b(4, 5), x) }))
+
+  func optional_notactive1(_ optional: Float?, _ x: Float) -> Float {
+    if let y = optional {
+      return x * y
+    }
+    return x + x
+  }
+  expectEqual(2, gradient(at: 2, in: { x in optional_notactive1(nil, x) }))
+  expectEqual(10, gradient(at: 2, in: { x in optional_notactive1(10, x) }))
+
+  struct Dense : Differentiable {
+    var w1: Float
+    @noDerivative var w2: Float?
+
+    @differentiable
+    func callAsFunction(_ input: Float) -> Float {
+      if let w2 = w2 {
+        return input * w1 * w2
+      }
+      return input * w1
+    }
+  }
+  expectEqual((Dense.AllDifferentiableVariables(w1: 10), 20),
+              Dense(w1: 4, w2: 5).gradient(at: 2, in: { dense, x in dense(x) }))
+  expectEqual((Dense.AllDifferentiableVariables(w1: 2), 4),
+              Dense(w1: 4, w2: nil).gradient(at: 2, in: { dense, x in dense(x) }))
+
+  indirect enum Indirect {
+    case e(Float, Enum)
+    case indirect(Indirect)
+  }
+
+  func enum_indirect_notactive1(_ indirect: Indirect, _ x: Float) -> Float {
+    switch indirect {
+    case let .e(f, e):
+      switch e {
+      case .a: return x * f * enum_notactive1(e, x)
+      case .b: return x * f * enum_notactive1(e, x)
+      }
+    case let .indirect(ind): return enum_indirect_notactive1(ind, x)
+    }
+  }
+  do {
+    let ind: Indirect = .e(10, .a(3))
+    expectEqual(120, gradient(at: 2, in: { x in enum_indirect_notactive1(ind, x) }))
+    expectEqual(120, gradient(at: 2, in: { x in enum_indirect_notactive1(.indirect(ind), x) }))
+  }
 }
 
 runAllTests()
