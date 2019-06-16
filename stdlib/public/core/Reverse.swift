@@ -24,7 +24,7 @@ extension MutableCollection where Self: BidirectionalCollection {
   ///   collection.
   @inlinable // protocol-only
   public mutating func reverse() {
-    if isEmpty { return }
+    if count < 2 { return }
     var f = startIndex
     var l = index(before: endIndex)
     while f < l {
