@@ -18,7 +18,6 @@ silopt_register_sources(
   Devirtualizer.cpp
   GenericSpecializer.cpp
   MergeCondFail.cpp
-  MarkUninitializedFixup.cpp
   Outliner.cpp
   ObjectOutliner.cpp
   OwnershipModelEliminator.cpp
