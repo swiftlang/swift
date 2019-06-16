@@ -2164,8 +2164,7 @@ bool ConstraintSystem::repairFailures(
 
   auto &elt = path.back();
   switch (elt.getKind()) {
-  case ConstraintLocator::LValueConversion:
-  case ConstraintLocator::ApplyArgToParam: {
+  case ConstraintLocator::LValueConversion: {
     if (repairByInsertingExplicitCall(lhs, rhs))
       return true;
 
@@ -2173,6 +2172,66 @@ bool ConstraintSystem::repairFailures(
       conversionsOrFixes.push_back(
           ForceOptional::create(*this, lhs, lhs->getOptionalObjectType(),
                                 getConstraintLocator(locator)));
+    }
+    break;
+  }
+  case ConstraintLocator::ApplyArgToParam: {
+    auto loc = getConstraintLocator(locator);
+    if (repairByInsertingExplicitCall(lhs, rhs))
+      return true;
+
+    if (lhs->getOptionalObjectType() && !rhs->getOptionalObjectType()) {
+      conversionsOrFixes.push_back(
+          ForceOptional::create(*this, lhs, lhs->getOptionalObjectType(),
+                                loc));
+    }
+
+    Expr *argAnchor = nullptr;
+    if (auto *AE = dyn_cast<ApplyExpr>(loc->getAnchor())) {
+      auto *args = AE->getArg();
+
+      if (auto *TE = dyn_cast<TupleExpr>(args))
+        argAnchor = TE->getElement(elt.getValue());
+      if (auto *PE = dyn_cast<ParenExpr>(args))
+        argAnchor = PE->getSubExpr();
+    }
+
+    if (!argAnchor)
+      break;
+
+    // Find the resolved overload related to this
+    auto resolvedOverload = getResolvedOverloadSets();
+    while (resolvedOverload) {
+      if (resolvedOverload->Locator->getAnchor() == argAnchor)
+        break;
+      resolvedOverload = resolvedOverload->Previous;
+    }
+
+    if (resolvedOverload && resolvedOverload->Choice.isDecl()) {
+      if (auto *decl =
+              dyn_cast<VarDecl>(resolvedOverload->Choice.getDecl())) {
+        if (decl->hasAttachedPropertyWrapper()) {
+          auto rawWrapperTy = decl->getAttachedPropertyWrapperType(0);
+          auto wrapperTy =
+              openUnboundGenericType(rawWrapperTy, resolvedOverload->Locator);
+          auto wrappedInfo = decl->getAttachedPropertyWrapperTypeInfo(0);
+          auto valueTy = wrapperTy->getTypeOfMember(
+              DC->getParentModule(), wrappedInfo.valueVar,
+              wrappedInfo.valueVar->getValueInterfaceType());
+          if (!valueTy->hasError()) {
+            addConstraint(ConstraintKind::Equal, lhs, valueTy,
+                          resolvedOverload->Locator);
+            auto result = matchTypes(
+                wrapperTy, rhs, ConstraintKind::Subtype,
+                TypeMatchFlags::TMF_ApplyingFix, resolvedOverload->Locator);
+
+            if (result.isSuccess()) {
+              conversionsOrFixes.push_back(InsertPropertyWrapperUnwrap::create(
+                  *this, lhs, wrapperTy, loc));
+            }
+          }
+        }
+      }
     }
     break;
   }
@@ -6744,7 +6803,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::SkipSuperclassRequirement:
   case FixKind::ContextualMismatch:
   case FixKind::AddMissingArguments:
-  case FixKind::SkipUnhandledConstructInFunctionBuilder: {
+  case FixKind::SkipUnhandledConstructInFunctionBuilder:
+  case FixKind::InsertPropertyWrapperUnwrap: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
 
@@ -6765,7 +6825,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::TreatKeyPathSubscriptIndexAsHashable:
   case FixKind::AllowInvalidRefInKeyPath:
   case FixKind::ExplicitlySpecifyGenericArguments:
-  case FixKind::InsertPropertyWrapperUnwrap:
   case FixKind::GenericArgumentsMismatch:
     llvm_unreachable("handled elsewhere");
   }
