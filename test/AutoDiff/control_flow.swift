@@ -449,18 +449,27 @@ ControlFlowTests.test("Enums") {
   expectEqual(20, gradient(at: 2, in: { x in Enum.b(4, 5).enum_notactive1(x) }))
 
   func enum_notactive2(_ e: Enum, _ x: Float) -> Float {
+    var y = x
     if x > 0 {
+      var z = y + y
       switch e {
-      case .a: return x * x * x
-      case .b: return -x
+      case .a: z = z - y
+      case .b: y = y + x
       }
+      var w = y
+      if case .a = e {
+        w = w + z
+      }
+      return w
     } else if case .b = e {
-      return -x
+      return y + y
     }
-    return x * x
+    return x + y
   }
-  expectEqual(12, gradient(at: 2, in: { x in enum_notactive2(.a(10), x) }))
-  expectEqual(-1, gradient(at: 2, in: { x in enum_notactive2(.b(4, 5), x) }))
+  expectEqual((8, 2), valueWithGradient(at: 4, in: { x in enum_notactive2(.a(10), x) }))
+  expectEqual((20, 2), valueWithGradient(at: 10, in: { x in enum_notactive2(.b(4, 5), x) }))
+  expectEqual((-20, 2), valueWithGradient(at: -10, in: { x in enum_notactive2(.a(10), x) }))
+  expectEqual((-2674, 2), valueWithGradient(at: -1337, in: { x in enum_notactive2(.b(4, 5), x) }))
 
   func optional_notactive1(_ optional: Float?, _ x: Float) -> Float {
     if let y = optional {

@@ -140,6 +140,59 @@ LeakCheckingTests.test("ControlFlow") {
   // FIXME: Fix control flow AD memory leaks.
   // See related FIXME comments in adjoint value/buffer propagation in
   // lib/SILOptimizer/Mandatory/Differentiation.cpp.
+  testWithLeakChecking(expectedLeakCount: 12) {
+    struct Dense : Differentiable {
+      var w1: Tracked<Float>
+      @noDerivative var w2: Tracked<Float>?
+
+      func callAsFunction(_ input: Tracked<Float>) -> Tracked<Float> {
+        if let w2 = w2 {
+          return input * w1 * w2
+        }
+        return input * w1
+      }
+    }
+    expectEqual((Dense.AllDifferentiableVariables(w1: 10), 20),
+                Dense(w1: 4, w2: 5).gradient(at: 2, in: { dense, x in dense(x) }))
+    expectEqual((Dense.AllDifferentiableVariables(w1: 2), 4),
+                Dense(w1: 4, w2: nil).gradient(at: 2, in: { dense, x in dense(x) }))
+  }
+
+  // FIXME: Fix control flow AD memory leaks.
+  // See related FIXME comments in adjoint value/buffer propagation in
+  // lib/SILOptimizer/Mandatory/Differentiation.cpp.
+  testWithLeakChecking(expectedLeakCount: 48) {
+    enum Enum {
+      case a(Tracked<Float>)
+      case b(Tracked<Float>, Tracked<Float>)
+    }
+    func enum_notactive2(_ e: Enum, _ x: Tracked<Float>) -> Tracked<Float> {
+      var y = x
+      if x > 0 {
+        var z = y + y
+        switch e {
+        case .a: z = z - y
+        case .b: y = y + x
+        }
+        var w = y
+        if case .a = e {
+          w = w + z
+        }
+        return w
+      } else if case .b = e {
+        return y + y
+      }
+      return x + y
+    }
+    expectEqual((8, 2), Tracked<Float>(4).valueWithGradient(in: { x in enum_notactive2(.a(10), x) }))
+    expectEqual((20, 2), Tracked<Float>(10).valueWithGradient(in: { x in enum_notactive2(.b(4, 5), x) }))
+    expectEqual((-20, 2), Tracked<Float>(-10).valueWithGradient(in: { x in enum_notactive2(.a(10), x) }))
+    expectEqual((-2674, 2), Tracked<Float>(-1337).valueWithGradient(in: { x in enum_notactive2(.b(4, 5), x) }))
+  }
+
+  // FIXME: Fix control flow AD memory leaks.
+  // See related FIXME comments in adjoint value/buffer propagation in
+  // lib/SILOptimizer/Mandatory/Differentiation.cpp.
   testWithLeakChecking(expectedLeakCount: 3) {
     var model = ExampleLeakModel()
     let x: Tracked<Float> = 1.0
