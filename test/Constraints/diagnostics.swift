@@ -1223,3 +1223,13 @@ func unresolvedTypeExistential() -> Bool {
 
 func rdar43525641(_ a: Int, _ b: Int = 0, c: Int = 0, _ d: Int) {}
 rdar43525641(1, c: 2, 3) // Ok
+
+struct Array {}
+let foo: Swift.Array = Array() // expected-error {{cannot convert value of type 'diagnostics.Array' to specified type 'Swift.Array'}}
+
+struct Error {}
+let bar: Swift.Error = Error() //expected-error {{value of type 'diagnostics.Error' does not conform to specified type 'Swift.Error'}}
+let baz: (Swift.Error) = Error() //expected-error {{value of type 'diagnostics.Error' does not conform to specified type 'Swift.Error'}}
+let baz2: Swift.Error = (Error()) //expected-error {{value of type 'diagnostics.Error' does not conform to specified type 'Swift.Error'}}
+let baz3: (Swift.Error) = (Error()) //expected-error {{value of type 'diagnostics.Error' does not conform to specified type 'Swift.Error'}}
+let baz4: ((Swift.Error)) = (Error()) //expected-error {{value of type 'diagnostics.Error' does not conform to specified type 'Swift.Error'}}
