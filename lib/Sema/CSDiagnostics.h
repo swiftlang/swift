@@ -794,6 +794,17 @@ public:
   bool diagnoseAsError() override;
 };
 
+class MissingPropertyWrapperUnwrapFailure final : public ContextualFailure {
+
+public:
+  MissingPropertyWrapperUnwrapFailure(Expr *root, ConstraintSystem &cs,
+                                      Type base, Type wrapper,
+                                      ConstraintLocator *locator)
+      : ContextualFailure(root, cs, base, wrapper, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
 class SubscriptMisuseFailure final : public FailureDiagnostic {
 public:
   SubscriptMisuseFailure(Expr *root, ConstraintSystem &cs,

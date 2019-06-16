@@ -21,6 +21,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangModule.h"
@@ -4774,6 +4775,51 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
                                       flags, locatorB);
     };
 
+    // Check if any property wrappers on the base of the member lookup have
+    // mactching members that we can fall back to.
+    if (auto dotExpr =
+            dyn_cast_or_null<UnresolvedDotExpr>(locator->getAnchor())) {
+      auto baseExpr = dotExpr->getBase();
+      auto resolvedOverload = getResolvedOverloadSets();
+      while (resolvedOverload) {
+        if (resolvedOverload->Locator->getAnchor() == baseExpr)
+          break;
+        resolvedOverload = resolvedOverload->Previous;
+      }
+
+      if (resolvedOverload && resolvedOverload->Choice.isDecl()) {
+        if (auto *decl =
+                dyn_cast<VarDecl>(resolvedOverload->Choice.getDecl())) {
+          // Check the property wrappers in order from outermost in so we can
+          // reccommend the minimum number of unwraps needed to produce a valid
+          // lookup.
+          for (unsigned i = 0; i < decl->getAttachedPropertyWrappers().size();
+               ++i) {
+            auto rawWrapperTy = decl->getAttachedPropertyWrapperType(i);
+            auto wrapperTy =
+                openUnboundGenericType(rawWrapperTy, resolvedOverload->Locator);
+            auto wrappedInfo = decl->getAttachedPropertyWrapperTypeInfo(i);
+            auto valueTy = wrapperTy->getTypeOfMember(
+                useDC->getParentModule(), wrappedInfo.valueVar,
+                wrappedInfo.valueVar->getValueInterfaceType());
+            if (valueTy->hasError())
+              continue;
+
+            addConstraint(ConstraintKind::Equal, valueTy, baseTy,
+                          resolvedOverload->Locator);
+
+            auto result = solveWithNewBaseOrName(wrapperTy, member);
+            if (result == SolutionKind::Solved) {
+              auto *fix = InsertPropertyWrapperUnwrap::create(
+                  *this, baseTy, wrapperTy, locator);
+              return recordFix(fix) ? SolutionKind::Error
+                                    : SolutionKind::Solved;
+            }
+          }
+        }
+      }
+    }
+
     if (auto *funcType = baseTy->getAs<FunctionType>()) {
       // We can't really suggest anything useful unless
       // function takes no arguments, otherwise it
@@ -6744,6 +6790,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::TreatKeyPathSubscriptIndexAsHashable:
   case FixKind::AllowInvalidRefInKeyPath:
   case FixKind::ExplicitlySpecifyGenericArguments:
+  case FixKind::InsertPropertyWrapperUnwrap:
   case FixKind::GenericArgumentsMismatch:
     llvm_unreachable("handled elsewhere");
   }

@@ -103,6 +103,9 @@ enum class FixKind : uint8_t {
   /// Add explicit `()` at the end of function or member to call it.
   InsertCall,
 
+  /// Add one or more property unwrap operators ('$')
+  InsertPropertyWrapperUnwrap,
+
   /// Instead of spelling out `subscript` directly, use subscript operator.
   UseSubscriptOperator,
 
@@ -624,6 +627,30 @@ public:
 
   static InsertExplicitCall *create(ConstraintSystem &cs,
                                     ConstraintLocator *locator);
+};
+
+class InsertPropertyWrapperUnwrap final : public ConstraintFix {
+  Type Base;
+  Type Wrapper;
+
+  InsertPropertyWrapperUnwrap(ConstraintSystem &cs, Type base, Type wrapper,
+                              ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::InsertPropertyWrapperUnwrap, locator),
+        Base(base), Wrapper(wrapper) {}
+
+public:
+  std::string getName() const override {
+    return "insert a $ to unwrap the property wrapper";
+  }
+
+  Type getBase() const { return Base; }
+  Type getWrapper() const { return Wrapper; }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static InsertPropertyWrapperUnwrap *create(ConstraintSystem &cs,
+                                             Type base, Type wrapper,
+                                             ConstraintLocator *locator);
 };
 
 class UseSubscriptOperator final : public ConstraintFix {

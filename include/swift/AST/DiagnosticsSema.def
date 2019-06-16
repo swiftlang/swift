@@ -992,6 +992,9 @@ ERROR(missing_address_of,none,
 ERROR(missing_address_of_yield,none,
       "yielding mutable value of type %0 requires explicit '&'",
       (Type))
+ERROR(missing_property_wrapper_unwrap,none,
+      "wrapped value of type %0 must be unwraped to value of type %1",
+      (Type, Type))
 ERROR(extraneous_address_of,none,
       "use of extraneous '&'",
       ())

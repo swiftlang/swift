@@ -1887,6 +1887,13 @@ bool MissingCallFailure::diagnoseAsError() {
   return true;
 }
 
+bool MissingPropertyWrapperUnwrapFailure::diagnoseAsError() {
+  emitDiagnostic(getAnchor()->getLoc(), diag::missing_property_wrapper_unwrap,
+                 getFromType(), getToType())
+      .fixItInsert(getAnchor()->getLoc(), "$");
+  return true;
+}
+
 bool SubscriptMisuseFailure::diagnoseAsError() {
   auto &sourceMgr = getASTContext().SourceMgr;
 
