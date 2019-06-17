@@ -494,7 +494,7 @@ struct PrintOptions {
   /// consistent and well-formed.
   ///
   /// \see swift::emitParseableInterface
-  static PrintOptions printParseableInterfaceFile();
+  static PrintOptions printParseableInterfaceFile(bool preferTypeRepr);
 
   static PrintOptions printModuleInterface();
   static PrintOptions printTypeInterface(Type T);
