@@ -3262,10 +3262,6 @@ class BeginBorrowInst
       : UnaryInstructionBase(DebugLoc, LValue,
                              LValue->getType().getObjectType()) {}
 
-private:
-  /// Predicate used to filer EndBorrowRange.
-  struct UseToEndBorrow;
-
 public:
   using EndBorrowRange =
       OptionalTransformRange<use_range, UseToEndBorrow, use_iterator>;

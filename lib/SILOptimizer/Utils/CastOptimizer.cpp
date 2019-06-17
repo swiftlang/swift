@@ -75,6 +75,111 @@ static SubstitutionMap lookupBridgeToObjCProtocolSubs(SILModule &mod,
                                                    target, conf);
 }
 
+/// Given that our insertion point is at the cast that we are trying to
+/// optimize, convert our incoming value to something that can be passed to the
+/// bridge call.
+static std::pair<SILValue, SILInstruction *>
+convertObjectToLoadableBridgeableType(SILBuilderWithScope &builder,
+                                      SILDynamicCastInst dynamicCast,
+                                      SILValue src) {
+  auto *f = dynamicCast.getFunction();
+  auto loc = dynamicCast.getLocation();
+  bool isConditional = dynamicCast.isConditional();
+
+  SILValue load =
+      builder.emitLoadValueOperation(loc, src, LoadOwnershipQualifier::Take);
+
+  SILType silBridgedTy = *dynamicCast.getLoweredBridgedTargetObjectType();
+
+  // If we are not conditional...
+  if (!isConditional) {
+    // and our loaded type is our bridged type, just return the load as our
+    // SILValue and signal to our caller that we did not create a new cast
+    // instruction by returning nullptr as second.
+    if (load->getType() == silBridgedTy) {
+      return {load, nullptr};
+    }
+
+    // Otherwise, just perform an unconditional checked cast to the sil bridged
+    // ty. We return the cast as our value and as our new cast instruction.
+    auto *cast =
+        builder.createUnconditionalCheckedCast(loc, load, silBridgedTy);
+    return {cast, cast};
+  }
+
+  SILBasicBlock *castSuccessBB =
+      f->createBasicBlockAfter(dynamicCast.getInstruction()->getParent());
+  castSuccessBB->createPhiArgument(silBridgedTy, ValueOwnershipKind::Owned);
+
+  // If we /are/ conditional and we do not need to bridge the load to the sil,
+  // then we just create our cast success block and branch from the end of the
+  // cast instruction block to the cast success block. We leave our insertion
+  // point in the cast success block since when we return, we are going to
+  // insert the bridge call/switch there. We return the argument of the cast
+  // success block as the value to be passed to the bridging function.
+  if (load->getType() == silBridgedTy) {
+    castSuccessBB->moveAfter(dynamicCast.getInstruction()->getParent());
+    builder.createBranch(loc, castSuccessBB, load);
+    builder.setInsertionPoint(castSuccessBB);
+    return {castSuccessBB->getArgument(0), nullptr};
+  }
+
+  auto *castFailBB = ([&]() -> SILBasicBlock * {
+    auto *failureBB = dynamicCast.getFailureBlock();
+    SILBuilderWithScope failureBBBuilder(&(*failureBB->begin()), builder);
+    return splitBasicBlockAndBranch(failureBBBuilder, &(*failureBB->begin()),
+                                    nullptr, nullptr);
+  }());
+
+  // Now that we have created the failure bb, move our cast success block right
+  // after the checked_cast_br bb.
+  castSuccessBB->moveAfter(dynamicCast.getInstruction()->getParent());
+
+  // Ok, we need to perform the full cast optimization. This means that we are
+  // going to replace the cast terminator in inst_block with a checked_cast_br.
+  auto *ccbi = builder.createCheckedCastBranch(loc, false, load, silBridgedTy,
+                                               castSuccessBB, castFailBB);
+  splitEdge(ccbi, /* EdgeIdx to CastFailBB */ 1);
+
+  // Now that we have split the edge to cast fail bb, add the default argument
+  // for the checked_cast_br. Then we need to handle our error conditions,
+  // namely we destroy on take_always and otherwise store the value back into
+  // the memory location that we took it out of.
+  {
+    auto *newFailureBlock = ccbi->getFailureBB();
+    SILValue defaultArg;
+    if (builder.hasOwnership()) {
+      defaultArg = newFailureBlock->createPhiArgument(
+          load->getType(), ValueOwnershipKind::Owned);
+    } else {
+      defaultArg = ccbi->getOperand();
+    }
+
+    // This block should be properly terminated already due to our method of
+    // splitting the failure block, so we can use begin() safely.
+    SILBuilderWithScope failureBuilder(newFailureBlock->begin());
+
+    switch (dynamicCast.getBridgedConsumptionKind()) {
+    case CastConsumptionKind::TakeAlways:
+      failureBuilder.emitDestroyValueOperation(loc, defaultArg);
+      break;
+    case CastConsumptionKind::TakeOnSuccess:
+    case CastConsumptionKind::CopyOnSuccess:
+      // Without ownership, we do not need to consume the taken value.
+      if (failureBuilder.hasOwnership()) {
+        failureBuilder.emitStoreValueOperation(loc, defaultArg, src,
+                                               StoreOwnershipQualifier::Init);
+      }
+      break;
+    case CastConsumptionKind::BorrowAlways:
+      llvm_unreachable("this should never occur here");
+    }
+  }
+
+  builder.setInsertionPoint(castSuccessBB);
+  return {castSuccessBB->getArgument(0), ccbi};
+}
+
 /// Create a call of _forceBridgeFromObjectiveC_bridgeable or
 /// _conditionallyBridgeFromObjectiveC_bridgeable which converts an ObjC
 /// instance into a corresponding Swift type, conforming to
@@ -108,7 +213,6 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
   SILInstruction *Inst = dynamicCast.getInstruction();
   bool isConditional = dynamicCast.isConditional();
   SILValue Dest = dynamicCast.getDest();
-  CanType BridgedTargetTy = dynamicCast.getBridgedTargetType();
   SILBasicBlock *SuccessBB = dynamicCast.getSuccessBlock();
   SILBasicBlock *FailureBB = dynamicCast.getFailureBlock();
   auto *F = Inst->getFunction();
@@ -128,64 +232,12 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
              ParameterConvention::Direct_Guaranteed &&
          "Parameter should be @guaranteed");
 
-  CanType CanBridgedTy = BridgedTargetTy->getCanonicalType();
-  SILType silBridgedTy = SILType::getPrimitiveObjectType(CanBridgedTy);
-
   SILBuilderWithScope Builder(Inst, BuilderContext);
 
-  // If this is a conditional cast:
-  // We need a new fail BB in order to add a dealloc_stack to it
-  SILBasicBlock *ConvFailBB = nullptr;
-  if (isConditional) {
-    auto CurrInsPoint = Builder.getInsertionPoint();
-    ConvFailBB = splitBasicBlockAndBranch(Builder, &(*FailureBB->begin()),
-                                          nullptr, nullptr);
-    Builder.setInsertionPoint(CurrInsPoint);
-  }
-
-  // Check if we can simplify a cast into:
-  // - ObjCTy to _ObjectiveCBridgeable._ObjectiveCType.
-  // - then convert _ObjectiveCBridgeable._ObjectiveCType to
-  // a Swift type using _forceBridgeFromObjectiveC.
-
-  // Inline constructor.
   SILValue srcOp;
   SILInstruction *newI;
-  std::tie(srcOp, newI) = [&]() -> std::pair<SILValue, SILInstruction *> {
-    // Generate a load for the source argument.
-    SILValue load =
-        Builder.createLoad(Loc, src, LoadOwnershipQualifier::Unqualified);
-
-    // If type of the source and the expected ObjC type are equal, there is no
-    // need to generate the conversion from ObjCTy to
-    // _ObjectiveCBridgeable._ObjectiveCType.
-    if (load->getType() == silBridgedTy) {
-      if (isConditional) {
-        SILBasicBlock *castSuccessBB = F->createBasicBlock();
-        castSuccessBB->createPhiArgument(silBridgedTy,
-                                         ValueOwnershipKind::Owned);
-        Builder.createBranch(Loc, castSuccessBB, load);
-        Builder.setInsertionPoint(castSuccessBB);
-        return {castSuccessBB->getArgument(0), nullptr};
-      }
-
-      return {load, nullptr};
-    }
-
-    if (isConditional) {
-      SILBasicBlock *castSuccessBB = F->createBasicBlock();
-      castSuccessBB->createPhiArgument(silBridgedTy, ValueOwnershipKind::Owned);
-      auto *ccbi = Builder.createCheckedCastBranch(
-          Loc, false, load, silBridgedTy, castSuccessBB, ConvFailBB);
-      splitEdge(ccbi, /* EdgeIdx to ConvFailBB */ 1);
-      Builder.setInsertionPoint(castSuccessBB);
-      return {castSuccessBB->getArgument(0), ccbi};
-    }
-
-    auto *cast =
-        Builder.createUnconditionalCheckedCast(Loc, load, silBridgedTy);
-    return {cast, cast};
-  }();
+  std::tie(srcOp, newI) =
+      convertObjectToLoadableBridgeableType(Builder, dynamicCast, src);
 
   // Now emit the a cast from the casted ObjC object into a target type.
   // This is done by means of calling _forceBridgeFromObjectiveC or
@@ -214,11 +266,11 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
   }
 
   // Emit a retain.
-  Builder.createRetainValue(Loc, srcOp, Builder.getDefaultAtomicity());
+  SILValue srcOpCopy = Builder.emitCopyValueOperation(Loc, srcOp);
 
   SmallVector<SILValue, 1> Args;
   Args.push_back(InOutOptionalParam);
-  Args.push_back(srcOp);
+  Args.push_back(srcOpCopy);
   Args.push_back(MetaTyVal);
 
   auto *AI = Builder.createApply(Loc, funcRef, subMap, Args, false);
@@ -226,13 +278,13 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
   // If we have guaranteed normal arguments, insert the destroy.
   //
   // TODO: Is it safe to just eliminate the initial retain?
-  Builder.createReleaseValue(Loc, srcOp, Builder.getDefaultAtomicity());
+  Builder.emitDestroyValueOperation(Loc, srcOpCopy);
 
   // If we have an unconditional_checked_cast_addr, return early. We do not need
   // to handle any conditional code.
   if (isa<UnconditionalCheckedCastAddrInst>(Inst)) {
     // Destroy the source value as unconditional_checked_cast_addr would.
-    Builder.createReleaseValue(Loc, srcOp, Builder.getDefaultAtomicity());
+    Builder.emitDestroyValueOperation(Loc, srcOp);
     EraseInstAction(Inst);
     return (newI) ? newI : AI;
   }
@@ -240,7 +292,7 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
   auto *CCABI = cast<CheckedCastAddrBranchInst>(Inst);
   switch (CCABI->getConsumptionKind()) {
   case CastConsumptionKind::TakeAlways:
-    Builder.createReleaseValue(Loc, srcOp, Builder.getDefaultAtomicity());
+    Builder.emitDestroyValueOperation(Loc, srcOp);
     break;
   case CastConsumptionKind::TakeOnSuccess: {
     // Insert a release in the success BB.
@@ -261,17 +313,18 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
     // Load from the optional.
     auto *SomeDecl = Builder.getASTContext().getOptionalSomeDecl();
 
-    SILBasicBlock *ConvSuccessBB = Inst->getFunction()->createBasicBlock();
-    SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 1> CaseBBs;
-    CaseBBs.push_back(
-        std::make_pair(mod.getASTContext().getOptionalNoneDecl(), FailureBB));
-    Builder.createSwitchEnumAddr(Loc, InOutOptionalParam, ConvSuccessBB,
-                                 CaseBBs);
+    auto *BridgeSuccessBB =
+        Inst->getFunction()->createBasicBlockAfter(Builder.getInsertionBB());
+    SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 2> CaseBBs;
+    CaseBBs.emplace_back(SomeDecl, BridgeSuccessBB);
+    CaseBBs.emplace_back(mod.getASTContext().getOptionalNoneDecl(), FailureBB);
+
+    Builder.createSwitchEnumAddr(Loc, InOutOptionalParam, nullptr, CaseBBs);
 
     Builder.setInsertionPoint(FailureBB->begin());
     Builder.createDeallocStack(Loc, Tmp);
 
-    Builder.setInsertionPoint(ConvSuccessBB);
+    Builder.setInsertionPoint(BridgeSuccessBB);
     auto Addr = Builder.createUncheckedTakeEnumDataAddr(Loc, InOutOptionalParam,
                                                         SomeDecl);
 
@@ -517,7 +570,7 @@ CastOptimizer::optimizeBridgedSwiftToObjCCast(SILDynamicCastInst dynamicCast) {
       Builder.createCopyAddr(Loc, Src, NewSrc, IsNotTake, IsInitialization);
       Src = NewSrc;
     } else {
-      Builder.createRetainValue(Loc, Src, Builder.getDefaultAtomicity());
+      Src = Builder.emitCopyValueOperation(Loc, Src);
     }
   }
 
@@ -528,7 +581,7 @@ CastOptimizer::optimizeBridgedSwiftToObjCCast(SILDynamicCastInst dynamicCast) {
     if (AddressOnlyType) {
       Builder.createDestroyAddr(Loc, Src);
     } else {
-      Builder.createReleaseValue(Loc, Src, Builder.getDefaultAtomicity());
+      Builder.emitDestroyValueOperation(Loc, Src);
     }
   };
 
