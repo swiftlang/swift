@@ -485,8 +485,8 @@ class BuildScriptInvocation(object):
             "--build-dir", self.workspace.build_root,
             "--install-prefix", args.install_prefix,
             "--host-target", args.host_target,
-            "--stdlib-deployment-targets",
-            " ".join(args.stdlib_deployment_targets),
+            "--stdlib-deployment-targets={}".format(
+                " ".join(args.stdlib_deployment_targets)),
             "--host-cc", toolchain.cc,
             "--host-cxx", toolchain.cxx,
             "--darwin-xcrun-toolchain", args.darwin_xcrun_toolchain,
