@@ -49,6 +49,8 @@ set(sources
   NSTimeZoneShims.h
   NSUndoManagerShims.h
 
+  ClockKitOverlayShims.h
+
   module.modulemap
   )
 set(output_dir "${SWIFTLIB_DIR}/shims")
