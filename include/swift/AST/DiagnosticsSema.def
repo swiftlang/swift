@@ -4372,7 +4372,8 @@ ERROR(property_wrapper_ambiguous_value_property, none,
   "named %1", (Type, Identifier))
 ERROR(property_wrapper_wrong_initial_value_init, none,
       "'init(initialValue:)' parameter type (%0) must be the same as its "
-      "'value' property type (%1) or an @autoclosure thereof", (Type, Type))
+      "'wrappedValue' property type (%1) or an @autoclosure thereof",
+      (Type, Type))
 ERROR(property_wrapper_failable_init, none,
       "%0 cannot be failable", (DeclName))
 ERROR(property_wrapper_ambiguous_initial_value_init, none,
@@ -4390,11 +4391,6 @@ ERROR(property_wrapper_attribute_not_on_property, none,
       (DeclName))
 NOTE(property_wrapper_declared_here,none,
      "property wrapper type %0 declared here", (DeclName))
-
-ERROR(property_wrapper_multiple,none,
-      "only one property wrapper can be attached to a given property", ())
-NOTE(previous_property_wrapper_here,none,
-      "previous property wrapper specified here", ())
 
 ERROR(property_wrapper_local,none,
       "property wrappers are not yet supported on local properties", ())
@@ -4419,18 +4415,12 @@ ERROR(property_with_wrapper_overrides,none,
       "property %0 with attached wrapper cannot override another property",
       (DeclName))
 
-ERROR(property_wrapper_and_normal_init,none,
-      "property %0 with attached wrapper cannot initialize both the "
-      "wrapper type and the property", (DeclName))
-ERROR(property_wrapper_init_without_initial_value, none,
-      "initializing property %0 with wrapper %1 that lacks "
-      "an 'init(initialValue:)' initializer", (DeclName, Type))
 NOTE(property_wrapper_direct_init,none,
      "initialize the property wrapper type directly with "
      "'(...') on the attribute", ())
 
 ERROR(property_wrapper_incompatible_property, none,
-      "property type %0 does not match that of the 'value' property of "
+      "property type %0 does not match that of the 'wrappedValue' property of "
       "its wrapper type %1", (Type, Type))
 
 ERROR(property_wrapper_type_access,none,
@@ -4450,6 +4440,9 @@ ERROR(property_wrapper_type_not_usable_from_inline,none,
 WARNING(property_wrapper_delegateValue,none,
         "property wrapper's `delegateValue` property should be renamed to "
         "'wrapperValue'; use of 'delegateValue' is deprecated", ())
+WARNING(property_wrapper_value,none,
+        "property wrapper's `value` property should be renamed to "
+        "'wrappedValue'; use of 'value' is deprecated", ())
 
 //------------------------------------------------------------------------------
 // MARK: function builder diagnostics
