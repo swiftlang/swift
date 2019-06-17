@@ -395,6 +395,13 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.RequestEvaluatorGraphVizPath = A->getValue();
   }
 
+  if (Args.getLastArg(OPT_require_explicit_availability, OPT_require_explicit_availability_target)) {
+    Opts.RequireExplicitAvailability = true;
+    if (const Arg *A = Args.getLastArg(OPT_require_explicit_availability_target)) {
+      Opts.RequireExplicitAvailabilityTarget = A->getValue();
+    }
+  }
+
   if (const Arg *A = Args.getLastArg(OPT_solver_memory_threshold)) {
     unsigned threshold;
     if (StringRef(A->getValue()).getAsInteger(10, threshold)) {

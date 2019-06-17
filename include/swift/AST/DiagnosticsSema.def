@@ -4152,6 +4152,9 @@ ERROR(availability_protocol_requires_version,
 NOTE(availability_protocol_requirement_here, none,
      "protocol requirement here", ())
 
+WARNING(public_decl_needs_availability, none,
+     "public declarations should have an availability attribute with -require-explicit-availability", ())
+
 // This doesn't display as an availability diagnostic, but it's
 // implemented there and fires when these subscripts are marked
 // unavailable, so it seems appropriate to put it here.

@@ -28,6 +28,7 @@ namespace swift {
   class Expr;
   class InFlightDiagnostic;
   class TypeChecker;
+  class Decl;
   class ValueDecl;
 
 /// Diagnose uses of unavailable declarations.
@@ -81,6 +82,9 @@ bool diagnoseExplicitUnavailability(
     SourceRange R,
     const DeclContext *DC,
     llvm::function_ref<void(InFlightDiagnostic &)> attachRenameFixIts);
+
+/// Check if \p decl has a introduction version required by -require-explicit-availability
+void checkExplicitAvailability(Decl *decl);
 
 } // namespace swift
 
