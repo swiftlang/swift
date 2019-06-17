@@ -2808,7 +2808,9 @@ ERROR(diff_params_clause_self_instance_method_only,none,
 ERROR(diff_params_clause_self_must_be_first,none,
       "'self' parameter must come first in the parameter list", ())
 ERROR(diff_params_clause_params_not_original_order,none,
-      "parameter names must be specified in original order", ())
+      "parameters must be specified in original order", ())
+ERROR(diff_params_clause_param_order_out_of_range,none,
+      "parameter order is larger than total number of parameters", ())
 ERROR(diff_params_clause_no_inferred_parameters,PointsToFirstBadToken,
       "no differentiation parameters could be inferred; must differentiate "
       "with respect to at least one parameter conforming to 'Differentiable'",

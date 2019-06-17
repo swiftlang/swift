@@ -32,25 +32,35 @@ enum class DifferentiabilityKind: uint8_t {
 
 class ParsedAutoDiffParameter {
 public:
-  enum class Kind { Named, Self };
+  enum class Kind { Named, Ordered, Self };
 
 private:
   SourceLoc Loc;
   Kind Kind;
   union Value {
-    struct { Identifier Name; }; // Index
+    struct { Identifier Name; }; // Named
+    struct { unsigned int Order; }; // Ordered
     struct {};                  // Self
     Value(Identifier name) : Name(name) {}
+    Value(unsigned int order) : Order(order) {}
     Value() {}
   } V;
 
 public:
   ParsedAutoDiffParameter(SourceLoc loc, enum Kind kind, Value value)
     : Loc(loc), Kind(kind), V(value) {}
+  
+  ParsedAutoDiffParameter(SourceLoc loc, enum Kind kind, unsigned int order)
+  : Loc(loc), Kind(kind), V(order) {}
 
   static ParsedAutoDiffParameter getNamedParameter(SourceLoc loc,
                                                    Identifier name) {
     return { loc, Kind::Named, name };
+  }
+  
+  static ParsedAutoDiffParameter getOrderedParameter(SourceLoc loc,
+                                                   unsigned int order) {
+    return { loc, Kind::Ordered, order };
   }
 
   static ParsedAutoDiffParameter getSelfParameter(SourceLoc loc) {
@@ -60,6 +70,10 @@ public:
   Identifier getName() const {
     assert(Kind == Kind::Named);
     return V.Name;
+  }
+  
+  unsigned int getOrder() const {
+    return V.Order;
   }
 
   enum Kind getKind() const {

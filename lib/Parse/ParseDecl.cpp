@@ -892,6 +892,17 @@ bool Parser::parseDifferentiationParametersClause(
             paramLoc, paramName));
         break;
       }
+      case tok::integer_literal: {
+        unsigned int paramNum;
+        if (parseUnsignedInteger(
+                paramNum, paramLoc,
+                diag::diff_params_clause_expected_parameter))
+          return true;
+
+        params.push_back(ParsedAutoDiffParameter::getOrderedParameter(
+            paramLoc, paramNum));
+        break;
+      }
       case tok::kw_self: {
         paramLoc = consumeToken(tok::kw_self);
         params.push_back(ParsedAutoDiffParameter::getSelfParameter(paramLoc));
@@ -1960,7 +1971,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     break;
   }
 
-  /// SWIFT_ENABLE_TENSORFLOW
+  // SWIFT_ENABLE_TENSORFLOW
   case DAK_Differentiable: {
     auto Attr = parseDifferentiableAttribute(AtLoc, Loc);
     if (Attr.isNonNull())
@@ -1968,7 +1979,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     break;
   }
 
-  /// SWIFT_ENABLE_TENSORFLOW
+  // SWIFT_ENABLE_TENSORFLOW
   case DAK_Differentiating: {
     auto Attr = parseDifferentiatingAttribute(AtLoc, Loc);
     if (Attr.isNonNull())
