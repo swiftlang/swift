@@ -396,6 +396,18 @@ struct ObservingTest {
   }
 }
 
+// Tuple initial values.
+struct WithTuples {
+	// CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers10WithTuplesVACycfC : $@convention(method) (@thin WithTuples.Type) -> WithTuples {
+	// CHECK: function_ref @$s17property_wrappers10WithTuplesV10$fractions33_F728088E0028E14D18C6A10CF68512E8LLAA07WrapperC12InitialValueVySd_S2dtGvpfi : $@convention(thin) () -> (Double, Double, Double)
+	// CHECK: function_ref @$s17property_wrappers23WrapperWithInitialValueV07initialF0ACyxGx_tcfC : $@convention(method) <τ_0_0> (@in τ_0_0, @thin WrapperWithInitialValue<τ_0_0>.Type) -> @out WrapperWithInitialValue<τ_0_0>
+  @WrapperWithInitialValue var fractions = (1.3, 0.7, 0.3)
+
+	static func getDefault() -> WithTuples {
+		return .init()
+	}
+}
+
 // CHECK-LABEL: sil_vtable ClassUsingWrapper {
 // CHECK:  #ClassUsingWrapper.x!getter.1: (ClassUsingWrapper) -> () -> Int : @$s17property_wrappers17ClassUsingWrapperC1xSivg   // ClassUsingWrapper.x.getter
 // CHECK:  #ClassUsingWrapper.x!setter.1: (ClassUsingWrapper) -> (Int) -> () : @$s17property_wrappers17ClassUsingWrapperC1xSivs // ClassUsingWrapper.x.setter
