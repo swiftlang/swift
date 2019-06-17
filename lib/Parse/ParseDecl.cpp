@@ -1153,6 +1153,72 @@ Parser::parseDifferentiatingAttribute(SourceLoc atLoc, SourceLoc loc) {
                                   original, linear, params));
 }
 
+// TODO: put in correct implementation
+ParserResult<TransposingAttr>
+Parser::parseTransposingAttribute(SourceLoc atLoc, SourceLoc loc) {
+  StringRef AttrName = "transposing";
+  SourceLoc lParenLoc = loc, rParenLoc = loc;
+  DeclNameWithLoc original;
+  SmallVector<ParsedAutoDiffParameter, 8> params;
+  
+  // Parse trailing comma, if it exists, and check for errors.
+  auto consumeIfTrailingComma = [&]() -> bool {
+    if (!consumeIf(tok::comma)) return false;
+    // Diagnose trailing comma before ')'.
+    if (Tok.is(tok::r_paren)) {
+      diagnose(Tok, diag::unexpected_separator, ",");
+      return true;
+    }
+    // Check that token after comma is 'wrt:'.
+    if (!Tok.is(tok::identifier) || !(Tok.getText() == "wrt")) {
+      diagnose(Tok, diag::attr_transposing_expected_label_linear_or_wrt);
+      return true;
+    }
+    return false;
+  };
+  
+  // Parse '('.
+  if (!consumeIf(tok::l_paren, lParenLoc)) {
+    diagnose(getEndOfPreviousLoc(), diag::attr_expected_lparen, AttrName,
+             /*DeclModifier*/ false);
+    return makeParserError();
+  }
+  
+  {
+    SyntaxParsingContext ContentContext(
+        SyntaxContext, SyntaxKind::DifferentiatingAttributeArguments);
+    
+    {
+      // Parse the name of the function.
+      SyntaxParsingContext FuncDeclNameContext(
+          SyntaxContext, SyntaxKind::FunctionDeclName);
+      original.Name = parseUnqualifiedDeclName(
+          /*afterDot*/ false, original.Loc,
+          diag::attr_transposing_expected_original_name,
+          /*allowOperators*/ true, /*allowZeroArgCompoundNames*/ true);
+      
+      if (consumeIfTrailingComma())
+        return makeParserError();
+    }
+    
+    // Parse the optional 'wrt' differentiation parameters clause.
+    if (Tok.is(tok::identifier) && Tok.getText() == "wrt" &&
+        parseDifferentiationParametersClause(params, AttrName))
+      return makeParserError();
+  }
+  
+  // Parse ')'.
+  if (!consumeIf(tok::r_paren, rParenLoc)) {
+    diagnose(getEndOfPreviousLoc(), diag::attr_expected_rparen, AttrName,
+             /*DeclModifier*/ false);
+    return makeParserError();
+  }
+  return ParserResult<TransposingAttr>(
+      TransposingAttr::create(Context, /*implicit*/ false, atLoc,
+                                  SourceRange(loc, rParenLoc),
+                                  original, params));
+}
+
 void Parser::parseObjCSelector(SmallVector<Identifier, 4> &Names,
                                SmallVector<SourceLoc, 4> &NameLocs,
                                bool &IsNullarySelector) {
@@ -1960,7 +2026,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     break;
   }
 
-  /// SWIFT_ENABLE_TENSORFLOW
+  // SWIFT_ENABLE_TENSORFLOW
   case DAK_Differentiable: {
     auto Attr = parseDifferentiableAttribute(AtLoc, Loc);
     if (Attr.isNonNull())
@@ -1968,9 +2034,17 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     break;
   }
 
-  /// SWIFT_ENABLE_TENSORFLOW
+  // SWIFT_ENABLE_TENSORFLOW
   case DAK_Differentiating: {
     auto Attr = parseDifferentiatingAttribute(AtLoc, Loc);
+    if (Attr.isNonNull())
+      Attributes.add(Attr.get());
+    break;
+  }
+  
+  // SWIFT_ENABLE_TENSORFLOW
+  case DAK_Transposing: {
+    auto Attr = parseTransposingAttribute(AtLoc, Loc);
     if (Attr.isNonNull())
       Attributes.add(Attr.get());
     break;

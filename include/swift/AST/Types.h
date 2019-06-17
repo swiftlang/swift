@@ -3086,7 +3086,7 @@ public:
   ///
   /// If `makeSelfParamFirst` is true, self's tangent is reordered to appear
   /// first. This should be used during type-checking, e.g. type-checking
-  /// `@differentiable` and `@differentiating` attributes.
+  /// `@differentiable`, `@transposing`, and `@differentiating` attributes.
   ///
   /// \note The original function type (`self`) need not be `@differentiable`.
   /// The resulting function will preserve all `ExtInfo` of the original

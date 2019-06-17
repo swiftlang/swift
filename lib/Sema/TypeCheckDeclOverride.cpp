@@ -1306,6 +1306,7 @@ namespace  {
     UNINTERESTING_ATTR(Differentiating)
     UNINTERESTING_ATTR(CompilerEvaluable)
     UNINTERESTING_ATTR(NoDerivative)
+    UNINTERESTING_ATTR(Transposing)
 
     // These can't appear on overridable declarations.
     UNINTERESTING_ATTR(Prefix)
