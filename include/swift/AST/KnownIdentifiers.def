@@ -135,7 +135,12 @@ IDENTIFIER_(typeList)
 // AdditiveArithmetic, VectorProtocol
 IDENTIFIER(zero)
 IDENTIFIER(VectorSpaceScalar)
+IDENTIFIER(adding)
+IDENTIFIER(subtracting)
 IDENTIFIER(scaled)
+IDENTIFIER(by)
+IDENTIFIER(scale)
+IDENTIFIER(x)
 // Differentiable
 IDENTIFIER(AllDifferentiableVariables)
 IDENTIFIER(TangentVector)

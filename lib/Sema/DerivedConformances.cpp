@@ -347,6 +347,17 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
     }
 
     // SWIFT_ENABLE_TENSORFLOW
+    // VectorProtocol.adding(_:)
+    // VectorProtocol.subtracting(_:)
+    if (name.isCompoundName() &&
+        (name.getBaseName() == ctx.Id_adding ||
+         name.getBaseName() == ctx.Id_subtracting)) {
+      auto argumentNames = name.getArgumentNames();
+      if (argumentNames.size() == 1 && argumentNames[0].empty())
+        return getRequirement(KnownProtocolKind::VectorProtocol);
+    }
+
+    // SWIFT_ENABLE_TENSORFLOW
     // TensorArrayProtocol._unpackTensorHandles(into:)
     if (name.isCompoundName() && 
         name.getBaseName() == ctx.Id_unpackTensorHandles) {

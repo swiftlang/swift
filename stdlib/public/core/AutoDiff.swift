@@ -26,6 +26,14 @@ public protocol VectorProtocol : AdditiveArithmetic {
   /// The type of scalars in the vector space.
   associatedtype VectorSpaceScalar : AdditiveArithmetic
 
+  func adding(_ x: VectorSpaceScalar) -> Self
+
+  mutating func add(_ x: VectorSpaceScalar)
+
+  func subtracting(_ x: VectorSpaceScalar) -> Self
+
+  mutating func subtract(_ x: VectorSpaceScalar)
+
   /// Returns `self` multiplied by the given scalar.
   func scaled(by scalar: VectorSpaceScalar) -> Self
 
@@ -34,16 +42,44 @@ public protocol VectorProtocol : AdditiveArithmetic {
 }
 
 public extension VectorProtocol {
+  mutating func add(_ x: VectorSpaceScalar) -> Self {
+    self = adding(x)
+  }
+
+  static func + (lhs: Self, rhs: VectorSpaceScalar) -> Self {
+    lhs.adding(rhs)
+  }
+
+  static func + (lhs: VectorSpaceScalar, rhs: Self) -> Self {
+    rhs.adding(lhs)
+  }
+
+  static func += (lhs: inout Self, rhs: VectorSpaceScalar) {
+    lhs.add(rhs)
+  }
+
+  mutating func subtract(_ x: VectorSpaceScalar) -> Self {
+    self = subtracting(x)
+  }
+
+  static func - (lhs: Self, rhs: VectorSpaceScalar) -> Self {
+    lhs.subtracting(rhs)
+  }
+
+  static func -= (lhs: inout Self, rhs: VectorSpaceScalar) {
+    lhs.subtract(rhs)
+  }
+
   mutating func scale(by scalar: VectorSpaceScalar) {
     self = scaled(by: scalar)
   }
 
   static func * (lhs: Self, rhs: VectorSpaceScalar) -> Self {
-    return lhs.scaled(by: rhs)
+    lhs.scaled(by: rhs)
   }
 
   static func * (lhs: VectorSpaceScalar, rhs: Self) -> Self {
-    return rhs.scaled(by: lhs)
+    rhs.scaled(by: lhs)
   }
 
   static func *= (lhs: inout Self, rhs: VectorSpaceScalar) {
@@ -51,7 +87,11 @@ public extension VectorProtocol {
   }
 }
 
-public extension VectorProtocol where VectorSpaceScalar: SignedNumeric {
+public extension VectorProtocol where VectorSpaceScalar : SignedNumeric {
+  static func - (lhs: VectorSpaceScalar, rhs: Self) -> Self {
+    -rhs.adding(lhs)
+  }
+
   static prefix func - (x: Self) -> Self {
     .zero - x
   }
