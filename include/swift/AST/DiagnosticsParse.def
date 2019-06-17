@@ -1512,6 +1512,12 @@ ERROR(attr_differentiating_expected_original_name,PointsToFirstBadToken,
 ERROR(attr_differentiating_expected_label_linear_or_wrt,none,
       "expected either 'linear' or 'wrt:'", ())
 
+// transposing
+ERROR(attr_transposing_expected_original_name,PointsToFirstBadToken,
+"expected an original function name", ())
+ERROR(attr_transposing_expected_label_linear_or_wrt,none,
+"expected either 'linear' or 'wrt:'", ())
+
 // differentiation `wrt` parameters clause
 ERROR(expected_colon_after_label,PointsToFirstBadToken,
       "expected a colon ':' after '%0'", (StringRef))
