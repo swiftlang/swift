@@ -4216,7 +4216,7 @@ public:
   void visitOpaqueTypeArchetypeType(OpaqueTypeArchetypeType *T) {
     switch (Options.OpaqueReturnTypePrinting) {
     case PrintOptions::OpaqueReturnTypePrintingMode::WithOpaqueKeyword:
-      Printer << "some ";
+      Printer.printKeyword("some", Options, /*Suffix=*/" ");
       LLVM_FALLTHROUGH;
     case PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword: {
       visit(T->getExistentialType());
