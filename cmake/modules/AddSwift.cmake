@@ -1383,7 +1383,7 @@ function(_add_swift_library_single target name)
   # NOTE(compnerd) use the C linker language to invoke `clang` rather than
   # `clang++` as we explicitly link against the C++ runtime.  We were previously
   # actually passing `-nostdlib++` to avoid the C++ runtime linkage.
-  if(SWIFTLIB_SINGLE_SDK STREQUAL ANDROID)
+  if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "ANDROID")
     set_property(TARGET "${target}" PROPERTY
       LINKER_LANGUAGE "C")
   else()
