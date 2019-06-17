@@ -3,6 +3,14 @@
 
 // REQUIRES: objc_interop
 
+// This test is disabled so we can more easily cherry-pick any cast optimizer
+// fixes without hitting conflicts, while at the same time allowing us to avoid
+// having to cherry-pick all the cast optimizer fixes only needed for ownership
+// to swift-5.1-branch. This makes sense since we are not going to ever run the
+// cast optimizer on ossa on swift-5.1-branch
+//
+// REQUIRES: disabled
+
 sil_stage canonical
 
 import Swift

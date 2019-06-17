@@ -234,22 +234,6 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
 
   SILBuilderWithScope Builder(Inst, BuilderContext);
 
-  // If this is a conditional cast:
-  // We need a new fail BB in order to add a dealloc_stack to it
-  SILBasicBlock *ConvFailBB = nullptr;
-  if (isConditional) {
-    auto CurrInsPoint = Builder.getInsertionPoint();
-    ConvFailBB = splitBasicBlockAndBranch(Builder, &(*FailureBB->begin()),
-                                          nullptr, nullptr);
-    Builder.setInsertionPoint(CurrInsPoint);
-  }
-
-  // Check if we can simplify a cast into:
-  // - ObjCTy to _ObjectiveCBridgeable._ObjectiveCType.
-  // - then convert _ObjectiveCBridgeable._ObjectiveCType to
-  // a Swift type using _forceBridgeFromObjectiveC.
-
-  // Inline constructor.
   SILValue srcOp;
   SILInstruction *newI;
   std::tie(srcOp, newI) =
@@ -282,11 +266,11 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
   }
 
   // Emit a retain.
-  Builder.createRetainValue(Loc, srcOp, Builder.getDefaultAtomicity());
+  SILValue srcOpCopy = Builder.emitCopyValueOperation(Loc, srcOp);
 
   SmallVector<SILValue, 1> Args;
   Args.push_back(InOutOptionalParam);
-  Args.push_back(srcOp);
+  Args.push_back(srcOpCopy);
   Args.push_back(MetaTyVal);
 
   auto *AI = Builder.createApply(Loc, funcRef, subMap, Args, false);
@@ -294,13 +278,13 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
   // If we have guaranteed normal arguments, insert the destroy.
   //
   // TODO: Is it safe to just eliminate the initial retain?
-  Builder.createReleaseValue(Loc, srcOp, Builder.getDefaultAtomicity());
+  Builder.emitDestroyValueOperation(Loc, srcOpCopy);
 
   // If we have an unconditional_checked_cast_addr, return early. We do not need
   // to handle any conditional code.
   if (isa<UnconditionalCheckedCastAddrInst>(Inst)) {
     // Destroy the source value as unconditional_checked_cast_addr would.
-    Builder.createReleaseValue(Loc, srcOp, Builder.getDefaultAtomicity());
+    Builder.emitDestroyValueOperation(Loc, srcOp);
     EraseInstAction(Inst);
     return (newI) ? newI : AI;
   }
@@ -308,7 +292,7 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
   auto *CCABI = cast<CheckedCastAddrBranchInst>(Inst);
   switch (CCABI->getConsumptionKind()) {
   case CastConsumptionKind::TakeAlways:
-    Builder.createReleaseValue(Loc, srcOp, Builder.getDefaultAtomicity());
+    Builder.emitDestroyValueOperation(Loc, srcOp);
     break;
   case CastConsumptionKind::TakeOnSuccess: {
     // Insert a release in the success BB.
@@ -586,7 +570,7 @@ CastOptimizer::optimizeBridgedSwiftToObjCCast(SILDynamicCastInst dynamicCast) {
       Builder.createCopyAddr(Loc, Src, NewSrc, IsNotTake, IsInitialization);
       Src = NewSrc;
     } else {
-      Builder.createRetainValue(Loc, Src, Builder.getDefaultAtomicity());
+      Src = Builder.emitCopyValueOperation(Loc, Src);
     }
   }
 
@@ -597,7 +581,7 @@ CastOptimizer::optimizeBridgedSwiftToObjCCast(SILDynamicCastInst dynamicCast) {
     if (AddressOnlyType) {
       Builder.createDestroyAddr(Loc, Src);
     } else {
-      Builder.createReleaseValue(Loc, Src, Builder.getDefaultAtomicity());
+      Builder.emitDestroyValueOperation(Loc, Src);
     }
   };
 

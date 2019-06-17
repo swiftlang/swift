@@ -46,9 +46,6 @@ sil @guaranteed_swift_array_user : $@convention(thin) <τ_0_0> (@guaranteed Arra
 //
 // CHECK: [[FAIL_BB]]:
 // CHECK-NEXT:   dealloc_stack [[CAST_TMP:%.*]]
-// CHECK-NEXT:   br [[NEXT:bb[0-9]+]]
-//
-// CHECK: [[NEXT]]:
 // CHECK-NEXT:   dealloc_stack [[OUTPUT]]
 // CHECK-NEXT:   destroy_addr [[INPUT]]
 // CHECK-NEXT:   dealloc_stack [[INPUT]]
@@ -121,9 +118,6 @@ bb4:
 //
 // CHECK: [[FAIL_BB]]:
 // CHECK-NEXT:   dealloc_stack [[CAST_TMP:%.*]]
-// CHECK-NEXT:   br [[FAIL_NEXT:bb[0-9]+]]
-//
-// CHECK: [[FAIL_NEXT]]:
 // CHECK-NEXT:   dealloc_stack [[OUTPUT]]
 // CHECK-NEXT:   destroy_addr [[INPUT]]
 // CHECK-NEXT:   dealloc_stack [[INPUT]]
@@ -195,9 +189,6 @@ bb4:
 //
 // CHECK: [[FAIL_BB:bb[0-9]+]]:
 // CHECK-NEXT:   dealloc_stack [[CAST_TMP:%.*]]
-// CHECK-NEXT:   br [[FAIL_NEXT:bb[0-9]+]]
-//
-// CHECK: [[FAIL_NEXT]]:
 // CHECK-NEXT:   dealloc_stack [[OUTPUT]]
 // CHECK-NEXT:   dealloc_stack [[INPUT]]
 // CHECK-NEXT:   br [[EXIT_BB]]
