@@ -95,9 +95,16 @@ public:
 
   /// Generate an enum payload containing the given bit pattern.
   static EnumPayload fromBitPattern(IRGenModule &IGM,
-                                    APInt bitPattern,
+                                    const APInt &bitPattern,
                                     EnumPayloadSchema schema);
-  
+
+  /// Generate an enum payload by scattering the packed bits to the bit positions
+  /// set in the mask.
+  static EnumPayload fromScatter(IRGenFunction &IGF,
+                                 const APInt &mask,
+                                 llvm::Value *packed,
+                                 EnumPayloadSchema schema);
+
   /// Insert a value into the enum payload.
   ///
   /// The current payload value at the given offset is assumed to be zero.
@@ -147,14 +154,14 @@ public:
   
   /// Emit an equality comparison operation that payload & mask == value.
   llvm::Value *emitCompare(IRGenFunction &IGF,
-                           APInt mask,
-                           APInt value) const;
+                           const APInt &mask,
+                           const APInt &value) const;
   
   /// Apply an AND mask to the payload.
-  void emitApplyAndMask(IRGenFunction &IGF, APInt mask);
+  void emitApplyAndMask(IRGenFunction &IGF, const APInt &mask);
   
   /// Apply an OR mask to the payload.
-  void emitApplyOrMask(IRGenFunction &IGF, APInt mask);
+  void emitApplyOrMask(IRGenFunction &IGF, const APInt &mask);
   
   /// Apply an OR mask to the payload.
   void emitApplyOrMask(IRGenFunction &IGF, EnumPayload mask);

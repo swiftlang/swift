@@ -3604,16 +3604,19 @@ namespace {
     EnumPayload getEmptyCasePayload(IRGenFunction &IGF,
                                     llvm::Value *tag,
                                     llvm::Value *tagIndex) const {
-      SpareBitVector commonSpareBits = CommonSpareBits;
-      commonSpareBits.flipAll();
+      // Generate tag index mask.
+      auto tagIndexBits = ~CommonSpareBits.asAPInt();
+      auto tagIndexValue = EnumPayload::fromScatter(IGF, tagIndexBits, tagIndex,
+                                                    PayloadSchema);
 
-      EnumPayload result = interleaveSpareBits(IGF, PayloadSchema,
-                                               commonSpareBits, tagIndex);
-      result.emitApplyOrMask(IGF,
-                             interleaveSpareBits(IGF, PayloadSchema,
-                                                 PayloadTagBits, tag));
+      // Generate tag mask.
+      auto tagBits = PayloadTagBits.asAPInt();
+      auto tagValue = EnumPayload::fromScatter(IGF, tagBits, tag,
+                                               PayloadSchema);
 
-      return result;
+      // Combine the tag and tag index masks.
+      tagIndexValue.emitApplyOrMask(IGF, tagValue);
+      return tagIndexValue;
     }
     
     struct DestructuredLoadableEnum {
@@ -4858,10 +4861,9 @@ namespace {
         payload.emitApplyAndMask(IGF, spareBitMask);
 
         // Store the tag into the spare bits.
-        payload.emitApplyOrMask(IGF,
-                                interleaveSpareBits(IGF, PayloadSchema,
-                                                    PayloadTagBits,
-                                                    spareTagBits));
+        auto tagMask = EnumPayload::fromScatter(IGF, PayloadTagBits.asAPInt(),
+                                                spareTagBits, PayloadSchema);
+        payload.emitApplyOrMask(IGF, tagMask);
 
         // Store the payload back.
         payload.store(IGF, payloadAddr);
@@ -5218,8 +5220,8 @@ namespace {
       if (CommonSpareBits.count()) {
         // Factor the index value into parts to scatter into the payload and
         // to store in the extra tag bits, if any.
-        EnumPayload payload =
-          interleaveSpareBits(IGF, PayloadSchema, CommonSpareBits, indexValue);
+        auto payload = EnumPayload::fromScatter(IGF, CommonSpareBits.asAPInt(),
+                                                indexValue, PayloadSchema);
         payload.store(IGF, projectPayload(IGF, dest));
         if (getExtraTagBitCountForExtraInhabitants() > 0) {
           auto tagBits = IGF.Builder.CreateLShr(indexValue,
@@ -6959,54 +6961,6 @@ llvm::APInt irgen::scatterBits(const llvm::APInt &mask, unsigned value) {
     }
     value >>= 1;
   }
-  return result;
-}
-
-/// A version of the above where the tag value is dynamic.
-EnumPayload irgen::interleaveSpareBits(IRGenFunction &IGF,
-                                       const EnumPayloadSchema &schema,
-                                       const SpareBitVector &spareBitVector,
-                                       llvm::Value *value) {
-  EnumPayload result;
-  APInt spareBits = spareBitVector.asAPInt();
-
-  unsigned usedBits = 0;
-
-  auto &DL = IGF.IGM.DataLayout;
-  schema.forEachType(IGF.IGM, [&](llvm::Type *type) {
-    unsigned bitSize = DL.getTypeSizeInBits(type);
-
-    // Take some bits off of the bottom of the pattern.
-    auto spareBitsChunk = SpareBitVector::fromAPInt(
-        spareBits.zextOrTrunc(bitSize));
-
-    if (usedBits >= 32 || spareBitsChunk.count() == 0) {
-      result.PayloadValues.push_back(type);
-    } else {
-      llvm::Value *payloadValue = value;
-      if (usedBits > 0) {
-        payloadValue = IGF.Builder.CreateLShr(payloadValue,
-                       llvm::ConstantInt::get(IGF.IGM.Int32Ty, usedBits));
-      }
-      payloadValue = emitScatterBits(IGF, spareBitsChunk.asAPInt(),
-                                     payloadValue, 0);
-      if (payloadValue->getType() != type) {
-        if (type->isPointerTy())
-          payloadValue = IGF.Builder.CreateIntToPtr(payloadValue, type);
-        else
-          payloadValue = IGF.Builder.CreateBitCast(payloadValue, type);
-      }
-
-      result.PayloadValues.push_back(payloadValue);
-    }
-    
-    // Shift the remaining bits down.
-    spareBits = spareBits.lshr(bitSize);
-
-    // Consume bits from the input value.
-    usedBits += spareBitsChunk.count();
-  });
-
   return result;
 }
 
