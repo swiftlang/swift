@@ -62,7 +62,7 @@ public protocol ElementaryFunctions {
 
 %for type in all_floating_point_types():
 % if type.bits == 80:
-#if (arch(i386) || arch(x86_64)) && !os(Windows)
+#if (arch(i386) || arch(x86_64)) && !(os(Windows) || os(Android))
 % end
 % Self = type.stdlib_name
 extension ${Self}: ElementaryFunctions {
