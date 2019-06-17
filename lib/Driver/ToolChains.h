@@ -27,6 +27,8 @@ protected:
                                      const JobContext &context) const override;
   InvocationInfo constructInvocation(const LinkJobAction &job,
                                      const JobContext &context) const override;
+  InvocationInfo constructInvocation(const ArchiveJobAction &job,
+                                     const JobContext &context) const override;
 
   std::string findProgramRelativeToSwiftImpl(StringRef name) const override;
 
@@ -42,6 +44,8 @@ public:
 class LLVM_LIBRARY_VISIBILITY Windows : public ToolChain {
 protected:
   InvocationInfo constructInvocation(const LinkJobAction &job,
+                                     const JobContext &context) const override;
+  InvocationInfo constructInvocation(const ArchiveJobAction &job,
                                      const JobContext &context) const override;
 
 public:
@@ -80,6 +84,8 @@ protected:
   virtual bool shouldProvideRPathToLinker() const;
 
   InvocationInfo constructInvocation(const LinkJobAction &job,
+                                     const JobContext &context) const override;
+  InvocationInfo constructInvocation(const ArchiveJobAction &job,
                                      const JobContext &context) const override;
 
 public:

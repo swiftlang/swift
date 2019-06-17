@@ -48,6 +48,7 @@ public:
     AutolinkExtractJob,
     REPLJob,
     LinkJob,
+    ArchiveJob,
     GenerateDSYMJob,
     VerifyDebugInfoJob,
     GeneratePCHJob,
@@ -313,13 +314,27 @@ public:
   LinkJobAction(ArrayRef<const Action *> Inputs, LinkKind K)
       : JobAction(Action::Kind::LinkJob, Inputs, file_types::TY_Image),
         Kind(K) {
-    assert(Kind != LinkKind::None);
+    assert(Kind != LinkKind::None && Kind != LinkKind::StaticLibrary);
   }
 
   LinkKind getKind() const { return Kind; }
 
   static bool classof(const Action *A) {
     return A->getKind() == Action::Kind::LinkJob;
+  }
+};
+
+class ArchiveJobAction : public JobAction {
+  virtual void anchor();
+
+public:
+  ArchiveJobAction(ArrayRef<const Action *> Inputs, LinkKind K)
+      : JobAction(Action::Kind::ArchiveJob, Inputs, file_types::TY_Image) {
+    assert(K == LinkKind::StaticLibrary);
+  }
+
+  static bool classof(const Action *A) {
+    return A->getKind() == Action::Kind::ArchiveJob;
   }
 };
 

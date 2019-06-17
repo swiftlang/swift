@@ -130,6 +130,8 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
   case LinkKind::DynamicLibrary:
     Arguments.push_back("-shared");
     break;
+  case LinkKind::StaticLibrary:
+    llvm_unreachable("the dynamic linker cannot build static libraries");
   }
 
   // Select the linker to use.
@@ -316,6 +318,31 @@ toolchains::GenericUnix::constructInvocation(const LinkJobAction &job,
 
   InvocationInfo II{Clang, Arguments};
   II.allowsResponseFiles = true;
+
+  return II;
+}
+
+
+ToolChain::InvocationInfo
+toolchains::GenericUnix::constructInvocation(const ArchiveJobAction &job,
+                               const JobContext &context) const {
+   assert(context.Output.getPrimaryOutputType() == file_types::TY_Image &&
+         "Invalid linker output type.");
+
+  ArgStringList Arguments;
+
+  // Configure the toolchain.
+  const char *AR = "ar";
+  Arguments.push_back("crs");
+
+  Arguments.push_back(
+      context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
+
+  addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
+                         file_types::TY_Object);
+  addInputsOfType(Arguments, context.InputActions, file_types::TY_Object);
+
+  InvocationInfo II{AR, Arguments};
 
   return II;
 }
