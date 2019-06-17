@@ -2929,65 +2929,20 @@ namespace {
       if (!conformance)
         return nullptr;
 
-      // Call the witness that builds the dictionary literal.
-      // FIXME: callWitness() may end up re-doing some work we already did
-      // to convert the dictionary literal elements to the (key, value) tuple.
-      // It would be nicer to re-use them.
-      // FIXME: Cache the name.
-      // FIXME: This location info is bogus.
-      Expr *typeRef = TypeExpr::createImplicitHack(expr->getLoc(), dictionaryTy,
-                                                   tc.Context);
-      cs.cacheExprTypes(typeRef);
-
       DeclName name(tc.Context, DeclBaseName::createConstructor(),
                     { tc.Context.Id_dictionaryLiteral });
+      ConcreteDeclRef witness =
+        conformance->getWitnessByName(dictionaryTy->getRValueType(), name);
+      if (!witness || !isa<AbstractFunctionDecl>(witness.getDecl()))
+        return nullptr;
+      expr->setInitializer(witness);
 
-      // Restructure the argument to provide the appropriate labels in the
-      // tuple.
-      SmallVector<TupleTypeElt, 4> typeElements;
-      SmallVector<Identifier, 4> names;
-      bool first = true;
-      for (auto elt : expr->getElements()) {
-        if (first) {
-          typeElements.push_back(TupleTypeElt(cs.getType(elt),
-                                              tc.Context.Id_dictionaryLiteral));
-          names.push_back(tc.Context.Id_dictionaryLiteral);
-
-          first = false;
-          continue;
-        }
-
-        typeElements.push_back(cs.getType(elt));
-        names.push_back(Identifier());
+      auto elementType = expr->getElementType();
+      for (auto &element : expr->getElements()) {
+        element = coerceToType(element, elementType,
+                               cs.getConstraintLocator(element));
       }
 
-      Type argType = TupleType::get(typeElements, tc.Context);
-      assert(isa<TupleType>(argType.getPointer()));
-
-      Expr *arg =
-            TupleExpr::create(tc.Context, expr->getLBracketLoc(),
-                              expr->getElements(),
-                              names,
-                              { },
-                              expr->getRBracketLoc(),
-                              /*HasTrailingClosure=*/false,
-                              /*Implicit=*/true,
-                              argType);
-
-      cs.cacheExprTypes(arg);
-
-      cs.setExprTypes(typeRef);
-      cs.setExprTypes(arg);
-
-      Expr *result = tc.callWitness(typeRef, dc, dictionaryProto,
-                                    *conformance, name, arg,
-                                    diag::dictionary_protocol_broken);
-      if (!result)
-        return nullptr;
-
-      cs.cacheExprTypes(result);
-
-      expr->setSemanticExpr(result);
       return expr;
     }
 
