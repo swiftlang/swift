@@ -31,6 +31,10 @@ public class GoodChild: Parent {
     set {}
   }
   @_implementationOnly public override subscript(_ index: Int32) -> Parent? { nil } // expected-note {{overridden declaration is here}}
+  @_implementationOnly public override var redefinedPropSECRET: Parent? { // expected-note {{overridden declaration is here}}
+    get { nil }
+    set {}
+  }
 }
 
 // CHECK-LABEL: class QuietChild : FooKit.Parent {
@@ -76,6 +80,10 @@ internal class PrivateChild: Parent {
     set {}
   }
   override subscript(_ index: Int32) -> Parent? { nil }
+  override var redefinedPropSECRET: Parent? {
+    get { nil }
+    set {}
+  }
 }
 
 internal class PrivateGrandchild: GoodChild {
@@ -87,6 +95,20 @@ internal class PrivateGrandchild: GoodChild {
     set {}
   }
   override subscript(_ index: Int32) -> Parent? { nil }
+  override var redefinedPropSECRET: Parent? {
+    get { nil }
+    set {}
+  }
+}
+
+// CHECK-LABEL: class SubscriptChild : FooKit.SubscriptParent {
+//  CHECK-NEXT:   @objc deinit
+//  CHECK-NEXT: }
+public class SubscriptChild: SubscriptParent {
+  @_implementationOnly public override subscript(_ index: Int32) -> Parent? {
+    get { nil }
+    set {}
+  }
 }
 
 #if ERRORS
@@ -107,6 +129,10 @@ public class NaughtyChild: Parent {
     set {}
   }
   public override subscript(_ index: Int32) -> Parent? { nil } // expected-error {{override of subscript imported as implementation-only must be declared '@_implementationOnly'}} {{3-3=@_implementationOnly }}
+  public override var redefinedPropSECRET: Parent? { // FIXME: the setter here is from the implementation-only import, so we'd like to complain about this too.
+    get { nil }
+    set {}
+  }
 }
 
 public class NaughtyChildByType: Parent {
@@ -128,6 +154,10 @@ public class NaughtyGrandchild: GoodChild {
     set {}
   }
   public override subscript(_ index: Int32) -> Parent? { nil } // expected-error {{override of '@_implementationOnly' subscript should also be declared '@_implementationOnly'}} {{3-3=@_implementationOnly }}
+  public override var redefinedPropSECRET: Parent? { // expected-error {{override of '@_implementationOnly' property should also be declared '@_implementationOnly'}} {{3-3=@_implementationOnly }}
+    get { nil }
+    set {}
+  }
 }
 
 #endif // ERRORS

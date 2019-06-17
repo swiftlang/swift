@@ -1712,7 +1712,10 @@ public:
     }
 
     // FIXME: Check storage decls where the setter is in a separate module from
-    // the getter, which is a thing Objective-C can do.
+    // the getter, which is a thing Objective-C can do. The ClangImporter
+    // doesn't make this easy, though, because it just gives the setter the same
+    // DeclContext as the property or subscript, which means we've lost the
+    // information about whether its module was implementation-only imported.
   }
 
   void visit(Decl *D) {

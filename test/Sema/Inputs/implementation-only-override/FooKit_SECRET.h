@@ -13,6 +13,8 @@
 @property (readwrite, strong, nullable) Parent *rwPropSECRET;
 
 - (nullable Parent *)objectAtIndexedSubscript:(int)index;
+
+@property (readwrite, strong, nullable) Parent *redefinedPropSECRET;
 @end
 
 @protocol MandatorySecrets
@@ -26,4 +28,8 @@
 @interface GenericParent<T: Base *> ()
 @property (readonly, strong, nullable) T roPropSECRET;
 - (nullable Parent *)objectAtIndexedSubscript:(int)index;
+@end
+
+@interface SubscriptParent ()
+- (void)setObject:(nullable Parent *)object atIndexedSubscript:(int)index;
 @end
