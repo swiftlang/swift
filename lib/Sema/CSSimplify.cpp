@@ -1606,7 +1606,44 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
     // Match up the replacement types of the respective substitution maps.
     return matchDeepTypeArguments(*this, subflags, args1, args2, locator);
   }
-  
+
+  // Handle protocol compositions.
+  if (auto existential1 = type1->getAs<ProtocolCompositionType>()) {
+    if (auto existential2 = type2->getAs<ProtocolCompositionType>()) {
+      auto layout1 = existential1->getExistentialLayout();
+      auto layout2 = existential2->getExistentialLayout();
+
+      // Explicit AnyObject and protocols must match exactly.
+      if (layout1.hasExplicitAnyObject != layout2.hasExplicitAnyObject)
+        return getTypeMatchFailure(locator);
+
+      if (layout1.getProtocols().size() != layout2.getProtocols().size())
+        return getTypeMatchFailure(locator);
+
+      for (unsigned i: indices(layout1.getProtocols())) {
+        if (!layout1.getProtocols()[i]->isEqual(layout2.getProtocols()[i]))
+          return getTypeMatchFailure(locator);
+      }
+
+      // This is the only interesting case. We might have type variables
+      // on either side of the superclass constraint, so make sure we
+      // recursively call matchTypes() here.
+      if (layout1.explicitSuperclass || layout2.explicitSuperclass) {
+        if (!layout1.explicitSuperclass || !layout2.explicitSuperclass)
+          return getTypeMatchFailure(locator);
+
+        auto result = matchTypes(layout1.explicitSuperclass,
+                                 layout2.explicitSuperclass,
+                                 ConstraintKind::Bind, subflags,
+                                 locator.withPathElement(
+                                   ConstraintLocator::ExistentialSuperclassType));
+        if (result.isFailure())
+          return result;
+      }
+
+      return getTypeMatchSuccess();
+    }
+  }
   // Handle nominal types that are not directly generic.
   if (auto nominal1 = type1->getAs<NominalType>()) {
     auto nominal2 = type2->castTo<NominalType>();
@@ -2533,7 +2570,22 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       llvm_unreachable("Polymorphic function type should have been opened");
 
     case TypeKind::ProtocolComposition:
-      // Existential types handled below.
+      switch (kind) {
+      case ConstraintKind::Equal:
+      case ConstraintKind::Bind:
+      case ConstraintKind::BindParam:
+        // If we are matching types for equality, we might still have
+        // type variables inside the protocol composition's superclass
+        // constraint.
+        conversionsOrFixes.push_back(ConversionRestrictionKind::DeepEquality);
+        break;
+
+      default:
+        // Subtype constraints where the RHS is an existential type are
+        // handled below.
+        break;
+      }
+
       break;
 
     case TypeKind::LValue:
