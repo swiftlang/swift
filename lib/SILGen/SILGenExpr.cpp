@@ -462,8 +462,7 @@ namespace {
     RValue visitKeyPathExpr(KeyPathExpr *E, SGFContext C);
     RValue visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E,
                                            SGFContext C);
-    RValue visitArrayExpr(ArrayExpr *E, SGFContext C);
-    RValue visitDictionaryExpr(DictionaryExpr *E, SGFContext C);
+    RValue visitCollectionExpr(CollectionExpr *E, SGFContext C);
     RValue visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E,
                                             SGFContext C);
     RValue visitInjectIntoOptionalExpr(InjectIntoOptionalExpr *E, SGFContext C);
@@ -3671,7 +3670,7 @@ visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, SGFContext C) {
   llvm_unreachable("Unhandled MagicIdentifierLiteralExpr in switch.");
 }
 
-RValue RValueEmitter::visitArrayExpr(ArrayExpr *E, SGFContext C) {
+RValue RValueEmitter::visitCollectionExpr(CollectionExpr *E, SGFContext C) {
   auto loc = SILLocation(E);
   ArgumentScope scope(SGF, loc);
 
@@ -3679,7 +3678,12 @@ RValue RValueEmitter::visitArrayExpr(ArrayExpr *E, SGFContext C) {
   // of emitting varargs.
   CanType arrayType, elementType;
   if (E->getInitializer()) {
-    elementType = E->getElementType()->getCanonicalType();
+    if (auto *arrayExpr = dyn_cast<ArrayExpr>(E)) {
+      elementType = arrayExpr->getElementType()->getCanonicalType();
+    } else {
+      auto *dictionaryExpr = cast<DictionaryExpr>(E);
+      elementType = dictionaryExpr->getElementType()->getCanonicalType();
+    }
     arrayType = ArraySliceType::get(elementType)->getCanonicalType();
   } else {
     arrayType = E->getType()->getCanonicalType();
@@ -3740,10 +3744,6 @@ RValue RValueEmitter::visitArrayExpr(ArrayExpr *E, SGFContext C) {
 
   return SGF.emitApplyAllocatingInitializer(
       loc, E->getInitializer(), std::move(args), E->getType(), C);
-}
-
-RValue RValueEmitter::visitDictionaryExpr(DictionaryExpr *E, SGFContext C) {
-  return visit(E->getSemanticExpr(), C);
 }
 
 /// Flattens one level of optional from a nested optional value.
