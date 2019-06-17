@@ -446,6 +446,12 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     Arguments.push_back(arg->getValue());
   }
                                  
+  if (context.Args.hasArg(options::
+          OPT_disable_autolinking_runtime_compatibility_dynamic_replacements)) {
+    Arguments.push_back(
+        "-disable-autolinking-runtime-compatibility-dynamic-replacements");
+  }
+
   return II;
 }
 

@@ -1178,6 +1178,11 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
                                                     runtimeCompatibilityVersion;
   }
 
+  if (!Args.hasArg(options::
+          OPT_disable_autolinking_runtime_compatibility_dynamic_replacements)) {
+    Opts.AutolinkRuntimeCompatibilityDynamicReplacementLibraryVersion =
+        getSwiftRuntimeCompatibilityVersionForTarget(Triple);
+  }
   return false;
 }
 

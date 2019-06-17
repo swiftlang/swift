@@ -17,28 +17,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "Overrides.h"
 #include "swift/Runtime/Once.h"
 #include "swift/Runtime/Exclusivity.h"
 #include "../runtime/ThreadLocalStorage.h"
 
 using namespace swift;
-
-// The thread-local key must be weak so that it is shared between different
-// binaries (e.g. shared libraries).
-__attribute__((weak)) __swift_thread_key_t _swift_dr_key;
-__attribute__((weak)) swift_once_t _swift_dr_Predicate;
-
-static void createSwiftThreadKey(void *) {
-  int result = SWIFT_THREAD_KEY_CREATE(&_swift_dr_key, nullptr);
-  if (result != 0)
-    abort();
-}
-
-static __swift_thread_key_t &getTLSKey() {
-  swift_once(&_swift_dr_Predicate, createSwiftThreadKey, nullptr);
-  return _swift_dr_key;
-}
 
 __attribute__((visibility("hidden"), weak))
 extern "C" char *swift_getFunctionReplacement50(char **ReplFnPtr, char *CurrFn) {
@@ -52,9 +35,11 @@ extern "C" char *swift_getFunctionReplacement50(char **ReplFnPtr, char *CurrFn) 
   if (RawReplFn == CurrFn)
     return nullptr;
 
-  __swift_thread_key_t key = getTLSKey();
-  if ((intptr_t)SWIFT_THREAD_GETSPECIFIC(key) != 0) {
-    SWIFT_THREAD_SETSPECIFIC(key, (void *)0);
+  auto origKey = (uintptr_t)SWIFT_THREAD_GETSPECIFIC(SWIFT_RUNTIME2_TLS_KEY);
+  if ((origKey & 0x1) != 0) {
+    auto mask = ((uintptr_t)-1) < 1;
+    auto resetKey = origKey & mask;
+    SWIFT_THREAD_SETSPECIFIC(SWIFT_RUNTIME2_TLS_KEY, (void *)resetKey);
     return nullptr;
   }
   return ReplFn;
@@ -67,6 +52,13 @@ extern "C" char *swift_getOrigOfReplaceable50(char **OrigFnPtr) {
     return swift_getOrigOfReplaceable(OrigFnPtr);
 
   char *OrigFn = *OrigFnPtr;
-  SWIFT_THREAD_SETSPECIFIC(getTLSKey(), (void *)-1);
+  auto origKey = (uintptr_t)SWIFT_THREAD_GETSPECIFIC(SWIFT_RUNTIME2_TLS_KEY);
+  auto newKey = origKey | 0x1;
+  SWIFT_THREAD_SETSPECIFIC(SWIFT_RUNTIME2_TLS_KEY, (void *)newKey);
   return OrigFn;
 }
+
+// Allow this library to get force-loaded by autolinking
+__attribute__((weak, visibility("hidden")))
+extern "C"
+char _swift_FORCE_LOAD_$_swiftCompatibilityDynamicReplacements = 0;

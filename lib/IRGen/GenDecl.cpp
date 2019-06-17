@@ -468,6 +468,15 @@ void IRGenModule::emitSourceFile(SourceFile &SF) {
                                          /*forceLoad*/ true));
       }
     }
+
+    if (auto compatibilityVersion =
+            IRGen.Opts.AutolinkRuntimeCompatibilityDynamicReplacementLibraryVersion) {
+      if (*compatibilityVersion <= llvm::VersionTuple(5, 0)) {
+        this->addLinkLibrary(LinkLibrary("swiftCompatibilityDynamicReplacements",
+                                         LibraryKind::Library,
+                                         /*forceLoad*/ true));
+      }
+    }
   }
 }
 
