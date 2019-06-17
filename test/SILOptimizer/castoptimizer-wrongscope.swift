@@ -3,6 +3,8 @@
 // RUN:   -Xllvm -sil-print-after=diagnostic-constant-propagation \
 // RUN:   2>&1 | %FileCheck %s
 
+// REQUIRES: optimized_stdlib
+
 // CHECK: alloc_stack $R, loc {{.*}}, scope 2
 // CHECK-NEXT: init_existential_addr {{.*}} : $*R, $Float, loc {{.*}}, scope 2
 // CHECK-NEXT: copy_addr [take] %8 to [initialization] %66 : $*Float, loc {{.*}}, scope 2
