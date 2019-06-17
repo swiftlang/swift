@@ -1863,6 +1863,24 @@ static void validateSelfAccessKind(TypeChecker &TC, FuncDecl *FD) {
     FD->setSelfAccessKind(SelfAccessKind::NonMutating);
   else if (FD->getAttrs().hasAttribute<ConsumingAttr>())
     FD->setSelfAccessKind(SelfAccessKind::__Consuming);
+  else if (auto accessor = dyn_cast<AccessorDecl>(FD)) {
+    if (accessor->getAccessorKind() == AccessorKind::Get ||
+        accessor->getAccessorKind() == AccessorKind::Set ||
+        accessor->getAccessorKind() == AccessorKind::DidSet ||
+        accessor->getAccessorKind() == AccessorKind::WillSet) {
+      auto storage = accessor->getStorage();
+      TC.validateDecl(storage);
+      if (accessor->getAccessorKind() == AccessorKind::Get) {
+        FD->setSelfAccessKind(storage->isGetterMutating()
+                              ? SelfAccessKind::Mutating
+                              : SelfAccessKind::NonMutating);
+      } else {
+        FD->setSelfAccessKind(storage->isSetterMutating()
+                              ? SelfAccessKind::Mutating
+                              : SelfAccessKind::NonMutating);
+      }
+    }
+  }
 
   if (FD->isMutating()) {
     if (!FD->isInstanceMember() ||
