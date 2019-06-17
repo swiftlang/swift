@@ -293,6 +293,8 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
   case LinkKind::DynamicLibrary:
     Arguments.push_back("-dylib");
     break;
+  case LinkKind::StaticLibrary:
+    llvm_unreachable("the dynamic linker cannot build static libraries");
   }
 
   assert(Triple.isOSDarwin());
@@ -544,6 +546,41 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
 
   // This should be the last option, for convenience in checking output.
   Arguments.push_back("-o");
+  Arguments.push_back(
+      context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
+
+  return II;
+}
+
+
+ToolChain::InvocationInfo
+toolchains::Darwin::constructInvocation(const ArchiveJobAction &job,
+                                        const JobContext &context) const {
+   assert(context.Output.getPrimaryOutputType() == file_types::TY_Image &&
+         "Invalid linker output type.");
+
+  // Configure the toolchain.
+  const char *LibTool = "libtool";
+
+  InvocationInfo II = {LibTool};
+  ArgStringList &Arguments = II.Arguments;
+
+  Arguments.push_back("-static");
+
+  if (context.shouldUseInputFileList()) {
+    Arguments.push_back("-filelist");
+    Arguments.push_back(context.getTemporaryFilePath("inputs", "LinkFileList"));
+    II.FilelistInfos.push_back({Arguments.back(), file_types::TY_Object,
+                                FilelistInfo::WhichFiles::Input});
+  } else {
+    addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
+                           file_types::TY_Object);
+  }
+
+  addInputsOfType(Arguments, context.InputActions, file_types::TY_Object);
+
+  Arguments.push_back("-o");
+
   Arguments.push_back(
       context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
 

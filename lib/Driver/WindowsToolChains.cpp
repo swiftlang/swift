@@ -61,6 +61,8 @@ toolchains::Windows::constructInvocation(const LinkJobAction &job,
   case LinkKind::DynamicLibrary:
     Arguments.push_back("-shared");
     break;
+  case LinkKind::StaticLibrary:
+    llvm_unreachable("invalid link kind");
   }
 
   // Select the linker to use.
@@ -181,6 +183,32 @@ toolchains::Windows::constructInvocation(const LinkJobAction &job,
       context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
 
   InvocationInfo II{Clang, Arguments};
+  II.allowsResponseFiles = true;
+
+  return II;
+}
+
+ToolChain::InvocationInfo
+toolchains::Windows::constructInvocation(const ArchiveJobAction &job,
+                                         const JobContext &context) const {
+   assert(context.Output.getPrimaryOutputType() == file_types::TY_Image &&
+         "Invalid linker output type.");
+
+  ArgStringList Arguments;
+
+  // Configure the toolchain.
+  const char *Link = "link";
+  Arguments.push_back("-lib");
+
+  addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
+                         file_types::TY_Object);
+  addInputsOfType(Arguments, context.InputActions, file_types::TY_Object);
+
+  Arguments.push_back(
+      context.Args.MakeArgString(Twine("/OUT:") + 
+      context.Output.getPrimaryOutputFilename()));
+
+  InvocationInfo II{Link, Arguments};
   II.allowsResponseFiles = true;
 
   return II;
