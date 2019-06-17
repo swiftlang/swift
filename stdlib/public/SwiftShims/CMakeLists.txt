@@ -87,11 +87,18 @@ endif()
 string(REGEX MATCH "[0-9]+\\.[0-9]+(\\.[0-9]+)?" CLANG_VERSION
   "${LLVM_PACKAGE_VERSION}")
 if(NOT SWIFT_INCLUDE_TOOLS AND SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER)
-  execute_process(COMMAND ${CMAKE_C_COMPILER} -print-resource-dir
-    OUTPUT_VARIABLE clang_headers_location
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-    ERROR_QUIET)
-  message(STATUS "using clang resource directory: ${clang_headers_location}")
+  if(SWIFT_COMPILER_IS_MSVC_LIKE)
+    execute_process(COMMAND ${CMAKE_C_COMPILER} /clang:-print-resource-dir
+      OUTPUT_VARIABLE clang_headers_location
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+      ERROR_QUIET)
+  else()
+    execute_process(COMMAND ${CMAKE_C_COMPILER} -print-resource-dir
+      OUTPUT_VARIABLE clang_headers_location
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+      ERROR_QUIET)
+  endif()
+  message(STATUS "Using clang Resource Directory: ${clang_headers_location}")
 else()
   set(clang_headers_location "${LLVM_LIBRARY_OUTPUT_INTDIR}/clang/${CLANG_VERSION}")
 endif()
