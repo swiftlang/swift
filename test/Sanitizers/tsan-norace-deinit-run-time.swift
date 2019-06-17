@@ -4,6 +4,9 @@
 // REQUIRES: executable_test
 // REQUIRES: tsan_runtime
 
+// Failing sporadically in CI
+// REQUIRES: rdar51804988
+
 // FIXME: This should be covered by "tsan_runtime"; older versions of Apple OSs
 // don't support TSan.
 // UNSUPPORTED: remote_run
