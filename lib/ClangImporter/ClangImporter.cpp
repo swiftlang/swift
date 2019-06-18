@@ -1672,8 +1672,7 @@ ModuleDecl *ClangImporter::Implementation::finishLoadingClangModule(
     Identifier name = SwiftContext.getIdentifier((*clangModule).Name);
     result = ModuleDecl::create(name, SwiftContext);
     result->setIsSystemModule(clangModule->IsSystem);
-    // Silence error messages about testably importing a Clang module.
-    result->setTestingEnabled();
+    result->setIsNonSwiftModule();
     result->setHasResolvedImports();
 
     wrapperUnit =
@@ -1842,8 +1841,7 @@ ClangModuleUnit *ClangImporter::Implementation::getWrapperForModule(
   Identifier name = SwiftContext.getIdentifier(underlying->Name);
   auto wrapper = ModuleDecl::create(name, SwiftContext);
   wrapper->setIsSystemModule(underlying->IsSystem);
-  // Silence error messages about testably importing a Clang module.
-  wrapper->setTestingEnabled();
+  wrapper->setIsNonSwiftModule();
   wrapper->setHasResolvedImports();
 
   auto file = new (SwiftContext) ClangModuleUnit(*wrapper, *this,

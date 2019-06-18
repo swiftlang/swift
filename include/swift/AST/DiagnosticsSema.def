@@ -792,6 +792,11 @@ ERROR(module_not_compiled_for_private_import,none,
 ERROR(import_implementation_cannot_be_exported,none,
       "module %0 cannot be both exported and implementation-only", (Identifier))
 
+WARNING(module_not_compiled_with_library_evolution,none,
+        "module %0 was not compiled with library evolution support; "
+        "using it means binary compatibility for %1 can't be guaranteed",
+        (Identifier, Identifier))
+
 
 // Operator decls
 ERROR(ambiguous_operator_decls,none,
