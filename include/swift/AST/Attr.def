@@ -396,7 +396,7 @@ SIMPLE_DECL_ATTR(_alwaysEmitIntoClient, AlwaysEmitIntoClient,
   83)
 
 SIMPLE_DECL_ATTR(_implementationOnly, ImplementationOnly,
-  OnImport | UserInaccessible,
+  OnImport | OnFunc | OnConstructor | OnVar | OnSubscript | UserInaccessible,
   84)
 DECL_ATTR(_custom, Custom,
   OnAnyDecl | UserInaccessible,

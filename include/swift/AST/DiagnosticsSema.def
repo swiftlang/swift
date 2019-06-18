@@ -2490,6 +2490,18 @@ WARNING(warn_implementation_only_conflict,none,
 NOTE(implementation_only_conflict_here,none,
      "imported as implementation-only here", ())
 
+ERROR(implementation_only_decl_non_override,none,
+      "'@_implementationOnly' can only be used on overrides", ())
+ERROR(implementation_only_override_changed_type,none,
+      "'@_implementationOnly' override must have the same type as the "
+      "declaration it overrides (%0)", (Type))
+ERROR(implementation_only_override_without_attr,none,
+      "override of '@_implementationOnly' %0 should also be declared "
+      "'@_implementationOnly'", (DescriptiveDeclKind))
+ERROR(implementation_only_override_import_without_attr,none,
+      "override of %0 imported as implementation-only must be declared "
+      "'@_implementationOnly'", (DescriptiveDeclKind))
+
 // Derived conformances
 ERROR(cannot_synthesize_init_in_extension_of_nonfinal,none,
       "implementation of %0 for non-final class cannot be automatically "
