@@ -7413,44 +7413,78 @@ Expr *ConstraintSystem::coerceToRValue(Expr *expr) {
 /// Emit the fixes computed as part of the solution, returning true if we were
 /// able to emit an error message, or false if none of the fixits worked out.
 bool ConstraintSystem::applySolutionFixes(Expr *E, const Solution &solution) {
-  llvm::SmallDenseMap<Expr *, SmallVector<const ConstraintFix *, 4>>
-      fixesPerExpr;
-
+  // First transfer all of the deduced information back
+  // to the constraint system.
   applySolution(solution);
 
-  for (auto *fix : solution.Fixes)
-    fixesPerExpr[fix->getAnchor()].push_back(fix);
+  class DiagnosticWalker : public ASTWalker {
+    Expr *root;
+    const Solution &solution;
+    llvm::SmallDenseMap<Expr *, SmallVector<ConstraintFix *, 4>> fixesPerExpr;
 
-  auto diagnoseExprFailures = [&](Expr *expr) -> bool {
-    auto fixes = fixesPerExpr.find(expr);
-    if (fixes == fixesPerExpr.end())
-      return false;
+    /// Determines whether any error have been diagnosed while
+    /// trying to apply fixes associated with a given solution.
+    bool DiagnosedAnyErrors = false;
 
-    bool diagnosedError = false;
-    for (const auto *fix : fixes->second) {
-      auto diagnosed = fix->diagnose(E);
+  public:
+    DiagnosticWalker(Expr *expr, const Solution &solution)
+        : root(expr), solution(solution) {
+      for (auto *fix : solution.Fixes)
+        fixesPerExpr[fix->getAnchor()].push_back(fix);
+    }
 
-      if (fix->isWarning()) {
-        assert(diagnosed && "warnings should always be diagnosed");
-        (void)diagnosed;
-      } else {
-        diagnosedError |= diagnosed;
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      // Diagnose root expression last.
+      if (E == root)
+        return {true, E};
+
+      if (auto *closure = dyn_cast<ClosureExpr>(E)) {
+        auto result = solution.builderTransformedClosures.find(closure);
+        if (result != solution.builderTransformedClosures.end()) {
+          auto *transformedExpr = result->second.second;
+          // Since this closure has been transformed into something
+          // else let's look inside transformed expression instead.
+          return {true, transformedExpr};
+        }
+      }
+
+      diagnose(E);
+      return {true, E};
+    }
+
+    Expr *walkToExprPost(Expr *E) override {
+      if (E == root)
+        diagnose(E);
+      return E;
+    }
+
+    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+      return {true, S};
+    }
+
+    bool hadErrors() const { return DiagnosedAnyErrors; }
+
+  private:
+    void diagnose(Expr *E) {
+      auto fixes = fixesPerExpr.find(E);
+      if (fixes == fixesPerExpr.end())
+        return;
+
+      for (const auto *fix : fixes->second) {
+        auto diagnosed = fix->diagnose(root);
+        if (fix->isWarning()) {
+          assert(diagnosed && "warnings should always be diagnosed");
+          (void)diagnosed;
+        } else {
+          DiagnosedAnyErrors |= diagnosed;
+        }
       }
     }
-    return diagnosedError;
   };
 
-  bool diagnosedError = false;
-  E->forEachChildExpr([&](Expr *subExpr) -> Expr * {
-    // Diagnose root expression at the end to
-    // preserve ordering.
-    if (subExpr != E)
-      diagnosedError |= diagnoseExprFailures(subExpr);
-    return subExpr;
-  });
-
-  diagnosedError |= diagnoseExprFailures(E);
-  return diagnosedError;
+  DiagnosticWalker diagnostics(E, solution);
+  E->walk(diagnostics);
+  return diagnostics.hadErrors();
 }
 
 /// Apply a given solution to the expression, producing a fully
