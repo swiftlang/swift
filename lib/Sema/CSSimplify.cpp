@@ -4790,30 +4790,25 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       if (resolvedOverload && resolvedOverload->Choice.isDecl()) {
         if (auto *decl =
                 dyn_cast<VarDecl>(resolvedOverload->Choice.getDecl())) {
-          // Check the property wrappers in order from outermost in so we can
-          // reccommend the minimum number of unwraps needed to produce a valid
-          // lookup.
-          for (unsigned i = 0; i < decl->getAttachedPropertyWrappers().size();
-               ++i) {
-            auto rawWrapperTy = decl->getAttachedPropertyWrapperType(i);
+          if (decl->hasAttachedPropertyWrapper()) {
+            auto rawWrapperTy = decl->getAttachedPropertyWrapperType(0);
             auto wrapperTy =
                 openUnboundGenericType(rawWrapperTy, resolvedOverload->Locator);
-            auto wrappedInfo = decl->getAttachedPropertyWrapperTypeInfo(i);
+            auto wrappedInfo = decl->getAttachedPropertyWrapperTypeInfo(0);
             auto valueTy = wrapperTy->getTypeOfMember(
                 useDC->getParentModule(), wrappedInfo.valueVar,
                 wrappedInfo.valueVar->getValueInterfaceType());
-            if (valueTy->hasError())
-              continue;
+            if (!valueTy->hasError()) {
+              addConstraint(ConstraintKind::Equal, valueTy, baseTy,
+                            resolvedOverload->Locator);
 
-            addConstraint(ConstraintKind::Equal, valueTy, baseTy,
-                          resolvedOverload->Locator);
-
-            auto result = solveWithNewBaseOrName(wrapperTy, member);
-            if (result == SolutionKind::Solved) {
-              auto *fix = InsertPropertyWrapperUnwrap::create(
-                  *this, baseTy, wrapperTy, locator);
-              return recordFix(fix) ? SolutionKind::Error
-                                    : SolutionKind::Solved;
+              auto result = solveWithNewBaseOrName(wrapperTy, member);
+              if (result == SolutionKind::Solved) {
+                auto *fix = InsertPropertyWrapperUnwrap::create(
+                    *this, baseTy, wrapperTy, locator);
+                return recordFix(fix) ? SolutionKind::Error
+                                      : SolutionKind::Solved;
+              }
             }
           }
         }
