@@ -2700,7 +2700,11 @@ public:
   /// True if this is a C function that was imported as a member of a type in
   /// Swift.
   bool isImportAsMember() const;
-  
+
+  /// Returns true if the declaration's interface type is a function type with a
+  /// curried self parameter.
+  bool hasCurriedSelf() const;
+
   /// Get the decl for this value's opaque result type, if it has one.
   OpaqueTypeDecl *getOpaqueResultTypeDecl() const;
 
@@ -7186,6 +7190,14 @@ inline bool ValueDecl::isStatic() const {
 inline bool ValueDecl::isImportAsMember() const {
   if (auto func = dyn_cast<AbstractFunctionDecl>(this))
     return func->isImportAsMember();
+  return false;
+}
+
+inline bool ValueDecl::hasCurriedSelf() const {
+  if (auto *afd = dyn_cast<AbstractFunctionDecl>(this))
+    return afd->hasImplicitSelfDecl();
+  if (isa<EnumElementDecl>(this))
+    return true;
   return false;
 }
 
