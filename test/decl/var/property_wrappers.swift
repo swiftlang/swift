@@ -877,3 +877,21 @@ struct TestComposition {
     $p3 = d // expected-error{{cannot assign value of type 'Double' to type 'WrapperD<WrapperE<Int?>, Int, String>'}}
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Missing Property Wrapper Unwrap Diagnostics
+// ---------------------------------------------------------------------------
+@propertyWrapper
+struct Foo<T> {
+  var wrappedValue: T
+
+  func foo() {}
+}
+
+struct MissingPropertyWrapperUnwrap {
+  @Foo var x: Int
+
+  func baz() {
+    self.x.foo() // expected-error {{wrapped value of type 'Int' must be unwraped to value of type 'Foo<Int>'}}{{10-10=$}}
+  }
+}
