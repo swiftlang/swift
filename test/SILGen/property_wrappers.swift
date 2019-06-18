@@ -346,6 +346,55 @@ func testComposition() {
   _ = CompositionMembers(p1: nil)
 }
 
+// Observers with non-default mutatingness.
+@propertyWrapper
+struct NonMutatingSet<T> {
+  private var fixed: T
+
+  var wrappedValue: T {
+    get { fixed }
+    nonmutating set { }
+  }
+
+  init(initialValue: T) {
+    fixed = initialValue
+  }
+}
+
+@propertyWrapper
+struct MutatingGet<T> {
+  private var fixed: T
+
+  var wrappedValue: T {
+    mutating get { fixed }
+    set { }
+  }
+
+  init(initialValue: T) {
+    fixed = initialValue
+  }
+}
+
+struct ObservingTest {
+	// ObservingTest.text.setter
+	// CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers13ObservingTestV4textSSvs : $@convention(method) (@owned String, @guaranteed ObservingTest) -> ()
+	// CHECK: function_ref @$s17property_wrappers14NonMutatingSetV12wrappedValuexvg
+  @NonMutatingSet var text: String = "" {
+    didSet { }
+  }
+
+  @NonMutatingSet var integer: Int = 17 {
+    willSet { }
+  }
+
+  @MutatingGet var text2: String = "" {
+    didSet { }
+  }
+
+  @MutatingGet var integer2: Int = 17 {
+    willSet { }
+  }
+}
 
 // CHECK-LABEL: sil_vtable ClassUsingWrapper {
 // CHECK-NEXT:  #ClassUsingWrapper.x!getter.1: (ClassUsingWrapper) -> () -> Int : @$s17property_wrappers17ClassUsingWrapperC1xSivg   // ClassUsingWrapper.x.getter
