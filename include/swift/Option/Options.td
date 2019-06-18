@@ -893,9 +893,9 @@ def disable_autolinking_runtime_compatibility : Flag<["-"], "disable-autolinking
   HelpText<"Do not use autolinking for runtime compatibility libraries">;
 
 def disable_autolinking_runtime_compatibility_dynamic_replacements
-    : Flag<[ "-" ],
-    "disable-autolinking-runtime-compatibility-dynamic-replacements">,
+    : Flag<[ "-" ], "disable-autolinking-runtime-compatibility-dynamic-replacements">,
       Flags<[ FrontendOption ]>,
-      HelpText<"Do not use autolinking for runtime compatibility libraries">;
+      HelpText<"Do not use autolinking for the dynamic replacement runtime "
+               "compatibility library">;
 
 include "FrontendOptions.td"
