@@ -275,7 +275,6 @@ static void addRuntimeLibraryFlags(const OutputInfo &OI,
 
   Arguments.push_back("-autolink-library");
   switch (RT) {
-  default: llvm_unreachable("invalid MSVC runtime library");
   case OutputInfo::MSVCRuntime::MultiThreaded:
     Arguments.push_back("libcmt");
     break;
