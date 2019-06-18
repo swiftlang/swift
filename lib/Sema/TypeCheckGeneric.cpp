@@ -167,6 +167,26 @@ static void revertDependentTypeLoc(TypeLoc &tl) {
 Type TypeChecker::getOrCreateOpaqueResultType(TypeResolution resolution,
                                               ValueDecl *originatingDecl,
                                               OpaqueReturnTypeRepr *repr) {
+  // Protocol requirements can't have opaque return types.
+  //
+  // TODO: Maybe one day we could treat this as sugar for an associated type.
+  if (isa<ProtocolDecl>(originatingDecl->getDeclContext())
+      && originatingDecl->isProtocolRequirement()) {
+    
+    SourceLoc fixitLoc;
+    if (auto vd = dyn_cast<VarDecl>(originatingDecl)) {
+      fixitLoc = vd->getParentPatternBinding()->getStartLoc();
+    } else {
+      fixitLoc = originatingDecl->getStartLoc();
+    }
+    
+    diagnose(repr->getLoc(), diag::opaque_type_in_protocol_requirement)
+      .fixItInsert(fixitLoc, "associatedtype <#AssocType#>\n")
+      .fixItReplace(repr->getSourceRange(), "<#AssocType#>");
+    
+    return ErrorType::get(Context);
+  }
+  
   // If the decl already has an opaque type decl for its return type, use it.
   if (auto existingDecl = originatingDecl->getOpaqueResultTypeDecl()) {
     return existingDecl->getDeclaredInterfaceType();
