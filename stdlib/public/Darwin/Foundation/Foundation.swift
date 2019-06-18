@@ -42,10 +42,11 @@ public let NSNotFound: Int = .max
 /// - parameter value: A user-visible string to return when the localized string
 ///   for `key` can't be found in the table. The default value is the empty
 ///   string, which indicates that `key` should be returned.
-/// - parameter comment: A note to the translator describing the context in
-///   in which this localized string is presented to the user. For example, this
-///   can indicate whether the "Book" is used as a noun or a verb. In French,
-///   the noun is "Livre", whereas the verb is "Réserver".
+/// - parameter comment: A note to the translator describing the context where
+///   the localized string is presented to the user. For example, this can
+///   indicate whether the "Book" is used as a noun or a verb. This distinction
+///   is important when translating to French, where the noun is "Livre" and the
+///   verb is "Réserver".
 ///
 /// - returns: A localized version of the string designated by `key` in the
 ///   table identified by `tableName`. If the localized string for `key` cannot
@@ -148,21 +149,32 @@ public let NSNotFound: Int = .max
 ///                            + "this other string literal works just fine.",
 ///                       comment: "The description of a sample of code.")
 ///
-/// However, since comments aren't localized, multi-line string literals are
-/// safe to use for `comment`.
+/// Luckily, since comments aren't localized, multi-line string literals can be
+/// safely used with `comment`.
 ///
 /// Alternatives
 /// ------------
 ///
 /// If having Xcode generate strings files from code isn't desired behavior,
 /// you should call `Bundle.localizedString(forKey:value:table:)` instead.
-/// Doing so will require the manual creation and management of the relevant
-/// strings files.
 ///
-/// It should be noted that both localization methods can be used at the same
-/// time, but data from manually managed strings file tables will be overwritten
-/// by Xcode if that table is also used with a call to
-/// `NSLocaliedString(_:tableName:bundle:value:comment:)`.
+///     let greeting = Bundle.localizedString(forKey: "program-greeting",
+///                                           value: "Hello, World!",
+///                                           table: "Localization")
+///
+/// However, this requires the manual creation and management of that table's
+/// strings file.
+///
+///     /* Localization.strings */
+///
+///     /* A friendly greeting to the user when the program starts. */
+///     "program-greeting" = "Hello, World!";
+///
+/// **Note:** Although `NSLocalizedString(_:tableName:bundle:value:comment:)`
+/// and `Bundle.localizedString(forKey:value:table:)` can be used in a project
+/// at the same time, data from a manually managed strings files will be
+/// overwritten by Xcode when their table is also used to look up localized
+/// strings with `NSLocalizedString(_:tableName:bundle:value:comment:)`.
 public
 func NSLocalizedString(_ key: String,
                        tableName: String? = nil,
