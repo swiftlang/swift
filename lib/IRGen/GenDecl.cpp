@@ -468,6 +468,15 @@ void IRGenModule::emitSourceFile(SourceFile &SF) {
                                          /*forceLoad*/ true));
       }
     }
+
+    if (auto compatibilityVersion =
+            IRGen.Opts.AutolinkRuntimeCompatibilityDynamicReplacementLibraryVersion) {
+      if (*compatibilityVersion <= llvm::VersionTuple(5, 0)) {
+        this->addLinkLibrary(LinkLibrary("swiftCompatibilityDynamicReplacements",
+                                         LibraryKind::Library,
+                                         /*forceLoad*/ true));
+      }
+    }
   }
 }
 
@@ -2239,8 +2248,8 @@ void IRGenModule::createReplaceableProlog(IRGenFunction &IGF, SILFunction *f) {
     rhs = FnAddr;
   } else {
     // Call swift_getFunctionReplacement to check which function to call.
-    auto *callRTFunc = IGF.Builder.CreateCall(getGetReplacementFn(),
-                                             { ReplAddr, FnAddr });
+    auto *callRTFunc =
+        IGF.Builder.CreateCall(getGetReplacementFn(), {ReplAddr, FnAddr});
     callRTFunc->setDoesNotThrow();
     ReplFn = callRTFunc;
     rhs = llvm::ConstantExpr::getNullValue(ReplFn->getType());
@@ -2408,8 +2417,9 @@ void IRGenModule::emitDynamicReplacementOriginalFunctionThunk(SILFunction *f) {
       llvm::ConstantExpr::getInBoundsGetElementPtr(nullptr, linkEntry, indices),
       FunctionPtrTy->getPointerTo());
 
-  auto *OrigFn = IGF.Builder.CreateCall(getGetOrigOfReplaceableFn(),
-                                        { fnPtrAddr });
+  auto *OrigFn =
+      IGF.Builder.CreateCall(getGetOrigOfReplaceableFn(), {fnPtrAddr});
+
   OrigFn->setDoesNotThrow();
 
   auto *typeFnPtr =
