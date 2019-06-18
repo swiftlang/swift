@@ -438,19 +438,20 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
   if (job.getKind() == LinkKind::Executable) {
     runtimeDynamicReplacementCompatibilityVersion
                          = getSwiftRuntimeCompatibilityVersionForTarget(Triple);
-    if (*runtimeDynamicReplacementCompatibilityVersion <=
-        llvm::VersionTuple(5, 0)) {
-      // Swift 5.0 dynamic replacement compatibility library.
-      SmallString<128> BackDeployLib;
-      BackDeployLib.append(RuntimeLibPath);
-      llvm::sys::path::append(BackDeployLib,
-                              "libswiftCompatibilityDynamicReplacements.a");
+    if (runtimeDynamicReplacementCompatibilityVersion)
+      if (*runtimeDynamicReplacementCompatibilityVersion <=
+          llvm::VersionTuple(5, 0)) {
+        // Swift 5.0 dynamic replacement compatibility library.
+        SmallString<128> BackDeployLib;
+        BackDeployLib.append(RuntimeLibPath);
+        llvm::sys::path::append(BackDeployLib,
+                                "libswiftCompatibilityDynamicReplacements.a");
 
-      if (llvm::sys::fs::exists(BackDeployLib)) {
-        Arguments.push_back("-force_load");
-        Arguments.push_back(context.Args.MakeArgString(BackDeployLib));
+        if (llvm::sys::fs::exists(BackDeployLib)) {
+          Arguments.push_back("-force_load");
+          Arguments.push_back(context.Args.MakeArgString(BackDeployLib));
+        }
       }
-    }
   }
 
   // Link the standard library.
