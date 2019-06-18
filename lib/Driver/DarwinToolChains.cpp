@@ -434,13 +434,9 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
     }
   }
     
-  Optional<llvm::VersionTuple> runtimeDynamicReplacementCompatibilityVersion;
   if (job.getKind() == LinkKind::Executable) {
-    runtimeDynamicReplacementCompatibilityVersion
-                         = getSwiftRuntimeCompatibilityVersionForTarget(Triple);
-    if (runtimeDynamicReplacementCompatibilityVersion)
-      if (*runtimeDynamicReplacementCompatibilityVersion <=
-          llvm::VersionTuple(5, 0)) {
+    if (runtimeCompatibilityVersion)
+      if (*runtimeCompatibilityVersion <= llvm::VersionTuple(5, 0)) {
         // Swift 5.0 dynamic replacement compatibility library.
         SmallString<128> BackDeployLib;
         BackDeployLib.append(RuntimeLibPath);
