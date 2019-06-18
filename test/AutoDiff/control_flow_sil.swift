@@ -16,30 +16,30 @@ func cond(_ x: Float) -> Float {
   return x - x
 }
 
-// CHECK-DATA-STRUCTURES: enum _AD__cond_bb0__Pred__src_0_wrt_0 {
-// CHECK-DATA-STRUCTURES: }
 // CHECK-DATA-STRUCTURES: struct _AD__cond_bb0__PB__src_0_wrt_0 {
-// CHECK-DATA-STRUCTURES: }
-// CHECK-DATA-STRUCTURES: enum _AD__cond_bb1__Pred__src_0_wrt_0 {
-// CHECK-DATA-STRUCTURES:   case bb0(_AD__cond_bb0__PB__src_0_wrt_0)
 // CHECK-DATA-STRUCTURES: }
 // CHECK-DATA-STRUCTURES: struct _AD__cond_bb1__PB__src_0_wrt_0 {
 // CHECK-DATA-STRUCTURES:   @_hasStorage var predecessor: _AD__cond_bb1__Pred__src_0_wrt_0 { get set }
 // CHECK-DATA-STRUCTURES:   @_hasStorage var pullback_0: (Float) -> (Float, Float) { get set }
 // CHECK-DATA-STRUCTURES: }
-// CHECK-DATA-STRUCTURES: enum _AD__cond_bb2__Pred__src_0_wrt_0 {
-// CHECK-DATA-STRUCTURES:   case bb0(_AD__cond_bb0__PB__src_0_wrt_0)
-// CHECK-DATA-STRUCTURES: }
 // CHECK-DATA-STRUCTURES: struct _AD__cond_bb2__PB__src_0_wrt_0 {
 // CHECK-DATA-STRUCTURES:   @_hasStorage var predecessor: _AD__cond_bb2__Pred__src_0_wrt_0 { get set }
 // CHECK-DATA-STRUCTURES:   @_hasStorage var pullback_1: (Float) -> (Float, Float) { get set }
 // CHECK-DATA-STRUCTURES: }
+// CHECK-DATA-STRUCTURES: struct _AD__cond_bb3__PB__src_0_wrt_0 {
+// CHECK-DATA-STRUCTURES:   @_hasStorage var predecessor: _AD__cond_bb3__Pred__src_0_wrt_0 { get set }
+// CHECK-DATA-STRUCTURES: }
+// CHECK-DATA-STRUCTURES: enum _AD__cond_bb0__Pred__src_0_wrt_0 {
+// CHECK-DATA-STRUCTURES: }
+// CHECK-DATA-STRUCTURES: enum _AD__cond_bb1__Pred__src_0_wrt_0 {
+// CHECK-DATA-STRUCTURES:   case bb0(_AD__cond_bb0__PB__src_0_wrt_0)
+// CHECK-DATA-STRUCTURES: }
+// CHECK-DATA-STRUCTURES: enum _AD__cond_bb2__Pred__src_0_wrt_0 {
+// CHECK-DATA-STRUCTURES:   case bb0(_AD__cond_bb0__PB__src_0_wrt_0)
+// CHECK-DATA-STRUCTURES: }
 // CHECK-DATA-STRUCTURES: enum _AD__cond_bb3__Pred__src_0_wrt_0 {
 // CHECK-DATA-STRUCTURES:   case bb2(_AD__cond_bb2__PB__src_0_wrt_0)
 // CHECK-DATA-STRUCTURES:   case bb1(_AD__cond_bb1__PB__src_0_wrt_0)
-// CHECK-DATA-STRUCTURES: }
-// CHECK-DATA-STRUCTURES: struct _AD__cond_bb3__PB__src_0_wrt_0 {
-// CHECK-DATA-STRUCTURES:   @_hasStorage var predecessor: _AD__cond_bb3__Pred__src_0_wrt_0 { get set }
 // CHECK-DATA-STRUCTURES: }
 
 // CHECK-SIL-LABEL: sil hidden @AD__cond__vjp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
@@ -135,6 +135,20 @@ func nested_cond_generic<T : Differentiable & FloatingPoint>(_ x: T, _ y: T) -> 
     }
   }
   return y
+}
+
+@differentiable
+@_silgen_name("loop_generic")
+func loop_generic<T : Differentiable & FloatingPoint>(_ x: T) -> T {
+  var result = x
+  for _ in 1..<3 {
+    var y = x
+    for _ in 1..<3 {
+      result = y
+      y = result
+    }
+  }
+  return result
 }
 
 // Test control flow + tuple buffer.

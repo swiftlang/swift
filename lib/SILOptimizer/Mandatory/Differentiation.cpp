@@ -21,9 +21,10 @@
 
 #define DEBUG_TYPE "differentiation"
 
-#include "swift/AST/AnyFunctionRef.h"
+#include "Differentiation.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
+#include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/DeclContext.h"
@@ -388,9 +389,11 @@ private:
   /// The original function.
   SILFunction *const original;
 
-  /// The pullback data structures.
-  DenseMap<SILBasicBlock *, std::pair<StructDecl *, EnumDecl *>>
-      pullbackDataStructures;
+  /// Mapping from original basic blocks to pullback structs.
+  DenseMap<SILBasicBlock *, StructDecl *> pullbackStructs;
+
+  /// Mapping from original basic blocks to predecessor enums.
+  DenseMap<SILBasicBlock *, EnumDecl *> predecessorEnums;
 
   /// Mapping from `apply` and `struct_extract` instructions in the original
   /// function to the corresponding pullback declaration in the pullback struct.
@@ -545,9 +548,8 @@ private:
 
   /// Creates a struct declaration with the given VJP generic signature, for
   /// storing the pullback values and predecessor of the given original block.
-  std::pair<StructDecl *, VarDecl *>
+  StructDecl *
   createPullbackStruct(SILBasicBlock *originalBB, SILAutoDiffIndices indices,
-                       EnumDecl *predecessorEnum,
                        CanGenericSignature vjpGenericSig) {
     auto *original = originalBB->getParent();
     auto &astCtx = original->getASTContext();
@@ -575,15 +577,6 @@ private:
     pullbackStruct->computeType();
     assert(pullbackStruct->hasInterfaceType());
     file.addVisibleDecl(pullbackStruct);
-    // Add predecessor field if not entry block.
-    VarDecl *predecessorEnumField = nullptr;
-    if (!originalBB->isEntry()) {
-      predecessorEnumField = addVarDecl(
-          pullbackStruct, astCtx.getIdentifier("predecessor").str(),
-          predecessorEnum->getDeclaredInterfaceType());
-      pullbackStructPredecessorFields.insert(
-          {pullbackStruct, predecessorEnumField});
-    }
     LLVM_DEBUG({
       auto &s = getADDebugStream();
       s << "Pullback struct created for function @" << original->getName()
@@ -591,77 +584,51 @@ private:
       pullbackStruct->print(s);
       s << '\n';
     });
-    return {pullbackStruct, predecessorEnumField};
+    return pullbackStruct;
   }
 
 public:
   PullbackInfo(const PullbackInfo &) = delete;
   PullbackInfo &operator=(const PullbackInfo &) = delete;
 
-  explicit PullbackInfo(SILFunction *original, SILFunction *vjp,
-                       const SILAutoDiffIndices &indices,
-                       Lowering::TypeConverter &typeConverter)
-      : original(original), typeConverter(typeConverter) {
-    // Get VJP generic signature.
-    CanGenericSignature vjpGenSig = nullptr;
-    if (auto *vjpGenEnv = vjp->getGenericEnvironment())
-      vjpGenSig = vjpGenEnv->getGenericSignature()->getCanonicalSignature();
-    // Create predecessor enum and pullback struct for each original block.
-    // TODO: Adapt data structure generation to handle loops.
-    // - Generate all pullback structs before predecessor enums.
-    // - Mark appropriate predecessor enums as indirect.
-    for (auto &origBB : *original) {
-      auto *predEnum = createBasicBlockPredecessorEnum(
-          &origBB, indices, vjpGenSig);
-      StructDecl *pbStruct;
-      VarDecl *predecessorEnumField;
-      std::tie(pbStruct, predecessorEnumField) = createPullbackStruct(
-          &origBB, indices, predEnum, vjpGenSig);
-      pullbackDataStructures.insert({&origBB, {pbStruct, predEnum}});
-    }
-  }
-
-  /// Returns the pullback struct and predecessor enum associated with the
-  /// given original block.
-  std::pair<StructDecl *, EnumDecl *>
-  getPullbackDataStructures(SILBasicBlock *origBB) {
-    return pullbackDataStructures.lookup(origBB);
-  }
+  explicit PullbackInfo(ADContext &context, SILFunction *original,
+                        SILFunction *vjp, const SILAutoDiffIndices &indices);
 
   /// Returns the pullback struct associated with the given original block.
   StructDecl *getPullbackStruct(SILBasicBlock *origBB) const {
-    return pullbackDataStructures.lookup(origBB).first;
+    return pullbackStructs.lookup(origBB);
   }
 
   /// Returns the lowered SIL type of the pullback struct associated with the
   /// given original block.
   SILType getPullbackStructLoweredType(SILBasicBlock *origBB) const {
     auto *pbStruct = getPullbackStruct(origBB);
-    auto pbStructType = pbStruct->getDeclaredInterfaceType()
-        ->getCanonicalType();
-    return typeConverter.getLoweredType(
-        pbStructType, ResilienceExpansion::Minimal);
+    auto pbStructType =
+        pbStruct->getDeclaredInterfaceType()->getCanonicalType();
+    return typeConverter.getLoweredType(pbStructType,
+                                        ResilienceExpansion::Minimal);
   }
 
   /// Returns the predecessor enum associated with the given original block.
   EnumDecl *getPredecessorEnum(SILBasicBlock *origBB) const {
-    return pullbackDataStructures.lookup(origBB).second;
+    return predecessorEnums.lookup(origBB);
   }
 
   /// Returns the lowered SIL type of the predecessor enum associated with the
   /// given original block.
   SILType getPredecessorEnumLoweredType(SILBasicBlock *origBB) const {
     auto *predEnum = getPredecessorEnum(origBB);
-    auto predEnumType = predEnum->getDeclaredInterfaceType()
-        ->getCanonicalType();
-    return typeConverter.getLoweredType(
-        predEnumType, ResilienceExpansion::Minimal);
+    auto predEnumType =
+        predEnum->getDeclaredInterfaceType()->getCanonicalType();
+    return typeConverter.getLoweredType(predEnumType,
+                                        ResilienceExpansion::Minimal);
   }
 
-  /// Returns the enum element in the given successor block's predecessor enum,
+  /// Returns the enum element in the given successor block's predecessor enum
   /// corresponding to the given predecessor block.
-  EnumElementDecl *lookUpPredecessorEnumElement(
-      SILBasicBlock *origPredBB, SILBasicBlock *origSuccBB) {
+  EnumElementDecl *
+  lookUpPredecessorEnumElement(SILBasicBlock *origPredBB,
+                               SILBasicBlock *origSuccBB) const {
     assert(origPredBB->getParent() == original);
     return predecessorEnumCases.lookup({origPredBB, origSuccBB});
   }
@@ -675,7 +642,7 @@ public:
   /// Returns the predecessor enum field for the pullback struct of the given
   /// original block.
   VarDecl *lookUpPullbackStructPredecessorField(SILBasicBlock *origBB) {
-    auto *pullbackStruct = getPullbackDataStructures(origBB).first;
+    auto *pullbackStruct = getPullbackStruct(origBB);
     return pullbackStructPredecessorFields.lookup(pullbackStruct);
   }
 
@@ -1254,6 +1221,38 @@ ADContext::emitNondifferentiabilityError(SourceLoc loc,
   }
 }
 
+PullbackInfo::PullbackInfo(ADContext &context, SILFunction *original,
+                           SILFunction *vjp, const SILAutoDiffIndices &indices)
+    : original(original), typeConverter(context.getTypeConverter()) {
+  auto &astCtx = original->getASTContext();
+  auto *loopAnalysis = context.getPassManager().getAnalysis<SILLoopAnalysis>();
+  auto *loopInfo = loopAnalysis->get(original);
+  // Get VJP generic signature.
+  CanGenericSignature vjpGenSig = nullptr;
+  if (auto *vjpGenEnv = vjp->getGenericEnvironment())
+    vjpGenSig = vjpGenEnv->getGenericSignature()->getCanonicalSignature();
+  // Create predecessor enum and pullback struct for each original block.
+  for (auto &origBB : *original) {
+    auto *pbStruct = createPullbackStruct(&origBB, indices, vjpGenSig);
+    pullbackStructs.insert({&origBB, pbStruct});
+  }
+  for (auto &origBB : *original) {
+    auto *pbStruct = getPullbackStruct(&origBB);
+    auto *predEnum =
+        createBasicBlockPredecessorEnum(&origBB, indices, vjpGenSig);
+    // If original block is in a loop, mark predecessor enum as indirect.
+    if (loopInfo->getLoopFor(&origBB))
+      predEnum->getAttrs().add(new (astCtx) IndirectAttr(/*Implicit*/ true));
+    predecessorEnums.insert({&origBB, predEnum});
+    if (origBB.isEntry())
+      continue;
+    auto *predEnumField =
+        addVarDecl(pbStruct, astCtx.getIdentifier("predecessor").str(),
+                   predEnum->getDeclaredInterfaceType());
+    pullbackStructPredecessorFields.insert({pbStruct, predEnumField});
+  }
+}
+
 //===----------------------------------------------------------------------===//
 // Activity Analysis
 //===----------------------------------------------------------------------===//
@@ -1737,6 +1736,7 @@ static void dumpActivityInfo(SILFunction &fn,
     for (auto &inst : bb)
       for (auto res : inst.getResults())
         dumpActivityInfo(res, indices, activityInfo, s);
+    s << "\n";
   }
 }
 
@@ -1756,23 +1756,13 @@ static bool diagnoseNoReturn(ADContext &context, SILFunction *original,
 /// flow unsupported" error at appropriate source locations. Returns true if
 /// error is emitted.
 ///
-/// Update as control flow support is added. Currently, loops and branching
-/// terminators other than `br` and `cond_br` are not supported.
+/// Update as control flow support is added. Currently, branching terminators
+/// other than `br`, `cond_br`, `switch_enum` are not supported.
 static bool diagnoseUnsupportedControlFlow(ADContext &context,
                                            SILFunction *original,
                                            DifferentiationInvoker invoker) {
   if (original->getBlocks().size() <= 1)
     return false;
-  // Diagnose loops first, to provide a more specific diagnostic.
-  auto *loopAnalysis = context.getPassManager().getAnalysis<SILLoopAnalysis>();
-  auto *loopInfo = loopAnalysis->get(original);
-  if (!loopInfo->empty()) {
-    auto *loop = *loopInfo->getTopLevelLoops().begin();
-    context.emitNondifferentiabilityError(
-        loop->getHeader()->getTerminator(), invoker,
-        diag::autodiff_loops_not_supported);
-    return true;
-  }
   // Diagnose unsupported branching terminators.
   for (auto &bb : *original) {
     auto *term = bb.getTerminator();
@@ -2846,15 +2836,12 @@ private:
   }
 
 public:
-  explicit VJPEmitter(ADContext &context,
-                      SILFunction *original,
-                      SILDifferentiableAttr *attr,
-                      SILFunction *vjp,
+  explicit VJPEmitter(ADContext &context, SILFunction *original,
+                      SILDifferentiableAttr *attr, SILFunction *vjp,
                       DifferentiationInvoker invoker)
       : TypeSubstCloner(*vjp, *original, getSubstitutionMap(original, vjp)),
         context(context), original(original), attr(attr), vjp(vjp),
-        pullbackInfo(
-            original, vjp, attr->getIndices(), context.getTypeConverter()),
+        pullbackInfo(context, original, vjp, attr->getIndices()),
         invoker(invoker), activityInfo(getActivityInfo(
                               context, original, attr->getIndices(), vjp)) {
     // Create empty adjoint function.
@@ -3055,15 +3042,28 @@ private:
 
   /// Build a predecessor enum instance using the given builder for the given
   /// original predecessor/successor blocks and pullback struct value.
-  EnumInst *buildPredecessorEnumValue(
-      SILBuilder &builder, SILBasicBlock *predBB, SILBasicBlock *succBB,
-      StructInst *pbStructVal) {
+  EnumInst *buildPredecessorEnumValue(SILBuilder &builder,
+                                      SILBasicBlock *predBB,
+                                      SILBasicBlock *succBB,
+                                      StructInst *pbStructVal) {
     auto loc = pbStructVal->getLoc();
     auto *succEnum = pullbackInfo.getPredecessorEnum(succBB);
     auto enumLoweredTy = getNominalDeclLoweredType(succEnum);
     auto *enumEltDecl =
         pullbackInfo.lookUpPredecessorEnumElement(predBB, succBB);
-    return builder.createEnum(loc, pbStructVal, enumEltDecl, enumLoweredTy);
+    auto enumEltType = remapType(
+        enumLoweredTy.getEnumElementType(enumEltDecl, getModule()));
+    // If the enum element type does not have a box type (i.e. the enum case is
+    // not indirect), then directly create an enum.
+    auto boxType = dyn_cast<SILBoxType>(enumEltType.getASTType());
+    if (!boxType)
+      return builder.createEnum(loc, pbStructVal, enumEltDecl, enumLoweredTy);
+    // Otherwise, box the pullback struct value and create an enum.
+    auto *allocBox = builder.createAllocBox(loc, boxType);
+    auto *projectBox = builder.createProjectBox(loc, allocBox, /*index*/ 0);
+    builder.createStore(loc, pbStructVal, projectBox,
+                        getBufferSOQ(projectBox->getType().getASTType(), *vjp));
+    return builder.createEnum(loc, allocBox, enumEltDecl, enumLoweredTy);
   }
 
 public:
@@ -3156,25 +3156,25 @@ public:
     // constructs a predecessor enum value and branches to the VJP successor
     // block.
     auto createTrampolineBasicBlock =
-      [&](SILBasicBlock *origSuccBB) -> SILBasicBlock * {
-        auto *vjpSuccBB = getOpBasicBlock(origSuccBB);
-        // Create the trampoline block.
-        auto *trampolineBB = vjp->createBasicBlockBefore(vjpSuccBB);
-        for (auto *arg : vjpSuccBB->getArguments().drop_back())
-          trampolineBB->createPhiArgument(arg->getType(),
-                                          arg->getOwnershipKind());
-        // Build predecessor enum value for successor block and branch to it.
-        SILBuilder trampolineBuilder(trampolineBB);
-        auto *succEnumVal = buildPredecessorEnumValue(
-            trampolineBuilder, origBB, origSuccBB, pbStructVal);
-        SmallVector<SILValue, 4> forwardedArguments(
-            trampolineBB->getArguments().begin(),
-            trampolineBB->getArguments().end());
-        forwardedArguments.push_back(succEnumVal);
-        trampolineBuilder.createBranch(
-            sei->getLoc(), vjpSuccBB, forwardedArguments);
-        return trampolineBB;
-      };
+        [&](SILBasicBlock *origSuccBB) -> SILBasicBlock * {
+      auto *vjpSuccBB = getOpBasicBlock(origSuccBB);
+      // Create the trampoline block.
+      auto *trampolineBB = vjp->createBasicBlockBefore(vjpSuccBB);
+      for (auto *arg : vjpSuccBB->getArguments().drop_back())
+        trampolineBB->createPhiArgument(arg->getType(),
+                                        arg->getOwnershipKind());
+      // Build predecessor enum value for successor block and branch to it.
+      SILBuilder trampolineBuilder(trampolineBB);
+      auto *succEnumVal = buildPredecessorEnumValue(trampolineBuilder, origBB,
+                                                    origSuccBB, pbStructVal);
+      SmallVector<SILValue, 4> forwardedArguments(
+          trampolineBB->getArguments().begin(),
+          trampolineBB->getArguments().end());
+      forwardedArguments.push_back(succEnumVal);
+      trampolineBuilder.createBranch(sei->getLoc(), vjpSuccBB,
+                                     forwardedArguments);
+      return trampolineBB;
+    };
 
     // Create trampoline successor basic blocks.
     SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 4> caseBBs;
@@ -3711,6 +3711,9 @@ private:
   /// Dominance info for the original function.
   DominanceInfo *domInfo = nullptr;
 
+  /// Post-dominance info for the original function.
+  PostDominanceInfo *postDomInfo = nullptr;
+
   /// Post-order info for the original function.
   PostOrderFunctionInfo *postOrderInfo = nullptr;
 
@@ -3738,15 +3741,16 @@ private:
   /// Mapping from original basic blocks to dominated active values.
   DenseMap<SILBasicBlock *, SmallVector<SILValue, 8>> activeValues;
 
-  /// Local adjoint values to be cleaned up. This is populated when adjoint
-  /// emission is run on one basic block and cleaned before processing another
-  /// basic block.
-  SmallVector<AdjointValue, 8> blockLocalAdjointValues;
-
   /// Mapping from original basic blocks and original active values to
   /// corresponding adjoint block arguments.
   DenseMap<std::pair<SILBasicBlock *, SILValue>, SILArgument *>
       activeValueAdjointBBArgumentMap;
+
+  /// Mapping from original basic blocks to local adjoint values to be cleaned
+  /// up. This is populated when adjoint emission is run on one basic block and
+  /// cleaned before processing another basic block.
+  DenseMap<SILBasicBlock *, SmallVector<AdjointValue, 8>>
+      blockLocalAdjointValues;
 
   /// Stack buffers allocated for storing local adjoint adjoint values.
   SmallVector<ValueWithCleanup, 8> functionLocalAllocations;
@@ -3794,8 +3798,10 @@ public:
     // Get dominance and post-order info for the original function.
     auto &passManager = getContext().getPassManager();
     auto *domAnalysis = passManager.getAnalysis<DominanceAnalysis>();
+    auto *postDomAnalysis = passManager.getAnalysis<PostDominanceAnalysis>();
     auto *postOrderAnalysis = passManager.getAnalysis<PostOrderAnalysis>();
     domInfo = domAnalysis->get(vjpEmitter.original);
+    postDomInfo = postDomAnalysis->get(vjpEmitter.original);
     postOrderInfo = postOrderAnalysis->get(vjpEmitter.original);
   }
 
@@ -3966,7 +3972,7 @@ private:
     valueMap.erase(it);
     auto adjVal = accumulateAdjointsDirect(existingValue, newAdjointValue);
     initializeAdjointValue(origBB, originalValue, adjVal);
-    blockLocalAdjointValues.push_back(adjVal);
+    blockLocalAdjointValues[origBB].push_back(adjVal);
   }
 
   /// Get the adjoint block argument corresponding to the given original block
@@ -4203,8 +4209,7 @@ public:
       auto &bbActiveValues = activeValues[bb];
       // If the current block has an immediate dominator, append the immediate
       // dominator block's active values to the current block's active values.
-      auto *domNode = domInfo->getNode(bb)->getIDom();
-      if (domNode) {
+      if (auto *domNode = domInfo->getNode(bb)->getIDom()) {
         auto &domBBActiveValues = activeValues[domNode->getBlock()];
         bbActiveValues.append(domBBActiveValues.begin(),
                               domBBActiveValues.end());
@@ -4250,8 +4255,21 @@ public:
       return true;
 
     // Create adjoint blocks and arguments, visiting original blocks in
-    // post-order.
-    for (auto *origBB : postOrderInfo->getPostOrder()) {
+    // post-order post-dominance order.
+    SmallVector<SILBasicBlock *, 8> postOrderPostDomOrder;
+    // Start from the root node, which may have a marker `nullptr` block if
+    // there are multiple roots.
+    PostOrderPostDominanceOrder postDomOrder(postDomInfo->getRootNode(),
+                                             postOrderInfo, original.size());
+    while (auto *origNode = postDomOrder.getNext()) {
+      auto *origBB = origNode->getBlock();
+      postDomOrder.pushChildren(origNode);
+      // If node is the `nullptr` marker basic block, do not push it.
+      if (!origBB)
+        continue;
+      postOrderPostDomOrder.push_back(origBB);
+    }
+    for (auto *origBB : postOrderPostDomOrder) {
       auto *adjointBB = adjoint.createBasicBlock();
       adjointBBMap.insert({origBB, adjointBB});
       auto pbStructLoweredType =
@@ -4302,10 +4320,17 @@ public:
       //   adjoint original block, trampoline adjoint values of active values.
       for (auto *succBB : origBB->getSuccessorBlocks()) {
         auto *adjointTrampolineBB = adjoint.createBasicBlockBefore(adjointBB);
-        adjointTrampolineBBMap.insert(
-            {{origBB, succBB}, adjointTrampolineBB});
-        adjointTrampolineBB->createPhiArgument(
-            pbStructLoweredType, ValueOwnershipKind::Guaranteed);
+        adjointTrampolineBBMap.insert({{origBB, succBB}, adjointTrampolineBB});
+        // Get the enum element type (i.e. the pullback struct type). The enum
+        // element type may be boxed if the enum is indirect.
+        auto enumLoweredTy =
+            getPullbackInfo().getPredecessorEnumLoweredType(succBB);
+        auto *enumEltDecl =
+            getPullbackInfo().lookUpPredecessorEnumElement(origBB, succBB);
+        auto enumEltType = remapType(
+            enumLoweredTy.getEnumElementType(enumEltDecl, getModule()));
+        adjointTrampolineBB->createPhiArgument(enumEltType,
+                                               ValueOwnershipKind::Guaranteed);
       }
     }
 
@@ -4356,7 +4381,7 @@ public:
 
     // Visit original blocks blocks in post-order and perform differentiation
     // in corresponding adjoint blocks.
-    for (auto *bb : postOrderInfo->getPostOrder()) {
+    for (auto *bb : postOrderPostDomOrder) {
       if (errorOccurred)
         break;
       // Get the corresponding adjoint basic block.
@@ -4392,10 +4417,7 @@ public:
       // 1. Get the pullback struct adjoint bb argument.
       // 2. Extract the predecessor enum value from the pullback struct value.
       auto *pbStructVal = getAdjointBlockPullbackStructArgument(bb);
-      StructDecl *pbStruct;
-      EnumDecl *predEnum;
-      std::tie(pbStruct, predEnum) =
-          getPullbackInfo().getPullbackDataStructures(bb);
+      auto *predEnum = getPullbackInfo().getPredecessorEnum(bb);
       auto *predEnumField =
           getPullbackInfo().lookUpPullbackStructPredecessorField(bb);
       auto *predEnumVal =
@@ -4482,19 +4504,30 @@ public:
             }
           }
           // Propagate pullback struct argument.
-          trampolineArguments.push_back(adjointSuccBB->getArguments().front());
+          auto *predPBStructVal = adjointTrampolineBB->getArguments().front();
+          auto boxType =
+              dyn_cast<SILBoxType>(predPBStructVal->getType().getASTType());
+          if (!boxType) {
+            trampolineArguments.push_back(predPBStructVal);
+          } else {
+            auto *projectBox = adjointTrampolineBBBuilder.createProjectBox(
+                adjLoc, predPBStructVal, /*index*/ 0);
+            auto *loadInst = adjointTrampolineBBBuilder.createLoad(
+                adjLoc, projectBox,
+                getBufferLOQ(projectBox->getType().getASTType(), adjoint));
+            trampolineArguments.push_back(loadInst);
+          }
           // Branch from adjoint trampoline block to adjoint block.
-          adjointTrampolineBBBuilder.createBranch(
-              adjLoc, adjointBB, trampolineArguments);
+          adjointTrampolineBBBuilder.createBranch(adjLoc, adjointBB,
+                                                  trampolineArguments);
         }
         auto *enumEltDecl =
             getPullbackInfo().lookUpPredecessorEnumElement(predBB, bb);
         adjointSuccessorCases.push_back({enumEltDecl, adjointSuccBB});
       }
       // Emit cleanups for all block-local adjoint values.
-      for (auto adjVal : blockLocalAdjointValues)
+      for (auto adjVal : blockLocalAdjointValues[bb])
         emitCleanupForAdjointValue(adjVal);
-      blockLocalAdjointValues.clear();
       // - If the original block has exactly one predecessor, then the adjoint
       //   block has exactly one successor. Extract the pullback struct value
       //   from the predecessor enum value using `unchecked_enum_data` and
@@ -4563,9 +4596,8 @@ public:
     for (auto i : getIndices().parameters->getIndices())
       addRetElt(i);
     // Emit cleanups for all local values.
-    for (auto adjVal : blockLocalAdjointValues)
+    for (auto adjVal : blockLocalAdjointValues[origEntry])
       emitCleanupForAdjointValue(adjVal);
-    blockLocalAdjointValues.clear();
 
     // Disable cleanup for original indirect parameter adjoint buffers.
     // Copy them to adjoint indirect results.

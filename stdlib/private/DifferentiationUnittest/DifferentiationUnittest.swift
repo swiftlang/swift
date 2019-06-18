@@ -181,6 +181,16 @@ extension Tracked where T : Differentiable & SignedNumeric, T == T.Magnitude,
   }
 }
 
+extension Tracked where T : Differentiable & FloatingPoint,
+                        T == T.AllDifferentiableVariables, T == T.TangentVector {
+  @usableFromInline
+  @differentiating(/)
+  internal static func _vjpDivide(lhs: Self, rhs: Self)
+      -> (value: Self, pullback: (Self) -> (Self, Self)) {
+    return (lhs / rhs, { v in (v / rhs, -lhs / (rhs * rhs) * v) })
+  }
+}
+
 // Differential operators for `Tracked<Float>`.
 public extension Differentiable {
   @inlinable

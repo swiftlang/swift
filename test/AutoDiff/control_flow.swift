@@ -519,4 +519,46 @@ ControlFlowTests.test("Enums") {
   }
 }
 
+ControlFlowTests.test("Loops") {
+  func for_loop(_ x: Float) -> Float {
+    var result = x
+    for _ in 1..<3 {
+      result = result * x
+    }
+    return result
+  }
+  expectEqual((8, 12), valueWithGradient(at: 2, in: for_loop))
+  expectEqual((27, 27), valueWithGradient(at: 3, in: for_loop))
+
+  func while_loop(_ x: Float) -> Float {
+    var result = x
+    var i = 1
+    while i < 3 {
+      result = result * x
+      i += 1
+    }
+    return result
+  }
+  expectEqual((8, 12), valueWithGradient(at: 2, in: while_loop))
+  expectEqual((27, 27), valueWithGradient(at: 3, in: while_loop))
+
+  func nested_loop(_ x: Float) -> Float {
+    var outer = x
+    for _ in 1..<3 {
+      outer = outer * x
+
+      var inner = outer
+      var i = 1
+      while i < 3 {
+        inner = inner / x
+        i += 1
+      }
+      outer = inner
+    }
+    return outer
+  }
+  expectEqual((0.5, -0.25), valueWithGradient(at: 2, in: nested_loop))
+  expectEqual((0.25, -0.0625), valueWithGradient(at: 4, in: nested_loop))
+}
+
 runAllTests()

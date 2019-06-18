@@ -36,10 +36,10 @@ func testOwnedVector(_ x: Vector) -> Vector {
 }
 _ = pullback(at: Vector.zero, in: testOwnedVector)
 
-// CHECK-LABEL: enum {{.*}}testOwnedVector{{.*}}__Pred__src_0_wrt_0 {
-// CHECK-NEXT: }
 // CHECK-LABEL: struct {{.*}}testOwnedVector{{.*}}__PB__src_0_wrt_0 {
 // CHECK-NEXT:   @_hasStorage var pullback_0: (Vector) -> (Vector, Vector) { get set }
+// CHECK-NEXT: }
+// CHECK-LABEL: enum {{.*}}testOwnedVector{{.*}}__Pred__src_0_wrt_0 {
 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil hidden @{{.*}}UsesMethodOfNoDerivativeMember{{.*}}applied2to{{.*}}__adjoint_src_0_wrt_0_1
