@@ -2346,6 +2346,17 @@ function(_add_swift_executable_single name)
   target_link_libraries("${name}" PRIVATE ${SWIFTEXE_SINGLE_LINK_LIBRARIES})
   swift_common_llvm_config("${name}" ${SWIFTEXE_SINGLE_LLVM_LINK_COMPONENTS})
 
+  # NOTE(compnerd) use the C linker language to invoke `clang` rather than
+  # `clang++` as we explicitly link against the C++ runtime.  We were previously
+  # actually passing `-nostdlib++` to avoid the C++ runtime linkage.
+  if(SWIFTEXE_SINGLE_SDK STREQUAL ANDROID)
+    set_property(TARGET "${name}" PROPERTY
+      LINKER_LANGUAGE "C")
+  else()
+    set_property(TARGET "${name}" PROPERTY
+      LINKER_LANGUAGE "CXX")
+  endif()
+
   set_target_properties(${name} PROPERTIES FOLDER "Swift executables")
 endfunction()
 
