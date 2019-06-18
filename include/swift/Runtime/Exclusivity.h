@@ -44,6 +44,9 @@ void swift_beginAccess(void *pointer, ValueBuffer *buffer,
 /// replacement function if it should be called.
 /// Returns null if the original function (which is passed in \p CurrFn) should
 /// be called.
+#ifdef __APPLE__
+__attribute__((weak_import))
+#endif
 SWIFT_RUNTIME_EXPORT
 char *swift_getFunctionReplacement(char **ReplFnPtr, char *CurrFn);
 
@@ -51,6 +54,9 @@ char *swift_getFunctionReplacement(char **ReplFnPtr, char *CurrFn);
 /// \p OrigFnPtr.
 /// This function is called from a replacement function to call the original
 /// function.
+#ifdef __APPLE__
+__attribute__((weak_import))
+#endif
 SWIFT_RUNTIME_EXPORT
 char *swift_getOrigOfReplaceable(char **OrigFnPtr);
 
