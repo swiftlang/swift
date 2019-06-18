@@ -904,11 +904,17 @@ struct MissingPropertyWrapperUnwrap {
   @Bar<Int, Bool> var y: Int
   @Bar<Int, String> var z: Int
 
+  func foo<T>(_: Foo<T>) {}
+
   func baz() {
     self.x.foo() // expected-error {{property 'x' will be unwrapped to value of type 'Int', use '$' to refer to the 'Foo<Int>' property wrapper}}{{10-10=$}}
     self.y.bar() // expected-error {{property 'y' will be unwrapped to value of type 'Int', use '$' to refer to the 'Bar<Int, Bool>' property wrapper}}{{10-10=$}}
     self.y.barWhereVIsString() // expected-error {{property 'y' will be unwrapped to value of type 'Int', use '$' to refer to the 'Bar<Int, Bool>' property wrapper}}{{10-10=$}}
     // expected-error@-1 {{referencing instance method 'barWhereVIsString()' on 'Bar' requires the types 'Bool' and 'String' be equivalent}}
     self.z.barWhereVIsString() // expected-error {{property 'z' will be unwrapped to value of type 'Int', use '$' to refer to the 'Bar<Int, String>' property wrapper}}{{10-10=$}} 
+  }
+
+  func bar() {
+    foo(self.x) //expected-error {{wrapped value of type 'Int' must be unwraped to value of type 'Foo<Int>'}}{{14-14=$}}
   }
 }
