@@ -108,8 +108,8 @@ struct DummyOptimizer<P : KeyPathIterable, Scalar : BinaryFloatingPoint>
     parameters: inout P, withGradients gradients: P
   ) {
     for kp in parameters.recursivelyAllWritableKeyPaths(to: Tensor<Scalar>.self) {
-      firstMoments[keyPath: kp] *= learningRate
-      parameters[keyPath: kp] -= learningRate * parameters[keyPath: kp]
+      firstMoments[keyPath: kp].scale(by: learningRate)
+      parameters[keyPath: kp] -= parameters[keyPath: kp].scaled(by: learningRate)
     }
   }
 }

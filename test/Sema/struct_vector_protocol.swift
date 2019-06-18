@@ -7,16 +7,28 @@ _ x: inout T, scalar: T.VectorSpaceScalar
   // Test `AdditiveArithmetic` requirements: `zero`, `+`, `-`.
   let zero = T.zero
   x += x + zero
-  x -= x - zero
+  x += x - zero
+  // Test `VectorProtocol` requirements: `VectorSpaceScalar`, `adding(_:)`, `add(_:)`
+  // `subtracting(_:)`, `subtract(_:)`, `scaled(by:)`, and `scale(by:)`.
+  x.add(scalar)
+  x.add(scalar)
+  x.scale(by: scalar)
+  _ = x.adding(scalar)
+  _ = x.subtracting(scalar)
+  _ = x.scaled(by: scalar)
+   
+  // NOTE: Operators have been disabled for type checker performance reasons.
+  // x += x + zero
+  // x -= x - zero
   // Test `VectorProtocol` requirements: `VectorSpaceScalar`, `+`, `-`, `*`.
-  x += scalar
-  x -= scalar
-  x *= scalar
-  _ = x + scalar
-  _ = scalar + x
-  _ = x - scalar
-  _ = scalar * x
-  _ = x * scalar
+  // x += scalar
+  // x -= scalar
+  // x *= scalar
+  // _ = x + scalar
+  // _ = scalar + x
+  // _ = x - scalar
+  // _ = scalar * x
+  // _ = x * scalar
 }
 
 struct Float2: VectorProtocol {
