@@ -12,7 +12,7 @@
 import FooKit
 @_implementationOnly import FooKit_SECRET
 
-// CHECK-LABEL: class GoodChild : FooKit.Parent {
+// CHECK-LABEL: class GoodChild : {{(FooKit[.])?}}Parent {
 //  CHECK-NEXT:   @objc override dynamic public init()
 //  CHECK-NEXT:   @objc deinit
 //  CHECK-NEXT: }
@@ -37,7 +37,7 @@ public class GoodChild: Parent {
   }
 }
 
-// CHECK-LABEL: class QuietChild : FooKit.Parent {
+// CHECK-LABEL: class QuietChild : {{(FooKit[.])?}}Parent {
 //  CHECK-NEXT:   @objc deinit
 //  CHECK-NEXT: }
 public class QuietChild: Parent {
@@ -46,7 +46,7 @@ public class QuietChild: Parent {
   internal required init(requiredSECRET: Int32) {}
 }
 
-// CHECK-LABEL: class GoodGenericChild<Toy> : FooKit.Parent {
+// CHECK-LABEL: class GoodGenericChild<Toy> : {{(FooKit[.])?}}Parent {
 //  CHECK-NEXT:   @objc override dynamic public init()
 //  CHECK-NEXT:   @objc deinit
 //  CHECK-NEXT: }
@@ -101,7 +101,7 @@ internal class PrivateGrandchild: GoodChild {
   }
 }
 
-// CHECK-LABEL: class SubscriptChild : FooKit.SubscriptParent {
+// CHECK-LABEL: class SubscriptChild : {{(FooKit[.])?}}SubscriptParent {
 //  CHECK-NEXT:   @objc deinit
 //  CHECK-NEXT: }
 public class SubscriptChild: SubscriptParent {
