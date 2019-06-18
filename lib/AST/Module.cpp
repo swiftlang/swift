@@ -19,7 +19,6 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
-#include "swift/AST/ASTScope.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/DiagnosticsSema.h"
@@ -1703,9 +1702,11 @@ StringRef SourceFile::getFilename() const {
 }
 
 ASTScope &SourceFile::getScope() {
-  if (!Scope) Scope = ASTScope::createRoot(this);
-  return *Scope;
+  if (!Scope)
+    Scope = std::unique_ptr<ASTScope>(new (getASTContext()) ASTScope(this));
+  return *Scope.get();
 }
+
 
 Identifier
 SourceFile::getDiscriminatorForPrivateValue(const ValueDecl *D) const {

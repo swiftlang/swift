@@ -49,6 +49,8 @@ set(sources
   NSTimeZoneShims.h
   NSUndoManagerShims.h
 
+  ClockKitOverlayShims.h
+
   module.modulemap
   )
 set(output_dir "${SWIFTLIB_DIR}/shims")
@@ -84,7 +86,22 @@ endif()
 # First extract the "version" used for Clang's resource directory.
 string(REGEX MATCH "[0-9]+\\.[0-9]+(\\.[0-9]+)?" CLANG_VERSION
   "${LLVM_PACKAGE_VERSION}")
-set(clang_headers_location "${LLVM_LIBRARY_OUTPUT_INTDIR}/clang/${CLANG_VERSION}")
+if(NOT SWIFT_INCLUDE_TOOLS AND SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER)
+  if(SWIFT_COMPILER_IS_MSVC_LIKE)
+    execute_process(COMMAND ${CMAKE_C_COMPILER} /clang:-print-resource-dir
+      OUTPUT_VARIABLE clang_headers_location
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+      ERROR_QUIET)
+  else()
+    execute_process(COMMAND ${CMAKE_C_COMPILER} -print-resource-dir
+      OUTPUT_VARIABLE clang_headers_location
+      OUTPUT_STRIP_TRAILING_WHITESPACE
+      ERROR_QUIET)
+  endif()
+  message(STATUS "Using clang Resource Directory: ${clang_headers_location}")
+else()
+  set(clang_headers_location "${LLVM_LIBRARY_OUTPUT_INTDIR}/clang/${CLANG_VERSION}")
+endif()
 
 if("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
   set(cmake_symlink_option "copy_directory")

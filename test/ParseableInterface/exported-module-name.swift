@@ -8,7 +8,7 @@
 // CHECK: import CoreKit
 import CoreKit
 
-// CHECK-LABEL: public struct CKThingWrapper : RawRepresentable {
+// CHECK-LABEL: public struct CKThingWrapper : Swift.RawRepresentable {
 public struct CKThingWrapper: RawRepresentable {
   public var rawValue: CKThing
   public init(rawValue: CKThing) {

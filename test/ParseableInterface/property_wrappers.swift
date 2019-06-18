@@ -6,12 +6,12 @@
 // RUN: %target-swift-frontend -build-module-from-parseable-interface -swift-version 5 %t/TestResilient.swiftinterface -o %t/TestResilient.swiftmodule
 // RUN: %target-swift-frontend -emit-module -o /dev/null -merge-modules -swift-version 5  -emit-parseable-module-interface-path - %t/TestResilient.swiftmodule -module-name TestResilient | %FileCheck %s --check-prefix CHECK --check-prefix RESILIENT
 
-@_propertyWrapper
+@propertyWrapper
 public struct Wrapper<T> {
   public var value: T
 }
 
-@_propertyWrapper
+@propertyWrapper
 public struct WrapperWithInitialValue<T> {
   public var value: T
 

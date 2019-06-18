@@ -34,7 +34,7 @@ namespace swift { extern "C" {
 // This declaration might not be universally correct.
 // We verify its correctness for the current platform in the runtime code.
 #if defined(__linux__)
-# if defined(__ANDROID__) && !defined(__aarch64__)
+# if defined(__ANDROID__) && !(defined(__aarch64__) || defined(__x86_64__))
 typedef __swift_uint16_t __swift_mode_t;
 # else
 typedef __swift_uint32_t __swift_mode_t;

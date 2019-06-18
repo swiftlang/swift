@@ -1154,13 +1154,16 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       // Walk each parameter's decl and typeloc and default value.
       if (doIt(P))
         return true;
-      
+
+      // Visit any custom attributes on the parameter.
+      visitCustomAttributes(P);
+
       // Don't walk into the type if the decl is implicit, or if the type is
       // implicit.
       if (!P->isImplicit() && !P->isTypeLocImplicit() &&
           doIt(P->getTypeLoc()))
         return true;
-      
+
       if (auto *E = P->getDefaultValue()) {
         auto res = doIt(E);
         if (!res) return true;

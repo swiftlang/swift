@@ -1777,7 +1777,7 @@ PlatformAvailability::PlatformAvailability(LangOptions &langOpts)
         "APIs deprecated as of macOS 10.9 and earlier are unavailable in Swift";
     break;
 
-  default:
+  case PlatformKind::none:
     break;
   }
 }
@@ -1818,7 +1818,11 @@ bool PlatformAvailability::treatDeprecatedAsUnavailable(
   Optional<unsigned> minor = version.getMinor();
 
   switch (platformKind) {
+  case PlatformKind::none:
+    llvm_unreachable("version but no platform?");
+
   case PlatformKind::OSX:
+  case PlatformKind::OSXApplicationExtension:
     // Anything deprecated in OSX 10.9.x and earlier is unavailable in Swift.
     return major < 10 ||
            (major == 10 && (!minor.hasValue() || minor.getValue() <= 9));
@@ -1834,10 +1838,9 @@ bool PlatformAvailability::treatDeprecatedAsUnavailable(
   case PlatformKind::watchOSApplicationExtension:
     // No deprecation filter on watchOS
     return false;
-
-  default:
-    return false;
   }
+
+  llvm_unreachable("Unexpected platform");
 }
 
 ClangImporter::Implementation::Implementation(ASTContext &ctx,

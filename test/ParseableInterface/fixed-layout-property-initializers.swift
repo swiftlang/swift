@@ -15,24 +15,24 @@
 // COMMON: @frozen public struct MyStruct {
 @frozen
 public struct MyStruct {
-  // COMMON: public var publicVar: [[BOOL:(Swift\.)?Bool]] = false
+  // COMMON: public var publicVar: Swift.Bool = false
   public var publicVar: Bool = false
 
-  // COMMON: internal var internalVar: ([[BOOL]], [[BOOL]]) = (false, true)
+  // COMMON: internal var internalVar: (Swift.Bool, Swift.Bool) = (false, true)
   internal var internalVar: (Bool, Bool) = (false, true)
 
-  // COMMON: private var privateVar: [[BOOL]] = Bool(4 < 10)
+  // COMMON: private var privateVar: Swift.Bool = Bool(4 < 10)
   private var privateVar: Bool = Bool(4 < 10)
 
   // COMMON: @usableFromInline
-  // COMMON-NEXT: internal var ufiVar: [[BOOL]] = true
+  // COMMON-NEXT: internal var ufiVar: Swift.Bool = true
   @usableFromInline internal var ufiVar: Bool = true
 
-  // COMMON: public var multiVar1: [[BOOL]] = Bool(false), (multiVar2, multiVar3): ([[BOOL]], [[BOOL]]) = (true, 3 == 0)
+  // COMMON: public var multiVar1: Swift.Bool = Bool(false), (multiVar2, multiVar3): (Swift.Bool, Swift.Bool) = (true, 3 == 0)
   public var multiVar1: Bool = Bool(false), (multiVar2, multiVar3): (Bool, Bool) = (true, 3 == 0)
 
-  // NONRESILIENT: @_hasInitialValue public static var staticVar: [[BOOL]]
-  // RESILIENT: {{^}}  public static var staticVar: [[BOOL]]
+  // NONRESILIENT: @_hasInitialValue public static var staticVar: Swift.Bool
+  // RESILIENT: {{^}}  public static var staticVar: Swift.Bool
   public static var staticVar: Bool = Bool(true && false)
 
   // FROMSOURCE: @inlinable internal init() {}
@@ -43,21 +43,21 @@ public struct MyStruct {
 // COMMON: @_fixed_layout public class MyClass {
 @_fixed_layout
 public class MyClass {
-  // COMMON: public var publicVar: [[BOOL]] = false
+  // COMMON: public var publicVar: Swift.Bool = false
   public var publicVar: Bool = false
 
-  // COMMON: internal var internalVar: [[BOOL]] = false
+  // COMMON: internal var internalVar: Swift.Bool = false
   internal var internalVar: Bool = false
 
-  // COMMON: private var privateVar: {{(Swift\.)?}}UInt8 = UInt8(2)
+  // COMMON: private var privateVar: Swift.UInt8 = UInt8(2)
   private var privateVar: UInt8 = UInt8(2)
 
   // COMMON: @usableFromInline
-  // COMMON-NEXT: internal var ufiVar: [[BOOL]] = true
+  // COMMON-NEXT: internal var ufiVar: Swift.Bool = true
   @usableFromInline internal var ufiVar: Bool = true
 
-  // NONRESILIENT: @_hasInitialValue public static var staticVar: [[BOOL]]
-  // RESILIENT: {{^}}  public static var staticVar: [[BOOL]]
+  // NONRESILIENT: @_hasInitialValue public static var staticVar: Swift.Bool
+  // RESILIENT: {{^}}  public static var staticVar: Swift.Bool
   public static var staticVar: Bool = Bool(true && false)
 
   // FROMSOURCE: @inlinable internal init() {}
@@ -65,6 +65,6 @@ public class MyClass {
   @inlinable init() {}
 }
 
-// NONRESILIENT: @_hasInitialValue public var topLevelVar: [[BOOL]]
-// RESILIENT: {{^}}public var topLevelVar: [[BOOL]]
+// NONRESILIENT: @_hasInitialValue public var topLevelVar: Swift.Bool
+// RESILIENT: {{^}}public var topLevelVar: Swift.Bool
 public var topLevelVar: Bool = Bool(false && !true)

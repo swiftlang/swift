@@ -120,6 +120,17 @@ do {
   let escaping: (@escaping () -> ()) -> () = { _ in }
   blackHole(escaping)
 }
+
+do {
+  let c: [@convention(c) () -> ()] = []
+  blackHole(c)
+}
+
+do {
+  let b: [(@escaping @convention(block) () -> (), @convention(block) () -> ()) -> ()] = []
+  blackHole(b)
+}
+
 // DEMANGLE: $syycD
 // DEMANGLE: $sySSzcD
 // DEMANGLE: $sySSncD
@@ -136,6 +147,8 @@ do {
 // DEMANGLE: $sSim_Sf1xSitD
 // DEMANGLE: $sSi1x_SfSim1ytD
 // DEMANGLE: $syyyccD
+// DEMANGLE: $sSayyyXCGD
+// DEMANGLE: $sSayyyyXL_yyXBtcGD
 
 // CHECK: () -> ()
 // CHECK: (inout String) -> ()
@@ -153,6 +166,8 @@ do {
 // CHECK: (Int.Type, x: Float, Int)
 // CHECK: (x: Int, Float, y: Int.Type)
 // CHECK: (@escaping () -> ()) -> ()
+// CHECK: Array<@convention(c) () -> ()>
+// CHECK: Array<(@escaping @convention(block) () -> (), @convention(block) () -> ()) -> ()>
 
 // DEMANGLE: $sSimD
 // DEMANGLE: $syycmD
@@ -171,6 +186,8 @@ do {
 // DEMANGLE: $sSim_Sf1xSitmD
 // DEMANGLE: $sSi1x_SfSim1ytmD
 // DEMANGLE: $syyyccmD
+// DEMANGLE: $sSayyyXCGmD
+// DEMANGLE: $sSayyyyXL_yyXBtcGmD
 
 // CHECK: Int.Type
 // CHECK: ((inout String) -> ()).Type
@@ -188,3 +205,5 @@ do {
 // CHECK: (Int.Type, x: Float, Int).Type
 // CHECK: (x: Int, Float, y: Int.Type).Type
 // CHECK: ((@escaping () -> ()) -> ()).Type
+// CHECK: Array<@convention(c) () -> ()>.Type
+// CHECK: Array<(@escaping @convention(block) () -> (), @convention(block) () -> ()) -> ()>.Type

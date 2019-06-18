@@ -3069,6 +3069,12 @@ void SILDebugScope::dump(SourceManager &SM, llvm::raw_ostream &OS,
   }
   OS << "}\n";
 }
+
+void SILDebugScope::dump(SILModule &Mod) const {
+  // We just use the default indent and llvm::errs().
+  dump(Mod.getASTContext().SourceMgr);
+}
+
 #endif
 
 void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {

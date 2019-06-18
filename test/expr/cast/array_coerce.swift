@@ -35,11 +35,16 @@ var cs = ca[0...0]
 var ds = da[0...0]
 
 cs = ds // expected-error{{cannot assign value of type 'ArraySlice<D>' to type 'ArraySlice<C>'}}
+// expected-note@-1 {{arguments to generic parameter 'Element' ('D' and 'C') are expected to be equal}}
+
 ds = cs // expected-error{{cannot assign value of type 'ArraySlice<C>' to type 'ArraySlice<D>'}}
+// expected-note@-1 {{arguments to generic parameter 'Element' ('C' and 'D') are expected to be equal}}
 
 // ContiguousArray<T>
 var cna: ContiguousArray<C> = [c1]
 var dna: ContiguousArray<D> = [d1]
 
 cna = dna // expected-error{{cannot assign value of type 'ContiguousArray<D>' to type 'ContiguousArray<C>'}}
+// expected-note@-1 {{arguments to generic parameter 'Element' ('D' and 'C') are expected to be equal}}
 dna = cna // expected-error{{cannot assign value of type 'ContiguousArray<C>' to type 'ContiguousArray<D>'}}
+// expected-note@-1 {{arguments to generic parameter 'Element' ('C' and 'D') are expected to be equal}}

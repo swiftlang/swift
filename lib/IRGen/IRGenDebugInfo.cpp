@@ -761,28 +761,6 @@ private:
     return Size(size);
   }
 
-#ifndef NDEBUG
-  static bool areTypesReallyEqual(Type lhs, Type rhs) {
-    // Due to an oversight, escaping and non-escaping @convention(block)
-    // are mangled identically.
-    auto eraseEscapingBlock = [](Type t) -> Type {
-      return t.transform([](Type t) -> Type {
-        if (auto *fnType = t->getAs<FunctionType>()) {
-          if (fnType->getExtInfo().getRepresentation()
-                == FunctionTypeRepresentation::Block) {
-            return FunctionType::get(fnType->getParams(),
-                                    fnType->getResult(),
-                                    fnType->getExtInfo().withNoEscape(true));
-          }
-        }
-        return t;
-      });
-    };
-
-    return eraseEscapingBlock(lhs)->isEqual(eraseEscapingBlock(rhs));
-  }
-#endif
-
   StringRef getMangledName(DebugTypeInfo DbgTy) {
     if (DbgTy.IsMetadataType)
       return MetadataTypeDeclCache.find(DbgTy.getDecl()->getName().str())
@@ -825,14 +803,12 @@ private:
         Ty->dump();
         abort();
       } else if (!Reconstructed->isEqual(Ty)) {
-        if (!areTypesReallyEqual(Reconstructed, Ty)) {
-          llvm::errs() << "Incorrect reconstructed type for " << Result << "\n";
-          llvm::errs() << "Original type:\n";
-          Ty->dump();
-          llvm::errs() << "Reconstructed type:\n";
-          Reconstructed->dump();
-          abort();
-        }
+        llvm::errs() << "Incorrect reconstructed type for " << Result << "\n";
+        llvm::errs() << "Original type:\n";
+        Ty->dump();
+        llvm::errs() << "Reconstructed type:\n";
+        Reconstructed->dump();
+        abort();
       }
 #endif
     }
@@ -2192,11 +2168,6 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
     SmallVector<uint64_t, 3> Operands;
     if (Indirection)
       Operands.push_back(llvm::dwarf::DW_OP_deref);
-
-    // There are variables without storage, such as "struct { func foo() {}
-    // }". Emit them as constant 0.
-    if (isa<llvm::UndefValue>(Piece))
-      Piece = llvm::ConstantInt::get(IGM.Int64Ty, 0);
 
     if (IsPiece) {
       // Advance the offset and align it for the next piece.

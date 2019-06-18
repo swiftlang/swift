@@ -826,6 +826,13 @@ Type TypeChecker::applyUnboundGenericArguments(
 
     subs = parentType->getContextSubstitutions(decl->getDeclContext());
     skipRequirementsCheck |= parentType->hasTypeVariable();
+  } else if (auto genericEnv =
+                 decl->getDeclContext()->getGenericEnvironmentOfContext()) {
+    auto subMap = genericEnv->getForwardingSubstitutionMap();
+    for (auto gp : subMap.getGenericSignature()->getGenericParams()) {
+      subs[gp->getCanonicalType()->castTo<GenericTypeParamType>()] =
+        Type(gp).subst(subMap);
+    }
   }
 
   SourceLoc noteLoc = decl->getLoc();
@@ -3685,4 +3692,28 @@ void TypeChecker::checkUnsupportedProtocolType(GenericParamList *genericParams) 
 
   UnsupportedProtocolVisitor visitor(*this, /*checkStatements=*/false);
   visitor.visitRequirements(genericParams->getRequirements());
+}
+
+Type swift::resolveCustomAttrType(CustomAttr *attr, DeclContext *dc,
+                                  CustomAttrTypeKind typeKind) {
+  auto resolution = TypeResolution::forContextual(dc);
+  TypeResolutionOptions options(TypeResolverContext::PatternBindingDecl);
+
+  // Property delegates allow their type to be an unbound generic.
+  if (typeKind == CustomAttrTypeKind::PropertyDelegate)
+    options |= TypeResolutionFlags::AllowUnboundGenerics;
+
+  ASTContext &ctx = dc->getASTContext();
+  auto &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
+  if (tc.validateType(attr->getTypeLoc(), resolution, options))
+    return Type();
+
+  // We always require the type to resolve to a nominal type.
+  Type type = attr->getTypeLoc().getType();
+  if (!type->getAnyNominal()) {
+    assert(ctx.Diags.hadAnyError());
+    return Type();
+  }
+
+  return type;
 }

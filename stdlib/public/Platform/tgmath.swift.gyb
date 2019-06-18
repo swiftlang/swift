@@ -232,7 +232,7 @@ def TypedBinaryFunctions():
 // Note these do not have a corresponding LLVM intrinsic
 % for T, CT, f, ufunc in TypedUnaryFunctions():
 %  if T == 'Float80':
-#if (arch(i386) || arch(x86_64)) && !os(Windows)
+#if (arch(i386) || arch(x86_64)) && !(os(Windows) || os(Android))
 %  end
 @_transparent
 // SWIFT_ENABLE_TENSORFLOW
@@ -263,7 +263,7 @@ public func tgamma(_ x: Float) -> Float {
   return Float.gamma(x)
 }
 
-#if (arch(i386) || arch(x86_64)) && !os(Windows)
+#if (arch(i386) || arch(x86_64)) && !(os(Windows) || os(Android))
 @_transparent
 public func cbrt(_ x: Float80) -> Float80 {
   return Float80.root(x, 3)
@@ -285,7 +285,7 @@ public func tgamma(_ x: Float80) -> Float80 {
 // Note these have a corresponding LLVM intrinsic
 % for T, ufunc in TypedUnaryIntrinsicFunctions():
 %  if T == 'Float80':
-#if (arch(i386) || arch(x86_64)) && !os(Windows)
+#if (arch(i386) || arch(x86_64)) && !(os(Windows) || os(Android))
 %  end
 %  if ufunc[-3:] != 'int':
 @_transparent
@@ -316,7 +316,7 @@ public func ${ufunc}(_ x: ${T}) -> ${T} {
 // Binary functions
 % for T, CT, f in OverlayFloatTypes():
 %  if T == 'Float80':
-#if (arch(i386) || arch(x86_64)) && !os(Windows)
+#if (arch(i386) || arch(x86_64)) && !(os(Windows) || os(Android))
 %  end
 @_transparent
 public func atan2(_ y: ${T}, _ x: ${T}) -> ${T} {
@@ -369,7 +369,7 @@ public func fmax(_ x: ${T}, _ y: ${T}) -> ${T} {
 % # This is AllFloatTypes not OverlayFloatTypes because of the tuple return.
 % for T, CT, f in AllFloatTypes():
 %  if T == 'Float80':
-#if (arch(i386) || arch(x86_64)) && !os(Windows)
+#if (arch(i386) || arch(x86_64)) && !(os(Windows) || os(Android))
 %  else:
 //  lgamma not available on Windows, apparently?
 #if !os(Windows)
@@ -385,7 +385,7 @@ public func lgamma(_ x: ${T}) -> (${T}, Int) {
 % # This is AllFloatTypes not OverlayFloatTypes because of the tuple return.
 % for T, CT, f in AllFloatTypes():
 %  if T == 'Float80':
-#if (arch(i386) || arch(x86_64)) && !os(Windows)
+#if (arch(i386) || arch(x86_64)) && !(os(Windows) || os(Android))
 %  end
 @_transparent
 public func remquo(_ x: ${T}, _ y: ${T}) -> (${T}, Int) {
@@ -401,7 +401,7 @@ public func remquo(_ x: ${T}, _ y: ${T}) -> (${T}, Int) {
 
 % for T, CT, f in OverlayFloatTypes():
 %  if T == 'Float80':
-#if (arch(i386) || arch(x86_64)) && !os(Windows)
+#if (arch(i386) || arch(x86_64)) && !(os(Windows) || os(Android))
 %  end
 @available(swift, deprecated: 4.2/*, obsoleted: 5.1*/, message:
            "use ${T}(nan: ${T}.RawSignificand).")

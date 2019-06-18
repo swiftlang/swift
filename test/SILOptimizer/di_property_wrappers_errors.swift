@@ -1,19 +1,19 @@
 // RUN: %target-swift-frontend -emit-sil -verify %s
-@_propertyWrapper
+@propertyWrapper
 final class ClassWrapper<T> {
-  var value: T {
+  var wrappedValue: T {
     didSet {
-      print("  .. set \(value)")
+      print("  .. set \(wrappedValue)")
     }
   }
 
   init(initialValue: T) {
     print("  .. init \(initialValue)")
-    self.value = initialValue
+    self.wrappedValue = initialValue
   }
 
   deinit {
-    print("  .. deinit \(value)")
+    print("  .. deinit \(wrappedValue)")
   }
 }
 

@@ -1011,8 +1011,6 @@ public:
     return Loc;
   }
   SourceLoc getTrailingQuoteLoc() const {
-    // Except when computing a SourceRange for an ASTScope. Then the range
-    // must be (Start - TrainingQuoteLoc).
     return TrailingQuoteLoc;
   }
 
