@@ -36,6 +36,7 @@ class SpecializeAttr;
 class TypeAliasDecl;
 struct TypeLoc;
 class ValueDecl;
+class AbstractStorageDecl;
 
 /// Display a nominal type or extension thereof.
 void simple_display(
@@ -672,6 +673,33 @@ public:
   // Cycle handling
   void diagnoseCycle(DiagnosticEngine &diags) const;
   void noteCycleStep(DiagnosticEngine &diags) const;
+};
+
+/// Request a function's self access kind.
+class SelfAccessKindRequest :
+    public SimpleRequest<SelfAccessKindRequest,
+                         CacheKind::SeparatelyCached,
+                         SelfAccessKind,
+                         FuncDecl *> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<SelfAccessKind>
+  evaluate(Evaluator &evaluator, FuncDecl *func) const;
+
+public:
+  // Cycle handling
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<SelfAccessKind> getCachedResult() const;
+  void cacheResult(SelfAccessKind value) const;
 };
 
 // Allow AnyValue to compare two Type values, even though Type doesn't

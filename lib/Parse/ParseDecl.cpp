@@ -4184,24 +4184,6 @@ static AccessorDecl *createAccessorFunc(SourceLoc DeclLoc,
                                  ValueArg, ReturnType,
                                  P->CurDeclContext);
 
-  // Non-static set/willSet/didSet/mutableAddress default to mutating.
-  // get/address default to non-mutating.
-  switch (Kind) {
-  case AccessorKind::Address:
-  case AccessorKind::Get:
-  case AccessorKind::Read:
-    break;
-
-  case AccessorKind::MutableAddress:
-  case AccessorKind::Set:
-  case AccessorKind::WillSet:
-  case AccessorKind::DidSet:
-  case AccessorKind::Modify:
-    if (D->isInstanceMember())
-      D->setSelfAccessKind(SelfAccessKind::Mutating);
-    break;
-  }
-
   return D;
 }
 

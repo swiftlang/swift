@@ -738,3 +738,27 @@ void FunctionBuilderTypeRequest::diagnoseCycle(DiagnosticEngine &diags) const {
 void FunctionBuilderTypeRequest::noteCycleStep(DiagnosticEngine &diags) const {
   std::get<0>(getStorage())->diagnose(diag::circular_reference_through);
 }
+
+//----------------------------------------------------------------------------//
+// SelfAccessKindRequest computation.
+//----------------------------------------------------------------------------//
+
+void SelfAccessKindRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  auto decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::circular_reference);
+}
+
+void SelfAccessKindRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  auto decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::circular_reference_through);
+}
+
+Optional<SelfAccessKind> SelfAccessKindRequest::getCachedResult() const {
+  auto *funcDecl = std::get<0>(getStorage());
+  return funcDecl->getCachedSelfAccessKind();
+}
+
+void SelfAccessKindRequest::cacheResult(SelfAccessKind value) const {
+  auto *funcDecl = std::get<0>(getStorage());
+  funcDecl->setSelfAccessKind(value);
+}

@@ -1957,46 +1957,54 @@ static bool doesContextHaveValueSemantics(DeclContext *dc) {
   return false;
 }
 
-static void validateSelfAccessKind(FuncDecl *FD) {
-  // Validate the mutating attribute if present, and install it into the bit
-  // on funcdecl (instead of just being a DeclAttribute).
-  if (FD->getAttrs().hasAttribute<MutatingAttr>())
-    FD->setSelfAccessKind(SelfAccessKind::Mutating);
-  else if (FD->getAttrs().hasAttribute<NonMutatingAttr>())
-    FD->setSelfAccessKind(SelfAccessKind::NonMutating);
-  else if (FD->getAttrs().hasAttribute<ConsumingAttr>())
-    FD->setSelfAccessKind(SelfAccessKind::__Consuming);
-  else if (auto accessor = dyn_cast<AccessorDecl>(FD)) {
-    if (accessor->getAccessorKind() == AccessorKind::Get ||
-        accessor->getAccessorKind() == AccessorKind::Set ||
-        accessor->getAccessorKind() == AccessorKind::DidSet ||
-        accessor->getAccessorKind() == AccessorKind::WillSet) {
-      auto storage = accessor->getStorage();
-      if (auto *resolver = FD->getASTContext().getLazyResolver())
+llvm::Expected<SelfAccessKind>
+SelfAccessKindRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
+  if (FD->getAttrs().getAttribute<MutatingAttr>(true)) {
+    if (!FD->isInstanceMember() ||
+        !doesContextHaveValueSemantics(FD->getDeclContext())) {
+      return SelfAccessKind::NonMutating;
+    }
+    return SelfAccessKind::Mutating;
+  } else if (FD->getAttrs().hasAttribute<NonMutatingAttr>()) {
+    return SelfAccessKind::NonMutating;
+  } else if (FD->getAttrs().hasAttribute<ConsumingAttr>()) {
+    return SelfAccessKind::__Consuming;
+  }
+
+  if (auto *AD = dyn_cast<AccessorDecl>(FD)) {
+    // Non-static set/willSet/didSet/mutableAddress default to mutating.
+    // get/address default to non-mutating.
+    switch (AD->getAccessorKind()) {
+    case AccessorKind::Address:
+    case AccessorKind::Get:
+    case AccessorKind::Read:
+      break;
+
+    case AccessorKind::MutableAddress:
+    case AccessorKind::Set:
+    case AccessorKind::Modify:
+      if (AD->isInstanceMember() &&
+          doesContextHaveValueSemantics(AD->getDeclContext()))
+        return SelfAccessKind::Mutating;
+      break;
+
+    case AccessorKind::WillSet:
+    case AccessorKind::DidSet: {
+      auto *storage =AD->getStorage();
+
+      // FIXME: Remove this once we request-ify isSetterMutating()
+      auto *resolver = storage->getASTContext().getLazyResolver();
+      if (resolver)
         resolver->resolveDeclSignature(storage);
-      if (accessor->getAccessorKind() == AccessorKind::Get) {
-        FD->setSelfAccessKind(storage->isGetterMutating()
-                              ? SelfAccessKind::Mutating
-                              : SelfAccessKind::NonMutating);
-      } else {
-        FD->setSelfAccessKind(storage->isSetterMutating()
-                              ? SelfAccessKind::Mutating
-                              : SelfAccessKind::NonMutating);
-      }
+      if (storage->isSetterMutating())
+        return SelfAccessKind::Mutating;
+
+      break;
+    }
     }
   }
 
-  if (FD->isMutating()) {
-    if (!FD->isInstanceMember() ||
-        !doesContextHaveValueSemantics(FD->getDeclContext()))
-      FD->setSelfAccessKind(SelfAccessKind::NonMutating);
-  }
-}
-
-static bool validateAccessorIsMutating(FuncDecl *accessor) {
-  assert(accessor && "accessor not present!");
-  validateSelfAccessKind(accessor);
-  return accessor->isMutating();
+  return SelfAccessKind::NonMutating;
 }
 
 static bool computeIsGetterMutating(AbstractStorageDecl *storage) {
@@ -2036,13 +2044,13 @@ static bool computeIsGetterMutating(AbstractStorageDecl *storage) {
     if (!storage->getGetter())
       return false;
 
-    return validateAccessorIsMutating(storage->getGetter());
+    return storage->getGetter()->isMutating();
 
   case ReadImplKind::Address:
-    return validateAccessorIsMutating(storage->getAddressor());
+    return storage->getAddressor()->isMutating();
 
   case ReadImplKind::Read:
-    return validateAccessorIsMutating(storage->getReadCoroutine());
+    return storage->getReadCoroutine()->isMutating();
   }
 
   llvm_unreachable("bad impl kind");
@@ -2088,7 +2096,7 @@ static bool computeIsSetterMutating(AbstractStorageDecl *storage) {
     auto *setter = storage->getSetter();
 
     if (setter)
-      result = validateAccessorIsMutating(setter);
+      result = setter->isMutating();
 
     // As a special extra check, if the user also gave us a modify
     // coroutine, check that it has the same mutatingness as the setter.
@@ -2096,7 +2104,7 @@ static bool computeIsSetterMutating(AbstractStorageDecl *storage) {
     // it's the implied value.
     if (impl.getReadWriteImpl() == ReadWriteImplKind::Modify) {
       auto modifyAccessor = storage->getModifyCoroutine();
-      auto modifyResult = validateAccessorIsMutating(modifyAccessor);
+      auto modifyResult = modifyAccessor->isMutating();
       if ((result || storage->isGetterMutating()) != modifyResult) {
         modifyAccessor->diagnose(
             diag::modify_mutatingness_differs_from_setter,
@@ -2114,10 +2122,10 @@ static bool computeIsSetterMutating(AbstractStorageDecl *storage) {
   }
 
   case WriteImplKind::MutableAddress:
-    return validateAccessorIsMutating(storage->getMutableAddressor());
+    return storage->getMutableAddressor()->isMutating();
 
   case WriteImplKind::Modify:
-    return validateAccessorIsMutating(storage->getModifyCoroutine());
+    return storage->getModifyCoroutine()->isMutating();
   }
   llvm_unreachable("bad storage kind");
 }
@@ -3984,8 +3992,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
         }
       }
     }
-
-    validateSelfAccessKind(FD);
 
     // Check whether the return type is dynamic 'Self'.
     FD->setDynamicSelf(checkDynamicSelfReturn(FD));
