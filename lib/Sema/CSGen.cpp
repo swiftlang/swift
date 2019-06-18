@@ -3791,7 +3791,8 @@ bool swift::isExtensionApplied(const DeclContext *DC, Type BaseTy,
                                const ExtensionDecl *ED) {
   // We can't do anything if the base type has unbound generic parameters.
   // We can't leak type variables into another constraint system.
-  if (BaseTy->hasTypeVariable() || BaseTy->hasUnboundGenericType())
+  if (BaseTy->hasTypeVariable() || BaseTy->hasUnboundGenericType() ||
+      BaseTy->hasUnresolvedType() || BaseTy->hasError())
     return true;
 
   if (!ED->isConstrainedExtension())
@@ -3811,7 +3812,8 @@ bool swift::isMemberDeclApplied(const DeclContext *DC, Type BaseTy,
                                 const ValueDecl *VD) {
   // We can't leak type variables into another constraint system.
   // We can't do anything if the base type has unbound generic parameters.
-  if (BaseTy->hasTypeVariable() || BaseTy->hasUnboundGenericType())
+  if (BaseTy->hasTypeVariable() || BaseTy->hasUnboundGenericType()||
+      BaseTy->hasUnresolvedType() || BaseTy->hasError())
     return true;
 
   const GenericContext *genericDecl = VD->getAsGenericContext();
