@@ -72,7 +72,7 @@ static void addMemberToContextIfNeeded(Decl *D, DeclContext *DC,
   } else if (auto *ed = dyn_cast<ExtensionDecl>(DC)) {
     ed->addMember(D, Hint);
   } else {
-    assert((isa<AbstractFunctionDecl>(DC) || isa<FileUnit>(DC)) &&
+    assert((DC->isLocalContext() || isa<FileUnit>(DC)) &&
            "Unknown declcontext");
   }
 }
@@ -2036,8 +2036,8 @@ void swift::maybeAddAccessorsToStorage(AbstractStorageDecl *storage) {
 
   auto *dc = storage->getDeclContext();
 
-  // Local variables don't otherwise get accessors.
-  if (dc->isLocalContext())
+  // Local stored variables don't otherwise get accessors.
+  if (dc->isLocalContext() && storage->getImplInfo().isSimpleStored())
     return;
 
   // Implicit properties don't get accessors.
@@ -2053,7 +2053,7 @@ void swift::maybeAddAccessorsToStorage(AbstractStorageDecl *storage) {
       return;
     }
     // Fixed-layout global variables don't get accessors.
-    if (!storage->isResilient())
+    if (!storage->isResilient() && storage->getImplInfo().isSimpleStored())
       return;
 
   // In a protocol context, variables written as just "var x : Int" or
