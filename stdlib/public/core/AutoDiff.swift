@@ -46,6 +46,19 @@ public extension VectorProtocol {
     self = adding(x)
   }
 
+  mutating func subtract(_ x: VectorSpaceScalar) {
+    self = subtracting(x)
+  }
+
+  mutating func scale(by scalar: VectorSpaceScalar) {
+    self = scaled(by: scalar)
+  }
+}
+
+/* Note: These default-implemented opreators will slow down type-checking
+   performance and break existing code.
+
+public extension VectorProtocol {
   static func + (lhs: Self, rhs: VectorSpaceScalar) -> Self {
     lhs.adding(rhs)
   }
@@ -58,20 +71,12 @@ public extension VectorProtocol {
     lhs.add(rhs)
   }
 
-  mutating func subtract(_ x: VectorSpaceScalar) {
-    self = subtracting(x)
-  }
-
   static func - (lhs: Self, rhs: VectorSpaceScalar) -> Self {
     lhs.subtracting(rhs)
   }
 
   static func -= (lhs: inout Self, rhs: VectorSpaceScalar) {
     lhs.subtract(rhs)
-  }
-
-  mutating func scale(by scalar: VectorSpaceScalar) {
-    self = scaled(by: scalar)
   }
 
   static func * (lhs: Self, rhs: VectorSpaceScalar) -> Self {
@@ -96,6 +101,7 @@ public extension VectorProtocol where VectorSpaceScalar : SignedNumeric {
     .zero - x
   }
 }
+*/
 
 /// A type that mathematically represents a differentiable manifold whose
 /// tangent spaces are finite-dimensional.
