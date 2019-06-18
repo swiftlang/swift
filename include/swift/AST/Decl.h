@@ -2705,6 +2705,15 @@ public:
   /// curried self parameter.
   bool hasCurriedSelf() const;
 
+  /// Returns true if the declaration has a parameter list associated with it.
+  ///
+  /// Note that not all declarations with function interface types have
+  /// parameter lists, for example an enum element without associated values.
+  bool hasParameterList() const;
+
+  /// Returns the number of curry levels in the declaration's interface type.
+  unsigned getNumCurryLevels() const;
+
   /// Get the decl for this value's opaque result type, if it has one.
   OpaqueTypeDecl *getOpaqueResultTypeDecl() const;
 
@@ -7201,6 +7210,21 @@ inline bool ValueDecl::hasCurriedSelf() const {
   return false;
 }
 
+inline bool ValueDecl::hasParameterList() const {
+  if (auto *eed = dyn_cast<EnumElementDecl>(this))
+    return eed->hasAssociatedValues();
+  return isa<AbstractFunctionDecl>(this) || isa<SubscriptDecl>(this);
+}
+
+inline unsigned ValueDecl::getNumCurryLevels() const {
+  unsigned curryLevels = 0;
+  if (hasParameterList())
+    curryLevels++;
+  if (hasCurriedSelf())
+    curryLevels++;
+  return curryLevels;
+}
+
 inline bool Decl::isPotentiallyOverridable() const {
   if (isa<VarDecl>(this) ||
       isa<SubscriptDecl>(this) ||
@@ -7265,7 +7289,7 @@ inline EnumElementDecl *EnumDecl::getUniqueElement(bool hasValue) const {
 }
 
 /// Retrieve parameter declaration from the given source at given index.
-const ParamDecl *getParameterAt(ValueDecl *source, unsigned index);
+const ParamDecl *getParameterAt(const ValueDecl *source, unsigned index);
 
 /// Display Decl subclasses.
 void simple_display(llvm::raw_ostream &out, const Decl *decl);
