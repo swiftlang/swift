@@ -60,7 +60,7 @@ extern "C" int pthread_key_init_np(int key, void (*destructor)(void *));
 
 # define SWIFT_RUNTIME_TLS_KEY __PTK_FRAMEWORK_SWIFT_KEY0
 # define SWIFT_STDLIB_TLS_KEY __PTK_FRAMEWORK_SWIFT_KEY1
-# define SWIFT_RUNTIME2_TLS_KEY __PTK_FRAMEWORK_SWIFT_KEY2
+# define SWIFT_COMPATIBILITY_50_TLS_KEY __PTK_FRAMEWORK_SWIFT_KEY2
 
 #endif
 
