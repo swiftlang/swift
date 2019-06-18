@@ -103,6 +103,9 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERICPARAM_21 | %FileCheck %s -check-prefix=GENERICPARAM_1
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DECL_MEMBER_INIT_1 | %FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARG_1 | %FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARG_2 | %FileCheck %s -check-prefix=UNRESOLVED_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARG_3 | %FileCheck %s -check-prefix=UNRESOLVED_3
 
 enum SomeEnum1 {
   case South
@@ -682,4 +685,10 @@ func testingGenericParam2<X>(obj: C<X>) {
 
 struct TestingStruct {
   var value: SomeEnum1 = .#^DECL_MEMBER_INIT_1^#
+}
+
+func testDefaultArgument(arg: SomeEnum1 = .#^DEFAULT_ARG_1^#) {}
+class TestDefalutArg {
+  func method(arg: SomeEnum1 = .#^DEFAULT_ARG_2^#) {}
+  init(arg: SomeEnum1 = .#^DEFAULT_ARG_3^#) {}
 }

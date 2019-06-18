@@ -18,9 +18,9 @@
 // RUN: %FileCheck %s -check-prefix=NEGATIVE_DEFAULT_ARGS_9 < %t
 //
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARG_INIT_1 | %FileCheck %s -check-prefix=DEFAULT_ARG_INIT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARG_INIT_2 | %FileCheck %s -check-prefix=DEFAULT_ARG_INIT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARG_INIT_2 | %FileCheck %s -check-prefix=DEFAULT_ARG_INIT_INTCONTEXT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARG_INIT_3 | %FileCheck %s -check-prefix=DEFAULT_ARG_INIT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARG_INIT_4 | %FileCheck %s -check-prefix=DEFAULT_ARG_INIT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEFAULT_ARG_INIT_4 | %FileCheck %s -check-prefix=DEFAULT_ARG_INIT_INTCONTEXT
 
 func freeFuncWithDefaultArgs1(
     _ a: Int, b: Int = 42, file: String = #file, line: Int = #line,
@@ -140,3 +140,7 @@ func testDefaultArgInit4(_ x: Int = #^DEFAULT_ARG_INIT_4^#) { }
 // DEFAULT_ARG_INIT: Begin completions
 // DEFAULT_ARG_INIT: Decl[GlobalVar]/CurrModule:         globalVar[#Int#]{{; name=.+$}}
 // DEFAULT_ARG_INIT: End completions
+
+// DEFAULT_ARG_INIT_INTCONTEXT: Begin completions
+// DEFAULT_ARG_INIT_INTCONTEXT: Decl[GlobalVar]/CurrModule/TypeRelation[Identical]: globalVar[#Int#]{{; name=.+$}}
+// DEFAULT_ARG_INIT_INTCONTEXT: End completions
