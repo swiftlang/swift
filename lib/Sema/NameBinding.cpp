@@ -225,6 +225,7 @@ void NameBinder::addImport(
 
   auto *testableAttr = ID->getAttrs().getAttribute<TestableAttr>();
   if (testableAttr && !topLevelModule->isTestingEnabled() &&
+      !topLevelModule->isNonSwiftModule() &&
       Context.LangOpts.EnableTestableAttrRequiresTestableModule) {
     diagnose(ID->getModulePath().front().second, diag::module_not_testable,
              topLevelModule->getName());
@@ -242,6 +243,15 @@ void NameBinder::addImport(
     } else {
       privateImportFileName = privateImportAttr->getSourceFile();
     }
+  }
+
+  if (SF.getParentModule()->isResilient() &&
+      !topLevelModule->isResilient() &&
+      !topLevelModule->isNonSwiftModule() &&
+      !ID->getAttrs().hasAttribute<ImplementationOnlyAttr>()) {
+    diagnose(ID->getModulePath().front().second,
+             diag::module_not_compiled_with_library_evolution,
+             topLevelModule->getName(), SF.getParentModule()->getName());
   }
 
   ImportOptions options;
