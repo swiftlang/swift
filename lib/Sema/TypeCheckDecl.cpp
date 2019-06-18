@@ -1957,7 +1957,7 @@ static bool doesContextHaveValueSemantics(DeclContext *dc) {
   return false;
 }
 
-static void validateSelfAccessKind(TypeChecker &TC, FuncDecl *FD) {
+static void validateSelfAccessKind(FuncDecl *FD) {
   // Validate the mutating attribute if present, and install it into the bit
   // on funcdecl (instead of just being a DeclAttribute).
   if (FD->getAttrs().hasAttribute<MutatingAttr>())
@@ -1972,7 +1972,8 @@ static void validateSelfAccessKind(TypeChecker &TC, FuncDecl *FD) {
         accessor->getAccessorKind() == AccessorKind::DidSet ||
         accessor->getAccessorKind() == AccessorKind::WillSet) {
       auto storage = accessor->getStorage();
-      TC.validateDecl(storage);
+      if (auto *resolver = FD->getASTContext().getLazyResolver())
+        resolver->resolveDeclSignature(storage);
       if (accessor->getAccessorKind() == AccessorKind::Get) {
         FD->setSelfAccessKind(storage->isGetterMutating()
                               ? SelfAccessKind::Mutating
@@ -1992,14 +1993,13 @@ static void validateSelfAccessKind(TypeChecker &TC, FuncDecl *FD) {
   }
 }
 
-static bool validateAccessorIsMutating(TypeChecker &TC, FuncDecl *accessor) {
+static bool validateAccessorIsMutating(FuncDecl *accessor) {
   assert(accessor && "accessor not present!");
-  validateSelfAccessKind(TC, accessor);
+  validateSelfAccessKind(accessor);
   return accessor->isMutating();
 }
 
-static bool computeIsGetterMutating(TypeChecker &TC,
-                                    AbstractStorageDecl *storage) {
+static bool computeIsGetterMutating(AbstractStorageDecl *storage) {
   // 'lazy' overrides the normal accessor-based rules and heavily
   // restricts what accessors can be used.  The getter is considered
   // mutating if this is instance storage on a value type.
@@ -2016,7 +2016,10 @@ static bool computeIsGetterMutating(TypeChecker &TC,
     if (auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo(0)) {
       if (wrapperInfo.valueVar &&
           (!storage->getGetter() || storage->getGetter()->isImplicit())) {
-        TC.validateDecl(wrapperInfo.valueVar);
+        // FIXME: Remove this once we request-ify isSetterMutating()
+        auto *resolver = storage->getASTContext().getLazyResolver();
+        if (resolver)
+          resolver->resolveDeclSignature(wrapperInfo.valueVar);
         return wrapperInfo.valueVar->isGetterMutating() &&
             var->isInstanceMember() &&
             doesContextHaveValueSemantics(var->getDeclContext());
@@ -2033,20 +2036,19 @@ static bool computeIsGetterMutating(TypeChecker &TC,
     if (!storage->getGetter())
       return false;
 
-    return validateAccessorIsMutating(TC, storage->getGetter());
+    return validateAccessorIsMutating(storage->getGetter());
 
   case ReadImplKind::Address:
-    return validateAccessorIsMutating(TC, storage->getAddressor());
+    return validateAccessorIsMutating(storage->getAddressor());
 
   case ReadImplKind::Read:
-    return validateAccessorIsMutating(TC, storage->getReadCoroutine());
+    return validateAccessorIsMutating(storage->getReadCoroutine());
   }
 
   llvm_unreachable("bad impl kind");
 }
 
-static bool computeIsSetterMutating(TypeChecker &TC,
-                                    AbstractStorageDecl *storage) {
+static bool computeIsSetterMutating(AbstractStorageDecl *storage) {
   // If we have an attached property wrapper, the setter is mutating if
   // the "value" property of the outermost wrapper type is mutating and we're
   // in a context that has value semantics.
@@ -2054,7 +2056,10 @@ static bool computeIsSetterMutating(TypeChecker &TC,
     if (auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo(0)) {
       if (wrapperInfo.valueVar &&
           (!storage->getSetter() || storage->getSetter()->isImplicit())) {
-        TC.validateDecl(wrapperInfo.valueVar);
+        // FIXME: Remove this once we request-ify isSetterMutating()
+        auto *resolver = storage->getASTContext().getLazyResolver();
+        if (resolver)
+          resolver->resolveDeclSignature(wrapperInfo.valueVar);
         return wrapperInfo.valueVar->isSetterMutating() &&
             var->isInstanceMember() &&
             doesContextHaveValueSemantics(var->getDeclContext());
@@ -2083,7 +2088,7 @@ static bool computeIsSetterMutating(TypeChecker &TC,
     auto *setter = storage->getSetter();
 
     if (setter)
-      result = validateAccessorIsMutating(TC, setter);
+      result = validateAccessorIsMutating(setter);
 
     // As a special extra check, if the user also gave us a modify
     // coroutine, check that it has the same mutatingness as the setter.
@@ -2091,16 +2096,16 @@ static bool computeIsSetterMutating(TypeChecker &TC,
     // it's the implied value.
     if (impl.getReadWriteImpl() == ReadWriteImplKind::Modify) {
       auto modifyAccessor = storage->getModifyCoroutine();
-      auto modifyResult = validateAccessorIsMutating(TC, modifyAccessor);
+      auto modifyResult = validateAccessorIsMutating(modifyAccessor);
       if ((result || storage->isGetterMutating()) != modifyResult) {
-        TC.diagnose(modifyAccessor,
-                    diag::modify_mutatingness_differs_from_setter,
-                    modifyResult ? SelfAccessKind::Mutating
-                                 : SelfAccessKind::NonMutating,
-                    modifyResult ? SelfAccessKind::NonMutating
-                                 : SelfAccessKind::Mutating);
+        modifyAccessor->diagnose(
+            diag::modify_mutatingness_differs_from_setter,
+            modifyResult ? SelfAccessKind::Mutating
+                         : SelfAccessKind::NonMutating,
+            modifyResult ? SelfAccessKind::NonMutating
+                         : SelfAccessKind::Mutating);
         if (setter)
-          TC.diagnose(setter, diag::previous_accessor, "setter", 0);
+          setter->diagnose(diag::previous_accessor, "setter", 0);
         modifyAccessor->setInvalid();
       }
     }
@@ -2109,16 +2114,15 @@ static bool computeIsSetterMutating(TypeChecker &TC,
   }
 
   case WriteImplKind::MutableAddress:
-    return validateAccessorIsMutating(TC, storage->getMutableAddressor());
+    return validateAccessorIsMutating(storage->getMutableAddressor());
 
   case WriteImplKind::Modify:
-    return validateAccessorIsMutating(TC, storage->getModifyCoroutine());
+    return validateAccessorIsMutating(storage->getModifyCoroutine());
   }
   llvm_unreachable("bad storage kind");
 }
 
-static bool shouldUseOpaqueReadAccessor(TypeChecker &TC,
-                                        AbstractStorageDecl *storage) {
+static bool shouldUseOpaqueReadAccessor(AbstractStorageDecl *storage) {
   return storage->getAttrs().hasAttribute<BorrowedAttr>();
 }
 
@@ -2130,13 +2134,13 @@ static void validateAbstractStorageDecl(TypeChecker &TC,
     }
   }
   
-  if (shouldUseOpaqueReadAccessor(TC, storage))
+  if (shouldUseOpaqueReadAccessor(storage))
     storage->setOpaqueReadOwnership(OpaqueReadOwnership::Borrowed);
 
   // isGetterMutating and isSetterMutating are part of the signature
   // of a storage declaration and need to be validated immediately.
-  storage->setIsGetterMutating(computeIsGetterMutating(TC, storage));
-  storage->setIsSetterMutating(computeIsSetterMutating(TC, storage));
+  storage->setIsGetterMutating(computeIsGetterMutating(storage));
+  storage->setIsSetterMutating(computeIsSetterMutating(storage));
 
   // Everything else about the accessors can wait until finalization.
   // This will validate all the accessors.
@@ -3981,7 +3985,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       }
     }
 
-    validateSelfAccessKind(*this, FD);
+    validateSelfAccessKind(FD);
 
     // Check whether the return type is dynamic 'Self'.
     FD->setDynamicSelf(checkDynamicSelfReturn(FD));
