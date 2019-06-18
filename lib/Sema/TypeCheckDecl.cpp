@@ -2026,10 +2026,13 @@ static bool computeIsGetterMutating(TypeChecker &TC,
 
   switch (storage->getReadImpl()) {
   case ReadImplKind::Stored:
+  case ReadImplKind::Inherited:
     return false;
 
   case ReadImplKind::Get:
-  case ReadImplKind::Inherited:
+    if (!storage->getGetter())
+      return false;
+
     return validateAccessorIsMutating(TC, storage->getGetter());
 
   case ReadImplKind::Address:
@@ -2059,6 +2062,11 @@ static bool computeIsSetterMutating(TypeChecker &TC,
     }
   }
 
+  // By default, the setter is mutating if we have an instance member of a
+  // value type, but this can be overridden below.
+  bool result = (storage->isInstanceMember() &&
+                 doesContextHaveValueSemantics(storage->getDeclContext()));
+
   auto impl = storage->getImplInfo();
   switch (impl.getWriteImpl()) {
   case WriteImplKind::Immutable:
@@ -2067,13 +2075,15 @@ static bool computeIsSetterMutating(TypeChecker &TC,
     // top-level setters are not.
     // It's important that we use this logic for "immutable" storage
     // in order to handle initialization of let-properties.
-    return storage->isInstanceMember() &&
-           doesContextHaveValueSemantics(storage->getDeclContext());
+    return result;
 
   case WriteImplKind::StoredWithObservers:
   case WriteImplKind::InheritedWithObservers:
   case WriteImplKind::Set: {
-    auto result = validateAccessorIsMutating(TC, storage->getSetter());
+    auto *setter = storage->getSetter();
+
+    if (setter)
+      result = validateAccessorIsMutating(TC, setter);
 
     // As a special extra check, if the user also gave us a modify
     // coroutine, check that it has the same mutatingness as the setter.
@@ -2089,7 +2099,8 @@ static bool computeIsSetterMutating(TypeChecker &TC,
                                  : SelfAccessKind::NonMutating,
                     modifyResult ? SelfAccessKind::NonMutating
                                  : SelfAccessKind::Mutating);
-        TC.diagnose(storage->getSetter(), diag::previous_accessor, "setter", 0);
+        if (setter)
+          TC.diagnose(setter, diag::previous_accessor, "setter", 0);
         modifyAccessor->setInvalid();
       }
     }
