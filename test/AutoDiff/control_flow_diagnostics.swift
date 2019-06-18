@@ -141,3 +141,15 @@ enum Tree : Differentiable & AdditiveArithmetic {
     }
   }
 }
+
+// expected-error @+1 {{function is not differentiable}}
+@differentiable
+// expected-note @+1 {{when differentiating this function definition}}
+func loop_array(_ array: [Float]) -> Float {
+  var result: Float = 1
+  // expected-note @+1 {{differentiating enum values is not yet supported}}
+  for x in array {
+    result = result * x
+  }
+  return result
+}

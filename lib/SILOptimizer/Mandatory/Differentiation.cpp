@@ -1736,7 +1736,7 @@ static void dumpActivityInfo(SILFunction &fn,
     for (auto &inst : bb)
       for (auto res : inst.getResults())
         dumpActivityInfo(res, indices, activityInfo, s);
-    s << "\n";
+    s << '\n';
   }
 }
 
