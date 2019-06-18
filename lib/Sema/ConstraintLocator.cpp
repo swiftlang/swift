@@ -63,6 +63,7 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
     case RValueAdjustment:
     case ClosureResult:
     case ParentType:
+    case ExistentialSuperclassType:
     case InstanceType:
     case SequenceElementType:
     case AutoclosureResult:
@@ -306,6 +307,10 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
         
     case ParentType:
       out << "parent type";
+      break;
+
+    case ExistentialSuperclassType:
+      out << "existential superclass type";
       break;
 
     case LValueConversion:
