@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeChecker.h"
+#include "TypeCheckAvailability.h"
 #include "TypeCheckType.h"
 #include "MiscDiagnostics.h"
 #include "ConstraintSystem.h"
@@ -2050,8 +2051,19 @@ static bool checkSuperInit(TypeChecker &tc, ConstructorDecl *fromCtor,
       // super.init() call.
       return true;
     }
+
+    // Make sure we can reference the designated initializer correctly.
+    if (fromCtor->getResilienceExpansion() == ResilienceExpansion::Minimal) {
+      TypeChecker::FragileFunctionKind fragileKind;
+      bool treatUsableFromInlineAsPublic;
+      std::tie(fragileKind, treatUsableFromInlineAsPublic) =
+        tc.getFragileFunctionKind(fromCtor);
+      tc.diagnoseInlinableDeclRef(
+          fromCtor->getLoc(), ctor, fromCtor, fragileKind,
+          treatUsableFromInlineAsPublic);
+    }
   }
-  
+
   return false;
 }
 
