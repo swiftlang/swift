@@ -204,7 +204,8 @@ public:
   }
   
   bool shouldInclude(const ValueDecl *VD) {
-    return isVisibleToObjC(VD, minRequiredAccess);
+    return isVisibleToObjC(VD, minRequiredAccess) &&
+           !VD->getAttrs().hasAttribute<ImplementationOnlyAttr>();
   }
 
 private:
