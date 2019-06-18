@@ -539,18 +539,12 @@ namespace RuntimeConstants {
   const auto NoUnwind = llvm::Attribute::NoUnwind;
   const auto ZExt = llvm::Attribute::ZExt;
   const auto FirstParamReturned = llvm::Attribute::Returned;
-  
-  bool AlwaysAvailable(ASTContext &Context) {
-    return false;
-  }
-  
-  bool OpaqueTypeAvailability(ASTContext &Context) {
-    auto deploymentAvailability =
-      AvailabilityContext::forDeploymentTarget(Context);
-    auto featureAvailability = Context.getOpaqueTypeAvailability();
-    
-    return !deploymentAvailability.isContainedIn(featureAvailability);
-  }
+
+  const auto AlwaysAvailable = RuntimeAvailability::AlwaysAvailable;
+  const auto AvailableByCompatibilityLibrary =
+      RuntimeAvailability::AvailableByCompatibilityLibrary;
+  const auto ConditionallyAvailable =
+      RuntimeAvailability::ConditionallyAvailable;
 } // namespace RuntimeConstants
 
 // We don't use enough attributes to justify generalizing the
@@ -594,13 +588,40 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
                       llvm::Constant *&cache,
                       const char *name,
                       llvm::CallingConv::ID cc,
-                      bool isWeakLinked,
+                      RuntimeAvailability availability,
+                      ASTContext *context,
                       llvm::ArrayRef<llvm::Type*> retTypes,
                       llvm::ArrayRef<llvm::Type*> argTypes,
                       ArrayRef<Attribute::AttrKind> attrs) {
+
   if (cache)
     return cache;
-  
+
+  bool isWeakLinked = false;
+  std::string functionName(name);
+
+  auto isFeatureAvailable = [&]() -> bool {
+    auto deploymentAvailability =
+        AvailabilityContext::forDeploymentTarget(*context);
+    auto featureAvailability = context->getSwift51Availability();
+    return deploymentAvailability.isContainedIn(featureAvailability);
+  };
+
+  switch (availability) {
+  case RuntimeAvailability::AlwaysAvailable:
+    // Nothing to do.
+    break;
+  case RuntimeAvailability::ConditionallyAvailable: {
+    isWeakLinked = !isFeatureAvailable();
+    break;
+  }
+  case RuntimeAvailability::AvailableByCompatibilityLibrary: {
+    if (!isFeatureAvailable())
+      functionName.append("50");
+    break;
+  }
+  }
+
   llvm::Type *retTy;
   if (retTypes.size() == 1)
     retTy = *retTypes.begin();
@@ -613,7 +634,7 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
                                       /*isVararg*/ false);
 
   cache =
-      cast<llvm::Function>(Module.getOrInsertFunction(name, fnTy).getCallee());
+      cast<llvm::Function>(Module.getOrInsertFunction(functionName.c_str(), fnTy).getCallee());
 
   // Add any function attributes and set the calling convention.
   if (auto fn = dyn_cast<llvm::Function>(cache)) {
@@ -668,7 +689,7 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
   llvm::Constant *IRGenModule::get##ID##Fn() {                                 \
     using namespace RuntimeConstants;                                          \
     return getRuntimeFn(Module, ID##Fn, #NAME, CC,                             \
-                        (AVAILABILITY)(this->Context),                         \
+                        AVAILABILITY, &this->Context,                          \
                         RETURNS, ARGS, ATTRS);                                 \
   }
 

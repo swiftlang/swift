@@ -275,7 +275,6 @@ static void addRuntimeLibraryFlags(const OutputInfo &OI,
 
   Arguments.push_back("-autolink-library");
   switch (RT) {
-  default: llvm_unreachable("invalid MSVC runtime library");
   case OutputInfo::MSVCRuntime::MultiThreaded:
     Arguments.push_back("libcmt");
     break;
@@ -445,7 +444,12 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     Arguments.push_back("-runtime-compatibility-version");
     Arguments.push_back(arg->getValue());
   }
-                                 
+
+  context.Args.AddLastArg(
+      Arguments,
+      options::
+          OPT_disable_autolinking_runtime_compatibility_dynamic_replacements);
+
   return II;
 }
 
