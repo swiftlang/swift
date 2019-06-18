@@ -2400,7 +2400,7 @@ CanType ValueDecl::getOverloadSignatureType() const {
                            /*topLevelFunction=*/true,
                            isMethod,
                            /*isInitializer=*/isa<ConstructorDecl>(afd),
-                           isMethod ? 2 : 1)->getCanonicalType();
+                           getNumCurryLevels())->getCanonicalType();
   }
 
   if (isa<AbstractStorageDecl>(this)) {
@@ -2416,7 +2416,7 @@ CanType ValueDecl::getOverloadSignatureType() const {
           /*topLevelFunction=*/true,
           /*isMethod=*/false,
           /*isInitializer=*/false,
-          1)->getCanonicalType();
+          getNumCurryLevels())->getCanonicalType();
     }
 
     // We want to curry the default signature type with the 'self' type of the
@@ -2430,7 +2430,7 @@ CanType ValueDecl::getOverloadSignatureType() const {
   if (isa<EnumElementDecl>(this)) {
     auto mappedType = mapSignatureFunctionType(
         getASTContext(), getInterfaceType(), /*topLevelFunction=*/false,
-        /*isMethod=*/false, /*isInitializer=*/false, /*curryLevels=*/0);
+        /*isMethod=*/false, /*isInitializer=*/false, getNumCurryLevels());
     return mappedType->getCanonicalType();
   }
 
@@ -6108,7 +6108,7 @@ DeclName AbstractFunctionDecl::getEffectiveFullName() const {
   return DeclName();
 }
 
-const ParamDecl *swift::getParameterAt(ValueDecl *source, unsigned index) {
+const ParamDecl *swift::getParameterAt(const ValueDecl *source, unsigned index) {
   const ParameterList *paramList;
   if (auto *AFD = dyn_cast<AbstractFunctionDecl>(source)) {
     paramList = AFD->getParameters();

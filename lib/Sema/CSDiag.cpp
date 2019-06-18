@@ -2663,8 +2663,7 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
     // default arguments.
     ParameterListInfo paramInfo;
     if (!candidates.empty()) {
-      paramInfo = ParameterListInfo(params, candidates[0].getDecl(),
-                                    candidates[0].skipCurriedSelf);
+      paramInfo = candidates[0].getParameterListInfo(params);
     } else {
       paramInfo = ParameterListInfo(params, nullptr, /*skipCurriedSelf=*/false);
     }
@@ -3550,8 +3549,7 @@ diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI, Expr *fnExpr,
     return false;
 
   auto params = candidate.getParameters();
-  ParameterListInfo paramInfo(params, candidate.getDecl(),
-                              candidate.skipCurriedSelf);
+  auto paramInfo = candidate.getParameterListInfo(params);
   auto args = decomposeArgType(CCI.CS.getType(argExpr), argLabels);
 
   // Check the case where a raw-representable type is constructed from an
@@ -4198,8 +4196,7 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
     return false;
 
   auto params = candidate.getParameters();
-  ParameterListInfo paramInfo(params, candidate.getDecl(),
-                              candidate.skipCurriedSelf);
+  auto paramInfo = candidate.getParameterListInfo(params);
   auto args = decomposeArgType(CS.getType(argExpr), argLabels);
 
   SmallVector<ParamBinding, 4> bindings;
@@ -4672,7 +4669,7 @@ static bool isViableOverloadSet(const CalleeCandidateInfo &CCI,
       return true;
     };
 
-    ParameterListInfo paramInfo(params, funcDecl, cand.skipCurriedSelf);
+    auto paramInfo = cand.getParameterListInfo(params);
     InputMatcher IM(params, paramInfo);
     auto result = IM.match(numArgs, pairMatcher);
     if (result == InputMatcher::IM_Succeeded)

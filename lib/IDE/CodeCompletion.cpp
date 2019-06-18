@@ -1464,7 +1464,7 @@ protocolForLiteralKind(CodeCompletionLiteralKind kind) {
 static bool hasTrivialTrailingClosure(const FuncDecl *FD,
                                       AnyFunctionType *funcType) {
   ParameterListInfo paramInfo(funcType->getParams(), FD,
-                              /*level*/ FD->isInstanceMember() ? 1 : 0);
+                              /*skipCurriedSelf*/ FD->hasCurriedSelf());
 
   if (paramInfo.size() - paramInfo.numNonDefaultedParameters() == 1) {
     auto param = funcType->getParams().back();
