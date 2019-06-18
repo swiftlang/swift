@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-opaque-result-types
 
 @_functionBuilder
 struct TupleBuilder { // expected-note 2{{struct 'TupleBuilder' declared here}}
@@ -125,4 +125,49 @@ func testOverloading(name: String) {
       }
     }
   }
+}
+
+protocol P {
+  associatedtype T
+}
+
+struct AnyP : P {
+  typealias T = Any
+  init<T>(_: T) where T : P {}
+}
+
+struct TupleP<U> : P {
+  typealias T = U
+  init(_: U) {}
+}
+
+@_functionBuilder
+struct Builder {
+  static func buildBlock<S0, S1>(_ stmt1: S0, _ stmt2: S1) // expected-note {{where 'S1' = 'Label<Any>.Type'}}
+           -> TupleP<(S0, S1)> where S0: P, S1: P {
+    return TupleP((stmt1, stmt2))
+  }
+}
+
+struct G<C> : P where C : P {
+  typealias T = C
+  init(@Builder _: () -> C) {}
+}
+
+struct Text : P {
+  typealias T = String
+  init(_: T) {}
+}
+
+struct Label<L> : P where L : P { // expected-note {{'L' declared as parameter to type 'Label'}}
+  typealias T = L
+  init(@Builder _: () -> L) {}
+}
+
+func test_51167632() -> some P {
+  AnyP(G { // expected-error {{static method 'buildBlock' requires that 'Label<Any>.Type' conform to 'P'}}
+    Text("hello")
+    Label  // expected-error {{generic parameter 'L' could not be inferred}}
+    // expected-note@-1 {{explicitly specify the generic arguments to fix this issue}} {{10-10=<<#L: P#>>}}
+  })
 }
