@@ -795,15 +795,15 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   // SWIFT_ENABLE_TENSORFLOW
   case DAK_Transposing: {
     Printer.printAttrName("@transposing");
-//    Printer << '(';
-//    auto *attr = cast<DifferentiatingAttr>(this);
-//    auto *derivative = dyn_cast_or_null<AbstractFunctionDecl>(D);
-//    Printer << attr->getOriginal().Name;
-//    auto diffParamsString = getDifferentiationParametersClauseString(
-//        derivative, attr->getParameterIndices(), attr->getParsedParameters());
-//    if (!diffParamsString.empty())
-//      Printer << ", " << diffParamsString;
-//    Printer << ')';
+    Printer << '(';
+    auto *attr = cast<TransposingAttr>(this);
+    auto *derivative = dyn_cast_or_null<AbstractFunctionDecl>(D);
+    Printer << attr->getOriginal().Name;
+    auto diffParamsString = getDifferentiationParametersClauseString(
+        derivative, attr->getParameterIndices(), attr->getParsedParameters());
+    if (!diffParamsString.empty())
+      Printer << ", " << diffParamsString;
+    Printer << ')';
     break;
   }
 
