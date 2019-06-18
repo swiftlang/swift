@@ -96,7 +96,8 @@ def update_single_repository(args):
             checkout_target = None
 
             if should_fetch:
-                shell.run(['git', 'fetch'], echo=True)
+                shell.run(['git', 'fetch', '--recurse-submodules=yes',
+                           '--targs'], echo=True)
 
             if tag:
                 checkout_target = confirm_tag_in_repo(tag, repo_name)
