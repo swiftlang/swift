@@ -158,6 +158,7 @@ struct _S {
 // ON_PROPERTY-DAG: Keyword/None:                       nonobjc[#Var Attribute#]; name=nonobjc
 // ON_PROPERTY-DAG: Keyword/None:                       inlinable[#Var Attribute#]; name=inlinable
 // ON_PROPERTY-DAG: Keyword/None:                       usableFromInline[#Var Attribute#]; name=usableFromInline
+// ON_PROPERTY-DAG: Keyword/None:                       GKInspectable[#Var Attribute#]; name=GKInspectable
 // SWIFT_ENABLE_TENSORFLOW
 // ON_PROPERTY-DAG: Keyword/None:                       differentiable[#Var Attribute#]; name=differentiable
 // ON_PROPERTY-DAG: Keyword/None:                       noDerivative[#Var Attribute#]; name=noDerivative
@@ -213,17 +214,13 @@ struct _S {
 // ON_MEMBER_LAST-DAG: Keyword/None:                       discardableResult[#Declaration Attribute#]; name=discardableResult
 // ON_MEMBER_LAST-DAG: Keyword/None:                       GKInspectable[#Declaration Attribute#]; name=GKInspectable
 // ON_MEMBER_LAST-DAG: Keyword/None:                       IBSegueAction[#Declaration Attribute#]; name=IBSegueAction
-<<<<<<< HEAD
-// ON_MEMBER_LAST-DAG: Keyword/None:                       _propertyWrapper[#Declaration Attribute#]; name=_propertyWrapper
-// ON_MEMBER_LAST-DAG: Keyword/None:                       compilerEvaluable[#Declaration Attribute#]; name=compilerEvaluable
+// ON_MEMBER_LAST-DAG: Keyword/None:                       propertyWrapper[#Declaration Attribute#]; name=propertyWrapper
+// ON_MEMBER_LAST-DAG: Keyword/None:                       _functionBuilder[#Declaration Attribute#]; name=_functionBuilder
 // SWIFT_ENABLE_TENSORFLOW
 // ON_MEMBER_LAST-DAG: Keyword/None:                       differentiable[#Declaration Attribute#]; name=differentiable
 // ON_MEMBER_LAST-DAG: Keyword/None:                       differentiating[#Declaration Attribute#]; name=differentiating
+// ON_MEMBER_LAST-DAG: Keyword/None:                       compilerEvaluable[#Declaration Attribute#]; name=compilerEvaluable
 // ON_MEMBER_LAST-DAG: Keyword/None:                       noDerivative[#Declaration Attribute#]; name=noDerivative
-=======
-// ON_MEMBER_LAST-DAG: Keyword/None:                       propertyWrapper[#Declaration Attribute#]; name=propertyWrapper
-// ON_MEMBER_LAST-DAG: Keyword/None:                       _functionBuilder[#Declaration Attribute#]; name=_functionBuilder
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-06-17-a
 // ON_MEMBER_LAST-NOT: Keyword
 // ON_MEMBER_LAST: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // ON_MEMBER_LAST-NOT: Decl[PrecedenceGroup]
@@ -257,14 +254,11 @@ struct _S {
 // KEYWORD_LAST-NEXT:             Keyword/None:                       propertyWrapper[#Declaration Attribute#]; name=propertyWrapper
 // KEYWORD_LAST-NEXT:             Keyword/None:                       _functionBuilder[#Declaration Attribute#]; name=_functionBuilder{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       IBSegueAction[#Declaration Attribute#]; name=IBSegueAction{{$}}
-<<<<<<< HEAD
 // SWIFT_ENABLE_TENSORFLOW
 // KEYWORD_LAST-NEXT:             Keyword/None:                       differentiable[#Declaration Attribute#]; name=differentiable
 // KEYWORD_LAST-NEXT:             Keyword/None:                       differentiating[#Declaration Attribute#]; name=differentiating
 // KEYWORD_LAST-NEXT:             Keyword/None:                       compilerEvaluable[#Declaration Attribute#]; name=compilerEvaluable
 // KEYWORD_LAST-NEXT:             Keyword/None:                       noDerivative[#Declaration Attribute#]; name=noDerivative
-=======
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-06-17-a
 // KEYWORD_LAST-NOT:              Keyword
 // KEYWORD_LAST: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // KEYWORD_LAST:                  End completions
