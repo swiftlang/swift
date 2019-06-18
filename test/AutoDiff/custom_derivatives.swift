@@ -87,4 +87,12 @@ CustomDerivativesTests.test("ModifyGradientOfSum") {
   })
 }
 
+CustomDerivativesTests.test("WithoutDerivative") {
+  expectEqual(0, gradient(at: Float(4)) { x in
+    withoutDerivative(at: x) { x in
+      sinf(x) + cosf(x)
+    }
+  })
+}
+
 runAllTests()
