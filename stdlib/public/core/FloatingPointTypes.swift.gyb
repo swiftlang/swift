@@ -1879,8 +1879,28 @@ extension ${Self} : Strideable {
 extension ${Self} : VectorProtocol {
   public typealias VectorSpaceScalar = ${Self}
 
+  public func adding(_ x: ${Self}) -> ${Self} {
+    self + x
+  }
+
+  public mutating func add(_ x: ${Self}) {
+    self += x
+  }
+
+  public func subtracting(_ x: ${Self}) -> ${Self} {
+    self - x
+  }
+
+  public mutating func subtract(_ x: ${Self}) {
+    self -= x
+  }
+
   public func scaled(by scalar: ${Self}) -> ${Self} {
-    return self * scalar
+    self * scalar
+  }
+
+  public mutating func scale(by scalar: ${Self}) {
+    self *= scalar
   }
 }
 

@@ -23,6 +23,8 @@ public struct Vector : AdditiveArithmetic, VectorProtocol, Differentiable, Equat
   @differentiable(vjp: fakeVJP)
   public static func - (lhs: Vector, rhs: Vector) -> Vector { abort() }
 
+  public func adding(_ scalar: Float) -> Vector { abort() }
+  public func subtracting(_ scalar: Float) -> Vector { abort() }
   public func scaled(by scalar: Float) -> Vector { abort() }
 
   public static func fakeVJP(lhs: Vector, rhs: Vector) -> (Vector, (Vector) -> (Vector, Vector)) { abort() }
