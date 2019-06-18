@@ -106,6 +106,10 @@ llvm::Value *emitGatherBits(IRGenFunction &IGF,
                             unsigned resultLowBit,
                             unsigned resultBitWidth);
 
+/// Pack masked bits into the low bits of an integer value.
+llvm::APInt gatherBits(const llvm::APInt &mask,
+                       const llvm::APInt &value);
+
 /// Unpack bits from the low bits of an integer value and
 /// move them to the bit positions indicated by the mask.
 /// Equivalent to a parallel bit deposit instruction (PDEP),
@@ -118,7 +122,7 @@ llvm::Value *emitScatterBits(IRGenFunction &IGF,
 /// Unpack bits from the low bits of an integer value and
 /// move them to the bit positions indicated by the mask.
 llvm::APInt scatterBits(const llvm::APInt &mask, unsigned value);
-  
+
 /// An implementation strategy for an enum, which handles how the enum is
 /// laid out and how to perform TypeInfo operations on values of the enum.
 class EnumImplStrategy {
