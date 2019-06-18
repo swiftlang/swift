@@ -50,6 +50,9 @@ public:
   ParsedAutoDiffParameter(SourceLoc loc, enum Kind kind, Value value)
     : Loc(loc), Kind(kind), V(value) {}
   
+  ParsedAutoDiffParameter(SourceLoc loc, enum Kind kind, unsigned int order)
+  : Loc(loc), Kind(kind), V(order) {}
+
   ParsedAutoDiffParameter(SourceLoc loc, enum Kind kind, unsigned index)
   : Loc(loc), Kind(kind), V(index) {}
 
@@ -72,6 +75,10 @@ public:
     return V.Name;
   }
   
+  unsigned int getIndex() const {
+    return V.Index;
+  }
+
   unsigned getIndex() const {
     return V.Index;
   }

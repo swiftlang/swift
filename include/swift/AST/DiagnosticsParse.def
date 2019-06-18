@@ -1518,13 +1518,17 @@ ERROR(attr_transposing_expected_original_name,PointsToFirstBadToken,
 ERROR(attr_transposing_expected_label_linear_or_wrt,none,
 "expected either 'linear' or 'wrt:'", ())
 
+// transposing `wrt` parameters clause
+ERROR(transposing_params_clause_expected_parameter,PointsToFirstBadToken,
+      "expected a parameter, which can be a 'unsigned int' parameter number "
+      "or 'self'", ())
+
 // differentiation `wrt` parameters clause
 ERROR(expected_colon_after_label,PointsToFirstBadToken,
       "expected a colon ':' after '%0'", (StringRef))
 ERROR(diff_params_clause_expected_parameter,PointsToFirstBadToken,
       "expected a parameter, which can be a function parameter name, "
-      "parameter index, or 'self'",
-      ())
+      "parameter index, or 'self'", ())
 
 // [differentiable ...] (sil-decl attr)
 ERROR(sil_attr_differentiable_expected_keyword,PointsToFirstBadToken,

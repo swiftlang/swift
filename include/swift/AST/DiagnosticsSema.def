@@ -2805,6 +2805,11 @@ ERROR(differentiating_attr_not_in_same_file_as_original,none,
 ERROR(differentiating_attr_original_already_has_derivative,none,
       "a derivative already exists for %0", (DeclName))
 
+// transposing
+ERROR(transposing_attr_result_value_not_differentiable,none,
+"'@differentiating' attribute requires function to return a differentiable "
+"type. %0 does not conform to 'Differentiable", (Type))
+
 // differentiation `wrt` parameters clause
 ERROR(diff_function_no_parameters,none,
       "%0 has no parameters to differentiate with respect to", (DeclName))
