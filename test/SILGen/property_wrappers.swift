@@ -191,14 +191,10 @@ struct WrapperWithStorageValue<T> {
 
 struct UseWrapperWithStorageValue {
   // UseWrapperWithStorageValue.$x.getter
-  // CHECK-LABEL: sil private [ossa] @$s17property_wrappers26UseWrapperWithStorageValueV2$x33_{{.*}}SiGvg : $@convention(method) (UseWrapperWithStorageValue) -> Wrapper<Int>
+  // CHECK-LABEL: sil hidden [transparent] [ossa] @$s17property_wrappers26UseWrapperWithStorageValueV2$xAA0D0VySiGvg : $@convention(method) (UseWrapperWithStorageValue) -> Wrapper<Int>
   // CHECK-NOT: return
   // CHECK: function_ref @$s17property_wrappers23WrapperWithStorageValueV07wrapperF0AA0C0VyxGvg
   @WrapperWithStorageValue(value: 17) var x: Int
-
-  func foo() {
-    _ = $x
-  }
 }
 
 @propertyWrapper
@@ -296,6 +292,121 @@ class UseWrapperWithDefaultInit {
 // CHECK: function_ref @$s17property_wrappers22WrapperWithDefaultInitVACyxGycfC
 // CHECK: return {{%.*}} : $WrapperWithDefaultInit<String>
 
+// Property wrapper composition.
+@propertyWrapper
+struct WrapperA<Value> {
+  var value: Value
+
+  init(initialValue: Value) {
+    value = initialValue
+  }
+}
+
+@propertyWrapper
+struct WrapperB<Value> {
+  var value: Value
+
+  init(initialValue: Value) {
+    value = initialValue
+  }
+}
+
+@propertyWrapper
+struct WrapperC<Value> {
+  var value: Value?
+
+  init(initialValue: Value?) {
+    value = initialValue
+  }
+}
+
+struct CompositionMembers {
+  // CompositionMembers.p1.getter
+  // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers18CompositionMembersV2p1SiSgvg : $@convention(method) (@guaranteed CompositionMembers) -> Optional<Int>
+  // CHECK: bb0([[SELF:%.*]] : @guaranteed $CompositionMembers):
+  // CHECK: [[P1:%.*]] = struct_extract [[SELF]] : $CompositionMembers, #CompositionMembers.$p1
+  // CHECK: [[P1_VALUE:%.*]] = struct_extract [[P1]] : $WrapperA<WrapperB<WrapperC<Int>>>, #WrapperA.value
+  // CHECK: [[P1_VALUE2:%.*]] = struct_extract [[P1_VALUE]] : $WrapperB<WrapperC<Int>>, #WrapperB.value
+  // CHECK: [[P1_VALUE3:%.*]] = struct_extract [[P1_VALUE2]] : $WrapperC<Int>, #WrapperC.value
+  // CHECK: return [[P1_VALUE3]] : $Optional<Int>
+  @WrapperA @WrapperB @WrapperC var p1: Int?
+  @WrapperA @WrapperB @WrapperC var p2 = "Hello"
+
+  // variable initialization expression of CompositionMembers.$p2
+  // CHECK-LABEL: sil hidden [transparent] [ossa] @$s17property_wrappers18CompositionMembersV3$p233_{{.*}}8WrapperAVyAA0N1BVyAA0N1CVySSGGGvpfi : $@convention(thin) () -> @owned Optional<String> {
+  // CHECK: %0 = string_literal utf8 "Hello"
+
+  // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers18CompositionMembersV2p12p2ACSiSg_SSSgtcfC : $@convention(method) (Optional<Int>, @owned Optional<String>, @thin CompositionMembers.Type) -> @owned CompositionMembers
+  // CHECK: function_ref @$s17property_wrappers8WrapperCV12initialValueACyxGxSg_tcfC
+  // CHECK: function_ref @$s17property_wrappers8WrapperBV12initialValueACyxGx_tcfC
+  // CHECK: function_ref @$s17property_wrappers8WrapperAV12initialValueACyxGx_tcfC
+}
+
+func testComposition() {
+  _ = CompositionMembers(p1: nil)
+}
+
+// Observers with non-default mutatingness.
+@propertyWrapper
+struct NonMutatingSet<T> {
+  private var fixed: T
+
+  var wrappedValue: T {
+    get { fixed }
+    nonmutating set { }
+  }
+
+  init(initialValue: T) {
+    fixed = initialValue
+  }
+}
+
+@propertyWrapper
+struct MutatingGet<T> {
+  private var fixed: T
+
+  var wrappedValue: T {
+    mutating get { fixed }
+    set { }
+  }
+
+  init(initialValue: T) {
+    fixed = initialValue
+  }
+}
+
+struct ObservingTest {
+	// ObservingTest.text.setter
+	// CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers13ObservingTestV4textSSvs : $@convention(method) (@owned String, @guaranteed ObservingTest) -> ()
+	// CHECK: function_ref @$s17property_wrappers14NonMutatingSetV12wrappedValuexvg
+  @NonMutatingSet var text: String = "" {
+    didSet { }
+  }
+
+  @NonMutatingSet var integer: Int = 17 {
+    willSet { }
+  }
+
+  @MutatingGet var text2: String = "" {
+    didSet { }
+  }
+
+  @MutatingGet var integer2: Int = 17 {
+    willSet { }
+  }
+}
+
+// Tuple initial values.
+struct WithTuples {
+	// CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers10WithTuplesVACycfC : $@convention(method) (@thin WithTuples.Type) -> WithTuples {
+	// CHECK: function_ref @$s17property_wrappers10WithTuplesV10$fractions33_F728088E0028E14D18C6A10CF68512E8LLAA07WrapperC12InitialValueVySd_S2dtGvpfi : $@convention(thin) () -> (Double, Double, Double)
+	// CHECK: function_ref @$s17property_wrappers23WrapperWithInitialValueV07initialF0ACyxGx_tcfC : $@convention(method) <τ_0_0> (@in τ_0_0, @thin WrapperWithInitialValue<τ_0_0>.Type) -> @out WrapperWithInitialValue<τ_0_0>
+  @WrapperWithInitialValue var fractions = (1.3, 0.7, 0.3)
+
+	static func getDefault() -> WithTuples {
+		return .init()
+	}
+}
 
 // CHECK-LABEL: sil_vtable ClassUsingWrapper {
 // CHECK:  #ClassUsingWrapper.x!getter.1: (ClassUsingWrapper) -> () -> Int : @$s17property_wrappers17ClassUsingWrapperC1xSivg   // ClassUsingWrapper.x.getter

@@ -574,14 +574,17 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
                                    TargetImpl target,
                                    ASTContext &ctx) {
   // Local function to "finish" the expression, creating a member reference
-  // to the underlying variable if there is one.
-  VarDecl *underlyingVar = nullptr;
+  // to the given sequence of underlying variables.
+  llvm::TinyPtrVector<VarDecl *> underlyingVars;
   auto finish = [&](Expr *result) -> Expr * {
-    if (!underlyingVar)
-      return result;
-
-    return new (ctx) MemberRefExpr(
-        result, SourceLoc(), underlyingVar, DeclNameLoc(), /*Implicit=*/true);
+    for (auto underlyingVar : underlyingVars) {
+      auto *memberRefExpr = new (ctx) MemberRefExpr(
+          result, SourceLoc(), underlyingVar,
+          DeclNameLoc(), /*Implicit=*/true);
+      result = memberRefExpr;
+    }
+    
+    return result;
   };
 
   AccessSemantics semantics;
@@ -621,7 +624,10 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
   case TargetImpl::Wrapper: {
     auto var = cast<VarDecl>(accessor->getStorage());
     storage = var->getPropertyWrapperBackingProperty();
-    underlyingVar = var->getAttachedPropertyWrapperTypeInfo().valueVar;
+    for (unsigned i : indices(var->getAttachedPropertyWrappers())) {
+      underlyingVars.push_back(
+          var->getAttachedPropertyWrapperTypeInfo(i).valueVar);
+    }
     semantics = AccessSemantics::DirectToStorage;
     selfAccessKind = SelfAccessorKind::Peer;
     break;
@@ -631,8 +637,7 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
     auto var =
       cast<VarDecl>(accessor->getStorage())->getOriginalWrappedProperty();
     storage = var->getPropertyWrapperBackingProperty();
-    underlyingVar = var->getAttachedPropertyWrapperTypeInfo().wrapperValueVar;
-    assert(underlyingVar);
+    underlyingVars.push_back( var->getAttachedPropertyWrapperTypeInfo(0).wrapperValueVar);
     semantics = AccessSemantics::DirectToStorage;
     selfAccessKind = SelfAccessorKind::Peer;
     break;
@@ -808,7 +813,7 @@ static bool isSynthesizedComputedProperty(AbstractStorageDecl *storage) {
   return (storage->getAttrs().hasAttribute<LazyAttr>() ||
           storage->getAttrs().hasAttribute<NSManagedAttr>() ||
           (isa<VarDecl>(storage) &&
-           cast<VarDecl>(storage)->getAttachedPropertyWrapper()));
+           cast<VarDecl>(storage)->hasAttachedPropertyWrapper()));
 }
 
 /// Synthesize the body of a trivial getter.  For a non-member vardecl or one
@@ -1518,9 +1523,15 @@ static VarDecl *synthesizePropertyWrapperStorageWrapperProperty(
   addMemberToContextIfNeeded(pbd, dc, var);
   pbd->setStatic(var->isStatic());
 
-  // The property is always private.
-  property->overwriteAccess(AccessLevel::Private);
-  property->overwriteSetterAccess(AccessLevel::Private);
+  // Determine the access level for the property.
+  AccessLevel access =
+    std::min(AccessLevel::Internal, var->getFormalAccess());
+  property->overwriteAccess(access);
+
+  // Determine setter access.
+  AccessLevel setterAccess =
+    std::min(AccessLevel::Internal, var->getSetterFormalAccess());
+  property->overwriteSetterAccess(setterAccess);
 
   // Add the accessors we need.
   bool hasSetter = wrapperVar->isSettable(nullptr) &&
@@ -1562,7 +1573,7 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
   if (!wrapperType || wrapperType->hasError())
     return PropertyWrapperBackingPropertyInfo();
 
-  auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo();
+  auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo(0);
   if (!wrapperInfo)
     return PropertyWrapperBackingPropertyInfo();
 
@@ -1590,11 +1601,7 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
   // Make sure that the property type matches the value of the
   // wrapper type.
   if (!storageType->hasError()) {
-    Type expectedPropertyType =
-        storageType->getTypeOfMember(
-          dc->getParentModule(),
-          wrapperInfo.valueVar,
-          wrapperInfo.valueVar->getValueInterfaceType());
+    Type expectedPropertyType = computeWrappedValueType(var, storageType);
     Type propertyType =
         dc->mapTypeIntoContext(var->getValueInterfaceType());
     if (!expectedPropertyType->hasError() &&
@@ -1680,8 +1687,8 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
   }
 
   // Get the property wrapper information.
-  if (!wrapperInfo.initialValueInit) {
-    assert(!originalInitialValue);
+  if (!var->allAttachedPropertyWrappersHaveInitialValueInit() &&
+      !originalInitialValue) {
     return PropertyWrapperBackingPropertyInfo(
         backingVar, storageVar, nullptr, nullptr, nullptr);
   }
@@ -1691,12 +1698,11 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
   OpaqueValueExpr *origValue =
       new (ctx) OpaqueValueExpr(var->getLoc(), var->getType(),
                                 /*isPlaceholder=*/true);
-  auto typeExpr = TypeExpr::createImplicit(storageType, ctx);
-  Expr *initializer =
-      CallExpr::createImplicit(ctx, typeExpr, {origValue},
-                               {ctx.Id_initialValue});
-  typeCheckSynthesizedWrapperInitializer(pbd, backingVar, parentPBD,
-                                         initializer);
+  Expr *initializer = buildPropertyWrapperInitialValueCall(
+      var, storageType, origValue,
+      /*ignoreAttributeArgs=*/!originalInitialValue);
+  typeCheckSynthesizedWrapperInitializer(
+      pbd, backingVar, parentPBD, initializer);
 
   return PropertyWrapperBackingPropertyInfo(
       backingVar, storageVar, originalInitialValue, initializer, origValue);
@@ -1706,7 +1712,7 @@ static bool wouldBeCircularSynthesis(AbstractStorageDecl *storage,
                                      AccessorKind kind) {
   // All property wrapper accessors are non-circular.
   if (auto var = dyn_cast<VarDecl>(storage)) {
-    if (var->getAttachedPropertyWrapper())
+    if (var->hasAttachedPropertyWrapper())
       return false;
 
     if (var->getOriginalWrappedProperty(
@@ -1791,14 +1797,27 @@ static void maybeAddAccessorsToLazyVariable(VarDecl *var, ASTContext &ctx) {
   addExpectedOpaqueAccessorsToStorage(var, ctx);
 }
 
+/// Determine whether all of the wrapped-value setters for the property wrappers attached to this
+/// variable are available and accessible.
+static bool allPropertyWrapperValueSettersAreAccessible(VarDecl *var) {
+  auto wrapperAttrs = var->getAttachedPropertyWrappers();
+  auto innermostDC = var->getInnermostDeclContext();
+  for (unsigned i : indices(wrapperAttrs)) {
+    auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo(i);
+    auto valueVar = wrapperInfo.valueVar;
+    if (!valueVar->isSettable(nullptr) ||
+        !valueVar->isSetterAccessibleFrom(innermostDC))
+      return false;
+  }
+  
+  return true;
+}
+
 static void maybeAddAccessorsForPropertyWrapper(VarDecl *var,
-                                                 ASTContext &ctx) {
+                                                ASTContext &ctx) {
   auto backingVar = var->getPropertyWrapperBackingProperty();
   if (!backingVar || backingVar->isInvalid())
     return;
-
-  auto valueVar = var->getAttachedPropertyWrapperTypeInfo().valueVar;
-  assert(valueVar && "Cannot fail when the backing var is valid");
 
   auto parentSF = var->getDeclContext()->getParentSourceFile();
   bool wrapperSetterIsUsable =
@@ -1806,8 +1825,7 @@ static void maybeAddAccessorsForPropertyWrapper(VarDecl *var,
     (parentSF &&
      parentSF->Kind != SourceFileKind::Interface &&
      !var->isLet() &&
-     valueVar->isSettable(nullptr) &&
-     valueVar->isSetterAccessibleFrom(var->getInnermostDeclContext()));
+     allPropertyWrapperValueSettersAreAccessible(var));
 
   if (!var->getGetter()) {
     addGetterToStorage(var, ctx);
@@ -1842,7 +1860,7 @@ void swift::maybeAddAccessorsToStorage(AbstractStorageDecl *storage) {
 
   // property wrappers require backing storage.
   if (auto var = dyn_cast<VarDecl>(storage)) {
-    if (var->getAttachedPropertyWrapper()) {
+    if (var->hasAttachedPropertyWrapper()) {
       maybeAddAccessorsForPropertyWrapper(var, ctx);
       return;
     }
@@ -1931,7 +1949,7 @@ static void synthesizeGetterBody(AccessorDecl *getter,
 
   // Synthesize the getter for a property wrapper.
   if (auto var = dyn_cast<VarDecl>(storage)) {
-    if (var->getAttachedPropertyWrapper()) {
+    if (var->hasAttachedPropertyWrapper()) {
       synthesizePropertyWrapperGetterBody(getter, ctx);
       return;
     }
@@ -1977,7 +1995,7 @@ static void synthesizeSetterBody(AccessorDecl *setter,
 
   // Synthesize the setter for a property wrapper.
   if (auto var = dyn_cast<VarDecl>(storage)) {
-    if (var->getAttachedPropertyWrapper()) {
+    if (var->hasAttachedPropertyWrapper()) {
       if (var->getAccessor(AccessorKind::WillSet) ||
           var->getAccessor(AccessorKind::DidSet)) {
         synthesizeObservedSetterBody(setter, TargetImpl::Wrapper, ctx);

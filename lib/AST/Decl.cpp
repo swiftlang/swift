@@ -1378,10 +1378,9 @@ bool PatternBindingEntry::isInitialized() const {
 
   // Initialized via a property wrapper.
   if (auto var = getPattern()->getSingleVar()) {
-    if (auto customAttr = var->getAttachedPropertyWrapper()) {
-      if (customAttr->getArg() != nullptr)
-        return true;
-    }
+    auto customAttrs = var->getAttachedPropertyWrappers();
+    if (customAttrs.size() > 0 && customAttrs[0]->getArg() != nullptr)
+      return true;
   }
 
   return false;
@@ -1571,10 +1570,10 @@ bool PatternBindingDecl::isDefaultInitializable(unsigned i) const {
   if (entry.isInitialized())
     return true;
 
-  // If it has an attached property wrapper that vends an `init()`, use that
+  // If the outermost attached property wrapper vends an `init()`, use that
   // for default initialization.
   if (auto singleVar = getSingleVar()) {
-    if (auto wrapperInfo = singleVar->getAttachedPropertyWrapperTypeInfo()) {
+    if (auto wrapperInfo = singleVar->getAttachedPropertyWrapperTypeInfo(0)) {
       if (wrapperInfo.defaultInit)
         return true;
     }
@@ -5252,12 +5251,12 @@ static bool isBackingStorageForDeclaredProperty(const VarDecl *var) {
   return name.str().startswith("$__lazy_storage_$_");
 }
 
-/// Whether the given variable
+/// Whether the given variable is a delcared property that has separate backing storage.
 static bool isDeclaredPropertyWithBackingStorage(const VarDecl *var) {
   if (var->getAttrs().hasAttribute<LazyAttr>())
     return true;
 
-  if (var->getAttachedPropertyWrapper())
+  if (var->hasAttachedPropertyWrapper())
     return true;
 
   return false;
@@ -5298,7 +5297,7 @@ bool VarDecl::isMemberwiseInitialized(bool preferDeclaredProperties) const {
   if (auto origWrapped = getOriginalWrappedProperty())
     origVar = origWrapped;
   if (origVar->getFormalAccess() < AccessLevel::Internal &&
-      origVar->getAttachedPropertyWrapper() &&
+      origVar->hasAttachedPropertyWrapper() &&
       (origVar->isParentInitialized() ||
        (origVar->getParentPatternBinding() &&
         origVar->getParentPatternBinding()->isDefaultInitializable())))
@@ -5340,22 +5339,39 @@ StaticSpellingKind AbstractStorageDecl::getCorrectStaticSpelling() const {
   return getCorrectStaticSpellingForDecl(this);
 }
 
-CustomAttr *VarDecl::getAttachedPropertyWrapper() const {
+llvm::TinyPtrVector<CustomAttr *> VarDecl::getAttachedPropertyWrappers() const {
   auto &ctx = getASTContext();
   if (!ctx.getLazyResolver())
-    return nullptr;
+    return { };
 
   auto mutableThis = const_cast<VarDecl *>(this);
   return evaluateOrDefault(ctx.evaluator,
-                           AttachedPropertyWrapperRequest{mutableThis},
-                           nullptr);
+                           AttachedPropertyWrappersRequest{mutableThis},
+                           { });
 }
 
-PropertyWrapperTypeInfo VarDecl::getAttachedPropertyWrapperTypeInfo() const {
-  auto attr = getAttachedPropertyWrapper();
-  if (!attr)
-    return PropertyWrapperTypeInfo();
+/// Whether this property has any attached property wrappers.
+bool VarDecl::hasAttachedPropertyWrapper() const {
+  return !getAttachedPropertyWrappers().empty();
+}
 
+/// Whether all of the attached property wrappers have an init(initialValue:) initializer.
+bool VarDecl::allAttachedPropertyWrappersHaveInitialValueInit() const {
+  for (unsigned i : indices(getAttachedPropertyWrappers())) {
+    if (!getAttachedPropertyWrapperTypeInfo(i).initialValueInit)
+      return false;
+  }
+  
+  return true;
+}
+
+PropertyWrapperTypeInfo
+VarDecl::getAttachedPropertyWrapperTypeInfo(unsigned i) const {
+  auto attrs = getAttachedPropertyWrappers();
+  if (i >= attrs.size())
+    return PropertyWrapperTypeInfo();
+  
+  auto attr = attrs[i];
   auto dc = getDeclContext();
   ASTContext &ctx = getASTContext();
   auto nominal = evaluateOrDefault(
@@ -5366,12 +5382,13 @@ PropertyWrapperTypeInfo VarDecl::getAttachedPropertyWrapperTypeInfo() const {
   return nominal->getPropertyWrapperTypeInfo();
 }
 
-Type VarDecl::getAttachedPropertyWrapperType() const {
+Type VarDecl::getAttachedPropertyWrapperType(unsigned index) const {
   auto &ctx = getASTContext();
   auto mutableThis = const_cast<VarDecl *>(this);
-  return evaluateOrDefault(ctx.evaluator,
-                           AttachedPropertyWrapperTypeRequest{mutableThis},
-                           Type());
+  return evaluateOrDefault(
+      ctx.evaluator,
+      AttachedPropertyWrapperTypeRequest{mutableThis, index},
+      Type());
 }
 
 Type VarDecl::getPropertyWrapperBackingPropertyType() const {
@@ -5396,12 +5413,13 @@ VarDecl *VarDecl::getPropertyWrapperBackingProperty() const {
   return getPropertyWrapperBackingPropertyInfo().backingVar;
 }
 
-bool VarDecl::isPropertyWrapperInitializedWithInitialValue() const {
-  auto customAttr = getAttachedPropertyWrapper();
-  if (!customAttr)
+static bool propertyWrapperInitializedViaInitialValue(
+   const VarDecl *var, bool checkDefaultInit) {
+  auto customAttrs = var->getAttachedPropertyWrappers();
+  if (customAttrs.empty())
     return false;
 
-  auto *PBD = getParentPatternBinding();
+  auto *PBD = var->getParentPatternBinding();
   if (!PBD)
     return false;
 
@@ -5410,44 +5428,29 @@ bool VarDecl::isPropertyWrapperInitializedWithInitialValue() const {
   if (PBD->getPatternList()[0].getEqualLoc().isValid())
     return true;
 
-  // If there was an initializer on the attribute itself, initialize
+  // If there was an initializer on the outermost wrapper, initialize
   // via the full wrapper.
-  if (customAttr->getArg() != nullptr)
+  if (customAttrs[0]->getArg() != nullptr)
     return false;
 
   // Default initialization does not use a value.
-  auto wrapperTypeInfo = getAttachedPropertyWrapperTypeInfo();
-  if (wrapperTypeInfo.defaultInit)
+  if (checkDefaultInit &&
+      var->getAttachedPropertyWrapperTypeInfo(0).defaultInit)
     return false;
 
-  // There is no initializer, so the initialization form depends on
-  // whether the property wrapper type has an init(initialValue:).
-  return wrapperTypeInfo.initialValueInit != nullptr;
+  // If all property wrappers have an initialValue initializer, the property
+  // wrapper will be initialized that way.
+  return var->allAttachedPropertyWrappersHaveInitialValueInit();
+}
+
+bool VarDecl::isPropertyWrapperInitializedWithInitialValue() const {
+  return propertyWrapperInitializedViaInitialValue(
+      this, /*checkDefaultInit=*/true);
 }
 
 bool VarDecl::isPropertyMemberwiseInitializedWithWrappedType() const {
-  auto customAttr = getAttachedPropertyWrapper();
-  if (!customAttr)
-    return false;
-
-  auto *PBD = getParentPatternBinding();
-  if (!PBD)
-    return false;
-
-  // If there was an initializer on the original property, initialize
-  // via the initial value.
-  if (PBD->getPatternList()[0].getEqualLoc().isValid())
-    return true;
-
-  // If there was an initializer on the attribute itself, initialize
-  // via the full wrapper.
-  if (customAttr->getArg() != nullptr)
-    return false;
-
-  // There is no initializer, so the initialization form depends on
-  // whether the property wrapper type has an init(initialValue:).
-  auto wrapperTypeInfo = getAttachedPropertyWrapperTypeInfo();
-  return wrapperTypeInfo.initialValueInit != nullptr;
+  return propertyWrapperInitializedViaInitialValue(
+      this, /*checkDefaultInit=*/false);
 }
 
 Identifier VarDecl::getObjCPropertyName() const {
@@ -5699,27 +5702,72 @@ void ParamDecl::setDefaultArgumentInitContext(Initializer *initContext) {
 }
 
 Expr *swift::findOriginalPropertyWrapperInitialValue(VarDecl *var,
-                                                      Expr *init) {
-  auto attr = var->getAttachedPropertyWrapper();
-  assert(attr && "No attached property wrapper?");
-
-  // Direct initialization implies no original initial value.
-  if (attr->getArg())
+                                                     Expr *init) {
+  auto *PBD = var->getParentPatternBinding();
+  if (!PBD)
     return nullptr;
 
-  // Look through any expressions wrapping the initializer.
-  init = init->getSemanticsProvidingExpr();
-  auto initCall = dyn_cast<CallExpr>(init);
-  if (!initCall)
+  // If there is no '=' on the pattern, there was no initial value.
+  if (PBD->getPatternList()[0].getEqualLoc().isInvalid())
     return nullptr;
 
-  auto initArg = cast<TupleExpr>(initCall->getArg())->getElement(0);
-  initArg = initArg->getSemanticsProvidingExpr();
-  if (auto autoclosure = dyn_cast<AutoClosureExpr>(initArg)) {
-    initArg =
-        autoclosure->getSingleExpressionBody()->getSemanticsProvidingExpr();
+  ASTContext &ctx = var->getASTContext();
+  auto dc = var->getInnermostDeclContext();
+  auto innermostAttr = var->getAttachedPropertyWrappers().back();
+  auto innermostNominal = evaluateOrDefault(
+      ctx.evaluator, CustomAttrNominalRequest{innermostAttr, dc}, nullptr);
+  if (!innermostNominal)
+    return nullptr;
+
+      // Walker
+  class Walker : public ASTWalker {
+  public:
+    NominalTypeDecl *innermostNominal;
+    Expr *initArg = nullptr;
+
+    Walker(NominalTypeDecl *innermostNominal)
+      : innermostNominal(innermostNominal) { }
+
+    virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      if (initArg)
+        return { false, E };
+
+      if (auto call = dyn_cast<CallExpr>(E)) {
+        // We're looking for an implicit call.
+        if (!call->isImplicit())
+          return { true, E };
+
+        // ... producing a value of the same nominal type as the innermost
+        // property wrapper.
+        if (call->getType()->getAnyNominal() != innermostNominal)
+          return { true, E };
+
+        // Find the implicit initialValue argument.
+        if (auto tuple = dyn_cast<TupleExpr>(call->getArg())) {
+          ASTContext &ctx = innermostNominal->getASTContext();
+          for (unsigned i : range(tuple->getNumElements())) {
+            if (tuple->getElementName(i) == ctx.Id_initialValue &&
+                tuple->getElementNameLoc(i).isInvalid()) {
+              initArg = tuple->getElement(i);
+              return { false, E };
+            }
+          }
+        }
+      }
+
+      return { true, E };
+    }
+  } walker(innermostNominal);
+  init->walk(walker);
+
+  Expr *initArg = walker.initArg;
+  if (initArg) {
+    initArg = initArg->getSemanticsProvidingExpr();
+    if (auto autoclosure = dyn_cast<AutoClosureExpr>(initArg)) {
+      initArg =
+          autoclosure->getSingleExpressionBody()->getSemanticsProvidingExpr();
+    }
   }
-
   return initArg;
 }
 
@@ -5755,7 +5803,9 @@ ParamDecl::getDefaultValueStringRepresentation(
     auto var = getStoredProperty();
 
     if (auto original = var->getOriginalWrappedProperty()) {
-      if (auto attr = original->getAttachedPropertyWrapper()) {
+      auto wrapperAttrs = original->getAttachedPropertyWrappers();
+      if (wrapperAttrs.size() > 0) {
+        auto attr = wrapperAttrs.front();
         if (auto arg = attr->getArg()) {
           SourceRange fullRange(attr->getTypeLoc().getSourceRange().Start,
                                 arg->getEndLoc());
