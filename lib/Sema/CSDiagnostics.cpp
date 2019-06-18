@@ -788,9 +788,10 @@ MissingOptionalUnwrapFailure::getOperatorParameterFor(Expr *expr) const {
 
 void MissingOptionalUnwrapFailure::offerDefaultValueUnwrapFixIt(
     DeclContext *DC, Expr *expr) const {
-  auto *anchor = getAnchor();
+  assert(expr);
 
-  // If anchor is an explicit address-of, or expression which produces
+  auto *anchor = getAnchor();
+  // If anchor is n explicit address-of, or expression which produces
   // an l-value (e.g. first argument of `+=` operator), let's not
   // suggest default value here because that would produce r-value type.
   if (isa<InOutExpr>(anchor))
@@ -935,7 +936,10 @@ bool MissingOptionalUnwrapFailure::diagnoseAsError() {
       if (singleUse && binding && binding->getNumPatternEntries() == 1 &&
           varDecl->getTypeSourceRangeForDiagnostics().isInvalid()) {
 
-        Expr *initializer = varDecl->getParentInitializer();
+        auto *initializer = varDecl->getParentInitializer();
+        if (!initializer)
+          return true;
+
         if (auto declRefExpr = dyn_cast<DeclRefExpr>(initializer)) {
           if (declRefExpr->getDecl()
                   ->getAttrs()
