@@ -8,8 +8,13 @@ _ x: inout T, scalar: T.VectorSpaceScalar
   let zero = T.zero
   x += x + zero
   x -= x - zero
-  // Test `VectorProtocol` requirements: `VectorSpaceScalar`, `*`.
+  // Test `VectorProtocol` requirements: `VectorSpaceScalar`, `+`, `-`, `*`.
+  x += scalar
+  x -= scalar
   x *= scalar
+  _ = x + scalar
+  _ = scalar + x
+  _ = x - scalar
   _ = scalar * x
   _ = x * scalar
 }
