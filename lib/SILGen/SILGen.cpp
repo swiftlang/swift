@@ -1316,46 +1316,15 @@ void SILGenModule::visitVarDecl(VarDecl *vd) {
   if (vd->hasStorage())
     addGlobalVariable(vd);
 
-  // Emit the variable's opaque accessors.
-  vd->visitExpectedOpaqueAccessors([&](AccessorKind kind) {
-    auto accessor = vd->getAccessor(kind);
-    if (!accessor) return;
-
-    // Only emit the accessor if it wasn't added to the surrounding decl
-    // list by the parser.  We can test that easily by looking at the impl
-    // info, since all of these accessors have a corresponding access kind
-    // whose impl should definitely point at the accessor if it was parsed.
-    //
-    // This is an unfortunate formation rule, but it's easier than messing
-    // with the invariants for now.
-    bool shouldEmit = [&] {
-      auto impl = vd->getImplInfo();
-      switch (kind) {
-      case AccessorKind::Get:
-        return impl.getReadImpl() != ReadImplKind::Get &&
-               !(impl.getReadImpl() == ReadImplKind::Stored &&
-                 impl.getWriteImpl() == WriteImplKind::StoredWithObservers);
-      case AccessorKind::Read:
-        return impl.getReadImpl() != ReadImplKind::Read;
-      case AccessorKind::Set:
-        return impl.getWriteImpl() != WriteImplKind::Set &&
-               impl.getWriteImpl() != WriteImplKind::StoredWithObservers;
-      case AccessorKind::Modify:
-        return impl.getReadWriteImpl() != ReadWriteImplKind::Modify;
-#define ACCESSOR(ID) \
-      case AccessorKind::ID:
-#define OPAQUE_ACCESSOR(ID, KEYWORD)
-#include "swift/AST/AccessorKinds.def"
-        llvm_unreachable("not an opaque accessor");
-      }
-      llvm_unreachable("covered switch");
-    }();
-    if (!shouldEmit) return;
-
+  for (auto *accessor : vd->getAllAccessors())
     emitFunction(accessor);
-  });
 
   tryEmitPropertyDescriptor(vd);
+}
+
+void SILGenModule::visitSubscriptDecl(SubscriptDecl *sd) {
+  for (auto *accessor : sd->getAllAccessors())
+    emitFunction(accessor);
 }
 
 bool
