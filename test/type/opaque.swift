@@ -380,3 +380,9 @@ func rdar_51641323() {
     // expected-note@-2 {{opaque return type declared here}}
   }
 }
+
+protocol Tinky {}
+
+protocol Patatino {
+  func returnsSomeNumeric() -> some Tinky // expected-error{{opaque return types are not allowed in protocol requirements}}
+}

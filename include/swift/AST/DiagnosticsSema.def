@@ -1565,6 +1565,8 @@ ERROR(opaque_type_invalid_constraint,none,
 ERROR(inferred_opaque_type,none,
       "property definition has inferred type %0, involving the 'some' "
       "return type of another declaration", (Type))
+ERROR(requirement_opaque_type,none,
+      "opaque return types are not allowed in protocol requirements", ())
 
 // Extensions
 ERROR(non_nominal_extension,none,

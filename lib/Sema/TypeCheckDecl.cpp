@@ -4013,6 +4013,12 @@ void TypeChecker::validateDecl(ValueDecl *D) {
         FD->getAttrs().add(
             new (C) ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true));
       }
+
+      // Declaring a protocol requirement with an opaque type is illegal.
+      if (TyR && TyR->getKind() == TypeReprKind::OpaqueReturn)
+        if (auto *D = FD->getDeclContext()->getAsDecl())
+          if (isa<ProtocolDecl>(D))
+            diagnose(FD, diag::requirement_opaque_type);
     }
 
     // We want the function to be available for name lookup as soon
