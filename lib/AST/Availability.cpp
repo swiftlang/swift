@@ -218,6 +218,10 @@ AvailabilityContext AvailabilityInference::inferForType(Type t) {
 }
 
 AvailabilityContext ASTContext::getOpaqueTypeAvailability() {
+  return getSwift51Availability();
+}
+
+AvailabilityContext ASTContext::getSwift51Availability() {
   auto target = LangOpts.Target;
   
   if (target.isMacOSX()) {
