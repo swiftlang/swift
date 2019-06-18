@@ -2105,7 +2105,7 @@ namespace {
         // Otherwise, create a new type variable.
         auto ty = Type();
         if (!var->hasNonPatternBindingInit() &&
-            !var->getAttachedPropertyWrapper()) {
+            !var->hasAttachedPropertyWrapper()) {
           if (auto boundExpr = locator.trySimplifyToExpr()) {
             if (!boundExpr->isSemanticallyInOutExpr())
               ty = CS.getType(boundExpr)->getRValueType();
@@ -3317,9 +3317,7 @@ namespace {
         }
 
         // Remove any semantic expression injected by typechecking.
-        if (auto CE = dyn_cast<CollectionExpr>(expr)) {
-          CE->setSemanticExpr(nullptr);
-        } else if (auto ISLE = dyn_cast<InterpolatedStringLiteralExpr>(expr)) {
+        if (auto ISLE = dyn_cast<InterpolatedStringLiteralExpr>(expr)) {
           ISLE->setSemanticExpr(nullptr);
         } else if (auto OLE = dyn_cast<ObjectLiteralExpr>(expr)) {
           OLE->setSemanticExpr(nullptr);

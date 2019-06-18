@@ -387,9 +387,8 @@ protected:
     /// It is up to the debugger to instruct SIL how to access this variable.
     IsDebuggerVar : 1,
 
-    /// Whether this is a property defined in the debugger's REPL.
-    /// FIXME: Remove this once LLDB has proper support for resilience.
-    IsREPLVar : 1,
+    /// Whether this is the backing storage for a lazy property.
+    IsLazyStorageProperty : 1,
 
     /// Whether this is the backing storage for a property wrapper.
     IsPropertyWrapperBackingProperty : 1
@@ -606,7 +605,7 @@ protected:
     HasAnyUnavailableValues : 1
   );
 
-  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1,
     /// If the module was or is being compiled with `-enable-testing`.
     TestingEnabled : 1,
 
@@ -621,14 +620,18 @@ protected:
     /// Whether all imports have been resolved. Used to detect circular imports.
     HasResolvedImports : 1,
 
-    // If the module was or is being compiled with `-enable-private-imports`.
+    /// If the module was or is being compiled with `-enable-private-imports`.
     PrivateImportsEnabled : 1,
 
-    // If the module is compiled with `-enable-implicit-dynamic`.
+    /// If the module is compiled with `-enable-implicit-dynamic`.
     ImplicitDynamicEnabled : 1,
 
-    // Whether the module is a system module.
-    IsSystemModule : 1
+    /// Whether the module is a system module.
+    IsSystemModule : 1,
+
+    /// Whether the module was imported from Clang (or, someday, maybe another
+    /// language).
+    IsNonSwiftModule : 1
   );
 
   SWIFT_INLINE_BITFIELD(PrecedenceGroupDecl, Decl, 1+2,
@@ -4819,7 +4822,7 @@ protected:
     Bits.VarDecl.Specifier = static_cast<unsigned>(Sp);
     Bits.VarDecl.IsCaptureList = IsCaptureList;
     Bits.VarDecl.IsDebuggerVar = false;
-    Bits.VarDecl.IsREPLVar = false;
+    Bits.VarDecl.IsLazyStorageProperty = false;
     Bits.VarDecl.HasNonPatternBindingInit = false;
     Bits.VarDecl.IsPropertyWrapperBackingProperty = false;
   }
@@ -5108,34 +5111,48 @@ public:
   void setDebuggerVar(bool IsDebuggerVar) {
     Bits.VarDecl.IsDebuggerVar = IsDebuggerVar;
   }
-  
-  /// Is this a special debugger REPL variable?
-  /// FIXME: Remove this once LLDB has proper support for resilience.
-  bool isREPLVar() const { return Bits.VarDecl.IsREPLVar; }
-  void setREPLVar(bool IsREPLVar) {
-    Bits.VarDecl.IsREPLVar = IsREPLVar;
+
+  /// Is this the synthesized storage for a 'lazy' property?
+  bool isLazyStorageProperty() const {
+    return Bits.VarDecl.IsLazyStorageProperty;
+  }
+  void setLazyStorageProperty(bool IsLazyStorage) {
+    Bits.VarDecl.IsLazyStorageProperty = IsLazyStorage;
   }
 
-  /// Retrieve the custom attribute that attaches a property wrapper to this
-  /// property.
-  CustomAttr *getAttachedPropertyWrapper() const;
+  /// Retrieve the custom attributes that attach property wrappers to this
+  /// property. The returned list contains all of the attached property wrapper attributes in source order,
+  /// which means the outermost wrapper attribute is provided first.
+  llvm::TinyPtrVector<CustomAttr *> getAttachedPropertyWrappers() const;
 
+  /// Whether this property has any attached property wrappers.
+  bool hasAttachedPropertyWrapper() const;
+  
+  /// Whether all of the attached property wrappers have an init(initialValue:) initializer.
+  bool allAttachedPropertyWrappersHaveInitialValueInit() const;
+  
   /// Retrieve the type of the attached property wrapper as a contextual
   /// type.
+  ///
+  /// \param index Which property wrapper type is being computed, where 0
+  /// indicates the first (outermost) attached property wrapper.
   ///
   /// \returns a NULL type for properties without attached wrappers,
   /// an error type when the property wrapper type itself is erroneous,
   /// or the wrapper type itself, which may involve unbound generic
   /// types.
-  Type getAttachedPropertyWrapperType() const;
+  Type getAttachedPropertyWrapperType(unsigned index) const;
 
   /// Retrieve information about the attached property wrapper type.
-  PropertyWrapperTypeInfo getAttachedPropertyWrapperTypeInfo() const;
+  ///
+  /// \param i Which attached property wrapper type is being queried, where 0 is the outermost (first)
+  /// attached property wrapper type.
+  PropertyWrapperTypeInfo getAttachedPropertyWrapperTypeInfo(unsigned i) const;
 
   /// Retrieve the fully resolved attached property wrapper type.
   ///
   /// This type will be the fully-resolved form of
-  /// \c getAttachedPropertyWrapperType(), which will not contain any
+  /// \c getAttachedPropertyWrapperType(0), which will not contain any
   /// unbound generic types. It will be the type of the backing property.
   Type getPropertyWrapperBackingPropertyType() const;
 
@@ -5149,8 +5166,8 @@ public:
   ///
   /// The backing storage property will be a stored property of the
   /// wrapper's type. This will be equivalent to
-  /// \c getAttachedPropertyWrapperType() when it is fully-specified;
-  /// if \c getAttachedPropertyWrapperType() involves an unbound
+  /// \c getAttachedPropertyWrapperType(0) when it is fully-specified;
+  /// if \c getAttachedPropertyWrapperType(0) involves an unbound
   /// generic type, the backing storage property will be the appropriate
   /// bound generic version.
   VarDecl *getPropertyWrapperBackingProperty() const;
@@ -5162,6 +5179,10 @@ public:
   /// @Lazy var i = 17
   /// \end
   bool isPropertyWrapperInitializedWithInitialValue() const;
+
+  /// Whether the memberwise initializer parameter for a property with a property wrapper type
+  /// uses the wrapped type.
+  bool isPropertyMemberwiseInitializedWithWrappedType() const;
 
   /// If this property is the backing storage for a property with an attached
   /// property wrapper, return the original property.
@@ -7209,8 +7230,7 @@ inline bool Decl::isPotentiallyOverridable() const {
       isa<SubscriptDecl>(this) ||
       isa<FuncDecl>(this) ||
       isa<DestructorDecl>(this)) {
-    return getDeclContext()->getSelfClassDecl() ||
-           isa<ProtocolDecl>(getDeclContext());
+    return getDeclContext()->getSelfClassDecl();
   } else {
     return false;
   }

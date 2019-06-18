@@ -63,6 +63,7 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
     case RValueAdjustment:
     case ClosureResult:
     case ParentType:
+    case ExistentialSuperclassType:
     case InstanceType:
     case SequenceElementType:
     case AutoclosureResult:
@@ -82,7 +83,6 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
     case KeyPathRoot:
     case KeyPathValue:
     case KeyPathComponentResult:
-    case SingleExprFuncResultType:
       if (unsigned numValues = numNumericValuesInPathElement(elt.getKind())) {
         id.AddInteger(elt.getValue());
         if (numValues > 1)
@@ -310,6 +310,10 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
       out << "parent type";
       break;
 
+    case ExistentialSuperclassType:
+      out << "existential superclass type";
+      break;
+
     case LValueConversion:
       out << "@lvalue-to-inout conversion";
       break;
@@ -364,7 +368,10 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
       break;
 
     case ContextualType:
-      out << "contextual type";
+      if (elt.isResultOfSingleExprFunction())
+        out << "expected result type of the function with a single expression";
+      else
+        out << "contextual type";
       break;
 
     case SynthesizedArgument:
@@ -389,9 +396,6 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
 
     case KeyPathComponentResult:
       out << "key path component result";
-      break;
-    case SingleExprFuncResultType:
-      out << " expected result type of the function with a single expression";
       break;
     }
   }

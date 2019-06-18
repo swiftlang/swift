@@ -427,6 +427,22 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
     }
   }
     
+  if (job.getKind() == LinkKind::Executable) {
+    if (runtimeCompatibilityVersion)
+      if (*runtimeCompatibilityVersion <= llvm::VersionTuple(5, 0)) {
+        // Swift 5.0 dynamic replacement compatibility library.
+        SmallString<128> BackDeployLib;
+        BackDeployLib.append(RuntimeLibPath);
+        llvm::sys::path::append(BackDeployLib,
+                                "libswiftCompatibilityDynamicReplacements.a");
+
+        if (llvm::sys::fs::exists(BackDeployLib)) {
+          Arguments.push_back("-force_load");
+          Arguments.push_back(context.Args.MakeArgString(BackDeployLib));
+        }
+      }
+  }
+
   // Link the standard library.
   Arguments.push_back("-L");
   if (context.Args.hasFlag(options::OPT_static_stdlib,

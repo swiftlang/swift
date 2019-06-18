@@ -67,16 +67,17 @@ ForceDowncast *ForceDowncast::create(ConstraintSystem &cs, Type toType,
 
 bool ForceOptional::diagnose(Expr *root, bool asNote) const {
   MissingOptionalUnwrapFailure failure(root, getConstraintSystem(), BaseType,
-                                       UnwrappedType, getLocator());
+                                       UnwrappedType, FullLocator);
   return failure.diagnose(asNote);
 }
 
 ForceOptional *ForceOptional::create(ConstraintSystem &cs, Type baseType,
                                      Type unwrappedType,
                                      ConstraintLocator *locator) {
-  return new (cs.getAllocator()) ForceOptional(
-      cs, baseType, unwrappedType,
-      cs.getConstraintLocator(simplifyLocatorToAnchor(cs, locator)));
+  auto *simplifiedLocator =
+      cs.getConstraintLocator(simplifyLocatorToAnchor(cs, locator));
+  return new (cs.getAllocator())
+      ForceOptional(cs, baseType, unwrappedType, simplifiedLocator, locator);
 }
 
 bool UnwrapOptionalBase::diagnose(Expr *root, bool asNote) const {
@@ -226,6 +227,23 @@ ContextualMismatch *ContextualMismatch::create(ConstraintSystem &cs, Type lhs,
                                                Type rhs,
                                                ConstraintLocator *locator) {
   return new (cs.getAllocator()) ContextualMismatch(cs, lhs, rhs, locator);
+}
+
+bool GenericArgumentsMismatch::diagnose(Expr *root, bool asNote) const {
+  auto failure = GenericArgumentsMismatchFailure(root, getConstraintSystem(),
+                                                 getActual(), getRequired(),
+                                                 getMismatches(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+GenericArgumentsMismatch *GenericArgumentsMismatch::create(
+    ConstraintSystem &cs, BoundGenericType *actual, BoundGenericType *required,
+    llvm::ArrayRef<unsigned> mismatches, ConstraintLocator *locator) {
+  unsigned size = totalSizeToAlloc<unsigned>(mismatches.size());
+  void *mem =
+      cs.getAllocator().Allocate(size, alignof(GenericArgumentsMismatch));
+  return new (mem)
+      GenericArgumentsMismatch(cs, actual, required, mismatches, locator);
 }
 
 bool AutoClosureForwarding::diagnose(Expr *root, bool asNote) const {

@@ -225,6 +225,8 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
                        options::OPT_experimental_dependency_include_intrafile);
   inputArgs.AddLastArg(arguments, options::OPT_package_description_version);
   inputArgs.AddLastArg(arguments, options::OPT_serialize_diagnostics_path);
+  inputArgs.AddLastArg(arguments, options::OPT_enable_astscope_lookup);
+  inputArgs.AddLastArg(arguments, options::OPT_disable_parser_lookup);
 
   // Pass on any build config options
   inputArgs.AddAllArgs(arguments, options::OPT_D);
@@ -273,7 +275,6 @@ static void addRuntimeLibraryFlags(const OutputInfo &OI,
 
   Arguments.push_back("-autolink-library");
   switch (RT) {
-  default: llvm_unreachable("invalid MSVC runtime library");
   case OutputInfo::MSVCRuntime::MultiThreaded:
     Arguments.push_back("libcmt");
     break;
@@ -443,7 +444,12 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     Arguments.push_back("-runtime-compatibility-version");
     Arguments.push_back(arg->getValue());
   }
-                                 
+
+  context.Args.AddLastArg(
+      Arguments,
+      options::
+          OPT_disable_autolinking_runtime_compatibility_dynamic_replacements);
+
   return II;
 }
 

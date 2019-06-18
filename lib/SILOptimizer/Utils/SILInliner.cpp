@@ -559,15 +559,20 @@ SILValue SILInlineCloner::borrowFunctionArgument(SILValue callArg,
       || callArg.getOwnershipKind() != ValueOwnershipKind::Owned) {
     return callArg;
   }
-  auto *borrow = getBuilder().createBeginBorrow(AI.getLoc(), callArg);
+
+  SILBuilderWithScope beginBuilder(AI.getInstruction(), getBuilder());
+  auto *borrow = beginBuilder.createBeginBorrow(AI.getLoc(), callArg);
   if (auto *tryAI = dyn_cast<TryApplyInst>(AI)) {
-    SILBuilder returnBuilder(tryAI->getNormalBB()->begin());
+    SILBuilderWithScope returnBuilder(tryAI->getNormalBB()->begin(),
+                                      getBuilder());
     returnBuilder.createEndBorrow(AI.getLoc(), borrow, callArg);
 
-    SILBuilder throwBuilder(tryAI->getErrorBB()->begin());
+    SILBuilderWithScope throwBuilder(tryAI->getErrorBB()->begin(),
+                                     getBuilder());
     throwBuilder.createEndBorrow(AI.getLoc(), borrow, callArg);
   } else {
-    SILBuilder returnBuilder(std::next(AI.getInstruction()->getIterator()));
+    SILBuilderWithScope returnBuilder(
+        std::next(AI.getInstruction()->getIterator()), getBuilder());
     returnBuilder.createEndBorrow(AI.getLoc(), borrow, callArg);
   }
   return borrow;

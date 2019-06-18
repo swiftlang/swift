@@ -1672,8 +1672,7 @@ ModuleDecl *ClangImporter::Implementation::finishLoadingClangModule(
     Identifier name = SwiftContext.getIdentifier((*clangModule).Name);
     result = ModuleDecl::create(name, SwiftContext);
     result->setIsSystemModule(clangModule->IsSystem);
-    // Silence error messages about testably importing a Clang module.
-    result->setTestingEnabled();
+    result->setIsNonSwiftModule();
     result->setHasResolvedImports();
 
     wrapperUnit =
@@ -1746,7 +1745,7 @@ PlatformAvailability::PlatformAvailability(LangOptions &langOpts)
         "APIs deprecated as of macOS 10.9 and earlier are unavailable in Swift";
     break;
 
-  default:
+  case PlatformKind::none:
     break;
   }
 }
@@ -1787,7 +1786,11 @@ bool PlatformAvailability::treatDeprecatedAsUnavailable(
   Optional<unsigned> minor = version.getMinor();
 
   switch (platformKind) {
+  case PlatformKind::none:
+    llvm_unreachable("version but no platform?");
+
   case PlatformKind::OSX:
+  case PlatformKind::OSXApplicationExtension:
     // Anything deprecated in OSX 10.9.x and earlier is unavailable in Swift.
     return major < 10 ||
            (major == 10 && (!minor.hasValue() || minor.getValue() <= 9));
@@ -1803,10 +1806,9 @@ bool PlatformAvailability::treatDeprecatedAsUnavailable(
   case PlatformKind::watchOSApplicationExtension:
     // No deprecation filter on watchOS
     return false;
-
-  default:
-    return false;
   }
+
+  llvm_unreachable("Unexpected platform");
 }
 
 ClangImporter::Implementation::Implementation(ASTContext &ctx,
@@ -1839,8 +1841,7 @@ ClangModuleUnit *ClangImporter::Implementation::getWrapperForModule(
   Identifier name = SwiftContext.getIdentifier(underlying->Name);
   auto wrapper = ModuleDecl::create(name, SwiftContext);
   wrapper->setIsSystemModule(underlying->IsSystem);
-  // Silence error messages about testably importing a Clang module.
-  wrapper->setTestingEnabled();
+  wrapper->setIsNonSwiftModule();
   wrapper->setHasResolvedImports();
 
   auto file = new (SwiftContext) ClangModuleUnit(*wrapper, *this,

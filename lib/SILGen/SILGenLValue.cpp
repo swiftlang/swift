@@ -1295,7 +1295,10 @@ namespace {
 
     bool hasPropertyWrapper() const {
       if (auto *VD = dyn_cast<VarDecl>(Storage)) {
-        if (auto wrapperInfo = VD->getAttachedPropertyWrapperTypeInfo()) {
+        // FIXME: Handle composition of property wrappers.
+        if (VD->getAttachedPropertyWrappers().size() == 1) {
+          auto wrapperInfo = VD->getAttachedPropertyWrapperTypeInfo(0);
+          
           // If there is no init(initialValue:), we cannot rewrite an
           // assignment into an initialization.
           if (!wrapperInfo.initialValueInit)
@@ -1401,7 +1404,9 @@ namespace {
         }
 
         // Create the allocating initializer function. It captures the metadata.
-        auto wrapperInfo = field->getAttachedPropertyWrapperTypeInfo();
+        // FIXME: Composition.
+        assert(field->getAttachedPropertyWrappers().size() == 1);
+        auto wrapperInfo = field->getAttachedPropertyWrapperTypeInfo(0);
         auto ctor = wrapperInfo.initialValueInit;
         SubstitutionMap subs = backingVar->getType()->getMemberSubstitutionMap(
                         SGF.getModule().getSwiftModule(), ctor);

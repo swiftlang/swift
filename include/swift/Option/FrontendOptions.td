@@ -121,9 +121,9 @@ def enable_target_os_checking :
 def disable_target_os_checking :
   Flag<["-"], "disable-target-os-checking">,
   HelpText<"Disable checking the target OS of serialized modules">;
-
-def enable_astscope_lookup : Flag<["-"], "enable-astscope-lookup">,
-  HelpText<"Enable ASTScope-based unqualified name lookup">;
+  
+def compare_to_astscope_lookup : Flag<["-"], "compare-to-astscope-lookup">,
+  HelpText<"Compare legacy to ASTScope-based unqualified name lookup (for debugging)">;
 
 def print_clang_stats : Flag<["-"], "print-clang-stats">,
   HelpText<"Print Clang importer statistics">;
@@ -534,6 +534,11 @@ def build_module_from_parseable_interface :
   Flag<["-"], "build-module-from-parseable-interface">,
   Alias<compile_module_from_interface>,
   ModeOpt;
+
+def module_interface_preserve_types_as_written :
+  Flag<["-"], "module-interface-preserve-types-as-written">,
+  HelpText<"When emitting a module interface, preserve types as they were "
+           "written in the source">;
 
 def prebuilt_module_cache_path :
   Separate<["-"], "prebuilt-module-cache-path">,

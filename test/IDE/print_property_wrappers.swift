@@ -3,7 +3,7 @@
 // Directly printing the type-checked AST
 // RUN: %target-swift-ide-test -print-ast-typechecked -source-filename %s | %FileCheck %s
 
-@_propertyWrapper
+@propertyWrapper
 struct Wrapper<Value> {
   var _stored: Value?
 
@@ -47,9 +47,9 @@ struct HasWrappers {
   var z: String
 
   // Memberwise initializer.
-  // CHECK: init(x: Wrapper<Int> = Wrapper(closure: foo), y: Bool = true, z: Wrapper<String> = Wrapper())
+  // CHECK: init(x: Wrapper<Int> = Wrapper(closure: foo), y: Bool = true, z: String)
 }
 
 func trigger() {
-  _ = HasWrappers(y: false)
+  _ = HasWrappers(y: false, z: "hello")
 }

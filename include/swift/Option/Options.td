@@ -312,6 +312,14 @@ def enable_library_evolution : Flag<["-"], "enable-library-evolution">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Build the module to allow binary-compatible library evolution">;
 
+def require_explicit_availability : Flag<["-"], "require-explicit-availability">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Require explicit availability on public declarations">;
+def require_explicit_availability_target : Separate<["-"], "require-explicit-availability-target">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Suggest fix-its adding @available(<target>, *) to public declarations without availability">,
+  MetaVarName<"<target>">;
+
 def module_name : Separate<["-"], "module-name">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Name of the module to build">;
@@ -853,6 +861,13 @@ def sanitize_coverage_EQ : CommaJoined<["-"], "sanitize-coverage=">,
   HelpText<"Specify the type of coverage instrumentation for Sanitizers and"
   " additional options separated by commas">;
 
+def enable_astscope_lookup : Flag<["-"], "enable-astscope-lookup">,
+  Flags<[FrontendOption]>,
+  HelpText<"Enable ASTScope-based unqualified name lookup">;
+
+def disable_parser_lookup : Flag<["-"], "disable_parser_lookup">,
+  HelpText<"Disable parser lookup & use ast scope lookup only (experimental)">;
+
 def index_file : Flag<["-"], "index-file">,
   HelpText<"Produce index data for a source file">, ModeOpt,
   Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
@@ -896,5 +911,11 @@ def runtime_compatibility_version : Separate<["-"], "runtime-compatibility-versi
 def disable_autolinking_runtime_compatibility : Flag<["-"], "disable-autolinking-runtime-compatibility">,
   Flags<[FrontendOption]>,
   HelpText<"Do not use autolinking for runtime compatibility libraries">;
+
+def disable_autolinking_runtime_compatibility_dynamic_replacements
+    : Flag<[ "-" ], "disable-autolinking-runtime-compatibility-dynamic-replacements">,
+      Flags<[ FrontendOption ]>,
+      HelpText<"Do not use autolinking for the dynamic replacement runtime "
+               "compatibility library">;
 
 include "FrontendOptions.td"

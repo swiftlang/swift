@@ -1,6 +1,6 @@
 // RUN: %target-swift-ide-test -print-indexed-symbols -source-filename %s | %FileCheck -check-prefix=CHECK %s
 
-@_propertyWrapper
+@propertyWrapper
 public struct Wrapper<T> {
   public var value: T
 

@@ -522,8 +522,8 @@ public:
       highlightOffendingType(TC, diag, complainRepr);
     });
 
-    // Check the property wrapper type.
-    if (auto attr = anyVar->getAttachedPropertyWrapper()) {
+    // Check the property wrapper types.
+    for (auto attr : anyVar->getAttachedPropertyWrappers()) {
       checkTypeAccess(attr->getTypeLoc(), anyVar,
                       /*mayBeInferred=*/false,
                       [&](AccessScope typeAccessScope,
@@ -1136,7 +1136,7 @@ public:
       highlightOffendingType(TC, diag, complainRepr);
     });
 
-    if (auto attr = anyVar->getAttachedPropertyWrapper()) {
+    for (auto attr : anyVar->getAttachedPropertyWrappers()) {
       checkTypeAccess(attr->getTypeLoc(),
                       fixedLayoutStructContext ? fixedLayoutStructContext
                                                : anyVar,
@@ -1872,7 +1872,12 @@ public:
   }
 
   void visitExtensionDecl(ExtensionDecl *ED) {
-    if (shouldSkipChecking(ED->getExtendedNominal()))
+    auto extendedType = ED->getExtendedNominal();
+    // TODO: Sometimes we have an extension that is marked valid but has no
+    //       extended type. Assert, just in case we see it while testing, but
+    //       don't crash. rdar://50401284
+    assert(extendedType && "valid extension with no extended type?");
+    if (!extendedType || shouldSkipChecking(extendedType))
       return;
 
     // FIXME: We should allow conforming to implementation-only protocols,

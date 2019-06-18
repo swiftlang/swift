@@ -1009,8 +1009,6 @@ public:
     return Loc;
   }
   SourceLoc getTrailingQuoteLoc() const {
-    // Except when computing a SourceRange for an ASTScope. Then the range
-    // must be (Start - TrainingQuoteLoc).
     return TrailingQuoteLoc;
   }
 
@@ -2128,8 +2126,6 @@ class CollectionExpr : public Expr {
   SourceLoc RBracketLoc;
   ConcreteDeclRef Initializer;
 
-  Expr *SemanticExpr = nullptr;
-
   /// Retrieve the intrusive pointer storage from the subtype
   Expr *const *getTrailingObjectsPointer() const;
   Expr **getTrailingObjectsPointer() {
@@ -2194,9 +2190,6 @@ public:
   SourceRange getSourceRange() const {
     return SourceRange(LBracketLoc, RBracketLoc);
   }
-  
-  Expr *getSemanticExpr() const { return SemanticExpr; }
-  void setSemanticExpr(Expr *e) { SemanticExpr = e; }
 
   static bool classof(const Expr *e) {
     return e->getKind() >= ExprKind::First_CollectionExpr &&
@@ -2274,6 +2267,8 @@ public:
   static bool classof(const Expr *e) {
     return e->getKind() == ExprKind::Dictionary;
   }
+
+  Type getElementType();
 };
 
 /// Subscripting expressions like a[i] that refer to an element within a

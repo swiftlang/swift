@@ -333,8 +333,11 @@ void AttributeEarlyChecker::visitDynamicAttr(DynamicAttr *attr) {
   // Members cannot be both dynamic and @_transparent.
   if (D->getAttrs().hasAttribute<TransparentAttr>())
     diagnoseAndRemoveAttr(attr, diag::dynamic_with_transparent);
+  if (!D->getAttrs().hasAttribute<ObjCAttr>() &&
+      D->getModuleContext()->isResilient())
+    diagnoseAndRemoveAttr(attr,
+                          diag::dynamic_and_library_evolution_not_supported);
 }
-
 
 void AttributeEarlyChecker::visitIBActionAttr(IBActionAttr *attr) {
   // Only instance methods can be IBActions.
@@ -2549,22 +2552,10 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
       attr->setInvalid();
       return;
     }
-
-    // If this attribute isn't the one that attached a property wrapper to
-    // this property, complain.
-    auto var = cast<VarDecl>(D);
-    if (auto attached = var->getAttachedPropertyWrapper()) {
-      if (attached != attr) {
-        TC.diagnose(attr->getLocation(), diag::property_wrapper_multiple);
-        TC.diagnose(attached->getLocation(),
-                    diag::previous_property_wrapper_here);
-        return;
-      }
-    }
-
+    
     return;
   }
-
+  
   // If the nominal type is a function builder type, verify that D is a
   // function, storage with an explicit getter, or parameter of function type.
   if (nominal->getAttrs().hasAttribute<FunctionBuilderAttr>()) {

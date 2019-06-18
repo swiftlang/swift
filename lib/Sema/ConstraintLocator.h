@@ -96,6 +96,8 @@ public:
     ClosureResult,
     /// The parent of a nested type.
     ParentType,
+    /// The superclass of a protocol existential type.
+    ExistentialSuperclassType,
     /// The instance of a metatype type.
     InstanceType,
     /// The element type of a sequence in a for ... in ... loop.
@@ -135,8 +137,6 @@ public:
     KeyPathValue,
     /// The result type of a key path component. Not used for subscripts.
     KeyPathComponentResult,
-    /// The expected type of the function with a single expression body.
-    SingleExprFuncResultType,
   };
 
   /// Determine the number of numeric values used for the given path
@@ -159,20 +159,20 @@ public:
     case ClosureResult:
     case ParentType:
     case InstanceType:
+    case ExistentialSuperclassType:
     case SequenceElementType:
     case AutoclosureResult:
     case Requirement:
     case Witness:
     case ImplicitlyUnwrappedDisjunctionChoice:
     case DynamicLookupResult:
-    case ContextualType:
     case KeyPathType:
     case KeyPathRoot:
     case KeyPathValue:
     case KeyPathComponentResult:
-    case SingleExprFuncResultType:
       return 0;
 
+    case ContextualType:
     case OpenedGeneric:
     case GenericArgument:
     case NamedTupleElement:
@@ -218,6 +218,7 @@ public:
     case MemberRefBase:
     case UnresolvedMember:
     case ParentType:
+    case ExistentialSuperclassType:
     case LValueConversion:
     case RValueAdjustment:
     case SubscriptMember:
@@ -240,7 +241,6 @@ public:
     case KeyPathRoot:
     case KeyPathValue:
     case KeyPathComponentResult:
-    case SingleExprFuncResultType:
       return 0;
 
     case FunctionArgument:
@@ -398,6 +398,10 @@ public:
       return PathElement(base);
     }
 
+    static PathElement getContextualType(bool isForSingleExprFunction = false) {
+      return PathElement(ContextualType, isForSingleExprFunction);
+    }
+
     /// Retrieve the kind of path element.
     PathElementKind getKind() const {
       switch (static_cast<StoredKind>(storedKind)) {
@@ -505,6 +509,17 @@ public:
 
     bool isKeyPathComponent() const {
       return getKind() == PathElementKind::KeyPathComponent;
+    }
+
+    bool isClosureResult() const {
+      return getKind() == PathElementKind::ClosureResult;
+    }
+
+    /// Determine whether this element points to the contextual type
+    /// associated with result of a single expression function.
+    bool isResultOfSingleExprFunction() const {
+      return getKind() == PathElementKind::ContextualType ? bool(getValue())
+                                                          : false;
     }
   };
 

@@ -197,6 +197,14 @@ static void PrintArg(raw_ostream &OS, const char *Arg, StringRef TempDir) {
   OS << '"';
 }
 
+static void ParseParseableInterfaceArgs(ParseableInterfaceOptions &Opts,
+                                        ArgList &Args) {
+  using namespace options;
+
+  Opts.PreserveTypesAsWritten |=
+    Args.hasArg(OPT_module_interface_preserve_types_as_written);
+}
+
 /// Save a copy of any flags marked as ModuleInterfaceOption, if running
 /// in a mode that is going to emit a .swiftinterface file.
 static void SaveParseableInterfaceArgs(ParseableInterfaceOptions &Opts,
@@ -316,7 +324,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       = A->getOption().matches(OPT_enable_target_os_checking);
   }
   
-  Opts.EnableASTScopeLookup |= Args.hasArg(OPT_enable_astscope_lookup);
+  Opts.EnableASTScopeLookup |= Args.hasArg(OPT_enable_astscope_lookup) || Args.hasArg(OPT_disable_parser_lookup);
+  Opts.CompareToASTScopeLookup |= Args.hasArg(OPT_compare_to_astscope_lookup);
   Opts.DebugConstraintSolver |= Args.hasArg(OPT_debug_constraints);
   Opts.NamedLazyMemberLoading &= !Args.hasArg(OPT_disable_named_lazy_member_loading);
   Opts.DebugGenericSignatures |= Args.hasArg(OPT_debug_generic_signatures);
@@ -384,6 +393,13 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   if (const Arg *A = Args.getLastArg(OPT_output_request_graphviz)) {
     Opts.RequestEvaluatorGraphVizPath = A->getValue();
+  }
+
+  if (Args.getLastArg(OPT_require_explicit_availability, OPT_require_explicit_availability_target)) {
+    Opts.RequireExplicitAvailability = true;
+    if (const Arg *A = Args.getLastArg(OPT_require_explicit_availability_target)) {
+      Opts.RequireExplicitAvailabilityTarget = A->getValue();
+    }
   }
 
   if (const Arg *A = Args.getLastArg(OPT_solver_memory_threshold)) {
@@ -1177,6 +1193,11 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
                                                     runtimeCompatibilityVersion;
   }
 
+  if (!Args.hasArg(options::
+          OPT_disable_autolinking_runtime_compatibility_dynamic_replacements)) {
+    Opts.AutolinkRuntimeCompatibilityDynamicReplacementLibraryVersion =
+        getSwiftRuntimeCompatibilityVersionForTarget(Triple);
+  }
   return false;
 }
 
@@ -1305,6 +1326,7 @@ bool CompilerInvocation::parseArgs(
     return true;
   }
 
+  ParseParseableInterfaceArgs(ParseableInterfaceOpts, ParsedArgs);
   SaveParseableInterfaceArgs(ParseableInterfaceOpts, FrontendOpts,
                              ParsedArgs, Diags);
 
