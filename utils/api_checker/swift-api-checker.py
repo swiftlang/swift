@@ -114,7 +114,7 @@ class DiagnoseConfig:
 
     def run(self, opts, before, after, output, verbose):
         cmd = [self.tool_path, '-diagnose-sdk', '-input-paths', before,
-               '-input-paths', after]
+               '-input-paths', after, '-print-module']
         if output:
             cmd.extend(['-o', output])
         cmd.extend(['-' + o for o in opts])
