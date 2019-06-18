@@ -42,7 +42,7 @@ public protocol VectorProtocol : AdditiveArithmetic {
 }
 
 public extension VectorProtocol {
-  mutating func add(_ x: VectorSpaceScalar) -> Self {
+  mutating func add(_ x: VectorSpaceScalar) {
     self = adding(x)
   }
 
@@ -58,7 +58,7 @@ public extension VectorProtocol {
     lhs.add(rhs)
   }
 
-  mutating func subtract(_ x: VectorSpaceScalar) -> Self {
+  mutating func subtract(_ x: VectorSpaceScalar) {
     self = subtracting(x)
   }
 
