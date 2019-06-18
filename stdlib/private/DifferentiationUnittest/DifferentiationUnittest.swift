@@ -114,7 +114,17 @@ extension Tracked : SignedNumeric & Numeric where T : SignedNumeric, T == T.Magn
   }
 
   public static func *= (lhs: inout Tracked, rhs: Tracked) {
-    lhs = Tracked(lhs.value * rhs.value)
+    lhs = lhs * rhs
+  }
+}
+
+extension Tracked where T : FloatingPoint {
+  public static func / (lhs: Tracked, rhs: Tracked) -> Tracked {
+    return Tracked(lhs.value / rhs.value)
+  }
+
+  public static func /= (lhs: inout Tracked, rhs: Tracked) {
+    lhs = lhs / rhs
   }
 }
 
