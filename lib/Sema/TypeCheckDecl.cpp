@@ -1991,11 +1991,6 @@ SelfAccessKindRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
     case AccessorKind::WillSet:
     case AccessorKind::DidSet: {
       auto *storage =AD->getStorage();
-
-      // FIXME: Remove this once we request-ify isSetterMutating()
-      auto *resolver = storage->getASTContext().getLazyResolver();
-      if (resolver)
-        resolver->resolveDeclSignature(storage);
       if (storage->isSetterMutating())
         return SelfAccessKind::Mutating;
 
@@ -2007,14 +2002,17 @@ SelfAccessKindRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
   return SelfAccessKind::NonMutating;
 }
 
-static bool computeIsGetterMutating(AbstractStorageDecl *storage) {
+llvm::Expected<bool>
+IsGetterMutatingRequest::evaluate(Evaluator &evaluator,
+                                  AbstractStorageDecl *storage) const {
+  bool result = (!storage->isStatic() &&
+                 doesContextHaveValueSemantics(storage->getDeclContext()));
+
   // 'lazy' overrides the normal accessor-based rules and heavily
   // restricts what accessors can be used.  The getter is considered
   // mutating if this is instance storage on a value type.
   if (storage->getAttrs().hasAttribute<LazyAttr>()) {
-    return storage->getDeclContext()->isTypeContext() &&
-           !storage->getDeclContext()->getSelfClassDecl() &&
-           !storage->isStatic();
+    return result;
   }
 
   // If we have an attached property wrapper, the getter is mutating if
@@ -2024,13 +2022,7 @@ static bool computeIsGetterMutating(AbstractStorageDecl *storage) {
     if (auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo(0)) {
       if (wrapperInfo.valueVar &&
           (!storage->getGetter() || storage->getGetter()->isImplicit())) {
-        // FIXME: Remove this once we request-ify isSetterMutating()
-        auto *resolver = storage->getASTContext().getLazyResolver();
-        if (resolver)
-          resolver->resolveDeclSignature(wrapperInfo.valueVar);
-        return wrapperInfo.valueVar->isGetterMutating() &&
-            var->isInstanceMember() &&
-            doesContextHaveValueSemantics(var->getDeclContext());
+        return wrapperInfo.valueVar->isGetterMutating() && result;
       }
     }
   }
@@ -2056,7 +2048,14 @@ static bool computeIsGetterMutating(AbstractStorageDecl *storage) {
   llvm_unreachable("bad impl kind");
 }
 
-static bool computeIsSetterMutating(AbstractStorageDecl *storage) {
+llvm::Expected<bool>
+IsSetterMutatingRequest::evaluate(Evaluator &evaluator,
+                                  AbstractStorageDecl *storage) const {
+  // By default, the setter is mutating if we have an instance member of a
+  // value type, but this can be overridden below.
+  bool result = (!storage->isStatic() &&
+                 doesContextHaveValueSemantics(storage->getDeclContext()));
+
   // If we have an attached property wrapper, the setter is mutating if
   // the "value" property of the outermost wrapper type is mutating and we're
   // in a context that has value semantics.
@@ -2064,21 +2063,10 @@ static bool computeIsSetterMutating(AbstractStorageDecl *storage) {
     if (auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo(0)) {
       if (wrapperInfo.valueVar &&
           (!storage->getSetter() || storage->getSetter()->isImplicit())) {
-        // FIXME: Remove this once we request-ify isSetterMutating()
-        auto *resolver = storage->getASTContext().getLazyResolver();
-        if (resolver)
-          resolver->resolveDeclSignature(wrapperInfo.valueVar);
-        return wrapperInfo.valueVar->isSetterMutating() &&
-            var->isInstanceMember() &&
-            doesContextHaveValueSemantics(var->getDeclContext());
+        return wrapperInfo.valueVar->isSetterMutating() && result;
       }
     }
   }
-
-  // By default, the setter is mutating if we have an instance member of a
-  // value type, but this can be overridden below.
-  bool result = (storage->isInstanceMember() &&
-                 doesContextHaveValueSemantics(storage->getDeclContext()));
 
   auto impl = storage->getImplInfo();
   switch (impl.getWriteImpl()) {
@@ -2144,11 +2132,6 @@ static void validateAbstractStorageDecl(TypeChecker &TC,
   
   if (shouldUseOpaqueReadAccessor(storage))
     storage->setOpaqueReadOwnership(OpaqueReadOwnership::Borrowed);
-
-  // isGetterMutating and isSetterMutating are part of the signature
-  // of a storage declaration and need to be validated immediately.
-  storage->setIsGetterMutating(computeIsGetterMutating(storage));
-  storage->setIsSetterMutating(computeIsSetterMutating(storage));
 
   // Everything else about the accessors can wait until finalization.
   // This will validate all the accessors.
@@ -2272,6 +2255,10 @@ public:
     // VarDecl is fully type-checked within its own file. It will NOT be run
     // when the VarDecl is merely used from another file.
     TC.validateDecl(VD);
+
+    // Compute these requests in case they emit diagnostics.
+    (void) VD->isGetterMutating();
+    (void) VD->isSetterMutating();
 
     // Set up accessors, also lowering lazy and @NSManaged properties.
     maybeAddAccessorsToStorage(VD);
@@ -2598,6 +2585,10 @@ public:
         }
       }
     }
+
+    // Compute these requests in case they emit diagnostics.
+    (void) SD->isGetterMutating();
+    (void) SD->isSetterMutating();
 
     triggerAccessorSynthesis(TC, SD);
     if (SD->getAttrs().hasAttribute<DynamicReplacementAttr>()) {

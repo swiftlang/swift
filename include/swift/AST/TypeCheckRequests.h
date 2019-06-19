@@ -702,6 +702,58 @@ public:
   void cacheResult(SelfAccessKind value) const;
 };
 
+/// Request whether the storage has a mutating getter.
+class IsGetterMutatingRequest :
+    public SimpleRequest<IsGetterMutatingRequest,
+                         CacheKind::SeparatelyCached,
+                         bool, AbstractStorageDecl *> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool>
+  evaluate(Evaluator &evaluator, AbstractStorageDecl *func) const;
+
+public:
+  // Cycle handling
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<bool> getCachedResult() const;
+  void cacheResult(bool value) const;
+};
+
+/// Request whether the storage has a mutating getter.
+class IsSetterMutatingRequest :
+    public SimpleRequest<IsSetterMutatingRequest,
+                         CacheKind::SeparatelyCached,
+                         bool, AbstractStorageDecl *> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool>
+  evaluate(Evaluator &evaluator, AbstractStorageDecl *func) const;
+
+public:
+  // Cycle handling
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<bool> getCachedResult() const;
+  void cacheResult(bool value) const;
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>

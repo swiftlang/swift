@@ -762,3 +762,55 @@ void SelfAccessKindRequest::cacheResult(SelfAccessKind value) const {
   auto *funcDecl = std::get<0>(getStorage());
   funcDecl->setSelfAccessKind(value);
 }
+
+//----------------------------------------------------------------------------//
+// IsGetterMutatingRequest computation.
+//----------------------------------------------------------------------------//
+
+void IsGetterMutatingRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  auto decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::circular_reference);
+}
+
+void IsGetterMutatingRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  auto decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::circular_reference_through);
+}
+
+Optional<bool> IsGetterMutatingRequest::getCachedResult() const {
+  auto *storage = std::get<0>(getStorage());
+  if (storage->LazySemanticInfo.IsGetterMutatingComputed)
+    return storage->LazySemanticInfo.IsGetterMutating;
+  return None;
+}
+
+void IsGetterMutatingRequest::cacheResult(bool value) const {
+  auto *storage = std::get<0>(getStorage());
+  storage->setIsGetterMutating(value);
+}
+
+//----------------------------------------------------------------------------//
+// IsSetterMutatingRequest computation.
+//----------------------------------------------------------------------------//
+
+void IsSetterMutatingRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  auto decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::circular_reference);
+}
+
+void IsSetterMutatingRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  auto decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::circular_reference_through);
+}
+
+Optional<bool> IsSetterMutatingRequest::getCachedResult() const {
+  auto *storage = std::get<0>(getStorage());
+  if (storage->LazySemanticInfo.IsSetterMutatingComputed)
+    return storage->LazySemanticInfo.IsSetterMutating;
+  return None;
+}
+
+void IsSetterMutatingRequest::cacheResult(bool value) const {
+  auto *storage = std::get<0>(getStorage());
+  storage->setIsSetterMutating(value);
+}
