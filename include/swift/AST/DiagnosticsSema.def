@@ -3616,6 +3616,10 @@ ERROR(unsupported_opaque_type,none,
 ERROR(opaque_type_unsupported_pattern,none,
       "'some' type can only be declared on a single property declaration", ())
 
+ERROR(opaque_type_in_protocol_requirement,none,
+      "'some' type cannot be the return type of a protocol requirement; did you mean to add an associated type?",
+      ())
+
 // SIL
 ERROR(opened_non_protocol,none,
       "@opened cannot be applied to non-protocol type %0", (Type))
