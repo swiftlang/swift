@@ -1787,6 +1787,9 @@ public:
     llvm_unreachable("Not yet implemented");
   }
 
+  // Emitted as part of its storage.
+  void visitAccessorDecl(AccessorDecl *D) {}
+
   void visitFuncDecl(FuncDecl *D);
   void visitPatternBindingDecl(PatternBindingDecl *D);
 

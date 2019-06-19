@@ -1907,6 +1907,16 @@ bool AbstractStorageDecl::requiresOpaqueModifyCoroutine() const {
   if (!supportsMutation())
     return false;
 
+  auto *dc = getDeclContext();
+
+  // Local properties don't have modify accessors.
+  if (dc->isLocalContext())
+    return false;
+
+  // Fixed-layout global properties don't have modify accessors.
+  if (dc->isModuleScopeContext() && !isResilient())
+    return false;
+
   // Imported storage declarations don't have eagerly-generated modify
   // accessors.
   if (hasClangNode())
@@ -1919,7 +1929,6 @@ bool AbstractStorageDecl::requiresOpaqueModifyCoroutine() const {
     return false;
 
   // Requirements of ObjC protocols don't support the modify coroutine.
-  auto *dc = getDeclContext();
   if (auto protoDecl = dyn_cast<ProtocolDecl>(dc))
     if (protoDecl->isObjC())
       return false;

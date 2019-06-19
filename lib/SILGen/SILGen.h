@@ -188,11 +188,13 @@ public:
   void visitTypeAliasDecl(TypeAliasDecl *d) {}
   void visitOpaqueTypeDecl(OpaqueTypeDecl *d) {}
   void visitAbstractTypeParamDecl(AbstractTypeParamDecl *d) {}
-  void visitSubscriptDecl(SubscriptDecl *d) {}
   void visitConstructorDecl(ConstructorDecl *d) {}
   void visitDestructorDecl(DestructorDecl *d) {}
   void visitModuleDecl(ModuleDecl *d) { }
   void visitMissingMemberDecl(MissingMemberDecl *d) {}
+
+  // Emitted as part of its storage.
+  void visitAccessorDecl(AccessorDecl *ad) {}
 
   void visitFuncDecl(FuncDecl *fd);
   void visitPatternBindingDecl(PatternBindingDecl *vd);
@@ -202,6 +204,7 @@ public:
   void visitNominalTypeDecl(NominalTypeDecl *ntd);
   void visitExtensionDecl(ExtensionDecl *ed);
   void visitVarDecl(VarDecl *vd);
+  void visitSubscriptDecl(SubscriptDecl *sd);
 
   void emitAbstractFuncDecl(AbstractFunctionDecl *AFD);
   
