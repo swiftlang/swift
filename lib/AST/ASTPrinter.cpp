@@ -3456,7 +3456,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     }
 
     bool isSimple = T->hasSimpleTypeRepr();
-    if (isSimple && T->is<OpaqueTypeArchetypeType>()) {
+    if (!isSimple && T->is<OpaqueTypeArchetypeType>()) {
       auto opaqueTy = T->castTo<OpaqueTypeArchetypeType>();
       switch (Options.OpaqueReturnTypePrinting) {
       case PrintOptions::OpaqueReturnTypePrintingMode::StableReference:

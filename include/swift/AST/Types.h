@@ -5599,6 +5599,7 @@ inline bool TypeBase::hasSimpleTypeRepr() const {
   case TypeKind::NestedArchetype:
     return cast<NestedArchetypeType>(this)->getParent()->hasSimpleTypeRepr();
       
+  case TypeKind::OpaqueTypeArchetype:
   case TypeKind::OpenedArchetype:
     return false;
 
