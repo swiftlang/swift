@@ -376,9 +376,9 @@ static std::string getDifferentiationParametersClauseString(
         break;
       case ParsedAutoDiffParameter::Kind::Ordered:
         auto *paramList = function->getParameters();
-        assert(param.getOrder() <= paramList->size() &&
+        assert(param.getIndex() <= paramList->size() &&
                "wrt parameter is out of range");
-        auto *funcParam = paramList->get(param.getOrder());
+        auto *funcParam = paramList->get(param.getIndex());
         printer << funcParam->getNameStr();
         break;
       }

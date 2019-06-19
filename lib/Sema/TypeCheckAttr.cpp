@@ -2890,10 +2890,10 @@ static AutoDiffParameterIndices *computeDifferentiationParameters(
         break;
       }
       case ParsedAutoDiffParameter::Kind::Ordered: {
-        auto index = parsedWrtParams[i].getOrder();
+        auto index = parsedWrtParams[i].getIndex();
         // Check for out of range error (TODO: check if this is caught earlier)
-        if (index > params.getArray().size()) {
-          TC.diagnose(paramLoc, diag::diff_params_clause_param_order_out_of_range);
+        if (index >= params.getArray().size()) {
+          TC.diagnose(paramLoc, diag::diff_params_clause_param_index_out_of_range);
           return nullptr;
         }
         // Parameter names must be specified in the original order.

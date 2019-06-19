@@ -84,7 +84,7 @@ func vjpAddWrtXY(x: Float, y: Float) -> (value: Float, pullback: (Float) -> (Flo
 func vjpUnknownParam(x: Float, y: Float) -> (value: Float, pullback: (Float) -> (Float)) {
   return (x + y, { $0 })
 }
-// expected-error @+1 {{parameter names must be specified in original order}}
+// expected-error @+1 {{parameters must be specified in original order}}
 @differentiating(add, wrt: (y, x))
 func vjpParamOrderNotIncreasing(x: Float, y: Float) -> (value: Float, pullback: (Float) -> (Float, Float)) {
   return (x + y, { ($0, $0) })

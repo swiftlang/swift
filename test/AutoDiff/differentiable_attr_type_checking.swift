@@ -192,7 +192,7 @@ func jvpUnknownParam(x: Float) -> Float {
   return x
 }
 
-// expected-error @+1 {{parameter names must be specified in original order}}
+// expected-error @+1 {{parameters must be specified in original order}}
 @differentiable(wrt: (y, x))
 func jvpParamOrderNotIncreasing(x: Float, y: Float) -> Float {
   return x * y
@@ -768,4 +768,9 @@ func slope2(_ x: Float) -> Float {
  @differentiable(linear, jvp: const3, vjp: const3) // expected-error {{cannot specify 'vjp:' or 'jvp:' for linear functions; use 'transpose:' instead}}
 func slope3(_ x: Float) -> Float {
   return 3 * x
+}
+
+@differentiable(wrt: 2) // expected-error {{parameter index is larger than total number of parameters}}
+func two(x: Float, y: Float) -> Float {
+  return x + y
 }
