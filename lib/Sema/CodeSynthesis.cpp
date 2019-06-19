@@ -222,6 +222,8 @@ static AccessorDecl *createGetterPrototype(AbstractStorageDecl *storage,
 
   if (storage->isGetterMutating())
     getter->setSelfAccessKind(SelfAccessKind::Mutating);
+  else
+    getter->setSelfAccessKind(SelfAccessKind::NonMutating);
 
   if (storage->isStatic())
     getter->setStatic();
@@ -268,6 +270,8 @@ static AccessorDecl *createSetterPrototype(AbstractStorageDecl *storage,
 
   if (isMutating)
     setter->setSelfAccessKind(SelfAccessKind::Mutating);
+  else
+    setter->setSelfAccessKind(SelfAccessKind::NonMutating);
 
   if (isStatic)
     setter->setStatic();
@@ -438,6 +442,8 @@ createCoroutineAccessorPrototype(AbstractStorageDecl *storage,
   
   if (isMutating)
     accessor->setSelfAccessKind(SelfAccessKind::Mutating);
+  else
+    accessor->setSelfAccessKind(SelfAccessKind::NonMutating);
 
   if (isStatic)
     accessor->setStatic();
