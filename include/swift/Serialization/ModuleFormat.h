@@ -52,7 +52,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 493; // backing variables
+const uint16_t SWIFTMODULE_VERSION_MINOR = 495; // remove superclass from ProtocolLayout
 
 using DeclIDField = BCFixed<31>;
 
@@ -997,7 +997,6 @@ namespace decls_block {
     BCFixed<1>,             // objc?
     BCFixed<1>,             // existential-type-supported?
     GenericEnvironmentIDField, // generic environment
-    TypeIDField,            // superclass
     AccessLevelField,       // access level
     BCArray<DeclIDField>    // inherited types
     // Trailed by the generic parameters (if any), the members record, and

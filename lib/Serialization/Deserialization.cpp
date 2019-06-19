@@ -3291,15 +3291,13 @@ public:
     DeclContextID contextID;
     bool isImplicit, isClassBounded, isObjC, existentialTypeSupported;
     GenericEnvironmentID genericEnvID;
-    TypeID superclassID;
     uint8_t rawAccessLevel;
     ArrayRef<uint64_t> rawInheritedIDs;
 
     decls_block::ProtocolLayout::readRecord(scratch, nameID, contextID,
                                             isImplicit, isClassBounded, isObjC,
                                             existentialTypeSupported,
-                                            genericEnvID, superclassID,
-                                            rawAccessLevel, rawInheritedIDs);
+                                            genericEnvID, rawAccessLevel, rawInheritedIDs);
 
     auto DC = MF.getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -3310,7 +3308,6 @@ public:
                                              /*TrailingWhere=*/nullptr);
     declOrOffset = proto;
 
-    proto->setSuperclass(MF.getType(superclassID));
     proto->setRequiresClass(isClassBounded);
     proto->setExistentialTypeSupported(existentialTypeSupported);
 
