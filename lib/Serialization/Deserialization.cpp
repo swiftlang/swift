@@ -1729,9 +1729,10 @@ giveUpFastPath:
       
       auto name = getIdentifier(DefiningDeclNameID);
       pathTrace.addOpaqueReturnType(name);
-      
-      if (auto opaqueTy = baseModule->lookupOpaqueResultType(name.str(),
-                                                             nullptr)) {
+    
+      auto lookupModule = M ? M : baseModule;
+      if (auto opaqueTy = lookupModule->lookupOpaqueResultType(name.str(),
+                                                               nullptr)) {
         values.push_back(opaqueTy);
       }
       break;
@@ -3190,7 +3191,6 @@ public:
                                               interfaceTypeID, genericEnvID,
                                               underlyingTypeID);
     
-    auto namingDecl = cast<ValueDecl>(MF.getDecl(namingDeclID));
     auto declContext = MF.getDeclContext(contextID);
     auto sig = MF.getGenericSignature(interfaceSigID);
     auto interfaceType = MF.getType(interfaceTypeID)
@@ -3202,9 +3202,12 @@ public:
       
     // Create the decl.
     auto opaqueDecl =
-      new (ctx) OpaqueTypeDecl(namingDecl, nullptr, declContext,
+      new (ctx) OpaqueTypeDecl(nullptr, nullptr, declContext,
                                sig, interfaceType);
     declOrOffset = opaqueDecl;
+
+    auto namingDecl = cast<ValueDecl>(MF.getDecl(namingDeclID));
+    opaqueDecl->setNamingDecl(namingDecl);
 
     if (auto genericParams = MF.maybeReadGenericParams(opaqueDecl))
       opaqueDecl->setGenericParams(genericParams);
