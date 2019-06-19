@@ -937,10 +937,22 @@ static GenericSignature *getNewGenericSignature(ValueDecl *base,
   auto derivedGenericCtx = derived->getAsGenericContext();
   auto &ctx = base->getASTContext();
 
+  if (!baseGenericCtx) {
+    return nullptr;
+  }
+
   auto baseClass =
       baseGenericCtx->getInnermostTypeContext()->getSelfClassDecl();
   auto derivedClass =
       derivedGenericCtx->getInnermostTypeContext()->getSelfClassDecl();
+
+  if (!derivedClass) {
+    return nullptr;
+  }
+
+  if (!derivedClass->getInterfaceType()->is<LValueType>()) {
+    return nullptr;
+  }
 
   auto subMap = derivedClass->getInterfaceType()->getContextSubstitutionMap(
       derivedClass->getModuleContext(), baseClass);
