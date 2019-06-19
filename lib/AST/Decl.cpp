@@ -4666,7 +4666,16 @@ void ProtocolDecl::computeKnownProtocolKind() const {
 
 void AbstractStorageDecl::overwriteImplInfo(StorageImplInfo implInfo) {
   setFieldsFromImplInfo(implInfo);
-  Accessors.getPointer()->overwriteImplInfo(implInfo);
+
+  auto *accessors = Accessors.getPointer();
+  if (!accessors) {
+    accessors = AccessorRecord::create(getASTContext(), SourceRange(),
+                                       implInfo, {});
+    Accessors.setPointer(accessors);
+    return;
+  }
+
+  accessors->overwriteImplInfo(implInfo);
 }
 
 bool AbstractStorageDecl::hasPrivateAccessor() const {
