@@ -69,6 +69,8 @@ public:
   bool diagnose(bool asNote = false);
 
   /// Try to produce an error diagnostic for the problem at hand.
+  ///
+  /// \returns true If anything was diagnosed, false otherwise.
   virtual bool diagnoseAsError() = 0;
 
   /// Instead of producing an error diagnostic, attempt to
@@ -357,6 +359,45 @@ protected:
   DiagAsNote getDiagnosticAsNote() const override {
     return diag::candidate_types_conformance_requirement;
   }
+};
+
+/// Diagnostics for mismatched generic arguments e.g
+/// ```swift
+/// struct F<G> {}
+/// let _:F<Int> = F<Bool>()
+/// ```
+class GenericArgumentsMismatchFailure final : public FailureDiagnostic {
+  BoundGenericType *Actual;
+  BoundGenericType *Required;
+  ArrayRef<unsigned> Mismatches;
+
+public:
+  GenericArgumentsMismatchFailure(Expr *expr, ConstraintSystem &cs,
+                                  BoundGenericType *actual,
+                                  BoundGenericType *required,
+                                  ArrayRef<unsigned> mismatches,
+                                  ConstraintLocator *locator)
+      : FailureDiagnostic(expr, cs, locator), Actual(actual),
+        Required(required), Mismatches(mismatches) {}
+
+  bool diagnoseAsError() override;
+
+private:
+  void emitNotesForMismatches() {
+    for (unsigned position : Mismatches) {
+      emitNoteForMismatch(position);
+    }
+  }
+
+  void emitNoteForMismatch(int mismatchPosition);
+
+  Optional<Diag<Type, Type>> getDiagnosticFor(ContextualTypePurpose context);
+
+  /// The actual type being used.
+  BoundGenericType *getActual() const { return Actual; }
+
+  /// The type needed by the generic requirement.
+  BoundGenericType *getRequired() const { return Required; }
 };
 
 /// Diagnose failures related to same-type generic requirements, e.g.
@@ -1306,6 +1347,30 @@ private:
   /// \returns true if all of the parameters have been covered.
   bool findArgumentLocations(
       llvm::function_ref<void(TypeRepr *, GenericTypeParamType *)> callback);
+};
+
+class SkipUnhandledConstructInFunctionBuilderFailure final
+    : public FailureDiagnostic {
+public:
+  using UnhandledNode = llvm::PointerUnion<Stmt *, Decl *>;
+
+  UnhandledNode unhandled;
+  NominalTypeDecl *builder;
+
+  void diagnosePrimary(bool asNote);
+
+public:
+  SkipUnhandledConstructInFunctionBuilderFailure(Expr *root,
+                                                 ConstraintSystem &cs,
+                                                 UnhandledNode unhandled,
+                                                 NominalTypeDecl *builder,
+                                                 ConstraintLocator *locator)
+    : FailureDiagnostic(root, cs, locator),
+      unhandled(unhandled),
+      builder(builder) { }
+
+  bool diagnoseAsError() override;
+  bool diagnoseAsNote() override;
 };
 
 } // end namespace constraints

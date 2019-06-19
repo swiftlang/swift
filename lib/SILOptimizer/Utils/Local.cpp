@@ -931,6 +931,9 @@ swift::tryToConcatenateStrings(ApplyInst *AI, SILBuilder &B) {
 //                              Closure Deletion
 //===----------------------------------------------------------------------===//
 
+/// NOTE: Instructions with transitive ownership kind are assumed to not keep
+/// the underlying closure alive as well. This is meant for instructions only
+/// with non-transitive users.
 static bool useDoesNotKeepClosureAlive(const SILInstruction *I) {
   switch (I->getKind()) {
   case SILInstructionKind::StrongRetainInst:
@@ -939,6 +942,7 @@ static bool useDoesNotKeepClosureAlive(const SILInstruction *I) {
   case SILInstructionKind::RetainValueInst:
   case SILInstructionKind::ReleaseValueInst:
   case SILInstructionKind::DebugValueInst:
+  case SILInstructionKind::EndBorrowInst:
     return true;
   default:
     return false;
@@ -951,9 +955,9 @@ static bool useHasTransitiveOwnership(const SILInstruction *I) {
   if (isa<ConvertEscapeToNoEscapeInst>(I))
     return true;
 
-  // Look through copy_value. It is inert for our purposes, but we need to look
-  // through it.
-  return isa<CopyValueInst>(I);
+  // Look through copy_value, begin_borrow. They are inert for our purposes, but
+  // we need to look through it.
+  return isa<CopyValueInst>(I) || isa<BeginBorrowInst>(I);
 }
 
 static SILValue createLifetimeExtendedAllocStack(

@@ -10,6 +10,9 @@
 // 3. Try to import the interface, which will pass and create a cached module
 // RUN: %target-swift-frontend -typecheck %s -I %t/Build -module-cache-path %t/ModuleCache
 
+// 3a. Make sure the test works on a fast machine
+// RUN: sleep 1
+
 // 4. Touch the interface so the cached module is no longer up-to-date
 // RUN: %{python} %S/../Inputs/make-old.py %t/Build/TestModule.swiftinterface
 
