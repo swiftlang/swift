@@ -37,6 +37,7 @@ class TypeAliasDecl;
 struct TypeLoc;
 class ValueDecl;
 class AbstractStorageDecl;
+enum class OpaqueReadOwnership: uint8_t;
 
 /// Display a nominal type or extension thereof.
 void simple_display(
@@ -752,6 +753,33 @@ public:
   bool isCached() const { return true; }
   Optional<bool> getCachedResult() const;
   void cacheResult(bool value) const;
+};
+
+/// Request whether reading the storage yields a borrowed value.
+class OpaqueReadOwnershipRequest :
+    public SimpleRequest<OpaqueReadOwnershipRequest,
+                         CacheKind::SeparatelyCached,
+                         OpaqueReadOwnership,
+                         AbstractStorageDecl *> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<OpaqueReadOwnership>
+  evaluate(Evaluator &evaluator, AbstractStorageDecl *storage) const;
+
+public:
+  // Cycle handling
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<OpaqueReadOwnership> getCachedResult() const;
+  void cacheResult(OpaqueReadOwnership value) const;
 };
 
 // Allow AnyValue to compare two Type values, even though Type doesn't

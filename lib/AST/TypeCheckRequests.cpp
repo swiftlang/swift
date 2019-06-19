@@ -814,3 +814,30 @@ void IsSetterMutatingRequest::cacheResult(bool value) const {
   auto *storage = std::get<0>(getStorage());
   storage->setIsSetterMutating(value);
 }
+
+//----------------------------------------------------------------------------//
+// OpaqueReadOwnershipRequest computation.
+//----------------------------------------------------------------------------//
+
+void OpaqueReadOwnershipRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  auto decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::circular_reference);
+}
+
+void OpaqueReadOwnershipRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  auto decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::circular_reference_through);
+}
+
+Optional<OpaqueReadOwnership>
+OpaqueReadOwnershipRequest::getCachedResult() const {
+  auto *storage = std::get<0>(getStorage());
+  if (storage->LazySemanticInfo.OpaqueReadOwnershipComputed)
+    return OpaqueReadOwnership(storage->LazySemanticInfo.OpaqueReadOwnership);
+  return None;
+}
+
+void OpaqueReadOwnershipRequest::cacheResult(OpaqueReadOwnership value) const {
+  auto *storage = std::get<0>(getStorage());
+  storage->setOpaqueReadOwnership(value);
+}

@@ -4384,6 +4384,7 @@ class AbstractStorageDecl : public ValueDecl {
   friend class SetterAccessLevelRequest;
   friend class IsGetterMutatingRequest;
   friend class IsSetterMutatingRequest;
+  friend class OpaqueReadOwnershipRequest;
 
 public:
   static const size_t MaxNumAccessors = 255;
@@ -4457,6 +4458,8 @@ private:
     unsigned IsGetterMutating : 1;
     unsigned IsSetterMutatingComputed : 1;
     unsigned IsSetterMutating : 1;
+    unsigned OpaqueReadOwnershipComputed : 1;
+    unsigned OpaqueReadOwnership : 2;
   } LazySemanticInfo = { };
 
 protected:
@@ -4466,8 +4469,6 @@ protected:
     : ValueDecl(Kind, DC, Name, NameLoc) {
     Bits.AbstractStorageDecl.HasStorage = true;
     Bits.AbstractStorageDecl.SupportsMutation = supportsMutation;
-    Bits.AbstractStorageDecl.OpaqueReadOwnership =
-      unsigned(OpaqueReadOwnership::Owned);
     Bits.AbstractStorageDecl.IsStatic = IsStatic;
   }
 
@@ -4551,11 +4552,10 @@ public:
   }
 
   /// Return the ownership of values opaquely read from this storage.
-  OpaqueReadOwnership getOpaqueReadOwnership() const {
-    return OpaqueReadOwnership(Bits.AbstractStorageDecl.OpaqueReadOwnership);
-  }
+  OpaqueReadOwnership getOpaqueReadOwnership() const;
   void setOpaqueReadOwnership(OpaqueReadOwnership ownership) {
-    Bits.AbstractStorageDecl.OpaqueReadOwnership = unsigned(ownership);
+    LazySemanticInfo.OpaqueReadOwnership = unsigned(ownership);
+    LazySemanticInfo.OpaqueReadOwnershipComputed = true;
   }
 
   /// Return true if reading this storage requires the ability to

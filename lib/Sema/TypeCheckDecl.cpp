@@ -2118,8 +2118,12 @@ IsSetterMutatingRequest::evaluate(Evaluator &evaluator,
   llvm_unreachable("bad storage kind");
 }
 
-static bool shouldUseOpaqueReadAccessor(AbstractStorageDecl *storage) {
-  return storage->getAttrs().hasAttribute<BorrowedAttr>();
+llvm::Expected<OpaqueReadOwnership>
+OpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
+                                     AbstractStorageDecl *storage) const {
+  return (storage->getAttrs().hasAttribute<BorrowedAttr>()
+          ? OpaqueReadOwnership::Borrowed
+          : OpaqueReadOwnership::Owned);
 }
 
 static void validateAbstractStorageDecl(TypeChecker &TC,
@@ -2129,9 +2133,6 @@ static void validateAbstractStorageDecl(TypeChecker &TC,
       sf->markDeclWithOpaqueResultTypeAsValidated(storage);
     }
   }
-  
-  if (shouldUseOpaqueReadAccessor(storage))
-    storage->setOpaqueReadOwnership(OpaqueReadOwnership::Borrowed);
 
   // Everything else about the accessors can wait until finalization.
   // This will validate all the accessors.
