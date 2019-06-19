@@ -13,9 +13,16 @@
 // binaries.
 //===----------------------------------------------------------------------===//
 
+#if defined(__APPLE__) && defined(__MACH__)
+#include "ProtocolRecord.h"
+#endif
+
 #include "swift/ABI/MetadataValues.h"
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/Demangling/Demangle.h"
+#if defined(__APPLE__) && defined(__MACH__)
+#include "swift/Reflection/ProtocolConformance.h"
+#endif
 #include "swift/Reflection/ReflectionContext.h"
 #include "swift/Reflection/TypeRef.h"
 #include "swift/Reflection/TypeRefBuilder.h"
@@ -216,9 +223,27 @@ public:
   }
 };
 
+#if defined(__APPLE__) && defined(__MACH__)
+static void dumpProtocolSection(ArrayRef<ReflectionInfo> reflectionInfos) {
+  using llvm::yaml::Output;
+  Output yout(llvm::outs());
+
+  llvm::outs() << "PROTOCOL DESCRIPTORS:\n";
+  llvm::outs() << "=====================\n";
+  for (const auto &sections : reflectionInfos) {
+    ProtocolDescriptorIterator<NativeRuntime> reader(sections);
+    while (reader.hasNext()) {
+      yaml::ProtocolRecord record(*reader);
+      yout << record;
+      ++reader;
+    }
+  }
+  llvm::outs() << '\n';
+}
+#endif
+
 static int doDumpReflectionSections(ArrayRef<std::string> BinaryFilenames,
-                                    StringRef Arch, ActionType Action,
-                                    std::ostream &OS) {
+                                    StringRef Arch, ActionType Action) {
   // Note: binaryOrError and objectOrError own the memory for our ObjectFile;
   // once they go out of scope, we can no longer do anything.
   std::vector<OwningBinary<Binary>> BinaryOwners;
@@ -253,7 +278,15 @@ static int doDumpReflectionSections(ArrayRef<std::string> BinaryFilenames,
   switch (Action) {
   case ActionType::DumpReflectionSections:
     // Dump everything
-    Context.getBuilder().dumpAllSections(OS);
+    Context.getBuilder().dumpAllSections(std::cout);
+    // Flush cout since we are going to use llvm::outs() so we can use YAML IO
+    // to dump the protocol section.
+    //
+    // TODO: We should not be using std::cout /anywhere/ in the compiler.
+    std::cout << std::flush;
+#if defined(__APPLE__) && defined(__MACH__)
+    dumpProtocolSection(Context.getBuilder().getReflectionInfos());
+#endif
     break;
   case ActionType::DumpTypeLowering: {
     for (std::string Line; std::getline(std::cin, Line);) {
@@ -268,18 +301,18 @@ static int doDumpReflectionSections(ArrayRef<std::string> BinaryFilenames,
       auto *TypeRef =
           swift::Demangle::decodeMangledType(Context.getBuilder(), Demangled);
       if (TypeRef == nullptr) {
-        OS << "Invalid typeref: " << Line << "\n";
+        std::cout << "Invalid typeref: " << Line << "\n";
         continue;
       }
 
-      TypeRef->dump(OS);
+      TypeRef->dump(std::cout);
       auto *TypeInfo =
           Context.getBuilder().getTypeConverter().getTypeInfo(TypeRef);
       if (TypeInfo == nullptr) {
-        OS << "Invalid lowering\n";
+        std::cout << "Invalid lowering\n";
         continue;
       }
-      TypeInfo->dump(OS);
+      TypeInfo->dump(std::cout);
     }
     break;
   }
@@ -292,6 +325,5 @@ int main(int argc, char *argv[]) {
   PROGRAM_START(argc, argv);
   llvm::cl::ParseCommandLineOptions(argc, argv, "Swift Reflection Dump\n");
   return doDumpReflectionSections(options::BinaryFilename,
-                                  options::Architecture, options::Action,
-                                  std::cout);
+                                  options::Architecture, options::Action);
 }

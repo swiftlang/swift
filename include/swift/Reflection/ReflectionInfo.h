@@ -96,6 +96,13 @@ struct ReflectionInfo {
     uint64_t SectionOffset;
   } ReflectionString;
 
+#if defined(__APPLE__) && defined(__MACH__)
+  struct {
+    GenericSection Metadata;
+    uint64_t SectionOffset;
+  } Protocol;
+#endif
+
   uint64_t LocalStartAddress;
   uint64_t RemoteStartAddress;
 };
