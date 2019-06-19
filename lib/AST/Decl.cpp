@@ -5525,6 +5525,15 @@ VarDecl *VarDecl::getPropertyWrapperBackingProperty() const {
   return getPropertyWrapperBackingPropertyInfo().backingVar;
 }
 
+VarDecl *VarDecl::getLazyStorageProperty() const {
+  auto &ctx = getASTContext();
+  auto mutableThis = const_cast<VarDecl *>(this);
+  return evaluateOrDefault(
+      ctx.evaluator,
+      LazyStoragePropertyRequest{mutableThis},
+      {});
+}
+
 static bool propertyWrapperInitializedViaInitialValue(
    const VarDecl *var, bool checkDefaultInit) {
   auto customAttrs = var->getAttachedPropertyWrappers();

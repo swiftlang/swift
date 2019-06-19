@@ -1476,21 +1476,21 @@ namespace {
 
 /// Synthesize the getter for a lazy property with the specified storage
 /// vardecl.
-static void synthesizeLazyGetterBody(AbstractFunctionDecl *fn, void *context) {
+static void synthesizeLazyGetterBody(AbstractFunctionDecl *fn, void *) {
   auto &Ctx = fn->getASTContext();
 
   // FIXME: Remove TypeChecker dependencies below.
   auto &TC = *(TypeChecker *) Ctx.getLazyResolver();
 
-  // The stored property backing the lazy var.
   AccessorDecl *Get = cast<AccessorDecl>(fn);
-  VarDecl *Storage = (VarDecl *) context;
-
-  // The lazy var itself.
-  auto VD = cast<VarDecl>(Get->getStorage());
-
   if (Get->isInvalid() || Ctx.hadError())
     return;
+
+  // The lazy var itself.
+  VarDecl *VD = cast<VarDecl>(Get->getStorage());
+
+  // The stored property backing the lazy var.
+  VarDecl *Storage = VD->getLazyStorageProperty();
 
   // The getter checks the optional, storing the initial value in if nil.  The
   // specific pattern we generate is:
@@ -1601,9 +1601,10 @@ static void synthesizeLazyGetterBody(AbstractFunctionDecl *fn, void *context) {
   Get->setBodyTypeCheckedIfPresent();
 }
 
-static void synthesizeLazySetterBody(AbstractFunctionDecl *fn, void *context) {
+static void synthesizeLazySetterBody(AbstractFunctionDecl *fn, void *) {
   auto *setter = cast<AccessorDecl>(fn);
-  auto *underlyingStorage = (VarDecl *) context;
+  auto *lazyVar = cast<VarDecl>(setter->getStorage());
+  auto *underlyingStorage = lazyVar->getLazyStorageProperty();
   auto &ctx = setter->getASTContext();
 
   if (setter->isInvalid() || ctx.hadError())
@@ -1613,13 +1614,12 @@ static void synthesizeLazySetterBody(AbstractFunctionDecl *fn, void *context) {
                                          underlyingStorage, ctx);
 }
 
-void swift::completeLazyVarImplementation(VarDecl *VD) {
-  auto &Context = VD->getASTContext();
-
+llvm::Expected<VarDecl *>
+LazyStoragePropertyRequest::evaluate(Evaluator &evaluator,
+                                     VarDecl *VD) const {
+  assert(isa<SourceFile>(VD->getDeclContext()->getModuleScopeContext()));
   assert(VD->getAttrs().hasAttribute<LazyAttr>());
-  assert(VD->getReadImpl() == ReadImplKind::Get);
-  assert(VD->getWriteImpl() == WriteImplKind::Set);
-  assert(!VD->isStatic() && "Static vars are already lazy on their own");
+  auto &Context = VD->getASTContext();
 
   // Create the storage property as an optional of VD's type.
   SmallString<64> NameBuf;
@@ -1637,26 +1637,45 @@ void swift::completeLazyVarImplementation(VarDecl *VD) {
   Storage->setLazyStorageProperty(true);
   Storage->setUserAccessible(false);
 
+  // The storage is implicit and private.
+  Storage->setImplicit();
+  Storage->overwriteAccess(AccessLevel::Private);
+  Storage->overwriteSetterAccess(AccessLevel::Private);
+
   addMemberToContextIfNeeded(Storage, VD->getDeclContext(), VD);
 
   // Create the pattern binding decl for the storage decl.  This will get
   // default initialized to nil.
   Pattern *PBDPattern = new (Context) NamedPattern(Storage, /*implicit*/true);
+  PBDPattern->setType(StorageTy);
   PBDPattern = TypedPattern::createImplicit(Context, PBDPattern, StorageTy);
+  auto *InitExpr = new (Context) NilLiteralExpr(SourceLoc(), /*Implicit=*/true);
+  InitExpr->setType(Storage->getType());
+
   auto *PBD = PatternBindingDecl::createImplicit(
-      Context, StaticSpellingKind::None, PBDPattern, /*init*/ nullptr,
+      Context, StaticSpellingKind::None, PBDPattern, InitExpr,
       VD->getDeclContext(), /*VarLoc*/ VD->getLoc());
-  addMemberToContextIfNeeded(PBD, VD->getDeclContext(), VD);
+  PBD->setInitializerChecked(0);
+
+  addMemberToContextIfNeeded(PBD, VD->getDeclContext(), Storage);
+
+  return Storage;
+}
+
+void swift::completeLazyVarImplementation(VarDecl *VD) {
+  assert(VD->getAttrs().hasAttribute<LazyAttr>());
+  assert(VD->getReadImpl() == ReadImplKind::Get);
+  assert(VD->getWriteImpl() == WriteImplKind::Set);
+  assert(!VD->isStatic() && "Static vars are already lazy on their own");
+
+  auto *Storage = VD->getLazyStorageProperty();
+  assert(Storage && "Unable to handle cycle while completing lazy property");
+  (void) Storage;
 
   // Now that we've got the storage squared away, enqueue the getter and
   // setter to be synthesized.
-  VD->getGetter()->setBodySynthesizer(&synthesizeLazyGetterBody, Storage);
-  VD->getSetter()->setBodySynthesizer(&synthesizeLazySetterBody, Storage);
-
-  // The storage is implicit and private.
-  Storage->setImplicit();
-  Storage->overwriteAccess(AccessLevel::Private);
-  Storage->overwriteSetterAccess(AccessLevel::Private);
+  VD->getGetter()->setBodySynthesizer(&synthesizeLazyGetterBody);
+  VD->getSetter()->setBodySynthesizer(&synthesizeLazySetterBody);
 }
 
 /// Synthesize a computed property `$foo` for a property with an attached

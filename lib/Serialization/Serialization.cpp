@@ -3318,6 +3318,7 @@ public:
     SmallVector<TypeID, 2> arrayFields;
     for (auto accessor : accessors.Decls)
       arrayFields.push_back(S.addDeclRef(accessor));
+
     if (auto backingInfo = var->getPropertyWrapperBackingPropertyInfo()) {
       if (backingInfo.backingVar) {
         ++numBackingProperties;
@@ -3331,6 +3332,10 @@ public:
     for (Type dependency : collectDependenciesFromType(ty->getCanonicalType()))
       arrayFields.push_back(S.addTypeRef(dependency));
 
+    VarDecl *lazyStorage = nullptr;
+    if (var->getAttrs().hasAttribute<LazyAttr>())
+      lazyStorage = var->getLazyStorageProperty();
+
     unsigned abbrCode = S.DeclTypeAbbrCodes[VarLayout::Code];
     VarLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                           S.addDeclBaseNameRef(var->getName()),
@@ -3342,6 +3347,8 @@ public:
                           var->hasNonPatternBindingInit(),
                           var->isGetterMutating(),
                           var->isSetterMutating(),
+                          var->isLazyStorageProperty(),
+                          S.addDeclRef(lazyStorage),
                           accessors.OpaqueReadOwnership,
                           accessors.ReadImpl,
                           accessors.WriteImpl,

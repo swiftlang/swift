@@ -841,3 +841,17 @@ void OpaqueReadOwnershipRequest::cacheResult(OpaqueReadOwnership value) const {
   auto *storage = std::get<0>(getStorage());
   storage->setOpaqueReadOwnership(value);
 }
+
+//----------------------------------------------------------------------------//
+// LazyStoragePropertyRequest computation.
+//----------------------------------------------------------------------------//
+
+void LazyStoragePropertyRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  auto decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::circular_reference);
+}
+
+void LazyStoragePropertyRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  auto decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::circular_reference_through);
+}

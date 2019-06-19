@@ -5180,6 +5180,9 @@ public:
   /// bound generic version.
   VarDecl *getPropertyWrapperBackingProperty() const;
 
+  /// Retrieve the backing storage property for a lazy property.
+  VarDecl *getLazyStorageProperty() const;
+
   /// Whether this is a property with a property wrapper that was initialized
   /// via a value of the original type, e.g.,
   ///
