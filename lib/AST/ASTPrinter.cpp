@@ -94,7 +94,7 @@ static bool contributesToParentTypeStorage(const AbstractStorageDecl *ASD) {
   return !ND->isResilient() && ASD->hasStorage() && !ASD->isStatic();
 }
 
-PrintOptions PrintOptions::printParseableInterfaceFile() {
+PrintOptions PrintOptions::printParseableInterfaceFile(bool preferTypeRepr) {
   PrintOptions result;
   result.PrintLongAttrsOnSeparateLines = true;
   result.TypeDefinitions = true;
@@ -110,6 +110,7 @@ PrintOptions PrintOptions::printParseableInterfaceFile() {
   result.EnumRawValues = EnumRawValueMode::PrintObjCOnly;
   result.OpaqueReturnTypePrinting =
       OpaqueReturnTypePrintingMode::StableReference;
+  result.PreferTypeRepr = preferTypeRepr;
 
   // We should print __consuming, __owned, etc for the module interface file.
   result.SkipUnderscoredKeywords = false;
@@ -990,7 +991,18 @@ void PrintAST::printAttributes(const Decl *D) {
 void PrintAST::printTypedPattern(const TypedPattern *TP) {
   printPattern(TP->getSubPattern());
   Printer << ": ";
-  printTypeLoc(TP->getTypeLoc());
+
+  // Make sure to check if the underlying var decl is an implicitly unwrapped
+  // optional.
+  bool isIUO = false;
+  if (auto *named = dyn_cast<NamedPattern>(TP->getSubPattern()))
+    if (auto decl = named->getDecl())
+      isIUO = decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+
+  if (isIUO)
+    printTypeLocForImplicitlyUnwrappedOptional(TP->getTypeLoc());
+  else
+    printTypeLoc(TP->getTypeLoc());
 }
 
 /// Determines if we are required to print the name of a property declaration,
@@ -2538,6 +2550,14 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
       tyLoc = TypeLoc::withoutLoc(decl->getInterfaceType());
 
     Printer.printDeclResultTypePre(decl, tyLoc);
+
+    // HACK: When printing result types for vars with opaque result types,
+    //       always print them using the `some` keyword instead of printing
+    //       the full stable reference.
+    llvm::SaveAndRestore<PrintOptions::OpaqueReturnTypePrintingMode>
+    x(Options.OpaqueReturnTypePrinting,
+      PrintOptions::OpaqueReturnTypePrintingMode::WithOpaqueKeyword);
+
     if (decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
       printTypeLocForImplicitlyUnwrappedOptional(tyLoc);
     else
@@ -2813,6 +2833,14 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
 
       Printer.printDeclResultTypePre(decl, ResultTyLoc);
       Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
+
+      // HACK: When printing result types for funcs with opaque result types,
+      //       always print them using the `some` keyword instead of printing
+      //       the full stable reference.
+      llvm::SaveAndRestore<PrintOptions::OpaqueReturnTypePrintingMode>
+      x(Options.OpaqueReturnTypePrinting,
+        PrintOptions::OpaqueReturnTypePrintingMode::WithOpaqueKeyword);
+
       if (decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
         printTypeLocForImplicitlyUnwrappedOptional(ResultTyLoc);
       else
@@ -2955,6 +2983,14 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
   Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
   if (!elementTy.getTypeRepr())
     elementTy = TypeLoc::withoutLoc(decl->getElementInterfaceType());
+
+  // HACK: When printing result types for subscripts with opaque result types,
+  //       always print them using the `some` keyword instead of printing
+  //       the full stable reference.
+  llvm::SaveAndRestore<PrintOptions::OpaqueReturnTypePrintingMode>
+  x(Options.OpaqueReturnTypePrinting,
+    PrintOptions::OpaqueReturnTypePrintingMode::WithOpaqueKeyword);
+
   if (decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
     printTypeLocForImplicitlyUnwrappedOptional(elementTy);
   else
