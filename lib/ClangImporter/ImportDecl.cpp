@@ -5708,6 +5708,8 @@ Decl *SwiftDeclConverter::importGlobalAsMethod(
   result->setAccess(AccessLevel::Public);
   if (selfIsInOut)
     result->setSelfAccessKind(SelfAccessKind::Mutating);
+  else
+    result->setSelfAccessKind(SelfAccessKind::NonMutating);
   if (selfIdx) {
     result->setSelfIndex(selfIdx.getValue());
   } else {
