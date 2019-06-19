@@ -960,6 +960,10 @@ public:
   /// Parse a differentiation parameters clause.
   bool parseDifferentiationParametersClause(
       SmallVectorImpl<ParsedAutoDiffParameter> &params, StringRef attrName);
+  
+  /// Parse a transposing parameters clause.
+  bool parseTransposingParametersClause(
+      SmallVectorImpl<ParsedAutoDiffParameter> &params, StringRef attrName);
 
   // SWIFT_ENABLE_TENSORFLOW
   /// Parse the @differentiating attribute.

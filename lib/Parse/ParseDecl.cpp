@@ -892,6 +892,95 @@ bool Parser::parseDifferentiationParametersClause(
             paramLoc, paramName));
         break;
       }
+      case tok::integer_literal: {
+        unsigned int paramNum;
+        if (parseUnsignedInteger(
+                paramNum, paramLoc,
+                diag::diff_params_clause_expected_parameter))
+          return true;
+
+        params.push_back(ParsedAutoDiffParameter::getOrderedParameter(
+            paramLoc, paramNum));
+        break;
+      }
+      case tok::kw_self: {
+        paramLoc = consumeToken(tok::kw_self);
+        params.push_back(ParsedAutoDiffParameter::getSelfParameter(paramLoc));
+        break;
+      }
+      default:
+        diagnose(Tok, diag::diff_params_clause_expected_parameter);
+        return true;
+    }
+    if (parseTrailingComma && Tok.isNot(tok::r_paren))
+      return parseToken(tok::comma, diag::attr_expected_comma, attrName,
+                        /*isDeclModifier=*/false);
+    return false;
+  };
+
+  // Parse opening '(' of the parameter list.
+  if (Tok.is(tok::l_paren)) {
+    SyntaxParsingContext DiffParamsContext(
+        SyntaxContext, SyntaxKind::DifferentiationParams);
+    consumeToken(tok::l_paren);
+    // Parse first parameter. At least one is required.
+    if (parseParam())
+      return errorAndSkipToEnd(2);
+    // Parse remaining parameters until ')'.
+    while (Tok.isNot(tok::r_paren))
+      if (parseParam())
+        return errorAndSkipToEnd(2);
+    SyntaxContext->collectNodesInPlace(SyntaxKind::DifferentiationParamList);
+    // Parse closing ')' of the parameter list.
+    consumeToken(tok::r_paren);
+  }
+  // If no opening '(' for parameter list, parse a single parameter.
+  else {
+    if (parseParam(/*parseTrailingComma*/ false))
+      return errorAndSkipToEnd();
+  }
+  return false;
+}
+
+bool Parser::parseTransposingParametersClause(
+    SmallVectorImpl<ParsedAutoDiffParameter> &params, StringRef attrName) {
+  // Set parse error, skip until ')' and parse it.
+  auto errorAndSkipToEnd = [&](int parenDepth = 1) -> bool {
+    for (int i = 0; i < parenDepth; i++) {
+      skipUntil(tok::r_paren);
+      if (!consumeIf(tok::r_paren))
+        diagnose(Tok, diag::attr_expected_rparen, attrName,
+                 /*DeclModifier=*/false);
+    }
+    return true;
+  };
+
+  SyntaxParsingContext DiffParamsClauseContext(
+      SyntaxContext, SyntaxKind::DifferentiationParamsClause);
+  consumeToken(tok::identifier);
+  if (!consumeIf(tok::colon)) {
+    diagnose(Tok, diag::expected_colon_after_label, "wrt");
+    return errorAndSkipToEnd();
+  }
+
+  // Function that parses a parameter into `params`. Returns true if error
+  // occurred.
+  auto parseParam = [&](bool parseTrailingComma = true) -> bool {
+    SyntaxParsingContext DiffParamContext(
+        SyntaxContext, SyntaxKind::DifferentiationParam);
+    SourceLoc paramLoc;
+    switch (Tok.getKind()) {
+      case tok::integer_literal: {
+        unsigned int paramNum;
+        if (parseUnsignedInteger(
+                paramNum, paramLoc,
+                diag::transposing_params_clause_expected_parameter))
+          return true;
+
+        params.push_back(ParsedAutoDiffParameter::getOrderedParameter(
+            paramLoc, paramNum));
+        break;
+      }
       case tok::kw_self: {
         paramLoc = consumeToken(tok::kw_self);
         params.push_back(ParsedAutoDiffParameter::getSelfParameter(paramLoc));
@@ -1203,7 +1292,7 @@ Parser::parseTransposingAttribute(SourceLoc atLoc, SourceLoc loc) {
     
     // Parse the optional 'wrt' differentiation parameters clause.
     if (Tok.is(tok::identifier) && Tok.getText() == "wrt" &&
-        parseDifferentiationParametersClause(params, AttrName))
+        parseTransposingParametersClause(params, AttrName))
       return makeParserError();
   }
   

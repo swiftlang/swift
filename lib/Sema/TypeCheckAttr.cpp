@@ -2891,6 +2891,23 @@ static AutoDiffParameterIndices *computeDifferentiationParameters(
         builder.setParameter(builder.size() - 1);
         break;
       }
+      case ParsedAutoDiffParameter::Kind::Ordered: {
+        auto index = parsedWrtParams[i].getOrder();
+        // Check for out of range error (TODO: check if this is caught earlier)
+        if (index > params.getArray().size()) {
+          TC.diagnose(paramLoc, diag::diff_params_clause_param_order_out_of_range);
+          return nullptr;
+        }
+        // Parameter names must be specified in the original order.
+        if ((int)index <= lastIndex) {
+          TC.diagnose(paramLoc,
+              diag::diff_params_clause_params_not_original_order);
+          return nullptr;
+        }
+        builder.setParameter(index);
+        lastIndex = index;
+        break;
+      }
     }
   }
   return builder.build(TC.Context);
