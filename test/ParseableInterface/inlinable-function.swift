@@ -31,7 +31,7 @@ public struct Foo: Hashable {
   // CHECK: public var hasDidSet: Swift.Int {
   public var hasDidSet: Int {
     // CHECK-NEXT: @_transparent get{{$}}
-    // CHECK-NEXT: set[[NEWVALUE]]{{$}}
+    // CHECK-NEXT: set{{(\(value\))?}}{{$}}
     // CHECK-NOT: didSet
     didSet {
       print("b set to \(hasDidSet)")
