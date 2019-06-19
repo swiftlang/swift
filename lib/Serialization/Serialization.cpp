@@ -3290,7 +3290,6 @@ public:
                                  /*resolver=*/nullptr),
                                S.addGenericEnvironmentRef(
                                                 proto->getGenericEnvironment()),
-                               S.addTypeRef(proto->getSuperclass()),
                                rawAccessLevel,
                                inherited);
 
