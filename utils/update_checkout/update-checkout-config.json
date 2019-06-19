@@ -382,9 +382,9 @@
             "aliases": ["tensorflow"],
             "repos": {
                 "llvm": "swift-DEVELOPMENT-SNAPSHOT-2019-06-17-a",
-                "clang": "e8935f525f",
+                "clang": "e8935f525f9b18c206dd738030e203e618f378bb",
                 "swift": "tensorflow",
-                "lldb": "648768ac45",
+                "lldb": "648768ac451bb8af9bb10d1ff7c32e1644db27cb",
                 "cmark": "swift-DEVELOPMENT-SNAPSHOT-2019-06-17-a",
                 "llbuild": "swift-DEVELOPMENT-SNAPSHOT-2019-06-17-a",
                 "swiftpm": "swift-DEVELOPMENT-SNAPSHOT-2019-06-17-a",
