@@ -2922,6 +2922,31 @@ for host in "${ALL_HOSTS[@]}"; do
             fi
 
             call "${CMAKE_BUILD[@]}" "${build_dir}" $(cmake_config_opt ${product}) -- "${BUILD_ARGS[@]}" ${build_targets[@]}
+
+            # When we are building LLVM copy over the compiler-rt
+            # builtins for iOS/tvOS/watchOS to ensure that Swift's
+            # stdlib can use compiler-rt builtins when targetting iOS/tvOS/watchOS.
+            if [[ "${product}" == "llvm" ]]; then
+                if [[ "$(uname -s)" == "Darwin" ]] ; then
+                    HOST_CXX_DIR=$(dirname "${HOST_CXX}")
+                    HOST_CXX_BUILTINS_VERSION=$(ls "$HOST_CXX_DIR/../lib/clang" | awk '{print $0}')
+                    HOST_CXX_BUILTINS_DIR="$HOST_CXX_DIR/../lib/clang/$HOST_CXX_BUILTINS_VERSION/lib/darwin"
+                    DEST_CXX_BUILTINS_VERSION=$(ls "$llvm_build_dir/lib/clang" | awk '{print $0}')
+                    DEST_BUILTINS_DIR="$llvm_build_dir/lib/clang/$DEST_CXX_BUILTINS_VERSION/lib/darwin"
+
+                    echo "copying compiler-rt embedded builtins into the local clang build directory $DEST_BUILTINS_DIR."
+
+                    if [ -f "$HOST_CXX_BUILTINS_DIR/libclang_rt.ios.a" ]; then
+                        call cp "$HOST_CXX_BUILTINS_DIR/libclang_rt.ios.a" "$DEST_BUILTINS_DIR/libclang_rt.ios.a"
+                    fi
+                    if [ -f "$HOST_CXX_BUILTINS_DIR/libclang_rt.watchos.a" ]; then
+                        call cp "$HOST_CXX_BUILTINS_DIR/libclang_rt.watchos.a" "$DEST_BUILTINS_DIR/libclang_rt.watchos.a"
+                    fi
+                    if [ -f "$HOST_CXX_BUILTINS_DIR/libclang_rt.tvos.a" ]; then
+                        call cp "$HOST_CXX_BUILTINS_DIR/libclang_rt.tvos.a" "$DEST_BUILTINS_DIR/libclang_rt.tvos.a"
+                    fi
+                fi
+            fi
         fi
     done
 done
