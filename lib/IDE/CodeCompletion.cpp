@@ -5381,9 +5381,11 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   case CompletionKind::AttributeBegin: {
     Lookup.getAttributeDeclCompletions(IsInSil, AttTargetDK);
 
-    // Provide any type name for property delegate.
+    // TypeName at attribute position after '@'.
+    // - VarDecl: Property Wrappers.
+    // - ParamDecl/VarDecl/FuncDecl: Function Buildres.
     if (!AttTargetDK || *AttTargetDK == DeclKind::Var ||
-        *AttTargetDK == DeclKind::Param)
+        *AttTargetDK == DeclKind::Param || *AttTargetDK == DeclKind::Func)
       Lookup.getTypeCompletionsInDeclContext(
           P.Context.SourceMgr.getCodeCompletionLoc());
     break;
