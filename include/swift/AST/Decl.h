@@ -2837,6 +2837,11 @@ public:
   
   ValueDecl *getNamingDecl() const { return NamingDecl; }
   
+  void setNamingDecl(ValueDecl *D) {
+    assert(!NamingDecl && "already have naming decl");
+    NamingDecl = D;
+  }
+  
   GenericSignature *getOpaqueInterfaceGenericSignature() const {
     return OpaqueInterfaceGenericSignature;
   }
