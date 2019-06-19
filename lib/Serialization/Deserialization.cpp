@@ -1628,7 +1628,12 @@ giveUpFastPath:
             return nullptr;
           }
           values.front() = storage->getAccessor(*actualKind);
-          assert(values.front() && "missing accessor");
+          if (!values.front()) {
+            return llvm::make_error<XRefError>("missing accessor",
+                                               pathTrace,
+                                               getXRefDeclNameForError());
+
+          }
         }
         break;
       }
@@ -3021,10 +3026,27 @@ public:
       }
     }
 
-    Expected<Decl *> overridden = MF.getDeclChecked(overriddenID);
-    if (!overridden) {
-      llvm::consumeError(overridden.takeError());
-      return llvm::make_error<OverrideError>(name, errorFlags);
+    Expected<Decl *> overriddenOrError = MF.getDeclChecked(overriddenID);
+    Decl *overridden;
+    if (overriddenOrError) {
+      overridden = overriddenOrError.get();
+    } else {
+      llvm::consumeError(overriddenOrError.takeError());
+      // There's one case where we know it's safe to ignore a missing override:
+      // if this declaration is '@objc' and 'dynamic'.
+      bool canIgnoreMissingOverriddenDecl = false;
+      if (isObjC && ctx.LangOpts.EnableDeserializationRecovery) {
+        canIgnoreMissingOverriddenDecl =
+            std::any_of(DeclAttributes::iterator(DAttrs),
+                        DeclAttributes::iterator(nullptr),
+                        [](const DeclAttribute *attr) -> bool {
+          return isa<DynamicAttr>(attr);
+        });
+      }
+      if (!canIgnoreMissingOverriddenDecl)
+        return llvm::make_error<OverrideError>(name, errorFlags);
+
+      overridden = nullptr;
     }
 
     for (TypeID dependencyID : dependencyIDs) {
@@ -3115,7 +3137,7 @@ public:
     if (auto bodyText = MF.maybeReadInlinableBodyText())
       fn->setBodyStringRepresentation(*bodyText);
 
-    fn->setOverriddenDecl(cast_or_null<FuncDecl>(overridden.get()));
+    fn->setOverriddenDecl(cast_or_null<FuncDecl>(overridden));
     if (fn->getOverriddenDecl())
       AddAttribute(new (ctx) OverrideAttr(SourceLoc()));
 
