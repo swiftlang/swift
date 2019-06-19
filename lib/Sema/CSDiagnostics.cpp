@@ -835,6 +835,9 @@ bool MissingExplicitConversionFailure::diagnoseAsError() {
 
   auto fromType = getType(anchor)->getRValueType();
   Type toType = resolveType(ConvertingTo);
+  if (!toType->hasTypeRepr())
+    return false;
+
   bool useAs = TC.isExplicitlyConvertibleTo(fromType, toType, DC);
   bool useAsBang = !useAs && TC.checkedCastMaySucceed(fromType, toType, DC);
   if (!useAs && !useAsBang)
