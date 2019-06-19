@@ -102,4 +102,5 @@ WARNING(clang_vfs_overlay_is_ignored,none,
 # undef NOTE
 # undef WARNING
 # undef ERROR
+# undef REMARK
 #endif
