@@ -344,31 +344,36 @@ protected:
     IsUserAccessible : 1
   );
 
-  SWIFT_INLINE_BITFIELD(AbstractStorageDecl, ValueDecl, 1+1+1+1+2+1+1+1,
-    /// Whether the getter is mutating.
-    IsGetterMutating : 1,
+  SWIFT_INLINE_BITFIELD(
+      AbstractStorageDecl, ValueDecl, 1 + 1 + 1 + 1 + 2 + 1 + 1 + 1 + 1 + 1,
+      /// Whether the getter is mutating.
+      IsGetterMutating : 1,
 
-    /// Whether the setter is mutating.
-    IsSetterMutating : 1,
+      /// Whether the setter is mutating.
+      IsSetterMutating : 1,
 
-    /// Whether this represents physical storage.
-    HasStorage : 1,
+      /// Whether this represents physical storage.
+      HasStorage : 1,
 
-    /// Whether this storage supports semantic mutation in some way.
-    SupportsMutation : 1,
+      /// Whether this storage supports semantic mutation in some way.
+      SupportsMutation : 1,
 
-    /// Whether an opaque read of this storage produces an owned value.
-    OpaqueReadOwnership : 2,
+      /// Whether an opaque read of this storage produces an owned value.
+      OpaqueReadOwnership : 2,
 
-    /// Whether a keypath component can directly reference this storage,
-    /// or if it must use the overridden declaration instead.
-    HasComputedValidKeyPathComponent : 1,
-    ValidKeyPathComponent : 1,
-    
-    /// Whether this property is a type property (currently unfortunately
-    /// called 'static').
-    IsStatic : 1
-  );
+      /// Whether a keypath component can directly reference this storage,
+      /// or if it must use the overridden declaration instead.
+      HasComputedValidKeyPathComponent : 1, ValidKeyPathComponent : 1,
+
+      /// Whether this property is a type property (currently unfortunately
+      /// called 'static').
+      IsStatic : 1,
+
+      /// Whether the getter throws
+      IsGetterThrowing : 1,
+
+      /// Whether the setter throws
+      IsSetterThrowing : 1);
 
   SWIFT_INLINE_BITFIELD(VarDecl, AbstractStorageDecl, 4+1+1+1+1+1,
     /// The specifier associated with this variable or parameter.  This
@@ -4569,6 +4574,24 @@ public:
   }
   void setIsSetterMutating(bool isMutating) {
     Bits.AbstractStorageDecl.IsSetterMutating = isMutating;
+  }
+
+  /// Return true if reading this storage requires the ability to
+  /// handle a throws.
+  bool isGetterThrowing() const {
+    return Bits.AbstractStorageDecl.IsGetterThrowing;
+  }
+  void setIsGetterThrowing(bool isThrowing) {
+    Bits.AbstractStorageDecl.IsGetterThrowing = isThrowing;
+  }
+
+  /// Return true if modifying this storage requires the ability to
+  /// handle a throws.
+  bool isSetterThrowing() const {
+    return Bits.AbstractStorageDecl.IsSetterThrowing;
+  }
+  void setIsSetterThrowing(bool isThrowing) {
+    Bits.AbstractStorageDecl.IsSetterThrowing = isThrowing;
   }
 
   AccessorDecl *getAccessor(AccessorKind kind) const {

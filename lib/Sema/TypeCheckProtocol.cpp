@@ -1219,6 +1219,33 @@ bool WitnessChecker::checkWitnessAccess(ValueDecl *requirement,
   return false;
 }
 
+/// If the getter or setter in a requirement is not marked as throws, but the
+/// witness specifies it as throws, then return true so it can be diagnosed.
+bool WitnessChecker::checkWitnessThrowingAccessor(ValueDecl *requirement,
+                                                  ValueDecl *witness) {
+  if (!isa<AbstractStorageDecl>(requirement) &&
+      !isa<AbstractStorageDecl>(witness)) {
+    return false;
+  }
+
+  auto shouldDiagnose = false;
+
+  auto reqStorageDecl = cast<AbstractStorageDecl>(requirement);
+  auto witnessStorageDecl = cast<AbstractStorageDecl>(witness);
+  
+  if (!reqStorageDecl->isGetterThrowing() && witnessStorageDecl->isGetterThrowing()) {
+    shouldDiagnose = true;
+  }
+  
+  if (requirement->isSettable(DC)) {
+    if (!reqStorageDecl->isSetterThrowing() && witnessStorageDecl->isSetterThrowing()) {
+      shouldDiagnose = true;
+    }
+  }
+
+  return shouldDiagnose;
+}
+
 bool WitnessChecker::
 checkWitnessAvailability(ValueDecl *requirement,
                          ValueDecl *witness,
@@ -1232,6 +1259,10 @@ RequirementCheck WitnessChecker::checkWitness(ValueDecl *requirement,
                                               const RequirementMatch &match) {
   if (!match.OptionalAdjustments.empty())
     return CheckKind::OptionalityConflict;
+
+  if (checkWitnessThrowingAccessor(requirement, match.Witness)) {
+    return RequirementCheck(CheckKind::ThrowingAccessor);
+  }
 
   bool isSetter = false;
   if (checkWitnessAccess(requirement, match.Witness, &isSetter)) {
@@ -3152,6 +3183,21 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
                          requirement->getFullName());
         });
       break;
+    case CheckKind::ThrowingAccessor: {
+      diagnoseOrDefer(
+          requirement, /*isError=*/true,
+          [witness, requirement](NormalProtocolConformance *conformance) {
+            auto &diags = witness->getASTContext().Diags;
+            SourceLoc diagLoc =
+                getLocForDiagnosingWitness(conformance, witness);
+            diags.diagnose(diagLoc, diag::throwable_accessor);
+            emitDeclaredHereIfNeeded(diags, diagLoc, witness);
+            diags.diagnose(requirement, diag::kind_declname_declared_here,
+                           DescriptiveDeclKind::Requirement,
+                           requirement->getFullName());
+          });
+      break;
+    }
     }
 
     if (auto *classDecl = Adoptee->getClassOrBoundGenericClass()) {

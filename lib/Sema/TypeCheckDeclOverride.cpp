@@ -1685,6 +1685,20 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     }
   }
 
+  if (auto VD = dyn_cast<VarDecl>(override)) {
+    auto baseVD = cast<VarDecl>(base);
+    if (auto overrideReadCoroutine = VD->getReadCoroutine()) {
+      if (auto baseReadCoroutine = baseVD->getReadCoroutine()) {
+        if (overrideReadCoroutine->hasThrows() &&
+            !baseReadCoroutine->hasThrows()) {
+          diags.diagnose(overrideReadCoroutine, diag::override_throws,
+                         isa<ConstructorDecl>(override));
+          diags.diagnose(baseReadCoroutine, diag::overridden_here);
+        }
+      }
+    }
+  }
+
   // The overridden declaration cannot be 'final'.
   if (base->isFinal() && !isAccessor) {
     // FIXME: Customize message to the kind of thing.

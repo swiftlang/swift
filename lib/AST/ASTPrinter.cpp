@@ -793,6 +793,7 @@ private:
   void printPatternType(const Pattern *P);
   void printAccessors(const AbstractStorageDecl *ASD);
   void printMutatingModifiersIfNeeded(const AccessorDecl *accessor);
+  void printThrowKeywordIfNeeded(const AccessorDecl *accessor);
   void printMembersOfDecl(Decl * NTD, bool needComma = false,
                           bool openBracket = true, bool closeBracket = true);
   void printMembers(ArrayRef<Decl *> members, bool needComma = false,
@@ -1741,6 +1742,13 @@ void PrintAST::printMutatingModifiersIfNeeded(const AccessorDecl *accessor) {
   }
 }
 
+void PrintAST::printThrowKeywordIfNeeded(const AccessorDecl *accessor) {
+  if (accessor->hasThrows()) {
+    Printer.printText(" ");
+    Printer.printKeyword("throws", Options);
+  }
+}
+
 void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
   if (isa<VarDecl>(ASD) && !Options.PrintPropertyAccessors)
     return;
@@ -1850,6 +1858,7 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD) {
       Printer << " ";
       printMutatingModifiersIfNeeded(Accessor);
       Printer.printKeyword(getAccessorLabel(Accessor), Options);
+      printThrowKeywordIfNeeded(Accessor);
     } else {
       {
         IndentRAII IndentMore(*this);

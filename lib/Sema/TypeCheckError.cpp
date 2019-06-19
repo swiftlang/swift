@@ -218,6 +218,14 @@ public:
       recurse = asImpl().checkApply(apply);
     } else if (auto interpolated = dyn_cast<InterpolatedStringLiteralExpr>(E)) {
       recurse = asImpl().checkInterpolatedStringLiteral(interpolated);
+    } else if (auto assignExpr = dyn_cast<AssignExpr>(E)) {
+      recurse = asImpl().checkAssignExpr(assignExpr);
+    } else if (auto memberRef = dyn_cast<MemberRefExpr>(E)) {
+      recurse = asImpl().checkMemberRefExpr(memberRef);
+    } else if (auto openExistential = dyn_cast<OpenExistentialExpr>(E)) {
+      recurse = asImpl().checkOpenExistentialExpr(openExistential);
+    } else if (auto subscript = dyn_cast<SubscriptExpr>(E)) {
+      recurse = asImpl().checkSubscriptExpr(subscript);
     }
     // Error handling validation (via checkTopLevelErrorHandling) happens after
     // type checking. If an unchecked expression is still around, the code was
@@ -608,6 +616,22 @@ private:
 
     ShouldRecurse_t checkIfConfig(IfConfigDecl *D) {
       return ShouldRecurse;
+    }
+
+    ShouldRecurse_t checkMemberRefExpr(MemberRefExpr *E) {
+      return ShouldNotRecurse;
+    }
+
+    ShouldRecurse_t checkAssignExpr(AssignExpr *E) {
+      return ShouldNotRecurse;
+    }
+        
+    ShouldRecurse_t checkOpenExistentialExpr(OpenExistentialExpr *E) {
+      return ShouldNotRecurse;
+    }
+
+    ShouldRecurse_t checkSubscriptExpr(SubscriptExpr *E) {
+      return ShouldNotRecurse;
     }
 
     ThrowingKind checkExhaustiveDoBody(DoCatchStmt *S) {
@@ -1564,6 +1588,7 @@ private:
     ContextScope scope(*this, None);
     scope.enterTry();
 
+    checkPotentiallyThrowingAccessor(E, scope, TC, E->getTryLoc());
     E->getSubExpr()->walk(*this);
 
     // Warn about 'try' expressions that weren't actually needed.
@@ -1586,6 +1611,7 @@ private:
     ContextScope scope(*this, Context::getHandled());
     scope.enterTry();
 
+    checkPotentiallyThrowingAccessor(E, scope, TC, E->getTryLoc());
     E->getSubExpr()->walk(*this);
 
     // Warn about 'try' expressions that weren't actually needed.
@@ -1600,6 +1626,7 @@ private:
     ContextScope scope(*this, Context::getHandled());
     scope.enterTry();
 
+    checkPotentiallyThrowingAccessor(E, scope, TC, E->getTryLoc());
     E->getSubExpr()->walk(*this);
 
     // Warn about 'try' expressions that weren't actually needed.
@@ -1608,6 +1635,280 @@ private:
     }
     return ShouldNotRecurse;
   }
+
+  ShouldRecurse_t checkMemberRefExpr(MemberRefExpr *E) {
+    return checkPotentiallyThrowingAccessorThrowSite(E, /*isSetter*/ false,
+                                                     /*isSubscript*/ false);
+  }
+
+  ShouldRecurse_t checkAssignExpr(AssignExpr *E) {
+    auto isSubscript = false;
+    Expr *subscriptExpr = nullptr;
+
+    if (isa<OpenExistentialExpr>(E->getDest())) {
+      auto subExpr = cast<OpenExistentialExpr>(E->getDest())->getSubExpr();
+      if (isa<SubscriptExpr>(subExpr)) {
+        subscriptExpr = cast<SubscriptExpr>(subExpr);
+        isSubscript = true;
+      }
+    } else if (isa<SubscriptExpr>(E->getDest())) {
+      subscriptExpr = cast<SubscriptExpr>(E->getDest());
+      isSubscript = true;
+    }
+    
+    auto expr = isSubscript ? subscriptExpr : E;
+    return checkPotentiallyThrowingAccessorThrowSite(expr, /*isSetter*/ true,
+                                                     isSubscript);
+  }
+  
+  ShouldRecurse_t checkOpenExistentialExpr(OpenExistentialExpr *E) {
+    auto isSubscript = isa<SubscriptExpr>(E->getSubExpr());
+    auto expr = isSubscript ? E->getSubExpr() : E;
+
+    if (!isa<AssignExpr>(expr) || !isa<MemberRefExpr>(expr) ||
+        !isa<SubscriptExpr>(expr)) {
+      return ShouldRecurse;
+    }
+
+    return checkPotentiallyThrowingAccessorThrowSite(expr, /*isSetter*/ false,
+                                                     isSubscript);
+  }
+
+  ShouldRecurse_t checkSubscriptExpr(SubscriptExpr *E) {
+    return checkPotentiallyThrowingAccessorThrowSite(E, /*isSetter*/ false,
+                                                     /*isSubscript*/ true);
+  }
+
+  ShouldRecurse_t checkPotentiallyThrowingAccessorThrowSite(Expr *E,
+                                                            bool isSetter,
+                                                            bool isSubscript) {
+    ContextScope scope(*this, None);
+    auto walker = ThrowingAccessorWalker(E, &Flags, TC, /*tryLoc*/ SourceLoc(),
+                                         /*handled*/ false);
+    auto throws = walker.checkAccessor(E, isSetter, isSubscript);
+
+    if (throws) {
+      auto classification = Classification(ThrowingKind::Throws,
+                                           PotentialReason::forThrowingApply());
+      checkThrowSite(E, /*requiresTry*/ true, classification);
+    }
+
+    return ShouldNotRecurse;
+  }
+
+  void checkPotentiallyThrowingAccessor(Expr *E, ContextScope &scope,
+                                        TypeChecker &typeChecker,
+                                        SourceLoc tryLoc) {
+    auto isTryHandled = isa<OptionalTryExpr>(E) || isa<ForceTryExpr>(E);
+    auto walker = ThrowingAccessorWalker(E, &Flags, typeChecker, tryLoc,
+                                         /*handled*/ isTryHandled);
+    E->walk(walker);
+  }
+
+  class ThrowingAccessorWalker : public ASTWalker {
+  private:
+    Expr *baseExpr;
+    ContextFlags *contextFlags;
+    TypeChecker &typeChecker;
+    SourceLoc tryLoc;
+    bool isTryHandled;
+
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      if (isa<AssignExpr>(E)) {
+        auto AE = cast<AssignExpr>(E);
+        if (auto SE = dyn_cast<SubscriptExpr>(AE->getDest())) {
+          return {checkSubscript(SE, contextFlags, typeChecker, tryLoc,
+                                 isTryHandled, true),
+                  nullptr};
+        }
+        if (auto OEE = dyn_cast<OpenExistentialExpr>(AE->getDest())) {
+          if (isa<SubscriptExpr>(OEE->getSubExpr())) {
+            return {checkSubscript(cast<SubscriptExpr>(OEE->getSubExpr()),
+                                   contextFlags, typeChecker, tryLoc,
+                                   isTryHandled, true),
+                    nullptr};
+          }
+        }
+
+        return {checkComputedPropertySetter(AE, contextFlags, typeChecker,
+                                            tryLoc, isTryHandled),
+                nullptr};
+      }
+      if (isa<MemberRefExpr>(E)) {
+        return {checkComputedPropertyGetter(cast<MemberRefExpr>(E),
+                                            contextFlags, typeChecker, tryLoc,
+                                            isTryHandled),
+                nullptr};
+      }
+      if (isa<SubscriptExpr>(E)) {
+        return {checkSubscript(cast<SubscriptExpr>(E), contextFlags,
+                               typeChecker, tryLoc, isTryHandled, false),
+                nullptr};
+      }
+      return {true, E};
+    }
+
+    bool checkComputedPropertySetter(AssignExpr *E, ContextFlags *flags,
+                                     TypeChecker &typeChecker, SourceLoc tryLoc,
+                                     bool isTryHandled) {
+
+      Expr *expr = E;
+
+      if (isa<OpenExistentialExpr>(E->getDest())) {
+        expr = cast<OpenExistentialExpr>(E->getDest())->getSubExpr();
+      } else {
+        expr = E->getDest();
+      }
+
+      if (!isa<MemberRefExpr>(expr)) {
+        return false;
+      }
+
+      auto *dest = cast<MemberRefExpr>(expr);
+
+      // If we're not accessing the getter or setter, then return
+      if (!(hasOrdinaryAccessSemantics(dest->getAccessSemantics()))) {
+        return false;
+      }
+
+      auto *decl = dest->getDecl().getDecl();
+
+      assert(decl && "Computed property does not have a decl?");
+
+      auto *variable = cast<VarDecl>(decl);
+
+      if (variable->getAccessor(AccessorKind::Set)->hasThrows()) {
+        flags->set(ContextFlags::HasTryThrowSite);
+        flags->set(ContextFlags::HasAnyThrowSite);
+
+        auto walker =
+            ThrowingAccessorChecker(typeChecker, tryLoc, isTryHandled);
+        baseExpr->walk(walker);
+        return true;
+      }
+
+      return false;
+    }
+
+    bool checkComputedPropertyGetter(MemberRefExpr *E, ContextFlags *flags,
+                                     TypeChecker &typeChecker, SourceLoc tryLoc,
+                                     bool isTryHandled) {
+
+      // If we're not accessing the getter or setter, then return
+      if (!(hasOrdinaryAccessSemantics(E->getAccessSemantics()))) {
+        return false;
+      }
+
+      auto *decl = E->getDecl().getDecl();
+
+      assert(decl && "Computed property does not have a decl?");
+
+      auto *variable = cast<VarDecl>(decl);
+
+      if (variable->getAccessor(AccessorKind::Get)->hasThrows()) {
+        flags->set(ContextFlags::HasTryThrowSite);
+        flags->set(ContextFlags::HasAnyThrowSite);
+
+        auto walker =
+            ThrowingAccessorChecker(typeChecker, tryLoc, isTryHandled);
+        baseExpr->walk(walker);
+
+        return true;
+      }
+
+      return false;
+    }
+
+    bool checkSubscript(SubscriptExpr *E, ContextFlags *flags,
+                        TypeChecker &typeChecker, SourceLoc tryLoc,
+                        bool isTryHandled, bool isSetter) {
+
+      // If we're not accessing the getter or setter, then return
+      if (!(hasOrdinaryAccessSemantics(E->getAccessSemantics()))) {
+        return false;
+      }
+
+      auto *decl = E->getMember().getDecl();
+
+      assert(decl && "Subscript does not have a decl?");
+
+      auto *subscriptDecl = cast<SubscriptDecl>(E->getMember().getDecl());
+
+      if (subscriptDecl
+              ->getAccessor(isSetter ? AccessorKind::Set : AccessorKind::Get)
+              ->hasThrows()) {
+        flags->set(ContextFlags::HasTryThrowSite);
+        flags->set(ContextFlags::HasAnyThrowSite);
+
+        auto walker =
+            ThrowingAccessorChecker(typeChecker, tryLoc, isTryHandled);
+        baseExpr->walk(walker);
+
+        return true;
+      }
+
+      return false;
+    }
+
+    bool hasOrdinaryAccessSemantics(const AccessSemantics &semantics) {
+      if (semantics == AccessSemantics::DirectToImplementation ||
+          semantics == AccessSemantics::DirectToStorage) {
+        return false;
+      }
+      return true;
+    }
+
+  public:
+    ThrowingAccessorWalker(Expr *expr, ContextFlags *flags, TypeChecker &tc,
+                           SourceLoc loc, bool handled = false)
+        : baseExpr(expr), contextFlags(flags), typeChecker(tc), tryLoc(loc),
+          isTryHandled(handled) {}
+
+    bool checkAccessor(Expr *E, bool isSetter, bool isSubscript) {
+      if (isSubscript && E && isa<SubscriptExpr>(E))
+        return checkSubscript(cast<SubscriptExpr>(E), contextFlags, typeChecker,
+                              tryLoc, isTryHandled, isSetter);
+
+      if (isSetter && E && (isa<AssignExpr>(E))) {
+        return checkComputedPropertySetter(cast<AssignExpr>(E), contextFlags,
+                                           typeChecker, tryLoc, isTryHandled);
+      } else if (E && isa<MemberRefExpr>(E)) {
+        return checkComputedPropertyGetter(cast<MemberRefExpr>(E), contextFlags,
+                                           typeChecker, tryLoc, isTryHandled);
+      }
+
+      return false;
+    }
+  };
+
+  class ThrowingAccessorChecker : public ASTWalker {
+    TypeChecker &typeChecker;
+    SourceLoc tryLoc;
+    bool isTryHandled;
+
+  private:
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      if (isa<DeclRefExpr>(E)) {
+        auto decl = cast<DeclRefExpr>(E)->getDecl();
+        auto ctx = decl->getDeclContext()->getLocalContext();
+
+        if (auto AFD = dyn_cast_or_null<AbstractFunctionDecl>(ctx)) {
+          if (!AFD->hasThrows() && !isTryHandled && tryLoc.isValid()) {
+            typeChecker.diagnose(tryLoc, diag::throw_in_nonthrowing_function);
+          }
+        }
+
+        return {false, nullptr};
+      }
+
+      return {true, E};
+    }
+
+  public:
+    ThrowingAccessorChecker(TypeChecker &tc, SourceLoc loc,
+                            bool handled = false)
+        : typeChecker(tc), tryLoc(loc), isTryHandled(handled) {}
+  };
 };
 
 } // end anonymous namespace

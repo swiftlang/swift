@@ -1990,6 +1990,8 @@ WARNING(redundant_conformance_adhoc_conditional,none,
 NOTE(redundant_conformance_witness_ignored,none,
      "%0 %1 will not be used to satisfy the conformance to %2",
      (DescriptiveDeclKind, DeclName, DeclName))
+ERROR(throwable_accessor,none,
+"cannot satisfy the requirement of a non-throwing accessor with a throwing one", ())
 
 // "Near matches"
 WARNING(req_near_match,none,

@@ -1998,6 +1998,11 @@ static bool validateAccessorIsMutating(TypeChecker &TC, FuncDecl *accessor) {
   return accessor->isMutating();
 }
 
+static bool validateAccessorIsThrowing(FuncDecl *accessor) {
+  assert(accessor && "accessor not present!");
+  return accessor->hasThrows();
+}
+
 static bool computeIsGetterMutating(TypeChecker &TC,
                                     AbstractStorageDecl *storage) {
   // 'lazy' overrides the normal accessor-based rules and heavily
@@ -2037,6 +2042,26 @@ static bool computeIsGetterMutating(TypeChecker &TC,
 
   case ReadImplKind::Read:
     return validateAccessorIsMutating(TC, storage->getReadCoroutine());
+  }
+
+  llvm_unreachable("bad impl kind");
+}
+
+static bool computeIsGetterThrowing(AbstractStorageDecl *storage) {
+
+  switch (storage->getReadImpl()) {
+  case ReadImplKind::Stored:
+    return false;
+
+  case ReadImplKind::Get:
+  case ReadImplKind::Inherited:
+    return validateAccessorIsThrowing(storage->getGetter());
+
+  case ReadImplKind::Address:
+    return validateAccessorIsThrowing(storage->getAddressor());
+
+  case ReadImplKind::Read:
+    return validateAccessorIsThrowing(storage->getReadCoroutine());
   }
 
   llvm_unreachable("bad impl kind");
@@ -2106,6 +2131,28 @@ static bool computeIsSetterMutating(TypeChecker &TC,
   llvm_unreachable("bad storage kind");
 }
 
+static bool computeIsSetterThrowing(AbstractStorageDecl *storage) {
+
+  switch (storage->getWriteImpl()) {
+  case WriteImplKind::Immutable:
+  case WriteImplKind::Stored:
+    return false;
+
+  case WriteImplKind::StoredWithObservers:
+  case WriteImplKind::InheritedWithObservers:
+  case WriteImplKind::Set:
+    return validateAccessorIsThrowing(storage->getSetter());
+
+  case WriteImplKind::MutableAddress:
+    return validateAccessorIsThrowing(storage->getMutableAddressor());
+
+  case WriteImplKind::Modify:
+    return validateAccessorIsThrowing(storage->getModifyCoroutine());
+  }
+
+  llvm_unreachable("bad impl kind");
+}
+
 static bool shouldUseOpaqueReadAccessor(TypeChecker &TC,
                                         AbstractStorageDecl *storage) {
   return storage->getAttrs().hasAttribute<BorrowedAttr>();
@@ -2126,6 +2173,11 @@ static void validateAbstractStorageDecl(TypeChecker &TC,
   // of a storage declaration and need to be validated immediately.
   storage->setIsGetterMutating(computeIsGetterMutating(TC, storage));
   storage->setIsSetterMutating(computeIsSetterMutating(TC, storage));
+
+  // isGetterThrowing and isSetterThrowing are part of the signature
+  // of a storage declaration and need to be validated immediately.
+  storage->setIsGetterThrowing(computeIsGetterThrowing(storage));
+  storage->setIsSetterThrowing(computeIsSetterThrowing(storage));
 
   // Everything else about the accessors can wait until finalization.
   // This will validate all the accessors.

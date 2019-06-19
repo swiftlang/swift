@@ -4103,16 +4103,12 @@ ParserResult<TypeDecl> Parser::parseDeclAssociatedType(Parser::ParseDeclOptions 
 
 /// This function creates an accessor function (with no body) for a computed
 /// property or subscript.
-static AccessorDecl *createAccessorFunc(SourceLoc DeclLoc,
-                                    ParameterList *param,
-                                    GenericParamList *GenericParams,
-                                    ParameterList *Indices,
-                                    TypeLoc ElementTy,
-                                    SourceLoc StaticLoc,
-                                    Parser::ParseDeclOptions Flags,
-                                    AccessorKind Kind,
-                                    AbstractStorageDecl *storage,
-                                    Parser *P, SourceLoc AccessorKeywordLoc) {
+static AccessorDecl *createAccessorFunc(
+    SourceLoc DeclLoc, ParameterList *param, GenericParamList *GenericParams,
+    ParameterList *Indices, TypeLoc ElementTy, SourceLoc StaticLoc,
+    Parser::ParseDeclOptions Flags, AccessorKind Kind,
+    AbstractStorageDecl *storage, Parser *P, SourceLoc AccessorKeywordLoc,
+    bool throws = false, SourceLoc throwsLoc = SourceLoc()) {
   // First task, set up the value argument list.  This is the "newValue" name
   // (for setters) followed by the index list (for subscripts).  For
   // non-subscript getters, this degenerates down to "()".
@@ -4172,17 +4168,13 @@ static AccessorDecl *createAccessorFunc(SourceLoc DeclLoc,
   TypeLoc ReturnType;
 
   // Start the function.
-  auto *D = AccessorDecl::create(P->Context,
-                                 /*FIXME FuncLoc=*/DeclLoc,
-                                 AccessorKeywordLoc,
-                                 Kind, storage,
-                                 StaticLoc, StaticSpellingKind::None,
-                                 /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-                                 (GenericParams
-                                  ? GenericParams->clone(P->CurDeclContext)
-                                  : nullptr),
-                                 ValueArg, ReturnType,
-                                 P->CurDeclContext);
+  auto *D = AccessorDecl::create(
+      P->Context,
+      /*FIXME FuncLoc=*/DeclLoc, AccessorKeywordLoc, Kind, storage, StaticLoc,
+      StaticSpellingKind::None,
+      /*Throws=*/throws, /*ThrowsLoc=*/throwsLoc,
+      (GenericParams ? GenericParams->clone(P->CurDeclContext) : nullptr),
+      ValueArg, ReturnType, P->CurDeclContext);
 
   // Non-static set/willSet/didSet/mutableAddress default to mutating.
   // get/address default to non-mutating.
@@ -4580,6 +4572,9 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags,
       continue;
     }
 
+    SourceLoc throwsLoc;
+    bool throws = consumeIf(tok::kw_throws, throwsLoc);
+
     // 'set' and 'willSet' can have an optional name.  This isn't valid in a
     // protocol, but we parse and then reject it for better QoI.
     //
@@ -4591,9 +4586,10 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags,
         parseOptionalAccessorArgument(Loc, *this, Kind, ElementTy);
 
     // Set up a function declaration.
-    auto accessor = createAccessorFunc(Loc, ValueNamePattern, GenericParams,
-                                       Indices, ElementTy, StaticLoc, Flags,
-                                       Kind, storage, this, Loc);
+    auto accessor = createAccessorFunc(
+        Loc, ValueNamePattern, GenericParams, Indices, ElementTy, StaticLoc,
+        Flags, Kind, storage, this, Loc, throws,
+        throwsLoc.isValid() ? throwsLoc : SourceLoc());
     accessor->getAttrs() = Attributes;
 
     // Collect this accessor and detect conflicts.
