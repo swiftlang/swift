@@ -67,6 +67,31 @@ func slope2(_ x: Float) -> Float {
   return 2 * x
 }
 
+@differentiable(wrt: y) // ok
+func two(x: Float, y: Float) -> Float {
+  return x + y
+}
+
+@differentiable(wrt: (x, y)) // ok
+func two(x: Float, y: Float) -> Float {
+  return x + y
+}
+
+@differentiable(wrt: (0, y)) // ok
+func two(x: Float, y: Float) -> Float {
+  return x + y
+}
+
+@differentiable(wrt: (x, 1)) // ok
+func two(x: Float, y: Float) -> Float {
+  return x + y
+}
+
+@differentiable(wrt: (0, 1)) // ok
+func two(x: Float, y: Float) -> Float {
+  return x + y
+}
+
 /// Bad
 
 @differentiable(3) // expected-error {{expected either 'wrt:' or a function specifier label, e.g. 'jvp:', or 'vjp:'}}
@@ -97,6 +122,21 @@ func bar(_ x: Float, _: Float) -> Float {
 @differentiable(wrt: x, y) // expected-error {{expected either 'wrt:' or a function specifier label, e.g. 'jvp:', or 'vjp:'}}
 func bar(_ x: Float, _ y: Float) -> Float {
   return 1 + x
+}
+
+@differentiable(wrt: 0, 1) // expected-error {{expected either 'wrt:' or a function specifier label, e.g. 'jvp:', or 'vjp:'}}
+func two(x: Float, y: Float) -> Float {
+  return x + y
+}
+
+@differentiable(wrt: 0, y) // expected-error {{expected either 'wrt:' or a function specifier label, e.g. 'jvp:', or 'vjp:'}}
+func two(x: Float, y: Float) -> Float {
+  return x + y
+}
+
+@differentiable(wrt: 0,) // expected-error {{expected either 'wrt:' or a function specifier label, e.g. 'jvp:', or 'vjp:'}}
+func two(x: Float, y: Float) -> Float {
+  return x + y
 }
 
 @differentiable(vjp: foo(_:_:) // expected-error {{expected ')' in 'differentiable' attribute}}
