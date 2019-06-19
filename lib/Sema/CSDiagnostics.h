@@ -795,14 +795,20 @@ public:
 };
 
 class MissingPropertyWrapperUnwrapFailure final : public ContextualFailure {
+  DeclName PropertyName;
 
 public:
   MissingPropertyWrapperUnwrapFailure(Expr *root, ConstraintSystem &cs,
+                                      DeclName propertyName,
                                       Type base, Type wrapper,
                                       ConstraintLocator *locator)
-      : ContextualFailure(root, cs, base, wrapper, locator) {}
+      : ContextualFailure(root, cs, base, wrapper, locator),
+        PropertyName(propertyName) {}
 
   bool diagnoseAsError() override;
+
+private:
+  DeclName getPropertyName() const { return PropertyName; }
 };
 
 class SubscriptMisuseFailure final : public FailureDiagnostic {

@@ -4780,36 +4780,23 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
     if (auto dotExpr =
             dyn_cast_or_null<UnresolvedDotExpr>(locator->getAnchor())) {
       auto baseExpr = dotExpr->getBase();
-      auto resolvedOverload = getResolvedOverloadSets();
-      while (resolvedOverload) {
-        if (resolvedOverload->Locator->getAnchor() == baseExpr)
-          break;
-        resolvedOverload = resolvedOverload->Previous;
-      }
+      auto resolvedOverload = findSelectedOverloadFor(baseExpr);
 
-      if (resolvedOverload && resolvedOverload->Choice.isDecl()) {
-        if (auto *decl =
-                dyn_cast<VarDecl>(resolvedOverload->Choice.getDecl())) {
-          if (decl->hasAttachedPropertyWrapper()) {
-            auto rawWrapperTy = decl->getAttachedPropertyWrapperType(0);
-            auto wrapperTy =
-                openUnboundGenericType(rawWrapperTy, resolvedOverload->Locator);
-            auto wrappedInfo = decl->getAttachedPropertyWrapperTypeInfo(0);
-            auto valueTy = wrapperTy->getTypeOfMember(
-                useDC->getParentModule(), wrappedInfo.valueVar,
-                wrappedInfo.valueVar->getValueInterfaceType());
-            if (!valueTy->hasError()) {
-              addConstraint(ConstraintKind::Equal, valueTy, baseTy,
-                            resolvedOverload->Locator);
+      auto wrapperTypes = getPropertyWrapperTypesFor(resolvedOverload, useDC);
+      if (wrapperTypes) {
+        auto wrapperTy = wrapperTypes->first;
+        auto valueTy = wrapperTypes->second;
+        if (!valueTy->hasError()) {
+          addConstraint(ConstraintKind::Equal, valueTy, baseTy,
+                        resolvedOverload->Locator);
 
-              auto result = solveWithNewBaseOrName(wrapperTy, member);
-              if (result == SolutionKind::Solved) {
-                auto *fix = InsertPropertyWrapperUnwrap::create(
-                    *this, baseTy, wrapperTy, locator);
-                return recordFix(fix) ? SolutionKind::Error
-                                      : SolutionKind::Solved;
-              }
-            }
+          auto result = solveWithNewBaseOrName(wrapperTy, member);
+          if (result == SolutionKind::Solved) {
+            auto *fix = InsertPropertyWrapperUnwrap::create(
+                *this, resolvedOverload->Choice.getDecl()->getFullName(),
+                baseTy, wrapperTy, locator);
+            return recordFix(fix) ? SolutionKind::Error
+                                  : SolutionKind::Solved;
           }
         }
       }

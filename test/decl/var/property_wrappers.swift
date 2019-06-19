@@ -892,6 +892,6 @@ struct MissingPropertyWrapperUnwrap {
   @Foo var x: Int
 
   func baz() {
-    self.x.foo() // expected-error {{wrapped value of type 'Int' must be unwraped to value of type 'Foo<Int>'}}{{10-10=$}}
+    self.x.foo() // expected-error {{property 'x' will be unwrapped to value of type 'Int', use '$' to refer to the 'Foo<Int>' property wrapper}}{{10-10=$}}
   }
 }

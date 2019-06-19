@@ -34,6 +34,7 @@
 #include "swift/AST/TypeCheckerDebugConsumer.h"
 #include "llvm/ADT/ilist.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "llvm/ADT/SetOperations.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -1561,6 +1562,16 @@ public:
     return resolvedOverloadSets;
   }
 
+  ResolvedOverloadSetListItem *findSelectedOverloadFor(Expr *expr) const {
+    auto resolvedOverload = getResolvedOverloadSets();
+    while (resolvedOverload) {
+      if (resolvedOverload->Locator->getAnchor() == expr)
+        return resolvedOverload;
+      resolvedOverload = resolvedOverload->Previous;
+    }
+    return nullptr;
+  }
+
 private:
   unsigned assignTypeVariableID() {
     return TypeCounter++;
@@ -2242,6 +2253,32 @@ public:
   /// this type variable.
   TypeVariableType *getRepresentative(TypeVariableType *typeVar) {
     return typeVar->getImpl().getRepresentative(getSavedBindings());
+  }
+
+  /// Gets the type of the property wrapper attached to the declaration
+  /// in the given resolved overload if there is one, and the property
+  /// wrapper's value type.
+  ///
+  /// \return A pair of the property wrapper's type, and the property wrapper's
+  /// value's type if the overload has a property wrapper.
+  Optional<std::pair<Type, Type>>
+  getPropertyWrapperTypesFor(ResolvedOverloadSetListItem *resolvedOverload,
+                             DeclContext *useDC) {
+    if (resolvedOverload && resolvedOverload->Choice.isDecl()) {
+      if (auto *decl =
+              dyn_cast<VarDecl>(resolvedOverload->Choice.getDecl())) {
+        if (decl->hasAttachedPropertyWrapper()) {
+          auto rawWrapperTy = decl->getAttachedPropertyWrapperType(0);
+          auto wrapperTy = openUnboundGenericType(rawWrapperTy, resolvedOverload->Locator);
+          auto wrappedInfo = decl->getAttachedPropertyWrapperTypeInfo(0);
+          auto valueTy = wrapperTy->getTypeOfMember(
+              useDC->getParentModule(), wrappedInfo.valueVar,
+              wrappedInfo.valueVar->getValueInterfaceType());
+          return std::make_pair(wrapperTy, valueTy);
+        }
+      }
+    }
+    return None;
   }
 
   /// Merge the equivalence sets of the two type variables.

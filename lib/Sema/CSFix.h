@@ -630,25 +630,29 @@ public:
 };
 
 class InsertPropertyWrapperUnwrap final : public ConstraintFix {
+  DeclName PropertyName;
   Type Base;
   Type Wrapper;
 
-  InsertPropertyWrapperUnwrap(ConstraintSystem &cs, Type base, Type wrapper,
+  InsertPropertyWrapperUnwrap(ConstraintSystem &cs, DeclName propertyName,
+                              Type base, Type wrapper,
                               ConstraintLocator *locator)
       : ConstraintFix(cs, FixKind::InsertPropertyWrapperUnwrap, locator),
-        Base(base), Wrapper(wrapper) {}
+        PropertyName(propertyName), Base(base), Wrapper(wrapper) {}
 
 public:
   std::string getName() const override {
     return "insert a $ to unwrap the property wrapper";
   }
 
+  DeclName getPropertyName() const { return PropertyName; }
   Type getBase() const { return Base; }
   Type getWrapper() const { return Wrapper; }
 
   bool diagnose(Expr *root, bool asNote = false) const override;
 
   static InsertPropertyWrapperUnwrap *create(ConstraintSystem &cs,
+                                             DeclName propertyName,
                                              Type base, Type wrapper,
                                              ConstraintLocator *locator);
 };

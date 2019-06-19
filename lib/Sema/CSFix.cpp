@@ -279,17 +279,18 @@ InsertExplicitCall *InsertExplicitCall::create(ConstraintSystem &cs,
 
 bool InsertPropertyWrapperUnwrap::diagnose(Expr *root, bool asNote) const {
   auto failure = MissingPropertyWrapperUnwrapFailure(
-      root, getConstraintSystem(), getBase(), getWrapper(),
+      root, getConstraintSystem(), getPropertyName(), getBase(), getWrapper(),
       getLocator());
   return failure.diagnose(asNote);
 }
 
 InsertPropertyWrapperUnwrap *
 InsertPropertyWrapperUnwrap::create(ConstraintSystem &cs,
+                                    DeclName propertyName,
                                     Type base, Type wrapper,
                                     ConstraintLocator *locator) {
   return new (cs.getAllocator())
-      InsertPropertyWrapperUnwrap(cs, base, wrapper, locator);
+      InsertPropertyWrapperUnwrap(cs, propertyName, base, wrapper, locator);
 }
 
 bool UseSubscriptOperator::diagnose(Expr *root, bool asNote) const {
