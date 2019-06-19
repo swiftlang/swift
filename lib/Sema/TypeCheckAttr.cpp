@@ -776,7 +776,6 @@ public:
     IGNORED_ATTR(IBDesignable)
     IGNORED_ATTR(IBInspectable)
     IGNORED_ATTR(IBOutlet) // checked early.
-    IGNORED_ATTR(ImplementationOnly)
     IGNORED_ATTR(ImplicitlyUnwrappedOptional)
     IGNORED_ATTR(Indirect)
     IGNORED_ATTR(Inline)
@@ -862,6 +861,8 @@ public:
   void visitCustomAttr(CustomAttr *attr);
   void visitPropertyWrapperAttr(PropertyWrapperAttr *attr);
   void visitFunctionBuilderAttr(FunctionBuilderAttr *attr);
+
+  void visitImplementationOnlyAttr(ImplementationOnlyAttr *attr);
 };
 } // end anonymous namespace
 
@@ -2631,6 +2632,69 @@ void AttributeChecker::visitPropertyWrapperAttr(PropertyWrapperAttr *attr) {
 void AttributeChecker::visitFunctionBuilderAttr(FunctionBuilderAttr *attr) {
   // TODO: check that the type at least provides a `sequence` factory?
   // Any other validation?
+}
+
+void
+AttributeChecker::visitImplementationOnlyAttr(ImplementationOnlyAttr *attr) {
+  if (isa<ImportDecl>(D)) {
+    // These are handled elsewhere.
+    return;
+  }
+
+  auto *VD = cast<ValueDecl>(D);
+  auto *overridden = VD->getOverriddenDecl();
+  if (!overridden) {
+    diagnoseAndRemoveAttr(attr, diag::implementation_only_decl_non_override);
+    return;
+  }
+
+  // Check if VD has the exact same type as what it overrides.
+  // Note: This is specifically not using `swift::getMemberTypeForComparison`
+  // because that erases more information than we want, like `throws`-ness.
+  auto baseInterfaceTy = overridden->getInterfaceType();
+  auto derivedInterfaceTy = VD->getInterfaceType();
+
+  auto selfInterfaceTy = VD->getDeclContext()->getDeclaredInterfaceType();
+
+  auto overrideInterfaceTy =
+      selfInterfaceTy->adjustSuperclassMemberDeclType(overridden, VD,
+                                                      baseInterfaceTy);
+
+  if (isa<AbstractFunctionDecl>(VD)) {
+    // Drop the 'Self' parameter.
+    // FIXME: The real effect here, though, is dropping the generic signature.
+    // This should be okay because it should already be checked as part of
+    // making an override, but that isn't actually the case as of this writing,
+    // and it's kind of suspect anyway.
+    derivedInterfaceTy =
+        derivedInterfaceTy->castTo<AnyFunctionType>()->getResult();
+    overrideInterfaceTy =
+        overrideInterfaceTy->castTo<AnyFunctionType>()->getResult();
+  } else if (isa<SubscriptDecl>(VD)) {
+    // For subscripts, we don't have a 'Self' type, but turn it
+    // into a monomorphic function type.
+    // FIXME: does this actually make sense, though?
+    auto derivedInterfaceFuncTy = derivedInterfaceTy->castTo<AnyFunctionType>();
+    derivedInterfaceTy =
+        FunctionType::get(derivedInterfaceFuncTy->getParams(),
+                          derivedInterfaceFuncTy->getResult());
+    auto overrideInterfaceFuncTy =
+        overrideInterfaceTy->castTo<AnyFunctionType>();
+    overrideInterfaceTy =
+        FunctionType::get(overrideInterfaceFuncTy->getParams(),
+                          overrideInterfaceFuncTy->getResult());
+  }
+
+  if (!derivedInterfaceTy->isEqual(overrideInterfaceTy)) {
+    TC.diagnose(VD, diag::implementation_only_override_changed_type,
+                overrideInterfaceTy);
+    TC.diagnose(overridden, diag::overridden_here);
+    return;
+  }
+
+  // FIXME: When compiling without library evolution enabled, this should also
+  // check whether VD or any of its accessors need a new vtable entry, even if
+  // it won't necessarily be able to say why.
 }
 
 void TypeChecker::checkParameterAttributes(ParameterList *params) {
