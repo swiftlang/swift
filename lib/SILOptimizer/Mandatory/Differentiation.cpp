@@ -3063,6 +3063,9 @@ private:
     auto *projectBox = builder.createProjectBox(loc, allocBox, /*index*/ 0);
     builder.createStore(loc, pbStructVal, projectBox,
                         getBufferSOQ(projectBox->getType().getASTType(), *vjp));
+    // NOTE(TF-585): `fix_lifetime` is generated to avoid AllocBoxToStack crash
+    // for nested loop AD.
+    builder.createFixLifetime(loc, allocBox);
     return builder.createEnum(loc, allocBox, enumEltDecl, enumLoweredTy);
   }
 
