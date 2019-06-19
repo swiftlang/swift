@@ -4782,22 +4782,23 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       auto baseExpr = dotExpr->getBase();
       auto resolvedOverload = findSelectedOverloadFor(baseExpr);
 
-      auto wrapperTypes = getPropertyWrapperTypesFor(resolvedOverload, useDC);
-      if (wrapperTypes) {
-        auto wrapperTy = wrapperTypes->first;
-        auto valueTy = wrapperTypes->second;
-        if (!valueTy->hasError()) {
-          addConstraint(ConstraintKind::Equal, valueTy, baseTy,
-                        resolvedOverload->Locator);
+      auto wrappedProperty = getPropertyWrapperInformation(resolvedOverload);
+      if (wrappedProperty) {
+        auto wrapperTy = wrappedProperty->second->castTo<UnboundGenericType>();
 
-          auto result = solveWithNewBaseOrName(wrapperTy, member);
-          if (result == SolutionKind::Solved) {
-            auto *fix = InsertPropertyWrapperUnwrap::create(
-                *this, resolvedOverload->Choice.getDecl()->getFullName(),
-                baseTy, wrapperTy, locator);
-            return recordFix(fix) ? SolutionKind::Error
+        llvm::SmallVector<Type, 4> genericArgs;
+        genericArgs.push_back(baseTy);
+        auto newBase = BoundGenericType::get(
+            dyn_cast<NominalTypeDecl>(wrapperTy->getDecl()),
+            Type(), genericArgs);
+
+        auto result = solveWithNewBaseOrName(newBase, member);
+        if (result == SolutionKind::Solved) {
+          auto *fix = InsertPropertyWrapperUnwrap::create(
+              *this, resolvedOverload->Choice.getDecl()->getFullName(),
+              baseTy, newBase, locator);
+          return recordFix(fix) ? SolutionKind::Error
                                   : SolutionKind::Solved;
-          }
         }
       }
     }

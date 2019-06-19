@@ -2255,26 +2255,19 @@ public:
     return typeVar->getImpl().getRepresentative(getSavedBindings());
   }
 
-  /// Gets the type of the property wrapper attached to the declaration
-  /// in the given resolved overload if there is one, and the property
-  /// wrapper's value type.
+  /// Gets the a VarDecl, and the type of its attached property wrapper if the
+  /// resolved overload has an attached property wrapper.
   ///
-  /// \return A pair of the property wrapper's type, and the property wrapper's
-  /// value's type if the overload has a property wrapper.
-  Optional<std::pair<Type, Type>>
-  getPropertyWrapperTypesFor(ResolvedOverloadSetListItem *resolvedOverload,
-                             DeclContext *useDC) {
+  /// \return A pair of the VarDecl and the attached property wrapper type if
+  ///         the given resolved overload has an attached property wrapper.
+  Optional<std::pair<VarDecl *, Type>>
+  getPropertyWrapperInformation(ResolvedOverloadSetListItem *resolvedOverload) {
     if (resolvedOverload && resolvedOverload->Choice.isDecl()) {
       if (auto *decl =
               dyn_cast<VarDecl>(resolvedOverload->Choice.getDecl())) {
         if (decl->hasAttachedPropertyWrapper()) {
           auto rawWrapperTy = decl->getAttachedPropertyWrapperType(0);
-          auto wrapperTy = openUnboundGenericType(rawWrapperTy, resolvedOverload->Locator);
-          auto wrappedInfo = decl->getAttachedPropertyWrapperTypeInfo(0);
-          auto valueTy = wrapperTy->getTypeOfMember(
-              useDC->getParentModule(), wrappedInfo.valueVar,
-              wrappedInfo.valueVar->getValueInterfaceType());
-          return std::make_pair(wrapperTy, valueTy);
+          return std::make_pair(decl, rawWrapperTy);
         }
       }
     }
