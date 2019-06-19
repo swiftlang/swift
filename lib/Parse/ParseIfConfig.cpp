@@ -584,6 +584,12 @@ ParserResult<IfConfigDecl> Parser::parseIfConfig(
   Parser::StructureMarkerRAII ParsingDecl(
       *this, Tok.getLoc(), Parser::StructureMarkerKind::IfConfig);
 
+  bool shouldEvaluate =
+      // Don't evaluate if it's in '-parse' mode, etc.
+      State->PerformConditionEvaluation &&
+      // If it's in inactive #if ... #endif block, there's no point to do it.
+      !getScopeInfo().isInactiveConfigBlock();
+
   bool foundActive = false;
   bool isVersionCondition = false;
   while (1) {
@@ -604,7 +610,7 @@ ParserResult<IfConfigDecl> Parser::parseIfConfig(
     // Parse the condition.  Evaluate it to determine the active
     // clause unless we're doing a parse-only pass.
     if (isElse) {
-      isActive = !foundActive && State->PerformConditionEvaluation;
+      isActive = !foundActive && shouldEvaluate;
     } else {
       llvm::SaveAndRestore<bool> S(InPoundIfEnvironment, true);
       ParserResult<Expr> Result = parseExprSequence(diag::expected_expr,
@@ -619,7 +625,7 @@ ParserResult<IfConfigDecl> Parser::parseIfConfig(
         // Error in the condition;
         isActive = false;
         isVersionCondition = false;
-      } else if (!foundActive && State->PerformConditionEvaluation) {
+      } else if (!foundActive && shouldEvaluate) {
         // Evaluate the condition only if we haven't found any active one and
         // we're not in parse-only mode.
         isActive = evaluateIfConfigCondition(Condition, Context);
