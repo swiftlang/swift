@@ -376,6 +376,10 @@ def emit_objc_header_path : Separate<["-"], "emit-objc-header-path">,
          ArgumentIsPath]>,
   MetaVarName<"<path>">, HelpText<"Emit an Objective-C header file to <path>">;
 
+def static : Flag<["-"], "static">,
+  Flags<[FrontendOption, ModuleInterfaceOption, NoInteractiveOption]>,
+  HelpText<"Make this module statically linkable and make the output of -emit-library a static library.">;
+
 def import_cf_types : Flag<["-"], "import-cf-types">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Recognize and import CF types as class types">;
