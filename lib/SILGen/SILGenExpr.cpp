@@ -3289,23 +3289,32 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
                                 ArrayRef<ProtocolConformanceRef> indexHashables,
                                 CanType baseTy,
                                 bool forPropertyDescriptor) {
+  auto baseDecl = storage;
+
+  // ABI-compatible overrides do not have property descriptors, so we need
+  // to reference the overridden declaration instead.
+  if (isa<ClassDecl>(baseDecl->getDeclContext())) {
+    while (!baseDecl->isValidKeyPathComponent())
+      baseDecl = baseDecl->getOverriddenDecl();
+  }
+
   /// Returns true if a key path component for the given property or
   /// subscript should be externally referenced.
   auto shouldUseExternalKeyPathComponent = [&]() -> bool {
     return (!forPropertyDescriptor &&
-            (storage->getModuleContext() != SwiftModule ||
-             storage->isResilient(SwiftModule, expansion)) &&
+            (baseDecl->getModuleContext() != SwiftModule ||
+             baseDecl->isResilient(SwiftModule, expansion)) &&
             // Protocol requirements don't have nor need property descriptors.
-            !isa<ProtocolDecl>(storage->getDeclContext()) &&
+            !isa<ProtocolDecl>(baseDecl->getDeclContext()) &&
             // Properties that only dispatch via ObjC lookup do not have nor
             // need property descriptors, since the selector identifies the
             // storage.
             // Properties that are not public don't need property descriptors
             // either.
-            (!storage->hasAnyAccessors() ||
-             (!getAccessorDeclRef(getRepresentativeAccessorForKeyPath(storage))
+            (!baseDecl->hasAnyAccessors() ||
+             (!getAccessorDeclRef(getRepresentativeAccessorForKeyPath(baseDecl))
                    .isForeign &&
-              getAccessorDeclRef(getRepresentativeAccessorForKeyPath(storage))
+              getAccessorDeclRef(getRepresentativeAccessorForKeyPath(baseDecl))
                       .getLinkage(ForDefinition) <= SILLinkage::PublicNonABI)));
   };
 
@@ -3335,10 +3344,7 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
 
     // ABI-compatible overrides do not have property descriptors, so we need
     // to reference the overridden declaration instead.
-    auto *baseDecl = externalDecl;
-    if (isa<ClassDecl>(baseDecl->getDeclContext())) {
-      while (!baseDecl->isValidKeyPathComponent())
-        baseDecl = baseDecl->getOverriddenDecl();
+    if (baseDecl != externalDecl) {
       externalSubs = SubstitutionMap::getOverrideSubstitutions(baseDecl,
                                                                externalDecl,
                                                                externalSubs);
