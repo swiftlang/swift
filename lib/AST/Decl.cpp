@@ -163,7 +163,6 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
   TRIVIAL_KIND(Param);
   TRIVIAL_KIND(Module);
   TRIVIAL_KIND(MissingMember);
-  TRIVIAL_KIND(OpaqueType);
 
    case DeclKind::Enum:
      return cast<EnumDecl>(this)->getGenericParams()
@@ -260,6 +259,13 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
        return DescriptiveDeclKind::ClassMethod;
      }
    }
+
+   case DeclKind::OpaqueType: {
+     auto *opaqueTypeDecl = cast<OpaqueTypeDecl>(this);
+     if (dyn_cast_or_null<VarDecl>(opaqueTypeDecl->getNamingDecl()))
+       return DescriptiveDeclKind::OpaqueVarType;
+     return DescriptiveDeclKind::OpaqueResultType;
+   }
   }
 #undef TRIVIAL_KIND
   llvm_unreachable("bad DescriptiveDeclKind");
@@ -320,7 +326,8 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(Module, "module");
   ENTRY(MissingMember, "missing member placeholder");
   ENTRY(Requirement, "requirement");
-  ENTRY(OpaqueType, "opaque type");
+  ENTRY(OpaqueResultType, "result");
+  ENTRY(OpaqueVarType, "type");
   }
 #undef ENTRY
   llvm_unreachable("bad DescriptiveDeclKind");
