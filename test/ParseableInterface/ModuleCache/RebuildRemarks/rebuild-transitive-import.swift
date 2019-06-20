@@ -9,7 +9,7 @@
 // RUN: %target-swift-frontend -compile-module-from-interface -o %t/Build/InnerModule.swiftmodule %t/Build/InnerModule.swiftinterface
 
 // 3. Touch the interface so the module becomes out of date.
-// RUN: touch %t/Build/InnerModule.swiftinterface
+// RUN: %{python} %S/../Inputs/make-old.py %t/Build/InnerModule.swiftinterface
 
 // 4. Create a module called OuterModule that imports InnerModule, and put its interface into the build dir.
 // RUN: echo 'import InnerModule' | %target-swift-frontend - -emit-module -o %t/Build/OuterModule.swiftmodule -module-name OuterModule -I %t/Build
