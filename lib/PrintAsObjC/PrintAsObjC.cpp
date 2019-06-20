@@ -257,8 +257,8 @@ private:
   void printDocumentationComment(Decl *D) {
     swift::markup::MarkupContext MC;
     auto DC = getSingleDocComment(MC, D);
-    if (DC.hasValue())
-      ide::getDocumentationCommentAsDoxygen(DC.getValue(), os);
+    if (DC)
+      ide::getDocumentationCommentAsDoxygen(DC, os);
   }
 
   /// Prints an encoded string, escaped properly for C.
