@@ -352,12 +352,13 @@ swift::extractCommentParts(swift::markup::MarkupContext &MC,
   return Parts;
 }
 
-DocComment *DocComment::create(markup::MarkupContext &MC, RawComment RC) {
+DocComment *DocComment::create(const Decl *D, markup::MarkupContext &MC,
+                               RawComment RC) {
   assert(!RC.isEmpty());
   swift::markup::LineList LL = MC.getLineList(RC);
   auto *Doc = swift::markup::parseDocument(MC, LL);
   auto Parts = extractCommentParts(MC, Doc);
-  return new (MC) DocComment(Doc, Parts);
+  return new (MC) DocComment(D, Doc, Parts);
 }
 
 void DocComment::addInheritanceNote(swift::markup::MarkupContext &MC,
@@ -385,7 +386,7 @@ DocComment *swift::getSingleDocComment(swift::markup::MarkupContext &MC,
   auto RC = D->getRawComment();
   if (RC.isEmpty())
     return nullptr;
-  return DocComment::create(MC, RC);
+  return DocComment::create(D, MC, RC);
 }
 
 namespace {
@@ -480,9 +481,18 @@ swift::getCascadingDocComment(swift::markup::MarkupContext &MC, const Decl *D) {
   assert(doc && "getDocCommentProvidingDecl() returned decl with no comment");
 
   // If the doc-comment is inherited from other decl, add a note about it.
-  if (docD != D)
-    if (auto baseD = docD->getDeclContext()->getSelfNominalTypeDecl())
+  if (docD != D) {
+    doc->setDecl(D);
+    if (auto baseD = docD->getDeclContext()->getSelfNominalTypeDecl()) {
       doc->addInheritanceNote(MC, baseD);
+
+      // If the doc is inherited from protocol requirement, associate the
+      // requirement with the doc-comment.
+      // FIXME: This is to keep the old behavior.
+      if (isa<ProtocolDecl>(baseD))
+        doc->setDecl(docD);
+    }
+  }
 
   return doc;
 }
