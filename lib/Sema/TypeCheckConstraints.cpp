@@ -649,21 +649,24 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
     }
   }
 
-  // If we have an unambiguous reference to a type decl, form a TypeExpr.
-  if (Lookup.size() == 1 && UDRE->getRefKind() == DeclRefKind::Ordinary &&
-      isa<TypeDecl>(Lookup[0].getValueDecl())) {
-    auto *D = cast<TypeDecl>(Lookup[0].getValueDecl());
-    // FIXME: This is odd.
-    if (isa<ModuleDecl>(D)) {
-      return new (Context) DeclRefExpr(D, UDRE->getNameLoc(),
-                                       /*Implicit=*/false,
-                                       AccessSemantics::Ordinary,
-                                       D->getInterfaceType());
-    }
+  if (Lookup.size() == 1 && UDRE->getRefKind() == DeclRefKind::Ordinary) {
+    // If we have an unambiguous reference to a type decl, form a TypeExpr.
+    if (auto *D = dyn_cast<TypeDecl>(Lookup[0].getValueDecl())) {
+      // FIXME: This is odd.
+      if (isa<ModuleDecl>(D)) {
+        return new (Context)
+            DeclRefExpr(D, UDRE->getNameLoc(),
+                        /*Implicit=*/false, AccessSemantics::Ordinary,
+                        D->getInterfaceType());
+      }
 
-    return TypeExpr::createForDecl(Loc, D,
-                                   Lookup[0].getDeclContext(),
-                                   UDRE->isImplicit());
+      return TypeExpr::createForDecl(Loc, D,
+                                     Lookup[0].getDeclContext(),
+                                     UDRE->isImplicit());
+    } else {
+      return new (Context) DeclRefExpr(Lookup[0].getValueDecl(),
+                                       UDRE->getNameLoc(), /*Implicit=*/false);
+    }
   }
 
   if (AllDeclRefs) {
