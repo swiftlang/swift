@@ -110,6 +110,41 @@ static void onDocumentUpdateNotification(StringRef DocumentName) {
   sourcekitd::postNotification(RespBuilder.createResponse());
 }
 
+/// A simple configurable FileSystemProvider, useful for tests that exercise
+/// the FileSystemProvider code.
+class TestFileSystemProvider : public SourceKit::FileSystemProvider {
+  /// Provides the real filesystem, overlayed with an InMemoryFileSystem that
+  /// contains specified files at specified locations.
+  /// \param Args The locations of the InMemoryFileSystem files, interleaved
+  //              with paths on the real filesystem to fetch their contents
+  //              from.
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
+  getFileSystem(const llvm::SmallVectorImpl<const char *> &Args,
+                llvm::SmallVectorImpl<char> &ErrBuf) override {
+    auto InMemoryFS = llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem>(
+        new llvm::vfs::InMemoryFileSystem());
+    for (unsigned i = 0; i < Args.size(); i += 2) {
+      const char *InMemoryName = Args[i];
+      const char *TargetPath = Args[i + 1];
+      auto TargetBufferOrErr = llvm::MemoryBuffer::getFile(TargetPath);
+      if (auto Err = TargetBufferOrErr.getError()) {
+        llvm::raw_svector_ostream ErrStream(ErrBuf);
+        ErrStream << "Error reading target file '" << TargetPath
+                  << "': " << Err.message() << "\n";
+        return nullptr;
+      }
+      auto RenamedTargetBuffer = llvm::MemoryBuffer::getMemBufferCopy(
+          TargetBufferOrErr.get()->getBuffer(), InMemoryName);
+      InMemoryFS->addFile(InMemoryName, 0, std::move(RenamedTargetBuffer));
+    }
+
+    auto OverlayFS = llvm::IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem>(
+        new llvm::vfs::OverlayFileSystem(llvm::vfs::getRealFileSystem()));
+    OverlayFS->pushOverlay(std::move(InMemoryFS));
+    return OverlayFS;
+  }
+};
+
 static SourceKit::Context *GlobalCtx = nullptr;
 
 void sourcekitd::initialize() {
@@ -118,7 +153,10 @@ void sourcekitd::initialize() {
                                      SourceKit::createSwiftLangSupport);
   GlobalCtx->getNotificationCenter()->addDocumentUpdateNotificationReceiver(
     onDocumentUpdateNotification);
+
+  GlobalCtx->setFileSystemProvider("testvfs", new TestFileSystemProvider);
 }
+
 void sourcekitd::shutdown() {
   delete GlobalCtx;
   GlobalCtx = nullptr;
@@ -128,14 +166,6 @@ static SourceKit::Context &getGlobalContext() {
   assert(GlobalCtx);
   return *GlobalCtx;
 }
-
-namespace SourceKit {
-void setGlobalFileSystemProvider(StringRef Name,
-                                 FileSystemProvider *FileSystemProvider) {
-  assert(FileSystemProvider);
-  getGlobalContext().setFileSystemProvider(Name, FileSystemProvider);
-}
-} // namespace SourceKit
 
 static sourcekitd_response_t demangleNames(ArrayRef<const char *> MangledNames,
                                            bool Simplified);
