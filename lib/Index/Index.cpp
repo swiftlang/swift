@@ -1405,9 +1405,9 @@ bool IndexSwiftASTWalker::indexComment(const Decl *D) {
 
   swift::markup::MarkupContext MC;
   auto DC = getSingleDocComment(MC, D);
-  if (!DC.hasValue())
+  if (!DC)
     return true;
-  for (StringRef tagName : DC.getValue()->getTags()) {
+  for (StringRef tagName : DC->getTags()) {
     tagName = tagName.trim();
     if (tagName.empty())
       continue;
