@@ -4788,8 +4788,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
         auto result = solveWithNewBaseOrName(wrapperTy, member);
         if (result == SolutionKind::Solved) {
           auto *fix = InsertPropertyWrapperUnwrap::create(
-              *this, resolvedOverload->Choice.getDecl()->getFullName(), baseTy,
-              wrapperTy, locator);
+              *this, wrappedProperty->first->getFullName(), baseTy, wrapperTy,
+              locator);
           return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
         }
       }
