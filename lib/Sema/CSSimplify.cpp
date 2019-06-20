@@ -4781,15 +4781,14 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
             dyn_cast_or_null<UnresolvedDotExpr>(locator->getAnchor())) {
       auto baseExpr = dotExpr->getBase();
       auto resolvedOverload = findSelectedOverloadFor(baseExpr);
-
-      auto wrappedProperty = getPropertyWrapperInformation(resolvedOverload);
-      if (wrappedProperty) {
+      if (auto wrappedProperty =
+              getPropertyWrapperInformation(resolvedOverload)) {
         auto wrapperTy = wrappedProperty->second;
         auto result = solveWithNewBaseOrName(wrapperTy, member);
         if (result == SolutionKind::Solved) {
           auto *fix = InsertPropertyWrapperUnwrap::create(
-              *this, resolvedOverload->Choice.getDecl()->getFullName(), baseTy,
-              wrapperTy, locator);
+              *this, wrappedProperty->first->getFullName(), baseTy, wrapperTy,
+              locator);
           return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
         }
       }
