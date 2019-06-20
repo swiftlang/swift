@@ -905,10 +905,10 @@ struct MissingPropertyWrapperUnwrap {
   @Bar<Int, String> var z: Int
 
   func baz() {
-    self.x.foo() // expected-error {{property 'x' will be unwrapped to value of type 'Int', use '$' to refer to the 'Foo<Int>' property wrapper}}{{10-10=$}}
-    self.y.bar() // expected-error {{property 'y' will be unwrapped to value of type 'Int', use '$' to refer to the 'Bar<Int, Bool>' property wrapper}}{{10-10=$}}
-    self.y.barWhereVIsString() // expected-error {{property 'y' will be unwrapped to value of type 'Int', use '$' to refer to the 'Bar<Int, Bool>' property wrapper}}{{10-10=$}}
+    self.x.foo() // expected-error {{property 'x' will be unwrapped to value of type 'Int', use '$' to refer to wrapper type 'Foo<Int>'}}{{10-10=$}}
+    self.y.bar() // expected-error {{property 'y' will be unwrapped to value of type 'Int', use '$' to refer to wrapper type 'Bar<Int, Bool>'}}{{10-10=$}}
+    self.y.barWhereVIsString() // expected-error {{property 'y' will be unwrapped to value of type 'Int', use '$' to refer to wrapper type 'Bar<Int, Bool>'}}{{10-10=$}}
     // expected-error@-1 {{referencing instance method 'barWhereVIsString()' on 'Bar' requires the types 'Bool' and 'String' be equivalent}}
-    self.z.barWhereVIsString() // expected-error {{property 'z' will be unwrapped to value of type 'Int', use '$' to refer to the 'Bar<Int, String>' property wrapper}}{{10-10=$}} 
+    self.z.barWhereVIsString() // expected-error {{property 'z' will be unwrapped to value of type 'Int', use '$' to refer to wrapper type 'Bar<Int, String>'}}{{10-10=$}} 
   }
 }
