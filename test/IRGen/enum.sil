@@ -882,23 +882,12 @@ enum SinglePayloadSpareBit {
 sil @single_payload_spare_bit_switch : $@convention(thin) (SinglePayloadSpareBit) -> () {
 // CHECK: entry:
 entry(%u : $SinglePayloadSpareBit):
-// CHECK-64:  switch i64 %0, label %[[X_DEST:[0-9]+]] [
+// CHECK:  switch i64 %{{[0-9]+}}, label %[[X_DEST:[0-9]+]] [
 // --              0x8000_0000_0000_0000
-// CHECK-64:    i64 -9223372036854775808, label %[[Y_DEST:[0-9]+]]
+// CHECK:    i64 -9223372036854775808, label %[[Y_DEST:[0-9]+]]
 // --              0x8000_0000_0000_0001
-// CHECK-64:    i64 -9223372036854775807, label %[[Z_DEST:[0-9]+]]
-// CHECK-64:  ]
-
-// CHECK-32:  switch i32 %0, label %[[X_DEST:[0-9]+]] [
-// CHECK-32:    i32 0, label %[[Y_HIGH:[0-9]+]]
-// CHECK-32:    i32 1, label %[[Z_HIGH:[0-9]+]]
-// CHECK-32:  ]
-// CHECK-32: [[Y_HIGH]]:
-// CHECK-32:  [[IS_Y:%.*]] = icmp eq i32 %1, -2147483648
-// CHECK-32:  br i1 [[IS_Y]], label %[[Y_DEST:[0-9]+]], label %[[X_DEST]]
-// CHECK-32: [[Z_HIGH]]:
-// CHECK-32:  [[IS_Z:%.*]] = icmp eq i32 %1, -2147483648
-// CHECK-32:  br i1 [[IS_Z]], label %[[Z_DEST:[0-9]+]], label %[[X_DEST]]
+// CHECK:    i64 -9223372036854775807, label %[[Z_DEST:[0-9]+]]
+// CHECK:  ]
   switch_enum %u : $SinglePayloadSpareBit, case #SinglePayloadSpareBit.x!enumelt.1: x_dest, case #SinglePayloadSpareBit.y!enumelt: y_dest, case #SinglePayloadSpareBit.z!enumelt: z_dest
 
 // CHECK: [[X_DEST]]:
