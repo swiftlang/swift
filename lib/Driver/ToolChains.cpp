@@ -380,6 +380,12 @@ ToolChain::constructInvocation(const CompileJobAction &job,
   if (context.Args.hasArg(options::OPT_embed_bitcode_marker))
     Arguments.push_back("-embed-bitcode-marker");
 
+  // For `-index-file` mode add `-disable-typo-correction`, since the errors
+  // will be ignored and it can be expensive to do typo-correction.
+  if (job.getType() == file_types::TY_IndexData) {
+    Arguments.push_back("-disable-typo-correction");
+  }
+
   if (context.Args.hasArg(options::OPT_index_store_path)) {
     context.Args.AddLastArg(Arguments, options::OPT_index_store_path);
     if (!context.Args.hasArg(options::OPT_index_ignore_system_modules))
