@@ -68,27 +68,6 @@ constants.""")
 
     stdin = sys.stdin.read()
 
-    if args.enable_windows_compatibility:
-        # Let's look for paths in the output, and try to transform them to use
-        # Unix directory separators to be automatically picked up by the tests.
-        # This only picks up absolute paths, but those should be the more
-        # common in the tools output and the easier to detect without false
-        # positives.
-
-        def replace_slashes(matchobj):
-            return re.sub(r'\\\\|\\', r'/', matchobj.group(0))
-
-        # The regex is composed of three parts:
-        #              Matches a drive letter followed by a slash (backward
-        #              escaped, simple backward, or forward)
-        stdin = re.sub(r'\b[a-zA-Z]:(?:\\\\|\\|\/)' +
-                       # Matches the path part, it always ends up in a slash.
-                       r'(?:[-a-zA-Z0-9_.]+(?:\\\\|\\|\/))*' +
-                       # Matches the last path component, which do not has a
-                       # trailing slash, but it is optional.
-                       r'(?:[-a-zA-Z0-9_.]+)?\b',
-                       replace_slashes, stdin)
-
     for s in args.sanitize_strings:
         replacement, pattern = s.split('=', 1)
         # We are replacing the Unix path separators in the paths passed as
