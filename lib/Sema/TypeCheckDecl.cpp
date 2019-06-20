@@ -3194,7 +3194,7 @@ public:
     TC.checkParameterAttributes(FD->getParameters());
 
     checkExplicitAvailability(FD);
-=
+
     if (isDeclaredInClass(FD)) {
       for (auto *Param : *FD->getParameters()) {
         TypeLoc TyLoc = Param->getTypeLoc();

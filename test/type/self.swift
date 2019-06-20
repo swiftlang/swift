@@ -137,7 +137,6 @@ class C {
   let p0: Self?
   var p1: Self? // expected-error {{'Self' is not available as the type of a mutable property}}
   // expected-error@-1 {{'Self' cannot be the type of a function argument in a class}}
-  // expected-error@-2 {{'Self' cannot be the type of a function argument in a class}}
 
   var prop: Self { // expected-error {{'Self' is not available as the type of a mutable property}}
     get {
