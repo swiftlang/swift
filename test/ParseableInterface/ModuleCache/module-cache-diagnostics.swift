@@ -57,7 +57,9 @@
 // RUN: %{python} %S/Inputs/check-is-old.py %t/modulecache/OtherModule-*.swiftmodule %t/modulecache/LeafModule-*.swiftmodule
 // RUN: %FileCheck %s -check-prefix=CHECK-ERROR <%t/err.txt
 // CHECK-ERROR: LeafModule.swiftinterface:7:8: error: no such module 'NotAModule'
-// CHECK-ERROR: OtherModule.swiftinterface:4:8: error: no such module 'LeafModule'
+// CHECK-ERROR: OtherModule.swiftinterface:4:8: error: failed to load module 'LeafModule'
+// CHECK-ERROR: module-cache-diagnostics.swift:{{[0-9]+}}:8: error: failed to load module 'OtherModule'
+// CHECK-ERROR-NOT: error:
 //
 //
 // Next test: same as above, but with a .dia file
@@ -80,7 +82,9 @@
 // RUN: %{python} %S/Inputs/check-is-old.py %t/modulecache/OtherModule-*.swiftmodule %t/modulecache/LeafModule-*.swiftmodule
 // RUN: %FileCheck %s -check-prefix=CHECK-ERROR-INLINE <%t/err-inline.txt
 // CHECK-ERROR-INLINE: LeafModule.swiftinterface:6:33: error: use of unresolved identifier 'unresolved'
-// CHECK-ERROR-INLINE: OtherModule.swiftinterface:4:8: error: no such module 'LeafModule'
+// CHECK-ERROR-INLINE: OtherModule.swiftinterface:4:8: error: failed to load module 'LeafModule'
+// CHECK-ERROR-INLINE: module-cache-diagnostics.swift:{{[0-9]+}}:8: error: failed to load module 'OtherModule'
+// CHECK-ERROR-INLINE-NOT: error:
 //
 //
 // Next test: same as above, but with a .dia file
