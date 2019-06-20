@@ -482,8 +482,14 @@ class OpaqueArchetypeSpecializer : public SILFunctionTransform {
 
     // Look for opaque type archetypes.
     bool foundOpaqueArchetype = false;
+    bool foundDynamicallyReplaceableFunction = false;
     for (auto &BB : *getFunction()) {
       for (auto &inst : BB) {
+        if (isa<DynamicFunctionRefInst>(inst) ||
+            isa<PreviousDynamicFunctionRefInst>(inst)) {
+          foundDynamicallyReplaceableFunction = true;
+          break;
+        }
         auto hasOpaqueOperand = [&] (SILInstruction &inst) -> bool {
           // Check the operands for opaque types.
           for (auto &opd : inst.getAllOperands())
@@ -491,8 +497,10 @@ class OpaqueArchetypeSpecializer : public SILFunctionTransform {
               return true;
           return false;
         };
-        if ((foundOpaqueArchetype = hasOpaqueOperand(inst)))
-          break;
+        foundOpaqueArchetype |= hasOpaqueOperand(inst);
+        if (foundOpaqueArchetype)
+          continue;
+
         auto hasOpaqueResult = [&](SILInstruction &inst) -> bool {
           // Check the results for opaque types.
           for (const auto &res : inst.getResults())
@@ -500,14 +508,14 @@ class OpaqueArchetypeSpecializer : public SILFunctionTransform {
               return true;
           return false;
         };
-        if ((foundOpaqueArchetype = hasOpaqueResult(inst)))
-          break;
+        foundOpaqueArchetype |= hasOpaqueResult(inst);
+        break;
       }
-      if (foundOpaqueArchetype)
+      if (foundDynamicallyReplaceableFunction)
         break;
     }
 
-    if (foundOpaqueArchetype) {
+    if (foundOpaqueArchetype && !foundDynamicallyReplaceableFunction) {
       OpaqueSpecializerCloner s(*getFunction());
       s.clone();
       removeUnreachableBlocks(*getFunction());
