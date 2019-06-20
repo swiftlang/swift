@@ -18,8 +18,6 @@
 #define SWIFT_REFLECTION_METADATASOURCEBUILDER_H
 
 #include "swift/Reflection/MetadataSource.h"
-#include <memory>
-#include <vector>
 
 namespace swift {
 namespace reflection {

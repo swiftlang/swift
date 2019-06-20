@@ -224,26 +224,27 @@ public:
     auto CaptureSec = findMachOSectionByName("__swift5_capture");
     auto TypeRefMdSec = findMachOSectionByName("__swift5_typeref");
     auto ReflStrMdSec = findMachOSectionByName("__swift5_reflstr");
-    auto ProtocolSec = findMachOSectionByName("__swift5_protos");
 
-    if (FieldMdSec.first == nullptr && AssocTySec.first == nullptr &&
-        BuiltinTySec.first == nullptr && CaptureSec.first == nullptr &&
-        TypeRefMdSec.first == nullptr && ReflStrMdSec.first == nullptr &&
-        ProtocolSec.first == nullptr)
+    if (FieldMdSec.first == nullptr &&
+        AssocTySec.first == nullptr &&
+        BuiltinTySec.first == nullptr &&
+        CaptureSec.first == nullptr &&
+        TypeRefMdSec.first == nullptr &&
+        ReflStrMdSec.first == nullptr)
       return false;
 
     auto LocalStartAddress = reinterpret_cast<uint64_t>(SectBuf.get());
     auto RemoteStartAddress = static_cast<uint64_t>(RangeStart);
 
-    ReflectionInfo info = {{{FieldMdSec.first, FieldMdSec.second}, 0},
-                           {{AssocTySec.first, AssocTySec.second}, 0},
-                           {{BuiltinTySec.first, BuiltinTySec.second}, 0},
-                           {{CaptureSec.first, CaptureSec.second}, 0},
-                           {{TypeRefMdSec.first, TypeRefMdSec.second}, 0},
-                           {{ReflStrMdSec.first, ReflStrMdSec.second}, 0},
-                           {{ProtocolSec.first, ProtocolSec.second}, 0},
-                           LocalStartAddress,
-                           RemoteStartAddress};
+    ReflectionInfo info = {
+        {{FieldMdSec.first, FieldMdSec.second}, 0},
+        {{AssocTySec.first, AssocTySec.second}, 0},
+        {{BuiltinTySec.first, BuiltinTySec.second}, 0},
+        {{CaptureSec.first, CaptureSec.second}, 0},
+        {{TypeRefMdSec.first, TypeRefMdSec.second}, 0},
+        {{ReflStrMdSec.first, ReflStrMdSec.second}, 0},
+        LocalStartAddress,
+        RemoteStartAddress};
 
     this->addReflectionInfo(info);
 
