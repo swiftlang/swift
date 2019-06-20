@@ -22,15 +22,22 @@ class TypeDecl;
 struct RawComment;
 
 class DocComment {
+  const Decl *D;
   swift::markup::Document *Doc = nullptr;
   swift::markup::CommentParts Parts;
 
-  DocComment(swift::markup::Document *Doc, swift::markup::CommentParts Parts)
-      : Doc(Doc), Parts(Parts) {}
+  DocComment(const Decl *D, swift::markup::Document *Doc,
+             swift::markup::CommentParts Parts)
+      : D(D), Doc(Doc), Parts(Parts) {}
+
 public:
-  static DocComment *create(swift::markup::MarkupContext &MC, RawComment RC);
+  static DocComment *create(const Decl *D, swift::markup::MarkupContext &MC,
+                            RawComment RC);
 
   void addInheritanceNote(swift::markup::MarkupContext &MC, TypeDecl *base);
+
+  const Decl *getDecl() const { return D; }
+  void setDecl(const Decl *D) { this->D = D; }
 
   const swift::markup::Document *getDocument() const { return Doc; }
 
@@ -106,4 +113,3 @@ void printBriefComment(RawComment RC, llvm::raw_ostream &OS);
 } // namespace swift
 
 #endif // LLVM_SWIFT_AST_COMMENT_H
-

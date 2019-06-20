@@ -258,7 +258,7 @@ struct CommentToXMLConverter {
     OS << "</Tags>";
   }
 
-  void visitDocComment(const Decl *D, const DocComment *DC);
+  void visitDocComment(const DocComment *DC);
   void visitCommentParts(const swift::markup::CommentParts &Parts);
 };
 } // unnamed namespace
@@ -297,7 +297,8 @@ void CommentToXMLConverter::visitCommentParts(const swift::markup::CommentParts 
   }
 }
 
-void CommentToXMLConverter::visitDocComment(const Decl *D, const DocComment *DC) {
+void CommentToXMLConverter::visitDocComment(const DocComment *DC) {
+  const Decl *D = DC->getDecl();
 
   StringRef RootEndTag;
   if (isa<AbstractFunctionDecl>(D)) {
@@ -463,7 +464,7 @@ bool ide::getDocumentationCommentAsXML(const Decl *D, raw_ostream &OS) {
     return false;
 
   CommentToXMLConverter Converter(OS);
-  Converter.visitDocComment(D, DC);
+  Converter.visitDocComment(DC);
 
   OS.flush();
   return true;
