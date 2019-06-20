@@ -56,6 +56,7 @@ public:
   /// Registers the given FileSystemProvider under Name. The caller is
   /// responsible for keeping FileSystemProvider alive at least as long as
   /// this Context.
+  /// This should only be called during setup because it is not synchronized.
   /// \param FileSystemProvider must be non-null
   void setFileSystemProvider(StringRef Name,
                              FileSystemProvider *FileSystemProvider);
