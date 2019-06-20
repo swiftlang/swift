@@ -281,9 +281,6 @@ ERROR(unsupported_version_of_module_interface,none,
       (StringRef, llvm::VersionTuple))
 ERROR(error_extracting_flags_from_module_interface,none,
       "error extracting flags from module interface", ())
-ERROR(missing_dependency_of_module_interface,none,
-      "missing dependency '%0' of module interface '%1': %2",
-      (StringRef, StringRef, StringRef))
 REMARK(rebuilding_module_from_interface,none,
        "rebuilding module '%0' from interface '%1'", (StringRef, StringRef))
 NOTE(out_of_date_module_here,none,
@@ -291,6 +288,9 @@ NOTE(out_of_date_module_here,none,
      (unsigned, StringRef))
 NOTE(module_interface_dependency_out_of_date,none,
      "dependency is out of date: '%0'",
+     (StringRef))
+NOTE(module_interface_dependency_missing,none,
+     "dependency is missing: '%0'",
      (StringRef))
 NOTE(compiled_module_invalid,none,
      "unable to load compiled module '%0'",
