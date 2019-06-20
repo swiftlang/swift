@@ -109,6 +109,13 @@ static bool isWithoutDerivative(SILValue v) {
   return false;
 }
 
+static ApplyInst *getAllocateUninitializedArrayIntrinsic(SILValue v) {
+  if (auto *applyInst = dyn_cast<ApplyInst>(v))
+    if (applyInst->hasSemantics("array.uninitialized_intrinsic"))
+      return applyInst;
+  return nullptr;
+}
+
 /// Given a function, gather all of its formal results (both direct and
 /// indirect) in an order defined by its result type. Note that "formal results"
 /// refer to result values in the body of the function, not at call sites.
@@ -1637,6 +1644,14 @@ void DifferentiableActivityInfo::setVaried(SILValue value,
 void DifferentiableActivityInfo::setUseful(SILValue value,
                                            unsigned dependentVariableIndex) {
   usefulValueSets[dependentVariableIndex].insert(value);
+  if (auto *uninitArrayApplyInst = getAllocateUninitializedArrayIntrinsic(value)) {
+    llvm::errs() << "FOUND 'array.uninitialized_intrinsic'\n";
+    uninitArrayApplyInst->dump();
+    // TODO: Set `pointer_to_address` result of `RawPointer`.
+    for (auto use : value->getUses())
+      for (auto res : use->getUser()->getResults())
+        setUseful(res, dependentVariableIndex);
+  }
 }
 
 void DifferentiableActivityInfo::recursivelySetVaried(
@@ -3237,6 +3252,12 @@ public:
       TypeSubstCloner::visitApplyInst(ai);
       return;
     }
+    if (ai->hasSemantics("array.uninitialized_intrinsic")) {
+      LLVM_DEBUG(getADDebugStream() << "array.uninitialized_intrinsic:\n" << *ai << '\n');
+      llvm::errs() << "HELLO 1\n";
+      TypeSubstCloner::visitApplyInst(ai);
+      return;
+    }
 
     // Get the parameter indices required for differentiating this function.
     LLVM_DEBUG(getADDebugStream() << "VJP-transforming:\n" << *ai << '\n');
@@ -4626,6 +4647,96 @@ public:
     }
     builder.createReturn(adjLoc, joinElements(retElts, builder, adjLoc));
 
+    DenseMap<SILBasicBlock *, DenseMap<SILValue, AdjointValue>> debugValueMap;
+    for (auto pair : valueMap) {
+      auto valPair = std::get<0>(pair);
+      auto *bb = std::get<0>(valPair);
+      auto origVal = std::get<1>(valPair);
+      auto adjVal = std::get<1>(pair);
+      debugValueMap[bb].insert({origVal, adjVal});
+    }
+    llvm::errs() << "\nDEBUG ADJOINT VALUE MAP for " << original.getName() << "\n";
+    for (auto pair : debugValueMap) {
+      auto *bb = std::get<0>(pair);
+      auto valMap = std::get<1>(pair);
+      llvm::errs() << "\nDEBUGGING bb" << bb->getDebugID() << " (" << valMap.size() << ")\n";
+      for (auto pair : valMap) {
+        llvm::errs() << "ORIG VS ADJ\n";
+        auto origVal = std::get<0>(pair);
+        auto adjVal = std::get<1>(pair);
+        origVal->dump();
+        adjVal.print(llvm::errs());
+        llvm::errs() << "\n";
+      }
+    }
+    llvm::errs() << "\n\n";
+
+    DenseMap<SILBasicBlock *, DenseMap<SILValue, ValueWithCleanup>> debugBufferMap;
+    for (auto pair : bufferMap) {
+      auto valPair = std::get<0>(pair);
+      auto *bb = std::get<0>(valPair);
+      auto origVal = std::get<1>(valPair);
+      auto adjVal = std::get<1>(pair);
+      debugBufferMap[bb].insert({origVal, adjVal});
+    }
+    llvm::errs() << "\nDEBUG ADJOINT BUFFER MAP for " << original.getName() << "\n";
+    for (auto pair : debugBufferMap) {
+      auto *bb = std::get<0>(pair);
+      auto valMap = std::get<1>(pair);
+      llvm::errs() << "\nDEBUGGING MAP FOR BB " << bb->getDebugID() << " (" << valMap.size() << ")\n";
+      for (auto pair : valMap) {
+        llvm::errs() << "ORIG VS ADJ\n";
+        auto origVal = std::get<0>(pair);
+        auto adjVal = std::get<1>(pair);
+        origVal->dump();
+        adjVal.getValue()->dump();
+      }
+    }
+    llvm::errs() << "\n\n";
+
+    llvm::errs() << "\nDebugging active values for " << original.getName() << "\n";
+    for (auto pair : activeValues) {
+      auto *bb = std::get<0>(pair);
+      auto bbActiveValues = std::get<1>(pair);
+      llvm::errs() << "Active values in bb" << bb->getDebugID() << " (" << bbActiveValues.size() << ")\n";
+      /*
+       for (auto val : bbActiveValues)
+       val->dump();
+       */
+    }
+    llvm::errs() << "\n\n";
+
+    llvm::errs() << "\nDebugging adjoint BB map for " << original.getName() << "\n";
+    for (auto pair : adjointBBMap) {
+      auto *bb = std::get<0>(pair);
+      auto *adjBB = std::get<1>(pair);
+      llvm::errs() << "bb" << bb->getDebugID() << " > adj bb" << adjBB->getDebugID() << "\n";
+      /*
+       for (auto val : bbActiveValues)
+       val->dump();
+       */
+    }
+    llvm::errs() << "\n\n";
+
+    llvm::errs() << "\nDebugging adjoint trampoline BB map for " << original.getName() << "\n";
+    for (auto pair : adjointTrampolineBBMap) {
+      auto bbPair = std::get<0>(pair);
+      auto *predBB = std::get<0>(bbPair);
+      auto *succBB = std::get<1>(bbPair);
+      auto *adjBB = std::get<1>(pair);
+      llvm::errs() << "(pred" << predBB->getDebugID() << " > succ" << succBB->getDebugID() << ") - adj bb" << adjBB->getDebugID() << "\n";
+      /*
+      for (auto val : bbActiveValues)
+        val->dump();
+      */
+    }
+    auto *loopAnalysis = getContext().getPassManager().getAnalysis<SILLoopAnalysis>();
+    auto *loopInfo = loopAnalysis->get(&original);
+    llvm::errs() << "\n\n";
+    llvm::errs() << "\nLoop info for " << original.getName() << "\n";
+    for (auto *loop : *loopInfo)
+      loop->dump();
+
     LLVM_DEBUG(getADDebugStream() << "Generated adjoint for "
                                   << original.getName() << ":\n" << adjoint);
     return errorOccurred;
@@ -4658,6 +4769,12 @@ public:
   }
 
   void visitApplyInst(ApplyInst *ai) {
+    if (ai->hasSemantics("array.uninitialized_intrinsic")) {
+      // TODO: Generate `Array.subscript` call.
+      LLVM_DEBUG(getADDebugStream() << "Found 'array.uninitialized_intrinsic':\n" << *ai << '\n');
+      getAdjoint().dump();
+      return;
+    }
     // Replace a call to a function with a call to its pullback.
     auto &nestedApplyInfo = getContext().getNestedApplyInfo();
     auto applyInfoLookup = nestedApplyInfo.find(ai);
