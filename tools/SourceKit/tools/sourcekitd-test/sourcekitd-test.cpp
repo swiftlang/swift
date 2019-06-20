@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "sourcekitd/FileSystemProvider.h"
 #include "sourcekitd/sourcekitd.h"
 
 #include "SourceKit/Support/Concurrency.h"
@@ -29,7 +28,6 @@
 #include "llvm/Support/Regex.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/Threading.h"
-#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/raw_ostream.h"
 #include <fstream>
 #if defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
@@ -221,41 +219,6 @@ static void printBufferedNotifications(bool syncWithService = true) {
   });
 }
 
-/// A simple configurable FileSystemProvider, useful for tests that exercise
-/// the FileSystemProvider code.
-class TestFileSystemProvider : public SourceKit::FileSystemProvider {
-  /// Provides the real filesystem, overlayed with an InMemoryFileSystem that
-  /// contains specified files at specified locations.
-  /// \param Args The locations of the InMemoryFileSystem files, interleaved
-  //              with paths on the real filesystem to fetch their contents
-  //              from.
-  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
-  getFileSystem(const llvm::SmallVectorImpl<const char *> &Args,
-                llvm::SmallVectorImpl<char> &ErrBuf) override {
-    auto InMemoryFS = llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem>(
-        new llvm::vfs::InMemoryFileSystem());
-    for (unsigned i = 0; i < Args.size(); i += 2) {
-      const char *InMemoryName = Args[i];
-      const char *TargetPath = Args[i + 1];
-      auto TargetBufferOrErr = llvm::MemoryBuffer::getFile(TargetPath);
-      if (auto Err = TargetBufferOrErr.getError()) {
-        llvm::raw_svector_ostream ErrStream(ErrBuf);
-        ErrStream << "Error reading target file '" << TargetPath
-                  << "': " << Err.message() << "\n";
-        return nullptr;
-      }
-      auto RenamedTargetBuffer = llvm::MemoryBuffer::getMemBufferCopy(
-          TargetBufferOrErr.get()->getBuffer(), InMemoryName);
-      InMemoryFS->addFile(InMemoryName, 0, std::move(RenamedTargetBuffer));
-    }
-
-    auto OverlayFS = llvm::IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem>(
-        new llvm::vfs::OverlayFileSystem(llvm::vfs::getRealFileSystem()));
-    OverlayFS->pushOverlay(std::move(InMemoryFS));
-    return OverlayFS;
-  }
-};
-
 struct skt_args {
   int argc;
   const char **argv;
@@ -279,9 +242,6 @@ static void skt_main(skt_args *args) {
   llvm::sys::PrintStackTraceOnErrorSignal(argv[0]);
 
   sourcekitd_initialize();
-
-  TestFileSystemProvider testFileSystemProvider;
-  SourceKit::setGlobalFileSystemProvider("testvfs", &testFileSystemProvider);
 
   sourcekitd_set_notification_handler(^(sourcekitd_response_t resp) {
     notification_receiver(resp);
