@@ -63,32 +63,36 @@ macro(swift_common_standalone_build_config_llvm product)
   endif()
 
   if(SWIFT_INCLUDE_TOOLS)
-    if(CMAKE_CROSSCOMPILING)
-      set(LLVM_NATIVE_BUILD_DIR "${LLVM_BINARY_DIR}/NATIVE")
-      if(NOT EXISTS "${LLVM_NATIVE_BUILD_DIR}")
-        message(FATAL_ERROR
-          "Attempting to cross-compile swift standalone but no native LLVM build
-          found.  Please cross-compile LLVM as well.")
-      endif()
-
-      if(CMAKE_HOST_SYSTEM_NAME MATCHES Windows)
-        set(HOST_EXECUTABLE_SUFFIX ".exe")
-      endif()
-
-      if(NOT CMAKE_CONFIGURATION_TYPES)
-        set(LLVM_TABLEGEN_EXE
-          "${LLVM_NATIVE_BUILD_DIR}/bin/llvm-tblgen${HOST_EXECUTABLE_SUFFIX}")
-      else()
-        # NOTE: LLVM NATIVE build is always built Release, as is specified in
-        # CrossCompile.cmake
-        set(LLVM_TABLEGEN_EXE
-          "${LLVM_NATIVE_BUILD_DIR}/Release/bin/llvm-tblgen${HOST_EXECUTABLE_SUFFIX}")
-      endif()
+    if(LLVM_TABLEGEN)
+      set(LLVM_TABLEGEN_EXE ${LLVM_TABLEGEN})
     else()
-      find_program(LLVM_TABLEGEN_EXE "llvm-tblgen" HINTS ${LLVM_TOOLS_BINARY_DIR}
-        NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH)
-      if(LLVM_TABLEGEN_EXE STREQUAL "LLVM_TABLEGEN_EXE-NOTFOUND")
-        message(FATAL_ERROR "Failed to find tablegen in ${LLVM_TOOLS_BINARY_DIR}")
+      if(CMAKE_CROSSCOMPILING)
+        set(LLVM_NATIVE_BUILD_DIR "${LLVM_BINARY_DIR}/NATIVE")
+        if(NOT EXISTS "${LLVM_NATIVE_BUILD_DIR}")
+          message(FATAL_ERROR
+            "Attempting to cross-compile swift standalone but no native LLVM build
+            found.  Please cross-compile LLVM as well.")
+        endif()
+
+        if(CMAKE_HOST_SYSTEM_NAME MATCHES Windows)
+          set(HOST_EXECUTABLE_SUFFIX ".exe")
+        endif()
+
+        if(NOT CMAKE_CONFIGURATION_TYPES)
+          set(LLVM_TABLEGEN_EXE
+            "${LLVM_NATIVE_BUILD_DIR}/bin/llvm-tblgen${HOST_EXECUTABLE_SUFFIX}")
+        else()
+          # NOTE: LLVM NATIVE build is always built Release, as is specified in
+          # CrossCompile.cmake
+          set(LLVM_TABLEGEN_EXE
+            "${LLVM_NATIVE_BUILD_DIR}/Release/bin/llvm-tblgen${HOST_EXECUTABLE_SUFFIX}")
+        endif()
+      else()
+        find_program(LLVM_TABLEGEN_EXE "llvm-tblgen" HINTS ${LLVM_TOOLS_BINARY_DIR}
+          NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH)
+        if(LLVM_TABLEGEN_EXE STREQUAL "LLVM_TABLEGEN_EXE-NOTFOUND")
+          message(FATAL_ERROR "Failed to find tablegen in ${LLVM_TOOLS_BINARY_DIR}")
+        endif()
       endif()
     endif()
   endif()
