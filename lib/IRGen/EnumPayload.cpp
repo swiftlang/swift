@@ -373,137 +373,10 @@ void EnumPayload::store(IRGenFunction &IGF, Address address) const {
   }
 }
 
-namespace {
-struct ult {
-  bool operator()(const APInt &a, const APInt &b) const {
-    return a.ult(b);
-  }
-};
-} // end anonymous namespace
-
-static void emitSubSwitch(IRGenFunction &IGF,
-                    MutableArrayRef<EnumPayload::LazyValue> values,
-                    APInt mask,
-                    MutableArrayRef<std::pair<APInt, llvm::BasicBlock *>> cases,
-                    SwitchDefaultDest dflt) {
-recur:
-  assert(!values.empty() && "didn't exit out when exhausting all values?!");
-  
-  assert(!cases.empty() && "switching with no cases?!");
-  
-  auto &DL = IGF.IGM.DataLayout;
-  auto &pv = values.front();
-  values = values.slice(1);
-  auto payloadTy = getPayloadType(pv);
-  unsigned size = DL.getTypeSizeInBits(payloadTy);
-  
-  // Grab a chunk of the mask.
-  auto maskPiece = mask.zextOrTrunc(size);
-  mask = mask.lshr(size);
-  
-  // If the piece is zero, this doesn't affect the switch. We can just move
-  // forward and recur.
-  if (maskPiece == 0) {
-    for (auto &casePair : cases)
-      casePair.first = casePair.first.lshr(size);
-    goto recur;
-  }
-  
-  // Force the value we will test.
-  auto v = forcePayloadValue(pv);
-  auto payloadIntTy = llvm::IntegerType::get(IGF.IGM.getLLVMContext(), size);
-  
-  // Need to coerce to integer for 'icmp eq' if it's not already an integer
-  // or pointer. (Switching or masking will also require a cast to integer.)
-  if (!isa<llvm::IntegerType>(v->getType())
-      && !isa<llvm::PointerType>(v->getType()))
-    v = IGF.Builder.CreateBitOrPointerCast(v, payloadIntTy);
-  
-  // Apply the mask if it's interesting.
-  if (!maskPiece.isAllOnesValue()) {
-    v = IGF.Builder.CreateBitOrPointerCast(v, payloadIntTy);
-    auto maskConstant = llvm::ConstantInt::get(payloadIntTy, maskPiece);
-    v = IGF.Builder.CreateAnd(v, maskConstant);
-  }
-  
-  // Gather the values we will switch over for this payload chunk.
-  // FIXME: std::map is lame. Should hash APInts.
-  std::map<APInt, SmallVector<std::pair<APInt, llvm::BasicBlock*>, 2>, ult>
-    subCases;
-  
-  for (auto casePair : cases) {
-    // Grab a chunk of the value.
-    auto valuePiece = casePair.first.zextOrTrunc(size);
-    // Index the case according to this chunk.
-    subCases[valuePiece].push_back({std::move(casePair.first).lshr(size),
-                                    casePair.second});
-  }
-  
-  bool needsAdditionalCases = !values.empty() && mask != 0;
-  SmallVector<std::pair<llvm::BasicBlock *, decltype(cases)>, 2> recursiveCases;
-  
-  auto blockForCases
-    = [&](MutableArrayRef<std::pair<APInt, llvm::BasicBlock*>> cases)
-        -> llvm::BasicBlock *
-    {
-      // If we need to recur, emit a new block.
-      if (needsAdditionalCases) {
-        auto newBB = IGF.createBasicBlock("");
-        recursiveCases.push_back({newBB, cases});
-        return newBB;
-      }
-      // Otherwise, we can jump directly to the ultimate destination.
-      assert(cases.size() == 1 && "more than one case for final destination?!");
-      return cases.front().second;
-    };
-  
-  // If there's only one case, do a cond_br.
-  if (subCases.size() == 1) {
-    auto &subCase = *subCases.begin();
-    llvm::BasicBlock *block = blockForCases(subCase.second);
-    // If the default case is unreachable, we don't need to conditionally
-    // branch.
-    if (dflt.getInt()) {
-      IGF.Builder.CreateBr(block);
-      goto next;
-    }
-  
-    auto &valuePiece = subCase.first;
-    llvm::Value *valueConstant = llvm::ConstantInt::get(payloadIntTy,
-                                                        valuePiece);
-    valueConstant = IGF.Builder.CreateBitOrPointerCast(valueConstant,
-                                                       v->getType());
-    auto cmp = IGF.Builder.CreateICmpEQ(v, valueConstant);
-    IGF.Builder.CreateCondBr(cmp, block, dflt.getPointer());
-    goto next;
-  }
-  
-  // Otherwise, do a switch.
-  {
-    v = IGF.Builder.CreateBitOrPointerCast(v, payloadIntTy);
-    auto swi = IGF.Builder.CreateSwitch(v, dflt.getPointer(), subCases.size());
-    
-    for (auto &subCase : subCases) {
-      auto &valuePiece = subCase.first;
-      auto valueConstant = llvm::ConstantInt::get(IGF.IGM.getLLVMContext(),
-                                                  valuePiece);
-
-      swi->addCase(valueConstant, blockForCases(subCase.second));
-    }
-  }
-  
-next:
-  // Emit the recursive cases.
-  for (auto &recursive : recursiveCases) {
-    IGF.Builder.emitBlock(recursive.first);
-    emitSubSwitch(IGF, values, mask, recursive.second, dflt);
-  }
-}
-
 void EnumPayload::emitSwitch(IRGenFunction &IGF,
-                           APInt mask,
-                           ArrayRef<std::pair<APInt, llvm::BasicBlock *>> cases,
-                           SwitchDefaultDest dflt) const {
+                             const APInt &mask,
+                             ArrayRef<std::pair<APInt, llvm::BasicBlock *>> cases,
+                             SwitchDefaultDest dflt) const {
   // If there's only one case to test, do a simple compare and branch.
   if (cases.size() == 1) {
     // If the default case is unreachable, don't bother branching at all.
@@ -517,12 +390,16 @@ void EnumPayload::emitSwitch(IRGenFunction &IGF,
     return;
   }
 
-  // Otherwise, break down the decision tree.
-  SmallVector<std::pair<APInt, llvm::BasicBlock*>, 4> mutableCases
-    (cases.begin(), cases.end());
-  
-  emitSubSwitch(IGF, PayloadValues, mask, mutableCases, dflt);
-  
+  // Otherwise emit a switch statement.
+  auto &context = IGF.IGM.getLLVMContext();
+  unsigned numBits = mask.countPopulation();
+  auto target = emitGatherSpareBits(IGF, SpareBitVector::fromAPInt(mask),
+                                    0, numBits);
+  auto swi = IGF.Builder.CreateSwitch(target, dflt.getPointer(), cases.size());
+  for (auto &c : cases) {
+    auto value = llvm::ConstantInt::get(context, gatherBits(mask, c.first));
+    swi->addCase(value, c.second);
+  }
   assert(IGF.Builder.hasPostTerminatorIP());
 }
 
