@@ -225,6 +225,19 @@ class InheritedProtocolCollector {
       // FIXME: This ignores layout constraints, but currently we don't support
       // any of those besides 'AnyObject'.
     }
+
+    // Check for synthesized protocols, like Hashable on enums.
+    if (auto *nominal = dyn_cast<NominalTypeDecl>(D)) {
+      SmallVector<ProtocolConformance *, 4> localConformances =
+          nominal->getLocalConformances(ConformanceLookupKind::NonInherited);
+
+      for (auto *conf : localConformances) {
+        if (conf->getSourceKind() != ConformanceEntryKind::Synthesized)
+          continue;
+        ExtraProtocols.push_back({conf->getProtocol(),
+                                  getAvailabilityAttrs(D, availableAttrs)});
+      }
+    }
   }
 
   /// For each type directly inherited by \p extension, record any protocols
