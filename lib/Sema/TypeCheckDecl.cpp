@@ -4478,13 +4478,13 @@ static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
     if (prop->getAttrs().hasAttribute<LazyAttr>() && !prop->isStatic() &&
         (!prop->getGetter() || !prop->getGetter()->hasBody())) {
       finalizeAbstractStorageDecl(TC, prop);
-      completeLazyVarImplementation(prop);
+      (void) prop->getLazyStorageProperty();
     }
 
     // Ensure that we create the backing variable for a wrapped property.
     if (prop->hasAttachedPropertyWrapper()) {
       finalizeAbstractStorageDecl(TC, prop);
-      (void)prop->getPropertyWrapperBackingProperty();
+      (void) prop->getPropertyWrapperBackingProperty();
     }
   }
 

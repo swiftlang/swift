@@ -2692,6 +2692,8 @@ public:
     DeclContextID contextID;
     bool isImplicit, isObjC, isStatic, hasNonPatternBindingInit;
     bool isGetterMutating, isSetterMutating;
+    bool isLazyStorageProperty;
+    DeclID lazyStorageID;
     unsigned rawSpecifier, numAccessors, numBackingProperties;
     uint8_t readImpl, writeImpl, readWriteImpl, opaqueReadOwnership;
     uint8_t rawAccessLevel, rawSetterAccessLevel;
@@ -2704,6 +2706,8 @@ public:
                                        isImplicit, isObjC, isStatic, rawSpecifier,
                                        hasNonPatternBindingInit,
                                        isGetterMutating, isSetterMutating,
+                                       isLazyStorageProperty,
+                                       lazyStorageID,
                                        opaqueReadOwnership,
                                        readImpl, writeImpl, readWriteImpl,
                                        numAccessors,
@@ -2821,7 +2825,14 @@ public:
                          cast<OpaqueTypeDecl>(MF.getDecl(opaqueReturnTypeID)));
     }
 
-    // If there are any backing properties, record the
+    // If this is a lazy property, record its backing storage.
+    if (lazyStorageID) {
+      VarDecl *storage = cast<VarDecl>(MF.getDecl(lazyStorageID));
+      ctx.evaluator.cacheOutput(
+          LazyStoragePropertyRequest{var}, std::move(storage));
+    }
+
+    // If there are any backing properties, record them.
     if (numBackingProperties > 0) {
       VarDecl *backingVar = cast<VarDecl>(MF.getDecl(backingPropertyIDs[0]));
       VarDecl *storageWrapperVar = nullptr;

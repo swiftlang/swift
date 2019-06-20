@@ -4666,7 +4666,16 @@ void ProtocolDecl::computeKnownProtocolKind() const {
 
 void AbstractStorageDecl::overwriteImplInfo(StorageImplInfo implInfo) {
   setFieldsFromImplInfo(implInfo);
-  Accessors.getPointer()->overwriteImplInfo(implInfo);
+
+  auto *accessors = Accessors.getPointer();
+  if (!accessors) {
+    accessors = AccessorRecord::create(getASTContext(), SourceRange(),
+                                       implInfo, {});
+    Accessors.setPointer(accessors);
+    return;
+  }
+
+  accessors->overwriteImplInfo(implInfo);
 }
 
 bool AbstractStorageDecl::hasPrivateAccessor() const {
@@ -5514,6 +5523,15 @@ VarDecl::getPropertyWrapperBackingPropertyInfo() const {
 
 VarDecl *VarDecl::getPropertyWrapperBackingProperty() const {
   return getPropertyWrapperBackingPropertyInfo().backingVar;
+}
+
+VarDecl *VarDecl::getLazyStorageProperty() const {
+  auto &ctx = getASTContext();
+  auto mutableThis = const_cast<VarDecl *>(this);
+  return evaluateOrDefault(
+      ctx.evaluator,
+      LazyStoragePropertyRequest{mutableThis},
+      {});
 }
 
 static bool propertyWrapperInitializedViaInitialValue(
