@@ -18,12 +18,11 @@
 #ifndef SWIFT_REFLECTION_TYPEREFBUILDER_H
 #define SWIFT_REFLECTION_TYPEREFBUILDER_H
 
+#include "swift/Remote/MetadataReader.h"
 #include "swift/Reflection/MetadataSourceBuilder.h"
 #include "swift/Reflection/Records.h"
-#include "swift/Reflection/ReflectionInfo.h"
 #include "swift/Reflection/TypeLowering.h"
 #include "swift/Reflection/TypeRef.h"
-#include "swift/Remote/MetadataReader.h"
 #include "llvm/ADT/Optional.h"
 
 #include <iostream>
@@ -32,6 +31,119 @@
 
 namespace swift {
 namespace reflection {
+
+template <typename Runtime> class ReflectionContext;
+
+template <typename Iterator>
+class ReflectionSection {
+  using const_iterator = Iterator;
+  const void * Begin;
+  const void * End;
+
+public:
+  ReflectionSection(const void * Begin,
+                    const void * End)
+  : Begin(Begin), End(End) {}
+
+  ReflectionSection(uint64_t Begin, uint64_t End)
+  : Begin(reinterpret_cast<const void *>(Begin)),
+    End(reinterpret_cast<const void *>(End)) {}
+
+  void *startAddress() {
+    return const_cast<void *>(Begin);
+  }
+  const void *startAddress() const {
+    return Begin;
+  }
+  
+  const void *endAddress() const {
+    return End;
+  }
+
+  const_iterator begin() const {
+    return const_iterator(Begin, End);
+  }
+
+  const_iterator end() const {
+    return const_iterator(End, End);
+  }
+
+  size_t size() const {
+    return (const char *)End - (const char *)Begin;
+  }
+};
+
+using FieldSection = ReflectionSection<FieldDescriptorIterator>;
+using AssociatedTypeSection = ReflectionSection<AssociatedTypeIterator>;
+using BuiltinTypeSection = ReflectionSection<BuiltinTypeDescriptorIterator>;
+using CaptureSection = ReflectionSection<CaptureDescriptorIterator>;
+using GenericSection = ReflectionSection<const void *>;
+
+struct ReflectionInfo {
+  struct {
+    FieldSection Metadata;
+    uint64_t SectionOffset;
+  } Field;
+
+  struct {
+    AssociatedTypeSection Metadata;
+    uint64_t SectionOffset;
+  } AssociatedType;
+
+  struct {
+    BuiltinTypeSection Metadata;
+    uint64_t SectionOffset;
+  } Builtin;
+
+  struct {
+    CaptureSection Metadata;
+    uint64_t SectionOffset;
+  } Capture;
+
+  struct {
+    GenericSection Metadata;
+    uint64_t SectionOffset;
+  } TypeReference;
+
+  struct {
+    GenericSection Metadata;
+    uint64_t SectionOffset;
+  } ReflectionString;
+
+  uint64_t LocalStartAddress;
+  uint64_t RemoteStartAddress;
+};
+
+struct ClosureContextInfo {
+  std::vector<const TypeRef *> CaptureTypes;
+  std::vector<std::pair<const TypeRef *, const MetadataSource *>> MetadataSources;
+  unsigned NumBindings = 0;
+
+  void dump() const;
+  void dump(std::ostream &OS) const;
+};
+
+struct FieldTypeInfo {
+  std::string Name;
+  const TypeRef *TR;
+  bool Indirect;
+
+  FieldTypeInfo() : Name(""), TR(nullptr), Indirect(false) {}
+  FieldTypeInfo(const std::string &Name, const TypeRef *TR, bool Indirect)
+      : Name(Name), TR(TR), Indirect(Indirect) {}
+
+  static FieldTypeInfo forEmptyCase(std::string Name) {
+    return FieldTypeInfo(Name, nullptr, false);
+  }
+
+  static FieldTypeInfo forIndirectCase(std::string Name, const TypeRef *TR) {
+    return FieldTypeInfo(Name, TR, true);
+  }
+
+  static FieldTypeInfo forField(std::string Name, const TypeRef *TR) {
+    return FieldTypeInfo(Name, TR, false);
+  }
+};
 
 /// An implementation of MetadataReader's BuilderType concept for
 /// building TypeRefs, and parsing field metadata from any images

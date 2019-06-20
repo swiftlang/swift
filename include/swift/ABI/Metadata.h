@@ -124,9 +124,9 @@ struct External {
 
   template <typename T, bool Nullable = false>
   using RelativeIndirectablePointer = int32_t;
-
+  
   template <typename T, bool Nullable = true>
-  using RelativeDirectPointer = RelativeDirectPointer<T, Nullable>;
+  using RelativeDirectPointer = int32_t;
 };
 
 /// Template for branching on native pointer types versus external ones
