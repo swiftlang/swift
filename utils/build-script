@@ -847,6 +847,15 @@ def clean_delay():
     print('\b\b\b\bnow.')
 
 
+def get_default_preset_substitutions():
+    """Return a dictionary consisting of default substitutions for use with any
+    preset."""
+    result = {}
+    result['build_root'] = SWIFT_BUILD_ROOT
+    result['source_root'] = SWIFT_SOURCE_ROOT
+    return result
+
+
 # Main entry point for the preset mode.
 def main_preset():
     parser = argparse.ArgumentParser(
@@ -945,7 +954,7 @@ def main_preset():
     if not args.preset:
         diagnostics.fatal("missing --preset option")
 
-    args.preset_substitutions = {}
+    args.preset_substitutions = get_default_preset_substitutions()
     for arg in args.preset_substitutions_raw:
         name, value = arg.split("=", 1)
         args.preset_substitutions[name] = value
