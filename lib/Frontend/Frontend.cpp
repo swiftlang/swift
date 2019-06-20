@@ -825,6 +825,18 @@ void CompilerInstance::parseAndCheckTypesUpTo(
                         options.WarnLongExpressionTypeChecking,
                         options.SolverExpressionTimeThreshold,
                         options.SwitchCheckingInvocationThreshold);
+
+    if (!Context->hadError() && Invocation.getFrontendOptions().PCMacro) {
+      performPCMacro(SF, PersistentState.getTopLevelContext());
+    }
+
+    // Playground transform knows to look out for PCMacro's changes and not
+    // to playground log them.
+    if (!Context->hadError() &&
+        Invocation.getFrontendOptions().PlaygroundTransform) {
+      performPlaygroundTransform(
+          SF, Invocation.getFrontendOptions().PlaygroundHighPerformance);
+    }
   });
 
   if (Invocation.isCodeCompletion()) {
@@ -965,17 +977,6 @@ void CompilerInstance::parseAndTypeCheckMainFileUpTo(
     performDebuggerTestingTransform(MainFile);
   }
 
-  if (mainIsPrimary && !Context->hadError() &&
-      Invocation.getFrontendOptions().PCMacro) {
-    performPCMacro(MainFile, PersistentState.getTopLevelContext());
-  }
-
-  // Playground transform knows to look out for PCMacro's changes and not
-  // to playground log them.
-  if (mainIsPrimary && !Context->hadError() &&
-      Invocation.getFrontendOptions().PlaygroundTransform)
-    performPlaygroundTransform(
-        MainFile, Invocation.getFrontendOptions().PlaygroundHighPerformance);
   if (!mainIsPrimary) {
     performNameBinding(MainFile);
   }
