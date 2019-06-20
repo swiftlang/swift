@@ -285,6 +285,7 @@ class swift::ParseableInterfaceBuilder {
   const SourceLoc diagnosticLoc;
   DependencyTracker *const dependencyTracker;
   CompilerInvocation subInvocation;
+  SmallVector<StringRef, 3> extraDependencies;
 
   void configureSubInvocationInputsAndOutputs(StringRef OutPath) {
     auto &SubFEOpts = subInvocation.getFrontendOptions();
@@ -398,6 +399,8 @@ class swift::ParseableInterfaceBuilder {
     auto DTDeps = SubInstance.getDependencyTracker()->getDependencies();
     SmallVector<StringRef, 16> InitialDepNames(DTDeps.begin(), DTDeps.end());
     InitialDepNames.push_back(interfacePath);
+    InitialDepNames.insert(InitialDepNames.end(),
+                           extraDependencies.begin(), extraDependencies.end());
     llvm::StringSet<> AllDepNames;
     SmallString<128> Scratch;
 
@@ -486,6 +489,12 @@ public:
 
   const CompilerInvocation &getSubInvocation() const {
     return subInvocation;
+  }
+
+  /// Ensures the requested file name is added as a dependency of the resulting
+  /// module.
+  void addExtraDependency(StringRef path) {
+    extraDependencies.push_back(path);
   }
 
   bool buildSwiftModule(StringRef OutPath, bool ShouldSerializeDeps,
@@ -682,6 +691,15 @@ struct ModuleRebuildInfo {
   void addMissingDependency(StringRef modulePath, StringRef depPath) {
     getOrInsertOutOfDateModule(modulePath)
       .missingDependencies.push_back(depPath);
+  }
+
+  /// Determines if we saw the given module path and registered is as out of
+  /// date.
+  bool sawOutOfDateModule(StringRef modulePath) {
+    for (auto &mod : outOfDateModules)
+      if (mod.path == modulePath)
+        return true;
+    return false;
   }
 
   const char *invalidModuleReason(serialization::Status status) {
@@ -1330,6 +1348,14 @@ class ParseableInterfaceModuleLoaderImpl {
       rebuildInfo.diagnose(ctx, diagnosticLoc, moduleName,
                            interfacePath);
     }
+
+    // If we found an out-of-date .swiftmodule, we still want to add it as
+    // a dependency of the .swiftinterface. That way if it's updated, but
+    // the .swiftinterface remains the same, we invalidate the cache and
+    // check the new .swiftmodule, because it likely has more information
+    // about the state of the world.
+    if (rebuildInfo.sawOutOfDateModule(modulePath))
+      builder.addExtraDependency(modulePath);
 
     if (builder.buildSwiftModule(cachedOutputPath, /*shouldSerializeDeps*/true,
                                  &moduleBuffer))
