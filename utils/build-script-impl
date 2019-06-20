@@ -2949,7 +2949,7 @@ for host in "${ALL_HOSTS[@]}"; do
             # When we are building LLVM copy over the compiler-rt
             # builtins for iOS/tvOS/watchOS to ensure that Swift's
             # stdlib can use compiler-rt builtins when targetting iOS/tvOS/watchOS.
-            if [[ "${product}" == "llvm" ]]; then
+            if [[ "${product}" == "llvm" && "${BUILD_LLVM}" == "1" ]]; then
                 if [[ "$(uname -s)" == "Darwin" ]] ; then
                     HOST_CXX_DIR=$(dirname "${HOST_CXX}")
                     HOST_CXX_BUILTINS_VERSION=$(ls "$HOST_CXX_DIR/../lib/clang" | awk '{print $0}')
