@@ -1002,7 +1002,7 @@ void UnqualifiedLookupFactory::addUnavailableInnerResults() {
 void UnqualifiedLookupFactory::lookForAModuleWithTheGivenName(
     DeclContext *const dc) {
   using namespace namelookup;
-  if (!Name.isSimpleName())
+  if (!Name.isSimpleName() || Name.isSpecial())
     return;
 
   // Look for a module with the given name.
