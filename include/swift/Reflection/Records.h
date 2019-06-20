@@ -17,11 +17,9 @@
 #ifndef SWIFT_REFLECTION_RECORDS_H
 #define SWIFT_REFLECTION_RECORDS_H
 
-#include "swift/Basic/LLVM.h"
 #include "swift/Basic/RelativePointer.h"
 #include "swift/Demangling/Demangle.h"
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/StringRef.h"
 
 namespace swift {
 
