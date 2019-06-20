@@ -5,6 +5,9 @@
 
 // REQUIRES: executable_test
 
+// XFAIL: swift_test_mode_optimize
+// XFAIL: swift_test_mode_optimize_size
+
 import StdlibUnittest
 
 dynamic func replaceable() -> Int {
