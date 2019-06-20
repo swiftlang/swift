@@ -1518,6 +1518,7 @@ void IRGenerator::emitDynamicReplacements() {
   autoReplacements.addInt32(1); // number of replacement entries.
   auto autoReplacementsArray = autoReplacements.beginArray();
   autoReplacementsArray.addRelativeAddress(var);
+  autoReplacementsArray.addInt32(0); // unused flags.
   autoReplacementsArray.finishAndAddTo(autoReplacements);
   auto autoReplVar = autoReplacements.finishAndCreateGlobal(
       "\x01l_auto_dynamic_replacements", IGM.getPointerAlignment(),
