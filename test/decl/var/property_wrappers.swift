@@ -915,6 +915,6 @@ struct MissingPropertyWrapperUnwrap {
   }
 
   func bar() {
-    foo(self.x) //expected-error {{wrapped value of type 'Int' must be unwraped to value of type 'Foo<Int>'}}{{14-14=$}}
+    foo(self.x) //expected-error {{property 'x' will be unwrapped to value of type 'Int', use '$' to refer to the 'Foo<Int>' property wrapper}}{{14-14=$}}
   }
 }

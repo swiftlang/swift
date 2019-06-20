@@ -2186,53 +2186,22 @@ bool ConstraintSystem::repairFailures(
                                 loc));
     }
 
-    Expr *argAnchor = nullptr;
-    if (auto *AE = dyn_cast<ApplyExpr>(loc->getAnchor())) {
-      auto *args = AE->getArg();
+    auto anchor = simplifyLocatorToAnchor(*this, loc);
+    auto resolvedOverload = findSelectedOverloadFor(anchor);
 
-      if (auto *TE = dyn_cast<TupleExpr>(args))
-        argAnchor = TE->getElement(elt.getValue());
-      if (auto *PE = dyn_cast<ParenExpr>(args))
-        argAnchor = PE->getSubExpr();
-    }
+    auto wrappedProperty = getPropertyWrapperInformation(resolvedOverload);
+    if (wrappedProperty) {
+      auto wrapperTy = wrappedProperty->second;
+      auto result = matchTypes(
+          wrapperTy, rhs, ConstraintKind::Subtype,
+          TypeMatchFlags::TMF_ApplyingFix, resolvedOverload->Locator);
 
-    if (!argAnchor)
-      break;
-
-    // Find the resolved overload related to this
-    auto resolvedOverload = getResolvedOverloadSets();
-    while (resolvedOverload) {
-      if (resolvedOverload->Locator->getAnchor() == argAnchor)
-        break;
-      resolvedOverload = resolvedOverload->Previous;
-    }
-
-    if (resolvedOverload && resolvedOverload->Choice.isDecl()) {
-      if (auto *decl =
-              dyn_cast<VarDecl>(resolvedOverload->Choice.getDecl())) {
-        if (decl->hasAttachedPropertyWrapper()) {
-          auto rawWrapperTy = decl->getAttachedPropertyWrapperType(0);
-          auto wrapperTy =
-              openUnboundGenericType(rawWrapperTy, resolvedOverload->Locator);
-          auto wrappedInfo = decl->getAttachedPropertyWrapperTypeInfo(0);
-          auto valueTy = wrapperTy->getTypeOfMember(
-              DC->getParentModule(), wrappedInfo.valueVar,
-              wrappedInfo.valueVar->getValueInterfaceType());
-          if (!valueTy->hasError()) {
-            addConstraint(ConstraintKind::Equal, lhs, valueTy,
-                          resolvedOverload->Locator);
-            auto result = matchTypes(
-                wrapperTy, rhs, ConstraintKind::Subtype,
-                TypeMatchFlags::TMF_ApplyingFix, resolvedOverload->Locator);
-
-            if (result.isSuccess()) {
-              conversionsOrFixes.push_back(InsertPropertyWrapperUnwrap::create(
-                  *this, lhs, wrapperTy, loc));
-            }
-          }
-        }
+      if (result.isSuccess()) {
+        conversionsOrFixes.push_back(InsertPropertyWrapperUnwrap::create(
+            *this, wrappedProperty->first->getFullName(), lhs, wrapperTy, loc));
       }
     }
+
     break;
   }
 
