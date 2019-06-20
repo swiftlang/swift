@@ -1959,6 +1959,9 @@ static bool addTypeCoerceFixit(InFlightDiagnostic &diag, ConstraintSystem &CS,
     fromType = fromType->getOptionalObjectType();
   toType = toType->lookThroughAllOptionalTypes();
 
+  if (!toType->hasTypeRepr())
+    return false;
+
   CheckedCastKind Kind = CS.getTypeChecker().typeCheckCheckedCast(
       fromType, toType, CheckedCastContextKind::None, CS.DC, SourceLoc(),
       nullptr, SourceRange());
