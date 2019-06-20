@@ -720,7 +720,8 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
   case serialization::Status::FailedToLoadBridgingHeader:
     // We already emitted a diagnostic about the bridging header. Just emit
     // a generic message here.
-    Ctx.Diags.diagnose(diagLoc, diag::serialization_load_failed, ModuleName);
+    Ctx.Diags.diagnose(diagLoc, diag::serialization_load_failed,
+                       ModuleName.str());
     break;
 
   case serialization::Status::NameMismatch: {
