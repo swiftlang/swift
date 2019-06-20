@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -33,12 +33,7 @@ namespace SourceKit {
 /// requests respond with an invalid request error if you try):
 /// - source.request.editor.open: Associates the given custom filesystem with
 ///                               this editor file, so that all subsequent
-///                               operations on this editor file use it. Sending
-///                               another 'source.request.editor.open' with
-///                               'key.vfs.name' replaces the filesystem.
-///                               Sending another 'source.request.editor.open'
-///                               without 'key.vfs.name' resets it to the default
-///                               filesystem.
+///                               operations on this editor file use it.
 /// - source.request.codecomplete: Uses the given custom filesystem to process.
 /// - source.request.cursorinfo: Uses the given custom filesystem to process.
 class FileSystemProvider {
