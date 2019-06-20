@@ -782,6 +782,30 @@ public:
   void cacheResult(OpaqueReadOwnership value) const;
 };
 
+/// Request to build the underlying storage for a lazy property.
+class LazyStoragePropertyRequest :
+    public SimpleRequest<LazyStoragePropertyRequest,
+                         CacheKind::Cached,
+                         VarDecl *,
+                         VarDecl *> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<VarDecl *>
+  evaluate(Evaluator &evaluator, VarDecl *lazyVar) const;
+
+public:
+  // Cycle handling
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+
+  bool isCached() const { return true; }
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>

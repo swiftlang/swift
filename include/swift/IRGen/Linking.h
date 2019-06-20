@@ -468,11 +468,12 @@ class LinkEntity {
   // in order to avoid bloating LinkEntity out to three key pointers.
   static unsigned getAssociatedTypeIndex(const ProtocolConformance *conformance,
                                          AssociatedTypeDecl *associate) {
-    assert(conformance->getProtocol() == associate->getProtocol());
+    auto *proto = associate->getProtocol();
+    assert(conformance->getProtocol() == proto);
     unsigned result = 0;
-    for (auto requirement : associate->getProtocol()->getMembers()) {
+    for (auto requirement : proto->getAssociatedTypeMembers()) {
       if (requirement == associate) return result;
-      if (isa<AssociatedTypeDecl>(requirement)) result++;
+      result++;
     }
     llvm_unreachable("didn't find associated type in protocol?");
   }
