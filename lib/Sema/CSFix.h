@@ -652,8 +652,8 @@ public:
   bool diagnose(Expr *root, bool asNote = false) const override;
 
   static InsertPropertyWrapperUnwrap *create(ConstraintSystem &cs,
-                                             DeclName propertyName,
-                                             Type base, Type wrapper,
+                                             DeclName propertyName, Type base,
+                                             Type wrapper,
                                              ConstraintLocator *locator);
 };
 

@@ -25,20 +25,20 @@
 #include "ConstraintLocator.h"
 #include "OverloadChoice.h"
 #include "TypeChecker.h"
-#include "swift/Basic/LLVM.h"
-#include "swift/Basic/OptionSet.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/NameLookup.h"
-#include "swift/AST/Types.h"
-#include "swift/AST/TypeCheckerDebugConsumer.h"
-#include "llvm/ADT/ilist.h"
-#include "llvm/ADT/PointerUnion.h"
 #include "swift/AST/PropertyWrappers.h"
+#include "swift/AST/TypeCheckerDebugConsumer.h"
+#include "swift/AST/Types.h"
+#include "swift/Basic/LLVM.h"
+#include "swift/Basic/OptionSet.h"
+#include "llvm/ADT/PointerUnion.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetOperations.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
-#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/ilist.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/Timer.h"
 #include "llvm/Support/raw_ostream.h"
@@ -2263,11 +2263,10 @@ public:
   Optional<std::pair<VarDecl *, Type>>
   getPropertyWrapperInformation(ResolvedOverloadSetListItem *resolvedOverload) {
     if (resolvedOverload && resolvedOverload->Choice.isDecl()) {
-      if (auto *decl =
-              dyn_cast<VarDecl>(resolvedOverload->Choice.getDecl())) {
+      if (auto *decl = dyn_cast<VarDecl>(resolvedOverload->Choice.getDecl())) {
         if (decl->hasAttachedPropertyWrapper()) {
-          auto rawWrapperTy = decl->getAttachedPropertyWrapperType(0);
-          return std::make_pair(decl, rawWrapperTy);
+          auto wrapperTy = decl->getPropertyWrapperBackingPropertyType();
+          return std::make_pair(decl, wrapperTy);
         }
       }
     }

@@ -285,8 +285,7 @@ bool InsertPropertyWrapperUnwrap::diagnose(Expr *root, bool asNote) const {
 }
 
 InsertPropertyWrapperUnwrap *
-InsertPropertyWrapperUnwrap::create(ConstraintSystem &cs,
-                                    DeclName propertyName,
+InsertPropertyWrapperUnwrap::create(ConstraintSystem &cs, DeclName propertyName,
                                     Type base, Type wrapper,
                                     ConstraintLocator *locator) {
   return new (cs.getAllocator())

@@ -4784,21 +4784,13 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
 
       auto wrappedProperty = getPropertyWrapperInformation(resolvedOverload);
       if (wrappedProperty) {
-        auto wrapperTy = wrappedProperty->second->castTo<UnboundGenericType>();
-
-        llvm::SmallVector<Type, 4> genericArgs;
-        genericArgs.push_back(baseTy);
-        auto newBase = BoundGenericType::get(
-            dyn_cast<NominalTypeDecl>(wrapperTy->getDecl()),
-            Type(), genericArgs);
-
-        auto result = solveWithNewBaseOrName(newBase, member);
+        auto wrapperTy = wrappedProperty->second;
+        auto result = solveWithNewBaseOrName(wrapperTy, member);
         if (result == SolutionKind::Solved) {
           auto *fix = InsertPropertyWrapperUnwrap::create(
-              *this, resolvedOverload->Choice.getDecl()->getFullName(),
-              baseTy, newBase, locator);
-          return recordFix(fix) ? SolutionKind::Error
-                                  : SolutionKind::Solved;
+              *this, resolvedOverload->Choice.getDecl()->getFullName(), baseTy,
+              wrapperTy, locator);
+          return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
         }
       }
     }

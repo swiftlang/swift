@@ -799,9 +799,8 @@ class MissingPropertyWrapperUnwrapFailure final : public ContextualFailure {
 
 public:
   MissingPropertyWrapperUnwrapFailure(Expr *root, ConstraintSystem &cs,
-                                      DeclName propertyName,
-                                      Type base, Type wrapper,
-                                      ConstraintLocator *locator)
+                                      DeclName propertyName, Type base,
+                                      Type wrapper, ConstraintLocator *locator)
       : ContextualFailure(root, cs, base, wrapper, locator),
         PropertyName(propertyName) {}
 
