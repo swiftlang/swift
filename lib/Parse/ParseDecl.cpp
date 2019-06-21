@@ -1753,8 +1753,12 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc At
       Tok.isNot(tok::kw_inout)) {
 
     if (Tok.is(tok::code_complete)) {
-      if (CodeCompletion)
-        CodeCompletion->completeDeclAttrBeginning(isInSILMode());
+      if (CodeCompletion) {
+        auto ccLine = SourceMgr.getLineNumber(Tok.getLoc());
+        auto nextLine = SourceMgr.getLineNumber(peekToken().getLoc());
+        CodeCompletion->completeDeclAttrBeginning(isInSILMode(),
+                                                  (nextLine - ccLine) > 1);
+      }
       consumeToken(tok::code_complete);
       return makeParserCodeCompletionStatus();
     }
