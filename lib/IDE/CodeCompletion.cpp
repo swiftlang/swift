@@ -1351,6 +1351,13 @@ public:
   void setAttrTargetDeclKind(Optional<DeclKind> DK) override {
     if (DK == DeclKind::PatternBinding)
       DK = DeclKind::Var;
+
+    // If the target is already set to 'Module', that means the completion
+    // should be performed as if it's not tied to any specific decl.
+    // see 'completeDeclAttrBeginning()'
+    if (AttTargetDK == DeclKind::Module)
+      DK = None;
+
     AttTargetDK = DK;
   }
 
@@ -1373,7 +1380,7 @@ public:
   void completeCaseStmtKeyword() override;
   void completeCaseStmtBeginning() override;
   void completeCaseStmtDotPrefix() override;
-  void completeDeclAttrBeginning(bool Sil) override;
+  void completeDeclAttrBeginning(bool Sil, bool isIndependent) override;
   void completeDeclAttrParam(DeclAttrKind DK, int Index) override;
   void completeInPrecedenceGroup(SyntaxKind SK) override;
   void completeNominalMemberBeginning(
@@ -4606,10 +4613,15 @@ void CodeCompletionCallbacksImpl::completeDeclAttrParam(DeclAttrKind DK,
   CurDeclContext = P.CurDeclContext;
 }
 
-void CodeCompletionCallbacksImpl::completeDeclAttrBeginning(bool Sil) {
+void CodeCompletionCallbacksImpl::completeDeclAttrBeginning(
+    bool Sil, bool isIndependent) {
   Kind = CompletionKind::AttributeBegin;
   IsInSil = Sil;
   CurDeclContext = P.CurDeclContext;
+
+  // Use 'DeclKind::Module' as the indicator of "This is independent attribute".
+  if (isIndependent)
+    AttTargetDK = DeclKind::Module;
 }
 
 void CodeCompletionCallbacksImpl::completeInPrecedenceGroup(SyntaxKind SK) {
@@ -5373,6 +5385,8 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   }
 
   case CompletionKind::AttributeBegin: {
+    assert(AttTargetDK != DeclKind::Module &&
+           "'setAttrTargetDeclKind()' hasn't been called");
     Lookup.getAttributeDeclCompletions(IsInSil, AttTargetDK);
 
     // TypeName at attribute position after '@'.

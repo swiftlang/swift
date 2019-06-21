@@ -10,7 +10,9 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ON_PROPERTY | %FileCheck %s -check-prefix=ON_PROPERTY
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ON_METHOD | %FileCheck %s -check-prefix=ON_METHOD
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ON_PARAM | %FileCheck %s -check-prefix=ON_PARAM
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ON_MEMBER_INDEPENDENT | %FileCheck %s -check-prefix=ON_MEMBER_LAST
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ON_MEMBER_LAST | %FileCheck %s -check-prefix=ON_MEMBER_LAST
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=KEYWORD_INDEPENDENT | %FileCheck %s -check-prefix=KEYWORD_LAST
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=KEYWORD_LAST | %FileCheck %s -check-prefix=KEYWORD_LAST
 
 struct MyStruct {}
@@ -160,6 +162,7 @@ struct _S {
 // ON_PROPERTY: End completions
 
   @#^ON_METHOD^#
+  private
   func foo()
 // ON_METHOD: Begin completions
 // ON_METHOD-DAG: Keyword/None:                       available[#Func Attribute#]; name=available
@@ -183,6 +186,10 @@ struct _S {
 // ON_PARAM: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // ON_PARAM-NOT: Keyword
 // ON_PARAM: End completions
+
+  @#^ON_MEMBER_INDEPENDENT^#
+
+  func dummy() {}
 
   @#^ON_MEMBER_LAST^#
 // ON_MEMBER_LAST: Begin completions
@@ -215,6 +222,10 @@ struct _S {
 // ON_MEMBER_LAST-NOT: Decl[PrecedenceGroup]
 // ON_MEMBER_LAST: End completions
 }
+
+@#^KEYWORD_INDEPENDENT^#
+
+func dummy() {}
 
 @#^KEYWORD_LAST^#
 
