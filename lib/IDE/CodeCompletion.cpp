@@ -1352,7 +1352,12 @@ public:
   void setAttrTargetDeclKind(Optional<DeclKind> DK) override {
     if (DK == DeclKind::PatternBinding)
       DK = DeclKind::Var;
-    AttTargetDK = DK;
+    else if (DK == DeclKind::Param)
+      // For params, consider the attribute is always for the decl.
+      AttTargetIsIndependent = false;
+
+    if (!AttTargetIsIndependent)
+      AttTargetDK = DK;
   }
 
   void completeExpr() override;
@@ -5376,16 +5381,13 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   }
 
   case CompletionKind::AttributeBegin: {
-    auto DK = AttTargetDK;
-    if (AttTargetIsIndependent)
-      DK = None;
-    Lookup.getAttributeDeclCompletions(IsInSil, DK);
+    Lookup.getAttributeDeclCompletions(IsInSil, AttTargetDK);
 
     // TypeName at attribute position after '@'.
     // - VarDecl: Property Wrappers.
     // - ParamDecl/VarDecl/FuncDecl: Function Buildres.
-    if (!DK.hasValue() || *DK == DeclKind::Var || *DK == DeclKind::Param ||
-        *DK == DeclKind::Func)
+    if (!AttTargetDK || *AttTargetDK == DeclKind::Var ||
+        *AttTargetDK == DeclKind::Param || *AttTargetDK == DeclKind::Func)
       Lookup.getTypeCompletionsInDeclContext(
           P.Context.SourceMgr.getCodeCompletionLoc());
     break;
