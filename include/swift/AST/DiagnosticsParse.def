@@ -1517,7 +1517,7 @@ ERROR(expected_colon_after_label,PointsToFirstBadToken,
       "expected a colon ':' after '%0'", (StringRef))
 ERROR(diff_params_clause_expected_parameter,PointsToFirstBadToken,
       "expected a parameter, which can be a function parameter name, "
-      "'unsigned int' parameter number or 'self'",
+      "parameter index, or 'self'",
       ())
 
 // [differentiable ...] (sil-decl attr)
