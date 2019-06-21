@@ -1754,10 +1754,11 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc At
 
     if (Tok.is(tok::code_complete)) {
       if (CodeCompletion) {
-        auto ccLine = SourceMgr.getLineNumber(Tok.getLoc());
-        auto nextLine = SourceMgr.getLineNumber(peekToken().getLoc());
-        CodeCompletion->completeDeclAttrBeginning(isInSILMode(),
-                                                  (nextLine - ccLine) > 1);
+        // If the next token is not on the same line, this attribute might be
+        // starting new declaration instead of adding attribute to existing
+        // decl.
+        auto isIndependent = peekToken().isAtStartOfLine();
+        CodeCompletion->completeDeclAttrBeginning(isInSILMode(), isIndependent);
       }
       consumeToken(tok::code_complete);
       return makeParserCodeCompletionStatus();
