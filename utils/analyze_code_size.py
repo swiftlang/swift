@@ -207,6 +207,7 @@ class Categories(object):
         names.extend([c[0] for c in self.category_mangled_matching])
         names.append('Unknown')
         total_size = 0
+        sorted_categories = []
         for name in names:
             category = self.categories.get(name)
             size = 0
@@ -214,8 +215,12 @@ class Categories(object):
                 size = category.size
             total_size += size
             if size > 0:
-                print("%60s: %8d (%6.2f%%)" %
-                      (name, size, (float(size) * 100) / section_size))
+                sorted_categories.append(
+                        (name, size, (float(size) * 100) / section_size))
+        sorted_categories.sort(key = lambda entry : entry [1], reverse=True)
+        for category in sorted_categories:
+            print("%60s: %8d (%6.2f%%)" %
+                    (category[0], category[1], category[2]))
         print("%60s: %8d (%6.2f%%)" % ('TOTAL', total_size, float(100)))
 
     def uncatorizedSymbols(self):
