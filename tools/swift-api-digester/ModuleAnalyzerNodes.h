@@ -164,6 +164,10 @@ class SDKContext {
   std::vector<BreakingAttributeInfo> BreakingAttrs;
 
 public:
+  // Define the set of known identifiers.
+#define IDENTIFIER_WITH_NAME(Name, IdStr) StringRef Id_##Name = IdStr;
+#include "swift/AST/KnownIdentifiers.def"
+
   SDKContext(CheckerOptions Options);
   llvm::BumpPtrAllocator &allocator() {
     return Allocator;
