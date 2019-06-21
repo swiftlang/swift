@@ -336,7 +336,7 @@ protected:
     NumProtocols : 16
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(TypeVariableType, TypeBase, 64-NumTypeBaseBits,
+  SWIFT_INLINE_BITFIELD_FULL(TypeVariableType, TypeBase, 20+4+20,
     /// The unique number assigned to this type variable.
     ID : 20,
 
