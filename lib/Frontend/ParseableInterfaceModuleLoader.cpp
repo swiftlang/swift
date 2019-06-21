@@ -18,6 +18,7 @@
 #include "swift/AST/FileSystem.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/Lazy.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/STLExtras.h"
@@ -563,6 +564,17 @@ public:
       SubInstance.addDiagnosticConsumer(&FDC);
 
       SubInstance.createDependencyTracker(FEOpts.TrackSystemDeps);
+
+      SWIFT_DEFER {
+        // Make sure to emit a generic top-level error if a module fails to
+        // load. This is not only good for users; it also makes sure that we've
+        // emitted an error in the parent diagnostic engine, which is what
+        // determines whether the process exits with a proper failure status.
+        if (SubInstance.getASTContext().hadError()) {
+          diags.diagnose(diagnosticLoc, diag::serialization_load_failed,
+                         moduleName);
+        }
+      };
 
       if (SubInstance.setup(subInvocation)) {
         SubError = true;
