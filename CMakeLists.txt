@@ -1082,6 +1082,7 @@ else()
   # ensure we build that when building tools.
   if(SWIFT_INCLUDE_TOOLS)
     add_subdirectory(stdlib/public/Reflection)
+    add_subdirectory(stdlib/public/SwiftShims)
   endif()
 endif()
 
