@@ -2334,8 +2334,8 @@ public:
 
     swift::markup::MarkupContext MC;
     auto DC = getSingleDocComment(MC, D);
-    if (DC.hasValue())
-      swift::markup::dump(DC.getValue()->getDocument(), OS);
+    if (DC)
+      swift::markup::dump(DC->getDocument(), OS);
 
     return true;
   }
