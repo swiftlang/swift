@@ -142,7 +142,7 @@ func testClike8(t: Int, x: CLike8) -> Int {
 // assigned values in the data area of the enum in declaration order
 // CHECK-LABEL: define hidden swiftcc double @"$s8test_v7k0A7SingleP{{.*}}"(i32, i32, i8)
 // CHECK: br i1
-// CHECK: switch i32 [[ID:%[0-9]+]]
+// CHECK: switch i64 [[ID:%[0-9]+]]
 // CHECK: [[FIRST:%[0-9]+]] = zext i32 %0 to i64
 // CHECK: [[SECOND:%[0-9]+]] = zext i32 %1 to i64
 // CHECK: [[TEMP:%[0-9]+]] = shl i64 [[SECOND]], 32
