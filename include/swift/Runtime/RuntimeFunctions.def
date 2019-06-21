@@ -638,7 +638,7 @@ FUNCTION(GetGenericMetadata, swift_getGenericMetadata,
 //                                     const OpaqueTypeDescriptor *descriptor,
 //                                     uintptr_t index);
 FUNCTION(GetOpaqueTypeMetadata, swift_getOpaqueTypeMetadata,
-         SwiftCC, ConditionallyAvailable,
+         SwiftCC, OpaqueTypeAvailability,
          RETURNS(TypeMetadataResponseTy),
          ARGS(SizeTy, Int8PtrTy, OpaqueTypeDescriptorPtrTy, SizeTy),
          ATTRS(NoUnwind, ReadOnly))
@@ -647,7 +647,7 @@ FUNCTION(GetOpaqueTypeMetadata, swift_getOpaqueTypeMetadata,
 //                                     const OpaqueTypeDescriptor *descriptor,
 //                                     uintptr_t index);
 FUNCTION(GetOpaqueTypeConformance, swift_getOpaqueTypeConformance,
-         SwiftCC, ConditionallyAvailable,
+         SwiftCC, OpaqueTypeAvailability,
          RETURNS(WitnessTablePtrTy),
          ARGS(Int8PtrTy, OpaqueTypeDescriptorPtrTy, SizeTy),
          ATTRS(NoUnwind, ReadOnly))
@@ -1226,13 +1226,13 @@ FUNCTION(EndAccess, swift_endAccess, C_CC, AlwaysAvailable,
          ATTRS(NoUnwind))
 
 FUNCTION(GetOrigOfReplaceable, swift_getOrigOfReplaceable, C_CC,
-         AvailableByCompatibilityLibrary,
+         DynamicReplacementAvailability,
          RETURNS(FunctionPtrTy),
          ARGS(FunctionPtrTy->getPointerTo()),
          ATTRS(NoUnwind))
 
 FUNCTION(GetReplacement, swift_getFunctionReplacement, C_CC,
-         AvailableByCompatibilityLibrary,
+         DynamicReplacementAvailability,
          RETURNS(FunctionPtrTy),
          ARGS(FunctionPtrTy->getPointerTo(), FunctionPtrTy),
          ATTRS(NoUnwind))

@@ -38,7 +38,6 @@ llvm::Constant *getRuntimeFn(llvm::Module &Module,
                       char const *name,
                       llvm::CallingConv::ID cc,
                       RuntimeAvailability availability,
-                      ASTContext *context,
                       llvm::ArrayRef<llvm::Type*> retTypes,
                       llvm::ArrayRef<llvm::Type*> argTypes,
                       llvm::ArrayRef<llvm::Attribute::AttrKind> attrs);
