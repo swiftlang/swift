@@ -21,6 +21,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangModule.h"
@@ -4754,6 +4755,25 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
                                       flags, locatorB);
     };
 
+    // Check if any property wrappers on the base of the member lookup have
+    // mactching members that we can fall back to.
+    if (auto dotExpr =
+            dyn_cast_or_null<UnresolvedDotExpr>(locator->getAnchor())) {
+      auto baseExpr = dotExpr->getBase();
+      auto resolvedOverload = findSelectedOverloadFor(baseExpr);
+      if (auto wrappedProperty =
+              getPropertyWrapperInformation(resolvedOverload)) {
+        auto wrapperTy = wrappedProperty->second;
+        auto result = solveWithNewBaseOrName(wrapperTy, member);
+        if (result == SolutionKind::Solved) {
+          auto *fix = InsertPropertyWrapperUnwrap::create(
+              *this, wrappedProperty->first->getFullName(), baseTy, wrapperTy,
+              locator);
+          return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+        }
+      }
+    }
+
     if (auto *funcType = baseTy->getAs<FunctionType>()) {
       // We can't really suggest anything useful unless
       // function takes no arguments, otherwise it
@@ -6700,6 +6720,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::TreatKeyPathSubscriptIndexAsHashable:
   case FixKind::AllowInvalidRefInKeyPath:
   case FixKind::ExplicitlySpecifyGenericArguments:
+  case FixKind::InsertPropertyWrapperUnwrap:
     llvm_unreachable("handled elsewhere");
   }
 

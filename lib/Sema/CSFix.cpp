@@ -260,6 +260,21 @@ InsertExplicitCall *InsertExplicitCall::create(ConstraintSystem &cs,
   return new (cs.getAllocator()) InsertExplicitCall(cs, locator);
 }
 
+bool InsertPropertyWrapperUnwrap::diagnose(Expr *root, bool asNote) const {
+  auto failure = MissingPropertyWrapperUnwrapFailure(
+      root, getConstraintSystem(), getPropertyName(), getBase(), getWrapper(),
+      getLocator());
+  return failure.diagnose(asNote);
+}
+
+InsertPropertyWrapperUnwrap *
+InsertPropertyWrapperUnwrap::create(ConstraintSystem &cs, DeclName propertyName,
+                                    Type base, Type wrapper,
+                                    ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      InsertPropertyWrapperUnwrap(cs, propertyName, base, wrapper, locator);
+}
+
 bool UseSubscriptOperator::diagnose(Expr *root, bool asNote) const {
   auto failure = SubscriptMisuseFailure(root, getConstraintSystem(), getLocator());
   return failure.diagnose(asNote);
