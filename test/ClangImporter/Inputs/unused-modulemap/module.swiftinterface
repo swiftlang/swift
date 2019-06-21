@@ -1,0 +1,4 @@
+// swift-interface-format-version: 1.0
+// swift-compiler-version: Swift version 5.1-dev (LLVM e56fafcd29, Swift e46d71ffe6)
+// swift-module-flags: -enable-library-evolution -module-name module
+import Swift

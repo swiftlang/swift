@@ -478,6 +478,10 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
       "-fretain-comments-from-system-headers",
 
       "-isystem", searchPathOpts.RuntimeResourcePath,
+
+      // Only record modulemaps in the dependency collector if they were
+      // actually loaded.
+      "-Xclang", "-skip-unused-modulemap-deps",
   });
 
   // Enable Position Independence.  `-fPIC` is not supported on Windows, which
