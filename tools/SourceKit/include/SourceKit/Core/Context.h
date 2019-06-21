@@ -16,7 +16,6 @@
 #include "SourceKit/Core/LLVM.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/StringMap.h"
 #include <memory>
 #include <string>
 
@@ -25,7 +24,6 @@ namespace llvm {
 }
 
 namespace SourceKit {
-  class FileSystemProvider;
   class LangSupport;
   class NotificationCenter;
 
@@ -33,8 +31,6 @@ class Context {
   std::string RuntimeLibPath;
   std::unique_ptr<LangSupport> SwiftLang;
   std::shared_ptr<NotificationCenter> NotificationCtr;
-
-  llvm::StringMap<FileSystemProvider *> FileSystemProviders;
 
 public:
   Context(StringRef RuntimeLibPath,
@@ -48,18 +44,6 @@ public:
   LangSupport &getSwiftLangSupport() { return *SwiftLang; }
 
   std::shared_ptr<NotificationCenter> getNotificationCenter() { return NotificationCtr; }
-
-  /// Returns the FileSystemProvider registered under Name, or nullptr if not
-  /// found.
-  FileSystemProvider *getFileSystemProvider(StringRef Name);
-
-  /// Registers the given FileSystemProvider under Name. The caller is
-  /// responsible for keeping FileSystemProvider alive at least as long as
-  /// this Context.
-  /// This should only be called during setup because it is not synchronized.
-  /// \param FileSystemProvider must be non-null
-  void setFileSystemProvider(StringRef Name,
-                             FileSystemProvider *FileSystemProvider);
 };
 
 } // namespace SourceKit

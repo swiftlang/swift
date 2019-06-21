@@ -15,6 +15,7 @@
 #include "SwiftLangSupport.h"
 #include "SourceKit/Core/Context.h"
 #include "SourceKit/Core/NotificationCenter.h"
+#include "SourceKit/Support/FileSystemProvider.h"
 #include "SourceKit/Support/ImmutableTextBuffer.h"
 #include "SourceKit/Support/Logging.h"
 #include "SourceKit/Support/Tracing.h"
@@ -2123,16 +2124,28 @@ void SwiftEditorDocument::reportDocumentStructure(SourceFile &SrcFile,
 
 void SwiftLangSupport::editorOpen(
     StringRef Name, llvm::MemoryBuffer *Buf, EditorConsumer &Consumer,
-    ArrayRef<const char *> Args,
-    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem) {
-  assert(FileSystem);
+    ArrayRef<const char *> Args, Optional<VFSOptions> vfsOptions) {
+  auto fileSystem = llvm::vfs::getRealFileSystem();
+  if (vfsOptions) {
+    auto provider = getFileSystemProvider(vfsOptions->name);
+    if (!provider) {
+      return Consumer.handleRequestError(
+          "unknown virtual filesystem 'key.vfs.name'");
+    }
+
+    SmallString<0> error;
+    fileSystem = provider->getFileSystem(vfsOptions->arguments, error);
+    if (!fileSystem) {
+      return Consumer.handleRequestError(error.c_str());
+    }
+  }
 
   ImmutableTextSnapshotRef Snapshot = nullptr;
   auto EditorDoc = EditorDocuments->getByUnresolvedName(Name);
   if (!EditorDoc) {
     EditorDoc = new SwiftEditorDocument(Name, *this);
     Snapshot = EditorDoc->initializeText(
-        Buf, Args, Consumer.needsSemanticInfo(), FileSystem);
+        Buf, Args, Consumer.needsSemanticInfo(), fileSystem);
     EditorDoc->parse(Snapshot, *this, Consumer.syntaxTreeEnabled());
     if (EditorDocuments->getOrUpdate(Name, *this, EditorDoc)) {
       // Document already exists, re-initialize it. This should only happen
@@ -2146,7 +2159,7 @@ void SwiftLangSupport::editorOpen(
 
   if (!Snapshot) {
     Snapshot = EditorDoc->initializeText(
-        Buf, Args, Consumer.needsSemanticInfo(), FileSystem);
+        Buf, Args, Consumer.needsSemanticInfo(), fileSystem);
     EditorDoc->parse(Snapshot, *this, Consumer.syntaxTreeEnabled());
   }
 
