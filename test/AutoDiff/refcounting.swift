@@ -23,6 +23,8 @@ public struct Vector : AdditiveArithmetic, VectorProtocol, Differentiable, Equat
   @differentiable(vjp: fakeVJP)
   public static func - (lhs: Vector, rhs: Vector) -> Vector { abort() }
 
+  public func adding(_ scalar: Float) -> Vector { abort() }
+  public func subtracting(_ scalar: Float) -> Vector { abort() }
   public func scaled(by scalar: Float) -> Vector { abort() }
 
   public static func fakeVJP(lhs: Vector, rhs: Vector) -> (Vector, (Vector) -> (Vector, Vector)) { abort() }
@@ -36,10 +38,10 @@ func testOwnedVector(_ x: Vector) -> Vector {
 }
 _ = pullback(at: Vector.zero, in: testOwnedVector)
 
-// CHECK-LABEL: enum {{.*}}testOwnedVector{{.*}}__Pred__src_0_wrt_0 {
-// CHECK-NEXT: }
 // CHECK-LABEL: struct {{.*}}testOwnedVector{{.*}}__PB__src_0_wrt_0 {
 // CHECK-NEXT:   @_hasStorage var pullback_0: (Vector) -> (Vector, Vector) { get set }
+// CHECK-NEXT: }
+// CHECK-LABEL: enum {{.*}}testOwnedVector{{.*}}__Pred__src_0_wrt_0 {
 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil hidden @{{.*}}UsesMethodOfNoDerivativeMember{{.*}}applied2to{{.*}}__adjoint_src_0_wrt_0_1

@@ -349,6 +349,7 @@ private:
     case Node::Kind::Directness:
     case Node::Kind::DynamicAttribute:
     case Node::Kind::EscapingAutoClosureType:
+    case Node::Kind::EscapingObjCBlock:
     case Node::Kind::NoEscapeFunctionType:
     case Node::Kind::ExplicitClosure:
     case Node::Kind::Extension:
@@ -1785,6 +1786,11 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
   }
   case Node::Kind::ObjCBlock: {
     Printer << "@convention(block) ";
+    printFunctionType(nullptr, Node);
+    return nullptr;
+  }
+  case Node::Kind::EscapingObjCBlock: {
+    Printer << "@escaping @convention(block) ";
     printFunctionType(nullptr, Node);
     return nullptr;
   }

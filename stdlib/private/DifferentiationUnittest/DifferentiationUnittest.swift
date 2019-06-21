@@ -114,7 +114,17 @@ extension Tracked : SignedNumeric & Numeric where T : SignedNumeric, T == T.Magn
   }
 
   public static func *= (lhs: inout Tracked, rhs: Tracked) {
-    lhs = Tracked(lhs.value * rhs.value)
+    lhs = lhs * rhs
+  }
+}
+
+extension Tracked where T : FloatingPoint {
+  public static func / (lhs: Tracked, rhs: Tracked) -> Tracked {
+    return Tracked(lhs.value / rhs.value)
+  }
+
+  public static func /= (lhs: inout Tracked, rhs: Tracked) {
+    lhs = lhs / rhs
   }
 }
 
@@ -178,6 +188,16 @@ extension Tracked where T : Differentiable & SignedNumeric, T == T.Magnitude,
   internal static func _vjpMultiply(lhs: Self, rhs: Self)
       -> (value: Self, pullback: (Self) -> (Self, Self)) {
     return (lhs * rhs, { v in (v * rhs, v * lhs) })
+  }
+}
+
+extension Tracked where T : Differentiable & FloatingPoint,
+                        T == T.AllDifferentiableVariables, T == T.TangentVector {
+  @usableFromInline
+  @differentiating(/)
+  internal static func _vjpDivide(lhs: Self, rhs: Self)
+      -> (value: Self, pullback: (Self) -> (Self, Self)) {
+    return (lhs / rhs, { v in (v / rhs, -lhs / (rhs * rhs) * v) })
   }
 }
 

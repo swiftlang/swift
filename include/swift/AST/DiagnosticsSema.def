@@ -393,6 +393,13 @@ ERROR(cannot_convert_closure_result_protocol,none,
       (Type, Type))
 ERROR(cannot_convert_closure_result_nil,none,
       "'nil' is not compatible with closure result type %0", (Type))
+ERROR(cannot_convert_parent_type,none,
+      "cannot convert parent type %0 to expected type %1",
+      (Type, Type))
+
+NOTE(generic_argument_mismatch,none,
+     "arguments to generic parameter %0 (%1 and %2) are expected to be equal",
+     (Identifier, Type, Type))
 
 ERROR(destructor_not_accessible,none,
       "deinitializers cannot be accessed", ())
@@ -4160,6 +4167,11 @@ ERROR(dynamic_with_transparent,none,
       "a declaration cannot be both '@_tranparent' and 'dynamic'",
       ())
 
+ERROR(dynamic_and_library_evolution_not_supported,none,
+      "marking non-'@objc' Swift declaration 'dynamic' in library evolution mode is not supported",
+      ())
+
+
 //------------------------------------------------------------------------------
 // MARK: @_dynamicReplacement(for:)
 //------------------------------------------------------------------------------
@@ -4562,7 +4574,8 @@ ERROR(property_wrapper_ambiguous_value_property, none,
   "named %1", (Type, Identifier))
 ERROR(property_wrapper_wrong_initial_value_init, none,
       "'init(initialValue:)' parameter type (%0) must be the same as its "
-      "'value' property type (%1) or an @autoclosure thereof", (Type, Type))
+      "'wrappedValue' property type (%1) or an @autoclosure thereof",
+      (Type, Type))
 ERROR(property_wrapper_failable_init, none,
       "%0 cannot be failable", (DeclName))
 ERROR(property_wrapper_ambiguous_initial_value_init, none,
@@ -4580,11 +4593,6 @@ ERROR(property_wrapper_attribute_not_on_property, none,
       (DeclName))
 NOTE(property_wrapper_declared_here,none,
      "property wrapper type %0 declared here", (DeclName))
-
-ERROR(property_wrapper_multiple,none,
-      "only one property wrapper can be attached to a given property", ())
-NOTE(previous_property_wrapper_here,none,
-      "previous property wrapper specified here", ())
 
 ERROR(property_wrapper_local,none,
       "property wrappers are not yet supported on local properties", ())
@@ -4609,18 +4617,12 @@ ERROR(property_with_wrapper_overrides,none,
       "property %0 with attached wrapper cannot override another property",
       (DeclName))
 
-ERROR(property_wrapper_and_normal_init,none,
-      "property %0 with attached wrapper cannot initialize both the "
-      "wrapper type and the property", (DeclName))
-ERROR(property_wrapper_init_without_initial_value, none,
-      "initializing property %0 with wrapper %1 that lacks "
-      "an 'init(initialValue:)' initializer", (DeclName, Type))
 NOTE(property_wrapper_direct_init,none,
      "initialize the property wrapper type directly with "
      "'(...') on the attribute", ())
 
 ERROR(property_wrapper_incompatible_property, none,
-      "property type %0 does not match that of the 'value' property of "
+      "property type %0 does not match that of the 'wrappedValue' property of "
       "its wrapper type %1", (Type, Type))
 
 ERROR(property_wrapper_type_access,none,
@@ -4637,6 +4639,50 @@ ERROR(property_wrapper_type_not_usable_from_inline,none,
       "%select{%select{variable|constant}0|property}1 "
       "must be '@usableFromInline' or public",
       (bool, bool))
+WARNING(property_wrapper_delegateValue,none,
+        "property wrapper's `delegateValue` property should be renamed to "
+        "'wrapperValue'; use of 'delegateValue' is deprecated", ())
+WARNING(property_wrapper_value,none,
+        "property wrapper's `value` property should be renamed to "
+        "'wrappedValue'; use of 'value' is deprecated", ())
+
+//------------------------------------------------------------------------------
+// MARK: function builder diagnostics
+//------------------------------------------------------------------------------
+ERROR(function_builder_decl, none,
+      "closure containing a declaration cannot be used with function "
+      "builder %0", (DeclName))
+NOTE(note_function_builder_decl, none,
+      "closure containing a declaration cannot be used with function "
+      "builder %0", (DeclName))
+ERROR(function_builder_control_flow, none,
+      "closure containing control flow statement cannot be used with function "
+      "builder %0", (DeclName))
+NOTE(note_function_builder_control_flow, none,
+      "closure containing control flow statement cannot be used with function "
+      "builder %0", (DeclName))
+ERROR(function_builder_attribute_not_allowed_here, none,
+      "function builder attribute %0 can only be applied to a parameter, "
+      "function, or computed property", (DeclName))
+ERROR(function_builder_attribute_on_storage_without_getter, none,
+      "function builder attribute %0 can only be applied to a "
+      "%select{subscript|property|constant|variable}1 if it defines a getter",
+      (DeclName, unsigned))
+ERROR(function_builder_parameter_not_of_function_type, none,
+      "function builder attribute %0 can only be applied to a parameter of "
+      "function type",
+      (DeclName))
+ERROR(function_builder_parameter_autoclosure, none,
+      "function builder attribute %0 cannot be applied to an autoclosure "
+      "parameter",
+      (DeclName))
+ERROR(function_builder_multiple, none,
+      "only one function builder attribute can be attached to a "
+      "%select{declaration|parameter}0", (bool))
+NOTE(previous_function_builder_here, none,
+     "previous function builder specified here", ())
+ERROR(function_builder_arguments, none,
+      "function builder attributes cannot have arguments", ())
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

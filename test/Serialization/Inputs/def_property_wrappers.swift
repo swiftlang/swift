@@ -1,4 +1,4 @@
-@_propertyWrapper
+@propertyWrapper
 public struct SomeWrapper<T> {
   public var value: T
 
@@ -12,7 +12,7 @@ public struct HasWrappers {
 }
 
 // SR-10844
-@_propertyWrapper
+@propertyWrapper
 class A<T: Equatable> {
 
   private var _value: T
@@ -27,7 +27,7 @@ class A<T: Equatable> {
   }
 }
 
-@_propertyWrapper
+@propertyWrapper
 class B: A<Double> {
   override var value: Double {
     get { super.value }

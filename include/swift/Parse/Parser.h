@@ -714,15 +714,15 @@ public:
 
   /// Add the given Decl to the current scope.
   void addToScope(ValueDecl *D, bool diagnoseRedefinitions = true) {
-    if (Context.LangOpts.EnableASTScopeLookup)
+    if (Context.LangOpts.DisableParserLookup)
       return;
 
     getScopeInfo().addToScope(D, *this, diagnoseRedefinitions);
   }
 
   ValueDecl *lookupInScope(DeclName Name) {
-    if (Context.LangOpts.EnableASTScopeLookup)
-      return nullptr;
+    if (Context.LangOpts.DisableParserLookup)
+          return nullptr;
 
     return getScopeInfo().lookupValueName(Name);
   }

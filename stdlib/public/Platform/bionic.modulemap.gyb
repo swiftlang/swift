@@ -19,9 +19,6 @@
 /// It's not named just Bionic so that it doesn't conflict in the event of a
 /// future official bionic modulemap.
 module SwiftGlibc [system] {
-  // FIXME: util contains rarely used functions and not usually needed.
-  // Unfortunately link directive doesn't work in the submodule yet.
-  link "util"
 
   link "dl"
 

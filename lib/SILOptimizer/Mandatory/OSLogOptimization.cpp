@@ -28,13 +28,14 @@
 /// Algorithm Overview:
 ///
 /// This pass implements a function-level transformation that collects calls
-/// to the os log APIs, which are annotated with an @_semantics attribute,
-/// and performs the following steps on each such call.
+/// to the initializer of the custom string interpolation type: OSLogMessage,
+/// which are annotated with an @_semantics attribute, and performs the
+/// following steps on each such call.
 ///
 ///  1. Determines the range of instructions to constant evaluate.
-///    The range starts from the first instruction that corresponds to the
-///     construction of the custom string interpolation to the last instruction
-///     of the body of the log call. The log call is also inlined into the
+///     The range starts from the first SIL instruction that corresponds to the
+///     construction of the custom string interpolation type: OSLogMessage to
+///     its destruction. The log call is also inlined into the
 ///     caller.
 ///
 ///  2. Constant evaluates the range of instruction identified in Step 1 and
@@ -56,13 +57,13 @@
 /// Code Overview:
 ///
 /// The function 'OSLogOptimization::run' implements the overall driver for
-/// step 1 to 4. The functions 'OSLogOptimization::inlineLogCallAndGetLast' and
-/// 'beginOfInterpolation' implement step 1 i.e., they compute the range of
-///  instructions to evaluate. The functions 'constantFold' is a driver for the
-/// steps 2 to 4. Step 2 is implemented by the function 'collectConstants',
-/// step 3 by 'detectAndDiagnoseErrors', and step 4 by 'substituteConstants' and
-/// 'emitCodeForSymbolicValue'. The remaining functions in the file implement
-/// the subtasks and utilities needed by the above functions.
+/// steps 1 to 4. The function 'beginOfInterpolation' implements step 1. It
+/// computes the instruction from which the evaluation must start. The function
+/// 'constantFold' is a driver for the  steps 2 to 4. Step 2 is implemented by
+/// the function 'collectConstants', step 3 by 'detectAndDiagnoseErrors', and
+/// step 4 by 'substituteConstants' and 'emitCodeForSymbolicValue'.
+/// The remaining functions in the file implement the subtasks and utilities
+/// needed by the above functions.
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticEngine.h"
@@ -70,6 +71,9 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/Basic/OptimizationMode.h"
+#include "swift/Demangling/Demangle.h"
+#include "swift/Demangling/Demangler.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILBuilder.h"
@@ -165,20 +169,32 @@ public:
   /// Information needed for folding strings.
   StringSILInfo stringInfo;
 
+  /// Instruction from where folding must begin.
+  SILInstruction *beginInstruction;
+
+  /// Instructions that mark the end points of folding. No folded SIL value must
+  /// be usable beyond these instructions (in the control-flow order). These
+  /// instructions are also used to emit destory instructions for non-trivial,
+  /// SIL values emitted during folding.
+  SmallSetVector<SILInstruction *, 2> endInstructions;
+
 private:
-  /// Single-valued instructions that were found to be constants during
+  /// SIL values that were found to be constants during
   /// constant evaluation.
-  SmallVector<SingleValueInstruction *, 4> constantValuedInstructions;
+  SmallVector<SILValue, 4> constantSILValues;
 
 public:
-  FoldState(SILFunction *fun) : constantEvaluator(allocator, fun) {}
+  FoldState(SILFunction *fun, SILInstruction *beginInst,
+            ArrayRef<SILInstruction *> endInsts)
+      : constantEvaluator(allocator, fun), beginInstruction(beginInst),
+        endInstructions(endInsts.begin(), endInsts.end()) {}
 
-  void addConstantInstruction(SingleValueInstruction *value) {
-    constantValuedInstructions.push_back(value);
+  void addConstantSILValue(SILValue value) {
+    constantSILValues.push_back(value);
   }
 
-  ArrayRef<SingleValueInstruction *> getConstantInstructions() {
-    return ArrayRef<SingleValueInstruction *>(constantValuedInstructions);
+  ArrayRef<SILValue> getConstantSILValues() {
+    return ArrayRef<SILValue>(constantSILValues);
   }
 };
 
@@ -262,29 +278,40 @@ evaluateOrSkip(ConstExprStepEvaluator &stepEval,
 ///     used only on string literals.
 ///   - StructInst cannot be folded. We can only fold its arguments and not the
 ///     instruction itself.
-static bool isInstructionFoldable(SingleValueInstruction *inst) {
-  ASTContext &astContext = inst->getFunction()->getASTContext();
-  ;
-  SILType silType = inst->getType();
+static bool isSILValueFoldable(SILValue value) {
+  SILInstruction *definingInst = value->getDefiningInstruction();
+  if (!definingInst)
+    return false;
 
-  return (!silType.isAddress() && !isa<LiteralInst>(inst) &&
-          !isa<StructInst>(inst) && !getStringMakeUTF8Init(inst) &&
+  ASTContext &astContext = definingInst->getFunction()->getASTContext();
+  SILType silType = value->getType();
+
+  return (!silType.isAddress() && !isa<LiteralInst>(definingInst) &&
+          !isa<StructInst>(definingInst) &&
+          !getStringMakeUTF8Init(definingInst) &&
           isIntegerOrStringType(silType, astContext));
 }
 
-/// Constant evaluate the instructions in the range 'first' to 'last'.
-/// Add foldable, constant-valued instructions discovered during the evaluation
-/// to the 'foldState' passed in.
+/// Given a 'foldState', constant evaluate instructions from
+/// 'foldState.beginInstruction' until an instruction in
+/// 'foldState.endInstructions' is seen. Add foldable, constant-valued
+/// instructions discovered during the evaluation to
+/// 'foldState.constantSILValues'.
 /// \returns error information for emitting diagnostics if the evaluation
 /// failed.
-static Optional<SymbolicValue> collectConstants(SILBasicBlock::iterator first,
-                                                SILBasicBlock::iterator last,
-                                                FoldState &foldState) {
+static Optional<SymbolicValue> collectConstants(FoldState &foldState) {
 
   ConstExprStepEvaluator &constantEvaluator = foldState.constantEvaluator;
+  SILBasicBlock::iterator currI = foldState.beginInstruction->getIterator();
+  auto &endInstructions = foldState.endInstructions;
 
-  for (auto currI = first; currI != last;) {
+  // The loop will break when it sees a return instruction or an instruction in
+  // endInstructions.
+  while (true) {
     SILInstruction *currInst = &(*currI);
+
+    if (endInstructions.count(currInst))
+      break;
 
     // Initialize string info from this instruction if possible.
     foldState.stringInfo.extractStringInfoFromInstruction(currInst);
@@ -299,17 +326,17 @@ static Optional<SymbolicValue> collectConstants(SILBasicBlock::iterator first,
     // Set the next instruction to continue evaluation from.
     currI = nextI.getValue();
 
-    // If the instruction is foldable and if we found a constant value for
-    // the result of the instruction, record it.
-    auto *singleValInst = dyn_cast<SingleValueInstruction>(currInst);
-    if (!singleValInst || !isInstructionFoldable(singleValInst)) {
-      continue;
-    }
+    // If the instruction results are foldable and if we found a constant value
+    // for the results, record it.
+    for (SILValue instructionResult : currInst->getResults()) {
+      if (!isSILValueFoldable(instructionResult))
+        continue;
 
-    Optional<SymbolicValue> constantVal =
-        constantEvaluator.lookupConstValue(singleValInst);
-    if (constantVal.hasValue()) {
-      foldState.addConstantInstruction(singleValInst);
+      Optional<SymbolicValue> constantVal =
+          constantEvaluator.lookupConstValue(instructionResult);
+      if (constantVal.hasValue()) {
+        foldState.addConstantSILValue(instructionResult);
+      }
     }
   }
   return None; // No error.
@@ -395,27 +422,117 @@ static SILValue emitCodeForSymbolicValue(SymbolicValue symVal,
   }
 }
 
+/// Collect the end-of-lifetime instructions of the given SILValue. These are
+/// either release_value or destroy_value instructions.
+/// \param value SIL value whose end-of-lifetime instructions must be collected.
+/// \param lifetimeEndInsts buffer for storing the found end-of-lifetime
+/// instructions of 'value'.
+static void getLifetimeEndInstructionsOfSILValue(
+    SILValue value, SmallVectorImpl<SILInstruction *> &lifetimeEndInsts) {
+
+  bool continueLifetimeEndInstructionSearch = true;
+  SILValue currValue = value;
+
+  while (continueLifetimeEndInstructionSearch) {
+    continueLifetimeEndInstructionSearch = false;
+
+    for (Operand *use : currValue->getUses()) {
+      SILInstruction *user = use->getUser();
+
+      if (isa<ReleaseValueInst>(user) || isa<DestroyValueInst>(user)) {
+        lifetimeEndInsts.push_back(user);
+        continue;
+      }
+
+      if (isa<CopyValueInst>(user)) {
+        auto *copyValueInst = cast<CopyValueInst>(user);
+        // Continue looking for the end-of-lifetime instruction for the
+        // result of copy_value.
+        currValue = copyValueInst;
+        continueLifetimeEndInstructionSearch = true;
+      }
+    }
+  }
+}
+
+/// Emit instructions to destroy the folded value at the end of its use, if
+/// required. Since this pass folds only integers or strings and since the
+/// former is a trivial type, we only have to destroy strings that are folded.
+/// For strings, a release_value (or a destory_value instruction in ownership
+/// SIL) has to be emitted if it is not already present.
+static void
+destroyFoldedValueAtEndOfUse(SILValue foldedVal, SILValue originalVal,
+                             ArrayRef<SILInstruction *> endOfUseInsts,
+                             SILFunction *fun) {
+  // Folded value should have either trivial or owned ownership as it is an
+  // integer or string constant.
+  assert(foldedVal.getOwnershipKind() == ValueOwnershipKind::Any ||
+         foldedVal.getOwnershipKind() == ValueOwnershipKind::Owned);
+
+  // If the ownership kinds of folded and original values are both either
+  // owned or trivial, there is nothing to do.
+  if (foldedVal.getOwnershipKind() == originalVal.getOwnershipKind()) {
+    return;
+  }
+  assert(originalVal.getOwnershipKind() == ValueOwnershipKind::Guaranteed);
+
+  // Here, the original value may be at +0 and hence may not be released.
+  // However, the folded value should always be released.
+  SmallVector<SILInstruction *, 2> lifeTimeEndInstsOfOriginal;
+  getLifetimeEndInstructionsOfSILValue(originalVal, lifeTimeEndInstsOfOriginal);
+
+  if (!lifeTimeEndInstsOfOriginal.empty()) {
+    // Here, the original value is released, and so would be the folded value.
+    return;
+  }
+
+  // Here, the original value is not released. Release the folded value at the
+  // 'endOfUse' instructions passed as parameter.
+  bool hasOwnership = fun->hasOwnership();
+  for (SILInstruction *endInst : endOfUseInsts) {
+    SILBuilderWithScope builder(endInst);
+    if (hasOwnership) {
+      builder.createDestroyValue(endInst->getLoc(), foldedVal);
+    } else {
+      builder.createReleaseValue(endInst->getLoc(), foldedVal,
+                                 builder.getDefaultAtomicity());
+    }
+  }
+}
+
 /// Given a fold state with constant-valued instructions, substitute the
 /// instructions with the constant values. The constant values could be strings
 /// or Stdlib integer-struct values or builtin integers.
 static void substituteConstants(FoldState &foldState) {
 
   ConstExprStepEvaluator &evaluator = foldState.constantEvaluator;
-
   SmallVector<SILInstruction *, 4> deletedInsts;
-  for (SingleValueInstruction *constantInst :
-       foldState.getConstantInstructions()) {
-    SymbolicValue constantVal =
-        evaluator.lookupConstValue(constantInst).getValue();
+  auto endOfUseInsts = ArrayRef<SILInstruction *>(
+      foldState.endInstructions.begin(), foldState.endInstructions.end());
 
-    SILBuilderWithScope builder(constantInst);
-    SILLocation loc = constantInst->getLoc();
-    SILType instType = constantInst->getType();
+  for (SILValue constantSILValue : foldState.getConstantSILValues()) {
+    SymbolicValue constantSymbolicVal =
+        evaluator.lookupConstValue(constantSILValue).getValue();
+
+    SILInstruction *definingInst = constantSILValue->getDefiningInstruction();
+    assert(definingInst);
+
+    SILBuilderWithScope builder(definingInst);
+    SILLocation loc = definingInst->getLoc();
+    SILType instType = constantSILValue->getType();
     SILValue foldedSILVal = emitCodeForSymbolicValue(
-        constantVal, instType, builder, loc, foldState.stringInfo);
+        constantSymbolicVal, instType, builder, loc, foldState.stringInfo);
 
-    constantInst->replaceAllUsesWith(foldedSILVal);
-    deletedInsts.push_back(constantInst);
+    // Add an instruction to end the lifetime of the foldedSILVal, if necessary.
+    destroyFoldedValueAtEndOfUse(foldedSILVal, constantSILValue, endOfUseInsts,
+                                 definingInst->getFunction());
+
+    constantSILValue->replaceAllUsesWith(foldedSILVal);
+
+    if (isa<SingleValueInstruction>(definingInst)) {
+      deletedInsts.push_back(definingInst);
+    } // Otherwise, be conservative and do not delete the instruction as other
+    // results of the instruction could be used.
   }
 
   recursivelyDeleteTriviallyDeadInstructions(deletedInsts, true,
@@ -428,12 +545,12 @@ static void substituteConstants(FoldState &foldState) {
 /// TODO: some of the checks here would be made redundant by a dedicated
 /// diagnostics check that will happen before the optimization starts.
 static bool detectAndDiagnoseErrors(Optional<SymbolicValue> errorInfo,
-                                    SingleValueInstruction *osLogMessageAddr,
+                                    SingleValueInstruction *osLogMessage,
                                     FoldState &foldState) {
   ConstExprStepEvaluator &constantEvaluator = foldState.constantEvaluator;
-  SILLocation loc = osLogMessageAddr->getLoc();
+  SILLocation loc = osLogMessage->getLoc();
   SourceLoc sourceLoc = loc.getSourceLoc();
-  SILFunction *fn = osLogMessageAddr->getFunction();
+  SILFunction *fn = osLogMessage->getFunction();
   SILModule &module = fn->getModule();
   ASTContext &astContext = fn->getASTContext();
   bool errorDetected = false;
@@ -450,21 +567,16 @@ static bool detectAndDiagnoseErrors(Optional<SymbolicValue> errorInfo,
   // inferred as constants. If not, it implies incorrect implementation
   // of the os log API in the overlay. Diagnostics here are for os log
   // library authors.
-  Optional<SymbolicValue> osLogMessageAddrValueOpt =
-      constantEvaluator.lookupConstValue(osLogMessageAddr);
-  assert(osLogMessageAddrValueOpt.hasValue() &&
-         osLogMessageAddrValueOpt->getKind() == SymbolicValue::Address);
-
-  SmallVector<unsigned, 2> accessPath;
-  SymbolicValue osLogMessageValue =
-      osLogMessageAddrValueOpt->getAddressValue(accessPath)->getValue();
-  if (!osLogMessageValue.isConstant()) {
+  Optional<SymbolicValue> osLogMessageValueOpt =
+      constantEvaluator.lookupConstValue(osLogMessage);
+  if (!osLogMessageValueOpt ||
+      osLogMessageValueOpt->getKind() != SymbolicValue::Aggregate) {
     diagnose(astContext, sourceLoc, diag::oslog_non_constant_message);
     return true;
   }
 
   SymbolicValue osLogInterpolationValue =
-      osLogMessageValue.lookThroughSingleElementAggregates();
+      osLogMessageValueOpt->lookThroughSingleElementAggregates();
   if (!osLogInterpolationValue.isConstant()) {
     diagnose(astContext, sourceLoc, diag::oslog_non_constant_interpolation);
     return true;
@@ -474,7 +586,7 @@ static bool detectAndDiagnoseErrors(Optional<SymbolicValue> errorInfo,
   // string or integer has a constant value. If this is violated this could
   // be an indication of an error in the usage of the API. Diagnostics emitted
   // here are for the users of the os log APIs.
-  SILType osLogMessageType = osLogMessageAddr->getType();
+  SILType osLogMessageType = osLogMessage->getType();
   StructDecl *structDecl = osLogMessageType.getStructOrBoundGenericStruct();
   assert(structDecl);
 
@@ -510,17 +622,18 @@ static bool detectAndDiagnoseErrors(Optional<SymbolicValue> errorInfo,
   return errorDetected;
 }
 
-/// Given a range of instructions from `first` to `last`, fold the constants
-/// that could be discovered by constant evaluating the instructions.
-static void constantFold(SILBasicBlock::iterator first,
-                         SILBasicBlock::iterator last) {
-
-  SILInstruction *firstInst = &(*first);
+/// Constant evaluate instructions starting from 'start' and fold the uses
+/// of the value 'oslogMessage'. Stop when oslogMessageValue is released.
+static void constantFold(SILInstruction *start,
+                         SingleValueInstruction *oslogMessage) {
 
   // Initialize fold state.
-  FoldState state(firstInst->getFunction());
+  SmallVector<SILInstruction *, 2> lifetimeEndInsts;
+  getLifetimeEndInstructionsOfSILValue(oslogMessage, lifetimeEndInsts);
 
-  auto errorInfo = collectConstants(first, last, state);
+  FoldState state(start->getFunction(), start, lifetimeEndInsts);
+
+  auto errorInfo = collectConstants(state);
 
   // At this point, the `OSLogMessage` instance should be mapped to a symbolic
   // value in the interpreter state. Furthermore, its format string and
@@ -528,74 +641,82 @@ static void constantFold(SILBasicBlock::iterator first,
   // If this is not the case, it means the formatting options or privacy
   // qualifiers provided by the user were not inferred as compile-time
   // constants. Detect and diagnose this scenario.
-  assert(isa<SingleValueInstruction>(firstInst));
-  bool errorDetected = detectAndDiagnoseErrors(
-      errorInfo, dyn_cast<SingleValueInstruction>(firstInst), state);
+  bool errorDetected = detectAndDiagnoseErrors(errorInfo, oslogMessage, state);
   if (errorDetected)
     return;
 
   substituteConstants(state);
 }
 
-/// Find an argument of type OSLogMessage from the given os log call.
-static SILValue findOSLogMessageArgument(ApplyInst *oslogCall) {
-  ASTContext &astContext = oslogCall->getFunction()->getASTContext();
-
-  for (auto argument : oslogCall->getArguments()) {
-    SILType argumentType = argument->getType();
-    auto *structDecl = argumentType.getStructOrBoundGenericStruct();
-    if (!structDecl)
-      continue;
-
-    if (structDecl->getName() == astContext.Id_OSLogMessage) {
-      return argument;
-    }
-  }
-  return SILValue();
-}
-
-/// Given an os log call that is passed a string interpolation,
-/// find the first instruction that marks the begining of the string
-/// interpolation. Normally, this instruction is the alloc_stack of the
-/// string interpolation type, which in this case if 'OSLogMessage'.
+/// Given a call to the initializer of OSLogMessage, which conforms to
+/// 'ExpressibleByStringInterpolation', find the first instruction, if any,
+/// that marks the begining of the string interpolation that is used to
+/// create an OSLogMessage instance. Normally, this instruction is the
+/// alloc_stack of the string interpolation type: 'OSLogInterpolation'.
 /// Constant evaluation and folding must begin from this instruction.
-static Optional<SILBasicBlock::iterator>
-beginOfInterpolation(ApplyInst *oslogCall) {
-  SILFunction *caller = oslogCall->getFunction();
+static SILInstruction *beginOfInterpolation(ApplyInst *oslogInit) {
+  auto oslogInitCallSite = FullApplySite(oslogInit);
+  SILFunction *callee = oslogInitCallSite.getCalleeFunction();
+  auto &astContext = oslogInit->getFunction()->getASTContext();
 
-  // Find an argument to the call with name 'OSLogMessage'. Since the log
-  // function definition may change/shuffle its arguments and also since mock
-  // test helpers for log functions do exist, do not rely on the position of
-  // the argument and instead look for an argument with a name.
-  auto &astContext = caller->getASTContext();
-  auto oslogMessageArgument = findOSLogMessageArgument(oslogCall);
-  assert(oslogMessageArgument && "No argument of type 'OSLogMessage' in the "
-                                 "os log call");
+  // The initializer must return the OSLogMessage instance directly.
+  assert(oslogInitCallSite.getNumArguments() >= 1 &&
+         oslogInitCallSite.getNumIndirectSILResults() == 0);
 
-  auto *stringInterpolAllocInst =
-      oslogMessageArgument->getDefiningInstruction();
-  if (!stringInterpolAllocInst ||
-      !isa<AllocStackInst>(stringInterpolAllocInst)) {
-    diagnose(astContext, oslogCall->getLoc().getSourceLoc(),
-             diag::oslog_dynamic_message);
-    return None;
+  SILInstruction *firstArgumentInst =
+      oslogInitCallSite.getArgument(0)->getDefiningInstruction();
+  if (!firstArgumentInst) {
+    // oslogInit call does not correspond to  an auto-generated initialization
+    // done by the compiler on seeing a string interpolation. Ignore this.
+    return nullptr;
   }
 
-  // Assumption: the alloc_stack of the string interpolation type 'OSLogMessage'
-  // must precede every other instruction relevant to the string interpolation.
-  return stringInterpolAllocInst->getIterator();
+  SILInstruction *startInst = nullptr;
+
+  // If this is an initialization from string interpolation, the first argument
+  // to the  initializer is a load of an auto-generated alloc-stack of
+  // OSLogInterpolation:
+  //  'alloc_stack $OSLogInterpolation, var, name $interpolation'
+  // If no such instruction exists, ignore this call as this is not a
+  // OSLogMessage instantiation through string interpolation.
+  if (callee->hasSemanticsAttr("oslog.message.init_interpolation")) {
+    auto *loadInst = dyn_cast<LoadInst>(firstArgumentInst);
+    if (!loadInst)
+      return nullptr;
+
+    auto *allocStackInst = dyn_cast<AllocStackInst>(loadInst->getOperand());
+    if (!allocStackInst)
+      return nullptr;
+
+    Optional<SILDebugVariable> varInfo = allocStackInst->getVarInfo();
+    if (!varInfo && varInfo->Name != astContext.Id_dollarInterpolation.str())
+      return nullptr;
+
+    startInst = allocStackInst;
+  }
+
+  // If this is an initialization from a string literal, the first argument
+  // should be the creation of the string literal.
+  if (callee->hasSemanticsAttr("oslog.message.init_stringliteral")) {
+    if (!getStringMakeUTF8Init(firstArgumentInst))
+      return nullptr;
+    startInst = firstArgumentInst;
+  }
+
+  return startInst;
 }
 
-/// If the SILInstruction is a call to an os log function, return the call
-/// as an ApplyInst. Otherwise, return nullptr.
-static ApplyInst *getAsOSLogCall(SILInstruction *inst) {
+/// If the SILInstruction is an initialization of OSLogMessage, return the
+/// initialization call as an ApplyInst. Otherwise, return nullptr.
+static ApplyInst *getAsOSLogMessageInit(SILInstruction *inst) {
   auto *applyInst = dyn_cast<ApplyInst>(inst);
   if (!applyInst) {
     return nullptr;
   }
 
   SILFunction *callee = applyInst->getCalleeFunction();
-  if (!callee || !callee->hasSemanticsAttrThatStartsWith("oslog.log")) {
+  if (!callee ||
+      !callee->hasSemanticsAttrThatStartsWith("oslog.message.init")) {
     return nullptr;
   }
 
@@ -612,69 +733,50 @@ class OSLogOptimization : public SILFunctionTransform {
 
   ~OSLogOptimization() override {}
 
-  /// Inline the given os log Call, by loading and linking the callee if it has
-  /// not been loaded yet, and return the last inlined instruction.
-  /// \param oslogCall log call instruction to inline.
-  /// \returns last instruction of the callee after inlining.
-  SILBasicBlock::iterator inlineLogCallAndGetLast(ApplyInst *oslogCall) {
-    SILFunction *callee = oslogCall->getReferencedFunctionOrNull();
-    assert(callee);
-
-    // Load and link the called os log function before inlining. This is needed
-    // to link shared functions that are used in the callee body.
-    if (callee->isExternalDeclaration()) {
-      callee->getModule().loadFunction(callee);
-      assert(!callee->isExternalDeclaration());
-      oslogCall->getFunction()->getModule().linkFunction(
-          callee, SILModule::LinkingMode::LinkNormal);
-    }
-
-    // Inline the log call into the caller and find the last instruction of the
-    // log call.
-    SILOptFunctionBuilder funcBuilder(*this);
-    SILBasicBlock *lastBB =
-        SILInliner::inlineFullApply(
-            oslogCall, SILInliner::InlineKind::PerformanceInline, funcBuilder)
-            .second;
-    return lastBB->end();
-  }
-
   /// The entry point to the transformation.
   void run() override {
+    auto &fun = *getFunction();
+
     // Don't rerun optimization on deserialized functions or stdlib functions.
-    if (getFunction()->wasDeserializedCanonical()) {
+    if (fun.wasDeserializedCanonical()) {
       return;
     }
 
-    auto &fun = *getFunction();
-
-    // Collect all os log calls in the function.
-    SmallVector<ApplyInst *, 4> oslogCalls;
+    // Collect all 'OSLogMessage.init' in the function. 'OSLogMessage' is a
+    // custom string interpolation type used by the new OS log APIs.
+    SmallVector<ApplyInst *, 4> oslogMessageInits;
     for (auto &bb : fun) {
       for (auto &inst : bb) {
-        auto oslogCall = getAsOSLogCall(&inst);
-        if (!oslogCall)
+        auto init = getAsOSLogMessageInit(&inst);
+        if (!init)
           continue;
-        oslogCalls.push_back(oslogCall);
+        oslogMessageInits.push_back(init);
       }
     }
 
-    // Optimize each os log call found. Optimizing a call will change the
-    // function body by inlining functions and folding constants.
-    for (auto *oslogCall : oslogCalls) {
+    // Constant fold the uses of properties of OSLogMessage instance. Note that
+    // the function body will change due to constant folding, after each
+    // iteration.
+    for (auto *oslogInit : oslogMessageInits) {
 
-      // Find the range of instructions that have to be constant evaluated
-      // and folded. The relevant instructions start at the begining of the
-      // string interpolation passed to the log call and end at the last
-      // instruction of the body of the called os log function (which will be
-      // inlined).
-      Optional<SILBasicBlock::iterator> firstI =
-          beginOfInterpolation(oslogCall);
-      if (!firstI)
+      // Find the first instruction from where constant evaluation and folding
+      // must begin. The first instruction should precede (in the control-flow
+      // order) the instructions that are generated by the compiler for
+      // the string-interpolation literal that is used to instantiate
+      // OSLogMessage instance.
+      SILInstruction *interpolationStart = beginOfInterpolation(oslogInit);
+      if (!interpolationStart) {
+        // This scenario indicates an explicit initialization of OSLogMessage
+        // that doesn't use a string inteprolation literal.
+        // However, this is not always an error as explicit initialization is
+        // used by thunk initializers auto-generated for protocol conformances.
+        // TODO: the log APIs uses must be diagnosed by a separate pass
+        // (possibly before mandatory inlining). The current pass should not
+        // emit diagnostics but only perform optimization.
         continue;
+      }
 
-      SILBasicBlock::iterator lastI = inlineLogCallAndGetLast(oslogCall);
-      constantFold(firstI.getValue(), lastI);
+      constantFold(interpolationStart, oslogInit);
     }
   }
 };

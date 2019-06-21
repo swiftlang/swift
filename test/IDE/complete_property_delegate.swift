@@ -6,7 +6,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SELF_VARNAME | %FileCheck %s -check-prefix=CONTEXT_VARNAME
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=SELF_DOLLAR_VARNAME | %FileCheck %s -check-prefix=CONTEXT_DOLLAR_VARNAME
 
-@_propertyWrapper
+@propertyWrapper
 struct Lazzzy<T> {
   var value: T
 

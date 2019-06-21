@@ -405,12 +405,15 @@ SIMPLE_DECL_ATTR(_implementationOnly, ImplementationOnly,
 DECL_ATTR(_custom, Custom,
   OnAnyDecl | UserInaccessible,
   85)
-SIMPLE_DECL_ATTR(_propertyWrapper, PropertyWrapper,
+SIMPLE_DECL_ATTR(propertyWrapper, PropertyWrapper,
   OnStruct | OnClass | OnEnum,
   86)
 SIMPLE_DECL_ATTR(_disfavoredOverload, DisfavoredOverload,
   OnAbstractFunction | OnVar | OnSubscript | UserInaccessible,
   87)
+SIMPLE_DECL_ATTR(_functionBuilder, FunctionBuilder,
+  OnNominalType,
+  88)
 
 SIMPLE_DECL_ATTR(IBSegueAction, IBSegueAction,
   OnFunc,
@@ -418,22 +421,20 @@ SIMPLE_DECL_ATTR(IBSegueAction, IBSegueAction,
 
 // SWIFT_ENABLE_TENSORFLOW
 DECL_ATTR(differentiable, Differentiable,
-  OnAccessor | OnConstructor | OnFunc | OnVar | OnSubscript | LongAttribute |
-  AllowMultipleAttributes,
-  88)
+OnAccessor | OnConstructor | OnFunc | OnVar | OnSubscript | LongAttribute |
+AllowMultipleAttributes,
+89)
 DECL_ATTR(differentiating, Differentiating,
-  OnFunc | LongAttribute | AllowMultipleAttributes | NotSerialized,
-  89)
-// If the attribute is NOT serialized, then please place that flag on the last line too.
+OnFunc | LongAttribute | AllowMultipleAttributes |
+NotSerialized, 90)
 SIMPLE_DECL_ATTR(compilerEvaluable, CompilerEvaluable,
-  OnAccessor | OnFunc | OnConstructor | OnSubscript,
-  /* Not serialized */ 90)
+OnAccessor | OnFunc | OnConstructor | OnSubscript,
+/* Not serialized */ 91)
 SIMPLE_DECL_ATTR(noDerivative, NoDerivative,
-  OnVar,
-  91)
+OnVar, 92)
 DECL_ATTR(transposing, Transposing,
-  OnFunc | LongAttribute | AllowMultipleAttributes | NotSerialized,
-  92)
+  OnFunc | LongAttribute | AllowMultipleAttributes |
+  NotSerialized, 93)
 
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS

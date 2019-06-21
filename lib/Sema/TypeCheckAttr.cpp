@@ -131,6 +131,7 @@ public:
   IGNORED_ATTR(Custom)
   IGNORED_ATTR(PropertyWrapper)
   IGNORED_ATTR(DisfavoredOverload)
+  IGNORED_ATTR(FunctionBuilder)
   // SWIFT_ENABLE_TENSORFLOW
   IGNORED_ATTR(Differentiable)
   IGNORED_ATTR(Differentiating)
@@ -254,14 +255,14 @@ void AttributeEarlyChecker::visitTransparentAttr(TransparentAttr *attr) {
     diagnoseAndRemoveAttr(attr, diag::transparent_in_protocols_not_supported);
   // Class declarations cannot be transparent.
   if (isa<ClassDecl>(Ctx)) {
-    
+
     // @transparent is always ok on implicitly generated accessors: they can
     // be dispatched (even in classes) when the references are within the
     // class themself.
     if (!(isa<AccessorDecl>(D) && D->isImplicit()))
       diagnoseAndRemoveAttr(attr, diag::transparent_in_classes_not_supported);
   }
-  
+
   if (auto *VD = dyn_cast<VarDecl>(D)) {
     // Stored properties and variables can't be transparent.
     if (VD->hasStorage())
@@ -328,7 +329,7 @@ void AttributeEarlyChecker::visitMutationAttr(DeclAttribute *attr) {
       }
     }
   }
-  
+
   // Verify that we don't have a static function.
   if (FD->isStatic())
     diagnoseAndRemoveAttr(attr, diag::static_functions_not_mutating);
@@ -338,8 +339,11 @@ void AttributeEarlyChecker::visitDynamicAttr(DynamicAttr *attr) {
   // Members cannot be both dynamic and @_transparent.
   if (D->getAttrs().hasAttribute<TransparentAttr>())
     diagnoseAndRemoveAttr(attr, diag::dynamic_with_transparent);
+  if (!D->getAttrs().hasAttribute<ObjCAttr>() &&
+      D->getModuleContext()->isResilient())
+    diagnoseAndRemoveAttr(attr,
+                          diag::dynamic_and_library_evolution_not_supported);
 }
-
 
 void AttributeEarlyChecker::visitIBActionAttr(IBActionAttr *attr) {
   // Only instance methods can be IBActions.
@@ -418,7 +422,7 @@ isAcceptableOutletType(Type type, bool &isArray, TypeChecker &TC) {
 
   if (type->isExistentialType())
     return diag::iboutlet_nonobjc_protocol;
-  
+
   // No other types are permitted.
   return diag::iboutlet_nonobject_type;
 }
@@ -524,10 +528,10 @@ void AttributeEarlyChecker::visitNSManagedAttr(NSManagedAttr *attr) {
     // Otherwise, ok.
   } else if (impl.getReadImpl() == ReadImplKind::Address ||
              impl.getWriteImpl() == WriteImplKind::MutableAddress) {
-    return diagnoseNotStored(/*addressed*/ 2);    
+    return diagnoseNotStored(/*addressed*/ 2);
   } else if (impl.getWriteImpl() == WriteImplKind::StoredWithObservers ||
              impl.getWriteImpl() == WriteImplKind::InheritedWithObservers) {
-    return diagnoseNotStored(/*observing*/ 1);    
+    return diagnoseNotStored(/*observing*/ 1);
   } else {
     return diagnoseNotStored(/*computed*/ 0);
   }
@@ -809,13 +813,13 @@ public:
 #undef IGNORED_ATTR
 
   void visitAvailableAttr(AvailableAttr *attr);
-  
+
   void visitCDeclAttr(CDeclAttr *attr);
 
   void visitDynamicCallableAttr(DynamicCallableAttr *attr);
 
   void visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr);
-  
+
   void visitFinalAttr(FinalAttr *attr);
   void visitIBActionAttr(IBActionAttr *attr);
   void visitIBSegueActionAttr(IBSegueActionAttr *attr);
@@ -830,7 +834,7 @@ public:
                                      Identifier Id_ApplicationDelegate,
                                      Identifier Id_Kit,
                                      Identifier Id_ApplicationMain);
-  
+
   void visitNSApplicationMainAttr(NSApplicationMainAttr *attr);
   void visitUIApplicationMainAttr(UIApplicationMainAttr *attr);
 
@@ -859,6 +863,7 @@ public:
   void visitNonOverrideAttr(NonOverrideAttr *attr);
   void visitCustomAttr(CustomAttr *attr);
   void visitPropertyWrapperAttr(PropertyWrapperAttr *attr);
+  void visitFunctionBuilderAttr(FunctionBuilderAttr *attr);
 
   // SWIFT_ENABLE_TENSORFLOW
   void visitDifferentiableAttr(DifferentiableAttr *attr);
@@ -1067,12 +1072,12 @@ visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
   // This attribute is only allowed on nominal types.
   auto decl = cast<NominalTypeDecl>(D);
   auto type = decl->getDeclaredType();
-  
+
   // Look up `subscript(dynamicMember:)` candidates.
   auto subscriptName = DeclName(TC.Context, DeclBaseName::createSubscript(),
                                 TC.Context.Id_dynamicMember);
   auto candidates = TC.lookupMember(decl, type, subscriptName);
-  
+
   // If there are no candidates, then the attribute is invalid.
   if (candidates.empty()) {
     TC.diagnose(attr->getLocation(), diag::invalid_dynamic_member_lookup_type,
@@ -1281,7 +1286,7 @@ void AttributeChecker::visitCDeclAttr(CDeclAttr *attr) {
   if (D->getDeclContext()->isTypeContext())
     TC.diagnose(attr->getLocation(),
                 diag::cdecl_not_at_top_level);
-  
+
   // The name must not be empty.
   if (attr->Name.empty())
     TC.diagnose(attr->getLocation(),
@@ -1297,12 +1302,12 @@ void AttributeChecker::visitUnsafeNoObjCTaggedPointerAttr(
                 diag::no_objc_tagged_pointer_not_class_protocol);
     attr->setInvalid();
   }
-  
+
   if (!proto->requiresClass()
       && !proto->getAttrs().hasAttribute<ObjCAttr>()) {
     TC.diagnose(attr->getLocation(),
                 diag::no_objc_tagged_pointer_not_class_protocol);
-    attr->setInvalid();    
+    attr->setInvalid();
   }
 }
 
@@ -1316,7 +1321,7 @@ void AttributeChecker::visitSwiftNativeObjCRuntimeBaseAttr(
     attr->setInvalid();
     return;
   }
-  
+
   if (theClass->hasSuperclass()) {
     TC.diagnose(attr->getLocation(),
                 diag::swift_native_objc_runtime_base_not_on_root_class);
@@ -1448,7 +1453,7 @@ void AttributeChecker::visitNSCopyingAttr(NSCopyingAttr *attr) {
   // Check the type.  It must be an [unchecked]optional, weak, a normal
   // class, AnyObject, or classbound protocol.
   // It must conform to the NSCopying protocol.
-  
+
 }
 
 void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
@@ -1460,7 +1465,7 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
     UIApplicationMainClass,
     NSApplicationMainClass,
   };
-  
+
   unsigned applicationMainKind;
   if (isa<UIApplicationMainAttr>(attr))
     applicationMainKind = UIApplicationMainClass;
@@ -1468,9 +1473,9 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
     applicationMainKind = NSApplicationMainClass;
   else
     llvm_unreachable("not an ApplicationMain attr");
-  
+
   auto *CD = dyn_cast<ClassDecl>(D);
-  
+
   // The applicant not being a class should have been diagnosed by the early
   // checker.
   if (!CD) return;
@@ -1483,7 +1488,7 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
     attr->setInvalid();
     return;
   }
-  
+
   // @XXApplicationMain classes must conform to the XXApplicationDelegate
   // protocol.
   auto &C = D->getASTContext();
@@ -1514,13 +1519,13 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
 
   if (attr->isInvalid())
     return;
-  
+
   // Register the class as the main class in the module. If there are multiples
   // they will be diagnosed.
   auto *SF = cast<SourceFile>(CD->getModuleScopeContext());
   if (SF->registerMainClass(CD, attr->getLocation()))
     attr->setInvalid();
-  
+
   // Check that we have the needed symbols in the frameworks.
   auto lookupOptions = defaultUnqualifiedLookupOptions;
   lookupOptions |= NameLookupFlags::KnownPrivate;
@@ -1990,7 +1995,7 @@ void AttributeChecker::visitFixedLayoutAttr(FixedLayoutAttr *attr) {
   if (isa<StructDecl>(D)) {
     TC.diagnose(attr->getLocation(), diag::fixed_layout_struct)
       .fixItReplace(attr->getRange(), "@frozen");
-  }  
+  }
 
   auto *VD = cast<ValueDecl>(D);
 
@@ -2561,16 +2566,57 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
       return;
     }
 
-    // If this attribute isn't the one that attached a property wrapper to
-    // this property, complain.
-    auto var = cast<VarDecl>(D);
-    if (auto attached = var->getAttachedPropertyWrapper()) {
-      if (attached != attr) {
-        TC.diagnose(attr->getLocation(), diag::property_wrapper_multiple);
-        TC.diagnose(attached->getLocation(),
-                    diag::previous_property_wrapper_here);
+    return;
+  }
+
+  // If the nominal type is a function builder type, verify that D is a
+  // function, storage with an explicit getter, or parameter of function type.
+  if (nominal->getAttrs().hasAttribute<FunctionBuilderAttr>()) {
+    ValueDecl *decl;
+    if (auto param = dyn_cast<ParamDecl>(D)) {
+      decl = param;
+    } else if (auto func = dyn_cast<FuncDecl>(D)) {
+      decl = func;
+    } else if (auto storage = dyn_cast<AbstractStorageDecl>(D)) {
+      decl = storage;
+      auto getter = storage->getGetter();
+      if (!getter || getter->isImplicit() || !getter->hasBody()) {
+        TC.diagnose(attr->getLocation(),
+                    diag::function_builder_attribute_on_storage_without_getter,
+                    nominal->getFullName(),
+                    isa<SubscriptDecl>(storage) ? 0
+                      : storage->getDeclContext()->isTypeContext() ? 1
+                      : cast<VarDecl>(storage)->isLet() ? 2 : 3);
+        attr->setInvalid();
         return;
       }
+    } else {
+      TC.diagnose(attr->getLocation(),
+                  diag::function_builder_attribute_not_allowed_here,
+                  nominal->getFullName());
+      attr->setInvalid();
+      return;
+    }
+
+    // Diagnose and ignore arguments.
+    if (attr->getArg()) {
+      TC.diagnose(attr->getLocation(), diag::function_builder_arguments)
+        .highlight(attr->getArg()->getSourceRange());
+    }
+
+    // Complain if this isn't the primary function-builder attribute.
+    auto attached = decl->getAttachedFunctionBuilder();
+    if (attached != attr) {
+      TC.diagnose(attr->getLocation(), diag::function_builder_multiple,
+                  isa<ParamDecl>(decl));
+      TC.diagnose(attached->getLocation(),
+                  diag::previous_function_builder_here);
+      attr->setInvalid();
+      return;
+    } else {
+      // Force any diagnostics associated with computing the function-builder
+      // type.
+      (void) decl->getFunctionBuilderType();
     }
 
     return;
@@ -2583,12 +2629,6 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
 }
 
 
-void TypeChecker::checkParameterAttributes(ParameterList *params) {
-  for (auto param: *params) {
-    checkDeclAttributes(param);
-  }
-}
-
 void AttributeChecker::visitPropertyWrapperAttr(PropertyWrapperAttr *attr) {
   auto nominal = dyn_cast<NominalTypeDecl>(D);
   if (!nominal)
@@ -2596,6 +2636,11 @@ void AttributeChecker::visitPropertyWrapperAttr(PropertyWrapperAttr *attr) {
 
   // Force checking of the property wrapper type.
   (void)nominal->getPropertyWrapperTypeInfo();
+}
+
+void AttributeChecker::visitFunctionBuilderAttr(FunctionBuilderAttr *attr) {
+  // TODO: check that the type at least provides a `sequence` factory?
+  // Any other validation?
 }
 
 // SWIFT_ENABLE_TENSORFLOW
@@ -2977,7 +3022,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   auto &ctx = TC.Context;
   auto lookupConformance =
       LookUpConformanceInModule(D->getDeclContext()->getParentModule());
-  
+
   // If functions is marked as linear, you cannot have a custom VJP and/or
   // a JVP.
   if (attr->isLinear() && (attr->getVJP() || attr->getJVP())) {
@@ -3750,6 +3795,12 @@ void AttributeChecker::visitNoDerivativeAttr(NoDerivativeAttr *attr) {
     diagnoseAndRemoveAttr(attr,
         diag::noderivative_only_on_stored_properties_in_differentiable_structs);
     return;
+  }
+}
+
+void TypeChecker::checkParameterAttributes(ParameterList *params) {
+  for (auto param: *params) {
+    checkDeclAttributes(param);
   }
 }
 

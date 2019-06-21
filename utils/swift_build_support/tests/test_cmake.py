@@ -500,6 +500,47 @@ class CMakeOptionsTestCase(unittest.TestCase):
             "-DOPT1_1=VAL1",
             "-DOPT1_2=VAL2"])
 
+    def test_initial_options_with_tuples(self):
+        options = CMakeOptions([('FOO', 'foo'), ('BAR', True)])
+        self.assertIn('-DFOO=foo', options)
+        self.assertIn('-DBAR=TRUE', options)
+
+    def test_initial_options_with_other_options(self):
+        options = CMakeOptions()
+        options.define('FOO', 'foo')
+        options.define('BAR', True)
+        derived = CMakeOptions(options)
+        self.assertIn('-DFOO=foo', derived)
+        self.assertIn('-DBAR=TRUE', derived)
+
+    def test_booleans_are_translated(self):
+        options = CMakeOptions()
+        options.define('A_BOOLEAN_OPTION', True)
+        options.define('ANOTHER_BOOLEAN_OPTION', False)
+        self.assertIn('-DA_BOOLEAN_OPTION=TRUE', options)
+        self.assertIn('-DANOTHER_BOOLEAN_OPTION=FALSE', options)
+
+    def test_extend_with_other_options(self):
+        options = CMakeOptions()
+        options.define('FOO', 'foo')
+        options.define('BAR', True)
+        derived = CMakeOptions()
+        derived.extend(options)
+        self.assertIn('-DFOO=foo', derived)
+        self.assertIn('-DBAR=TRUE', derived)
+
+    def test_extend_with_tuples(self):
+        options = CMakeOptions()
+        options.extend([('FOO', 'foo'), ('BAR', True)])
+        self.assertIn('-DFOO=foo', options)
+        self.assertIn('-DBAR=TRUE', options)
+
+    def test_contains(self):
+        options = CMakeOptions()
+        self.assertTrue('-DFOO=foo' not in options)
+        options.define('FOO', 'foo')
+        self.assertTrue('-DFOO=foo' in options)
+
 
 if __name__ == '__main__':
     unittest.main()

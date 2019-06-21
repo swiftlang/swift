@@ -202,18 +202,11 @@ static void deriveBodyVectorProtocol_method(AbstractFunctionDecl *funcDecl,
       BraceStmt::create(C, SourceLoc(), returnStmt, SourceLoc(), true));
 }
 
-// Synthesize body for `scaled(by:)`.
-static void deriveBodyVectorProtocol_scalarMultiply(
-    AbstractFunctionDecl *funcDecl, void *) {
-  auto &C = funcDecl->getASTContext();
-  deriveBodyVectorProtocol_method(funcDecl, C.Id_scaled, C.getIdentifier("by"));
-}
-
 // Synthesize function declaration for a `VectorProtocol` method requirement.
 static ValueDecl *deriveVectorProtocol_method(
-    DerivedConformance &derived, Identifier methodName, Identifier argumentName,
-    Identifier parameterName, Type parameterType, Type returnType,
-    AbstractFunctionDecl::BodySynthesizer bodySynthesizer) {
+    DerivedConformance &derived, Identifier methodBaseName,
+    Identifier argumentLabel, Identifier parameterName, Type parameterType,
+    Type returnType, AbstractFunctionDecl::BodySynthesizer bodySynthesizer) {
   auto nominal = derived.Nominal;
   auto &TC = derived.TC;
   auto &C = derived.TC.Context;
@@ -221,11 +214,11 @@ static ValueDecl *deriveVectorProtocol_method(
 
   auto *param =
       new (C) ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
-                        argumentName, SourceLoc(), parameterName, parentDC);
+                        argumentLabel, SourceLoc(), parameterName, parentDC);
   param->setInterfaceType(parameterType);
   ParameterList *params = ParameterList::create(C, {param});
 
-  DeclName declName(C, methodName, params);
+  DeclName declName(C, methodBaseName, params);
   auto funcDecl = FuncDecl::create(C, SourceLoc(), StaticSpellingKind::None,
                                    SourceLoc(), declName, SourceLoc(),
                                    /*Throws*/ false, SourceLoc(),
@@ -258,8 +251,13 @@ static ValueDecl *deriveVectorProtocol_method(
   return funcDecl;
 }
 
-// Synthesize the `scaled(by:)` function declaration.
-static ValueDecl *deriveVectorProtocol_scaled(DerivedConformance &derived) {
+/// Synthesize a method declaration that has the following signture:
+///   func {methodBaseName}(
+///     {argumentLabel} {parameterName}: VectorSpaceScalar
+///   ) -> Self
+static ValueDecl *deriveVectorProtocol_unaryMethodOnScalar(
+    DerivedConformance &derived, Identifier methodBaseName,
+    Identifier argumentLabel, Identifier parameterName) {
   auto &C = derived.TC.Context;
   auto *nominal = derived.Nominal;
   auto *parentDC = derived.getConformanceContext();
@@ -268,18 +266,32 @@ static ValueDecl *deriveVectorProtocol_scaled(DerivedConformance &derived) {
   auto scalarType = deriveVectorProtocol_VectorSpaceScalar(nominal, parentDC)
       ->mapTypeOutOfContext();
 
+  auto bodySynthesizer = [](AbstractFunctionDecl *funcDecl, void *ctx) {
+    auto methodNameAndLabel = reinterpret_cast<Identifier *>(ctx);
+    deriveBodyVectorProtocol_method(
+        funcDecl, methodNameAndLabel[0], methodNameAndLabel[1]);
+  };
+  Identifier baseNameAndLabel[2] = {methodBaseName, argumentLabel};
   return deriveVectorProtocol_method(
-      derived, C.Id_scaled, C.getIdentifier("by"), C.getIdentifier("scalar"),
-      scalarType, selfInterfaceType,
-      {deriveBodyVectorProtocol_scalarMultiply, nullptr});
+      derived, methodBaseName, argumentLabel, parameterName, scalarType,
+      selfInterfaceType,
+      {bodySynthesizer, C.AllocateCopy(baseNameAndLabel).data()});
 }
 
 ValueDecl *DerivedConformance::deriveVectorProtocol(ValueDecl *requirement) {
   // Diagnose conformances in disallowed contexts.
   if (checkAndDiagnoseDisallowedContext(requirement))
     return nullptr;
+  auto &C = requirement->getASTContext();
   if (requirement->getBaseName() == TC.Context.Id_scaled)
-    return deriveVectorProtocol_scaled(*this);
+    return deriveVectorProtocol_unaryMethodOnScalar(
+        *this, C.Id_scaled, C.Id_by, C.Id_scale);
+  if (requirement->getBaseName() == TC.Context.Id_adding)
+    return deriveVectorProtocol_unaryMethodOnScalar(
+        *this, C.Id_adding, Identifier(), C.Id_x);
+  if (requirement->getBaseName() == TC.Context.Id_subtracting)
+    return deriveVectorProtocol_unaryMethodOnScalar(
+        *this, C.Id_subtracting, Identifier(), C.Id_x);
   TC.diagnose(requirement->getLoc(), diag::broken_vector_protocol_requirement);
   return nullptr;
 }

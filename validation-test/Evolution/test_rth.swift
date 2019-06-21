@@ -12,8 +12,11 @@ let clientIsAfter = true
 #endif
 
 let execPath = CommandLine.arguments.first!
-// FIXME: Don't hardcode "/" here.
+#if os(Windows)
+let execName = execPath.split(separator: "\\").last!
+#else
 let execName = execPath.split(separator: "/").last!
+#endif
 switch execName {
 case "after_after":
   precondition(clientIsAfter)

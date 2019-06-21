@@ -24,7 +24,7 @@ ${ ObjectiveCBridgeableImplementationForNSValue("CGSize") }
 ${ ObjectiveCBridgeableImplementationForNSValue("CGAffineTransform") }
 
 extension NSValue {
-    @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+    @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
     public func value<StoredType>(of type: StoredType.Type) -> StoredType? {
         if StoredType.self is AnyObject.Type {
             let encoding = String(cString: objCType)
@@ -42,11 +42,7 @@ extension NSValue {
             }
             let allocated = UnsafeMutablePointer<StoredType>.allocate(capacity: 1)
             defer { allocated.deallocate() }
-            if #available(OSX 10.13, iOS 11.0, tvOS 11.0, watchOS 4.0, *) {
-                getValue(allocated, size: storedSize)
-            } else {
-                getValue(allocated)
-            }
+            getValue(allocated, size: storedSize)
             return allocated.pointee
         }
         return nil

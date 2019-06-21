@@ -33,6 +33,57 @@ func enum_nonactive2(_ e: Enum, _ x: Float) -> Float {
   }
 }
 
+// Test loops.
+
+@differentiable
+func for_loop(_ x: Float) -> Float {
+  var result: Float = x
+  for _ in 0..<3 {
+    result = result * x
+  }
+  return result
+}
+
+@differentiable
+func while_loop(_ x: Float) -> Float {
+  var result = x
+  var i = 1
+  while i < 3 {
+    result = result * x
+    i += 1
+  }
+  return result
+}
+
+@differentiable
+func nested_loop(_ x: Float) -> Float {
+  var outer = x
+  for _ in 1..<3 {
+    outer = outer * x
+
+    var inner = outer
+    var i = 1
+    while i < 3 {
+      inner = inner / x
+      i += 1
+    }
+    outer = inner
+  }
+  return outer
+}
+
+// Test `try_apply`.
+
+// expected-error @+1 {{function is not differentiable}}
+@differentiable
+// expected-note @+1 {{when differentiating this function definition}}
+func withoutDerivative<T : Differentiable, R: Differentiable>(
+  at x: T, in body: (T) throws -> R
+) rethrows -> R {
+  // expected-note @+1 {{differentiating control flow is not yet supported}}
+  try body(x)
+}
+
 // Test unsupported differentiation of active enum values.
 
 // expected-error @+1 {{function is not differentiable}}
@@ -91,16 +142,14 @@ enum Tree : Differentiable & AdditiveArithmetic {
   }
 }
 
-// Test loops.
-
 // expected-error @+1 {{function is not differentiable}}
 @differentiable
 // expected-note @+1 {{when differentiating this function definition}}
-func loop(_ x: Float) -> Float {
+func loop_array(_ array: [Float]) -> Float {
   var result: Float = 1
-  // expected-note @+1 {{differentiating loops is not yet supported}}
-  for _ in 0..<3 {
-    result += x
+  // expected-note @+1 {{differentiating enum values is not yet supported}}
+  for x in array {
+    result = result * x
   }
-  return x
+  return result
 }

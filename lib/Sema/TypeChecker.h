@@ -658,6 +658,9 @@ private:
   /// when executing scripts.
   bool InImmediateMode = false;
 
+  /// Closure expressions that have already been prechecked.
+  llvm::SmallPtrSet<ClosureExpr *, 2> precheckedClosures;
+
   /// A helper to construct and typecheck call to super.init().
   ///
   /// \returns NULL if the constructed expression does not typecheck.
@@ -665,6 +668,7 @@ private:
 
   TypeChecker(ASTContext &Ctx);
   friend class ASTContext;
+  friend class constraints::ConstraintSystem;
 
 public:
   /// Create a new type checker instance for the given ASTContext, if it
@@ -1024,6 +1028,7 @@ public:
   bool typeCheckDestructorBodyUntil(DestructorDecl *DD,
                                     SourceLoc EndTypeCheckLoc);
 
+  bool typeCheckFunctionBuilderFuncBody(FuncDecl *FD, Type builderType);
   bool typeCheckClosureBody(ClosureExpr *closure);
 
   bool typeCheckTapBody(TapExpr *expr, DeclContext *DC);
@@ -2172,6 +2177,24 @@ bool isValidStringDynamicMemberLookup(SubscriptDecl *decl, DeclContext *DC,
 /// takes a single non-variadic parameter of `{Writable}KeyPath<T, U>` type.
 bool isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl, TypeChecker &TC);
 
+/// Compute the wrapped value type for the given property that has attached
+/// property wrappers, when the backing storage is known to have the given type.
+///
+/// \param var A property that has attached property wrappers.
+/// \param backingStorageType The type of the backing storage property.
+/// \param limit How many levels of unwrapping to perform, where 0 means to return the
+/// \c backingStorageType directly and the maximum is the number of attached property wrappers
+/// (which will produce the original property type). If not specified, defaults to the maximum.
+Type computeWrappedValueType(VarDecl *var, Type backingStorageType,
+                             Optional<unsigned> limit = None);
+  
+/// Build a call to the init(initialValue:) initializers of the property wrappers, filling in the given
+/// \c value as the original value.
+Expr *buildPropertyWrapperInitialValueCall(VarDecl *var,
+                                           Type backingStorageType,
+                                           Expr *value,
+                                           bool ignoreAttributeArgs);
+  
 /// Whether an overriding declaration requires the 'override' keyword.
 enum class OverrideRequiresKeyword {
   /// The keyword is never required.

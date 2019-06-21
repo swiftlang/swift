@@ -519,4 +519,112 @@ ControlFlowTests.test("Enums") {
   }
 }
 
+ControlFlowTests.test("Loops") {
+  func for_loop(_ x: Float) -> Float {
+    var result = x
+    for _ in 1..<3 {
+      result = result * x
+    }
+    return result
+  }
+  expectEqual((8, 12), valueWithGradient(at: 2, in: for_loop))
+  expectEqual((27, 27), valueWithGradient(at: 3, in: for_loop))
+
+  func while_loop(_ x: Float) -> Float {
+    var result = x
+    var i = 1
+    while i < 3 {
+      result = result * x
+      i += 1
+    }
+    return result
+  }
+  expectEqual((8, 12), valueWithGradient(at: 2, in: while_loop))
+  expectEqual((27, 27), valueWithGradient(at: 3, in: while_loop))
+
+  func repeat_while_loop(_ x: Float) -> Float {
+    var result = x
+    var i = 1
+    repeat {
+      result = result * x
+      i += 1
+    } while i < 3
+    return result
+  }
+  // FIXME(TF-584): Investigate incorrect (too big) gradient values
+  // for repeat-while loops.
+  // expectEqual((8, 12), valueWithGradient(at: 2, in: repeat_while_loop))
+  // expectEqual((27, 27), valueWithGradient(at: 3, in: repeat_while_loop))
+  expectEqual((8, 18), valueWithGradient(at: 2, in: repeat_while_loop))
+  expectEqual((27, 36), valueWithGradient(at: 3, in: repeat_while_loop))
+
+  func loop_continue(_ x: Float) -> Float {
+    var result = x
+    for i in 1..<10 {
+      if i.isMultiple(of: 2) {
+        continue
+      }
+      result = result * x
+    }
+    return result
+  }
+  expectEqual((64, 192), valueWithGradient(at: 2, in: loop_continue))
+  expectEqual((729, 1458), valueWithGradient(at: 3, in: loop_continue))
+
+  func loop_break(_ x: Float) -> Float {
+    var result = x
+    for i in 1..<10 {
+      if i.isMultiple(of: 2) {
+        continue
+      }
+      result = result * x
+    }
+    return result
+  }
+  expectEqual((64, 192), valueWithGradient(at: 2, in: loop_break))
+  expectEqual((729, 1458), valueWithGradient(at: 3, in: loop_break))
+
+  func nested_loop1(_ x: Float) -> Float {
+    var outer = x
+    for _ in 1..<3 {
+      outer = outer * x
+
+      var inner = outer
+      var i = 1
+      while i < 3 {
+        inner = inner + x
+        i += 1
+      }
+      outer = inner
+    }
+    return outer
+  }
+  expectEqual((20, 22), valueWithGradient(at: 2, in: nested_loop1))
+  expectEqual((104, 66), valueWithGradient(at: 4, in: nested_loop1))
+
+  func nested_loop2(_ x: Float, count: Int) -> Float {
+    var outer = x
+    outerLoop: for _ in 1..<count {
+      outer = outer * x
+
+      var inner = outer
+      var i = 1
+      while i < count {
+        inner = inner + x
+        i += 1
+
+        switch Int(inner.truncatingRemainder(dividingBy: 7)) {
+        case 0: break outerLoop
+        case 1: break
+        default: continue
+        }
+      }
+      outer = inner
+    }
+    return outer
+  }
+  expectEqual((24, 12), valueWithGradient(at: 2, in: { x in nested_loop2(x, count: 5) }))
+  expectEqual((16, 8), valueWithGradient(at: 4, in: { x in nested_loop2(x, count: 5) }))
+}
+
 runAllTests()

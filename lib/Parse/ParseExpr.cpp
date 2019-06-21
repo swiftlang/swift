@@ -1963,8 +1963,9 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
   unsigned QuoteLength;
   tok QuoteKind;
   std::tie(QuoteLength, QuoteKind) =
-      Tok.isMultilineString() ? std::make_tuple(3, tok::multiline_string_quote)
-                              : std::make_tuple(1, tok::string_quote);
+    Tok.isMultilineString() ? std::make_tuple(3, tok::multiline_string_quote)
+                            : std::make_tuple(1, Tok.getText().startswith("\'") ?
+                                          tok::single_quote: tok::string_quote);
   unsigned CloseQuoteBegin = Tok.getLength() - DelimiterLength - QuoteLength;
 
   OpenDelimiterStr = Tok.getRawText().take_front(DelimiterLength);

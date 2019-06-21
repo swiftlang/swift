@@ -11,6 +11,8 @@ extension Tensor : Equatable where Scalar : Equatable {}
 extension Tensor : AdditiveArithmetic where Scalar : AdditiveArithmetic {}
 extension Tensor : VectorProtocol where Scalar : AdditiveArithmetic {
   typealias VectorSpaceScalar = Scalar
+  func adding(_: Scalar) -> Self { self }
+  func subtracting(_: Scalar) -> Self { self }
   func scaled(by scalar: Scalar) -> Self { self }
 }
 
@@ -55,6 +57,12 @@ extension TensorParameters : VectorProtocol {
     return TensorParameters(w: lhs.w + rhs.w, b: lhs.b + rhs.b)
   }
   typealias VectorSpaceScalar = Float
+  func adding(_ x: VectorSpaceScalar) -> TensorParameters {
+    return TensorParameters(w: w.adding(x), b: b.adding(x))
+  }
+  func subtracting(_ x: VectorSpaceScalar) -> TensorParameters {
+    return TensorParameters(w: w.subtracting(x), b: b.subtracting(x))
+  }
   func scaled(by scalar: VectorSpaceScalar) -> TensorParameters {
     return TensorParameters(w: w.scaled(by: scalar), b: b.scaled(by: scalar))
   }
@@ -100,8 +108,8 @@ struct DummyOptimizer<P : KeyPathIterable, Scalar : BinaryFloatingPoint>
     parameters: inout P, withGradients gradients: P
   ) {
     for kp in parameters.recursivelyAllWritableKeyPaths(to: Tensor<Scalar>.self) {
-      firstMoments[keyPath: kp] *= learningRate
-      parameters[keyPath: kp] -= learningRate * parameters[keyPath: kp]
+      firstMoments[keyPath: kp].scale(by: learningRate)
+      parameters[keyPath: kp] -= parameters[keyPath: kp].scaled(by: learningRate)
     }
   }
 }
