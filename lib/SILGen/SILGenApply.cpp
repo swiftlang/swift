@@ -5134,7 +5134,9 @@ RValue SILGenFunction::emitLiteral(LiteralExpr *literal, SGFContext C) {
       std::string value;
       if (loc.isValid())
         value = ctx.SourceMgr.getDisplayNameForLoc(loc);
-      builtinLiteralArgs = emitStringLiteral(*this, literal, value, C,
+      builtinLiteralArgs = emitStringLiteral(*this, literal,
+                                             llvm::sys::path::filename(value),
+                                             C,
                                              magicLiteral->getStringEncoding());
       builtinInit = magicLiteral->getBuiltinInitializer();
       init = magicLiteral->getInitializer();
