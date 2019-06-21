@@ -4442,4 +4442,4 @@ public:
 
 #pragma clang diagnostic pop
 
-#endif /* SWIFT_ABI_METADATA_H */
+#endif // SWIFT_ABI_METADATA_H

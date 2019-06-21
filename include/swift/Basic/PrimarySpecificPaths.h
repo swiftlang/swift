@@ -52,4 +52,4 @@ public:
 };
 } // namespace swift
 
-#endif /* SWIFT_BASIC_PRIMARYSPECIFICPATHS_H */
+#endif // SWIFT_BASIC_PRIMARYSPECIFICPATHS_H

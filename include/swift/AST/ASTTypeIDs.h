@@ -38,4 +38,4 @@ class Type;
 
 } // end namespace swift
 
-#endif /* SWIFT_AST_ASTTYPEIDS_H */
+#endif // SWIFT_AST_ASTTYPEIDS_H

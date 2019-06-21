@@ -137,4 +137,4 @@ struct SupplementaryOutputPaths {
 };
 } // namespace swift
 
-#endif /* SWIFT_FRONTEND_SUPPLEMENTARYOUTPUTPATHS_H */
+#endif // SWIFT_FRONTEND_SUPPLEMENTARYOUTPUTPATHS_H
