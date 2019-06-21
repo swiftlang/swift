@@ -338,14 +338,14 @@ protected:
 
   SWIFT_INLINE_BITFIELD_FULL(TypeVariableType, TypeBase, 64-NumTypeBaseBits,
     /// The unique number assigned to this type variable.
-    ID : 32 - NumTypeBaseBits,
+    ID : 20,
 
     /// Type variable options.
     Options : 4,
 
     ///  Index into the list of type variables, as used by the
     ///  constraint graph.
-    GraphIndex : 28
+    GraphIndex : 20
   );
 
   SWIFT_INLINE_BITFIELD(SILFunctionType, TypeBase, NumSILExtInfoBits+3+1+2,
