@@ -1646,6 +1646,11 @@ void Remangler::mangleObjCBlock(Node *node) {
   Buffer << "XB";
 }
 
+void Remangler::mangleEscapingObjCBlock(Node *node) {
+  mangleChildNodesReversed(node);
+  Buffer << "XL";
+}
+
 void Remangler::mangleOwningAddressor(Node *node) {
   mangleAbstractStorage(node->getFirstChild(), "lO");
 }

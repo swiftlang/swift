@@ -172,13 +172,12 @@ bool constraints::areConservativelyCompatibleArgumentLabels(
   }
 
   auto params = levelTy->getParams();
-  SmallBitVector defaultMap =
-    computeDefaultMap(params, decl, hasCurriedSelf);
+  ParameterListInfo paramInfo(params, decl, hasCurriedSelf);
 
   MatchCallArgumentListener listener;
   SmallVector<ParamBinding, 8> unusedParamBindings;
 
-  return !matchCallArguments(argInfos, params, defaultMap,
+  return !matchCallArguments(argInfos, params, paramInfo,
                              hasTrailingClosure,
                              /*allow fixes*/ false,
                              listener, unusedParamBindings);
@@ -230,12 +229,12 @@ static bool acceptsTrailingClosure(const AnyFunctionType::Param &param) {
 bool constraints::
 matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
                    ArrayRef<AnyFunctionType::Param> params,
-                   const SmallBitVector &defaultMap,
+                   const ParameterListInfo &paramInfo,
                    bool hasTrailingClosure,
                    bool allowFixes,
                    MatchCallArgumentListener &listener,
                    SmallVectorImpl<ParamBinding> &parameterBindings) {
-  assert(params.size() == defaultMap.size() && "Default map does not match");
+  assert(params.size() == paramInfo.size() && "Default map does not match");
 
   // Keep track of the parameter we're matching and what argument indices
   // got bound to each parameter.
@@ -252,10 +251,6 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
   // Indicates whether any of the arguments are potentially out-of-order,
   // requiring further checking at the end.
   bool potentiallyOutOfOrder = false;
-
-  auto hasDefault = [&defaultMap, &numParams](unsigned idx) -> bool {
-    return idx < numParams ? defaultMap.test(idx) : false;
-  };
 
   // Local function that claims the argument at \c argNumber, returning the
   // index of the claimed argument. This is primarily a helper for
@@ -346,7 +341,8 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
         // func foo(_ a: Int, _ b: Int = 0, c: Int = 0, _ d: Int) {}
         // foo(1, c: 2, 3) // -> `3` will be claimed as '_ b:'.
         // ```
-        if (argLabel.empty() && (hasDefault(i) || !forVariadic))
+        if (argLabel.empty() &&
+            (paramInfo.hasDefaultArgument(i) || !forVariadic))
           continue;
 
         potentiallyOutOfOrder = true;
@@ -565,7 +561,7 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
         // now if label doesn't match because it's incorrect
         // or argument belongs to some other parameter, so
         // we just leave this parameter unfulfilled.
-        if (defaultMap.test(i))
+        if (paramInfo.hasDefaultArgument(i))
           continue;
 
         // Looks like there was no parameter claimed at the same
@@ -602,7 +598,7 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
         continue;
 
       // Parameters with defaults can be unfulfilled.
-      if (hasDefault(paramIdx))
+      if (paramInfo.hasDefaultArgument(paramIdx))
         continue;
 
       listener.missingArgument(paramIdx);
@@ -635,7 +631,7 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
         // If we are moving the the position with a different label
         // and there is no default value for it, can't diagnose the
         // problem as a simple re-ordering.
-        if (!defaultMap.test(actualIndex))
+        if (!paramInfo.hasDefaultArgument(actualIndex))
           return false;
       }
 
@@ -643,7 +639,7 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
         if (oldLabel == params[i].getLabel())
           break;
 
-        if (!defaultMap.test(i))
+        if (!paramInfo.hasDefaultArgument(i))
           return false;
       }
 
@@ -734,7 +730,8 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
 
 /// Find the callee declaration and uncurry level for a given call
 /// locator.
-static std::tuple<ValueDecl *, bool, ArrayRef<Identifier>, bool>
+static std::tuple<ValueDecl *, bool, ArrayRef<Identifier>, bool,
+                  ConstraintLocator *>
 getCalleeDeclAndArgs(ConstraintSystem &cs,
                      ConstraintLocatorBuilder callLocator,
                      SmallVectorImpl<Identifier> &argLabelsScratch) {
@@ -746,14 +743,14 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
   auto callExpr = callLocator.getLocatorParts(path);
   if (!callExpr)
     return std::make_tuple(nullptr, /*hasCurriedSelf=*/false, argLabels,
-                           hasTrailingClosure);
+                           hasTrailingClosure, nullptr);
 
   // Our remaining path can only be 'ApplyArgument'.
   if (!path.empty() &&
       !(path.size() <= 2 &&
         path.back().getKind() == ConstraintLocator::ApplyArgument))
     return std::make_tuple(nullptr, /*hasCurriedSelf=*/false, argLabels,
-                           hasTrailingClosure);
+                           hasTrailingClosure, nullptr);
 
   // Dig out the callee.
   ConstraintLocator *targetLocator;
@@ -778,12 +775,12 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
         path[0].getKind() != ConstraintLocator::KeyPathComponent ||
         path[1].getKind() != ConstraintLocator::ApplyArgument)
       return std::make_tuple(nullptr, /*hasCurriedSelf=*/false, argLabels,
-                             hasTrailingClosure);
+                             hasTrailingClosure, nullptr);
 
     auto componentIndex = path[0].getValue();
     if (componentIndex >= keyPath->getComponents().size())
       return std::make_tuple(nullptr, /*hasCurriedSelf=*/false, argLabels,
-                             hasTrailingClosure);
+                             hasTrailingClosure, nullptr);
 
     auto &component = keyPath->getComponents()[componentIndex];
     switch (component.getKind()) {
@@ -803,7 +800,7 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
     case KeyPathExpr::Component::Kind::Identity:
     case KeyPathExpr::Component::Kind::TupleElement:
       return std::make_tuple(nullptr, /*hasCurriedSelf=*/false, argLabels,
-                             hasTrailingClosure);
+                             hasTrailingClosure, nullptr);
     }
 
   } else {
@@ -815,13 +812,14 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
       hasTrailingClosure = objectLiteral->hasTrailingClosure();
     }
     return std::make_tuple(nullptr, /*hasCurriedSelf=*/false, argLabels,
-                           hasTrailingClosure);
+                           hasTrailingClosure, nullptr);
   }
 
   // Find the overload choice corresponding to the callee locator.
   // FIXME: This linearly walks the list of resolved overloads, which is
   // potentially very expensive.
   Optional<OverloadChoice> choice;
+  ConstraintLocator *calleeLocator = nullptr;
   for (auto resolved = cs.getResolvedOverloadSets(); resolved;
        resolved = resolved->Previous) {
     // FIXME: Workaround null locators.
@@ -848,6 +846,7 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
     resolvedLocator = simplifyLocator(cs, resolvedLocator, range);
 
     if (resolvedLocator == targetLocator) {
+      calleeLocator = resolved->Locator;
       choice = resolved->Choice;
       break;
     }
@@ -856,7 +855,7 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
   // If we didn't find any matching overloads, we're done.
   if (!choice)
     return std::make_tuple(nullptr, /*hasCurriedSelf=*/false, argLabels,
-                           hasTrailingClosure);
+                           hasTrailingClosure, nullptr);
 
   // If there's a declaration, return it.
   if (auto *decl = choice->getDeclOrNull()) {
@@ -879,11 +878,12 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
       }
     }
 
-    return std::make_tuple(decl, hasCurriedSelf, argLabels, hasTrailingClosure);
+    return std::make_tuple(decl, hasCurriedSelf, argLabels, hasTrailingClosure,
+                           calleeLocator);
   }
 
   return std::make_tuple(nullptr, /*hasCurriedSelf=*/false, argLabels,
-                         hasTrailingClosure);
+                         hasTrailingClosure, calleeLocator);
 }
 
 class ArgumentFailureTracker : public MatchCallArgumentListener {
@@ -945,11 +945,12 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
   ArrayRef<Identifier> argLabels;
   SmallVector<Identifier, 2> argLabelsScratch;
   bool hasTrailingClosure = false;
-  std::tie(callee, hasCurriedSelf, argLabels, hasTrailingClosure) =
+  ConstraintLocator *calleeLocator;
+  std::tie(callee, hasCurriedSelf, argLabels, hasTrailingClosure,
+           calleeLocator) =
     getCalleeDeclAndArgs(cs, locator, argLabelsScratch);
 
-  SmallBitVector defaultMap =
-    computeDefaultMap(params, callee, hasCurriedSelf);
+  ParameterListInfo paramInfo(params, callee, hasCurriedSelf);
 
   // Apply labels to arguments.
   SmallVector<AnyFunctionType::Param, 8> argsWithLabels;
@@ -960,7 +961,7 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
   SmallVector<ParamBinding, 4> parameterBindings;
   ArgumentFailureTracker listener(cs, parameterBindings, locator);
   if (constraints::matchCallArguments(argsWithLabels, params,
-                                      defaultMap,
+                                      paramInfo,
                                       hasTrailingClosure,
                                       cs.shouldAttemptFixes(), listener,
                                       parameterBindings))
@@ -1009,6 +1010,20 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
           // in Swift <= 4 mode.
           cs.increaseScore(SK_FunctionConversion);
           matchingAutoClosureResult = false;
+        }
+      }
+
+      // If the parameter has a function builder type and the argument is a
+      // closure, apply the function builder transformation.
+      if (Type functionBuilderType
+              = paramInfo.getFunctionBuilderType(paramIdx)) {
+        Expr *arg = getArgumentExpr(locator.getAnchor(), argIdx);
+        if (auto closure = dyn_cast_or_null<ClosureExpr>(arg)) {
+          auto result =
+              cs.applyFunctionBuilder(closure, functionBuilderType,
+                                      calleeLocator, loc);
+          if (result.isFailure())
+            return result;
         }
       }
 
@@ -1579,25 +1594,28 @@ ConstraintSystem::matchSuperclassTypes(Type type1, Type type2,
   return getTypeMatchFailure(locator);
 }
 
-static ConstraintSystem::TypeMatchResult
-matchDeepTypeArguments(ConstraintSystem &cs,
-                       ConstraintSystem::TypeMatchOptions subflags,
-                       ArrayRef<Type> args1,
-                       ArrayRef<Type> args2,
-                       ConstraintLocatorBuilder locator) {
+static ConstraintSystem::TypeMatchResult matchDeepTypeArguments(
+    ConstraintSystem &cs, ConstraintSystem::TypeMatchOptions subflags,
+    ArrayRef<Type> args1, ArrayRef<Type> args2,
+    ConstraintLocatorBuilder locator,
+    llvm::function_ref<void(unsigned)> recordMismatch = [](unsigned) {}) {
   if (args1.size() != args2.size()) {
     return cs.getTypeMatchFailure(locator);
   }
-  for (unsigned i = 0, n = args1.size(); i != n; ++i) {
-    auto result = cs.matchTypes(args1[i], args2[i], ConstraintKind::Bind,
-                                subflags, locator.withPathElement(
-                                        LocatorPathElt::getGenericArgument(i)));
 
-    if (result.isFailure())
-      return result;
+  auto allMatch = cs.getTypeMatchSuccess();
+  for (unsigned i = 0, n = args1.size(); i != n; ++i) {
+    auto result = cs.matchTypes(
+        args1[i], args2[i], ConstraintKind::Bind, subflags,
+        locator.withPathElement(LocatorPathElt::getGenericArgument(i)));
+
+    if (result.isFailure()) {
+      recordMismatch(i);
+      allMatch = result;
+    }
   }
 
-  return cs.getTypeMatchSuccess();
+  return allMatch;
 }
 
 ConstraintSystem::TypeMatchResult
@@ -1653,9 +1671,47 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
       return result;
   }
 
-  // Match up the generic arguments, exactly.
   auto args1 = bound1->getGenericArgs();
   auto args2 = bound2->getGenericArgs();
+
+  // Match up the generic arguments, exactly.
+
+  if (shouldAttemptFixes()) {
+    bool forRequirement = false;
+    if (auto last = locator.last()) {
+      forRequirement = last->isTypeParameterRequirement() ||
+                       last->isConditionalRequirement();
+    }
+
+    // Optionals and arrays have a lot of special diagnostics and only one
+    // generic argument so if we' re dealing with one, don't produce generic
+    // arguments mismatch fixes.
+    // TODO(diagnostics): Move Optional and Array diagnostics over to the
+    // new framework.
+    bool isOptional = bound1->getDecl()->isOptionalDecl();
+    bool isArray = isArrayType(bound1).hasValue();
+
+    if (forRequirement || isOptional || isArray)
+      return matchDeepTypeArguments(*this, subflags, args1, args2, locator);
+
+    SmallVector<unsigned, 4> mismatches;
+    auto result = matchDeepTypeArguments(
+        *this, subflags, args1, args2, locator,
+        [&mismatches](unsigned position) { mismatches.push_back(position); });
+
+    if (mismatches.empty())
+      return result;
+
+    auto *fix = GenericArgumentsMismatch::create(
+        *this, bound1, bound2, mismatches, getConstraintLocator(locator));
+
+    if (!recordFix(fix)) {
+      // Increase the solution's score for each mismtach this fixes.
+      increaseScore(SK_Fix, mismatches.size());
+      return getTypeMatchSuccess();
+    }
+    return result;
+  }
   return matchDeepTypeArguments(*this, subflags, args1, args2, locator);
 }
 
@@ -2096,6 +2152,15 @@ bool ConstraintSystem::repairFailures(
     return false;
   }
 
+  auto hasConversionOrRestriction = [&](ConversionRestrictionKind kind) {
+    return llvm::any_of(conversionsOrFixes,
+                        [kind](const RestrictionOrFix correction) {
+                          if (auto restriction = correction.getRestriction())
+                            return restriction == kind;
+                          return false;
+                        });
+  };
+
   auto &elt = path.back();
   switch (elt.getKind()) {
   case ConstraintLocator::LValueConversion:
@@ -2164,6 +2229,11 @@ bool ConstraintSystem::repairFailures(
   }
 
   case ConstraintLocator::ClosureResult: {
+    // If we could record a generic arguments mismatch instead of this fix,
+    // don't record a ContextualMismatch here.
+    if (hasConversionOrRestriction(ConversionRestrictionKind::DeepEquality))
+      break;
+
     auto *fix = ContextualMismatch::create(*this, lhs, rhs,
                                            getConstraintLocator(locator));
     conversionsOrFixes.push_back(fix);
@@ -2222,6 +2292,11 @@ bool ConstraintSystem::repairFailures(
 
   case ConstraintLocator::TupleElement: {
     if (anchor && (isa<ArrayExpr>(anchor) || isa<DictionaryExpr>(anchor))) {
+      // If we could record a generic arguments mismatch instead of this fix,
+      // don't record a ContextualMismatch here.
+      if (hasConversionOrRestriction(ConversionRestrictionKind::DeepEquality))
+        break;
+
       conversionsOrFixes.push_back(CollectionElementContextualMismatch::create(
           *this, lhs, rhs, getConstraintLocator(locator)));
     }
@@ -2935,8 +3010,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   // literals and expressions representing an implicit return type of the single
   // expression functions.
   if (auto elt = locator.last()) {
-    if (elt->getKind() == ConstraintLocator::ClosureResult ||
-        elt->getKind() == ConstraintLocator::SingleExprFuncResultType) {
+    if (elt->isClosureResult() || elt->isResultOfSingleExprFunction()) {
       if (kind >= ConstraintKind::Subtype &&
           (type1->isUninhabited() || type2->isVoid())) {
         increaseScore(SK_FunctionConversion);
@@ -4648,7 +4722,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
 
       // If the base type is optional because we haven't chosen to force an
       // implicit optional, don't try to fix it. The IUO will be forced instead.
-      if (auto dotExpr = dyn_cast<UnresolvedDotExpr>(locator->getAnchor())) {
+      if (auto dotExpr =
+              dyn_cast_or_null<UnresolvedDotExpr>(locator->getAnchor())) {
         auto baseExpr = dotExpr->getBase();
         auto resolvedOverload = getResolvedOverloadSets();
         while (resolvedOverload) {
@@ -4668,8 +4743,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       auto innerTV = createTypeVariable(locator,
                                         TVO_CanBindToLValue |
                                         TVO_CanBindToNoEscape);
-      Type optTy = getTypeChecker().getOptionalType(
-          locator->getAnchor()->getSourceRange().Start, innerTV);
+      Type optTy = getTypeChecker().getOptionalType(SourceLoc(), innerTV);
       SmallVector<Constraint *, 2> optionalities;
       auto nonoptionalResult = Constraint::createFixed(
           *this, ConstraintKind::Bind,
@@ -5405,8 +5479,9 @@ done:
                                             {rootTy, valueTy});
   // Let's check whether deduced key path type would match
   // expected contextual one.
-  return matchTypes(resolvedKPTy, keyPathTy, ConstraintKind::Bind, subflags,
-                    locator.withPathElement(ConstraintLocator::ContextualType));
+  return matchTypes(
+      resolvedKPTy, keyPathTy, ConstraintKind::Bind, subflags,
+      locator.withPathElement(LocatorPathElt::getContextualType()));
 }
 
 ConstraintSystem::SolutionKind
@@ -6701,7 +6776,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::SkipSameTypeRequirement:
   case FixKind::SkipSuperclassRequirement:
   case FixKind::ContextualMismatch:
-  case FixKind::AddMissingArguments: {
+  case FixKind::AddMissingArguments:
+  case FixKind::SkipUnhandledConstructInFunctionBuilder: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
 
@@ -6722,6 +6798,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::TreatKeyPathSubscriptIndexAsHashable:
   case FixKind::AllowInvalidRefInKeyPath:
   case FixKind::ExplicitlySpecifyGenericArguments:
+  case FixKind::GenericArgumentsMismatch:
     llvm_unreachable("handled elsewhere");
   }
 

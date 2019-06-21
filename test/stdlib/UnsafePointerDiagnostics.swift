@@ -86,10 +86,14 @@ func unsafePointerConversionAvailability(
   _ = UnsafePointer<Int>(orp)  // expected-error {{cannot convert value of type 'UnsafeRawPointer?' to expected argument type 'RawPointer'}}
   _ = UnsafePointer<Int>(omrp) // expected-error {{cannot convert value of type 'UnsafeMutableRawPointer?' to expected argument type 'RawPointer'}}
 
-  _ = UnsafePointer<Int>(ups) // expected-error {{cannot convert value of type 'UnsafePointer<String>' to expected argument type 'RawPointer'}}
-  _ = UnsafeMutablePointer<Int>(umps) // expected-error {{cannot convert value of type 'UnsafeMutablePointer<String>' to expected argument type 'UnsafeMutablePointer<_>'}}
-  _ = UnsafePointer<String>(upi) // expected-error {{cannot convert value of type 'UnsafePointer<Int>' to expected argument type 'RawPointer'}}
-  _ = UnsafeMutablePointer<String>(umpi) // expected-error {{cannot convert value of type 'UnsafeMutablePointer<Int>' to expected argument type 'UnsafeMutablePointer<_>'}}
+  _ = UnsafePointer<Int>(ups) // expected-error {{cannot convert value of type 'UnsafePointer<String>' to expected argument type 'UnsafePointer<Int>'}}
+  // expected-note@-1 {{arguments to generic parameter 'Pointee' ('String' and 'Int') are expected to be equal}}
+  _ = UnsafeMutablePointer<Int>(umps) // expected-error {{cannot convert value of type 'UnsafeMutablePointer<String>' to expected argument type 'UnsafeMutablePointer<Int>'}}
+  // expected-note@-1 {{arguments to generic parameter 'Pointee' ('String' and 'Int') are expected to be equal}}
+  _ = UnsafePointer<String>(upi) // expected-error {{cannot convert value of type 'UnsafePointer<Int>' to expected argument type 'UnsafePointer<String>'}}
+  // expected-note@-1 {{arguments to generic parameter 'Pointee' ('Int' and 'String') are expected to be equal}}
+  _ = UnsafeMutablePointer<String>(umpi) // expected-error {{cannot convert value of type 'UnsafeMutablePointer<Int>' to expected argument type 'UnsafeMutablePointer<String>'}}
+  // expected-note@-1 {{arguments to generic parameter 'Pointee' ('Int' and 'String') are expected to be equal}}
 }
 
 func unsafeRawBufferPointerConversions(

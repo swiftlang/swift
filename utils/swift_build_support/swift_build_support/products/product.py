@@ -12,6 +12,8 @@
 
 import abc
 
+from .. import cmake
+
 
 class Product(object):
     @classmethod
@@ -59,7 +61,7 @@ class Product(object):
         self.toolchain = toolchain
         self.source_dir = source_dir
         self.build_dir = build_dir
-        self.cmake_options = []
+        self.cmake_options = cmake.CMakeOptions()
 
 
 class ProductBuilder(object):

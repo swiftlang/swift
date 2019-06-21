@@ -29,7 +29,7 @@
 // RUN: %{python} %S/Inputs/make-old.py %t/modulecache/OtherModule-*.swiftmodule
 //
 //
-// Actual test: add an inlinable func with an unused var to LeafModule.swiftinterface (which should emit a warning); check we do get a rebuild, but no warning.
+// Actual test: add an inlinable func with an unused var to LeafModule.swiftinterface (which should emit a warning); check we do get a rebuild, but no warning. (For astooscopelookup testing, must filter out that warning; see the sed command below.)
 //
 // RUN: %{python} %S/Inputs/check-is-old.py %t/OtherModule.swiftinterface %t/LeafModule.swiftinterface
 // RUN: %{python} %S/Inputs/check-is-old.py %t/modulecache/OtherModule-*.swiftmodule %t/modulecache/LeafModule-*.swiftmodule
@@ -38,7 +38,7 @@
 // RUN: %{python} %S/Inputs/make-old.py %t/LeafModule.swiftinterface
 // RUN: %{python} %S/Inputs/check-is-old.py %t/LeafModule.swiftinterface
 // RUN: rm %t/TestModule.swiftmodule
-// RUN: %target-swift-frontend -I %t -module-cache-path %t/modulecache -emit-module -o %t/TestModule.swiftmodule -module-name TestModule %s >%t/warn.txt 2>&1
+// RUN: %target-swift-frontend -I %t -module-cache-path %t/modulecache -emit-module -o %t/TestModule.swiftmodule -module-name TestModule %s  2>&1 | sed '/WARNING: TRYING Scope exclusively/d' >%t/warn.txt
 // RUN: %{python} %S/Inputs/check-is-new.py %t/modulecache/OtherModule-*.swiftmodule %t/modulecache/LeafModule-*.swiftmodule
 // "check warn.txt exists and is empty"
 // RUN: test -e %t/warn.txt -a ! -s %t/warn.txt

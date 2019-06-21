@@ -96,8 +96,9 @@ bool rotateLoop(SILLoop *L, DominanceInfo *DT, SILLoopInfo *LI,
                 bool RotateSingleBlockLoops, SILBasicBlock *UpTo,
                 bool ShouldVerify);
 
-/// Splits the basic block before the instruction with an unconditional
-/// branch and updates the dominator tree and loop info.
+/// Splits the basic block before the instruction with an unconditional branch
+/// and updates the dominator tree and loop info. Returns the new, branched to
+/// block that contains the end of \p SplitBeforeInst's block.
 SILBasicBlock *splitBasicBlockAndBranch(SILBuilder &B,
                                         SILInstruction *SplitBeforeInst,
                                         DominanceInfo *DT, SILLoopInfo *LI);

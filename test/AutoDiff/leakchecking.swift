@@ -193,6 +193,44 @@ LeakCheckingTests.test("ControlFlow") {
   // FIXME: Fix control flow AD memory leaks.
   // See related FIXME comments in adjoint value/buffer propagation in
   // lib/SILOptimizer/Mandatory/Differentiation.cpp.
+  testWithLeakChecking(expectedLeakCount: 6) {
+    func for_loop(_ x: Tracked<Float>) -> Tracked<Float> {
+      var result = x
+      for _ in 1..<3 {
+        result = result * x
+      }
+      return result
+    }
+    expectEqual((8, 12), Tracked<Float>(2).valueWithGradient(in: for_loop))
+    expectEqual((27, 27), Tracked<Float>(3).valueWithGradient(in: for_loop))
+  }
+
+  // FIXME: Fix control flow AD memory leaks.
+  // See related FIXME comments in adjoint value/buffer propagation in
+  // lib/SILOptimizer/Mandatory/Differentiation.cpp.
+  testWithLeakChecking(expectedLeakCount: 20) {
+    func nested_loop(_ x: Tracked<Float>) -> Tracked<Float> {
+      var outer = x
+      for _ in 1..<3 {
+        outer = outer * x
+
+        var inner = outer
+        var i = 1
+        while i < 3 {
+          inner = inner / x
+          i += 1
+        }
+        outer = inner
+      }
+      return outer
+    }
+    expectEqual((0.5, -0.25), Tracked<Float>(2).valueWithGradient(in: nested_loop))
+    expectEqual((0.25, -0.0625), Tracked<Float>(4).valueWithGradient(in: nested_loop))
+  }
+
+  // FIXME: Fix control flow AD memory leaks.
+  // See related FIXME comments in adjoint value/buffer propagation in
+  // lib/SILOptimizer/Mandatory/Differentiation.cpp.
   testWithLeakChecking(expectedLeakCount: 3) {
     var model = ExampleLeakModel()
     let x: Tracked<Float> = 1.0

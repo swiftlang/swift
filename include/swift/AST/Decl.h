@@ -387,9 +387,8 @@ protected:
     /// It is up to the debugger to instruct SIL how to access this variable.
     IsDebuggerVar : 1,
 
-    /// Whether this is a property defined in the debugger's REPL.
-    /// FIXME: Remove this once LLDB has proper support for resilience.
-    IsREPLVar : 1,
+    /// Whether this is the backing storage for a lazy property.
+    IsLazyStorageProperty : 1,
 
     /// Whether this is the backing storage for a property wrapper.
     IsPropertyWrapperBackingProperty : 1
@@ -2709,6 +2708,14 @@ public:
   /// `this` must be of a decl type that supports opaque return types, and
   /// must not have previously had an opaque result type set.
   void setOpaqueResultTypeDecl(OpaqueTypeDecl *D);
+
+  /// Retrieve the attribute associating this declaration with a
+  /// function builder, if there is one.
+  CustomAttr *getAttachedFunctionBuilder() const;
+
+  /// Retrieve the @functionBuilder type attached to this declaration,
+  /// if there is one.
+  Type getFunctionBuilderType() const;
 };
 
 /// This is a common base class for declarations which declare a type.
@@ -4808,7 +4815,7 @@ protected:
     Bits.VarDecl.Specifier = static_cast<unsigned>(Sp);
     Bits.VarDecl.IsCaptureList = IsCaptureList;
     Bits.VarDecl.IsDebuggerVar = false;
-    Bits.VarDecl.IsREPLVar = false;
+    Bits.VarDecl.IsLazyStorageProperty = false;
     Bits.VarDecl.HasNonPatternBindingInit = false;
     Bits.VarDecl.IsPropertyWrapperBackingProperty = false;
   }
@@ -5097,34 +5104,48 @@ public:
   void setDebuggerVar(bool IsDebuggerVar) {
     Bits.VarDecl.IsDebuggerVar = IsDebuggerVar;
   }
-  
-  /// Is this a special debugger REPL variable?
-  /// FIXME: Remove this once LLDB has proper support for resilience.
-  bool isREPLVar() const { return Bits.VarDecl.IsREPLVar; }
-  void setREPLVar(bool IsREPLVar) {
-    Bits.VarDecl.IsREPLVar = IsREPLVar;
+
+  /// Is this the synthesized storage for a 'lazy' property?
+  bool isLazyStorageProperty() const {
+    return Bits.VarDecl.IsLazyStorageProperty;
+  }
+  void setLazyStorageProperty(bool IsLazyStorage) {
+    Bits.VarDecl.IsLazyStorageProperty = IsLazyStorage;
   }
 
-  /// Retrieve the custom attribute that attaches a property wrapper to this
-  /// property.
-  CustomAttr *getAttachedPropertyWrapper() const;
+  /// Retrieve the custom attributes that attach property wrappers to this
+  /// property. The returned list contains all of the attached property wrapper attributes in source order,
+  /// which means the outermost wrapper attribute is provided first.
+  llvm::TinyPtrVector<CustomAttr *> getAttachedPropertyWrappers() const;
 
+  /// Whether this property has any attached property wrappers.
+  bool hasAttachedPropertyWrapper() const;
+  
+  /// Whether all of the attached property wrappers have an init(initialValue:) initializer.
+  bool allAttachedPropertyWrappersHaveInitialValueInit() const;
+  
   /// Retrieve the type of the attached property wrapper as a contextual
   /// type.
+  ///
+  /// \param index Which property wrapper type is being computed, where 0
+  /// indicates the first (outermost) attached property wrapper.
   ///
   /// \returns a NULL type for properties without attached wrappers,
   /// an error type when the property wrapper type itself is erroneous,
   /// or the wrapper type itself, which may involve unbound generic
   /// types.
-  Type getAttachedPropertyWrapperType() const;
+  Type getAttachedPropertyWrapperType(unsigned index) const;
 
   /// Retrieve information about the attached property wrapper type.
-  PropertyWrapperTypeInfo getAttachedPropertyWrapperTypeInfo() const;
+  ///
+  /// \param i Which attached property wrapper type is being queried, where 0 is the outermost (first)
+  /// attached property wrapper type.
+  PropertyWrapperTypeInfo getAttachedPropertyWrapperTypeInfo(unsigned i) const;
 
   /// Retrieve the fully resolved attached property wrapper type.
   ///
   /// This type will be the fully-resolved form of
-  /// \c getAttachedPropertyWrapperType(), which will not contain any
+  /// \c getAttachedPropertyWrapperType(0), which will not contain any
   /// unbound generic types. It will be the type of the backing property.
   Type getPropertyWrapperBackingPropertyType() const;
 
@@ -5138,8 +5159,8 @@ public:
   ///
   /// The backing storage property will be a stored property of the
   /// wrapper's type. This will be equivalent to
-  /// \c getAttachedPropertyWrapperType() when it is fully-specified;
-  /// if \c getAttachedPropertyWrapperType() involves an unbound
+  /// \c getAttachedPropertyWrapperType(0) when it is fully-specified;
+  /// if \c getAttachedPropertyWrapperType(0) involves an unbound
   /// generic type, the backing storage property will be the appropriate
   /// bound generic version.
   VarDecl *getPropertyWrapperBackingProperty() const;
@@ -5151,6 +5172,10 @@ public:
   /// @Lazy var i = 17
   /// \end
   bool isPropertyWrapperInitializedWithInitialValue() const;
+
+  /// Whether the memberwise initializer parameter for a property with a property wrapper type
+  /// uses the wrapped type.
+  bool isPropertyMemberwiseInitializedWithWrappedType() const;
 
   /// If this property is the backing storage for a property with an attached
   /// property wrapper, return the original property.
@@ -5344,7 +5369,7 @@ public:
     assert(isVariadic());
     return getVarargBaseTy(getInterfaceType());
   }
-  
+
   SourceRange getSourceRange() const;
 
   AnyFunctionType::Param toFunctionParam(Type type = Type()) const;
@@ -7178,8 +7203,7 @@ inline bool Decl::isPotentiallyOverridable() const {
       isa<SubscriptDecl>(this) ||
       isa<FuncDecl>(this) ||
       isa<DestructorDecl>(this)) {
-    return getDeclContext()->getSelfClassDecl() ||
-           isa<ProtocolDecl>(getDeclContext());
+    return getDeclContext()->getSelfClassDecl();
   } else {
     return false;
   }

@@ -49,7 +49,7 @@ Additionally, [Bazel](https://www.bazel.build) between v0.24.1 and v0.25.2 (incl
 
 For Ubuntu, you'll need the following development dependencies:
 
-    sudo apt-get install git cmake ninja-build clang python uuid-dev libicu-dev icu-devtools libbsd-dev libedit-dev libxml2-dev libsqlite3-dev swig libpython-dev libncurses5-dev pkg-config libblocksruntime-dev libcurl4-openssl-dev systemtap-sdt-dev tzdata rsync
+    sudo apt-get install git cmake ninja-build clang python uuid-dev libicu-dev icu-devtools libedit-dev libxml2-dev libsqlite3-dev swig libpython-dev libncurses5-dev pkg-config libcurl4-openssl-dev systemtap-sdt-dev tzdata rsync
 
 Additionally, [Bazel](https://www.bazel.build) between v0.24.1 and v0.25.2 (inclusive) is required to build with TensorFlow support. Ubuntu installation instructions can be found [below](#bazel).
 

@@ -462,10 +462,10 @@ function(_add_variant_link_flags)
     list(APPEND link_libraries "bsd" "atomic")
     list(APPEND result "-Wl,-Bsymbolic")
   elseif("${LFLAGS_SDK}" STREQUAL "ANDROID")
-    list(APPEND link_libraries "dl" "log" "atomic" "icudataswift" "icui18nswift" "icuucswift")
-    # We provide our own C++ below, so we ask the linker not to do it. However,
-    # we need to add the math library, which is linked implicitly by libc++.
-    list(APPEND result "-nostdlib++" "-lm")
+    list(APPEND link_libraries "dl" "log" "atomic")
+    # We need to add the math library, which is linked implicitly by libc++
+    list(APPEND result "-lm")
+
     if("${LFLAGS_ARCH}" MATCHES armv7)
       set(android_libcxx_path "${SWIFT_ANDROID_NDK_PATH}/sources/cxx-stl/llvm-libc++/libs/armeabi-v7a")
     elseif("${LFLAGS_ARCH}" MATCHES aarch64)
@@ -477,8 +477,17 @@ function(_add_variant_link_flags)
     else()
       message(SEND_ERROR "unknown architecture (${LFLAGS_ARCH}) for android")
     endif()
-    list(APPEND link_libraries "${android_libcxx_path}/libc++abi.a")
-    list(APPEND link_libraries "${android_libcxx_path}/libc++_shared.so")
+
+    # link against the custom C++ library
+    list(APPEND link_libraries
+      ${android_libcxx_path}/libc++abi.a
+      ${android_libcxx_path}/libc++_shared.so)
+
+    # link against the ICU libraries
+    list(APPEND link_libraries
+      ${SWIFT_ANDROID_${LFLAGS_ARCH}_ICU_I18N}
+      ${SWIFT_ANDROID_${LFLAGS_ARCH}_ICU_UC})
+
     swift_android_lib_for_arch(${LFLAGS_ARCH} ${LFLAGS_ARCH}_LIB)
     foreach(path IN LISTS ${LFLAGS_ARCH}_LIB)
       list(APPEND library_search_directories ${path})
@@ -517,8 +526,12 @@ function(_add_variant_link_flags)
         NOT "${CMAKE_SYSTEM_NAME}" STREQUAL "WINDOWS"))
       list(APPEND result "-fuse-ld=lld")
     elseif(SWIFT_ENABLE_GOLD_LINKER AND
-       "${SWIFT_SDK_${LFLAGS_SDK}_OBJECT_FORMAT}" STREQUAL "ELF")
-      list(APPEND result "-fuse-ld=gold")
+        "${SWIFT_SDK_${LFLAGS_SDK}_OBJECT_FORMAT}" STREQUAL "ELF")
+      if(CMAKE_HOST_SYSTEM_NAME STREQUAL Windows)
+        list(APPEND result "-fuse-ld=gold.exe")
+      else()
+        list(APPEND result "-fuse-ld=gold")
+      endif()
     endif()
   endif()
 
@@ -1400,8 +1413,16 @@ function(_add_swift_library_single target name)
         ${SWIFTLIB_SINGLE_PRIVATE_LINK_LIBRARIES})
   endif()
 
-  set_property(TARGET "${target}" PROPERTY
+  # NOTE(compnerd) use the C linker language to invoke `clang` rather than
+  # `clang++` as we explicitly link against the C++ runtime.  We were previously
+  # actually passing `-nostdlib++` to avoid the C++ runtime linkage.
+  if(SWIFTLIB_SINGLE_SDK STREQUAL ANDROID)
+    set_property(TARGET "${target}" PROPERTY
+      LINKER_LANGUAGE "C")
+  else()
+    set_property(TARGET "${target}" PROPERTY
       LINKER_LANGUAGE "CXX")
+  endif()
 
   if(target_static)
     set_property(TARGET "${target_static}" APPEND_STRING PROPERTY

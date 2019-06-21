@@ -117,6 +117,8 @@ namespace {
       return getStartLocImpl(E);
     }
     template <class T> static SourceRange getSourceRange(const T *E) {
+      if (E->getStartLoc().isInvalid() != E->getEndLoc().isInvalid())
+        return SourceRange();
       return { E->getStartLoc(), E->getEndLoc() };
     }
   };
