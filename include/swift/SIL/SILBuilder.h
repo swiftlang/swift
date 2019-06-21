@@ -174,6 +174,9 @@ public:
     setInsertionPoint(I);
   }
 
+  SILBuilder(SILBasicBlock *BB, const SILDebugScope *DS, SILBuilder &B)
+      : SILBuilder(BB, DS, B.getBuilderContext()) {}
+
   /// Build instructions before the given insertion point, inheriting the debug
   /// location.
   ///
@@ -2263,6 +2266,11 @@ public:
       : SILBuilder(BB) {
     inheritScopeFrom(InheritScopeFrom);
   }
+
+  explicit SILBuilderWithScope(SILBasicBlock *BB, SILBuilder &B,
+                               SILInstruction *InheritScopeFrom)
+      : SILBuilder(BB, InheritScopeFrom->getDebugScope(),
+                   B.getBuilderContext()) {}
 
   /// Creates a new SILBuilder with an insertion point at the
   /// beginning of BB and the debug scope from the first

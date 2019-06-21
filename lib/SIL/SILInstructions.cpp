@@ -499,6 +499,35 @@ BeginApplyInst::create(SILDebugLocation loc, SILValue callee,
                                       isNonThrowing, specializationInfo);
 }
 
+void BeginApplyInst::getCoroutineEndPoints(
+    SmallVectorImpl<EndApplyInst *> &endApplyInsts,
+    SmallVectorImpl<AbortApplyInst *> &abortApplyInsts) const {
+  for (auto *tokenUse : getTokenResult()->getUses()) {
+    auto *user = tokenUse->getUser();
+    if (auto *end = dyn_cast<EndApplyInst>(user)) {
+      endApplyInsts.push_back(end);
+      continue;
+    }
+
+    abortApplyInsts.push_back(cast<AbortApplyInst>(user));
+  }
+}
+
+void BeginApplyInst::getCoroutineEndPoints(
+    SmallVectorImpl<Operand *> &endApplyInsts,
+    SmallVectorImpl<Operand *> &abortApplyInsts) const {
+  for (auto *tokenUse : getTokenResult()->getUses()) {
+    auto *user = tokenUse->getUser();
+    if (isa<EndApplyInst>(user)) {
+      endApplyInsts.push_back(tokenUse);
+      continue;
+    }
+
+    assert(isa<AbortApplyInst>(user));
+    abortApplyInsts.push_back(tokenUse);
+  }
+}
+
 bool swift::doesApplyCalleeHaveSemantics(SILValue callee, StringRef semantics) {
   if (auto *FRI = dyn_cast<FunctionRefBaseInst>(callee))
     if (auto *F = FRI->getReferencedFunctionOrNull())

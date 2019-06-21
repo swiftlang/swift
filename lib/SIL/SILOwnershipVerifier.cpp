@@ -287,6 +287,17 @@ bool SILValueOwnershipChecker::gatherUsers(
       continue;
     }
 
+    // If we are guaranteed and used by a begin_apply, add the end_apply,
+    // abort_apply as lifetime ending uses of our guaranteed value. We must
+    // guarantee the lifetime of the value across the entire coroutine.
+    if (auto *beginApply = dyn_cast<BeginApplyInst>(user)) {
+      SmallVector<Operand *, 1> endApplies;
+      SmallVector<Operand *, 1> abortApplies;
+      beginApply->getCoroutineEndPoints(endApplies, abortApplies);
+      copy(endApplies, std::back_inserter(implicitRegularUsers));
+      copy(abortApplies, std::back_inserter(implicitRegularUsers));
+    }
+
     // If we are guaranteed, but are not a guaranteed forwarding inst,
     // just continue. This user is just treated as a normal use.
     if (!isGuaranteedForwardingInst(user))

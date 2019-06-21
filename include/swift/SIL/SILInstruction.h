@@ -2226,6 +2226,9 @@ public:
   }
 };
 
+class EndApplyInst;
+class AbortApplyInst;
+
 /// BeginApplyInst - Represents the beginning of the full application of
 /// a yield_once coroutine (up until the coroutine yields a value back).
 class BeginApplyInst final
@@ -2280,6 +2283,13 @@ public:
   bool isNonThrowing() const {
     return isNonThrowingApply();
   }
+
+  void getCoroutineEndPoints(
+      SmallVectorImpl<EndApplyInst *> &endApplyInsts,
+      SmallVectorImpl<AbortApplyInst *> &abortApplyInsts) const;
+
+  void getCoroutineEndPoints(SmallVectorImpl<Operand *> &endApplyInsts,
+                             SmallVectorImpl<Operand *> &abortApplyInsts) const;
 };
 
 inline BeginApplyInst *BeginApplyResult::getParent() {
