@@ -1263,6 +1263,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   bool HasSpace = false;
   bool ShouldCompleteCallPatternAfterParen = true;
   bool PreferFunctionReferencesToCalls = false;
+  bool AttTargetIsIndependent = false;
   Optional<DeclKind> AttTargetDK;
   Optional<StmtKind> ParentStmtKind;
 
@@ -1353,13 +1354,6 @@ public:
   void setAttrTargetDeclKind(Optional<DeclKind> DK) override {
     if (DK == DeclKind::PatternBinding)
       DK = DeclKind::Var;
-
-    // If the target is already set to 'Module', that means the completion
-    // should be performed as if it's not tied to any specific decl.
-    // see 'completeDeclAttrBeginning()'
-    if (AttTargetDK == DeclKind::Module)
-      DK = None;
-
     AttTargetDK = DK;
   }
 
@@ -4624,10 +4618,7 @@ void CodeCompletionCallbacksImpl::completeDeclAttrBeginning(
   Kind = CompletionKind::AttributeBegin;
   IsInSil = Sil;
   CurDeclContext = P.CurDeclContext;
-
-  // Use 'DeclKind::Module' as the indicator of "This is independent attribute".
-  if (isIndependent)
-    AttTargetDK = DeclKind::Module;
+  AttTargetIsIndependent = isIndependent;
 }
 
 void CodeCompletionCallbacksImpl::completeInPrecedenceGroup(SyntaxKind SK) {
@@ -5391,15 +5382,16 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   }
 
   case CompletionKind::AttributeBegin: {
-    assert(AttTargetDK != DeclKind::Module &&
-           "'setAttrTargetDeclKind()' hasn't been called");
-    Lookup.getAttributeDeclCompletions(IsInSil, AttTargetDK);
+    auto DK = AttTargetDK;
+    if (AttTargetIsIndependent)
+      DK = None;
+    Lookup.getAttributeDeclCompletions(IsInSil, DK);
 
     // TypeName at attribute position after '@'.
     // - VarDecl: Property Wrappers.
     // - ParamDecl/VarDecl/FuncDecl: Function Buildres.
-    if (!AttTargetDK || *AttTargetDK == DeclKind::Var ||
-        *AttTargetDK == DeclKind::Param || *AttTargetDK == DeclKind::Func)
+    if (!DK.hasValue() || *DK == DeclKind::Var || *DK == DeclKind::Param ||
+        *DK == DeclKind::Func)
       Lookup.getTypeCompletionsInDeclContext(
           P.Context.SourceMgr.getCodeCompletionLoc());
     break;
