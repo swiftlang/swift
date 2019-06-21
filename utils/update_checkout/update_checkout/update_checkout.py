@@ -17,7 +17,6 @@ import platform
 import re
 import sys
 import traceback
-
 from functools import reduce
 from multiprocessing import freeze_support
 
@@ -309,49 +308,42 @@ def obtain_all_additional_swift_sources(args, config, with_ssh, scheme_name,
                               args.n_processes)
 
 
-def dump_repo_hashes(config):
+def dump_repo_hashes(config, branch_scheme_name='repro'):
     """
     Dumps the current state of the repo into a new config file that contains a
     master branch scheme with the relevant branches set to the appropriate
     hashes.
     """
-    branch_scheme_name = 'repro'
     new_config = {}
     config_copy_keys = ['ssh-clone-pattern', 'https-clone-pattern', 'repos']
     for config_copy_key in config_copy_keys:
         new_config[config_copy_key] = config[config_copy_key]
     repos = {}
+    repos = repo_hashes(config)
     branch_scheme = {'aliases': [branch_scheme_name], 'repos': repos}
     new_config['branch-schemes'] = {branch_scheme_name: branch_scheme}
-    for repo_name, repo_info in sorted(config['repos'].items(),
-                                       key=lambda x: x[0]):
-        with shell.pushd(os.path.join(SWIFT_SOURCE_ROOT, repo_name),
-                         dry_run=False,
-                         echo=False):
-            h = shell.capture(["git", "rev-parse", "HEAD"],
-                              echo=False).strip()
-            repos[repo_name] = str(h)
     json.dump(new_config, sys.stdout, indent=4)
 
 
-def dump_hashes_config(args, config):
-    branch_scheme_name = args.dump_hashes_config
-    new_config = {}
-    config_copy_keys = ['ssh-clone-pattern', 'https-clone-pattern', 'repos']
-    for config_copy_key in config_copy_keys:
-        new_config[config_copy_key] = config[config_copy_key]
+def repo_hashes(config):
     repos = {}
-    branch_scheme = {'aliases': [branch_scheme_name], 'repos': repos}
-    new_config['branch-schemes'] = {args.dump_hashes_config: branch_scheme}
     for repo_name, repo_info in sorted(config['repos'].items(),
                                        key=lambda x: x[0]):
-        with shell.pushd(os.path.join(SWIFT_SOURCE_ROOT, repo_name),
-                         dry_run=False,
-                         echo=False):
-            h = shell.capture(["git", "rev-parse", "HEAD"],
-                              echo=False).strip()
-            repos[repo_name] = str(h)
-    json.dump(new_config, sys.stdout, indent=4)
+        repo_path = os.path.join(SWIFT_SOURCE_ROOT, repo_name)
+        if os.path.exists(repo_path):
+            with shell.pushd(repo_path, dry_run=False, echo=False):
+                h = shell.capture(["git", "rev-parse", "HEAD"],
+                                  echo=False).strip()
+        else:
+            h = 'skip'
+        repos[repo_name] = str(h)
+    return repos
+
+
+def print_repo_hashes(config):
+    repos = repo_hashes(config)
+    for repo_name, repo_hash in repos.iteritems():
+        print("{:<35}: {:<35}".format(repo_name, repo_hash))
 
 
 def validate_config(config):
@@ -520,7 +512,7 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
         return (None, None)
 
     if args.dump_hashes_config:
-        dump_hashes_config(args, config)
+        dump_repo_hashes(config, args.dump_hashes_config)
         return (None, None)
 
     cross_repos_pr = {}
@@ -563,4 +555,5 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
         print("update-checkout failed, fix errors and try again")
     else:
         print("update-checkout succeeded")
+        print_repo_hashes(config)
     sys.exit(fail_count)
