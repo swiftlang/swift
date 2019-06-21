@@ -12,9 +12,10 @@
 
 #include "SwiftASTManager.h"
 #include "SwiftLangSupport.h"
-#include "SourceKit/Support/UIdent.h"
+#include "SourceKit/Support/FileSystemProvider.h"
 #include "SourceKit/Support/ImmutableTextBuffer.h"
 #include "SourceKit/Support/Logging.h"
+#include "SourceKit/Support/UIdent.h"
 
 #include "swift/AST/ASTDemangler.h"
 #include "swift/AST/ASTPrinter.h"
@@ -1588,9 +1589,23 @@ static void resolveRange(SwiftLangSupport &Lang,
 void SwiftLangSupport::getCursorInfo(
     StringRef InputFile, unsigned Offset, unsigned Length, bool Actionables,
     bool CancelOnSubsequentRequest, ArrayRef<const char *> Args,
-    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+    Optional<VFSOptions> vfsOptions,
     std::function<void(const RequestResult<CursorInfoData> &)> Receiver) {
-  assert(FileSystem);
+
+  auto fileSystem = llvm::vfs::getRealFileSystem();
+  if (vfsOptions) {
+    auto provider = getFileSystemProvider(vfsOptions->name);
+    if (!provider) {
+      return Receiver(RequestResult<CursorInfoData>::fromError(
+          "unknown virtual filesystem 'key.vfs.name'"));
+    }
+
+    SmallString<0> error;
+    fileSystem = provider->getFileSystem(vfsOptions->arguments, error);
+    if (!fileSystem) {
+      return Receiver(RequestResult<CursorInfoData>::fromError(error));
+    }
+  }
 
   if (auto IFaceGenRef = IFaceGenContexts.get(InputFile)) {
     IFaceGenRef->accessASTAsync([this, IFaceGenRef, Offset, Actionables, Receiver] {
@@ -1624,7 +1639,7 @@ void SwiftLangSupport::getCursorInfo(
 
   std::string Error;
   SwiftInvocationRef Invok =
-      ASTMgr->getInvocation(Args, InputFile, FileSystem, Error);
+      ASTMgr->getInvocation(Args, InputFile, fileSystem, Error);
   if (!Invok) {
     LOG_WARN_FUNC("failed to create an ASTInvocation: " << Error);
     Receiver(RequestResult<CursorInfoData>::fromError(Error));
@@ -1825,10 +1840,22 @@ resolveCursorFromUSR(SwiftLangSupport &Lang, StringRef InputFile, StringRef USR,
 
 void SwiftLangSupport::getCursorInfoFromUSR(
     StringRef filename, StringRef USR, bool CancelOnSubsequentRequest,
-    ArrayRef<const char *> Args,
-    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+    ArrayRef<const char *> Args, Optional<VFSOptions> vfsOptions,
     std::function<void(const RequestResult<CursorInfoData> &)> Receiver) {
-  assert(FileSystem);
+  auto fileSystem = llvm::vfs::getRealFileSystem();
+  if (vfsOptions) {
+    auto provider = getFileSystemProvider(vfsOptions->name);
+    if (!provider) {
+      return Receiver(RequestResult<CursorInfoData>::fromError(
+          "unknown virtual filesystem 'key.vfs.name'"));
+    }
+
+    SmallString<0> error;
+    fileSystem = provider->getFileSystem(vfsOptions->arguments, error);
+    if (!fileSystem) {
+      return Receiver(RequestResult<CursorInfoData>::fromError(error));
+    }
+  }
 
   if (auto IFaceGenRef = IFaceGenContexts.get(filename)) {
     LOG_WARN_FUNC("Info from usr for generated interface not implemented yet.");
@@ -1840,7 +1867,7 @@ void SwiftLangSupport::getCursorInfoFromUSR(
 
   std::string Error;
   SwiftInvocationRef Invok =
-      ASTMgr->getInvocation(Args, filename, FileSystem, Error);
+      ASTMgr->getInvocation(Args, filename, fileSystem, Error);
   if (!Invok) {
     LOG_WARN_FUNC("failed to create an ASTInvocation: " << Error);
     Receiver(RequestResult<CursorInfoData>::fromError(Error));

@@ -14,6 +14,7 @@
 #include "SwiftASTManager.h"
 #include "SourceKit/Core/Context.h"
 #include "SourceKit/SwiftLang/Factory.h"
+#include "SourceKit/Support/FileSystemProvider.h"
 #include "SourceKit/Support/UIdent.h"
 
 #include "swift/AST/ASTVisitor.h"
@@ -193,6 +194,43 @@ UIdent UIdentVisitor::visitExtensionDecl(const ExtensionDecl *D) {
   return UIdent();
 }
 
+namespace {
+/// A simple configurable FileSystemProvider, useful for tests that exercise
+/// the FileSystemProvider code.
+class TestFileSystemProvider: public SourceKit::FileSystemProvider {
+  /// Provides the real filesystem, overlayed with an InMemoryFileSystem that
+  /// contains specified files at specified locations.
+  /// \param Args The locations of the InMemoryFileSystem files, interleaved
+  //              with paths on the real filesystem to fetch their contents
+  //              from.
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
+  getFileSystem(const llvm::SmallVectorImpl<const char *> &Args,
+                llvm::SmallVectorImpl<char> &ErrBuf) override {
+    auto InMemoryFS = llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem>(
+        new llvm::vfs::InMemoryFileSystem());
+    for (unsigned i = 0; i < Args.size(); i += 2) {
+      const char *InMemoryName = Args[i];
+      const char *TargetPath = Args[i + 1];
+      auto TargetBufferOrErr = llvm::MemoryBuffer::getFile(TargetPath);
+      if (auto Err = TargetBufferOrErr.getError()) {
+        llvm::raw_svector_ostream ErrStream(ErrBuf);
+        ErrStream << "Error reading target file '" << TargetPath
+                  << "': " << Err.message() << "\n";
+        return nullptr;
+      }
+      auto RenamedTargetBuffer = llvm::MemoryBuffer::getMemBufferCopy(
+          TargetBufferOrErr.get()->getBuffer(), InMemoryName);
+      InMemoryFS->addFile(InMemoryName, 0, std::move(RenamedTargetBuffer));
+    }
+
+    auto OverlayFS = llvm::IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem>(
+        new llvm::vfs::OverlayFileSystem(llvm::vfs::getRealFileSystem()));
+    OverlayFS->pushOverlay(std::move(InMemoryFS));
+    return OverlayFS;
+  }
+};
+}
+
 SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
     : NotificationCtr(SKCtx.getNotificationCenter()),
       CCCache(new SwiftCompletionCache) {
@@ -206,6 +244,9 @@ SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
                                              RuntimeResourcePath);
   // By default, just use the in-memory cache.
   CCCache->inMemory = llvm::make_unique<ide::CodeCompletionCache>();
+
+  // Provide a default file system provider.
+  setFileSystemProvider("testvfs", llvm::make_unique<TestFileSystemProvider>());
 }
 
 SwiftLangSupport::~SwiftLangSupport() {
@@ -885,6 +926,20 @@ void SwiftLangSupport::getStatistics(StatisticsReceiver receiver) {
 #include "SwiftStatistics.def"
   };
   receiver(stats);
+}
+
+FileSystemProvider *SwiftLangSupport::getFileSystemProvider(StringRef Name) {
+  auto It = FileSystemProviders.find(Name);
+  if (It == FileSystemProviders.end())
+    return nullptr;
+  return It->second.get();
+}
+
+void SwiftLangSupport::setFileSystemProvider(
+     StringRef Name, std::unique_ptr<FileSystemProvider> FileSystemProvider) {
+  assert(FileSystemProvider);
+  auto Result = FileSystemProviders.try_emplace(Name, std::move(FileSystemProvider));
+  assert(Result.second && "tried to set existing FileSystemProvider");
 }
 
 CloseClangModuleFiles::~CloseClangModuleFiles() {

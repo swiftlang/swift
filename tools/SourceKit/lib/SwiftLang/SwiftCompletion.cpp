@@ -14,6 +14,7 @@
 #include "SwiftASTManager.h"
 #include "SwiftLangSupport.h"
 #include "SwiftEditorDiagConsumer.h"
+#include "SourceKit/Support/FileSystemProvider.h"
 #include "SourceKit/Support/Logging.h"
 #include "SourceKit/Support/UIdent.h"
 
@@ -204,8 +205,22 @@ static bool swiftCodeCompleteImpl(
 void SwiftLangSupport::codeComplete(
     llvm::MemoryBuffer *UnresolvedInputFile, unsigned Offset,
     SourceKit::CodeCompletionConsumer &SKConsumer, ArrayRef<const char *> Args,
-    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem) {
-  assert(FileSystem);
+    Optional<VFSOptions> vfsOptions) {
+
+  auto fileSystem = llvm::vfs::getRealFileSystem();
+  if (vfsOptions) {
+    auto provider = getFileSystemProvider(vfsOptions->name);
+    if (!provider) {
+      return SKConsumer.failed("unknown virtual filesystem 'key.vfs.name'");
+    }
+
+    SmallString<0> error;
+    fileSystem = provider->getFileSystem(vfsOptions->arguments, error);
+    if (!fileSystem) {
+      return SKConsumer.failed(error);
+    }
+  }
+
   SwiftCodeCompletionConsumer SwiftConsumer([&](
       MutableArrayRef<CodeCompletionResult *> Results,
       SwiftCompletionInfo &info) {
@@ -237,7 +252,7 @@ void SwiftLangSupport::codeComplete(
 
   std::string Error;
   if (!swiftCodeCompleteImpl(*this, UnresolvedInputFile, Offset, SwiftConsumer,
-                             Args, FileSystem, Error)) {
+                             Args, fileSystem, Error)) {
     SKConsumer.failed(Error);
   }
 }

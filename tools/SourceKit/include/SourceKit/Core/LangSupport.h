@@ -304,6 +304,15 @@ public:
 struct Statistic;
 typedef std::function<void(ArrayRef<Statistic *> stats)> StatisticsReceiver;
 
+/// Options for configuring a virtual file system provider.
+struct VFSOptions {
+  /// The name of the virtual file system to use.
+  std::string name;
+
+  /// Arguments for the virtual file system provider.
+  SmallVector<const char *, 8> arguments;
+};
+
 /// Used to wrap the result of a request. There are three possibilities:
 /// - The request succeeded (`value` is valid)
 /// - The request was cancelled
@@ -646,7 +655,7 @@ public:
   virtual void
   codeComplete(llvm::MemoryBuffer *InputBuf, unsigned Offset,
                CodeCompletionConsumer &Consumer, ArrayRef<const char *> Args,
-               llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem) = 0;
+               Optional<VFSOptions> vfsOptions) = 0;
 
   virtual void codeCompleteOpen(StringRef name, llvm::MemoryBuffer *inputBuf,
                                 unsigned offset, OptionsDictionary *options,
@@ -672,8 +681,7 @@ public:
 
   virtual void
   editorOpen(StringRef Name, llvm::MemoryBuffer *Buf, EditorConsumer &Consumer,
-             ArrayRef<const char *> Args,
-             llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem) = 0;
+             ArrayRef<const char *> Args, Optional<VFSOptions> vfsOptions) = 0;
 
   virtual void editorOpenInterface(EditorConsumer &Consumer,
                                    StringRef Name,
@@ -725,8 +733,7 @@ public:
   virtual void
   getCursorInfo(StringRef Filename, unsigned Offset, unsigned Length,
                 bool Actionables, bool CancelOnSubsequentRequest,
-                ArrayRef<const char *> Args,
-                llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+                ArrayRef<const char *> Args, Optional<VFSOptions> vfsOptions,
        std::function<void(const RequestResult<CursorInfoData> &)> Receiver) = 0;
 
   virtual void getNameInfo(StringRef Filename, unsigned Offset,
@@ -741,8 +748,7 @@ public:
 
   virtual void getCursorInfoFromUSR(
       StringRef Filename, StringRef USR, bool CancelOnSubsequentRequest,
-      ArrayRef<const char *> Args,
-      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
+      ArrayRef<const char *> Args, Optional<VFSOptions> vfsOptions,
       std::function<void(const RequestResult<CursorInfoData> &)> Receiver) = 0;
 
   virtual void findRelatedIdentifiersInFile(StringRef Filename,
