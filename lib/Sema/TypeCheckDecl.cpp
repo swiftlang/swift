@@ -19,6 +19,7 @@
 #include "DerivedConformances.h"
 #include "TypeChecker.h"
 #include "TypeCheckAccess.h"
+#include "TypeCheckAvailability.h"
 #include "TypeCheckType.h"
 #include "MiscDiagnostics.h"
 #include "swift/AST/AccessScope.h"
@@ -2587,6 +2588,8 @@ public:
 
     ED->getAllConformances();
 
+    checkExplicitAvailability(ED);
+
     TC.checkDeclCircularity(ED);
     TC.ConformanceContexts.push_back(ED);
   }
@@ -2611,6 +2614,8 @@ public:
     checkAccessControl(TC, SD);
 
     SD->getAllConformances();
+
+    checkExplicitAvailability(SD);
 
     TC.checkDeclCircularity(SD);
     TC.ConformanceContexts.push_back(SD);
@@ -2836,6 +2841,8 @@ public:
 
     checkAccessControl(TC, CD);
 
+    checkExplicitAvailability(CD);
+
     TC.checkDeclCircularity(CD);
     TC.ConformanceContexts.push_back(CD);
   }
@@ -2907,6 +2914,8 @@ public:
 
     // Explicitly calculate this bit.
     (void) PD->existentialTypeSupported(&TC);
+
+    checkExplicitAvailability(PD);
   }
 
   void visitVarDecl(VarDecl *VD) {
@@ -2990,6 +2999,8 @@ public:
     }
 
     TC.checkParameterAttributes(FD->getParameters());
+
+    checkExplicitAvailability(FD);
   }
 
   void visitModuleDecl(ModuleDecl *) { }
@@ -3062,6 +3073,8 @@ public:
     // enough information for later passes that might query conformances.
     if (auto nominal = ED->getExtendedNominal())
       (void) nominal->getAllConformances();
+
+    checkExplicitAvailability(ED);
   }
 
   void visitTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {

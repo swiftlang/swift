@@ -97,6 +97,13 @@ namespace swift {
     /// Enable 'availability' restrictions for App Extensions.
     bool EnableAppExtensionRestrictions = false;
 
+    /// Require public declarations to declare an introduction OS version.
+    bool RequireExplicitAvailability = false;
+
+    /// Introduction platform and version to suggest as fix-it
+    /// when using RequireExplicitAvailability.
+    std::string RequireExplicitAvailabilityTarget;
+
     ///
     /// Support for alternate usage modes
     ///

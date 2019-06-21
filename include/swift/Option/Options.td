@@ -309,6 +309,14 @@ def enable_library_evolution : Flag<["-"], "enable-library-evolution">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Build the module to allow binary-compatible library evolution">;
 
+def require_explicit_availability : Flag<["-"], "require-explicit-availability">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Require explicit availability on public declarations">;
+def require_explicit_availability_target : Separate<["-"], "require-explicit-availability-target">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Suggest fix-its adding @available(<target>, *) to public declarations without availability">,
+  MetaVarName<"<target>">;
+
 def module_name : Separate<["-"], "module-name">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Name of the module to build">;
