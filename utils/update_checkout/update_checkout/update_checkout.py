@@ -342,7 +342,8 @@ def repo_hashes(config):
 
 def print_repo_hashes(config):
     repos = repo_hashes(config)
-    for repo_name, repo_hash in repos.iteritems():
+    for repo_name, repo_hash in sorted(repos.items(),
+                                       key=lambda x: x[0]):
         print("{:<35}: {:<35}".format(repo_name, repo_hash))
 
 
