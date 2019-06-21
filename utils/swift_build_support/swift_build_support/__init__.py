@@ -23,6 +23,7 @@ __all__ = [
     "diagnostics",
     "host_specific_configuration",
     "migration",
+    "packaging",
     "tar",
     "targets",
     "toolchain",

@@ -32,3 +32,13 @@ def tar(source, destination):
     # these cases using the exit code, which should cause 'shell.call' to
     # raise.
     shell.call(args + [source], stderr=shell.DEVNULL)
+
+
+def untar(source):
+    """
+    Extract a gzip archive of the file at 'source'.
+    """
+    # Discard stderr output such as 'tar: Failed to open ...'. We'll detect
+    # these cases using the exit code, which should cause 'shell.call' to
+    # raise.
+    shell.call(['tar', '-x', '-z', '-f', source], stderr=shell.DEVNULL)

@@ -345,6 +345,10 @@ def create_argument_parser():
            help='the path to install debug symbols into')
     option('--install-destdir', store_path,
            help='the path to use as the filesystem root for the installation')
+    option('--installable-package', store_path,
+           help='the path to the archive of the installation directory')
+    option('--test-installable-package', store_true,
+           help='whether to run post-packaging tests on the produced package')
 
     option(['-j', '--jobs'], store_int('build_jobs'),
            default=multiprocessing.cpu_count(),
@@ -510,6 +514,12 @@ def create_argument_parser():
            help='A space separated list of targets to cross-compile host '
                 'Swift tools for. Can be used multiple times.')
 
+    option('--cross-compile-install-prefixes', store,
+           help='Semicolon-separated list of install prefixes to use for the '
+                'cross-compiled hosts. The list expands, so if there are '
+                'more cross-compile hosts than prefixes, unmatched hosts use '
+                'the last prefix in the list.')
+
     option('--stdlib-deployment-targets', store,
            type=argparse.ShellSplitType(),
            default=None,
@@ -533,6 +543,10 @@ def create_argument_parser():
            help='Semicolon-separated list of architectures to configure Swift '
                 'module-only targets on Darwin platforms. These targets are '
                 'in addition to the full library targets.')
+
+    option('--skip-merge-lipo-cross-compile-tools', store_true,
+           help='Set to skip running merge-lipo after installing '
+                'cross-compiled host Swift tools.')
 
     # -------------------------------------------------------------------------
     in_group('Options to select projects')

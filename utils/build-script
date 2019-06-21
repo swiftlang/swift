@@ -29,6 +29,7 @@ from swift_build_support.swift_build_support import (
     debug,
     diagnostics,
     migration,
+    packaging,
     products,
     shell,
     tar,
@@ -368,6 +369,13 @@ class BuildScriptInvocation(object):
         if args.cross_compile_hosts:
             impl_args += [
                 "--cross-compile-hosts", " ".join(args.cross_compile_hosts)]
+        if args.cross_compile_install_prefixes:
+            impl_args += [
+                "--cross-compile-install-prefixes",
+                args.cross_compile_install_prefixes
+            ]
+        if args.skip_merge_lipo_cross_compile_tools:
+            impl_args += ["--skip-merge-lipo-cross-compile-tools"]
 
         if args.test_paths:
             impl_args += ["--test-paths", " ".join(args.test_paths)]
@@ -409,6 +417,12 @@ class BuildScriptInvocation(object):
             impl_args += [
                 "--install-destdir", os.path.abspath(args.install_destdir)
             ]
+        if args.installable_package:
+            impl_args += [
+                "--installable-package", args.installable_package
+            ]
+        if args.test_installable_package:
+            impl_args += ["--test-installable-package"]
 
         if args.skip_build:
             impl_args += ["--skip-build-cmark",
@@ -824,8 +838,13 @@ class BuildScriptInvocation(object):
         self._execute_action(action_name)
 
     def _execute_package_action(self, host_target):
-        action_name = "{}-package".format(host_target.name)
-        self._execute_action(action_name)
+        if host_target.name.startswith('macosx-'):
+            action_name = "{}-package".format(host_target.name)
+            self._execute_action(action_name)
+        else:
+            p = packaging.Package(self.args, self.workspace, host_target.name)
+            p.build()
+            p.test()
 
     def _execute_merged_host_lipo_action(self):
         self._execute_action("merged-hosts-lipo")
