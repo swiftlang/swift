@@ -1975,6 +1975,14 @@ bool MissingCallFailure::diagnoseAsError() {
   return true;
 }
 
+bool MissingPropertyWrapperUnwrapFailure::diagnoseAsError() {
+  emitDiagnostic(getAnchor()->getLoc(),
+                 diag::extraneous_property_wrapper_unwrap, getPropertyName(),
+                 getFromType(), getToType())
+      .fixItInsert(getAnchor()->getLoc(), "$");
+  return true;
+}
+
 bool SubscriptMisuseFailure::diagnoseAsError() {
   auto &sourceMgr = getASTContext().SourceMgr;
 
