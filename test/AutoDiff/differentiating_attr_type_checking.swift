@@ -315,3 +315,35 @@ func f(_ x: PropertyDiff) -> Float {
 
 let a = gradient(at: PropertyDiff(), in: f)
 print(a)
+
+// Index based 'wrt:'
+
+func add2(x: Float, y: Float) -> Float {
+  return x + y
+}
+
+@differentiating(add2, wrt: (0, y)) // ok
+func two3(x: Float, y: Float) -> (value: Float, pullback: (Float) -> (Float, Float)) {
+  return (x + y, { ($0, $0) })
+}
+
+@differentiating(add2, wrt: (1)) // ok
+func two4(x: Float, y: Float) -> (value: Float, pullback: (Float) -> Float) {
+  return (x + y, { $0 })
+}
+
+
+@differentiating(add2, wrt: 2) // expected-error {{parameter index is larger than total number of parameters}}
+func two5(x: Float, y: Float) -> (value: Float, pullback: (Float) -> (Float, Float)) {
+  return (x + y, { ($0, $0) })
+}
+
+@differentiating(add2, wrt: (1, x)) // expected-error {{parameters must be specified in original order}}
+func two6(x: Float, y: Float) -> (value: Float, pullback: (Float) -> (Float, Float)) {
+  return (x + y, { ($0, $0) })
+}
+
+@differentiating(add2, wrt: (1, 0)) // expected-error {{parameters must be specified in original order}}
+func two7(x: Float, y: Float) -> (value: Float, pullback: (Float) -> (Float, Float)) {
+  return (x + y, { ($0, $0) })
+}
