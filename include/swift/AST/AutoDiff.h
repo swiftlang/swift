@@ -39,10 +39,10 @@ private:
   Kind Kind;
   union Value {
     struct { Identifier Name; }; // Named
-    struct { unsigned int Order; }; // Ordered
+    struct { unsigned int Index; }; // Ordered
     struct {};                  // Self
     Value(Identifier name) : Name(name) {}
-    Value(unsigned int order) : Order(order) {}
+    Value(unsigned int index) : Index(index) {}
     Value() {}
   } V;
 
@@ -72,8 +72,8 @@ public:
     return V.Name;
   }
   
-  unsigned int getOrder() const {
-    return V.Order;
+  unsigned int getIndex() const {
+    return V.Index;
   }
 
   enum Kind getKind() const {

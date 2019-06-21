@@ -192,7 +192,7 @@ func jvpUnknownParam(x: Float) -> Float {
   return x
 }
 
-// expected-error @+1 {{parameter names must be specified in original order}}
+// expected-error @+1 {{parameters must be specified in original order}}
 @differentiable(wrt: (y, x))
 func jvpParamOrderNotIncreasing(x: Float, y: Float) -> Float {
   return x * y
@@ -768,4 +768,51 @@ func slope2(_ x: Float) -> Float {
  @differentiable(linear, jvp: const3, vjp: const3) // expected-error {{cannot specify 'vjp:' or 'jvp:' for linear functions; use 'transpose:' instead}}
 func slope3(_ x: Float) -> Float {
   return 3 * x
+}
+
+// Index based 'wrt:'
+
+@differentiable(wrt: y) // ok
+func two1(x: Float, y: Float) -> Float {
+  return x + y
+}
+
+ @differentiable(wrt: (x, y)) // ok
+func two2(x: Float, y: Float) -> Float {
+  return x + y
+}
+
+ @differentiable(wrt: (0, y)) // ok
+func two3(x: Float, y: Float) -> Float {
+  return x + y
+}
+
+ @differentiable(wrt: (x, 1)) // ok
+func two4(x: Float, y: Float) -> Float {
+  return x + y
+}
+
+ @differentiable(wrt: (0, 1)) // ok
+func two5(x: Float, y: Float) -> Float {
+  return x + y
+}
+
+@differentiable(wrt: 2) // expected-error {{parameter index is larger than total number of parameters}}
+func two6(x: Float, y: Float) -> Float {
+  return x + y
+}
+
+@differentiable(wrt: (1, 0)) // expected-error {{parameters must be specified in original order}}
+func two7(x: Float, y: Float) -> Float {
+  return x + y
+}
+
+@differentiable(wrt: (1, x)) // expected-error {{parameters must be specified in original order}}
+func two8(x: Float, y: Float) -> Float {
+  return x + y
+}
+
+@differentiable(wrt: (y, 0)) // expected-error {{parameters must be specified in original order}}
+func two9(x: Float, y: Float) -> Float {
+  return x + y
 }
