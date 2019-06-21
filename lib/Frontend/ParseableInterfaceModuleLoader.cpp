@@ -925,7 +925,12 @@ class ParseableInterfaceModuleLoaderImpl {
   bool serializedASTBufferIsUpToDate(
       StringRef path, const llvm::MemoryBuffer &buf,
       SmallVectorImpl<FileDependency> &allDeps) {
-    LLVM_DEBUG(llvm::dbgs() << "Validating deps of " << modulePath << "\n");
+
+    // Clear the existing dependencies, because we're going to re-fill them
+    // in validateSerializedAST.
+    allDeps.clear();
+
+    LLVM_DEBUG(llvm::dbgs() << "Validating deps of " << path << "\n");
     auto validationInfo = serialization::validateSerializedAST(
         buf.getBuffer(), /*ExtendedValidationInfo=*/nullptr, &allDeps);
 
@@ -956,6 +961,13 @@ class ParseableInterfaceModuleLoaderImpl {
       StringRef path, const ForwardingModule &fwd,
       SmallVectorImpl<FileDependency> &deps,
       std::unique_ptr<llvm::MemoryBuffer> &moduleBuffer) {
+
+    // Clear the existing dependencies, because we're going to re-fill them
+    // from the forwarding module.
+    deps.clear();
+
+    LLVM_DEBUG(llvm::dbgs() << "Validating deps of " << path << "\n");
+
     // First, make sure the underlying module path exists and is valid.
     auto modBuf = fs.getBufferForFile(fwd.underlyingModulePath);
     if (!modBuf || !serializedASTLooksValid(*modBuf.get()))
