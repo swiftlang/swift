@@ -336,16 +336,16 @@ protected:
     NumProtocols : 16
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(TypeVariableType, TypeBase, 64-NumTypeBaseBits,
+  SWIFT_INLINE_BITFIELD_FULL(TypeVariableType, TypeBase, 20+3+21,
     /// The unique number assigned to this type variable.
-    ID : 32 - NumTypeBaseBits,
+    ID : 20,
 
     /// Type variable options.
     Options : 3,
 
     ///  Index into the list of type variables, as used by the
     ///  constraint graph.
-    GraphIndex : 29
+    GraphIndex : 21
   );
 
   SWIFT_INLINE_BITFIELD(SILFunctionType, TypeBase, NumSILExtInfoBits+3+1+2,
@@ -5227,7 +5227,11 @@ class TypeVariableType : public TypeBase {
   TypeVariableType(const ASTContext &C, unsigned ID)
     : TypeBase(TypeKind::TypeVariable, &C,
                RecursiveTypeProperties::HasTypeVariable) {
+    // Note: the ID may overflow (current limit is 2^20 - 1).
     Bits.TypeVariableType.ID = ID;
+    if (Bits.TypeVariableType.ID != ID) {
+      llvm::report_fatal_error("Type variable id overflow");
+    }
   }
 
   class Implementation;
@@ -5263,6 +5267,10 @@ public:
     return reinterpret_cast<Implementation *>(this + 1);
   }
 
+  /// Type variable IDs are not globally unique and are
+  /// used in equivalence class merging (so representative
+  /// is always a type variable with smaller id), as well
+  /// as a visual aid when dumping AST.
   unsigned getID() const { return Bits.TypeVariableType.ID; }
 
   // Implement isa/cast/dyncast/etc.
