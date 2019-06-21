@@ -42,4 +42,4 @@ void simple_display(llvm::raw_ostream &out, const TypeResolutionStage &value);
 
 } // end namespace swift
 
-#endif /* SWIFT_AST_TYPE_RESOLUTION_STAGE_H */
+#endif // SWIFT_AST_TYPE_RESOLUTION_STAGE_H
