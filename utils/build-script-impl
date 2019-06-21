@@ -2957,16 +2957,18 @@ for host in "${ALL_HOSTS[@]}"; do
                     DEST_CXX_BUILTINS_VERSION=$(ls "$llvm_build_dir/lib/clang" | awk '{print $0}')
                     DEST_BUILTINS_DIR="$llvm_build_dir/lib/clang/$DEST_CXX_BUILTINS_VERSION/lib/darwin"
 
-                    echo "copying compiler-rt embedded builtins into the local clang build directory $DEST_BUILTINS_DIR."
+                    if [ -d "$DEST_BUILTINS_DIR" ]; then
+                        echo "copying compiler-rt embedded builtins into the local clang build directory $DEST_BUILTINS_DIR."
 
-                    if [ -f "$HOST_CXX_BUILTINS_DIR/libclang_rt.ios.a" ]; then
-                        call cp "$HOST_CXX_BUILTINS_DIR/libclang_rt.ios.a" "$DEST_BUILTINS_DIR/libclang_rt.ios.a"
-                    fi
-                    if [ -f "$HOST_CXX_BUILTINS_DIR/libclang_rt.watchos.a" ]; then
-                        call cp "$HOST_CXX_BUILTINS_DIR/libclang_rt.watchos.a" "$DEST_BUILTINS_DIR/libclang_rt.watchos.a"
-                    fi
-                    if [ -f "$HOST_CXX_BUILTINS_DIR/libclang_rt.tvos.a" ]; then
-                        call cp "$HOST_CXX_BUILTINS_DIR/libclang_rt.tvos.a" "$DEST_BUILTINS_DIR/libclang_rt.tvos.a"
+                        if [ -f "$HOST_CXX_BUILTINS_DIR/libclang_rt.ios.a" ]; then
+                            call cp "$HOST_CXX_BUILTINS_DIR/libclang_rt.ios.a" "$DEST_BUILTINS_DIR/libclang_rt.ios.a"
+                        fi
+                        if [ -f "$HOST_CXX_BUILTINS_DIR/libclang_rt.watchos.a" ]; then
+                            call cp "$HOST_CXX_BUILTINS_DIR/libclang_rt.watchos.a" "$DEST_BUILTINS_DIR/libclang_rt.watchos.a"
+                        fi
+                        if [ -f "$HOST_CXX_BUILTINS_DIR/libclang_rt.tvos.a" ]; then
+                            call cp "$HOST_CXX_BUILTINS_DIR/libclang_rt.tvos.a" "$DEST_BUILTINS_DIR/libclang_rt.tvos.a"
+                        fi
                     fi
                 fi
             fi
