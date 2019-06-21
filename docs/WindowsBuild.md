@@ -355,8 +355,8 @@ cmake -G Ninja^
   -DFOUNDATION_BUILD_DIR=S:\b\foundation^
   -DLIBDISPATCH_BUILD_DIR=S:\b\libdispatch^
   -DLIBDISPATCH_SOURCE_DIR=S:\swift-corelibs-libdispatch^
-  -DLLBUILD_PATH_TO_SQLITE_SOURCE=S:\sqlite-amalgamation-3270200^
-  -DLLBUILD_PATH_TO_SQLITE_BUILD=S:\b\sqlite^
+  -DSQLite3_INCLUDE_DIR=S:\sqlite-amalgamation-3270200^
+  -DSQLite3_LIBRARY=S:\b\sqlite\sqlite3.lib^
   -DLLBUILD_SUPPORT_BINDINGS=Swift^
   S:\llbuild
 ninja

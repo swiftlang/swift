@@ -221,8 +221,11 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
     // Attributes.
     if (paramContext != ParameterContextKind::EnumElement) {
       auto AttrStatus = parseDeclAttributeList(param.Attrs);
-      if (AttrStatus.hasCodeCompletion())
+      if (AttrStatus.hasCodeCompletion()) {
+        if (CodeCompletion)
+          CodeCompletion->setAttrTargetDeclKind(DeclKind::Param);
         status.setHasCodeCompletion();
+      }
     }
     
     // ('inout' | '__shared' | '__owned')?

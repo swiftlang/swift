@@ -262,25 +262,25 @@ struct Color: _ExpressibleByColorLiteral {
 
 // CHECK-LABEL: sil hidden [ossa] @$s8literals16makeColorLiteralAA0C0VyF : $@convention(thin) () -> Color {
 // CHECK: [[COLOR_METATYPE:%.*]] = metatype $@thin Color.Type
-// CHECK: [[VALUE:%.*]] = float_literal $Builtin.FPIEEE80, 0x3FFFADD2F1A9FBE76C8B
+// CHECK: [[VALUE:%.*]] = float_literal $Builtin.FPIEEE{{64|80}}, {{0x3FF5BA5E353F7CEE|0x3FFFADD2F1A9FBE76C8B}}
 // CHECK: [[METATYPE:%.*]] = metatype $@thin Float.Type
-// CHECK: [[FN:%.*]] = function_ref @$sSf20_builtinFloatLiteralSfBf80__tcfC
-// CHECK: [[R:%.*]] = apply [[FN]]([[VALUE]], [[METATYPE]]) : $@convention(method) (Builtin.FPIEEE80, @thin Float.Type) -> Float
+// CHECK: [[FN:%.*]] = function_ref @$sSf20_builtinFloatLiteralSfBf{{64|80}}__tcfC
+// CHECK: [[R:%.*]] = apply [[FN]]([[VALUE]], [[METATYPE]]) : $@convention(method) (Builtin.FPIEEE{{64|80}}, @thin Float.Type) -> Float
 
-// CHECK: [[VALUE:%.*]] = float_literal $Builtin.FPIEEE80, 0xBFFB978D4FDF3B645A1D
+// CHECK: [[VALUE:%.*]] = float_literal $Builtin.FPIEEE{{64|80}}, {{0xBFB2F1A9FBE76C8B|0xBFFB978D4FDF3B645A1D}}
 // CHECK: [[METATYPE:%.*]] = metatype $@thin Float.Type
-// CHECK: [[FN:%.*]] = function_ref @$sSf20_builtinFloatLiteralSfBf80__tcfC
-// CHECK: [[G:%.*]] = apply [[FN]]([[VALUE]], [[METATYPE]]) : $@convention(method) (Builtin.FPIEEE80, @thin Float.Type) -> Float
+// CHECK: [[FN:%.*]] = function_ref @$sSf20_builtinFloatLiteralSfBf{{64|80}}__tcfC
+// CHECK: [[G:%.*]] = apply [[FN]]([[VALUE]], [[METATYPE]]) : $@convention(method) (Builtin.FPIEEE{{64|80}}, @thin Float.Type) -> Float
 
-// CHECK: [[VALUE:%.*]] = float_literal $Builtin.FPIEEE80, 0xBFF8C49BA5E353F7CED9
+// CHECK: [[VALUE:%.*]] = float_literal $Builtin.FPIEEE{{64|80}}, {{0xBF889374BC6A7EFA|0xBFF8C49BA5E353F7CED9}}
 // CHECK: [[METATYPE:%.*]] = metatype $@thin Float.Type
-// CHECK: [[FN:%.*]] = function_ref @$sSf20_builtinFloatLiteralSfBf80__tcfC
-// CHECK: [[B:%.*]] = apply [[FN]]([[VALUE]], [[METATYPE]]) : $@convention(method) (Builtin.FPIEEE80, @thin Float.Type) -> Float
+// CHECK: [[FN:%.*]] = function_ref @$sSf20_builtinFloatLiteralSfBf{{64|80}}__tcfC
+// CHECK: [[B:%.*]] = apply [[FN]]([[VALUE]], [[METATYPE]]) : $@convention(method) (Builtin.FPIEEE{{64|80}}, @thin Float.Type) -> Float
 
-// CHECK: [[VALUE:%.*]] = float_literal $Builtin.FPIEEE80, 0x3FFF8000000000000000
+// CHECK: [[VALUE:%.*]] = float_literal $Builtin.FPIEEE{{64|80}}, {{0x3FF0000000000000|0x3FFF8000000000000000}}
 // CHECK: [[METATYPE:%.*]] = metatype $@thin Float.Type
-// CHECK: [[FN:%.*]] = function_ref @$sSf20_builtinFloatLiteralSfBf80__tcfC
-// CHECK: [[A:%.*]] = apply [[FN]]([[VALUE]], [[METATYPE]]) : $@convention(method) (Builtin.FPIEEE80, @thin Float.Type) -> Float
+// CHECK: [[FN:%.*]] = function_ref @$sSf20_builtinFloatLiteralSfBf{{64|80}}__tcfC
+// CHECK: [[A:%.*]] = apply [[FN]]([[VALUE]], [[METATYPE]]) : $@convention(method) (Builtin.FPIEEE{{64|80}}, @thin Float.Type) -> Float
 
 // CHECK: [[FN:%.*]] = function_ref @$s8literals5ColorV16_colorLiteralRed5green4blue5alphaACSf_S3ftcfC : $@convention(method) (Float, Float, Float, Float, @thin Color.Type) -> Color
 // CHECK: [[LIT:%.*]] = apply [[FN]]([[R]], [[G]], [[B]], [[A]], [[COLOR_METATYPE]]) : $@convention(method) (Float, Float, Float, Float, @thin Color.Type) -> Color

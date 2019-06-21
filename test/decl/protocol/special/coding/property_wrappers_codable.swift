@@ -1,16 +1,16 @@
 // RUN: %target-typecheck-verify-swift -verify-ignore-unknown
 
-@_propertyWrapper
+@propertyWrapper
 struct Wrapper<T: Codable> {
-  var value: T
+  var wrappedValue: T
 }
 
-@_propertyWrapper
+@propertyWrapper
 struct WrapperWithInitialValue<T: Codable> {
-  var value: T
+  var wrappedValue: T
 
   init(initialValue: T) {
-    self.value = initialValue
+    self.wrappedValue = initialValue
   }
 }
 

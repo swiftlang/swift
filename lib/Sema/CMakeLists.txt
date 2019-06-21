@@ -4,6 +4,7 @@ if (SWIFT_FORCE_OPTIMIZED_TYPECHECKER)
 endif()
 
 add_swift_host_library(swiftSema STATIC
+  BuilderTransform.cpp
   CSApply.cpp
   CSBindings.cpp
   CSDiag.cpp

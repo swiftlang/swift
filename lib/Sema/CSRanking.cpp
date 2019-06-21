@@ -668,7 +668,7 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
           return true;
         };
 
-        auto defaultMap = computeDefaultMap(
+        ParameterListInfo paramInfo(
             params2, decl2, decl2->getDeclContext()->isTypeContext());
         auto params2ForMatching = params2;
         if (compareTrailingClosureParamsSeparately) {
@@ -676,7 +676,7 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
           params2ForMatching = params2.drop_back();
         }
 
-        InputMatcher IM(params2ForMatching, defaultMap);
+        InputMatcher IM(params2ForMatching, paramInfo);
         if (IM.match(numParams1, pairMatcher) != InputMatcher::IM_Succeeded)
           return false;
 
@@ -1444,8 +1444,8 @@ SolutionDiff::SolutionDiff(ArrayRef<Solution> solutions) {
 }
 
 InputMatcher::InputMatcher(const ArrayRef<AnyFunctionType::Param> params,
-                           const SmallBitVector &defaultValueMap)
-    : NumSkippedParameters(0), DefaultValueMap(defaultValueMap),
+                           const ParameterListInfo &paramInfo)
+    : NumSkippedParameters(0), ParamInfo(paramInfo),
       Params(params) {}
 
 InputMatcher::Result
@@ -1458,7 +1458,7 @@ InputMatcher::match(int numInputs,
     // If we've claimed all of the inputs, the rest of the parameters should
     // be either default or variadic.
     if (inputIdx == numInputs) {
-      if (!DefaultValueMap[i] && !Params[i].isVariadic())
+      if (!ParamInfo.hasDefaultArgument(i) && !Params[i].isVariadic())
         return IM_HasUnmatchedParam;
       ++NumSkippedParameters;
       continue;
@@ -1476,7 +1476,8 @@ InputMatcher::match(int numInputs,
     // params: (a: Int, b: Int = 0, c: Int)
     //
     // and we shouldn't claim any input and just skip such parameter.
-    if ((numInputs - inputIdx) < (numParams - i) && DefaultValueMap[i]) {
+    if ((numInputs - inputIdx) < (numParams - i) &&
+        ParamInfo.hasDefaultArgument(i)) {
       ++NumSkippedParameters;
       continue;
     }

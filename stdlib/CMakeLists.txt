@@ -7,6 +7,17 @@ include(AddSwiftStdlib)
 
 # Create convenience targets for the Swift standard library.
 
+# NOTE(compnerd) this will pass the *build* configuration to the *host*
+# libraries.  Explicitly indicate to CMake that it should **NOT** track the
+# implicit language runtimes.  This can go away once we migrate to an external
+# project with its own configure with the CMAKE_SYSTEM_NAME set rather than
+# using the custom cross-compilation solution
+set(CMAKE_C_IMPLICIT_LINK_LIBRARIES "")
+set(CMAKE_CXX_IMPLICIT_LINK_LIBRARIES "")
+
+set(CMAKE_C_IMPLICIT_LINK_DIRECTORIES "")
+set(CMAKE_CXX_IMPLICIT_LINK_DIRECTORIES "")
+
 # NOTE(compnerd) save the original compiler for the host swiftReflection that
 # we build
 set(HOST_CMAKE_CXX_COMPILER ${CMAKE_CXX_COMPILER})
@@ -40,7 +51,7 @@ else()
   # everything and there are various places where we link runtime code with
   # code built by the host compiler. Disable sanitizers for the runtime for
   # now.
-  append("-fno-sanitize=all" CMAKE_C_FLAGS CMAKE_CXX_FLAGS)
+  add_compile_options(-fno-sanitize=all)
 endif()
 
 # Do not enforce checks for LLVM's ABI-breaking build settings.
@@ -49,7 +60,11 @@ endif()
 # on the presence of symbols in libSupport to identify how the code was
 # built and cause link failures for mismatches. Without linking that library,
 # we get link failures regardless, so instead, this just disables the checks.
-append("-DLLVM_DISABLE_ABI_BREAKING_CHECKS_ENFORCING=1" CMAKE_C_FLAGS CMAKE_CXX_FLAGS)
+if(CMAKE_VERSION VERSION_LESS 3.12)
+  append("-DLLVM_DISABLE_ABI_BREAKING_CHECKS_ENFORCING=1" CMAKE_C_FLAGS CMAKE_CXX_FLAGS)
+else()
+  add_compile_definitions(LLVM_DISABLE_ABI_BREAKING_CHECKS_ENFORCING=1)
+endif()
 
 set(SWIFT_STDLIB_LIBRARY_BUILD_TYPES)
 if(SWIFT_BUILD_DYNAMIC_STDLIB)

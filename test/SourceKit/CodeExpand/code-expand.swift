@@ -37,6 +37,16 @@ dispatch_after(<#T##when: dispatch_time_t##dispatch_time_t#>, <#T##queue: dispat
 // CHECK-NEXT: <#code#>
 // CHECK-NEXT: }
 
+@_functionBuilder
+struct MyBuilder {}
+func acceptBuilder<Result>(@MyBuilder body: () -> Result) {}
+do {
+  acceptBuilder(body: <#T##() -> Result#>)
+  // CHECK: acceptBuilder {
+  // CHECK-NEXT: <#code#>
+  // CHECK-NEXT: }
+}
+
 foo(x: <#T##Self.SegueIdentifier -> Void#>)
 // CHECK:      foo { (<#Self.SegueIdentifier#>) in
 

@@ -3898,6 +3898,19 @@ namespace {
       simplifyExprType(E);
       auto valueType = cs.getType(E);
 
+      // TODO(diagnostics): Once all of the diagnostics are moved to
+      // new diagnostics framework this check could be eliminated.
+      //
+      // Only way for this to happen is CSDiag try to re-typecheck
+      // sub-expression which contains this placeholder with
+      // `AllowUnresolvedTypeVariables` flag set.
+      //
+      // A better solution could be to replace placeholders with this
+      // implicit call early on and type-check that call together with
+      // the rest of the constraint system.
+      if (valueType->hasUnresolvedType())
+        return nullptr;
+
       auto &tc = cs.getTypeChecker();
       auto &ctx = tc.Context;
       // Synthesize a call to _undefined() of appropriate type.
@@ -5346,8 +5359,7 @@ Expr *ExprRewriter::coerceCallArguments(
   // Determine whether this application has curried self.
   bool skipCurriedSelf = apply ? hasCurriedSelf(cs, callee, apply) : true;
   // Determine the parameter bindings.
-  SmallBitVector defaultMap
-    = computeDefaultMap(params, callee.getDecl(), skipCurriedSelf);
+  ParameterListInfo paramInfo(params, callee.getDecl(), skipCurriedSelf);
 
   SmallVector<AnyFunctionType::Param, 8> args;
   AnyFunctionType::decomposeInput(cs.getType(arg), args);
@@ -5362,7 +5374,7 @@ Expr *ExprRewriter::coerceCallArguments(
   MatchCallArgumentListener listener;
   SmallVector<ParamBinding, 4> parameterBindings;
   bool failed = constraints::matchCallArguments(args, params,
-                                                defaultMap,
+                                                paramInfo,
                                                 hasTrailingClosure,
                                                 /*allowFixes=*/false, listener,
                                                 parameterBindings);
@@ -7482,6 +7494,21 @@ namespace {
         // metadata types/conformances during IRGen.
         tc.requestRequiredNominalTypeLayoutForParameters(params);
 
+        // If this closure had a function builder applied, rewrite it to a
+        // closure with a single expression body containing the builder
+        // invocations.
+        auto builder =
+            Rewriter.solution.builderTransformedClosures.find(closure);
+        if (builder != Rewriter.solution.builderTransformedClosures.end()) {
+          auto singleExpr = builder->second.second;
+          auto returnStmt = new (tc.Context) ReturnStmt(
+             singleExpr->getStartLoc(), singleExpr, /*implicit=*/true);
+          auto braceStmt = BraceStmt::create(
+              tc.Context, returnStmt->getStartLoc(), ASTNode(returnStmt),
+              returnStmt->getEndLoc(), /*implicit=*/true);
+          closure->setBody(braceStmt, /*isSingleExpression=*/true);
+        }
+
         // If this is a single-expression closure, convert the expression
         // in the body to the result type of the closure.
         if (closure->hasSingleExpressionBody()) {
@@ -7523,7 +7550,11 @@ namespace {
           ClosuresToTypeCheck.push_back(closure);
         }
 
-        tc.ClosuresWithUncomputedCaptures.push_back(closure);
+        // Don't try to register captures if constraint system is used to
+        // produce diagnostics for one of the sub-expressions.
+        if (!cs.Options.contains(
+                ConstraintSystemFlags::SubExpressionDiagnostics))
+          tc.ClosuresWithUncomputedCaptures.push_back(closure);
 
         return { false, closure };
       }
@@ -7612,6 +7643,11 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
                                       Type convertType,
                                       bool discardedExpr,
                                       bool skipClosures) {
+  // Add the node types back.
+  for (auto &nodeType : solution.addedNodeTypes) {
+    setType(nodeType.first, nodeType.second);
+  }
+
   // If any fixes needed to be applied to arrive at this solution, resolve
   // them to specific expressions.
   if (!solution.Fixes.empty()) {

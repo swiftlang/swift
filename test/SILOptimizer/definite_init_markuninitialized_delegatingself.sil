@@ -275,3 +275,20 @@ bb2:
   %7 = tuple ()
   return %7 : $()
 }
+
+// <rdar://51198592> DI was crashing as it wrongly detected a `type(of: self)`
+// use in a delegating initializer, when there was none.
+class MyClass4 {
+}
+
+sil hidden [ossa] @test_self_uninit_use_in_delegating_init : $@convention(method) (@thick MyClass4.Type) -> @owned MyClass4 {
+bb0(%1 : $@thick MyClass4.Type):
+  %2 = alloc_stack $MyClass4, let, name "self"
+  %3 = mark_uninitialized [delegatingself] %2 : $*MyClass4
+  %5 = load_borrow %3 : $*MyClass4 // expected-error {{'self' used before 'self.init' call or assignment to 'self'}}
+  end_borrow %5 : $MyClass4
+  %7 = load [copy] %3 : $*MyClass4 // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
+  destroy_addr %3 : $*MyClass4
+  dealloc_stack %2 : $*MyClass4
+  return %7 : $MyClass4
+}

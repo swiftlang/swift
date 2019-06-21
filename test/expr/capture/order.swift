@@ -1,3 +1,4 @@
+// XFAIL: enable-astscope-lookup
 // RUN: %target-typecheck-verify-swift
 
 func makeIncrementor(amount: Int) -> () -> Int {

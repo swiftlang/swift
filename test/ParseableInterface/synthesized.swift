@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -typecheck -emit-parseable-module-interface-path - %s -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s
 
-// CHECK-LABEL: public enum HasRawValue : Int {
+// CHECK-LABEL: public enum HasRawValue : Swift.Int {
 public enum HasRawValue: Int {
   // CHECK-NEXT: case a, b, c
   case a, b = 5, c
@@ -15,7 +15,7 @@ public enum HasRawValue: Int {
   case a, b = 5, c
 }
 
-// CHECK-LABEL: @objc public enum ObjCEnum : Int32 {
+// CHECK-LABEL: @objc public enum ObjCEnum : Swift.Int32 {
 // CHECK-NEXT: case a, b = 5, c
 // CHECK-DAG: public typealias RawValue = Swift.Int32
 // CHECK-DAG: @inlinable public init?(rawValue: Swift.Int32)

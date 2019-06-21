@@ -6,7 +6,7 @@ enum MyEnum {
   case east, west
 }
 
-@_propertyWrapper
+@propertyWrapper
 struct MyStruct {
   var value: MyEnum
   init(initialValue: MyEnum) {}

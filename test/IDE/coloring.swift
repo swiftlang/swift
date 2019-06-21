@@ -439,3 +439,9 @@ class PropertyDelgate {
   })
   var something
 }
+
+// CHECK: <kw>func</kw> acceptBuilder<T>(
+func acceptBuilder<T>(
+  // CHECK: @SomeBuilder<Element> label param: () -> <type>T</type>
+  @SomeBuilder<Element> label param: () -> T
+) {}

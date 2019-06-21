@@ -1050,13 +1050,6 @@ static void validatePatternBindingEntries(TypeChecker &tc,
     validatePatternBindingEntry(tc, binding, i);
 }
 
-void swift::makeFinal(ASTContext &ctx, ValueDecl *D) {
-  if (D && !D->isFinal()) {
-    assert(isa<ClassDecl>(D) || D->isPotentiallyOverridable());
-    D->getAttrs().add(new (ctx) FinalAttr(/*IsImplicit=*/true));
-  }
-}
-
 namespace {
 // The raw values of this enum must be kept in sync with
 // diag::implicitly_final_cannot_be_open.
@@ -1070,12 +1063,8 @@ enum class ImplicitlyFinalReason : unsigned {
 };
 }
 
-static bool inferFinalAndDiagnoseIfNeeded(ValueDecl *D,
+static bool inferFinalAndDiagnoseIfNeeded(ValueDecl *D, ClassDecl *cls,
                                           StaticSpellingKind staticSpelling) {
-  auto cls = D->getDeclContext()->getSelfClassDecl();
-  if (!cls)
-    return false;
-
   // Are there any reasons to infer 'final'? Prefer 'static' over the class
   // being final for the purposes of diagnostics.
   Optional<ImplicitlyFinalReason> reason;
@@ -1110,31 +1099,10 @@ static bool inferFinalAndDiagnoseIfNeeded(ValueDecl *D,
   return true;
 }
 
-/// Make the given declaration 'dynamic', if it isn't already marked as such.
-static void makeDynamic(ValueDecl *decl) {
-  // If there isn't already a 'dynamic' attribute, add an inferred one.
-  if (decl->getAttrs().hasAttribute<DynamicAttr>())
-    return;
-  
-  auto attr = new (decl->getASTContext()) DynamicAttr(/*implicit=*/true);
-  decl->getAttrs().add(attr);
-}
-
-static llvm::Expected<bool> isStorageDynamic(Evaluator &evaluator,
-                                             AccessorDecl *accessor) {
-  auto isDynamicResult = evaluator(IsDynamicRequest{accessor->getStorage()});
-
-  if (!isDynamicResult)
-    return isDynamicResult;
-
-  return *isDynamicResult;
-}
-
 /// Runtime-replacable accessors are dynamic when their storage declaration
 /// is dynamic and they were explicitly defined or they are implicitly defined
 /// getter/setter because no accessor was defined.
-static llvm::Expected<bool>
-doesAccessorNeedDynamicAttribute(AccessorDecl *accessor, Evaluator &evaluator) {
+static bool doesAccessorNeedDynamicAttribute(AccessorDecl *accessor) {
   auto kind = accessor->getAccessorKind();
   auto storage = accessor->getStorage();
   bool isObjC = storage->isObjC();
@@ -1145,7 +1113,7 @@ doesAccessorNeedDynamicAttribute(AccessorDecl *accessor, Evaluator &evaluator) {
     if (!isObjC &&
         (readImpl == ReadImplKind::Read || readImpl == ReadImplKind::Address))
       return false;
-    return isStorageDynamic(evaluator, accessor);
+    return storage->isDynamic();
   }
   case AccessorKind::Set: {
     auto writeImpl = storage->getWriteImpl();
@@ -1153,32 +1121,32 @@ doesAccessorNeedDynamicAttribute(AccessorDecl *accessor, Evaluator &evaluator) {
                     writeImpl == WriteImplKind::MutableAddress ||
                     writeImpl == WriteImplKind::StoredWithObservers))
       return false;
-    return isStorageDynamic(evaluator, accessor);
+    return storage->isDynamic();
   }
   case AccessorKind::Read:
     if (!isObjC && storage->getReadImpl() == ReadImplKind::Read)
-      return isStorageDynamic(evaluator, accessor);
+      return storage->isDynamic();
     return false;
   case AccessorKind::Modify: {
     if (!isObjC && storage->getWriteImpl() == WriteImplKind::Modify)
-      return isStorageDynamic(evaluator, accessor);
+      return storage->isDynamic();
     return false;
   }
   case AccessorKind::MutableAddress: {
     if (!isObjC && storage->getWriteImpl() == WriteImplKind::MutableAddress)
-      return isStorageDynamic(evaluator, accessor);
+      return storage->isDynamic();
     return false;
   }
   case AccessorKind::Address: {
     if (!isObjC && storage->getReadImpl() == ReadImplKind::Address)
-      return isStorageDynamic(evaluator, accessor);
+      return storage->isDynamic();
     return false;
   }
   case AccessorKind::DidSet:
   case AccessorKind::WillSet:
     if (!isObjC &&
         storage->getWriteImpl() == WriteImplKind::StoredWithObservers)
-      return isStorageDynamic(evaluator, accessor);
+      return storage->isDynamic();
     return false;
   }
   llvm_unreachable("covered switch");
@@ -1186,15 +1154,28 @@ doesAccessorNeedDynamicAttribute(AccessorDecl *accessor, Evaluator &evaluator) {
 
 llvm::Expected<bool>
 IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
+  if (isa<ClassDecl>(decl))
+    return decl->getAttrs().hasAttribute<FinalAttr>();
+
+  auto cls = decl->getDeclContext()->getSelfClassDecl();
+  if (!cls)
+    return false;
+
   switch (decl->getKind()) {
     case DeclKind::Var: {
       // Properties are final if they are declared 'static' or a 'let'
       auto *VD = cast<VarDecl>(decl);
+
+      // Backing storage for 'lazy' or property wrappers is always final.
+      if (VD->isLazyStorageProperty() ||
+          VD->getOriginalWrappedProperty())
+        return true;
+
       if (auto *nominalDecl = VD->getDeclContext()->getSelfClassDecl()) {
         // If this variable is a class member, mark it final if the
         // class is final, or if it was declared with 'let'.
         auto *PBD = VD->getParentPatternBinding();
-        if (PBD && inferFinalAndDiagnoseIfNeeded(decl, PBD->getStaticSpelling()))
+        if (PBD && inferFinalAndDiagnoseIfNeeded(decl, cls, PBD->getStaticSpelling()))
           return true;
 
         if (VD->isLet()) {
@@ -1219,7 +1200,7 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     case DeclKind::Func: {
       // Methods declared 'static' are final.
       auto staticSpelling = cast<FuncDecl>(decl)->getStaticSpelling();
-      if (inferFinalAndDiagnoseIfNeeded(decl, staticSpelling))
+      if (inferFinalAndDiagnoseIfNeeded(decl, cls, staticSpelling))
         return true;
       break;
     }
@@ -1230,9 +1211,7 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
           case AccessorKind::DidSet:
           case AccessorKind::WillSet:
             // Observing accessors are marked final if in a class.
-            if (accessor->getDeclContext()->getSelfClassDecl())
-              return true;
-            break;
+            return true;
 
           case AccessorKind::Read:
           case AccessorKind::Modify:
@@ -1254,7 +1233,7 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     case DeclKind::Subscript: {
       // Member subscripts.
       auto staticSpelling = cast<SubscriptDecl>(decl)->getStaticSpelling();
-      if (inferFinalAndDiagnoseIfNeeded(decl, staticSpelling))
+      if (inferFinalAndDiagnoseIfNeeded(decl, cls, staticSpelling))
         return true;
       break;
     }
@@ -1284,40 +1263,17 @@ IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   }
 
   if (auto accessor = dyn_cast<AccessorDecl>(decl)) {
-    // Swift 5: Runtime-replacable accessors are dynamic when their storage declaration
+    // Runtime-replacable accessors are dynamic when their storage declaration
     // is dynamic and they were explicitly defined or they are implicitly defined
     // getter/setter because no accessor was defined.
-    if (decl->getASTContext().LangOpts.isSwiftVersionAtLeast(5))
-      return doesAccessorNeedDynamicAttribute(accessor, evaluator);
-
-    // Pre Swift 5: Runtime-replacable accessors are dynamic when their storage declaration
-    // is dynamic. Other accessors are never dynamic.
-    switch (accessor->getAccessorKind()) {
-    case AccessorKind::Get:
-    case AccessorKind::Set: {
-      auto isDynamicResult = evaluator(
-          IsDynamicRequest{accessor->getStorage()});
-      if (isDynamicResult && *isDynamicResult)
-        makeDynamic(decl);
-      
-      return isDynamicResult;  
-    }
-
-#define OBJC_ACCESSOR(ID, KEYWORD)
-#define ACCESSOR(ID) \
-    case AccessorKind::ID:
-#include "swift/AST/AccessorKinds.def"
-      return false;
-    }
+    return doesAccessorNeedDynamicAttribute(accessor);
   }
 
   // The 'NSManaged' attribute implies 'dynamic'.
   // FIXME: Use a semantic check for NSManaged rather than looking for the
   // attribute (which could be ill-formed).
-  if (decl->getAttrs().hasAttribute<NSManagedAttr>()) {
-    makeDynamic(decl);
+  if (decl->getAttrs().hasAttribute<NSManagedAttr>())
     return true;
-  }
 
   // The presence of 'final' blocks the inference of 'dynamic'.
   if (decl->isFinal())
@@ -1334,10 +1290,8 @@ IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   // @objc declarations in class extensions are implicitly dynamic.
   // This is intended to enable overriding the declarations.
   auto dc = decl->getDeclContext();
-  if (isa<ExtensionDecl>(dc) && dc->getSelfClassDecl()) {
-    makeDynamic(decl);
+  if (isa<ExtensionDecl>(dc) && dc->getSelfClassDecl())
     return true;
-  }
 
   // If any of the declarations overridden by this declaration are dynamic
   // or were imported from Objective-C, this declaration is dynamic.
@@ -1347,10 +1301,8 @@ IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   auto overriddenDecls = evaluateOrDefault(evaluator,
     OverriddenDeclsRequest{decl}, {});
   for (auto overridden : overriddenDecls) {
-    if (overridden->isDynamic() || overridden->hasClangNode()) {
-      makeDynamic(decl);
+    if (overridden->isDynamic() || overridden->hasClangNode())
       return true;
-    }
   }
 
   return false;
@@ -2039,10 +1991,10 @@ static bool computeIsGetterMutating(TypeChecker &TC,
   }
 
   // If we have an attached property wrapper, the getter is mutating if
-  // the "value" property of the wrapper type is mutating and we're in
-  // a context that has value semantics.
+  // the "value" property of the outermost wrapper type is mutating and we're
+  // in a context that has value semantics.
   if (auto var = dyn_cast<VarDecl>(storage)) {
-    if (auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo()) {
+    if (auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo(0)) {
       if (wrapperInfo.valueVar &&
           (!storage->getGetter() || storage->getGetter()->isImplicit())) {
         TC.validateDecl(wrapperInfo.valueVar);
@@ -2074,10 +2026,10 @@ static bool computeIsGetterMutating(TypeChecker &TC,
 static bool computeIsSetterMutating(TypeChecker &TC,
                                     AbstractStorageDecl *storage) {
   // If we have an attached property wrapper, the setter is mutating if
-  // the "value" property of the wrapper type is mutating and we're in
-  // a context that has value semantics.
+  // the "value" property of the outermost wrapper type is mutating and we're
+  // in a context that has value semantics.
   if (auto var = dyn_cast<VarDecl>(storage)) {
-    if (auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo()) {
+    if (auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo(0)) {
       if (wrapperInfo.valueVar &&
           (!storage->getSetter() || storage->getSetter()->isImplicit())) {
         TC.validateDecl(wrapperInfo.valueVar);
@@ -2557,7 +2509,7 @@ public:
         // by the backing storage property.
         if (!DC->isLocalContext() &&
             !(PBD->getSingleVar() &&
-              PBD->getSingleVar()->getAttachedPropertyWrapper())) {
+              PBD->getSingleVar()->hasAttachedPropertyWrapper())) {
           auto *initContext = cast_or_null<PatternBindingInitializer>(
               entry.getInitContext());
           if (initContext) {
@@ -4378,7 +4330,7 @@ static bool shouldValidateMemberDuringFinalization(NominalTypeDecl *nominal,
        !cast<VarDecl>(VD)->isStatic() &&
        (cast<VarDecl>(VD)->hasStorage() ||
         VD->getAttrs().hasAttribute<LazyAttr>() ||
-        cast<VarDecl>(VD)->getAttachedPropertyWrapper())))
+        cast<VarDecl>(VD)->hasAttachedPropertyWrapper())))
     return true;
 
   // For classes, we need to validate properties and functions,
@@ -4475,8 +4427,8 @@ static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
       completeLazyVarImplementation(prop);
     }
 
-    // Ensure that we create the backing variable for a property wrapper.
-    if (prop->getAttachedPropertyWrapper()) {
+    // Ensure that we create the backing variable for a wrapped property.
+    if (prop->hasAttachedPropertyWrapper()) {
       finalizeAbstractStorageDecl(TC, prop);
       (void)prop->getPropertyWrapperBackingProperty();
     }

@@ -570,6 +570,11 @@ struct Score {
 
 };
 
+/// An AST node that can gain type information while solving.
+using TypedNode =
+    llvm::PointerUnion3<const Expr *, const TypeLoc *,
+                        const ParamDecl *>;
+
 /// Display a score.
 llvm::raw_ostream &operator<<(llvm::raw_ostream &out, const Score &score);
 
@@ -642,8 +647,15 @@ public:
   /// The locators of \c Defaultable constraints whose defaults were used.
   llvm::SmallPtrSet<ConstraintLocator *, 2> DefaultedConstraints;
 
+  /// The node -> type mappings introduced by this solution.
+  llvm::SmallVector<std::pair<TypedNode, Type>, 8> addedNodeTypes;
+
   std::vector<std::pair<ConstraintLocator *, ProtocolConformanceRef>>
       Conformances;
+
+  /// The set of closures that have been transformed by a function builder.
+  llvm::MapVector<ClosureExpr *, std::pair<Type, Expr *>>
+      builderTransformedClosures;
 
   /// Simplify the given type by substituting all occurrences of
   /// type variables for their fixed types.
@@ -828,6 +840,14 @@ enum class ConstraintSystemFlags {
   /// If set, the top-level expression may be able to provide an underlying
   /// type for the contextual opaque archetype.
   UnderlyingTypeForOpaqueReturnType = 0x40,
+
+  /// FIXME(diagnostics): Once diagnostics are completely switched to new
+  /// framework, this flag could be removed as obsolete.
+  ///
+  /// If set, this identifies constraint system as being used to re-typecheck
+  /// one of the sub-expressions as part of the expression diagnostics, which
+  /// is attempting to narrow down failure location.
+  SubExpressionDiagnostics = 0x80,
 };
 
 /// Options that affect the constraint system as a whole.
@@ -1102,8 +1122,15 @@ private:
   SmallVector<std::pair<ConstraintLocator *, OpenedArchetypeType *>, 4>
     OpenedExistentialTypes;
 
+  /// The node -> type mappings introduced by generating constraints.
+  llvm::SmallVector<std::pair<TypedNode, Type>, 8> addedNodeTypes;
+
   std::vector<std::pair<ConstraintLocator *, ProtocolConformanceRef>>
       CheckedConformances;
+
+  /// The set of closures that have been transformed by a function builder.
+  SmallVector<std::tuple<ClosureExpr *, Type, Expr *>, 4>
+      builderTransformedClosures;
 
 public:
   /// The locators of \c Defaultable constraints whose defaults were used.
@@ -1578,6 +1605,8 @@ public:
     /// The length of \c DefaultedConstraints.
     unsigned numDefaultedConstraints;
 
+    unsigned numAddedNodeTypes;
+
     unsigned numCheckedConformances;
 
     unsigned numMissingMembers;
@@ -1585,6 +1614,8 @@ public:
     unsigned numDisabledConstraints;
 
     unsigned numFavoredConstraints;
+
+    unsigned numBuilderTransformedClosures;
 
     /// The previous score.
     Score PreviousScore;
@@ -1726,33 +1757,48 @@ public:
     this->FavoredTypes[E] = T;
   }
 
+  /// Set the type in our type map for the given node.
+  ///
+  /// The side tables are used through the expression type checker to avoid mutating nodes until
+  /// we know we have successfully type-checked them.
+  void setType(TypedNode node, Type type) {
+    assert(!node.isNull() && "Cannot set type information on null node");
+    assert(type && "Expected non-null type");
+
+    // Record the type.
+    if (auto expr = node.dyn_cast<const Expr *>()) {
+      ExprTypes[expr] = type.getPointer();
+    } else if (auto typeLoc = node.dyn_cast<const TypeLoc *>()) {
+      TypeLocTypes[typeLoc] = type.getPointer();
+    } else {
+      auto param = node.get<const ParamDecl *>();
+      ParamTypes[param] = type.getPointer();
+    }
+
+    // Record the fact that we ascribed a type to this node.
+    if (solverState && solverState->depth > 0) {
+      addedNodeTypes.push_back({node, type});
+    }
+  }
+
   /// Set the type in our type map for a given expression. The side
   /// map is used throughout the expression type checker in order to
   /// avoid mutating expressions until we know we have successfully
   /// type-checked them.
-  void setType(Expr *E, Type T) {
-    assert(E != nullptr && "Expected non-null expression!");
-    assert(T && "Expected non-null type!");
-
-    // FIXME: We sometimes set the type and then later set it to a
-    //        value that is slightly different, e.g. not an lvalue.
-    // assert((ExprTypes.find(E) == ExprTypes.end() ||
-    //         ExprTypes.find(E)->second->isEqual(T) ||
-    //         ExprTypes.find(E)->second->hasTypeVariable()) &&
-    //        "Expected type to be invariant!");
-
-    ExprTypes[E] = T.getPointer();
-  }
-
   void setType(TypeLoc &L, Type T) {
-    assert(T && "Expected non-null type!");
-    TypeLocTypes[&L] = T.getPointer();
+    setType(TypedNode(&L), T);
   }
 
-  void setType(ParamDecl *P, Type T) {
-    assert(P && "Expected non-null parameter!");
-    assert(T && "Expected non-null type!");
-    ParamTypes[P] = T.getPointer();
+  /// Erase the type for the given node.
+  void eraseType(TypedNode node) {
+    if (auto expr = node.dyn_cast<const Expr *>()) {
+      ExprTypes.erase(expr);
+    } else if (auto typeLoc = node.dyn_cast<const TypeLoc *>()) {
+      TypeLocTypes.erase(typeLoc);
+    } else {
+      auto param = node.get<const ParamDecl *>();
+      ParamTypes.erase(param);
+    }
   }
 
   void setType(KeyPathExpr *KP, unsigned I, Type T) {
@@ -1768,12 +1814,20 @@ public:
   }
 
   bool hasType(const TypeLoc &L) const {
-    return TypeLocTypes.find(&L) != TypeLocTypes.end();
+    return hasType(TypedNode(&L));
   }
 
-  bool hasType(const ParamDecl *P) const {
-    assert(P != nullptr && "Expected non-null parameter!");
-    return ParamTypes.find(P) != ParamTypes.end();
+  /// Check to see if we have a type for a node.
+  bool hasType(TypedNode node) const {
+    assert(!node.isNull() && "Expected non-null node");
+    if (auto expr = node.dyn_cast<const Expr *>()) {
+      return ExprTypes.find(expr) != ExprTypes.end();
+    } else if (auto typeLoc = node.dyn_cast<const TypeLoc *>()) {
+      return TypeLocTypes.find(typeLoc) != TypeLocTypes.end();
+    } else {
+      auto param = node.get<const ParamDecl *>();
+      return ParamTypes.find(param) != ParamTypes.end();
+    }
   }
 
   bool hasType(const KeyPathExpr *KP, unsigned I) const {
@@ -2519,7 +2573,7 @@ public:
   /// Generate constraints for the given (unchecked) expression.
   ///
   /// \returns a possibly-sanitized expression, or null if an error occurred.
-  Expr *generateConstraints(Expr *E);
+  Expr *generateConstraints(Expr *E, DeclContext *dc = nullptr);
 
   /// Generate constraints for binding the given pattern to the
   /// value of the given expression.
@@ -3005,6 +3059,11 @@ public:
   SolutionKind simplifyConstraint(const Constraint &constraint);
   /// Simplify the given disjunction choice.
   void simplifyDisjunctionChoice(Constraint *choice);
+
+  /// Apply the given function builder to the closure expression.
+  TypeMatchResult applyFunctionBuilder(ClosureExpr *closure, Type builderType,
+                                       ConstraintLocator *calleeLocator,
+                                       ConstraintLocatorBuilder locator);
 
 private:
   /// The kind of bindings that are permitted.
@@ -3700,7 +3759,7 @@ public:
 ///
 /// \param args The arguments.
 /// \param params The parameters.
-/// \param defaultMap A map indicating if the parameter at that index has a default value.
+/// \param paramInfo Declaration-level information about the parameters.
 /// \param hasTrailingClosure Whether the last argument is a trailing closure.
 /// \param allowFixes Whether to allow fixes when matching arguments.
 ///
@@ -3712,7 +3771,7 @@ public:
 /// \returns true if the call arguments could not be matched to the parameters.
 bool matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
                         ArrayRef<AnyFunctionType::Param> params,
-                        const SmallBitVector &defaultMap,
+                        const ParameterListInfo &paramInfo,
                         bool hasTrailingClosure,
                         bool allowFixes,
                         MatchCallArgumentListener &listener,
@@ -4086,7 +4145,7 @@ public:
 /// in the custom function when necessary.
 class InputMatcher {
   size_t NumSkippedParameters;
-  const SmallBitVector DefaultValueMap;
+  const ParameterListInfo &ParamInfo;
   const ArrayRef<AnyFunctionType::Param> Params;
 
 public:
@@ -4102,7 +4161,7 @@ public:
   };
 
   InputMatcher(const ArrayRef<AnyFunctionType::Param> params,
-               const SmallBitVector &defaultValueMap);
+               const ParameterListInfo &paramInfo);
 
   /// Matching a given array of inputs.
   ///

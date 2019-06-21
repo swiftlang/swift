@@ -150,6 +150,7 @@ struct CheckerOptions {
 };
 
 class SDKContext {
+  std::vector<std::unique_ptr<CompilerInstance>> CIs;
   llvm::StringSet<> TextData;
   llvm::BumpPtrAllocator Allocator;
   SourceManager SourceMgr;
@@ -197,6 +198,11 @@ public:
   bool shouldIgnore(Decl *D, const Decl* Parent = nullptr) const;
   ArrayRef<BreakingAttributeInfo> getBreakingAttributeInfo() const { return BreakingAttrs; }
   Optional<uint8_t> getFixedBinaryOrder(ValueDecl *VD) const;
+
+  CompilerInstance &newCompilerInstance() {
+    CIs.emplace_back(new CompilerInstance());
+    return *CIs.back();
+  }
 
   template<class YAMLNodeTy, typename ...ArgTypes>
   void diagnose(YAMLNodeTy node, Diag<ArgTypes...> ID,
@@ -683,6 +689,7 @@ public:
 
   // Serialize the content of all roots to a given file using JSON format.
   void serialize(StringRef Filename);
+  static void serialize(StringRef Filename, SDKNode *Root);
 
   // After collecting decls, either from imported modules or from a previously
   // serialized JSON file, using this function to get the root of the SDK.
@@ -722,6 +729,11 @@ int dumpSwiftModules(const CompilerInvocation &InitInvok,
                      StringRef OutputDir,
                      const std::vector<std::string> PrintApis,
                      CheckerOptions Opts);
+
+SDKNodeRoot *getSDKNodeRoot(SDKContext &SDKCtx,
+                            const CompilerInvocation &InitInvok,
+                            const llvm::StringSet<> &ModuleNames,
+                            CheckerOptions Opts);
 
 int dumpSDKContent(const CompilerInvocation &InitInvok,
                    const llvm::StringSet<> &ModuleNames,
