@@ -4636,6 +4636,156 @@ AnyFunctionType::getAutoDiffOriginalFunctionType() {
   return originalType;
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+static AnyFunctionType *
+makeFunctionType(ArrayRef<AnyFunctionType::Param> params,
+Type retTy, GenericSignature *genericSignature) {
+  if (genericSignature)
+    return GenericFunctionType::get(genericSignature, params, retTy);
+  return FunctionType::get(params, retTy);
+}
+
+AnyFunctionType *calculateExpectedOriginalTransposeFunctionType(
+    AnyFunctionType *transpose,
+    TransposingAttr *attr,
+GenericSignature *genericSignature) {
+
+  // Get the original function's original result.
+  bool isCurried = transpose->getResult()->is<AnyFunctionType>();
+  Type originalResult;
+  if (isCurried) {
+    originalResult = transpose->getParams().front().getPlainType();
+  } else {
+    originalResult = transpose->getParams().back().getPlainType();
+  }
+
+  auto transposeParams = transpose->getParams();
+  auto transposeResult = transpose->getResult();
+
+  if (isCurried) {
+    transposeParams = transpose->getResult()->getAs<AnyFunctionType>()
+                          ->getParams();
+    transposeResult = transpose->getResult()->getAs<AnyFunctionType>()
+                          ->getResult();
+  }
+
+  SmallVector<AnyFunctionType::Param, 8> originalParams;
+  auto wrtParams = attr->getParsedParameters();
+  ArrayRef<TupleTypeElt> transposeResultTypes;
+  // Return type of '@transposing' function can have single type or tuples
+  // of types.
+  if (auto t = transpose->getResult()->getAs<TupleType>()) {
+    transposeResultTypes = t->getElements();
+  } else {
+    transposeResultTypes = ArrayRef<TupleTypeElt>(transpose->getResult());
+  }
+  
+  // TODO: use set when optimizing.
+//  SmallPtrSet<unsigned, 8> wrtParamSet;
+//  bool wrtSelf = false;
+//  for (auto param : wrtParams) {
+//    switch (param.getKind()) {
+//    case ParsedAutoDiffParameter::Kind::Self:
+//      wrtSelf = true;
+//      break;
+//    case ParsedAutoDiffParameter::Kind::Named:
+//      llvm_unreachable("'@transposing' does not support named wrt arguments");
+//      break;
+//    case ParsedAutoDiffParameter::Kind::Ordered:
+//      wrtParamSet.insert(param.getIndex());
+//      break;
+//    }
+//  }
+  
+  Type originalSelfType;
+  size_t numberOriginalParameters =
+      transpose->getParams().size() - 1 + wrtParams.size();
+  
+//  for (auto i : originalParams) {
+//    llvm::errs() << i.getLabel() << "\n";
+//  }
+//  llvm::errs() << "~~~~~~~~~~~~\n";
+//  for (auto i : transposeParams) {
+//    llvm::errs() << i.getLabel() << "\n";
+//  }
+//  llvm::errs() << "~~~~~~~~~~~~\n";
+//  for (auto i : transposeResultTypes) {
+//    llvm::errs() << i.getType() << "\n";
+//  }
+//  llvm::errs() << "!!!!!!!\n";
+
+  for (auto i : range(0, numberOriginalParameters)) {
+    bool isWrt = false;
+    for (auto wrt : wrtParams) {
+      if (wrt.getIndex() == i) {
+        isWrt = true;
+        break;
+      }
+    }
+    if (isWrt) {
+      originalParams.append(1, AnyFunctionType::Param(
+          transposeResultTypes.front().getType()));
+      transposeResultTypes = transposeResultTypes.drop_front();
+    } else {
+      originalParams.append(1, transposeParams.front());
+      transposeParams = transposeParams.drop_front();
+    }
+  }
+//  for (auto i : originalParams) {
+//    llvm::errs() << i.getLabel() << "\n";
+//  }
+//  llvm::errs() << "~~~~~~~~~~~~\n";
+//  for (auto i : transposeParams) {
+//    llvm::errs() << i.getLabel() << "\n";
+//  }
+//  llvm::errs() << "~~~~~~~~~~~~\n";
+//  for (auto i : transposeResultTypes) {
+//    llvm::errs() << i.getType() << "\n";
+//  }
+  // Append the rest of the parameters from the '@transposing'
+  for (auto result : transposeResultTypes) {
+    originalParams.append(1, AnyFunctionType::Param(result.getType()));
+  }
+//  originalParams.append(transposeResultTypes.begin(), transposeResultTypes.end());
+  
+  auto originalType = makeFunctionType(
+                          originalParams,
+                          originalResult,
+                          isCurried ? nullptr : genericSignature);
+  if (isCurried) {
+    originalType = makeFunctionType(
+                       { AnyFunctionType::Param(originalSelfType) },
+                       originalType,
+                       genericSignature);
+  }
+  return originalType;
+}
+
+// Compute the original function type corresponding to the given transpose
+// function type.
+AnyFunctionType *
+AnyFunctionType::getTransposeOriginalFunctionType(TransposingAttr *attr) {
+  // Unwrap curry levels. At most, two parameter lists are necessary, for
+  // curried method types with a `(Self)` parameter list.
+  SmallVector<AnyFunctionType *, 2> curryLevels;
+  auto *currentLevel = this;
+  for (unsigned i : range(2)) {
+    (void)i;
+    if (currentLevel == nullptr)
+      break;
+    curryLevels.push_back(currentLevel);
+    currentLevel = currentLevel->getResult()->getAs<AnyFunctionType>();
+  }
+
+  auto *transpose = curryLevels.back();
+  auto *originalType = calculateExpectedOriginalTransposeFunctionType(
+                           transpose,
+                           attr,
+                           getOptGenericSignature());
+  
+  return originalType;
+}
+
 AnyFunctionType *AnyFunctionType::getWithoutDifferentiability() const {
   SmallVector<Param, 8> newParams;
   for (auto &param : getParams()) {
