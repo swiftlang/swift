@@ -1884,8 +1884,11 @@ private:
   bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
     if (Cancelled)
       return false;
-    if (auto *V = dyn_cast<VarDecl>(D))
-        D = V->getCanonicalVarDecl();
+    if (auto *V = dyn_cast<VarDecl>(D)) {
+      // Handle references to the implicitly generated vars in case statements
+      // matching multiple patterns
+      D = V->getCanonicalVarDecl();
+    }
     if (D == Dcl)
       return passId(Range);
     return true;
@@ -1896,10 +1899,19 @@ private:
     if (Cancelled)
       return false;
 
-    if (auto *V = dyn_cast<VarDecl>(D))
+    if (auto *V = dyn_cast<VarDecl>(D)) {
       D = V->getCanonicalVarDecl();
-    else if (CtorTyRef)
+
+      // If we have a backing property of a property wrapper, use the wrapped
+      // property instead (i.e. if this is $foo, pretend it's foo).
+      if (auto *Wrapped = V->getOriginalWrappedProperty()) {
+        assert(Range.getByteLength() > 1 && Range.str().front() == '$');
+        D = Wrapped;
+        Range = CharSourceRange(Range.getStart().getAdvancedLoc(1), Range.getByteLength() - 1);
+      }
+    } else if (CtorTyRef) {
       D = CtorTyRef;
+    }
 
     if (D == Dcl)
       return passId(Range);
