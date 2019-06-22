@@ -149,14 +149,14 @@ public let NSNotFound: Int = .max
 ///                            + "this other string literal works just fine.",
 ///                       comment: "The description of a sample of code.")
 ///
-/// Luckily, since comments aren't localized, multi-line string literals can be
-/// safely used with `comment`.
+/// Since comments aren't localized, multi-line string literals can be safely
+/// used with `comment`.
 ///
 /// Restrict Autosynthesized Localizations
 /// --------------------------------------
 ///
 /// If having Xcode generate strings files from code isn't desired behavior,
-/// you should call `Bundle.localizedString(forKey:value:table:)` instead.
+/// call `Bundle.localizedString(forKey:value:table:)` instead.
 ///
 ///     let greeting = Bundle.localizedString(forKey: "program-greeting",
 ///                                           value: "Hello, World!",
