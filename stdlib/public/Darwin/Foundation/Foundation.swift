@@ -48,10 +48,8 @@ public let NSNotFound: Int = .max
 ///
 /// - returns: A localized version of the string designated by `key` in the
 ///   table identified by `tableName`. If the localized string for `key` cannot
-///   be found within the table, the following semantics are used to determine
-///   returned value:
-///     - If `value` is the empty string, `key` is returned.
-///     - If `value` is not the empty string, `value` is returned.
+///   be found within the table, `value` is returned. However, `key` is returned
+///   instead when `value` is the empty string.
 ///
 /// Export Localizations with Xcode
 /// -------------------------------
