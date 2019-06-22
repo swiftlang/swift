@@ -21,6 +21,12 @@ open class OtherDerived : Derived {
   }
 }
 
+public final class OtherFinalDerived : Derived {
+  public override func privateMethod() -> Int {
+    return super.privateMethod() + 1
+  }
+}
+
 VTableTestSuite.test("Base") {
   expectEqual(1, callBaseMethod(Base()))
 }
@@ -33,6 +39,11 @@ VTableTestSuite.test("Derived") {
 VTableTestSuite.test("OtherDerived") {
   expectEqual(3, callBaseMethod(OtherDerived()))
   expectEqual(3, callDerivedMethod(OtherDerived()))
+}
+
+VTableTestSuite.test("OtherFinalDerived") {
+  expectEqual(3, callBaseMethod(OtherFinalDerived()))
+  expectEqual(3, callDerivedMethod(OtherFinalDerived()))
 }
 
 runAllTests()
