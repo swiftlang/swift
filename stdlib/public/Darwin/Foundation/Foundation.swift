@@ -35,8 +35,7 @@ public let NSNotFound: Int = .max
 /// - parameter tableName: The name of the table containing the localized string
 ///   identified by `key`. This is the prefix of the strings file—a file with
 ///   the `.strings` extension—containing the localized values. If `tableName`
-///   is `nil` or the empty string, the `Localizable` table is used. The default
-///   value is `nil`.
+///   is `nil` or the empty string, the `Localizable` table is used.
 /// - parameter bundle: The bundle containing the table's strings file. The main
 ///   bundle is used by default.
 /// - parameter value: A user-visible string to return when the localized string
