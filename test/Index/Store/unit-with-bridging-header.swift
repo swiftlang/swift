@@ -20,7 +20,6 @@
 // PCH-UNIT: DEPEND START
 // PCH-UNIT: Record | user | {{.*}}bridge-include.h | bridge-include.h-
 // PCH-UNIT: File | user | {{.*}}bridge-head.h
-// PCH-UNIT: File | user | {{.*}}module.modulemap
 // PCH-UNIT: DEPEND END (3)
 // PCH-UNIT: INCLUDE START
 // PCH-UNIT: {{.*}}bridge-head.h:1 | {{.*}}bridge-include.h
