@@ -103,8 +103,14 @@ public let NSNotFound: Int = .max
 /// Use Only String Literals
 /// ------------------------
 ///
-/// Variables and interpolated strings cannot be passed into `key`, `tableName`,
-/// `value`, and `comment`.
+/// String literal values must be used with `key`, `tableName`, `value`, and
+/// `comment`.
+///
+/// Xcode does not evaluate interpolated strings and string variables when
+/// generating strings files from code. Using those language features will
+/// result in exported localizations that resemble the code expression instead
+/// of its value. Translators would then translate that exported value—leaving
+/// international users with a localized string containing code.
 ///
 ///     // Translators will see "1 + 1 = (1 + 1)".
 ///     // International users will see a localization "1 + 1 = (1 + 1)".
@@ -112,8 +118,7 @@ public let NSNotFound: Int = .max
 ///                                             value: "1 + 1 = \(1 + 1)"
 ///                                             comment: "A math equation.")
 ///
-/// These strings must be string literal expressions. When you need
-/// to dynamically insert values within localized strings, set `value` to a
+/// To dynamically insert values within localized strings, set `value` to a
 /// format string, and use `String.localizedStringWithFormat(_:_:)` to insert
 /// those values.
 ///
