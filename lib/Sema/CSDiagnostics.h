@@ -807,20 +807,45 @@ public:
   bool diagnoseAsError() override;
 };
 
-class MissingPropertyWrapperUnwrapFailure final : public ContextualFailure {
-  DeclName PropertyName;
+class PropertyWrapperReferenceFailure : public ContextualFailure {
+  DeclName Name;
+  bool IsMemberAccess;
 
 public:
-  MissingPropertyWrapperUnwrapFailure(Expr *root, ConstraintSystem &cs,
-                                      DeclName propertyName, Type base,
-                                      Type wrapper, ConstraintLocator *locator)
-      : ContextualFailure(root, cs, base, wrapper, locator),
-        PropertyName(propertyName) {}
+  PropertyWrapperReferenceFailure(Expr *root, ConstraintSystem &cs,
+                                  DeclName name, Type base, bool isMemberAccess,
+                                  Type wrapper, ConstraintLocator *locator)
+      : ContextualFailure(root, cs, base, wrapper, locator), Name(name),
+        IsMemberAccess(isMemberAccess) {}
+
+  DeclName getName() const { return Name; }
+  bool isMemberAccess() const { return IsMemberAccess; }
+};
+
+class ExtraneousPropertyWrapperUnwrapFailure final
+    : public PropertyWrapperReferenceFailure {
+public:
+  ExtraneousPropertyWrapperUnwrapFailure(Expr *root, ConstraintSystem &cs,
+                                         DeclName name, Type base,
+                                         bool isMemberAccess, Type wrapper,
+                                         ConstraintLocator *locator)
+      : PropertyWrapperReferenceFailure(root, cs, name, base, isMemberAccess,
+                                        wrapper, locator) {}
 
   bool diagnoseAsError() override;
+};
 
-private:
-  DeclName getPropertyName() const { return PropertyName; }
+class MissingPropertyWrapperUnwrapFailure final
+    : public PropertyWrapperReferenceFailure {
+public:
+  MissingPropertyWrapperUnwrapFailure(Expr *root, ConstraintSystem &cs,
+                                      DeclName name, Type base,
+                                      bool isMemberAccess, Type wrapper,
+                                      ConstraintLocator *locator)
+      : PropertyWrapperReferenceFailure(root, cs, name, base, isMemberAccess,
+                                        wrapper, locator) {}
+
+  bool diagnoseAsError() override;
 };
 
 class SubscriptMisuseFailure final : public FailureDiagnostic {

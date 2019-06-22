@@ -2253,18 +2253,38 @@ public:
     return typeVar->getImpl().getRepresentative(getSavedBindings());
   }
 
-  /// Gets the a VarDecl, and the type of its attached property wrapper if the
-  /// resolved overload has an attached property wrapper.
-  ///
-  /// \return A pair of the VarDecl and the attached property wrapper type if
-  ///         the given resolved overload has an attached property wrapper.
+  /// Gets the VarDecl, and the type of its attached property wrapper if the
+  /// resolved overload has a decl with an attached property wrapper.
   Optional<std::pair<VarDecl *, Type>>
   getPropertyWrapperInformation(ResolvedOverloadSetListItem *resolvedOverload) {
-    if (resolvedOverload && resolvedOverload->Choice.isDecl()) {
+    if (resolvedOverload->Choice.isDecl()) {
       if (auto *decl = dyn_cast<VarDecl>(resolvedOverload->Choice.getDecl())) {
         if (decl->hasAttachedPropertyWrapper()) {
           auto wrapperTy = decl->getPropertyWrapperBackingPropertyType();
           return std::make_pair(decl, wrapperTy);
+        }
+      }
+    }
+    return None;
+  }
+
+  /// Gets the VarDecl, and the type of the type property that it wraps if
+  /// resolved overload has a decl which is the backing storage for a
+  /// property wrapper.
+  Optional<std::pair<VarDecl *, Type>>
+  getWrappedPropertyInformation(ResolvedOverloadSetListItem *resolvedOverload,
+                                Type baseTy, DeclContext *useDC) {
+    if (resolvedOverload->Choice.isDecl()) {
+      if (auto *decl = dyn_cast<VarDecl>(resolvedOverload->Choice.getDecl())) {
+        if (decl->getName().str().startswith("$")) {
+          auto wrapperTyInfo =
+              baseTy->getAnyNominal()->getPropertyWrapperTypeInfo();
+          if (wrapperTyInfo.isValid()) {
+            auto valueTy = baseTy->getTypeOfMember(
+                useDC->getParentModule(), wrapperTyInfo.valueVar,
+                wrapperTyInfo.valueVar->getValueInterfaceType());
+            return std::make_pair(decl, valueTy);
+          }
         }
       }
     }
