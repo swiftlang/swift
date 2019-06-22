@@ -41,8 +41,8 @@ public let NSNotFound: Int = .max
 /// - parameter bundle: The bundle containing the table's strings file. The main
 ///   bundle is used by default.
 /// - parameter value: A user-visible string to return when the localized string
-///   for `key` can't be found in the table. The default value is the empty
-///   string, which indicates that `key` should be returned.
+///   for `key` cannot be found in the table. If `value` is the empty string,
+///   `key` would be returned instead.
 /// - parameter comment: A note to the translator describing the context where
 ///   the localized string is presented to the user.
 ///
