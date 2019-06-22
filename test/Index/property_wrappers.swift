@@ -2,51 +2,65 @@
 
 @propertyWrapper
 public struct Wrapper<T> {
+  // CHECK: [[@LINE-1]]:15 | struct/Swift | Wrapper | [[Wrapper_USR:.*]] | Def | rel: 0
   public var value: T
+  // CHECK: [[@LINE-1]]:14 | instance-property/Swift | value | [[value_USR:.*]] | Def,RelChild | rel: 1
 
   public init(initialValue: T) {
+  // CHECK: [[@LINE-1]]:10 | constructor/Swift | init(initialValue:) | [[WrapperInit_USR:.*]] | Def,RelChild | rel: 1
     self.value = initialValue
   }
 
   public init(body: () -> T) {
+  // CHECK: [[@LINE-1]]:10 | constructor/Swift | init(body:) | [[WrapperBodyInit_USR:.*]] | Def,RelChild | rel: 1
     self.value = body()
   }
 }
 
 var globalInt: Int { return 17 }
+// CHECK: [[@LINE-1]]:5 | variable/Swift | globalInt | [[globalInt_USR:.*]] | Def | rel: 0
 
 public struct HasWrappers {
   @Wrapper
+  // CHECK: [[@LINE-1]]:4 | struct/Swift | Wrapper | [[Wrapper_USR]] | Ref | rel: 0
   public var x: Int = globalInt
-  // CHECK: [[@LINE-2]]:4 | struct/Swift | Wrapper | s:14swift_ide_test7WrapperV | Ref | rel: 0
-  // CHECK-NOT: [[@LINE-2]]:23 | variable/Swift | globalInt | s:14swift_ide_test9globalIntSivp | Ref,Read | rel: 0
-  // CHECK: [[@LINE-4]]:4 | constructor/Swift | init(initialValue:) | s:14swift_ide_test7WrapperV12initialValueACyxGx_tcfc | Ref,Call,Impl | rel: 0
-  // CHECK: [[@LINE-4]]:14 | instance-property/Swift | x | s:14swift_ide_test11HasWrappersV1xSivp | Def,RelChild | rel: 1
-  // CHECK: [[@LINE-5]]:23 | variable/Swift | globalInt | s:14swift_ide_test9globalIntSivp | Ref,Read | rel: 0
+  // CHECK-NOT: [[@LINE-1]]:23 | variable/Swift | globalInt | [[globalInt_USR]] | Ref,Read | rel: 0
+  // CHECK: [[@LINE-4]]:4 | constructor/Swift | init(initialValue:) | [[WrapperInit_USR]] | Ref,Call,Impl | rel: 0
+  // CHECK: [[@LINE-3]]:14 | instance-property/Swift | x | [[x_USR:.*]] | Def,RelChild | rel: 1
+  // CHECK: [[@LINE-4]]:23 | variable/Swift | globalInt | [[globalInt_USR]] | Ref,Read | rel: 0
 
   @Wrapper(body: { globalInt })
+  // CHECK: [[@LINE-1]]:4 | struct/Swift | Wrapper | [[Wrapper_USR]] | Ref | rel: 0
+  // CHECK: [[@LINE-2]]:20 | variable/Swift | globalInt | [[globalInt_USR]] | Ref,Read | rel: 0
+  // CHECK: [[@LINE-3]]:4 | constructor/Swift | init(body:) | [[WrapperBodyInit_USR]] | Ref,Call | rel: 0
   public var y: Int
-  // CHECK: [[@LINE-2]]:4 | struct/Swift | Wrapper | s:14swift_ide_test7WrapperV | Ref | rel: 0
-  // CHECK: [[@LINE-3]]:20 | variable/Swift | globalInt | s:14swift_ide_test9globalIntSivp | Ref,Read | rel: 0
-  // CHECK: [[@LINE-4]]:4 | constructor/Swift | init(body:) | s:14swift_ide_test7WrapperV4bodyACyxGxyXE_tcfc | Ref,Call | rel: 0
-  // CHECK: [[@LINE-4]]:14 | instance-property/Swift | y | s:14swift_ide_test11HasWrappersV1ySivp | Def,RelChild | rel: 1
-  // CHECK-NOT: [[@LINE-6]]:20 | variable/Swift | globalInt | s:14swift_ide_test9globalIntSivp | Ref,Read | rel: 0
+  // CHECK: [[@LINE-1]]:14 | instance-property/Swift | y | [[y_USR:.*]] | Def,RelChild | rel: 1
+  // CHECK-NOT: [[@LINE-6]]:20 | variable/Swift | globalInt | [[globalInt_USR]] | Ref,Read | rel: 0
 
   @Wrapper(body: {
-  // CHECK: [[@LINE-1]]:4 | struct/Swift | Wrapper | s:14swift_ide_test7WrapperV | Ref | rel: 0
+  // CHECK: [[@LINE-1]]:4 | struct/Swift | Wrapper | [[Wrapper_USR]] | Ref | rel: 0
     struct Inner {
       @Wrapper
-      // CHECK: [[@LINE-1]]:8 | struct/Swift | Wrapper | s:14swift_ide_test7WrapperV | Ref | rel: 0
-      // CHECK: [[@LINE-2]]:8 | constructor/Swift | init(initialValue:) | s:14swift_ide_test7WrapperV12initialValueACyxGx_tcfc | Ref,Call,Impl | rel: 0
+      // CHECK: [[@LINE-1]]:8 | struct/Swift | Wrapper | [[Wrapper_USR]] | Ref | rel: 0
+      // CHECK: [[@LINE-2]]:8 | constructor/Swift | init(initialValue:) | [[WrapperInit_USR]] | Ref,Call,Impl | rel: 0
       var x: Int = globalInt
-      // CHECK: [[@LINE-1]]:20 | variable/Swift | globalInt | s:14swift_ide_test9globalIntSivp | Ref,Read | rel: 0
+      // CHECK: [[@LINE-1]]:20 | variable/Swift | globalInt | [[globalInt_USR]] | Ref,Read | rel: 0
     }
     return Inner().x + globalInt
-    // CHECK: [[@LINE-1]]:24 | variable/Swift | globalInt | s:14swift_ide_test9globalIntSivp | Ref,Read | rel: 0
+    // CHECK: [[@LINE-1]]:24 | variable/Swift | globalInt | [[globalInt_USR]] | Ref,Read | rel: 0
   })
-  // CHECK: [[@LINE-12]]:4 | constructor/Swift | init(body:) | s:14swift_ide_test7WrapperV4bodyACyxGxyXE_tcfc | Ref,Call | rel: 0
+  // CHECK: [[@LINE-12]]:4 | constructor/Swift | init(body:) | [[WrapperBodyInit_USR]] | Ref,Call | rel: 0
   public var z: Int
-  // CHECK: [[@LINE-1]]:14 | instance-property/Swift | z | s:14swift_ide_test11HasWrappersV1zSivp | Def,RelChild | rel: 1
+  // CHECK: [[@LINE-1]]:14 | instance-property/Swift | z | [[z_USR:.*]] | Def,RelChild | rel: 1
+
+  func backingUse() {
+    _ = $y.value + $z.value + x + $x.value
+    // CHECK: [[@LINE-1]]:10 | instance-property/Swift | y | [[y_USR]] | Ref,Read,RelCont | rel: 1
+    // CHECK: [[@LINE-2]]:12 | instance-property/Swift | value | [[value_USR:.*]] | Ref,Read,RelCont | rel: 1
+    // CHECK: [[@LINE-3]]:21 | instance-property/Swift | z | [[z_USR]] | Ref,Read,RelCont | rel: 1
+    // CHECK: [[@LINE-4]]:31 | instance-property/Swift | x | [[x_USR]] | Ref,Read,RelCont | rel: 1
+    // CHECK: [[@LINE-5]]:36 | instance-property/Swift | x | [[x_USR]] | Ref,Read,RelCont | rel: 1
+  }
 }
 
 func useMemberwiseInits(i: Int) {

@@ -10,7 +10,7 @@ struct /*wrapper:def*/Foo<T> {
 }
 
 @_functionBuilder
-struct /*builder:def*/OtherBuilder {
+struct /*builder:def*/Other {
     public static func buildBlock(_ components: String...) -> String {
         return components.joined()
     }
@@ -18,7 +18,7 @@ struct /*builder:def*/OtherBuilder {
 
 struct Bar {
     @/*wrapper*/Foo
-    var /*wrapped:def*/foo: Int = 10
+    var /*wrapped:def*/descriptive: Int = 10
     @/*wrapper*/Foo(initialValue: "hello")
     var bar: String
     @/*wrapper*/Foo
@@ -30,20 +30,20 @@ struct Bar {
         return Bar().inner
     }()
 
-    func combined(@/*builder*/OtherBuilder _ a: () -> String) -> String {
+    func combined(@/*builder*/Other _ a: () -> String) -> String {
         return a()
     }
 
-     @/*builder*/OtherBuilder
+     @/*builder*/Other
     func hello() -> String {
         "hello"
         "there"
     }
 
     func baz() {
-        let _: /*wrapper*/Foo<Int> = /*wrapped+1*/$foo
-        let _: Int = /*wrapped+1*/$foo.value
-        let _: Int = /*wrapped*/foo
+        let _: /*wrapper*/Foo<Int> = /*wrapped+1*/$descriptive
+        let _: Int = /*wrapped+1*/$descriptive.value
+        let _: Int = /*wrapped*/descriptive
         let _: /*wrapper*/Foo<String> = $bar
     }
 }

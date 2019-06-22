@@ -769,13 +769,30 @@ bool NameMatcher::tryResolve(ASTWalker::ParentTy Node, SourceLoc NameLoc,
   CharSourceRange Range = Lexer::getCharSourceRangeFromSourceRange(getSourceMgr(),
                                                                    NameLoc);
   UnresolvedLoc &Next = LocsToResolve.back();
-  if (Range.isValid() && NameLoc == Next.Loc) {
-    LocsToResolve.pop_back();
-    ResolvedLocs.push_back({Node, Range, LabelRanges, RangeType,
-      isActive(), isInSelector()});
-    return true;
+  bool WasResolved = false;
+  if (Range.isValid()) {
+    if (NameLoc == Next.Loc) {
+      LocsToResolve.pop_back();
+      ResolvedLocs.push_back({Node, Range, LabelRanges, RangeType,
+        isActive(), isInSelector()});
+      if (isDone())
+        return true;
+      WasResolved = true;
+    }
+
+    if (Range.getByteLength() > 1 && Range.str().front() == '$') {
+      // Also try after any leading dollar for name references of wrapped properties,
+      // e.g. 'foo' in '$foo' occurrences.
+      auto NewRange = CharSourceRange(Range.getStart().getAdvancedLoc(1), Range.getByteLength() - 1);
+      if (NewRange.getStart() == Next.Loc) {
+        LocsToResolve.pop_back();
+        ResolvedLocs.push_back({Node, NewRange, {}, LabelRangeType::None,
+          isActive(), isInSelector()});
+        WasResolved = true;
+      }
+    }
   }
-  return false;
+  return WasResolved;
 };
 
 void ResolvedRangeInfo::print(llvm::raw_ostream &OS) {
