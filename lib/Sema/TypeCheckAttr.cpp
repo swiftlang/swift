@@ -2856,7 +2856,7 @@ static AutoDiffParameterIndices *computeDifferentiationParameters(
   auto *functionType = function->getInterfaceType()->eraseDynamicSelfType()
       ->castTo<AnyFunctionType>();
   auto &params = *function->getParameters();
-  auto numParams = functionType->getNumParams();
+  auto numParams = function->getParameters()->size();
   auto isInstanceMethod = function->isInstanceMember();
 
   // Diagnose if function has no parameters.

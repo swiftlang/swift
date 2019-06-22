@@ -39,10 +39,10 @@ private:
   Kind Kind;
   union Value {
     struct { Identifier Name; }; // Named
-    struct { unsigned int Index; }; // Ordered
+    struct { unsigned Index; }; // Ordered
     struct {};                  // Self
     Value(Identifier name) : Name(name) {}
-    Value(unsigned int index) : Index(index) {}
+    Value(unsigned index) : Index(index) {}
     Value() {}
   } V;
 
@@ -50,7 +50,7 @@ public:
   ParsedAutoDiffParameter(SourceLoc loc, enum Kind kind, Value value)
     : Loc(loc), Kind(kind), V(value) {}
   
-  ParsedAutoDiffParameter(SourceLoc loc, enum Kind kind, unsigned int index)
+  ParsedAutoDiffParameter(SourceLoc loc, enum Kind kind, unsigned index)
   : Loc(loc), Kind(kind), V(index) {}
 
   static ParsedAutoDiffParameter getNamedParameter(SourceLoc loc,
@@ -59,7 +59,7 @@ public:
   }
   
   static ParsedAutoDiffParameter getOrderedParameter(SourceLoc loc,
-                                                     unsigned int index) {
+                                                     unsigned index) {
     return { loc, Kind::Ordered, index };
   }
 
@@ -72,7 +72,7 @@ public:
     return V.Name;
   }
   
-  unsigned int getIndex() const {
+  unsigned getIndex() const {
     return V.Index;
   }
 

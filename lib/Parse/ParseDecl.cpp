@@ -893,7 +893,7 @@ bool Parser::parseDifferentiationParametersClause(
         break;
       }
       case tok::integer_literal: {
-        unsigned int paramNum;
+        unsigned paramNum;
         if (parseUnsignedInteger(
                 paramNum, paramLoc,
                 diag::diff_params_clause_expected_parameter))
