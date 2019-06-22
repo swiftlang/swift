@@ -73,13 +73,6 @@ SimpleMathTests.test("CaptureGlobal") {
   expectEqual(30, gradient(at: 0, in: foo))
 }
 
-let foo: (Float) -> Float = { x in
-  return x * x
-}
-SimpleMathTests.test("GlobalLet") {
-  expectEqual(2, gradient(at: 1, in: foo))
-}
-
 var foo_diffable: @differentiable (Float) -> (Float)
   = differentiableFunction { x in (x * x, { v in 2 * x * v }) }
 SimpleMathTests.test("GlobalDiffableFunc") {
