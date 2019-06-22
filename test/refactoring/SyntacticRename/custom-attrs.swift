@@ -18,7 +18,7 @@ struct /*builder:def*/Other {
 
 struct Bar {
     @/*wrapper*/Foo
-    var foo: Int = 10
+    var /*wrapped:def*/foo: Int = 10
     @/*wrapper*/Foo(initialValue: "hello")
     var bar: String
     @/*wrapper*/Foo
@@ -41,11 +41,10 @@ struct Bar {
     }
 
     func baz() {
-        let _: /*wrapper*/Foo<Int> = $foo
-        let _: Int = $foo.value
-        let _: Int = foo
+        let _: /*wrapper*/Foo<Int> = /*wrapped+1*/$foo
+        let _: Int = /*wrapped+1*/$foo.value
+        let _: Int = /*wrapped*/foo
         let _: /*wrapper*/Foo<String> = $bar
-        let _: String = $bar.value
     }
 }
 
@@ -54,9 +53,13 @@ struct Bar {
 // RUN: %empty-directory(%t.ranges)
 // RUN: %refactor -syntactic-rename -source-filename %s -pos="wrapper" -is-non-protocol-type -old-name "Foo" -new-name "Foo2" >> %t.result/custom-attrs-Foo.swift
 // RUN: %refactor -find-rename-ranges -source-filename %s -pos="wrapper" -is-non-protocol-type -old-name "Foo" >> %t.ranges/custom-attrs-Foo.swift
+// RUN: %refactor -syntactic-rename -source-filename %s -pos="wrapped" -old-name "foo" -new-name "descriptive" >> %t.result/custom-attrs-wrapped.swift
+// RUN: %refactor -find-rename-ranges -source-filename %s -pos="wrapped" -old-name "foo" >> %t.ranges/custom-attrs-wrapped.swift
 // RUN: %refactor -syntactic-rename -source-filename %s -pos="builder" -is-non-protocol-type -old-name "Other" -new-name "OtherBuilder" >> %t.result/custom-attrs-Other.swift
 // RUN: %refactor -find-rename-ranges -source-filename %s -pos="builder" -is-non-protocol-type -old-name "Other" >> %t.ranges/custom-attrs-Other.swift
 // RUN: diff -u %S/Outputs/custom-attrs/Foo.swift.expected %t.result/custom-attrs-Foo.swift
 // RUN: diff -u %S/FindRangeOutputs/custom-attrs/Foo.swift.expected %t.ranges/custom-attrs-Foo.swift
+// RUN: diff -u %S/Outputs/custom-attrs/wrapped.swift.expected %t.result/custom-attrs-wrapped.swift
+// RUN: diff -u %S/FindRangeOutputs/custom-attrs/wrapped.swift.expected %t.ranges/custom-attrs-wrapped.swift
 // RUN: diff -u %S/Outputs/custom-attrs/Other.swift.expected %t.result/custom-attrs-Other.swift
 // RUN: diff -u %S/FindRangeOutputs/custom-attrs/Other.swift.expected %t.ranges/custom-attrs-Other.swift

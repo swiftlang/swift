@@ -18,7 +18,7 @@ struct /*builder:def*/<base>Other</base> {
 
 struct Bar {
     @/*wrapper*/Foo
-    var foo: Int = 10
+    var /*wrapped:def*/foo: Int = 10
     @/*wrapper*/Foo(initialValue: "hello")
     var bar: String
     @/*wrapper*/Foo
@@ -41,11 +41,10 @@ struct Bar {
     }
 
     func baz() {
-        let _: /*wrapper*/Foo<Int> = $foo
-        let _: Int = $foo.value
-        let _: Int = foo
+        let _: /*wrapper*/Foo<Int> = /*wrapped+1*/$foo
+        let _: Int = /*wrapped+1*/$foo.value
+        let _: Int = /*wrapped*/foo
         let _: /*wrapper*/Foo<String> = $bar
-        let _: String = $bar.value
     }
 }
 
