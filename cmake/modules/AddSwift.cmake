@@ -1096,6 +1096,10 @@ function(_add_swift_library_single target name)
     set_target_properties("${target}"
       PROPERTIES
       INSTALL_RPATH "$ORIGIN:/usr/lib/swift/cygwin")
+  elseif("${SWIFTLIB_SINGLE_SDK}" STREQUAL "ANDROID")
+    # CMake generates incorrect rule `$SONAME_FLAG $INSTALLNAME_DIR$SONAME` for Android build on macOS cross-compile host.
+    # Proper linker flags constructed manually. See below variable `swiftlib_link_flags_all`.
+    set_target_properties("${target}" PROPERTIES NO_SONAME TRUE)
   endif()
 
   set_target_properties("${target}" PROPERTIES BUILD_WITH_INSTALL_RPATH YES)
@@ -1881,6 +1885,16 @@ function(add_swift_target_library name)
     if(${SWIFT_SDK_${sdk}_OBJECT_FORMAT} STREQUAL ELF AND
        NOT ${name} STREQUAL swiftRemoteMirror)
       list(APPEND swiftlib_link_flags_all "-Wl,-z,defs")
+    endif()
+    # Setting back linker flags which are not supported when making Android build on macOS cross-compile host.
+    if(SWIFTLIB_SHARED)
+      if(sdk IN_LIST SWIFT_APPLE_PLATFORMS)
+        list(APPEND swiftlib_link_flags_all "-dynamiclib -Wl,-headerpad_max_install_names")
+      elseif(sdk STREQUAL ANDROID)
+        list(APPEND swiftlib_link_flags_all "-shared")
+        # TODO: Instead of `lib${name}.so` find variable or target property which already have this value.
+        list(APPEND swiftlib_link_flags_all "-Wl,-soname,lib${name}.so")
+      endif()
     endif()
 
     set(sdk_supported_archs
