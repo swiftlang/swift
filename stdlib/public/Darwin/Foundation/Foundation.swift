@@ -43,10 +43,7 @@ public let NSNotFound: Int = .max
 ///   for `key` can't be found in the table. The default value is the empty
 ///   string, which indicates that `key` should be returned.
 /// - parameter comment: A note to the translator describing the context where
-///   the localized string is presented to the user. For example, this can
-///   indicate whether the "Book" is used as a noun or a verb. This distinction
-///   is important when translating to French, where the noun is "Livre" and the
-///   verb is "Réserver".
+///   the localized string is presented to the user.
 ///
 /// - returns: A localized version of the string designated by `key` in the
 ///   table identified by `tableName`. If the localized string for `key` cannot
