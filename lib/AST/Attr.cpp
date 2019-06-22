@@ -389,6 +389,65 @@ static std::string getDifferentiationParametersClauseString(
   return printer.str();
 }
 
+// Returns the differentiation parameters clause string for the given function,
+// parameter indices, and parsed parameters.
+static std::string getTransposingParametersClauseString(
+    const AbstractFunctionDecl *function, AutoDiffIndexSubset *indices,
+    ArrayRef<ParsedAutoDiffParameter> parsedParams) {
+  bool isInstanceMethod = function && function->isInstanceMember();
+  
+  std::string result;
+  llvm::raw_string_ostream printer(result);
+  
+  // Use parameters from `AutoDiffIndexSubset`, if specified.
+  if (indices) {
+    SmallBitVector parameters(indices->getBitVector());
+    auto parameterCount = parameters.count();
+    printer << "wrt: ";
+    if (parameterCount > 1)
+      printer << '(';
+    // Check if differentiating wrt `self`. If so, manually print it first.
+    if (isInstanceMethod && parameters.test(parameters.size() - 1)) {
+      parameters.reset(parameters.size() - 1);
+      printer << "self";
+      if (parameters.any())
+        printer << ", ";
+    }
+    // Print remaining differentiation parameters.
+    interleave(parameters.set_bits(), [&](unsigned index) {
+      printer << function->getParameters()->get(index)->getName().str();
+    }, [&] { printer << ", "; });
+    if (parameterCount > 1)
+      printer << ')';
+  }
+  // Otherwise, use the parsed parameters.
+  else if (!parsedParams.empty()) {
+    printer << "wrt: ";
+    if (parsedParams.size() > 1)
+      printer << '(';
+    interleave(parsedParams, [&](const ParsedAutoDiffParameter &param) {
+      switch (param.getKind()) {
+        case ParsedAutoDiffParameter::Kind::Named:
+          printer << param.getName();
+          break;
+        case ParsedAutoDiffParameter::Kind::Self:
+          printer << "self";
+          break;
+        case ParsedAutoDiffParameter::Kind::Ordered:
+          auto *paramList = function->getParameters();
+          assert(param.getIndex() <= paramList->size() &&
+                 "wrt parameter is out of range");
+          auto *funcParam = paramList->get(param.getIndex());
+          printer << funcParam->getNameStr();
+          break;
+      }
+    }, [&] { printer << ", "; });
+    if (parsedParams.size() > 1)
+      printer << ')';
+  }
+  return printer.str();
+}
+
 // SWIFT_ENABLE_TENSORFLOW
 // Print the arguments of the given `@differentiable` attribute.
 static void printDifferentiableAttrArguments(
@@ -806,8 +865,8 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     auto *attr = cast<TransposingAttr>(this);
     auto *derivative = dyn_cast_or_null<AbstractFunctionDecl>(D);
     Printer << attr->getOriginal().Name;
-    auto diffParamsString = getDifferentiationParametersClauseString(
-        derivative, attr->getParameterIndices(), attr->getParsedParameters());
+    auto diffParamsString = getTransposingParametersClauseString(
+        derivative, attr->getParameterIndexSubset(), attr->getParsedParameters());
     if (!diffParamsString.empty())
       Printer << ", " << diffParamsString;
     Printer << ')';
@@ -1463,9 +1522,9 @@ TransposingAttr::TransposingAttr(
 
 TransposingAttr::TransposingAttr(
     ASTContext &context, bool implicit, SourceLoc atLoc, SourceRange baseRange,
-    DeclNameWithLoc original, AutoDiffParameterIndices *indices)
+    DeclNameWithLoc original, AutoDiffIndexSubset *indices)
     : DeclAttribute(DAK_Differentiating, atLoc, baseRange, implicit),
-    Original(std::move(original)), ParameterIndices(indices) {}
+    Original(std::move(original)), ParameterIndexSubset(indices) {}
 
 TransposingAttr *
 TransposingAttr::create(ASTContext &context, bool implicit,
@@ -1482,7 +1541,7 @@ TransposingAttr *
 TransposingAttr::create(ASTContext &context, bool implicit,
 SourceLoc atLoc, SourceRange baseRange,
 DeclNameWithLoc original,
-AutoDiffParameterIndices *indices) {
+AutoDiffIndexSubset *indices) {
   void *mem = context.Allocate(sizeof(DifferentiatingAttr),
                                alignof(DifferentiatingAttr));
   return new (mem) TransposingAttr(context, implicit, atLoc, baseRange,

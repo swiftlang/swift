@@ -1699,17 +1699,17 @@ class TransposingAttr final
   /// The number of parsed parameters specified in 'wrt:'.
   unsigned NumParsedParameters = 0;
   /// The differentiation parameters' indices, resolved by the type checker.
-  AutoDiffParameterIndices *ParameterIndices = nullptr;
+  AutoDiffIndexSubset *ParameterIndexSubset = nullptr;
   
   explicit TransposingAttr(ASTContext &context, bool implicit,
-  SourceLoc atLoc, SourceRange baseRange,
-  DeclNameWithLoc original,
-  ArrayRef<ParsedAutoDiffParameter> params);
+                           SourceLoc atLoc, SourceRange baseRange,
+                           DeclNameWithLoc original,
+                           ArrayRef<ParsedAutoDiffParameter> params);
   
   explicit TransposingAttr(ASTContext &context, bool implicit,
-  SourceLoc atLoc, SourceRange baseRange,
-  DeclNameWithLoc original,
-  AutoDiffParameterIndices *indices);
+                           SourceLoc atLoc, SourceRange baseRange,
+                           DeclNameWithLoc original,
+                           AutoDiffIndexSubset *indices);
   
 public:
   static TransposingAttr *create(ASTContext &context, bool implicit,
@@ -1720,7 +1720,7 @@ public:
   static TransposingAttr *create(ASTContext &context, bool implicit,
                                  SourceLoc atLoc, SourceRange baseRange,
                                  DeclNameWithLoc original,
-                                 AutoDiffParameterIndices *indices);
+                                 AutoDiffIndexSubset *indices);
   
   DeclNameWithLoc getOriginal() const { return Original; }
   
@@ -1739,11 +1739,11 @@ public:
     return NumParsedParameters;
   }
   
-  AutoDiffParameterIndices *getParameterIndices() const {
-    return ParameterIndices;
+  AutoDiffIndexSubset *getParameterIndexSubset() const {
+    return ParameterIndexSubset;
   }
-  void setParameterIndices(AutoDiffParameterIndices *pi) {
-    ParameterIndices = pi;
+  void setParameterIndices(AutoDiffIndexSubset *pi) {
+    ParameterIndexSubset = pi;
   }
   
   static bool classof(const DeclAttribute *DA) {

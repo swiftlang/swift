@@ -2959,6 +2959,108 @@ static AutoDiffParameterIndices *computeDifferentiationParameters(
 }
 
 // SWIFT_ENABLE_TENSORFLOW
+// Computes `AutoDiffIndexSubset` from the given parsed transposing
+// parameters (possibly empty) for the given function, then verifies
+// that the parameter indices are valid.
+// - If parsed parameters are empty, infer parameter indices.
+// - Otherwise, build parameter indices from parsed parameters.
+// The attribute name/location are used in diagnostics.
+static AutoDiffIndexSubset *computeTransposingParameters(
+    TypeChecker &TC, ArrayRef<ParsedAutoDiffParameter> parsedWrtParams,
+    AbstractFunctionDecl *function, GenericEnvironment *derivativeGenEnv,
+    SourceLoc attrLoc
+) {
+  // Get function type and parameters.
+  TC.resolveDeclSignature(function);
+  auto *functionType = function->getInterfaceType()->eraseDynamicSelfType()
+      ->castTo<AnyFunctionType>();
+  
+  ArrayRef<TupleTypeElt> transposeResultTypes;
+  // Return type of '@transposing' function can have single type or tuple
+  // of types.
+  if (auto t = functionType->getResult()->getAs<TupleType>()) {
+    transposeResultTypes = t->getElements();
+  } else {
+    transposeResultTypes = ArrayRef<TupleTypeElt>(functionType->getResult());
+  }
+  
+  auto &params = *function->getParameters();
+  auto isInstanceMethod = function->isInstanceMember();
+  
+  // Diagnose if function has no parameters.
+  if (params.size() == 0) {
+    // If function is an instance method, diagnose only if `self` does not
+    // conform to `Differentiable`.
+    auto selfType = function->getImplicitSelfDecl()->getInterfaceType();
+    if (derivativeGenEnv)
+      selfType = derivativeGenEnv->mapTypeIntoContext(selfType);
+    // FIXME(TF-568): `Differentiable`-conforming protocols cannot define
+    // `@differentiable` computed properties because the check below returns
+    // false.
+    if (!conformsToDifferentiable(selfType, function)) {
+      TC.diagnose(attrLoc, diag::diff_function_no_parameters,
+                  function->getFullName())
+      .highlight(function->getSignatureSourceRange());
+      return nullptr;
+    }
+  }
+  
+  // If parsed differentiation parameters are empty, infer parameter indices
+  // from the function type.
+  // TODO: !!!!!!!!!!!!!!!
+//  if (parsedWrtParams.empty())
+//    return TypeChecker::inferTransposingParameters(
+//        function, derivativeGenEnv);
+  
+  // Otherwise, build parameter indices from parsed differentiation parameters.
+  auto paramIndices = SmallBitVector();
+  unsigned numParams = params.size() + transposeResultTypes.size() - 1;
+  int lastIndex = -1;
+  for (unsigned i : indices(parsedWrtParams)) {
+    auto paramLoc = parsedWrtParams[i].getLoc();
+    switch (parsedWrtParams[i].getKind()) {
+      case ParsedAutoDiffParameter::Kind::Named: {
+        TC.diagnose(paramLoc,
+            diag::transposing_attr_cant_use_named_wrt_params, parsedWrtParams[i].getName());
+        return nullptr;
+      }
+      case ParsedAutoDiffParameter::Kind::Self: {
+        // 'self' is only applicable to instance methods.
+        if (!isInstanceMethod) {
+          TC.diagnose(paramLoc,
+                      diag::diff_params_clause_self_instance_method_only);
+          return nullptr;
+        }
+        // 'self' can only be the first in the list.
+        if (i > 0) {
+          TC.diagnose(paramLoc, diag::diff_params_clause_self_must_be_first);
+          return nullptr;
+        }
+        paramIndices.set(parsedWrtParams.size() - 1);
+        break;
+      }
+      case ParsedAutoDiffParameter::Kind::Ordered: {
+        auto index = parsedWrtParams[i].getIndex();
+        if (index >= numParams) {
+          TC.diagnose(paramLoc, diag::diff_params_clause_param_index_out_of_range);
+          return nullptr;
+        }
+        // Parameter names must be specified in the original order.
+        if ((int)index <= lastIndex) {
+          TC.diagnose(paramLoc,
+                      diag::diff_params_clause_params_not_original_order);
+          return nullptr;
+        }
+        paramIndices.set(index);
+        lastIndex = index;
+        break;
+      }
+    }
+  }
+  return AutoDiffIndexSubset::get(TC.Context, paramIndices);
+}
+
+// SWIFT_ENABLE_TENSORFLOW
 // Checks if the given `AutoDiffParameterIndices` instance is valid for the
 // given function type in the given derivative generic environment and module
 // context. Returns true on error.
@@ -3691,25 +3793,11 @@ void AttributeChecker::visitTransposingAttr(TransposingAttr *attr) {
                                      ->castTo<AnyFunctionType>();
   auto transposeResultType = transpose->getResultInterfaceType();
 
-  // Result type must conform to `Differentiable`.
-//  auto diffableProto = ctx.getProtocol(KnownProtocolKind::Differentiable);
-//  auto valueResultType = transposeResultType;
-//  if (valueResultType->hasTypeParameter())
-//    valueResultType = transpose->mapTypeIntoContext(valueResultType);
-//  auto valueResultConf = TC.conformsToProtocol(valueResultType, diffableProto,
-//                                               transpose->getDeclContext(),
-//                                               None);
-//  if (!valueResultConf) {
-//    TC.diagnose(attr->getLocation(),
-//                diag::transposing_attr_result_value_not_differentiable,
-//                transposeResultType);
-//    attr->setInvalid();
-//    return;
-//  }
   
   // Get checked wrt param indices.
-  AutoDiffParameterIndices *checkedWrtParamIndices =
-      attr->getParameterIndices();
+  
+  AutoDiffIndexSubset *checkedWrtParamIndices =
+      attr->getParameterIndexSubset();
   
   // Get the parsed wrt param indices, which have not yet been checked.
   // This is defined for parsed attributes.
@@ -3718,9 +3806,8 @@ void AttributeChecker::visitTransposingAttr(TransposingAttr *attr) {
   // If checked wrt param indices are not specified, compute them.
   if (!checkedWrtParamIndices)
     checkedWrtParamIndices =
-    computeDifferentiationParameters(TC, parsedWrtParams, transpose,
+        computeTransposingParameters(TC, parsedWrtParams, transpose,
                                      transpose->getGenericEnvironment(),
-                                     attr->getAttrName(),
                                      attr->getLocation());
   if (!checkedWrtParamIndices) {
     attr->setInvalid();

@@ -794,6 +794,34 @@ struct NumberWrtStruct: Differentiable {
   }
 }
 
+struct NumberWrtStruct: Differentiable {
+  var a, b: Float
+
+  @differentiable(wrt: 0) // ok
+  @differentiable(wrt: 1) // ok
+  func foo1(_ x: Float, _ y: Float) -> Float {
+    return a*x + b*y
+  }
+
+  @differentiable(wrt: -1) // expected-error {{expected a parameter, which can be a function parameter name, parameter index, or 'self'}}
+  @differentiable(wrt: (1, x)) // expected-error {{parameters must be specified in original order}}
+  func foo2(_ x: Float, _ y: Float) -> Float {
+    return a*x + b*y
+  }
+
+  @differentiable(wrt: (x, 1)) // ok
+  @differentiable(wrt: (0)) // ok
+  static func staticFoo1(_ x: Float, _ y: Float) -> Float {
+    return x + y
+  }
+
+  @differentiable(wrt: (1, 1)) // expected-error {{parameters must be specified in original order}}
+  @differentiable(wrt: (2)) // expected-error {{parameter index is larger than total number of parameters}}
+  static func staticFoo2(_ x: Float, _ y: Float) -> Float {
+    return x + y
+  }
+}
+
 @differentiable(wrt: y) // ok
 func two1(x: Float, y: Float) -> Float {
   return x + y

@@ -50,8 +50,8 @@ public:
   ParsedAutoDiffParameter(SourceLoc loc, enum Kind kind, Value value)
     : Loc(loc), Kind(kind), V(value) {}
   
-  ParsedAutoDiffParameter(SourceLoc loc, enum Kind kind, unsigned int order)
-  : Loc(loc), Kind(kind), V(order) {}
+  ParsedAutoDiffParameter(SourceLoc loc, enum Kind kind, unsigned index)
+  : Loc(loc), Kind(kind), V(index) {}
 
   ParsedAutoDiffParameter(SourceLoc loc, enum Kind kind, unsigned index)
   : Loc(loc), Kind(kind), V(index) {}
@@ -75,7 +75,7 @@ public:
     return V.Name;
   }
   
-  unsigned int getIndex() const {
+  unsigned getIndex() const {
     return V.Index;
   }
 
@@ -360,6 +360,13 @@ public:
 
   unsigned getNumIndices() const {
     return (unsigned)std::distance(begin(), end());
+  }
+  
+  SmallBitVector getBitVector() const {
+    SmallBitVector indicesBitVec(capacity, false);
+    for (auto index : getIndices())
+      indicesBitVec.set(index);
+    return indicesBitVec;
   }
 
   bool contains(unsigned index) const {
