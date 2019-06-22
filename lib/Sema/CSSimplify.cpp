@@ -131,6 +131,9 @@ bool constraints::areConservativelyCompatibleArgumentLabels(
   bool hasCurriedSelf;
   if (isa<SubscriptDecl>(decl)) {
     hasCurriedSelf = false;
+  } else if (decl->isStatic() && isa<AbstractFunctionDecl>(decl)) {
+    // Static methods always have their Self.Type parameter applied.
+    hasCurriedSelf = true;
   } else if (!baseType || baseType->is<ModuleType>()) {
     hasCurriedSelf = false;
   } else if (baseType->is<AnyMetatypeType>() && decl->isInstanceMember()) {
