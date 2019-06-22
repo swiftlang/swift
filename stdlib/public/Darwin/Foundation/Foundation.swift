@@ -55,8 +55,8 @@ public let NSNotFound: Int = .max
 ///     - If `value` is the empty string, `key` is returned.
 ///     - If `value` is not the empty string, `value` is returned.
 ///
-/// Exporting Localizations
-/// -----------------------
+/// Export Localizations with Xcode
+/// -------------------------------
 ///
 /// Xcode can read through a project's code to find invocations of
 /// `NSLocalizedString(_:tableName:bundle:value:comment:)` and automatically
@@ -80,8 +80,8 @@ public let NSNotFound: Int = .max
 ///     xcodebuild -importLocalizations -project <projectname>.xcodeproj \
 ///                                     -localizationPath <path>
 ///
-/// Keys and Values
-/// ---------------
+/// Choose Meaningful Keys
+/// ----------------------
 ///
 /// Words can often have multiple different meanings depending on the context
 /// in which they're used. For example, the word "Book" can be used as a noun—a
@@ -104,8 +104,8 @@ public let NSNotFound: Int = .max
 ///     verb: Title of the button that makes a reservation.
 ///     """)
 ///
-/// Limitations
-/// -----------
+/// Use Only String Literals
+/// ------------------------
 ///
 /// Variables and interpolated strings cannot be passed into `key`, `tableName`,
 /// `value`, and `comment`.
@@ -152,8 +152,8 @@ public let NSNotFound: Int = .max
 /// Luckily, since comments aren't localized, multi-line string literals can be
 /// safely used with `comment`.
 ///
-/// Alternatives
-/// ------------
+/// Restrict Autosynthesized Localizations
+/// --------------------------------------
 ///
 /// If having Xcode generate strings files from code isn't desired behavior,
 /// you should call `Bundle.localizedString(forKey:value:table:)` instead.
