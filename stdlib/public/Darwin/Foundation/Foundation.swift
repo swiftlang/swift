@@ -170,7 +170,7 @@ public let NSNotFound: Int = .max
 ///     /* A friendly greeting to the user when the program starts. */
 ///     "program-greeting" = "Hello, World!";
 ///
-/// **Note:** Although `NSLocalizedString(_:tableName:bundle:value:comment:)`
+/// - note: Although `NSLocalizedString(_:tableName:bundle:value:comment:)`
 /// and `Bundle.localizedString(forKey:value:table:)` can be used in a project
 /// at the same time, data from a manually managed strings files will be
 /// overwritten by Xcode when their table is also used to look up localized
