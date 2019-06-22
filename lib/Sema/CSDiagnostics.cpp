@@ -2479,13 +2479,23 @@ bool ClosureParamDestructuringFailure::diagnoseAsError() {
   auto bodyStmts = closureBody->getElements();
 
   SourceLoc bodyLoc;
+  SourceLoc inLoc = closure->getInLoc();
+  // If location for `in` is unknown we can't proceed
+  // since we'll not be able to figure out source line
+  // to place the fix-it on.
+  if (inLoc.isInvalid())
+    return true;
+
   // If the body is empty let's put the cursor
   // right after "in", otherwise make it start
   // location of the first statement in the body.
   if (bodyStmts.empty())
-    bodyLoc = Lexer::getLocForEndOfToken(sourceMgr, closure->getInLoc());
+    bodyLoc = Lexer::getLocForEndOfToken(sourceMgr, inLoc);
   else
     bodyLoc = bodyStmts.front().getStartLoc();
+
+  if (bodyLoc.isInvalid())
+    return true;
 
   SmallString<64> fixIt;
   llvm::raw_svector_ostream OS(fixIt);
@@ -2493,7 +2503,7 @@ bool ClosureParamDestructuringFailure::diagnoseAsError() {
   // If this is multi-line closure we'd have to insert new lines
   // in the suggested 'let' to keep the structure of the code intact,
   // otherwise just use ';' to keep everything on the same line.
-  auto inLine = sourceMgr.getLineNumber(closure->getInLoc());
+  auto inLine = sourceMgr.getLineNumber(inLoc);
   auto bodyLine = sourceMgr.getLineNumber(bodyLoc);
   auto isMultiLineClosure = bodyLine > inLine;
   auto indent =
