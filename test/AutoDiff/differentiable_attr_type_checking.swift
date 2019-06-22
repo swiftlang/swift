@@ -805,22 +805,22 @@ func two1(x: Float, y: Float) -> Float {
   return x + y
 }
 
- @differentiable(wrt: (x, y)) // ok
+@differentiable(wrt: (x, y)) // ok
 func two2(x: Float, y: Float) -> Float {
   return x + y
 }
 
- @differentiable(wrt: (0, y)) // ok
+@differentiable(wrt: (0, y)) // ok
 func two3(x: Float, y: Float) -> Float {
   return x + y
 }
 
- @differentiable(wrt: (x, 1)) // ok
+@differentiable(wrt: (x, 1)) // ok
 func two4(x: Float, y: Float) -> Float {
   return x + y
 }
 
- @differentiable(wrt: (0, 1)) // ok
+@differentiable(wrt: (0, 1)) // ok
 func two5(x: Float, y: Float) -> Float {
   return x + y
 }

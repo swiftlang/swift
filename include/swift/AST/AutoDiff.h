@@ -50,8 +50,8 @@ public:
   ParsedAutoDiffParameter(SourceLoc loc, enum Kind kind, Value value)
     : Loc(loc), Kind(kind), V(value) {}
   
-  ParsedAutoDiffParameter(SourceLoc loc, enum Kind kind, unsigned int order)
-  : Loc(loc), Kind(kind), V(order) {}
+  ParsedAutoDiffParameter(SourceLoc loc, enum Kind kind, unsigned int index)
+  : Loc(loc), Kind(kind), V(index) {}
 
   static ParsedAutoDiffParameter getNamedParameter(SourceLoc loc,
                                                    Identifier name) {
@@ -59,8 +59,8 @@ public:
   }
   
   static ParsedAutoDiffParameter getOrderedParameter(SourceLoc loc,
-                                                   unsigned int order) {
-    return { loc, Kind::Ordered, order };
+                                                     unsigned int index) {
+    return { loc, Kind::Ordered, index };
   }
 
   static ParsedAutoDiffParameter getSelfParameter(SourceLoc loc) {
