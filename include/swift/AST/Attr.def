@@ -428,10 +428,10 @@ DECL_ATTR(differentiating, Differentiating,
 OnFunc | LongAttribute | AllowMultipleAttributes |
 NotSerialized, 90)
 SIMPLE_DECL_ATTR(compilerEvaluable, CompilerEvaluable,
-OnAccessor | OnFunc | OnConstructor | OnSubscript,
-/* Not serialized */ 91)
+  OnAccessor | OnFunc | OnConstructor | OnSubscript,
+  /* Not serialized */ 91)
 SIMPLE_DECL_ATTR(noDerivative, NoDerivative,
-OnVar, 92)
+  OnVar, 92)
 DECL_ATTR(transposing, Transposing,
   OnFunc | LongAttribute | AllowMultipleAttributes |
   NotSerialized, 93)
