@@ -2276,9 +2276,9 @@ public:
                                 Type baseTy, DeclContext *useDC) {
     if (resolvedOverload->Choice.isDecl()) {
       if (auto *decl = dyn_cast<VarDecl>(resolvedOverload->Choice.getDecl())) {
-        if (decl->getName().str().startswith("$")) {
-          auto wrapperTyInfo =
-              baseTy->getAnyNominal()->getPropertyWrapperTypeInfo();
+        auto *baseTyDecl = baseTy->getAnyNominal();
+        if (decl->isWrapperOrAnonClosureParam() && baseTyDecl) {
+          auto wrapperTyInfo = baseTyDecl->getPropertyWrapperTypeInfo();
           if (wrapperTyInfo.isValid()) {
             auto valueTy = baseTy->getTypeOfMember(
                 useDC->getParentModule(), wrapperTyInfo.valueVar,
