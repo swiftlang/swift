@@ -449,10 +449,9 @@ private:
     // property wrapper reference, e.g. report 'foo' for a '$foo' reference.
     if (auto *VD = dyn_cast<VarDecl>(D)) {
       if (auto *Wrapped = VD->getOriginalWrappedProperty()) {
-        if (Range.getByteLength() > 1 && Range.str().front() == '$') {
-          auto AfterDollar = Loc.getAdvancedLoc(1);
-          reportRef(Wrapped, AfterDollar, Info, None);
-        }
+        assert(Range.getByteLength() > 1 && Range.str().front() == '$');
+        auto AfterDollar = Loc.getAdvancedLoc(1);
+        reportRef(Wrapped, AfterDollar, Info, None);
       }
     }
 
