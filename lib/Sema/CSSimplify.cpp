@@ -4809,20 +4809,37 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
     };
 
     // Check if any property wrappers on the base of the member lookup have
-    // mactching members that we can fall back to.
+    // mactching members that we can fall back to, or if the type wraps any
+    // properties that have matching members.
     if (auto dotExpr =
             dyn_cast_or_null<UnresolvedDotExpr>(locator->getAnchor())) {
       auto baseExpr = dotExpr->getBase();
       auto resolvedOverload = findSelectedOverloadFor(baseExpr);
-      if (auto wrappedProperty =
-              getPropertyWrapperInformation(resolvedOverload)) {
-        auto wrapperTy = wrappedProperty->second;
-        auto result = solveWithNewBaseOrName(wrapperTy, member);
-        if (result == SolutionKind::Solved) {
-          auto *fix = InsertPropertyWrapperUnwrap::create(
-              *this, wrappedProperty->first->getFullName(), baseTy, wrapperTy,
-              locator);
-          return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+
+      if (resolvedOverload) {
+        if (auto propertyWrapper =
+                getPropertyWrapperInformation(resolvedOverload)) {
+          auto wrapperTy = propertyWrapper->second;
+          auto result = solveWithNewBaseOrName(wrapperTy, member);
+          if (result == SolutionKind::Solved) {
+            auto *fix = UsePropertyWrapperType::create(
+                *this, member, baseTy, wrapperTy,
+                /*isMemberAccess=*/true, locator);
+            return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+          }
+        }
+
+        if (auto wrappedProperty = getWrappedPropertyInformation(
+                resolvedOverload, baseTy, useDC)) {
+          auto wrappedTy = wrappedProperty->second;
+          auto result = solveWithNewBaseOrName(wrappedTy, member);
+
+          if (result == SolutionKind::Solved) {
+            auto *fix = UseWrappedPropertyType::create(
+                *this, member, baseTy, wrappedTy,
+                /*isMemberAccess=*/true, locator);
+            return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+          }
         }
       }
     }
@@ -6797,7 +6814,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::TreatKeyPathSubscriptIndexAsHashable:
   case FixKind::AllowInvalidRefInKeyPath:
   case FixKind::ExplicitlySpecifyGenericArguments:
-  case FixKind::InsertPropertyWrapperUnwrap:
+  case FixKind::UsePropertyWrapperType:
+  case FixKind::UseWrappedPropertyType:
   case FixKind::GenericArgumentsMismatch:
     llvm_unreachable("handled elsewhere");
   }

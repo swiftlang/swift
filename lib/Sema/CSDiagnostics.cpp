@@ -1973,11 +1973,25 @@ bool MissingCallFailure::diagnoseAsError() {
   return true;
 }
 
+bool ExtraneousPropertyWrapperUnwrapFailure::diagnoseAsError() {
+  auto diagnostic = diag::extraneous_property_wrapper_unwrap;
+  if (isMemberAccess())
+    diagnostic = diag::extraneous_property_wrapper_unwrap_member_access;
+
+  emitDiagnostic(getAnchor()->getLoc(), diagnostic, getName(), getFromType(),
+                 getToType())
+      .fixItInsert(getAnchor()->getLoc(), "$");
+  return true;
+}
+
 bool MissingPropertyWrapperUnwrapFailure::diagnoseAsError() {
-  emitDiagnostic(getAnchor()->getLoc(),
-                 diag::extraneous_property_wrapper_unwrap, getPropertyName(),
-                 getFromType(), getToType())
-      .fixItInsert(getAnchor()->getLoc(), "_");
+  auto diagnostic = diag::missing_property_wrapper_unwrap;
+  if (isMemberAccess())
+    diagnostic = diag::missing_property_wrapper_unwrap_member_access;
+
+  emitDiagnostic(getAnchor()->getLoc(), diagnostic, getName(), getFromType(),
+                 getToType())
+      .fixItRemoveChars(getAnchor()->getLoc(), getAnchor()->getLoc());
   return true;
 }
 

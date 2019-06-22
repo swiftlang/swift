@@ -103,8 +103,13 @@ enum class FixKind : uint8_t {
   /// Add explicit `()` at the end of function or member to call it.
   InsertCall,
 
-  /// Add one or more property unwrap operators ('$')
-  InsertPropertyWrapperUnwrap,
+  /// Add a '$' to refer to the property wrapper type instead of the
+  /// wrapped property type.
+  UsePropertyWrapperType,
+
+  /// Remove a '$' to refer to the wrapped property type instead of the
+  /// property wrapper type.
+  UseWrappedPropertyType,
 
   /// Instead of spelling out `subscript` directly, use subscript operator.
   UseSubscriptOperator,
@@ -632,32 +637,58 @@ public:
                                     ConstraintLocator *locator);
 };
 
-class InsertPropertyWrapperUnwrap final : public ConstraintFix {
-  DeclName PropertyName;
+// TODO(diagnostics): Add property wrapper related diagnostics for places
+/// other than member accesses with isMemberAccess = false. The machinery
+/// for those diagnostics is in place, so the fixes just need to be recorded.
+
+class UsePropertyWrapperType final : public ConstraintFix {
+  DeclName Name;
+  bool IsMemberAccess;
   Type Base;
   Type Wrapper;
 
-  InsertPropertyWrapperUnwrap(ConstraintSystem &cs, DeclName propertyName,
-                              Type base, Type wrapper,
-                              ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::InsertPropertyWrapperUnwrap, locator),
-        PropertyName(propertyName), Base(base), Wrapper(wrapper) {}
+  UsePropertyWrapperType(ConstraintSystem &cs, DeclName name, Type base,
+                         Type wrapper, bool isMemberAccess,
+                         ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::UsePropertyWrapperType, locator), Name(name),
+        IsMemberAccess(isMemberAccess), Base(base), Wrapper(wrapper) {}
 
 public:
   std::string getName() const override {
-    return "insert a $ to unwrap the property wrapper";
+    return "insert'$' to use property wrapper type instead of wrapped type";
   }
-
-  DeclName getPropertyName() const { return PropertyName; }
-  Type getBase() const { return Base; }
-  Type getWrapper() const { return Wrapper; }
 
   bool diagnose(Expr *root, bool asNote = false) const override;
 
-  static InsertPropertyWrapperUnwrap *create(ConstraintSystem &cs,
-                                             DeclName propertyName, Type base,
-                                             Type wrapper,
-                                             ConstraintLocator *locator);
+  static UsePropertyWrapperType *create(ConstraintSystem &cs, DeclName name,
+                                        Type base, Type wrapper,
+                                        bool isMemberAccess,
+                                        ConstraintLocator *locator);
+};
+
+class UseWrappedPropertyType final : public ConstraintFix {
+  DeclName Name;
+  bool IsMemberAccess;
+  Type Base;
+  Type Wrapper;
+
+  UseWrappedPropertyType(ConstraintSystem &cs, DeclName name, Type base,
+                         Type wrapper, bool isMemberAccess,
+                         ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::UseWrappedPropertyType, locator), Name(name),
+        IsMemberAccess(isMemberAccess), Base(base), Wrapper(wrapper) {}
+
+public:
+  std::string getName() const override {
+    return "insert'$' to use property wrapper type instead of wrapped type";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static UseWrappedPropertyType *create(ConstraintSystem &cs, DeclName name,
+                                        Type base, Type wrapper,
+                                        bool isMemberAccess,
+                                        ConstraintLocator *locator);
 };
 
 class UseSubscriptOperator final : public ConstraintFix {
