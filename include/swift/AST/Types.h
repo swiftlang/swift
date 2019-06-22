@@ -19,6 +19,7 @@
 
 // SWIFT_ENABLE_TENSORFLOW
 #include "swift/AST/AutoDiff.h"
+#include "swift/AST/Attr.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/GenericParamKey.h"
 #include "swift/AST/Identifier.h"
@@ -3101,6 +3102,10 @@ public:
   /// Given the type of an autodiff associated function, returns the
   /// corresponding original function type.
   AnyFunctionType *getAutoDiffOriginalFunctionType();
+  
+  /// Given the type of a transposing associated function, returns the
+  /// corresponding original function type.
+  AnyFunctionType *getTransposeOriginalFunctionType(TransposingAttr *attr);
 
   AnyFunctionType *getWithoutDifferentiability() const;
 

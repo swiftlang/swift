@@ -3680,36 +3680,56 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
 
 void AttributeChecker::visitTransposingAttr(TransposingAttr *attr) {
   auto &ctx = TC.Context;
-  FuncDecl *derivative = dyn_cast<FuncDecl>(D);
+      FuncDecl *transpose = dyn_cast<FuncDecl>(D);
   auto lookupConformance =
-  LookUpConformanceInModule(D->getDeclContext()->getParentModule());
+      LookUpConformanceInModule(D->getDeclContext()->getParentModule());
   auto original = attr->getOriginal();
 
-  auto *transposeInterfaceType = derivative->getInterfaceType()
-  ->eraseDynamicSelfType()->castTo<AnyFunctionType>();
-  auto transposeResultType = derivative->getResultInterfaceType();
+  auto *transposeInterfaceType = transpose->getInterfaceType()
+                                     ->eraseDynamicSelfType()
+                                     ->castTo<AnyFunctionType>();
+  auto transposeResultType = transpose->getResultInterfaceType();
 
   // Result type must conform to `Differentiable`.
-  auto diffableProto = ctx.getProtocol(KnownProtocolKind::Differentiable);
-  auto valueResultType = transposeResultType;
-  if (valueResultType->hasTypeParameter())
-    valueResultType = derivative->mapTypeIntoContext(valueResultType);
-  auto valueResultConf = TC.conformsToProtocol(valueResultType, diffableProto,
-                                               derivative->getDeclContext(),
-                                               None);
-  if (!valueResultConf) {
-    TC.diagnose(attr->getLocation(),
-                diag::transposing_attr_result_value_not_differentiable,
-                transposeResultType);
+//  auto diffableProto = ctx.getProtocol(KnownProtocolKind::Differentiable);
+//  auto valueResultType = transposeResultType;
+//  if (valueResultType->hasTypeParameter())
+//    valueResultType = transpose->mapTypeIntoContext(valueResultType);
+//  auto valueResultConf = TC.conformsToProtocol(valueResultType, diffableProto,
+//                                               transpose->getDeclContext(),
+//                                               None);
+//  if (!valueResultConf) {
+//    TC.diagnose(attr->getLocation(),
+//                diag::transposing_attr_result_value_not_differentiable,
+//                transposeResultType);
+//    attr->setInvalid();
+//    return;
+//  }
+  
+  // Get checked wrt param indices.
+  AutoDiffParameterIndices *checkedWrtParamIndices =
+      attr->getParameterIndices();
+  
+  // Get the parsed wrt param indices, which have not yet been checked.
+  // This is defined for parsed attributes.
+  auto parsedWrtParams = attr->getParsedParameters();
+  
+  // If checked wrt param indices are not specified, compute them.
+  if (!checkedWrtParamIndices)
+    checkedWrtParamIndices =
+    computeDifferentiationParameters(TC, parsedWrtParams, transpose,
+                                     transpose->getGenericEnvironment(),
+                                     attr->getAttrName(),
+                                     attr->getLocation());
+  if (!checkedWrtParamIndices) {
     attr->setInvalid();
     return;
   }
   
   // Compute expected original function type and look up original function.
-  auto *originalFnType = transposeInterfaceType
-      ->getAutoDiffOriginalFunctionType();
-  
-  
+  auto *originalFnType =
+      transposeInterfaceType->getTransposeOriginalFunctionType(attr);
+  originalFnType->dump();
 }
 
 static bool

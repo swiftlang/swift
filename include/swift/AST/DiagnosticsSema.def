@@ -2807,8 +2807,10 @@ ERROR(differentiating_attr_original_already_has_derivative,none,
 
 // transposing
 ERROR(transposing_attr_result_value_not_differentiable,none,
-"'@differentiating' attribute requires function to return a differentiable "
-"type. %0 does not conform to 'Differentiable", (Type))
+      "'@differentiating' attribute requires function to return a differentiable "
+      "type. %0 does not conform to 'Differentiable", (Type))
+ERROR(transposing_attr_overload_not_found,none,
+      "could not find function %0 with expected type %1", (DeclName, Type))
 
 // differentiation `wrt` parameters clause
 ERROR(diff_function_no_parameters,none,
