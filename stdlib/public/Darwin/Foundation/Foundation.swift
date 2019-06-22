@@ -32,6 +32,7 @@ public let NSNotFound: Int = .max
 /// Returns the localized version of a string.
 ///
 /// - parameter key: An identifying value used to reference a localized string.
+///   `key` must not be the empty string.
 /// - parameter tableName: The name of the table containing the localized string
 ///   identified by `key`. This is the prefix of the strings file—a file with
 ///   the `.strings` extension—containing the localized values. If `tableName`
