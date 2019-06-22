@@ -935,7 +935,10 @@ struct TestComposition {
 struct Foo<T> {
   var wrappedValue: T
 
+  var prop: Int = 42
+
   func foo() {}
+  func bar(x: Int) {}
 }
 
 @propertyWrapper
@@ -943,22 +946,55 @@ struct Bar<T, V> {
   var wrappedValue: T
 
   func bar() {}
+
+  // TODO(diagnostics): We need to figure out what to do about subscripts.
+  // The problem standing in our way - keypath application choice
+  // is always added to results even if it's not applicable.
+}
+
+@propertyWrapper
+struct Baz<T> {
+  var wrappedValue: T
+  
+  func onPropertyWrapper() {}
+
+  var projectedValue: V {
+    return V()
+  }
 }
 
 extension Bar where V == String { // expected-note {{where 'V' = 'Bool'}}
   func barWhereVIsString() {}
 }
 
+struct V {
+  func onWrapperValue() {}
+}
+
+struct W {
+  func onWrapped() {}
+}
+
 struct MissingPropertyWrapperUnwrap {
+  @Foo var w: W
   @Foo var x: Int
   @Bar<Int, Bool> var y: Int
   @Bar<Int, String> var z: Int
+  @Baz var usesWrapperValue: W
 
   func baz() {
-    self.x.foo() // expected-error {{property 'x' will be unwrapped to value of type 'Int', use '_' to refer to wrapper type 'Foo<Int>'}}{{10-10=_}}
-    self.y.bar() // expected-error {{property 'y' will be unwrapped to value of type 'Int', use '_' to refer to wrapper type 'Bar<Int, Bool>'}}{{10-10=_}}
-    self.y.barWhereVIsString() // expected-error {{property 'y' will be unwrapped to value of type 'Int', use '_' to refer to wrapper type 'Bar<Int, Bool>'}}{{10-10=_}}
+    self.x.foo() // expected-error {{referencing instance method 'foo()' requires wrapper 'Foo<Int>'}}{{10-10=_}}
+    self.x.prop  // expected-error {{referencing property 'prop' requires wrapper 'Foo<Int>'}} {{10-10=_}}
+    self.x.bar(x: 42) // expected-error {{referencing instance method 'bar(x:)' requires wrapper 'Foo<Int>'}} {{10-10=_}}
+    self.y.bar() // expected-error {{referencing instance method 'bar()' requires wrapper 'Bar<Int, Bool>'}}{{10-10=_}}
+    self.y.barWhereVIsString() // expected-error {{referencing instance method 'barWhereVIsString()' requires wrapper 'Bar<Int, Bool>'}}{{10-10=_}}
     // expected-error@-1 {{referencing instance method 'barWhereVIsString()' on 'Bar' requires the types 'Bool' and 'String' be equivalent}}
-    self.z.barWhereVIsString() // expected-error {{property 'z' will be unwrapped to value of type 'Int', use '_' to refer to wrapper type 'Bar<Int, String>'}}{{10-10=_}} 
+    self.z.barWhereVIsString() // expected-error {{referencing instance method 'barWhereVIsString()' requires wrapper 'Bar<Int, String>'}}{{10-10=_}}
+    self.usesWrapperValue.onPropertyWrapper() // expected-error {{referencing instance method 'onPropertyWrapper()' requires wrapper 'Baz<W>'}}{{10-10=_}}
+
+    self._w.onWrapped() // expected-error {{referencing instance method 'onWrapped()' requires wrapped value of type 'W'}}{{10-11=}}
+    self.usesWrapperValue.onWrapperValue() // expected-error {{referencing instance method 'onWrapperValue()' requires wrapper 'V'}}{{10-10=$}}
+    self.$usesWrapperValue.onWrapped() // expected-error {{referencing instance method 'onWrapped()' requires wrapped value of type 'W'}}{{10-11=}}
+    self._usesWrapperValue.onWrapped() // expected-error {{referencing instance method 'onWrapped()' requires wrapped value of type 'W'}}{{10-11=}}
   }
 }

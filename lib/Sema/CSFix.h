@@ -100,8 +100,13 @@ enum class FixKind : uint8_t {
   /// Add explicit `()` at the end of function or member to call it.
   InsertCall,
 
-  /// Add one or more property unwrap operators ('$')
-  InsertPropertyWrapperUnwrap,
+  /// Add '$' or '_' to refer to the property wrapper or storage instead
+  /// of the wrapped property type.
+  UsePropertyWrapper,
+
+  /// Remove '$' or '_' to refer to the wrapped property type instead of
+  /// the storage or property wrapper.
+  UseWrappedValue,
 
   /// Instead of spelling out `subscript` directly, use subscript operator.
   UseSubscriptOperator,
@@ -566,32 +571,56 @@ public:
                                     ConstraintLocator *locator);
 };
 
-class InsertPropertyWrapperUnwrap final : public ConstraintFix {
-  DeclName PropertyName;
+class UsePropertyWrapper final : public ConstraintFix {
+  VarDecl *Wrapped;
+  bool UsingStorageWrapper;
   Type Base;
   Type Wrapper;
 
-  InsertPropertyWrapperUnwrap(ConstraintSystem &cs, DeclName propertyName,
-                              Type base, Type wrapper,
-                              ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::InsertPropertyWrapperUnwrap, locator),
-        PropertyName(propertyName), Base(base), Wrapper(wrapper) {}
+  UsePropertyWrapper(ConstraintSystem &cs, VarDecl *wrapped,
+                     bool usingStorageWrapper, Type base, Type wrapper,
+                     ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::UsePropertyWrapper, locator),
+        Wrapped(wrapped), UsingStorageWrapper(usingStorageWrapper), Base(base),
+        Wrapper(wrapper) {}
 
 public:
   std::string getName() const override {
-    return "insert a $ to unwrap the property wrapper";
+    return "insert '$' or '_' to use property wrapper type instead of wrapped type";
   }
-
-  DeclName getPropertyName() const { return PropertyName; }
-  Type getBase() const { return Base; }
-  Type getWrapper() const { return Wrapper; }
 
   bool diagnose(Expr *root, bool asNote = false) const override;
 
-  static InsertPropertyWrapperUnwrap *create(ConstraintSystem &cs,
-                                             DeclName propertyName, Type base,
-                                             Type wrapper,
-                                             ConstraintLocator *locator);
+  static UsePropertyWrapper *create(ConstraintSystem &cs, VarDecl *wrapped,
+                                    bool usingStorageWrapper, Type base,
+                                    Type wrapper, ConstraintLocator *locator);
+};
+
+class UseWrappedValue final : public ConstraintFix {
+  VarDecl *PropertyWrapper;
+  Type Base;
+  Type Wrapper;
+
+  UseWrappedValue(ConstraintSystem &cs, VarDecl *propertyWrapper, Type base,
+                  Type wrapper, ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::UseWrappedValue, locator),
+        PropertyWrapper(propertyWrapper), Base(base), Wrapper(wrapper) {}
+
+  bool usingStorageWrapper() const {
+    auto nameStr = PropertyWrapper->getName().str();
+    return !nameStr.startswith("_");
+  }
+
+public:
+  std::string getName() const override {
+    return "remove '$' or _ to use wrapped type instead of wrapper type";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static UseWrappedValue *create(ConstraintSystem &cs, VarDecl *propertyWrapper,
+                                 Type base, Type wrapper,
+                                 ConstraintLocator *locator);
 };
 
 class UseSubscriptOperator final : public ConstraintFix {

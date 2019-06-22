@@ -119,7 +119,7 @@ protected:
     return None;
   }
 
-  ValueDecl *getResolvedMemberRef(UnresolvedDotExpr *member) {
+  ValueDecl *getResolvedMemberRef(UnresolvedDotExpr *member) const {
     auto locator = CS.getConstraintLocator(member, ConstraintLocator::Member);
     return CS.findResolvedMemberRef(locator);
   }
@@ -759,20 +759,57 @@ public:
   bool diagnoseAsError() override;
 };
 
-class MissingPropertyWrapperUnwrapFailure final : public ContextualFailure {
-  DeclName PropertyName;
+class PropertyWrapperReferenceFailure : public ContextualFailure {
+  VarDecl *Property;
+  bool UsingStorageWrapper;
 
 public:
-  MissingPropertyWrapperUnwrapFailure(Expr *root, ConstraintSystem &cs,
-                                      DeclName propertyName, Type base,
-                                      Type wrapper, ConstraintLocator *locator)
-      : ContextualFailure(root, cs, base, wrapper, locator),
-        PropertyName(propertyName) {}
+  PropertyWrapperReferenceFailure(Expr *root, ConstraintSystem &cs,
+                                  VarDecl *property, bool usingStorageWrapper,
+                                  Type base, Type wrapper,
+                                  ConstraintLocator *locator)
+      : ContextualFailure(root, cs, base, wrapper, locator), Property(property),
+        UsingStorageWrapper(usingStorageWrapper) {}
+
+  VarDecl *getProperty() const { return Property; }
+
+  Identifier getPropertyName() const { return Property->getName(); }
+
+  bool usingStorageWrapper() const { return UsingStorageWrapper; }
+
+  ValueDecl *getReferencedMember() const {
+    auto *locator = getLocator();
+    if (auto overload = getOverloadChoiceIfAvailable(locator))
+      return overload->choice.getDeclOrNull();
+    return nullptr;
+  }
+};
+
+class ExtraneousPropertyWrapperUnwrapFailure final
+    : public PropertyWrapperReferenceFailure {
+public:
+  ExtraneousPropertyWrapperUnwrapFailure(Expr *root, ConstraintSystem &cs,
+                                         VarDecl *property,
+                                         bool usingStorageWrapper, Type base,
+                                         Type wrapper,
+                                         ConstraintLocator *locator)
+      : PropertyWrapperReferenceFailure(root, cs, property, usingStorageWrapper,
+                                        base, wrapper, locator) {}
 
   bool diagnoseAsError() override;
+};
 
-private:
-  DeclName getPropertyName() const { return PropertyName; }
+class MissingPropertyWrapperUnwrapFailure final
+    : public PropertyWrapperReferenceFailure {
+public:
+  MissingPropertyWrapperUnwrapFailure(Expr *root, ConstraintSystem &cs,
+                                      VarDecl *property,
+                                      bool usingStorageWrapper, Type base,
+                                      Type wrapper, ConstraintLocator *locator)
+      : PropertyWrapperReferenceFailure(root, cs, property, usingStorageWrapper,
+                                        base, wrapper, locator) {}
+
+  bool diagnoseAsError() override;
 };
 
 class SubscriptMisuseFailure final : public FailureDiagnostic {

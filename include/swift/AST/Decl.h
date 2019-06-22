@@ -5148,6 +5148,10 @@ public:
   /// bound generic version.
   VarDecl *getPropertyWrapperBackingProperty() const;
 
+  /// Retreive the storage wrapper for a property that has an attached
+  /// property wrapper.
+  VarDecl *getPropertyWrapperStorageWrapper() const;
+
   /// Whether this is a property with a property wrapper that was initialized
   /// via a value of the original type, e.g.,
   ///
