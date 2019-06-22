@@ -2971,12 +2971,11 @@ namespace {
     bool indexLocals() override { return shouldIndexLocals; }
     void failed(StringRef error) override {}
 
-    bool recordHash(StringRef hash, bool isKnown) override { return true; }
     bool startDependency(StringRef name, StringRef path, bool isClangModule,
-                         bool isSystem, StringRef hash) override {
+                         bool isSystem) override {
       OS << (isClangModule ? "clang-module" : "module") << " | ";
       OS << (isSystem ? "system" : "user") << " | ";
-      OS << name << " | " << path << "-" << hash << "\n";
+      OS << name << " | " << path << "\n";
       return true;
     }
     bool finishDependency(bool isClangModule) override {
@@ -3041,7 +3040,7 @@ static int doPrintIndexedSymbols(const CompilerInvocation &InitInvok,
   llvm::outs() << llvm::sys::path::filename(SF->getFilename()) << '\n';
   llvm::outs() << "------------\n";
   PrintIndexDataConsumer consumer(llvm::outs(), indexLocals);
-  indexSourceFile(SF, StringRef(), consumer);
+  indexSourceFile(SF, consumer);
 
   return 0;
 }
@@ -3073,7 +3072,7 @@ static int doPrintIndexedSymbolsFromModule(const CompilerInvocation &InitInvok,
   }
 
   PrintIndexDataConsumer consumer(llvm::outs());
-  indexModule(M, StringRef(), consumer);
+  indexModule(M, consumer);
 
   return 0;
 }
