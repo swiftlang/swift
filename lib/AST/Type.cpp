@@ -4471,6 +4471,17 @@ Optional<VectorSpace> TypeBase::getAutoDiffAssociatedTangentSpace(
   return cache(None);
 }
 
+Type getTangentType(Type type) {
+  if (!type->is<InOutType>()) {
+    return type->getAutoDiffAssociatedTangentSpace(
+        lookupConformance)->getType();
+  }
+  Type base = type->getInOutObjectType();
+  Type tangentBase = base->getAutoDiffAssociatedTangentSpace(
+      lookupConformance)->getType();
+  return InOutType::get(tangentBase);
+}
+
 AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
     AutoDiffParameterIndices *indices, unsigned resultIndex,
     unsigned differentiationOrder, AutoDiffAssociatedFunctionKind kind,
@@ -4544,20 +4555,15 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
     SmallVector<AnyFunctionType::Param, 8> differentialParams;
     for (auto wrtParamType : wrtParamTypes)
       differentialParams.push_back(
-          AnyFunctionType::Param(
-              wrtParamType->getAutoDiffAssociatedTangentSpace(lookupConformance)
-                  ->getType()));
+          AnyFunctionType::Param(getTangentType(wrtParamType)));
 
     SmallVector<TupleTypeElt, 8> differentialResults;
     if (auto *resultTuple = originalResult->getAs<TupleType>()) {
       auto resultTupleEltType = resultTuple->getElementType(resultIndex);
-      differentialResults.push_back(resultTupleEltType
-          ->getAutoDiffAssociatedTangentSpace(lookupConformance)->getType());
+      differentialResults.push_back(getTangentType(resultTupleEltType));
     } else {
       assert(resultIndex == 0 && "resultIndex out of bounds");
-      differentialResults.push_back(
-          originalResult->getAutoDiffAssociatedTangentSpace(lookupConformance)
-              ->getType());
+      differentialResults.push_back(getTangentType(originalResult));
     }
     Type differentialResult =
         differentialResults.size() > 1
@@ -4574,22 +4580,16 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
     if (auto *resultTuple = originalResult->getAs<TupleType>()) {
       auto resultTupleEltType = resultTuple->getElementType(resultIndex);
       pullbackParams.push_back(
-          AnyFunctionType::Param(resultTupleEltType
-              ->getAutoDiffAssociatedTangentSpace(lookupConformance)
-                  ->getType()));
+          AnyFunctionType::Param(getTangentType(resultTupleEltType)));
     } else {
       assert(resultIndex == 0 && "resultIndex out of bounds");
       pullbackParams.push_back(
-          AnyFunctionType::Param(originalResult
-              ->getAutoDiffAssociatedTangentSpace(lookupConformance)
-                  ->getType()));
+          AnyFunctionType::Param(getTangentType(originalResult)));
     }
 
     SmallVector<TupleTypeElt, 8> pullbackResults;
     for (auto wrtParamType : wrtParamTypes)
-      pullbackResults.push_back(wrtParamType
-          ->getAutoDiffAssociatedTangentSpace(lookupConformance)
-              ->getType());
+      pullbackResults.push_back(getTangentType(wrtParamType));
     Type pullbackResult = pullbackResults.size() > 1
                               ? TupleType::get(pullbackResults, ctx)
                               : pullbackResults[0].getType();
