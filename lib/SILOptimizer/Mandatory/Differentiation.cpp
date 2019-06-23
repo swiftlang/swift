@@ -3336,7 +3336,8 @@ public:
           loweredPullbackType);
       auto *thunkRef = getBuilder().createFunctionRef(loc, thunk);
       pullback = getBuilder().createPartialApply(
-          ai->getLoc(), thunkRef, thunk->getForwardingSubstitutionMap(),
+          ai->getLoc(), thunkRef,
+          getOpSubstitutionMap(thunk->getForwardingSubstitutionMap()),
           {pullback}, actualPullbackType->getCalleeConvention());
     }
     pullbackValues[ai->getParent()].push_back(pullback);
