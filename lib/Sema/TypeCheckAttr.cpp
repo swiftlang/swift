@@ -2957,6 +2957,16 @@ static bool checkDifferentiationParameters(
     return true;
   }
 
+  // We keep track of whether there are any inout wrt parameters. If the
+  // function is being differentiated with respect to more than one `inout`
+  // parameters, we produce an error. Also, if the original function type has a
+  // `Void` return type, we try to see if any `inout` parameter is being
+  // differentiated with respect to. If not, we produce an error. For example:
+  //   - (T0, T1, T2) -> Void, wrt: 0, 1              // bad: no `inout` wrt parameters.
+  //   - (inout T0, inout T1, T2) -> Void, wrt: 0, 1  // bad: more than one `inout` wrt parameters.
+  //   - (T0, inout T1, T2) -> Void, wrt: 0, 1        // good: exactly one `inout` wrt parameter.
+  bool hasInOutWrtParam = false;
+
   // Check that differentiation parameters have allowed types.
   SmallVector<Type, 4> wrtParamTypes;
   indices->getSubsetParameterTypes(functionType, wrtParamTypes);
@@ -2969,6 +2979,18 @@ static bool checkDifferentiationParameters(
           derivativeGenEnv->mapTypeIntoContext(wrtParamType);
     else
       wrtParamType = AFD->mapTypeIntoContext(wrtParamType);
+    if (wrtParamType->is<InOutType>()) {
+      if (hasInOutWrtParam) {
+        TC.diagnose(
+            loc,
+            diag::differentiable_attr_multiple_inout,
+            AFD->getFullName()
+        ).highlight(AFD->getSourceRange());
+        return true;
+      }
+      wrtParamType = wrtParamType->getInOutObjectType();
+      hasInOutWrtParam = true;
+    }
     SourceLoc loc = parsedWrtParams.empty()
         ? attrLoc
         : parsedWrtParams[i].getLoc();
@@ -2995,6 +3017,29 @@ static bool checkDifferentiationParameters(
       return true;
     }
   }
+
+  if (functionType->isVoid() && !hasInOutWrtParam) {
+    TC.diagnose(
+        loc,
+        diag::differentiable_attr_void_result,
+        AFD->getFullName()
+    ).highlight(AFD->getSourceRange());
+    return true;
+  }
+
+  // We also check if the original function has a return type, along with
+  // differentiating with respect to at least one `inout` parameter. For example:
+  //   - (T0, T1, T2) -> R       // good
+  //   - (T0, inout T1, T2) -> R // bad
+  if (!functionType->isVoid() && hasInOutWrtParam) {
+    TC.diagnose(
+        loc,
+        diag::differentiable_attr_non_void_inout,
+        AFD->getFullName()
+    ).highlight(AFD->getSourceRange());
+    return true;
+  }
+
   return false;
 }
 
@@ -3020,6 +3065,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
           diag::differentiable_attr_stored_property_variable_unsupported);
       return;
     }
+    // TODO [eaplatanios]: Add support for multiple `original` functions (both getter and setter).
     // When used directly on a storage decl (stored/computed property or
     // subscript), the getter is currently inferred to be `@differentiable`.
     // TODO(TF-129): Infer setter to also be `@differentiable` after
@@ -3027,11 +3073,6 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     // handle multiple `original` functions (both getter and setter).
     original = asd->getGetter();
   }
-  // Setters are not yet supported.
-  // TODO(TF-129): Remove this when differentiation supports inout parameters.
-  if (auto *accessor = dyn_cast_or_null<AccessorDecl>(original))
-    if (accessor->isSetter())
-      original = nullptr;
 
   // Global immutable vars, for example, have no getter, and therefore trigger
   // this.
@@ -3051,19 +3092,6 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   auto *originalFnTy = original->getInterfaceType()->eraseDynamicSelfType()
       ->castTo<AnyFunctionType>();
   bool isMethod = original->hasImplicitSelfDecl();
-
-  // If the original function returns the empty tuple type, there's no output to
-  // differentiate from.
-  auto originalResultTy = originalFnTy->getResult();
-  if (isMethod)
-    originalResultTy = originalResultTy->castTo<AnyFunctionType>()->getResult();
-  if (originalResultTy->isEqual(ctx.TheEmptyTupleType)) {
-    TC.diagnose(attr->getLocation(), diag::differentiable_attr_void_result,
-                original->getFullName())
-        .highlight(original->getSourceRange());
-    attr->setInvalid();
-    return;
-  }
 
   // Start type-checking the arguments of the @differentiable attribute. This
   // covers 'wrt:', 'jvp:', and 'vjp:', all of which are optional.

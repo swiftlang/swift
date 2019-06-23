@@ -2736,7 +2736,11 @@ ERROR(implements_attr_protocol_not_conformed_to,none,
 // SWIFT_ENABLE_TENSORFLOW
 // @differentiable
 ERROR(differentiable_attr_void_result,none,
-      "cannot differentiate void function %0", (DeclName))
+      "cannot differentiate void function %0 with no inout wrt parameters", (DeclName))
+ERROR(differentiable_attr_non_void_inout,none,
+      "cannot differentiate non-void function %0 with inout wrt parameter", (DeclName))
+ERROR(differentiable_attr_multiple_inout,none,
+      "cannot differentiate function %0 with multiple inout wrt parameters", (DeclName))
 ERROR(differentiable_attr_associated_function_protocol,none,
       "cannot specify associated differentiation function on protocol "
       "requirement", ())
