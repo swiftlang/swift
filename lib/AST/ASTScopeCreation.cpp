@@ -95,43 +95,14 @@ public:
     // Implicit nodes don't have source information for name lookup.
     if (d->isImplicit())
       return false;
-    // Have also seen the following in an AST:
-    // Source::
-    //
-    //  func testInvalidKeyPathComponents() {
-    //    let _ = \.{return 0} // expected-error* {{}}
-    //  }
-    //  class X {
-    //    class var a: Int { return 1 }
-    //  }
-    //
-    // AST:
-    // clang-format off
-    //    (source_file "test.swift"
-    //     (func_decl range=[test.swift:1:3 - line:3:3] "testInvalidKeyPathComponents()" interface type='() -> ()' access=internal
-    //      (parameter_list range=[test.swift:1:36 - line:1:37])
-    //      (brace_stmt range=[test.swift:1:39 - line:3:3]
-    //       (pattern_binding_decl range=[test.swift:2:5 - line:2:11]
-    //        (pattern_any)
-    //        (error_expr implicit type='<null>'))
-    //
-    //       (pattern_binding_decl range=[test.swift:2:5 - line:2:5] <=== SOURCE RANGE WILL CONFUSE SCOPE CODE
-    //        (pattern_typed implicit type='<<error type>>'
-    //         (pattern_named '_')))
-    //      ...
-    // clang-format on
-    //
-    // So test the SourceRange
-    //
-    // But wait!
-    // var z = $x0 + $x1
-    // z
-    //
-    // z has start == end, but must be pushed to expand source range
-    //
-    // So, only check source ranges for PatternBindingDecls
-    if (isa<PatternBindingDecl>(d) && (d->getStartLoc() == d->getEndLoc()))
-      return false;
+    /// In \c Parser::parseDeclVarGetSet fake PBDs are created. Ignore them.
+    /// Example:
+    /// \code
+    /// class SR10903 { static var _: Int { 0 } }
+    /// \endcode
+    if (const auto *PBD = dyn_cast<PatternBindingDecl>(d))
+      if (PBD->isInvalid())
+        return false;
     /// In
     /// \code
     /// @propertyWrapper
