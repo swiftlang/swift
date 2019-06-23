@@ -16,15 +16,14 @@ func diffableClosureInStruct(s: Foo) {
 
 public func closureCaptureMutable() {
   var val: Float = 10
-  let clo: (Float) -> Float = { x in
+  _ = gradient(at: 0) { (x: Float) -> Float in
     val += 2
     return val * x
   }
-  _ = gradient(at: 0, in: clo)
 }
 
 // CHECK-LABEL: @AD__{{.*}}closureCaptureMutable{{.*}}___vjp_src_0_wrt_0
-// CHECK: bb0({{%.*}} : $Float, [[BOXED_ARG:%.*]] : ${ var Float }):
+// CHECK: bb0({{%.*}} : $Float, [[INOUT_ARG:%.*]] : $*Float):
 // CHECK:   [[ADJOINT:%.*]] = function_ref @AD__{{.*}}closureCaptureMutabley{{.*}}___adjoint_src_0_wrt_0
 // CHECK:   {{.*}} = partial_apply [callee_guaranteed] [[ADJOINT]]({{.*}})
 
