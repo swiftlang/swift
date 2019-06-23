@@ -4270,12 +4270,13 @@ public:
     // have a zero derivative.
     if (!getActivityInfo().isVaried(origResult, getIndices().parameters)) {
       // Emit fixit if original result has a valid source location.
-      auto sourceLoc = origResult.getLoc().getEndSourceLoc();
-      if (sourceLoc.isValid()) {
+      auto startLoc = origResult.getLoc().getStartSourceLoc();
+      auto endLoc = origResult.getLoc().getEndSourceLoc();
+      if (startLoc.isValid() && endLoc.isValid()) {
         getContext()
-            .diagnose(sourceLoc, diag::autodiff_nonvaried_result_fixit)
-            .fixItInsert(sourceLoc, "withoutDerivative(at:")
-            .fixItInsertAfter(sourceLoc, ")");
+            .diagnose(startLoc, diag::autodiff_nonvaried_result_fixit)
+            .fixItInsert(startLoc, "withoutDerivative(at:")
+            .fixItInsertAfter(endLoc, ")");
       }
     }
     builder.setInsertionPoint(
