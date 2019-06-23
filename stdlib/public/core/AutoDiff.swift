@@ -139,12 +139,14 @@ public extension Differentiable where TangentVector == Self {
   }
 }
 
-public extension Differentiable {
-  /// Identity function that stops derivatives from propagating.
-  @inlinable
-  @inline(__always)
-  @_semantics("autodiff.nonvarying")
-  func withoutDerivative() -> Self { return self }
+/// Acts as an identity function. When used in a context where `x` is being
+/// differentiated with respect to, this function will not produce any 
+/// derivative at `x`.
+@inlinable
+@inline(__always)
+@_semantics("autodiff.nonvarying")
+public func withoutDerivative<T>(at x: T) -> T {
+  x
 }
 
 /// Applies the given closure `body` to `x`. When used in a context where `x` is
