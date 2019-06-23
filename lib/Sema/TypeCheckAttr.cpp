@@ -3817,9 +3817,97 @@ void AttributeChecker::visitTransposingAttr(TransposingAttr *attr) {
   // Compute expected original function type.
   auto *originalFnType =
       transposeInterfaceType->getTransposeOriginalFunctionType(attr);
-//  originalFnType->dump();
+  originalFnType->dump();
   
   // Lookup original function.
+  std::function<bool(GenericSignature *, GenericSignature *)>
+    checkGenericSignatureSatisfied =
+        [&](GenericSignature *source, GenericSignature *target) {
+          // If target is null, then its requirements are satisfied.
+          if (!target)
+            return true;
+          // If source is null but target is not null, then target's
+          // requirements are not satisfied.
+          if (!source)
+            return false;
+          // Check if target's requirements are satisfied by source.
+          return TC.checkGenericArguments(
+                     transpose, original.Loc.getBaseNameLoc(),
+                     original.Loc.getBaseNameLoc(), Type(),
+                     source->getGenericParams(), target->getRequirements(),
+                     [](SubstitutableType *dependentType) {
+                       return Type(dependentType);
+                     }, lookupConformance, None) == RequirementCheckResult::Success;
+  };
+  
+  auto isValidOriginal = [&](FuncDecl *originalCandidate) {
+    TC.validateDeclForNameLookup(originalCandidate);
+    return checkFunctionSignature(
+        cast<AnyFunctionType>(originalFnType->getCanonicalType()),
+        originalCandidate->getInterfaceType()->getCanonicalType(),
+        checkGenericSignatureSatisfied);
+  };
+  
+  // TODO: Do not reuse incompatible `@differentiable` attribute diagnostics.
+  // Rename compatible diagnostics so that they're not attribute-specific.
+  auto overloadDiagnostic = [&]() {
+    TC.diagnose(original.Loc, diag::differentiating_attr_overload_not_found,
+                original.Name, originalFnType);
+  };
+  auto ambiguousDiagnostic = [&]() {
+    TC.diagnose(original.Loc,
+                diag::differentiable_attr_ambiguous_function_identifier,
+                original.Name);
+  };
+  auto notFunctionDiagnostic = [&]() {
+    TC.diagnose(original.Loc, diag::differentiable_attr_specified_not_function,
+                original.Name);
+  };
+  std::function<void()> invalidTypeContextDiagnostic = [&]() {
+    TC.diagnose(original.Loc,
+                diag::differentiable_attr_function_not_same_type_context,
+                original.Name);
+  };
+  
+  // Returns true if the derivative function and original function candidate are
+  // defined in compatible type contexts. If the derivative function and the
+  // original function candidate have different parents, return false.
+  std::function<bool(FuncDecl *)> hasValidTypeContext = [&](FuncDecl *func) {
+    /*
+    // Check if both functions are top-level.
+    if (!transpose->getInnermostTypeContext() &&
+        !func->getInnermostTypeContext())
+      return true;
+    // Check if both functions are defined in the same type context.
+    if (auto typeCtx1 = transpose->getInnermostTypeContext())
+      if (auto typeCtx2 = func->getInnermostTypeContext()) {
+        return typeCtx1->getSelfNominalTypeDecl() ==
+        typeCtx2->getSelfNominalTypeDecl();
+      }
+    return transpose->getParent() == func->getParent();
+    */
+    return true;
+  };
+  
+  auto lookupOptions = defaultMemberLookupOptions
+  | NameLookupFlags::IgnoreAccessControl;
+  auto derivativeTypeCtx = transpose->getInnermostTypeContext();
+  if (!derivativeTypeCtx) derivativeTypeCtx = transpose->getParent();
+  assert(derivativeTypeCtx);
+  
+  // Look up original function.
+  auto *originalFn = TC.lookupFuncDecl(
+      original.Name, original.Loc.getBaseNameLoc(), /*baseType*/ Type(),
+      derivativeTypeCtx, isValidOriginal, overloadDiagnostic,
+      ambiguousDiagnostic, notFunctionDiagnostic, lookupOptions,
+      hasValidTypeContext, invalidTypeContextDiagnostic);
+  
+  
+  if (!originalFn) {
+    attr->setInvalid();
+    return;
+  }
+  attr->setOriginalFunction(originalFn);
 }
 
 static bool

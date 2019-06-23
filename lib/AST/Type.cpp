@@ -4697,23 +4697,9 @@ GenericSignature *genericSignature) {
 //    }
 //  }
   
-  Type originalSelfType;
   size_t numberOriginalParameters =
       transpose->getParams().size() - 1 + wrtParams.size();
   
-//  for (auto i : originalParams) {
-//    llvm::errs() << i.getLabel() << "\n";
-//  }
-//  llvm::errs() << "~~~~~~~~~~~~\n";
-//  for (auto i : transposeParams) {
-//    llvm::errs() << i.getLabel() << "\n";
-//  }
-//  llvm::errs() << "~~~~~~~~~~~~\n";
-//  for (auto i : transposeResultTypes) {
-//    llvm::errs() << i.getType() << "\n";
-//  }
-//  llvm::errs() << "!!!!!!!\n";
-
   for (auto i : range(0, numberOriginalParameters)) {
     bool isWrt = false;
     for (auto wrt : wrtParams) {
@@ -4731,32 +4717,26 @@ GenericSignature *genericSignature) {
       transposeParams = transposeParams.drop_front();
     }
   }
-//  for (auto i : originalParams) {
-//    llvm::errs() << i.getLabel() << "\n";
-//  }
-//  llvm::errs() << "~~~~~~~~~~~~\n";
-//  for (auto i : transposeParams) {
-//    llvm::errs() << i.getLabel() << "\n";
-//  }
-//  llvm::errs() << "~~~~~~~~~~~~\n";
-//  for (auto i : transposeResultTypes) {
-//    llvm::errs() << i.getType() << "\n";
-//  }
   // Append the rest of the parameters from the '@transposing'
   for (auto result : transposeResultTypes) {
     originalParams.append(1, AnyFunctionType::Param(result.getType()));
   }
 //  originalParams.append(transposeResultTypes.begin(), transposeResultTypes.end());
   
-  auto originalType = makeFunctionType(
+  auto *originalType = makeFunctionType(
                           originalParams,
                           originalResult,
                           isCurried ? nullptr : genericSignature);
+
   if (isCurried) {
-    originalType = makeFunctionType(
-                       { AnyFunctionType::Param(originalSelfType) },
-                       originalType,
-                       genericSignature);
+    auto *methodType = makeFunctionType(
+                           { transpose->getParams() },
+                           originalType,
+                           genericSignature);
+    originalType = makeFunctionType(AnyFunctionType::Param(
+                                        originalType->getResult()),
+                                    methodType,
+                                    nullptr);
   }
   return originalType;
 }
@@ -4767,19 +4747,8 @@ AnyFunctionType *
 AnyFunctionType::getTransposeOriginalFunctionType(TransposingAttr *attr) {
   // Unwrap curry levels. At most, two parameter lists are necessary, for
   // curried method types with a `(Self)` parameter list.
-  SmallVector<AnyFunctionType *, 2> curryLevels;
-  auto *currentLevel = this;
-  for (unsigned i : range(2)) {
-    (void)i;
-    if (currentLevel == nullptr)
-      break;
-    curryLevels.push_back(currentLevel);
-    currentLevel = currentLevel->getResult()->getAs<AnyFunctionType>();
-  }
-
-  auto *transpose = curryLevels.back();
   auto *originalType = calculateExpectedOriginalTransposeFunctionType(
-                           transpose,
+                           /*transpose=*/ this,
                            attr,
                            getOptGenericSignature());
   
