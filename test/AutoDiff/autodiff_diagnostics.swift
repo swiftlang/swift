@@ -1,16 +1,6 @@
 // RUN: %target-swift-frontend -emit-sil -verify %s
 
 //===----------------------------------------------------------------------===//
-// Top-level (before VJP/adjoint synthesis)
-//===----------------------------------------------------------------------===//
-
-// expected-note @+1 {{opaque non-'@differentiable' function is not differentiable}}
-func foo(_ f: (Float) -> Float) -> Float {
-  // expected-error @+1 {{function is not differentiable}}
-  return gradient(at: 0, in: f)
-}
-
-//===----------------------------------------------------------------------===//
 // Basic function
 //===----------------------------------------------------------------------===//
 

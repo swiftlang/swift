@@ -13,7 +13,7 @@ var SIMDTests = TestSuite("SIMD")
 SIMDTests.test("init(repeating:)") {
   let g = SIMD4<Float>(1, 1, 1, 1)
   
-  let foo1 = { (x: Float) -> SIMD4<Float> in
+  func foo1(x: Float) -> SIMD4<Float> {
     return SIMD4<Float>(repeating: 2 * x)
   }
   let (val1, bp1) = valueWithPullback(at: 5, in: foo1)
@@ -24,7 +24,7 @@ SIMDTests.test("init(repeating:)") {
 SIMDTests.test("Sum") {
   let a = SIMD4<Float>(1, 2, 3, 4)
   
-  let foo1 = { (x: SIMD4<Float>) -> Float in
+  func foo1(x: SIMD4<Float>) -> Float {
     return x.sum()
   }
   let (val1, bp1) = valueWithPullback(at: a, in: foo1)
@@ -36,7 +36,7 @@ SIMDTests.test("Identity") {
   let a = SIMD4<Float>(1, 2, 3, 4)
   let g = SIMD4<Float>(1, 1, 1, 1)
   
-  let foo1 = { (x: SIMD4<Float>) -> SIMD4<Float> in
+  func foo1(x: SIMD4<Float>) -> SIMD4<Float> {
     return x
   }
   let (val1, bp1) = valueWithPullback(at: a, in: foo1)
@@ -48,7 +48,7 @@ SIMDTests.test("Negate") {
   let a = SIMD4<Float>(1, 2, 3, 4)
   let g = SIMD4<Float>(1, 1, 1, 1)
   
-  let foo1 = { (x: SIMD4<Float>) -> SIMD4<Float> in
+  func foo1(x: SIMD4<Float>) -> SIMD4<Float> {
     return -x
   }
   let (val1, bp1) = valueWithPullback(at: a, in: foo1)
@@ -59,7 +59,7 @@ SIMDTests.test("Negate") {
 SIMDTests.test("subscript") {
   let a = SIMD4<Float>(1, 2, 3, 4)
   
-  let foo1 = { (x: SIMD4<Float>) -> Float in
+  func foo1(x: SIMD4<Float>) -> Float {
     return x[3]
   }
   
@@ -73,7 +73,7 @@ SIMDTests.test("Addition") {
   let g = SIMD4<Float>(1, 1, 1, 1)
   
   // SIMD + SIMD
-  let foo1 = { (x: SIMD4<Float>, y: SIMD4<Float>) -> SIMD4<Float> in
+  func foo1(x: SIMD4<Float>, y: SIMD4<Float>) -> SIMD4<Float> {
     return x + y
   }
   let (val1, bp1) = valueWithPullback(at: a, a, in: foo1)
@@ -81,7 +81,7 @@ SIMDTests.test("Addition") {
   expectEqual((g, g), bp1(g))
   
   // SIMD + Scalar
-  let foo2 = { (x: SIMD4<Float>, y: Float) -> SIMD4<Float> in
+  func foo2(x: SIMD4<Float>, y: Float) -> SIMD4<Float> {
     return x + y
   }
   let (val2, bp2) = valueWithPullback(at: a, 5, in: foo2)
@@ -89,7 +89,7 @@ SIMDTests.test("Addition") {
   expectEqual((g, 4), bp2(g))
   
   // Scalar + SIMD
-  let foo3 = { (x: SIMD4<Float>, y: Float) -> SIMD4<Float> in
+  func foo3(x: SIMD4<Float>, y: Float) -> SIMD4<Float> {
     return y + x
   }
   let (val3, bp3) = valueWithPullback(at: a, 5, in: foo3)
@@ -102,7 +102,7 @@ SIMDTests.test("Subtraction") {
   let g = SIMD4<Float>(1, 1, 1, 1)
   
   // SIMD - SIMD
-  let foo1 = { (x: SIMD4<Float>, y: SIMD4<Float>) -> SIMD4<Float> in
+  func foo1(x: SIMD4<Float>, y: SIMD4<Float>) -> SIMD4<Float> {
     return x - y
   }
   let (val1, bp1) = valueWithPullback(at: a, a, in: foo1)
@@ -110,7 +110,7 @@ SIMDTests.test("Subtraction") {
   expectEqual((g, -g), bp1(g))
   
   // SIMD - Scalar
-  let foo2 = { (x: SIMD4<Float>, y: Float) -> SIMD4<Float> in
+  func foo2(x: SIMD4<Float>, y: Float) -> SIMD4<Float> {
     return x - y
   }
   let (val2, bp2) = valueWithPullback(at: a, 5, in: foo2)
@@ -118,7 +118,7 @@ SIMDTests.test("Subtraction") {
   expectEqual((g, -4), bp2(g))
   
   // Scalar - SIMD
-  let foo3 = { (x: SIMD4<Float>, y: Float) -> SIMD4<Float> in
+  func foo3(x: SIMD4<Float>, y: Float) -> SIMD4<Float> {
     return y - x
   }
   let (val3, bp3) = valueWithPullback(at: a, 5, in: foo3)
@@ -131,7 +131,7 @@ SIMDTests.test("Multiplication") {
   let g = SIMD4<Float>(1, 1, 1, 1)
 
   // SIMD * SIMD
-  let foo1 = { (x: SIMD4<Float>, y: SIMD4<Float>) -> SIMD4<Float> in
+  func foo1(x: SIMD4<Float>, y: SIMD4<Float>) -> SIMD4<Float> {
     return x * y
   }
   let (val1, bp1) = valueWithPullback(at: a, a, in: foo1)
@@ -139,7 +139,7 @@ SIMDTests.test("Multiplication") {
   expectEqual((a, a), bp1(g))
 
   // SIMD * Scalar
-  let foo2 = { (x: SIMD4<Float>, y: Float) -> SIMD4<Float> in
+  func foo2(x: SIMD4<Float>, y: Float) -> SIMD4<Float> {
     return x * y
   }
   let (val2, bp2) = valueWithPullback(at: a, 5, in: foo2)
@@ -147,7 +147,7 @@ SIMDTests.test("Multiplication") {
   expectEqual((SIMD4<Float>(5, 5, 5, 5), 10), bp2(g))
 
   // Scalar * SIMD
-  let foo3 = { (x: SIMD4<Float>, y: Float) -> SIMD4<Float> in
+  func foo3(x: SIMD4<Float>, y: Float) -> SIMD4<Float> {
     return y * x
   }
   let (val3, bp3) = valueWithPullback(at: a, 5, in: foo3)
@@ -160,7 +160,7 @@ SIMDTests.test("Division") {
   let g = SIMD4<Float>(1, 1, 1, 1)
   
   // SIMD / SIMD
-  let foo1 = { (x: SIMD4<Float>, y: SIMD4<Float>) -> SIMD4<Float> in
+  func foo1(x: SIMD4<Float>, y: SIMD4<Float>) -> SIMD4<Float> {
     return x / y
   }
   let dlhs1 = g / a
@@ -170,7 +170,7 @@ SIMDTests.test("Division") {
   expectEqual((dlhs1, drhs1), bp1(g))
   
   // SIMD / Scalar
-  let foo2 = { (x: SIMD4<Float>, y: Float) -> SIMD4<Float> in
+  func foo2(x: SIMD4<Float>, y: Float) -> SIMD4<Float> {
     return x / y
   }
   let dlhs2 = g / 5
@@ -180,7 +180,7 @@ SIMDTests.test("Division") {
   expectEqual((dlhs2, drhs2), bp2(g))
   
   // Scalar / SIMD
-  let foo3 = { (x: Float, y: SIMD4<Float>) -> SIMD4<Float> in
+  func foo3(x: Float, y: SIMD4<Float>) -> SIMD4<Float> {
     return x / y
   }
   let dlhs3 = (g / a).sum()
