@@ -973,3 +973,101 @@ bb4:
   %9999 = tuple()
   return %9999 : $()
 }
+
+// Make sure that we properly emit ossa in this case. We just want to know that
+// the optimization actually happened.
+//
+// CHECK-LABEL: sil [ossa] @array_to_nsarray_conditional_copy_on_success : $@convention(thin) (@owned Array<NSObject>) -> () {
+// CHECK-NOT: checked_cast_addr_br
+// CHECK: } // end sil function 'array_to_nsarray_conditional_copy_on_success'
+sil [ossa] @array_to_nsarray_conditional_copy_on_success : $@convention(thin) (@owned Array<NSObject>) -> () {
+bb0(%0 : @owned $Array<NSObject>):
+  %1 = alloc_stack $Array<NSObject>
+  %2 = alloc_stack $NSArray
+  store %0 to [init] %1 : $*Array<NSObject>
+  checked_cast_addr_br copy_on_success Array<NSObject> in %1 : $*Array<NSObject> to NSArray in %2 : $*NSArray, bb1, bb2
+
+bb1:
+  destroy_addr %1 : $*Array<NSObject>
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  destroy_addr %1 : $*Array<NSObject>
+  dealloc_stack %2 : $*NSArray
+  dealloc_stack %1 : $*Array<NSObject>
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @array_to_nsarray_conditional_take_on_success : $@convention(thin) (@owned Array<NSObject>) -> () {
+// CHECK-NOT: checked_cast_addr_br
+// CHECK: } // end sil function 'array_to_nsarray_conditional_take_on_success'
+sil [ossa] @array_to_nsarray_conditional_take_on_success : $@convention(thin) (@owned Array<NSObject>) -> () {
+bb0(%0 : @owned $Array<NSObject>):
+  %1 = alloc_stack $Array<NSObject>
+  %2 = alloc_stack $NSArray
+  store %0 to [init] %1 : $*Array<NSObject>
+  checked_cast_addr_br take_on_success Array<NSObject> in %1 : $*Array<NSObject> to NSArray in %2 : $*NSArray, bb1, bb2
+
+bb1:
+  destroy_addr %1 : $*Array<NSObject>
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  destroy_addr %1 : $*Array<NSObject>
+  dealloc_stack %2 : $*NSArray
+  dealloc_stack %1 : $*Array<NSObject>
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @array_to_nsarray_conditional_take_always : $@convention(thin) (@owned Array<NSObject>) -> () {
+// CHECK-NOT: checked_cast_addr_br
+// CHECK: } // end sil function 'array_to_nsarray_conditional_take_always'
+sil [ossa] @array_to_nsarray_conditional_take_always : $@convention(thin) (@owned Array<NSObject>) -> () {
+bb0(%0 : @owned $Array<NSObject>):
+  %1 = alloc_stack $Array<NSObject>
+  %2 = alloc_stack $NSArray
+  store %0 to [init] %1 : $*Array<NSObject>
+  checked_cast_addr_br take_always Array<NSObject> in %1 : $*Array<NSObject> to NSArray in %2 : $*NSArray, bb1, bb2
+
+bb1:
+  destroy_addr %1 : $*Array<NSObject>
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  destroy_addr %1 : $*Array<NSObject>
+  dealloc_stack %2 : $*NSArray
+  dealloc_stack %1 : $*Array<NSObject>
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil @nsarray_user : $@convention(thin) (@in_guaranteed NSArray) -> ()
+
+// CHECK-LABEL: sil [ossa] @array_to_nsarray_unconditional_loadable_address : $@convention(thin) (@owned Array<NSObject>) -> () {
+// CHECK-NOT: unconditional_checked_cast_addr
+// CHECK: } // end sil function 'array_to_nsarray_unconditional_loadable_address'
+sil [ossa] @array_to_nsarray_unconditional_loadable_address : $@convention(thin) (@owned Array<NSObject>) -> () {
+bb0(%0 : @owned $Array<NSObject>):
+  %1 = alloc_stack $Array<NSObject>
+  %2 = alloc_stack $NSArray
+  store %0 to [init] %1 : $*Array<NSObject>
+  unconditional_checked_cast_addr Array<NSObject> in %1 : $*Array<NSObject> to NSArray in %2 : $*NSArray
+  %3 = function_ref @nsarray_user : $@convention(thin) (@in_guaranteed NSArray) -> ()
+  apply %3(%2) : $@convention(thin) (@in_guaranteed NSArray) -> ()
+  destroy_addr %2 : $*NSArray
+  dealloc_stack %2 : $*NSArray
+  dealloc_stack %1 : $*Array<NSObject>
+  %9999 = tuple()
+  return %9999 : $()
+}
