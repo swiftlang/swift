@@ -45,16 +45,16 @@ struct NoDerivativeProperty : Differentiable {
 // expected-error @+1 {{function is not differentiable}}
 _ = gradient(at: NoDerivativeProperty(x: 1, y: 1)) { s -> Float in
   var tmp = s
-  // expected-note @+1 {{cannot differentiate through a '@noDerivative' stored property; do you want to add '.withoutDerivative()'?}}
+  // expected-note @+1 {{cannot differentiate through a '@noDerivative' stored property; do you want to use 'withoutDerivative(at:)'?}}
   tmp.y = tmp.x
   return tmp.x
 }
 _ = gradient(at: NoDerivativeProperty(x: 1, y: 1)) { s in
-  // expected-warning @+1 {{result does not depend on differentiation arguments and will always have a zero derivative; do you want to add '.withoutDerivative()'?}} {{13-13=.withoutDerivative()}}
+  // expected-warning @+1 {{result does not depend on differentiation arguments and will always have a zero derivative; do you want to use 'withoutDerivative(at:)'?}} {{10-10=withoutDerivative(at:}} {{13-13=)}}
   return s.y
 }
 _ = gradient(at: NoDerivativeProperty(x: 1, y: 1)) {
-  // expected-warning @+1 {{result does not depend on differentiation arguments and will always have a zero derivative; do you want to add '.withoutDerivative()'?}} {{7-7=.withoutDerivative()}}
+  // expected-warning @+1 {{result does not depend on differentiation arguments and will always have a zero derivative; do you want to use 'withoutDerivative(at:)'?}} {{3-3=withoutDerivative(at:}} {{7-7=)}}
   $0.y
 }
 
@@ -74,7 +74,7 @@ _ = gradient(at: 0, in: uses_optionals)
 
 func base(_ x: Float) -> Float {
   // expected-error @+2 {{expression is not differentiable}}
-  // expected-note @+1 {{cannot differentiate through a non-differentiable result; do you want to add '.withoutDerivative()'?}}
+  // expected-note @+1 {{cannot differentiate through a non-differentiable result; do you want to use 'withoutDerivative(at:)'?}}
   return Float(Int(x))
 }
 
@@ -225,7 +225,7 @@ let no_return: @differentiable (Float) -> Float = { x in
 @differentiable
 // expected-note @+1 {{when differentiating this function definition}}
 func roundingGivesError(x: Float) -> Float {
-  // expected-note @+1 {{cannot differentiate through a non-differentiable result; do you want to add '.withoutDerivative()'?}}
+  // expected-note @+1 {{cannot differentiate through a non-differentiable result; do you want to use 'withoutDerivative(at:)'?}}
   return Float(Int(x))
 }
 
@@ -261,7 +261,7 @@ func one() -> Float {
 }
 @differentiable
 func nonVariedResult(_ x: Float) -> Float {
-  // expected-warning @+1 {{result does not depend on differentiation arguments and will always have a zero derivative; do you want to add '.withoutDerivative()'?}} {{15-15=.withoutDerivative()}}
+  // expected-warning @+1 {{result does not depend on differentiation arguments and will always have a zero derivative; do you want to use 'withoutDerivative(at:)'?}} {{10-10=withoutDerivative(at:}} {{15-15=)}}
   return one()
 }
 

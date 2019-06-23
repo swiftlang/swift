@@ -413,16 +413,16 @@ NOTE(autodiff_external_nondifferentiable_function,none,
      "'@differentiable' and that are defined in other files", ())
 NOTE(autodiff_nondifferentiable_argument,none,
      "cannot differentiate through a non-differentiable argument; do you want "
-     "to add '.withoutDerivative()'?", ())
+     "to use 'withoutDerivative(at:)'?", ())
 NOTE(autodiff_nondifferentiable_result,none,
      "cannot differentiate through a non-differentiable result; do you want to "
-     "add '.withoutDerivative()'?", ())
+     "use 'withoutDerivative(at:)'?", ())
 NOTE(autodiff_noderivative_stored_property,none,
      "cannot differentiate through a '@noDerivative' stored property; do you "
-     "want to add '.withoutDerivative()'?", ())
+     "want to use 'withoutDerivative(at:)'?", ())
 WARNING(autodiff_nonvaried_result_fixit,none,
         "result does not depend on differentiation arguments and will always "
-        "have a zero derivative; do you want to add '.withoutDerivative()'?",
+        "have a zero derivative; do you want to use 'withoutDerivative(at:)'?",
         ())
 NOTE(autodiff_enums_unsupported,none,
      "differentiating enum values is not yet supported", ())
