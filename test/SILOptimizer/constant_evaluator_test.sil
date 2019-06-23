@@ -153,6 +153,15 @@ bb0:
   return %2 : $(Builtin.Int8)
 } // CHECK: Returns int: -1
 
+// CHECK-LABEL: @interpretSignedTruncWithIntLiteral
+sil @interpretSignedTruncWithIntLiteral : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %0 = integer_literal $Builtin.IntLiteral, 5
+  %1 = builtin "s_to_s_checked_trunc_IntLiteral_Int64"(%0 : $Builtin.IntLiteral) : $(Builtin.Int64, Builtin.Int1)
+  %2 = tuple_extract %1 : $(Builtin.Int64, Builtin.Int1), 0
+  return %2 : $(Builtin.Int64)
+} // CHECK: Returns int: 5
+
 // CHECK-LABEL: @interpretSignedExtend
 sil @interpretSignedExtend : $@convention(thin) () -> Builtin.Int64 {
 bb0:
