@@ -2092,6 +2092,16 @@ public:
     lowering.emitDestroyValue(*this, Loc, v);
   }
 
+  /// Convenience function for destroying objects and addresses.
+  ///
+  /// Objects are destroyed using emitDestroyValueOperation and addresses by
+  /// emitting destroy_addr.
+  void emitDestroyOperation(SILLocation loc, SILValue v) {
+    if (v->getType().isObject())
+      return emitDestroyValueOperation(loc, v);
+    createDestroyAddr(loc, v);
+  }
+
   SILValue emitTupleExtract(SILLocation Loc, SILValue Operand, unsigned FieldNo,
                             SILType ResultTy) {
     // Fold tuple_extract(tuple(x,y,z),2)
