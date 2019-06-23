@@ -2982,7 +2982,7 @@ static bool checkDifferentiationParameters(
     if (wrtParamType->is<InOutType>()) {
       if (hasInOutWrtParam) {
         TC.diagnose(
-            loc,
+            attrLoc,
             diag::differentiable_attr_multiple_inout,
             AFD->getFullName()
         ).highlight(AFD->getSourceRange());
@@ -2999,9 +2999,9 @@ static bool checkDifferentiationParameters(
          wrtParamType->isAnyClassReferenceType()) ||
         wrtParamType->isExistentialType()) {
       TC.diagnose(
-           loc,
-           diag::diff_params_clause_cannot_diff_wrt_objects_or_existentials,
-           wrtParamType);
+          loc,
+          diag::diff_params_clause_cannot_diff_wrt_objects_or_existentials,
+          wrtParamType);
       return true;
     }
     // Parameter cannot have a function type.
@@ -3018,9 +3018,15 @@ static bool checkDifferentiationParameters(
     }
   }
 
-  if (functionType->isVoid() && !hasInOutWrtParam) {
+  auto *originalFnTy = AFD->getInterfaceType()
+      ->eraseDynamicSelfType()->castTo<AnyFunctionType>();
+  auto originalResultTy = originalFnTy->getResult();
+  if (AFD->hasImplicitSelfDecl())
+    originalResultTy = originalResultTy->castTo<AnyFunctionType>()->getResult();
+
+  if (originalResultTy->isVoid() && !hasInOutWrtParam) {
     TC.diagnose(
-        loc,
+        attrLoc,
         diag::differentiable_attr_void_result,
         AFD->getFullName()
     ).highlight(AFD->getSourceRange());
@@ -3033,7 +3039,7 @@ static bool checkDifferentiationParameters(
   //   - (T0, inout T1, T2) -> R // bad
   if (!functionType->isVoid() && hasInOutWrtParam) {
     TC.diagnose(
-        loc,
+        attrLoc,
         diag::differentiable_attr_non_void_inout,
         AFD->getFullName()
     ).highlight(AFD->getSourceRange());
@@ -3204,6 +3210,10 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
 
     // Set the checked differentiation parameter indices in the attribute.
     attr->setParameterIndices(checkedWrtParamIndices);
+
+    auto originalResultTy = originalFnTy->getResult();
+    if (isMethod)
+      originalResultTy = originalResultTy->castTo<AnyFunctionType>()->getResult();
 
     if (whereClauseGenEnv)
       originalResultTy =

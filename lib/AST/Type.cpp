@@ -4536,7 +4536,7 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
 
   // The following transformation is used to transform types to their
   // associated tangent types.
-  auto getTangentType = [](Type t) -> Type {
+  auto getTangentType = [lookupConformance](Type type) -> Type {
     if (!type->is<InOutType>()) {
       return type->getAutoDiffAssociatedTangentSpace(
           lookupConformance)->getType();
