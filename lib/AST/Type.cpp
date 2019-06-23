@@ -4499,7 +4499,7 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
   SmallVector<AnyFunctionType *, 2> curryLevels;
   auto *currentLevel = eraseDynamicSelfType()->castTo<AnyFunctionType>();
   for (unsigned i : range(2)) {
-    (void)i;
+    (void) i;
     if (currentLevel == nullptr)
       break;
     curryLevels.push_back(currentLevel);
@@ -4507,6 +4507,32 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
   }
 
   Type originalResult = curryLevels.back()->getResult();
+
+  // Perform validity checks for `inout` parameters. If the function is being
+  // differentiated with respect to more than one `inout` parameters, we
+  // produce an error. Also, if the original function type has a `Void` return
+  // type, we try to see if any `inout` parameter is being differentiated with
+  // respect to. If not, we produce an error. For example:
+  //   - (T0, T1, T2) -> Void, wrt: 0, 1              // bad: no `inout` wrt parameters.
+  //   - (inout T0, inout T1, T2) -> Void, wrt: 0, 1  // bad: more than one `inout` wrt parameters.
+  //   - (T0, inout T1, T2) -> Void, wrt: 0, 1        // good: exactly one `inout` wrt parameter.
+  bool hasInOutWrtParam = false;
+  for (auto wrtParamType : wrtParamTypes) {
+    if (wrtParamType->is<InOutType>()) {
+      assert(!hasInOutWrtParam &&
+             "no more than one `inout` wrt parameters are allowed");
+      hasInOutWrtParam = true;
+    }
+  }
+  assert((!originalResult->isVoid() || hasInOutWrtParam) &&
+         "no `inout` wrt parameters for function with `Void` return type");
+
+  // We also check if the original function has a return type, along with
+  // differentiating with respect to at least one `inout` parameter. For example:
+  //   - (T0, T1, T2) -> R       // good
+  //   - (T0, inout T1, T2) -> R // bad
+  assert((originalResult->isVoid() || !hasInOutWrtParam) &&
+         "non-`Void` return type and differentiating wrt `inout` parameter");
 
   // Build the closure type, which is different depending on whether this is a
   // JVP or VJP.
