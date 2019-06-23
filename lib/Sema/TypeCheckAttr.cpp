@@ -3057,7 +3057,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     return;
   }
 
-  AbstractFunctionDecl *original = dyn_cast<AbstractFunctionDecl>(D);
+  SmallVector<AbstractFunctionDecl*, 2> originalFns;
   if (auto *asd = dyn_cast<AbstractStorageDecl>(D)) {
     if (asd->getImplInfo().isSimpleStored() &&
         (attr->getJVP() || attr->getVJP())) {
@@ -3065,293 +3065,295 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
           diag::differentiable_attr_stored_property_variable_unsupported);
       return;
     }
-    // TODO [eaplatanios]: Add support for multiple `original` functions (both getter and setter).
     // When used directly on a storage decl (stored/computed property or
-    // subscript), the getter is currently inferred to be `@differentiable`.
-    // TODO(TF-129): Infer setter to also be `@differentiable` after
-    // differentiation supports inout parameters. This requires refactoring to
-    // handle multiple `original` functions (both getter and setter).
-    original = asd->getGetter();
+    // subscript), both the getter and the setter are inferred to be
+    // `@differentiable`.
+    originalFns.push_back(asd->getGetter());
+    originalFns.push_back(asd->getSetter());
+  } else {
+    originalFns.push_back(dyn_cast<AbstractFunctionDecl>(D));
   }
 
-  // Global immutable vars, for example, have no getter, and therefore trigger
-  // this.
-  if (!original) {
-    diagnoseAndRemoveAttr(attr, diag::invalid_decl_attribute, attr);
-    return;
-  }
-
-  // Class members are not supported by differentiation yet.
-  if (original->getInnermostTypeContext() &&
-      isa<ClassDecl>(original->getInnermostTypeContext())) {
-    diagnoseAndRemoveAttr(attr, diag::differentiable_attr_class_unsupported);
-    return;
-  }
-
-  TC.resolveDeclSignature(original);
-  auto *originalFnTy = original->getInterfaceType()->eraseDynamicSelfType()
-      ->castTo<AnyFunctionType>();
-  bool isMethod = original->hasImplicitSelfDecl();
-
-  // Start type-checking the arguments of the @differentiable attribute. This
-  // covers 'wrt:', 'jvp:', and 'vjp:', all of which are optional.
-
-  // Handle 'where' clause, if it exists.
-  // - Resolve attribute where clause requirements and store in the attribute
-  //   for serialization.
-  // - Compute generic signature for autodiff associated functions based on
-  //   the original function's generate signature and the attribute's where
-  //   clause requirements.
-  GenericSignature *whereClauseGenSig = nullptr;
-  GenericEnvironment *whereClauseGenEnv = nullptr;
-  if (auto whereClause = attr->getWhereClause()) {
-    if (whereClause->getRequirements().empty()) {
-      // Where clause must not be empty.
-      TC.diagnose(attr->getLocation(),
-                  diag::differentiable_attr_empty_where_clause);
-      attr->setInvalid();
+  for (auto original : originalFns) {
+    // Global immutable vars, for example, have no getter, and therefore trigger
+    // this.
+    if (!original) {
+      diagnoseAndRemoveAttr(attr, diag::invalid_decl_attribute, attr);
       return;
     }
 
-    auto *originalGenSig = original->getGenericSignature();
-    if (!originalGenSig) {
-      // Attributes with where clauses can only be declared on
-      // generic functions.
-      TC.diagnose(attr->getLocation(),
-                  diag::differentiable_attr_nongeneric_trailing_where,
-                  original->getFullName())
-        .highlight(whereClause->getSourceRange());
-      attr->setInvalid();
+    // Class members are not supported by differentiation yet.
+    if (original->getInnermostTypeContext() &&
+        isa<ClassDecl>(original->getInnermostTypeContext())) {
+      diagnoseAndRemoveAttr(attr, diag::differentiable_attr_class_unsupported);
       return;
     }
 
-    // Build a new generic signature for autodiff associated functions.
-    GenericSignatureBuilder builder(ctx);
-    // Add the original function's generic signature.
-    builder.addGenericSignature(originalGenSig);
-
-    using FloatingRequirementSource =
-        GenericSignatureBuilder::FloatingRequirementSource;
-
-    RequirementRequest::visitRequirements(
-      WhereClauseOwner(original, attr), TypeResolutionStage::Structural,
-      [&](const Requirement &req, RequirementRepr *reqRepr) {
-        switch (req.getKind()) {
-        case RequirementKind::SameType:
-        case RequirementKind::Superclass:
-        case RequirementKind::Conformance:
-          break;
-
-        // Layout requirements are not supported.
-        case RequirementKind::Layout:
-          TC.diagnose(attr->getLocation(),
-                      diag::differentiable_attr_unsupported_req_kind)
-            .highlight(reqRepr->getSourceRange());
-          return false;
-        }
-
-        // Add requirement to generic signature builder.
-        builder.addRequirement(req, reqRepr,
-                               FloatingRequirementSource::forExplicit(reqRepr),
-                               nullptr, original->getModuleContext());
-        return false;
-      });
-
-    // Compute generic signature and environment for autodiff associated
-    // functions.
-    whereClauseGenSig = std::move(builder).computeGenericSignature(
-        attr->getLocation(), /*allowConcreteGenericParams=*/true);
-    whereClauseGenEnv = whereClauseGenSig->createGenericEnvironment();
-    // Store the resolved requirements in the attribute.
-    attr->setRequirements(ctx, whereClauseGenSig->getRequirements());
-  }
-
-  // Validate the 'wrt:' parameters.
-
-  // Get the parsed wrt param indices, which have not yet been checked.
-  // This is defined for parsed attributes.
-  auto parsedWrtParams = attr->getParsedParameters();
-  // Get checked wrt param indices.
-  // This is defined only for compiler-synthesized attributes.
-  AutoDiffParameterIndices *checkedWrtParamIndices =
-      attr->getParameterIndices();
-
-  // Compute the derivative function type.
-  auto derivativeFnTy = originalFnTy;
-  if (whereClauseGenEnv)
-    derivativeFnTy = whereClauseGenEnv->mapTypeIntoContext(derivativeFnTy)
+    TC.resolveDeclSignature(original);
+    auto *originalFnTy = original->getInterfaceType()->eraseDynamicSelfType()
         ->castTo<AnyFunctionType>();
+    bool isMethod = original->hasImplicitSelfDecl();
 
-  // If checked wrt param indices are not specified, compute them.
-  if (!checkedWrtParamIndices)
-    checkedWrtParamIndices =
-        computeDifferentiationParameters(TC, parsedWrtParams, original,
-                                         whereClauseGenEnv, attr->getAttrName(),
-                                         attr->getLocation());
-  if (!checkedWrtParamIndices) {
-    attr->setInvalid();
-    return;
-  }
+    // Start type-checking the arguments of the @differentiable attribute. This
+    // covers 'wrt:', 'jvp:', and 'vjp:', all of which are optional.
 
-  // Check if differentiation parameter indices are valid.
-  if (checkDifferentiationParameters(
-          TC, original, checkedWrtParamIndices, derivativeFnTy, whereClauseGenEnv,
-          original->getModuleContext(), parsedWrtParams, attr->getLocation())) {
-    attr->setInvalid();
-    return;
-  }
+    // Handle 'where' clause, if it exists.
+    // - Resolve attribute where clause requirements and store in the attribute
+    //   for serialization.
+    // - Compute generic signature for autodiff associated functions based on
+    //   the original function's generate signature and the attribute's where
+    //   clause requirements.
+    GenericSignature *whereClauseGenSig = nullptr;
+    GenericEnvironment *whereClauseGenEnv = nullptr;
+    if (auto whereClause = attr->getWhereClause()) {
+      if (whereClause->getRequirements().empty()) {
+        // Where clause must not be empty.
+        TC.diagnose(attr->getLocation(),
+                    diag::differentiable_attr_empty_where_clause);
+        attr->setInvalid();
+        return;
+      }
 
-  // Set the checked differentiation parameter indices in the attribute.
-  attr->setParameterIndices(checkedWrtParamIndices);
+      auto *originalGenSig = original->getGenericSignature();
+      if (!originalGenSig) {
+        // Attributes with where clauses can only be declared on
+        // generic functions.
+        TC.diagnose(attr->getLocation(),
+                    diag::differentiable_attr_nongeneric_trailing_where,
+                    original->getFullName())
+            .highlight(whereClause->getSourceRange());
+        attr->setInvalid();
+        return;
+      }
 
-  if (whereClauseGenEnv)
-    originalResultTy =
-        whereClauseGenEnv->mapTypeIntoContext(originalResultTy);
-  else
-    originalResultTy = original->mapTypeIntoContext(originalResultTy);
-  // Check that original function's result type conforms to `Differentiable`.
-  if (!conformsToDifferentiable(originalResultTy, original)) {
-    TC.diagnose(attr->getLocation(),
-                diag::differentiable_attr_result_not_differentiable,
-                originalResultTy);
-    attr->setInvalid();
-    return;
-  }
+      // Build a new generic signature for autodiff associated functions.
+      GenericSignatureBuilder builder(ctx);
+      // Add the original function's generic signature.
+      builder.addGenericSignature(originalGenSig);
 
-  // Checks that the `candidate` function type equals the `required` function
-  // type, disregarding parameter labels and tuple result labels.
-  std::function<bool(CanAnyFunctionType, CanType)> checkFunctionSignature;
-  checkFunctionSignature = [&](CanAnyFunctionType required,
-                               CanType candidate) -> bool {
+      using FloatingRequirementSource =
+      GenericSignatureBuilder::FloatingRequirementSource;
 
-    // Check that candidate is actually a function.
-    CanAnyFunctionType candidateFnTy = dyn_cast<AnyFunctionType>(candidate);
-    if (!candidateFnTy)
-      return false;
+      RequirementRequest::visitRequirements(
+          WhereClauseOwner(original, attr), TypeResolutionStage::Structural,
+          [&](const Requirement &req, RequirementRepr *reqRepr) {
+            switch (req.getKind()) {
+              case RequirementKind::SameType:
+              case RequirementKind::Superclass:
+              case RequirementKind::Conformance:
+                break;
 
-    // Check that generic signatures match.
-    if (candidateFnTy.getOptGenericSignature() !=
-        required.getOptGenericSignature())
-      return false;
+                // Layout requirements are not supported.
+              case RequirementKind::Layout:
+                TC.diagnose(attr->getLocation(),
+                            diag::differentiable_attr_unsupported_req_kind)
+                    .highlight(reqRepr->getSourceRange());
+                return false;
+            }
 
-    // Check that parameter types match, disregarding labels.
-    if (!std::equal(required.getParams().begin(), required.getParams().end(),
-                    candidateFnTy.getParams().begin(),
-                    [](AnyFunctionType::Param x, AnyFunctionType::Param y) {
-                      return x.getPlainType()->isEqual(y.getPlainType());
-                    }))
-      return false;
+            // Add requirement to generic signature builder.
+            builder.addRequirement(req, reqRepr,
+                                   FloatingRequirementSource::forExplicit(reqRepr),
+                                   nullptr, original->getModuleContext());
+            return false;
+          });
 
-    // If required result type is non-function, check that result types match.
-    // If result types are tuple types, ignore labels.
-    CanAnyFunctionType requiredResultFnTy =
-        dyn_cast<AnyFunctionType>(required.getResult());
-    if (!requiredResultFnTy) {
-      auto requiredResultTupleTy = required.getResult()->getAs<TupleType>();
-      auto candidateResultTupleTy =
-          candidateFnTy.getResult()->getAs<TupleType>();
-      if (!requiredResultTupleTy || !candidateResultTupleTy)
-        return required.getResult()->isEqual(candidateFnTy.getResult());
-      // If result types are tuple types, check that element types match,
-      // ignoring labels.
-      return std::equal(requiredResultTupleTy->getElementTypes().begin(),
-                        requiredResultTupleTy->getElementTypes().end(),
-                        candidateResultTupleTy->getElementTypes().begin(),
-                        [](Type x, Type y) { return x->isEqual(y); });
+      // Compute generic signature and environment for autodiff associated
+      // functions.
+      whereClauseGenSig = std::move(builder).computeGenericSignature(
+          attr->getLocation(), /*allowConcreteGenericParams=*/true);
+      whereClauseGenEnv = whereClauseGenSig->createGenericEnvironment();
+      // Store the resolved requirements in the attribute.
+      attr->setRequirements(ctx, whereClauseGenSig->getRequirements());
     }
 
-    // Required result type is a function. Recurse.
-    return checkFunctionSignature(requiredResultFnTy,
-                                  candidateFnTy.getResult());
-  };
+    // Validate the 'wrt:' parameters.
 
-  // Resolve the JVP declaration, if it exists.
-  if (attr->getJVP()) {
-    AnyFunctionType *expectedJVPFnTy =
-        originalFnTy->getAutoDiffAssociatedFunctionType(
-            checkedWrtParamIndices, /*resultIndex*/ 0,
-            /*differentiationOrder*/ 1, AutoDiffAssociatedFunctionKind::JVP,
-            lookupConformance, whereClauseGenSig, /*makeSelfParamFirst*/ true);
+    // Get the parsed wrt param indices, which have not yet been checked.
+    // This is defined for parsed attributes.
+    auto parsedWrtParams = attr->getParsedParameters();
+    // Get checked wrt param indices.
+    // This is defined only for compiler-synthesized attributes.
+    AutoDiffParameterIndices *checkedWrtParamIndices =
+        attr->getParameterIndices();
 
-    auto isValidJVP = [&](FuncDecl *jvpCandidate) {
-      TC.validateDeclForNameLookup(jvpCandidate);
-      return checkFunctionSignature(
-          cast<AnyFunctionType>(expectedJVPFnTy->getCanonicalType()),
-          jvpCandidate->getInterfaceType()->getCanonicalType());
-    };
+    // Compute the derivative function type.
+    auto derivativeFnTy = originalFnTy;
+    if (whereClauseGenEnv)
+      derivativeFnTy = whereClauseGenEnv->mapTypeIntoContext(derivativeFnTy)
+          ->castTo<AnyFunctionType>();
 
-    FuncDecl *jvp = resolveAutoDiffAssociatedFunction(
-        TC, attr->getJVP().getValue(), original, expectedJVPFnTy, isValidJVP);
-
-    if (!jvp) {
+    // If checked wrt param indices are not specified, compute them.
+    if (!checkedWrtParamIndices)
+      checkedWrtParamIndices =
+          computeDifferentiationParameters(TC, parsedWrtParams, original,
+                                           whereClauseGenEnv, attr->getAttrName(),
+                                           attr->getLocation());
+    if (!checkedWrtParamIndices) {
       attr->setInvalid();
       return;
     }
-    // Memorize the jvp reference in the attribute.
-    attr->setJVPFunction(jvp);
-  }
 
-  // Resolve the VJP declaration, if it exists.
-  if (attr->getVJP()) {
-    AnyFunctionType *expectedVJPFnTy =
-        originalFnTy->getAutoDiffAssociatedFunctionType(
-            checkedWrtParamIndices, /*resultIndex*/ 0,
-            /*differentiationOrder*/ 1, AutoDiffAssociatedFunctionKind::VJP,
-            lookupConformance, whereClauseGenSig, /*makeSelfParamFirst*/ true);
-
-    auto isValidVJP = [&](FuncDecl *vjpCandidate) {
-      TC.validateDeclForNameLookup(vjpCandidate);
-      return checkFunctionSignature(
-          cast<AnyFunctionType>(expectedVJPFnTy->getCanonicalType()),
-          vjpCandidate->getInterfaceType()->getCanonicalType());
-    };
-
-    FuncDecl *vjp = resolveAutoDiffAssociatedFunction(
-        TC, attr->getVJP().getValue(), original, expectedVJPFnTy, isValidVJP);
-
-    if (!vjp) {
+    // Check if differentiation parameter indices are valid.
+    if (checkDifferentiationParameters(
+        TC, original, checkedWrtParamIndices, derivativeFnTy, whereClauseGenEnv,
+        original->getModuleContext(), parsedWrtParams, attr->getLocation())) {
       attr->setInvalid();
       return;
     }
-    // Memorize the vjp reference in the attribute.
-    attr->setVJPFunction(vjp);
-  }
 
-  if (auto *asd = dyn_cast<AbstractStorageDecl>(D)) {
-    // Remove `@differentiable` attribute from storage declaration to prevent
-    // duplicate attribute registration during SILGen.
-    D->getAttrs().removeAttribute(attr);
-    // Transfer `@differentiable` attribute from storage declaration to
-    // getter accessor.
-    auto *newAttr = DifferentiableAttr::create(
-        ctx, /*implicit*/ true, attr->AtLoc, attr->getRange(), attr->isLinear(),
-        attr->getParameterIndices(), attr->getJVP(), attr->getVJP(),
-        attr->getRequirements());
-    newAttr->setJVPFunction(attr->getJVPFunction());
-    newAttr->setVJPFunction(attr->getVJPFunction());
+    // Set the checked differentiation parameter indices in the attribute.
+    attr->setParameterIndices(checkedWrtParamIndices);
+
+    if (whereClauseGenEnv)
+      originalResultTy =
+          whereClauseGenEnv->mapTypeIntoContext(originalResultTy);
+    else
+      originalResultTy = original->mapTypeIntoContext(originalResultTy);
+    // Check that original function's result type conforms to `Differentiable`.
+    if (!conformsToDifferentiable(originalResultTy, original)) {
+      TC.diagnose(attr->getLocation(),
+                  diag::differentiable_attr_result_not_differentiable,
+                  originalResultTy);
+      attr->setInvalid();
+      return;
+    }
+
+    // Checks that the `candidate` function type equals the `required` function
+    // type, disregarding parameter labels and tuple result labels.
+    std::function<bool(CanAnyFunctionType, CanType)> checkFunctionSignature;
+    checkFunctionSignature = [&](CanAnyFunctionType required,
+                                 CanType candidate) -> bool {
+
+      // Check that candidate is actually a function.
+      CanAnyFunctionType candidateFnTy = dyn_cast<AnyFunctionType>(candidate);
+      if (!candidateFnTy)
+        return false;
+
+      // Check that generic signatures match.
+      if (candidateFnTy.getOptGenericSignature() !=
+          required.getOptGenericSignature())
+        return false;
+
+      // Check that parameter types match, disregarding labels.
+      if (!std::equal(required.getParams().begin(), required.getParams().end(),
+                      candidateFnTy.getParams().begin(),
+                      [](AnyFunctionType::Param x, AnyFunctionType::Param y) {
+                        return x.getPlainType()->isEqual(y.getPlainType());
+                      }))
+        return false;
+
+      // If required result type is non-function, check that result types match.
+      // If result types are tuple types, ignore labels.
+      CanAnyFunctionType requiredResultFnTy =
+          dyn_cast<AnyFunctionType>(required.getResult());
+      if (!requiredResultFnTy) {
+        auto requiredResultTupleTy = required.getResult()->getAs<TupleType>();
+        auto candidateResultTupleTy =
+            candidateFnTy.getResult()->getAs<TupleType>();
+        if (!requiredResultTupleTy || !candidateResultTupleTy)
+          return required.getResult()->isEqual(candidateFnTy.getResult());
+        // If result types are tuple types, check that element types match,
+        // ignoring labels.
+        return std::equal(requiredResultTupleTy->getElementTypes().begin(),
+                          requiredResultTupleTy->getElementTypes().end(),
+                          candidateResultTupleTy->getElementTypes().begin(),
+                          [](Type x, Type y) { return x->isEqual(y); });
+      }
+
+      // Required result type is a function. Recurse.
+      return checkFunctionSignature(requiredResultFnTy,
+                                    candidateFnTy.getResult());
+    };
+
+    // Resolve the JVP declaration, if it exists.
+    if (attr->getJVP()) {
+      AnyFunctionType *expectedJVPFnTy =
+          originalFnTy->getAutoDiffAssociatedFunctionType(
+              checkedWrtParamIndices, /*resultIndex*/ 0,
+              /*differentiationOrder*/ 1, AutoDiffAssociatedFunctionKind::JVP,
+              lookupConformance, whereClauseGenSig, /*makeSelfParamFirst*/ true);
+
+      auto isValidJVP = [&](FuncDecl *jvpCandidate) {
+        TC.validateDeclForNameLookup(jvpCandidate);
+        return checkFunctionSignature(
+            cast<AnyFunctionType>(expectedJVPFnTy->getCanonicalType()),
+            jvpCandidate->getInterfaceType()->getCanonicalType());
+      };
+
+      FuncDecl *jvp = resolveAutoDiffAssociatedFunction(
+          TC, attr->getJVP().getValue(), original, expectedJVPFnTy, isValidJVP);
+
+      if (!jvp) {
+        attr->setInvalid();
+        return;
+      }
+      // Memorize the jvp reference in the attribute.
+      attr->setJVPFunction(jvp);
+    }
+
+    // Resolve the VJP declaration, if it exists.
+    if (attr->getVJP()) {
+      AnyFunctionType *expectedVJPFnTy =
+          originalFnTy->getAutoDiffAssociatedFunctionType(
+              checkedWrtParamIndices, /*resultIndex*/ 0,
+              /*differentiationOrder*/ 1, AutoDiffAssociatedFunctionKind::VJP,
+              lookupConformance, whereClauseGenSig, /*makeSelfParamFirst*/ true);
+
+      auto isValidVJP = [&](FuncDecl *vjpCandidate) {
+        TC.validateDeclForNameLookup(vjpCandidate);
+        return checkFunctionSignature(
+            cast<AnyFunctionType>(expectedVJPFnTy->getCanonicalType()),
+            vjpCandidate->getInterfaceType()->getCanonicalType());
+      };
+
+      FuncDecl *vjp = resolveAutoDiffAssociatedFunction(
+          TC, attr->getVJP().getValue(), original, expectedVJPFnTy, isValidVJP);
+
+      if (!vjp) {
+        attr->setInvalid();
+        return;
+      }
+      // Memorize the vjp reference in the attribute.
+      attr->setVJPFunction(vjp);
+    }
+
+    if (auto *asd = dyn_cast<AbstractStorageDecl>(D)) {
+      // Remove `@differentiable` attribute from storage declaration to prevent
+      // duplicate attribute registration during SILGen.
+      D->getAttrs().removeAttribute(attr);
+      // Transfer `@differentiable` attribute from storage declaration to
+      // getter accessor.
+      auto *newAttr = DifferentiableAttr::create(
+          ctx, /*implicit*/ true, attr->AtLoc, attr->getRange(), attr->isLinear(),
+          attr->getParameterIndices(), attr->getJVP(), attr->getVJP(),
+          attr->getRequirements());
+      newAttr->setJVPFunction(attr->getJVPFunction());
+      newAttr->setVJPFunction(attr->getVJPFunction());
+      auto insertion = ctx.DifferentiableAttrs.try_emplace(
+          {asd->getGetter(), newAttr->getParameterIndices()}, newAttr);
+      // Valid `@differentiable` attributes are uniqued by their parameter
+      // indices. Reject duplicate attributes for the same decl and parameter
+      // indices pair.
+      if (!insertion.second) {
+        diagnoseAndRemoveAttr(attr, diag::differentiable_attr_duplicate);
+        TC.diagnose(insertion.first->getSecond()->getLocation(),
+                    diag::differentiable_attr_duplicate_note);
+        return;
+      }
+      asd->getGetter()->getAttrs().add(newAttr);
+      return;
+    }
     auto insertion = ctx.DifferentiableAttrs.try_emplace(
-        {asd->getGetter(), newAttr->getParameterIndices()}, newAttr);
-    // Valid `@differentiable` attributes are uniqued by their parameter
-    // indices. Reject duplicate attributes for the same decl and parameter
-    // indices pair.
-    if (!insertion.second) {
+        {D, attr->getParameterIndices()}, attr);
+    // `@differentiable` attributes are uniqued by their parameter indices.
+    // Reject duplicate attributes for the same decl and parameter indices pair.
+    if (!insertion.second && insertion.first->getSecond() != attr) {
       diagnoseAndRemoveAttr(attr, diag::differentiable_attr_duplicate);
       TC.diagnose(insertion.first->getSecond()->getLocation(),
                   diag::differentiable_attr_duplicate_note);
       return;
     }
-    asd->getGetter()->getAttrs().add(newAttr);
-    return;
-  }
-  auto insertion = ctx.DifferentiableAttrs.try_emplace(
-      {D, attr->getParameterIndices()}, attr);
-  // `@differentiable` attributes are uniqued by their parameter indices.
-  // Reject duplicate attributes for the same decl and parameter indices pair.
-  if (!insertion.second && insertion.first->getSecond() != attr) {
-    diagnoseAndRemoveAttr(attr, diag::differentiable_attr_duplicate);
-    TC.diagnose(insertion.first->getSecond()->getLocation(),
-                diag::differentiable_attr_duplicate_note);
-    return;
   }
 }
 
