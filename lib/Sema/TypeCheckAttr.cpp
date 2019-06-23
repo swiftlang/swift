@@ -2856,6 +2856,7 @@ static AutoDiffParameterIndices *computeDifferentiationParameters(
   auto *functionType = function->getInterfaceType()->eraseDynamicSelfType()
       ->castTo<AnyFunctionType>();
   auto &params = *function->getParameters();
+  auto numParams = function->getParameters()->size();
   auto isInstanceMethod = function->isInstanceMember();
 
   // Diagnose if function has no parameters.
@@ -2932,6 +2933,22 @@ static AutoDiffParameterIndices *computeDifferentiationParameters(
           return nullptr;
         }
         builder.setParameter(builder.size() - 1);
+        break;
+      }
+      case ParsedAutoDiffParameter::Kind::Ordered: {
+        auto index = parsedWrtParams[i].getIndex();
+        if (index >= numParams) {
+          TC.diagnose(paramLoc, diag::diff_params_clause_param_index_out_of_range);
+          return nullptr;
+        }
+        // Parameter names must be specified in the original order.
+        if ((int)index <= lastIndex) {
+          TC.diagnose(paramLoc,
+              diag::diff_params_clause_params_not_original_order);
+          return nullptr;
+        }
+        builder.setParameter(index);
+        lastIndex = index;
         break;
       }
     }

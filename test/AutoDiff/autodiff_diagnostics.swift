@@ -1,16 +1,6 @@
 // RUN: %target-swift-frontend -emit-sil -verify %s
 
 //===----------------------------------------------------------------------===//
-// Top-level (before VJP/adjoint synthesis)
-//===----------------------------------------------------------------------===//
-
-// expected-note @+1 {{opaque non-'@differentiable' function is not differentiable}}
-func foo(_ f: (Float) -> Float) -> Float {
-  // expected-error @+1 {{function is not differentiable}}
-  return gradient(at: 0, in: f)
-}
-
-//===----------------------------------------------------------------------===//
 // Basic function
 //===----------------------------------------------------------------------===//
 
@@ -178,6 +168,23 @@ struct TF_305 : Differentiable {
     self.activation = activation
     self.strides = strides
   }
+}
+
+protocol TF_534_Layer : Differentiable {
+  associatedtype Input : Differentiable
+  associatedtype Output : Differentiable
+
+  @differentiable
+  func callAsFunction(_ input: Input) -> Output
+}
+struct TF_534_Tensor<Scalar> : Differentiable {}
+
+func TF_534<Model: TF_534_Layer>(
+  _ model: inout Model, inputs: Model.Input
+) -> TF_534_Tensor<Float> where Model.Output == TF_534_Tensor<Float> {
+  return valueWithPullback(at: model) { model -> Model.Output in
+    return model(inputs)
+  }.0
 }
 
 //===----------------------------------------------------------------------===//

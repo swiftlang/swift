@@ -1100,10 +1100,6 @@ NOTE(string_index_not_integer_note,none,
      "consider using an existing high level algorithm, "
      "str.startIndex.advanced(by: n), or a projection like str.utf8", ())
 
-// SWIFT_ENABLE_TENSORFLOW
-ERROR(invalid_tensorflow_fn_conversion,none,
-      "TensorFlow functions cannot be converted to other function types", ())
-
 
 ERROR(invalid_c_function_pointer_conversion_expr,none,
       "a C function pointer can only be formed from a reference to a 'func' or "
@@ -1118,6 +1114,12 @@ ERROR(c_function_pointer_from_function_with_context,none,
       "%select{local function|closure}0 that captures "
       "%select{context|generic parameters|dynamic Self type|<<error>}1",
       (bool, unsigned))
+// SWIFT_ENABLE_TENSORFLOW
+ERROR(invalid_differentiable_function_conversion_expr,none,
+      "a '@differentiable' function can only be formed from a reference to a "
+      "'func' or a literal closure", ())
+NOTE(invalid_differentiable_function_conversion_parameter,none,
+     "did you mean to take a '%0' closure?", (StringRef))
 ERROR(invalid_autoclosure_forwarding,none,
       "add () to forward @autoclosure parameter", ())
 
@@ -2819,7 +2821,9 @@ ERROR(diff_params_clause_self_instance_method_only,none,
 ERROR(diff_params_clause_self_must_be_first,none,
       "'self' parameter must come first in the parameter list", ())
 ERROR(diff_params_clause_params_not_original_order,none,
-      "parameter names must be specified in original order", ())
+      "parameters must be specified in original order", ())
+ERROR(diff_params_clause_param_index_out_of_range,none,
+      "parameter index is larger than total number of parameters", ())
 ERROR(diff_params_clause_no_inferred_parameters,PointsToFirstBadToken,
       "no differentiation parameters could be inferred; must differentiate "
       "with respect to at least one parameter conforming to 'Differentiable'",
