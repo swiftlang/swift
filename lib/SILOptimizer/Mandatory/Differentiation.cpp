@@ -4274,7 +4274,8 @@ public:
       if (sourceLoc.isValid()) {
         getContext()
             .diagnose(sourceLoc, diag::autodiff_nonvaried_result_fixit)
-            .fixItInsertAfter(sourceLoc, ".withoutDerivative()");
+            .fixItInsert(sourceLoc, "withoutDerivative(at:")
+            .fixItInsertAfter(sourceLoc, ")");
       }
     }
     builder.setInsertionPoint(
