@@ -3791,7 +3791,7 @@ void AttributeChecker::visitTransposingAttr(TransposingAttr *attr) {
   auto *transposeInterfaceType = transpose->getInterfaceType()
                                      ->eraseDynamicSelfType()
                                      ->castTo<AnyFunctionType>();
-  auto transposeResultType = transpose->getResultInterfaceType();
+//  auto transposeResultType = transpose->getResultInterfaceType();
 
   
   // Get checked wrt param indices.
@@ -3814,10 +3814,12 @@ void AttributeChecker::visitTransposingAttr(TransposingAttr *attr) {
     return;
   }
   
-  // Compute expected original function type and look up original function.
+  // Compute expected original function type.
   auto *originalFnType =
       transposeInterfaceType->getTransposeOriginalFunctionType(attr);
-  originalFnType->dump();
+//  originalFnType->dump();
+  
+  // Lookup original function.
 }
 
 static bool

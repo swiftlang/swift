@@ -1514,9 +1514,9 @@ ERROR(attr_differentiating_expected_label_linear_or_wrt,none,
 
 // transposing
 ERROR(attr_transposing_expected_original_name,PointsToFirstBadToken,
-"expected an original function name", ())
+      "expected an original function name", ())
 ERROR(attr_transposing_expected_label_linear_or_wrt,none,
-"expected either 'linear' or 'wrt:'", ())
+      "expected either 'linear' or 'wrt:'", ())
 
 // transposing `wrt` parameters clause
 ERROR(transposing_params_clause_expected_parameter,PointsToFirstBadToken,
