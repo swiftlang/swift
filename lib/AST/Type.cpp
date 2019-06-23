@@ -4471,17 +4471,6 @@ Optional<VectorSpace> TypeBase::getAutoDiffAssociatedTangentSpace(
   return cache(None);
 }
 
-Type getTangentType(Type type) {
-  if (!type->is<InOutType>()) {
-    return type->getAutoDiffAssociatedTangentSpace(
-        lookupConformance)->getType();
-  }
-  Type base = type->getInOutObjectType();
-  Type tangentBase = base->getAutoDiffAssociatedTangentSpace(
-      lookupConformance)->getType();
-  return InOutType::get(tangentBase);
-}
-
 AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
     AutoDiffParameterIndices *indices, unsigned resultIndex,
     unsigned differentiationOrder, AutoDiffAssociatedFunctionKind kind,
@@ -4544,6 +4533,19 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
   //   - (T0, inout T1, T2) -> R // bad
   assert((originalResult->isVoid() || !hasInOutWrtParam) &&
          "non-`Void` return type and differentiating wrt `inout` parameter");
+
+  // The following transformation is used to transform types to their
+  // associated tangent types.
+  auto getTangentType = [](Type t) -> Type {
+    if (!type->is<InOutType>()) {
+      return type->getAutoDiffAssociatedTangentSpace(
+          lookupConformance)->getType();
+    }
+    Type base = type->getInOutObjectType();
+    Type tangentBase = base->getAutoDiffAssociatedTangentSpace(
+        lookupConformance)->getType();
+    return InOutType::get(tangentBase);
+  };
 
   // Build the closure type, which is different depending on whether this is a
   // JVP or VJP.
