@@ -119,7 +119,7 @@ struct MarkUninitializedFixup : SILFunctionTransform {
 
         // Then create the new mark_uninitialized and force all uses of the
         // project_box to go through the new mark_uninitialized.
-        SILBuilder B(std::next(PBI->getIterator()));
+        SILBuilderWithScope B(&*std::next(PBI->getIterator()));
         SILValue Undef = SILUndef::get(PBI->getType(), *PBI->getFunction());
         auto *NewMUI =
             B.createMarkUninitialized(PBI->getLoc(), Undef, MUI->getKind());
