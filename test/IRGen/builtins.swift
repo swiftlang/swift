@@ -804,7 +804,15 @@ enum MyError : Error {
 
 throw MyError.A
 
+/// Builtin.globalStringTablePointer must be reduced to a string_literal instruction before IRGen. IRGen
+/// should make this a trap.
+// CHECK-LABEL: define {{.*}}globalStringTablePointer
+// CHECK: call void @llvm.trap()
+// CHECK: ret i8* undef
+func globalStringTablePointerUse(_ str: String) -> Builtin.RawPointer {
+  return Builtin.globalStringTablePointer(str);
+}
+
 
 
 // CHECK: ![[R]] = !{i64 0, i64 9223372036854775807}
-
