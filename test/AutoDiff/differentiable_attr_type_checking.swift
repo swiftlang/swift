@@ -852,7 +852,7 @@ func inout1(x: Float, y: inout Float) -> Void {
   let _ = x + y
 }
 
-@differentiable(wrt: y) // expected-error {{cannot differentiate function 'inout1(x:y:)' with respect to an 'inout' parameter}}
+@differentiable(wrt: y) // expected-error {{cannot differentiate function 'inout2(x:y:)' with respect to an 'inout' parameter}}
 func inout2(x: Float, y: inout Float) -> Float {
   let _ = x + y
 }
