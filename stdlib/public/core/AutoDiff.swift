@@ -336,6 +336,35 @@ public extension Differentiable {
 // Free-function-style differential operators
 //===----------------------------------------------------------------------===//
 
+// Transpose
+
+@inlinable
+func transpose<T, R>(
+  of body: @escaping @differentiable/*(linear)*/ (T) -> R
+) -> @differentiable/*(linear)*/ (R) -> T {
+  fatalError()
+}
+
+// Value with differential
+
+@inlinable
+func valueWithDifferential<T, R>(
+  at x: T, in body: @differentiable (T) -> R
+) -> (value: R,
+      differential: @differentiable/*(linear)*/
+        (T.TangentVector) -> R.TangentVector) {
+  fatalError()
+}
+
+@inlinable
+func valueWithDifferential<T, U, R>(
+  at x: T, _ y: U, in body: @differentiable (T, U) -> R
+) -> (value: R,
+      differential: @differentiable/*(linear)*/
+        (T.TangentVector, U.TangentVector) -> R.TangentVector) {
+  fatalError()
+}
+
 // Value with pullback
 
 @inlinable
@@ -362,6 +391,23 @@ public func valueWithPullback<T, U, V, R>(
   return Builtin.autodiffApply_vjp_arity3(f, x, y, z)
 }
 
+// Differential
+
+@inlinable
+public func differential<T, R>(
+  at x: T, in body: @differentiable(T) -> R
+) -> @differentiable/*(linear)*/ (T.TangentVector) -> R.TangentVector {
+  fatalError()
+}
+
+@inlinable
+public func differential<T, U, R>(
+  at x: T, _ y: U, in body: @differentiable(T, U) -> R
+) -> @differentiable/*(linear)*/ (T.TangentVector, U.TangentVector)
+    -> R.TangentVector {
+  fatalError()
+}
+
 // Pullback
 
 @inlinable
@@ -384,6 +430,66 @@ public func pullback<T, U, V, R>(
 ) -> (R.TangentVector)
     -> (T.TangentVector, U.TangentVector, V.TangentVector) {
   return Builtin.autodiffApply_vjp_arity3(f, x, y, z).1
+}
+
+// Derivative
+
+@inlinable
+func derivative<T: FloatingPoint, R>(
+  at x: T, in body: @escaping @differentiable (T) -> R
+) ->  R.TangentVector where T.TangentVector : FloatingPoint {
+  fatalError()
+}
+
+@inlinable
+func derivative<T: FloatingPoint, U: FloatingPoint, R>(
+  at x: T, _ y: U, in body: @escaping @differentiable (T) -> R
+) -> R.TangentVector where T.TangentVector : FloatingPoint {
+  fatalError()
+}
+
+// Gradient
+
+@inlinable
+public func gradient<T, R>(
+  at x: T, in f: @differentiable (T) -> R
+) -> T.TangentVector
+  where R : FloatingPoint, R.TangentVector == R {
+    return pullback(at: x, in: f)(R(1))
+}
+
+@inlinable
+public func gradient<T, U, R>(
+  at x: T, _ y: U, in f: @differentiable (T, U) -> R
+) -> (T.TangentVector, U.TangentVector)
+  where R : FloatingPoint, R.TangentVector == R {
+    return pullback(at: x, y, in: f)(R(1))
+}
+
+@inlinable
+public func gradient<T, U, V, R>(
+  at x: T, _ y: U, _ z: V, in f: @differentiable (T, U, V) -> R
+) -> (T.TangentVector, U.TangentVector, V.TangentVector)
+  where R : FloatingPoint, R.TangentVector == R {
+    return pullback(at: x, y, z, in: f)(R(1))
+}
+
+// Value with derivative
+
+@inlinable
+func valueWithDerivative<T: FloatingPoint, R>(
+  at x: T, in body: @escaping @differentiable (T) -> R
+) -> (value: R, derivative: R.TangentVector)
+  where T.TangentVector : FloatingPoint {
+    fatalError()
+}
+
+@inlinable
+func valueWithDerivative<T: FloatingPoint, U: FloatingPoint, R>(
+  at x: T, _ y: U, in body: @escaping @differentiable (T) -> R
+) -> (value: R, derivative: R.TangentVector)
+  where T.TangentVector : FloatingPoint {
+    fatalError()
 }
 
 // Value with gradient
@@ -416,61 +522,23 @@ public func valueWithGradient<T, U, V, R>(
   return (y, pullback(R(1)))
 }
 
-// Value with gradient (curried)
+// Derivative (curried)
 
-@inlinable
-public func valueWithGradient<T, R>(
-  of f: @escaping @differentiable (T) -> R
-) -> (T) -> (value: R, gradient: T.TangentVector)
-  where R : FloatingPoint, R.TangentVector == R {
-  return { x in valueWithGradient(at: x, in: f) }
+@inlinable 
+func derivative<T: FloatingPoint, R>(
+  of body: @escaping @differentiable (T) -> R
+) -> (T) -> R.TangentVector where T.TangentVector : FloatingPoint {
+    fatalError()
 }
 
-@inlinable
-public func valueWithGradient<T, U, R>(
-  of f: @escaping @differentiable (T, U) -> R
-) -> (T, U) -> (value: R, gradient: (T.TangentVector, U.TangentVector))
-  where R : FloatingPoint, R.TangentVector == R {
-  return { x, y in valueWithGradient(at: x, y, in: f) }
+@inlinable 
+func derivative<T: FloatingPoint, U: FloatingPoint, R>(
+  of body: @escaping @differentiable (T, U) -> R
+) -> (T, U) -> R.TangentVector where T.TangentVector : FloatingPoint {
+    fatalError()
 }
 
-@inlinable
-public func valueWithGradient<T, U, V, R>(
-  of f: @escaping @differentiable (T, U, V) -> R
-) -> (T, U, V)
-    -> (value: R,
-        gradient: (T.TangentVector, U.TangentVector, V.TangentVector))
-  where R : FloatingPoint, R.TangentVector == R {
-  return { x, y, z in valueWithGradient(at: x, y, z, in: f) }
-}
-
-// Gradient
-
-@inlinable
-public func gradient<T, R>(
-  at x: T, in f: @differentiable (T) -> R
-) -> T.TangentVector
-  where R : FloatingPoint, R.TangentVector == R {
-  return pullback(at: x, in: f)(R(1))
-}
-
-@inlinable
-public func gradient<T, U, R>(
-  at x: T, _ y: U, in f: @differentiable (T, U) -> R
-) -> (T.TangentVector, U.TangentVector)
-  where R : FloatingPoint, R.TangentVector == R {
-  return pullback(at: x, y, in: f)(R(1))
-}
-
-@inlinable
-public func gradient<T, U, V, R>(
-  at x: T, _ y: U, _ z: V, in f: @differentiable (T, U, V) -> R
-) -> (T.TangentVector, U.TangentVector, V.TangentVector)
-  where R : FloatingPoint, R.TangentVector == R {
-  return pullback(at: x, y, z, in: f)(R(1))
-}
-
-// Gradient (curried)
+// Gradient of (curried)
 
 @inlinable
 public func gradient<T, R>(
@@ -494,6 +562,52 @@ public func gradient<T, U, V, R>(
 ) -> (T, U, V) -> (T.TangentVector, U.TangentVector, V.TangentVector)
   where R : FloatingPoint, R.TangentVector == R {
   return { x, y, z in gradient(at: x, y, z, in: f) }
+}
+
+// Value with derivative of (curried)
+
+@inlinable
+func valueWithDerivative<T: FloatingPoint, R>(
+  of body: @escaping @differentiable (T) -> R
+) -> (value: R, derivative: R.TangentVector)
+  where T.TangentVector: FloatingPoint {
+    fatalError()
+}
+
+@inlinable
+func valueWithDerivative<T: FloatingPoint, U: FloatingPoint, R>(
+  of body: @escaping @differentiable (T, U) -> R
+) -> (value: R, derivative: R.TangentVector)
+  where T.TangentVector: FloatingPoint, U.TangentVector: FloatingPoint {
+    fatalError()
+}
+
+// Value with gradient (curried)
+
+@inlinable
+public func valueWithGradient<T, R>(
+  of f: @escaping @differentiable (T) -> R
+) -> (T) -> (value: R, gradient: T.TangentVector)
+  where R : FloatingPoint, R.TangentVector == R {
+    return { x in valueWithGradient(at: x, in: f) }
+}
+
+@inlinable
+public func valueWithGradient<T, U, R>(
+  of f: @escaping @differentiable (T, U) -> R
+) -> (T, U) -> (value: R, gradient: (T.TangentVector, U.TangentVector))
+  where R : FloatingPoint, R.TangentVector == R {
+    return { x, y in valueWithGradient(at: x, y, in: f) }
+}
+
+@inlinable
+public func valueWithGradient<T, U, V, R>(
+  of f: @escaping @differentiable (T, U, V) -> R
+) -> (T, U, V)
+  -> (value: R,
+      gradient: (T.TangentVector, U.TangentVector, V.TangentVector))
+  where R : FloatingPoint, R.TangentVector == R {
+    return { x, y, z in valueWithGradient(at: x, y, z, in: f) }
 }
 
 //===----------------------------------------------------------------------===//
