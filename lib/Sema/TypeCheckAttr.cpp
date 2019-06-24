@@ -2979,6 +2979,13 @@ static bool checkDifferentiationParameters(
   indices->getSubsetParameterTypes(functionType, wrtParamTypes);
   for (unsigned i : range(wrtParamTypes.size())) {
     auto wrtParamType = wrtParamTypes[i];
+    if (wrtParamType->is<InOutType>()) {
+      TC.diagnose(
+          loc,
+          diag::diff_params_clause_inout_argument,
+          wrtParamType);
+      return true;
+    }
     if (!wrtParamType->hasTypeParameter())
       wrtParamType = wrtParamType->mapTypeOutOfContext();
     if (derivativeGenEnv)
@@ -3069,17 +3076,6 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
       ->castTo<AnyFunctionType>();
   bool isMethod = original->hasImplicitSelfDecl();
 
-  // Check if there are any inout parameters.
-  for (auto &param : originalFnTy->getParams()) {
-    if (param.isInOut()) {
-      TC.diagnose(attr->getLocation(), diag::differentiable_attr_inout_argument,
-                  original->getFullName())
-          .highlight(original->getSourceRange());
-      attr->setInvalid();
-      return;
-    }
-  }
-
   // If the original function returns the empty tuple type, there's no output to
   // differentiate from.
   auto originalResultTy = originalFnTy->getResult();
@@ -3094,7 +3090,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   }
 
   // Start type-checking the arguments of the @differentiable attribute. This
-  // covers 'wrt:', 'jvp:', and 'vjp:', all of which are optional.
+  // covers 'wrt:', 'jvp:', 'vjp:', and 'where', all of which are optional.
 
   // Handle 'where' clause, if it exists.
   // - Resolve attribute where clause requirements and store in the attribute
