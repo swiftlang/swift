@@ -320,7 +320,7 @@ void sourcekitd::handleRequest(sourcekitd_object_t Req,
 
 static std::unique_ptr<llvm::MemoryBuffer> getInputBufForRequest(
     Optional<StringRef> SourceFile, Optional<StringRef> SourceText,
-    llvm::SmallString<64> &ErrBuf) {
+    const Optional<VFSOptions> &vfsOptions, llvm::SmallString<64> &ErrBuf) {
   std::unique_ptr<llvm::MemoryBuffer> InputBuf;
 
   if (SourceText.hasValue()) {
@@ -330,6 +330,11 @@ static std::unique_ptr<llvm::MemoryBuffer> getInputBufForRequest(
     else
       BufName = "<input>";
     InputBuf = llvm::MemoryBuffer::getMemBuffer(*SourceText, BufName);
+
+  } else if (vfsOptions.hasValue() && SourceFile.hasValue()) {
+    ErrBuf = "using 'key.sourcefile' to read source text from the filesystem "
+             "is not supported when using 'key.vfs.name'";
+    return nullptr;
 
   } else if (SourceFile.hasValue()) {
     llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
@@ -487,7 +492,7 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
 
   if (ReqUID == RequestDocInfo) {
     std::unique_ptr<llvm::MemoryBuffer> InputBuf = getInputBufForRequest(
-        SourceFile, SourceText, ErrBuf);
+        SourceFile, SourceText, vfsOptions, ErrBuf);
     if (!InputBuf)
       return Rec(createErrorRequestFailed(ErrBuf.c_str()));
     StringRef ModuleName;
@@ -501,7 +506,7 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     if (!Name.hasValue())
       return Rec(createErrorRequestInvalid("missing 'key.name'"));
     std::unique_ptr<llvm::MemoryBuffer> InputBuf =
-        getInputBufForRequest(SourceFile, SourceText, ErrBuf);
+        getInputBufForRequest(SourceFile, SourceText, vfsOptions, ErrBuf);
     if (!InputBuf)
       return Rec(createErrorRequestFailed(ErrBuf.c_str()));
     int64_t EnableSyntaxMap = true;
@@ -543,7 +548,7 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
     if (!Name.hasValue())
       return Rec(createErrorRequestInvalid("missing 'key.name'"));
     std::unique_ptr<llvm::MemoryBuffer> InputBuf = getInputBufForRequest(
-        SourceFile, SourceText, ErrBuf);
+        SourceFile, SourceText, vfsOptions, ErrBuf);
     if (!InputBuf)
       return Rec(createErrorRequestFailed(ErrBuf.c_str()));
     int64_t Offset = 0;
@@ -697,7 +702,7 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
 
   if (ReqUID == RequestSyntacticRename) {
     std::unique_ptr<llvm::MemoryBuffer> InputBuf = getInputBufForRequest(
-        SourceFile, SourceText, ErrBuf);
+        SourceFile, SourceText, vfsOptions, ErrBuf);
     if (!InputBuf)
       return Rec(createErrorRequestFailed(ErrBuf.c_str()));
 
@@ -709,7 +714,7 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
 
   if (ReqUID == RequestFindRenameRanges) {
     std::unique_ptr<llvm::MemoryBuffer> InputBuf = getInputBufForRequest(
-        SourceFile, SourceText, ErrBuf);
+        SourceFile, SourceText, vfsOptions, ErrBuf);
     if (!InputBuf)
       return Rec(createErrorRequestFailed(ErrBuf.c_str()));
 
@@ -862,7 +867,7 @@ static void handleSemanticRequest(
 
   if (ReqUID == RequestCodeComplete) {
     std::unique_ptr<llvm::MemoryBuffer> InputBuf =
-        getInputBufForRequest(SourceFile, SourceText, ErrBuf);
+        getInputBufForRequest(SourceFile, SourceText, vfsOptions, ErrBuf);
     if (!InputBuf)
       return Rec(createErrorRequestFailed(ErrBuf.c_str()));
     int64_t Offset;
@@ -873,7 +878,7 @@ static void handleSemanticRequest(
 
   if (ReqUID == RequestCodeCompleteOpen) {
     std::unique_ptr<llvm::MemoryBuffer> InputBuf = getInputBufForRequest(
-        SourceFile, SourceText, ErrBuf);
+        SourceFile, SourceText, vfsOptions, ErrBuf);
     if (!InputBuf)
       return Rec(createErrorRequestFailed(ErrBuf.c_str()));
     Optional<StringRef> Name = Req.getString(KeyName);
@@ -899,7 +904,7 @@ static void handleSemanticRequest(
 
   if (ReqUID == RequestTypeContextInfo) {
     std::unique_ptr<llvm::MemoryBuffer> InputBuf = getInputBufForRequest(
-        SourceFile, SourceText, ErrBuf);
+        SourceFile, SourceText, vfsOptions, ErrBuf);
     if (!InputBuf)
       return Rec(createErrorRequestFailed(ErrBuf.c_str()));
     int64_t Offset;
@@ -910,7 +915,7 @@ static void handleSemanticRequest(
 
   if (ReqUID == RequestConformingMethodList) {
     std::unique_ptr<llvm::MemoryBuffer> InputBuf = getInputBufForRequest(
-        SourceFile, SourceText, ErrBuf);
+        SourceFile, SourceText, vfsOptions, ErrBuf);
     if (!InputBuf)
       return Rec(createErrorRequestFailed(ErrBuf.c_str()));
     int64_t Offset;
