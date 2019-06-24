@@ -173,8 +173,8 @@ extension Decimal : Hashable, Comparable {
 
         var d = 0.0
         for idx in stride(from: min(_length, 8), to: 0, by: -1) {
-	        d = d * 65536 + Double(self[idx - 1])
-	    }
+	    d = d * 65536 + Double(self[idx - 1])
+	}
         
         if _exponent < 0 {
             for _ in _exponent..<0 {
