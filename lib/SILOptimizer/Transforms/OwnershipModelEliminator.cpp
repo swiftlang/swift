@@ -382,9 +382,6 @@ struct OwnershipModelEliminator : SILModuleTransform {
       if (SkipTransparent && F.isTransparent())
         continue;
 
-      // Verify here to make sure ownership is correct before we strip.
-      F.verify();
-
       if (stripOwnership(F)) {
         auto InvalidKind =
             SILAnalysis::InvalidationKind::BranchesAndInstructions;

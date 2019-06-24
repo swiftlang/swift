@@ -105,10 +105,6 @@ sil @unowned_tuple_user : $@convention(thin) ((Builtin.Int32, Builtin.NativeObje
 sil @produce_owned_optional : $@convention(thin) () -> @owned Optional<Builtin.NativeObject>
 sil @guaranteed_nativeobject_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
 
-class UnsafeUnownedFieldKlass {
-  unowned(safe) var x: @sil_unowned Builtin.NativeObject
-}
-
 ////////////////
 // Test Cases //
 ////////////////
@@ -1160,26 +1156,3 @@ bb0:
   %9999 = tuple()
   return %9999 : $()
 }
-
-// Make sure that we do not false positive due to borrow users of %12 in an
-// unreachable block.
-sil [ossa] @test_unreachable_users : $@convention(method) (@guaranteed UnsafeUnownedFieldKlass) -> () {
-bb0(%0 : @guaranteed $UnsafeUnownedFieldKlass):
-  %3 = ref_element_addr %0 : $UnsafeUnownedFieldKlass, #UnsafeUnownedFieldKlass.x
-  %4 = load_borrow %3 : $*@sil_unowned Builtin.NativeObject
-  %5 = copy_unowned_value %4 : $@sil_unowned Builtin.NativeObject
-  end_borrow %4 : $@sil_unowned Builtin.NativeObject
-  %12 = begin_borrow %5 : $Builtin.NativeObject
-  %func = function_ref @guaranteed_nativeobject_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
-  apply %func(%12) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
-  end_borrow %12 : $Builtin.NativeObject
-  destroy_value %5 : $Builtin.NativeObject
-  %36 = tuple ()
-  return %36 : $()
-
-bb1:
-  %func2 = function_ref @guaranteed_nativeobject_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
-  apply %func2(%12) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
-  unreachable
-}
-
