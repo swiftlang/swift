@@ -36,7 +36,7 @@ SupersetVJPTests.test("CrossModuleClosure") {
 SupersetVJPTests.test("SubsetOfSubset") {
   @differentiable(wrt: (x, z))
   func foo(_ x: Float, _ y: Float, _ z: Float) -> Float {
-    Float(0).withoutDerivative()
+    withoutDerivative(at: 0)
   }
   expectEqual(0, gradient(at: 0, in: { x in foo(x, 0, 0) }))
 }
