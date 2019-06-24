@@ -2978,6 +2978,9 @@ static bool checkDifferentiationParameters(
   SmallVector<Type, 4> wrtParamTypes;
   indices->getSubsetParameterTypes(functionType, wrtParamTypes);
   for (unsigned i : range(wrtParamTypes.size())) {
+    SourceLoc loc = parsedWrtParams.empty()
+        ? attrLoc
+        : parsedWrtParams[i].getLoc();
     auto wrtParamType = wrtParamTypes[i];
     if (wrtParamType->is<InOutType>()) {
       TC.diagnose(
@@ -2993,9 +2996,6 @@ static bool checkDifferentiationParameters(
           derivativeGenEnv->mapTypeIntoContext(wrtParamType);
     else
       wrtParamType = AFD->mapTypeIntoContext(wrtParamType);
-    SourceLoc loc = parsedWrtParams.empty()
-        ? attrLoc
-        : parsedWrtParams[i].getLoc();
     // Parameter cannot have a class or existential type.
     if ((!wrtParamType->hasTypeParameter() &&
          wrtParamType->isAnyClassReferenceType()) ||

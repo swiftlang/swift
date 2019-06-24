@@ -844,3 +844,10 @@ func two8(x: Float, y: Float) -> Float {
 func two9(x: Float, y: Float) -> Float {
   return x + y
 }
+
+// Inout 'wrt:' arguments.
+
+@differentiable(wrt: y) // expected-error {{cannot differentiate function 'inout1(x:y:)' with respect to an 'inout' parameter}}
+func inout1(x: Float, y: inout Float) -> Float {
+  return x + y
+}
