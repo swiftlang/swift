@@ -3828,6 +3828,12 @@ private:
         type.getCategory());
   }
 
+  /// Substitutes all replacement types of the given substitution map using the
+  /// adjoint function's substitution map.
+  SubstitutionMap remapSubstitutionMap(SubstitutionMap substMap) {
+    return substMap.subst(getAdjoint().getForwardingSubstitutionMap());
+  }
+
   //--------------------------------------------------------------------------//
   // Managed value mapping
   //--------------------------------------------------------------------------//
@@ -4654,7 +4660,8 @@ public:
           pullbackType, *applyInfo.originalPullbackType);
       auto *thunkRef = builder.createFunctionRef(loc, thunk);
       pullback = builder.createPartialApply(
-          loc, thunkRef, thunk->getForwardingSubstitutionMap(),
+          loc, thunkRef,
+          remapSubstitutionMap(thunk->getForwardingSubstitutionMap()),
           {pullback}, pullbackType->getCalleeConvention());
     }
     args.push_back(seed);
