@@ -6,7 +6,7 @@
 // RUN: %target-build-swift-dylib(%t/%target-library-name(resilient_class)) -enable-library-evolution %S/../../Inputs/resilient_class.swift -emit-module -emit-module-path %t/resilient_class.swiftmodule -module-name resilient_class -I%t -L%t -lresilient_struct
 // RUN: %target-codesign %t/%target-library-name(resilient_class)
 
-// RUN: %target-build-swift-dylib(%t/%target-library-name(resilient_objc_class)) -enable-library-evolution %S/../../Inputs/resilient_objc_class.swift -emit-module -emit-module-path %t/resilient_objc_class.swiftmodule -module-name resilient_objc_class -I%t -L%t -lresilient_struct
+// RUN: %target-build-swift-dylib(%t/%target-library-name(resilient_objc_class)) -Xfrontend -enable-resilience %S/../../Inputs/resilient_objc_class.swift -emit-module -emit-module-path %t/resilient_objc_class.swiftmodule -module-name resilient_objc_class -I%t -L%t -lresilient_struct
 // RUN: %target-codesign %t/%target-library-name(resilient_objc_class)
 
 // RUN: %target-build-swift %s -L %t -I %t -lresilient_struct -lresilient_class -lresilient_objc_class -o %t/main %target-rpath(%t)
