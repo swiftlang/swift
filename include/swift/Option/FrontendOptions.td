@@ -171,6 +171,9 @@ def disable_objc_attr_requires_foundation_module :
   HelpText<"Disable requiring uses of @objc to require importing the "
            "Foundation module">;
 
+def enable_resilience : Flag<["-"], "enable-resilience">,
+   HelpText<"Deprecated, use -enable-library-evolution instead">;
+
 }
 
 
