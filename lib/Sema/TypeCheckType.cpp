@@ -2668,10 +2668,14 @@ bool TypeResolver::isDifferentiableType(Type ty) {
   if (resolution.getStage() != TypeResolutionStage::Contextual) {
     ty = DC->mapTypeIntoContext(ty);
   }
-  return ty
-      ->getAutoDiffAssociatedTangentSpace(
-          LookUpConformanceInModule(DC->getParentModule()))
-      .hasValue();
+  auto lookupConformance = LookUpConformanceInModule(DC->getParentModule());
+  if (!ty->is<InOutType>()) {
+    return ty->getAutoDiffAssociatedTangentSpace(
+        lookupConformance).hasValue();
+  }
+  Type base = ty->getInOutObjectType();
+  return base->getAutoDiffAssociatedTangentSpace(
+      lookupConformance).hasValue();
 }
 
 Type TypeResolver::resolveSILBoxType(SILBoxTypeRepr *repr,
