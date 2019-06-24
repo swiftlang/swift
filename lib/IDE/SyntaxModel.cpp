@@ -1272,6 +1272,10 @@ bool ModelASTWalker::processComment(CharSourceRange Range) {
   if (NewLinePos != StringRef::npos) {
     Text = Text.substr(0, NewLinePos);
   }
+  if (Text.endswith("*/")) {
+    Text = Text.drop_back(2);
+  }
+  Text = Text.rtrim();
 
   CharSourceRange BeforeMarker{ SM, Range.getStart(), Loc };
   CharSourceRange Marker(Loc, Text.size());
