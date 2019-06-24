@@ -140,10 +140,12 @@ internal func _continuationPayload(_ x: UInt8) -> UInt32 {
   return UInt32(x & 0x3F)
 }
 
-@inlinable @inline(__always)
+@inlinable
 internal func _scalarAlign(
   _ utf8: UnsafeBufferPointer<UInt8>, _ idx: Int
 ) -> Int {
+  guard _fastPath(idx != utf8.count) else { return idx }
+
   var i = idx
   while _slowPath(UTF8.isContinuation(utf8[_unchecked: i])) {
     i &-= 1
@@ -160,26 +162,38 @@ extension _StringGuts {
   @inlinable
   @inline(__always) // fast-path: fold common fastUTF8 check
   internal func scalarAlign(_ idx: Index) -> Index {
-    // TODO(String performance): isASCII check
+    let result: String.Index
+    if _fastPath(idx.isAligned) {
+      result = idx
+    } else {
+      // TODO(String performance): isASCII check
+      result = scalarAlignSlow(idx)
+    }
+
+    _internalInvariant(isOnUnicodeScalarBoundary(result),
+      "Alignment bit is set for non-aligned index")
+    _internalInvariant(result.isAligned)
+    return result
+  }
+
+  @inline(never) // slow-path
+  @_alwaysEmitIntoClient // Swift 5.1
+  internal func scalarAlignSlow(_ idx: Index) -> Index {
+    _internalInvariant(!idx.isAligned)
 
     if _slowPath(idx.transcodedOffset != 0 || idx._encodedOffset == 0) {
-      // Transcoded indices are already scalar aligned
-      return String.Index(_encodedOffset: idx._encodedOffset)
+      // Transcoded index offsets are already scalar aligned
+      return String.Index(_encodedOffset: idx._encodedOffset).aligned
     }
     if _slowPath(self.isForeign) {
-      return foreignScalarAlign(idx)
+      let foreignIdx = foreignScalarAlign(idx)
+      _internalInvariant(foreignIdx.isAligned)
+      return foreignIdx
     }
 
-    return self.withFastUTF8 { utf8 in
-      let i = _scalarAlign(utf8, idx._encodedOffset)
-
-      // If no alignment is performed, keep grapheme cache
-      if i == idx._encodedOffset {
-        return idx
-      }
-
-      return Index(_encodedOffset: i)
-    }
+    return String.Index(_encodedOffset:
+      self.withFastUTF8 { _scalarAlign($0, idx._encodedOffset) }
+    ).aligned
   }
 
   @inlinable
@@ -345,15 +359,17 @@ extension _StringGuts {
   @usableFromInline @inline(never) // slow-path
   @_effects(releasenone)
   internal func foreignScalarAlign(_ idx: Index) -> Index {
+    guard idx._encodedOffset != self.count else { return idx.aligned }
+
     _internalInvariant(idx._encodedOffset < self.count)
 
     let ecCU = foreignErrorCorrectedUTF16CodeUnit(at: idx)
     if _fastPath(!UTF16.isTrailSurrogate(ecCU)) {
-      return idx
+      return idx.aligned
     }
     _internalInvariant(idx._encodedOffset > 0,
       "Error-correction shouldn't give trailing surrogate at position zero")
-    return String.Index(_encodedOffset: idx._encodedOffset &- 1)
+    return String.Index(_encodedOffset: idx._encodedOffset &- 1).aligned
   }
 
   @usableFromInline @inline(never)

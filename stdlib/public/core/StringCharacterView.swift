@@ -60,13 +60,14 @@ extension String: BidirectionalCollection {
     _precondition(i < endIndex, "String index is out of bounds")
 
     // TODO: known-ASCII fast path, single-scalar-grapheme fast path, etc.
+    let i = _guts.scalarAlign(i)
     let stride = _characterStride(startingAt: i)
     let nextOffset = i._encodedOffset &+ stride
     let nextStride = _characterStride(
-      startingAt: Index(_encodedOffset: nextOffset))
+      startingAt: Index(_encodedOffset: nextOffset).aligned)
 
     return Index(
-      encodedOffset: nextOffset, characterStride: nextStride)
+      encodedOffset: nextOffset, characterStride: nextStride).aligned
   }
 
   /// Returns the position immediately before the given index.
@@ -78,9 +79,10 @@ extension String: BidirectionalCollection {
     _precondition(i > startIndex, "String index is out of bounds")
 
     // TODO: known-ASCII fast path, single-scalar-grapheme fast path, etc.
+    let i = _guts.scalarAlign(i)
     let stride = _characterStride(endingAt: i)
     let priorOffset = i._encodedOffset &- stride
-    return Index(encodedOffset: priorOffset, characterStride: stride)
+    return Index(encodedOffset: priorOffset, characterStride: stride).aligned
   }
   /// Returns an index that is the specified distance from the given index.
   ///
@@ -167,7 +169,7 @@ extension String: BidirectionalCollection {
   @inlinable @inline(__always)
   public func distance(from start: Index, to end: Index) -> IndexDistance {
     // TODO: known-ASCII and single-scalar-grapheme fast path, etc.
-    return _distance(from: start, to: end)
+    return _distance(from: _guts.scalarAlign(start), to: _guts.scalarAlign(end))
   }
 
   /// Accesses the character at the given position.
@@ -191,12 +193,15 @@ extension String: BidirectionalCollection {
 
     let i = _guts.scalarAlign(i)
     let distance = _characterStride(startingAt: i)
+
     return _guts.errorCorrectedCharacter(
       startingAt: i._encodedOffset, endingAt: i._encodedOffset &+ distance)
   }
 
   @inlinable @inline(__always)
   internal func _characterStride(startingAt i: Index) -> Int {
+    _internalInvariant(i.isAligned)
+
     // Fast check if it's already been measured, otherwise check resiliently
     if let d = i.characterStride { return d }
 
@@ -207,6 +212,8 @@ extension String: BidirectionalCollection {
 
   @inlinable @inline(__always)
   internal func _characterStride(endingAt i: Index) -> Int {
+    _internalInvariant(i.isAligned)
+
     if i == startIndex { return 0 }
 
     return _guts._opaqueCharacterStride(endingAt: i._encodedOffset)
