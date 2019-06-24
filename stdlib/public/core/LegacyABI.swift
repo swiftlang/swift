@@ -60,3 +60,11 @@ extension Substring {
     return try copy.withUTF8(body)
   }
 }
+
+extension String {
+  @usableFromInline // Never actually used in inlinable code...
+  internal func _nativeCopyUTF16CodeUnits(
+    into buffer: UnsafeMutableBufferPointer<UInt16>,
+    range: Range<String.Index>
+  ) { fatalError() }
+}

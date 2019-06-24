@@ -238,7 +238,16 @@ StringTests.test("ForeignIndexes/Valid") {
     let donor = "abcdef"
     let acceptor = "\u{1f601}\u{1f602}\u{1f603}"
     expectEqual("\u{1f601}", acceptor[donor.startIndex])
-    expectEqual("\u{1f601}", acceptor[donor.index(after: donor.startIndex)])
+
+    // Donor's second index is scalar-aligned in donor, but not acceptor. This
+    // will trigger a stdlib assertion.
+    let donorSecondIndex = donor.index(after: donor.startIndex)
+    if _isStdlibInternalChecksEnabled() {
+      expectCrash { _ = acceptor[donorSecondIndex] }
+    } else {
+      expectEqual(1, acceptor[donorSecondIndex].utf8.count)
+      expectEqual(0x9F, acceptor[donorSecondIndex].utf8.first!)
+    }
   }
 }
 
@@ -248,7 +257,14 @@ StringTests.test("ForeignIndexes/UnexpectedCrash") {
 
   // Adjust donor.startIndex to ensure it caches a stride
   let start = donor.index(before: donor.index(after: donor.startIndex))
-  expectEqual("a", acceptor[start])
+
+  // `start` has a cached stride greater than 1, so subscript will trigger an
+  // assertion when it makes a multi-grapheme-cluster Character.
+  if _isStdlibInternalChecksEnabled() {
+   expectCrash { _ = acceptor[start] }
+  } else {
+    expectEqual("abcd", String(acceptor[start]))
+  }
 }
 
 StringTests.test("ForeignIndexes/subscript(Index)/OutOfBoundsTrap") {

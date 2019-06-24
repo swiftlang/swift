@@ -420,6 +420,6 @@ extension String {
   ) {
     _internalInvariant(buffer.count >= range.count)
     let indexRange = self._toUTF16Indices(range)
-    self._nativeCopyUTF16CodeUnits(into: buffer, range: indexRange)
+    self.utf16._nativeCopy(into: buffer, alignedRange: indexRange)
   }
 }
