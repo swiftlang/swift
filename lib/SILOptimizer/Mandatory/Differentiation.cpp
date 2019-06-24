@@ -3136,21 +3136,17 @@ public:
     // Check for active 'inout' arguments.
     auto paramInfos = ai->getSubstCalleeConv().getParameters();
     bool hasActiveInoutParams = false;
-    for (unsigned i : swift::indices(paramInfos))
+    for (unsigned i : swift::indices(paramInfos)) {
+      auto argument = ai->getArgumentsWithoutIndirectResults()[i];
       if (paramInfos[i].isIndirectInOut() &&
-          activityInfo.isActive(ai->getArgumentsWithoutIndirectResults()[i],
-                                getIndices()))
+          activityInfo.isActive(argument, getIndices())) {
+        allResults.push_back(argument);
         hasActiveInoutParams = true;
-    // Reject functions with active inout arguments. It's not yet supported.
-    if (hasActiveInoutParams) {
-      context.emitNondifferentiabilityError(ai, invoker,
-          diag::autodiff_cannot_differentiate_through_inout_arguments);
-      errorOccurred = true;
-      return;
+      }
     }
     // If there's no active results, this function should not be differentiated.
     // Do standard cloning.
-    if (!hasActiveResults || !hasActiveArguments) {
+    if ((!hasActiveResults || !hasActiveArguments) && !hasActiveInoutParams) {
       LLVM_DEBUG(getADDebugStream() << "No active results:\n" << *ai << '\n');
       TypeSubstCloner::visitApplyInst(ai);
       return;
