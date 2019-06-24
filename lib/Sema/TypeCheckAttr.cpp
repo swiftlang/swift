@@ -3092,12 +3092,18 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     // subscript), both the getter and the setter are inferred to be
     // `@differentiable`.
     originalFns.push_back(asd->getGetter());
-    originalFns.push_back(asd->getSetter());
+    // TODO(TF-357): Uncomment once inout auto-diff is supported.
+    // originalFns.push_back(asd->getSetter());
   } else {
     originalFns.push_back(dyn_cast<AbstractFunctionDecl>(D));
   }
 
   for (auto original : originalFns) {
+    // TODO(TF-357): Uncomment once inout auto-diff is supported.
+    if (auto *accessor = dyn_cast_or_null<AccessorDecl>(original))
+      if (accessor->isSetter())
+        original = nullptr;
+
     // Global immutable vars, for example, have no getter, and therefore trigger
     // this.
     if (!original) {

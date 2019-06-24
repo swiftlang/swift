@@ -4516,36 +4516,29 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
   //   - (T0, T1, T2) -> Void, wrt: 0, 1              // bad: no `inout` wrt parameters.
   //   - (inout T0, inout T1, T2) -> Void, wrt: 0, 1  // bad: more than one `inout` wrt parameters.
   //   - (T0, inout T1, T2) -> Void, wrt: 0, 1        // good: exactly one `inout` wrt parameter.
-  bool hasInOutWrtParam = false;
+  Type* inoutWrtParamType = nullptr;
   for (auto wrtParamType : wrtParamTypes) {
     if (wrtParamType->is<InOutType>()) {
-      assert(!hasInOutWrtParam &&
+      assert(inoutWrtParamType == nullptr &&
              "no more than one `inout` wrt parameters are allowed");
-      hasInOutWrtParam = true;
+      inoutWrtParamType = &wrtParamType->getInOutObjectType();
     }
   }
-  assert((!originalResult->isVoid() || hasInOutWrtParam) &&
+  assert((!originalResult->isVoid() || inoutWrtParamType != nullptr) &&
          "no `inout` wrt parameters for function with `Void` return type");
 
   // We also check if the original function has a return type, along with
   // differentiating with respect to at least one `inout` parameter. For example:
   //   - (T0, T1, T2) -> R       // good
   //   - (T0, inout T1, T2) -> R // bad
-  assert((originalResult->isVoid() || !hasInOutWrtParam) &&
+  assert((originalResult->isVoid() || inoutWrtParamType == nullptr) &&
          "non-`Void` return type and differentiating wrt `inout` parameter");
 
-  // The following transformation is used to transform types to their
-  // associated tangent types.
-  auto getTangentType = [lookupConformance](Type type) -> Type {
-    if (!type->is<InOutType>()) {
-      return type->getAutoDiffAssociatedTangentSpace(
-          lookupConformance)->getType();
-    }
-    Type base = type->getInOutObjectType();
-    Type tangentBase = base->getAutoDiffAssociatedTangentSpace(
-        lookupConformance)->getType();
-    return InOutType::get(tangentBase);
-  };
+  // For inout arguments, we treat the inout type as both an argument type and
+  // a result type.
+  if (inoutWrtParamType != nullptr) {
+    originalResult = inoutWrtParamType;
+  }
 
   // Build the closure type, which is different depending on whether this is a
   // JVP or VJP.
@@ -4557,15 +4550,21 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
     SmallVector<AnyFunctionType::Param, 8> differentialParams;
     for (auto wrtParamType : wrtParamTypes)
       differentialParams.push_back(
-          AnyFunctionType::Param(getTangentType(wrtParamType)));
+          AnyFunctionType::Param(wrtParamType->getInOutObjectType()
+               ->getAutoDiffAssociatedTangentSpace(lookupConformance)
+               ->getType()));
 
     SmallVector<TupleTypeElt, 8> differentialResults;
     if (auto *resultTuple = originalResult->getAs<TupleType>()) {
       auto resultTupleEltType = resultTuple->getElementType(resultIndex);
-      differentialResults.push_back(getTangentType(resultTupleEltType));
+      differentialResults.push_back(resultTupleEltType->getInOutObjectType()
+          ->getAutoDiffAssociatedTangentSpace(lookupConformance)
+          ->getType());
     } else {
       assert(resultIndex == 0 && "resultIndex out of bounds");
-      differentialResults.push_back(getTangentType(originalResult));
+      differentialResults.push_back(originalResult->getInOutObjectType()
+          ->getAutoDiffAssociatedTangentSpace(lookupConformance)
+          ->getType());
     }
     Type differentialResult =
         differentialResults.size() > 1
@@ -4582,16 +4581,22 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
     if (auto *resultTuple = originalResult->getAs<TupleType>()) {
       auto resultTupleEltType = resultTuple->getElementType(resultIndex);
       pullbackParams.push_back(
-          AnyFunctionType::Param(getTangentType(resultTupleEltType)));
+          AnyFunctionType::Param(resultTupleEltType->getInOutObjectType()
+               ->getAutoDiffAssociatedTangentSpace(lookupConformance)
+               ->getType()));
     } else {
       assert(resultIndex == 0 && "resultIndex out of bounds");
       pullbackParams.push_back(
-          AnyFunctionType::Param(getTangentType(originalResult)));
+          AnyFunctionType::Param(originalResult->getInOutObjectType()
+               ->getAutoDiffAssociatedTangentSpace(lookupConformance)
+               ->getType()));
     }
 
     SmallVector<TupleTypeElt, 8> pullbackResults;
     for (auto wrtParamType : wrtParamTypes)
-      pullbackResults.push_back(getTangentType(wrtParamType));
+      pullbackResults.push_back(wrtParamType->getInOutObjectType()
+          ->getAutoDiffAssociatedTangentSpace(lookupConformance)
+          ->getType());
     Type pullbackResult = pullbackResults.size() > 1
                               ? TupleType::get(pullbackResults, ctx)
                               : pullbackResults[0].getType();
