@@ -5851,6 +5851,10 @@ ADContext::getOrCreateSubsetParametersThunkForLinearMap(
     SILFunction *parentThunk, CanSILFunctionType linearMapType,
     CanSILFunctionType targetType, AutoDiffAssociatedFunctionKind kind,
     SILAutoDiffIndices desiredIndices, SILAutoDiffIndices actualIndices) {
+  LLVM_DEBUG(getADDebugStream() << "Getting a subset parameters thunk for " <<
+             linearMapType << " from " << actualIndices << " to " <<
+             desiredIndices << '\n');
+
   SubstitutionMap interfaceSubs = parentThunk->getForwardingSubstitutionMap();
   GenericEnvironment *genericEnv = parentThunk->getGenericEnvironment();
   auto thunkType = buildThunkType(
@@ -5929,6 +5933,26 @@ ADContext::getOrCreateSubsetParametersThunkForLinearMap(
     }
   };
 
+  // `actualIndices` and `desiredIndices` are with respect to the original
+  // function. However, the differential parameters and pullback results may
+  // already be w.r.t. a subset. We create a map between the original function's
+  // actual parameter indices and the linear map's actual indices.
+  // Example:
+  //   Original: (T0, T1, T2) -> R
+  //   Actual indices: 0, 2
+  //   Original differential: (T0, T2) -> R
+  //   Original pullback: R -> (T0, T2)
+  //   Desired indices w.r.t. original: 2
+  //   Desired indices w.r.t. linear map: 1
+  SmallDenseMap<unsigned, unsigned> actualParamIndicesMap;
+  {
+    unsigned indexInBitVec = 0;
+    for (auto index : actualIndices.parameters->getIndices()) {
+      actualParamIndicesMap[index] = indexInBitVec;
+      indexInBitVec++;
+    }
+  }
+
   switch (kind) {
   // Differential arguments are:
   // - All indirect results, followed by:
@@ -5953,7 +5977,8 @@ ADContext::getOrCreateSubsetParametersThunkForLinearMap(
       // Otherwise, construct and use a zero argument.
       else {
         auto zeroSILType =
-            linearMapType->getParameters()[i].getSILStorageType();
+            linearMapType->getParameters()[actualParamIndicesMap[i]]
+                .getSILStorageType();
         buildZeroArgument(zeroSILType);
       }
     }
@@ -5972,7 +5997,7 @@ ADContext::getOrCreateSubsetParametersThunkForLinearMap(
     };
     // Iterate over actual indices.
     for (unsigned i : actualIndices.parameters->getIndices()) {
-      auto resultInfo = linearMapType->getResults()[i];
+      auto resultInfo = linearMapType->getResults()[actualParamIndicesMap[i]];
       // Skip direct results. Only indirect results are relevant as arguments.
       if (resultInfo.isFormalDirect())
         continue;
@@ -6020,14 +6045,15 @@ ADContext::getOrCreateSubsetParametersThunkForLinearMap(
     // - Do nothing if result is indirect.
     //   (It was already forwarded to the `apply` instruction).
     // - Push it to `results` if result is direct.
+    auto result = allResults[actualParamIndicesMap[i]];
     if (desiredIndices.isWrtParameter(i)) {
-      if (allResults[i]->getType().isAddress())
+      if (result->getType().isAddress())
         continue;
-      results.push_back(allResults[i]);
+      results.push_back(result);
     }
     // Otherwise, cleanup the unused results.
     else {
-      emitCleanup(builder, loc, allResults[i]);
+      emitCleanup(builder, loc, result);
     }
   }
   // Deallocate local allocations and return final direct result.
@@ -6045,6 +6071,11 @@ ADContext::getOrCreateSubsetParametersThunkForAssociatedFunction(
     SILValue origFnOperand, SILValue assocFn,
     AutoDiffAssociatedFunctionKind kind, SILAutoDiffIndices desiredIndices,
     SILAutoDiffIndices actualIndices) {
+  LLVM_DEBUG(getADDebugStream() << "Getting a subset parameters thunk for "
+             "associated function " << assocFn << " of the original function "
+             << origFnOperand << " from " << actualIndices << " to " <<
+             desiredIndices << '\n');
+
   auto origFnType = origFnOperand->getType().castTo<SILFunctionType>();
   auto &module = getModule();
   auto lookupConformance = LookUpConformanceInModule(module.getSwiftModule());
@@ -6366,6 +6397,11 @@ void ADContext::foldAutoDiffFunctionExtraction(AutoDiffFunctionInst *source) {
 }
 
 bool ADContext::processAutoDiffFunctionInst(AutoDiffFunctionInst *adfi) {
+  LLVM_DEBUG({
+    auto &s = getADDebugStream() << "Processing AutoDiffFunctionInst:\n";
+    adfi->printInContext(s);
+  });
+
   if (adfi->getNumAssociatedFunctions() ==
       autodiff::getNumAutoDiffAssociatedFunctions(
           adfi->getDifferentiationOrder()))

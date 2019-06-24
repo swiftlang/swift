@@ -33,6 +33,14 @@ SupersetVJPTests.test("CrossModuleClosure") {
   expectEqual(1, gradient(at: Float(1)) { x in x + 2 })
 }
 
+SupersetVJPTests.test("SubsetOfSubset") {
+  @differentiable(wrt: (x, z))
+  func foo(_ x: Float, _ y: Float, _ z: Float) -> Float {
+    Float(0).withoutDerivative()
+  }
+  expectEqual(0, gradient(at: 0, in: { x in foo(x, 0, 0) }))
+}
+
 // FIXME: The expression `(+) as @differentiable (Float, @nondiff Float) -> Float)`
 // forms a curry thunk of `Float.+` before conversion to @differentiable, and AD
 // doesn't know how to differentiate the curry thunk, so it produces a
