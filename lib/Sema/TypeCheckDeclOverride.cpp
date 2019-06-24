@@ -952,7 +952,7 @@ static GenericSignature *getNewGenericSignature(ValueDecl *base,
 
   if (baseGenericCtx) {
     unsigned depth = 0;
-    
+
     if (auto *genericSig = baseClass->getGenericSignature())
       depth = genericSig->getGenericParams().back()->getDepth() + 1;
 
@@ -961,7 +961,6 @@ static GenericSignature *getNewGenericSignature(ValueDecl *base,
 
     auto source =
         GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
-    auto *baseClassSig = baseClass->getGenericSignature();
 
     unsigned superclassDepth = 0;
     if (baseClassSig) {
@@ -995,8 +994,6 @@ static GenericSignature *getNewGenericSignature(ValueDecl *base,
         builder.addRequirement(*substReqt, source, nullptr);
       }
     }
-
-    subMap = SubstitutionMap::get(baseClassSig, substFn, lookupConformanceFn);
 
     auto *genericSig = std::move(builder).computeGenericSignature(SourceLoc());
     return genericSig;
