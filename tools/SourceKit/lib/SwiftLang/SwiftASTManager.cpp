@@ -168,7 +168,6 @@ void InvocationOptions::profile(llvm::FoldingSetNodeID &ID) const {
   for (auto &Arg : Args)
     ID.AddString(Arg);
   ID.AddString(PrimaryFile);
-  ID.AddPointer(FileSystem.get());
 }
 
 //===----------------------------------------------------------------------===//
