@@ -170,23 +170,6 @@ struct TF_305 : Differentiable {
   }
 }
 
-protocol TF_534_Layer : Differentiable {
-  associatedtype Input : Differentiable
-  associatedtype Output : Differentiable
-
-  @differentiable
-  func callAsFunction(_ input: Input) -> Output
-}
-struct TF_534_Tensor<Scalar> : Differentiable {}
-
-func TF_534<Model: TF_534_Layer>(
-  _ model: inout Model, inputs: Model.Input
-) -> TF_534_Tensor<Float> where Model.Output == TF_534_Tensor<Float> {
-  return valueWithPullback(at: model) { model -> Model.Output in
-    return model(inputs)
-  }.0
-}
-
 //===----------------------------------------------------------------------===//
 // Classes and existentials (not yet supported)
 //===----------------------------------------------------------------------===//
