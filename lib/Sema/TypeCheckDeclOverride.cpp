@@ -963,7 +963,8 @@ static GenericSignature *getNewGenericSignature(ValueDecl *base,
         GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
 
     unsigned superclassDepth = 0;
-    if (baseClassSig) {
+    
+    if (baseGenericCtx->isGeneric()) {
       superclassDepth =
           baseGenericCtx->getGenericParams()->getParams().back()->getDepth() +
           1;
