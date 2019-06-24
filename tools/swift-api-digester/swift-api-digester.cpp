@@ -26,6 +26,7 @@
 // can be reflected as source-breaking changes for API users. If they are,
 // the output of api-digester will include such changes.
 
+#include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/AST/DiagnosticsModuleDiffer.h"
 #include "swift/IDE/APIDigesterData.h"
 #include <functional>
@@ -209,6 +210,11 @@ static llvm::cl::opt<std::string>
 LocationFilter("location",
               llvm::cl::desc("Filter nodes with the given location."),
               llvm::cl::cat(Category));
+
+static llvm::cl::opt<bool>
+CompilerStyleDiags("compiler-style-diags",
+                   llvm::cl::desc("Print compiler style diagnostics to stderr."),
+                   llvm::cl::cat(Category));
 } // namespace options
 
 namespace {
@@ -2114,9 +2120,11 @@ static int diagnoseModuleChange(SDKContext &Ctx, SDKNodeRoot *LeftModule,
     FileOS.reset(new llvm::raw_fd_ostream(OutputPath, EC, llvm::sys::fs::F_None));
     OS = FileOS.get();
   }
-  ModuleDifferDiagsConsumer PDC(true, *OS);
+  std::unique_ptr<DiagnosticConsumer> pConsumer = options::CompilerStyleDiags ?
+    llvm::make_unique<PrintingDiagnosticConsumer>():
+    llvm::make_unique<ModuleDifferDiagsConsumer>(true, *OS);
 
-  Ctx.getDiags().addConsumer(PDC);
+  Ctx.getDiags().addConsumer(*pConsumer);
   TypeAliasDiffFinder(LeftModule, RightModule,
                       Ctx.getTypeAliasUpdateMap()).search();
   PrunePass Prune(Ctx, std::move(ProtocolReqWhitelist));
@@ -2185,10 +2193,11 @@ static int generateMigrationScript(StringRef LeftPath, StringRef RightPath,
     return 1;
   }
   llvm::errs() << "Diffing: " << LeftPath << " and " << RightPath << "\n";
-
-  ModuleDifferDiagsConsumer PDC(false);
+  std::unique_ptr<DiagnosticConsumer> pConsumer = options::CompilerStyleDiags ?
+    llvm::make_unique<PrintingDiagnosticConsumer>():
+    llvm::make_unique<ModuleDifferDiagsConsumer>(false);
   SDKContext Ctx(Opts);
-  Ctx.getDiags().addConsumer(PDC);
+  Ctx.getDiags().addConsumer(*pConsumer);
 
   SwiftDeclCollector LeftCollector(Ctx);
   LeftCollector.deSerialize(LeftPath);
