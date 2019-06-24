@@ -151,8 +151,7 @@ ProtocolConformance *RequirementFailure::getConformanceForConditionalReq(
     return nullptr;
   }
 
-  auto *typeReqLoc = cs.getConstraintLocator(getRawAnchor(), path.drop_back(),
-                                             /*summaryFlags=*/0);
+  auto *typeReqLoc = cs.getConstraintLocator(getRawAnchor(), path.drop_back());
 
   auto result = llvm::find_if(
       cs.CheckedConformances,
