@@ -375,6 +375,12 @@ getAlternativeLiteralTypes(KnownProtocolKind kind) {
 }
 
 ConstraintLocator *ConstraintSystem::getConstraintLocator(
+    Expr *anchor, ArrayRef<ConstraintLocator::PathElement> path) {
+  auto summaryFlags = ConstraintLocator::getSummaryFlagsForPath(path);
+  return getConstraintLocator(anchor, path, summaryFlags);
+}
+
+ConstraintLocator *ConstraintSystem::getConstraintLocator(
                      Expr *anchor,
                      ArrayRef<ConstraintLocator::PathElement> path,
                      unsigned summaryFlags) {
