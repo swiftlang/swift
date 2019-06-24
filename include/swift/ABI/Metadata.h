@@ -3641,6 +3641,11 @@ public:
     return cd->getKind() >= ContextDescriptorKind::Type_First
         && cd->getKind() <= ContextDescriptorKind::Type_Last;
   }
+
+#ifndef NDEBUG
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const,
+                            "Only meant for use in the debugger");
+#endif
 };
 
 using TypeContextDescriptor = TargetTypeContextDescriptor<InProcess>;
@@ -4242,6 +4247,11 @@ public:
   static bool classof(const TargetContextDescriptor<Runtime> *cd) {
     return cd->getKind() == ContextDescriptorKind::Enum;
   }
+
+#ifndef NDEBUG
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const,
+                            "Only meant for use in the debugger");
+#endif
 };
 
 using EnumDescriptor = TargetEnumDescriptor<InProcess>;
