@@ -9,36 +9,43 @@
 // don't support TSan.
 // UNSUPPORTED: remote_run
 
-// rdar://51730684
-// REQUIRES: disable
-
 // Test ThreadSanitizer execution end-to-end with libdispatch.
 
 import Dispatch
+
+let q = DispatchQueue(label: "q", attributes: .concurrent)
 
 let sync1 = DispatchSemaphore(value: 0)
 let sync2 = DispatchSemaphore(value: 0)
 let finish = DispatchSemaphore(value: 0)
 
-let q = DispatchQueue(label: "q", attributes: .concurrent)
+func wait1_signal2() { sync1.wait();   sync2.signal() }
+func signal1_wait2() { sync1.signal(); sync2.wait()   }
 
-var racy = 1
+func race() {
+  var racy = 1
 
-q.async {
-  sync1.wait()
-  sync2.signal()
-  racy = 2
-  finish.signal()
+  q.async {
+    wait1_signal2()
+    racy = 2
+    wait1_signal2()
+    finish.signal()
+  }
+  q.async {
+    signal1_wait2()
+    racy = 3
+    signal1_wait2()
+    finish.signal()
+  }
+
+  finish.wait()
+  finish.wait()
 }
-q.async {
-  sync1.signal()
-  sync2.wait()
-  racy = 3
-  finish.signal()
-}
 
-finish.wait()
-finish.wait()
+// TSan %deflake as part of the test.
+for _ in 1...10 {
+  race()
+}
 
 print("Done!")
 
