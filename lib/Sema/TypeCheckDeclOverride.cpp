@@ -934,45 +934,27 @@ static void checkOverrideAccessControl(ValueDecl *baseDecl, ValueDecl *decl,
 static GenericSignature *getNewGenericSignature(ValueDecl *base,
                                                 ValueDecl *derived) {
   auto baseGenericCtx = base->getAsGenericContext();
-  auto derivedGenericCtx = derived->getAsGenericContext();
   auto &ctx = base->getASTContext();
 
   if (!baseGenericCtx) {
     return nullptr;
   }
 
-  auto baseClass =
-      baseGenericCtx->getInnermostTypeContext()->getSelfClassDecl();
-  auto derivedClass =
-      derivedGenericCtx->getInnermostTypeContext()->getSelfClassDecl();
+  auto baseClass = base->getDeclContext()->getSelfClassDecl();
+  auto derivedClass = derived->getDeclContext()->getSelfClassDecl();
 
-  if (!derivedClass) {
+  if (!baseClass && !derivedClass) {
     return nullptr;
   }
 
-  if (!derivedClass->getInterfaceType()->is<LValueType>()) {
-    return nullptr;
-  }
-
-  auto subMap = derivedClass->getInterfaceType()->getContextSubstitutionMap(
+  auto subMap = derivedClass->getSuperclass()->getContextSubstitutionMap(
       derivedClass->getModuleContext(), baseClass);
 
-  auto *genericParams = baseGenericCtx->getGenericParams();
-  if (genericParams) {
-    SmallVector<GenericTypeParamDecl *, 4> newParams;
-
-    // First, clone the superclass constructor's generic parameter list,
-    // but change the depth of the generic parameters to be one greater
-    // than the depth of the subclass.
+  if (baseGenericCtx) {
     unsigned depth = 0;
+    
     if (auto *genericSig = baseClass->getGenericSignature())
       depth = genericSig->getGenericParams().back()->getDepth() + 1;
-
-    for (auto *param : genericParams->getParams()) {
-      auto *newParam = new (ctx) GenericTypeParamDecl(
-          baseClass, param->getName(), SourceLoc(), depth, param->getIndex());
-      newParams.push_back(newParam);
-    }
 
     GenericSignatureBuilder builder(ctx);
     builder.addGenericSignature(derivedClass->getGenericSignature());
@@ -982,17 +964,19 @@ static GenericSignature *getNewGenericSignature(ValueDecl *base,
     auto *baseClassSig = baseClass->getGenericSignature();
 
     unsigned superclassDepth = 0;
-    if (baseClassSig)
+    if (baseClassSig) {
       superclassDepth =
           baseGenericCtx->getGenericParams()->getParams().back()->getDepth() +
           1;
+    }
 
-    // We're going to be substituting the requirements of the base class
-    // initializer to form the requirements of the derived class initializer.
     auto substFn = [&](SubstitutableType *type) -> Type {
       auto *gp = cast<GenericTypeParamType>(type);
-      if (gp->getDepth() < superclassDepth)
+
+      if (gp->getDepth() < superclassDepth) {
         return Type(gp).subst(subMap);
+      }
+
       return CanGenericTypeParamType::get(
           gp->getDepth() - superclassDepth + depth, gp->getIndex(), ctx);
     };
@@ -1006,12 +990,12 @@ static GenericSignature *getNewGenericSignature(ValueDecl *base,
       return ProtocolConformanceRef(proto);
     };
 
-    for (auto reqt : baseClassSig->getRequirements())
-      if (auto substReqt = reqt.subst(substFn, lookupConformanceFn))
+    for (auto reqt : baseGenericCtx->getGenericSignature()->getRequirements()) {
+      if (auto substReqt = reqt.subst(substFn, lookupConformanceFn)) {
         builder.addRequirement(*substReqt, source, nullptr);
+      }
+    }
 
-    // Now form the substitution map that will be used to remap parameter
-    // types.
     subMap = SubstitutionMap::get(baseClassSig, substFn, lookupConformanceFn);
 
     auto *genericSig = std::move(builder).computeGenericSignature(SourceLoc());
