@@ -166,15 +166,15 @@ extension Decimal : Hashable, Comparable {
         }
     }
     
-    internal var doubleValue : Double {
+    internal var doubleValue: Double {
         if _length == 0 {
             return _isNegative == 1 ? Double.nan : 0
         }
 
         var d = 0.0
-        for idx in stride(from: min(_length, 8), to: 0, by: -1) {
-	    d = d * 65536 + Double(self[idx - 1])
-	}
+        for idx in (0..<min(_length, 8)).reversed() {
+            d = d * 65536 + Double(self[idx])
+        }
         
         if _exponent < 0 {
             for _ in _exponent..<0 {
