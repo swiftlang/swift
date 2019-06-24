@@ -112,6 +112,7 @@ struct TestOptions {
   bool timeRequest = false;
   unsigned repeatRequest = 1;
   llvm::StringMap<std::string> VFSFiles;
+  llvm::Optional<std::string> VFSName;
   llvm::Optional<bool> CancelOnSubsequentRequest;
   bool parseArgs(llvm::ArrayRef<const char *> Args);
   void printHelp(bool ShowHidden) const;
