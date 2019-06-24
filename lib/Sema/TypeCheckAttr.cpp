@@ -2967,47 +2967,49 @@ static AutoDiffParameterIndices *computeDifferentiationParameters(
 // The attribute name/location are used in diagnostics.
 static AutoDiffIndexSubset *computeTransposingParameters(
     TypeChecker &TC, ArrayRef<ParsedAutoDiffParameter> parsedWrtParams,
-    AbstractFunctionDecl *function, GenericEnvironment *derivativeGenEnv,
-    SourceLoc attrLoc
+    AbstractFunctionDecl *transposeFunc, bool isCurried,
+    GenericEnvironment *derivativeGenEnv, SourceLoc attrLoc
 ) {
   // Get function type and parameters.
-  TC.resolveDeclSignature(function);
-  auto *functionType = function->getInterfaceType()->eraseDynamicSelfType()
+  TC.resolveDeclSignature(transposeFunc);
+  auto *functionType = transposeFunc->getInterfaceType()->eraseDynamicSelfType()
       ->castTo<AnyFunctionType>();
   
   ArrayRef<TupleTypeElt> transposeResultTypes;
   // Return type of '@transposing' function can have single type or tuple
   // of types.
-  if (auto t = functionType->getResult()->getAs<TupleType>()) {
+  auto temp = functionType->getResult();
+  if (isCurried)
+    temp = temp->getAs<AnyFunctionType>()->getResult();
+  
+  if (auto t = temp->getAs<TupleType>()) {
     transposeResultTypes = t->getElements();
   } else {
-    transposeResultTypes = ArrayRef<TupleTypeElt>(functionType->getResult());
+    transposeResultTypes = ArrayRef<TupleTypeElt>(temp);
   }
   
-  auto &params = *function->getParameters();
-  auto isInstanceMethod = function->isInstanceMember();
+  auto &params = *transposeFunc->getParameters();
+  auto isInstanceMethod = transposeFunc->isInstanceMember();
   
-  // Diagnose if function has no parameters.
-  if (params.size() == 0) {
-    // If function is an instance method, diagnose only if `self` does not
-    // conform to `Differentiable`.
-    auto selfType = function->getImplicitSelfDecl()->getInterfaceType();
+  // Make sure the self type is differentiable.
+  if (isCurried) {
+    auto selfType = transposeFunc->getImplicitSelfDecl()->getInterfaceType();
     if (derivativeGenEnv)
       selfType = derivativeGenEnv->mapTypeIntoContext(selfType);
     // FIXME(TF-568): `Differentiable`-conforming protocols cannot define
     // `@differentiable` computed properties because the check below returns
     // false.
-    if (!conformsToDifferentiable(selfType, function)) {
+    if (!conformsToDifferentiable(selfType, transposeFunc)) {
       TC.diagnose(attrLoc, diag::diff_function_no_parameters,
-                  function->getFullName())
-      .highlight(function->getSignatureSourceRange());
+                  transposeFunc->getFullName())
+      .highlight(transposeFunc->getSignatureSourceRange());
       return nullptr;
     }
   }
   
   // If parsed differentiation parameters are empty, infer parameter indices
   // from the function type.
-  // TODO: !!!!!!!!!!!!!!!
+  // TODO(bartchr): still need to do this!
 //  if (parsedWrtParams.empty())
 //    return TypeChecker::inferTransposingParameters(
 //        function, derivativeGenEnv);
@@ -3792,7 +3794,6 @@ void AttributeChecker::visitTransposingAttr(TransposingAttr *attr) {
                                      ->eraseDynamicSelfType()
                                      ->castTo<AnyFunctionType>();
 //  auto transposeResultType = transpose->getResultInterfaceType();
-
   
   // Get checked wrt param indices.
   
@@ -3804,9 +3805,10 @@ void AttributeChecker::visitTransposingAttr(TransposingAttr *attr) {
   auto parsedWrtParams = attr->getParsedParameters();
   
   // If checked wrt param indices are not specified, compute them.
+  bool isCurried = transposeInterfaceType->getResult()->is<AnyFunctionType>();
   if (!checkedWrtParamIndices)
     checkedWrtParamIndices =
-        computeTransposingParameters(TC, parsedWrtParams, transpose,
+        computeTransposingParameters(TC, parsedWrtParams, transpose, isCurried,
                                      transpose->getGenericEnvironment(),
                                      attr->getLocation());
   if (!checkedWrtParamIndices) {
@@ -3817,7 +3819,6 @@ void AttributeChecker::visitTransposingAttr(TransposingAttr *attr) {
   // Compute expected original function type.
   auto *originalFnType =
       transposeInterfaceType->getTransposeOriginalFunctionType(attr);
-  originalFnType->dump();
   
   // Lookup original function.
   std::function<bool(GenericSignature *, GenericSignature *)>
