@@ -137,6 +137,9 @@ def repeat_request_EQ : Joined<["-"], "repeat-request=">, Alias<repeat_request>;
 def vfs_files : CommaJoined<["-"], "vfs-files=">,
   HelpText<"Injects a VFS into the request, overlaying files specified by the given <name>=<target> pairs over the real filesystem">;
 
+def vfs_name : Separate<["-"], "vfs-name">,
+  HelpText<"Specify a virtual filesystem name">;
+
 def help : Flag<["-", "--"], "help">,
   HelpText<"Display available options">;
 

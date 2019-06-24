@@ -989,8 +989,10 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     }
   }
 
+  if (Opts.VFSName) {
+    sourcekitd_request_dictionary_set_string(Req, KeyVFSName, Opts.VFSName->c_str());
+  }
   if (!Opts.VFSFiles.empty()) {
-    sourcekitd_request_dictionary_set_string(Req, KeyVFSName, "testvfs");
     sourcekitd_object_t VFSArgs = sourcekitd_request_array_create(nullptr, 0);
     for (auto &NameAndTarget : Opts.VFSFiles) {
       sourcekitd_request_array_set_string(VFSArgs, SOURCEKITD_ARRAY_APPEND,

@@ -942,6 +942,26 @@ void SwiftLangSupport::setFileSystemProvider(
   assert(Result.second && "tried to set existing FileSystemProvider");
 }
 
+llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> SwiftLangSupport::getFileSystem(const Optional<VFSOptions> &vfsOptions, std::string &error) {
+  if (!vfsOptions)
+    return llvm::vfs::getRealFileSystem();
+
+  auto provider = getFileSystemProvider(vfsOptions->name);
+  if (!provider) {
+    error = "unknown virtual filesystem '" + vfsOptions->name + "'";
+    return nullptr;
+  }
+
+  SmallString<0> smallError;
+  auto fileSystem = provider->getFileSystem(vfsOptions->arguments, smallError);
+  if (!fileSystem) {
+    error = smallError.str();
+    return nullptr;
+  }
+
+  return fileSystem;
+}
+
 CloseClangModuleFiles::~CloseClangModuleFiles() {
   clang::Preprocessor &PP = loader.getClangPreprocessor();
   clang::ModuleMap &ModMap = PP.getHeaderSearchInfo().getModuleMap();

@@ -1592,20 +1592,10 @@ void SwiftLangSupport::getCursorInfo(
     Optional<VFSOptions> vfsOptions,
     std::function<void(const RequestResult<CursorInfoData> &)> Receiver) {
 
-  auto fileSystem = llvm::vfs::getRealFileSystem();
-  if (vfsOptions) {
-    auto provider = getFileSystemProvider(vfsOptions->name);
-    if (!provider) {
-      return Receiver(RequestResult<CursorInfoData>::fromError(
-          "unknown virtual filesystem 'key.vfs.name'"));
-    }
-
-    SmallString<0> error;
-    fileSystem = provider->getFileSystem(vfsOptions->arguments, error);
-    if (!fileSystem) {
-      return Receiver(RequestResult<CursorInfoData>::fromError(error));
-    }
-  }
+  std::string error;
+  auto fileSystem = getFileSystem(vfsOptions, error);
+  if (!fileSystem)
+    return Receiver(RequestResult<CursorInfoData>::fromError(error));
 
   if (auto IFaceGenRef = IFaceGenContexts.get(InputFile)) {
     IFaceGenRef->accessASTAsync([this, IFaceGenRef, Offset, Actionables, Receiver] {
@@ -1842,20 +1832,11 @@ void SwiftLangSupport::getCursorInfoFromUSR(
     StringRef filename, StringRef USR, bool CancelOnSubsequentRequest,
     ArrayRef<const char *> Args, Optional<VFSOptions> vfsOptions,
     std::function<void(const RequestResult<CursorInfoData> &)> Receiver) {
-  auto fileSystem = llvm::vfs::getRealFileSystem();
-  if (vfsOptions) {
-    auto provider = getFileSystemProvider(vfsOptions->name);
-    if (!provider) {
-      return Receiver(RequestResult<CursorInfoData>::fromError(
-          "unknown virtual filesystem 'key.vfs.name'"));
-    }
+    std::string error;
 
-    SmallString<0> error;
-    fileSystem = provider->getFileSystem(vfsOptions->arguments, error);
-    if (!fileSystem) {
-      return Receiver(RequestResult<CursorInfoData>::fromError(error));
-    }
-  }
+  auto fileSystem = getFileSystem(vfsOptions, error);
+  if (!fileSystem)
+    return Receiver(RequestResult<CursorInfoData>::fromError(error));
 
   if (auto IFaceGenRef = IFaceGenContexts.get(filename)) {
     LOG_WARN_FUNC("Info from usr for generated interface not implemented yet.");

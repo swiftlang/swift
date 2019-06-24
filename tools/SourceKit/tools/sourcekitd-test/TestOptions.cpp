@@ -354,11 +354,16 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       break;
 
     case OPT_vfs_files:
+      VFSName = VFSName.getValueOr("testvfs");
       for (const char *VFSFile : InputArg->getValues()) {
         auto NameAndTarget = StringRef(VFSFile).split('=');
         VFSFiles.try_emplace(std::get<0>(NameAndTarget),
                              std::get<1>(NameAndTarget).str());
       }
+      break;
+
+    case OPT_vfs_name:
+      VFSName = InputArg->getValue();
       break;
 
     case OPT_UNKNOWN:

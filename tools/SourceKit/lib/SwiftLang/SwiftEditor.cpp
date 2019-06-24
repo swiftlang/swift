@@ -2107,20 +2107,11 @@ void SwiftEditorDocument::reportDocumentStructure(SourceFile &SrcFile,
 void SwiftLangSupport::editorOpen(
     StringRef Name, llvm::MemoryBuffer *Buf, EditorConsumer &Consumer,
     ArrayRef<const char *> Args, Optional<VFSOptions> vfsOptions) {
-  auto fileSystem = llvm::vfs::getRealFileSystem();
-  if (vfsOptions) {
-    auto provider = getFileSystemProvider(vfsOptions->name);
-    if (!provider) {
-      return Consumer.handleRequestError(
-          "unknown virtual filesystem 'key.vfs.name'");
-    }
 
-    SmallString<0> error;
-    fileSystem = provider->getFileSystem(vfsOptions->arguments, error);
-    if (!fileSystem) {
-      return Consumer.handleRequestError(error.c_str());
-    }
-  }
+  std::string error;
+  auto fileSystem = getFileSystem(vfsOptions, error);
+  if (!fileSystem)
+    return Consumer.handleRequestError(error.c_str());
 
   ImmutableTextSnapshotRef Snapshot = nullptr;
   auto EditorDoc = EditorDocuments->getByUnresolvedName(Name);

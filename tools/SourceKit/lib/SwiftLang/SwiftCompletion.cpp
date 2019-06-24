@@ -207,19 +207,10 @@ void SwiftLangSupport::codeComplete(
     SourceKit::CodeCompletionConsumer &SKConsumer, ArrayRef<const char *> Args,
     Optional<VFSOptions> vfsOptions) {
 
-  auto fileSystem = llvm::vfs::getRealFileSystem();
-  if (vfsOptions) {
-    auto provider = getFileSystemProvider(vfsOptions->name);
-    if (!provider) {
-      return SKConsumer.failed("unknown virtual filesystem 'key.vfs.name'");
-    }
-
-    SmallString<0> error;
-    fileSystem = provider->getFileSystem(vfsOptions->arguments, error);
-    if (!fileSystem) {
-      return SKConsumer.failed(error);
-    }
-  }
+  std::string error;
+  auto fileSystem = getFileSystem(vfsOptions, error);
+  if (!fileSystem)
+    return SKConsumer.failed(error);
 
   SwiftCodeCompletionConsumer SwiftConsumer([&](
       MutableArrayRef<CodeCompletionResult *> Results,
