@@ -304,8 +304,7 @@ ProtocolConformance *RequirementFailure::getConformanceForConditionalReq(
     return nullptr;
   }
 
-  auto *typeReqLoc = cs.getConstraintLocator(getRawAnchor(), path.drop_back(),
-                                             /*summaryFlags=*/0);
+  auto *typeReqLoc = getConstraintLocator(getRawAnchor(), path.drop_back());
 
   auto result = llvm::find_if(
       cs.CheckedConformances,
@@ -1926,8 +1925,7 @@ bool MissingCallFailure::diagnoseAsError() {
 
     case ConstraintLocator::AutoclosureResult: {
       auto &cs = getConstraintSystem();
-      auto loc = cs.getConstraintLocator(getRawAnchor(), path.drop_back(),
-                                         /*summaryFlags=*/0);
+      auto loc = getConstraintLocator(getRawAnchor(), path.drop_back());
       AutoClosureForwardingFailure failure(cs, loc);
       return failure.diagnoseAsError();
     }

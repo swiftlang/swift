@@ -2054,13 +2054,11 @@ static ConstraintFix *fixRequirementFailure(ConstraintSystem &cs, Type type1,
     auto reqPath = path.drop_back();
     // If underlying conformance requirement has been fixed,
     // then there is no reason to fix up conditional requirements.
-    if (cs.hasFixFor(cs.getConstraintLocator(anchor, reqPath,
-                                             /*summaryFlags=*/0)))
+    if (cs.hasFixFor(cs.getConstraintLocator(anchor, reqPath)))
       return nullptr;
   }
 
-  auto *reqLoc = cs.getConstraintLocator(anchor, path,
-                                         /*summaryFlags=*/0);
+  auto *reqLoc = cs.getConstraintLocator(anchor, path);
 
   auto reqKind = static_cast<RequirementKind>(req.getValue2());
   switch (reqKind) {
@@ -2232,8 +2230,7 @@ bool ConstraintSystem::repairFailures(
                                       getASTContext().TheEmptyTupleType);
       conversionsOrFixes.push_back(AddMissingArguments::create(
           *this, fnType, {FunctionType::Param(*arg)},
-          getConstraintLocator(anchor, path,
-                               /*summaryFlags=*/0)));
+          getConstraintLocator(anchor, path)));
     }
     break;
   }
