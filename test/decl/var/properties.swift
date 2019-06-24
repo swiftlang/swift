@@ -1278,6 +1278,18 @@ let sr8811c = (16, fatalError()) // expected-warning {{constant 'sr8811c' inferr
 
 let sr8811d: (Int, Never) = (16, fatalError()) // Ok
 
+// SR-10995
+
+class SR_10995 {
+  func makeDoubleOptionalNever() -> Never?? {
+    return nil
+  }
+
+  func sr_10995_foo() {
+    let doubleOptionalNever = makeDoubleOptionalNever() // expected-warning {{Constant 'doubleOptionalNever' inferred to have type 'Never??', which is an enum with no cases}}
+  }
+}
+
 // SR-9267
 
 class SR_9267 {}

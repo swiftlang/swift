@@ -1133,7 +1133,7 @@ recur:
     // a variable, or there is some other bug.  We always tell them that they
     // can silence the warning with an explicit type annotation
     // (and provide a fixit) as a note.
-    Type diagTy = type->getOptionalObjectType();
+    Type diagTy = type->lookThroughAllOptionalTypes();
     if (!diagTy) diagTy = type;
     
     auto diag = diag::type_inferred_to_undesirable_type;
