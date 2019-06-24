@@ -1028,9 +1028,9 @@ bool swift::isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl,
   return false;
 }
 
-Optional<Type>
-swift::getRootTypeOfKeypathDynamicMember(SubscriptDecl *subscript,
-                                         const DeclContext *DC) {
+Optional<std::pair<Type, Type>>
+swift::getRootAndResultTypeOfKeypathDynamicMember(SubscriptDecl *subscript,
+                                                  const DeclContext *DC) {
   auto &TC = TypeChecker::createForContext(DC->getASTContext());
 
   if (!isValidKeyPathDynamicMemberLookup(subscript, TC))
@@ -1040,11 +1040,10 @@ swift::getRootTypeOfKeypathDynamicMember(SubscriptDecl *subscript,
   auto keyPathType = param->getType()->getAs<BoundGenericType>();
   if (!keyPathType)
     return None;
-
-  assert(!keyPathType->getGenericArgs().empty() &&
+  auto genericArgs = keyPathType->getGenericArgs();
+  assert(!genericArgs.empty() && genericArgs.size() == 2 &&
          "invalid keypath dynamic member");
-  auto rootType = keyPathType->getGenericArgs()[0];
-  return rootType;
+  return std::pair<Type, Type>{genericArgs[0], genericArgs[1]};
 }
 
 /// The @dynamicMemberLookup attribute is only allowed on types that have at

@@ -973,18 +973,20 @@ static void lookupVisibleDynamicMemberLookupDecls(
     if (!subscript)
       continue;
 
-    auto rootType = getRootTypeOfKeypathDynamicMember(subscript, dc);
-    if (!rootType)
+    auto rootAndResult =
+        getRootAndResultTypeOfKeypathDynamicMember(subscript, dc);
+    if (!rootAndResult)
       continue;
+    auto rootType = rootAndResult->first;
 
     auto subs =
         baseType->getMemberSubstitutionMap(dc->getParentModule(), subscript);
-    auto memberType = rootType->subst(subs);
+    auto memberType = rootType.subst(subs);
     if (!memberType || !memberType->mayHaveMembers())
       continue;
 
-    KeyPathDynamicMemberConsumer::SubscriptChange(consumer, subscript,
-                                                  baseType);
+    KeyPathDynamicMemberConsumer::SubscriptChange sub(consumer, subscript,
+                                                      baseType);
 
     lookupVisibleMemberAndDynamicMemberDecls(memberType, consumer, consumer, dc,
                                              LS, reason, typeResolver, GSB,
