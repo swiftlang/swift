@@ -1263,6 +1263,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   bool HasSpace = false;
   bool ShouldCompleteCallPatternAfterParen = true;
   bool PreferFunctionReferencesToCalls = false;
+  bool AttTargetIsIndependent = false;
   Optional<DeclKind> AttTargetDK;
   Optional<StmtKind> ParentStmtKind;
 
@@ -1353,7 +1354,12 @@ public:
   void setAttrTargetDeclKind(Optional<DeclKind> DK) override {
     if (DK == DeclKind::PatternBinding)
       DK = DeclKind::Var;
-    AttTargetDK = DK;
+    else if (DK == DeclKind::Param)
+      // For params, consider the attribute is always for the decl.
+      AttTargetIsIndependent = false;
+
+    if (!AttTargetIsIndependent)
+      AttTargetDK = DK;
   }
 
   void completeExpr() override;
@@ -1375,7 +1381,7 @@ public:
   void completeCaseStmtKeyword() override;
   void completeCaseStmtBeginning() override;
   void completeCaseStmtDotPrefix() override;
-  void completeDeclAttrBeginning(bool Sil) override;
+  void completeDeclAttrBeginning(bool Sil, bool isIndependent) override;
   void completeDeclAttrParam(DeclAttrKind DK, int Index) override;
   void completeInPrecedenceGroup(SyntaxKind SK) override;
   void completeNominalMemberBeginning(
@@ -4612,10 +4618,12 @@ void CodeCompletionCallbacksImpl::completeDeclAttrParam(DeclAttrKind DK,
   CurDeclContext = P.CurDeclContext;
 }
 
-void CodeCompletionCallbacksImpl::completeDeclAttrBeginning(bool Sil) {
+void CodeCompletionCallbacksImpl::completeDeclAttrBeginning(
+    bool Sil, bool isIndependent) {
   Kind = CompletionKind::AttributeBegin;
   IsInSil = Sil;
   CurDeclContext = P.CurDeclContext;
+  AttTargetIsIndependent = isIndependent;
 }
 
 void CodeCompletionCallbacksImpl::completeInPrecedenceGroup(SyntaxKind SK) {

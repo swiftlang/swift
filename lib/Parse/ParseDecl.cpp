@@ -1753,8 +1753,13 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc At
       Tok.isNot(tok::kw_inout)) {
 
     if (Tok.is(tok::code_complete)) {
-      if (CodeCompletion)
-        CodeCompletion->completeDeclAttrBeginning(isInSILMode());
+      if (CodeCompletion) {
+        // If the next token is not on the same line, this attribute might be
+        // starting new declaration instead of adding attribute to existing
+        // decl.
+        auto isIndependent = peekToken().isAtStartOfLine();
+        CodeCompletion->completeDeclAttrBeginning(isInSILMode(), isIndependent);
+      }
       consumeToken(tok::code_complete);
       return makeParserCodeCompletionStatus();
     }
