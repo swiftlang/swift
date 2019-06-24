@@ -1994,12 +1994,80 @@ public:
 
   Type getTypeOfMember(const ValueDecl *VD,
                        DynamicLookupInfo dynamicLookupInfo) {
-    if (dynamicLookupInfo.getKind() == DynamicLookupInfo::None) {
+    switch (dynamicLookupInfo.getKind()) {
+    case DynamicLookupInfo::None:
       return getTypeOfMember(VD, this->ExprType);
-    } else {
-      // FIXME: for keypath dynamic members we should substitute the subscript
-      // return type; for now just avoid substituting at all by passing null.
+    case DynamicLookupInfo::AnyObject:
       return getTypeOfMember(VD, Type());
+    case DynamicLookupInfo::KeyPathDynamicMember: {
+      auto &keyPathInfo = dynamicLookupInfo.getKeyPathDynamicMember();
+
+      // Map the result of VD to keypath member lookup results.
+      // Given:
+      //   struct Wrapper<T> {
+      //     subscript<U>(dynamicMember: KeyPath<T, U>) -> Wrapped<U> { get }
+      //   }
+      //   struct Circle {
+      //     var center: Point { get }
+      //     var radius: Length { get }
+      //   }
+      //
+      // Consider 'Wrapper<Circle>.center'.
+      //   'VD' is 'Circle.center' decl.
+      //   'keyPathInfo.subscript' is 'Wrapper<T>.subscript' decl.
+      //   'keyPathInfo.baseType' is 'Wrapper<Circle>' type.
+
+      // FIXME: Handle nested keypath member lookup.
+      // i.e. cases where 'ExprType' != 'keyPathInfo.baseType'.
+
+      auto *SD = keyPathInfo.subscript;
+      auto elementTy = SD->getElementTypeLoc().getType();
+      if (!elementTy->hasTypeParameter())
+        return elementTy;
+
+      // Map is:
+      //   { τ_0_0(T) => Circle
+      //     τ_1_0(U) => U }
+      auto subs = keyPathInfo.baseType->getMemberSubstitutions(SD);
+
+      // Extract the root and result type of the KeyPath type in the parameter.
+      // i.e. 'T' and 'U'
+      auto rootAndResult =
+          getRootAndResultTypeOfKeypathDynamicMember(SD, CurrDeclContext);
+
+      // If the keyPath result type has type parameters, that might affect the
+      // subscript result type.
+      auto keyPathResultTy = rootAndResult->second->mapTypeOutOfContext();
+      if (keyPathResultTy->hasTypeParameter()) {
+        auto keyPathRootTy =
+            rootAndResult->first.subst(QueryTypeSubstitutionMap{subs},
+                                       LookUpConformanceInModule(CurrModule));
+
+        // The result type of the VD.
+        // i.e. 'Circle.center' => 'Point'.
+        auto innerResultTy = getTypeOfMember(VD, keyPathRootTy);
+
+        if (auto paramTy = keyPathResultTy->getAs<GenericTypeParamType>()) {
+          // Replace keyPath result type in the map with the inner result type.
+          // i.e. Make the map as:
+          //   { τ_0_0(T) => Circle
+          //     τ_1_0(U) => Point }
+          auto key =
+              paramTy->getCanonicalType()->castTo<GenericTypeParamType>();
+          subs[key] = innerResultTy;
+        } else {
+          // FIXME: Handle the case where the KeyPath result is generic.
+          // e.g. 'subscript<U>(dynamicMember: KeyPath<T, Box<U>>) -> Bag<U>'
+          // For now, just return the inner type.
+          return innerResultTy;
+        }
+      }
+
+      // Substitute the element type of the subscript using modified map.
+      // i.e. 'Wrapped<U>' => 'Wrapped<Point>'.
+      return elementTy.subst(QueryTypeSubstitutionMap{subs},
+                             LookUpConformanceInModule(CurrModule));
+    }
     }
   }
 
