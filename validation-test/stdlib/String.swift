@@ -602,11 +602,11 @@ StringTests.test("appendToSubstringBug")
     if s0.unusedCapacity == 0 { s0 += "y" }
     let cap = s0.unusedCapacity
     expectNotEqual(0, cap)
-    
+
     // This sorta checks for the original bug
     expectEqual(
       cap, String(s0[s0.index(_nth: 1)..<s0.endIndex]).unusedCapacity)
-    
+
     return (s0, cap)
   }
 
@@ -616,7 +616,7 @@ StringTests.test("appendToSubstringBug")
       return (String(s0[s0.index(_nth: 5)..<s0.endIndex]), unused)
     }()
     let originalID = s.bufferID
-    // Appending to a String always results in storage that 
+    // Appending to a String always results in storage that
     // starts at the beginning of its native buffer
     s += "z"
     expectNotEqual(originalID, s.bufferID)
@@ -880,7 +880,7 @@ StringTests.test("stringGutsExtensibility")
   for k in 0..<3 {
     for count in 1..<16 {
       for boundary in 0..<count {
-        
+
         var x = (
             k == 0 ? asciiString("b")
           : k == 1 ? ("b" as NSString as String)
@@ -888,7 +888,7 @@ StringTests.test("stringGutsExtensibility")
         )
 
         if k == 0 { expectTrue(x._guts.isFastUTF8) }
-        
+
         for i in 0..<count {
           x.append(String(
             decoding: repeatElement(i < boundary ? ascii : nonAscii, count: 3),
@@ -897,7 +897,7 @@ StringTests.test("stringGutsExtensibility")
         // Make sure we can append pure ASCII to wide storage
         x.append(String(
           decoding: repeatElement(ascii, count: 2), as: UTF16.self))
-        
+
         expectEqualSequence(
           [UTF16.CodeUnit(UnicodeScalar("b").value)]
           + Array(repeatElement(ascii, count: 3*boundary))
@@ -951,17 +951,17 @@ StringTests.test("stringGutsReserve")
       fatalError("case unhandled!")
     }
     expectEqual(isSwiftNative(base), startedNative)
-    
+
     let originalBuffer = base.bufferID
     let isUnique = base._guts.isUniqueNative
     let startedUnique =
       startedNative &&
       base._classify()._objectIdentifier != nil &&
       isUnique
-    
+
     base.reserveCapacity(16)
     // Now it's unique
-    
+
     // If it was already native and unique, no reallocation
     if startedUnique && startedNative {
       expectEqual(originalBuffer, base.bufferID)
@@ -1302,14 +1302,14 @@ StringTests.test("unicodeViews") {
   // FIXME: note changed String(describing:) results
   expectEqual(
     "\u{FFFD}",
-    String(describing: 
+    String(describing:
       winter.utf8[
         winter.utf8.startIndex
         ..<
         winter.utf8.index(after: winter.utf8.index(after: winter.utf8.startIndex))
       ]))
   */
-  
+
   expectEqual(
     "\u{1F3C2}", String(
       winter.utf8[winter.utf8.startIndex..<winter.utf8.index(_nth: 4)]))
@@ -1317,7 +1317,7 @@ StringTests.test("unicodeViews") {
   expectEqual(
     "\u{1F3C2}", String(
       winter.utf16[winter.utf16.startIndex..<winter.utf16.index(_nth: 2)]))
-  
+
   expectEqual(
     "\u{1F3C2}", String(
       winter.unicodeScalars[
@@ -1358,7 +1358,7 @@ StringTests.test("indexConversion")
   let s = "go further into the larder to barter."
 
   var matches: [String] = []
-  
+
   re.enumerateMatches(
     in: s, options: NSRegularExpression.MatchingOptions(), range: NSRange(0..<s.utf16.count)
   ) {
@@ -1812,18 +1812,18 @@ public let testSuffix = "z"
 StringTests.test("COW.Smoke") {
   var s1 = "COW Smoke Cypseloides" + testSuffix
   let identity1 = s1._rawIdentifier()
-  
+
   var s2 = s1
   expectEqual(identity1, s2._rawIdentifier())
-  
+
   s2.append(" cryptus")
   expectTrue(identity1 != s2._rawIdentifier())
-  
+
   s1.remove(at: s1.startIndex)
   expectEqual(identity1, s1._rawIdentifier())
-  
+
   _fixLifetime(s1)
-  _fixLifetime(s2)  
+  _fixLifetime(s2)
 }
 
 struct COWStringTest {
@@ -1841,7 +1841,7 @@ for test in testCases {
   StringTests.test("COW.\(test.name).IndexesDontAffectUniquenessCheck") {
     let s = test.test + testSuffix
     let identity1 = s._rawIdentifier()
-  
+
     let startIndex = s.startIndex
     let endIndex = s.endIndex
     expectNotEqual(startIndex, endIndex)
@@ -1849,9 +1849,9 @@ for test in testCases {
     expectLE(startIndex, endIndex)
     expectGT(endIndex, startIndex)
     expectGE(endIndex, startIndex)
-  
+
     expectEqual(identity1, s._rawIdentifier())
-  
+
     // Keep indexes alive during the calls above
     _fixLifetime(startIndex)
     _fixLifetime(endIndex)
@@ -1973,7 +1973,7 @@ for test in testCases {
 
     expectGT(s.count, 0)
     expectEqual(identity1, s._rawIdentifier())
-  } 
+  }
 }
 
 for test in testCases {
@@ -2028,16 +2028,16 @@ enum _Ordering: Int, Equatable {
   }
 }
 
-struct ComparisonTestCase {  
+struct ComparisonTestCase {
   var strings: [String]
   // var test: (String, String) -> Void
   var comparison: _Ordering
-  
+
   init(_ strings: [String], _ comparison: _Ordering) {
     self.strings = strings
     self.comparison = comparison
   }
-  
+
   func test() {
     for pair in zip(strings, strings[1...]) {
       switch comparison {
@@ -2064,7 +2064,7 @@ struct ComparisonTestCase {
       }
     }
   }
-  
+
   func testOpaqueStrings() {
 #if _runtime(_ObjC)
     let opaqueStrings = strings.map { NSSlowString(string: $0) as String }
@@ -2081,16 +2081,16 @@ struct ComparisonTestCase {
     expectEqualSequence(strings, opaqueStrings)
 #endif
   }
-  
+
   func testOpaqueSubstrings() {
 #if _runtime(_ObjC)
     for pair in zip(strings, strings[1...]) {
       let string1 = pair.0.dropLast()
       let string2 = pair.1
       let opaqueString = (NSSlowString(string: pair.0) as String).dropLast()
-      
+
       guard string1.count > 0 else { return }
-      
+
       expectEqual(string1, opaqueString)
       expectEqual(string1 < string2, opaqueString < string2)
       expectEqual(string1 > string2, opaqueString > string2)
@@ -2110,7 +2110,7 @@ let comparisonTestCases = [
 
   ComparisonTestCase(["á", "\u{0061}\u{0301}"], .equal),
   ComparisonTestCase(["à", "\u{0061}\u{0301}", "â", "\u{e3}", "a\u{0308}"], .less),
-  
+
   // Exploding scalars AND exploding segments
   ComparisonTestCase(["\u{fa2}", "\u{fa1}\u{fb7}"], .equal),
   ComparisonTestCase([
@@ -2143,15 +2143,15 @@ let comparisonTestCases = [
     "🧀" // D83E DDC0 -- aka a really big scalar
   ], .less),
 
-  
+
   ComparisonTestCase(["f̛̗̘̙̜̹̺̻̼͇͈͉͍͎̽̾̿̀́͂̓̈́͆͊͋͌̚ͅ͏͓͔͕͖͙͚͐͑͒͗͛ͣͤͥͦ͘͜͟͢͝͞͠͡", "ơ̗̘̙̜̹̺̻̼͇͈͉͍͎̽̾̿̀́͂̓̈́͆͊͋͌̚ͅ͏͓͔͕͖͙͚͐͑͒͗͛ͥͦͧͨͩͪͫͬͭͮ͘"], .less),
   ComparisonTestCase(["\u{f90b}", "\u{5587}"], .equal),
-  
+
   ComparisonTestCase(["a\u{1D160}a", "a\u{1D158}\u{1D1C7}"], .less),
 
   ComparisonTestCase(["a\u{305}\u{315}", "a\u{315}\u{305}"], .equal),
   ComparisonTestCase(["a\u{315}bz", "a\u{315}\u{305}az"], .greater),
-  
+
   ComparisonTestCase(["\u{212b}", "\u{00c5}"], .equal),
   ComparisonTestCase([
     "A",
@@ -2181,7 +2181,7 @@ let comparisonTestCases = [
     "\u{FFEE}", // half width CJK dot
     "🧀", // D83E DDC0 -- aka a really big scalar
   ], .less),
-  
+
   ComparisonTestCase(["ư̴̵̶̷̸̗̘̙̜̹̺̻̼͇͈͉͍͎̽̾̿̀́͂̓̈́͆͊͋͌̚ͅ͏͓͔͕͖͙͚͐͑͒͗͛ͣͤͥͦͧͨͩͪͫͬͭͮ͘͜͟͢͝͞͠͡", "ì̡̢̧̨̝̞̟̠̣̤̥̦̩̪̫̬̭̮̯̰̹̺̻̼͇͈͉͍͎́̂̃̄̉̊̋̌̍̎̏̐̑̒̓̽̾̿̀́͂̓̈́͆͊͋͌ͅ͏͓͔͕͖͙͐͑͒͗ͬͭͮ͘"], .greater),
   ComparisonTestCase(["ư̴̵̶̷̸̗̘̙̜̹̺̻̼͇͈͉͍͎̽̾̿̀́͂̓̈́͆͊͋͌̚ͅ͏͓͔͕͖͙͚͐͑͒͗͛ͣͤͥͦͧͨͩͪͫͬͭͮ͘͜͟͢͝͞͠͡", "aì̡̢̧̨̝̞̟̠̣̤̥̦̩̪̫̬̭̮̯̰̹̺̻̼͇͈͉͍͎́̂̃̄̉̊̋̌̍̎̏̐̑̒̓̽̾̿̀́͂̓̈́͆͊͋͌ͅ͏͓͔͕͖͙͐͑͒͗ͬͭͮ͘"], .greater),
   ComparisonTestCase(["ì̡̢̧̨̝̞̟̠̣̤̥̦̩̪̫̬̭̮̯̰̹̺̻̼͇͈͉͍͎́̂̃̄̉̊̋̌̍̎̏̐̑̒̓̽̾̿̀́͂̓̈́͆͊͋͌ͅ͏͓͔͕͖͙͐͑͒͗ͬͭͮ͘", "ì̡̢̧̨̝̞̟̠̣̤̥̦̩̪̫̬̭̮̯̰̹̺̻̼͇͈͉͍͎́̂̃̄̉̊̋̌̍̎̏̐̑̒̓̽̾̿̀́͂̓̈́͆͊͋͌ͅ͏͓͔͕͖͙͐͑͒͗ͬͭͮ͘"], .equal)
@@ -2209,7 +2209,7 @@ StringTests.test("Comparison.Substrings") {
   let str = "abcdefg"
   let expectedStr = "bcdef"
   let substring = str.dropFirst().dropLast()
-  
+
   expectEqual(expectedStr, substring)
 }
 
@@ -2220,7 +2220,7 @@ StringTests.test("Comparison.Substrings/Opaque")
   let str = NSSlowString(string: "abcdefg") as String
   let expectedStr = NSSlowString(string: "bcdef") as String
   let substring = str.dropFirst().dropLast()
-  
+
   expectEqual(expectedStr, substring)
 #endif
 }
@@ -2228,7 +2228,7 @@ StringTests.test("Comparison.Substrings/Opaque")
 StringTests.test("NormalizationBufferCrashRegressionTest") {
   let str = "\u{0336}\u{0344}\u{0357}\u{0343}\u{0314}\u{0351}\u{0340}\u{0300}\u{0340}\u{0360}\u{0314}\u{0357}\u{0315}\u{0301}\u{0344}a"
   let set = Set([str])
-  
+
   expectTrue(set.contains(str))
 }
 
