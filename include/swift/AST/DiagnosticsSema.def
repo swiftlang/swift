@@ -2740,7 +2740,7 @@ ERROR(implements_attr_protocol_not_conformed_to,none,
 ERROR(differentiable_attr_void_result,none,
       "cannot differentiate void function %0", (DeclName))
 ERROR(differentiable_attr_inout_argument,none,
-      "cannot differentiate function %0 with inout arguments", (DeclName))
+      "cannot differentiate function %0 with respect to an 'inout' parameter", (DeclName))
 ERROR(differentiable_attr_associated_function_protocol,none,
       "cannot specify associated differentiation function on protocol "
       "requirement", ())
