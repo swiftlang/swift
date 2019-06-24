@@ -1132,12 +1132,11 @@ static Type diagnoseUnknownType(TypeResolution resolution,
     }
 
     // Try ignoring access control.
-    DeclContext *lookupDC = dc;
     NameLookupOptions relookupOptions = lookupOptions;
     relookupOptions |= NameLookupFlags::KnownPrivate;
     relookupOptions |= NameLookupFlags::IgnoreAccessControl;
     auto inaccessibleResults =
-    TypeChecker::lookupUnqualifiedType(lookupDC, comp->getIdentifier(),
+    TypeChecker::lookupUnqualifiedType(dc, comp->getIdentifier(),
                                        comp->getIdLoc(), relookupOptions);
     if (!inaccessibleResults.empty()) {
       // FIXME: What if the unviable candidates have different levels of access?
@@ -1283,7 +1282,6 @@ resolveTopLevelIdentTypeComponent(TypeResolution resolution,
   // Resolve the first component, which is the only one that requires
   // unqualified name lookup.
   auto DC = resolution.getDeclContext();
-  DeclContext *lookupDC = DC;
 
   // Dynamic 'Self' in the result type of a function body.
   if (options.getBaseContext() == TypeResolverContext::DynamicSelfResult &&
@@ -1305,7 +1303,7 @@ resolveTopLevelIdentTypeComponent(TypeResolution resolution,
   NameLookupOptions lookupOptions = defaultUnqualifiedLookupOptions;
   if (options.contains(TypeResolutionFlags::KnownNonCascadingDependency))
     lookupOptions |= NameLookupFlags::KnownPrivate;
-  auto globals = TypeChecker::lookupUnqualifiedType(lookupDC,
+  auto globals = TypeChecker::lookupUnqualifiedType(DC,
                                                     id,
                                                     comp->getIdLoc(),
                                                     lookupOptions);
