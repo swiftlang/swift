@@ -3069,6 +3069,17 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
       ->castTo<AnyFunctionType>();
   bool isMethod = original->hasImplicitSelfDecl();
 
+  // Check if there are any inout parameters.
+  for (auto &param : originalFnTy->getParams()) {
+    if (param.isInOut()) {
+      TC.diagnose(attr->getLocation(), diag::differentiable_attr_inout_argument,
+                  original->getFullName())
+          .highlight(original->getSourceRange());
+      attr->setInvalid();
+      return;
+    }
+  }
+
   // If the original function returns the empty tuple type, there's no output to
   // differentiate from.
   auto originalResultTy = originalFnTy->getResult();
