@@ -6,6 +6,9 @@ import subprocess
 import sys
 
 
+useCSV = False
+
+
 def main(arguments):
     parser = argparse.ArgumentParser(
         description='Analyze the code size in a binary')
@@ -16,13 +19,20 @@ def main(arguments):
                         default=False)
     parser.add_argument('-list-category', type=str,
                         help='list symbols in category')
+    parser.add_argument('-csv', dest='use_csv', action='store_true',
+                        help='print results as csv')
     parser.add_argument('-uncategorized', action='store_true',
                         help='show all uncategorized symbols',
                         dest='show_uncategorized',
                         default=False)
     parser.add_argument('bin', help='the binary')
+    parser.set_defaults(use_csv=False)
 
     args = parser.parse_args(arguments)
+    if args.use_csv:
+        global useCSV
+        useCSV = True
+        print("Using csv")
 
     segments = parse_segments(args.bin, args.arch)
 
@@ -216,11 +226,15 @@ class Categories(object):
             total_size += size
             if size > 0:
                 sorted_categories.append(
-                        (name, size, (float(size) * 100) / section_size))
-        sorted_categories.sort(key = lambda entry : entry [1], reverse=True)
+                    (name, size, (float(size) * 100) / section_size))
+        sorted_categories.sort(key=lambda entry: entry[1], reverse=True)
         for category in sorted_categories:
-            print("%60s: %8d (%6.2f%%)" %
-                    (category[0], category[1], category[2]))
+            if useCSV:
+                print("%s;%d;%.2f%%" %
+                      (category[0], category[1], category[2]))
+            else:
+                print("%60s: %8d (%6.2f%%)" %
+                      (category[0], category[1], category[2]))
         print("%60s: %8d (%6.2f%%)" % ('TOTAL', total_size, float(100)))
 
     def uncatorizedSymbols(self):
