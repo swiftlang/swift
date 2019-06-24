@@ -12,13 +12,6 @@
 // RUN: %FileCheck -check-prefix=CHECK -check-prefix=RESILIENCE %s < %t/resilience2.dump.txt
 // RUN: %FileCheck -check-prefix=NEGATIVE %s < %t/resilience2.dump.txt
 
-// FIXME: The alternate -enable-resilience flag is going away soon.
-
-// RUN: %target-swift-frontend -emit-module -o %t -enable-resilience %s
-// RUN: llvm-bcanalyzer -dump %t/resilience.swiftmodule > %t/resilience2.dump.txt
-// RUN: %FileCheck -check-prefix=CHECK -check-prefix=RESILIENCE %s < %t/resilience2.dump.txt
-// RUN: %FileCheck -check-prefix=NEGATIVE %s < %t/resilience2.dump.txt
-
 // CHECK: <MODULE_BLOCK {{.*}}>
 // RESILIENCE: <RESILIENCE_STRATEGY abbrevid={{[0-9]+}} op0=1/>
 // FRAGILE-NOT: <RESILIENCE_STRATEGY abbrevid={{[0-9]+}}
