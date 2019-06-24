@@ -2245,8 +2245,7 @@ bool ConstraintSystem::repairFailures(
                                       getASTContext().TheEmptyTupleType);
       conversionsOrFixes.push_back(AddMissingArguments::create(
           *this, fnType, {FunctionType::Param(*arg)},
-          getConstraintLocator(anchor, path,
-                               /*summaryFlags=*/0)));
+          getConstraintLocator(anchor, path)));
     }
     break;
   }

@@ -147,6 +147,14 @@ protected:
     return nullptr;
   }
 
+  /// Retrive the constraint locator for the given anchor and
+  /// path, uniqued and automatically calculate the summary flags
+  ConstraintLocator *
+  getConstraintLocator(Expr *anchor,
+                       ArrayRef<ConstraintLocator::PathElement> path) {
+    return CS.getConstraintLocator(anchor, path);
+  }
+
   /// \returns true is locator hasn't been simplified down to expression.
   bool hasComplexLocator() const { return HasComplexLocator; }
 
