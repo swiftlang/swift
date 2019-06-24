@@ -552,9 +552,7 @@ public:
 private:
   bool indexLocals() override { return true; }
   void failed(StringRef error) override {}
-  bool recordHash(StringRef hash, bool isKnown) override { return true; }
-  bool startDependency(StringRef name, StringRef path, bool isClangModule,
-                       bool isSystem, StringRef hash) override {
+  bool startDependency(StringRef name, StringRef path, bool isClangModule, bool isSystem) override {
     return true;
   }
   bool finishDependency(bool isClangModule) override { return true; }

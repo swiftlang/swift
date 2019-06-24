@@ -96,8 +96,9 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
   // If the base method is less visible than the derived method, we need
   // a thunk.
   bool baseLessVisibleThanDerived =
-    (derivedDecl->isEffectiveLinkageMoreVisibleThan(baseDecl) &&
-     !usesObjCDynamicDispatch);
+    (!usesObjCDynamicDispatch &&
+     !derivedDecl->isFinal() &&
+     derivedDecl->isEffectiveLinkageMoreVisibleThan(baseDecl));
 
   // Determine the derived thunk type by lowering the derived type against the
   // abstraction pattern of the base.

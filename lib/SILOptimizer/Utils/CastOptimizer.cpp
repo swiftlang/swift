@@ -320,7 +320,7 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
   // Temporary to hold the intermediate result.
   AllocStackInst *Tmp = nullptr;
   CanType OptionalTy;
-  SILValue InOutOptionalParam;
+  SILValue outOptionalParam;
   if (isConditional) {
     // Create a temporary
     OptionalTy = OptionalType::get(Dest->getType().getASTType())
@@ -328,16 +328,16 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
                      ->getCanonicalType();
     Tmp = Builder.createAllocStack(Loc,
                                    SILType::getPrimitiveObjectType(OptionalTy));
-    InOutOptionalParam = Tmp;
+    outOptionalParam = Tmp;
   } else {
-    InOutOptionalParam = Dest;
+    outOptionalParam = Dest;
   }
 
   // Emit a retain.
   SILValue srcArg = Builder.emitCopyValueOperation(Loc, srcOp);
 
   SmallVector<SILValue, 1> Args;
-  Args.push_back(InOutOptionalParam);
+  Args.push_back(outOptionalParam);
   Args.push_back(srcArg);
   Args.push_back(MetaTyVal);
 
@@ -415,13 +415,13 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
     CaseBBs.emplace_back(SomeDecl, BridgeSuccessBB);
     CaseBBs.emplace_back(mod.getASTContext().getOptionalNoneDecl(), FailureBB);
 
-    Builder.createSwitchEnumAddr(Loc, InOutOptionalParam, nullptr, CaseBBs);
+    Builder.createSwitchEnumAddr(Loc, outOptionalParam, nullptr, CaseBBs);
 
     Builder.setInsertionPoint(FailureBB->begin());
     Builder.createDeallocStack(Loc, Tmp);
 
     Builder.setInsertionPoint(BridgeSuccessBB);
-    auto Addr = Builder.createUncheckedTakeEnumDataAddr(Loc, InOutOptionalParam,
+    auto Addr = Builder.createUncheckedTakeEnumDataAddr(Loc, outOptionalParam,
                                                         SomeDecl);
 
     Builder.createCopyAddr(Loc, Addr, Dest, IsTake, IsInitialization);

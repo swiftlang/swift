@@ -103,6 +103,9 @@ enum class FixKind : uint8_t {
   /// Add explicit `()` at the end of function or member to call it.
   InsertCall,
 
+  /// Add one or more property unwrap operators ('$')
+  InsertPropertyWrapperUnwrap,
+
   /// Instead of spelling out `subscript` directly, use subscript operator.
   UseSubscriptOperator,
 
@@ -235,11 +238,14 @@ public:
 class ForceOptional final : public ConstraintFix {
   Type BaseType;
   Type UnwrappedType;
+  ConstraintLocator *FullLocator;
 
   ForceOptional(ConstraintSystem &cs, Type baseType, Type unwrappedType,
-                ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::ForceOptional, locator), BaseType(baseType),
-        UnwrappedType(unwrappedType) {
+                ConstraintLocator *simplifiedLocator,
+                ConstraintLocator *fullLocator)
+      : ConstraintFix(cs, FixKind::ForceOptional, simplifiedLocator),
+        BaseType(baseType), UnwrappedType(unwrappedType),
+        FullLocator(fullLocator) {
     assert(baseType && "Base type must not be null");
     assert(unwrappedType && "Unwrapped type must not be null");
   }
@@ -624,6 +630,34 @@ public:
 
   static InsertExplicitCall *create(ConstraintSystem &cs,
                                     ConstraintLocator *locator);
+};
+
+class InsertPropertyWrapperUnwrap final : public ConstraintFix {
+  DeclName PropertyName;
+  Type Base;
+  Type Wrapper;
+
+  InsertPropertyWrapperUnwrap(ConstraintSystem &cs, DeclName propertyName,
+                              Type base, Type wrapper,
+                              ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::InsertPropertyWrapperUnwrap, locator),
+        PropertyName(propertyName), Base(base), Wrapper(wrapper) {}
+
+public:
+  std::string getName() const override {
+    return "insert a $ to unwrap the property wrapper";
+  }
+
+  DeclName getPropertyName() const { return PropertyName; }
+  Type getBase() const { return Base; }
+  Type getWrapper() const { return Wrapper; }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static InsertPropertyWrapperUnwrap *create(ConstraintSystem &cs,
+                                             DeclName propertyName, Type base,
+                                             Type wrapper,
+                                             ConstraintLocator *locator);
 };
 
 class UseSubscriptOperator final : public ConstraintFix {

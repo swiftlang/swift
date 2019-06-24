@@ -1677,12 +1677,13 @@ buildDescriptorPath(const ContextDescriptor *context) const {
       hasNonKeyGenericParams = true;
   }
 
-  // Form the path element.
-  descriptorPath.push_back(PathElement{localGenericParams,
-                                       context->getNumGenericParams(),
-                                       numKeyGenericParamsInParent,
-                                       numKeyGenericParamsHere,
-                                       hasNonKeyGenericParams});
+  // Form the path element if there are any generic parameters to be found.
+  if (numKeyGenericParamsHere != 0)
+    descriptorPath.push_back(PathElement{localGenericParams,
+                                         context->getNumGenericParams(),
+                                         numKeyGenericParamsInParent,
+                                         numKeyGenericParamsHere,
+                                         hasNonKeyGenericParams});
   return numKeyGenericParamsInParent + numKeyGenericParamsHere;
 }
 
@@ -2044,6 +2045,8 @@ public:
     for (auto &replacementEntry : getReplacementEntries())
       replacementEntry.enable();
   }
+
+  uint32_t getNumScopes() const { return numScopes; }
 };
 
 /// A map from original to replaced opaque type descriptor of a some type.
@@ -2083,6 +2086,7 @@ public:
     for (auto &replacementEntry : getReplacementEntries())
       replacementEntry.enable(lock);
   }
+  uint32_t getNumEntries() const { return numEntries; }
 };
 
 } // anonymous namespace
@@ -2090,19 +2094,55 @@ public:
 void swift::addImageDynamicReplacementBlockCallback(
     const void *replacements, uintptr_t replacementsSize,
     const void *replacementsSome, uintptr_t replacementsSomeSize) {
+
   auto *automaticReplacements =
       reinterpret_cast<const AutomaticDynamicReplacements *>(replacements);
+
   const AutomaticDynamicReplacementsSome *someReplacements = nullptr;
   if (replacementsSomeSize) {
     someReplacements =
         reinterpret_cast<const AutomaticDynamicReplacementsSome *>(
             replacementsSome);
   }
+
+  auto sizeOfCurrentEntry = sizeof(AutomaticDynamicReplacements) +
+                            (automaticReplacements->getNumScopes() *
+                             sizeof(AutomaticDynamicReplacementEntry));
+  auto sizeOfCurrentSomeEntry =
+      replacementsSomeSize == 0
+          ? 0
+          : sizeof(AutomaticDynamicReplacementsSome) +
+                (someReplacements->getNumEntries() *
+                 sizeof(DynamicReplacementSomeDescriptor));
+
   auto &lock = DynamicReplacementLock.get();
   lock.withLock([&] {
-    automaticReplacements->enableReplacements();
-    if (someReplacements)
+    auto endOfAutomaticReplacements =
+        ((const char *)automaticReplacements) + replacementsSize;
+    while (((const char *)automaticReplacements) < endOfAutomaticReplacements) {
+      automaticReplacements->enableReplacements();
+      automaticReplacements =
+          reinterpret_cast<const AutomaticDynamicReplacements *>(
+              ((const char *)automaticReplacements) + sizeOfCurrentEntry);
+      if ((const char*)automaticReplacements <  endOfAutomaticReplacements)
+        sizeOfCurrentEntry = sizeof(AutomaticDynamicReplacements) +
+                             (automaticReplacements->getNumScopes() *
+                              sizeof(AutomaticDynamicReplacementEntry));
+    }
+    if (!replacementsSomeSize)
+      return;
+    auto endOfSomeReplacements =
+        ((const char *)someReplacements) + replacementsSomeSize;
+    while (((const char *)someReplacements) < endOfSomeReplacements) {
       someReplacements->enableReplacements(lock);
+      someReplacements =
+          reinterpret_cast<const AutomaticDynamicReplacementsSome *>(
+              ((const char *)someReplacements) + sizeOfCurrentSomeEntry);
+      if  ((const char*) someReplacements < endOfSomeReplacements)
+        sizeOfCurrentSomeEntry = sizeof(AutomaticDynamicReplacementsSome) +
+                                 (someReplacements->getNumEntries() *
+                                  sizeof(DynamicReplacementSomeDescriptor));
+    }
   });
 }
 

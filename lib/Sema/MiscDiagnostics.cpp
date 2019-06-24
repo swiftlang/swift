@@ -387,6 +387,8 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         TC.diagnose(c->getLoc(), diag::collection_literal_empty)
           .highlight(c->getSourceRange());
       else {
+        assert(c->getType()->hasTypeRepr() &&
+               "a defaulted type should always be printable");
         TC.diagnose(c->getLoc(), diag::collection_literal_heterogeneous,
                     c->getType())
           .highlight(c->getSourceRange())
@@ -3377,6 +3379,8 @@ public:
               fnType = fnType->getResult()->getAs<FunctionType>();
 
             // Coerce to this type.
+            assert(fnType->hasTypeRepr() &&
+                   "Objective-C methods should always have printable types");
             out << " as ";
             fnType->print(out);
           }
@@ -3541,6 +3545,9 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
     }
 
     void emitSilenceOptionalAnyWarningWithCoercion(Expr *E, Type destType) {
+      assert(destType->hasTypeRepr() &&
+             "coercion to Any should always be printable");
+
       SmallString<16> coercionString;
       coercionString += " as ";
       coercionString += destType->getWithoutParens()->getString();

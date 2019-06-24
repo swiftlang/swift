@@ -228,6 +228,7 @@ public:
   
   /// Pull in runtime compatibility shim libraries by autolinking.
   Optional<llvm::VersionTuple> AutolinkRuntimeCompatibilityLibraryVersion;
+  Optional<llvm::VersionTuple> AutolinkRuntimeCompatibilityDynamicReplacementLibraryVersion;
 
   IRGenOptions()
       : DWARFVersion(2), OutputKind(IRGenOutputKind::LLVMAssembly),

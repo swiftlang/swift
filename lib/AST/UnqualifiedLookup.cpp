@@ -504,7 +504,7 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
 void UnqualifiedLookupFactory::lookUpTopLevelNamesInModuleScopeContext(
     DeclContext *DC) {
   // TODO: Does the debugger client care about compound names?
-  if (Name.isSimpleName() && DebugClient &&
+  if (Name.isSimpleName() && !Name.isSpecial() && DebugClient &&
       DebugClient->lookupOverrides(Name.getBaseName(), DC, Loc,
                                    isOriginallyTypeLookup, Results))
     return;
@@ -1002,7 +1002,7 @@ void UnqualifiedLookupFactory::addUnavailableInnerResults() {
 void UnqualifiedLookupFactory::lookForAModuleWithTheGivenName(
     DeclContext *const dc) {
   using namespace namelookup;
-  if (!Name.isSimpleName())
+  if (!Name.isSimpleName() || Name.isSpecial())
     return;
 
   // Look for a module with the given name.

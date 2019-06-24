@@ -347,11 +347,9 @@ public:
     return e ? CS.getType(e) : Type();
   }
 
-  /// This is the same as typeCheckChildIndependently, but works on an arbitrary
-  /// subexpression of the current node because it handles ClosureExpr parents
-  /// of the specified node.
-  Expr *typeCheckArbitrarySubExprIndependently(Expr *subExpr,
-                                             TCCOptions options = TCCOptions());
+  /// Find a nearest declaration context which could be used
+  /// to type-check this sub-expression.
+  DeclContext *findDeclContext(Expr *subExpr) const;
 
   /// Special magic to handle inout exprs and tuples in argument lists.
   Expr *typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
@@ -1085,8 +1083,8 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
     // constraint.
     if (CS.getContextualTypePurpose() != CTP_Unused)
       options |= TCC_ForceRecheck;
-      
-    auto sub = typeCheckArbitrarySubExprIndependently(anchor, options);
+
+    auto sub = typeCheckChildIndependently(anchor, options);
     if (!sub) return true;
     fromType = CS.getType(sub);
   }
@@ -1280,7 +1278,6 @@ namespace {
     llvm::DenseMap<Pattern*, Type> PatternTypes;
     llvm::DenseMap<ParamDecl*, Type> ParamDeclTypes;
     llvm::DenseMap<ParamDecl*, Type> ParamDeclInterfaceTypes;
-    llvm::DenseMap<CollectionExpr*, Expr*> CollectionSemanticExprs;
     llvm::DenseSet<ValueDecl*> PossiblyInvalidDecls;
     ExprTypeSaverAndEraser(const ExprTypeSaverAndEraser&) = delete;
     void operator=(const ExprTypeSaverAndEraser&) = delete;
@@ -1340,15 +1337,6 @@ namespace {
                 P->setInvalid(false);
             }
           
-          // If we have a CollectionExpr with a type checked SemanticExpr,
-          // remove it so we can recalculate a new semantic form.
-          if (auto *CE = dyn_cast<CollectionExpr>(expr)) {
-            if (auto SE = CE->getSemanticExpr()) {
-              TS->CollectionSemanticExprs[CE] = SE;
-              CE->setSemanticExpr(nullptr);
-            }
-          }
-          
           expr->setType(nullptr);
 
           return { true, expr };
@@ -1403,9 +1391,6 @@ namespace {
         paramDeclIfaceElt.first->setInterfaceType(paramDeclIfaceElt.second->getInOutObjectType());
       }
       
-      for (auto CSE : CollectionSemanticExprs)
-        CSE.first->setSemanticExpr(CSE.second);
-      
       if (!PossiblyInvalidDecls.empty())
         for (auto D : PossiblyInvalidDecls)
           if (D->hasInterfaceType())
@@ -1426,10 +1411,6 @@ namespace {
     // we go digging through failed constraints, and expect their locators to
     // still be meaningful.
     ~ExprTypeSaverAndEraser() {
-      for (auto CSE : CollectionSemanticExprs)
-        if (!CSE.first->getType())
-          CSE.first->setSemanticExpr(CSE.second);
-
       for (auto exprElt : ExprTypes)
         if (!exprElt.first->getType())
           exprElt.first->setType(exprElt.second);
@@ -1559,10 +1540,14 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(
   if ((!convertType || options.contains(TCC_AllowUnresolvedTypeVariables)) &&
       allowFreeTypeVariables)
     TCEOptions |= TypeCheckExprFlags::AllowUnresolvedTypeVariables;
-  
-  auto resultTy = CS.TC.typeCheckExpression(
-      subExpr, CS.DC, TypeLoc::withoutLoc(convertType), convertTypePurpose,
-      TCEOptions, listener, &CS);
+
+  // When we're type checking a single-expression closure, we need to reset the
+  // DeclContext to this closure for the recursive type checking.  Otherwise,
+  // if there is a closure in the subexpression, we can violate invariants.
+  auto *DC = findDeclContext(subExpr);
+  auto resultTy =
+      CS.TC.typeCheckExpression(subExpr, DC, TypeLoc::withoutLoc(convertType),
+                                convertTypePurpose, TCEOptions, listener, &CS);
 
   CS.cacheExprTypes(subExpr);
 
@@ -1598,49 +1583,53 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(
   return subExpr;
 }
 
-/// This is the same as typeCheckChildIndependently, but works on an arbitrary
-/// subexpression of the current node because it handles ClosureExpr parents
-/// of the specified node.
-Expr *FailureDiagnosis::
-typeCheckArbitrarySubExprIndependently(Expr *subExpr, TCCOptions options) {
-  if (subExpr == expr)
-    return typeCheckChildIndependently(subExpr, options);
-  
-  // Construct a parent map for the expr tree we're investigating.
-  auto parentMap = expr->getParentMap();
-  
-  ClosureExpr *NearestClosure = nullptr;
-  
-  // Walk the parents of the specified expression, handling any ClosureExprs.
-  for (Expr *node = parentMap[subExpr]; node; node = parentMap[node]) {
-    auto *CE = dyn_cast<ClosureExpr>(node);
-    if (!CE) continue;
-    
-    // Keep track of the innermost closure we see that we're jumping into.
-    if (!NearestClosure)
-      NearestClosure = CE;
-    
-    // If we have a ClosureExpr parent of the specified node, check to make sure
-    // none of its arguments are type variables.  If so, these type variables
-    // would be accessible to name lookup of the subexpression and may thus leak
-    // in.  Reset them to UnresolvedTypes for safe measures.
-    for (auto *param : *CE->getParameters()) {
-      if (param->hasValidSignature()) {
-        auto type = param->getType();
-        assert(!type->hasTypeVariable() && !type->hasError());
-        (void)type;
+DeclContext *FailureDiagnosis::findDeclContext(Expr *subExpr) const {
+  if (auto *closure =
+          dyn_cast<ClosureExpr>(subExpr->getSemanticsProvidingExpr()))
+    return closure->getParent();
+
+  struct DCFinder : public ASTWalker {
+    DeclContext *DC, *CurrDC;
+    Expr *SubExpr;
+
+    DCFinder(DeclContext *DC, Expr *expr) : DC(DC), CurrDC(DC), SubExpr(expr) {}
+
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      if (E == SubExpr) {
+        DC = CurrDC;
+        return {false, nullptr};
       }
+
+      if (auto *closure = dyn_cast<ClosureExpr>(E)) {
+        CurrDC = closure;
+        // If we have a ClosureExpr parent of the specified node, check to make
+        // sure none of its arguments are type variables.  If so, these type
+        // variables would be accessible to name lookup of the subexpression and
+        // may thus leak in.  Reset them to UnresolvedTypes for safe measures.
+        assert(llvm::all_of(*closure->getParameters(), [](const ParamDecl *PD) {
+          if (PD->hasValidSignature()) {
+            auto paramTy = PD->getType();
+            return !(paramTy->hasTypeVariable() || paramTy->hasError());
+          }
+          return true;
+        }));
+      }
+
+      return {true, E};
     }
-  }
 
-  // When we're type checking a single-expression closure, we need to reset the
-  // DeclContext to this closure for the recursive type checking.  Otherwise,
-  // if there is a closure in the subexpression, we can violate invariants.
-  auto newDC = NearestClosure ? NearestClosure : CS.DC;
-  llvm::SaveAndRestore<DeclContext *> SavedDC(CS.DC, newDC);
+    Expr *walkToExprPost(Expr *E) override {
+      if (auto *closure = dyn_cast<ClosureExpr>(E)) {
+        assert(CurrDC == closure && "DeclContext imbalance");
+        CurrDC = closure->getParent();
+      }
+      return E;
+    }
 
-  // Otherwise, we're ok to type check the subexpr.
-  return typeCheckChildIndependently(subExpr, options);
+  } finder(CS.DC, subExpr);
+
+  expr->walk(finder);
+  return finder.DC;
 }
 
 /// For an expression being type checked with a CTP_CalleeResult contextual
@@ -1969,6 +1958,9 @@ static bool addTypeCoerceFixit(InFlightDiagnostic &diag, ConstraintSystem &CS,
   if (bothOptional)
     fromType = fromType->getOptionalObjectType();
   toType = toType->lookThroughAllOptionalTypes();
+
+  if (!toType->hasTypeRepr())
+    return false;
 
   CheckedCastKind Kind = CS.getTypeChecker().typeCheckCheckedCast(
       fromType, toType, CheckedCastContextKind::None, CS.DC, SourceLoc(),
@@ -2674,8 +2666,7 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
     // default arguments.
     ParameterListInfo paramInfo;
     if (!candidates.empty()) {
-      paramInfo = ParameterListInfo(params, candidates[0].getDecl(),
-                                    candidates[0].skipCurriedSelf);
+      paramInfo = candidates[0].getParameterListInfo(params);
     } else {
       paramInfo = ParameterListInfo(params, nullptr, /*skipCurriedSelf=*/false);
     }
@@ -3561,8 +3552,7 @@ diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI, Expr *fnExpr,
     return false;
 
   auto params = candidate.getParameters();
-  ParameterListInfo paramInfo(params, candidate.getDecl(),
-                              candidate.skipCurriedSelf);
+  auto paramInfo = candidate.getParameterListInfo(params);
   auto args = decomposeArgType(CCI.CS.getType(argExpr), argLabels);
 
   // Check the case where a raw-representable type is constructed from an
@@ -4209,8 +4199,7 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
     return false;
 
   auto params = candidate.getParameters();
-  ParameterListInfo paramInfo(params, candidate.getDecl(),
-                              candidate.skipCurriedSelf);
+  auto paramInfo = candidate.getParameterListInfo(params);
   auto args = decomposeArgType(CS.getType(argExpr), argLabels);
 
   SmallVector<ParamBinding, 4> bindings;
@@ -4683,7 +4672,7 @@ static bool isViableOverloadSet(const CalleeCandidateInfo &CCI,
       return true;
     };
 
-    ParameterListInfo paramInfo(params, funcDecl, cand.skipCurriedSelf);
+    auto paramInfo = cand.getParameterListInfo(params);
     InputMatcher IM(params, paramInfo);
     auto result = IM.match(numArgs, pairMatcher);
     if (result == InputMatcher::IM_Succeeded)
@@ -6698,8 +6687,7 @@ bool FailureDiagnosis::diagnoseMemberFailures(
     NameLoc = DeclNameLoc(memberRange.Start);
 
     // Retypecheck the anchor type, which is the base of the member expression.
-    baseExpr =
-        typeCheckArbitrarySubExprIndependently(baseExpr, TCC_AllowLValue);
+    baseExpr = typeCheckChildIndependently(baseExpr, TCC_AllowLValue);
     if (!baseExpr)
       return true;
 

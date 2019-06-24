@@ -204,7 +204,8 @@ public:
   }
   
   bool shouldInclude(const ValueDecl *VD) {
-    return isVisibleToObjC(VD, minRequiredAccess);
+    return isVisibleToObjC(VD, minRequiredAccess) &&
+           !VD->getAttrs().hasAttribute<ImplementationOnlyAttr>();
   }
 
 private:
@@ -256,8 +257,8 @@ private:
   void printDocumentationComment(Decl *D) {
     swift::markup::MarkupContext MC;
     auto DC = getSingleDocComment(MC, D);
-    if (DC.hasValue())
-      ide::getDocumentationCommentAsDoxygen(DC.getValue(), os);
+    if (DC)
+      ide::getDocumentationCommentAsDoxygen(DC, os);
   }
 
   /// Prints an encoded string, escaped properly for C.

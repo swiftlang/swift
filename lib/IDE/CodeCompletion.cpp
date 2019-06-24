@@ -266,10 +266,10 @@ void getSwiftDocKeyword(const Decl* D, CommandWordsPairs &Words) {
     return;
   static swift::markup::MarkupContext MC;
   auto DC = getSingleDocComment(MC, D);
-  if (!DC.hasValue())
+  if (!DC)
     return;
   SwiftDocWordExtractor Extractor(Words);
-  for (auto Part : DC.getValue()->getBodyNodes()) {
+  for (auto Part : DC->getBodyNodes()) {
     switch (Part->getKind()) {
       case ASTNodeKind::KeywordField:
       case ASTNodeKind::RecommendedField:
@@ -1263,6 +1263,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   bool HasSpace = false;
   bool ShouldCompleteCallPatternAfterParen = true;
   bool PreferFunctionReferencesToCalls = false;
+  bool AttTargetIsIndependent = false;
   Optional<DeclKind> AttTargetDK;
   Optional<StmtKind> ParentStmtKind;
 
@@ -1351,7 +1352,12 @@ public:
   void setAttrTargetDeclKind(Optional<DeclKind> DK) override {
     if (DK == DeclKind::PatternBinding)
       DK = DeclKind::Var;
-    AttTargetDK = DK;
+    else if (DK == DeclKind::Param)
+      // For params, consider the attribute is always for the decl.
+      AttTargetIsIndependent = false;
+
+    if (!AttTargetIsIndependent)
+      AttTargetDK = DK;
   }
 
   void completeExpr() override;
@@ -1373,7 +1379,7 @@ public:
   void completeCaseStmtKeyword() override;
   void completeCaseStmtBeginning() override;
   void completeCaseStmtDotPrefix() override;
-  void completeDeclAttrBeginning(bool Sil) override;
+  void completeDeclAttrBeginning(bool Sil, bool isIndependent) override;
   void completeDeclAttrParam(DeclAttrKind DK, int Index) override;
   void completeInPrecedenceGroup(SyntaxKind SK) override;
   void completeNominalMemberBeginning(
@@ -1464,7 +1470,7 @@ protocolForLiteralKind(CodeCompletionLiteralKind kind) {
 static bool hasTrivialTrailingClosure(const FuncDecl *FD,
                                       AnyFunctionType *funcType) {
   ParameterListInfo paramInfo(funcType->getParams(), FD,
-                              /*level*/ FD->isInstanceMember() ? 1 : 0);
+                              /*skipCurriedSelf*/ FD->hasCurriedSelf());
 
   if (paramInfo.size() - paramInfo.numNonDefaultedParameters() == 1) {
     auto param = funcType->getParams().back();
@@ -4612,10 +4618,12 @@ void CodeCompletionCallbacksImpl::completeDeclAttrParam(DeclAttrKind DK,
   CurDeclContext = P.CurDeclContext;
 }
 
-void CodeCompletionCallbacksImpl::completeDeclAttrBeginning(bool Sil) {
+void CodeCompletionCallbacksImpl::completeDeclAttrBeginning(
+    bool Sil, bool isIndependent) {
   Kind = CompletionKind::AttributeBegin;
   IsInSil = Sil;
   CurDeclContext = P.CurDeclContext;
+  AttTargetIsIndependent = isIndependent;
 }
 
 void CodeCompletionCallbacksImpl::completeInPrecedenceGroup(SyntaxKind SK) {
@@ -5381,9 +5389,11 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   case CompletionKind::AttributeBegin: {
     Lookup.getAttributeDeclCompletions(IsInSil, AttTargetDK);
 
-    // Provide any type name for property delegate.
+    // TypeName at attribute position after '@'.
+    // - VarDecl: Property Wrappers.
+    // - ParamDecl/VarDecl/FuncDecl: Function Buildres.
     if (!AttTargetDK || *AttTargetDK == DeclKind::Var ||
-        *AttTargetDK == DeclKind::Param)
+        *AttTargetDK == DeclKind::Param || *AttTargetDK == DeclKind::Func)
       Lookup.getTypeCompletionsInDeclContext(
           P.Context.SourceMgr.getCodeCompletionLoc());
     break;

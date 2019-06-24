@@ -497,9 +497,14 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
   if (!DeclAttrs)
     return;
 
+  SmallVector<const DeclAttribute *, 8> orderedAttributes(begin(), end());
+  print(Printer, Options, orderedAttributes, D);
+}
+
+void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
+                           ArrayRef<const DeclAttribute *> FlattenedAttrs,
+                           const Decl *D) {
   using AttributeVector = SmallVector<const DeclAttribute *, 8>;
-  AttributeVector orderedAttributes(begin(), end());
-  std::reverse(orderedAttributes.begin(), orderedAttributes.end());
 
   // Process attributes in passes.
   AttributeVector shortAvailableAttributes;
@@ -509,7 +514,7 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
   AttributeVector attributes;
   AttributeVector modifiers;
 
-  for (auto DA : orderedAttributes) {
+  for (auto DA : llvm::reverse(FlattenedAttrs)) {
     if (!Options.PrintImplicitAttrs && DA->isImplicit())
       continue;
     if (!Options.PrintUserInaccessibleAttrs &&

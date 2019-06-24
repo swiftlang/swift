@@ -209,6 +209,7 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_warnings_as_errors);
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_coverage_EQ);
+  inputArgs.AddLastArg(arguments, options::OPT_static);
   inputArgs.AddLastArg(arguments, options::OPT_swift_version);
   inputArgs.AddLastArg(arguments, options::OPT_enforce_exclusivity_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_stats_output_dir);
@@ -276,7 +277,6 @@ static void addRuntimeLibraryFlags(const OutputInfo &OI,
 
   Arguments.push_back("-autolink-library");
   switch (RT) {
-  default: llvm_unreachable("invalid MSVC runtime library");
   case OutputInfo::MSVCRuntime::MultiThreaded:
     Arguments.push_back("libcmt");
     break;
@@ -425,6 +425,12 @@ ToolChain::constructInvocation(const CompileJobAction &job,
   if (context.Args.hasArg(options::OPT_embed_bitcode_marker))
     Arguments.push_back("-embed-bitcode-marker");
 
+  // For `-index-file` mode add `-disable-typo-correction`, since the errors
+  // will be ignored and it can be expensive to do typo-correction.
+  if (job.getType() == file_types::TY_IndexData) {
+    Arguments.push_back("-disable-typo-correction");
+  }
+
   if (context.Args.hasArg(options::OPT_index_store_path)) {
     context.Args.AddLastArg(Arguments, options::OPT_index_store_path);
     if (!context.Args.hasArg(options::OPT_index_ignore_system_modules))
@@ -446,7 +452,12 @@ ToolChain::constructInvocation(const CompileJobAction &job,
     Arguments.push_back("-runtime-compatibility-version");
     Arguments.push_back(arg->getValue());
   }
-                                 
+
+  context.Args.AddLastArg(
+      Arguments,
+      options::
+          OPT_disable_autolinking_runtime_compatibility_dynamic_replacements);
+
   return II;
 }
 
@@ -1087,9 +1098,15 @@ ToolChain::constructInvocation(const AutolinkExtractJobAction &job,
 }
 
 ToolChain::InvocationInfo
-ToolChain::constructInvocation(const LinkJobAction &job,
+ToolChain::constructInvocation(const DynamicLinkJobAction &job,
                                const JobContext &context) const {
   llvm_unreachable("linking not implemented for this toolchain");
+}
+
+ToolChain::InvocationInfo
+ToolChain::constructInvocation(const StaticLinkJobAction &job,
+                               const JobContext &context) const {
+   llvm_unreachable("archiving not implemented for this toolchain");
 }
 
 void ToolChain::addPathEnvironmentVariableIfNeeded(

@@ -414,7 +414,7 @@ public:
   //==========================================================================//
 
   void indexSource(StringRef Filename, IndexingConsumer &Consumer,
-                   ArrayRef<const char *> Args, StringRef Hash) override;
+                   ArrayRef<const char *> Args) override;
 
   void codeComplete(
       llvm::MemoryBuffer *InputBuf, unsigned Offset,

@@ -25,19 +25,20 @@
 #include "ConstraintLocator.h"
 #include "OverloadChoice.h"
 #include "TypeChecker.h"
-#include "swift/Basic/LLVM.h"
-#include "swift/Basic/OptionSet.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/NameLookup.h"
-#include "swift/AST/Types.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/TypeCheckerDebugConsumer.h"
-#include "llvm/ADT/ilist.h"
+#include "swift/AST/Types.h"
+#include "swift/Basic/LLVM.h"
+#include "swift/Basic/OptionSet.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetOperations.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
-#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/ilist.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/Timer.h"
 #include "llvm/Support/raw_ostream.h"
@@ -1561,6 +1562,16 @@ public:
     return resolvedOverloadSets;
   }
 
+  ResolvedOverloadSetListItem *findSelectedOverloadFor(Expr *expr) const {
+    auto resolvedOverload = getResolvedOverloadSets();
+    while (resolvedOverload) {
+      if (resolvedOverload->Locator->getAnchor() == expr)
+        return resolvedOverload;
+      resolvedOverload = resolvedOverload->Previous;
+    }
+    return nullptr;
+  }
+
 private:
   unsigned assignTypeVariableID() {
     return TypeCounter++;
@@ -2242,6 +2253,24 @@ public:
   /// this type variable.
   TypeVariableType *getRepresentative(TypeVariableType *typeVar) {
     return typeVar->getImpl().getRepresentative(getSavedBindings());
+  }
+
+  /// Gets the a VarDecl, and the type of its attached property wrapper if the
+  /// resolved overload has an attached property wrapper.
+  ///
+  /// \return A pair of the VarDecl and the attached property wrapper type if
+  ///         the given resolved overload has an attached property wrapper.
+  Optional<std::pair<VarDecl *, Type>>
+  getPropertyWrapperInformation(ResolvedOverloadSetListItem *resolvedOverload) {
+    if (resolvedOverload && resolvedOverload->Choice.isDecl()) {
+      if (auto *decl = dyn_cast<VarDecl>(resolvedOverload->Choice.getDecl())) {
+        if (decl->hasAttachedPropertyWrapper()) {
+          auto wrapperTy = decl->getPropertyWrapperBackingPropertyType();
+          return std::make_pair(decl, wrapperTy);
+        }
+      }
+    }
+    return None;
   }
 
   /// Merge the equivalence sets of the two type variables.
@@ -3787,6 +3816,14 @@ matchCallArguments(ConstraintSystem &cs,
 /// Given an expression that is the target of argument labels (for a call,
 /// subscript, etc.), find the underlying target expression.
 Expr *getArgumentLabelTargetExpr(Expr *fn);
+
+/// Returns true if a reference to a member on a given base type will apply its
+/// curried self parameter, assuming it has one.
+///
+/// This is true for most member references, however isn't true for things like
+/// an instance member being referenced on a metatype, where the curried self
+/// parameter remains unapplied.
+bool doesMemberRefApplyCurriedSelf(Type baseTy, const ValueDecl *decl);
 
 /// Attempt to prove that arguments with the given labels at the
 /// given parameter depth cannot be used with the given value.

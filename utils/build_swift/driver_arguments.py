@@ -527,7 +527,7 @@ def create_argument_parser():
            help='A space separated list of targets to cross-compile host '
                 'Swift tools for. Can be used multiple times.')
 
-    option('--stdlib-deployment-targets', append,
+    option('--stdlib-deployment-targets', store,
            type=argparse.ShellSplitType(),
            default=None,
            help='list of targets to compile or cross-compile the Swift '

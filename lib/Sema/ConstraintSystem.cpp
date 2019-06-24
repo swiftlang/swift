@@ -409,6 +409,12 @@ ConstraintLocator *ConstraintSystem::getConstraintLocator(
 }
 
 ConstraintLocator *ConstraintSystem::getCalleeLocator(Expr *expr) {
+  // Make sure we handle subscripts before looking at apply exprs. We don't
+  // want to return a subscript member locator for an expression such as x[](y),
+  // as its callee is not the subscript, but rather the function it returns.
+  if (isa<SubscriptExpr>(expr))
+    return getConstraintLocator(expr, ConstraintLocator::SubscriptMember);
+
   if (auto *applyExpr = dyn_cast<ApplyExpr>(expr)) {
     auto *fnExpr = applyExpr->getFn();
     // For an apply of a metatype, we have a short-form constructor. Unlike
@@ -436,9 +442,6 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(Expr *expr) {
 
   if (isa<UnresolvedMemberExpr>(expr))
     return getConstraintLocator(locator, ConstraintLocator::UnresolvedMember);
-
-  if (isa<SubscriptExpr>(expr))
-    return getConstraintLocator(locator, ConstraintLocator::SubscriptMember);
 
   if (isa<MemberRefExpr>(expr))
     return getConstraintLocator(locator, ConstraintLocator::Member);
@@ -850,29 +853,7 @@ void ConstraintSystem::recordOpenedTypes(
 static unsigned getNumRemovedArgumentLabels(TypeChecker &TC, ValueDecl *decl,
                                             bool isCurriedInstanceReference,
                                             FunctionRefKind functionRefKind) {
-  unsigned numParameterLists;
-
-  // Enum elements with associated values have to be treated
-  // as regular function values.
-  //
-  // enum E {
-  //   case foo(a: Int)
-  // }
-  // let bar: [Int] = []
-  // bar.map(E.foo)
-  //
-  // `E.foo` has to act as a regular function type passed as a value.
-  if (auto *EED = dyn_cast<EnumElementDecl>(decl)) {
-    numParameterLists = EED->hasAssociatedValues() ? 2 : 1;
-
-  // Only applicable to functions. Nothing else should have argument labels in
-  // the type.
-  } else if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-    numParameterLists = func->hasImplicitSelfDecl() ? 2 : 1;
-  } else {
-    return 0;
-  }
-
+  unsigned numParameterLists = decl->getNumCurryLevels();
   switch (functionRefKind) {
   case FunctionRefKind::Unapplied:
   case FunctionRefKind::Compound:
@@ -1199,17 +1180,16 @@ ConstraintSystem::getTypeOfMemberReference(
   // Figure out the instance type used for the base.
   Type baseObjTy = getFixedTypeRecursive(baseTy, /*wantRValue=*/true);
 
-  bool isInstance = true;
-  if (auto baseMeta = baseObjTy->getAs<AnyMetatypeType>()) {
-    baseObjTy = baseMeta->getInstanceType();
-    isInstance = false;
-  }
-
   // If the base is a module type, just use the type of the decl.
   if (baseObjTy->is<ModuleType>()) {
     return getTypeOfReference(value, functionRefKind, locator, useDC);
   }
 
+  // Check to see if the self parameter is applied, in which case we'll want to
+  // strip it off later.
+  auto hasAppliedSelf = doesMemberRefApplyCurriedSelf(baseObjTy, value);
+
+  baseObjTy = baseObjTy->getMetatypeInstanceType();
   // SWIFT_ENABLE_TENSORFLOW
   FunctionType::Param baseObjParam(
       baseObjTy->getInOutObjectType(), Identifier(),
@@ -1238,10 +1218,9 @@ ConstraintSystem::getTypeOfMemberReference(
   Type openedType;
   OpenedTypeMap localReplacements;
   auto &replacements = replacementsPtr ? *replacementsPtr : localReplacements;
-  bool isCurriedInstanceReference = value->isInstanceMember() && !isInstance;
-  unsigned numRemovedArgumentLabels =
-    getNumRemovedArgumentLabels(TC, value, isCurriedInstanceReference,
-                                functionRefKind);
+  unsigned numRemovedArgumentLabels = getNumRemovedArgumentLabels(
+      TC, value, /*isCurriedInstanceReference*/ !hasAppliedSelf,
+      functionRefKind);
 
   AnyFunctionType *funcType;
 
@@ -1280,10 +1259,11 @@ ConstraintSystem::getTypeOfMemberReference(
 
     auto selfTy = outerDC->getSelfInterfaceType();
 
-    // If self is a value type and the base type is an lvalue, wrap it in an
+    // If this is a reference to an instance member that applies self,
+    // where self is a value type and the base type is an lvalue, wrap it in an
     // inout type.
     auto selfFlags = ParameterTypeFlags();
-    if (isInstance &&
+    if (value->isInstanceMember() && hasAppliedSelf &&
         !outerDC->getDeclaredInterfaceType()->hasReferenceSemantics() &&
         baseTy->is<LValueType>() &&
         !selfTy->hasError())
@@ -1369,7 +1349,7 @@ ConstraintSystem::getTypeOfMemberReference(
 
   // Compute the type of the reference.
   Type type;
-  if (!value->isInstanceMember() || isInstance) {
+  if (hasAppliedSelf) {
     // For a static member referenced through a metatype or an instance
     // member referenced through an instance, strip off the 'self'.
     type = openedFnType->getResult();

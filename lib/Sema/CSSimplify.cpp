@@ -21,6 +21,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangModule.h"
@@ -100,6 +101,23 @@ static Optional<unsigned> scoreParamAndArgNameTypo(StringRef paramName,
   return dist;
 }
 
+bool constraints::doesMemberRefApplyCurriedSelf(Type baseTy,
+                                                const ValueDecl *decl) {
+  assert(decl->getDeclContext()->isTypeContext() &&
+         "Expected a member reference");
+
+  // For a reference to an instance method on a metatype, we want to keep the
+  // curried self.
+  if (decl->isInstanceMember()) {
+    assert(baseTy);
+    if (isa<AbstractFunctionDecl>(decl) && baseTy->is<AnyMetatypeType>())
+      return false;
+  }
+
+  // Otherwise the reference applies self.
+  return true;
+}
+
 bool constraints::areConservativelyCompatibleArgumentLabels(
                                                OverloadChoice choice,
                                                ArrayRef<Identifier> labels,
@@ -128,51 +146,29 @@ bool constraints::areConservativelyCompatibleArgumentLabels(
     return true;
   }
 
-  // This is a member lookup, which generally means that the call arguments
-  // (if we have any) will apply to the second level of parameters, with
-  // the member lookup binding the first level.  But there are cases where
-  // we can get an unapplied declaration reference back.
-  bool hasCurriedSelf;
-  if (isa<SubscriptDecl>(decl)) {
-    hasCurriedSelf = true;
-  } else if (!baseType || baseType->is<ModuleType>()) {
-    hasCurriedSelf = false;
-  } else if (baseType->is<AnyMetatypeType>() && decl->isInstanceMember()) {
-    hasCurriedSelf = false;
-  } else if (auto *EED = dyn_cast<EnumElementDecl>(decl)) {
-    // enum elements have either `(Self.Type) -> (Arg...) -> Self`, or
-    // `(Self.Type) -> Self`, in the former case self type has to be
-    // stripped off.
-    hasCurriedSelf = bool(EED->getParameterList());
-  } else {
-    hasCurriedSelf = true;
-  }
-
-  const AnyFunctionType *fTy;
-
-  if (auto fn = dyn_cast<AbstractFunctionDecl>(decl)) {
-    fTy = fn->getInterfaceType()->castTo<AnyFunctionType>();
-  } else if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
-    fTy = subscript->getInterfaceType()->castTo<AnyFunctionType>();
-  } else if (auto enumElement = dyn_cast<EnumElementDecl>(decl)) {
-    fTy = enumElement->getInterfaceType()->castTo<AnyFunctionType>();
-  } else {
+  if (!decl->hasParameterList())
     return true;
-  }
 
   SmallVector<AnyFunctionType::Param, 8> argInfos;
   for (auto argLabel : labels) {
     argInfos.push_back(AnyFunctionType::Param(Type(), argLabel, {}));
   }
 
-  const AnyFunctionType *levelTy = fTy;
-  if (hasCurriedSelf && !isa<SubscriptDecl>(decl)) {
-    levelTy = levelTy->getResult()->getAs<AnyFunctionType>();
-    assert(levelTy && "Parameter list curry level does not match type");
+  // This is a member lookup, which generally means that the call arguments
+  // (if we have any) will apply to the second level of parameters, with
+  // the member lookup applying the curried self at the first level. But there
+  // are cases where we can get an unapplied declaration reference back.
+  auto hasAppliedSelf =
+      decl->hasCurriedSelf() && doesMemberRefApplyCurriedSelf(baseType, decl);
+
+  auto *fnType = decl->getInterfaceType()->castTo<AnyFunctionType>();
+  if (hasAppliedSelf) {
+    fnType = fnType->getResult()->getAs<AnyFunctionType>();
+    assert(fnType && "Parameter list curry level does not match type");
   }
 
-  auto params = levelTy->getParams();
-  ParameterListInfo paramInfo(params, decl, hasCurriedSelf);
+  auto params = fnType->getParams();
+  ParameterListInfo paramInfo(params, decl, hasAppliedSelf);
 
   MatchCallArgumentListener listener;
   SmallVector<ParamBinding, 8> unusedParamBindings;
@@ -742,14 +738,14 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
   SmallVector<LocatorPathElt, 2> path;
   auto callExpr = callLocator.getLocatorParts(path);
   if (!callExpr)
-    return std::make_tuple(nullptr, /*hasCurriedSelf=*/false, argLabels,
+    return std::make_tuple(nullptr, /*hasAppliedSelf=*/false, argLabels,
                            hasTrailingClosure, nullptr);
 
   // Our remaining path can only be 'ApplyArgument'.
   if (!path.empty() &&
       !(path.size() <= 2 &&
         path.back().getKind() == ConstraintLocator::ApplyArgument))
-    return std::make_tuple(nullptr, /*hasCurriedSelf=*/false, argLabels,
+    return std::make_tuple(nullptr, /*hasAppliedSelf=*/false, argLabels,
                            hasTrailingClosure, nullptr);
 
   // Dig out the callee.
@@ -774,12 +770,12 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
     if (path.size() != 2 ||
         path[0].getKind() != ConstraintLocator::KeyPathComponent ||
         path[1].getKind() != ConstraintLocator::ApplyArgument)
-      return std::make_tuple(nullptr, /*hasCurriedSelf=*/false, argLabels,
+      return std::make_tuple(nullptr, /*hasAppliedSelf=*/false, argLabels,
                              hasTrailingClosure, nullptr);
 
     auto componentIndex = path[0].getValue();
     if (componentIndex >= keyPath->getComponents().size())
-      return std::make_tuple(nullptr, /*hasCurriedSelf=*/false, argLabels,
+      return std::make_tuple(nullptr, /*hasAppliedSelf=*/false, argLabels,
                              hasTrailingClosure, nullptr);
 
     auto &component = keyPath->getComponents()[componentIndex];
@@ -799,7 +795,7 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
     case KeyPathExpr::Component::Kind::OptionalWrap:
     case KeyPathExpr::Component::Kind::Identity:
     case KeyPathExpr::Component::Kind::TupleElement:
-      return std::make_tuple(nullptr, /*hasCurriedSelf=*/false, argLabels,
+      return std::make_tuple(nullptr, /*hasAppliedSelf=*/false, argLabels,
                              hasTrailingClosure, nullptr);
     }
 
@@ -811,7 +807,7 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
       argLabels = objectLiteral->getArgumentLabels();
       hasTrailingClosure = objectLiteral->hasTrailingClosure();
     }
-    return std::make_tuple(nullptr, /*hasCurriedSelf=*/false, argLabels,
+    return std::make_tuple(nullptr, /*hasAppliedSelf=*/false, argLabels,
                            hasTrailingClosure, nullptr);
   }
 
@@ -854,35 +850,24 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
   
   // If we didn't find any matching overloads, we're done.
   if (!choice)
-    return std::make_tuple(nullptr, /*hasCurriedSelf=*/false, argLabels,
+    return std::make_tuple(nullptr, /*hasAppliedSelf=*/false, argLabels,
                            hasTrailingClosure, nullptr);
 
   // If there's a declaration, return it.
   if (auto *decl = choice->getDeclOrNull()) {
-    bool hasCurriedSelf = false;
-    if (decl->getDeclContext()->isTypeContext()) {
-      if (auto function = dyn_cast<AbstractFunctionDecl>(decl)) {
-        // References to instance members on a metatype stay at level 0.
-        // Everything else is level 1.
-        if (!(function->isInstanceMember() &&
-              cs.getFixedTypeRecursive(choice->getBaseType(),
-                                       /*wantRValue=*/true)
-                ->is<AnyMetatypeType>()))
-          hasCurriedSelf = true;
-      } else if (isa<SubscriptDecl>(decl)) {
-        // Subscript level 1 == the indices.
-        hasCurriedSelf = true;
-      } else if (isa<EnumElementDecl>(decl)) {
-        // Enum element level 1 == the payload.
-        hasCurriedSelf = true;
-      }
-    }
+    auto baseType = choice->getBaseType();
+    if (baseType)
+      baseType = cs.getFixedTypeRecursive(baseType, /*wantRValue=*/true);
 
-    return std::make_tuple(decl, hasCurriedSelf, argLabels, hasTrailingClosure,
+    // In most cases where we reference a declaration with a curried self
+    // parameter, it gets dropped from the type of the reference.
+    bool hasAppliedSelf =
+        decl->hasCurriedSelf() && doesMemberRefApplyCurriedSelf(baseType, decl);
+    return std::make_tuple(decl, hasAppliedSelf, argLabels, hasTrailingClosure,
                            calleeLocator);
   }
 
-  return std::make_tuple(nullptr, /*hasCurriedSelf=*/false, argLabels,
+  return std::make_tuple(nullptr, /*hasAppliedSelf=*/false, argLabels,
                          hasTrailingClosure, calleeLocator);
 }
 
@@ -941,16 +926,16 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
     ConstraintLocatorBuilder locator) {
   // Extract the parameters.
   ValueDecl *callee;
-  bool hasCurriedSelf;
+  bool hasAppliedSelf;
   ArrayRef<Identifier> argLabels;
   SmallVector<Identifier, 2> argLabelsScratch;
   bool hasTrailingClosure = false;
   ConstraintLocator *calleeLocator;
-  std::tie(callee, hasCurriedSelf, argLabels, hasTrailingClosure,
+  std::tie(callee, hasAppliedSelf, argLabels, hasTrailingClosure,
            calleeLocator) =
     getCalleeDeclAndArgs(cs, locator, argLabelsScratch);
 
-  ParameterListInfo paramInfo(params, callee, hasCurriedSelf);
+  ParameterListInfo paramInfo(params, callee, hasAppliedSelf);
 
   // Apply labels to arguments.
   SmallVector<AnyFunctionType::Param, 8> argsWithLabels;
@@ -1639,7 +1624,44 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
     // Match up the replacement types of the respective substitution maps.
     return matchDeepTypeArguments(*this, subflags, args1, args2, locator);
   }
-  
+
+  // Handle protocol compositions.
+  if (auto existential1 = type1->getAs<ProtocolCompositionType>()) {
+    if (auto existential2 = type2->getAs<ProtocolCompositionType>()) {
+      auto layout1 = existential1->getExistentialLayout();
+      auto layout2 = existential2->getExistentialLayout();
+
+      // Explicit AnyObject and protocols must match exactly.
+      if (layout1.hasExplicitAnyObject != layout2.hasExplicitAnyObject)
+        return getTypeMatchFailure(locator);
+
+      if (layout1.getProtocols().size() != layout2.getProtocols().size())
+        return getTypeMatchFailure(locator);
+
+      for (unsigned i: indices(layout1.getProtocols())) {
+        if (!layout1.getProtocols()[i]->isEqual(layout2.getProtocols()[i]))
+          return getTypeMatchFailure(locator);
+      }
+
+      // This is the only interesting case. We might have type variables
+      // on either side of the superclass constraint, so make sure we
+      // recursively call matchTypes() here.
+      if (layout1.explicitSuperclass || layout2.explicitSuperclass) {
+        if (!layout1.explicitSuperclass || !layout2.explicitSuperclass)
+          return getTypeMatchFailure(locator);
+
+        auto result = matchTypes(layout1.explicitSuperclass,
+                                 layout2.explicitSuperclass,
+                                 ConstraintKind::Bind, subflags,
+                                 locator.withPathElement(
+                                   ConstraintLocator::ExistentialSuperclassType));
+        if (result.isFailure())
+          return result;
+      }
+
+      return getTypeMatchSuccess();
+    }
+  }
   // Handle nominal types that are not directly generic.
   if (auto nominal1 = type1->getAs<NominalType>()) {
     auto nominal2 = type2->castTo<NominalType>();
@@ -2631,7 +2653,22 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       llvm_unreachable("Polymorphic function type should have been opened");
 
     case TypeKind::ProtocolComposition:
-      // Existential types handled below.
+      switch (kind) {
+      case ConstraintKind::Equal:
+      case ConstraintKind::Bind:
+      case ConstraintKind::BindParam:
+        // If we are matching types for equality, we might still have
+        // type variables inside the protocol composition's superclass
+        // constraint.
+        conversionsOrFixes.push_back(ConversionRestrictionKind::DeepEquality);
+        break;
+
+      default:
+        // Subtype constraints where the RHS is an existential type are
+        // handled below.
+        break;
+      }
+
       break;
 
     case TypeKind::LValue:
@@ -4774,6 +4811,25 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
                                       flags, locatorB);
     };
 
+    // Check if any property wrappers on the base of the member lookup have
+    // mactching members that we can fall back to.
+    if (auto dotExpr =
+            dyn_cast_or_null<UnresolvedDotExpr>(locator->getAnchor())) {
+      auto baseExpr = dotExpr->getBase();
+      auto resolvedOverload = findSelectedOverloadFor(baseExpr);
+      if (auto wrappedProperty =
+              getPropertyWrapperInformation(resolvedOverload)) {
+        auto wrapperTy = wrappedProperty->second;
+        auto result = solveWithNewBaseOrName(wrapperTy, member);
+        if (result == SolutionKind::Solved) {
+          auto *fix = InsertPropertyWrapperUnwrap::create(
+              *this, wrappedProperty->first->getFullName(), baseTy, wrapperTy,
+              locator);
+          return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+        }
+      }
+    }
+
     if (auto *funcType = baseTy->getAs<FunctionType>()) {
       // We can't really suggest anything useful unless
       // function takes no arguments, otherwise it
@@ -6798,6 +6854,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::TreatKeyPathSubscriptIndexAsHashable:
   case FixKind::AllowInvalidRefInKeyPath:
   case FixKind::ExplicitlySpecifyGenericArguments:
+  case FixKind::InsertPropertyWrapperUnwrap:
   case FixKind::GenericArgumentsMismatch:
     llvm_unreachable("handled elsewhere");
   }

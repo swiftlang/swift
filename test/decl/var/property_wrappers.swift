@@ -877,3 +877,38 @@ struct TestComposition {
     $p3 = d // expected-error{{cannot assign value of type 'Double' to type 'WrapperD<WrapperE<Int?>, Int, String>'}}
 	}
 }
+
+// ---------------------------------------------------------------------------
+// Missing Property Wrapper Unwrap Diagnostics
+// ---------------------------------------------------------------------------
+@propertyWrapper
+struct Foo<T> {
+  var wrappedValue: T
+
+  func foo() {}
+}
+
+@propertyWrapper
+struct Bar<T, V> {
+  var wrappedValue: T
+
+  func bar() {}
+}
+
+extension Bar where V == String { // expected-note {{where 'V' = 'Bool'}}
+  func barWhereVIsString() {}
+}
+
+struct MissingPropertyWrapperUnwrap {
+  @Foo var x: Int
+  @Bar<Int, Bool> var y: Int
+  @Bar<Int, String> var z: Int
+
+  func baz() {
+    self.x.foo() // expected-error {{property 'x' will be unwrapped to value of type 'Int', use '$' to refer to wrapper type 'Foo<Int>'}}{{10-10=$}}
+    self.y.bar() // expected-error {{property 'y' will be unwrapped to value of type 'Int', use '$' to refer to wrapper type 'Bar<Int, Bool>'}}{{10-10=$}}
+    self.y.barWhereVIsString() // expected-error {{property 'y' will be unwrapped to value of type 'Int', use '$' to refer to wrapper type 'Bar<Int, Bool>'}}{{10-10=$}}
+    // expected-error@-1 {{referencing instance method 'barWhereVIsString()' on 'Bar' requires the types 'Bool' and 'String' be equivalent}}
+    self.z.barWhereVIsString() // expected-error {{property 'z' will be unwrapped to value of type 'Int', use '$' to refer to wrapper type 'Bar<Int, String>'}}{{10-10=$}} 
+  }
+}
