@@ -171,9 +171,6 @@ def disable_objc_attr_requires_foundation_module :
   HelpText<"Disable requiring uses of @objc to require importing the "
            "Foundation module">;
 
-def enable_resilience : Flag<["-"], "enable-resilience">,
-   HelpText<"Deprecated, use -enable-library-evolution instead">;
-
 }
 
 
@@ -581,9 +578,5 @@ def read_legacy_type_info_path_EQ : Joined<["-"], "read-legacy-type-info-path=">
 def type_info_dump_filter_EQ : Joined<["-"], "type-info-dump-filter=">,
   Flags<[FrontendOption]>,
   HelpText<"One of 'all', 'resilient' or 'fragile'">;
-
-def enable_objc_resilient_class_stubs : Flag<["-"], "enable-resilient-objc-class-stubs">,
-  HelpText<"Emit Objective-C resilient class stubs for classes with "
-           "resiliently-sized metadata">;
 
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]
