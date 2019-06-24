@@ -1837,7 +1837,7 @@ bool MissingCallFailure::diagnoseAsError() {
 
     case ConstraintLocator::AutoclosureResult: {
       auto &cs = getConstraintSystem();
-      auto loc = cs.getConstraintLocator(getRawAnchor(), path.drop_back());
+      auto loc = getConstraintLocator(getRawAnchor(), path.drop_back());
       AutoClosureForwardingFailure failure(cs, loc);
       return failure.diagnoseAsError();
     }
