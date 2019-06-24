@@ -2165,6 +2165,32 @@ bool swift::conflicting(ASTContext &ctx,
   if (!conflicting(sig1, sig2, skipProtocolExtensionCheck))
     return false;
 
+  // Functions and enum elements do not conflict with each other if their types
+  // are different.
+  if (((sig1.IsFunction && sig2.IsEnumElement) ||
+       (sig1.IsEnumElement && sig2.IsFunction)) &&
+      sig1Type != sig2Type) {
+    return false;
+  }
+
+  // Nominal types and enum elements always conflict with each other.
+  if ((sig1.IsNominal && sig2.IsEnumElement) ||
+      (sig1.IsEnumElement && sig2.IsNominal)) {
+    return true;
+  }
+
+  // Typealiases and enum elements always conflict with each other.
+  if ((sig1.IsTypeAlias && sig2.IsEnumElement) ||
+      (sig1.IsEnumElement && sig2.IsTypeAlias)) {
+    return true;
+  }
+
+  // Enum elements always conflict with each other. At this point, they
+  // have the same base name but different types.
+  if (sig1.IsEnumElement && sig2.IsEnumElement) {
+    return true;
+  }
+
   // Functions always conflict with non-functions with the same signature.
   // In practice, this only applies for zero argument functions.
   if (sig1.IsFunction != sig2.IsFunction)
@@ -2336,6 +2362,9 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
   signature.IsInstanceMember = isInstanceMember();
   signature.IsVariable = isa<VarDecl>(this);
   signature.IsFunction = isa<AbstractFunctionDecl>(this);
+  signature.IsEnumElement = isa<EnumElementDecl>(this);
+  signature.IsNominal = isa<NominalTypeDecl>(this);
+  signature.IsTypeAlias = isa<TypeAliasDecl>(this);
   signature.HasOpaqueReturnType =
                        !signature.IsVariable && (bool)getOpaqueResultTypeDecl();
 
@@ -2386,6 +2415,13 @@ CanType ValueDecl::getOverloadSignatureType() const {
     // and struct decl.
     return defaultSignatureType->addCurriedSelfType(getDeclContext())
                                ->getCanonicalType();
+  }
+
+  if (isa<EnumElementDecl>(this)) {
+    auto mappedType = mapSignatureFunctionType(
+        getASTContext(), getInterfaceType(), /*topLevelFunction=*/false,
+        /*isMethod=*/false, /*isInitializer=*/false, /*curryLevels=*/0);
+    return mappedType->getCanonicalType();
   }
 
   // Note: If you add more cases to this function, you should update the

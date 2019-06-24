@@ -486,5 +486,122 @@ extension SR7250 where T : P3 {
   subscript(i: Int) -> String { return "" }
 }
 
+// SR-10084
 
+struct SR_10084_S {
+  let name: String
+}
 
+enum SR_10084_E {
+  case foo(SR_10084_S) // expected-note {{'foo' previously declared here}}
+    
+  static func foo(_ name: String) -> SR_10084_E { // Okay
+    return .foo(SR_10084_S(name: name))
+  }
+
+  func foo(_ name: Bool) -> SR_10084_E { // Okay
+    return .foo(SR_10084_S(name: "Test"))
+  }
+
+  static func foo(_ value: SR_10084_S) -> SR_10084_E { // expected-error {{invalid redeclaration of 'foo'}}
+    return .foo(value)
+  }
+}
+
+enum SR_10084_E_1 {
+  static func foo(_ name: String) -> SR_10084_E_1 { // Okay
+    return .foo(SR_10084_S(name: name))
+  }
+
+  static func foo(_ value: SR_10084_S) -> SR_10084_E_1 { // expected-note {{'foo' previously declared here}}
+    return .foo(value)
+  }
+
+  case foo(SR_10084_S) // expected-error {{invalid redeclaration of 'foo'}}
+}
+
+enum SR_10084_E_2 {
+  case fn(() -> Void) // expected-note {{'fn' previously declared here}}
+
+  static func fn(_ x: @escaping () -> Void) -> SR_10084_E_2 { // expected-error {{invalid redeclaration of 'fn'}}
+    fatalError()
+  }
+
+  static func fn(_ x: @escaping () -> Int) -> SR_10084_E_2 { // Okay
+    fatalError()
+  }
+
+  static func fn(_ x: @escaping () -> Bool) -> SR_10084_E_2 { // Okay
+    fatalError()
+  }
+}
+
+enum SR_10084_E_3 {
+  protocol A {} //expected-error {{protocol 'A' cannot be nested inside another declaration}} // expected-note {{'A' previously declared here}}
+  case A // expected-error {{invalid redeclaration of 'A'}}
+}
+
+enum SR_10084_E_4 {
+  class B {} // expected-note {{'B' previously declared here}}
+  case B // expected-error {{invalid redeclaration of 'B'}}
+}
+
+enum SR_10084_E_5 {
+  struct C {} // expected-note {{'C' previously declared here}}
+  case C // expected-error {{invalid redeclaration of 'C'}}
+}
+
+enum SR_10084_E_6 {
+  case D // expected-note {{'D' previously declared here}}
+  protocol D {} //expected-error {{protocol 'D' cannot be nested inside another declaration}} // expected-error {{invalid redeclaration of 'D'}}
+}
+
+enum SR_10084_E_7 {
+  case E // expected-note {{'E' previously declared here}}
+  class E {} // expected-error {{invalid redeclaration of 'E'}} 
+}
+
+enum SR_10084_E_8 {
+  case F // expected-note {{'F' previously declared here}}
+  struct F {} // expected-error {{invalid redeclaration of 'F'}} 
+}
+
+enum SR_10084_E_9 {
+  case A // expected-note {{found this candidate}} // expected-note {{'A' previously declared here}}
+  static let A: SR_10084_E_9 = .A // expected-note {{found this candidate}} // expected-error {{invalid redeclaration of 'A'}} // expected-error {{ambiguous use of 'A'}}
+}
+
+enum SR_10084_E_10 {
+  static let A: SR_10084_E_10 = .A // expected-note {{found this candidate}} // expected-note {{'A' previously declared here}} // expected-error {{ambiguous use of 'A'}}
+  case A // expected-note {{found this candidate}} // expected-error {{invalid redeclaration of 'A'}}
+}
+
+enum SR_10084_E_11 {
+  case A // expected-note {{found this candidate}} // expected-note {{'A' previously declared here}}
+  static var A: SR_10084_E_11 = .A // expected-note {{found this candidate}} // expected-error {{invalid redeclaration of 'A'}} // expected-error {{ambiguous use of 'A'}}
+}
+
+enum SR_10084_E_12 {
+  static var A: SR_10084_E_12 = .A // expected-note {{found this candidate}} // expected-note {{'A' previously declared here}} // expected-error {{ambiguous use of 'A'}}
+  case A // expected-note {{found this candidate}} // expected-error {{invalid redeclaration of 'A'}}
+}
+
+enum SR_10084_E_13 {
+  case X // expected-note {{'X' previously declared here}}
+  struct X<T> {} // expected-error {{invalid redeclaration of 'X'}}
+}
+
+enum SR_10084_E_14 {
+  struct X<T> {} // expected-note {{'X' previously declared here}}
+  case X // expected-error {{invalid redeclaration of 'X'}}
+}
+
+enum SR_10084_E_15 {
+  case Y // expected-note {{'Y' previously declared here}}
+  typealias Y = Int // expected-error {{invalid redeclaration of 'Y'}}
+}
+
+enum SR_10084_E_16 {
+  typealias Z = Int // expected-note {{'Z' previously declared here}}
+  case Z // expected-error {{invalid redeclaration of 'Z'}}
+}
