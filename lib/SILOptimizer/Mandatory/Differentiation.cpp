@@ -5944,7 +5944,8 @@ ADContext::getOrCreateSubsetParametersThunkForLinearMap(
   //   Original pullback: R -> (T0, T2)
   //   Desired indices w.r.t. original: 2
   //   Desired indices w.r.t. linear map: 1
-  SmallDenseMap<unsigned, unsigned> actualParamIndicesMap;
+  SmallVector<unsigned, 4> actualParamIndicesMap(
+      actualIndices.parameters->getCapacity(), UINT_MAX);
   {
     unsigned indexInBitVec = 0;
     for (auto index : actualIndices.parameters->getIndices()) {
@@ -5952,6 +5953,11 @@ ADContext::getOrCreateSubsetParametersThunkForLinearMap(
       indexInBitVec++;
     }
   }
+  auto mapOriginalParameterIndex = [&](unsigned index) -> unsigned {
+    auto mappedIndex = actualParamIndicesMap[index];
+    assert(mappedIndex < actualIndices.parameters->getCapacity());
+    return mappedIndex;
+  };
 
   switch (kind) {
   // Differential arguments are:
@@ -5977,7 +5983,7 @@ ADContext::getOrCreateSubsetParametersThunkForLinearMap(
       // Otherwise, construct and use a zero argument.
       else {
         auto zeroSILType =
-            linearMapType->getParameters()[actualParamIndicesMap[i]]
+            linearMapType->getParameters()[mapOriginalParameterIndex(i)]
                 .getSILStorageType();
         buildZeroArgument(zeroSILType);
       }
@@ -5997,7 +6003,8 @@ ADContext::getOrCreateSubsetParametersThunkForLinearMap(
     };
     // Iterate over actual indices.
     for (unsigned i : actualIndices.parameters->getIndices()) {
-      auto resultInfo = linearMapType->getResults()[actualParamIndicesMap[i]];
+      auto resultInfo =
+          linearMapType->getResults()[mapOriginalParameterIndex(i)];
       // Skip direct results. Only indirect results are relevant as arguments.
       if (resultInfo.isFormalDirect())
         continue;
@@ -6045,7 +6052,7 @@ ADContext::getOrCreateSubsetParametersThunkForLinearMap(
     // - Do nothing if result is indirect.
     //   (It was already forwarded to the `apply` instruction).
     // - Push it to `results` if result is direct.
-    auto result = allResults[actualParamIndicesMap[i]];
+    auto result = allResults[mapOriginalParameterIndex(i)];
     if (desiredIndices.isWrtParameter(i)) {
       if (result->getType().isAddress())
         continue;
