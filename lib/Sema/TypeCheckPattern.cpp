@@ -1134,6 +1134,7 @@ recur:
     // can silence the warning with an explicit type annotation
     // (and provide a fixit) as a note.
     Type diagTy = type->lookThroughAllOptionalTypes();
+    bool isOptional = !type->getOptionalObjectType().isNull();
     if (!diagTy) diagTy = type;
     
     auto diag = diag::type_inferred_to_undesirable_type;
@@ -1148,10 +1149,12 @@ recur:
         shouldRequireType = true;
     } else if (diagTy->isStructurallyUninhabited()) {
       shouldRequireType = true;
-      diag = diag::type_inferred_to_uninhabited_type;
-      
+      diag = isOptional ? diag::type_inferred_to_undesirable_type
+                        : diag::type_inferred_to_uninhabited_type;
+
       if (diagTy->is<TupleType>()) {
-        diag = diag::type_inferred_to_uninhabited_tuple_type;
+        diag = isOptional ? diag::type_inferred_to_undesirable_type
+                          : diag::type_inferred_to_uninhabited_tuple_type;
       } else {
         assert((diagTy->is<EnumType>() || diagTy->is<BoundGenericEnumType>()) &&
           "unknown structurally uninhabited type");
