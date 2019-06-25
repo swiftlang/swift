@@ -28,7 +28,7 @@
 // CHECK-L2: # DYLD_LIBRARY_PATH={{/foo/:/bar/:[^:]+/lib/swift/macosx$}}
 
 // RUN: env DYLD_LIBRARY_PATH=/abc/ %swift_driver_plain -### -target x86_64-apple-macosx10.9 -L/foo/ -L/bar/ %s | %FileCheck -check-prefix=CHECK-L2-ENV %s
-// CHECK-L2-ENV: # DYLD_LIBRARY_PATH={{/foo/:/bar/:[^:]+/lib/swift/macosx:/abc/$}}
+// CHECK-L2-ENV: # DYLD_LIBRARY_PATH={{/foo/:/bar/:[^:]+/lib/swift/macosx:[^:]+\.sdk/usr/lib/swift:/abc/$}}
 
 // RUN: %swift_driver -### -target x86_64-apple-macosx10.9 %s | %FileCheck -check-prefix=CHECK-NO-FRAMEWORKS %s
 // RUN: env DYLD_FRAMEWORK_PATH=/abc/ %swift_driver_plain -### -target x86_64-apple-macosx10.9 %s | %FileCheck -check-prefix=CHECK-NO-FRAMEWORKS %s
@@ -56,7 +56,7 @@
 // CHECK-COMPLEX: -F /bar/
 // CHECK-COMPLEX: #
 // CHECK-COMPLEX-DAG: DYLD_FRAMEWORK_PATH=/foo/:/bar/:/abc/{{$| }}
-// CHECK-COMPLEX-DAG: DYLD_LIBRARY_PATH={{/foo2/:/bar2/:[^:]+/lib/swift/macosx($| )}}
+// CHECK-COMPLEX-DAG: DYLD_LIBRARY_PATH={{/foo2/:/bar2/:[^:]+/lib/swift/macosx:[^:]+\.sdk/usr/lib/swift($| )}}
 
 // RUN: %swift_driver -### -target x86_64-unknown-linux-gnu -L/foo/ %s | %FileCheck -check-prefix=CHECK-L-LINUX${LD_LIBRARY_PATH+_LAX} %s
 // CHECK-L-LINUX: # LD_LIBRARY_PATH={{/foo/:[^:]+/lib/swift/linux$}}

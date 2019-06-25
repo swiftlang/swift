@@ -108,28 +108,36 @@ toolchains::Windows::constructInvocation(const DynamicLinkJobAction &job,
   // driver rather than the `clang-cl` driver.
   Arguments.push_back("-nostartfiles");
 
-  SmallString<128> SharedRuntimeLibPath;
-  getRuntimeLibraryPath(SharedRuntimeLibPath, context.Args,
-                        /*Shared=*/true);
-
   // Link the standard library.
-  Arguments.push_back("-L");
   if (context.Args.hasFlag(options::OPT_static_stdlib,
                            options::OPT_no_static_stdlib, false)) {
-    SmallString<128> StaticRuntimeLibPath;
-    getRuntimeLibraryPath(StaticRuntimeLibPath, context.Args,
-                          /*Shared=*/false);
+    SmallVector<std::string, 4> StaticRuntimeLibPaths;
+    getRuntimeLibraryPaths(StaticRuntimeLibPaths, context.Args,
+                           context.OI.SDKPath, /*Shared=*/false);
 
-    // Since Windows has separate libraries per architecture, link against the
-    // architecture specific version of the static library.
-    Arguments.push_back(context.Args.MakeArgString(StaticRuntimeLibPath + "/" +
-                                                   getTriple().getArchName()));
+    for (auto path : StaticRuntimeLibPaths) {
+      Arguments.push_back("-L");
+      // Since Windows has separate libraries per architecture, link against the
+      // architecture specific version of the static library.
+      Arguments.push_back(context.Args.MakeArgString(path + "/" +
+                                                     getTriple().getArchName()));
+    }
   } else {
-    Arguments.push_back(context.Args.MakeArgString(SharedRuntimeLibPath + "/" +
-                                                   getTriple().getArchName()));
+    SmallVector<std::string, 4> SharedRuntimeLibPaths;
+    getRuntimeLibraryPaths(SharedRuntimeLibPaths, context.Args,
+                           context.OI.SDKPath, /*Shared=*/true);
+
+    for (auto path : SharedRuntimeLibPaths) {
+      Arguments.push_back("-L");
+      Arguments.push_back(context.Args.MakeArgString(path + "/" +
+                                                     getTriple().getArchName()));
+    }
   }
 
-  SmallString<128> swiftrtPath = SharedRuntimeLibPath;
+  SmallString<128> SharedResourceDirPath;
+  getResourceDirPath(SharedResourceDirPath, context.Args, /*Shared=*/true);
+
+  SmallString<128> swiftrtPath = SharedResourceDirPath;
   llvm::sys::path::append(swiftrtPath,
                           swift::getMajorArchitectureName(getTriple()));
   llvm::sys::path::append(swiftrtPath, "swiftrt.obj");
@@ -164,7 +172,7 @@ toolchains::Windows::constructInvocation(const DynamicLinkJobAction &job,
   }
 
   if (context.Args.hasArg(options::OPT_profile_generate)) {
-    SmallString<128> LibProfile(SharedRuntimeLibPath);
+    SmallString<128> LibProfile(SharedResourceDirPath);
     llvm::sys::path::remove_filename(LibProfile); // remove platform name
     llvm::sys::path::append(LibProfile, "clang", "lib");
 
