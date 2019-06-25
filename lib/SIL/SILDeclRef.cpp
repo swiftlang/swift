@@ -1046,10 +1046,10 @@ unsigned SILDeclRef::getParameterListCount() const {
 
   auto *vd = getDecl();
 
-  if (auto *func = dyn_cast<AbstractFunctionDecl>(vd)) {
-    return func->hasImplicitSelfDecl() ? 2 : 1;
-  } else if (auto *ed = dyn_cast<EnumElementDecl>(vd)) {
-    return ed->hasAssociatedValues() ? 2 : 1;
+  if (isa<AbstractFunctionDecl>(vd) || isa<EnumElementDecl>(vd)) {
+    // For functions and enum elements, the number of parameter lists is the
+    // same as in their interface type.
+    return vd->getNumCurryLevels();
   } else if (isa<ClassDecl>(vd)) {
     return 2;
   } else if (isa<VarDecl>(vd)) {

@@ -55,10 +55,6 @@ void addExpectedOpaqueAccessorsToStorage(AbstractStorageDecl *storage,
 
 void triggerAccessorSynthesis(TypeChecker &TC, AbstractStorageDecl *storage);
 
-/// Provide storage and accessor implementations for the given property,
-/// which must be lazy.
-void completeLazyVarImplementation(VarDecl *lazyVar);
-
 /// Describes the kind of implicit constructor that will be
 /// generated.
 enum class ImplicitConstructorKind {

@@ -367,20 +367,9 @@ static Type getAdjustedParamType(const AnyFunctionType::Param &param) {
 
 // Is a particular parameter of a function or subscript declaration
 // declared to be an IUO?
-static bool paramIsIUO(Decl *decl, int paramNum) {
-  if (auto *fn = dyn_cast<AbstractFunctionDecl>(decl)) {
-    auto *paramList = fn->getParameters();
-    auto *param = paramList->get(paramNum);
-    return param->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
-  }
-  if (auto *ee = dyn_cast<EnumElementDecl>(decl)) {
-    auto *param = ee->getParameterList()->get(paramNum);
-    return param->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
-  }
-
-  auto *subscript = cast<SubscriptDecl>(decl);
-  auto *index = subscript->getIndices()->get(paramNum);
-  return index->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+static bool paramIsIUO(const ValueDecl *decl, int paramNum) {
+  return swift::getParameterAt(decl, paramNum)->getAttrs()
+      .hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
 }
 
 /// Determine whether the first declaration is as "specialized" as
@@ -479,30 +468,12 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
       Type type1 = decl1->getInterfaceType();
       Type type2 = decl2->getInterfaceType();
 
-      /// What part of the type should we check?
-      enum {
-        CheckAll,
-        CheckInput,
-      } checkKind;
-      if (isa<AbstractFunctionDecl>(decl1) || isa<EnumElementDecl>(decl1)) {
-        // Nothing to do: these have the curried 'self' already.
-        if (auto elt = dyn_cast<EnumElementDecl>(decl1)) {
-          checkKind = elt->hasAssociatedValues() ? CheckInput : CheckAll;
-        } else {
-          checkKind = CheckInput;
-        }
-      } else {
-        // Add a curried 'self' type.
+      // Add curried 'self' types if necessary.
+      if (!decl1->hasCurriedSelf())
         type1 = type1->addCurriedSelfType(outerDC1);
-        type2 = type2->addCurriedSelfType(outerDC2);
 
-        // For a subscript declaration, only look at the input type (i.e., the
-        // indices).
-        if (isa<SubscriptDecl>(decl1))
-          checkKind = CheckInput;
-        else
-          checkKind = CheckAll;
-      }
+      if (!decl2->hasCurriedSelf())
+        type2 = type2->addCurriedSelfType(outerDC2);
 
       auto openType = [&](ConstraintSystem &cs, DeclContext *innerDC,
                           DeclContext *outerDC, Type type,
@@ -600,18 +571,16 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
       }
 
       bool fewerEffectiveParameters = false;
-      switch (checkKind) {
-      case CheckAll:
-        // Check whether the first type is a subtype of the second.
+      if (!decl1->hasParameterList() && !decl2->hasParameterList()) {
+        // If neither decl has a parameter list, simply check whether the first
+        // type is a subtype of the second.
         cs.addConstraint(ConstraintKind::Subtype,
                          openedType1,
                          openedType2,
                          locator);
-        break;
-
-      case CheckInput: {
-        // Check whether the first function type's input is a subtype of the
-        // second type's inputs, i.e., can we forward the arguments?
+      } else if (decl1->hasParameterList() && decl2->hasParameterList()) {
+        // Otherwise, check whether the first function type's input is a subtype
+        // of the second type's inputs, i.e., can we forward the arguments?
         auto funcTy1 = openedType1->castTo<FunctionType>();
         auto funcTy2 = openedType2->castTo<FunctionType>();
         auto params1 = funcTy1->getParams();
@@ -669,7 +638,7 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
         };
 
         ParameterListInfo paramInfo(
-            params2, decl2, decl2->getDeclContext()->isTypeContext());
+            params2, decl2, decl2->hasCurriedSelf());
         auto params2ForMatching = params2;
         if (compareTrailingClosureParamsSeparately) {
           --numParams1;
@@ -685,9 +654,6 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
         if (compareTrailingClosureParamsSeparately)
           if (!maybeAddSubtypeConstraint(params1.back(), params2.back()))
             knownNonSubtype = true;
-
-        break;
-      }
       }
 
       if (!knownNonSubtype) {

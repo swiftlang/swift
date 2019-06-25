@@ -96,6 +96,8 @@ public:
     ClosureResult,
     /// The parent of a nested type.
     ParentType,
+    /// The superclass of a protocol existential type.
+    ExistentialSuperclassType,
     /// The instance of a metatype type.
     InstanceType,
     /// The element type of a sequence in a for ... in ... loop.
@@ -157,6 +159,7 @@ public:
     case ClosureResult:
     case ParentType:
     case InstanceType:
+    case ExistentialSuperclassType:
     case SequenceElementType:
     case AutoclosureResult:
     case Requirement:
@@ -215,6 +218,7 @@ public:
     case MemberRefBase:
     case UnresolvedMember:
     case ParentType:
+    case ExistentialSuperclassType:
     case LValueConversion:
     case RValueAdjustment:
     case SubscriptMember:

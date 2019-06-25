@@ -67,6 +67,7 @@ constants.""")
         slashes_re = r'/'
 
     stdin = sys.stdin.read()
+
     for s in args.sanitize_strings:
         replacement, pattern = s.split('=', 1)
         # We are replacing the Unix path separators in the paths passed as

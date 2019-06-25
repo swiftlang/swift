@@ -344,13 +344,7 @@ protected:
     IsUserAccessible : 1
   );
 
-  SWIFT_INLINE_BITFIELD(AbstractStorageDecl, ValueDecl, 1+1+1+1+2+1+1+1,
-    /// Whether the getter is mutating.
-    IsGetterMutating : 1,
-
-    /// Whether the setter is mutating.
-    IsSetterMutating : 1,
-
+  SWIFT_INLINE_BITFIELD(AbstractStorageDecl, ValueDecl, 1+1+2+1+1+1,
     /// Whether this represents physical storage.
     HasStorage : 1,
 
@@ -439,7 +433,7 @@ protected:
     HasSingleExpressionBody : 1
   );
 
-  SWIFT_INLINE_BITFIELD(FuncDecl, AbstractFunctionDecl, 1+2+1+1+2,
+  SWIFT_INLINE_BITFIELD(FuncDecl, AbstractFunctionDecl, 1+2+1+1+1+2,
     /// Whether this function is a 'static' method.
     IsStatic : 1,
 
@@ -451,6 +445,9 @@ protected:
 
     /// Whether this function has a dynamic Self return type.
     HasDynamicSelf : 1,
+
+    /// Whether we've computed the 'self' access kind yet.
+    SelfAccessComputed : 1,
 
     /// Backing bits for 'self' access kind.
     SelfAccess : 2
@@ -605,7 +602,7 @@ protected:
     HasAnyUnavailableValues : 1
   );
 
-  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1,
     /// If the module was or is being compiled with `-enable-testing`.
     TestingEnabled : 1,
 
@@ -620,14 +617,18 @@ protected:
     /// Whether all imports have been resolved. Used to detect circular imports.
     HasResolvedImports : 1,
 
-    // If the module was or is being compiled with `-enable-private-imports`.
+    /// If the module was or is being compiled with `-enable-private-imports`.
     PrivateImportsEnabled : 1,
 
-    // If the module is compiled with `-enable-implicit-dynamic`.
+    /// If the module is compiled with `-enable-implicit-dynamic`.
     ImplicitDynamicEnabled : 1,
 
-    // Whether the module is a system module.
-    IsSystemModule : 1
+    /// Whether the module is a system module.
+    IsSystemModule : 1,
+
+    /// Whether the module was imported from Clang (or, someday, maybe another
+    /// language).
+    IsNonSwiftModule : 1
   );
 
   SWIFT_INLINE_BITFIELD(PrecedenceGroupDecl, Decl, 1+2,
@@ -2696,7 +2697,20 @@ public:
   /// True if this is a C function that was imported as a member of a type in
   /// Swift.
   bool isImportAsMember() const;
-  
+
+  /// Returns true if the declaration's interface type is a function type with a
+  /// curried self parameter.
+  bool hasCurriedSelf() const;
+
+  /// Returns true if the declaration has a parameter list associated with it.
+  ///
+  /// Note that not all declarations with function interface types have
+  /// parameter lists, for example an enum element without associated values.
+  bool hasParameterList() const;
+
+  /// Returns the number of curry levels in the declaration's interface type.
+  unsigned getNumCurryLevels() const;
+
   /// Get the decl for this value's opaque result type, if it has one.
   OpaqueTypeDecl *getOpaqueResultTypeDecl() const;
 
@@ -2835,6 +2849,11 @@ public:
                  GenericTypeParamType *UnderlyingInterfaceType);
   
   ValueDecl *getNamingDecl() const { return NamingDecl; }
+  
+  void setNamingDecl(ValueDecl *D) {
+    assert(!NamingDecl && "already have naming decl");
+    NamingDecl = D;
+  }
   
   GenericSignature *getOpaqueInterfaceGenericSignature() const {
     return OpaqueInterfaceGenericSignature;
@@ -4378,6 +4397,10 @@ public:
 /// SubscriptDecl, representing potentially settable memory locations.
 class AbstractStorageDecl : public ValueDecl {
   friend class SetterAccessLevelRequest;
+  friend class IsGetterMutatingRequest;
+  friend class IsSetterMutatingRequest;
+  friend class OpaqueReadOwnershipRequest;
+
 public:
   static const size_t MaxNumAccessors = 255;
 private:
@@ -4445,6 +4468,15 @@ private:
     Bits.AbstractStorageDecl.SupportsMutation = implInfo.supportsMutation();
   }
 
+  struct {
+    unsigned IsGetterMutatingComputed : 1;
+    unsigned IsGetterMutating : 1;
+    unsigned IsSetterMutatingComputed : 1;
+    unsigned IsSetterMutating : 1;
+    unsigned OpaqueReadOwnershipComputed : 1;
+    unsigned OpaqueReadOwnership : 2;
+  } LazySemanticInfo = { };
+
 protected:
   AbstractStorageDecl(DeclKind Kind, bool IsStatic, DeclContext *DC,
                       DeclName Name, SourceLoc NameLoc,
@@ -4452,10 +4484,6 @@ protected:
     : ValueDecl(Kind, DC, Name, NameLoc) {
     Bits.AbstractStorageDecl.HasStorage = true;
     Bits.AbstractStorageDecl.SupportsMutation = supportsMutation;
-    Bits.AbstractStorageDecl.IsGetterMutating = false;
-    Bits.AbstractStorageDecl.IsSetterMutating = true;
-    Bits.AbstractStorageDecl.OpaqueReadOwnership =
-      unsigned(OpaqueReadOwnership::Owned);
     Bits.AbstractStorageDecl.IsStatic = IsStatic;
   }
 
@@ -4539,29 +4567,26 @@ public:
   }
 
   /// Return the ownership of values opaquely read from this storage.
-  OpaqueReadOwnership getOpaqueReadOwnership() const {
-    return OpaqueReadOwnership(Bits.AbstractStorageDecl.OpaqueReadOwnership);
-  }
+  OpaqueReadOwnership getOpaqueReadOwnership() const;
   void setOpaqueReadOwnership(OpaqueReadOwnership ownership) {
-    Bits.AbstractStorageDecl.OpaqueReadOwnership = unsigned(ownership);
+    LazySemanticInfo.OpaqueReadOwnership = unsigned(ownership);
+    LazySemanticInfo.OpaqueReadOwnershipComputed = true;
   }
 
   /// Return true if reading this storage requires the ability to
   /// modify the base value.
-  bool isGetterMutating() const {
-    return Bits.AbstractStorageDecl.IsGetterMutating;
-  }
+  bool isGetterMutating() const;
   void setIsGetterMutating(bool isMutating) {
-    Bits.AbstractStorageDecl.IsGetterMutating = isMutating;
+    LazySemanticInfo.IsGetterMutating = isMutating;
+    LazySemanticInfo.IsGetterMutatingComputed = true;
   }
   
   /// Return true if modifying this storage requires the ability to
   /// modify the base value.
-  bool isSetterMutating() const {
-    return Bits.AbstractStorageDecl.IsSetterMutating;
-  }
+  bool isSetterMutating() const;
   void setIsSetterMutating(bool isMutating) {
-    Bits.AbstractStorageDecl.IsSetterMutating = isMutating;
+    LazySemanticInfo.IsSetterMutating = isMutating;
+    LazySemanticInfo.IsSetterMutatingComputed = true;
   }
 
   AccessorDecl *getAccessor(AccessorKind kind) const {
@@ -5164,6 +5189,9 @@ public:
   /// generic type, the backing storage property will be the appropriate
   /// bound generic version.
   VarDecl *getPropertyWrapperBackingProperty() const;
+
+  /// Retrieve the backing storage property for a lazy property.
+  VarDecl *getLazyStorageProperty() const;
 
   /// Whether this is a property with a property wrapper that was initialized
   /// via a value of the original type, e.g.,
@@ -5926,6 +5954,7 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SelfAccessKind SAK);
 /// FuncDecl - 'func' declaration.
 class FuncDecl : public AbstractFunctionDecl {
   friend class AbstractFunctionDecl;
+  friend class SelfAccessKindRequest;
 
   SourceLoc StaticLoc;  // Location of the 'static' token or invalid.
   SourceLoc FuncLoc;    // Location of the 'func' token.
@@ -5956,7 +5985,9 @@ protected:
 
     Bits.FuncDecl.HasDynamicSelf = false;
     Bits.FuncDecl.ForcedStaticDispatch = false;
-    Bits.FuncDecl.SelfAccess = static_cast<unsigned>(SelfAccessKind::NonMutating);
+    Bits.FuncDecl.SelfAccess =
+      static_cast<unsigned>(SelfAccessKind::NonMutating);
+    Bits.FuncDecl.SelfAccessComputed = false;
   }
 
 private:
@@ -5968,6 +5999,13 @@ private:
                               GenericParamList *GenericParams,
                               DeclContext *Parent,
                               ClangNode ClangN);
+
+  Optional<SelfAccessKind> getCachedSelfAccessKind() const {
+    if (Bits.FuncDecl.SelfAccessComputed)
+      return static_cast<SelfAccessKind>(Bits.FuncDecl.SelfAccess);
+
+    return None;
+  }
 
 public:
   /// Factory function only for use by deserialization.
@@ -6006,7 +6044,7 @@ public:
   void setStatic(bool IsStatic = true) {
     Bits.FuncDecl.IsStatic = IsStatic;
   }
-      
+
   bool isMutating() const {
     return getSelfAccessKind() == SelfAccessKind::Mutating;
   }
@@ -6017,11 +6055,11 @@ public:
     return getSelfAccessKind() == SelfAccessKind::__Consuming;
   }
 
-  SelfAccessKind getSelfAccessKind() const {
-    return static_cast<SelfAccessKind>(Bits.FuncDecl.SelfAccess);
-  }
+  SelfAccessKind getSelfAccessKind() const;
+
   void setSelfAccessKind(SelfAccessKind mod) {
     Bits.FuncDecl.SelfAccess = static_cast<unsigned>(mod);
+    Bits.FuncDecl.SelfAccessComputed = true;
   }
 
   SourceLoc getStaticLoc() const { return StaticLoc; }
@@ -7198,6 +7236,29 @@ inline bool ValueDecl::isImportAsMember() const {
   return false;
 }
 
+inline bool ValueDecl::hasCurriedSelf() const {
+  if (auto *afd = dyn_cast<AbstractFunctionDecl>(this))
+    return afd->hasImplicitSelfDecl();
+  if (isa<EnumElementDecl>(this))
+    return true;
+  return false;
+}
+
+inline bool ValueDecl::hasParameterList() const {
+  if (auto *eed = dyn_cast<EnumElementDecl>(this))
+    return eed->hasAssociatedValues();
+  return isa<AbstractFunctionDecl>(this) || isa<SubscriptDecl>(this);
+}
+
+inline unsigned ValueDecl::getNumCurryLevels() const {
+  unsigned curryLevels = 0;
+  if (hasParameterList())
+    curryLevels++;
+  if (hasCurriedSelf())
+    curryLevels++;
+  return curryLevels;
+}
+
 inline bool Decl::isPotentiallyOverridable() const {
   if (isa<VarDecl>(this) ||
       isa<SubscriptDecl>(this) ||
@@ -7262,7 +7323,7 @@ inline EnumElementDecl *EnumDecl::getUniqueElement(bool hasValue) const {
 }
 
 /// Retrieve parameter declaration from the given source at given index.
-const ParamDecl *getParameterAt(ValueDecl *source, unsigned index);
+const ParamDecl *getParameterAt(const ValueDecl *source, unsigned index);
 
 /// Display Decl subclasses.
 void simple_display(llvm::raw_ostream &out, const Decl *decl);

@@ -2729,16 +2729,15 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
   }
 
   /// Writes the given pattern, recursively.
-  void writePattern(const Pattern *pattern, const DeclContext *owningDC) {
+  void writePattern(const Pattern *pattern) {
     using namespace decls_block;
 
     // Retrieve the type of the pattern.
     auto getPatternType = [&] {
       Type type = pattern->getType();
 
-      // If we have an owning context and a contextual type, map out to an
-      // interface type.
-      if (owningDC && type->hasArchetype())
+      // If we have a contextual type, map out to an interface type.
+      if (type->hasArchetype())
         type = type->mapTypeOutOfContext();
 
       return type;
@@ -2750,7 +2749,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       unsigned abbrCode = S.DeclTypeAbbrCodes[ParenPatternLayout::Code];
       ParenPatternLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                      pattern->isImplicit());
-      writePattern(cast<ParenPattern>(pattern)->getSubPattern(), owningDC);
+      writePattern(cast<ParenPattern>(pattern)->getSubPattern());
       break;
     }
     case PatternKind::Tuple: {
@@ -2767,7 +2766,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
         // FIXME: Default argument expressions?
         TuplePatternEltLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                           S.addDeclBaseNameRef(elt.getLabel()));
-        writePattern(elt.getPattern(), owningDC);
+        writePattern(elt.getPattern());
       }
       break;
     }
@@ -2795,7 +2794,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       TypedPatternLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                      S.addTypeRef(getPatternType()),
                                      typed->isImplicit());
-      writePattern(typed->getSubPattern(), owningDC);
+      writePattern(typed->getSubPattern());
       break;
     }
     case PatternKind::Is:
@@ -2811,7 +2810,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       unsigned abbrCode = S.DeclTypeAbbrCodes[VarPatternLayout::Code];
       VarPatternLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                    var->isLet(), var->isImplicit());
-      writePattern(var->getSubPattern(), owningDC);
+      writePattern(var->getSubPattern());
       break;
     }
     }
@@ -3000,7 +2999,7 @@ public:
       owningDC = binding->getDeclContext();
 
     for (auto entry : binding->getPatternList()) {
-      writePattern(entry.getPattern(), owningDC);
+      writePattern(entry.getPattern());
       // Ignore initializer; external clients don't need to know about it.
     }
   }
@@ -3329,7 +3328,6 @@ public:
                                  /*resolver=*/nullptr),
                                S.addGenericEnvironmentRef(
                                                 proto->getGenericEnvironment()),
-                               S.addTypeRef(proto->getSuperclass()),
                                rawAccessLevel,
                                inherited);
 
@@ -3359,6 +3357,7 @@ public:
     SmallVector<TypeID, 2> arrayFields;
     for (auto accessor : accessors.Decls)
       arrayFields.push_back(S.addDeclRef(accessor));
+
     if (auto backingInfo = var->getPropertyWrapperBackingPropertyInfo()) {
       if (backingInfo.backingVar) {
         ++numBackingProperties;
@@ -3372,6 +3371,10 @@ public:
     for (Type dependency : collectDependenciesFromType(ty->getCanonicalType()))
       arrayFields.push_back(S.addTypeRef(dependency));
 
+    VarDecl *lazyStorage = nullptr;
+    if (var->getAttrs().hasAttribute<LazyAttr>())
+      lazyStorage = var->getLazyStorageProperty();
+
     unsigned abbrCode = S.DeclTypeAbbrCodes[VarLayout::Code];
     VarLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                           S.addDeclBaseNameRef(var->getName()),
@@ -3383,6 +3386,8 @@ public:
                           var->hasNonPatternBindingInit(),
                           var->isGetterMutating(),
                           var->isSetterMutating(),
+                          var->isLazyStorageProperty(),
+                          S.addDeclRef(lazyStorage),
                           accessors.OpaqueReadOwnership,
                           accessors.ReadImpl,
                           accessors.WriteImpl,

@@ -468,6 +468,15 @@ void IRGenModule::emitSourceFile(SourceFile &SF) {
                                          /*forceLoad*/ true));
       }
     }
+
+    if (auto compatibilityVersion =
+            IRGen.Opts.AutolinkRuntimeCompatibilityDynamicReplacementLibraryVersion) {
+      if (*compatibilityVersion <= llvm::VersionTuple(5, 0)) {
+        this->addLinkLibrary(LinkLibrary("swiftCompatibilityDynamicReplacements",
+                                         LibraryKind::Library,
+                                         /*forceLoad*/ true));
+      }
+    }
   }
 }
 
@@ -1506,6 +1515,7 @@ void IRGenerator::emitDynamicReplacements() {
   autoReplacements.addInt32(1); // number of replacement entries.
   auto autoReplacementsArray = autoReplacements.beginArray();
   autoReplacementsArray.addRelativeAddress(var);
+  autoReplacementsArray.addInt32(0); // unused flags.
   autoReplacementsArray.finishAndAddTo(autoReplacements);
   auto autoReplVar = autoReplacements.finishAndCreateGlobal(
       "\x01l_auto_dynamic_replacements", IGM.getPointerAlignment(),
@@ -2236,8 +2246,8 @@ void IRGenModule::createReplaceableProlog(IRGenFunction &IGF, SILFunction *f) {
     rhs = FnAddr;
   } else {
     // Call swift_getFunctionReplacement to check which function to call.
-    auto *callRTFunc = IGF.Builder.CreateCall(getGetReplacementFn(),
-                                             { ReplAddr, FnAddr });
+    auto *callRTFunc =
+        IGF.Builder.CreateCall(getGetReplacementFn(), {ReplAddr, FnAddr});
     callRTFunc->setDoesNotThrow();
     ReplFn = callRTFunc;
     rhs = llvm::ConstantExpr::getNullValue(ReplFn->getType());
@@ -2405,8 +2415,9 @@ void IRGenModule::emitDynamicReplacementOriginalFunctionThunk(SILFunction *f) {
       llvm::ConstantExpr::getInBoundsGetElementPtr(nullptr, linkEntry, indices),
       FunctionPtrTy->getPointerTo());
 
-  auto *OrigFn = IGF.Builder.CreateCall(getGetOrigOfReplaceableFn(),
-                                        { fnPtrAddr });
+  auto *OrigFn =
+      IGF.Builder.CreateCall(getGetOrigOfReplaceableFn(), {fnPtrAddr});
+
   OrigFn->setDoesNotThrow();
 
   auto *typeFnPtr =

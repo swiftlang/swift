@@ -1628,7 +1628,12 @@ giveUpFastPath:
             return nullptr;
           }
           values.front() = storage->getAccessor(*actualKind);
-          assert(values.front() && "missing accessor");
+          if (!values.front()) {
+            return llvm::make_error<XRefError>("missing accessor",
+                                               pathTrace,
+                                               getXRefDeclNameForError());
+
+          }
         }
         break;
       }
@@ -1724,9 +1729,10 @@ giveUpFastPath:
       
       auto name = getIdentifier(DefiningDeclNameID);
       pathTrace.addOpaqueReturnType(name);
-      
-      if (auto opaqueTy = baseModule->lookupOpaqueResultType(name.str(),
-                                                             nullptr)) {
+    
+      auto lookupModule = M ? M : baseModule;
+      if (auto opaqueTy = lookupModule->lookupOpaqueResultType(name.str(),
+                                                               nullptr)) {
         values.push_back(opaqueTy);
       }
       break;
@@ -2686,6 +2692,8 @@ public:
     DeclContextID contextID;
     bool isImplicit, isObjC, isStatic, hasNonPatternBindingInit;
     bool isGetterMutating, isSetterMutating;
+    bool isLazyStorageProperty;
+    DeclID lazyStorageID;
     unsigned rawSpecifier, numAccessors, numBackingProperties;
     uint8_t readImpl, writeImpl, readWriteImpl, opaqueReadOwnership;
     uint8_t rawAccessLevel, rawSetterAccessLevel;
@@ -2698,6 +2706,8 @@ public:
                                        isImplicit, isObjC, isStatic, rawSpecifier,
                                        hasNonPatternBindingInit,
                                        isGetterMutating, isSetterMutating,
+                                       isLazyStorageProperty,
+                                       lazyStorageID,
                                        opaqueReadOwnership,
                                        readImpl, writeImpl, readWriteImpl,
                                        numAccessors,
@@ -2815,7 +2825,14 @@ public:
                          cast<OpaqueTypeDecl>(MF.getDecl(opaqueReturnTypeID)));
     }
 
-    // If there are any backing properties, record the
+    // If this is a lazy property, record its backing storage.
+    if (lazyStorageID) {
+      VarDecl *storage = cast<VarDecl>(MF.getDecl(lazyStorageID));
+      ctx.evaluator.cacheOutput(
+          LazyStoragePropertyRequest{var}, std::move(storage));
+    }
+
+    // If there are any backing properties, record them.
     if (numBackingProperties > 0) {
       VarDecl *backingVar = cast<VarDecl>(MF.getDecl(backingPropertyIDs[0]));
       VarDecl *storageWrapperVar = nullptr;
@@ -2996,10 +3013,27 @@ public:
       }
     }
 
-    Expected<Decl *> overridden = MF.getDeclChecked(overriddenID);
-    if (!overridden) {
-      llvm::consumeError(overridden.takeError());
-      return llvm::make_error<OverrideError>(name, errorFlags);
+    Expected<Decl *> overriddenOrError = MF.getDeclChecked(overriddenID);
+    Decl *overridden;
+    if (overriddenOrError) {
+      overridden = overriddenOrError.get();
+    } else {
+      llvm::consumeError(overriddenOrError.takeError());
+      // There's one case where we know it's safe to ignore a missing override:
+      // if this declaration is '@objc' and 'dynamic'.
+      bool canIgnoreMissingOverriddenDecl = false;
+      if (isObjC && ctx.LangOpts.EnableDeserializationRecovery) {
+        canIgnoreMissingOverriddenDecl =
+            std::any_of(DeclAttributes::iterator(DAttrs),
+                        DeclAttributes::iterator(nullptr),
+                        [](const DeclAttribute *attr) -> bool {
+          return isa<DynamicAttr>(attr);
+        });
+      }
+      if (!canIgnoreMissingOverriddenDecl)
+        return llvm::make_error<OverrideError>(name, errorFlags);
+
+      overridden = nullptr;
     }
 
     for (TypeID dependencyID : dependencyIDs) {
@@ -3090,7 +3124,7 @@ public:
     if (auto bodyText = MF.maybeReadInlinableBodyText())
       fn->setBodyStringRepresentation(*bodyText);
 
-    fn->setOverriddenDecl(cast_or_null<FuncDecl>(overridden.get()));
+    fn->setOverriddenDecl(cast_or_null<FuncDecl>(overridden));
     if (fn->getOverriddenDecl())
       AddAttribute(new (ctx) OverrideAttr(SourceLoc()));
 
@@ -3134,7 +3168,6 @@ public:
                                               interfaceTypeID, genericEnvID,
                                               underlyingTypeID);
     
-    auto namingDecl = cast<ValueDecl>(MF.getDecl(namingDeclID));
     auto declContext = MF.getDeclContext(contextID);
     auto sig = MF.getGenericSignature(interfaceSigID);
     auto interfaceType = MF.getType(interfaceTypeID)
@@ -3146,9 +3179,12 @@ public:
       
     // Create the decl.
     auto opaqueDecl =
-      new (ctx) OpaqueTypeDecl(namingDecl, nullptr, declContext,
+      new (ctx) OpaqueTypeDecl(nullptr, nullptr, declContext,
                                sig, interfaceType);
     declOrOffset = opaqueDecl;
+
+    auto namingDecl = cast<ValueDecl>(MF.getDecl(namingDeclID));
+    opaqueDecl->setNamingDecl(namingDecl);
 
     if (auto genericParams = MF.maybeReadGenericParams(opaqueDecl))
       opaqueDecl->setGenericParams(genericParams);
@@ -3232,15 +3268,13 @@ public:
     DeclContextID contextID;
     bool isImplicit, isClassBounded, isObjC, existentialTypeSupported;
     GenericEnvironmentID genericEnvID;
-    TypeID superclassID;
     uint8_t rawAccessLevel;
     ArrayRef<uint64_t> rawInheritedIDs;
 
     decls_block::ProtocolLayout::readRecord(scratch, nameID, contextID,
                                             isImplicit, isClassBounded, isObjC,
                                             existentialTypeSupported,
-                                            genericEnvID, superclassID,
-                                            rawAccessLevel, rawInheritedIDs);
+                                            genericEnvID, rawAccessLevel, rawInheritedIDs);
 
     auto DC = MF.getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -3251,7 +3285,6 @@ public:
                                              /*TrailingWhere=*/nullptr);
     declOrOffset = proto;
 
-    proto->setSuperclass(MF.getType(superclassID));
     proto->setRequiresClass(isClassBounded);
     proto->setExistentialTypeSupported(existentialTypeSupported);
 

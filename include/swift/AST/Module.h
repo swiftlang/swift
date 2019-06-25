@@ -337,6 +337,18 @@ public:
     Bits.ModuleDecl.IsSystemModule = flag;
   }
 
+  /// Returns true if this module is a non-Swift module that was imported into
+  /// Swift.
+  ///
+  /// Right now that's just Clang modules.
+  bool isNonSwiftModule() const {
+    return Bits.ModuleDecl.IsNonSwiftModule;
+  }
+  /// \see #isNonSwiftModule
+  void setIsNonSwiftModule(bool flag = true) {
+    Bits.ModuleDecl.IsNonSwiftModule = flag;
+  }
+
   bool isResilient() const {
     return getResilienceStrategy() != ResilienceStrategy::Default;
   }

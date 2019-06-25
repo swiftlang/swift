@@ -38,7 +38,8 @@ if #available(OSX 10.13, iOS 11.0, tvOS 11.0, *) {
         }
     }
 
-    ModelIOTests.test("MDLAnimatedVector2/accessors") {
+    ModelIOTests.test("MDLAnimatedVector2/accessors")
+    .skip(.always("rdar://problem/50449570")).code {
         let animatedVal = MDLAnimatedVector2()
         let testCount = 10
         let testTimeVal = 5.0
@@ -67,7 +68,8 @@ if #available(OSX 10.13, iOS 11.0, tvOS 11.0, *) {
         }
     }
 
-    ModelIOTests.test("MDLAnimatedVector3/accessors") {
+    ModelIOTests.test("MDLAnimatedVector3/accessors")
+    .skip(.always("rdar://problem/50449570")).code {
         let animatedVal = MDLAnimatedVector3()
         let testCount = 10
         let testTimeVal = 5.0
@@ -98,7 +100,8 @@ if #available(OSX 10.13, iOS 11.0, tvOS 11.0, *) {
         }
     }
 
-    ModelIOTests.test("MDLAnimatedVector4/accessors") {
+    ModelIOTests.test("MDLAnimatedVector4/accessors")
+    .skip(.always("rdar://problem/50449570")).code {
         let animatedVal = MDLAnimatedVector4()
         let testCount = 10
         let testTimeVal = 5.0
@@ -131,7 +134,8 @@ if #available(OSX 10.13, iOS 11.0, tvOS 11.0, *) {
         }
     }
 
-    ModelIOTests.test("MDLAnimatedMatrix4x4/accessors") {
+    ModelIOTests.test("MDLAnimatedMatrix4x4/accessors")
+    .skip(.always("rdar://problem/50449570")).code {
         let animatedVal = MDLAnimatedMatrix4x4()
         let testCount = 10
         let testTimeVal = 5.0
@@ -166,7 +170,8 @@ if #available(OSX 10.13, iOS 11.0, tvOS 11.0, *) {
         }
     }
 
-    ModelIOTests.test("MDLMatrix4x4Array/accessors") {
+    ModelIOTests.test("MDLMatrix4x4Array/accessors")
+    .skip(.always("rdar://problem/50449570")).code {
         let testCount = 10
         let matrixArray = MDLMatrix4x4Array(elementCount: testCount)
         let testFloatVal = float4x4()
@@ -196,7 +201,8 @@ if #available(OSX 10.13, iOS 11.0, tvOS 11.0, *) {
         }
     }
 
-    ModelIOTests.test("MDLAnimatedScalarArray/accessors") {
+    ModelIOTests.test("MDLAnimatedScalarArray/accessors")
+    .skip(.always("rdar://problem/50449570")).code {
         let elementCount = 10
         let animatedVal = MDLAnimatedScalarArray(elementCount: elementCount)
         let subCount = 2
@@ -240,7 +246,8 @@ if #available(OSX 10.13, iOS 11.0, tvOS 11.0, *) {
         }
     }
 
-    ModelIOTests.test("MDLAnimatedQuaternionArray/accessors") {
+    ModelIOTests.test("MDLAnimatedQuaternionArray/accessors")
+    .skip(.always("rdar://problem/50449570")).code {
         let elementCount = 10
         let testCount = 10
         let totalCount = elementCount * testCount
@@ -283,7 +290,8 @@ if #available(OSX 10.13, iOS 11.0, tvOS 11.0, *) {
         }
     }
 
-    ModelIOTests.test("MDLAnimatedVector3Array/accessors") {
+    ModelIOTests.test("MDLAnimatedVector3Array/accessors")
+    .skip(.always("rdar://problem/50449570")).code {
         let elementCount = 10
         let animatedVal = MDLAnimatedVector3Array(elementCount: elementCount)
         let testCount = 10
