@@ -127,6 +127,9 @@ public:
   /// Whether or not the AST stored for this document is up-to-date or just an
   /// artifact of incremental syntax parsing
   bool hasUpToDateAST() const;
+
+  /// Returns the virtual filesystem associated with this document.
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> getFileSystem() const;
 };
 
 typedef IntrusiveRefCntPtr<SwiftEditorDocument> SwiftEditorDocumentRef;
@@ -323,17 +326,23 @@ public:
   /// \param FileSystemProvider must be non-null
   void setFileSystemProvider(StringRef Name, std::unique_ptr<FileSystemProvider> FileSystemProvider);
 
-  /// Returns the filesystem specified by \p vfsOptions, or \c RealFileSystem if
-  /// vfsOptions is None.
+  /// Returns the filesystem appropriate to use in a request with the given
+  /// \p vfsOptions and \p primaryFile.
+  ///
+  /// If \p vfsOptions is provided, returns a virtual filesystem created from
+  /// a registered FileSystemProvider, or nullptr if there is an error.
+  ///
+  /// If \p vfsOptions is None and \p primaryFile is provided, returns the
+  /// virtual filesystem associated with that editor document, if any.
+  ///
+  /// Otherwise, returns the real filesystem.
   ///
   /// \param vfsOptions Options to select and initialize the VFS, or None to
   ///                   get the real file system.
   /// \param error Set to a description of the error, if appropriate.
-  /// \returns The filesystem described by \p vfsOptions, or nullptr if there is
-  ///          an error (and sets \p error). If \p vfsOptions is None, this
-  ///          cannot fail.
   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
-  getFileSystem(const Optional<VFSOptions> &vfsOptions, std::string &error);
+  getFileSystem(const Optional<VFSOptions> &vfsOptions,
+                Optional<StringRef> primaryFile, std::string &error);
 
   /// Copy a memory buffer inserting '0' at the position of \c origBuf.
   // TODO: Share with code completion.
