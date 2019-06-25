@@ -3,17 +3,17 @@
 @propertyWrapper
 public struct Wrapper<T> {
   // CHECK: [[@LINE-1]]:15 | struct/Swift | Wrapper | [[Wrapper_USR:.*]] | Def | rel: 0
-  public var value: T
-  // CHECK: [[@LINE-1]]:14 | instance-property/Swift | value | [[value_USR:.*]] | Def,RelChild | rel: 1
+  public var wrappedValue: T
+  // CHECK: [[@LINE-1]]:14 | instance-property/Swift | wrappedValue | [[wrappedValue_USR:.*]] | Def,RelChild | rel: 1
 
   public init(initialValue: T) {
   // CHECK: [[@LINE-1]]:10 | constructor/Swift | init(initialValue:) | [[WrapperInit_USR:.*]] | Def,RelChild | rel: 1
-    self.value = initialValue
+    self.wrappedValue = initialValue
   }
 
   public init(body: () -> T) {
   // CHECK: [[@LINE-1]]:10 | constructor/Swift | init(body:) | [[WrapperBodyInit_USR:.*]] | Def,RelChild | rel: 1
-    self.value = body()
+    self.wrappedValue = body()
   }
 }
 
@@ -54,12 +54,12 @@ public struct HasWrappers {
   // CHECK: [[@LINE-1]]:14 | instance-property/Swift | z | [[z_USR:.*]] | Def,RelChild | rel: 1
 
   func backingUse() {
-    _ = $y.value + $z.value + x + $x.value
+    _ = $y.wrappedValue + $z.wrappedValue + x + $x.wrappedValue
     // CHECK: [[@LINE-1]]:10 | instance-property/Swift | y | [[y_USR]] | Ref,Read,RelCont | rel: 1
-    // CHECK: [[@LINE-2]]:12 | instance-property/Swift | value | [[value_USR:.*]] | Ref,Read,RelCont | rel: 1
-    // CHECK: [[@LINE-3]]:21 | instance-property/Swift | z | [[z_USR]] | Ref,Read,RelCont | rel: 1
-    // CHECK: [[@LINE-4]]:31 | instance-property/Swift | x | [[x_USR]] | Ref,Read,RelCont | rel: 1
-    // CHECK: [[@LINE-5]]:36 | instance-property/Swift | x | [[x_USR]] | Ref,Read,RelCont | rel: 1
+    // CHECK: [[@LINE-2]]:12 | instance-property/Swift | wrappedValue | [[wrappedValue_USR:.*]] | Ref,Read,RelCont | rel: 1
+    // CHECK: [[@LINE-3]]:28 | instance-property/Swift | z | [[z_USR]] | Ref,Read,RelCont | rel: 1
+    // CHECK: [[@LINE-4]]:45 | instance-property/Swift | x | [[x_USR]] | Ref,Read,RelCont | rel: 1
+    // CHECK: [[@LINE-5]]:50 | instance-property/Swift | x | [[x_USR]] | Ref,Read,RelCont | rel: 1
   }
 }
 

@@ -264,13 +264,14 @@ struct ResolvedLoc {
 /// Resolved locations also indicate the nature of the matched occurrence (e.g.
 /// whether it is within active/inactive code, or a selector or string literal).
 class NameMatcher: public ASTWalker {
-  using LocAndAttrArg = std::pair<SourceLoc, Expr *>;
-
   SourceFile &SrcFile;
   std::vector<UnresolvedLoc> LocsToResolve;
   std::vector<ResolvedLoc> ResolvedLocs;
   ArrayRef<Token> TokensToCheck;
-  llvm::Optional<LocAndAttrArg> CustomAttrDelayedArg;
+
+  /// The \c Expr argument of a parent \c CustomAttr (if one exists) and
+  /// the \c SourceLoc of the type name it applies to.
+  llvm::Optional<std::pair<SourceLoc, Expr *>> CustomAttrArg;
   unsigned InactiveConfigRegionNestings = 0;
   unsigned SelectorNestings = 0;
 
