@@ -1724,6 +1724,7 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
   if (!var->hasInterfaceType()) {
     auto &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
     tc.validateDecl(var);
+    assert(var->hasInterfaceType());
   }
 
   // Make sure that the property type matches the value of the
