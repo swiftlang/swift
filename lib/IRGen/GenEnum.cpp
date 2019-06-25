@@ -5794,7 +5794,9 @@ std::unique_ptr<EnumImplStrategy>
 EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
   unsigned numElements = 0;
   TypeInfoKind tik = Loadable;
-  IsFixedSize_t alwaysFixedSize = IsFixedSize;
+  IsFixedSize_t alwaysFixedSize =
+      TC.IGM.isResilient(theEnum, ResilienceExpansion::Minimal) ? IsNotFixedSize
+                                                                : IsFixedSize;
   bool allowFixedLayoutOptimizations = true;
   std::vector<Element> elementsWithPayload;
   std::vector<Element> elementsWithNoPayload;
