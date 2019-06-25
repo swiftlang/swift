@@ -354,12 +354,13 @@ extension Decimal {
     }
     
     public init(_ value: Double) {
+        precondition(!value.isInfinite, "Decimal does not yet fully adopt FloatingPoint")
         if value.isNaN {
             self = Decimal.nan
         } else if value == 0.0 {
-            self = Decimal(_exponent: 0, _length: 0, _isNegative: 0, _isCompact: 0, _reserved: 0, _mantissa: (0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000))
+            self = Decimal()
         } else {
-            self.init() // zero-initialize everything
+            self = Decimal()
             let negative = value < 0
             var val = negative ? -1 * value : value
             var exponent = 0
@@ -373,28 +374,29 @@ extension Decimal {
             }
             var mantissa = UInt64(val)
             
-            var i = UInt32(0)
-            // this is a bit ugly but it is the closest approximation of the C initializer that can be expressed here.
+            var i: UInt32 = 0
+            // This is a bit ugly but it is the closest approximation of the C
+            // initializer that can be expressed here.
             while mantissa != 0 && i < 8 /* NSDecimalMaxSize */ {
                 switch i {
-                    case 0:
-                        _mantissa.0 = UInt16(mantissa & 0xffff)
-                    case 1:
-                        _mantissa.1 = UInt16(mantissa & 0xffff)
-                    case 2:
-                        _mantissa.2 = UInt16(mantissa & 0xffff)
-                    case 3:
-                        _mantissa.3 = UInt16(mantissa & 0xffff)
-                    case 4:
-                        _mantissa.4 = UInt16(mantissa & 0xffff)
-                    case 5:
-                        _mantissa.5 = UInt16(mantissa & 0xffff)
-                    case 6:
-                        _mantissa.6 = UInt16(mantissa & 0xffff)
-                    case 7:
-                        _mantissa.7 = UInt16(mantissa & 0xffff)
-                    default:
-                        fatalError("initialization overflow")
+                case 0:
+                    _mantissa.0 = UInt16(truncatingIfNeeded: mantissa)
+                case 1:
+                    _mantissa.1 = UInt16(truncatingIfNeeded: mantissa)
+                case 2:
+                    _mantissa.2 = UInt16(truncatingIfNeeded: mantissa)
+                case 3:
+                    _mantissa.3 = UInt16(truncatingIfNeeded: mantissa)
+                case 4:
+                    _mantissa.4 = UInt16(truncatingIfNeeded: mantissa)
+                case 5:
+                    _mantissa.5 = UInt16(truncatingIfNeeded: mantissa)
+                case 6:
+                    _mantissa.6 = UInt16(truncatingIfNeeded: mantissa)
+                case 7:
+                    _mantissa.7 = UInt16(truncatingIfNeeded: mantissa)
+                default:
+                    fatalError("initialization overflow")
                 }
                 mantissa = mantissa >> 16
                 i += 1
