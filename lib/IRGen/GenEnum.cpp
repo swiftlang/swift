@@ -5794,12 +5794,13 @@ std::unique_ptr<EnumImplStrategy>
 EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
   unsigned numElements = 0;
   TypeInfoKind tik = Loadable;
-  IsFixedSize_t alwaysFixedSize =
-      TC.IGM.isResilient(theEnum, ResilienceExpansion::Minimal) ? IsNotFixedSize
-                                                                : IsFixedSize;
+  IsFixedSize_t alwaysFixedSize = IsFixedSize;
   bool allowFixedLayoutOptimizations = true;
   std::vector<Element> elementsWithPayload;
   std::vector<Element> elementsWithNoPayload;
+
+  if (TC.IGM.isResilient(theEnum, ResilienceExpansion::Minimal))
+    alwaysFixedSize = IsNotFixedSize;
 
   // Resilient enums are manipulated as opaque values, except we still
   // make the following assumptions:
