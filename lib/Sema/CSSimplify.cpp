@@ -3437,8 +3437,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
         auto reqPath = ArrayRef<LocatorPathElt>(path).drop_back();
         // Underlying conformance requirement is itself fixed,
         // this wouldn't lead to a right solution.
-        if (hasFixFor(getConstraintLocator(anchor, reqPath,
-                                           /*summaryFlags=*/0)))
+        if (hasFixFor(getConstraintLocator(anchor, reqPath)))
           return SolutionKind::Error;
       }
 

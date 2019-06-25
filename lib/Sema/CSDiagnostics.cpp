@@ -112,10 +112,9 @@ Optional<SelectedOverload> FailureDiagnostic::getChoiceFor(Expr *expr) {
 
   if (auto *AE = dyn_cast<ApplyExpr>(expr)) {
     if (auto *TE = dyn_cast<TypeExpr>(AE->getFn())) {
-      locator = cs.getConstraintLocator(AE,
-                                        {ConstraintLocator::ApplyFunction,
-                                         ConstraintLocator::ConstructorMember},
-                                        /*summaryFlags=*/0);
+      locator =
+          getConstraintLocator(AE, {ConstraintLocator::ApplyFunction,
+                                    ConstraintLocator::ConstructorMember});
     }
     return getChoiceFor(AE->getFn());
   } else if (auto *UDE = dyn_cast<UnresolvedDotExpr>(expr)) {
@@ -586,10 +585,9 @@ Type NoEscapeFuncToTypeConversionFailure::getParameterTypeFor(
       locator =
           cs.getConstraintLocator(fnExpr, ConstraintLocator::UnresolvedMember);
     } else if (auto *TE = dyn_cast<TypeExpr>(fnExpr)) {
-      locator = cs.getConstraintLocator(call,
-                                        {ConstraintLocator::ApplyFunction,
-                                         ConstraintLocator::ConstructorMember},
-                                        /*summaryFlags=*/0);
+      locator =
+          getConstraintLocator(call, {ConstraintLocator::ApplyFunction,
+                                      ConstraintLocator::ConstructorMember});
     } else {
       locator = cs.getConstraintLocator(fnExpr);
     }
