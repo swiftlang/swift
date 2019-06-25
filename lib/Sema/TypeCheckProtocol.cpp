@@ -449,14 +449,6 @@ swift::matchWitness(
     // Result types must match.
     // FIXME: Could allow (trivial?) subtyping here.
     if (!ignoreReturnType) {
-      if (reqResultType->hasDynamicSelfType()) {
-        auto classDecl = witness->getDeclContext()->getSelfClassDecl();
-        if (!classDecl || classDecl->isFinal() ||
-            witnessResultType->hasDynamicSelfType())
-          reqResultType = reqResultType->eraseDynamicSelfType();
-        witnessResultType = witnessResultType->eraseDynamicSelfType();
-      }
-
       auto reqTypeIsIUO =
           req->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
       auto witnessTypeIsIUO =
@@ -1768,12 +1760,6 @@ static void addAssocTypeDeductionString(llvm::SmallString<128> &str,
 
 /// Clean up the given declaration type for display purposes.
 static Type getTypeForDisplay(ModuleDecl *module, ValueDecl *decl) {
-  // If we're not in a type context, just grab the interface type.
-  Type type = decl->getInterfaceType();
-  if (!decl->getDeclContext()->isTypeContext() ||
-      !isa<AbstractFunctionDecl>(decl))
-    return type;
-
   // For a constructor, we only care about the parameter types.
   if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
     return AnyFunctionType::composeInput(module->getASTContext(),
@@ -1783,23 +1769,13 @@ static Type getTypeForDisplay(ModuleDecl *module, ValueDecl *decl) {
                                          /*canonicalVararg=*/false);
   }
 
-  // We have something function-like, so we want to strip off the 'self'.
-  if (auto genericFn = type->getAs<GenericFunctionType>()) {
-    if (auto resultFn = genericFn->getResult()->getAs<FunctionType>()) {
-      // For generic functions, build a new generic function... but strip off
-      // the requirements. They don't add value.
-      auto sigWithoutReqts
-        = GenericSignature::get(genericFn->getGenericParams(), {});
-      return GenericFunctionType::get(sigWithoutReqts,
-                                      resultFn->getParams(),
-                                      resultFn->getResult(),
-                                      resultFn->getExtInfo());
-    }
-  }
+  Type type = decl->getInterfaceType();
 
   // Redeclaration checking might mark a candidate as `invalid` and
   // reset it's type to ErrorType, let's dig out original type to
   // make the diagnostic better.
+  //
+  // FIXME: Remove this once setInvalid() goes away.
   if (auto errorType = type->getAs<ErrorType>()) {
     auto originalType = errorType->getOriginalType();
     if (!originalType || !originalType->is<AnyFunctionType>())
@@ -1808,7 +1784,31 @@ static Type getTypeForDisplay(ModuleDecl *module, ValueDecl *decl) {
     type = originalType;
   }
 
-  return type->castTo<AnyFunctionType>()->getResult();
+  // If we're not in a type context, just grab the interface type.
+  if (!decl->getDeclContext()->isTypeContext())
+    return type;
+
+  GenericSignature *sigWithoutReqts = nullptr;
+  if (auto genericFn = type->getAs<GenericFunctionType>()) {
+    // For generic functions, build a new generic function... but strip off
+    // the requirements. They don't add value.
+    sigWithoutReqts
+      = GenericSignature::get(genericFn->getGenericParams(), {});
+  }
+
+  // For functions, strip off the 'Self' parameter clause.
+  if (isa<AbstractFunctionDecl>(decl))
+    type = type->castTo<AnyFunctionType>()->getResult();
+
+  if (sigWithoutReqts) {
+    auto resultFn = type->castTo<AnyFunctionType>();
+    return GenericFunctionType::get(sigWithoutReqts,
+                                    resultFn->getParams(),
+                                    resultFn->getResult(),
+                                    resultFn->getExtInfo());
+  }
+
+  return type;
 }
 
 /// Clean up the given requirement type for display purposes.
@@ -1817,17 +1817,53 @@ static Type getRequirementTypeForDisplay(ModuleDecl *module,
                                          ValueDecl *req) {
   auto type = getTypeForDisplay(module, req);
 
-  // Replace generic type parameters and associated types with their
-  // witnesses, when we have them.
-  auto selfTy = conformance->getProtocol()->getSelfInterfaceType();
-  return type.subst([&](SubstitutableType *dependentType) {
-                      if (dependentType->isEqual(selfTy))
-                        return conformance->getType();
+  auto substType = [&](Type type, bool isResult) -> Type {
+    // Replace generic type parameters and associated types with their
+    // witnesses, when we have them.
+    auto selfTy = conformance->getProtocol()->getSelfInterfaceType();
+    auto substSelfTy = conformance->getType();
+    if (isResult && substSelfTy->getClassOrBoundGenericClass())
+      substSelfTy = DynamicSelfType::get(selfTy, module->getASTContext());
+    return type.subst([&](SubstitutableType *dependentType) {
+                        if (dependentType->isEqual(selfTy))
+                          return substSelfTy;
 
-                      return Type(dependentType);
-                    },
-                    LookUpConformanceInModule(module),
-                    SubstFlags::UseErrorType);
+                        return Type(dependentType);
+                      },
+                      LookUpConformanceInModule(module),
+                      SubstFlags::UseErrorType);
+  };
+
+  if (auto fnTy = type->getAs<AnyFunctionType>()) {
+    SmallVector<AnyFunctionType::Param, 4> params;
+    for (auto param : fnTy->getParams()) {
+      params.push_back(
+        param.withType(
+          substType(param.getPlainType(),
+        /*result*/false)));
+    }
+
+    auto result = substType(fnTy->getResult(), /*result*/true);
+
+    auto *genericSig = fnTy->getOptGenericSignature();
+    if (genericSig) {
+      if (genericSig->getGenericParams().size() > 1) {
+        genericSig = GenericSignature::get(
+          genericSig->getGenericParams().slice(1),
+          genericSig->getRequirements());
+      } else {
+        genericSig = nullptr;
+      }
+    }
+
+    if (genericSig) {
+      return GenericFunctionType::get(genericSig, params, result,
+                                      fnTy->getExtInfo());
+    }
+    return FunctionType::get(params, result, fnTy->getExtInfo());
+  }
+
+  return substType(type, /*result*/false);
 }
 
 /// Retrieve the kind of requirement described by the given declaration,
@@ -2666,7 +2702,7 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
       }
       // Issue diagnostics for witness values.
       Type RequirementType =
-      getRequirementTypeForDisplay(DC->getParentModule(), Conf, VD);
+        getRequirementTypeForDisplay(DC->getParentModule(), Conf, VD);
       auto Diag = Diags.diagnose(VD, diag::no_witnesses,
                                  getRequirementKind(VD), VD->getFullName(),
                                  RequirementType, AddFixit);

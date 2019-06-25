@@ -3716,8 +3716,7 @@ bool checkDynamicSelfReturn(FuncDecl *func) {
     return false;
 
   // 'Self' on a free function is not dynamic 'Self'.
-  if (!func->getDeclContext()->getSelfClassDecl() &&
-      !isa<ProtocolDecl>(func->getDeclContext()))
+  if (!func->getDeclContext()->getSelfClassDecl())
     return false;
 
   // 'Self' on a property accessor is not dynamic 'Self'...even on a read-only

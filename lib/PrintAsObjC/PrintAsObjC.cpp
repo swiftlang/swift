@@ -1930,6 +1930,14 @@ private:
       decl = type->getDecl();
     }
 
+    if (auto *proto = dyn_cast<ProtocolDecl>(decl->getDeclContext())) {
+      if (type->isEqual(proto->getSelfInterfaceType())) {
+        printNullability(optionalKind, NullabilityPrintKind::ContextSensitive);
+        os << "instancetype";
+        return;
+      }
+    }
+
     assert(decl->getClangDecl() && "can only handle imported ObjC generics");
     os << cast<clang::ObjCTypeParamDecl>(decl->getClangDecl())->getName();
     printNullability(optionalKind);
