@@ -190,32 +190,29 @@ toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
     staticStdlib = true;
   }
 
-  SmallString<128> SharedResourceDirPath;
-  getResourceDirPath(SharedResourceDirPath, context.Args, /*Shared=*/true);
+  SmallVector<std::string, 4> RuntimeLibPaths;
+  getRuntimeLibraryPaths(RuntimeLibPaths, context.Args, context.OI.SDKPath,
+                         /*Shared=*/!(staticExecutable || staticStdlib));
 
-  SmallString<128> StaticResourceDirPath;
-  getResourceDirPath(StaticResourceDirPath, context.Args, /*Shared=*/false);
+  // Add the runtime library link paths.
+  for (auto path : RuntimeLibPaths) {
+    Arguments.push_back("-L");
+    Arguments.push_back(context.Args.MakeArgString(path));
+  }
 
-  SmallVector<std::string, 4> SharedRuntimeLibPaths;
-  getRuntimeLibraryPaths(SharedRuntimeLibPaths, context.Args,
-                         context.OI.SDKPath, /*Shared=*/true);
-
-  SmallVector<std::string, 4> StaticRuntimeLibPaths;
-  getRuntimeLibraryPaths(StaticRuntimeLibPaths, context.Args,
-                         context.OI.SDKPath, /*Shared=*/false);
-
-  // Add the runtime library link path, which is platform-specific and found
-  // relative to the compiler.
   if (!(staticExecutable || staticStdlib) && shouldProvideRPathToLinker()) {
     // FIXME: We probably shouldn't be adding an rpath here unless we know
     //        ahead of time the standard library won't be copied.
-    for (auto path : SharedRuntimeLibPaths) {
+    for (auto path : RuntimeLibPaths) {
       Arguments.push_back("-Xlinker");
       Arguments.push_back("-rpath");
       Arguments.push_back("-Xlinker");
       Arguments.push_back(context.Args.MakeArgString(path));
     }
   }
+
+  SmallString<128> SharedResourceDirPath;
+  getResourceDirPath(SharedResourceDirPath, context.Args, /*Shared=*/true);
 
   SmallString<128> swiftrtPath = SharedResourceDirPath;
   llvm::sys::path::append(swiftrtPath,
@@ -251,42 +248,26 @@ toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
 
   // Link the standard library.
 
+  // If we need to use an .lnk file, linkFilePath will contain it.
+  SmallString<128> linkFilePath;
+  getResourceDirPath(linkFilePath, context.Args, /*Shared=*/false);
+
   if (staticExecutable) {
-    for (auto path : StaticRuntimeLibPaths) {
-      Arguments.push_back("-L");
-      Arguments.push_back(context.Args.MakeArgString(path));
-    }
-
-    SmallString<128> linkFilePath = StaticResourceDirPath;
     llvm::sys::path::append(linkFilePath, "static-executable-args.lnk");
-    auto linkFile = linkFilePath.str();
-
-    if (llvm::sys::fs::is_regular_file(linkFile)) {
-      Arguments.push_back(context.Args.MakeArgString(Twine("@") + linkFile));
-    } else {
-      llvm::report_fatal_error(
-          "-static-executable not supported on this platform");
-    }
   } else if (staticStdlib) {
-    for (auto path : StaticRuntimeLibPaths) {
-      Arguments.push_back("-L");
-      Arguments.push_back(context.Args.MakeArgString(path));
-    }
-
-    SmallString<128> linkFilePath = StaticResourceDirPath;
     llvm::sys::path::append(linkFilePath, "static-stdlib-args.lnk");
+  } else {
+    linkFilePath.clear();
+    Arguments.push_back("-lswiftCore");
+  }
+
+  if (!linkFilePath.empty()) {
     auto linkFile = linkFilePath.str();
     if (llvm::sys::fs::is_regular_file(linkFile)) {
       Arguments.push_back(context.Args.MakeArgString(Twine("@") + linkFile));
     } else {
       llvm::report_fatal_error(linkFile + " not found");
     }
-  } else {
-    for (auto path : SharedRuntimeLibPaths) {
-      Arguments.push_back("-L");
-      Arguments.push_back(context.Args.MakeArgString(path));
-    }
-    Arguments.push_back("-lswiftCore");
   }
 
   // Explicitly pass the target to the linker

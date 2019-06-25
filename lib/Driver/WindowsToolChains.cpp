@@ -108,30 +108,20 @@ toolchains::Windows::constructInvocation(const DynamicLinkJobAction &job,
   // driver rather than the `clang-cl` driver.
   Arguments.push_back("-nostartfiles");
 
-  // Link the standard library.
-  if (context.Args.hasFlag(options::OPT_static_stdlib,
-                           options::OPT_no_static_stdlib, false)) {
-    SmallVector<std::string, 4> StaticRuntimeLibPaths;
-    getRuntimeLibraryPaths(StaticRuntimeLibPaths, context.Args,
-                           context.OI.SDKPath, /*Shared=*/false);
+  bool wantsStaticStdlib =
+      context.Args.hasFlag(options::OPT_static_stdlib,
+                           options::OPT_no_static_stdlib, false);
 
-    for (auto path : StaticRuntimeLibPaths) {
-      Arguments.push_back("-L");
-      // Since Windows has separate libraries per architecture, link against the
-      // architecture specific version of the static library.
-      Arguments.push_back(context.Args.MakeArgString(path + "/" +
-                                                     getTriple().getArchName()));
-    }
-  } else {
-    SmallVector<std::string, 4> SharedRuntimeLibPaths;
-    getRuntimeLibraryPaths(SharedRuntimeLibPaths, context.Args,
-                           context.OI.SDKPath, /*Shared=*/true);
+  SmallVector<std::string, 4> RuntimeLibPaths;
+  getRuntimeLibraryPaths(RuntimeLibPaths, context.Args, context.OI.SDKPath,
+                         /*Shared=*/!wantsStaticStdlib);
 
-    for (auto path : SharedRuntimeLibPaths) {
-      Arguments.push_back("-L");
-      Arguments.push_back(context.Args.MakeArgString(path + "/" +
-                                                     getTriple().getArchName()));
-    }
+  for (auto path : RuntimeLibPaths) {
+    Arguments.push_back("-L");
+    // Since Windows has separate libraries per architecture, link against the
+    // architecture specific version of the static library.
+    Arguments.push_back(context.Args.MakeArgString(path + "/" +
+                                                   getTriple().getArchName()));
   }
 
   SmallString<128> SharedResourceDirPath;

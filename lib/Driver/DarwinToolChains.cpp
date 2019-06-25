@@ -391,13 +391,10 @@ toolchains::Darwin::constructInvocation(const DynamicLinkJobAction &job,
   Arguments.push_back("-arch");
   Arguments.push_back(context.Args.MakeArgString(getTriple().getArchName()));
 
-  // Add the runtime library link path, which is platform-specific and found
-  // relative to the compiler.
-  SmallString<128> ResourceDirPath;
-  getResourceDirPath(ResourceDirPath, context.Args, /*Shared=*/true);
-
   // Link compatibility libraries, if we're deploying back to OSes that
   // have an older Swift runtime.
+  SmallString<128> SharedResourceDirPath;
+  getResourceDirPath(SharedResourceDirPath, context.Args, /*Shared=*/true);
   Optional<llvm::VersionTuple> runtimeCompatibilityVersion;
   
   if (context.Args.hasArg(options::OPT_runtime_compatibility_version)) {
@@ -419,7 +416,7 @@ toolchains::Darwin::constructInvocation(const DynamicLinkJobAction &job,
     if (*runtimeCompatibilityVersion <= llvm::VersionTuple(5, 0)) {
       // Swift 5.0 compatibility library
       SmallString<128> BackDeployLib;
-      BackDeployLib.append(ResourceDirPath);
+      BackDeployLib.append(SharedResourceDirPath);
       llvm::sys::path::append(BackDeployLib, "libswiftCompatibility50.a");
       
       if (llvm::sys::fs::exists(BackDeployLib)) {
@@ -434,7 +431,7 @@ toolchains::Darwin::constructInvocation(const DynamicLinkJobAction &job,
       if (*runtimeCompatibilityVersion <= llvm::VersionTuple(5, 0)) {
         // Swift 5.0 dynamic replacement compatibility library.
         SmallString<128> BackDeployLib;
-        BackDeployLib.append(ResourceDirPath);
+        BackDeployLib.append(SharedResourceDirPath);
         llvm::sys::path::append(BackDeployLib,
                                 "libswiftCompatibilityDynamicReplacements.a");
 
@@ -445,32 +442,31 @@ toolchains::Darwin::constructInvocation(const DynamicLinkJobAction &job,
       }
   }
 
+  bool wantsStaticStdlib =
+      context.Args.hasFlag(options::OPT_static_stdlib,
+                           options::OPT_no_static_stdlib, false);
+
+  SmallVector<std::string, 4> RuntimeLibPaths;
+  getRuntimeLibraryPaths(RuntimeLibPaths, context.Args,
+                         context.OI.SDKPath, /*Shared=*/!wantsStaticStdlib);
+
+  // Add the runtime library link path, which is platform-specific and found
+  // relative to the compiler.
+  for (auto path : RuntimeLibPaths) {
+    Arguments.push_back("-L");
+    Arguments.push_back(context.Args.MakeArgString(path));
+  }
+
   // Link the standard library.
-  if (context.Args.hasFlag(options::OPT_static_stdlib,
-                           options::OPT_no_static_stdlib, false)) {
-    SmallVector<std::string, 4> StaticRuntimeLibPaths;
-    getRuntimeLibraryPaths(StaticRuntimeLibPaths, context.Args,
-                           context.OI.SDKPath, /*Shared=*/false);
-
-    for (auto path : StaticRuntimeLibPaths) {
-      Arguments.push_back("-L");
-      Arguments.push_back(context.Args.MakeArgString(path));
-    }
-
+  if (wantsStaticStdlib) {
     Arguments.push_back("-lc++");
     Arguments.push_back("-framework");
     Arguments.push_back("Foundation");
     Arguments.push_back("-force_load_swift_libs");
   } else {
-    SmallVector<std::string, 4> SharedRuntimeLibPaths;
-    getRuntimeLibraryPaths(SharedRuntimeLibPaths, context.Args,
-                           context.OI.SDKPath, /*Shared=*/true);
-
-    for (auto path : SharedRuntimeLibPaths) {
-      Arguments.push_back("-L");
-      Arguments.push_back(context.Args.MakeArgString(path));
-      // FIXME: We probably shouldn't be adding an rpath here unless we know ahead
-      // of time the standard library won't be copied. SR-1967
+    // FIXME: We probably shouldn't be adding an rpath here unless we know ahead
+    // of time the standard library won't be copied. SR-1967
+    for (auto path : RuntimeLibPaths) {
       Arguments.push_back("-rpath");
       Arguments.push_back(context.Args.MakeArgString(path));
     }
