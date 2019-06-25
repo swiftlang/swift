@@ -362,8 +362,8 @@ static std::vector<CharSourceRange> getEnumParamListInfo(SourceManager &SM,
 }
 
 bool NameMatcher::handleCustomAttrs(Decl *D) {
-  // CustomAttrs of non-param VarDecls are handled by their containing
-  // PatternBindingDecl
+  // CustomAttrs of non-param VarDecls are handled when this method is called
+  // on their containing PatternBindingDecls (see below).
   if (isa<VarDecl>(D) && !isa<ParamDecl>(D))
     return true;
 
@@ -380,9 +380,12 @@ bool NameMatcher::handleCustomAttrs(Decl *D) {
       continue;
     auto *Arg = customAttr->getArg();
     if (auto *Repr = customAttr->getTypeLoc().getTypeRepr()) {
-      SWIFT_DEFER { CustomAttrDelayedArg = None; };
+      // Note the associated call arguments of the semantic initializer call
+      // in case we're resolving an explicit initializer call within the
+      // CustomAttr's type, e.g. on `Wrapper` in `@Wrapper(initialValue: 10)`.
+      SWIFT_DEFER { CustomAttrArg = None; };
       if (Arg && !Arg->isImplicit())
-        CustomAttrDelayedArg = {Repr->getLoc(), Arg};
+        CustomAttrArg = {Repr->getLoc(), Arg};
       if (!Repr->walk(*this))
         return false;
     }
@@ -619,10 +622,11 @@ bool NameMatcher::walkToTypeReprPre(TypeRepr *T) {
     return false;
 
   if (isa<ComponentIdentTypeRepr>(T)) {
-    // Check if we're in a CustomAttr and have associated call arguments
-    if (CustomAttrDelayedArg.hasValue() && CustomAttrDelayedArg->first == T->getLoc()) {
+    // If we're walking a CustomAttr's type we may have an associated call
+    // argument to resolve with from its semantic initializer.
+    if (CustomAttrArg.hasValue() && CustomAttrArg->first == T->getLoc()) {
       tryResolve(ASTWalker::ParentTy(T), T->getLoc(), LabelRangeType::CallArg,
-                 getCallArgLabelRanges(getSourceMgr(), CustomAttrDelayedArg->second, LabelRangeEndAt::BeforeElemStart));
+                 getCallArgLabelRanges(getSourceMgr(), CustomAttrArg->second, LabelRangeEndAt::BeforeElemStart));
     } else {
       tryResolve(ASTWalker::ParentTy(T), T->getLoc());
     }
@@ -788,9 +792,10 @@ bool NameMatcher::tryResolve(ASTWalker::ParentTy Node, SourceLoc NameLoc,
     }
 
     if (Range.getByteLength() > 1 && Range.str().front() == '$') {
-      // Also try after any leading dollar for name references of wrapped properties,
-      // e.g. 'foo' in '$foo' occurrences.
-      auto NewRange = CharSourceRange(Range.getStart().getAdvancedLoc(1), Range.getByteLength() - 1);
+      // Also try after any leading dollar for name references of wrapped
+      // properties, e.g. 'foo' in '$foo' occurrences.
+      auto NewRange = CharSourceRange(Range.getStart().getAdvancedLoc(1),
+                                      Range.getByteLength() - 1);
       if (NewRange.getStart() == Next.Loc) {
         LocsToResolve.pop_back();
         ResolvedLocs.push_back({Node, NewRange, {}, LabelRangeType::None,

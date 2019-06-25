@@ -571,6 +571,8 @@ bool SemaAnnotator::handleCustomAttributes(Decl *D) {
         assert(customAttr->getArg());
         if (!SemaInit->walk(*this))
           return false;
+        // Don't walk this again via the associated PatternBindingDecl's
+        // initializer
         ExprsToSkip.insert(SemaInit);
       }
     } else if (auto *Arg = customAttr->getArg()) {

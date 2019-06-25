@@ -1,12 +1,12 @@
 public struct Outer {
     @propertyWrapper
     public struct InnerWrapper<T> {
-        public var value: T
+        public var wrappedValue: T
         public /*init:def*/<keywordBase>init</keywordBase>(<arglabel index=0>initialValue</arglabel><param index=0></param>: T) {
-            self.value = initialValue
+            self.wrappedValue = initialValue
         }
         public /*body:def*/init(first: Int, body: () -> T) {
-            self.value = body()
+            self.wrappedValue = body()
         }
     }
 }

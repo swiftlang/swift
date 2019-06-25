@@ -1120,8 +1120,8 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     if (!Walker.walkToParameterListPre(PL))
       return false;
     
-    // Walk each parameter decl, typeloc and default value.
     for (auto P : *PL) {
+      // Walk each parameter's decl and typeloc and default value.
       if (doIt(P))
         return true;
 
@@ -1137,7 +1137,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
         P->setDefaultValue(res);
       }
     }
-    
+
     return Walker.walkToParameterListPost(PL);
   }
   
@@ -1255,7 +1255,6 @@ public:
     return false;
   }
 
-  /// Returns true on failure
   bool doIt(TypeLoc &TL) {
     if (!Walker.walkToTypeLocPre(TL))
       return false;

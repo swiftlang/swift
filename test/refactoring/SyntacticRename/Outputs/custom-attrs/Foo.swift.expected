@@ -1,8 +1,8 @@
 @propertyWrapper
 struct /*wrapper:def*/Foo2<T> {
-    public var value: T
+    public var wrappedValue: T
     init(initialValue: T) {
-        value = initialValue
+        wrappedValue = initialValue
     }
     init(initialValue: T, otherThing: Bool) {
         self.init(initialValue: initialValue)
@@ -42,7 +42,7 @@ struct Bar {
 
     func baz() {
         let _: /*wrapper*/Foo2<Int> = /*wrapped+1*/$foo
-        let _: Int = /*wrapped+1*/$foo.value
+        let _: Int = /*wrapped+1*/$foo.wrappedValue
         let _: Int = /*wrapped*/foo
         let _: /*wrapper*/Foo2<String> = $bar
     }
