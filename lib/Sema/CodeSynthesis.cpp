@@ -1709,10 +1709,7 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
   // Compute the name of the storage type.
   ASTContext &ctx = var->getASTContext();
   SmallString<64> nameBuf;
-  if (wrapperInfo.wrapperValueVar)
-    nameBuf = "$$";
-  else
-    nameBuf = "$";
+  nameBuf = "_";
   nameBuf += var->getName().str();
   Identifier name = ctx.getIdentifier(nameBuf);
 
