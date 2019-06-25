@@ -1721,6 +1721,12 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
   Type storageInterfaceType = wrapperType;
   Type storageType = dc->mapTypeIntoContext(storageInterfaceType);
 
+  if (!var->hasInterfaceType()) {
+    auto &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
+    tc.validateDecl(var);
+    assert(var->hasInterfaceType());
+  }
+
   // Make sure that the property type matches the value of the
   // wrapper type.
   if (!storageInterfaceType->hasError()) {
@@ -1771,9 +1777,6 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
   if (parentPBD->isInitialized(patternNumber) &&
       !parentPBD->isInitializerChecked(patternNumber)) {
     auto &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
-    if (!var->hasType())
-      tc.validateDecl(var);
-
     tc.typeCheckPatternBinding(parentPBD, patternNumber);
   }
 
