@@ -1058,16 +1058,17 @@ ToolChain::constructInvocation(const StaticLinkJobAction &job,
 
 void ToolChain::addPathEnvironmentVariableIfNeeded(
     Job::EnvironmentVector &env, const char *name, const char *separator,
-    options::ID optionID, const ArgList &args, StringRef extraEntry) const {
+    options::ID optionID, const ArgList &args,
+    ArrayRef<std::string> extraEntries) const {
   auto linkPathOptions = args.filtered(optionID);
-  if (linkPathOptions.begin() == linkPathOptions.end() && extraEntry.empty())
+  if (linkPathOptions.begin() == linkPathOptions.end() && extraEntries.empty())
     return;
 
   std::string newPaths;
   interleave(linkPathOptions,
              [&](const Arg *arg) { newPaths.append(arg->getValue()); },
              [&] { newPaths.append(separator); });
-  if (!extraEntry.empty()) {
+  for (auto extraEntry : extraEntries) {
     if (!newPaths.empty())
       newPaths.append(separator);
     newPaths.append(extraEntry.data(), extraEntry.size());
@@ -1091,7 +1092,7 @@ void ToolChain::getClangLibraryPath(const ArgList &Args,
                                     SmallString<128> &LibPath) const {
   const llvm::Triple &T = getTriple();
 
-  getRuntimeLibraryPath(LibPath, Args, /*Shared=*/true);
+  getResourceDirPath(LibPath, Args, /*Shared=*/true);
   // Remove platform name.
   llvm::sys::path::remove_filename(LibPath);
   llvm::sys::path::append(LibPath, "clang", "lib",
@@ -1101,25 +1102,39 @@ void ToolChain::getClangLibraryPath(const ArgList &Args,
 
 /// Get the runtime library link path, which is platform-specific and found
 /// relative to the compiler.
-void ToolChain::getRuntimeLibraryPath(SmallVectorImpl<char> &runtimeLibPath,
-                                      const llvm::opt::ArgList &args,
-                                      bool shared) const {
+void ToolChain::getResourceDirPath(SmallVectorImpl<char> &resourceDirPath,
+                                   const llvm::opt::ArgList &args,
+                                   bool shared) const {
   // FIXME: Duplicated from CompilerInvocation, but in theory the runtime
   // library link path and the standard library module import path don't
   // need to be the same.
   if (const Arg *A = args.getLastArg(options::OPT_resource_dir)) {
     StringRef value = A->getValue();
-    runtimeLibPath.append(value.begin(), value.end());
+    resourceDirPath.append(value.begin(), value.end());
   } else {
     auto programPath = getDriver().getSwiftProgramPath();
-    runtimeLibPath.append(programPath.begin(), programPath.end());
-    llvm::sys::path::remove_filename(runtimeLibPath); // remove /swift
-    llvm::sys::path::remove_filename(runtimeLibPath); // remove /bin
-    llvm::sys::path::append(runtimeLibPath, "lib",
+    resourceDirPath.append(programPath.begin(), programPath.end());
+    llvm::sys::path::remove_filename(resourceDirPath); // remove /swift
+    llvm::sys::path::remove_filename(resourceDirPath); // remove /bin
+    llvm::sys::path::append(resourceDirPath, "lib",
                             shared ? "swift" : "swift_static");
   }
-  llvm::sys::path::append(runtimeLibPath,
+  llvm::sys::path::append(resourceDirPath,
                           getPlatformNameForTriple(getTriple()));
+}
+
+void ToolChain::getRuntimeLibraryPaths(SmallVectorImpl<std::string> &runtimeLibPaths,
+                                       const llvm::opt::ArgList &args,
+                                       StringRef SDKPath, bool shared) const {
+  SmallString<128> scratchPath;
+  getResourceDirPath(scratchPath, args, shared);
+  runtimeLibPaths.push_back(scratchPath.str());
+
+  if (!SDKPath.empty()) {
+    scratchPath = SDKPath;
+    llvm::sys::path::append(scratchPath, "usr", "lib", "swift");
+    runtimeLibPaths.push_back(scratchPath.str());
+  }
 }
 
 bool ToolChain::sanitizerRuntimeLibExists(const ArgList &args,
