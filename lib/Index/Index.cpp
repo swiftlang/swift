@@ -326,6 +326,12 @@ private:
     return true;
   }
 
+  /// Report calls to the initializers of property wrapper types on wrapped properties.
+  ///
+  /// These may be either explicit:
+  ///     `\@Wrapper(initialialValue: 42) var x: Int`
+  /// or implicit:
+  ///     `\@Wrapper var x = 10`
   bool handleCustomAttrInitRefs(Decl * D) {
     for (auto *customAttr : D->getAttrs().getAttributes<CustomAttr, true>()) {
       if (customAttr->isImplicit())
@@ -445,8 +451,9 @@ private:
     if (!reportRef(D, Loc, Info, Data.AccKind))
       return false;
 
-    // Report a reference to the underlying property if this is an explicit
-    // property wrapper reference, e.g. report 'foo' for a '$foo' reference.
+    // If this is a reference to a property wrapper backing property, report a
+    // reference to the wrapped property too (i.e. report an occurrence of `foo`
+    // in `$foo`.
     if (auto *VD = dyn_cast<VarDecl>(D)) {
       if (auto *Wrapped = VD->getOriginalWrappedProperty()) {
         assert(Range.getByteLength() > 1 && Range.str().front() == '$');
