@@ -203,6 +203,38 @@ void AutoDiffParameterIndices::getSubsetParameterTypes(
   }
 }
 
+void AutoDiffIndexSubset::getIndexSubsetParameterTypes(
+AnyFunctionType *functionType,
+SmallVectorImpl<Type> &paramTypes,
+bool reverseCurryLevels) const {
+  SmallVector<AnyFunctionType *, 2> curryLevels;
+  unwrapCurryLevels(functionType, curryLevels);
+  
+  SmallVector<unsigned, 2> curryLevelParameterIndexOffsets(curryLevels.size());
+  unsigned currentOffset = 0;
+  for (unsigned curryLevelIndex : reversed(indices(curryLevels))) {
+    curryLevelParameterIndexOffsets[curryLevelIndex] = currentOffset;
+    currentOffset += curryLevels[curryLevelIndex]->getNumParams();
+  }
+  
+  // If `reverseCurryLevels` is true, reverse the curry levels and offsets.
+  if (reverseCurryLevels) {
+    std::reverse(curryLevels.begin(), curryLevels.end());
+    std::reverse(curryLevelParameterIndexOffsets.begin(),
+                 curryLevelParameterIndexOffsets.end());
+  }
+  
+  for (unsigned curryLevelIndex : indices(curryLevels)) {
+    auto *curryLevel = curryLevels[curryLevelIndex];
+    unsigned parameterIndexOffset =
+    curryLevelParameterIndexOffsets[curryLevelIndex];
+    for (unsigned paramIndex : range(curryLevel->getNumParams()))
+      if (getBitWord(parameterIndexOffset + paramIndex))
+        paramTypes.push_back(
+                             curryLevel->getParams()[paramIndex].getPlainType());
+  }
+}
+
 static unsigned countNumFlattenedElementTypes(Type type) {
   if (auto *tupleTy = type->getCanonicalType()->getAs<TupleType>())
     return accumulate(tupleTy->getElementTypes(), 0,

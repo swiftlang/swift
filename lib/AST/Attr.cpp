@@ -435,8 +435,7 @@ static std::string getTransposingParametersClauseString(
           break;
         case ParsedAutoDiffParameter::Kind::Ordered:
           // TODO(bartchr): add assertion that the wrt is not too big
-          auto *paramList = function->getParameters();
-          auto *funcParam = paramList->get(param.getIndex());
+          auto *funcParam = function->getParameters()->get(param.getIndex());
           printer << funcParam->getNameStr();
           break;
       }

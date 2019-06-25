@@ -408,6 +408,11 @@ public:
   int findFirst() const { return findNext(-1); }
   int findPrevious(int endIndex) const;
   int findLast() const { return findPrevious(capacity); }
+    
+  void getIndexSubsetParameterTypes(
+           AnyFunctionType *functionType,
+           SmallVectorImpl<Type> &paramTypes,
+           bool reverseCurryLevels = false) const;
 
   class iterator {
   public:
