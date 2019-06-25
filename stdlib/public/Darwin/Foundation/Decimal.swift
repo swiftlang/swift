@@ -19,12 +19,46 @@ extension Decimal {
     public typealias RoundingMode = NSDecimalNumber.RoundingMode
     public typealias CalculationError = NSDecimalNumber.CalculationError
 
-    public static let leastFiniteMagnitude = Decimal(_exponent: 127, _length: 8, _isNegative: 1, _isCompact: 1, _reserved: 0, _mantissa: (0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff))
-    public static let greatestFiniteMagnitude = Decimal(_exponent: 127, _length: 8, _isNegative: 0, _isCompact: 1, _reserved: 0, _mantissa: (0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff))
-    public static let leastNormalMagnitude = Decimal(_exponent: -127, _length: 1, _isNegative: 0, _isCompact: 1, _reserved: 0, _mantissa: (0x0001, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000))
-    public static let leastNonzeroMagnitude = Decimal(_exponent: -127, _length: 1, _isNegative: 0, _isCompact: 1, _reserved: 0, _mantissa: (0x0001, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000))
-
-    public static let pi = Decimal(_exponent: -38, _length: 8, _isNegative: 0, _isCompact: 1, _reserved: 0, _mantissa: (0x6623, 0x7d57, 0x16e7, 0xad0d, 0xaf52, 0x4641, 0xdfa7, 0xec58))
+    public static let leastFiniteMagnitude = Decimal(
+        _exponent: 127,
+        _length: 8,
+        _isNegative: 1,
+        _isCompact: 1,
+        _reserved: 0,
+        _mantissa: (0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff)
+    )
+    public static let greatestFiniteMagnitude = Decimal(
+        _exponent: 127,
+        _length: 8,
+        _isNegative: 0,
+        _isCompact: 1,
+        _reserved: 0,
+        _mantissa: (0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff, 0xffff)
+    )
+    public static let leastNormalMagnitude = Decimal(
+        _exponent: -127,
+        _length: 1,
+        _isNegative: 0,
+        _isCompact: 1,
+        _reserved: 0,
+        _mantissa: (0x0001, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000)
+    )
+    public static let leastNonzeroMagnitude = Decimal(
+        _exponent: -127,
+        _length: 1,
+        _isNegative: 0,
+        _isCompact: 1,
+        _reserved: 0,
+        _mantissa: (0x0001, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000)
+    )
+    public static let pi = Decimal(
+        _exponent: -38,
+        _length: 8,
+        _isNegative: 0,
+        _isCompact: 1,
+        _reserved: 0,
+        _mantissa: (0x6623, 0x7d57, 0x16e7, 0xad0d, 0xaf52, 0x4641, 0xdfa7, 0xec58)
+    )
 
     public var exponent: Int { 
         get {
