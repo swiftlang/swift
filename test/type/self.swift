@@ -131,7 +131,6 @@ class C {
     // expected-error@-1 {{'Self' cannot be the type of a function argument in a class}}
     // expected-error@-2 {{'Self' can only appear at the top level of a method result type}}
     return { return self }
-    // expected-error@-1 {{cannot convert value of type 'C' to closure result type 'Self'}}
   }
   func i() -> (Self, Self) {}
   // expected-error@-1 {{'Self' can only appear at the top level of a method result type}}

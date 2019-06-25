@@ -812,17 +812,14 @@ namespace {
       Type dynamicSelfFnType;
       if (!member->getDeclContext()->getSelfProtocolDecl()) {
         if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
-          if ((isa<FuncDecl>(func) &&
-               cast<FuncDecl>(func)->hasDynamicSelf()) ||
-              (isa<ConstructorDecl>(func) &&
-               containerTy->getClassOrBoundGenericClass())) {
+          if (func->hasDynamicSelfResult() &&
+              !baseTy->getOptionalObjectType()) {
             refTy = refTy->replaceCovariantResultType(containerTy, 2);
             if (!baseTy->isEqual(containerTy)) {
               dynamicSelfFnType = refTy->replaceCovariantResultType(baseTy, 2);
             }
           }
-        }
-        else if (auto *decl = dyn_cast<VarDecl>(member)) {
+        } else if (auto *decl = dyn_cast<VarDecl>(member)) {
           if (decl->getValueInterfaceType()->hasDynamicSelfType()) {
             refTy = refTy->replaceCovariantResultType(containerTy, 1);
             if (!baseTy->isEqual(containerTy)) {

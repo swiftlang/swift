@@ -908,7 +908,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     // If this is a method whose result type is dynamic Self, replace
     // DynamicSelf with the actual object type.
     if (!func->getDeclContext()->getSelfProtocolDecl()) {
-      if (func->hasDynamicSelf()) {
+      if (func->getResultInterfaceType()->hasDynamicSelfType()) {
         auto params = openedType->getParams();
         assert(params.size() == 1);
         Type selfTy = params.front().getPlainType()->getMetatypeInstanceType();
@@ -1299,17 +1299,15 @@ ConstraintSystem::getTypeOfMemberReference(
     // Class methods returning Self as well as constructors get the
     // result replaced with the base object type.
     if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
-      if ((isa<FuncDecl>(func) && cast<FuncDecl>(func)->hasDynamicSelf()) ||
-          (isa<ConstructorDecl>(func) && !baseObjTy->getOptionalObjectType())) {
+      if (func->hasDynamicSelfResult() &&
+          !baseObjTy->getOptionalObjectType()) {
         openedType = openedType->replaceCovariantResultType(baseObjTy, 2);
       }
-    }
-    else if (auto *decl = dyn_cast<SubscriptDecl>(value)) {
+    } else if (auto *decl = dyn_cast<SubscriptDecl>(value)) {
       if (decl->getElementInterfaceType()->hasDynamicSelfType()) {
         openedType = openedType->replaceCovariantResultType(baseObjTy, 2);
       }
-    }
-    else if (auto *decl = dyn_cast<VarDecl>(value)) {
+    } else if (auto *decl = dyn_cast<VarDecl>(value)) {
       if (decl->getValueInterfaceType()->hasDynamicSelfType()) {
         openedType = openedType->replaceCovariantResultType(baseObjTy, 1);
       }
@@ -1487,16 +1485,17 @@ Type ConstraintSystem::getEffectiveOverloadType(const OverloadChoice &overload,
 
       // Cope with 'Self' returns.
       if (!decl->getDeclContext()->getSelfProtocolDecl()) {
-        if ((isa<FuncDecl>(decl) && cast<FuncDecl>(decl)->hasDynamicSelf()) ||
-            (isa<ConstructorDecl>(decl) &&
-             !overload.getBaseType()->getOptionalObjectType())) {
+        if (isa<AbstractFunctionDecl>(decl) &&
+            cast<AbstractFunctionDecl>(decl)->hasDynamicSelfResult()) {
           if (!overload.getBaseType())
             return Type();
 
-          Type selfType = overload.getBaseType()->getRValueType()
-              ->getMetatypeInstanceType()
-              ->lookThroughAllOptionalTypes();
-          type = type->replaceCovariantResultType(selfType, 2);
+          if (!overload.getBaseType()->getOptionalObjectType()) {
+            Type selfType = overload.getBaseType()->getRValueType()
+                ->getMetatypeInstanceType()
+                ->lookThroughAllOptionalTypes();
+            type = type->replaceCovariantResultType(selfType, 2);
+          }
         }
       }
 

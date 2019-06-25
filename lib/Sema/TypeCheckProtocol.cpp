@@ -2847,7 +2847,7 @@ void ConformanceChecker::checkNonFinalClassWitness(ValueDecl *requirement,
     // If the function has a dynamic Self, it's okay.
     if (auto func = dyn_cast<FuncDecl>(witness)) {
       if (func->getDeclContext()->getSelfClassDecl() &&
-          !func->hasDynamicSelf()) {
+          !func->hasDynamicSelfResult()) {
         diagnoseOrDefer(requirement, false,
           [witness, requirement](NormalProtocolConformance *conformance) {
             auto proto = conformance->getProtocol();

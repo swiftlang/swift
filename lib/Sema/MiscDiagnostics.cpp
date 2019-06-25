@@ -4177,15 +4177,13 @@ Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
   // Handle contextual type, result type, and returnsSelf.
   Type contextType = afd->getDeclContext()->getDeclaredInterfaceType();
   Type resultType;
-  bool returnsSelf = false;
+  bool returnsSelf = afd->hasDynamicSelfResult();
 
   if (auto func = dyn_cast<FuncDecl>(afd)) {
     resultType = func->getResultInterfaceType();
     resultType = func->mapTypeIntoContext(resultType);
-    returnsSelf = func->hasDynamicSelf();
   } else if (isa<ConstructorDecl>(afd)) {
     resultType = contextType;
-    returnsSelf = true;
   }
 
   // Figure out the first parameter name.
