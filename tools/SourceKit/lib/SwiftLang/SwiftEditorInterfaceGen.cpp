@@ -775,7 +775,8 @@ void SwiftLangSupport::editorOpenSwiftSourceInterface(StringRef Name,
   auto AstConsumer = std::make_shared<PrimaryFileInterfaceConsumer>(Name,
     SourceName, IFaceGenContexts, Consumer, Invocation);
   static const char OncePerASTToken = 0;
-  getASTManager()->processASTAsync(Invocation, AstConsumer, &OncePerASTToken);
+  getASTManager()->processASTAsync(Invocation, AstConsumer, &OncePerASTToken,
+                                   llvm::vfs::getRealFileSystem());
 }
 
 void SwiftLangSupport::editorOpenHeaderInterface(EditorConsumer &Consumer,

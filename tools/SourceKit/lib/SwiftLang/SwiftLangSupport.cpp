@@ -942,24 +942,38 @@ void SwiftLangSupport::setFileSystemProvider(
   assert(Result.second && "tried to set existing FileSystemProvider");
 }
 
-llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> SwiftLangSupport::getFileSystem(const Optional<VFSOptions> &vfsOptions, std::string &error) {
-  if (!vfsOptions)
-    return llvm::vfs::getRealFileSystem();
+llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
+SwiftLangSupport::getFileSystem(const Optional<VFSOptions> &vfsOptions,
+                                Optional<StringRef> primaryFile,
+                                std::string &error) {
+  // First, try the specified vfsOptions.
+  if (vfsOptions) {
+    auto provider = getFileSystemProvider(vfsOptions->name);
+    if (!provider) {
+      error = "unknown virtual filesystem '" + vfsOptions->name + "'";
+      return nullptr;
+    }
 
-  auto provider = getFileSystemProvider(vfsOptions->name);
-  if (!provider) {
-    error = "unknown virtual filesystem '" + vfsOptions->name + "'";
-    return nullptr;
+    SmallString<0> smallError;
+    auto fileSystem =
+        provider->getFileSystem(vfsOptions->arguments, smallError);
+    if (!fileSystem) {
+      error = smallError.str();
+      return nullptr;
+    }
+
+    return fileSystem;
   }
 
-  SmallString<0> smallError;
-  auto fileSystem = provider->getFileSystem(vfsOptions->arguments, smallError);
-  if (!fileSystem) {
-    error = smallError.str();
-    return nullptr;
+  // Otherwise, try to find an open document with a filesystem.
+  if (primaryFile) {
+    if (auto doc = EditorDocuments->getByUnresolvedName(*primaryFile)) {
+      return doc->getFileSystem();
+    }
   }
 
-  return fileSystem;
+  // Fallback to the real filesystem.
+  return llvm::vfs::getRealFileSystem();
 }
 
 CloseClangModuleFiles::~CloseClangModuleFiles() {
