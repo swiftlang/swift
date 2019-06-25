@@ -72,12 +72,13 @@ toolchains::Darwin::constructInvocation(const InterpretJobAction &job,
                                         const JobContext &context) const {
   InvocationInfo II = ToolChain::constructInvocation(job, context);
 
-  SmallString<128> runtimeLibraryPath;
-  getRuntimeLibraryPath(runtimeLibraryPath, context.Args, /*Shared=*/true);
+  SmallVector<std::string, 4> runtimeLibraryPaths;
+  getRuntimeLibraryPaths(runtimeLibraryPaths, context.Args, context.OI.SDKPath,
+                         /*Shared=*/true);
 
   addPathEnvironmentVariableIfNeeded(II.ExtraEnvironment, "DYLD_LIBRARY_PATH",
                                      ":", options::OPT_L, context.Args,
-                                     runtimeLibraryPath);
+                                     runtimeLibraryPaths);
   addPathEnvironmentVariableIfNeeded(II.ExtraEnvironment, "DYLD_FRAMEWORK_PATH",
                                      ":", options::OPT_F, context.Args);
   // FIXME: Add options::OPT_Fsystem paths to DYLD_FRAMEWORK_PATH as well.
@@ -390,13 +391,10 @@ toolchains::Darwin::constructInvocation(const DynamicLinkJobAction &job,
   Arguments.push_back("-arch");
   Arguments.push_back(context.Args.MakeArgString(getTriple().getArchName()));
 
-  // Add the runtime library link path, which is platform-specific and found
-  // relative to the compiler.
-  SmallString<128> RuntimeLibPath;
-  getRuntimeLibraryPath(RuntimeLibPath, context.Args, /*Shared=*/true);
-
   // Link compatibility libraries, if we're deploying back to OSes that
   // have an older Swift runtime.
+  SmallString<128> SharedResourceDirPath;
+  getResourceDirPath(SharedResourceDirPath, context.Args, /*Shared=*/true);
   Optional<llvm::VersionTuple> runtimeCompatibilityVersion;
   
   if (context.Args.hasArg(options::OPT_runtime_compatibility_version)) {
@@ -418,7 +416,7 @@ toolchains::Darwin::constructInvocation(const DynamicLinkJobAction &job,
     if (*runtimeCompatibilityVersion <= llvm::VersionTuple(5, 0)) {
       // Swift 5.0 compatibility library
       SmallString<128> BackDeployLib;
-      BackDeployLib.append(RuntimeLibPath);
+      BackDeployLib.append(SharedResourceDirPath);
       llvm::sys::path::append(BackDeployLib, "libswiftCompatibility50.a");
       
       if (llvm::sys::fs::exists(BackDeployLib)) {
@@ -433,7 +431,7 @@ toolchains::Darwin::constructInvocation(const DynamicLinkJobAction &job,
       if (*runtimeCompatibilityVersion <= llvm::VersionTuple(5, 0)) {
         // Swift 5.0 dynamic replacement compatibility library.
         SmallString<128> BackDeployLib;
-        BackDeployLib.append(RuntimeLibPath);
+        BackDeployLib.append(SharedResourceDirPath);
         llvm::sys::path::append(BackDeployLib,
                                 "libswiftCompatibilityDynamicReplacements.a");
 
@@ -444,23 +442,34 @@ toolchains::Darwin::constructInvocation(const DynamicLinkJobAction &job,
       }
   }
 
+  bool wantsStaticStdlib =
+      context.Args.hasFlag(options::OPT_static_stdlib,
+                           options::OPT_no_static_stdlib, false);
+
+  SmallVector<std::string, 4> RuntimeLibPaths;
+  getRuntimeLibraryPaths(RuntimeLibPaths, context.Args,
+                         context.OI.SDKPath, /*Shared=*/!wantsStaticStdlib);
+
+  // Add the runtime library link path, which is platform-specific and found
+  // relative to the compiler.
+  for (auto path : RuntimeLibPaths) {
+    Arguments.push_back("-L");
+    Arguments.push_back(context.Args.MakeArgString(path));
+  }
+
   // Link the standard library.
-  Arguments.push_back("-L");
-  if (context.Args.hasFlag(options::OPT_static_stdlib,
-                           options::OPT_no_static_stdlib, false)) {
-    SmallString<128> StaticRuntimeLibPath;
-    getRuntimeLibraryPath(StaticRuntimeLibPath, context.Args, /*Shared=*/false);
-    Arguments.push_back(context.Args.MakeArgString(StaticRuntimeLibPath));
+  if (wantsStaticStdlib) {
     Arguments.push_back("-lc++");
     Arguments.push_back("-framework");
     Arguments.push_back("Foundation");
     Arguments.push_back("-force_load_swift_libs");
   } else {
-    Arguments.push_back(context.Args.MakeArgString(RuntimeLibPath));
     // FIXME: We probably shouldn't be adding an rpath here unless we know ahead
     // of time the standard library won't be copied. SR-1967
-    Arguments.push_back("-rpath");
-    Arguments.push_back(context.Args.MakeArgString(RuntimeLibPath));
+    for (auto path : RuntimeLibPaths) {
+      Arguments.push_back("-rpath");
+      Arguments.push_back(context.Args.MakeArgString(path));
+    }
   }
 
   if (context.Args.hasArg(options::OPT_profile_generate)) {
