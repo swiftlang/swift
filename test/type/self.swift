@@ -129,10 +129,15 @@ class C {
   }
   func h(j: () -> Self) -> () -> Self {
     // expected-error@-1 {{'Self' cannot be the type of a function argument in a class}}
-    // expected-error@-2 {{'Self' cannot be the type of a nested return value}}
+    // expected-error@-2 {{'Self' can only appear at the top level of a method result type}}
     return { return self }
     // expected-error@-1 {{cannot convert value of type 'C' to closure result type 'Self'}}
   }
+  func i() -> (Self, Self) {}
+  // expected-error@-1 {{'Self' can only appear at the top level of a method result type}}
+
+  func j() -> Self.Type {}
+  // expected-error@-1 {{'Self' can only appear at the top level of a method result type}}
 
   let p0: Self?
   var p1: Self? // expected-error {{'Self' is not available as the type of a mutable property}}

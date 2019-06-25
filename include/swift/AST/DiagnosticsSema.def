@@ -2588,7 +2588,7 @@ ERROR(self_in_mutable_subscript,none,
 ERROR(self_in_parameter,none,
       "'Self' cannot be the type of a function argument in a class", ())
 ERROR(self_in_nested_return,none,
-      "'Self' cannot be the type of a nested return value", ())
+      "'Self' can only appear at the top level of a method result type", ())
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Attributes

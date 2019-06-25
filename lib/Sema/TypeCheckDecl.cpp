@@ -3204,9 +3204,21 @@ public:
         else
           diagnoseSelfTypedParameters(Param->getInterfaceType(), Loc, 1);
       }
-      TypeLoc RTyLoc = FD->getBodyResultTypeLoc();
-      if (RTyLoc.getType())
-        diagnoseSelfTypedParameters(RTyLoc.getType(), RTyLoc.getLoc(), 1);
+
+      auto ResultTy = FD->getResultInterfaceType();
+
+      // For now, DynamicSelfType can only appear at the top level of a
+      // function result type, possibly wrapped in an optional type.
+      if (ResultTy->hasDynamicSelfType()) {
+        if (auto ObjectTy = ResultTy->getOptionalObjectType())
+          ResultTy = ObjectTy;
+        if (!ResultTy->is<DynamicSelfType>()) {
+          auto loc = FD->getBodyResultTypeLoc().getLoc();
+          if (loc.isInvalid())
+            loc = FD->getLoc();
+          TC.diagnose(loc, diag::self_in_nested_return);
+        }
+      }
     }
   }
 

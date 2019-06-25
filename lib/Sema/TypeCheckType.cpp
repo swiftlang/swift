@@ -1284,18 +1284,25 @@ resolveTopLevelIdentTypeComponent(TypeResolution resolution,
   auto DC = resolution.getDeclContext();
 
   // Dynamic 'Self' in the result type of a function body.
-  if (options.getBaseContext() == TypeResolverContext::DynamicSelfResult &&
-      comp->getIdentifier() == ctx.Id_Self) {
-    auto func = cast<FuncDecl>(DC);
-    assert(func->hasDynamicSelf() && "Not marked as having dynamic Self?");
+  if (comp->getIdentifier() == ctx.Id_Self) {
+    switch (options.getBaseContext()) {
+    case TypeResolverContext::FunctionResult: {
+      if (auto *typeDC = DC->getInnermostTypeContext()) {
+        // FIXME: The passed-in TypeRepr should get 'typechecked' as well.
+        // The issue is though that ComponentIdentTypeRepr only accepts a ValueDecl
+        // while the 'Self' type is more than just a reference to a TypeDecl.
+        auto selfType = resolution.mapTypeIntoContext(
+          typeDC->getSelfInterfaceType());
+        if (!typeDC->getSelfClassDecl())
+          return selfType;
+        return DynamicSelfType::get(selfType, ctx);
+      }
 
-    // FIXME: The passed-in TypeRepr should get 'typechecked' as well.
-    // The issue is though that ComponentIdentTypeRepr only accepts a ValueDecl
-    // while the 'Self' type is more than just a reference to a TypeDecl.
-
-    auto selfType = resolution.mapTypeIntoContext(
-      func->getDeclContext()->getSelfInterfaceType());
-    return DynamicSelfType::get(selfType, ctx);
+      break;
+    }
+    default:
+      break;
+    }
   }
 
   auto id = comp->getIdentifier();
@@ -3081,7 +3088,6 @@ Type TypeResolver::resolveImplicitlyUnwrappedOptionalType(
     break;
   case TypeResolverContext::FunctionInput:
   case TypeResolverContext::FunctionResult:
-  case TypeResolverContext::DynamicSelfResult:
   case TypeResolverContext::PatternBindingDecl:
     doDiag = !isDirect;
     break;
