@@ -89,7 +89,8 @@ namespace swift {
     bool DisableAvailabilityChecking = false;
 
     /// Maximum number of typo corrections we are allowed to perform.
-    unsigned TypoCorrectionLimit = 10;
+    /// This is disabled by default until we can get typo-correction working within acceptable performance bounds.
+    unsigned TypoCorrectionLimit = 0;
     
     /// Should access control be respected?
     bool EnableAccessControl = true;
