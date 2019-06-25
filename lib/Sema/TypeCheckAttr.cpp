@@ -3015,7 +3015,7 @@ static AutoDiffIndexSubset *computeTransposingParameters(
 //        function, derivativeGenEnv);
   
   // Otherwise, build parameter indices from parsed differentiation parameters.
-  auto paramIndices = SmallBitVector();
+  auto paramIndices = SmallBitVector(parsedWrtParams.size());
   unsigned numParams = params.size() + transposeResultTypes.size() - 1;
   int lastIndex = -1;
   for (unsigned i : indices(parsedWrtParams)) {
@@ -3815,6 +3815,9 @@ void AttributeChecker::visitTransposingAttr(TransposingAttr *attr) {
     attr->setInvalid();
     return;
   }
+  
+  // Set the checked differentiation parameter indices in the attribute.
+  attr->setParameterIndices(checkedWrtParamIndices);
   
   // Compute expected original function type.
   auto *originalFnType =
