@@ -207,13 +207,14 @@ namespace swift {
   /// @dynamicMemberLookup attribute on it.
   bool hasDynamicMemberLookupAttribute(Type type);
 
-  /// Returns the root type of the keypath type in a keypath dynamic member
-  /// lookup subscript, or \c None if it cannot be determined.
+  /// Returns the root type and result type of the keypath type in a keypath
+  /// dynamic member lookup subscript, or \c None if it cannot be determined.
   ///
   /// \param subscript The potential keypath dynamic member lookup subscript.
   /// \param DC The DeclContext from which the subscript is being referenced.
-  Optional<Type> getRootTypeOfKeypathDynamicMember(SubscriptDecl *subscript,
-                                                   const DeclContext *DC);
+  Optional<std::pair<Type, Type>>
+  getRootAndResultTypeOfKeypathDynamicMember(SubscriptDecl *subscript,
+                                             const DeclContext *DC);
 }
 
 #endif
