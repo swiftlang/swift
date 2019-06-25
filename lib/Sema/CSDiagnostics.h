@@ -149,7 +149,7 @@ protected:
   /// path, uniqued and automatically calculate the summary flags
   ConstraintLocator *
   getConstraintLocator(Expr *anchor,
-                       ArrayRef<ConstraintLocator::PathElement> path) {
+                       ArrayRef<ConstraintLocator::PathElement> path) const {
     return CS.getConstraintLocator(anchor, path);
   }
 

@@ -1892,7 +1892,7 @@ public:
   /// path, uniqued and automatically infer the summary flags
   ConstraintLocator *
   getConstraintLocator(Expr *anchor,
-                       ArrayRef<ConstraintLocator::PathElement> path) const;
+                       ArrayRef<ConstraintLocator::PathElement> path);
 
   /// Retrieve the constraint locator for the given anchor and
   /// an empty path, uniqued.
