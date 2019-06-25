@@ -987,7 +987,7 @@ bool Parser::parseTransposingParametersClause(
         break;
       }
       default:
-        diagnose(Tok, diag::diff_params_clause_expected_parameter);
+        diagnose(Tok, diag::transposing_params_clause_expected_parameter);
         return true;
     }
     if (parseTrailingComma && Tok.isNot(tok::r_paren))
