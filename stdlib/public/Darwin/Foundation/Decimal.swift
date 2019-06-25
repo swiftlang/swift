@@ -94,11 +94,6 @@ extension Decimal {
     @available(*, unavailable, message: "Decimal does not yet fully adopt FloatingPoint.")
     public mutating func formTruncatingRemainder(dividingBy other: Decimal) { fatalError("Decimal does not yet fully adopt FloatingPoint") }
 
-    public mutating func negate() {
-        guard _length != 0 else { return }
-        _isNegative = _isNegative == 0 ? 1 : 0
-    }
-
     public func isEqual(to other: Decimal) -> Bool {
         var lhs = self
         var rhs = other
@@ -141,38 +136,6 @@ extension Decimal {
 
     public var nextDown: Decimal {
         return self - Decimal(_exponent: _exponent, _length: 1, _isNegative: 0, _isCompact: 1, _reserved: 0, _mantissa: (0x0001, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000))
-    }
-
-    public static func +(lhs: Decimal, rhs: Decimal) -> Decimal {
-        var res = Decimal()
-        var leftOp = lhs
-        var rightOp = rhs
-        NSDecimalAdd(&res, &leftOp, &rightOp, .plain)
-        return res
-    }
-
-    public static func -(lhs: Decimal, rhs: Decimal) -> Decimal {
-        var res = Decimal()
-        var leftOp = lhs
-        var rightOp = rhs
-        NSDecimalSubtract(&res, &leftOp, &rightOp, .plain)
-        return res
-    }
-
-    public static func /(lhs: Decimal, rhs: Decimal) -> Decimal {
-        var res = Decimal()
-        var leftOp = lhs
-        var rightOp = rhs
-        NSDecimalDivide(&res, &leftOp, &rightOp, .plain)
-        return res
-    }
-
-    public static func *(lhs: Decimal, rhs: Decimal) -> Decimal {
-        var res = Decimal()
-        var leftOp = lhs
-        var rightOp = rhs
-        NSDecimalMultiply(&res, &leftOp, &rightOp, .plain)
-        return res
     }
 }
 
@@ -258,46 +221,75 @@ extension Decimal : ExpressibleByIntegerLiteral {
 }
 
 extension Decimal : SignedNumeric {
-  public var magnitude: Decimal {
-      guard _length != 0 else { return self }
-      return Decimal(
-          _exponent: self._exponent, _length: self._length,
-          _isNegative: 0, _isCompact: self._isCompact,
-          _reserved: 0, _mantissa: self._mantissa)
-  }
+    public var magnitude: Decimal {
+        guard _length != 0 else { return self }
+        return Decimal(
+            _exponent: self._exponent, _length: self._length,
+            _isNegative: 0, _isCompact: self._isCompact,
+            _reserved: 0, _mantissa: self._mantissa)
+    }
 
-  // FIXME(integers): implement properly
-  public init?<T : BinaryInteger>(exactly source: T) {
-      fatalError()
-  }
+    // FIXME(integers): implement properly
+    public init?<T : BinaryInteger>(exactly source: T) {
+        fatalError()
+    }
 
-  public static func +=(lhs: inout Decimal, rhs: Decimal) {
-      var rhs = rhs
-      _ = withUnsafeMutablePointer(to: &lhs) {
-          NSDecimalAdd($0, $0, &rhs, .plain)
-      }
-  }
+    public static func +=(lhs: inout Decimal, rhs: Decimal) {
+        var rhs = rhs
+        _ = withUnsafeMutablePointer(to: &lhs) {
+            NSDecimalAdd($0, $0, &rhs, .plain)
+        }
+    }
 
-  public static func -=(lhs: inout Decimal, rhs: Decimal) {
-      var rhs = rhs
-      _ = withUnsafeMutablePointer(to: &lhs) {
-          NSDecimalSubtract($0, $0, &rhs, .plain)
-      }
-  }
+    public static func -=(lhs: inout Decimal, rhs: Decimal) {
+        var rhs = rhs
+        _ = withUnsafeMutablePointer(to: &lhs) {
+            NSDecimalSubtract($0, $0, &rhs, .plain)
+        }
+    }
 
-  public static func *=(lhs: inout Decimal, rhs: Decimal) {
-      var rhs = rhs
-      _ = withUnsafeMutablePointer(to: &lhs) {
-          NSDecimalMultiply($0, $0, &rhs, .plain)
-      }
-  }
+    public static func *=(lhs: inout Decimal, rhs: Decimal) {
+        var rhs = rhs
+        _ = withUnsafeMutablePointer(to: &lhs) {
+            NSDecimalMultiply($0, $0, &rhs, .plain)
+        }
+    }
 
-  public static func /=(lhs: inout Decimal, rhs: Decimal) {
-      var rhs = rhs
-      _ = withUnsafeMutablePointer(to: &lhs) {
-          NSDecimalDivide($0, $0, &rhs, .plain)
-      }
-  }
+    public static func /=(lhs: inout Decimal, rhs: Decimal) {
+        var rhs = rhs
+        _ = withUnsafeMutablePointer(to: &lhs) {
+            NSDecimalDivide($0, $0, &rhs, .plain)
+        }
+    }
+
+    public static func +(lhs: Decimal, rhs: Decimal) -> Decimal {
+        var answer = lhs
+        answer += rhs
+        return answer
+    }
+
+    public static func -(lhs: Decimal, rhs: Decimal) -> Decimal {
+        var answer = lhs
+        answer -= rhs
+        return answer
+    }
+
+    public static func *(lhs: Decimal, rhs: Decimal) -> Decimal {
+        var answer = lhs
+        answer *= rhs
+        return answer
+    }
+
+    public static func /(lhs: Decimal, rhs: Decimal) -> Decimal {
+        var answer = lhs
+        answer /= rhs
+        return answer
+    }
+
+    public mutating func negate() {
+        guard _length != 0 else { return }
+        _isNegative = _isNegative == 0 ? 1 : 0
+    }
 }
 
 extension Decimal {
