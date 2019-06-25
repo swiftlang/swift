@@ -18,6 +18,20 @@ struct WrapperWithInitialValue<T> {
 }
 
 @propertyWrapper
+struct WrapperWithDefaultInit<T> {
+  private var stored: T?
+
+  var wrappedValue: T {
+    get { stored! }
+    set { stored = newValue }
+  }
+
+  init() {
+    self.stored = nil
+  }
+}
+
+@propertyWrapper
 struct WrapperAcceptingAutoclosure<T> {
   private let fn: () -> T
 
@@ -610,6 +624,21 @@ struct DefaultedMemberwiseInits {
 
   @WrapperWithInitialValue(initialValue: 17)
   var z: Int
+
+  @WrapperWithDefaultInit
+  var w: Int
+
+  @WrapperWithDefaultInit
+  var optViaDefaultInit: Int?
+
+  @WrapperWithInitialValue
+  var optViaInitialValue: Int?
+}
+
+
+struct CannotDefaultMemberwiseOptionalInit { // expected-note{{'init(x:)' declared here}}
+  @Wrapper
+  var x: Int?
 }
 
 func testDefaultedMemberwiseInits() {
@@ -622,6 +651,13 @@ func testDefaultedMemberwiseInits() {
   _ = DefaultedMemberwiseInits(y: 42)
   _ = DefaultedMemberwiseInits(x: Wrapper(wrappedValue: false))
   _ = DefaultedMemberwiseInits(z: WrapperWithInitialValue(initialValue: 42))
+  _ = DefaultedMemberwiseInits(w: WrapperWithDefaultInit())
+  _ = DefaultedMemberwiseInits(optViaDefaultInit: WrapperWithDefaultInit())
+  _ = DefaultedMemberwiseInits(optViaInitialValue: nil)
+  _ = DefaultedMemberwiseInits(optViaInitialValue: 42)
+
+  _ = CannotDefaultMemberwiseOptionalInit() // expected-error{{missing argument for parameter 'x' in call}}
+  _ = CannotDefaultMemberwiseOptionalInit(x: Wrapper(wrappedValue: nil))
 }
 
 // ---------------------------------------------------------------------------

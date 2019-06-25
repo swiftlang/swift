@@ -2088,18 +2088,18 @@ static void maybeAddMemberwiseDefaultArg(ParamDecl *arg, VarDecl *var,
   if (!var->getParentPattern()->getSingleVar())
     return;
 
-  // Determine whether this variable will be 'nil' initialized.
-  bool isNilInitialized =
-    (isa<OptionalType>(var->getValueInterfaceType().getPointer()) &&
-     !var->isParentInitialized()) ||
-    var->getAttrs().hasAttribute<LazyAttr>();
-
   // Whether we have explicit initialization.
   bool isExplicitlyInitialized = var->isParentInitialized();
 
-  // If this is neither nil-initialized nor explicitly initialized, don't add
-  // anything.
-  if (!isNilInitialized && !isExplicitlyInitialized)
+  // Whether we can default-initialize this property.
+  auto binding = var->getParentPatternBinding();
+  bool isDefaultInitializable =
+      var->getAttrs().hasAttribute<LazyAttr>() ||
+      (binding && binding->isDefaultInitializable());
+
+  // If this is neither explicitly initialized nor
+  // default-initializable, don't add anything.
+  if (!isExplicitlyInitialized && !isDefaultInitializable)
     return;
 
   // We can add a default value now.
@@ -2115,13 +2115,15 @@ static void maybeAddMemberwiseDefaultArg(ParamDecl *arg, VarDecl *var,
   // default arg. All lazy variables return a nil literal as well. *Note* that
   // the type will always be a sugared T? because we don't default init an
   // explicit Optional<T>.
+  bool isNilInitialized =
+    var->getAttrs().hasAttribute<LazyAttr>() ||
+    (!isExplicitlyInitialized && isDefaultInitializable &&
+     var->getValueInterfaceType()->getAnyNominal() == ctx.getOptionalDecl() &&
+     !var->getAttachedPropertyWrapperTypeInfo(0).defaultInit);
   if (isNilInitialized) {
     arg->setDefaultArgumentKind(DefaultArgumentKind::NilLiteral);
     return;
   }
-
- // Explicitly initialize.
- assert(isExplicitlyInitialized);
 
   // If there's a backing storage property, the memberwise initializer
   // will be in terms of that.
