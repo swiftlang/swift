@@ -2983,6 +2983,9 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
   // If we don't have a substituted base type, fail.
   if (!substBase) return failed();
 
+  if (auto *selfType = substBase->getAs<DynamicSelfType>())
+    substBase = selfType->getSelfType();
+
   // Error recovery path.
   // FIXME: Generalized existentials will look here.
   if (substBase->isOpenedExistential())
