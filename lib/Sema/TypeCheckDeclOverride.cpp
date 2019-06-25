@@ -942,6 +942,7 @@ static GenericSignature *getNewGenericSignature(ValueDecl *base,
 
   auto baseClass = base->getDeclContext()->getSelfClassDecl();
   auto derivedClass = derived->getDeclContext()->getSelfClassDecl();
+  auto *baseClassSig = baseClass->getGenericSignature();
 
   if (!baseClass && !derivedClass) {
     return nullptr;
@@ -950,7 +951,7 @@ static GenericSignature *getNewGenericSignature(ValueDecl *base,
   auto subMap = derivedClass->getSuperclass()->getContextSubstitutionMap(
       derivedClass->getModuleContext(), baseClass);
 
-  if (baseGenericCtx) {
+  if (baseGenericCtx->getGenericSignature() != nullptr) {
     unsigned depth = 0;
 
     if (auto *genericSig = baseClass->getGenericSignature())
@@ -963,11 +964,9 @@ static GenericSignature *getNewGenericSignature(ValueDecl *base,
         GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
 
     unsigned superclassDepth = 0;
-    
-    if (baseGenericCtx->isGeneric()) {
-      superclassDepth =
-          baseGenericCtx->getGenericParams()->getParams().back()->getDepth() +
-          1;
+
+    if (baseClassSig) {
+      superclassDepth = baseClassSig->getGenericParams().back()->getDepth() + 1;
     }
 
     auto substFn = [&](SubstitutableType *type) -> Type {
@@ -1020,6 +1019,7 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
     emittedMatchError = true;
   }
 
+  auto baseGenericCtx = baseDecl->getAsGenericContext();
   auto derivedGenericCtx = decl->getAsGenericContext();
 
   // If the generic signatures are different, then complain.
@@ -1032,9 +1032,11 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
       auto satOne = derivedSig->requirementsNotSatisfiedBy(newSig).empty();
       auto satTwo = newSig->requirementsNotSatisfiedBy(derivedSig).empty();
 
-      if (!satOne && !satTwo) {
+      if (!satOne || !satTwo) {
         diags.diagnose(decl, diag::override_method_different_generic_sig,
-                       decl->getBaseName());
+                       decl->getBaseName(),
+                       derivedGenericCtx->getGenericSignature()->getAsString(),
+                       baseGenericCtx->getGenericSignature()->getAsString());
         diags.diagnose(baseDecl, diag::overridden_here);
         emittedMatchError = true;
       }
