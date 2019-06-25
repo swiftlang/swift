@@ -150,20 +150,31 @@ public func pow(_ x: Decimal, _ y: Int) -> Decimal {
 }
 
 extension Decimal : Hashable, Comparable {
-    internal var doubleValue : Double {
-        var d = 0.0
-        if _length == 0 && _isNegative == 0 {
-            return Double.nan
+    private subscript(index: UInt32) -> UInt16 {
+        get {
+            switch index {
+            case 0: return _mantissa.0
+            case 1: return _mantissa.1
+            case 2: return _mantissa.2
+            case 3: return _mantissa.3
+            case 4: return _mantissa.4
+            case 5: return _mantissa.5
+            case 6: return _mantissa.6
+            case 7: return _mantissa.7
+            default: fatalError("Invalid index \(index) for _mantissa")
+            }
         }
-        
-        d = d * 65536 + Double(_mantissa.7)
-        d = d * 65536 + Double(_mantissa.6)
-        d = d * 65536 + Double(_mantissa.5)
-        d = d * 65536 + Double(_mantissa.4)
-        d = d * 65536 + Double(_mantissa.3)
-        d = d * 65536 + Double(_mantissa.2)
-        d = d * 65536 + Double(_mantissa.1)
-        d = d * 65536 + Double(_mantissa.0)
+    }
+    
+    internal var doubleValue: Double {
+        if _length == 0 {
+            return _isNegative == 1 ? Double.nan : 0
+        }
+
+        var d = 0.0
+        for idx in (0..<min(_length, 8)).reversed() {
+            d = d * 65536 + Double(self[idx])
+        }
         
         if _exponent < 0 {
             for _ in _exponent..<0 {
@@ -212,6 +223,7 @@ extension Decimal : ExpressibleByIntegerLiteral {
 
 extension Decimal : SignedNumeric {
   public var magnitude: Decimal {
+      guard _length != 0 else { return self }
       return Decimal(
           _exponent: self._exponent, _length: self._length,
           _isNegative: 0, _isCompact: self._isCompact,
