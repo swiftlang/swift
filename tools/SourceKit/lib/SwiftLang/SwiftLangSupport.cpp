@@ -197,7 +197,7 @@ UIdent UIdentVisitor::visitExtensionDecl(const ExtensionDecl *D) {
 namespace {
 /// A simple configurable FileSystemProvider, useful for tests that exercise
 /// the FileSystemProvider code.
-class TestFileSystemProvider: public SourceKit::FileSystemProvider {
+class InMemoryFileSystemProvider: public SourceKit::FileSystemProvider {
   /// Provides the real filesystem, overlayed with an InMemoryFileSystem that
   /// contains specified files at specified locations.
   /// \param Args The locations of the InMemoryFileSystem files, interleaved
@@ -246,7 +246,7 @@ SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
   CCCache->inMemory = llvm::make_unique<ide::CodeCompletionCache>();
 
   // Provide a default file system provider.
-  setFileSystemProvider("testvfs", llvm::make_unique<TestFileSystemProvider>());
+  setFileSystemProvider("in-memory-vfs", llvm::make_unique<InMemoryFileSystemProvider>());
 }
 
 SwiftLangSupport::~SwiftLangSupport() {
