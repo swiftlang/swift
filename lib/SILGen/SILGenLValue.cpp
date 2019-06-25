@@ -1412,7 +1412,8 @@ namespace {
                         SGF.getModule().getSwiftModule(), ctor);
 
         Type ity = ctor->getInterfaceType();
-        AnyFunctionType *substIty = ity.subst(subs)->castTo<AnyFunctionType>();
+        AnyFunctionType *substIty =
+          ity.subst(subs)->getCanonicalType()->castTo<AnyFunctionType>();
 
         auto initRef = SILDeclRef(ctor, SILDeclRef::Kind::Allocator)
           .asForeign(requiresForeignEntryPoint(ctor));
