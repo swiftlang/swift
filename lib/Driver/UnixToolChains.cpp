@@ -194,12 +194,6 @@ toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
   getRuntimeLibraryPaths(RuntimeLibPaths, context.Args, context.OI.SDKPath,
                          /*Shared=*/!(staticExecutable || staticStdlib));
 
-  // Add the runtime library link paths.
-  for (auto path : RuntimeLibPaths) {
-    Arguments.push_back("-L");
-    Arguments.push_back(context.Args.MakeArgString(path));
-  }
-
   if (!(staticExecutable || staticStdlib) && shouldProvideRPathToLinker()) {
     // FIXME: We probably shouldn't be adding an rpath here unless we know
     //        ahead of time the standard library won't be copied.
@@ -246,9 +240,15 @@ toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
           Twine("@") + OutputInfo.getPrimaryOutputFilename()));
   }
 
-  // Link the standard library.
+  // Add the runtime library link paths.
+  for (auto path : RuntimeLibPaths) {
+    Arguments.push_back("-L");
+    Arguments.push_back(context.Args.MakeArgString(path));
+  }
 
-  // If we need to use an .lnk file, linkFilePath will contain it.
+  // Link the standard library. In two paths, we do this using a .lnk file;
+  // if we're going that route, we'll set `linkFilePath` to the path to that
+  // file.
   SmallString<128> linkFilePath;
   getResourceDirPath(linkFilePath, context.Args, /*Shared=*/false);
 
