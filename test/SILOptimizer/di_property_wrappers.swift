@@ -346,8 +346,26 @@ func testDefaultInit() {
   // CHECK: set value hello
 }
 
+// rdar://problem/51581937: DI crash with a property wrapper of an optional
+struct OptIntStruct {
+  @Wrapper var wrapped: Int?
+
+  init() {
+     wrapped = 42
+  }
+}
+
+func testOptIntStruct() {
+  // CHECK: ## OptIntStruct
+  print("\n## OptIntStruct")
+
+  let use = OptIntStruct()
+  // CHECK-NEXT:   .. init Optional(42)
+}
+
 testIntStruct()
 testIntClass()
 testRefStruct()
 testGenericClass()
 testDefaultInit()
+testOptIntStruct()
