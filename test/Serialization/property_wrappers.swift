@@ -16,10 +16,10 @@ func useWrappers(hd: HasWrappers) {
   // Access the original properties
   let _: Int = hd.x
 
-  let _: SomeWrapper<Int> = hd.$x // expected-error{{'$x' is inaccessible due to 'private' protection level}}
+  let _: SomeWrapper<Int> = hd._x // expected-error{{'_x' is inaccessible due to 'private' protection level}}
 
   var mutableHD = hd
   mutableHD.x = 17
 
-  mutableHD.$x = SomeWrapper(initialValue: 42) // expected-error{{'$x' is inaccessible due to 'private' protection level}}
+  mutableHD._x = SomeWrapper(initialValue: 42) // expected-error{{'_x' is inaccessible due to 'private' protection level}}
 }
