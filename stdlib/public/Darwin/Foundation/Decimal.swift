@@ -233,6 +233,8 @@ extension Decimal : Hashable, Comparable {
     public static func ==(lhs: Decimal, rhs: Decimal) -> Bool {
         var lhsVal = lhs
         var rhsVal = rhs
+        // Note: In swift-corelibs-foundation, a bitwise comparison is first
+        // performed using fileprivate members not accessible here.
         return NSDecimalCompare(&lhsVal, &rhsVal) == .orderedSame
     }
 
@@ -513,10 +515,12 @@ extension Decimal : CustomStringConvertible {
         }
         self = theDecimal
     }
-    
+
+    // Note: In swift-corelibs-foundation, `NSDecimalString(_:_:)` is
+    // implemented in terms of `description`; here, it's the other way around.
     public var description: String {
-        var val = self
-        return NSDecimalString(&val, nil)
+        var value = self
+        return NSDecimalString(&value, nil)
     }
 }
 
