@@ -16,6 +16,7 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/Types.h"
@@ -83,6 +84,15 @@ SuperclassTypeRequest::evaluate(Evaluator &evaluator,
                                 NominalTypeDecl *nominalDecl,
                                 TypeResolutionStage stage) const {
   assert(isa<ClassDecl>(nominalDecl) || isa<ProtocolDecl>(nominalDecl));
+
+  // If this is a protocol that came from a serialized module, compute the
+  // superclass via its generic signature.
+  if (auto *proto = dyn_cast<ProtocolDecl>(nominalDecl)) {
+    if (proto->wasDeserialized()) {
+      return proto->getGenericSignature()
+          ->getSuperclassBound(proto->getSelfInterfaceType());
+    }
+  }
 
   for (unsigned int idx : indices(nominalDecl->getInherited())) {
     auto result = evaluator(InheritedTypeRequest{nominalDecl, idx, stage});

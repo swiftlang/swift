@@ -14,8 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef __SWIFT_ABI_KEYPATH_H__
-#define __SWIFT_ABI_KEYPATH_H__
+#ifndef SWIFT_ABI_KEYPATH_H
+#define SWIFT_ABI_KEYPATH_H
 
 // We include the basic constants in a shim header so that it can be shared with
 // the Swift implementation in the standard library.
@@ -235,4 +235,4 @@ public:
 
 }
 
-#endif
+#endif // SWIFT_ABI_KEYPATH_H

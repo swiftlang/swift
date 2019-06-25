@@ -366,7 +366,6 @@ struct OtherGeneric<X, Y, Z> {
   var z: GenericWithOpaqueAssoc<Z>.Assoc
 }
 
-
 protocol P_51641323 {
   associatedtype T
 
@@ -379,4 +378,22 @@ func rdar_51641323() {
     // expected-error@-1 {{return type of property 'foo' requires that '() -> ()' conform to 'P_51641323'}}
     // expected-note@-2 {{opaque return type declared here}}
   }
+}
+
+// Protocol requirements cannot have opaque return types
+protocol OpaqueProtocolRequirement {
+  // expected-error@+1 {{cannot be the return type of a protocol requirement}}{{3-3=associatedtype <#AssocType#>\n}}{{20-26=<#AssocType#>}}
+  func method() -> some P
+
+  // expected-error@+1 {{cannot be the return type of a protocol requirement}}{{3-3=associatedtype <#AssocType#>\n}}{{13-19=<#AssocType#>}}
+  var prop: some P { get }
+
+  // expected-error@+1 {{cannot be the return type of a protocol requirement}}{{3-3=associatedtype <#AssocType#>\n}}{{18-24=<#AssocType#>}}
+  subscript() -> some P { get }
+}
+
+func testCoercionDiagnostics() {
+  var opaque = foo()
+  opaque = bar() // expected-error {{cannot assign value of type 'some P' to type 'some P'}} {{none}}
+  opaque = () // expected-error {{cannot assign value of type '()' to type 'some P'}} {{none}}
 }

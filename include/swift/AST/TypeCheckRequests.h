@@ -36,6 +36,8 @@ class SpecializeAttr;
 class TypeAliasDecl;
 struct TypeLoc;
 class ValueDecl;
+class AbstractStorageDecl;
+enum class OpaqueReadOwnership: uint8_t;
 
 /// Display a nominal type or extension thereof.
 void simple_display(
@@ -679,6 +681,136 @@ public:
   // Cycle handling
   void diagnoseCycle(DiagnosticEngine &diags) const;
   void noteCycleStep(DiagnosticEngine &diags) const;
+};
+
+/// Request a function's self access kind.
+class SelfAccessKindRequest :
+    public SimpleRequest<SelfAccessKindRequest,
+                         CacheKind::SeparatelyCached,
+                         SelfAccessKind,
+                         FuncDecl *> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<SelfAccessKind>
+  evaluate(Evaluator &evaluator, FuncDecl *func) const;
+
+public:
+  // Cycle handling
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<SelfAccessKind> getCachedResult() const;
+  void cacheResult(SelfAccessKind value) const;
+};
+
+/// Request whether the storage has a mutating getter.
+class IsGetterMutatingRequest :
+    public SimpleRequest<IsGetterMutatingRequest,
+                         CacheKind::SeparatelyCached,
+                         bool, AbstractStorageDecl *> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool>
+  evaluate(Evaluator &evaluator, AbstractStorageDecl *func) const;
+
+public:
+  // Cycle handling
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<bool> getCachedResult() const;
+  void cacheResult(bool value) const;
+};
+
+/// Request whether the storage has a mutating getter.
+class IsSetterMutatingRequest :
+    public SimpleRequest<IsSetterMutatingRequest,
+                         CacheKind::SeparatelyCached,
+                         bool, AbstractStorageDecl *> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool>
+  evaluate(Evaluator &evaluator, AbstractStorageDecl *func) const;
+
+public:
+  // Cycle handling
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<bool> getCachedResult() const;
+  void cacheResult(bool value) const;
+};
+
+/// Request whether reading the storage yields a borrowed value.
+class OpaqueReadOwnershipRequest :
+    public SimpleRequest<OpaqueReadOwnershipRequest,
+                         CacheKind::SeparatelyCached,
+                         OpaqueReadOwnership,
+                         AbstractStorageDecl *> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<OpaqueReadOwnership>
+  evaluate(Evaluator &evaluator, AbstractStorageDecl *storage) const;
+
+public:
+  // Cycle handling
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<OpaqueReadOwnership> getCachedResult() const;
+  void cacheResult(OpaqueReadOwnership value) const;
+};
+
+/// Request to build the underlying storage for a lazy property.
+class LazyStoragePropertyRequest :
+    public SimpleRequest<LazyStoragePropertyRequest,
+                         CacheKind::Cached,
+                         VarDecl *,
+                         VarDecl *> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<VarDecl *>
+  evaluate(Evaluator &evaluator, VarDecl *lazyVar) const;
+
+public:
+  // Cycle handling
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+
+  bool isCached() const { return true; }
 };
 
 // Allow AnyValue to compare two Type values, even though Type doesn't

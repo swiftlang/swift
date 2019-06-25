@@ -52,6 +52,7 @@
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEPENDENT_IN_CLOSURE_1 | %FileCheck %s -check-prefix=DEPENDENT_IN_CLOSURE_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEPENDENT_IN_CLOSURE_2 | %FileCheck %s -check-prefix=DEPENDENT_IN_CLOSURE_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_WITH_UNRESOLVEDTYPE_1 | %FileCheck %s -check-prefix=INIT_WITH_UNRESOLVEDTYPE_1
 
 func freeFunc() {}
 
@@ -395,4 +396,17 @@ func testDependentTypeInClosure() {
 // DEPENDENT_IN_CLOSURE_2-DAG: Decl[Constructor]/CurrNominal:      init({#(arg): _#}, {#fn: (_.Content) -> Void##(_.Content) -> Void#})[#DependentTypeInClosure<_>#]; name=init(arg: _, fn: (_.Content) -> Void)
 // DEPENDENT_IN_CLOSURE_2-DAG: Decl[Constructor]/CurrNominal:      init({#arg: _#}, {#fn: () -> _.Content##() -> _.Content#})[#DependentTypeInClosure<_>#]; name=init(arg: _, fn: () -> _.Content)
 // DEPENDENT_IN_CLOSURE_2: End completions
+}
+struct InitWithUnresolved<Data: DataType> where Data.Content: Comparable {
+  init(arg: Data, fn: (Data.Content) -> Void) {}
+}
+extension InitWithUnresolved where Self.Data: Comparable {
+  init(arg2: Data) {}
+}
+func testInitWithUnresolved() {
+  let _ = InitWithUnresolved(#^INIT_WITH_UNRESOLVEDTYPE_1^#
+// INIT_WITH_UNRESOLVEDTYPE_1: Begin completions, 2 items
+// INIT_WITH_UNRESOLVEDTYPE_1-DAG: Decl[Constructor]/CurrNominal:      ['(']{#arg: _#}, {#fn: (_.Content) -> Void##(_.Content) -> Void#}[')'][#InitWithUnresolved<_>#];
+// INIT_WITH_UNRESOLVEDTYPE_1-DAG: Decl[Constructor]/CurrNominal:      ['(']{#arg2: _#}[')'][#InitWithUnresolved<_>#];
+// INIT_WITH_UNRESOLVEDTYPE_1: End completions
 }

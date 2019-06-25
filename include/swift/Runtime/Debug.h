@@ -14,8 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef _SWIFT_RUNTIME_DEBUG_HELPERS_
-#define _SWIFT_RUNTIME_DEBUG_HELPERS_
+#ifndef SWIFT_RUNTIME_DEBUG_HELPERS_H
+#define SWIFT_RUNTIME_DEBUG_HELPERS_H
 
 #include <cstdarg>
 #include <cstdio>
@@ -268,4 +268,4 @@ inline static int swift_asprintf(char **strp, const char *fmt, ...) {
 // namespace swift
 }
 
-#endif // _SWIFT_RUNTIME_DEBUG_HELPERS_
+#endif // SWIFT_RUNTIME_DEBUG_HELPERS_H

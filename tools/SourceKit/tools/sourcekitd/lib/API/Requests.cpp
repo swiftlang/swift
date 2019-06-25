@@ -148,8 +148,7 @@ static sourcekitd_response_t
 mangleSimpleClassNames(ArrayRef<std::pair<StringRef, StringRef>> ModuleClassPairs);
 
 static sourcekitd_response_t indexSource(StringRef Filename,
-                                         ArrayRef<const char *> Args,
-                                         StringRef KnownHash);
+                                         ArrayRef<const char *> Args);
 
 static sourcekitd_response_t reportDocInfo(llvm::MemoryBuffer *InputBuf,
                                            StringRef ModuleName,
@@ -958,10 +957,7 @@ static void handleSemanticRequest(
     return Rec(createErrorRequestInvalid("missing 'key.sourcefile'"));
 
   if (ReqUID == RequestIndex) {
-    StringRef Hash;
-    Optional<StringRef> HashOpt = Req.getString(KeyHash);
-    if (HashOpt.hasValue()) Hash = *HashOpt;
-    return Rec(indexSource(*SourceFile, Args, Hash));
+    return Rec(indexSource(*SourceFile, Args));
   }
 
   if (ReqUID == RequestCursorInfo) {
@@ -1195,13 +1191,10 @@ public:
 
   void failed(StringRef ErrDescription) override;
 
-  bool recordHash(StringRef Hash, bool isKnown) override;
-
   bool startDependency(UIdent Kind,
                        StringRef Name,
                        StringRef Path,
-                       bool IsSystem,
-                       StringRef Hash) override;
+                       bool IsSystem) override;
 
   bool finishDependency(UIdent Kind) override;
 
@@ -1214,12 +1207,11 @@ public:
 } // end anonymous namespace
 
 static sourcekitd_response_t indexSource(StringRef Filename,
-                                         ArrayRef<const char *> Args,
-                                         StringRef KnownHash) {
+                                         ArrayRef<const char *> Args) {
   ResponseBuilder RespBuilder;
   SKIndexingConsumer IdxConsumer(RespBuilder);
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
-  Lang.indexSource(Filename, IdxConsumer, Args, KnownHash);
+  Lang.indexSource(Filename, IdxConsumer, Args);
 
   if (!IdxConsumer.ErrorDescription.empty())
     return createErrorRequestFailed(IdxConsumer.ErrorDescription.c_str());
@@ -1231,26 +1223,10 @@ void SKIndexingConsumer::failed(StringRef ErrDescription) {
   ErrorDescription = ErrDescription;
 }
 
-bool SKIndexingConsumer::recordHash(StringRef Hash, bool isKnown) {
-  assert(!Hash.empty());
-  TopDict.set(KeyHash, Hash);
-  if (!isKnown) {
-    // If the hash is known key.entities should be missing otherwise it should
-    // exist, even as an empty array, so create it here.
-    assert(EntitiesStack.size() == 1);
-    Entity &Top = EntitiesStack.back();
-    ResponseBuilder::Array &Arr = Top.Entities;
-    assert(Arr.isNull());
-    Arr = Top.Data.setArray(KeyEntities);
-  }
-  return true;
-}
-
 bool SKIndexingConsumer::startDependency(UIdent Kind,
                                          StringRef Name,
                                          StringRef Path,
-                                         bool IsSystem,
-                                         StringRef Hash) {
+                                         bool IsSystem) {
   Dependency &Parent = DependenciesStack.back();
   ResponseBuilder::Array &Arr = Parent.Dependencies;
   if (Arr.isNull())
@@ -1262,8 +1238,6 @@ bool SKIndexingConsumer::startDependency(UIdent Kind,
   Elem.set(KeyFilePath, Path);
   if (IsSystem)
     Elem.setBool(KeyIsSystem, IsSystem);
-  if (!Hash.empty())
-    Elem.set(KeyHash, Hash);
 
   DependenciesStack.push_back({ Kind, Elem, ResponseBuilder::Array() });
   return true;

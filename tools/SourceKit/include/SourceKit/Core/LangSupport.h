@@ -64,13 +64,10 @@ public:
 
   virtual void failed(StringRef ErrDescription) = 0;
 
-  virtual bool recordHash(StringRef Hash, bool isKnown) = 0;
-
   virtual bool startDependency(UIdent Kind,
                                StringRef Name,
                                StringRef Path,
-                               bool IsSystem,
-                               StringRef Hash) = 0;
+                               bool IsSystem) = 0;
 
   virtual bool finishDependency(UIdent Kind) = 0;
 
@@ -648,8 +645,7 @@ public:
 
   virtual void indexSource(StringRef Filename,
                            IndexingConsumer &Consumer,
-                           ArrayRef<const char *> Args,
-                           StringRef Hash) = 0;
+                           ArrayRef<const char *> Args) = 0;
 
   virtual void
   codeComplete(llvm::MemoryBuffer *InputBuf, unsigned Offset,
