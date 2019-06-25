@@ -265,6 +265,9 @@ PropertyWrapperTypeInfoRequest::evaluate(
       .fixItReplace(valueVar->getNameLoc(), "wrappedValue");
   }
 
+  if (!valueVar->hasInterfaceType())
+    static_cast<TypeChecker &>(*ctx.getLazyResolver()).validateDecl(valueVar);
+
   PropertyWrapperTypeInfo result;
   result.valueVar = valueVar;
   result.initialValueInit = findInitialValueInit(ctx, nominal, valueVar);
