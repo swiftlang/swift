@@ -226,10 +226,17 @@ static void checkInheritanceClause(
     DC = ext;
 
     inheritedClause = ext->getInherited();
-    ASTContext &ctx = ext->getASTContext();
 
     // Protocol extensions cannot have inheritance clauses.
     if (auto proto = ext->getExtendedProtocolDecl()) {
+      ASTContext &ctx = ext->getASTContext();
+      TypeChecker &TC = TypeChecker::createForContext(ctx);
+      auto lookupOptions = defaultMemberTypeLookupOptions;
+      lookupOptions -= NameLookupFlags::PerformConformanceCheck;
+      lookupOptions |= NameLookupFlags::IncludeAttributeImplements;
+
+      proto->inheritedProtocolsChanged();
+
       for (unsigned i = 0, n = inheritedClause.size(); i != n; ++i) {
 
         // Validate the type.
@@ -241,16 +248,8 @@ static void checkInheritanceClause(
         if (!inheritedTy || inheritedTy->hasError())
           continue;
 
-        if (auto inheritedPr = dyn_cast_or_null<ProtocolDecl>(inheritedTy
+        if (auto inheritedPr = dyn_cast<ProtocolDecl>(inheritedTy
             ->getCanonicalType()->getNominalOrBoundGenericNominal())) {
-          std::vector<TypeLoc> Inherited = proto->getInherited();
-          Inherited.push_back(TypeLoc::withoutLoc(inheritedTy));
-          proto->setInherited(ctx.AllocateCopy(MutableArrayRef<TypeLoc>(Inherited)));
-
-          TypeChecker &TC = TypeChecker::createForContext(ctx);
-          auto lookupOptions = defaultMemberTypeLookupOptions;
-          lookupOptions -= NameLookupFlags::PerformConformanceCheck;
-          lookupOptions |= NameLookupFlags::IncludeAttributeImplements;
 
           bool reported = false;
           for (auto member : inheritedPr->getMembers()) {

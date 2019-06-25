@@ -58,6 +58,7 @@
 #include "clang/AST/Attr.h"
 #include "clang/AST/DeclObjC.h"
 
+#include "ConformanceLookupTable.h"
 #include "InlinableText.h"
 #include <algorithm>
 
@@ -4135,18 +4136,29 @@ ProtocolDecl::getInheritedProtocolsSlow() {
   SmallPtrSet<const ProtocolDecl *, 2> known;
   known.insert(this);
   bool anyObject = false;
-  for (const auto found :
-           getDirectlyInheritedNominalTypeDecls(
-             const_cast<ProtocolDecl *>(this), anyObject)) {
-    if (auto proto = dyn_cast<ProtocolDecl>(found.second)) {
-      if (known.insert(proto).second)
-        result.push_back(proto);
+  auto enumerateInherited = [&] (llvm::PointerUnion<TypeDecl *,
+                                 ExtensionDecl *> decl) {
+    for (const auto found :
+             getDirectlyInheritedNominalTypeDecls(decl, anyObject)) {
+      if (auto proto = dyn_cast<ProtocolDecl>(found.second)) {
+        if (known.insert(proto).second)
+          result.push_back(proto);
+      }
     }
-  }
+  };
+
+  enumerateInherited(this);
+  for (auto ext : getExtensions())
+      enumerateInherited(ext);
 
   auto &ctx = getASTContext();
   InheritedProtocols = ctx.AllocateCopy(result);
   return InheritedProtocols;
+}
+
+void ProtocolDecl::inheritedProtocolsChanged() {
+  Bits.ProtocolDecl.InheritedProtocolsValid = false;
+  prepareConformanceTable()->invalidate();
 }
 
 llvm::TinyPtrVector<AssociatedTypeDecl *>

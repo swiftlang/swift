@@ -1055,16 +1055,18 @@ public:
     for (Decl *member : e->getMembers())
       visit(member);
 
-    if (!isa<ProtocolDecl>(e->getExtendedNominal())) {
-      // Emit witness tables for protocol conformances introduced by the
-      // extension.
-      for (auto *conformance : e->getLocalConformances(
-                                 ConformanceLookupKind::All,
-                                 nullptr)) {
-        if (conformance->isComplete()) {
-          if (auto *normal =dyn_cast<NormalProtocolConformance>(conformance))
-            SGM.getWitnessTable(normal);
-        }
+    // Emit witness tables for protocol conformances introduced by the
+    // extension.
+    for (auto *conformance : e->getLocalConformances(
+                               ConformanceLookupKind::All,
+                               nullptr, /*addExtended*/true)) {
+//        fprintf(stderr, "emitExtension (%s) ===== %s: %s (%d/%zu)\n", e->getExtendedNominal()->getNameStr().str().c_str(),
+//               conformance->getType()->getCanonicalType()->getAnyNominal()->getNameStr().str().c_str(),
+//               conformance->getProtocol()->getNameStr().str().c_str(), conformance->getState(),
+//               conformance->getProtocol()->getInheritedProtocols().size());
+      if (conformance->isComplete()) {
+        if (auto *normal = dyn_cast<NormalProtocolConformance>(conformance))
+          SGM.getWitnessTable(normal);
       }
     }
   }

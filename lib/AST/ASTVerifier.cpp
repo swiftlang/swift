@@ -2609,7 +2609,8 @@ public:
       }
 
       auto proto = conformance->getProtocol();
-      if (normal->getDeclContext() != conformingDC) {
+      if (normal->getDeclContext() != conformingDC &&
+          !isa<ExtensionDecl>(conformingDC)) {
         Out << "AST verification error: conformance of "
             << nominal->getName().str() << " to protocol "
             << proto->getName().str() << " is in the wrong context.\n"

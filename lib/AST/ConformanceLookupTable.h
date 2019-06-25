@@ -311,6 +311,11 @@ class ConformanceLookupTable {
   llvm::MapVector<DeclContext *, SmallVector<ConformanceEntry *, 4>>
     AllConformances;
 
+  /// Tracks notionals that have an implied conformance from inheriting protocol extension
+  /// Used to know notionals that need to refresh their conformances and which witnesses to emit.
+  llvm::DenseMap<const ExtensionDecl *, llvm::DenseMap<NominalTypeDecl *,
+    llvm::DenseMap<ProtocolDecl *, bool>>> NotionalConformancesFromExtension;
+
   /// The complete set of diagnostics about erroneously superseded
   /// protocol conformances.
   llvm::SmallDenseMap<DeclContext *, std::vector<ConformanceEntry *> >
@@ -329,8 +334,12 @@ class ConformanceLookupTable {
 
   /// Add the protocols from the given list.
   void addInheritedProtocols(
+                         NominalTypeDecl *nominal,
                          llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
-                         ConformanceSource source);
+                         ConformanceSource source, int depth = 0);
+
+  void addWitnessRequirement(NominalTypeDecl *nominal, ProtocolDecl *proto,
+                             ExtensionDecl *ext);
 
   /// Expand the implied conformances for the given DeclContext.
   void expandImpliedConformances(NominalTypeDecl *nominal, DeclContext *dc);
@@ -417,6 +426,8 @@ public:
   /// Destroy the conformance table.
   void destroy();
 
+  void invalidate();
+
   /// Add a synthesized conformance to the lookup table.
   void addSynthesizedConformance(NominalTypeDecl *nominal,
                                  ProtocolDecl *protocol);
@@ -443,6 +454,10 @@ public:
                           SmallVectorImpl<ProtocolDecl *> *protocols,
                           SmallVectorImpl<ProtocolConformance *> *conformances,
                           SmallVectorImpl<ConformanceDiagnostic> *diagnostics);
+
+  /// Add conformances implied by an inheriting protocol extension
+  void addExtendedConformances(const ExtensionDecl *ext,
+                              SmallVectorImpl<ProtocolConformance *> &conformances);
 
   /// Retrieve the complete set of protocols to which this nominal
   /// type conforms.

@@ -1267,9 +1267,9 @@ ProtocolConformance::getInheritedConformance(ProtocolDecl *protocol) const {
 }
 
 #pragma mark Protocol conformance lookup
-void NominalTypeDecl::prepareConformanceTable() const {
+ConformanceLookupTable *NominalTypeDecl::prepareConformanceTable() const {
   if (ConformanceTable)
-    return;
+    return ConformanceTable;
 
   auto mutableThis = const_cast<NominalTypeDecl *>(this);
   ASTContext &ctx = getASTContext();
@@ -1282,7 +1282,7 @@ void NominalTypeDecl::prepareConformanceTable() const {
   if (file->getKind() != FileUnitKind::Source &&
       file->getKind() != FileUnitKind::ClangModule &&
       file->getKind() != FileUnitKind::DWARFModule) {
-    return;
+    return ConformanceTable;
   }
 
   SmallPtrSet<ProtocolDecl *, 2> protocols;
@@ -1316,6 +1316,8 @@ void NominalTypeDecl::prepareConformanceTable() const {
       addSynthesized(KnownProtocolKind::RawRepresentable);
     }
   }
+
+  return ConformanceTable;
 }
 
 bool NominalTypeDecl::lookupConformance(
@@ -1400,7 +1402,7 @@ DeclContext::getLocalProtocols(
 SmallVector<ProtocolConformance *, 2>
 DeclContext::getLocalConformances(
   ConformanceLookupKind lookupKind,
-  SmallVectorImpl<ConformanceDiagnostic> *diagnostics) const
+  SmallVectorImpl<ConformanceDiagnostic> *diagnostics, bool addExtended) const
 {
   SmallVector<ProtocolConformance *, 2> result;
 
@@ -1412,8 +1414,9 @@ DeclContext::getLocalConformances(
   // Protocols only have self-conformances.
   if (auto protocol = dyn_cast<ProtocolDecl>(nominal)) {
     if (protocol->requiresSelfConformanceWitnessTable())
-      return { protocol->getASTContext().getSelfConformance(protocol) };
-    return { };
+      result.push_back(protocol->getASTContext().getSelfConformance(protocol));
+    if (!addExtended)
+      return result;
   }
 
   // Update to record all potential conformances.
@@ -1425,6 +1428,11 @@ DeclContext::getLocalConformances(
     nullptr,
     &result,
     diagnostics);
+
+  if (addExtended)
+    if (auto ext = dyn_cast_or_null<ExtensionDecl>(this))
+      if (auto proto = ext->getExtendedProtocolDecl())
+        proto->prepareConformanceTable()->addExtendedConformances(ext, result);
 
   return result;
 }

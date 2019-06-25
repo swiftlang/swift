@@ -951,7 +951,7 @@ enum Foo : Int, ReallyRaw {
 protocol BadProto1 { }
 protocol BadProto2 { }
 
-extension BadProto1 : BadProto2 { } // expected-error{{extension of protocol 'BadProto1' cannot have an inheritance clause}}
+extension BadProto1 : BadProto2 { } // now possible
 
 extension BadProto2 {
   struct S { } // expected-error{{type 'S' cannot be nested in protocol extension of 'BadProto2'}}
