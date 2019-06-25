@@ -750,3 +750,26 @@ func test_generic_subscript_with_missing_arg() {
     _ = s[0] // expected-error {{generic parameter 'U' could not be inferred}}
   }
 }
+
+// rdar://problem/51413254
+
+infix operator ==>
+
+struct Key {
+  init(_ key: String) {}
+}
+
+func ==> (lhs: Any, rhs: Key) throws -> Any {
+  return 0
+}
+
+func ==> <A>(lhs: Any, rhs: Key) throws -> A {
+  fatalError()
+}
+
+struct R_51413254 {
+  var str: String = ""
+  mutating func test(_ anyDict: Any) throws {
+    self.str = try anyDict ==> Key("a") // Ok
+  }
+}
