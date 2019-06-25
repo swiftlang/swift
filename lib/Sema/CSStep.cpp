@@ -313,8 +313,8 @@ StepResult ComponentStep::take(bool prevFailed) {
       // Let's drop `generic parameter '...'` part of the locator to
       // group all of the missing generic parameters related to the
       // same path together.
-      defaultableGenericParams[CS.getConstraintLocator(anchor, path.drop_back(),
-                                                       /*summaryFlags=*/0)]
+      defaultableGenericParams[CS.getConstraintLocator(anchor,
+                                                       path.drop_back())]
           .push_back(locator->getGenericParameter());
     }
 
