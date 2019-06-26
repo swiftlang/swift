@@ -3439,6 +3439,12 @@ public:
   /// Whether this closure consists of a single expression.
   bool hasSingleExpressionBody() const;
 
+  /// Retrieve the body for closure that has a single expression for
+  /// its body.
+  ///
+  /// Only valid when \c hasSingleExpressionBody() is true.
+  Expr *getSingleExpressionBody() const;
+
   static bool classof(const Expr *E) {
     return E->getKind() >= ExprKind::First_AbstractClosureExpr &&
            E->getKind() <= ExprKind::Last_AbstractClosureExpr;

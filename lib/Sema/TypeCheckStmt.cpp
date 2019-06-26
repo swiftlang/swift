@@ -442,6 +442,32 @@ public:
       return RS;
     }
 
+    // If the body consisted of a single return without a result
+    // 
+    //   func foo() -> Int {
+    //     return
+    //   }
+    // 
+    // in parseAbstractFunctionBody the return is given an empty, implicit tuple
+    // as its result
+    //
+    //   func foo() -> Int {
+    //     return ()
+    //   }
+    //
+    // Look for that case and diagnose it as missing return expression.
+    if (!ResultTy->isVoid() && TheFunc->hasSingleExpressionBody()) {
+      auto expr = TheFunc->getSingleExpressionBody();
+      if (expr->isImplicit()) {
+        if (auto tuple = dyn_cast<TupleExpr>(expr)) {
+          if (tuple->getNumElements() == 0 && !ResultTy->isVoid()) {
+            TC.diagnose(RS->getReturnLoc(), diag::return_expr_missing);
+            return nullptr;
+          }
+        }
+      }
+    }
+
     Expr *E = RS->getResult();
 
     // In an initializer, the only expression allowed is "nil", which indicates
