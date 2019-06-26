@@ -7,7 +7,7 @@
 // RUN: %target-run %t/main %t/%target-library-name(A) | %FileCheck %s
 
 
-// METADATA: @"$s1A8SomeEnumOMn" = constant <{ i32, i32, i32, i32, i32, i32, i32 }> <{{{.*}} i32 33554434, i32 0 }>
+// METADATA: @"$s1A8SomeEnumOMn" = {{.*}}constant <{ i32, i32, i32, i32, i32, i32, i32 }> <{{{.*}} i32 33554434, i32 0 }>
 
 import A
 
