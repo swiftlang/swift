@@ -4468,6 +4468,8 @@ WARNING(property_wrapper_delegateValue,none,
 WARNING(property_wrapper_value,none,
         "property wrapper's `value` property should be renamed to "
         "'wrappedValue'; use of 'value' is deprecated", ())
+ERROR(property_wrapper_projection_value_missing,none,
+      "could not find projection value property %0", (Identifier))
 
 //------------------------------------------------------------------------------
 // MARK: function builder diagnostics

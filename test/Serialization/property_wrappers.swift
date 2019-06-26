@@ -21,5 +21,8 @@ func useWrappers(hd: HasWrappers) {
   var mutableHD = hd
   mutableHD.x = 17
 
+  // Access the projected properties
+  let _: OtherWrapper<Int> = hd.$x
+
   mutableHD._x = SomeWrapper(initialValue: 42) // expected-error{{'_x' is inaccessible due to 'private' protection level}}
 }

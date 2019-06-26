@@ -2463,6 +2463,16 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
         addTypeRef(theAttr->getTypeLoc().getType()));
       return;
     }
+
+    case DAK_ProjectionValueProperty: {
+      auto abbrCode =
+          DeclTypeAbbrCodes[ProjectionValuePropertyDeclAttrLayout::Code];
+      auto theAttr = cast<ProjectionValuePropertyAttr>(DA);
+      ProjectionValuePropertyDeclAttrLayout::emitRecord(
+        Out, ScratchRecord, abbrCode, theAttr->isImplicit(),
+        addDeclBaseNameRef(theAttr->ProjectionPropertyName));
+      break;
+    }
   }
 }
 

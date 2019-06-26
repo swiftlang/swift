@@ -1331,6 +1331,9 @@ ERROR(objc_runtime_name_must_be_identifier,none,
 ERROR(attr_only_at_non_local_scope, none,
       "attribute '%0' can only be used in a non-local scope", (StringRef))
 
+ERROR(projection_value_property_not_identifier,none,
+      "@_projectionValueProperty name must be an identifier", ())
+
 // Access control
 ERROR(attr_access_expected_set,none,
       "expected 'set' as subject of '%0' modifier", (StringRef))

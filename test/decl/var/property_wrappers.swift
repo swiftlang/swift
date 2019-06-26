@@ -787,6 +787,20 @@ struct TestGenericStorageRef<T> {
   @InitialValueWrapperWithStorageRef var inner: Inner = Inner()
 }
 
+// Wiring up the _projectionValueProperty attribute.
+struct TestProjectionValuePropertyAttr {
+  @_projectionValueProperty(wrapperA)
+  @WrapperWithStorageRef var a: String
+
+  var wrapperA: Wrapper<String> {
+    Wrapper(wrappedValue: "blah")
+  }
+
+  @_projectionValueProperty(wrapperB) // expected-error{{could not find projection value property 'wrapperB'}}
+  @WrapperWithStorageRef var b: String
+}
+
+
 // ---------------------------------------------------------------------------
 // Misc. semantic issues
 // ---------------------------------------------------------------------------
