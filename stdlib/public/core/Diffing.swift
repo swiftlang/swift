@@ -301,6 +301,7 @@ fileprivate func myers<C,D>(
   let trace = descent(from: a, to: b)
 
   var changes = [CollectionDifference<C.Element>.Change]()
+  changes.reserveCapacity(trace.count)
 
   var x = a.count
   var y = b.count
