@@ -1048,35 +1048,6 @@ static std::string getDeclNameFromContext(DeclContext *dc,
   }
 }
 
-//
-// SE-0068 is "Expanding Swift Self to class members and value types"
-// Returns a Type if 'Self' is available in the current implementation.
-// Errs on the side of returning `Self` in most circumstances which is
-// subsequently validated in the various vistors in TypeCheckDecl.cpp.
-//
-// https://github.com/apple/swift-evolution/blob/master/proposals/0068-universal-self.md
-//
-static Type SelfAllowedBySE0068(TypeResolution resolution,
-                                TypeResolutionOptions options) {
-  auto dc = resolution.getDeclContext();
-  ASTContext &ctx = dc->getASTContext();
-  DeclContext *nominalDC = nullptr;
-  NominalTypeDecl *nominal = nullptr;
-  if ((nominalDC = dc->getInnermostTypeContext()) &&
-      (nominal = nominalDC->getSelfNominalTypeDecl())) {
-    assert(!isa<ProtocolDecl>(nominal) && "Cannot be a protocol");
-
-    if (!options.is(TypeResolverContext::GenericRequirement)) {
-      Type SelfType = nominal->getSelfInterfaceType();
-      if (nominalDC->getSelfClassDecl() != nullptr)
-        SelfType = DynamicSelfType::get(SelfType, ctx);
-      return resolution.mapTypeIntoContext(SelfType);
-    }
-  }
-
-  return Type();
-}
-
 /// Diagnose a reference to an unknown type.
 ///
 /// This routine diagnoses a reference to an unknown type, and
@@ -1104,18 +1075,12 @@ static Type diagnoseUnknownType(TypeResolution resolution,
           (nominal = nominalDC->getSelfNominalTypeDecl())) {
         // Attempt to refer to 'Self' within a non-protocol nominal
         // type. Fix this by replacing 'Self' with the nominal type name.
-        assert(!isa<ProtocolDecl>(nominal) && "Cannot be a protocol");
+        assert(isa<ClassDecl>(nominal) && "Must be a class");
 
         // Produce a Fix-It replacing 'Self' with the nominal type name.
         auto name = getDeclNameFromContext(dc, nominal);
         diags.diagnose(comp->getIdLoc(), diag::self_in_nominal, name)
           .fixItReplace(comp->getIdLoc(), name);
-
-        // If this is a requirement, replacing 'Self' with a valid type will
-        // result in additional unnecessary diagnostics (does not refer to a
-        // generic parameter or associated type). Simply return an error type.
-        if (options.is(TypeResolverContext::GenericRequirement))
-          return ErrorType::get(ctx);
 
         auto type = resolution.mapTypeIntoContext(
           dc->getInnermostTypeContext()->getSelfInterfaceType());
@@ -1256,6 +1221,41 @@ static Type diagnoseUnknownType(TypeResolution resolution,
   return ErrorType::get(ctx);
 }
 
+enum class SelfTypeKind {
+  StaticSelf,
+  DynamicSelf,
+  InvalidSelf
+};
+
+static SelfTypeKind getSelfTypeKind(DeclContext *dc,
+                                    TypeResolutionOptions options) {
+  auto *typeDC = dc->getInnermostTypeContext();
+
+  // For protocols, skip this code path and find the 'Self' generic parameter.
+  if (typeDC->getSelfProtocolDecl())
+    return SelfTypeKind::InvalidSelf;
+
+  // In enums and structs, 'Self' is just a shorthand for the nominal type,
+  // and can be used anywhere.
+  if (!typeDC->getSelfClassDecl())
+    return SelfTypeKind::StaticSelf;
+
+  // In local functions inside classes, 'Self' is the DynamicSelfType and can
+  // be used anywhere.
+  if (dc->isLocalContext())
+    return SelfTypeKind::DynamicSelf;
+
+  // In class methods, 'Self' is the DynamicSelfType and can only appear in
+  // the return type.
+  switch (options.getBaseContext()) {
+  case TypeResolverContext::FunctionResult:
+  case TypeResolverContext::PatternBindingDecl:
+    return SelfTypeKind::DynamicSelf;
+  default:
+    return SelfTypeKind::InvalidSelf;
+  }
+}
+
 /// Resolve the given identifier type representation as an unqualified type,
 /// returning the type it references.
 ///
@@ -1282,30 +1282,28 @@ resolveTopLevelIdentTypeComponent(TypeResolution resolution,
   // Resolve the first component, which is the only one that requires
   // unqualified name lookup.
   auto DC = resolution.getDeclContext();
+  auto id = comp->getIdentifier();
 
   // Dynamic 'Self' in the result type of a function body.
-  if (comp->getIdentifier() == ctx.Id_Self) {
-    switch (options.getBaseContext()) {
-    case TypeResolverContext::FunctionResult: {
-      if (auto *typeDC = DC->getInnermostTypeContext()) {
-        // FIXME: The passed-in TypeRepr should get 'typechecked' as well.
-        // The issue is though that ComponentIdentTypeRepr only accepts a ValueDecl
-        // while the 'Self' type is more than just a reference to a TypeDecl.
-        auto selfType = resolution.mapTypeIntoContext(
-          typeDC->getSelfInterfaceType());
-        if (!typeDC->getSelfClassDecl())
-          return selfType;
-        return DynamicSelfType::get(selfType, ctx);
-      }
+  if (id == ctx.Id_Self) {
+    if (auto *typeDC = DC->getInnermostTypeContext()) {
+      // FIXME: The passed-in TypeRepr should get 'typechecked' as well.
+      // The issue is though that ComponentIdentTypeRepr only accepts a ValueDecl
+      // while the 'Self' type is more than just a reference to a TypeDecl.
+      auto selfType = resolution.mapTypeIntoContext(
+        typeDC->getSelfInterfaceType());
 
-      break;
-    }
-    default:
-      break;
+      // Check if we can reference Self here, and if so, what kind of Self it is.
+      switch (getSelfTypeKind(DC, options)) {
+      case SelfTypeKind::StaticSelf:
+        return selfType;
+      case SelfTypeKind::DynamicSelf:
+        return DynamicSelfType::get(selfType, ctx);
+      case SelfTypeKind::InvalidSelf:
+        break;
+      }
     }
   }
-
-  auto id = comp->getIdentifier();
 
   NameLookupOptions lookupOptions = defaultUnqualifiedLookupOptions;
   if (options.contains(TypeResolutionFlags::KnownNonCascadingDependency))
@@ -1374,10 +1372,6 @@ resolveTopLevelIdentTypeComponent(TypeResolution resolution,
     // source, bail out.
     if (options.contains(TypeResolutionFlags::SilenceErrors))
       return ErrorType::get(ctx);
-
-    if (id == ctx.Id_Self)
-      if (auto SelfType = SelfAllowedBySE0068(resolution, options))
-        return SelfType;
 
     return diagnoseUnknownType(resolution, nullptr, SourceRange(), comp,
                                options, lookupOptions);
