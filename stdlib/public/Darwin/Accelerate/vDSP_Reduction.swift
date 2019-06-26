@@ -20,7 +20,6 @@ extension vDSP {
     /// - Parameter vector: The input vector.
     /// - Returns: The maximum value in `vector`.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func maximum<U>(_ vector: U) -> Float
         where
         U: AccelerateBuffer,
@@ -43,7 +42,6 @@ extension vDSP {
     /// - Parameter vector: The input vector.
     /// - Returns: The maximum value in `vector`.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func maximum<U>(_ vector: U) -> Double
         where
         U: AccelerateBuffer,
@@ -68,7 +66,6 @@ extension vDSP {
     /// - Parameter vector: The input vector.
     /// - Returns: The maximum magnitude in `vector`.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func maximumMagnitude<U>(_ vector: U) -> Float
         where
         U: AccelerateBuffer,
@@ -91,7 +88,6 @@ extension vDSP {
     /// - Parameter vector: The input vector.
     /// - Returns: The maximum magnitude in `vector`.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func maximumMagnitude<U>(_ vector: U) -> Double
         where
         U: AccelerateBuffer,
@@ -116,7 +112,6 @@ extension vDSP {
     /// - Parameter vector: The input vector.
     /// - Returns: The minimum value in `vector`.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func minimum<U>(_ vector: U) -> Float
         where
         U: AccelerateBuffer,
@@ -139,7 +134,6 @@ extension vDSP {
     /// - Parameter vector: The input vector.
     /// - Returns: The minimum value in `vector`.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func minimum<U>(_ vector: U) -> Double
         where
         U: AccelerateBuffer,
@@ -164,7 +158,6 @@ extension vDSP {
     /// - Parameter vector: The input vector.
     /// - Returns: The sum of values in `vector`.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func sum<U>(_ vector: U) -> Float
         where
         U: AccelerateBuffer,
@@ -187,7 +180,6 @@ extension vDSP {
     /// - Parameter vector: The input vector.
     /// - Returns: The sum of values in `vector`.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func sum<U>(_ vector: U) -> Double
         where
         U: AccelerateBuffer,
@@ -210,7 +202,6 @@ extension vDSP {
     /// - Parameter vector: The input vector.
     /// - Returns: The sum of squares in `vector`.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func sumOfSquares<U>(_ vector: U) -> Float
         where
         U: AccelerateBuffer,
@@ -233,7 +224,6 @@ extension vDSP {
     /// - Parameter vector: The input vector.
     /// - Returns: The sum of squares in `vector`.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func sumOfSquares<U>(_ vector: U) -> Double
         where
         U: AccelerateBuffer,
@@ -256,7 +246,6 @@ extension vDSP {
     /// - Parameter vector: The input vector.
     /// - Returns: The sum of values and the sum of squares in `vector`.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func sumAndSumOfSquares<U>(_ vector: U) -> (elementsSum: Float, squaresSum: Float)
         where
         U: AccelerateBuffer,
@@ -281,7 +270,6 @@ extension vDSP {
     /// - Parameter vector: The input vector.
     /// - Returns: The sum of values and the sum of squares in `vector`.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func sumAndSumOfSquares<U>(_ vector: U) -> (elementsSum: Double, squaresSum: Double)
         where
         U: AccelerateBuffer,
@@ -306,7 +294,6 @@ extension vDSP {
     /// - Parameter vector: The input vector.
     /// - Returns: The sum of magnitudes in `vector`.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func sumOfMagnitudes<U>(_ vector: U) -> Float
         where
         U: AccelerateBuffer,
@@ -329,7 +316,6 @@ extension vDSP {
     /// - Parameter vector: The input vector.
     /// - Returns: The sum of magnitudes in `vector`.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func sumOfMagnitudes<U>(_ vector: U) -> Double
         where
         U: AccelerateBuffer,
@@ -358,7 +344,6 @@ extension vDSP {
     /// - Parameter vector: The input vector.
     /// - Returns: A tuple containing the maximum value and its index.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func indexOfMaximum<U>(_ vector: U) -> (UInt, Float)
         where
         U: AccelerateBuffer,
@@ -383,7 +368,6 @@ extension vDSP {
     /// - Parameter vector: The input vector.
     /// - Returns: A tuple containing the maximum value and its index.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func indexOfMaximum<U>(_ vector: U) -> (UInt, Double)
         where
         U: AccelerateBuffer,
@@ -410,7 +394,6 @@ extension vDSP {
     /// - Parameter vector: The input vector.
     /// - Returns: A tuple containing the maximum magnitude and its index.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func indexOfMaximumMagnitude<U>(_ vector: U) -> (UInt, Float)
         where
         U: AccelerateBuffer,
@@ -435,7 +418,6 @@ extension vDSP {
     /// - Parameter vector: The input vector.
     /// - Returns: A tuple containing the maximum magnitude and its index.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func indexOfMaximumMagnitude<U>(_ vector: U) -> (UInt, Double)
         where
         U: AccelerateBuffer,
@@ -462,7 +444,6 @@ extension vDSP {
     /// - Parameter vector: The input vector.
     /// - Returns: A tuple containing the minimum value and its index.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func indexOfMinimum<U>(_ vector: U) -> (UInt, Float)
         where
         U: AccelerateBuffer,
@@ -487,7 +468,6 @@ extension vDSP {
     /// - Parameter vector: The input vector.
     /// - Returns: A tuple containing the minimum value and its index.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func indexOfMinimum<U>(_ vector: U) -> (UInt, Double)
         where
         U: AccelerateBuffer,
@@ -517,7 +497,6 @@ extension vDSP {
     ///
     /// - Parameter vector: The input vector.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func meanSquare<U>(_ vector: U) -> Float
         where
         U: AccelerateBuffer,
@@ -539,7 +518,6 @@ extension vDSP {
     ///
     /// - Parameter vector: The input vector.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func meanSquare<U>(_ vector: U) -> Double
         where
         U: AccelerateBuffer,
@@ -563,7 +541,6 @@ extension vDSP {
     ///
     /// - Parameter vector: The input vector.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func meanMagnitude<U>(_ vector: U) -> Float
         where
         U: AccelerateBuffer,
@@ -585,7 +562,6 @@ extension vDSP {
     ///
     /// - Parameter vector: The input vector.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func meanMagnitude<U>(_ vector: U) -> Double
         where
         U: AccelerateBuffer,
@@ -610,7 +586,6 @@ extension vDSP {
     ///
     /// - Parameter vector: The input vector.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func mean<U>(_ vector: U) -> Float
         where
         U: AccelerateBuffer,
@@ -632,7 +607,6 @@ extension vDSP {
     ///
     /// - Parameter vector: The input vector.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func mean<U>(_ vector: U) -> Double
         where
         U: AccelerateBuffer,
@@ -656,7 +630,6 @@ extension vDSP {
     ///
     /// - Parameter vector: The input vector.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func rootMeanSquare<U>(_ vector: U) -> Float
         where
         U: AccelerateBuffer,
@@ -678,7 +651,6 @@ extension vDSP {
     ///
     /// - Parameter vector: The input vector.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func rootMeanSquare<U>(_ vector: U) -> Double
         where
         U: AccelerateBuffer,

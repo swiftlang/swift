@@ -24,7 +24,6 @@ extension vDSP {
     /// - Parameter splitComplex: Single-precision complex input vector.
     /// - Parameter result: Single-precision real output vector.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func phase<V>(_ splitComplex: DSPSplitComplex,
                                 result: inout V)
         where
@@ -47,7 +46,6 @@ extension vDSP {
     /// - Parameter splitComplex: Double-precision complex input vector.
     /// - Parameter result: Double-precision real output vector.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func phase<V>(_ splitComplex: DSPDoubleSplitComplex,
                                 result: inout V)
         where
@@ -76,7 +74,6 @@ extension vDSP {
     /// - Parameter source: Single-precision complex input vector.
     /// - Parameter destination: Single-precision real output vector.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func copy(_ source: DSPSplitComplex,
                             to destination: inout DSPSplitComplex,
                             count: Int) {
@@ -95,7 +92,6 @@ extension vDSP {
     /// - Parameter source: Double-precision complex input vector.
     /// - Parameter destination: Double-precision real output vector.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func copy(_ source: DSPDoubleSplitComplex,
                             to destination: inout DSPDoubleSplitComplex,
                             count: Int) {
@@ -120,7 +116,6 @@ extension vDSP {
     /// - Parameter splitComplex: the `A` in `C[n] = conj(A[n])`.
     /// - Parameter result: The `C` in `C[n] = conj(A[n])`.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func conjugate(_ splitComplex: DSPSplitComplex,
                                  count: Int,
                                  result: inout DSPSplitComplex) {
@@ -137,7 +132,6 @@ extension vDSP {
     /// - Parameter splitComplex: the `A` in `C[n] = conj(A[n])`.
     /// - Parameter result: The `C` in `C[n] = conj(A[n])`.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func conjugate(_ splitComplex: DSPDoubleSplitComplex,
                                  count: Int,
                                  result: inout DSPDoubleSplitComplex) {
@@ -162,7 +156,6 @@ extension vDSP {
     /// - Parameter vector: the `b` in `c[i] = a[i] / b[i]`.
     /// - Parameter result: The `c` in `c[i] = a[i] / b[i]`.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func divide<U>(_ splitComplex: DSPSplitComplex,
                                  by vector: U,
                                  result: inout DSPSplitComplex)
@@ -187,7 +180,6 @@ extension vDSP {
     /// - Parameter vector: the `b` in `c[i] = a[i] / b[i]`.
     /// - Parameter result: The `c` in `c[i] = a[i] / b[i]`.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func divide<U>(_ splitComplex: DSPDoubleSplitComplex,
                                  by vector: U,
                                  result: inout DSPDoubleSplitComplex)
@@ -212,7 +204,6 @@ extension vDSP {
     /// - Parameter vector: the `b` in `c[i] = a[i] * b[i]`.
     /// - Parameter result: The `c` in `c[i] = a[i] * b[i]`.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func multiply<U>(_ splitComplex: DSPSplitComplex,
                                    by vector: U,
                                    result: inout DSPSplitComplex)
@@ -237,7 +228,6 @@ extension vDSP {
     /// - Parameter vector: the `b` in `c[i] = a[i] * b[i]`.
     /// - Parameter result: The `c` in `c[i] = a[i] * b[i]`.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func multiply<U>(_ splitComplex: DSPDoubleSplitComplex,
                                    by vector: U,
                                    result: inout DSPDoubleSplitComplex)
@@ -264,7 +254,6 @@ extension vDSP {
     /// - Parameter useConjugate: Specifies whether to multiply the complex conjugates of `splitComplexA`.
     /// - Parameter result: The `c` in `c[i] = a[i] * b[i]` or `c[i] = conj(a[i]) * b[i]`.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func multiply(_ splitComplexA: DSPSplitComplex,
                                 by splitComplexB: DSPSplitComplex,
                                 count: Int,
@@ -293,7 +282,6 @@ extension vDSP {
     /// - Parameter useConjugate: Specifies whether to multiply the complex conjugates of `splitComplexA`.
     /// - Parameter result: The `c` in `c[i] = a[i] * b[i]` or `c[i] = conj(a[i]) * b[i]`.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func multiply(_ splitComplexA: DSPDoubleSplitComplex,
                                 by splitComplexB: DSPDoubleSplitComplex,
                                 count: Int,
@@ -321,7 +309,6 @@ extension vDSP {
     /// - Parameter count: The number of elements to process.
     /// - Parameter result: The `c` in `c[i] = a[i] + b[i]`.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func add(_ splitComplexA: DSPSplitComplex,
                            to splitComplexB: DSPSplitComplex,
                            count: Int,
@@ -345,7 +332,6 @@ extension vDSP {
     /// - Parameter count: The number of elements to process.
     /// - Parameter result: The `c` in `c[i] = a[i] + b[i]`.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func add(_ splitComplexA: DSPDoubleSplitComplex,
                            to splitComplexB: DSPDoubleSplitComplex,
                            count: Int,
@@ -369,7 +355,6 @@ extension vDSP {
     /// - Parameter count: The number of elements to process.
     /// - Parameter result: The `c` in `c[i] = a[i] / b[i]`.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func divide(_ splitComplexA: DSPSplitComplex,
                               by splitComplexB: DSPSplitComplex,
                               count: Int,
@@ -393,7 +378,6 @@ extension vDSP {
     /// - Parameter count: The number of elements to process.
     /// - Parameter result: The `c` in `c[i] = a[i] / b[i]`.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func divide(_ splitComplexA: DSPDoubleSplitComplex,
                               by splitComplexB: DSPDoubleSplitComplex,
                               count: Int,
@@ -417,7 +401,6 @@ extension vDSP {
     /// - Parameter count: The number of elements to process.
     /// - Parameter result: The `c` in `c[i] = a[i] - b[i]`.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func subtract(_ splitComplexB: DSPSplitComplex,
                                 from splitComplexA: DSPSplitComplex,
                                 count: Int,
@@ -441,7 +424,6 @@ extension vDSP {
     /// - Parameter count: The number of elements to process.
     /// - Parameter result: The `c` in `c[i] = a[i] - b[i]`.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func subtract(_ splitComplexB: DSPDoubleSplitComplex,
                                 from splitComplexA: DSPDoubleSplitComplex,
                                 count: Int,
@@ -469,7 +451,6 @@ extension vDSP {
     /// - Parameter vector: The input vector.
     /// - Parameter result: The output vector.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func absolute<V>(_ vector: DSPSplitComplex,
                                    result: inout V)
         where
@@ -493,7 +474,6 @@ extension vDSP {
     /// - Parameter vector: The input vector.
     /// - Parameter result: The output vector.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func absolute<V>(_ vector: DSPDoubleSplitComplex,
                                    result: inout V)
         where
@@ -522,7 +502,6 @@ extension vDSP {
     /// - Parameter splitComplex: Input values.
     /// - Parameter result: Output values.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func squareMagnitudes<V>(_ splitComplex: DSPSplitComplex,
                                            result: inout V)
         where
@@ -541,7 +520,6 @@ extension vDSP {
     }
     
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     /// Calculates the squared magnitude of each element in `vector`, writing the result to `result`; double-precision.
     ///
     /// - Parameter splitComplex: Input values.

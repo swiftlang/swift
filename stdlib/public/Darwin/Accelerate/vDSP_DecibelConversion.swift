@@ -19,7 +19,6 @@ extension vDSP {
     /// - Parameter zeroReference: Zero reference.
     /// - Returns: `power` converted to decibels.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func powerToDecibels<U>(_ power: U,
                                           zeroReference: Float) -> [Float]
         where
@@ -45,7 +44,6 @@ extension vDSP {
     /// - Parameter decibels: Destination vector.
     /// - Parameter zeroReference: Zero reference.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func convert<U, V>(power: U,
                                      toDecibels decibels: inout V,
                                      zeroReference: Float)
@@ -76,7 +74,6 @@ extension vDSP {
     /// - Parameter zeroReference: Zero reference.
     /// - Returns: `power` converted to decibels.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func powerToDecibels<U>(_ power: U,
                                           zeroReference: Double) -> [Double]
         where
@@ -102,7 +99,6 @@ extension vDSP {
     /// - Parameter decibels: Destination vector.
     /// - Parameter zeroReference: Zero reference.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func convert<U, V>(power: U,
                                      toDecibels decibels: inout V,
                                      zeroReference: Double)
@@ -133,7 +129,6 @@ extension vDSP {
     /// - Parameter zeroReference: Zero reference.
     /// - Returns: `amplitude` converted to decibels.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func amplitudeToDecibels<U>(_ amplitude: U,
                                               zeroReference: Float) -> [Float]
         where
@@ -159,7 +154,6 @@ extension vDSP {
     /// - Parameter decibels: Destination vector.
     /// - Parameter zeroReference: Zero reference.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func convert<U, V>(amplitude: U,
                                      toDecibels decibels: inout V,
                                      zeroReference: Float)
@@ -190,7 +184,6 @@ extension vDSP {
     /// - Parameter zeroReference: Zero reference.
     /// - Returns: `amplitude` converted to decibels.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func amplitudeToDecibels<U>(_ amplitude: U,
                                               zeroReference: Double) -> [Double]
         where
@@ -216,7 +209,6 @@ extension vDSP {
     /// - Parameter decibels: Destination vector.
     /// - Parameter zeroReference: Zero reference.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func convert<U, V>(amplitude: U,
                                      toDecibels decibels: inout V,
                                      zeroReference: Double)
