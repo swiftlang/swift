@@ -716,16 +716,6 @@ public:
     return None;
   }
 
-  /// Retrieve overload choices associated with given expression.
-  void getOverloadChoices(Expr *anchor,
-                          SmallVectorImpl<SelectedOverload> &overloads) const {
-    for (auto &e : overloadChoices) {
-      auto *locator = e.first;
-      if (locator->getAnchor() == anchor)
-        overloads.push_back(e.second);
-    }
-  }
-
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump() const LLVM_ATTRIBUTE_USED,
       "only for use within the debugger");
@@ -1926,6 +1916,11 @@ public:
     auto e = ExprWeights.find(expr);
     return e != ExprWeights.end() ? e->second.second : nullptr;
   }
+
+  /// Returns a locator describing the callee for a given expression. For
+  /// a function application, this is a locator describing the function expr.
+  /// For an unresolved dot/member, this is a locator to the member.
+  ConstraintLocator *getCalleeLocator(Expr *expr);
 
 public:
 
