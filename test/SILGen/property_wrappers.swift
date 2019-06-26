@@ -184,7 +184,7 @@ struct WrapperWithDidSetWillSet {
 struct WrapperWithStorageValue<T> {
   var value: T
 
-  var wrapperValue: Wrapper<T> {
+  var projectedValue: Wrapper<T> {
     return Wrapper(value: value)
   }
 }
@@ -193,7 +193,7 @@ struct UseWrapperWithStorageValue {
   // UseWrapperWithStorageValue._x.getter
   // CHECK-LABEL: sil hidden [transparent] [ossa] @$s17property_wrappers26UseWrapperWithStorageValueV2$xAA0D0VySiGvg : $@convention(method) (UseWrapperWithStorageValue) -> Wrapper<Int>
   // CHECK-NOT: return
-  // CHECK: function_ref @$s17property_wrappers23WrapperWithStorageValueV07wrapperF0AA0C0VyxGvg
+  // CHECK: function_ref @$s17property_wrappers23WrapperWithStorageValueV09projectedF0AA0C0VyxGvg
   @WrapperWithStorageValue(value: 17) var x: Int
 }
 

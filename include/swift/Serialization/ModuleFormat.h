@@ -1580,8 +1580,8 @@ namespace decls_block {
   using ClangImporterSynthesizedTypeDeclAttrLayout
     = BCRecordLayout<ClangImporterSynthesizedType_DECL_ATTR>;
   using PrivateImportDeclAttrLayout = BCRecordLayout<PrivateImport_DECL_ATTR>;
-  using ProjectionValuePropertyDeclAttrLayout = BCRecordLayout<
-      ProjectionValueProperty_DECL_ATTR,
+  using ProjectedValuePropertyDeclAttrLayout = BCRecordLayout<
+      ProjectedValueProperty_DECL_ATTR,
       BCFixed<1>,        // isImplicit
       IdentifierIDField  // name
   >;

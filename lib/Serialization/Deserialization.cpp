@@ -4231,14 +4231,14 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         break;
       }
 
-      case decls_block::ProjectionValueProperty_DECL_ATTR: {
+      case decls_block::ProjectedValueProperty_DECL_ATTR: {
         bool isImplicit;
         IdentifierID nameID;
-        serialization::decls_block::ProjectionValuePropertyDeclAttrLayout
+        serialization::decls_block::ProjectedValuePropertyDeclAttrLayout
             ::readRecord(scratch, isImplicit, nameID);
 
         auto name = MF.getIdentifier(nameID);
-        Attr = new (ctx) ProjectionValuePropertyAttr(
+        Attr = new (ctx) ProjectedValuePropertyAttr(
             name, SourceLoc(), SourceRange(), isImplicit);
         break;
       }

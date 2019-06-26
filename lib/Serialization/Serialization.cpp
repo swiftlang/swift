@@ -2464,14 +2464,14 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
       return;
     }
 
-    case DAK_ProjectionValueProperty: {
+    case DAK_ProjectedValueProperty: {
       auto abbrCode =
-          DeclTypeAbbrCodes[ProjectionValuePropertyDeclAttrLayout::Code];
-      auto theAttr = cast<ProjectionValuePropertyAttr>(DA);
-      ProjectionValuePropertyDeclAttrLayout::emitRecord(
+          DeclTypeAbbrCodes[ProjectedValuePropertyDeclAttrLayout::Code];
+      auto theAttr = cast<ProjectedValuePropertyAttr>(DA);
+      ProjectedValuePropertyDeclAttrLayout::emitRecord(
         Out, ScratchRecord, abbrCode, theAttr->isImplicit(),
         addDeclBaseNameRef(theAttr->ProjectionPropertyName));
-      break;
+      return;
     }
   }
 }
@@ -2864,6 +2864,72 @@ void Serializer::writeDecl(const Decl *D) {
       auto discriminator = value->getLocalDiscriminator();
       auto abbrCode = DeclTypeAbbrCodes[LocalDiscriminatorLayout::Code];
       LocalDiscriminatorLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                           discriminator);
+    }
+  }
+
+  void writeDiscriminatorsIfNeeded(const ValueDecl *value) {
+    using namespace decls_block;
+
+    auto *storage = dyn_cast<AbstractStorageDecl>(value);
+    auto access = value->getFormalAccess();
+    // Emit the private descriminator for private decls.
+    // FIXME: We shouldn't need to encode this for /all/ private decls.
+    // In theory we can follow the same rules as mangling and only include
+    // the outermost private context.
+    bool shouldEmitPrivateDescriminator =
+        access <= swift::AccessLevel::FilePrivate &&
+        !value->getDeclContext()->isLocalContext();
+
+    // Emit the the filename for private mapping for private decls and
+    // decls with private accessors if compiled with -enable-private-imports.
+    bool shouldEmitFilenameForPrivate =
+        S.M->arePrivateImportsEnabled() &&
+        !value->getDeclContext()->isLocalContext() &&
+        (access <= swift::AccessLevel::FilePrivate ||
+         (storage &&
+          storage->getFormalAccess() >= swift::AccessLevel::Internal &&
+          storage->hasPrivateAccessor()));
+
+    if (shouldEmitFilenameForPrivate || shouldEmitPrivateDescriminator) {
+      auto topLevelContext = value->getDeclContext()->getModuleScopeContext();
+      if (auto *enclosingFile = dyn_cast<FileUnit>(topLevelContext)) {
+        if (shouldEmitPrivateDescriminator) {
+          Identifier discriminator =
+              enclosingFile->getDiscriminatorForPrivateValue(value);
+          unsigned abbrCode =
+              S.DeclTypeAbbrCodes[PrivateDiscriminatorLayout::Code];
+          PrivateDiscriminatorLayout::emitRecord(
+              S.Out, S.ScratchRecord, abbrCode,
+              S.addDeclBaseNameRef(discriminator));
+        }
+        auto getFilename = [](FileUnit *enclosingFile,
+                              const ValueDecl *decl) -> StringRef {
+          if (auto *SF = dyn_cast<SourceFile>(enclosingFile)) {
+            return llvm::sys::path::filename(SF->getFilename());
+          } else if (auto *LF = dyn_cast<LoadedFile>(enclosingFile)) {
+            return LF->getFilenameForPrivateDecl(decl);
+          }
+          return StringRef();
+        };
+        if (shouldEmitFilenameForPrivate) {
+          auto filename = getFilename(enclosingFile, value);
+          if (!filename.empty()) {
+            auto filenameID = S.addFilename(filename);
+            FilenameForPrivateLayout::emitRecord(
+                S.Out, S.ScratchRecord,
+                S.DeclTypeAbbrCodes[FilenameForPrivateLayout::Code],
+                filenameID);
+          }
+        }
+      }
+    }
+
+    if (value->getDeclContext()->isLocalContext()) {
+      auto discriminator = value->getLocalDiscriminator();
+      auto abbrCode = S.DeclTypeAbbrCodes[LocalDiscriminatorLayout::Code];
+      LocalDiscriminatorLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+>>>>>>> db5440bdef... [SE-0258] Rename wrapperValue to projectedValue.
                                            discriminator);
     }
   }

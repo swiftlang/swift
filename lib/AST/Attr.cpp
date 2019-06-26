@@ -634,10 +634,10 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
-  case DAK_ProjectionValueProperty:
-    Printer.printAttrName("@_projectionValueProperty");
+  case DAK_ProjectedValueProperty:
+    Printer.printAttrName("@_projectedValueProperty");
     Printer << "(";
-    Printer << cast<ProjectionValuePropertyAttr>(this)->ProjectionPropertyName;
+    Printer << cast<ProjectedValuePropertyAttr>(this)->ProjectionPropertyName;
     Printer << ")";
     break;
 
@@ -769,8 +769,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "_clangImporterSynthesizedType";
   case DAK_Custom:
     return "<<custom>>";
-  case DAK_ProjectionValueProperty:
-    return "_projectionValueProperty";
+  case DAK_ProjectedValueProperty:
+    return "_projectedValueProperty";
   }
   llvm_unreachable("bad DeclAttrKind");
 }

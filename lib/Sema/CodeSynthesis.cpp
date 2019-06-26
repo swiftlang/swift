@@ -563,7 +563,7 @@ namespace {
     /// through the 'value' property.
     Wrapper,
     /// We're referencing the backing property for a property with a wrapper
-    /// through the 'wrapperValue' property.
+    /// through the 'projectedValue' property.
     WrapperStorage,
   };
 } // end anonymous namespace
@@ -637,7 +637,7 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
     auto var =
       cast<VarDecl>(accessor->getStorage())->getOriginalWrappedProperty();
     storage = var->getPropertyWrapperBackingProperty();
-    underlyingVars.push_back( var->getAttachedPropertyWrapperTypeInfo(0).wrapperValueVar);
+    underlyingVars.push_back( var->getAttachedPropertyWrapperTypeInfo(0).projectedValueVar);
     semantics = AccessSemantics::DirectToStorage;
     selfAccessKind = SelfAccessorKind::Peer;
     break;
@@ -1484,13 +1484,13 @@ void swift::completeLazyVarImplementation(VarDecl *VD) {
 }
 
 /// Synthesize a computed property `$foo` for a property with an attached
-/// wrapper that has a `wrapperValue` property.
+/// wrapper that has a `projectedValue` property.
 static VarDecl *synthesizePropertyWrapperStorageWrapperProperty(
     ASTContext &ctx, VarDecl *var, Type wrapperType,
     VarDecl *wrapperVar) {
-  // If the original property has a @_projectionValueProperty attribute, use
+  // If the original property has a @_projectedValueProperty attribute, use
   // that to find the storage wrapper property.
-  if (auto attr = var->getAttrs().getAttribute<ProjectionValuePropertyAttr>()){
+  if (auto attr = var->getAttrs().getAttribute<ProjectedValuePropertyAttr>()){
     SmallVector<ValueDecl *, 2> declsFound;
     auto projectionName = attr->ProjectionPropertyName;
     auto dc = var->getDeclContext();
@@ -1570,7 +1570,7 @@ static VarDecl *synthesizePropertyWrapperStorageWrapperProperty(
   addExpectedOpaqueAccessorsToStorage(property, ctx);
 
   var->getAttrs().add(
-      new (ctx) ProjectionValuePropertyAttr(name, SourceLoc(), SourceRange(),
+      new (ctx) ProjectedValuePropertyAttr(name, SourceLoc(), SourceRange(),
                                             /*Implicit=*/true));
   return property;
 }
@@ -1705,12 +1705,12 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
     pbd->setInitializerChecked(0);
   }
 
-  // If there is a storage wrapper property (wrapperValue) in the wrapper,
+  // If there is a projection property (projectedValue) in the wrapper,
   // synthesize a computed property for '$foo'.
   VarDecl *storageVar = nullptr;
-  if (wrapperInfo.wrapperValueVar) {
+  if (wrapperInfo.projectedValueVar) {
     storageVar = synthesizePropertyWrapperStorageWrapperProperty(
-        ctx, var, storageType, wrapperInfo.wrapperValueVar);
+        ctx, var, storageInterfaceType, wrapperInfo.projectedValueVar);
   }
 
   // Get the property wrapper information.

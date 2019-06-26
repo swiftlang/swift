@@ -4464,7 +4464,10 @@ ERROR(property_wrapper_type_not_usable_from_inline,none,
       (bool, bool))
 WARNING(property_wrapper_delegateValue,none,
         "property wrapper's `delegateValue` property should be renamed to "
-        "'wrapperValue'; use of 'delegateValue' is deprecated", ())
+        "'projectedValue'; use of 'delegateValue' is deprecated", ())
+WARNING(property_wrapper_wrapperValue,none,
+        "property wrapper's `wrapperValue` property should be renamed to "
+        "'projectedValue'; use of 'wrapperValue' is deprecated", ())
 WARNING(property_wrapper_value,none,
         "property wrapper's `value` property should be renamed to "
         "'wrappedValue'; use of 'value' is deprecated", ())
