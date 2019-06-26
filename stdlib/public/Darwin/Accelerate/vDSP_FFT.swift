@@ -20,7 +20,6 @@
 extension vDSP {
     
     /// An enumeration that defines the size of the FFT decomposition.
-    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public enum Radix {
         case radix2
         case radix3
@@ -39,7 +38,6 @@ extension vDSP {
     }
     
     /// A class that provides forward and inverse FFT on `DSPSplitComplex` or `DSPDoubleSplitComplex` structure.
-    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public class FFT<T: vDSP_FourierTransformable> {
         
         let log2n: vDSP_Length
@@ -113,7 +111,6 @@ extension vDSP {
     // MARK: 2D FFT
     
     /// A class that provides forward and inverse 2D FFT on `DSPSplitComplex` or `DSPDoubleSplitComplex` structure.
-    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public class FFT2D<T: vDSP_FourierTransformable>: FFT<T> {
         
         let width: Int
@@ -123,7 +120,6 @@ extension vDSP {
         ///
         /// - Parameter width: The width of the matrix to be transformed.
         /// - Parameter height: The width of the matrix to be transformed.
-        @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
         required public init?(width: Int,
                               height: Int,
                               ofType: T.Type) {

@@ -18,7 +18,6 @@ extension vDSP {
     /// - Parameter splitComplexVector: Source vector.
     /// - Parameter interleavedComplexVector: Destination vector.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func convert(splitComplexVector: DSPSplitComplex,
                                toInterleavedComplexVector interleavedComplexVector: inout [DSPComplex]) {
         
@@ -34,7 +33,6 @@ extension vDSP {
     /// - Parameter interleavedComplexVector: Source vector.
     /// - Parameter splitComplexVector: Destination vector.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func convert(interleavedComplexVector: [DSPComplex],
                                toSplitComplexVector splitComplexVector: inout DSPSplitComplex) {
         
@@ -48,7 +46,6 @@ extension vDSP {
     /// - Parameter splitComplexVector: Source vector.
     /// - Parameter interleavedComplexVector: Destination vector.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func convert(splitComplexVector: DSPDoubleSplitComplex,
                                toInterleavedComplexVector interleavedComplexVector: inout [DSPDoubleComplex]) {
         
@@ -64,7 +61,6 @@ extension vDSP {
     /// - Parameter interleavedComplexVector: Source vector.
     /// - Parameter splitComplexVector: Destination vector.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func convert(interleavedComplexVector: [DSPDoubleComplex],
                                toSplitComplexVector splitComplexVector: inout DSPDoubleSplitComplex) {
         

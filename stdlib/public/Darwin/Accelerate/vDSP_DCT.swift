@@ -14,7 +14,6 @@
 extension vDSP {
     
     /// An enum that specifies which DCT variant to perform.
-    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public enum DCTTransformType: CaseIterable {
         case II
         case III
@@ -33,7 +32,6 @@ extension vDSP {
     }
     
      /// A class that provides single-precision discrete cosine transform.
-    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public class DCT {
         
         fileprivate let dctSetup: vDSP_DFT_Setup
@@ -60,7 +58,6 @@ extension vDSP {
         ///
         /// - Parameter input: Real input vector.
         /// - Returns: Real output vector.
-        @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
         public func transform<U>(_ vector: U) -> [Float]
             where
             U: AccelerateBuffer,
@@ -82,7 +79,6 @@ extension vDSP {
         ///
         /// - Parameter input: Real input vector.
         /// - Parameter output: Real output vector.
-        @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
         public func transform<U, V>(_ vector: U, result: inout V)
             where
             U: AccelerateBuffer,
@@ -130,7 +126,6 @@ fileprivate protocol vDSP_DCTFunctions {
 @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension vDSP.VectorizableFloat: vDSP_DCTFunctions {
     
-    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     fileprivate static func makeDCTSetup(previous: vDSP.DCT? = nil,
                                     count: Int,
                                     transformType: vDSP.DCTTransformType) -> OpaquePointer? {
@@ -140,7 +135,6 @@ extension vDSP.VectorizableFloat: vDSP_DCTFunctions {
                                     transformType.dctType)
     }
     
-    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     fileprivate static func transform<U, V>(dctSetup: OpaquePointer,
                                        source: U,
                                        destination: inout V)

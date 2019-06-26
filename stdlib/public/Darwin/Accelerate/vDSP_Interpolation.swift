@@ -19,7 +19,6 @@ extension vDSP {
     /// - Parameter vectorB: The `B` in `D[n] = A[n] + C * (B[n] - A[n])`.
     /// - Parameter interpolationConstant: The `C` in `D[n] = A[n] + C * (B[n] - A[n])`.
     /// - Returns: The `D` in `D[n] = A[n] + C * (B[n] - A[n])`.
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     @inlinable
     public static func linearInterpolate<T, U>(_ vectorA: T,
                                                _ vectorB: U,
@@ -49,7 +48,6 @@ extension vDSP {
     /// - Parameter vectorB: The `B` in `D[n] = A[n] + C * (B[n] - A[n])`.
     /// - Parameter interpolationConstant: The `C` in `D[n] = A[n] + C * (B[n] - A[n])`.
     /// - Parameter result: The `D` in `D[n] = A[n] + C * (B[n] - A[n])`.
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     @inlinable
     public static func linearInterpolate<T, U, V>(_ vectorA: T,
                                                   _ vectorB: U,
@@ -85,7 +83,6 @@ extension vDSP {
     /// - Parameter vectorB: The `B` in `D[n] = A[n] + C * (B[n] - A[n])`.
     /// - Parameter interpolationConstant: The `C` in `D[n] = A[n] + C * (B[n] - A[n])`.
     /// - Returns: The `D` in `D[n] = A[n] + C * (B[n] - A[n])`.
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     @inlinable
     public static func linearInterpolate<T, U>(_ vectorA: T,
                                                _ vectorB: U,
@@ -115,7 +112,6 @@ extension vDSP {
     /// - Parameter vectorB: The `B` in `D[n] = A[n] + C * (B[n] - A[n])`.
     /// - Parameter interpolationConstant: The `C` in `D[n] = A[n] + C * (B[n] - A[n])`.
     /// - Parameter result: The `D` in `D[n] = A[n] + C * (B[n] - A[n])`.
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     @inlinable
     public static func linearInterpolate<T, U, V>(_ vectorA: T,
                                                   _ vectorB: U,
@@ -161,7 +157,6 @@ extension vDSP {
     /// - Parameter vector: Input values.
     /// - Parameter controlVector: Vector that controls interpolation.
     /// - Returns: Output values.
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     @inlinable
     public static func linearInterpolate<T, U>(elementsOf vector: T,
                                                using controlVector: U) -> [Float]
@@ -199,7 +194,6 @@ extension vDSP {
     /// - Parameter vector: Input values.
     /// - Parameter controlVector: Vector that controls interpolation.
     /// - Parameter result: Output values.
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     @inlinable
     public static func linearInterpolate<T, U, V>(elementsOf vector: T,
                                                   using controlVector: U,
@@ -243,7 +237,6 @@ extension vDSP {
     /// - Parameter vector: Input values.
     /// - Parameter controlVector: Vector that controls interpolation.
     /// - Returns: Output values.
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     @inlinable
     public static func linearInterpolate<T, U>(elementsOf vector: T,
                                                using controlVector: U) -> [Double]
@@ -281,7 +274,6 @@ extension vDSP {
     /// - Parameter vector: Input values.
     /// - Parameter controlVector: Vector that controls interpolation.
     /// - Parameter result: Output values.
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     @inlinable
     public static func linearInterpolate<T, U, V>(elementsOf vector: T,
                                                   using controlVector: U,

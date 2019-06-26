@@ -21,7 +21,6 @@ extension vDSP {
     
     /// An enumeration that specifies whether to perform complex-to-complex or
     /// complex-to-real discrete Fourier transform.
-    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     // TODO: Should probably be @_frozen; check with Accelerate.
     public enum DFTTransformType {
         /// Specifies complex-to-complex discrete Fourier transform, forward
@@ -34,7 +33,6 @@ extension vDSP {
     }
     
     /// A class that provides single- and double-precision discrete Fourier transform.
-    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public class DFT <T: vDSP_FloatingPointDiscreteFourierTransformable> {
         fileprivate let dftSetup: vDSP_DFT_Setup
         

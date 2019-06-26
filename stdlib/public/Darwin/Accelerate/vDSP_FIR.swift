@@ -20,7 +20,6 @@ extension vDSP {
     /// - Parameter filter: Filter to use during the downsampling operation.
     /// - Returns: Single-precision output vector.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func downsample<T, U>(_ source: U,
                                         decimationFactor: Int,
                                         filter: T) -> [Float]
@@ -53,7 +52,6 @@ extension vDSP {
     /// - Parameter filter: Filter to use during the downsampling operation.
     /// - Parameter result: Single-precision output vector.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func downsample<T, U, V>(_ source: U,
                                            decimationFactor: Int,
                                            filter: T,
@@ -93,7 +91,6 @@ extension vDSP {
     /// - Parameter filter: Filter to use during the downsampling operation.
     /// - Returns: Double-precision output vector.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func downsample<T, U>(_ source: U,
                                         decimationFactor: Int,
                                         filter: T) -> [Double]
@@ -125,7 +122,6 @@ extension vDSP {
     /// - Parameter filter: Filter to use during the downsampling operation.
     /// - Parameter result: Double-precision output vector.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func downsample<T, U, V>(_ source: U,
                                            decimationFactor: Int,
                                            filter: T,
