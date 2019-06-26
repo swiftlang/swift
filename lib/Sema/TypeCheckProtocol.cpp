@@ -4113,18 +4113,17 @@ Optional<ProtocolConformanceRef> TypeChecker::conformsToProtocol(
     recordDependency();
   }
 
+  if (options.contains(ConformanceCheckFlags::SkipConditionalRequirements))
+    return lookupResult;
+
   auto condReqs = lookupResult->getConditionalRequirementsIfAvailable();
+  assert(condReqs &&
+         "unhandled recursion: missing conditional requirements when they're "
+         "required");
+
   // If we have a conditional requirements that
   // we need to check, do so now.
-  if (!condReqs) {
-    assert(
-        options.contains(
-            ConformanceCheckFlags::AllowUnavailableConditionalRequirements) &&
-        "unhandled recursion: missing conditional requirements when they're "
-        "required");
-  } else if (!condReqs->empty() &&
-             !options.contains(
-                 ConformanceCheckFlags::SkipConditionalRequirements)) {
+  if (!condReqs->empty()) {
     // Figure out the location of the conditional conformance.
     auto conformanceDC = lookupResult->getConcrete()->getDeclContext();
     SourceLoc noteLoc;

@@ -555,7 +555,9 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
       auto typeDecl =
         concrete->getTypeWitnessAndDecl(assocType, lazyResolver).second;
 
-      assert(typeDecl && "Missing type witness?");
+      // Circularity.
+      if (!typeDecl)
+        continue;
 
       auto memberType =
           substMemberTypeWithBase(dc->getParentModule(), typeDecl, type);

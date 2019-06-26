@@ -937,7 +937,7 @@ static void maybeDiagnoseBadConformanceRef(DeclContext *dc,
           parentTy, protocol, dc,
           (ConformanceCheckFlags::InExpression |
            ConformanceCheckFlags::SuppressDependencyTracking |
-           ConformanceCheckFlags::AllowUnavailableConditionalRequirements))) {
+           ConformanceCheckFlags::SkipConditionalRequirements))) {
     if (conformanceRef->isConcrete())
       conformance = conformanceRef->getConcrete();
   }
