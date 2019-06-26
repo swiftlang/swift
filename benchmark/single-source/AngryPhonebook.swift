@@ -15,72 +15,54 @@
 import TestsUtils
 import Foundation
 
+let t: [BenchmarkCategory] = [.validation, .api, .String]
+
 public let AngryPhonebook = [
   BenchmarkInfo(
-    name: "AngryPhonebook",
-    runFunction: run_AngryPhonebook,
-    tags: [.validation, .api, .String],
-    legacyFactor: 7),
+    name: "AngryPhonebook.Latin",
+    runFunction: { angryPhonebook($0, latin) },
+    tags: t,
+    setUpFunction: { blackHole(latin) }),
   BenchmarkInfo(
-    name: "AngryPhonebookCyrillic",
-    runFunction: run_AngryPhonebookCyrillic,
-    tags: [.validation, .api, .String]),
+    name: "AngryPhonebook.Armenian",
+    runFunction: { angryPhonebook($0, armenian) },
+    tags: t,
+    setUpFunction: { blackHole(armenian) }),
   BenchmarkInfo(
-    name: "AngryPhonebookArmenian",
-    runFunction: run_AngryPhonebookArmenian,
-    tags: [.validation, .api, .String])
+    name: "AngryPhonebook.Cyrillic",
+    runFunction: { angryPhonebook($0, cyrillic) },
+    tags: t,
+    setUpFunction: { blackHole(cyrillic) })
 ]
 
-let words = [
+// Workloads for various scripts. Always 20 names for 400 pairings.
+// To keep the performance of various scripts roughly comparable, aim for
+// a total length of approximately 120 characters.
+// E.g.: `latin.joined(separator: "").count == 118`
+
+let latin = [
   "James", "John", "Robert", "Michael", "William", "David", "Richard", "Joseph",
-  "Charles", "Thomas", "Christopher", "Daniel", "Matthew", "Donald", "Anthony",
-  "Paul", "Mark", "George", "Steven", "Kenneth", "Andrew", "Edward", "Brian",
-  "Joshua", "Kevin", "Ronald", "Timothy", "Jason", "Jeffrey", "Gary", "Ryan",
-  "Nicholas", "Eric", "Stephen", "Jacob", "Larry", "Frank"]
+  "Charles", "Thomas", "Jacob", "Daniel", "Matthew", "Donald", "Anthony",
+  "Paul", "Mark", "George", "Steven", "Kenneth"]
+
+let armenian: [String] = [
+  "Արմեն", "Աննա", "Հարութ", "Միքայել", "Մարիա", "Դավիթ", "Վարդան",
+  "Նարինե", "Տիգրան", "Տաթևիկ", "Թագուհի", "Թամարա", "Ազնաուր", "Գրիգոր",
+  "Կոմիտաս", "Հայկ", "Գառնիկ", "Վահրամ", "Վահագն", "Գևորգ"]
+
+let cyrillic: [String] = [
+  "Ульяна", "Аркадий", "Аня", "Даниил", "Дмитрий", "Эдуард", "Юрій", "Давид",
+  "Анна", "Дмитрий", "Евгений", "Борис", "Ксения", "Артур", "Аполлон",
+  "Соломон", "Николай", "Кристи", "Надежда", "Спартак"]
 
 @inline(never)
-public func run_AngryPhonebook(_ N: Int) {
+public func angryPhonebook(_ N: Int, _ names: [String]) {
+  assert(names.count == 20)
   // Permute the names.
   for _ in 1...N {
-    for firstname in words {
-      for lastname in words {
-        _ = (firstname.uppercased(), lastname.lowercased())
-      }
-    }
-  }
-}
-
-let cyrillicNames: [String] = [
-  "Александр", "Аркадий", "Аня", "Даниил", "Дмитрий", "Эдуард", "Юрій 🇺🇦", "Давид",
-  "Анна", "Дмитрий 🇺🇸", "Евгений", "👍🏼 Борис", "Владимир", "👍🏽 Артур", "Антон",
-  "Антон 👍🏻", "Надія 👍", "Алёна", "Алиса", "Елена 🇷🇺", "Елизавета 👍🏾", "👍🏿 Инна",
-  "Жанна 🇨🇦", "Ульяна", "Кристина", "Ксения", "👍🏿👍🏾👍🏽👍🏼👍🏻👍🇺🇦🇷🇺🇨🇦🇺🇸👨‍👩‍👧‍👦"]
-
-@inline(never)
-public func run_AngryPhonebookCyrillic(_ N: Int) {
-  // Permute the names.
-  for _ in 1...N {
-    for firstname in cyrillicNames {
-      for lastname in cyrillicNames {
-        _ = (firstname.uppercased(), lastname.lowercased())
-      }
-    }
-  }
-}
-
-let armenianNames: [String] = [
-  "Արմեն 🇦🇲", "Աննա", "Հարություն", "Միքայել", "Մարիա", "Դավիթ", "Վարդան", "Նարինե",
-  "Հռիփսիմե", "Տիգրան👍", "Տաթև", "Ադամ", "Ազատ", "Ազնաւուր🇨🇦", "Գրիգոր", "Անի",
-  "Լիլիթ👍🏽", "Հայկ👍🏼", "Անդրանիկ", "Գառնիկ 👨‍👩‍👧‍👦", "Վահրամ", "Վահագն👍🏿", "Գևորգ",
-  "Թագուհի 🇺🇸", "Թամարա👍🏻", "Արամ", "Արսեն", "Կոմիտաս", "👍🏿👍🏾👍🏽👍🏼👍🏻👍🇦🇲🇨🇦🇺🇸👨‍👩‍👧‍👦"]
-
-@inline(never)
-public func run_AngryPhonebookArmenian(_ N: Int) {
-  // Permute the names.
-  for _ in 1...N {
-    for firstname in armenianNames {
-      for lastname in armenianNames {
-        _ = (firstname.uppercased(), lastname.lowercased())
+    for firstname in names {
+      for lastname in names {
+        blackHole((firstname.uppercased(), lastname.lowercased()))
       }
     }
   }
