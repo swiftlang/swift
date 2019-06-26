@@ -16,7 +16,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension vDSP {
     
     /// An enumeration that defines the size of the FFT decomposition.
@@ -334,7 +334,7 @@ struct vDSP_FFTFunctions {
 }
 
 
-
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension DSPSplitComplex {
     
     /// Creates a new `DSPSplitComplex` structure from a real array not in even-odd split configuration.
@@ -357,6 +357,7 @@ extension DSPSplitComplex {
     }
 }
 
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension DSPDoubleSplitComplex {
     
     /// Creates a new `DSPDoubleSplitComplex` structure from a real array not in even-odd split configuration.
@@ -384,6 +385,7 @@ extension Array where Element == Float {
     ///
     /// - Parameter scale: A multiplier to apply during conversion.
     /// - Parameter count: The length of the required resulting array (typically half the count of either the real or imaginary parts of the `DSPSplitComplex`.
+    @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
     public init(fromSplitComplex splitComplex: DSPSplitComplex,
                 scale: Float,
                 count: Int) {
@@ -416,6 +418,7 @@ extension Array where Element == Double {
     ///
     /// - Parameter scale: A multiplier to apply during conversion.
     /// - Parameter count: The length of the required resulting array (typically half the count of either the real or imaginary parts of the `DSPSplitComplex`.
+    @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
     public init(fromSplitComplex splitComplex: DSPDoubleSplitComplex,
                 scale: Double,
                 count: Int) {
