@@ -233,22 +233,22 @@ extension vDSP {
     
 }
 
-@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 public protocol vDSP_FloatingPointBiquadFilterable: BinaryFloatingPoint {
     associatedtype BiquadFunctions: vDSP_BiquadFunctions where BiquadFunctions.Scalar == Self
 }
 
-@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension Float: vDSP_FloatingPointBiquadFilterable {
     public typealias BiquadFunctions = vDSP.VectorizableFloat
 }
 
-@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension Double: vDSP_FloatingPointBiquadFilterable {
     public typealias BiquadFunctions = vDSP.VectorizableDouble
 }
 
-@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 public protocol vDSP_BiquadFunctions {
     associatedtype Scalar
     
@@ -286,7 +286,7 @@ public protocol vDSP_BiquadFunctions {
 //
 //===----------------------------------------------------------------------===//
 
-@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension vDSP.VectorizableFloat: vDSP_BiquadFunctions {
     
     /// Returns a data structure that contains precalculated data for use by the cascaded biquad IIR filter function.
@@ -352,7 +352,7 @@ extension vDSP.VectorizableFloat: vDSP_BiquadFunctions {
     }
 }
 
-@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension vDSP.VectorizableDouble: vDSP_BiquadFunctions {
     
     /// Returns a data structure that contains precalculated data for use by the cascaded biquad IIR filter function.

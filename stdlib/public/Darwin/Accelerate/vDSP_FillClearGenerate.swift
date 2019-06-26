@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 /// Types that support vectorized window generation.
-@available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 public protocol vDSP_FloatingPointGeneratable: BinaryFloatingPoint {
 }
 extension Float: vDSP_FloatingPointGeneratable {}
