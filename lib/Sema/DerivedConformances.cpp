@@ -67,6 +67,10 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
     return canDeriveAdditiveArithmetic(Nominal, DC);
 
   // SWIFT_ENABLE_TENSORFLOW
+  if (*knownProtocol == KnownProtocolKind::PointwiseMultiplicative)
+    return canDerivePointwiseMultiplicative(Nominal, DC);
+
+  // SWIFT_ENABLE_TENSORFLOW
   if (*knownProtocol == KnownProtocolKind::ElementaryFunctions)
     return canDeriveElementaryFunctions(Nominal, DC);
 
@@ -253,6 +257,11 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
       return getRequirement(KnownProtocolKind::AdditiveArithmetic);
 
     // SWIFT_ENABLE_TENSORFLOW
+    // PointwiseMultiplicative.one
+    if (name.isSimpleName(ctx.Id_one))
+      return getRequirement(KnownProtocolKind::PointwiseMultiplicative);
+
+    // SWIFT_ENABLE_TENSORFLOW
     // KeyPathIterable.allKeyPaths
     if (name.isSimpleName(ctx.Id_allKeyPaths))
       return getRequirement(KnownProtocolKind::KeyPathIterable);
@@ -307,6 +316,14 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
       auto argumentNames = name.getArgumentNames();
       if (argumentNames.size() == 2)
         return getRequirement(KnownProtocolKind::AdditiveArithmetic);
+    }
+
+    // SWIFT_ENABLE_TENSORFLOW
+    // PointwiseMultiplicative.*
+    if (func->isOperator() && name.getBaseName() == "*") {
+      auto argumentNames = name.getArgumentNames();
+      if (argumentNames.size() == 2)
+        return getRequirement(KnownProtocolKind::PointwiseMultiplicative);
     }
 
     // SWIFT_ENABLE_TENSORFLOW
