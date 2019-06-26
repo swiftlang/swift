@@ -262,6 +262,11 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
       return getRequirement(KnownProtocolKind::PointwiseMultiplicative);
 
     // SWIFT_ENABLE_TENSORFLOW
+    // PointwiseMultiplicative.reciprocal
+    if (name.isSimpleName(ctx.Id_reciprocal))
+      return getRequirement(KnownProtocolKind::PointwiseMultiplicative);
+
+    // SWIFT_ENABLE_TENSORFLOW
     // KeyPathIterable.allKeyPaths
     if (name.isSimpleName(ctx.Id_allKeyPaths))
       return getRequirement(KnownProtocolKind::KeyPathIterable);

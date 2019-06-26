@@ -142,6 +142,7 @@ IDENTIFIER_(typeList)
 // AdditiveArithmetic, PointwiseMultiplicative, VectorProtocol
 IDENTIFIER(zero)
 IDENTIFIER(one)
+IDENTIFIER(reciprocal)
 IDENTIFIER(VectorSpaceScalar)
 IDENTIFIER(adding)
 IDENTIFIER(subtracting)

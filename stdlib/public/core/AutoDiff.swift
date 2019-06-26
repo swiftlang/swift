@@ -32,6 +32,12 @@ public protocol PointwiseMultiplicative : AdditiveArithmetic {
   /// `x .* .one == x` and `.one .* x == x`.
   static var one: Self { get }
 
+  /// The multiplicative inverse of self.
+  ///
+  /// For any value, `x .* x.reciprocal == .one` and
+  /// `x.reciprocal .* x == .one`.
+  var reciprocal: Self { get }
+
   /// Multiplies two values and produces their product.
   ///
   /// - Parameters:

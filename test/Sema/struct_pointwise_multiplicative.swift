@@ -4,9 +4,9 @@
 func testPointwiseMultiplicative<T : PointwiseMultiplicative>(
   _ x: inout T
 ) {
-  // Test `PointwiseMultiplicative` requirements: `one`, `*`.
+  // Test `PointwiseMultiplicative` requirements: `one`, `.*`.
   let one = T.one
-  x *= x * one
+  x .*= x .* one
 }
 
 struct Empty : PointwiseMultiplicative {}
@@ -15,94 +15,74 @@ func testEmpty() {
   testPointwiseMultiplicative(&empty)
 }
 
-struct Int2: PointwiseMultiplicative {
-  var a: Int
-  var b: Int
-}
-func testInt2() {
-  var int2 = Int2(a: 1, b: 1)
-  testPointwiseMultiplicative(&int2)
-}
-
 // Test generic type.
 struct Vector2<T : PointwiseMultiplicative>: PointwiseMultiplicative {
   var x: T
   var y: T
 }
 func testVector2() {
-  var vec2 = Vector2<Double>(x: 1, y: 1)
+  var vec2 = Vector2<Empty>(x: Empty(), y: Empty.one)
   testPointwiseMultiplicative(&vec2)
 }
 
 // Test nested type.
 struct Nested: PointwiseMultiplicative {
-  var int2: Int2
-  var int: Int
+  var empty: Empty
+  var vec2: Vector2<Empty>
 }
-func testNested(int2: Int2) {
-  var nested = Nested(int2: int2, int: 1)
+func testNested(vec2: Vector2<Empty>) {
+  var nested = Nested(empty: Empty(), vec2: vec2)
   testPointwiseMultiplicative(&nested)
-}
-
-// Test mixed type.
-// Note: `Numeric` refines `PointwiseMultiplicative`.
-struct Mixed: PointwiseMultiplicative {
-  var nested: Nested
-  var float: Float
-  var uint8: UInt8
-}
-func testMixed(nested: Nested) {
-  var mixed = Mixed(nested: nested, float: 1, uint8: 1)
-  testPointwiseMultiplicative(&mixed)
 }
 
 // Test type in generic context.
 struct A<T> {
   struct B<U, V> {
     struct GenericContextNested : PointwiseMultiplicative {
+      var empty: Empty
       var nested: Nested
-      var float: Float
-      var uint8: UInt8
     }
   }
 }
 func testGenericContext<T, U, V>(nested: Nested) -> A<T>.B<U, V>.GenericContextNested {
   var genericNested =
-    A<T>.B<U, V>.GenericContextNested(nested: nested, float: 1, uint8: 1)
+    A<T>.B<U, V>.GenericContextNested(empty: Empty(), nested: nested)
   testPointwiseMultiplicative(&genericNested)
   return genericNested
 }
 
 // Test extension.
 struct Extended {
-  var x: Int
+  var empty: Empty
 }
-extension Extended : Equatable, PointwiseMultiplicative {}
+extension Extended : Equatable, AdditiveArithmetic, PointwiseMultiplicative {}
 
 // Test extension of generic type.
 struct GenericExtended<T> {
   var x: T
 }
-extension GenericExtended : Equatable, PointwiseMultiplicative where T : PointwiseMultiplicative {}
+extension GenericExtended : Equatable, AdditiveArithmetic, PointwiseMultiplicative
+  where T : PointwiseMultiplicative {}
 
 // Test memberwise initializer synthesis.
 struct NoMemberwiseInitializer<T : PointwiseMultiplicative> : PointwiseMultiplicative {
   var value: T
   init(randomLabel value: T) { self.value = value }
 }
-struct NoMemberwiseInitializerCustomZero: PointwiseMultiplicative {
-  var x: Float
-  static var zero: Self { return NoMemberwiseInitializerCustomZero(0) }
-  init(_ x: Float) {
+struct NoMemberwiseInitializerCustomOne: PointwiseMultiplicative {
+  var x: Empty
+  static var one: Self { return NoMemberwiseInitializerCustomOne(Empty()) }
+  init(_ x: Empty) {
     self.x = x
   }
-} struct NoMemberwiseInitializerExtended<T> {
+}
+struct NoMemberwiseInitializerExtended<T> {
   var value: T
   init(_ value: T) {
     self.value = value
   }
 }
-extension NoMemberwiseInitializerExtended: Equatable, PointwiseMultiplicative
+extension NoMemberwiseInitializerExtended: Equatable, AdditiveArithmetic, PointwiseMultiplicative
   where T : PointwiseMultiplicative {}
 
 // Test derived conformances in disallowed contexts.

@@ -263,8 +263,8 @@ static ValueDecl *deriveMathOperator(DerivedConformance &derived,
   return operatorDecl;
 }
 
-// Synthesize body for a ring identity computed property getter.
-static void deriveBodyRingIdentityGetter(
+// Synthesize body for a ring property computed property getter.
+static void deriveBodyRingPropertyGetter(
     AbstractFunctionDecl *funcDecl, ProtocolDecl *proto, ValueDecl *reqDecl) {
   auto *parentDC = funcDecl->getParent();
   auto *nominal = parentDC->getSelfNominalTypeDecl();
@@ -280,37 +280,51 @@ static void deriveBodyRingIdentityGetter(
                                                   funcDecl, /*Implicit*/ true);
   auto *initExpr = new (C) ConstructorRefCallExpr(initDRE, nominalTypeExpr);
 
-  auto createMemberRingIdentityExpr = [&](VarDecl *member) -> Expr * {
+  auto createMemberRingPropertyExpr = [&](VarDecl *member) -> Expr * {
     auto memberType =
         parentDC->mapTypeIntoContext(member->getValueInterfaceType());
-    auto *memberTypeExpr = TypeExpr::createImplicit(memberType, C);
+    Expr *memberExpr = nullptr;
+    // If the property is static, create a type expression: `Member`.
+    if (reqDecl->isStatic()) {
+      memberExpr = TypeExpr::createImplicit(memberType, C);
+    }
+    // If the property is not static, create a member ref expression:
+    // `self.member`.
+    else {
+      auto *selfDecl = funcDecl->getImplicitSelfDecl();
+      auto *selfDRE =
+          new (C) DeclRefExpr(selfDecl, DeclNameLoc(), /*Implicit*/ true);
+      memberExpr =
+         new (C) MemberRefExpr(selfDRE, SourceLoc(), member, DeclNameLoc(),
+                               /*Implicit*/ true);
+    }
     auto module = nominal->getModuleContext();
     auto confRef = module->lookupConformance(memberType, proto);
     assert(confRef && "Member does not conform to ring protocol");
     // If conformance reference is not concrete, then concrete witness
-    // declaration for ring identity cannot be resolved. Return reference to
+    // declaration for ring property cannot be resolved. Return reference to
     // protocol requirement: this will be dynamically dispatched.
     if (!confRef->isConcrete()) {
-      return new (C) MemberRefExpr(memberTypeExpr, SourceLoc(), reqDecl,
+      return new (C) MemberRefExpr(memberExpr, SourceLoc(), reqDecl,
                                    DeclNameLoc(), /*Implicit*/ true);
     }
     // Otherwise, return reference to concrete witness declaration.
     auto conf = confRef->getConcrete();
     auto witnessDecl = conf->getWitnessDecl(reqDecl, C.getLazyResolver());
-    return new (C) MemberRefExpr(memberTypeExpr, SourceLoc(), witnessDecl,
+    return new (C) MemberRefExpr(memberExpr, SourceLoc(), witnessDecl,
                                  DeclNameLoc(), /*Implicit*/ true);
   };
 
-  // Create array of `member.<ring identity>` expressions.
-  llvm::SmallVector<Expr *, 2> memberIdExprs;
+  // Create array of `member.<ring property>` expressions.
+  llvm::SmallVector<Expr *, 2> memberPropExprs;
   llvm::SmallVector<Identifier, 2> memberNames;
   for (auto member : nominal->getStoredProperties()) {
-    memberIdExprs.push_back(createMemberRingIdentityExpr(member));
+    memberPropExprs.push_back(createMemberRingPropertyExpr(member));
     memberNames.push_back(member->getName());
   }
-  // Call memberwise initializer with member ring identity expressions.
+  // Call memberwise initializer with member ring property expressions.
   auto *callExpr =
-      CallExpr::createImplicit(C, initExpr, memberIdExprs, memberNames);
+      CallExpr::createImplicit(C, initExpr, memberPropExprs, memberNames);
   ASTNode returnStmt = new (C) ReturnStmt(SourceLoc(), callExpr, true);
   funcDecl->setBody(
       BraceStmt::create(C, SourceLoc(), returnStmt, SourceLoc(), true));
@@ -322,52 +336,66 @@ static void deriveBodyAdditiveArithmetic_zero(AbstractFunctionDecl *funcDecl,
   auto &C = funcDecl->getASTContext();
   auto *addArithProto = C.getProtocol(KnownProtocolKind::AdditiveArithmetic);
   auto *zeroReq = getProtocolRequirement(addArithProto, C.Id_zero);
-  deriveBodyRingIdentityGetter(funcDecl, addArithProto, zeroReq);
+  deriveBodyRingPropertyGetter(funcDecl, addArithProto, zeroReq);
 }
 
-// Synthesize body for the `PointwiseMultiplicative.one` computed property getter.
-static void deriveBodyPointwiseMultiplicative_one(AbstractFunctionDecl *funcDecl,
-                                                  void *) {
+// Synthesize body for the `PointwiseMultiplicative.one` computed property
+// getter.
+static void deriveBodyPointwiseMultiplicative_one(
+    AbstractFunctionDecl *funcDecl, void *) {
   auto &C = funcDecl->getASTContext();
-  auto *pointMulProto = C.getProtocol(KnownProtocolKind::PointwiseMultiplicative);
+  auto *pointMulProto =
+      C.getProtocol(KnownProtocolKind::PointwiseMultiplicative);
   auto *oneReq = getProtocolRequirement(pointMulProto, C.Id_one);
-  deriveBodyRingIdentityGetter(funcDecl, pointMulProto, oneReq);
+  deriveBodyRingPropertyGetter(funcDecl, pointMulProto, oneReq);
 }
 
-// Synthesize the static property declaration for a ring protocol identity.
+// Synthesize body for the `PointwiseMultiplicative.reciprocal` computed
+// property getter.
+static void
+deriveBodyPointwiseMultiplicative_reciprocal(AbstractFunctionDecl *funcDecl,
+                                             void *) {
+  auto &C = funcDecl->getASTContext();
+  auto *pointMulProto =
+      C.getProtocol(KnownProtocolKind::PointwiseMultiplicative);
+  auto *reciprocalReq = getProtocolRequirement(pointMulProto, C.Id_reciprocal);
+  deriveBodyRingPropertyGetter(funcDecl, pointMulProto, reciprocalReq);
+}
+
+// Synthesize a ring protocol property declaration.
 static ValueDecl *
-deriveRingIdentity(DerivedConformance &derived, Identifier identityName,
+deriveRingProperty(DerivedConformance &derived, Identifier propertyName,
+                   bool isStatic,
                    AbstractFunctionDecl::BodySynthesizer bodySynthesizer) {
   auto *nominal = derived.Nominal;
   auto *parentDC = derived.getConformanceContext();
   auto &TC = derived.TC;
-  auto &C = TC.Context;
 
   auto returnInterfaceTy = nominal->getDeclaredInterfaceType();
   auto returnTy = parentDC->mapTypeIntoContext(returnInterfaceTy);
 
-  // Create ring identity static property declaration.
-  VarDecl *idDecl;
+  // Create ring property declaration.
+  VarDecl *propDecl;
   PatternBindingDecl *pbDecl;
-  std::tie(idDecl, pbDecl) = derived.declareDerivedProperty(
-      C.Id_zero, returnInterfaceTy, returnTy, /*isStatic*/ true,
+  std::tie(propDecl, pbDecl) = derived.declareDerivedProperty(
+      propertyName, returnInterfaceTy, returnTy, /*isStatic*/ isStatic,
       /*isFinal*/ true);
 
-  // Create ring identity getter.
+  // Create ring property getter.
   auto *getterDecl =
-      derived.declareDerivedPropertyGetter(TC, idDecl, returnTy);
+      derived.declareDerivedPropertyGetter(TC, propDecl, returnTy);
   getterDecl->setBodySynthesizer(bodySynthesizer.Fn, bodySynthesizer.Context);
-  idDecl->setAccessors(StorageImplInfo::getImmutableComputed(), SourceLoc(),
+  propDecl->setAccessors(StorageImplInfo::getImmutableComputed(), SourceLoc(),
                          {getterDecl}, SourceLoc());
-  derived.addMembersToConformanceContext({getterDecl, idDecl, pbDecl});
+  derived.addMembersToConformanceContext({getterDecl, propDecl, pbDecl});
 
-  return idDecl;
+  return propDecl;
 }
 
 // Synthesize the static property declaration for `AdditiveArithmetic.zero`.
 static ValueDecl *deriveAdditiveArithmetic_zero(DerivedConformance &derived) {
   auto &C = derived.TC.Context;
-  return deriveRingIdentity(derived, C.Id_zero,
+  return deriveRingProperty(derived, C.Id_zero, /*isStatic*/ true,
                             {deriveBodyAdditiveArithmetic_zero, nullptr});
 }
 
@@ -376,8 +404,18 @@ static ValueDecl *deriveAdditiveArithmetic_zero(DerivedConformance &derived) {
 static ValueDecl *
 derivePointwiseMultiplicative_one(DerivedConformance &derived) {
   auto &C = derived.TC.Context;
-  return deriveRingIdentity(derived, C.Id_one,
+  return deriveRingProperty(derived, C.Id_one, /*isStatic*/ true,
                             {deriveBodyPointwiseMultiplicative_one, nullptr});
+}
+
+// Synthesize the instance property declaration for
+// `PointwiseMultiplicative.reciprocal`.
+static ValueDecl *
+derivePointwiseMultiplicative_reciprocal(DerivedConformance &derived) {
+  auto &C = derived.TC.Context;
+  return deriveRingProperty(
+      derived, C.Id_reciprocal, /*isStatic*/ false,
+      {deriveBodyPointwiseMultiplicative_reciprocal, nullptr});
 }
 
 ValueDecl *
@@ -409,6 +447,8 @@ DerivedConformance::derivePointwiseMultiplicative(ValueDecl *requirement) {
     return deriveMathOperator(*this, Multiply);
   if (requirement->getBaseName() == TC.Context.Id_one)
     return derivePointwiseMultiplicative_one(*this);
+  if (requirement->getBaseName() == TC.Context.Id_reciprocal)
+    return derivePointwiseMultiplicative_reciprocal(*this);
   TC.diagnose(requirement->getLoc(),
               diag::broken_pointwise_multiplicative_requirement);
   return nullptr;
