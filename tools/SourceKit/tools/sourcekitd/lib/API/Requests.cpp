@@ -299,6 +299,46 @@ syntaxSerializationFormatFromUID(sourcekitd_uid_t UID) {
   }
 }
 
+namespace {
+class SKOptionsDictionary : public OptionsDictionary {
+  RequestDict Options;
+
+public:
+  explicit SKOptionsDictionary(RequestDict Options) : Options(Options) {}
+
+  bool valueForOption(UIdent Key, unsigned &Val) override {
+    int64_t result;
+    if (Options.getInt64(Key, result, false))
+      return false;
+    Val = static_cast<unsigned>(result);
+    return true;
+  }
+
+  bool valueForOption(UIdent Key, bool &Val) override {
+    int64_t result;
+    if (Options.getInt64(Key, result, false))
+      return false;
+    Val = result ? true : false;
+    return true;
+  }
+
+  bool valueForOption(UIdent Key, StringRef &Val) override {
+    Optional<StringRef> value = Options.getString(Key);
+    if (!value)
+      return false;
+    Val = *value;
+    return true;
+  }
+
+  bool forEach(UIdent key, llvm::function_ref<bool(OptionsDictionary &)> applier) override {
+    return Options.dictionaryArrayApply(key, [=](RequestDict dict) {
+      SKOptionsDictionary skDict(dict);
+      return applier(skDict);
+    });
+  }
+};
+} // anonymous namespace
+
 static void handleRequestImpl(sourcekitd_object_t Req,
                               ResponseReceiver Receiver);
 
@@ -353,6 +393,22 @@ static std::unique_ptr<llvm::MemoryBuffer> getInputBufForRequest(
   }
 
   return InputBuf;
+}
+
+/// Read optional VFSOptions from a request dictionary. The request dictionary
+/// *must* outlive the resulting VFSOptions.
+/// \returns true on failure and sets \p error.
+static Optional<VFSOptions> getVFSOptions(RequestDict &Req) {
+  auto name = Req.getString(KeyVFSName);
+  if (!name)
+    return None;
+
+  std::unique_ptr<OptionsDictionary> options;
+  if (auto dict = Req.getDictionary(KeyVFSOptions)) {
+    options = llvm::make_unique<SKOptionsDictionary>(*dict);
+  }
+
+  return VFSOptions{name->str(), std::move(options)};
 }
 
 static void handleSemanticRequest(
@@ -475,13 +531,7 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
           "This request does not support custom filesystems"));
     }
 
-    vfsOptions = VFSOptions{VFSName->str(), {}};
-
-    bool Failed = Req.getStringArray(KeyVFSArgs, vfsOptions->arguments, /*isOptional=*/true);
-    if (Failed) {
-      return Rec(
-          createErrorRequestInvalid("'key.vfs.args' not an array of strings"));
-    }
+    vfsOptions = getVFSOptions(Req);
   }
 
   SmallVector<const char *, 8> Args;
@@ -848,8 +898,9 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
   sourcekitd_request_retain(ReqObj);
   ++numSemaRequests;
   SemaQueue.dispatch(
-      [ReqObj, Rec, ReqUID, SourceFile, SourceText, Args, vfsOptions] {
+      [ReqObj, Rec, ReqUID, SourceFile, SourceText, Args] {
         RequestDict Req(ReqObj);
+        auto vfsOptions = getVFSOptions(Req);
         handleSemanticRequest(Req, Rec, ReqUID, SourceFile, SourceText, Args,
                               std::move(vfsOptions));
         sourcekitd_request_release(ReqObj);
@@ -1951,37 +2002,6 @@ public:
   void startGroup(UIdent kind, StringRef name) override;
   void endGroup() override;
   void setNextRequestStart(unsigned offset) override;
-};
-
-class SKOptionsDictionary : public OptionsDictionary {
-  RequestDict &Options;
-
-public:
-  explicit SKOptionsDictionary(RequestDict &Options) : Options(Options) {}
-
-  bool valueForOption(UIdent Key, unsigned &Val) override {
-    int64_t result;
-    if (Options.getInt64(Key, result, false))
-      return false;
-    Val = static_cast<unsigned>(result);
-    return true;
-  }
-
-  bool valueForOption(UIdent Key, bool &Val) override {
-    int64_t result;
-    if (Options.getInt64(Key, result, false))
-      return false;
-    Val = result ? true : false;
-    return true;
-  }
-
-  bool valueForOption(UIdent Key, StringRef &Val) override {
-    Optional<StringRef> value = Options.getString(Key);
-    if (!value)
-      return false;
-    Val = *value;
-    return true;
-  }
 };
 } // end anonymous namespace
 
