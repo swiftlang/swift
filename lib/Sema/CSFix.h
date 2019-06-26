@@ -671,12 +671,14 @@ class UseWrappedPropertyType final : public ConstraintFix {
   bool IsMemberAccess;
   Type Base;
   Type Wrapper;
+  bool FromStorageWrapper;
 
   UseWrappedPropertyType(ConstraintSystem &cs, DeclName name, Type base,
                          Type wrapper, bool isMemberAccess,
-                         ConstraintLocator *locator)
+                         bool fromStorageWrapper, ConstraintLocator *locator)
       : ConstraintFix(cs, FixKind::UseWrappedPropertyType, locator), Name(name),
-        IsMemberAccess(isMemberAccess), Base(base), Wrapper(wrapper) {}
+        IsMemberAccess(isMemberAccess), Base(base), Wrapper(wrapper),
+        FromStorageWrapper(fromStorageWrapper) {}
 
 public:
   std::string getName() const override {
@@ -688,6 +690,7 @@ public:
   static UseWrappedPropertyType *create(ConstraintSystem &cs, DeclName name,
                                         Type base, Type wrapper,
                                         bool isMemberAccess,
+                                        bool fromStorageWrapper,
                                         ConstraintLocator *locator);
 };
 

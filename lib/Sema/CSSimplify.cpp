@@ -4837,9 +4837,18 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
           auto result = solveWithNewBaseOrName(wrappedTy, member);
 
           if (result == SolutionKind::Solved) {
+            auto name = wrappedProperty->first->getName();
+
+            bool fromStorageWrapper = true;
+            if (!name.empty()) {
+              auto nameStr = name.str();
+              assert(!nameStr.empty() && nameStr[0] == '$');
+              fromStorageWrapper = nameStr.size() >= 2 && nameStr[1] != '$';
+            }
+
             auto *fix = UseWrappedPropertyType::create(
-                *this, member, baseTy, wrappedTy,
-                /*isMemberAccess=*/true, locator);
+                *this, member, baseTy, wrappedTy, /*isMemberAccess=*/true,
+                fromStorageWrapper, locator);
             return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
           }
         }

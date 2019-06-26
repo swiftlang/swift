@@ -267,8 +267,7 @@ namespace {
 
       if (auto DRE = dyn_cast<DeclRefExpr>(expr)) {
         if (auto varDecl = dyn_cast<VarDecl>(DRE->getDecl())) {
-          auto paramDecl = dyn_cast<ParamDecl>(varDecl);
-          if (paramDecl && paramDecl->isAnonClosureParam()) {
+          if (varDecl->isAnonClosureParam()) {
             LTI.anonClosureParams.push_back(DRE);
           } else if (CS.hasType(DRE)) {
             LTI.collectedTypes.insert(CS.getType(DRE).getPointer());

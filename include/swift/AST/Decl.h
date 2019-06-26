@@ -5015,9 +5015,8 @@ public:
     return cast_or_null<VarDecl>(AbstractStorageDecl::getOverriddenDecl());
   }
 
-  /// Determine whether this declaration is a proprety wrapper, or
-  /// an anonymous closure parameter.
-  bool isWrapperOrAnonClosureParam() const;
+  /// Determine whether this declaration is an anonymous closure parameter.
+  bool isAnonClosureParam() const;
 
   /// Return the raw specifier value for this property or parameter.
   Specifier getSpecifier() const {
@@ -5389,9 +5388,6 @@ public:
     assert(isVariadic());
     return getVarargBaseTy(getInterfaceType());
   }
-
-  /// Determine whether this declaration is an anonymous closure parameter.
-  bool isAnonClosureParam() const;
 
   SourceRange getSourceRange() const;
 
