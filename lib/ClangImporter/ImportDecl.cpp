@@ -4109,8 +4109,9 @@ namespace {
       // If the method has a related result type that is representable
       // in Swift as DynamicSelf, do so.
       if (!prop && decl->hasRelatedResultType()) {
-        resultTy = DynamicSelfType::get(dc->getSelfInterfaceType(),
-                                        Impl.SwiftContext);
+        resultTy = dc->getSelfInterfaceType();
+        if (dc->getSelfClassDecl())
+          resultTy = DynamicSelfType::get(resultTy, Impl.SwiftContext);
         isIUO = false;
 
         OptionalTypeKind nullability = OTK_ImplicitlyUnwrappedOptional;
