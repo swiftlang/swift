@@ -459,7 +459,7 @@ public:
     if (!ResultTy->isVoid() && TheFunc->hasSingleExpressionBody()) {
       auto expr = TheFunc->getSingleExpressionBody();
       if (expr->isImplicit() && isa<TupleExpr>(expr) &&
-          dyn_cast<TupleExpr>(expr)->getNumElements() == 0) {
+          cast<TupleExpr>(expr)->getNumElements() == 0) {
         TC.diagnose(RS->getReturnLoc(), diag::return_expr_missing);
         return RS;
       }
