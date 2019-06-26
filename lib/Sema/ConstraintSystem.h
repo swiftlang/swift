@@ -2253,8 +2253,24 @@ public:
     return typeVar->getImpl().getRepresentative(getSavedBindings());
   }
 
-  /// Gets the VarDecl, and the type of its attached property wrapper if the
-  /// resolved overload has a decl with an attached property wrapper.
+  /// Gets the VarDecl associateed with resolvedOverload, and the type of the
+  /// storage wrapper if the decl has an associated storage wrapper.
+  Optional<std::pair<VarDecl *, Type>>
+  getStorageWrapperInformation(ResolvedOverloadSetListItem *resolvedOverload) {
+    if (resolvedOverload->Choice.isDecl()) {
+      if (auto *decl = dyn_cast<VarDecl>(resolvedOverload->Choice.getDecl())) {
+        if (decl->hasAttachedPropertyWrapper()) {
+          if (auto storageWrapper = decl->getPropertyWrapperStorageWrapper()) {
+            return std::make_pair(decl, storageWrapper->getType());
+          }
+        }
+      }
+    }
+    return None;
+  }
+
+  /// Gets the VarDecl associateed with resolvedOverload, and the type of the
+  /// backing storage if the decl has an associated property wrapper.
   Optional<std::pair<VarDecl *, Type>>
   getPropertyWrapperInformation(ResolvedOverloadSetListItem *resolvedOverload) {
     if (resolvedOverload->Choice.isDecl()) {
@@ -2276,15 +2292,8 @@ public:
                                 Type baseTy, DeclContext *useDC) {
     if (resolvedOverload->Choice.isDecl()) {
       if (auto *decl = dyn_cast<VarDecl>(resolvedOverload->Choice.getDecl())) {
-        auto *baseTyDecl = baseTy->getAnyNominal();
-        if (decl->isWrapperOrAnonClosureParam() && baseTyDecl) {
-          auto wrapperTyInfo = baseTyDecl->getPropertyWrapperTypeInfo();
-          if (wrapperTyInfo.isValid()) {
-            auto valueTy = baseTy->getTypeOfMember(
-                useDC->getParentModule(), wrapperTyInfo.valueVar,
-                wrapperTyInfo.valueVar->getValueInterfaceType());
-            return std::make_pair(decl, valueTy);
-          }
+        if (auto wrapped = decl->getOriginalWrappedProperty()) {
+          return std::make_pair(decl, wrapped->getType());
         }
       }
     }

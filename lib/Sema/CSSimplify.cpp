@@ -4817,9 +4817,11 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       auto resolvedOverload = findSelectedOverloadFor(baseExpr);
 
       if (resolvedOverload) {
-        if (auto propertyWrapper =
-                getPropertyWrapperInformation(resolvedOverload)) {
-          auto wrapperTy = propertyWrapper->second;
+        auto wrapper = getStorageWrapperInformation(resolvedOverload);
+        if (!wrapper)
+          wrapper = getPropertyWrapperInformation(resolvedOverload);
+        if (wrapper) {
+          auto wrapperTy = wrapper->second;
           auto result = solveWithNewBaseOrName(wrapperTy, member);
           if (result == SolutionKind::Solved) {
             auto *fix = UsePropertyWrapperType::create(
