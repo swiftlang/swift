@@ -2181,6 +2181,32 @@ static void checkProtocolSelfRequirements(ProtocolDecl *proto,
       });
 }
 
+/// For now, DynamicSelfType can only appear at the top level of a
+/// function result type, possibly wrapped in an optional type.
+///
+/// In the future, we could generalize it to allow it in any
+/// covariant position, so that for example a class method could
+/// return '() -> Self'.
+static void checkDynamicSelfType(ValueDecl *decl, Type type) {
+  if (!type->hasDynamicSelfType())
+    return;
+
+  if (auto objectTy = type->getOptionalObjectType())
+    type = objectTy;
+
+  if (type->is<DynamicSelfType>())
+    return;
+
+  if (isa<FuncDecl>(decl))
+    decl->diagnose(diag::dynamic_self_invalid_method);
+  else if (isa<VarDecl>(decl))
+    decl->diagnose(diag::dynamic_self_invalid_property);
+  else {
+    assert(isa<SubscriptDecl>(decl));
+    decl->diagnose(diag::dynamic_self_invalid_subscript);
+  }
+}
+
 namespace {
 class DeclChecker : public DeclVisitor<DeclChecker> {
 public:
@@ -2223,6 +2249,7 @@ public:
       }
     }
   }
+
 
   //===--------------------------------------------------------------------===//
   // Visit Methods.
@@ -2345,6 +2372,17 @@ public:
     TC.checkDeclAttributes(VD);
 
     triggerAccessorSynthesis(TC, VD);
+
+    if (VD->getDeclContext()->getSelfClassDecl()) {
+      checkDynamicSelfType(VD, VD->getValueInterfaceType());
+
+      if (VD->getValueInterfaceType()->hasDynamicSelfType()) {
+        if (VD->hasStorage())
+          VD->diagnose(diag::dynamic_self_in_stored_property);
+        else if (VD->isSettable(nullptr))
+          VD->diagnose(diag::dynamic_self_in_mutable_property);
+      }
+    }
 
     // FIXME: Temporary hack until capture computation has been request-ified.
     if (VD->getDeclContext()->isLocalContext()) {
@@ -2598,6 +2636,15 @@ public:
 
     TC.checkParameterAttributes(SD->getIndices());
     TC.checkDefaultArguments(SD->getIndices(), SD);
+
+    if (SD->getDeclContext()->getSelfClassDecl()) {
+      checkDynamicSelfType(SD, SD->getValueInterfaceType());
+
+      if (SD->getValueInterfaceType()->hasDynamicSelfType() &&
+          SD->isSettable()) {
+        SD->diagnose(diag::dynamic_self_in_mutable_subscript);
+      }
+    }
   }
 
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
@@ -3148,6 +3195,9 @@ public:
     TC.checkParameterAttributes(FD->getParameters());
 
     checkExplicitAvailability(FD);
+
+    if (FD->getDeclContext()->getSelfClassDecl())
+      checkDynamicSelfType(FD, FD->getResultInterfaceType());
   }
 
   void visitModuleDecl(ModuleDecl *) { }
@@ -3600,77 +3650,9 @@ bool swift::isMemberOperator(FuncDecl *decl, Type type) {
   return false;
 }
 
-bool checkDynamicSelfReturn(FuncDecl *func,
-                            TypeRepr *typeRepr,
-                            unsigned optionalDepth) {
-  // Look through parentheses.
-  if (auto parenRepr = dyn_cast<TupleTypeRepr>(typeRepr)) {
-    if (!parenRepr->isParenType()) return false;
-    return checkDynamicSelfReturn(func, parenRepr->getElementType(0),
-                                  optionalDepth);
-  }
-
-  // Look through attributes.
-  if (auto attrRepr = dyn_cast<AttributedTypeRepr>(typeRepr)) {
-    TypeAttributes attrs = attrRepr->getAttrs();
-    if (!attrs.empty())
-      return false;
-    return checkDynamicSelfReturn(func, attrRepr->getTypeRepr(),
-                                  optionalDepth);
-
-  }
-
-  // Look through optional types.
-  TypeRepr *base = nullptr;
-  if (auto *optRepr = dyn_cast<OptionalTypeRepr>(typeRepr))
-    base = optRepr->getBase();
-  else if (auto *optRepr =
-               dyn_cast<ImplicitlyUnwrappedOptionalTypeRepr>(typeRepr))
-    base = optRepr->getBase();
-
-  if (base) {
-    // But only one level.
-    if (optionalDepth != 0) return false;
-    return checkDynamicSelfReturn(func, base, optionalDepth + 1);
-  }
-
-  // Check whether we have a simple identifier type.
-  auto simpleRepr = dyn_cast<SimpleIdentTypeRepr>(typeRepr);
-  if (!simpleRepr)
-    return false;
-
-  // Check whether it is 'Self'.
-  if (simpleRepr->getIdentifier() != func->getASTContext().Id_Self)
-    return false;
-
-  // Note that the function has a dynamic Self return type and set
-  // the return type component to the dynamic self type.
-  return true;
-}
-
-/// Check for methods that return 'DynamicResult'.
-bool checkDynamicSelfReturn(FuncDecl *func) {
-  // Check whether we have a specified result type.
-  auto typeRepr = func->getBodyResultTypeLoc().getTypeRepr();
-  if (!typeRepr)
-    return false;
-
-  // 'Self' on a free function is not dynamic 'Self'.
-  if (!func->getDeclContext()->getSelfClassDecl() &&
-      !isa<ProtocolDecl>(func->getDeclContext()))
-    return false;
-
-  // 'Self' on a property accessor is not dynamic 'Self'...even on a read-only
-  // property. We could implement it as such in the future.
-  if (isa<AccessorDecl>(func))
-    return false;
-
-  return checkDynamicSelfReturn(func, typeRepr, 0);
-}
-
-Type buildAddressorResultType(TypeChecker &TC,
-                              AccessorDecl *addressor,
-                              Type valueType) {
+static Type buildAddressorResultType(TypeChecker &TC,
+                                     AccessorDecl *addressor,
+                                     Type valueType) {
   assert(addressor->getAccessorKind() == AccessorKind::Address ||
          addressor->getAccessorKind() == AccessorKind::MutableAddress);
 
@@ -3984,9 +3966,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
         }
       }
     }
-
-    // Check whether the return type is dynamic 'Self'.
-    FD->setDynamicSelf(checkDynamicSelfReturn(FD));
 
     // Accessors should pick up various parts of their type signatures
     // directly from the storage declaration instead of re-deriving them.

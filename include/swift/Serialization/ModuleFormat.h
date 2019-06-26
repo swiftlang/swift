@@ -52,7 +52,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 496; // changes for lazy storage request
+const uint16_t SWIFTMODULE_VERSION_MINOR = 497; // remove FuncDecl::hasDynamicSelf()
 
 using DeclIDField = BCFixed<31>;
 
@@ -1082,7 +1082,6 @@ namespace decls_block {
     StaticSpellingKindField, // spelling of 'static' or 'class'
     BCFixed<1>,   // isObjC?
     SelfAccessKindField,   // self access kind
-    BCFixed<1>,   // has dynamic self?
     BCFixed<1>,   // has forced static dispatch?
     BCFixed<1>,   // throws?
     GenericEnvironmentIDField, // generic environment
@@ -1124,7 +1123,6 @@ namespace decls_block {
     StaticSpellingKindField, // spelling of 'static' or 'class'
     BCFixed<1>,   // isObjC?
     SelfAccessKindField,   // self access kind
-    BCFixed<1>,   // has dynamic self?
     BCFixed<1>,   // has forced static dispatch?
     BCFixed<1>,   // throws?
     GenericEnvironmentIDField, // generic environment

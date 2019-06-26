@@ -94,10 +94,6 @@ enum class TypeResolverContext : uint8_t {
   /// tuple return values. See also: TypeResolutionFlags::Direct
   FunctionResult,
 
-  /// Whether we are in the result type of a function body that is
-  /// known to produce dynamic Self.
-  DynamicSelfResult,
-
   /// Whether we are in a protocol's where clause
   ProtocolWhereClause,
 
@@ -211,7 +207,6 @@ public:
     case Context::FunctionInput:
     case Context::VariadicFunctionInput:
     case Context::FunctionResult:
-    case Context::DynamicSelfResult:
     case Context::ProtocolWhereClause:
     case Context::ExtensionBinding:
     case Context::SubscriptDecl:

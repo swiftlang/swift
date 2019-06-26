@@ -3426,7 +3426,6 @@ public:
                            fn->isObjC(),
                            uint8_t(
                              getStableSelfAccessKind(fn->getSelfAccessKind())),
-                           fn->hasDynamicSelf(),
                            fn->hasForcedStaticDispatch(),
                            fn->hasThrows(),
                            S.addGenericEnvironmentRef(
@@ -3503,7 +3502,6 @@ public:
                                fn->isObjC(),
                                uint8_t(getStableSelfAccessKind(
                                                   fn->getSelfAccessKind())),
-                               fn->hasDynamicSelf(),
                                fn->hasForcedStaticDispatch(),
                                fn->hasThrows(),
                                S.addGenericEnvironmentRef(

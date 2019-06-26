@@ -433,7 +433,7 @@ protected:
     HasSingleExpressionBody : 1
   );
 
-  SWIFT_INLINE_BITFIELD(FuncDecl, AbstractFunctionDecl, 1+2+1+1+1+2,
+  SWIFT_INLINE_BITFIELD(FuncDecl, AbstractFunctionDecl, 1+2+1+1+2,
     /// Whether this function is a 'static' method.
     IsStatic : 1,
 
@@ -442,9 +442,6 @@ protected:
 
     /// Whether we are statically dispatched even if overridable
     ForcedStaticDispatch : 1,
-
-    /// Whether this function has a dynamic Self return type.
-    HasDynamicSelf : 1,
 
     /// Whether we've computed the 'self' access kind yet.
     SelfAccessComputed : 1,
@@ -5923,8 +5920,13 @@ public:
   /// True if the declaration is forced to be statically dispatched.
   bool hasForcedStaticDispatch() const;
 
-  /// Get the interface type of this decl and remove the Self context.
+  /// Get the type of this declaration without the Self clause.
+  /// Asserts if not in type context.
   Type getMethodInterfaceType() const;
+
+  /// Tests if this is a function returning a DynamicSelfType, or a
+  /// constructor.
+  bool hasDynamicSelfResult() const;
 
   using DeclContext::operator new;
   using Decl::getASTContext;
@@ -5973,7 +5975,6 @@ protected:
       StaticLoc.isValid() || StaticSpelling != StaticSpellingKind::None;
     Bits.FuncDecl.StaticSpelling = static_cast<unsigned>(StaticSpelling);
 
-    Bits.FuncDecl.HasDynamicSelf = false;
     Bits.FuncDecl.ForcedStaticDispatch = false;
     Bits.FuncDecl.SelfAccess =
       static_cast<unsigned>(SelfAccessKind::NonMutating);
@@ -6086,15 +6087,6 @@ public:
   /// This also allows the binary-operator-ness of a func decl to be determined
   /// prior to type checking.
   bool isBinaryOperator() const;
-  
-  /// Determine whether this function has a dynamic \c Self return
-  /// type.
-  bool hasDynamicSelf() const { return Bits.FuncDecl.HasDynamicSelf; }
-
-  /// Set whether this function has a dynamic \c Self return or not.
-  void setDynamicSelf(bool hasDynamicSelf) { 
-    Bits.FuncDecl.HasDynamicSelf = hasDynamicSelf;
-  }
 
   void getLocalCaptures(SmallVectorImpl<CapturedValue> &Result) const {
     return getCaptureInfo().getLocalCaptures(Result);
