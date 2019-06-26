@@ -25,3 +25,16 @@ func foo(
 
 // RUN: not %sourcekitd-test -req=cursor -vfs-name nope %s -dont-print-request 2>&1 | %FileCheck %s -check-prefix=NONEXISTENT_VFS_ERROR
 // NONEXISTENT_VFS_ERROR: error response (Request Failed): unknown virtual filesystem 'nope'
+
+// == Using an open document ==
+// RUN: %sourcekitd-test \
+// RUN:   -req=open -vfs-files=/target_file2.swift=%S/../Inputs/vfs/other_file_in_target.swift,/CModule/module.modulemap=%S/../Inputs/vfs/CModule/module.modulemap,/CModule/CModule.h=%S/../Inputs/vfs/CModule/CModule.h,/SwiftModule/SwiftModule.swiftmodule=%t/SwiftModule.swiftmodule %s -pass-as-sourcetext -- %s /target_file2.swift -I /CModule -I /SwiftModule == \
+// RUN:   -req=cursor -pos=5:43 %s -print-raw-response -- %s /target_file2.swift -I /CModule -I /SwiftModule | %FileCheck --check-prefix=CMODULE_RAW %s
+// CMODULE_RAW: key.kind: source.lang.swift.ref.struct
+// CMODULE_RAW: key.name: "StructDefinedInCModule"
+// CMODULE_RAW: key.filepath: "/CModule/CModule.h"
+
+// == Overriding an open document ==
+// RUN: %sourcekitd-test \
+// RUN:   -req=syntax-map %s -pass-as-sourcetext == \
+// RUN:   -req=cursor -pos=5:43 %s -print-raw-response -vfs-files=/target_file2.swift=%S/../Inputs/vfs/other_file_in_target.swift,/CModule/module.modulemap=%S/../Inputs/vfs/CModule/module.modulemap,/CModule/CModule.h=%S/../Inputs/vfs/CModule/CModule.h,/SwiftModule/SwiftModule.swiftmodule=%t/SwiftModule.swiftmodule -- %s /target_file2.swift -I /CModule -I /SwiftModule | %FileCheck --check-prefix=CMODULE_RAW %s
