@@ -1586,6 +1586,11 @@ bool PatternBindingDecl::isDefaultInitializable(unsigned i) const {
     if (auto wrapperInfo = singleVar->getAttachedPropertyWrapperTypeInfo(0)) {
       if (wrapperInfo.defaultInit)
         return true;
+
+      // If one of the attached wrappers is missing an initialValue
+      // initializer, cannot default-initialize.
+      if (!singleVar->allAttachedPropertyWrappersHaveInitialValueInit())
+        return false;
     }
   }
 
