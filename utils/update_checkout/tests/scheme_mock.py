@@ -36,6 +36,10 @@ MOCK_REMOTE = {
 }
 
 MOCK_CONFIG = {
+    # This is here just b/c we expect it. We should consider consolidating
+    # clone-patterns into a dictionary where we map protocols (i.e. ['ssh,
+    # 'https'] to patterns). Then we can define this issue.
+    'ssh-clone-pattern': 'DO_NOT_USE',
     # We reset this value with our remote path when we process
     'https-clone-pattern': '',
     'repos': {

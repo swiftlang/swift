@@ -514,7 +514,7 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
     validate_config(config)
 
     if args.dump_hashes:
-        dump_repo_hashes(config)
+        dump_repo_hashes(args, config)
         return (None, None)
 
     if args.dump_hashes_config:
