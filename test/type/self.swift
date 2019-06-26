@@ -5,7 +5,7 @@ struct S0<T> {
 }
 
 class C0<T> {
-  func foo(_ other: Self) { } // expected-error{{'Self' cannot be the type of a function argument in a class}}
+  func foo(_ other: Self) { } // expected-error{{covariant 'Self' can only appear as the type of a property, subscript or method result; did you mean 'C0'?}}
 }
 
 enum E0<T> {
@@ -47,7 +47,7 @@ final class FinalMario : Mario {
 
 class A<T> {
   typealias _Self = Self
-  // expected-error@-1 {{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'A'?}}
+  // expected-error@-1 {{covariant 'Self' can only appear as the type of a property, subscript or method result; did you mean 'A'?}}
   let b: Int
   required init(a: Int) {
     print("\(Self.self).\(#function)")
@@ -55,7 +55,7 @@ class A<T> {
     b = a
   }
   static func z(n: Self? = nil) {
-    // expected-error@-1 {{'Self' cannot be the type of a function argument in a class}}
+    // expected-error@-1 {{covariant 'Self' can only appear as the type of a property, subscript or method result; did you mean 'A'?}}
     print("\(Self.self).\(#function)")
   }
   class func y() {
@@ -80,12 +80,11 @@ class A<T> {
     let copy = Self.init(a: 11)
     return copy
   }
-  subscript (i: Int) -> Self { // expected-error {{'Self' is not available as the type of a mutable subscript}}
+  subscript (i: Int) -> Self { // expected-error {{mutable subscript cannot have covariant 'Self' type}}
     get {
       return Self.init(a: i)
     }
     set(newValue) {
-      // expected-error@-1 {{'Self' cannot be the type of a function argument in a class}}
     }
   }
 }
@@ -122,38 +121,39 @@ class C {
 
   func f() {
     func g(_: Self) {}
+    let x: Self = self as! Self
+    g(x)
+    typealias _Self = Self
   }
   func g() {
     _ = Self.init() as? Self
     // expected-warning@-1 {{conditional cast from 'Self' to 'Self' always succeeds}}
   }
   func h(j: () -> Self) -> () -> Self {
-    // expected-error@-1 {{'Self' cannot be the type of a function argument in a class}}
-    // expected-error@-2 {{'Self' can only appear at the top level of a method result type}}
+    // expected-error@-1 {{covariant 'Self' can only appear at the top level of method result type}}
     return { return self }
   }
   func i() -> (Self, Self) {}
-  // expected-error@-1 {{'Self' can only appear at the top level of a method result type}}
+  // expected-error@-1 {{covariant 'Self' can only appear at the top level of method result type}}
 
   func j() -> Self.Type {}
-  // expected-error@-1 {{'Self' can only appear at the top level of a method result type}}
+  // expected-error@-1 {{covariant 'Self' can only appear at the top level of method result type}}
 
   let p0: Self?
-  var p1: Self? // expected-error {{'Self' is not available as the type of a mutable property}}
-  // expected-error@-1 {{'Self' cannot be the type of a function argument in a class}}
+  var p1: Self? // expected-error {{mutable property cannot have covariant 'Self' type}}
 
-  var prop: Self { // expected-error {{'Self' is not available as the type of a mutable property}}
+  var prop: Self { // expected-error {{mutable property cannot have covariant 'Self' type}}
     get {
       return self
     }
-    set (newValue) { // expected-error {{'Self' cannot be the type of a function argument in a class}}
+    set (newValue) {
     }
   }
-  subscript (i: Int) -> Self { // expected-error {{'Self' is not available as the type of a mutable subscript}}
+  subscript (i: Int) -> Self { // expected-error {{mutable subscript cannot have covariant 'Self' type}}
     get {
       return self
     }
-    set (newValue) { // expected-error {{'Self' cannot be the type of a function argument in a class}}
+    set (newValue) {
     }
   }
 }

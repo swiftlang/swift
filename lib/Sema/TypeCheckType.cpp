@@ -1079,7 +1079,7 @@ static Type diagnoseUnknownType(TypeResolution resolution,
 
         // Produce a Fix-It replacing 'Self' with the nominal type name.
         auto name = getDeclNameFromContext(dc, nominal);
-        diags.diagnose(comp->getIdLoc(), diag::self_in_nominal, name)
+        diags.diagnose(comp->getIdLoc(), diag::dynamic_self_invalid, name)
           .fixItReplace(comp->getIdLoc(), name);
 
         auto type = resolution.mapTypeIntoContext(
@@ -1240,18 +1240,28 @@ static SelfTypeKind getSelfTypeKind(DeclContext *dc,
   if (!typeDC->getSelfClassDecl())
     return SelfTypeKind::StaticSelf;
 
-  // In local functions inside classes, 'Self' is the DynamicSelfType and can
-  // be used anywhere.
-  if (dc->isLocalContext())
-    return SelfTypeKind::DynamicSelf;
-
   // In class methods, 'Self' is the DynamicSelfType and can only appear in
   // the return type.
   switch (options.getBaseContext()) {
   case TypeResolverContext::FunctionResult:
   case TypeResolverContext::PatternBindingDecl:
     return SelfTypeKind::DynamicSelf;
+  case TypeResolverContext::AbstractFunctionDecl:
+  case TypeResolverContext::SubscriptDecl:
+  case TypeResolverContext::TypeAliasDecl:
+  case TypeResolverContext::GenericTypeAliasDecl:
+    // When checking a function or subscript parameter list, we have to go up
+    // one level to determine if we're in a local context or not.
+    if (dc->getParent()->isLocalContext())
+      return SelfTypeKind::DynamicSelf;
+
+    return SelfTypeKind::InvalidSelf;
   default:
+    // In local functions inside classes, 'Self' is the DynamicSelfType and can
+    // be used anywhere.
+    if (dc->isLocalContext())
+      return SelfTypeKind::DynamicSelf;
+
     return SelfTypeKind::InvalidSelf;
   }
 }
