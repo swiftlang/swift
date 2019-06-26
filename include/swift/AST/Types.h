@@ -585,10 +585,6 @@ public:
   /// existential type throughout the given type.
   Type eraseOpenedExistential(OpenedArchetypeType *opened);
 
-  /// Erase DynamicSelfType from the given type by replacing it with its
-  /// underlying type.
-  Type eraseDynamicSelfType();
-
   /// Given a declaration context, returns a function type with the 'self'
   /// type curried as the input if the declaration context describes a type.
   /// Otherwise, returns the type itself.
