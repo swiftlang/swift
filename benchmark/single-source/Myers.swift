@@ -23,152 +23,174 @@ let loremLong = Array("Sed ut perspiciatis, unde omnis iste natus error sit volu
 public func run_Myers(N: Int) {
   if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) { // FIXME(availability-5.1)
     for _ in 1...N {
-      let _ = myers(from: loremShort, to: loremLong)
+      let _ = myers(from: loremShort, to: loremLong, using: ==)
     }
   }
 }
 
-// Extremely rudimentary type made to represent the rows of the triangular matrix type used by the Myer's algorithm
+// _V is a rudimentary type made to represent the rows of the triangular matrix type used by the Myer's algorithm
 //
-// This type is basically an array that only supports indexes in the set stride(from: -d, through: d, by: 2) where d is the depth of this row in the matrix
-fileprivate struct V {
-    private var a: [Int]
-    
-    // The way negative indexes are implemented is by interleaving them in the empty slots between the valid positive indexes
-    @inline(__always) private static func transform(_ index: Int) -> Int {
-        // 0 -> 0
-        // 1 -> 0
-        // -3, -1, 1, 3 -> 3, 1, 0, 2 -> 0...3
-        // -2, 0, 2 -> 2, 0, 1 -> 0...2
-        return (index <= 0 ? -index : index &- 1)
+// This type is basically an array that only supports indexes in the set `stride(from: -d, through: d, by: 2)` where `d` is the depth of this row in the matrix
+// `d` is always known at allocation-time, and is used to preallocate the structure.
+fileprivate struct _V {
+
+  private var a: [Int]
+
+  // The way negative indexes are implemented is by interleaving them in the empty slots between the valid positive indexes
+  @inline(__always) private static func transform(_ index: Int) -> Int {
+    // -3, -1, 1, 3 -> 3, 1, 0, 2 -> 0...3
+    // -2, 0, 2 -> 2, 0, 1 -> 0...2
+    return (index <= 0 ? -index : index &- 1)
+  }
+
+  init(maxIndex largest: Int) {
+    a = [Int](repeating: 0, count: largest + 1)
+  }
+
+  subscript(index: Int) -> Int {
+    get {
+      return a[_V.transform(index)]
     }
-    
-    init(maxIndex largest: Int) {
-        a = [Int](repeating: 0, count: largest + 1)
+    set(newValue) {
+      a[_V.transform(index)] = newValue
     }
-    
-    subscript(index: Int) -> Int {
-        get {
-            return a[V.transform(index)]
-        }
-        set(newValue) {
-            a[V.transform(index)] = newValue
-        }
-    }
+  }
 }
 
 @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) // FIXME(availability-5.1)
-fileprivate func myers<C>(
-    from old: C, to new: C,
-    using cmp: (C.Element, C.Element) -> Bool = (==)
+fileprivate func myers<C,D>(
+  from old: C, to new: D,
+  using cmp: (C.Element, D.Element) -> Bool
 ) -> CollectionDifference<C.Element>
-    where
+  where
     C : BidirectionalCollection,
-    C.Element : Equatable
+    D : BidirectionalCollection,
+    C.Element == D.Element
 {
-    
-    func descent(from a: [C.Element], to b: [C.Element]) -> [V] {
-        let n = a.count
-        let m = b.count
-        let max = n + m
-        
-        var result = [V]()
-        var v = V(maxIndex: 1)
-        v[1] = 0
-        
-        var x = 0
-        var y = 0
-        iterator: for d in 0...max {
-            let prev_v = v
-            result.append(v)
-            v = V(maxIndex: d)
-            
-            // The code in this loop is very hot—the loop bounds increases in terms
-            // of the iterator of the outer loop!
-            for k in stride(from: -d, through: d, by: 2) {
-                if k == -d {
-                    x = prev_v[k &+ 1]
-                } else {
-                    let km = prev_v[k &- 1]
-                    
-                    if k != d {
-                        let kp = prev_v[k &+ 1]
-                        if km < kp {
-                            x = kp
-                        } else {
-                            x = km &+ 1
-                        }
-                    } else {
-                        x = km &+ 1
-                    }
-                }
-                y = x &- k
-                
-                while x < n && y < m {
-                    if !cmp(a[x], b[y]) {
-                        break;
-                    }
-                    x &+= 1
-                    y &+= 1
-                }
-                
-                v[k] = x
-                
-                if x >= n && y >= m { break }
-            }
-            if x >= n && y >= m { break }
-        }
-        
-        assert(x >= n && y >= m)
-        
-        return result
-    }
-    
-    /* Splatting the collections into arrays here has two advantages:
-     *
-     *     1) Subscript access becomes inlined
-     *     2) Subscript index becomes Int, matching the iterator types in the algorithm
-     *
-     * Combined, these effects dramatically improves performance when
-     * collections differ significantly, without unduly degrading runtime when
-     * the parameters are very similar.
-     *
-     * In terms of memory use, the linear cost is significantly less than the
-     * worst-case n² memory use of the descent algorithm.
-     */
-    let a = Array(old)
-    let b = Array(new)
 
-    let trace = descent(from: a, to: b)
-    
+  // Core implementation of the algorithm described at http://www.xmailserver.org/diff2.pdf
+  // Variable names match those used in the paper as closely as possible
+  func _descent(from a: UnsafeBufferPointer<C.Element>, to b: UnsafeBufferPointer<D.Element>) -> [_V] {
+    let n = a.count
+    let m = b.count
+    let max = n + m
+
+    var result = [_V]()
+    var v = _V(maxIndex: 1)
+    v[1] = 0
+
+    var x = 0
+    var y = 0
+    iterator: for d in 0...max {
+      let prev_v = v
+      result.append(v)
+      v = _V(maxIndex: d)
+
+      // The code in this loop is _very_ hot—the loop bounds increases in terms
+      // of the iterator of the outer loop!
+      for k in stride(from: -d, through: d, by: 2) {
+        if k == -d {
+          x = prev_v[k &+ 1]
+        } else {
+          let km = prev_v[k &- 1]
+
+          if k != d {
+            let kp = prev_v[k &+ 1]
+            if km < kp {
+              x = kp
+            } else {
+              x = km &+ 1
+            }
+          } else {
+            x = km &+ 1
+          }
+        }
+        y = x &- k
+
+        while x < n && y < m {
+          if !cmp(a[x], b[y]) {
+            break;
+          }
+          x &+= 1
+          y &+= 1
+        }
+
+        v[k] = x
+
+        if x >= n && y >= m {
+          break iterator
+        }
+      }
+      if x >= n && y >= m {
+        break
+      }
+    }
+
+    return result
+  }
+
+  // Backtrack through the trace generated by the Myers descent to produce the changes that make up the diff
+  func _formChanges(
+    from a: UnsafeBufferPointer<C.Element>,
+    to b: UnsafeBufferPointer<C.Element>,
+    using trace: [_V]
+  ) -> [CollectionDifference<C.Element>.Change] {
     var changes = [CollectionDifference<C.Element>.Change]()
-    changes.reserveCapacity(trace.count)
     
     var x = a.count
     var y = b.count
     for d in stride(from: trace.count &- 1, to: 0, by: -1) {
-        let v = trace[d]
-        let k = x &- y
-        let prev_k = (k == -d || (k != d && v[k &- 1] < v[k &+ 1])) ? k &+ 1 : k &- 1
-        let prev_x = v[prev_k]
-        let prev_y = prev_x &- prev_k
-        
-        while x > prev_x && y > prev_y {
-            // No change at this position.
-            x &-= 1
-            y &-= 1
-        }
-        
-        assert((x == prev_x && y > prev_y) || (y == prev_y && x > prev_x))
-        if y != prev_y {
-            changes.append(.insert(offset: prev_y, element: b[prev_y], associatedWith: nil))
-        } else {
-            changes.append(.remove(offset: prev_x, element: a[prev_x], associatedWith: nil))
-        }
-        
-        x = prev_x
-        y = prev_y
+      let v = trace[d]
+      let k = x &- y
+      let prev_k = (k == -d || (k != d && v[k &- 1] < v[k &+ 1])) ? k &+ 1 : k &- 1
+      let prev_x = v[prev_k]
+      let prev_y = prev_x &- prev_k
+
+      while x > prev_x && y > prev_y {
+        // No change at this position.
+        x &-= 1
+        y &-= 1
+      }
+
+      assert((x == prev_x && y > prev_y) || (y == prev_y && x > prev_x))
+      if y != prev_y {
+        changes.append(.insert(offset: prev_y, element: b[prev_y], associatedWith: nil))
+      } else {
+        changes.append(.remove(offset: prev_x, element: a[prev_x], associatedWith: nil))
+      }
+
+      x = prev_x
+      y = prev_y
     }
-    
-    return CollectionDifference(changes)!
+
+    return changes
+  }
+
+  /* Splatting the collections into contiguous storage has two advantages:
+   *
+   *   1) Subscript access is much faster
+   *   2) Subscript index becomes Int, matching the iterator types in the algorithm
+   *
+   * Combined, these effects dramatically improves performance when
+   * collections differ significantly, without unduly degrading runtime when
+   * the parameters are very similar.
+   *
+   * In terms of memory use, the linear cost of creating a ContiguousArray (when
+   * necessary) is significantly less than the worst-case n² memory use of the
+   * descent algorithm.
+   */
+  func _withContiguousStorage<C : Collection, R>(
+    for values: C,
+    _ body: (UnsafeBufferPointer<C.Element>) throws -> R
+  ) rethrows -> R {
+    if let result = try values.withContiguousStorageIfAvailable(body) { return result }
+    let array = ContiguousArray(values)
+    return try array.withUnsafeBufferPointer(body)
+  }
+
+  return _withContiguousStorage(for: old) { a in
+    return _withContiguousStorage(for: new) { b in
+      return CollectionDifference(_formChanges(from: a, to: b, using:_descent(from: a, to: b)))!
+    }
+  }
 }
