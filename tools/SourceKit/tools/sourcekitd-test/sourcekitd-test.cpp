@@ -993,15 +993,18 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     sourcekitd_request_dictionary_set_string(Req, KeyVFSName, Opts.VFSName->c_str());
   }
   if (!Opts.VFSFiles.empty()) {
-    sourcekitd_object_t VFSArgs = sourcekitd_request_array_create(nullptr, 0);
+    sourcekitd_object_t files = sourcekitd_request_array_create(nullptr, 0);
     for (auto &NameAndTarget : Opts.VFSFiles) {
-      sourcekitd_request_array_set_string(VFSArgs, SOURCEKITD_ARRAY_APPEND,
-                                          NameAndTarget.first().data());
-      sourcekitd_request_array_set_string(VFSArgs, SOURCEKITD_ARRAY_APPEND,
-                                          NameAndTarget.second.c_str());
+      sourcekitd_object_t file = sourcekitd_request_dictionary_create(nullptr, nullptr, 0);
+      sourcekitd_request_dictionary_set_string(file, KeyName, NameAndTarget.first().data());
+      sourcekitd_request_dictionary_set_string(file, KeySourceFile,  NameAndTarget.second.c_str());
+      sourcekitd_request_array_set_value(files, SOURCEKITD_ARRAY_APPEND, file);
     }
-    sourcekitd_request_dictionary_set_value(Req, KeyVFSArgs, VFSArgs);
-    sourcekitd_request_release(VFSArgs);
+    sourcekitd_object_t vfsOpts = sourcekitd_request_dictionary_create(nullptr, nullptr, 0);
+    sourcekitd_request_dictionary_set_value(vfsOpts, KeyFiles, files);
+    sourcekitd_request_dictionary_set_value(Req, KeyVFSOptions, vfsOpts);
+    sourcekitd_request_release(vfsOpts);
+    sourcekitd_request_release(files);
   }
 
   if (!Opts.isAsyncRequest) {

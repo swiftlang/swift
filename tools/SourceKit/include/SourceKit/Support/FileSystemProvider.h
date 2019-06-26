@@ -42,11 +42,10 @@ public:
 
   /// Returns a llvm::vfs::FileSystem to be used while serving a request, or
   /// nullptr on failure.
-  /// \param Args arguments passed into the request under 'key.vfs.args'.
-  /// \param [out] ErrBuf filled with an error message on failure.
+  /// \param options arguments passed into the request under 'key.vfs.options'.
+  /// \param [out] error filled with an error message on failure.
   virtual llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
-  getFileSystem(const llvm::SmallVectorImpl<const char *> &Args,
-                llvm::SmallVectorImpl<char> &ErrBuf) = 0;
+  getFileSystem(OptionsDictionary &options, std::string &error) = 0;
 };
 
 } // namespace SourceKit

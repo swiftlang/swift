@@ -195,33 +195,48 @@ UIdent UIdentVisitor::visitExtensionDecl(const ExtensionDecl *D) {
 }
 
 namespace {
-/// A simple configurable FileSystemProvider, useful for tests that exercise
-/// the FileSystemProvider code.
+/// A simple FileSystemProvider that creates an InMemoryFileSystem for a given
+/// dictionary of file contents and overlays that on top of the real filesystem.
 class InMemoryFileSystemProvider: public SourceKit::FileSystemProvider {
   /// Provides the real filesystem, overlayed with an InMemoryFileSystem that
   /// contains specified files at specified locations.
-  /// \param Args The locations of the InMemoryFileSystem files, interleaved
-  //              with paths on the real filesystem to fetch their contents
-  //              from.
   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
-  getFileSystem(const llvm::SmallVectorImpl<const char *> &Args,
-                llvm::SmallVectorImpl<char> &ErrBuf) override {
+  getFileSystem(OptionsDictionary &options, std::string &error) override {
     auto InMemoryFS = llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem>(
         new llvm::vfs::InMemoryFileSystem());
-    for (unsigned i = 0; i < Args.size(); i += 2) {
-      const char *InMemoryName = Args[i];
-      const char *TargetPath = Args[i + 1];
-      auto TargetBufferOrErr = llvm::MemoryBuffer::getFile(TargetPath);
-      if (auto Err = TargetBufferOrErr.getError()) {
-        llvm::raw_svector_ostream ErrStream(ErrBuf);
-        ErrStream << "Error reading target file '" << TargetPath
-                  << "': " << Err.message() << "\n";
-        return nullptr;
+
+    static UIdent KeyFiles("key.files");
+    static UIdent KeyName("key.name");
+    static UIdent KeySourceFile("key.sourcefile");
+    bool failed = options.forEach(KeyFiles, [&](OptionsDictionary &file) {
+      StringRef name;
+      if (!file.valueForOption(KeyName, name)) {
+        error = "missing 'key.name'";
+        return true;
       }
-      auto RenamedTargetBuffer = llvm::MemoryBuffer::getMemBufferCopy(
-          TargetBufferOrErr.get()->getBuffer(), InMemoryName);
-      InMemoryFS->addFile(InMemoryName, 0, std::move(RenamedTargetBuffer));
-    }
+
+      StringRef mappedPath;
+      if (!file.valueForOption(KeySourceFile, mappedPath)) {
+        error = "missing 'key.sourcefile'";
+        return true;
+      }
+
+      auto bufferOrErr = llvm::MemoryBuffer::getFile(mappedPath);
+      if (auto err = bufferOrErr.getError()) {
+        llvm::raw_string_ostream errStream(error);
+        errStream << "error reading target file '" << mappedPath
+                  << "': " << err.message() << "\n";
+        return true;
+      }
+
+      auto renamedBuffer = llvm::MemoryBuffer::getMemBufferCopy(
+          bufferOrErr.get()->getBuffer(), name);
+      InMemoryFS->addFile(name, 0, std::move(renamedBuffer));
+      return false;
+    });
+
+    if (failed)
+      return nullptr;
 
     auto OverlayFS = llvm::IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem>(
         new llvm::vfs::OverlayFileSystem(llvm::vfs::getRealFileSystem()));
@@ -954,15 +969,7 @@ SwiftLangSupport::getFileSystem(const Optional<VFSOptions> &vfsOptions,
       return nullptr;
     }
 
-    SmallString<0> smallError;
-    auto fileSystem =
-        provider->getFileSystem(vfsOptions->arguments, smallError);
-    if (!fileSystem) {
-      error = smallError.str();
-      return nullptr;
-    }
-
-    return fileSystem;
+    return provider->getFileSystem(*vfsOptions->options, error);
   }
 
   // Otherwise, try to find an open document with a filesystem.

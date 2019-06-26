@@ -297,6 +297,7 @@ public:
   virtual bool valueForOption(UIdent Key, unsigned &Val) = 0;
   virtual bool valueForOption(UIdent Key, bool &Val) = 0;
   virtual bool valueForOption(UIdent Key, StringRef &Val) = 0;
+  virtual bool forEach(UIdent key, llvm::function_ref<bool(OptionsDictionary &)> applier) = 0;
 };
 
 struct Statistic;
@@ -307,8 +308,9 @@ struct VFSOptions {
   /// The name of the virtual file system to use.
   std::string name;
 
-  /// Arguments for the virtual file system provider.
-  SmallVector<const char *, 8> arguments;
+  /// Arguments for the virtual file system provider (may be null).
+  // FIXME: the lifetime is actually limited by the RequestDict.
+  std::unique_ptr<OptionsDictionary> options;
 };
 
 /// Used to wrap the result of a request. There are three possibilities:
