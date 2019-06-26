@@ -77,6 +77,7 @@ set(SWIFT_BENCH_MODULES
     single-source/DictionaryRemove
     single-source/DictionarySubscriptDefault
     single-source/DictionarySwap
+    single-source/Diffing
     single-source/DropFirst
     single-source/DropLast
     single-source/DropWhile
@@ -101,6 +102,7 @@ set(SWIFT_BENCH_MODULES
     single-source/Memset
     single-source/MonteCarloE
     single-source/MonteCarloPi
+    single-source/Myers
     single-source/NSDictionaryCastToSwift
     single-source/NSError
     single-source/NSStringConversion
