@@ -166,6 +166,7 @@ namespace CodeCompletion {
 class SessionCache : public ThreadSafeRefCountedBase<SessionCache> {
   std::unique_ptr<llvm::MemoryBuffer> buffer;
   std::vector<std::string> args;
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem;
   CompletionSink sink;
   std::vector<Completion *> sortedCompletions;
   CompletionKind completionKind;
@@ -177,10 +178,13 @@ class SessionCache : public ThreadSafeRefCountedBase<SessionCache> {
 public:
   SessionCache(CompletionSink &&sink,
                std::unique_ptr<llvm::MemoryBuffer> &&buffer,
-               std::vector<std::string> &&args, CompletionKind completionKind,
+               std::vector<std::string> &&args,
+               llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem,
+               CompletionKind completionKind,
                TypeContextKind typeContextKind, bool mayUseImplicitMemberExpr,
                FilterRules filterRules)
-      : buffer(std::move(buffer)), args(std::move(args)), sink(std::move(sink)),
+      : buffer(std::move(buffer)), args(std::move(args)),
+        fileSystem(std::move(fileSystem)), sink(std::move(sink)),
         completionKind(completionKind), typeContextKind(typeContextKind),
         completionMayUseImplicitMemberExpr(mayUseImplicitMemberExpr),
         filterRules(std::move(filterRules)) {}
@@ -188,6 +192,7 @@ public:
   ArrayRef<Completion *> getSortedCompletions();
   llvm::MemoryBuffer *getBuffer();
   ArrayRef<std::string> getCompilerArgs();
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> getFileSystem();
   const FilterRules &getFilterRules();
   CompletionKind getCompletionKind();
   TypeContextKind getCompletionTypeContextKind();
@@ -455,7 +460,8 @@ public:
                         unsigned offset, OptionsDictionary *options,
                         ArrayRef<FilterRule> rawFilterRules,
                         GroupedCodeCompletionConsumer &consumer,
-                        ArrayRef<const char *> args) override;
+                        ArrayRef<const char *> args,
+                        Optional<VFSOptions> vfsOptions) override;
 
   void codeCompleteClose(StringRef name, unsigned offset,
                          GroupedCodeCompletionConsumer &consumer) override;
