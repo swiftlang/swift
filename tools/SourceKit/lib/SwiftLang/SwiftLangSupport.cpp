@@ -208,6 +208,7 @@ class InMemoryFileSystemProvider: public SourceKit::FileSystemProvider {
     static UIdent KeyFiles("key.files");
     static UIdent KeyName("key.name");
     static UIdent KeySourceFile("key.sourcefile");
+    static UIdent KeySourceText("key.sourcetext");
     bool failed = options.forEach(KeyFiles, [&](OptionsDictionary &file) {
       StringRef name;
       if (!file.valueForOption(KeyName, name)) {
@@ -215,9 +216,16 @@ class InMemoryFileSystemProvider: public SourceKit::FileSystemProvider {
         return true;
       }
 
+      StringRef content;
+      if (file.valueForOption(KeySourceText, content)) {
+        auto buffer = llvm::MemoryBuffer::getMemBufferCopy(content, name);
+        InMemoryFS->addFile(name, 0, std::move(buffer));
+        return false;
+      }
+
       StringRef mappedPath;
       if (!file.valueForOption(KeySourceFile, mappedPath)) {
-        error = "missing 'key.sourcefile'";
+        error = "missing 'key.sourcefile' or 'key.sourcetext'";
         return true;
       }
 
