@@ -1272,6 +1272,11 @@ public:
     llvm_unreachable("unimplemented for ClangImporter");
   }
 
+  void loadRequirementSignature(const ProtocolDecl *decl, uint64_t contextData,
+                                SmallVectorImpl<Requirement> &reqs) override {
+    llvm_unreachable("unimplemented for ClangImporter");
+  }
+
   template <typename DeclTy, typename ...Targs>
   DeclTy *createDeclWithClangNode(ClangNode ClangN, AccessLevel access,
                                   Targs &&... Args) {

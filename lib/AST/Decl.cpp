@@ -69,6 +69,12 @@ STATISTIC(NumLazyGenericEnvironments,
           "# of lazily-deserialized generic environments known");
 STATISTIC(NumLazyGenericEnvironmentsLoaded,
           "# of lazily-deserialized generic environments loaded");
+STATISTIC(NumLazyRequirementSignatures,
+          "# of lazily-deserialized requirement signatures known");
+STATISTIC(NumLazyRequirementSignaturesLoaded,
+          "# of lazily-deserialized requirement signatures loaded");
+
+#undef DEBUG_TYPE
 
 #define DECL(Id, _) \
   static_assert((DeclKind::Id == DeclKind::Module) ^ \
@@ -4571,6 +4577,29 @@ void ProtocolDecl::createGenericParamsIfMissing() {
 void ProtocolDecl::computeRequirementSignature() {
   assert(!RequirementSignature && "already computed requirement signature");
 
+  // First check if we have a deserializable requirement signature.
+  if (hasLazyRequirementSignature()) {
+    ASTContext &ctx = getASTContext();
+
+    ++NumLazyRequirementSignaturesLoaded;
+    // FIXME: (transitional) increment the redundant "always-on" counter.
+    if (ctx.Stats)
+      ctx.Stats->getFrontendCounters().NumLazyRequirementSignaturesLoaded++;
+    Bits.ProtocolDecl.HasLazyRequirementSignature = false;
+
+    auto contextData = static_cast<LazyProtocolData *>(
+        ctx.getOrCreateLazyContextData(this, nullptr));
+
+    SmallVector<Requirement, 8> requirements;
+    contextData->loader->loadRequirementSignature(
+        this, contextData->requirementSignatureData, requirements);
+    if (requirements.empty())
+      setRequirementSignature(requirements);
+    else
+      setRequirementSignature(ctx.AllocateCopy(requirements));
+    return;
+  }
+
   // Compute and record the signature.
   auto requirementSig =
     GenericSignatureBuilder::computeRequirementSignature(this);
@@ -4586,9 +4615,25 @@ void ProtocolDecl::setRequirementSignature(ArrayRef<Requirement> requirements) {
     RequirementSignature = reinterpret_cast<Requirement *>(this + 1);
     Bits.ProtocolDecl.NumRequirementsInSignature = 0;
   } else {
-    RequirementSignature = getASTContext().AllocateCopy(requirements).data();
+    RequirementSignature = requirements.data();
     Bits.ProtocolDecl.NumRequirementsInSignature = requirements.size();
   }
+}
+
+void
+ProtocolDecl::setLazyRequirementSignature(LazyMemberLoader *lazyLoader,
+                                          uint64_t requirementSignatureData) {
+  assert(!RequirementSignature && "requirement signature already set");
+
+  auto contextData = static_cast<LazyProtocolData *>(
+      getASTContext().getOrCreateLazyContextData(this, lazyLoader));
+  contextData->requirementSignatureData = requirementSignatureData;
+  Bits.ProtocolDecl.HasLazyRequirementSignature = true;
+
+  ++NumLazyRequirementSignatures;
+  // FIXME: (transitional) increment the redundant "always-on" counter.
+  if (getASTContext().Stats)
+    getASTContext().Stats->getFrontendCounters().NumLazyRequirementSignatures++;
 }
 
 void ProtocolDecl::computeKnownProtocolKind() const {

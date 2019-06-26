@@ -3374,8 +3374,11 @@ ResolveWitnessResult ConformanceChecker::resolveTypeWitnessViaLookup(
   }
 
   if (!Proto->isRequirementSignatureComputed()) {
-    Conformance->setInvalid();
-    return ResolveWitnessResult::Missing;
+    Proto->computeRequirementSignature();
+    if (!Proto->isRequirementSignatureComputed()) {
+      Conformance->setInvalid();
+      return ResolveWitnessResult::Missing;
+    }
   }
 
   // Look for a member type with the same name as the associated type.
@@ -3527,10 +3530,14 @@ void ConformanceChecker::addUsedConformances(ProtocolConformance *conformance) {
 void ConformanceChecker::ensureRequirementsAreSatisfied(
                                                      bool failUnsubstituted) {
   auto proto = Conformance->getProtocol();
-  // Some other problem stopped the signature being computed.
+
   if (!proto->isRequirementSignatureComputed()) {
-    Conformance->setInvalid();
-    return;
+    proto->computeRequirementSignature();
+    if (!proto->isRequirementSignatureComputed()) {
+      // Some other problem stopped the signature being computed.
+      Conformance->setInvalid();
+      return;
+    }
   }
 
   if (CheckedRequirementSignature)

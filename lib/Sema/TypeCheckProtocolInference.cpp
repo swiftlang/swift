@@ -1097,7 +1097,11 @@ bool AssociatedTypeInference::checkCurrentTypeWitnesses(
          &valueWitnesses) {
   // If we don't have a requirement signature for this protocol, bail out.
   // FIXME: We should never get to this point. Or we should always fail.
-  if (!proto->isRequirementSignatureComputed()) return false;
+  if (!proto->isRequirementSignatureComputed()) {
+    proto->computeRequirementSignature();
+    if (!proto->isRequirementSignatureComputed())
+      return false;
+  }
 
   // Check any same-type requirements in the protocol's requirement signature.
   SubstOptions options = getSubstOptionsWithCurrentTypeWitnesses();
