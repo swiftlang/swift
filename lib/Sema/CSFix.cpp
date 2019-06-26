@@ -280,7 +280,7 @@ InsertExplicitCall *InsertExplicitCall::create(ConstraintSystem &cs,
 
 bool UsePropertyWrapperType::diagnose(Expr *root, bool asNote) const {
   auto failure = ExtraneousPropertyWrapperUnwrapFailure(
-      root, getConstraintSystem(), Name, Base, IsMemberAccess, Wrapper,
+      root, getConstraintSystem(), Name, Base, Wrapper, IsMemberAccess,
       getLocator());
   return failure.diagnose(asNote);
 }
@@ -295,17 +295,16 @@ UsePropertyWrapperType::create(ConstraintSystem &cs, DeclName name, Type base,
 
 bool UseWrappedPropertyType::diagnose(Expr *root, bool asNote) const {
   auto failure = MissingPropertyWrapperUnwrapFailure(
-      root, getConstraintSystem(), Name, Base, IsMemberAccess, Wrapper,
-      getLocator());
+      root, getConstraintSystem(), Name, Base, Wrapper, IsMemberAccess,
+      FromStorageWrapper, getLocator());
   return failure.diagnose(asNote);
 }
 
-UseWrappedPropertyType *
-UseWrappedPropertyType::create(ConstraintSystem &cs, DeclName name, Type base,
-                               Type wrapper, bool isMemberAccess,
-                               ConstraintLocator *locator) {
-  return new (cs.getAllocator())
-      UseWrappedPropertyType(cs, name, base, wrapper, isMemberAccess, locator);
+UseWrappedPropertyType *UseWrappedPropertyType::create(
+    ConstraintSystem &cs, DeclName name, Type base, Type wrapper,
+    bool isMemberAccess, bool fromStorageWrapper, ConstraintLocator *locator) {
+  return new (cs.getAllocator()) UseWrappedPropertyType(
+      cs, name, base, wrapper, isMemberAccess, fromStorageWrapper, locator);
 }
 
 bool UseSubscriptOperator::diagnose(Expr *root, bool asNote) const {

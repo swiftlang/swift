@@ -982,5 +982,6 @@ struct MissingPropertyWrapperUnwrap {
     self.$w.onWrapped() // expected-error {{value of type 'Foo<W>' has no member 'onWrapped', requires wrapped type 'W'}} {{10-10=}}
     self.usesWrapperValue.onWrapperValue() // expected-error {{value of type 'W' has no member 'onWrapperValue', requires wrapper type 'V'}}{{10-10=$}}
     self.$usesWrapperValue.onWrapped() // expected-error {{value of type 'V' has no member 'onWrapped', requires wrapped type 'W'}}{{10-10=}}
+    self.$$usesWrapperValue.onWrapped() // expected-error {{value of type 'Baz<W>' has no member 'onWrapped', requires wrapped type 'W'}}{{10-11=}}
   }
 }

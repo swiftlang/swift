@@ -1989,9 +1989,13 @@ bool MissingPropertyWrapperUnwrapFailure::diagnoseAsError() {
   if (isMemberAccess())
     diagnostic = diag::missing_property_wrapper_unwrap_member_access;
 
+  // If we're going from a storage wrapper, remove only one $. Remove two
+  // if we're coming from the backing storage.
+  auto endLoc =
+      getAnchor()->getLoc().getAdvancedLoc(isFromStorageWrapper() ? 0 : 1);
   emitDiagnostic(getAnchor()->getLoc(), diagnostic, getName(), getFromType(),
                  getToType())
-      .fixItRemoveChars(getAnchor()->getLoc(), getAnchor()->getLoc());
+      .fixItRemoveChars(getAnchor()->getLoc(), endLoc);
   return true;
 }
 
