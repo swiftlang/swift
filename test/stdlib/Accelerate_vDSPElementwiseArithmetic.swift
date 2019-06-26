@@ -20,7 +20,7 @@ func lround(_ x: Float) -> Int {
     return lround(Double(x))
 }
 
-if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
+if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
     
     var result = [Float.nan]
     
@@ -461,7 +461,7 @@ if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
 //
 //===----------------------------------------------------------------------===//
 
-if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
+if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
     
     var result = [Double.nan]
     
