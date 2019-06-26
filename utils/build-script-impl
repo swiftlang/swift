@@ -3342,6 +3342,9 @@ for host in "${ALL_HOSTS[@]}"; do
                     echo "Skipping PlaygroundLogger tests on non-macOS platform"
                     continue
                 fi
+
+                echo "Skipping PlaygroundLogger tests due to rdar://47528005"
+                continue
                 
                 PLAYGROUNDSUPPORT_BUILD_DIR=$(build_directory ${host} ${product})
                 SWIFTC_BIN="$(build_directory_bin ${host} swift)/swiftc"
