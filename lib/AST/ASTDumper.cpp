@@ -310,16 +310,6 @@ static StringRef getDefaultArgumentKindString(DefaultArgumentKind value) {
 
   llvm_unreachable("Unhandled DefaultArgumentKind in switch.");
 }
-static StringRef getAccessorKindString(AccessorKind value) {
-  switch (value) {
-#define ACCESSOR(ID)
-#define SINGLETON_ACCESSOR(ID, KEYWORD) \
-  case AccessorKind::ID: return #KEYWORD;
-#include "swift/AST/AccessorKinds.def"
-  }
-
-  llvm_unreachable("Unhandled AccessorKind in switch.");
-}
 static StringRef
 getMagicIdentifierLiteralExprKindString(MagicIdentifierLiteralExpr::Kind value) {
   switch (value) {
@@ -3758,4 +3748,15 @@ void GenericEnvironment::dump(raw_ostream &os) const {
 
 void GenericEnvironment::dump() const {
   dump(llvm::errs());
+}
+
+StringRef swift::getAccessorKindString(AccessorKind value) {
+  switch (value) {
+#define ACCESSOR(ID)
+#define SINGLETON_ACCESSOR(ID, KEYWORD) \
+  case AccessorKind::ID: return #KEYWORD;
+#include "swift/AST/AccessorKinds.def"
+  }
+
+  llvm_unreachable("Unhandled AccessorKind in switch.");
 }

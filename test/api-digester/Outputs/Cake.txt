@@ -9,13 +9,11 @@ cake: Protocol P3 has generic signature change from <Self : cake.P1, Self : cake
 Swift: Extension Int has been removed
 cake: Accessor GlobalVarChangedToLet.Set() has been removed
 cake: Accessor RemoveSetters.Value.Set() has been removed
+cake: Accessor RemoveSetters.subscript(_:).Set() has been removed
 cake: AssociatedType RequiementChanges.removedType has been removed
 cake: Constructor Somestruct2.init(_:) has been removed
 cake: Func C4.foo() has been removed
 cake: Func RequiementChanges.removedFunc() has been removed
-cake: Subscript RemoveSetters.subscript(_:) has removed its setter
-cake: Var GlobalVarChangedToLet has removed its setter
-cake: Var RemoveSetters.Value has removed its setter
 cake: Var RequiementChanges.removedVar has been removed
 
 /* Moved Decls */
