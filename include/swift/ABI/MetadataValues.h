@@ -733,6 +733,14 @@ enum class FunctionMetadataConvention: uint8_t {
   CFunctionPointer = 3,
 };
 
+/// Differentiability kind for function type metadata.
+/// Duplicates `DifferentiabilityKind` in AutoDiff.h.
+enum class FunctionMetadataDifferentiabilityKind: uint8_t {
+  NonDifferentiable = 0b00,
+  Normal = 0b01,
+  Linear = 0b11
+};
+
 /// Flags in a function type metadata record.
 template <typename int_type>
 class TargetFunctionTypeFlags {
@@ -747,7 +755,8 @@ class TargetFunctionTypeFlags {
     ParamFlagsMask    = 0x02000000U,
     EscapingMask      = 0x04000000U,
     // SWIFT_ENABLE_TENSORFLOW
-    DifferentiableMask  = 0x08000000U
+    DifferentiableMask  = 0x08000000U,
+    LinearMask          = 0x10000000U
   };
   int_type Data;
   
@@ -785,10 +794,14 @@ public:
   }
   
   // SWIFT_ENABLE_TENSORFLOW
-  constexpr TargetFunctionTypeFlags<int_type>
-  withDifferentiable(bool isDifferentiable) const {
-    return TargetFunctionTypeFlags<int_type>((Data & ~DifferentiableMask) |
-                                   (isDifferentiable ? DifferentiableMask : 0));
+  constexpr TargetFunctionTypeFlags<int_type> withDifferentiabilityKind(
+      FunctionMetadataDifferentiabilityKind differentiability) const {
+    return TargetFunctionTypeFlags<int_type>(
+        (Data & ~DifferentiableMask & ~LinearMask) |
+        (differentiability == FunctionMetadataDifferentiabilityKind::Normal
+             ? DifferentiableMask : 0) |
+        (differentiability == FunctionMetadataDifferentiabilityKind::Linear
+             ? LinearMask : 0));
   }
 
   unsigned getNumParameters() const { return Data & NumParametersMask; }
@@ -807,7 +820,15 @@ public:
   
   // SWIFT_ENABLE_TENSORFLOW
   bool isDifferentiable() const {
-    return bool (Data & DifferentiableMask);
+    return getDifferentiabilityKind() >=
+        FunctionMetadataDifferentiabilityKind::Normal;
+  }
+  FunctionMetadataDifferentiabilityKind getDifferentiabilityKind() const {
+    if (bool(Data & DifferentiableMask))
+      return FunctionMetadataDifferentiabilityKind::Normal;
+    if (bool(Data & LinearMask))
+      return FunctionMetadataDifferentiabilityKind::Linear;
+    return FunctionMetadataDifferentiabilityKind::NonDifferentiable;
   }
 
   bool hasParameterFlags() const { return bool(Data & ParamFlagsMask); }

@@ -388,8 +388,18 @@ Type ASTBuilder::createFunctionType(
   }
 
   // SWIFT_ENABLE_TENSORFLOW
-  if (flags.isDifferentiable())
+  switch (flags.getDifferentiabilityKind()) {
+  case FunctionMetadataDifferentiabilityKind::NonDifferentiable:
+    einfo =
+        einfo.withDifferentiabilityKind(DifferentiabilityKind::NonDifferentiable);
+    break;
+  case FunctionMetadataDifferentiabilityKind::Normal:
     einfo = einfo.withDifferentiabilityKind(DifferentiabilityKind::Normal);
+    break;
+  case FunctionMetadataDifferentiabilityKind::Linear:
+    einfo = einfo.withDifferentiabilityKind(DifferentiabilityKind::Linear);
+    break;
+  }
 
   // The result type must be materializable.
   if (!output->isMaterializable()) return Type();

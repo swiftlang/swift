@@ -1159,6 +1159,30 @@ void Remangler::mangleThinFunctionType(Node *node) {
   mangleChildNodes(node); // argument tuple, result type
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+void Remangler::mangleDifferentiableFunctionType(Node *node) {
+  Buffer << "XF";
+  mangleChildNodes(node); // argument tuple, result type
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+void Remangler::mangleEscapingDifferentiableFunctionType(Node *node) {
+  Buffer << "XG";
+  mangleChildNodes(node); // argument tuple, result type
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+void Remangler::mangleLinearFunctionType(Node *node) {
+  Buffer << "XH";
+  mangleChildNodes(node); // argument tuple, result type
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+void Remangler::mangleEscapingLinearFunctionType(Node *node) {
+  Buffer << "XI";
+  mangleChildNodes(node); // argument tuple, result type
+}
+
 void Remangler::mangleArgumentTuple(Node *node) {
   mangleSingleChildNode(node);
 }
