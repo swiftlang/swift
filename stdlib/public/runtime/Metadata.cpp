@@ -3954,10 +3954,10 @@ template <>
 LLVM_ATTRIBUTE_USED
 void TypeContextDescriptor::dump() const {
   printf("TargetTypeContextDescriptor.\n");
-  printf("Flags: 0x%x.\n", this->Flags);
+  printf("Flags: 0x%x.\n", this->Flags.getIntValue());
   printf("Parent: %p.\n", this->Parent.get());
   printf("Name: %s.\n", Name.get());
-  printf("Access function: %p.\n", getAccessFunction());
+  printf("Access function: %p.\n", static_cast<void *>(getAccessFunction()));
   printf("Fields: %p.\n", Fields.get());
 }
 
@@ -3965,13 +3965,13 @@ template<>
 LLVM_ATTRIBUTE_USED
 void EnumDescriptor::dump() const {
   printf("TargetEnumDescriptor.\n");
-  printf("Flags: 0x%x.\n", this->Flags);
+  printf("Flags: 0x%x.\n", this->Flags.getIntValue());
   printf("Parent: %p.\n", this->Parent.get());
   printf("Name: %s.\n", Name.get());
-  printf("Access function: %p.\n", getAccessFunction());
+  printf("Access function: %p.\n", static_cast<void *>(getAccessFunction()));
   printf("Fields: %p.\n", Fields.get());
   printf("NumPayloadCasesAndPayloadSizeOffset: 0x%08x "
-         "(payload cases: %u - payload size offset: %u).\n",
+         "(payload cases: %u - payload size offset: %zu).\n",
          NumPayloadCasesAndPayloadSizeOffset,
          getNumPayloadCases(), getPayloadSizeOffset());
   printf("NumEmptyCases: %u\n", NumEmptyCases);
