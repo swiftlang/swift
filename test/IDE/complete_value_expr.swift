@@ -637,8 +637,8 @@ func testSwitch1() {
 }
 
 // IN_SWITCH_CASE: Begin completions
-// IN_SWITCH_CASE-DAG: Decl[GlobalVar]/CurrModule: fooObject[#FooStruct#]{{; name=.+$}}
-// IN_SWITCH_CASE-DAG: Decl[Struct]/CurrModule:    FooStruct[#FooStruct#]{{; name=.+$}}
+// IN_SWITCH_CASE-DAG: Decl[GlobalVar]/CurrModule{{(/TypeRelation\[Identical\])?}}: fooObject[#FooStruct#]{{; name=.+$}}
+// IN_SWITCH_CASE-DAG: Decl[Struct]/CurrModule{{(/TypeRelation\[Identical\])?}}:    FooStruct[#FooStruct#]{{; name=.+$}}
 // IN_SWITCH_CASE: End completions
 
 //===--- Helper types that are used in this test
