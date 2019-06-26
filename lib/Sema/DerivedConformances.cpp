@@ -319,8 +319,8 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
     }
 
     // SWIFT_ENABLE_TENSORFLOW
-    // PointwiseMultiplicative.*
-    if (func->isOperator() && name.getBaseName() == "*") {
+    // PointwiseMultiplicative.(.*)
+    if (func->isOperator() && name.getBaseName() == ".*") {
       auto argumentNames = name.getArgumentNames();
       if (argumentNames.size() == 2)
         return getRequirement(KnownProtocolKind::PointwiseMultiplicative);

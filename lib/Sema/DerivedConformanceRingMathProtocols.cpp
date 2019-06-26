@@ -36,7 +36,7 @@ enum MathOperator {
   Add,
   // `-(Self, Self)`: AdditiveArithmetic
   Subtract,
-  // `*(Self, Self)`: PointwiseMultiplicative
+  // `.*(Self, Self)`: PointwiseMultiplicative
   Multiply
 };
 
@@ -47,7 +47,7 @@ static StringRef getMathOperatorName(MathOperator op) {
   case Subtract:
     return "-";
   case Multiply:
-    return "*";
+    return ".*";
   }
 }
 
@@ -405,7 +405,7 @@ DerivedConformance::derivePointwiseMultiplicative(ValueDecl *requirement) {
     return nullptr;
   // Create memberwise initializer for nominal type if it doesn't already exist.
   getOrCreateEffectiveMemberwiseInitializer(TC, Nominal);
-  if (requirement->getBaseName() == TC.Context.getIdentifier("*"))
+  if (requirement->getBaseName() == TC.Context.getIdentifier(".*"))
     return deriveMathOperator(*this, Multiply);
   if (requirement->getBaseName() == TC.Context.Id_one)
     return derivePointwiseMultiplicative_one(*this);

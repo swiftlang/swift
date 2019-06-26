@@ -16,17 +16,20 @@
 //
 //===----------------------------------------------------------------------===//
 
+infix operator .* : MultiplicationPrecedence
+infix operator .*= : AssignmentPrecedence
+
 //===----------------------------------------------------------------------===//
 // Compiler Protocols
 //===----------------------------------------------------------------------===//
 
 /// A type with values that support pointwise multiplication.
 // TODO: Add API documentation.
-public protocol PointwiseMultiplicative : Equatable {
+public protocol PointwiseMultiplicative : AdditiveArithmetic {
   /// The one value.
   ///
   /// One is the identity element for multiplication. For any value,
-  /// `x * .one == x` and `.one * x == x`.
+  /// `x .* .one == x` and `.one .* x == x`.
   static var one: Self { get }
 
   /// Multiplies two values and produces their product.
@@ -34,19 +37,19 @@ public protocol PointwiseMultiplicative : Equatable {
   /// - Parameters:
   ///   - lhs: The first value to multiply.
   ///   - rhs: The second value to multiply.
-  static func *(lhs: Self, rhs: Self) -> Self
+  static func .*(lhs: Self, rhs: Self) -> Self
 
   /// Multiplies two values and produces their product.
   ///
   /// - Parameters:
   ///   - lhs: The first value to multiply.
   ///   - rhs: The second value to multiply.
-  static func *=(lhs: inout Self, rhs: Self)
+  static func .*=(lhs: inout Self, rhs: Self)
 }
 
 public extension PointwiseMultiplicative {
-  static func *=(lhs: inout Self, rhs: Self) {
-    lhs = lhs * rhs
+  static func .*=(lhs: inout Self, rhs: Self) {
+    lhs = lhs .* rhs
   }
 }
 
