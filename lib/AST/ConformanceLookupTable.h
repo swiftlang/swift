@@ -332,12 +332,18 @@ class ConformanceLookupTable {
   bool addProtocol(ProtocolDecl *protocol, SourceLoc loc,
                    ConformanceSource source);
 
-  /// Add the protocols from the given list.
+  /// Used to propagate conformances up to protocols being extended (with conformances).
+  using Propagator = std::function<void (ProtocolDecl *inheritedProto)>;
+
+  /// Add the protocols from the given list, register conformance infered from protocol extension.
   void addInheritedProtocols(
                          NominalTypeDecl *nominal,
                          llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
-                         ConformanceSource source, int depth = 0);
+                         ConformanceSource source, int depth = 0, 
+                         SourceLoc loc = SourceLoc(),
+                         Propagator *propagator = nullptr);
 
+  /// Register the conformance of the notional against the protocl for when witness tables are emitted.
   void addWitnessRequirement(NominalTypeDecl *nominal, ProtocolDecl *proto,
                              ExtensionDecl *ext);
 
