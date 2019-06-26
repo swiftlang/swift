@@ -866,89 +866,28 @@ static VarDecl *getImplicitSelfDeclForSuperContext(Parser &P,
 ///     'super' '.' 'init'
 ///   expr-super-subscript:
 ///     'super' '[' expr ']'
-ParserResult<Expr> Parser::parseExprSuper(bool isExprBasic) {
+ParserResult<Expr> Parser::parseExprSuper() {
   SyntaxParsingContext SuperCtxt(SyntaxContext, SyntaxContextKind::Expr);
   // Parse the 'super' reference.
   SourceLoc superLoc = consumeToken(tok::kw_super);
-  
-  VarDecl *selfDecl = getImplicitSelfDeclForSuperContext(*this,
-                                                         CurDeclContext,
-                                                         superLoc);
-  bool ErrorOccurred = selfDecl == nullptr;
-
   SyntaxContext->createNodeInPlace(SyntaxKind::SuperRefExpr);
-  Expr *superRef = !ErrorOccurred
-    ? cast<Expr>(new (Context) SuperRefExpr(selfDecl, superLoc,
-                                            /*Implicit=*/false))
-    : cast<Expr>(new (Context) ErrorExpr(superLoc));
-  
-  if (Tok.isAny(tok::period, tok::period_prefix)) {
-    // 'super.' must be followed by a member or initializer ref.
 
-    SourceLoc dotLoc = consumeToken();
-    
-    if (Tok.is(tok::code_complete)) {
-      if (CodeCompletion) {
-        if (auto *SRE = dyn_cast<SuperRefExpr>(superRef))
-          CodeCompletion->completeExprSuperDot(SRE);
-      }
-
-      // Eat the code completion token because we handled it.
-      consumeToken(tok::code_complete);
-      return makeParserCodeCompletionResult(superRef);
-    }
-
-    DeclNameLoc nameLoc;
-    DeclName name = parseUnqualifiedDeclName(/*afterDot=*/true, nameLoc,
-                      diag::expected_identifier_after_super_dot_expr);
-    if (!name)
-      return nullptr;
-
-    SyntaxContext->createNodeInPlace(SyntaxKind::MemberAccessExpr);
-    return makeParserResult(
-             new (Context) UnresolvedDotExpr(superRef, dotLoc, name, nameLoc,
-                                             /*Implicit=*/false));
-  }
-
-  if (Tok.isFollowingLSquare()) {
-    // super[expr]
-    SourceLoc lSquareLoc, rSquareLoc;
-    SmallVector<Expr *, 2> indexArgs;
-    SmallVector<Identifier, 2> indexArgLabels;
-    SmallVector<SourceLoc, 2> indexArgLabelLocs;
-    Expr *trailingClosure;
-
-    ParserStatus status = parseExprList(tok::l_square, tok::r_square,
-                                        /*isPostfix=*/true, isExprBasic,
-                                        lSquareLoc, indexArgs, indexArgLabels,
-                                        indexArgLabelLocs,
-                                        rSquareLoc,
-                                        trailingClosure,
-                                        SyntaxKind::FunctionCallArgumentList);
-    SyntaxContext->createNodeInPlace(SyntaxKind::SubscriptExpr);
-    return makeParserResult(
-      status,
-      SubscriptExpr::create(Context, superRef, lSquareLoc, indexArgs,
-                            indexArgLabels, indexArgLabelLocs, rSquareLoc,
-                            trailingClosure, ConcreteDeclRef(),
-                            /*implicit=*/false));
-  }
-
-  if (Tok.is(tok::code_complete)) {
-    if (CodeCompletion) {
-      if (auto *SRE = dyn_cast<SuperRefExpr>(superRef))
-      CodeCompletion->completeExprSuper(SRE);
-    }
-    // Eat the code completion token because we handled it.
-    consumeToken(tok::code_complete);
-    return makeParserCodeCompletionResult(superRef);
-  }
-  
-  if (consumeIf(tok::unknown))
+  // 'super.' must be followed by a member ref, explicit initializer ref, or
+  // subscript call.
+  if (Tok.isNot(tok::period, tok::period_prefix, tok::l_square,
+                tok::code_complete)) {
+    if (!consumeIf(tok::unknown))
+      diagnose(Tok, diag::expected_dot_or_subscript_after_super);
     return nullptr;
-  
-  diagnose(Tok, diag::expected_dot_or_subscript_after_super);
-  return nullptr;
+  }
+
+  VarDecl *selfDecl =
+      getImplicitSelfDeclForSuperContext(*this, CurDeclContext, superLoc);
+  if (!selfDecl)
+    return makeParserResult(new (Context) ErrorExpr(superLoc));
+
+  return makeParserResult(new (Context) SuperRefExpr(selfDecl, superLoc,
+                                                     /*Implicit=*/false));
 }
 
 /// Copy a numeric literal value into AST-owned memory, stripping underscores
@@ -1188,8 +1127,10 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
       }
 
       DeclNameLoc NameLoc;
-      DeclName Name = parseUnqualifiedDeclName(/*afterDot=*/true, NameLoc,
-                                               diag::expected_member_name);
+      Diag<> D = isa<SuperRefExpr>(Result.get())
+                     ? diag::expected_identifier_after_super_dot_expr
+                     : diag::expected_member_name;
+      DeclName Name = parseUnqualifiedDeclName(/*afterDot=*/true, NameLoc, D);
       if (!Name)
         return nullptr;
       SyntaxContext->createNodeInPlace(SyntaxKind::MemberAccessExpr);
@@ -1688,8 +1629,8 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
                                             /*implicit=*/false));
   }
       
-  case tok::kw_super: // super.foo or super[foo]
-    return parseExprSuper(isExprBasic);
+  case tok::kw_super: // 'super'
+    return parseExprSuper();
 
   case tok::l_paren:
     // Build a tuple expression syntax node.

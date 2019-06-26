@@ -485,8 +485,6 @@ enum class CompletionKind {
   PostfixExprBeginning,
   PostfixExpr,
   PostfixExprParen,
-  SuperExpr,
-  SuperExprDot,
   KeyPathExprObjC,
   KeyPathExprSwift,
   TypeDeclResultBeginning,
