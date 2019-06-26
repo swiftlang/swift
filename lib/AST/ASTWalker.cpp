@@ -1555,20 +1555,28 @@ Stmt *Traversal::visitForEachStmt(ForEachStmt *S) {
 
   // The iterator decl is built directly on top of the sequence
   // expression, so don't visit both.
-  if (PatternBindingDecl *Iterator = S->getIterator()) {
-    if (doIt(Iterator))
-      return nullptr;
-
-  } else if (Expr *Sequence = S->getSequence()) {
+  if (Expr *Sequence = S->getSequence()) {
     if ((Sequence = doIt(Sequence)))
       S->setSequence(Sequence);
     else
       return nullptr;
   }
 
-  if (auto IteratorNext = S->getIteratorNext()) {
+  if (auto IteratorNext = S->getConvertElementExpr()) {
     if ((IteratorNext = doIt(IteratorNext)))
-      S->setIteratorNext(IteratorNext);
+      S->setConvertElementExpr(IteratorNext);
+    else
+      return nullptr;
+  }
+
+  if (auto IteratorVar = S->getIteratorVar()) {
+    if (doIt(IteratorVar))
+      return nullptr;
+  }
+
+  if (auto IteratorVarRef = S->getIteratorVarRef()) {
+    if ((IteratorVarRef = doIt(IteratorVarRef)))
+      S->setIteratorVarRef(IteratorVarRef);
     else
       return nullptr;
   }
