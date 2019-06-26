@@ -139,8 +139,11 @@ class C {
   func j() -> Self.Type {}
   // expected-error@-1 {{covariant 'Self' can only appear at the top level of method result type}}
 
-  let p0: Self?
-  var p1: Self? // expected-error {{mutable property cannot have covariant 'Self' type}}
+  let p0: Self? // expected-error {{stored property cannot have covariant 'Self' type}}
+  var p1: Self? // expected-error {{stored property cannot have covariant 'Self' type}}
+
+  static func staticFunc() -> Self {}
+  let stored: Self = Self.staticFunc() // expected-error {{stored property cannot have covariant 'Self' type}}
 
   var prop: Self { // expected-error {{mutable property cannot have covariant 'Self' type}}
     get {

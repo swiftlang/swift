@@ -2376,9 +2376,11 @@ public:
     if (VD->getDeclContext()->getSelfClassDecl()) {
       checkDynamicSelfType(VD, VD->getValueInterfaceType());
 
-      if (VD->getValueInterfaceType()->hasDynamicSelfType() &&
-          VD->isSettable(nullptr)) {
-        VD->diagnose(diag::dynamic_self_in_mutable_property);
+      if (VD->getValueInterfaceType()->hasDynamicSelfType()) {
+        if (VD->hasStorage())
+          VD->diagnose(diag::dynamic_self_in_stored_property);
+        else if (VD->isSettable(nullptr))
+          VD->diagnose(diag::dynamic_self_in_mutable_property);
       }
     }
 

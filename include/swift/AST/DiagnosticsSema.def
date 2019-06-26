@@ -2581,6 +2581,8 @@ ERROR(dynamic_self_invalid,none,
       "did you mean '%0'?", (StringRef))
 ERROR(dynamic_self_in_mutable_property,none,
       "mutable property cannot have covariant 'Self' type", ())
+ERROR(dynamic_self_in_stored_property,none,
+      "stored property cannot have covariant 'Self' type", ())
 ERROR(dynamic_self_in_mutable_subscript,none,
       "mutable subscript cannot have covariant 'Self' type", ())
 ERROR(dynamic_self_invalid_property,none,
