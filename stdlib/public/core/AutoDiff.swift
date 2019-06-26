@@ -398,7 +398,7 @@ public func valueWithPullback<T, U, V, R>(
 @available(*, unavailable)
 @inlinable
 public func differential<T, R>(
-  at x: T, in body: @differentiable(T) -> R
+  at x: T, in body: @differentiable (T) -> R
 ) -> @differentiable/*(linear)*/ (T.TangentVector) -> R.TangentVector {
   fatalError()
 }
@@ -406,7 +406,7 @@ public func differential<T, R>(
 @available(*, unavailable)
 @inlinable
 public func differential<T, U, R>(
-  at x: T, _ y: U, in body: @differentiable(T, U) -> R
+  at x: T, _ y: U, in body: @differentiable (T, U) -> R
 ) -> @differentiable/*(linear)*/ (T.TangentVector, U.TangentVector)
     -> R.TangentVector {
   fatalError()
