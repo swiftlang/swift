@@ -568,6 +568,9 @@ getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived,
   auto diffableType = TypeLoc::withoutLoc(diffableProto->getDeclaredType());
   auto *addArithProto = C.getProtocol(KnownProtocolKind::AdditiveArithmetic);
   auto addArithType = TypeLoc::withoutLoc(addArithProto->getDeclaredType());
+  auto *pointMulProto =
+      C.getProtocol(KnownProtocolKind::PointwiseMultiplicative);
+  auto pointMulType = TypeLoc::withoutLoc(pointMulProto->getDeclaredType());
   auto *mathProto = C.getProtocol(KnownProtocolKind::ElementaryFunctions);
   auto mathType = TypeLoc::withoutLoc(mathProto->getDeclaredType());
   auto *vectorProto = C.getProtocol(KnownProtocolKind::VectorProtocol);
@@ -575,7 +578,7 @@ getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived,
   auto *kpIterableProto = C.getProtocol(KnownProtocolKind::KeyPathIterable);
   auto kpIterableType = TypeLoc::withoutLoc(kpIterableProto->getDeclaredType());
 
-  SmallVector<TypeLoc, 3> inherited{diffableType};
+  SmallVector<TypeLoc, 4> inherited{diffableType};
 
   // Cache original members and their associated types for later use.
   SmallVector<VarDecl *, 8> diffProperties;
@@ -592,6 +595,14 @@ getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived,
       llvm::all_of(diffProperties, [&](VarDecl *vd) {
         return TC.conformsToProtocol(getAssociatedType(vd, parentDC, id),
                                      addArithProto, parentDC, None);
+      });
+
+  // Associated struct can derive `PointwiseMultiplicative` if the associated
+  // types of all stored properties conform to `PointwiseMultiplicative`.
+  bool canDerivePointwiseMultiplicative =
+      llvm::all_of(diffProperties, [&](VarDecl *vd) {
+        return TC.conformsToProtocol(getAssociatedType(vd, parentDC, id),
+                                     pointMulProto, parentDC, None);
       });
 
   // Associated struct can derive `ElementaryFunctions` if the associated types
@@ -634,6 +645,10 @@ getOrSynthesizeSingleAssociatedStruct(DerivedConformance &derived,
                               None))
       inherited.push_back(kpIterableType);
   }
+  // If all members conform to `PointwiseMultiplicative`, make the associated
+  // struct conform to `PointwiseMultiplicative`.
+  if (canDerivePointwiseMultiplicative)
+    inherited.push_back(pointMulType);
   // If all members conform to `ElementaryFunctions`, make the associated struct
   // conform to `ElementaryFunctions`.
   if (canDeriveElementaryFunctions)

@@ -2548,26 +2548,22 @@ ERROR(broken_encodable_requirement,none,
 ERROR(broken_decodable_requirement,none,
       "Decodable protocol is broken: unexpected requirement", ())
 // SWIFT_ENABLE_TENSORFLOW
-ERROR(broken_key_path_iterable_requirement,none,
-      "KeyPathIterable protocol is broken: unexpected requirement", ())
-ERROR(broken_tensor_array_protocol_requirement,none,
-      "TensorArrayProtocol protocol is broken: unexpected requirement", ())
-ERROR(broken_tensor_group_requirement,none,
-      "TensorGroup protocol is broken: unexpected requirement", ())
-ERROR(parameterized_no_parameters_struct,none,
-      "cannot automatically synthesize %0 because 'Parameters' struct does not "
-      "exist", (Type))
-ERROR(parameterized_invalid_parameters_struct,none,
-      "cannot automatically synthesize %0 because 'Parameters' struct is "
-      "invalid", (Type))
 ERROR(broken_additive_arithmetic_requirement,none,
       "AdditiveArithmetic protocol is broken: unexpected requirement", ())
+ERROR(broken_pointwise_multiplicative_requirement,none,
+      "PointwiseMultiplicative protocol is broken: unexpected requirement", ())
 ERROR(broken_elementary_functions_requirement,none,
       "ElementaryFunctions protocol is broken: unexpected requirement", ())
 ERROR(broken_vector_protocol_requirement,none,
       "VectorProtocol protocol is broken: unexpected requirement", ())
 ERROR(broken_differentiable_requirement,none,
       "Differentiable protocol is broken: unexpected requirement", ())
+ERROR(broken_key_path_iterable_requirement,none,
+      "KeyPathIterable protocol is broken: unexpected requirement", ())
+ERROR(broken_tensor_array_protocol_requirement,none,
+      "TensorArrayProtocol protocol is broken: unexpected requirement", ())
+ERROR(broken_tensor_group_requirement,none,
+      "TensorGroup protocol is broken: unexpected requirement", ())
 WARNING(differentiable_nondiff_type_implicit_noderivative_fixit,none,
       "stored property %0 has no derivative because it does not conform to "
       "'Differentiable'; add an explicit '@noDerivative' attribute"
