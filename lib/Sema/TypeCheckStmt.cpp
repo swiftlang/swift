@@ -458,13 +458,11 @@ public:
     // Look for that case and diagnose it as missing return expression.
     if (!ResultTy->isVoid() && TheFunc->hasSingleExpressionBody()) {
       auto expr = TheFunc->getSingleExpressionBody();
-      if (expr->isImplicit()) {
-        if (auto tuple = dyn_cast<TupleExpr>(expr)) {
-          if (tuple->getNumElements() == 0 && !ResultTy->isVoid()) {
-            TC.diagnose(RS->getReturnLoc(), diag::return_expr_missing);
-            return nullptr;
-          }
-        }
+      if (expr->isImplicit() &&
+          dyn_cast<TupleExpr>(expr) != nullptr &&
+          dyn_cast<TupleExpr>(expr)->getNumElements() == 0) {
+        TC.diagnose(RS->getReturnLoc(), diag::return_expr_missing);
+        return RS;
       }
     }
 
