@@ -663,7 +663,8 @@ public:
                                 unsigned offset, OptionsDictionary *options,
                                 ArrayRef<FilterRule> filterRules,
                                 GroupedCodeCompletionConsumer &consumer,
-                                ArrayRef<const char *> args) = 0;
+                                ArrayRef<const char *> args,
+                                Optional<VFSOptions> vfsOptions) = 0;
 
   virtual void codeCompleteClose(StringRef name, unsigned offset,
                                  GroupedCodeCompletionConsumer &consumer) = 0;

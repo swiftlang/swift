@@ -167,7 +167,8 @@ static sourcekitd_response_t codeCompleteOpen(StringRef name,
                                               llvm::MemoryBuffer *InputBuf,
                                               int64_t Offset,
                                               Optional<RequestDict> optionsDict,
-                                              ArrayRef<const char *> Args);
+                                              ArrayRef<const char *> Args,
+                                              Optional<VFSOptions> vfsOptions);
 
 static sourcekitd_response_t
 codeCompleteUpdate(StringRef name, int64_t Offset,
@@ -526,7 +527,7 @@ void handleRequestImpl(sourcekitd_object_t ReqObj, ResponseReceiver Rec) {
 
   if (Optional<StringRef> VFSName = Req.getString(KeyVFSName)) {
     if (ReqUID != RequestEditorOpen && ReqUID != RequestCodeComplete &&
-        ReqUID != RequestCursorInfo) {
+        ReqUID != RequestCodeCompleteOpen && ReqUID != RequestCursorInfo) {
       return Rec(createErrorRequestInvalid(
           "This request does not support custom filesystems"));
     }
@@ -940,7 +941,8 @@ static void handleSemanticRequest(
     if (Req.getInt64(KeyOffset, Offset, /*isOptional=*/false))
       return Rec(createErrorRequestInvalid("missing 'key.offset'"));
     Optional<RequestDict> options = Req.getDictionary(KeyCodeCompleteOptions);
-    return Rec(codeCompleteOpen(*Name, InputBuf.get(), Offset, options, Args));
+    return Rec(codeCompleteOpen(*Name, InputBuf.get(), Offset, options, Args,
+                                std::move(vfsOptions)));
   }
 
   if (ReqUID == RequestCodeCompleteUpdate) {
@@ -2009,7 +2011,8 @@ static sourcekitd_response_t codeCompleteOpen(StringRef Name,
                                               llvm::MemoryBuffer *InputBuf,
                                               int64_t Offset,
                                               Optional<RequestDict> optionsDict,
-                                              ArrayRef<const char *> Args) {
+                                              ArrayRef<const char *> Args,
+                                              Optional<VFSOptions> vfsOptions) {
   ResponseBuilder RespBuilder;
   SKGroupedCodeCompletionConsumer CCC(RespBuilder);
   std::unique_ptr<SKOptionsDictionary> options;
@@ -2091,7 +2094,7 @@ static sourcekitd_response_t codeCompleteOpen(StringRef Name,
   }
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
   Lang.codeCompleteOpen(Name, InputBuf, Offset, options.get(), filterRules, CCC,
-                        Args);
+                        Args, std::move(vfsOptions));
   return CCC.createResponse();
 }
 
