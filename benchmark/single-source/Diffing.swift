@@ -63,7 +63,7 @@ let loremReverse = Array(".auqila angam erolod te erobal tu tnudidicni ropmet do
 
 @inline(never)
 public func run_DiffSame(_ N: Int) {
-  if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) { // FIXME(availability-5.1)
+  if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
     for _ in 1...N {
       let _ = longPangram.difference(from: longPangram)
     }
@@ -72,7 +72,7 @@ public func run_DiffSame(_ N: Int) {
 
 @inline(never)
 public func run_DiffPangramToAlphabet(_ N: Int) {
-  if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) { // FIXME(availability-5.1)
+  if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
     for _ in 1...N {
       let _ = longPangram.difference(from: alphabets)
     }
@@ -81,7 +81,7 @@ public func run_DiffPangramToAlphabet(_ N: Int) {
 
 @inline(never)
 public func run_DiffPangrams(_ N: Int) {
-  if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) { // FIXME(availability-5.1)
+  if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
     for _ in 1...N {
       let _ = longPangram.difference(from: typingPangram)
     }
@@ -90,7 +90,7 @@ public func run_DiffPangrams(_ N: Int) {
 
 @inline(never)
 public func run_DiffReversedAlphabets(_ N: Int) {
-  if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) { // FIXME(availability-5.1)
+  if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
     for _ in 1...N {
       let _ = alphabets.difference(from: alphabetsReversed)
     }
@@ -99,7 +99,7 @@ public func run_DiffReversedAlphabets(_ N: Int) {
 
 @inline(never)
 public func run_DiffReversedLorem(_ N: Int) {
-  if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) { // FIXME(availability-5.1)
+  if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
     for _ in 1...N {
       let _ = loremIpsum.difference(from: loremReverse)
     }
@@ -108,7 +108,7 @@ public func run_DiffReversedLorem(_ N: Int) {
 
 @inline(never)
 public func run_DiffDisparate(_ N: Int) {
-  if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) { // FIXME(availability-5.1)
+  if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
     for _ in 1...N {
       let _ = alphabets.difference(from: numbersAndSymbols)
     }
@@ -117,7 +117,7 @@ public func run_DiffDisparate(_ N: Int) {
 
 @inline(never)
 public func run_DiffSimilar(_ N: Int) {
-  if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) { // FIXME(availability-5.1)
+  if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
     for _ in 1...N {
       let _ = loremIpsum.difference(from: unabridgedLorem)
     }

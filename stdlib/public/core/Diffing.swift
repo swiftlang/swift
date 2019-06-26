@@ -12,7 +12,7 @@
 
 // MARK: Diff application to RangeReplaceableCollection
 
-@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) // FIXME(availability-5.1)
+@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
 extension CollectionDifference {
   fileprivate func _fastEnumeratedApply(
     _ consume: (Change) -> Void
@@ -64,7 +64,7 @@ extension RangeReplaceableCollection {
   ///
   /// - Complexity: O(*n* + *c*), where *n* is `self.count` and *c* is the
   ///   number of changes contained by the parameter.
-  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) // FIXME(availability-5.1)
+  @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
   public func applying(_ difference: CollectionDifference<Element>) -> Self? {
     var result = Self()
     var enumeratedRemoves = 0
@@ -112,8 +112,8 @@ extension RangeReplaceableCollection {
 // MARK: Definition of API
 
 extension BidirectionalCollection {
-  /// Returns the difference needed to produce this collection's ordered 
-  /// elements from the given collection, using the given predicate as an 
+  /// Returns the difference needed to produce this collection's ordered
+  /// elements from the given collection, using the given predicate as an
   /// equivalence test.
   ///
   /// This function does not infer element moves. If you need to infer moves,
@@ -121,16 +121,16 @@ extension BidirectionalCollection {
   ///
   /// - Parameters:
   ///   - other: The base state.
-  ///   - areEquivalent: A closure that returns a Boolean value indicating 
+  ///   - areEquivalent: A closure that returns a Boolean value indicating
   ///     whether two elements are equivalent.
   ///
   /// - Returns: The difference needed to produce the reciever's state from
   ///   the parameter's state.
   ///
-  /// - Complexity: Worst case performance is O(*n* * *m*), where *n* is the 
-  ///   count of this collection and *m* is `other.count`. You can expect 
+  /// - Complexity: Worst case performance is O(*n* * *m*), where *n* is the
+  ///   count of this collection and *m* is `other.count`. You can expect
   ///   faster execution when the collections share many common elements.
-  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) // FIXME(availability-5.1)
+  @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
   public func difference<C: BidirectionalCollection>(
     from other: C,
     by areEquivalent: (C.Element, Element) -> Bool
@@ -141,7 +141,7 @@ extension BidirectionalCollection {
 }
 
 extension BidirectionalCollection where Element : Equatable {
-  /// Returns the difference needed to produce this collection's ordered 
+  /// Returns the difference needed to produce this collection's ordered
   /// elements from the given collection.
   ///
   /// This function does not infer element moves. If you need to infer moves,
@@ -150,14 +150,14 @@ extension BidirectionalCollection where Element : Equatable {
   /// - Parameters:
   ///   - other: The base state.
   ///
-  /// - Returns: The difference needed to produce this collection's ordered 
+  /// - Returns: The difference needed to produce this collection's ordered
   ///   elements from the given collection.
   ///
-  /// - Complexity: Worst case performance is O(*n* * *m*), where *n* is the 
-  ///   count of this collection and *m* is `other.count`. You can expect 
-  ///   faster execution when the collections share many common elements, or 
+  /// - Complexity: Worst case performance is O(*n* * *m*), where *n* is the
+  ///   count of this collection and *m* is `other.count`. You can expect
+  ///   faster execution when the collections share many common elements, or
   ///   if `Element` conforms to `Hashable`.
-  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) // FIXME(availability-5.1)
+  @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
   public func difference<C: BidirectionalCollection>(
     from other: C
   ) -> CollectionDifference<Element> where C.Element == Self.Element {
@@ -209,7 +209,7 @@ fileprivate struct _V {
   }
 }
 
-@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) // FIXME(availability-5.1)
+@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
 fileprivate func _myers<C,D>(
   from old: C, to new: D,
   using cmp: (C.Element, D.Element) -> Bool

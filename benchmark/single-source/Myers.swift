@@ -21,7 +21,7 @@ let loremLong = Array("Sed ut perspiciatis, unde omnis iste natus error sit volu
 
 @inline(never)
 public func run_Myers(N: Int) {
-  if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) { // FIXME(availability-5.1)
+  if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
     for _ in 1...N {
       let _ = myers(from: loremShort, to: loremLong, using: ==)
     }
@@ -57,7 +57,7 @@ fileprivate struct _V {
   }
 }
 
-@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) // FIXME(availability-5.1)
+@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
 fileprivate func myers<C,D>(
   from old: C, to new: D,
   using cmp: (C.Element, D.Element) -> Bool
@@ -136,7 +136,7 @@ fileprivate func myers<C,D>(
     using trace: [_V]
   ) -> [CollectionDifference<C.Element>.Change] {
     var changes = [CollectionDifference<C.Element>.Change]()
-    
+
     var x = a.count
     var y = b.count
     for d in stride(from: trace.count &- 1, to: 0, by: -1) {

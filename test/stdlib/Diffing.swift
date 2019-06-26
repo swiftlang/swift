@@ -8,8 +8,7 @@ let suite = TestSuite("Diffing")
 
 // This availability test has to be this awkward because of
 // rdar://problem/48450376 - Availability checks don't apply to top-level code
-// FIXME(availability-5.1)
-if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, * ) {
+if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
 
   suite.test("Diffing empty collections") {
     let a = [Int]()
