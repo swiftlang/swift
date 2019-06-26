@@ -244,6 +244,12 @@ public:
     return DeclOrKind.get<ValueDecl*>();
   }
 
+  /// Retrieves the declaration that corresponds to this overload choice, or
+  /// \c nullptr if this choice is not for a declaration.
+  ValueDecl *getDeclOrNull() const {
+    return isDecl() ? getDecl() : nullptr;
+  }
+
   /// Returns true if this is either a decl for an optional that was
   /// declared as one that can be implicitly unwrapped, or is a
   /// function-typed decl that has a return value that is implicitly

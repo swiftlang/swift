@@ -4591,8 +4591,7 @@ namespace {
     buildKeyPathPropertyComponent(const SelectedOverload &overload,
                                   SourceLoc componentLoc,
                                   ConstraintLocator *locator) {
-      if (overload.choice.isDecl()) {
-        auto property = overload.choice.getDecl();
+      if (auto *property = overload.choice.getDeclOrNull()) {
         // Key paths can only refer to properties currently.
         auto varDecl = cast<VarDecl>(property);
         // Key paths don't work with mutating-get properties.
@@ -4909,10 +4908,8 @@ static ConcreteDeclRef resolveLocatorToDecl(
     // Overloaded and unresolved cases: find the resolved overload.
     auto anchorLocator = cs.getConstraintLocator(anchor);
     if (auto selected = findOvlChoice(anchorLocator)) {
-      if (selected->choice.isDecl())
-        return getConcreteDeclRef(selected->choice.getDecl(),
-                                  selected->openedType,
-                                  anchorLocator);
+      if (auto *decl = selected->choice.getDeclOrNull())
+        return getConcreteDeclRef(decl, selected->openedType, anchorLocator);
     }
   }
   
@@ -4921,10 +4918,8 @@ static ConcreteDeclRef resolveLocatorToDecl(
     auto anchorLocator = cs.getConstraintLocator(anchor,
                            ConstraintLocator::UnresolvedMember);
     if (auto selected = findOvlChoice(anchorLocator)) {
-      if (selected->choice.isDecl())
-        return getConcreteDeclRef(selected->choice.getDecl(),
-                                  selected->openedType,
-                                  anchorLocator);
+      if (auto *decl = selected->choice.getDeclOrNull())
+        return getConcreteDeclRef(decl, selected->openedType, anchorLocator);
     }
   }
 
@@ -4933,10 +4928,8 @@ static ConcreteDeclRef resolveLocatorToDecl(
     auto anchorLocator = cs.getConstraintLocator(anchor,
                                                  ConstraintLocator::Member);
     if (auto selected = findOvlChoice(anchorLocator)) {
-      if (selected->choice.isDecl())
-        return getConcreteDeclRef(selected->choice.getDecl(),
-                                  selected->openedType,
-                                  anchorLocator);
+      if (auto *decl = selected->choice.getDeclOrNull())
+        return getConcreteDeclRef(decl, selected->openedType, anchorLocator);
     }
   }
 
@@ -4949,10 +4942,8 @@ static ConcreteDeclRef resolveLocatorToDecl(
     auto anchorLocator =
       cs.getConstraintLocator(anchor, ConstraintLocator::SubscriptMember);
     if (auto selected = findOvlChoice(anchorLocator)) {
-      if (selected->choice.isDecl())
-        return getConcreteDeclRef(selected->choice.getDecl(),
-                                  selected->openedType,
-                                  anchorLocator);
+      if (auto *decl = selected->choice.getDeclOrNull())
+        return getConcreteDeclRef(decl, selected->openedType, anchorLocator);
     }
   }
 

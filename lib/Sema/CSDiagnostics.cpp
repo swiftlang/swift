@@ -105,32 +105,9 @@ Expr *FailureDiagnostic::getArgumentExprFor(Expr *anchor) const {
   return nullptr;
 }
 
-// TODO: Replace duplications of this logic with calls to this.
-Optional<SelectedOverload> FailureDiagnostic::getChoiceFor(Expr *expr) {
+Optional<SelectedOverload> FailureDiagnostic::getChoiceFor(Expr *expr) const {
   auto &cs = getConstraintSystem();
-  ConstraintLocator *locator = nullptr;
-
-  if (auto *AE = dyn_cast<ApplyExpr>(expr)) {
-    if (auto *TE = dyn_cast<TypeExpr>(AE->getFn())) {
-      locator =
-          getConstraintLocator(AE, {ConstraintLocator::ApplyFunction,
-                                    ConstraintLocator::ConstructorMember});
-    }
-    return getChoiceFor(AE->getFn());
-  } else if (auto *UDE = dyn_cast<UnresolvedDotExpr>(expr)) {
-    locator = cs.getConstraintLocator(UDE, ConstraintLocator::Member);
-  } else if (auto *UME = dyn_cast<UnresolvedMemberExpr>(expr)) {
-    locator = cs.getConstraintLocator(UME, ConstraintLocator::UnresolvedMember);
-  } else if (auto *SE = dyn_cast<SubscriptExpr>(expr)) {
-    locator = cs.getConstraintLocator(SE, ConstraintLocator::SubscriptMember);
-  } else {
-    locator = cs.getConstraintLocator(expr);
-  }
-
-  if (!locator)
-    return None;
-
-  return getOverloadChoiceIfAvailable(locator);
+  return getOverloadChoiceIfAvailable(cs.getCalleeLocator(expr));
 }
 
 Type RequirementFailure::getOwnerType() const {
@@ -189,10 +166,6 @@ ProtocolConformance *RequirementFailure::getConformanceForConditionalReq(
 
 ValueDecl *RequirementFailure::getDeclRef() const {
   auto &cs = getConstraintSystem();
-  auto &TC = getTypeChecker();
-
-  auto *anchor = getRawAnchor();
-  auto *locator = cs.getConstraintLocator(anchor);
 
   // Get a declaration associated with given type (if any).
   // This is used to retrieve affected declaration when
@@ -214,38 +187,7 @@ ValueDecl *RequirementFailure::getDeclRef() const {
   if (isFromContextualType())
     return getAffectedDeclFromType(cs.getContextualType());
 
-  if (auto *AE = dyn_cast<CallExpr>(anchor)) {
-    // NOTE: In valid code, the function can only be a TypeExpr
-    assert(isa<TypeExpr>(AE->getFn()) ||
-           isa<OverloadedDeclRefExpr>(AE->getFn()));
-    ConstraintLocatorBuilder ctor(locator);
-    locator = cs.getConstraintLocator(
-        ctor.withPathElement(PathEltKind::ApplyFunction)
-            .withPathElement(PathEltKind::ConstructorMember));
-  } else if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchor)) {
-    ConstraintLocatorBuilder member(locator);
-
-    if (TC.getSelfForInitDelegationInConstructor(getDC(), UDE)) {
-      member = member.withPathElement(PathEltKind::ConstructorMember);
-    } else {
-      member = member.withPathElement(PathEltKind::Member);
-    }
-
-    locator = cs.getConstraintLocator(member);
-  } else if (auto *UME = dyn_cast<UnresolvedMemberExpr>(anchor)) {
-    locator = cs.getConstraintLocator(locator, PathEltKind::UnresolvedMember);
-  } else if (isa<SubscriptExpr>(anchor)) {
-    ConstraintLocatorBuilder subscript(locator);
-    locator = cs.getConstraintLocator(
-        subscript.withPathElement(PathEltKind::SubscriptMember));
-  } else if (isa<MemberRefExpr>(anchor)) {
-    ConstraintLocatorBuilder memberRef(locator);
-    locator =
-        cs.getConstraintLocator(memberRef.withPathElement(PathEltKind::Member));
-  }
-
-  auto overload = getOverloadChoiceIfAvailable(locator);
-  if (overload)
+  if (auto overload = getChoiceFor(getRawAnchor()))
     return overload->choice.getDecl();
 
   return getAffectedDeclFromType(getOwnerType());
@@ -574,31 +516,7 @@ bool NoEscapeFuncToTypeConversionFailure::diagnoseParameterUse() const {
 
 Type NoEscapeFuncToTypeConversionFailure::getParameterTypeFor(
     Expr *expr, unsigned paramIdx) const {
-  auto &cs = getConstraintSystem();
-  ConstraintLocator *locator = nullptr;
-
-  if (auto *call = dyn_cast<CallExpr>(expr)) {
-    auto *fnExpr = call->getFn();
-    if (isa<UnresolvedDotExpr>(fnExpr)) {
-      locator = cs.getConstraintLocator(fnExpr, ConstraintLocator::Member);
-    } else if (isa<UnresolvedMemberExpr>(fnExpr)) {
-      locator =
-          cs.getConstraintLocator(fnExpr, ConstraintLocator::UnresolvedMember);
-    } else if (auto *TE = dyn_cast<TypeExpr>(fnExpr)) {
-      locator =
-          getConstraintLocator(call, {ConstraintLocator::ApplyFunction,
-                                      ConstraintLocator::ConstructorMember});
-    } else {
-      locator = cs.getConstraintLocator(fnExpr);
-    }
-  } else if (auto *SE = dyn_cast<SubscriptExpr>(expr)) {
-    locator = cs.getConstraintLocator(SE, ConstraintLocator::SubscriptMember);
-  }
-
-  if (!locator)
-    return Type();
-
-  auto choice = getOverloadChoiceIfAvailable(locator);
+  auto choice = getChoiceFor(expr);
   if (!choice)
     return Type();
 

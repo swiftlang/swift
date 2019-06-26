@@ -414,6 +414,47 @@ ConstraintLocator *ConstraintSystem::getConstraintLocator(
   return getConstraintLocator(anchor, path, builder.getSummaryFlags());
 }
 
+ConstraintLocator *ConstraintSystem::getCalleeLocator(Expr *expr) {
+  // Make sure we handle subscripts before looking at apply exprs. We don't
+  // want to return a subscript member locator for an expression such as x[](y),
+  // as its callee is not the subscript, but rather the function it returns.
+  if (isa<SubscriptExpr>(expr))
+    return getConstraintLocator(expr, ConstraintLocator::SubscriptMember);
+
+  if (auto *applyExpr = dyn_cast<ApplyExpr>(expr)) {
+    auto *fnExpr = applyExpr->getFn();
+    // For an apply of a metatype, we have a short-form constructor. Unlike
+    // other locators to callees, these are anchored on the apply expression
+    // rather than the function expr.
+    if (simplifyType(getType(fnExpr))->is<AnyMetatypeType>()) {
+      auto *fnLocator =
+          getConstraintLocator(applyExpr, ConstraintLocator::ApplyFunction);
+      return getConstraintLocator(fnLocator,
+                                  ConstraintLocator::ConstructorMember);
+    }
+    // Otherwise fall through and look for locators anchored on the fn expr.
+    expr = fnExpr;
+  }
+
+  auto *locator = getConstraintLocator(expr);
+  if (auto *ude = dyn_cast<UnresolvedDotExpr>(expr)) {
+    if (TC.getSelfForInitDelegationInConstructor(DC, ude)) {
+      return getConstraintLocator(locator,
+                                  ConstraintLocator::ConstructorMember);
+    } else {
+      return getConstraintLocator(locator, ConstraintLocator::Member);
+    }
+  }
+
+  if (isa<UnresolvedMemberExpr>(expr))
+    return getConstraintLocator(locator, ConstraintLocator::UnresolvedMember);
+
+  if (isa<MemberRefExpr>(expr))
+    return getConstraintLocator(locator, ConstraintLocator::Member);
+
+  return locator;
+}
+
 Type ConstraintSystem::openUnboundGenericType(UnboundGenericType *unbound,
                                               ConstraintLocatorBuilder locator,
                                               OpenedTypeMap &replacements) {
@@ -2102,8 +2143,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
   }
   assert(!refType->hasTypeParameter() && "Cannot have a dependent type here");
   
-  if (choice.isDecl()) {
-    auto decl = choice.getDecl();
+  if (auto *decl = choice.getDeclOrNull()) {
     // If we're binding to an init member, the 'throws' need to line up between
     // the bound and reference types.
     if (auto CD = dyn_cast<ConstructorDecl>(decl)) {
@@ -2425,16 +2465,11 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
   if (solutions.empty())
     return false;
 
-  auto getOverloadDecl = [&](SelectedOverload &overload) -> ValueDecl * {
-    auto &choice = overload.choice;
-    return choice.isDecl() ? choice.getDecl() : nullptr;
-  };
-
   // Problems related to fixes forming ambiguous solution set
   // could only be diagnosed (at the moment), if all of the fixes
-  // are attached to the same anchor, which means they fix
-  // different overloads of the same declaration.
-  Expr *commonAnchor = nullptr;
+  // have the same callee locator, which means they fix different
+  // overloads of the same declaration.
+  ConstraintLocator *commonCalleeLocator = nullptr;
   SmallPtrSet<ValueDecl *, 4> distinctChoices;
   SmallVector<std::pair<const Solution *, const ConstraintFix *>, 4>
       viableSolutions;
@@ -2448,21 +2483,17 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
       return false;
 
     const auto *fix = fixes.front();
-    if (commonAnchor && commonAnchor != fix->getAnchor())
+    auto *calleeLocator = getCalleeLocator(fix->getAnchor());
+    if (commonCalleeLocator && commonCalleeLocator != calleeLocator)
       return false;
 
-    commonAnchor = fix->getAnchor();
+    commonCalleeLocator = calleeLocator;
 
-    SmallVector<SelectedOverload, 2> overloads;
-    solution.getOverloadChoices(commonAnchor, overloads);
-    // There is unfortunately no way, at the moment, to figure out
-    // what declaration the fix is attached to, so we have to make
-    // sure that there is only one declaration associated with common
-    // anchor to be sure that the right problem is being diagnosed.
-    if (overloads.size() != 1)
+    auto overload = solution.getOverloadChoiceIfAvailable(calleeLocator);
+    if (!overload)
       return false;
 
-    auto *decl = getOverloadDecl(overloads.front());
+    auto *decl = overload->choice.getDeclOrNull();
     if (!decl)
       return false;
 
@@ -2485,6 +2516,7 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
     DiagnosticTransaction transaction(TC.Diags);
 
     const auto *fix = viableSolutions.front().second;
+    auto *commonAnchor = commonCalleeLocator->getAnchor();
     if (fix->getKind() == FixKind::UseSubscriptOperator) {
       auto *UDE = cast<UnresolvedDotExpr>(commonAnchor);
       TC.diagnose(commonAnchor->getLoc(),

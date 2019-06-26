@@ -4,10 +4,9 @@
 // RUN: %target-run %t/main
 
 // REQUIRES: executable_test
-// REQUIRES: rdar52073880
 
-// XFAIL: swift_test_mode_optimize
-// XFAIL: swift_test_mode_optimize_size
+// UNSUPPORTED: swift_test_mode_optimize
+// UNSUPPORTED: swift_test_mode_optimize_size
 
 import StdlibUnittest
 

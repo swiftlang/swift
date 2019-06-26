@@ -1081,29 +1081,19 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
 
   // Do some special-case code completion for the start of the pattern.
   if (P.Tok.is(tok::code_complete)) {
+    auto CCE = new (P.Context) CodeCompletionExpr(P.Tok.getLoc());
+    result.ThePattern = new (P.Context) ExprPattern(CCE);
     if (P.CodeCompletion) {
       switch (parsingContext) {
       case GuardedPatternContext::Case:
-        P.CodeCompletion->completeCaseStmtBeginning();
+        P.CodeCompletion->completeCaseStmtBeginning(CCE);
         break;
       case GuardedPatternContext::Catch:
-        P.CodeCompletion->completePostfixExprBeginning(nullptr);
+        P.CodeCompletion->completePostfixExprBeginning(CCE);
         break;
       }
     }
-    auto loc = P.consumeToken(tok::code_complete);
-    result.ThePattern = new (P.Context) AnyPattern(loc);
-    status.setHasCodeCompletion();
-    return;
-  }
-  if (parsingContext == GuardedPatternContext::Case &&
-      P.Tok.isAny(tok::period_prefix, tok::period) &&
-      P.peekToken().is(tok::code_complete)) {
-    P.consumeToken();
-    if (P.CodeCompletion)
-      P.CodeCompletion->completeCaseStmtDotPrefix();
-    auto loc = P.consumeToken(tok::code_complete);
-    result.ThePattern = new (P.Context) AnyPattern(loc);
+    P.consumeToken(tok::code_complete);
     status.setHasCodeCompletion();
     return;
   }

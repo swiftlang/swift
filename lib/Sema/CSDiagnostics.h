@@ -164,7 +164,7 @@ protected:
   /// reference or subscript, nullptr otherwise.
   Expr *getArgumentExprFor(Expr *anchor) const;
 
-  Optional<SelectedOverload> getChoiceFor(Expr *);
+  Optional<SelectedOverload> getChoiceFor(Expr *) const;
 
 private:
   /// Compute anchor expression associated with current diagnostic.

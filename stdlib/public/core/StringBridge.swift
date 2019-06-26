@@ -91,6 +91,26 @@ internal func _cocoaStringCopyUTF8(
 }
 
 @_effects(readonly)
+internal func _cocoaStringUTF8Count(
+  _ target: _CocoaString,
+  range: Range<Int>
+) -> Int? {
+  var count = 0
+  let len = _stdlib_binary_CFStringGetLength(target)
+  let converted = _swift_stdlib_CFStringGetBytes(
+    target,
+    _swift_shims_CFRange(location: range.startIndex, length: range.count),
+    kCFStringEncodingUTF8,
+    0,
+    0,
+    UnsafeMutablePointer<UInt8>(Builtin.inttoptr_Word(0._builtinWordValue)),
+    0,
+    &count
+  )
+  return converted == len ? count : nil
+}
+
+@_effects(readonly)
 internal func _cocoaStringCompare(
   _ string: _CocoaString, _ other: _CocoaString
 ) -> Int {

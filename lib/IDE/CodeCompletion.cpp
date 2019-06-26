@@ -338,44 +338,6 @@ std::string swift::ide::removeCodeCompletionTokens(
   return CleanFile;
 }
 
-namespace {
-class StmtFinder : public ASTWalker {
-  SourceManager &SM;
-  SourceLoc Loc;
-  StmtKind Kind;
-  Stmt *Found = nullptr;
-
-public:
-  StmtFinder(SourceManager &SM, SourceLoc Loc, StmtKind Kind)
-      : SM(SM), Loc(Loc), Kind(Kind) {}
-
-  std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
-    return { SM.rangeContainsTokenLoc(S->getSourceRange(), Loc), S };
-  }
-
-  Stmt *walkToStmtPost(Stmt *S) override {
-    if (S->getKind() == Kind) {
-      Found = S;
-      return nullptr;
-    }
-    return S;
-  }
-
-  Stmt *getFoundStmt() const {
-    return Found;
-  }
-};
-} // end anonymous namespace
-
-static Stmt *findNearestStmt(const DeclContext *DC, SourceLoc Loc,
-                             StmtKind Kind) {
-  auto &SM = DC->getASTContext().SourceMgr;
-  StmtFinder Finder(SM, Loc, Kind);
-  // FIXME(thread-safety): the walker is mutating the AST.
-  const_cast<DeclContext *>(DC)->walkContext(Finder);
-  return Finder.getFoundStmt();
-}
-
 CodeCompletionString::CodeCompletionString(ArrayRef<Chunk> Chunks) {
   std::uninitialized_copy(Chunks.begin(), Chunks.end(),
                           getTrailingObjects<Chunk>());
@@ -1379,8 +1341,7 @@ public:
   void completeTypeIdentifierWithoutDot(IdentTypeRepr *ITR) override;
 
   void completeCaseStmtKeyword() override;
-  void completeCaseStmtBeginning() override;
-  void completeCaseStmtDotPrefix() override;
+  void completeCaseStmtBeginning(CodeCompletionExpr *E) override;
   void completeDeclAttrBeginning(bool Sil, bool isIndependent) override;
   void completeDeclAttrParam(DeclAttrKind DK, int Index) override;
   void completeInPrecedenceGroup(SyntaxKind SK) override;
@@ -1996,12 +1957,80 @@ public:
 
   Type getTypeOfMember(const ValueDecl *VD,
                        DynamicLookupInfo dynamicLookupInfo) {
-    if (dynamicLookupInfo.getKind() == DynamicLookupInfo::None) {
+    switch (dynamicLookupInfo.getKind()) {
+    case DynamicLookupInfo::None:
       return getTypeOfMember(VD, this->ExprType);
-    } else {
-      // FIXME: for keypath dynamic members we should substitute the subscript
-      // return type; for now just avoid substituting at all by passing null.
+    case DynamicLookupInfo::AnyObject:
       return getTypeOfMember(VD, Type());
+    case DynamicLookupInfo::KeyPathDynamicMember: {
+      auto &keyPathInfo = dynamicLookupInfo.getKeyPathDynamicMember();
+
+      // Map the result of VD to keypath member lookup results.
+      // Given:
+      //   struct Wrapper<T> {
+      //     subscript<U>(dynamicMember: KeyPath<T, U>) -> Wrapped<U> { get }
+      //   }
+      //   struct Circle {
+      //     var center: Point { get }
+      //     var radius: Length { get }
+      //   }
+      //
+      // Consider 'Wrapper<Circle>.center'.
+      //   'VD' is 'Circle.center' decl.
+      //   'keyPathInfo.subscript' is 'Wrapper<T>.subscript' decl.
+      //   'keyPathInfo.baseType' is 'Wrapper<Circle>' type.
+
+      // FIXME: Handle nested keypath member lookup.
+      // i.e. cases where 'ExprType' != 'keyPathInfo.baseType'.
+
+      auto *SD = keyPathInfo.subscript;
+      auto elementTy = SD->getElementTypeLoc().getType();
+      if (!elementTy->hasTypeParameter())
+        return elementTy;
+
+      // Map is:
+      //   { τ_0_0(T) => Circle
+      //     τ_1_0(U) => U }
+      auto subs = keyPathInfo.baseType->getMemberSubstitutions(SD);
+
+      // Extract the root and result type of the KeyPath type in the parameter.
+      // i.e. 'T' and 'U'
+      auto rootAndResult =
+          getRootAndResultTypeOfKeypathDynamicMember(SD, CurrDeclContext);
+
+      // If the keyPath result type has type parameters, that might affect the
+      // subscript result type.
+      auto keyPathResultTy = rootAndResult->second->mapTypeOutOfContext();
+      if (keyPathResultTy->hasTypeParameter()) {
+        auto keyPathRootTy =
+            rootAndResult->first.subst(QueryTypeSubstitutionMap{subs},
+                                       LookUpConformanceInModule(CurrModule));
+
+        // The result type of the VD.
+        // i.e. 'Circle.center' => 'Point'.
+        auto innerResultTy = getTypeOfMember(VD, keyPathRootTy);
+
+        if (auto paramTy = keyPathResultTy->getAs<GenericTypeParamType>()) {
+          // Replace keyPath result type in the map with the inner result type.
+          // i.e. Make the map as:
+          //   { τ_0_0(T) => Circle
+          //     τ_1_0(U) => Point }
+          auto key =
+              paramTy->getCanonicalType()->castTo<GenericTypeParamType>();
+          subs[key] = innerResultTy;
+        } else {
+          // FIXME: Handle the case where the KeyPath result is generic.
+          // e.g. 'subscript<U>(dynamicMember: KeyPath<T, Box<U>>) -> Bag<U>'
+          // For now, just return the inner type.
+          return innerResultTy;
+        }
+      }
+
+      // Substitute the element type of the subscript using modified map.
+      // i.e. 'Wrapped<U>' => 'Wrapped<Point>'.
+      return elementTy.subst(QueryTypeSubstitutionMap{subs},
+                             LookUpConformanceInModule(CurrModule));
+    }
     }
   }
 
@@ -3843,27 +3872,6 @@ public:
     }
   }
 
-  void getTypeContextEnumElementCompletions(SourceLoc Loc) {
-    llvm::SaveAndRestore<LookupKind> ChangeLookupKind(
-        Kind, LookupKind::EnumElement);
-    NeedLeadingDot = !HaveDot;
-
-    auto *Switch = cast_or_null<SwitchStmt>(
-        findNearestStmt(CurrDeclContext, Loc, StmtKind::Switch));
-    if (!Switch)
-      return;
-    auto Ty = Switch->getSubjectExpr()->getType();
-    if (!Ty)
-      return;
-    ExprType = Ty;
-    auto *TheEnumDecl = dyn_cast_or_null<EnumDecl>(Ty->getAnyNominal());
-    if (!TheEnumDecl)
-      return;
-    for (auto Element : TheEnumDecl->getAllElements()) {
-      foundDecl(Element, DeclVisibilityKind::MemberOfCurrentNominal, {});
-    }
-  }
-
   void getTypeCompletions(Type BaseType) {
     Kind = LookupKind::Type;
     this->BaseType = BaseType;
@@ -4658,18 +4666,12 @@ void CodeCompletionCallbacksImpl::completeCaseStmtKeyword() {
   CurDeclContext = P.CurDeclContext;
 }
 
-void CodeCompletionCallbacksImpl::completeCaseStmtBeginning() {
+void CodeCompletionCallbacksImpl::completeCaseStmtBeginning(CodeCompletionExpr *E) {
   assert(!InEnumElementRawValue);
 
   Kind = CompletionKind::CaseStmtBeginning;
   CurDeclContext = P.CurDeclContext;
-}
-
-void CodeCompletionCallbacksImpl::completeCaseStmtDotPrefix() {
-  assert(!InEnumElementRawValue);
-
-  Kind = CompletionKind::CaseStmtDotPrefix;
-  CurDeclContext = P.CurDeclContext;
+  CodeCompleteTokenExpr = E;
 }
 
 void CodeCompletionCallbacksImpl::completeImportDecl(
@@ -4955,7 +4957,6 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
   case CompletionKind::SuperExpr:
   case CompletionKind::SuperExprDot:
   case CompletionKind::CaseStmtBeginning:
-  case CompletionKind::CaseStmtDotPrefix:
   case CompletionKind::TypeIdentifierWithDot:
   case CompletionKind::TypeIdentifierWithoutDot:
     break;
@@ -5355,16 +5356,11 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   }
 
   case CompletionKind::CaseStmtBeginning: {
-    SourceLoc Loc = P.Context.SourceMgr.getCodeCompletionLoc();
-    Lookup.getValueCompletionsInDeclContext(Loc);
-    Lookup.getTypeContextEnumElementCompletions(Loc);
-    break;
-  }
-
-  case CompletionKind::CaseStmtDotPrefix: {
-    Lookup.setHaveDot(SourceLoc());
-    SourceLoc Loc = P.Context.SourceMgr.getCodeCompletionLoc();
-    Lookup.getTypeContextEnumElementCompletions(Loc);
+    ExprContextInfo ContextInfo(CurDeclContext, CodeCompleteTokenExpr);
+    Lookup.setExpectedTypes(ContextInfo.getPossibleTypes(),
+                            ContextInfo.isSingleExpressionBody());
+    Lookup.getUnresolvedMemberCompletions(ContextInfo.getPossibleTypes());
+    DoPostfixExprBeginning();
     break;
   }
 

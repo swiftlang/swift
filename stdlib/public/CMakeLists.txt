@@ -52,6 +52,7 @@ if(CXX_SUPPORTS_DEFAULT_HIDDEN_VISIBILITY)
   list(APPEND SWIFT_RUNTIME_CORE_CXX_FLAGS "-fvisibility=hidden")
 endif()
 
+add_subdirectory(legacy_layouts)
 add_subdirectory(SwiftShims)
 
 if(SWIFT_BUILD_STDLIB)

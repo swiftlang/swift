@@ -47,7 +47,7 @@ struct HasWrappers {
   var z: String
 
   // Memberwise initializer.
-  // CHECK: init(x: Wrapper<Int> = Wrapper(closure: foo), y: Bool = true, z: String)
+  // CHECK: init(x: Wrapper<Int> = Wrapper(closure: foo), y: Bool = true, z: String = Wrapper())
 }
 
 func trigger() {

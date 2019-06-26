@@ -829,8 +829,12 @@ void ConstraintSystem::shrink(Expr *expr) {
           return expr;
         }
 
-        // Or it's a function application with other candidates present.
-        if (isa<ApplyExpr>(expr)) {
+        // Or it's a function application or assignment with other candidates
+        // present. Assignment should be easy to solve because we'd get a
+        // contextual type from the destination expression, otherwise shrink
+        // might produce incorrect results without considering aforementioned
+        // destination type.
+        if (isa<ApplyExpr>(expr) || isa<AssignExpr>(expr)) {
           Candidates.push_back(Candidate(CS, PrimaryExpr));
           return expr;
         }
@@ -2100,11 +2104,9 @@ void ConstraintSystem::partitionDisjunction(
     forEachChoice(Choices, [&](unsigned index, Constraint *constraint) -> bool {
       if (constraint->getKind() != ConstraintKind::BindOverload)
         return false;
-      if (!constraint->getOverloadChoice().isDecl())
-        return false;
 
-      auto *decl = constraint->getOverloadChoice().getDecl();
-      auto *funcDecl = dyn_cast<FuncDecl>(decl);
+      auto *decl = constraint->getOverloadChoice().getDeclOrNull();
+      auto *funcDecl = dyn_cast_or_null<FuncDecl>(decl);
       if (!funcDecl)
         return false;
 
