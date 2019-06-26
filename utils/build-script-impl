@@ -2954,8 +2954,8 @@ for host in "${ALL_HOSTS[@]}"; do
                     HOST_CXX_DIR=$(dirname "${HOST_CXX}")
                     HOST_CXX_BUILTINS_VERSION=$(ls "$HOST_CXX_DIR/../lib/clang" | awk '{print $0}')
                     HOST_CXX_BUILTINS_DIR="$HOST_CXX_DIR/../lib/clang/$HOST_CXX_BUILTINS_VERSION/lib/darwin"
-                    DEST_CXX_BUILTINS_VERSION=$(ls "$llvm_build_dir/lib/clang" | awk '{print $0}')
-                    DEST_BUILTINS_DIR="$llvm_build_dir/lib/clang/$DEST_CXX_BUILTINS_VERSION/lib/darwin"
+                    DEST_CXX_BUILTINS_VERSION=$(ls "$(build_directory_bin ${host} llvm)/../lib/clang" | awk '{print $0}')
+                    DEST_BUILTINS_DIR="$(build_directory_bin ${host} llvm)/../lib/clang/$DEST_CXX_BUILTINS_VERSION/lib/darwin"
 
                     if [ -d "$DEST_BUILTINS_DIR" ]; then
                         echo "copying compiler-rt embedded builtins into the local clang build directory $DEST_BUILTINS_DIR."
