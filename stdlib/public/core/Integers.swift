@@ -133,7 +133,7 @@ public extension AdditiveArithmetic where Self : ExpressibleByIntegerLiteral {
   ///
   /// Zero is the identity element for addition. For any value,
   /// `x + .zero == x` and `.zero + x == x`.
-  @_transparent
+  @inlinable @inline(__always)
   static var zero: Self {
     return 0
   }
