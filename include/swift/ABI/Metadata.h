@@ -3362,6 +3362,11 @@ public:
   explicit operator bool() const {
     return Function != nullptr;
   }
+
+  /// For debugging purposes only.
+  explicit operator void*() const {
+    return reinterpret_cast<void *>(Function);
+  }
   
   /// Invoke with an array of arguments of dynamic size.
   MetadataResponse operator()(MetadataRequest request,
