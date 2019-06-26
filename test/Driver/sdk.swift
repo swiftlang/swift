@@ -14,9 +14,7 @@
 // OSX-NEXT: bin{{/|\\\\}}swift
 // OSX: -sdk {{.*}}/Inputs/clang-importer-sdk
 // OSX: {{.*}}.o{{[ "]}}
-// OSX: {{-syslibroot|--sysroot}} {{[^ ]*}}/Inputs/clang-importer-sdk
-// OSX: -L {{[^ ]*}}/Inputs/clang-importer-sdk/usr/lib/swift
-// OSX: -rpath {{[^ ]*}}/Inputs/clang-importer-sdk/usr/lib/swift
+// OSX: {{-syslibroot|--sysroot}} {{.*}}/Inputs/clang-importer-sdk
 
 // LINUX-NOT: warning: no such SDK:
 // LINUX: bin{{/|\\\\}}swift
