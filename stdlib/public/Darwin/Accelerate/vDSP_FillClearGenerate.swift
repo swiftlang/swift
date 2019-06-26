@@ -17,6 +17,7 @@ public protocol vDSP_FloatingPointGeneratable: BinaryFloatingPoint {
 extension Float: vDSP_FloatingPointGeneratable {}
 extension Double: vDSP_FloatingPointGeneratable {}
 
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension vDSP {
     
     /// Fill vector with specified scalar value, single-precision.

@@ -15,6 +15,7 @@
 
 // Array-Oriented Arithmetic and Auxiliary Functions
 
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension vForce {
     
     // MARK: Ceiling
@@ -1130,6 +1131,7 @@ extension vForce {
 
 // Array-Oriented Exponential and Logarithmic Functions
 
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension vForce {
     
     // MARK: Exponential
@@ -1733,6 +1735,7 @@ extension vForce {
 
 // Array-Oriented Power Functions
 
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension vForce {
     
     // MARK: Power
@@ -1866,6 +1869,7 @@ extension vForce {
 
 // Array-Oriented Trigonometric Functions
 
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension vForce {
     
     // MARK: Sine
@@ -2832,6 +2836,7 @@ extension vForce {
 
 // Array-Oriented Hyperbolic Functions
 
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension vForce {
     
     // MARK: Hyperbolic Sine

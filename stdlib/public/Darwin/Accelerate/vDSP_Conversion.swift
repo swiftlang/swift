@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension vDSP {
     
     // MARK: Integer to floating-point conversion
@@ -801,6 +802,7 @@ public protocol vDSP_FloatingPointConvertable {}
 extension Float: vDSP_FloatingPointConvertable {}
 extension Double: vDSP_FloatingPointConvertable {}
 
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension vDSP {
     
     // MARK: Integer to floating-point conversion
