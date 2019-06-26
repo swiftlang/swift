@@ -4198,6 +4198,18 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         break;
       }
 
+      case decls_block::ProjectionValueProperty_DECL_ATTR: {
+        bool isImplicit;
+        IdentifierID nameID;
+        serialization::decls_block::ProjectionValuePropertyDeclAttrLayout
+            ::readRecord(scratch, isImplicit, nameID);
+
+        auto name = MF.getIdentifier(nameID);
+        Attr = new (ctx) ProjectionValuePropertyAttr(
+            name, SourceLoc(), SourceRange(), isImplicit);
+        break;
+      }
+
 #define SIMPLE_DECL_ATTR(NAME, CLASS, ...) \
       case decls_block::CLASS##_DECL_ATTR: { \
         bool isImplicit; \

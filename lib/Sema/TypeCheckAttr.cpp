@@ -132,6 +132,7 @@ public:
   IGNORED_ATTR(PropertyWrapper)
   IGNORED_ATTR(DisfavoredOverload)
   IGNORED_ATTR(FunctionBuilder)
+  IGNORED_ATTR(ProjectionValueProperty)
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
@@ -803,6 +804,7 @@ public:
     IGNORED_ATTR(WarnUnqualifiedAccess)
     IGNORED_ATTR(WeakLinked)
     IGNORED_ATTR(DisfavoredOverload)
+    IGNORED_ATTR(ProjectionValueProperty)
 #undef IGNORED_ATTR
 
   void visitAvailableAttr(AvailableAttr *attr);

@@ -634,6 +634,13 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
+  case DAK_ProjectionValueProperty:
+    Printer.printAttrName("@_projectionValueProperty");
+    Printer << "(";
+    Printer << cast<ProjectionValuePropertyAttr>(this)->ProjectionPropertyName;
+    Printer << ")";
+    break;
+
   case DAK_Count:
     llvm_unreachable("exceed declaration attribute kinds");
 
@@ -762,6 +769,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "_clangImporterSynthesizedType";
   case DAK_Custom:
     return "<<custom>>";
+  case DAK_ProjectionValueProperty:
+    return "_projectionValueProperty";
   }
   llvm_unreachable("bad DeclAttrKind");
 }

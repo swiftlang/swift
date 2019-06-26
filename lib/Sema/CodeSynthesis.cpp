@@ -1622,6 +1622,34 @@ LazyStoragePropertyRequest::evaluate(Evaluator &evaluator,
 static VarDecl *synthesizePropertyWrapperStorageWrapperProperty(
     ASTContext &ctx, VarDecl *var, Type wrapperType,
     VarDecl *wrapperVar) {
+  // If the original property has a @_projectionValueProperty attribute, use
+  // that to find the storage wrapper property.
+  if (auto attr = var->getAttrs().getAttribute<ProjectionValuePropertyAttr>()){
+    SmallVector<ValueDecl *, 2> declsFound;
+    auto projectionName = attr->ProjectionPropertyName;
+    auto dc = var->getDeclContext();
+    if (dc->isTypeContext()) {
+      dc->lookupQualified(dc->getSelfNominalTypeDecl(), projectionName,
+                          NL_QualifiedDefault, declsFound);
+    } else if (dc->isModuleScopeContext()) {
+      dc->lookupQualified(dc->getParentModule(), projectionName,
+                          NL_QualifiedDefault, declsFound);
+    } else {
+      llvm_unreachable("Property wrappers don't work in local contexts");
+    }
+
+    if (declsFound.size() == 1 && isa<VarDecl>(declsFound.front())) {
+      auto property = cast<VarDecl>(declsFound.front());
+      property->setOriginalWrappedProperty(var);
+      return property;
+    }
+
+    ctx.Diags.diagnose(attr->getLocation(),
+                       diag::property_wrapper_projection_value_missing,
+                       projectionName);
+    attr->setInvalid();
+  }
+
   // Compute the name of the storage type.
   SmallString<64> nameBuf;
   nameBuf = "$";
@@ -1656,14 +1684,10 @@ static VarDecl *synthesizePropertyWrapperStorageWrapperProperty(
   pbd->setStatic(var->isStatic());
 
   // Determine the access level for the property.
-  AccessLevel access =
-    std::min(AccessLevel::Internal, var->getFormalAccess());
-  property->overwriteAccess(access);
+  property->overwriteAccess(var->getFormalAccess());
 
   // Determine setter access.
-  AccessLevel setterAccess =
-    std::min(AccessLevel::Internal, var->getSetterFormalAccess());
-  property->overwriteSetterAccess(setterAccess);
+  property->overwriteSetterAccess(var->getSetterFormalAccess());
 
   // Add the accessors we need.
   bool hasSetter = wrapperVar->isSettable(nullptr) &&
@@ -1674,6 +1698,9 @@ static VarDecl *synthesizePropertyWrapperStorageWrapperProperty(
     property->overwriteImplInfo(StorageImplInfo::getImmutableComputed());
   addExpectedOpaqueAccessorsToStorage(property, ctx);
 
+  var->getAttrs().add(
+      new (ctx) ProjectionValuePropertyAttr(name, SourceLoc(), SourceRange(),
+                                            /*Implicit=*/true));
   return property;
 }
 

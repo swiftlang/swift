@@ -2510,6 +2510,17 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
         S.addTypeRef(theAttr->getTypeLoc().getType()));
       return;
     }
+
+    case DAK_ProjectionValueProperty: {
+      auto abbrCode =
+          S.DeclTypeAbbrCodes[ProjectionValuePropertyDeclAttrLayout::Code];
+      auto theAttr = cast<ProjectionValuePropertyAttr>(DA);
+      ProjectionValuePropertyDeclAttrLayout::emitRecord(
+        S.Out, S.ScratchRecord, abbrCode, theAttr->isImplicit(),
+        S.addDeclBaseNameRef(theAttr->ProjectionPropertyName));
+      break;
+    }
+
     }
   }
 
