@@ -76,9 +76,6 @@ public let ObjectiveCBridging = [
   BenchmarkInfo(name: "ObjectiveCBridgeASCIIStringFromFile",
                 runFunction: run_ASCIIStringFromFile, tags: ts,
                 setUpFunction: setup_ASCIIStringFromFile),
-  BenchmarkInfo(name: "UnicodeStringFromCodable",
-                 runFunction: run_UnicodeStringFromCodable, tags: ts,
-                 setUpFunction: setup_UnicodeStringFromCodable),
 ]
 
 #if _runtime(_ObjC)
@@ -747,25 +744,3 @@ public func run_ASCIIStringFromFile(_ N: Int) {
   #endif
 }
 
-var unicodeStringFromCodable:String? = nil
-var unicodeStringFromCodableDict = [String:Void]()
-public func setup_UnicodeStringFromCodable() {
-  let jsonString = "[\(String(reflecting: string))]"
-
-   let decoded = try JSONDecoder().decode([String].self, from: Data(jsonString.utf8))
-   let reEncoded = try JSONEncoder().encode(decoded)
-   let desc = try JSONDecoder().decode([String].self, from: reEncoded)
-
-   unicodeStringFromCodable = desc[0]
-}
-
-@inline(never)
-public func run_UnicodeStringFromCodable(_ N: Int) {
-  #if _runtime(_ObjC)
-  for _ in 0 ..< N {
-    for _ in 0..<100 {
-      unicodeStringFromCodableDict[identity(unicodeStringFromCodable)] = ()
-    }
-  }
-  #endif
-}
