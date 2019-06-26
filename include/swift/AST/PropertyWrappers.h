@@ -46,12 +46,11 @@ struct PropertyWrapperTypeInfo {
   /// value with an attached property wrapper.
   ConstructorDecl *defaultInit = nullptr;
 
-  /// The property through which the wrapper value ($foo) will be accessed,
-  /// hiding the underlying storage completely.
+  /// The property through which the projection value ($foo) will be accessed.
   ///
   /// This property is optional. If present, a computed property for `$foo`
   /// will be created that redirects to this property.
-  VarDecl *wrapperValueVar = nullptr;
+  VarDecl *projectedValueVar = nullptr;
 
   /// Whether this is a valid property wrapper.
   bool isValid() const {

@@ -2511,11 +2511,11 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
-    case DAK_ProjectionValueProperty: {
+    case DAK_ProjectedValueProperty: {
       auto abbrCode =
-          S.DeclTypeAbbrCodes[ProjectionValuePropertyDeclAttrLayout::Code];
-      auto theAttr = cast<ProjectionValuePropertyAttr>(DA);
-      ProjectionValuePropertyDeclAttrLayout::emitRecord(
+          S.DeclTypeAbbrCodes[ProjectedValuePropertyDeclAttrLayout::Code];
+      auto theAttr = cast<ProjectedValuePropertyAttr>(DA);
+      ProjectedValuePropertyDeclAttrLayout::emitRecord(
         S.Out, S.ScratchRecord, abbrCode, theAttr->isImplicit(),
         S.addDeclBaseNameRef(theAttr->ProjectionPropertyName));
       break;

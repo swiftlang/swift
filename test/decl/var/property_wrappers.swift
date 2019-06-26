@@ -720,7 +720,7 @@ func testDefaultedPrivateMemberwiseLets() {
 struct WrapperWithStorageRef<T> {
   var wrappedValue: T
 
-  var wrapperValue: Wrapper<T> {
+  var projectedValue: Wrapper<T> {
     return Wrapper(wrappedValue: wrappedValue)
   }
 }
@@ -767,7 +767,7 @@ func testStorageRefPrivate() {
 }
 
 
-// rdar://problem/50873275 - crash when using wrapper with wrapperValue in
+// rdar://problem/50873275 - crash when using wrapper with projectedValue in
 // generic type.
 @propertyWrapper
 struct InitialValueWrapperWithStorageRef<T> {
@@ -777,7 +777,7 @@ struct InitialValueWrapperWithStorageRef<T> {
     wrappedValue = initialValue
   }
 
-  var wrapperValue: Wrapper<T> {
+  var projectedValue: Wrapper<T> {
     return Wrapper(wrappedValue: wrappedValue)
   }
 }
@@ -787,16 +787,16 @@ struct TestGenericStorageRef<T> {
   @InitialValueWrapperWithStorageRef var inner: Inner = Inner()
 }
 
-// Wiring up the _projectionValueProperty attribute.
+// Wiring up the _projectedValueProperty attribute.
 struct TestProjectionValuePropertyAttr {
-  @_projectionValueProperty(wrapperA)
+  @_projectedValueProperty(wrapperA)
   @WrapperWithStorageRef var a: String
 
   var wrapperA: Wrapper<String> {
     Wrapper(wrappedValue: "blah")
   }
 
-  @_projectionValueProperty(wrapperB) // expected-error{{could not find projection value property 'wrapperB'}}
+  @_projectedValueProperty(wrapperB) // expected-error{{could not find projection value property 'wrapperB'}}
   @WrapperWithStorageRef var b: String
 }
 
@@ -848,7 +848,7 @@ protocol P { }
 @propertyWrapper
 struct WrapperRequiresP<T: P> {
   var wrappedValue: T
-  var wrapperValue: T { return wrappedValue }
+  var projectedValue: T { return wrappedValue }
 }
 
 struct UsesWrapperRequiringP {

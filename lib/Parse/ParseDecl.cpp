@@ -1630,7 +1630,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     break;
   }
 
-  case DAK_ProjectionValueProperty: {
+  case DAK_ProjectedValueProperty: {
     if (!consumeIf(tok::l_paren)) {
       diagnose(Loc, diag::attr_expected_lparen, AttrName,
                DeclAttribute::isDeclModifier(DK));
@@ -1653,7 +1653,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       return false;
     }
 
-    Attributes.add(new (Context) ProjectionValuePropertyAttr(
+    Attributes.add(new (Context) ProjectedValuePropertyAttr(
         name, AtLoc, range, /*implicit*/ false));
     break;
   }

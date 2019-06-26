@@ -10,7 +10,7 @@ public struct SomeWrapper<T> {
     self.wrappedValue = initialValue
   }
 
-  public var wrapperValue: OtherWrapper<T> {
+  public var projectedValue: OtherWrapper<T> {
     OtherWrapper(value: wrappedValue)
   }
 }

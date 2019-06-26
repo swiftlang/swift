@@ -1480,22 +1480,22 @@ public:
 /// @A var foo: Int
 /// \endcode
 ///
-/// Where \c A is a property wrapper that has a \c wrapperValue property, the compiler
+/// Where \c A is a property wrapper that has a \c projectedValue property, the compiler
 /// synthesizes a declaration $foo an attaches the attribute
-/// \c _projectionValuePropertyAttr($foo) to \c foo to record the link.
-class ProjectionValuePropertyAttr : public DeclAttribute {
+/// \c _projectedValuePropertyAttr($foo) to \c foo to record the link.
+class ProjectedValuePropertyAttr : public DeclAttribute {
 public:
-  ProjectionValuePropertyAttr(Identifier PropertyName,
+  ProjectedValuePropertyAttr(Identifier PropertyName,
                               SourceLoc AtLoc, SourceRange Range,
                               bool Implicit)
-    : DeclAttribute(DAK_ProjectionValueProperty, AtLoc, Range, Implicit),
+    : DeclAttribute(DAK_ProjectedValueProperty, AtLoc, Range, Implicit),
       ProjectionPropertyName(PropertyName) {}
 
   // The projection property name.
   const Identifier ProjectionPropertyName;
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_ProjectionValueProperty;
+    return DA->getKind() == DAK_ProjectedValueProperty;
   }
 };
 
