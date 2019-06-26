@@ -313,8 +313,8 @@ class ConformanceLookupTable {
 
   /// Tracks notionals that have an implied conformance from inheriting protocol extension
   /// Used to know notionals that need to refresh their conformances and which witnesses to emit.
-  llvm::DenseMap<const ExtensionDecl *, llvm::DenseMap<NominalTypeDecl *,
-    llvm::DenseMap<ProtocolDecl *, bool>>> NotionalConformancesFromExtension;
+  llvm::DenseMap<NominalTypeDecl *, llvm::DenseMap<ProtocolDecl *, bool>>
+    NotionalConformancesFromExtension;
 
   /// The complete set of diagnostics about erroneously superseded
   /// protocol conformances.
@@ -462,8 +462,8 @@ public:
                           SmallVectorImpl<ConformanceDiagnostic> *diagnostics);
 
   /// Add conformances implied by an inheriting protocol extension
-  void addExtendedConformances(const ExtensionDecl *ext,
-                              SmallVectorImpl<ProtocolConformance *> &conformances);
+  void addExtendedConformances(
+                          SmallVectorImpl<ProtocolConformance *> &conformances);
 
   /// Retrieve the complete set of protocols to which this nominal
   /// type conforms.

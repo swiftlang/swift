@@ -3264,7 +3264,7 @@ protected:
 
   friend class ProtocolType;
 
-  /// Prepare the conformance table.
+  /// Prepare the conformance table (also becomes accessor).
   ConformanceLookupTable *prepareConformanceTable() const;
 
 public:
