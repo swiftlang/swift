@@ -2576,9 +2576,21 @@ NOTE(missing_member_type_conformance_prevents_synthesis, none,
 ERROR(dynamic_self_non_method,none,
       "%select{global|local}0 function cannot return 'Self'", (bool))
 
-ERROR(self_in_nominal,none,
-      "'Self' is only available in a protocol or as the result of a "
-      "method in a class; did you mean '%0'?", (StringRef))
+ERROR(dynamic_self_invalid,none,
+      "covariant 'Self' can only appear as the type of a property, subscript or method result; "
+      "did you mean '%0'?", (StringRef))
+ERROR(dynamic_self_in_mutable_property,none,
+      "mutable property cannot have covariant 'Self' type", ())
+ERROR(dynamic_self_in_stored_property,none,
+      "stored property cannot have covariant 'Self' type", ())
+ERROR(dynamic_self_in_mutable_subscript,none,
+      "mutable subscript cannot have covariant 'Self' type", ())
+ERROR(dynamic_self_invalid_property,none,
+      "covariant 'Self' can only appear at the top level of property type", ())
+ERROR(dynamic_self_invalid_subscript,none,
+      "covariant 'Self' can only appear at the top level of subscript element type", ())
+ERROR(dynamic_self_invalid_method,none,
+      "covariant 'Self' can only appear at the top level of method result type", ())
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Attributes

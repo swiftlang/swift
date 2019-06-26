@@ -6179,6 +6179,12 @@ Type AbstractFunctionDecl::getMethodInterfaceType() const {
   return Ty->castTo<AnyFunctionType>()->getResult();
 }
 
+bool AbstractFunctionDecl::hasDynamicSelfResult() const {
+  if (auto *funcDecl = dyn_cast<FuncDecl>(this))
+    return funcDecl->getResultInterfaceType()->hasDynamicSelfType();
+  return isa<ConstructorDecl>(this);
+}
+
 bool AbstractFunctionDecl::argumentNameIsAPIByDefault() const {
   // Initializers have argument labels.
   if (isa<ConstructorDecl>(this))

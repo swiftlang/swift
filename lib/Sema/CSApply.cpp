@@ -812,13 +812,18 @@ namespace {
       Type dynamicSelfFnType;
       if (!member->getDeclContext()->getSelfProtocolDecl()) {
         if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
-          if ((isa<FuncDecl>(func) &&
-               cast<FuncDecl>(func)->hasDynamicSelf()) ||
-              (isa<ConstructorDecl>(func) &&
-               containerTy->getClassOrBoundGenericClass())) {
+          if (func->hasDynamicSelfResult() &&
+              !baseTy->getOptionalObjectType()) {
             refTy = refTy->replaceCovariantResultType(containerTy, 2);
             if (!baseTy->isEqual(containerTy)) {
               dynamicSelfFnType = refTy->replaceCovariantResultType(baseTy, 2);
+            }
+          }
+        } else if (auto *decl = dyn_cast<VarDecl>(member)) {
+          if (decl->getValueInterfaceType()->hasDynamicSelfType()) {
+            refTy = refTy->replaceCovariantResultType(containerTy, 1);
+            if (!baseTy->isEqual(containerTy)) {
+              dynamicSelfFnType = refTy->replaceCovariantResultType(baseTy, 1);
             }
           }
         }
@@ -930,7 +935,6 @@ namespace {
 
       // For properties, build member references.
       if (isa<VarDecl>(member)) {
-        assert(!dynamicSelfFnType && "Converted type doesn't make sense here");
         if (!baseIsInstance && member->isInstanceMember()) {
           assert(memberLocator.getBaseLocator() && 
                  cs.UnevaluatedRootExprs.count(
@@ -952,6 +956,12 @@ namespace {
         cs.setType(memberRefExpr, simplifyType(openedType));
         Expr *result = memberRefExpr;
         closeExistential(result, locator);
+        if (dynamicSelfFnType) {
+          result = new (context) CovariantReturnConversionExpr(result,
+                                                            dynamicSelfFnType);
+          cs.cacheType(result);
+          cs.setType(result, simplifyType(openedType));
+        }
         return forceUnwrapIfExpected(result, choice, memberLocator);
       }
       
@@ -1439,6 +1449,16 @@ namespace {
 
       Expr *result = subscriptExpr;
       closeExistential(result, locator);
+
+      if (subscript->getElementInterfaceType()->hasDynamicSelfType()) {
+        auto dynamicSelfFnType =
+          openedFullFnType->replaceCovariantResultType(baseTy, 2);
+        result = new (tc.Context) CovariantReturnConversionExpr(result,
+                                                            dynamicSelfFnType);
+        cs.cacheType(result);
+        cs.setType(result, simplifyType(baseTy));
+      }
+
       return result;
     }
 

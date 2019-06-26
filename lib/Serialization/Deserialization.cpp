@@ -2921,7 +2921,7 @@ public:
     bool isStatic;
     uint8_t rawStaticSpelling, rawAccessLevel, rawMutModifier;
     uint8_t rawAccessorKind;
-    bool isObjC, hasDynamicSelf, hasForcedStaticDispatch, throws;
+    bool isObjC, hasForcedStaticDispatch, throws;
     unsigned numNameComponentsBiased;
     GenericEnvironmentID genericEnvID;
     TypeID resultInterfaceTypeID;
@@ -2935,7 +2935,7 @@ public:
     if (!isAccessor) {
       decls_block::FuncLayout::readRecord(scratch, contextID, isImplicit,
                                           isStatic, rawStaticSpelling, isObjC,
-                                          rawMutModifier, hasDynamicSelf,
+                                          rawMutModifier,
                                           hasForcedStaticDispatch, throws,
                                           genericEnvID,
                                           resultInterfaceTypeID,
@@ -2948,7 +2948,7 @@ public:
     } else {
       decls_block::AccessorLayout::readRecord(scratch, contextID, isImplicit,
                                           isStatic, rawStaticSpelling, isObjC,
-                                          rawMutModifier, hasDynamicSelf,
+                                          rawMutModifier,
                                           hasForcedStaticDispatch, throws,
                                           genericEnvID,
                                           resultInterfaceTypeID,
@@ -3131,7 +3131,6 @@ public:
     if (isImplicit)
       fn->setImplicit();
     fn->setIsObjC(isObjC);
-    fn->setDynamicSelf(hasDynamicSelf);
     fn->setForcedStaticDispatch(hasForcedStaticDispatch);
     fn->setNeedsNewVTableEntry(needsNewVTableEntry);
 

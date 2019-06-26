@@ -567,15 +567,12 @@ void TypeChecker::validateGenericFuncOrSubscriptSignature(
       decl->getDeclContext()->getGenericSignatureOfContext();
 
   auto params = func ? func->getParameters() : subscr->getIndices();
-  bool hasDynamicSelf = false;
   TypeLoc emptyLoc;
   TypeLoc &resultTyLoc = [&]() -> TypeLoc& {
     if (subscr)
       return subscr->getElementTypeLoc();
-    if (auto fn = dyn_cast<FuncDecl>(func)) {
-      hasDynamicSelf = fn->hasDynamicSelf();
+    if (auto fn = dyn_cast<FuncDecl>(func))
       return fn->getBodyResultTypeLoc();
-    }
     return emptyLoc;
   }();
 
@@ -605,9 +602,8 @@ void TypeChecker::validateGenericFuncOrSubscriptSignature(
     if (!resultTyLoc.isNull() &&
         !(resultTyLoc.getTypeRepr() &&
           isa<OpaqueReturnTypeRepr>(resultTyLoc.getTypeRepr())))
-      validateType(resultTyLoc, resolution, hasDynamicSelf
-                     ? TypeResolverContext::DynamicSelfResult
-                     : TypeResolverContext::FunctionResult);
+      validateType(resultTyLoc, resolution,
+                   TypeResolverContext::FunctionResult);
 
     // Infer requirements from it.
     if (resultTyLoc.getTypeRepr()) {
@@ -658,9 +654,8 @@ void TypeChecker::validateGenericFuncOrSubscriptSignature(
       resultTyLoc.setType(
           getOrCreateOpaqueResultType(resolution, decl, opaqueTy));
     } else {
-      validateType(resultTyLoc, resolution, hasDynamicSelf
-                   ? TypeResolverContext::DynamicSelfResult
-                   : TypeResolverContext::FunctionResult);
+      validateType(resultTyLoc, resolution,
+                   TypeResolverContext::FunctionResult);
     }
   }
 
