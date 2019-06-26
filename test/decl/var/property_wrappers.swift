@@ -945,8 +945,21 @@ struct Bar<T, V> {
   func bar() {}
 }
 
+@propertyWrapper
+struct Baz<T> {
+  var wrappedValue: T
+
+  var wrapperValue: V {
+    return V()
+  }
+}
+
 extension Bar where V == String { // expected-note {{where 'V' = 'Bool'}}
   func barWhereVIsString() {}
+}
+
+struct V {
+  func onWrapperValue() {}
 }
 
 struct W {
@@ -958,21 +971,16 @@ struct MissingPropertyWrapperUnwrap {
   @Foo var x: Int
   @Bar<Int, Bool> var y: Int
   @Bar<Int, String> var z: Int
+  @Baz var usesWrapperValue: W
 
   func baz() {
-<<<<<<< HEAD
-    self.x.foo() // expected-error {{property 'x' will be unwrapped to value of type 'Int', use '_' to refer to wrapper type 'Foo<Int>'}}{{10-10=_}}
-    self.y.bar() // expected-error {{property 'y' will be unwrapped to value of type 'Int', use '_' to refer to wrapper type 'Bar<Int, Bool>'}}{{10-10=_}}
-    self.y.barWhereVIsString() // expected-error {{property 'y' will be unwrapped to value of type 'Int', use '_' to refer to wrapper type 'Bar<Int, Bool>'}}{{10-10=_}}
-    // expected-error@-1 {{referencing instance method 'barWhereVIsString()' on 'Bar' requires the types 'Bool' and 'String' be equivalent}}
-    self.z.barWhereVIsString() // expected-error {{property 'z' will be unwrapped to value of type 'Int', use '_' to refer to wrapper type 'Bar<Int, String>'}}{{10-10=_}} 
-=======
     self.x.foo() // expected-error {{value of type 'Int' has no member 'foo', requires wrapper type 'Foo<Int>'}}{{10-10=$}}
     self.y.bar() // expected-error {{value of type 'Int' has no member 'bar', requires wrapper type 'Bar<Int, Bool>'}}{{10-10=$}}
     self.y.barWhereVIsString() // expected-error {{value of type 'Int' has no member 'barWhereVIsString', requires wrapper type 'Bar<Int, Bool>'}}{{10-10=$}}
     // expected-error@-1 {{referencing instance method 'barWhereVIsString()' on 'Bar' requires the types 'Bool' and 'String' be equivalent}}
     self.z.barWhereVIsString() // expected-error {{value of type 'Int' has no member 'barWhereVIsString', requires wrapper type 'Bar<Int, String>'}}{{10-10=$}}
     self.$w.onWrapped() // expected-error {{value of type 'Foo<W>' has no member 'onWrapped', requires wrapped type 'W'}} {{10-10=}}
->>>>>>> Sema: Add property wrapper diagnostic for unnecessary $ in member access
+    self.usesWrapperValue.onWrapperValue() // expected-error {{value of type 'W' has no member 'onWrapperValue', requires wrapper type 'V'}}{{10-10=$}}
+    self.$usesWrapperValue.onWrapped() // expected-error {{value of type 'V' has no member 'onWrapped', requires wrapped type 'W'}}{{10-10=}}
   }
 }
