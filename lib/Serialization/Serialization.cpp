@@ -3342,8 +3342,6 @@ void Serializer::writeDecl(const Decl *D) {
                                proto->isObjC(),
                                proto->existentialTypeSupported(
                                  /*resolver=*/nullptr),
-                               addGenericEnvironmentRef(
-                                                proto->getGenericEnvironment()),
                                rawAccessLevel,
                                inherited);
 

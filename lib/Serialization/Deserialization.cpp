@@ -3316,14 +3316,13 @@ public:
     IdentifierID nameID;
     DeclContextID contextID;
     bool isImplicit, isClassBounded, isObjC, existentialTypeSupported;
-    GenericEnvironmentID genericEnvID;
     uint8_t rawAccessLevel;
     ArrayRef<uint64_t> rawInheritedIDs;
 
     decls_block::ProtocolLayout::readRecord(scratch, nameID, contextID,
                                             isImplicit, isClassBounded, isObjC,
                                             existentialTypeSupported,
-                                            genericEnvID, rawAccessLevel, rawInheritedIDs);
+                                            rawAccessLevel, rawInheritedIDs);
 
     auto DC = MF.getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -3349,8 +3348,6 @@ public:
     proto->setGenericParams(genericParams);
 
     handleInherited(proto, rawInheritedIDs);
-
-    MF.configureGenericEnvironment(proto, genericEnvID);
 
     if (isImplicit)
       proto->setImplicit();
