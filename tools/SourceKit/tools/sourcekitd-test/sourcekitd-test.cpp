@@ -87,7 +87,7 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
                            std::unique_ptr<llvm::MemoryBuffer> SourceBuf,
                            TestOptions *InitOpts);
 static void printCursorInfo(sourcekitd_variant_t Info, StringRef Filename,
-                            const llvm::StringMap<std::string> &VFSFiles,
+                            const llvm::StringMap<TestOptions::VFSFile> &VFSFiles,
                             llvm::raw_ostream &OS);
 static void printNameTranslationInfo(sourcekitd_variant_t Info, llvm::raw_ostream &OS);
 static void printRangeInfo(sourcekitd_variant_t Info, StringRef Filename,
@@ -97,7 +97,7 @@ static void printDocInfo(sourcekitd_variant_t Info, StringRef Filename);
 static void printInterfaceGen(sourcekitd_variant_t Info, bool CheckASCII);
 static void printSemanticInfo();
 static void printRelatedIdents(sourcekitd_variant_t Info, StringRef Filename,
-                               const llvm::StringMap<std::string> &VFSFiles,
+                               const llvm::StringMap<TestOptions::VFSFile> &VFSFiles,
                                llvm::raw_ostream &OS);
 static void printFoundInterface(sourcekitd_variant_t Info,
                                 llvm::raw_ostream &OS);
@@ -123,19 +123,19 @@ static void printStatistics(sourcekitd_variant_t Info, raw_ostream &OS);
 
 static unsigned
 resolveFromLineCol(unsigned Line, unsigned Col, StringRef Filename,
-                   const llvm::StringMap<std::string> &VFSFiles);
+                   const llvm::StringMap<TestOptions::VFSFile> &VFSFiles);
 static unsigned resolveFromLineCol(unsigned Line, unsigned Col,
                                    llvm::MemoryBuffer *InputBuf);
 static std::pair<unsigned, unsigned>
 resolveToLineCol(unsigned Offset, StringRef Filename,
-                 const llvm::StringMap<std::string> &VFSFiles);
+                 const llvm::StringMap<TestOptions::VFSFile> &VFSFiles);
 static std::pair<unsigned, unsigned> resolveToLineCol(unsigned Offset,
                                                   llvm::MemoryBuffer *InputBuf);
 static std::pair<unsigned, unsigned> resolveToLineColFromBuf(unsigned Offset,
                                                       const char *Buf);
 static llvm::MemoryBuffer *
 getBufferForFilename(StringRef Filename,
-                     const llvm::StringMap<std::string> &VFSFiles);
+                     const llvm::StringMap<TestOptions::VFSFile> &VFSFiles);
 
 static void notification_receiver(sourcekitd_response_t resp);
 
@@ -997,7 +997,13 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     for (auto &NameAndTarget : Opts.VFSFiles) {
       sourcekitd_object_t file = sourcekitd_request_dictionary_create(nullptr, nullptr, 0);
       sourcekitd_request_dictionary_set_string(file, KeyName, NameAndTarget.first().data());
-      sourcekitd_request_dictionary_set_string(file, KeySourceFile,  NameAndTarget.second.c_str());
+
+      if (NameAndTarget.second.passAsSourceText) {
+        auto content = getBufferForFilename(NameAndTarget.first(), Opts.VFSFiles);
+        sourcekitd_request_dictionary_set_string(file, KeySourceText,  content->getBufferStart());
+      } else {
+        sourcekitd_request_dictionary_set_string(file, KeySourceFile,  NameAndTarget.second.path.c_str());
+      }
       sourcekitd_request_array_set_value(files, SOURCEKITD_ARRAY_APPEND, file);
     }
     sourcekitd_object_t vfsOpts = sourcekitd_request_dictionary_create(nullptr, nullptr, 0);
@@ -1408,7 +1414,7 @@ static void printNameTranslationInfo(sourcekitd_variant_t Info,
 }
 
 static void printCursorInfo(sourcekitd_variant_t Info, StringRef FilenameIn,
-                            const llvm::StringMap<std::string> &VFSFiles,
+                            const llvm::StringMap<TestOptions::VFSFile> &VFSFiles,
                             llvm::raw_ostream &OS) {
   const char *InternalDiagnostic =
       sourcekitd_variant_dictionary_get_string(Info, KeyInternalDiagnostic);
@@ -1883,7 +1889,7 @@ static void printInterfaceGen(sourcekitd_variant_t Info, bool CheckASCII) {
 }
 
 static void printRelatedIdents(sourcekitd_variant_t Info, StringRef Filename,
-                               const llvm::StringMap<std::string> &VFSFiles,
+                               const llvm::StringMap<TestOptions::VFSFile> &VFSFiles,
                                llvm::raw_ostream &OS) {
   OS << "START RANGES\n";
   sourcekitd_variant_t Res =
@@ -2095,7 +2101,7 @@ static void expandPlaceholders(llvm::MemoryBuffer *SourceBuf,
 
 static std::pair<unsigned, unsigned>
 resolveToLineCol(unsigned Offset, StringRef Filename,
-                 const llvm::StringMap<std::string> &VFSFiles) {
+                 const llvm::StringMap<TestOptions::VFSFile> &VFSFiles) {
   return resolveToLineCol(Offset, getBufferForFilename(Filename, VFSFiles));
 }
 
@@ -2128,7 +2134,7 @@ resolveToLineColFromBuf(unsigned Offset, const char *Ptr) {
 
 static unsigned
 resolveFromLineCol(unsigned Line, unsigned Col, StringRef Filename,
-                   const llvm::StringMap<std::string> &VFSFiles) {
+                   const llvm::StringMap<TestOptions::VFSFile> &VFSFiles) {
   return resolveFromLineCol(Line, Col,
                             getBufferForFilename(Filename, VFSFiles));
 }
@@ -2171,10 +2177,10 @@ static llvm::StringMap<llvm::MemoryBuffer*> Buffers;
 
 static llvm::MemoryBuffer *
 getBufferForFilename(StringRef Filename,
-                     const llvm::StringMap<std::string> &VFSFiles) {
+                     const llvm::StringMap<TestOptions::VFSFile> &VFSFiles) {
   auto VFSFileIt = VFSFiles.find(Filename);
   auto MappedFilename =
-      VFSFileIt == VFSFiles.end() ? Filename : StringRef(VFSFileIt->second);
+      VFSFileIt == VFSFiles.end() ? Filename : StringRef(VFSFileIt->second.path);
 
   auto It = Buffers.find(MappedFilename);
   if (It != Buffers.end())

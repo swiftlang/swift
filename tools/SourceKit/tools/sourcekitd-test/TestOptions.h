@@ -111,7 +111,13 @@ struct TestOptions {
   bool isAsyncRequest = false;
   bool timeRequest = false;
   unsigned repeatRequest = 1;
-  llvm::StringMap<std::string> VFSFiles;
+  struct VFSFile {
+    std::string path;
+    bool passAsSourceText;
+    VFSFile(std::string path, bool passAsSourceText)
+        : path(std::move(path)), passAsSourceText(passAsSourceText) {}
+  };
+  llvm::StringMap<VFSFile> VFSFiles;
   llvm::Optional<std::string> VFSName;
   llvm::Optional<bool> CancelOnSubsequentRequest;
   bool parseArgs(llvm::ArrayRef<const char *> Args);

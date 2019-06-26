@@ -355,10 +355,11 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
 
     case OPT_vfs_files:
       VFSName = VFSName.getValueOr("in-memory-vfs");
-      for (const char *VFSFile : InputArg->getValues()) {
-        auto NameAndTarget = StringRef(VFSFile).split('=');
-        VFSFiles.try_emplace(std::get<0>(NameAndTarget),
-                             std::get<1>(NameAndTarget).str());
+      for (const char *vfsFile : InputArg->getValues()) {
+        StringRef name, target;
+        std::tie(name, target) = StringRef(vfsFile).split('=');
+        bool passAsSourceText = target.consume_front("@");
+        VFSFiles.try_emplace(name, VFSFile(target.str(), passAsSourceText));
       }
       break;
 
