@@ -156,7 +156,7 @@ extension vDSP {
     
 }
 
-@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 public protocol vDSP_FourierTransformFunctions {
     associatedtype SplitComplex
     
@@ -185,7 +185,7 @@ public protocol vDSP_FourierTransformFunctions {
 //
 //===----------------------------------------------------------------------===//
 
-@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 public struct vDSP_SplitComplexFloat: vDSP_FourierTransformFunctions {
     public typealias SplitComplex = DSPSplitComplex
     
@@ -232,7 +232,7 @@ public struct vDSP_SplitComplexFloat: vDSP_FourierTransformFunctions {
     }
 }
 
-@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 public struct vDSP_SplitComplexDouble: vDSP_FourierTransformFunctions {
     public typealias SplitComplex = DSPDoubleSplitComplex
     
@@ -279,22 +279,22 @@ public struct vDSP_SplitComplexDouble: vDSP_FourierTransformFunctions {
     }
 }
 
-@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 public protocol vDSP_FourierTransformable {
     associatedtype FFTFunctions: vDSP_FourierTransformFunctions where FFTFunctions.SplitComplex == Self
 }
 
-@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension DSPSplitComplex: vDSP_FourierTransformable {
     public typealias FFTFunctions = vDSP_SplitComplexFloat
 }
 
-@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension DSPDoubleSplitComplex: vDSP_FourierTransformable {
     public typealias FFTFunctions = vDSP_SplitComplexDouble
 }
 
-@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 struct vDSP_FFTFunctions {
     /// Performs a 1D fast Fourier transform.
     @inlinable

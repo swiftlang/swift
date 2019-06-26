@@ -788,7 +788,7 @@ extension vDSP {
 //
 //===----------------------------------------------------------------------===//
 
-@available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 public protocol vDSP_IntegerConvertable {}
 extension UInt8: vDSP_IntegerConvertable {}
 extension UInt16: vDSP_IntegerConvertable {}
@@ -797,7 +797,7 @@ extension Int8: vDSP_IntegerConvertable {}
 extension Int16: vDSP_IntegerConvertable {}
 extension Int32: vDSP_IntegerConvertable {}
 
-@available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 public protocol vDSP_FloatingPointConvertable {}
 extension Float: vDSP_FloatingPointConvertable {}
 extension Double: vDSP_FloatingPointConvertable {}

@@ -100,17 +100,17 @@ extension vDSP {
     }
 }
 
-@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 fileprivate protocol vDSP_FloatingPointDiscreteCosineTransformable: BinaryFloatingPoint {
     associatedtype DCTFunctions: vDSP_DCTFunctions where DCTFunctions.Scalar == Self
 }
 
-@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension Float: vDSP_FloatingPointDiscreteCosineTransformable {
     typealias DCTFunctions = vDSP.VectorizableFloat
 }
 
-@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 fileprivate protocol vDSP_DCTFunctions {
     associatedtype Scalar
     
@@ -127,7 +127,7 @@ fileprivate protocol vDSP_DCTFunctions {
         U.Element == Scalar, V.Element == Scalar
 }
 
-@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension vDSP.VectorizableFloat: vDSP_DCTFunctions {
     
     @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
