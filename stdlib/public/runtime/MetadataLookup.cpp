@@ -1106,19 +1106,24 @@ public:
   Demangle::NodeFactory &getNodeFactory() { return demangler; }
 
   BuiltType resolveOpaqueType(NodePointer opaqueDecl,
-                              ArrayRef<BuiltType> genericArgs,
+                              ArrayRef<ArrayRef<BuiltType>> genericArgs,
                               unsigned ordinal) {
     auto descriptor = _findOpaqueTypeDescriptor(opaqueDecl, demangler);
     if (!descriptor)
       return BuiltType();
     auto outerContext = descriptor->Parent.get();
     
+    SmallVector<BuiltType, 8> allGenericArgs;
+    for (auto argSet : genericArgs) {
+      allGenericArgs.append(argSet.begin(), argSet.end());
+    }
+    
     // Gather the generic parameters we need to parameterize the opaque decl.
     SmallVector<unsigned, 8> genericParamCounts;
     SmallVector<const void *, 8> allGenericArgsVec;
     
     if (!_gatherGenericParameters(outerContext,
-                                  genericArgs,
+                                  allGenericArgs,
                                   BuiltType(), /* no parent */
                                   genericParamCounts, allGenericArgsVec,
                                   demangler))
