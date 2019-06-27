@@ -152,7 +152,7 @@ extension String.Index {
   @usableFromInline @inline(never) @_effects(releasenone)
   internal func _invariantCheck() {
     _internalInvariant(_encodedOffset >= 0)
-    if self.isAligned {
+    if self._isAligned {
       _internalInvariant(transcodedOffset == 0)
     }
   }
@@ -249,11 +249,11 @@ extension String.Index {
 extension String.Index {
   @_alwaysEmitIntoClient // Swift 5.1
   @inline(__always)
-  internal var isAligned: Bool { return 0 != _rawBits & 0x2000 }
+  internal var _isAligned: Bool { return 0 != _rawBits & 0x2000 }
 
   @_alwaysEmitIntoClient // Swift 5.1
   @inline(__always)
-  internal var aligned: String.Index {
+  internal var _aligned: String.Index {
     var idx = self
     idx._rawBits |= 0x2000
     idx._invariantCheck()
