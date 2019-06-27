@@ -795,16 +795,6 @@ void swift::ide::api::SDKNodeDeclFunction::diagnose(SDKNode *Right) {
   }
 }
 
-void swift::ide::api::SDKNodeDeclSubscript::diagnose(SDKNode *Right) {
-  SDKNodeDeclAbstractFunc::diagnose(Right);
-  auto *R = dyn_cast<SDKNodeDeclSubscript>(Right);
-  if (!R)
-    return;
-  if (hasSetter() && !R->hasSetter()) {
-    emitDiag(diag::removed_setter);
-  }
-}
-
 void swift::ide::api::SDKNodeDecl::diagnose(SDKNode *Right) {
   SDKNode::diagnose(Right);
   auto *RD = dyn_cast<SDKNodeDecl>(Right);
@@ -882,9 +872,6 @@ void swift::ide::api::SDKNodeDeclVar::diagnose(SDKNode *Right) {
   auto *RV = dyn_cast<SDKNodeDeclVar>(Right);
   if (!RV)
     return;
-  if (getSetter() && !RV->getSetter()) {
-    emitDiag(diag::removed_setter);
-  }
   if (Ctx.checkingABI()) {
     if (hasFixedBinaryOrder() != RV->hasFixedBinaryOrder()) {
       emitDiag(diag::var_has_fixed_order_change, hasFixedBinaryOrder());
@@ -976,8 +963,15 @@ class PrunePass : public MatchedNodeListener, public SDKTreeDiffPass {
 
   static void printSpaces(llvm::raw_ostream &OS, SDKNode *N) {
     assert(N);
+    StringRef Space = "        ";
+    // Accessor doesn't have parent.
+    if (auto *AC = dyn_cast<SDKNodeDeclAccessor>(N)) {
+      OS << Space;
+      printSpaces(OS, AC->getStorage());
+      return;
+    }
     for (auto P = N; !isa<SDKNodeRoot>(P); P = P->getParent())
-      OS << "        ";
+      OS << Space;
   }
 
   static void debugMatch(SDKNode *Left, SDKNode *Right, NodeMatchReason Reason,
@@ -1001,6 +995,13 @@ class PrunePass : public MatchedNodeListener, public SDKTreeDiffPass {
       OS << Left->getPrintedName() << Arrow << Right->getPrintedName() << "\n";
       return;
     }
+  }
+
+  static StringRef getParentProtocolName(SDKNode *Node) {
+    if (auto *Acc = dyn_cast<SDKNodeDeclAccessor>(Node)) {
+      Node = Acc->getStorage();
+    }
+    return Node->getParent()->getAs<SDKNodeDecl>()->getFullyQualifiedName();
   }
 
 public:
@@ -1043,8 +1044,7 @@ public:
               ShouldComplain = false;
           }
           if (ShouldComplain &&
-              ProtocolReqWhitelist.count(D->getParent()->getAs<SDKNodeDecl>()->
-                                         getFullyQualifiedName())) {
+              ProtocolReqWhitelist.count(getParentProtocolName(D))) {
             // Ignore protocol requirement additions if the protocol has been added
             // to the whitelist.
             ShouldComplain = false;
@@ -1082,6 +1082,9 @@ public:
         TD->emitDiag(diag::conformance_removed,
                      Conf->getName(),
                      TD->isProtocol());
+      }
+      if (auto *Acc = dyn_cast<SDKNodeDeclAccessor>(Left)) {
+        Acc->emitDiag(diag::removed_decl, Acc->isDeprecated());
       }
       return;
     case NodeMatchReason::FuncToProperty:
@@ -1131,11 +1134,9 @@ public:
     }
     case SDKNodeKind::TypeWitness:
     case SDKNodeKind::DeclOperator:
-    case SDKNodeKind::DeclSubscript:
     case SDKNodeKind::DeclAssociatedType:
     case SDKNodeKind::DeclFunction:
-    case SDKNodeKind::DeclSetter:
-    case SDKNodeKind::DeclGetter:
+    case SDKNodeKind::DeclAccessor:
     case SDKNodeKind::DeclConstructor:
     case SDKNodeKind::DeclTypeAlias:
     case SDKNodeKind::TypeFunc:
@@ -1148,15 +1149,25 @@ public:
       SNMatcher.match();
       break;
     }
+    case SDKNodeKind::DeclSubscript: {
+      auto *LSub = dyn_cast<SDKNodeDeclSubscript>(Left);
+      auto *RSub = dyn_cast<SDKNodeDeclSubscript>(Right);
+      SequentialNodeMatcher(LSub->getChildren(), RSub->getChildren(), *this).match();
+#define ACCESSOR(ID)                                                          \
+      singleMatch(LSub->getAccessor(AccessorKind::ID),                        \
+                  RSub->getAccessor(AccessorKind::ID), *this);
+#include "swift/AST/AccessorKinds.def"
+      break;
+    }
     case SDKNodeKind::DeclVar: {
       auto *LVar = dyn_cast<SDKNodeDeclVar>(Left);
       auto *RVar = dyn_cast<SDKNodeDeclVar>(Right);
       // Match property type.
       singleMatch(LVar->getType(), RVar->getType(), *this);
-      // Match property getter function.
-      singleMatch(LVar->getGetter(), RVar->getGetter(), *this);
-      // Match property setter function.
-      singleMatch(LVar->getSetter(), RVar->getSetter(), *this);
+#define ACCESSOR(ID)                                                          \
+      singleMatch(LVar->getAccessor(AccessorKind::ID),                        \
+                  RVar->getAccessor(AccessorKind::ID), *this);
+#include "swift/AST/AccessorKinds.def"
       break;
     }
     }
@@ -1224,7 +1235,7 @@ class TypeMemberDiffFinder : public SDKNodeVisitor {
         declNode->isStatic())
       TypeMemberDiffs.insert({diffNode, node});
     // Move from a getter/setter function to a property
-    else if (node->getKind() == SDKNodeKind::DeclGetter &&
+    else if (node->getKind() == SDKNodeKind::DeclAccessor &&
              diffNode->getKind() == SDKNodeKind::DeclFunction &&
              node->isNameValid()) {
       diffNode->annotate(NodeAnnotation::Rename);

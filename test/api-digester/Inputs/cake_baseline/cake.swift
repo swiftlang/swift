@@ -53,6 +53,9 @@ public struct fixedLayoutStruct {
   public var b = 2
   public func foo() {}
   public var a = 1
+  public var height: Int {
+    _read { yield 0 }
+  }
 }
 
 @usableFromInline
