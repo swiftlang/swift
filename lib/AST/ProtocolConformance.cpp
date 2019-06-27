@@ -1430,9 +1430,9 @@ DeclContext::getLocalConformances(
     diagnostics);
 
   if (addExtended)
-    if (const ExtensionDecl *ext = dyn_cast_or_null<ExtensionDecl>(this))
-      if (ProtocolDecl *proto = ext->getExtendedProtocolDecl())
-        proto->prepareConformanceTable()->addExtendedConformances(result);
+    if (auto ext = dyn_cast_or_null<ExtensionDecl>(this))
+      if (auto proto = ext->getExtendedProtocolDecl())
+        proto->prepareConformanceTable()->addExtendedConformances(ext, result);
 
   return result;
 }
