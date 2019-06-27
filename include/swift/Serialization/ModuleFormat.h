@@ -52,7 +52,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 499; // remove protocol's generic env
+const uint16_t SWIFTMODULE_VERSION_MINOR = 500; // dependency types for protocols
 
 using DeclIDField = BCFixed<31>;
 
@@ -997,7 +997,8 @@ namespace decls_block {
     BCFixed<1>,             // objc?
     BCFixed<1>,             // existential-type-supported?
     AccessLevelField,       // access level
-    BCArray<DeclIDField>    // inherited types
+    BCVBR<4>,               // number of inherited types
+    BCArray<TypeIDField>    // inherited types, followed by dependency types
     // Trailed by the generic parameters (if any), the members record, and
     // the default witness table record
   >;
