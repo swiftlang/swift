@@ -628,7 +628,7 @@ ERROR(sema_opening_import,Fatal,
       "opening import file for module %0: %1", (Identifier, StringRef))
 
 ERROR(serialization_load_failed,Fatal,
-      "failed to load module %0", (Identifier))
+      "failed to load module '%0'", (StringRef))
 ERROR(serialization_malformed_module,Fatal,
       "malformed compiled module: %0", (StringRef))
 ERROR(serialization_module_too_new,Fatal,
@@ -791,6 +791,11 @@ ERROR(module_not_compiled_for_private_import,none,
 
 ERROR(import_implementation_cannot_be_exported,none,
       "module %0 cannot be both exported and implementation-only", (Identifier))
+
+WARNING(module_not_compiled_with_library_evolution,none,
+        "module %0 was not compiled with library evolution support; "
+        "using it means binary compatibility for %1 can't be guaranteed",
+        (Identifier, Identifier))
 
 
 // Operator decls
@@ -992,6 +997,10 @@ ERROR(missing_address_of,none,
 ERROR(missing_address_of_yield,none,
       "yielding mutable value of type %0 requires explicit '&'",
       (Type))
+ERROR(extraneous_property_wrapper_unwrap,none,
+      "property %0 will be unwrapped to value of type %1, use '$' to refer to "
+      "wrapper type %2",
+      (DeclName, Type, Type))
 ERROR(extraneous_address_of,none,
       "use of extraneous '&'",
       ())
@@ -1100,10 +1109,6 @@ NOTE(string_index_not_integer_note,none,
      "consider using an existing high level algorithm, "
      "str.startIndex.advanced(by: n), or a projection like str.utf8", ())
 
-// SWIFT_ENABLE_TENSORFLOW
-ERROR(invalid_tensorflow_fn_conversion,none,
-      "TensorFlow functions cannot be converted to other function types", ())
-
 
 ERROR(invalid_c_function_pointer_conversion_expr,none,
       "a C function pointer can only be formed from a reference to a 'func' or "
@@ -1118,6 +1123,12 @@ ERROR(c_function_pointer_from_function_with_context,none,
       "%select{local function|closure}0 that captures "
       "%select{context|generic parameters|dynamic Self type|<<error>}1",
       (bool, unsigned))
+// SWIFT_ENABLE_TENSORFLOW
+ERROR(invalid_differentiable_function_conversion_expr,none,
+      "a '@differentiable' function can only be formed from a reference to a "
+      "'func' or a literal closure", ())
+NOTE(invalid_differentiable_function_conversion_parameter,none,
+     "did you mean to take a '%0' closure?", (StringRef))
 ERROR(invalid_autoclosure_forwarding,none,
       "add () to forward @autoclosure parameter", ())
 
@@ -2490,6 +2501,18 @@ WARNING(warn_implementation_only_conflict,none,
 NOTE(implementation_only_conflict_here,none,
      "imported as implementation-only here", ())
 
+ERROR(implementation_only_decl_non_override,none,
+      "'@_implementationOnly' can only be used on overrides", ())
+ERROR(implementation_only_override_changed_type,none,
+      "'@_implementationOnly' override must have the same type as the "
+      "declaration it overrides (%0)", (Type))
+ERROR(implementation_only_override_without_attr,none,
+      "override of '@_implementationOnly' %0 should also be declared "
+      "'@_implementationOnly'", (DescriptiveDeclKind))
+ERROR(implementation_only_override_import_without_attr,none,
+      "override of %0 imported as implementation-only must be declared "
+      "'@_implementationOnly'", (DescriptiveDeclKind))
+
 // Derived conformances
 ERROR(cannot_synthesize_init_in_extension_of_nonfinal,none,
       "implementation of %0 for non-final class cannot be automatically "
@@ -2525,26 +2548,22 @@ ERROR(broken_encodable_requirement,none,
 ERROR(broken_decodable_requirement,none,
       "Decodable protocol is broken: unexpected requirement", ())
 // SWIFT_ENABLE_TENSORFLOW
-ERROR(broken_key_path_iterable_requirement,none,
-      "KeyPathIterable protocol is broken: unexpected requirement", ())
-ERROR(broken_tensor_array_protocol_requirement,none,
-      "TensorArrayProtocol protocol is broken: unexpected requirement", ())
-ERROR(broken_tensor_group_requirement,none,
-      "TensorGroup protocol is broken: unexpected requirement", ())
-ERROR(parameterized_no_parameters_struct,none,
-      "cannot automatically synthesize %0 because 'Parameters' struct does not "
-      "exist", (Type))
-ERROR(parameterized_invalid_parameters_struct,none,
-      "cannot automatically synthesize %0 because 'Parameters' struct is "
-      "invalid", (Type))
 ERROR(broken_additive_arithmetic_requirement,none,
       "AdditiveArithmetic protocol is broken: unexpected requirement", ())
+ERROR(broken_pointwise_multiplicative_requirement,none,
+      "PointwiseMultiplicative protocol is broken: unexpected requirement", ())
 ERROR(broken_elementary_functions_requirement,none,
       "ElementaryFunctions protocol is broken: unexpected requirement", ())
 ERROR(broken_vector_protocol_requirement,none,
       "VectorProtocol protocol is broken: unexpected requirement", ())
 ERROR(broken_differentiable_requirement,none,
       "Differentiable protocol is broken: unexpected requirement", ())
+ERROR(broken_key_path_iterable_requirement,none,
+      "KeyPathIterable protocol is broken: unexpected requirement", ())
+ERROR(broken_tensor_array_protocol_requirement,none,
+      "TensorArrayProtocol protocol is broken: unexpected requirement", ())
+ERROR(broken_tensor_group_requirement,none,
+      "TensorGroup protocol is broken: unexpected requirement", ())
 WARNING(differentiable_nondiff_type_implicit_noderivative_fixit,none,
       "stored property %0 has no derivative because it does not conform to "
       "'Differentiable'; add an explicit '@noDerivative' attribute"
@@ -3802,6 +3821,10 @@ ERROR(unsupported_opaque_type,none,
 ERROR(opaque_type_unsupported_pattern,none,
       "'some' type can only be declared on a single property declaration", ())
 
+ERROR(opaque_type_in_protocol_requirement,none,
+      "'some' type cannot be the return type of a protocol requirement; did you mean to add an associated type?",
+      ())
+
 // SWIFT_ENABLE_TENSORFLOW
 // Function differentiability
 ERROR(autodiff_attr_argument_not_differentiable,none,
@@ -3817,7 +3840,6 @@ ERROR(nondiff_attr_invalid_on_nondifferentiable_function,none,
 ERROR(attr_differentiable_no_vjp_or_jvp_when_linear,none,
       "cannot specify 'vjp:' or 'jvp:' for linear functions; use "
       "'transpose:' instead", ())
-
 // SIL
 ERROR(opened_non_protocol,none,
       "@opened cannot be applied to non-protocol type %0", (Type))
@@ -4331,6 +4353,9 @@ ERROR(availability_protocol_requires_version,
 
 NOTE(availability_protocol_requirement_here, none,
      "protocol requirement here", ())
+
+WARNING(public_decl_needs_availability, none,
+     "public declarations should have an availability attribute with -require-explicit-availability", ())
 
 // This doesn't display as an availability diagnostic, but it's
 // implemented there and fires when these subscripts are marked

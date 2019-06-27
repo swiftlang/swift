@@ -75,7 +75,7 @@ MethodTests.test("instance method with generated adjoint, called from differenta
 MethodTests.test("instance method with generated adjoint, differentiated directly") {
   // This is our current syntax for taking gradients of instance methods
   // directly. If/when we develop nicer syntax for this, change this test.
-  let g = { (p: Parameter) in p.squared() }
+  func g(p: Parameter) -> Float { p.squared() }
   expectEqual(Parameter(x: 4), gradient(at: Parameter(x: 2), in: g))
   expectEqual(Parameter(x: 40), gradient(at: Parameter(x: 20), in: g))
 }
@@ -136,7 +136,7 @@ MethodTests.test("static method with generated adjoint, wrt only second param") 
 }
 
 MethodTests.test("static method with generated adjoint, wrt all params") {
-  let g = { (a: Parameter, b: Parameter) in a * b }
+  func g(a: Parameter, b: Parameter) -> Float { a * b }
   expectEqual((Parameter(x: 100), Parameter(x: 200)),
               gradient(at: Parameter(x: 200), Parameter(x: 100), in: g))
   expectEqual((Parameter(x: 200), Parameter(x: 100)),
@@ -291,7 +291,7 @@ MethodTests.test("instance method with custom adjoint, called from differentated
 MethodTests.test("instance method with generated adjoint, differentated directly") {
   // This is our current syntax for taking gradients of instance methods
   // directly. If/when we develop nicer syntax for this, change this test.
-  let g = { (p: CustomParameter) in p.squared() }
+  func g(p: CustomParameter) -> Float { p.squared() }
   expectEqual(CustomParameter(x: 4), gradient(at: CustomParameter(x: 2), in: g))
   expectEqual(CustomParameter(x: 10), gradient(at: CustomParameter(x: 20), in: g))
 }
@@ -328,7 +328,7 @@ MethodTests.test("instance method with custom adjoint, wrt only non-self") {
 }
 
 MethodTests.test("instance method with custom adjoint, wrt self and non-self") {
-  let g = { (p: CustomParameter, o: Float) in p.multiplied(with: o) }
+  func g(p: CustomParameter, o: Float) -> Float { p.multiplied(with: o) }
   expectEqual((CustomParameter(x: 5), 10), gradient(at: CustomParameter(x: 100), 5, in: g))
   expectEqual((CustomParameter(x: 10), 5), gradient(at: CustomParameter(x: 5), 100, in: g))
 }

@@ -1652,6 +1652,9 @@ public:
   explicit ExportabilityChecker(TypeChecker &TC) : TC(TC) {}
 
   static bool shouldSkipChecking(const ValueDecl *VD) {
+    if (VD->getAttrs().hasAttribute<ImplementationOnlyAttr>())
+      return true;
+
     // Accessors are handled as part of their Var or Subscript, and we don't
     // want to redo extension signature checking for them.
     if (isa<AccessorDecl>(VD))
@@ -1681,13 +1684,49 @@ public:
     return true;
   }
 
+  void checkOverride(const ValueDecl *VD) {
+    const ValueDecl *overridden = VD->getOverriddenDecl();
+    if (!overridden)
+      return;
+
+    auto *SF = VD->getDeclContext()->getParentSourceFile();
+    assert(SF && "checking a non-source declaration?");
+
+    ModuleDecl *M = overridden->getModuleContext();
+    if (SF->isImportedImplementationOnly(M)) {
+      TC.diagnose(VD, diag::implementation_only_override_import_without_attr,
+                  overridden->getDescriptiveKind())
+        .fixItInsert(VD->getAttributeInsertionLoc(false),
+                     "@_implementationOnly ");
+      TC.diagnose(overridden, diag::overridden_here);
+      return;
+    }
+
+    if (overridden->getAttrs().hasAttribute<ImplementationOnlyAttr>()) {
+      TC.diagnose(VD, diag::implementation_only_override_without_attr,
+                  overridden->getDescriptiveKind())
+        .fixItInsert(VD->getAttributeInsertionLoc(false),
+                     "@_implementationOnly ");
+      TC.diagnose(overridden, diag::overridden_here);
+      return;
+    }
+
+    // FIXME: Check storage decls where the setter is in a separate module from
+    // the getter, which is a thing Objective-C can do. The ClangImporter
+    // doesn't make this easy, though, because it just gives the setter the same
+    // DeclContext as the property or subscript, which means we've lost the
+    // information about whether its module was implementation-only imported.
+  }
+
   void visit(Decl *D) {
     if (D->isInvalid() || D->isImplicit())
       return;
 
-    if (auto *VD = dyn_cast<ValueDecl>(D))
+    if (auto *VD = dyn_cast<ValueDecl>(D)) {
       if (shouldSkipChecking(VD))
         return;
+      checkOverride(VD);
+    }
 
     DeclVisitor<ExportabilityChecker>::visit(D);
   }
@@ -1729,11 +1768,14 @@ public:
   void checkNamedPattern(const NamedPattern *NP,
                          const llvm::DenseSet<const VarDecl *> &seenVars) {
     const VarDecl *theVar = NP->getDecl();
-    // Only check individual variables if we didn't check an enclosing
-    // TypedPattern.
-    if (seenVars.count(theVar) || theVar->isInvalid())
-      return;
     if (shouldSkipChecking(theVar))
+      return;
+
+    checkOverride(theVar);
+
+    // Only check the type of individual variables if we didn't check an
+    // enclosing TypedPattern.
+    if (seenVars.count(theVar) || theVar->isInvalid())
       return;
 
     checkType(theVar->getInterfaceType(), /*typeRepr*/nullptr, theVar,

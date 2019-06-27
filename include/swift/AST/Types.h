@@ -1077,6 +1077,13 @@ public:
              const PrintOptions &PO = PrintOptions()) const;
   void print(ASTPrinter &Printer, const PrintOptions &PO) const;
 
+  /// Can this type be written in source at all?
+  ///
+  /// If not, it shouldn't be shown in fix-its, for instance. The primary
+  /// example is opaque result types, which are written `some P` at the point
+  /// of definition but cannot be uttered anywhere else.
+  bool hasTypeRepr() const;
+
   /// Does this type have grammatically simple syntax?
   bool hasSimpleTypeRepr() const;
 
@@ -5795,6 +5802,7 @@ inline bool TypeBase::hasSimpleTypeRepr() const {
   case TypeKind::NestedArchetype:
     return cast<NestedArchetypeType>(this)->getParent()->hasSimpleTypeRepr();
       
+  case TypeKind::OpaqueTypeArchetype:
   case TypeKind::OpenedArchetype:
     return false;
 

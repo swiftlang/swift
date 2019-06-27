@@ -17,12 +17,16 @@
 // CHECK-NEXT: @import MostlyPrivate1;
 // CHECK-NEXT: @import MostlyPrivate1_Private;
 // CHECK-NEXT: @import MostlyPrivate2_Private;
+// CHECK-NEXT: @import ObjectiveC;
 // CHECK-NEXT: @import ctypes.bits;
 
 // NEGATIVE-NOT: ctypes;
 // NEGATIVE-NOT: ImSub;
 // NEGATIVE-NOT: ImplicitSub;
 // NEGATIVE-NOT: MostlyPrivate2;
+// NEGATIVE-NOT: MiserablePileOfSecrets;
+
+// NEGATIVE-NOT: secretMethod
 
 import ctypes.bits
 import Foundation
@@ -40,6 +44,8 @@ import MostlyPrivate1_Private
 // Deliberately not importing MostlyPrivate2
 import MostlyPrivate2_Private
 
+@_implementationOnly import MiserablePileOfSecrets
+
 @objc class Test {
   @objc let word: DWORD = 0
   @objc let number: TimeInterval = 0.0
@@ -56,4 +62,8 @@ import MostlyPrivate2_Private
   @objc let mp1pub: MP1PublicType = 0
 
   @objc let mp2priv: MP2PrivateType = 0
+}
+
+@objc public class TestSubclass: NSObject {
+  @_implementationOnly public override func secretMethod() {}
 }

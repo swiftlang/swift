@@ -25,7 +25,9 @@ class LLVM_LIBRARY_VISIBILITY Darwin : public ToolChain {
 protected:
   InvocationInfo constructInvocation(const InterpretJobAction &job,
                                      const JobContext &context) const override;
-  InvocationInfo constructInvocation(const LinkJobAction &job,
+  InvocationInfo constructInvocation(const DynamicLinkJobAction &job,
+                                     const JobContext &context) const override;
+  InvocationInfo constructInvocation(const StaticLinkJobAction &job,
                                      const JobContext &context) const override;
 
   std::string findProgramRelativeToSwiftImpl(StringRef name) const override;
@@ -41,7 +43,9 @@ public:
 
 class LLVM_LIBRARY_VISIBILITY Windows : public ToolChain {
 protected:
-  InvocationInfo constructInvocation(const LinkJobAction &job,
+  InvocationInfo constructInvocation(const DynamicLinkJobAction &job,
+                                     const JobContext &context) const override;
+  InvocationInfo constructInvocation(const StaticLinkJobAction &job,
                                      const JobContext &context) const override;
 
 public:
@@ -79,7 +83,9 @@ protected:
   /// default is to return true (and so specify an -rpath).
   virtual bool shouldProvideRPathToLinker() const;
 
-  InvocationInfo constructInvocation(const LinkJobAction &job,
+  InvocationInfo constructInvocation(const DynamicLinkJobAction &job,
+                                     const JobContext &context) const override;
+  InvocationInfo constructInvocation(const StaticLinkJobAction &job,
                                      const JobContext &context) const override;
 
 public:

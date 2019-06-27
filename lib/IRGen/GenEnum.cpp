@@ -6928,6 +6928,24 @@ llvm::Value *irgen::emitScatterBits(IRGenFunction &IGF,
   return result;
 }
 
+/// Pack masked bits into the low bits of an integer value.
+llvm::APInt irgen::gatherBits(const llvm::APInt &mask,
+                              const llvm::APInt &value) {
+  assert(mask.getBitWidth() == value.getBitWidth());
+  llvm::APInt result = llvm::APInt(mask.countPopulation(), 0);
+  unsigned j = 0;
+  for (unsigned i = 0; i < mask.getBitWidth(); ++i) {
+    if (!mask[i]) {
+      continue;
+    }
+    if (value[i]) {
+      result.setBit(j);
+    }
+    ++j;
+  }
+  return result;
+}
+
 /// Unpack bits from the low bits of an integer value and
 /// move them to the bit positions indicated by the mask.
 llvm::APInt irgen::scatterBits(const llvm::APInt &mask, unsigned value) {

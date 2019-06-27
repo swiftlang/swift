@@ -20,6 +20,7 @@
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/DebuggerClient.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookupRequests.h"
@@ -2060,6 +2061,25 @@ SuperclassDeclRequest::evaluate(Evaluator &evaluator,
                                 NominalTypeDecl *subject) const {
   auto &Ctx = subject->getASTContext();
 
+  // Protocols may get their superclass bound from a `where Self : Superclass`
+  // clause.
+  if (auto *proto = dyn_cast<ProtocolDecl>(subject)) {
+    // If the protocol came from a serialized module, compute the superclass via
+    // its generic signature.
+    if (proto->wasDeserialized()) {
+      auto superTy = proto->getGenericSignature()
+          ->getSuperclassBound(proto->getSelfInterfaceType());
+      if (superTy)
+        return superTy->getClassOrBoundGenericClass();
+    }
+
+    // Otherwise check the where clause.
+    auto selfBounds = getSelfBoundsFromWhereClause(proto);
+    for (auto inheritedNominal : selfBounds.decls)
+      if (auto classDecl = dyn_cast<ClassDecl>(inheritedNominal))
+        return classDecl;
+  }
+
   for (unsigned i : indices(subject->getInherited())) {
     // Find the inherited declarations referenced at this position.
     auto inheritedTypes = evaluateOrDefault(evaluator,
@@ -2079,15 +2099,6 @@ SuperclassDeclRequest::evaluate(Evaluator &evaluator,
     }
   }
 
-  // Protocols also support '... where Self : Superclass'.
-  auto *proto = dyn_cast<ProtocolDecl>(subject);
-  if (proto == nullptr)
-    return nullptr;
-
-  auto selfBounds = getSelfBoundsFromWhereClause(proto);
-  for (auto inheritedNominal : selfBounds.decls)
-    if (auto classDecl = dyn_cast<ClassDecl>(inheritedNominal))
-      return classDecl;
 
   return nullptr;
 }

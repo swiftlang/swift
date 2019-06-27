@@ -16,9 +16,54 @@
 //
 //===----------------------------------------------------------------------===//
 
+infix operator .* : MultiplicationPrecedence
+infix operator .*= : AssignmentPrecedence
+
 //===----------------------------------------------------------------------===//
 // Compiler Protocols
 //===----------------------------------------------------------------------===//
+
+/// A type with values that support pointwise multiplication.
+// TODO: Add API documentation.
+public protocol PointwiseMultiplicative : AdditiveArithmetic {
+  /// The one value.
+  ///
+  /// One is the identity element for multiplication. For any value,
+  /// `x .* .one == x` and `.one .* x == x`.
+  static var one: Self { get }
+
+  /// The multiplicative inverse of self.
+  ///
+  /// For any value, `x .* x.reciprocal == .one` and
+  /// `x.reciprocal .* x == .one`.
+  var reciprocal: Self { get }
+
+  /// Multiplies two values and produces their product.
+  ///
+  /// - Parameters:
+  ///   - lhs: The first value to multiply.
+  ///   - rhs: The second value to multiply.
+  static func .*(lhs: Self, rhs: Self) -> Self
+
+  /// Multiplies two values and produces their product.
+  ///
+  /// - Parameters:
+  ///   - lhs: The first value to multiply.
+  ///   - rhs: The second value to multiply.
+  static func .*=(lhs: inout Self, rhs: Self)
+}
+
+public extension PointwiseMultiplicative {
+  static func .*=(lhs: inout Self, rhs: Self) {
+    lhs = lhs .* rhs
+  }
+}
+
+public extension PointwiseMultiplicative where Self : ExpressibleByIntegerLiteral {
+  static var one: Self {
+    return 1
+  }
+}
 
 /// A type that represents an unranked vector space. Values of this type are
 /// elements in this vector space and have either no shape or a static shape.
@@ -139,12 +184,14 @@ public extension Differentiable where TangentVector == Self {
   }
 }
 
-public extension Differentiable {
-  /// Identity function that stops derivatives from propagating.
-  @inlinable
-  @inline(__always)
-  @_semantics("autodiff.nonvarying")
-  func withoutDerivative() -> Self { return self }
+/// Returns `x` like an identity function. When used in a context where `x` is
+/// being differentiated with respect to, this function will not produce any 
+/// derivative at `x`.
+@inlinable
+@inline(__always)
+@_semantics("autodiff.nonvarying")
+public func withoutDerivative<T>(at x: T) -> T {
+  x
 }
 
 /// Applies the given closure `body` to `x`. When used in a context where `x` is
@@ -334,6 +381,37 @@ public extension Differentiable {
 // Free-function-style differential operators
 //===----------------------------------------------------------------------===//
 
+// Transpose
+
+@available(*, unavailable)
+@inlinable
+public func transpose<T, R>(
+  of body: @escaping @differentiable/*(linear)*/ (T) -> R
+) -> @differentiable/*(linear)*/ (R) -> T {
+  fatalError()
+}
+
+// Value with differential
+
+@available(*, unavailable)
+@inlinable
+public func valueWithDifferential<T, R>(
+  at x: T, in body: @differentiable (T) -> R
+) -> (value: R, differential: @differentiable/*(linear)*/
+        (T.TangentVector) -> R.TangentVector) {
+  fatalError()
+}
+
+@available(*, unavailable)
+@inlinable
+public func valueWithDifferential<T, U, R>(
+  at x: T, _ y: U, in body: @differentiable (T, U) -> R
+) -> (value: R,
+      differential: @differentiable/*(linear)*/
+        (T.TangentVector, U.TangentVector) -> R.TangentVector) {
+  fatalError()
+}
+
 // Value with pullback
 
 @inlinable
@@ -360,6 +438,25 @@ public func valueWithPullback<T, U, V, R>(
   return Builtin.autodiffApply_vjp_arity3(f, x, y, z)
 }
 
+// Differential
+
+@available(*, unavailable)
+@inlinable
+public func differential<T, R>(
+  at x: T, in body: @differentiable (T) -> R
+) -> @differentiable/*(linear)*/ (T.TangentVector) -> R.TangentVector {
+  fatalError()
+}
+
+@available(*, unavailable)
+@inlinable
+public func differential<T, U, R>(
+  at x: T, _ y: U, in body: @differentiable (T, U) -> R
+) -> @differentiable/*(linear)*/ (T.TangentVector, U.TangentVector)
+    -> R.TangentVector {
+  fatalError()
+}
+
 // Pullback
 
 @inlinable
@@ -382,6 +479,70 @@ public func pullback<T, U, V, R>(
 ) -> (R.TangentVector)
     -> (T.TangentVector, U.TangentVector, V.TangentVector) {
   return Builtin.autodiffApply_vjp_arity3(f, x, y, z).1
+}
+
+// Derivative
+
+@available(*, unavailable)
+@inlinable
+public func derivative<T: FloatingPoint, R>(
+  at x: T, in body: @escaping @differentiable (T) -> R
+) ->  R.TangentVector where T.TangentVector : FloatingPoint {
+  fatalError()
+}
+
+@available(*, unavailable)
+@inlinable
+public func derivative<T: FloatingPoint, U: FloatingPoint, R>(
+  at x: T, _ y: U, in body: @escaping @differentiable (T) -> R
+) -> R.TangentVector where T.TangentVector : FloatingPoint {
+  fatalError()
+}
+
+// Gradient
+
+@inlinable
+public func gradient<T, R>(
+  at x: T, in f: @differentiable (T) -> R
+) -> T.TangentVector
+  where R : FloatingPoint, R.TangentVector == R {
+  return pullback(at: x, in: f)(R(1))
+}
+
+@inlinable
+public func gradient<T, U, R>(
+  at x: T, _ y: U, in f: @differentiable (T, U) -> R
+) -> (T.TangentVector, U.TangentVector)
+  where R : FloatingPoint, R.TangentVector == R {
+  return pullback(at: x, y, in: f)(R(1))
+}
+
+@inlinable
+public func gradient<T, U, V, R>(
+  at x: T, _ y: U, _ z: V, in f: @differentiable (T, U, V) -> R
+) -> (T.TangentVector, U.TangentVector, V.TangentVector)
+  where R : FloatingPoint, R.TangentVector == R {
+  return pullback(at: x, y, z, in: f)(R(1))
+}
+
+// Value with derivative
+
+@available(*, unavailable)
+@inlinable
+public func valueWithDerivative<T: FloatingPoint, R>(
+  at x: T, in body: @escaping @differentiable (T) -> R
+) -> (value: R, derivative: R.TangentVector)
+  where T.TangentVector : FloatingPoint {
+  fatalError()
+}
+
+@available(*, unavailable)
+@inlinable
+public func valueWithDerivative<T: FloatingPoint, U: FloatingPoint, R>(
+  at x: T, _ y: U, in body: @escaping @differentiable (T) -> R
+) -> (value: R, derivative: R.TangentVector)
+  where T.TangentVector : FloatingPoint {
+  fatalError()
 }
 
 // Value with gradient
@@ -414,58 +575,22 @@ public func valueWithGradient<T, U, V, R>(
   return (y, pullback(R(1)))
 }
 
-// Value with gradient (curried)
+// Derivative (curried)
 
-@inlinable
-public func valueWithGradient<T, R>(
-  of f: @escaping @differentiable (T) -> R
-) -> (T) -> (value: R, gradient: T.TangentVector)
-  where R : FloatingPoint, R.TangentVector == R {
-  return { x in valueWithGradient(at: x, in: f) }
+@available(*, unavailable)
+@inlinable 
+public func derivative<T: FloatingPoint, R>(
+  of body: @escaping @differentiable (T) -> R
+) -> (T) -> R.TangentVector where T.TangentVector : FloatingPoint {
+  fatalError()
 }
 
-@inlinable
-public func valueWithGradient<T, U, R>(
-  of f: @escaping @differentiable (T, U) -> R
-) -> (T, U) -> (value: R, gradient: (T.TangentVector, U.TangentVector))
-  where R : FloatingPoint, R.TangentVector == R {
-  return { x, y in valueWithGradient(at: x, y, in: f) }
-}
-
-@inlinable
-public func valueWithGradient<T, U, V, R>(
-  of f: @escaping @differentiable (T, U, V) -> R
-) -> (T, U, V)
-    -> (value: R,
-        gradient: (T.TangentVector, U.TangentVector, V.TangentVector))
-  where R : FloatingPoint, R.TangentVector == R {
-  return { x, y, z in valueWithGradient(at: x, y, z, in: f) }
-}
-
-// Gradient
-
-@inlinable
-public func gradient<T, R>(
-  at x: T, in f: @differentiable (T) -> R
-) -> T.TangentVector
-  where R : FloatingPoint, R.TangentVector == R {
-  return pullback(at: x, in: f)(R(1))
-}
-
-@inlinable
-public func gradient<T, U, R>(
-  at x: T, _ y: U, in f: @differentiable (T, U) -> R
-) -> (T.TangentVector, U.TangentVector)
-  where R : FloatingPoint, R.TangentVector == R {
-  return pullback(at: x, y, in: f)(R(1))
-}
-
-@inlinable
-public func gradient<T, U, V, R>(
-  at x: T, _ y: U, _ z: V, in f: @differentiable (T, U, V) -> R
-) -> (T.TangentVector, U.TangentVector, V.TangentVector)
-  where R : FloatingPoint, R.TangentVector == R {
-  return pullback(at: x, y, z, in: f)(R(1))
+@available(*, unavailable)
+@inlinable 
+public func derivative<T: FloatingPoint, U: FloatingPoint, R>(
+  of body: @escaping @differentiable (T, U) -> R
+) -> (T, U) -> R.TangentVector where T.TangentVector : FloatingPoint {
+  fatalError()
 }
 
 // Gradient (curried)
@@ -492,6 +617,54 @@ public func gradient<T, U, V, R>(
 ) -> (T, U, V) -> (T.TangentVector, U.TangentVector, V.TangentVector)
   where R : FloatingPoint, R.TangentVector == R {
   return { x, y, z in gradient(at: x, y, z, in: f) }
+}
+
+// Value with derivative (curried)
+
+@available(*, unavailable)
+@inlinable
+public func valueWithDerivative<T: FloatingPoint, R>(
+  of body: @escaping @differentiable (T) -> R
+) -> (value: R, derivative: R.TangentVector)
+  where T.TangentVector: FloatingPoint {
+  fatalError()
+}
+
+@available(*, unavailable)
+@inlinable
+public func valueWithDerivative<T: FloatingPoint, U: FloatingPoint, R>(
+  of body: @escaping @differentiable (T, U) -> R
+) -> (value: R, derivative: R.TangentVector)
+  where T.TangentVector: FloatingPoint, U.TangentVector: FloatingPoint {
+  fatalError()
+}
+
+// Value with gradient (curried)
+
+@inlinable
+public func valueWithGradient<T, R>(
+  of f: @escaping @differentiable (T) -> R
+) -> (T) -> (value: R, gradient: T.TangentVector)
+  where R : FloatingPoint, R.TangentVector == R {
+  return { x in valueWithGradient(at: x, in: f) }
+}
+
+@inlinable
+public func valueWithGradient<T, U, R>(
+  of f: @escaping @differentiable (T, U) -> R
+) -> (T, U) -> (value: R, gradient: (T.TangentVector, U.TangentVector))
+  where R : FloatingPoint, R.TangentVector == R {
+  return { x, y in valueWithGradient(at: x, y, in: f) }
+}
+
+@inlinable
+public func valueWithGradient<T, U, V, R>(
+  of f: @escaping @differentiable (T, U, V) -> R
+) -> (T, U, V)
+  -> (value: R,
+      gradient: (T.TangentVector, U.TangentVector, V.TangentVector))
+  where R : FloatingPoint, R.TangentVector == R {
+  return { x, y, z in valueWithGradient(at: x, y, z, in: f) }
 }
 
 //===----------------------------------------------------------------------===//

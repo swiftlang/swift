@@ -525,8 +525,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   Expr *visitCollectionExpr(CollectionExpr *E) {
-    HANDLE_SEMANTIC_EXPR(E);
-
     for (auto &elt : E->getElements())
       if (Expr *Sub = doIt(elt))
         elt = Sub;

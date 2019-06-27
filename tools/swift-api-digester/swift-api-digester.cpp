@@ -1959,6 +1959,18 @@ void DiagnosisEmitter::handle(const SDKNodeDecl *Node, NodeAnnotation Anno) {
     }
     if (FoundInSuperclass)
       return;
+
+    // When diagnosing API changes, avoid complaining the removal of these
+    // synthesized functions since they are compiler implementation details.
+    // If an enum is no longer equatable, another diagnostic about removing
+    // conforming protocol will be emitted.
+    if (!Ctx.checkingABI()) {
+      if (Node->getName() == Ctx.Id_derived_struct_equals ||
+          Node->getName() == Ctx.Id_derived_enum_equals) {
+        return;
+      }
+    }
+
     Node->emitDiag(diag::removed_decl, Node->isDeprecated());
     return;
   }

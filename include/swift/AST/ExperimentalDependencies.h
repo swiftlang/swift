@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef ExperimentalDependencies_h
-#define ExperimentalDependencies_h
+#ifndef SWIFT_AST_EXPERIMENTAL_DEPENDENCIES_H
+#define SWIFT_AST_EXPERIMENTAL_DEPENDENCIES_H
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Range.h"
@@ -982,4 +982,4 @@ struct SequenceTraits<
 LLVM_YAML_DECLARE_MAPPING_TRAITS(
     swift::experimental_dependencies::SourceFileDepGraph)
 
-#endif /* ExperimentalDependencies_h */
+#endif // SWIFT_AST_EXPERIMENTAL_DEPENDENCIES_H

@@ -11,30 +11,30 @@ import Glibc
 var SimpleMathTests = TestSuite("SimpleMath")
 
 SimpleMathTests.test("Arithmetics") {
-  let foo1 = { (x: Float, y: Float) -> Float in
+  func foo1(x: Float, y: Float) -> Float {
     return x * y
   }
   expectEqual((4, 3), gradient(at: 3, 4, in: foo1))
-  let foo2 = { (x: Float, y: Float) -> Float in
+  func foo2(x: Float, y: Float) -> Float {
     return -x * y
   }
   expectEqual((-4, -3), gradient(at: 3, 4, in: foo2))
-  let foo3 = { (x: Float, y: Float) -> Float in
+  func foo3(x: Float, y: Float) -> Float {
     return -x + y
   }
   expectEqual((-1, 1), gradient(at: 3, 4, in: foo3))
 }
 
 SimpleMathTests.test("Fanout") {
-  let foo1 = { (x: Float) -> Float in
+  func foo1(x: Float) -> Float {
      x - x
   }
   expectEqual(0, gradient(at: 100, in: foo1))
-  let foo2 = { (x: Float) -> Float in
+  func foo2(x: Float) -> Float {
      x + x
   }
   expectEqual(2, gradient(at: 100, in: foo2))
-  let foo3 = { (x: Float, y: Float) -> Float in
+  func foo3(x: Float, y: Float) -> Float {
     x + x + x * y
   }
   expectEqual((4, 3), gradient(at: 3, 2, in: foo3))
@@ -66,7 +66,7 @@ SimpleMathTests.test("CaptureLocal") {
 
 var globalVar: Float = 10
 SimpleMathTests.test("CaptureGlobal") {
-  let foo: (Float) -> Float = { x in
+  func foo(x: Float) -> Float {
     globalVar += 20
     return globalVar * x
   }

@@ -223,3 +223,17 @@ func rdar46459603() {
   _ = [arr.values] == [[e]]
   // expected-error@-1 {{protocol type 'Any' cannot conform to 'Equatable' because only concrete types can conform to protocols}}
 }
+
+// SR-10843
+infix operator ^^^
+func ^^^ (lhs: String, rhs: String) {}
+
+struct SR10843 {
+  static func ^^^ (lhs: SR10843, rhs: SR10843) {}
+}
+
+func sr10843() {
+  let s = SR10843()
+  (^^^)(s, s)
+  _ = (==)(0, 0)
+}

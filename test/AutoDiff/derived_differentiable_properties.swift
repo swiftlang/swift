@@ -2,6 +2,8 @@
 // RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s --check-prefix=CHECK-SILGEN
 // RUN: %target-swift-frontend -emit-sil -verify %s
 
+struct PointwiseMultiplicativeDummy : Differentiable, PointwiseMultiplicative {}
+
 public struct Foo : Differentiable {
   public var a: Float
 }
@@ -20,6 +22,7 @@ public struct Foo : Differentiable {
 
 struct AdditiveTangentIsSelf : AdditiveArithmetic, Differentiable {
   var a: Float
+  var dummy: PointwiseMultiplicativeDummy
 }
 let _: @differentiable (AdditiveTangentIsSelf) -> Float = { x in
   x.a + x.a
@@ -27,7 +30,8 @@ let _: @differentiable (AdditiveTangentIsSelf) -> Float = { x in
 
 // CHECK-AST-LABEL: internal struct AdditiveTangentIsSelf : AdditiveArithmetic, Differentiable {
 // CHECK-AST:         internal var a: Float
-// CHECK-AST:         internal init(a: Float)
+// CHECK-AST:         internal var dummy: PointwiseMultiplicativeDummy
+// CHECK-AST:         internal init(a: Float, dummy: PointwiseMultiplicativeDummy)
 // CHECK-AST:         internal typealias TangentVector = AdditiveTangentIsSelf
 // CHECK-AST:         internal typealias AllDifferentiableVariables = AdditiveTangentIsSelf
 
@@ -44,6 +48,21 @@ struct TestNoDerivative : Differentiable {
 // CHECK-AST:           internal typealias AllDifferentiableVariables = TestNoDerivative.AllDifferentiableVariables
 // CHECK-AST:           internal typealias TangentVector = TestNoDerivative.AllDifferentiableVariables
 // CHECK-AST:         internal typealias TangentVector = TestNoDerivative.AllDifferentiableVariables
+
+struct TestPointwiseMultiplicative : Differentiable {
+  var w: PointwiseMultiplicativeDummy
+  @noDerivative var technicallyDifferentiable: PointwiseMultiplicativeDummy
+}
+
+// CHECK-AST-LABEL: internal struct TestPointwiseMultiplicative : Differentiable {
+// CHECK-AST:         var w: PointwiseMultiplicativeDummy
+// CHECK-AST:         @noDerivative internal var technicallyDifferentiable: PointwiseMultiplicativeDummy
+// CHECK-AST:         internal init(w: PointwiseMultiplicativeDummy, technicallyDifferentiable: PointwiseMultiplicativeDummy)
+// CHECK-AST:         internal struct AllDifferentiableVariables : Differentiable, AdditiveArithmetic, PointwiseMultiplicative
+// CHECK-AST:           internal typealias AllDifferentiableVariables = TestPointwiseMultiplicative.AllDifferentiableVariables
+// CHECK-AST:           internal typealias TangentVector = TestPointwiseMultiplicative.AllDifferentiableVariables
+// CHECK-AST:         internal typealias TangentVector = TestPointwiseMultiplicative.AllDifferentiableVariables
+
 
 struct TestKeyPathIterable : Differentiable, KeyPathIterable {
   var w: Float

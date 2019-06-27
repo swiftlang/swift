@@ -317,14 +317,8 @@ ResilienceExpansion DeclContext::getResilienceExpansion() const {
     if (isa<DefaultArgumentInitializer>(dc)) {
       dc = dc->getParent();
 
-      const ValueDecl *VD;
-      if (auto *FD = dyn_cast<AbstractFunctionDecl>(dc)) {
-        VD = FD;
-      } else if (auto *EED = dyn_cast<EnumElementDecl>(dc)) {
-        VD = EED;
-      } else {
-        VD = cast<SubscriptDecl>(dc);
-      }
+      auto *VD = cast<ValueDecl>(dc->getAsDecl());
+      assert(VD->hasParameterList());
 
       auto access =
         VD->getFormalAccessScope(/*useDC=*/nullptr,

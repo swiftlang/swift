@@ -546,6 +546,7 @@ EXPECTED_OPTIONS = [
     StrOption('--host-target'),
     StrOption('--lit-args'),
     StrOption('--llvm-targets-to-build'),
+    StrOption('--stdlib-deployment-targets'),
     StrOption('--swift-darwin-module-archs'),
     StrOption('--swift-darwin-supported-archs'),
 
@@ -581,7 +582,6 @@ EXPECTED_OPTIONS = [
     AppendOption('--cross-compile-hosts'),
     AppendOption('--extra-cmake-options'),
     AppendOption('--extra-swift-args'),
-    AppendOption('--stdlib-deployment-targets'),
     AppendOption('--test-paths'),
 
     UnsupportedOption('--build-jobs'),

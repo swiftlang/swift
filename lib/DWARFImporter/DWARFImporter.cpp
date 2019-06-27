@@ -120,8 +120,7 @@ public:
       return it->second->getParentModule();
 
     auto *decl = ModuleDecl::create(name, SwiftContext);
-    // Silence error messages about testably importing a Clang module.
-    decl->setTestingEnabled();
+    decl->setIsNonSwiftModule();
     decl->setHasResolvedImports();
     auto wrapperUnit = new (SwiftContext) DWARFModuleUnit(*decl);
     ModuleWrappers.insert({name, wrapperUnit});

@@ -1045,6 +1045,7 @@ public:
   ParserResult<VarDecl> parseDeclVarGetSet(Pattern *pattern,
                                            ParseDeclOptions Flags,
                                            SourceLoc StaticLoc,
+                                           StaticSpellingKind StaticSpelling,
                                            SourceLoc VarLoc,
                                            bool hasInitializer,
                                            const DeclAttributes &Attributes,
