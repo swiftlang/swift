@@ -189,8 +189,7 @@ func testIUO(a: SimpleCallable!, b: MultipleArgsCallable!, c: Extended!,
   _ = d()?.callAsFunction()?()
   _ = e()
   _ = e(1, 2, 3)
-  // FIXME(TF-444): `mutating func callAsFunction` and IUO doesn't work.
-  // _ = f()
+  _ = f()
   _ = g(&inoutInt)
   _ = try? h()
   _ = try? h { throw DummyError() }
