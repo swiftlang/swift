@@ -318,8 +318,7 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
 
     /// Stored generic signature builders for canonical generic signatures.
     llvm::DenseMap<GenericSignature *,
-                   std::unique_ptr<GenericSignatureBuilder,
-                                   default_destroy<GenericSignatureBuilder>>>
+                   destroying_unique_ptr<GenericSignatureBuilder>>
       GenericSignatureBuilders;
 
     /// Canonical generic environments for canonical generic signatures.
@@ -407,7 +406,7 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   };
 
   /// The current constraint solver arena, if any.
-  ConstraintSolverArena *CurrentConstraintSolverArena = nullptr;
+  destroying_unique_ptr<ConstraintSolverArena> CurrentConstraintSolverArena;
 
   Arena &getArena(AllocationArena arena) {
     switch (arena) {
@@ -438,23 +437,21 @@ ASTContext::Implementation::~Implementation() {
 
 ConstraintCheckerArenaRAII::
 ConstraintCheckerArenaRAII(ASTContext &self, llvm::BumpPtrAllocator &allocator)
-  : Self(self), Data(self.getImpl().CurrentConstraintSolverArena)
+  : Self(self), Data(self.getImpl().CurrentConstraintSolverArena.release())
 {
   using ConstraintSolverArena =
       ASTContext::Implementation::ConstraintSolverArena;
 
   void *arenaBuffer = allocator.Allocate<ConstraintSolverArena>();
-  Self.getImpl().CurrentConstraintSolverArena =
-      new (arenaBuffer) ConstraintSolverArena(allocator);
+  Self.getImpl().CurrentConstraintSolverArena.reset(
+      new (arenaBuffer) ConstraintSolverArena(allocator));
 }
 
 ConstraintCheckerArenaRAII::~ConstraintCheckerArenaRAII() {
   using ConstraintSolverArena =
       ASTContext::Implementation::ConstraintSolverArena;
-
-  Self.getImpl().CurrentConstraintSolverArena->~ConstraintSolverArena();
-  Self.getImpl().CurrentConstraintSolverArena =
-      static_cast<ConstraintSolverArena *>(Data);
+  Self.getImpl().CurrentConstraintSolverArena.reset(
+      static_cast<ConstraintSolverArena *>(Data));
 }
 
 static ModuleDecl *createBuiltinModule(ASTContext &ctx) {

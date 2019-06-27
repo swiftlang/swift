@@ -887,6 +887,9 @@ struct default_destroy {
   }
 };
 
+template <typename T>
+using destroying_unique_ptr = std::unique_ptr<T, default_destroy<T>>;
+
 } // end namespace swift
 
 #endif // SWIFT_BASIC_INTERLEAVE_H
