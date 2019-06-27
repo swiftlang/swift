@@ -1657,6 +1657,9 @@ static VarDecl *synthesizePropertyWrapperStorageWrapperProperty(
   Identifier name = ctx.getIdentifier(nameBuf);
 
   // Determine the type of the property.
+  if (!wrapperVar->hasInterfaceType()) {
+    static_cast<TypeChecker &>(*ctx.getLazyResolver()).validateDecl(wrapperVar);
+  }
   Type propertyType = wrapperType->getTypeOfMember(
       var->getModuleContext(), wrapperVar,
       wrapperVar->getValueInterfaceType());
