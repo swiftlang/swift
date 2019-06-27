@@ -43,3 +43,18 @@ bb0(%0 : $*ResilientStruct):
   %5 = partial_apply [callee_guaranteed] %4(%1) : $@convention(thin) (@guaranteed <τ_0_0> { var τ_0_0 } <ResilientStruct>) -> ()
   return %5 : $@callee_guaranteed () -> ()
 }
+
+// CHECK-LABEL: sil [serializable] @test_capture_promotion_2
+// CHECK:  [[F:%.*]] = function_ref @closure0 : $@convention(thin) (@guaranteed <τ_0_0> { var τ_0_0 } <ResilientStruct>) -> ()
+// CHECK:  [[C:%.*]] = partial_apply [callee_guaranteed] [[F]]({{.*}}) : $@convention(thin) (@guaranteed <τ_0_0> { var τ_0_0 } <ResilientStruct>) -> ()
+// CHECK:  return [[C]]
+
+sil [serializable] @test_capture_promotion_2 : $@convention(thin) (@in_guaranteed ResilientStruct) -> @owned @callee_guaranteed () -> () {
+bb0(%0 : $*ResilientStruct):
+  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <ResilientStruct>
+  %2 = project_box %1 : $<τ_0_0> { var τ_0_0 } <ResilientStruct>, 0
+  copy_addr %0 to [initialization] %2 : $*ResilientStruct
+  %4 = function_ref @closure0 : $@convention(thin) (@guaranteed <τ_0_0> { var τ_0_0 } <ResilientStruct>) -> ()
+  %5 = partial_apply [callee_guaranteed] %4(%1) : $@convention(thin) (@guaranteed <τ_0_0> { var τ_0_0 } <ResilientStruct>) -> ()
+  return %5 : $@callee_guaranteed () -> ()
+}
