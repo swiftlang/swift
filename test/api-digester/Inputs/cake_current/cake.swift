@@ -57,6 +57,9 @@ public struct fixedLayoutStruct {
   public func foo() {}
   private var c = 3
   private lazy var lazy_d = 4
+  public var height: Int {
+    get { return 0 }
+  }
 }
 
 @usableFromInline
