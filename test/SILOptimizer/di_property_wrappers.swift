@@ -49,7 +49,7 @@ struct IntStruct {
 
   init(conditional b: Bool) {
      if b {
-       self.$wrapped = Wrapper(initialValue: 32)
+       self._wrapped = Wrapper(initialValue: 32)
      } else {
        wrapped = 42
      }
@@ -73,7 +73,7 @@ final class IntClass {
 
   init(conditional b: Bool) {
      if b {
-       self.$wrapped = Wrapper(initialValue: 32)
+       self._wrapped = Wrapper(initialValue: 32)
      } else {
        wrapped = 42
      }
@@ -97,7 +97,7 @@ struct RefStruct {
 
   init(conditional b: Bool) {
      if b {
-       self.$wrapped = Wrapper(initialValue: Payload(32))
+       self._wrapped = Wrapper(initialValue: Payload(32))
      } else {
        wrapped = Payload(42)
      }
@@ -121,7 +121,7 @@ final class GenericClass<T : IntInitializable> {
 
   init(conditional b: Bool) {
      if b {
-       self.$wrapped = Wrapper(initialValue: T(32))
+       self._wrapped = Wrapper(initialValue: T(32))
      } else {
        wrapped = T(42)
      }

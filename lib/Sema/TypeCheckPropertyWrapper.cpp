@@ -272,18 +272,30 @@ PropertyWrapperTypeInfoRequest::evaluate(
   result.valueVar = valueVar;
   result.initialValueInit = findInitialValueInit(ctx, nominal, valueVar);
   result.defaultInit = findDefaultInit(ctx, nominal);
-  result.wrapperValueVar =
-    findValueProperty(ctx, nominal, ctx.Id_wrapperValue, /*allowMissing=*/true);
+  result.projectedValueVar =
+    findValueProperty(ctx, nominal, ctx.Id_projectedValue,
+                      /*allowMissing=*/true);
 
-  // If there was no wrapperValue property, but there is a delegateValue
-  // property, use that and warn.
-  if (!result.wrapperValueVar) {
-    result.wrapperValueVar =
-      findValueProperty(ctx, nominal, ctx.Id_delegateValue,
+  // If there was no projectedValue property, but there is a delegateValue
+  // or wrapperValue, property, use that and warn.
+  if (!result.projectedValueVar) {
+    result.projectedValueVar =
+      findValueProperty(ctx, nominal, ctx.Id_wrapperValue,
                         /*allowMissing=*/true);
-    if (result.wrapperValueVar) {
-      result.wrapperValueVar->diagnose(diag::property_wrapper_delegateValue)
-        .fixItReplace(result.wrapperValueVar->getNameLoc(), "wrapperValue");
+    if (result.projectedValueVar) {
+      result.projectedValueVar->diagnose(diag::property_wrapper_wrapperValue)
+        .fixItReplace(result.projectedValueVar->getNameLoc(),
+                      "projectedValue");
+    } else {
+      result.projectedValueVar =
+          findValueProperty(ctx, nominal, ctx.Id_delegateValue,
+                            /*allowMissing=*/true);
+      if (result.projectedValueVar) {
+        result.projectedValueVar->diagnose(
+            diag::property_wrapper_delegateValue)
+          .fixItReplace(result.projectedValueVar->getNameLoc(),
+                        "projectedValue");
+      }
     }
   }
 

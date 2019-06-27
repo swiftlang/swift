@@ -409,6 +409,9 @@ SIMPLE_DECL_ATTR(_disfavoredOverload, DisfavoredOverload,
 SIMPLE_DECL_ATTR(_functionBuilder, FunctionBuilder,
   OnNominalType,
   88)
+DECL_ATTR(_projectedValueProperty, ProjectedValueProperty,
+  OnVar | UserInaccessible,
+  89)
 
 SIMPLE_DECL_ATTR(IBSegueAction, IBSegueAction,
   OnFunc,

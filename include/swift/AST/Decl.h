@@ -4767,7 +4767,7 @@ enum class PropertyWrapperSynthesizedPropertyKind {
   /// wrapper type.
   Backing,
   /// A storage wrapper (e.g., `$foo`), which is a wrapper over the
-  /// wrapper instance's `wrapperValue` property.
+  /// wrapper instance's `projectedValue` property.
   StorageWrapper,
 };
 
