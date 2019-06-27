@@ -163,7 +163,7 @@ extension _StringGuts {
   @inline(__always) // fast-path: fold common fastUTF8 check
   internal func scalarAlign(_ idx: Index) -> Index {
     let result: String.Index
-    if _fastPath(idx.isAligned) {
+    if _fastPath(idx._isAligned) {
       result = idx
     } else {
       // TODO(String performance): isASCII check
@@ -172,28 +172,28 @@ extension _StringGuts {
 
     _internalInvariant(isOnUnicodeScalarBoundary(result),
       "Alignment bit is set for non-aligned index")
-    _internalInvariant(result.isAligned)
+    _internalInvariant(result._isAligned)
     return result
   }
 
   @inline(never) // slow-path
   @_alwaysEmitIntoClient // Swift 5.1
   internal func scalarAlignSlow(_ idx: Index) -> Index {
-    _internalInvariant(!idx.isAligned)
+    _internalInvariant(!idx._isAligned)
 
     if _slowPath(idx.transcodedOffset != 0 || idx._encodedOffset == 0) {
       // Transcoded index offsets are already scalar aligned
-      return String.Index(_encodedOffset: idx._encodedOffset).aligned
+      return String.Index(_encodedOffset: idx._encodedOffset)._aligned
     }
     if _slowPath(self.isForeign) {
       let foreignIdx = foreignScalarAlign(idx)
-      _internalInvariant(foreignIdx.isAligned)
+      _internalInvariant(foreignIdx._isAligned)
       return foreignIdx
     }
 
     return String.Index(_encodedOffset:
       self.withFastUTF8 { _scalarAlign($0, idx._encodedOffset) }
-    ).aligned
+    )._aligned
   }
 
   @inlinable
@@ -359,17 +359,17 @@ extension _StringGuts {
   @usableFromInline @inline(never) // slow-path
   @_effects(releasenone)
   internal func foreignScalarAlign(_ idx: Index) -> Index {
-    guard idx._encodedOffset != self.count else { return idx.aligned }
+    guard idx._encodedOffset != self.count else { return idx._aligned }
 
     _internalInvariant(idx._encodedOffset < self.count)
 
     let ecCU = foreignErrorCorrectedUTF16CodeUnit(at: idx)
     if _fastPath(!UTF16.isTrailSurrogate(ecCU)) {
-      return idx.aligned
+      return idx._aligned
     }
     _internalInvariant(idx._encodedOffset > 0,
       "Error-correction shouldn't give trailing surrogate at position zero")
-    return String.Index(_encodedOffset: idx._encodedOffset &- 1).aligned
+    return String.Index(_encodedOffset: idx._encodedOffset &- 1)._aligned
   }
 
   @usableFromInline @inline(never)
