@@ -21,9 +21,12 @@ add_swift_target_library(swiftNetwork ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} I
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
 
   TARGET_SDKS OSX IOS IOS_SIMULATOR TVOS TVOS_SIMULATOR # WATCHOS WATCHOS_SIMULATOR
-  SWIFT_MODULE_DEPENDS_OSX Darwin Dispatch Foundation ObjectiveC # auto-updated
-  SWIFT_MODULE_DEPENDS_IOS Darwin Dispatch Foundation ObjectiveC # auto-updated
-  SWIFT_MODULE_DEPENDS_TVOS Darwin Dispatch Foundation ObjectiveC # auto-updated
+  SWIFT_MODULE_DEPENDS_OSX Darwin Dispatch CoreFoundation ObjectiveC # auto-updated
+    Foundation # Imported in Swift
+  SWIFT_MODULE_DEPENDS_IOS Darwin Dispatch CoreFoundation ObjectiveC # auto-updated
+    Foundation # Imported in Swift
+  SWIFT_MODULE_DEPENDS_TVOS Darwin Dispatch CoreFoundation ObjectiveC # auto-updated
+    Foundation # Imported in Swift
   # SWIFT_MODULE_DEPENDS_WATCHOS Darwin Dispatch Foundation ObjectiveC # auto-updated
   FRAMEWORK_DEPENDS_WEAK Network
 
