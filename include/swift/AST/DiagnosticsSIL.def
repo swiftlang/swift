@@ -116,6 +116,14 @@ ERROR(unsupported_c_function_pointer_conversion,none,
 ERROR(objc_selector_malformed,none,"the type ObjectiveC.Selector is malformed",
       ())
 
+// Capture before declaration diagnostics.
+ERROR(capture_before_declaration,none,
+      "closure captures %0 before it is declared", (Identifier))
+ERROR(capture_before_declaration_defer,none,
+      "'defer' block captures %0 before it is declared", (Identifier))
+NOTE(captured_value_declared_here,none,
+     "captured value declared here", ())
+
 // Invalid escaping capture diagnostics.
 ERROR(escaping_inout_capture,none,
       "escaping closure captures 'inout' parameter %0", (Identifier))

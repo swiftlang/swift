@@ -24,6 +24,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILProfiler.h"
 #include "swift/SIL/SILUndef.h"
+#include "swift/AST/DiagnosticsSIL.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -213,6 +214,47 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       vd->getInterfaceType());
     auto valueType = FunctionDC->mapTypeIntoContext(
       vd->getValueInterfaceType());
+
+    //
+    // If we haven't emitted the captured value yet, we're forming a closure
+    // to a local function before all of its captures have been emitted. Eg,
+    //
+    // func f() { g() } // transitive capture of 'x'
+    // f() // closure formed here
+    // var x = 123 // 'x' defined here
+    // func g() { print(x) } // 'x' captured here
+    //
+    auto found = VarLocs.find(vd);
+    if (found == VarLocs.end()) {
+      auto &Diags = getASTContext().Diags;
+
+      Diags.diagnose(closure.getLoc(),
+                     closure.isDeferBody()
+                     ? diag::capture_before_declaration_defer
+                     : diag::capture_before_declaration,
+                     vd->getBaseName().getIdentifier());
+      Diags.diagnose(vd->getLoc(), diag::captured_value_declared_here);
+      Diags.diagnose(capture.getLoc(), diag::value_captured_here);
+
+      // Emit an 'undef' of the correct type.
+      switch (SGM.Types.getDeclCaptureKind(capture, expansion)) {
+      case CaptureKind::Constant:
+        capturedArgs.push_back(emitUndef(getLoweredType(type)));
+        break;
+      case CaptureKind::StorageAddress:
+        capturedArgs.push_back(emitUndef(getLoweredType(type).getAddressType()));
+        break;
+      case CaptureKind::Box: {
+        auto boxTy = SGM.Types.getContextBoxTypeForCapture(vd,
+                                  getLoweredType(type).getASTType(),
+                                  FunctionDC->getGenericEnvironmentOfContext(),
+                                  /*mutable*/ true);
+        capturedArgs.push_back(emitUndef(boxTy));
+        break;
+      }
+      }
+      continue;
+    }
 
     auto Entry = found->second;
 
