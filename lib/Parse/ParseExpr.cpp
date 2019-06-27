@@ -2283,14 +2283,16 @@ Expr *Parser::parseExprIdentifier() {
     if (D) {
       for (auto activeVar : DisabledVars) {
         if (activeVar == D) {
-          diagnose(loc.getBaseNameLoc(), DisabledVarReason);
+          if (!Context.LangOpts.BuildSyntaxTree)
+            diagnose(loc.getBaseNameLoc(), DisabledVarReason);
           return new (Context) ErrorExpr(loc.getSourceRange());
         }
       }
     } else {
       for (auto activeVar : DisabledVars) {
         if (activeVar->getFullName() == name) {
-          diagnose(loc.getBaseNameLoc(), DisabledVarReason);
+          if (!Context.LangOpts.BuildSyntaxTree)
+            diagnose(loc.getBaseNameLoc(), DisabledVarReason);
           return new (Context) ErrorExpr(loc.getSourceRange());
         }
       }
