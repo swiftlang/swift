@@ -290,6 +290,7 @@ fileprivate func _myers<C,D>(
     using trace: [_V]
   ) -> [CollectionDifference<C.Element>.Change] {
     var changes = [CollectionDifference<C.Element>.Change]()
+    changes.reserveCapacity(trace.count)
 
     var x = a.count
     var y = b.count
