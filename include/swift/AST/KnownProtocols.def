@@ -78,7 +78,6 @@ PROTOCOL(Encodable)
 PROTOCOL(Decodable)
 // SWIFT_ENABLE_TENSORFLOW
 PROTOCOL(AdditiveArithmetic)
-PROTOCOL(PointwiseMultiplicative)
 PROTOCOL(ElementaryFunctions)
 PROTOCOL(KeyPathIterable)
 PROTOCOL(TensorArrayProtocol)

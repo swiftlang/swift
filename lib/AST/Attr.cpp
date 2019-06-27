@@ -866,10 +866,10 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer.printAttrName("@transposing");
     Printer << '(';
     auto *attr = cast<TransposingAttr>(this);
-    auto *derivative = dyn_cast_or_null<AbstractFunctionDecl>(D);
+    auto *transpose = dyn_cast_or_null<AbstractFunctionDecl>(D);
     Printer << attr->getOriginal().Name;
     auto diffParamsString = getTransposingParametersClauseString(
-        derivative, attr->getParameterIndexSubset(), attr->getParsedParameters());
+        transpose, attr->getParameterIndexSubset(), attr->getParsedParameters());
     if (!diffParamsString.empty())
       Printer << ", " << diffParamsString;
     Printer << ')';

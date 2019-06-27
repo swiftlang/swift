@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -typecheck -verify %s
+
 @differentiable // expected-error {{'@differentiable' attribute cannot be applied to this declaration}}
 let globalConst: Float = 1
 
@@ -29,6 +30,7 @@ func no_jvp_or_vjp(_ x: Float) -> Float {
 }
 
 // Test duplicated `@differentiable` attributes.
+
 @differentiable // expected-error {{duplicate '@differentiable' attribute}}
 @differentiable // expected-note {{other attribute declared here}}
 func dupe_attributes(arg: Float) -> Float { return arg }
@@ -151,6 +153,7 @@ struct SubscriptMethod {
 }
 
 // JVP
+
 @differentiable(jvp: jvpSimpleJVP)
 func jvpSimple(x: Float) -> Float {
   return x
@@ -314,13 +317,13 @@ extension JVPStruct {
       return 0
     }
   }
-  
+
   // expected-error @+1 {{'computedPropJVP' does not have expected type '(JVPStruct) -> () -> (Double, (JVPStruct.TangentVector) -> Double.TangentVector)' (aka '(JVPStruct) -> () -> (Double, (JVPStruct) -> Double)'}}
   @differentiable(jvp: computedPropJVP)
   var computedPropWrongType: Double {
     return 0
   }
-  
+
   var computedPropWrongAccessor: Float {
     get {
       return 0
@@ -461,7 +464,7 @@ extension VJPStruct {
       return 0
     }
   }
-  
+
   // expected-error @+1 {{'computedPropVJP' does not have expected type '(VJPStruct) -> () -> (Double, (Double.TangentVector) -> VJPStruct.TangentVector)' (aka '(VJPStruct) -> () -> (Double, (Double) -> VJPStruct)'}}
   @differentiable(vjp: computedPropVJP)
   var computedPropWrongType: Double {
@@ -478,7 +481,7 @@ extension VJPStruct {
       fatalError("unimplemented")
     }
   }
-  
+
   func computedPropVJP() -> (Float, (Float) -> VJPStruct) {
     fatalError("unimplemented")
   }
@@ -530,7 +533,7 @@ struct ResultLabelTest {
   static func vjpResultLabels(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
     return (x, { $0 })
   }
-  
+
   @differentiable(jvp: jvpResultLabels, vjp: vjpResultLabels)
   func derivativeResultLabels(_ x: Float) -> Float {
     return x
@@ -743,7 +746,7 @@ struct DiffableStruct : Differentiable {
 
 struct NonDiffableStruct {
   var a: Float
-  
+
   @differentiable
   func fn(_ b: Float) -> Float {
     return a + b
@@ -766,6 +769,7 @@ func slope3(_ x: Float) -> Float {
 }
 
 // Index based 'wrt:'
+
 struct NumberWrtStruct: Differentiable {
   var a, b: Float
 

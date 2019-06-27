@@ -4744,7 +4744,7 @@ AnyFunctionType::getTransposeOriginalFunctionType(TransposingAttr *attr) {
   // If the function is curried and is differentiating WRT 'self', then grab
   // the type from the result list (guaranteed to be the first since 'self'
   // is first in WRT list) and remove it.
-  Type selfType;
+  Type selfType = originalResult;
   if (isCurried && wrtSelf) {
     selfType = transposeResultTypes.front().getType();
     transposeResultTypes = transposeResultTypes.drop_front();
