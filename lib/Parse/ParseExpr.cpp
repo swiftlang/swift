@@ -874,8 +874,8 @@ ParserResult<Expr> Parser::parseExprSuper() {
 
   // 'super.' must be followed by a member ref, explicit initializer ref, or
   // subscript call.
-  if (Tok.isNot(tok::period, tok::period_prefix, tok::l_square,
-                tok::code_complete)) {
+  if (!Tok.isAny(tok::period, tok::period_prefix, tok::code_complete) &&
+      !Tok.isFollowingLSquare()) {
     if (!consumeIf(tok::unknown))
       diagnose(Tok, diag::expected_dot_or_subscript_after_super);
     return nullptr;
