@@ -10,9 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension vDSP {
   
-    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public enum IntegrationRule {
         case runningSum
         case simpson
@@ -26,7 +26,6 @@ extension vDSP {
     /// - Parameter stepSize: The integration step size (weighting factor for running sum).
     /// - Returns: The integration result.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func integrate<U>(_ vector: U,
                                     using rule: IntegrationRule,
                                     stepSize: Float = 1) -> [Float]
@@ -53,7 +52,6 @@ extension vDSP {
     /// - Parameter rule: The integration rule.
     /// - Parameter stepSize: The integration step size (weighting factor for running sum).
     /// - Parameter result: The destination vector to receive the result.
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func integrate<U, V>(_ vector: U,
                                        using rule: IntegrationRule,
                                        stepSize: Float = 1,
@@ -96,7 +94,6 @@ extension vDSP {
     /// - Parameter stepSize: The integration step size (weighting factor for running sum).
     /// - Returns: The integration result.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func integrate<U>(_ vector: U,
                                     using rule: IntegrationRule,
                                     stepSize: Double = 1) -> [Double]
@@ -123,7 +120,6 @@ extension vDSP {
     /// - Parameter rule: The integration rule.
     /// - Parameter stepSize: The integration step size (weighting factor for running sum).
     /// - Parameter result: The destination vector to receive the result.
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func integrate<U, V>(_ vector: U,
                                        using rule: IntegrationRule,
                                        stepSize: Double = 1,
