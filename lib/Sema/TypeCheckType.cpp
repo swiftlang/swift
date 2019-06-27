@@ -2455,13 +2455,13 @@ Type TypeResolver::resolveOpaqueReturnType(TypeRepr *repr,
   // The type repr should be a generic identifier type. We don't really use
   // the identifier for anything, but we do resolve the generic arguments
   // to instantiate the possibly-generic opaque type.
-  SmallVector<Type, 4> TypeArgs;
+  SmallVector<Type, 4> TypeArgsBuf;
   if (auto generic = dyn_cast<GenericIdentTypeRepr>(repr)) {
     for (auto argRepr : generic->getGenericArgs()) {
       auto argTy = resolveType(argRepr, options);
       if (!argTy)
         return Type();
-      TypeArgs.push_back(argTy);
+      TypeArgsBuf.push_back(argTy);
     }
   }
   
@@ -2478,6 +2478,7 @@ Type TypeResolver::resolveOpaqueReturnType(TypeRepr *repr,
     builder.getNodeFactory().createNode(Node::Kind::OpaqueReturnTypeOf);
   opaqueNode->addChild(definingDeclNode, builder.getNodeFactory());
   
+  auto TypeArgs = ArrayRef<Type>(TypeArgsBuf);
   auto ty = builder.resolveOpaqueType(opaqueNode, TypeArgs, ordinal);
   if (!ty) {
     diagnose(repr->getLoc(), diag::no_opaque_return_type_of);
