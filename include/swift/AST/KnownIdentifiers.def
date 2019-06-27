@@ -139,9 +139,11 @@ IDENTIFIER_(unpackTensorHandles)
 IDENTIFIER_(tensorHandleCount)
 // TensorGroup
 IDENTIFIER_(typeList)
-// AdditiveArithmetic, VectorProtocol
+// AdditiveArithmetic, PointwiseMultiplicative, VectorProtocol
 IDENTIFIER(zero)
 IDENTIFIER(VectorSpaceScalar)
+IDENTIFIER(one)
+IDENTIFIER(reciprocal)
 IDENTIFIER(adding)
 IDENTIFIER(subtracting)
 IDENTIFIER(scaled)

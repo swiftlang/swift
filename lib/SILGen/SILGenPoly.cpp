@@ -3257,19 +3257,23 @@ static ManagedValue createAutoDiffThunk(SILGenFunction &SGF,
 
   auto withoutDifferentiablePattern = [](AbstractionPattern pattern)
       -> AbstractionPattern {
-    auto patternType = cast<AnyFunctionType>(pattern.getType());
+    auto patternType = pattern.getAs<AnyFunctionType>();
+    // If pattern does not store an `AnyFunctionType`, return original pattern.
+    // This logic handles opaque abstraction patterns.
+    if (!patternType)
+      return pattern;
     pattern.rewriteType(
         pattern.getGenericSignature(),
         patternType->getWithoutDifferentiability()->getCanonicalType());
     return pattern;
   };
 
+  auto inputOrigTypeNotDiff = withoutDifferentiablePattern(inputOrigType);
   CanAnyFunctionType inputSubstTypeNotDiff(
       inputSubstType->getWithoutDifferentiability());
-  auto inputOrigTypeNotDiff = withoutDifferentiablePattern(inputOrigType);
+  auto outputOrigTypeNotDiff = withoutDifferentiablePattern(outputOrigType);
   CanAnyFunctionType outputSubstTypeNotDiff(
       outputSubstType->getWithoutDifferentiability());
-  auto outputOrigTypeNotDiff = withoutDifferentiablePattern(outputOrigType);
   auto &expectedTLNotDiff = SGF.getTypeLowering(outputOrigTypeNotDiff,
                                                 outputSubstTypeNotDiff);
   // `autodiff_function_extract` is consuming; copy `fn` before passing as
@@ -3307,17 +3311,15 @@ static ManagedValue createAutoDiffThunk(SILGenFunction &SGF,
         if (!patternType)
           return pattern;
         return AbstractionPattern(
-            pattern.getGenericSignature(),
-            getAssocFnTy(cast<AnyFunctionType>(pattern.getType()), kind));
+            pattern.getGenericSignature(), getAssocFnTy(patternType, kind));
       };
   auto createAssocFnThunk = [&](AutoDiffAssociatedFunctionKind kind)
       -> ManagedValue {
+    auto assocFnInputOrigType = getAssocFnPattern(inputOrigTypeNotDiff, kind);
     auto assocFnInputSubstType = getAssocFnTy(inputSubstTypeNotDiff, kind);
-    auto assocFnInputOrigType = getAssocFnPattern(inputOrigTypeNotDiff,
-                                                  kind);
-    auto assocFnOutputSubstType = getAssocFnTy(outputSubstTypeNotDiff, kind);
     auto assocFnOutputOrigType = getAssocFnPattern(outputOrigTypeNotDiff,
                                                    kind);
+    auto assocFnOutputSubstType = getAssocFnTy(outputSubstTypeNotDiff, kind);
     auto &assocFnExpectedTL = SGF.getTypeLowering(assocFnOutputOrigType,
                                                   assocFnOutputSubstType);
     // `autodiff_function_extract` is consuming; copy `fn` before passing as

@@ -1537,7 +1537,7 @@ ArrayRef<ParsedAutoDiffParameter> params) {
   unsigned size = totalSizeToAlloc<ParsedAutoDiffParameter>(params.size());
   void *mem = context.Allocate(size, alignof(DifferentiatingAttr));
   return new (mem) TransposingAttr(context, implicit, atLoc, baseRange,
-                                       std::move(original), params);
+                                   std::move(original), params);
 }
 
 TransposingAttr *
@@ -1548,7 +1548,7 @@ AutoDiffIndexSubset *indices) {
   void *mem = context.Allocate(sizeof(DifferentiatingAttr),
                                alignof(DifferentiatingAttr));
   return new (mem) TransposingAttr(context, implicit, atLoc, baseRange,
-                                       std::move(original), indices);
+                                   std::move(original), indices);
 }
 
 ImplementsAttr::ImplementsAttr(SourceLoc atLoc, SourceRange range,

@@ -4703,6 +4703,7 @@ AnyFunctionType::getTransposeOriginalFunctionType(TransposingAttr *attr) {
     // function to be the original result.
     originalResult = transposeParams.back().getPlainType();
   }
+  assert(originalResult);
 
   if (isCurried) {
     // If it's curried, then we need to get the parameters and result of the
@@ -4722,6 +4723,7 @@ AnyFunctionType::getTransposeOriginalFunctionType(TransposingAttr *attr) {
   } else {
     transposeResultTypes = ArrayRef<TupleTypeElt>(transposeResult);
   }
+  assert(!transposeResultTypes.empty());
   
   // TODO(bartchr): use set when optimizing.
 //  SmallPtrSet<unsigned, 8> wrtParamSet;
@@ -4741,9 +4743,10 @@ AnyFunctionType::getTransposeOriginalFunctionType(TransposingAttr *attr) {
     }
   }
   
-  // If the function is curried and is differentiating WRT 'self', then grab
+  // If the function is curried and is transposing WRT 'self', then grab
   // the type from the result list (guaranteed to be the first since 'self'
-  // is first in WRT list) and remove it.
+  // is first in WRT list) and remove it. If it's still curried but not
+  // transposing WRT 'self', then the 'Self' type is the same as the result.
   Type selfType = originalResult;
   if (isCurried && wrtSelf) {
     selfType = transposeResultTypes.front().getType();
@@ -4751,9 +4754,9 @@ AnyFunctionType::getTransposeOriginalFunctionType(TransposingAttr *attr) {
   }
   
   SmallVector<AnyFunctionType::Param, 8> originalParams;
-  size_t numberOriginalParameters =
-      transposeParams.size() - 1 + wrtParams.size();
-  for (auto i : range(0, numberOriginalParameters)) {
+  unsigned numberOriginalParameters =
+      transposeParams.size() + wrtParams.size() - 1;
+  for (auto i : range(numberOriginalParameters)) {
     bool isWrt = false;
     for (auto wrt : wrtParams) {
       if (wrt.getIndex() == i) {
@@ -4764,13 +4767,15 @@ AnyFunctionType::getTransposeOriginalFunctionType(TransposingAttr *attr) {
     if (isWrt) {
       // If in WRT list, the item in the result tuple must be a parameter in the
       // original function.
-      originalParams.append(1, AnyFunctionType::Param(
-          transposeResultTypes.front().getType()));
+      auto g = transposeResultTypes.front().getType();
+      // TODO(bartchr): this prevents a segfault occuring when converting 'g' to 'Param'
+      llvm::nulls() << g;
+      originalParams.push_back(AnyFunctionType::Param(g));
       transposeResultTypes = transposeResultTypes.drop_front();
     } else {
       // Else if not in the WRT list, the parameter in the transposing function
       // is a parameter in the original function.
-      originalParams.append(1, transposeParams.front());
+      originalParams.push_back(transposeParams.front());
       transposeParams = transposeParams.drop_front();
     }
   }

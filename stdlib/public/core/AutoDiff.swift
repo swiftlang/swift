@@ -16,9 +16,54 @@
 //
 //===----------------------------------------------------------------------===//
 
+infix operator .* : MultiplicationPrecedence
+infix operator .*= : AssignmentPrecedence
+
 //===----------------------------------------------------------------------===//
 // Compiler Protocols
 //===----------------------------------------------------------------------===//
+
+/// A type with values that support pointwise multiplication.
+// TODO: Add API documentation.
+public protocol PointwiseMultiplicative : AdditiveArithmetic {
+  /// The one value.
+  ///
+  /// One is the identity element for multiplication. For any value,
+  /// `x .* .one == x` and `.one .* x == x`.
+  static var one: Self { get }
+
+  /// The multiplicative inverse of self.
+  ///
+  /// For any value, `x .* x.reciprocal == .one` and
+  /// `x.reciprocal .* x == .one`.
+  var reciprocal: Self { get }
+
+  /// Multiplies two values and produces their product.
+  ///
+  /// - Parameters:
+  ///   - lhs: The first value to multiply.
+  ///   - rhs: The second value to multiply.
+  static func .*(lhs: Self, rhs: Self) -> Self
+
+  /// Multiplies two values and produces their product.
+  ///
+  /// - Parameters:
+  ///   - lhs: The first value to multiply.
+  ///   - rhs: The second value to multiply.
+  static func .*=(lhs: inout Self, rhs: Self)
+}
+
+public extension PointwiseMultiplicative {
+  static func .*=(lhs: inout Self, rhs: Self) {
+    lhs = lhs .* rhs
+  }
+}
+
+public extension PointwiseMultiplicative where Self : ExpressibleByIntegerLiteral {
+  static var one: Self {
+    return 1
+  }
+}
 
 /// A type that represents an unranked vector space. Values of this type are
 /// elements in this vector space and have either no shape or a static shape.
@@ -398,7 +443,7 @@ public func valueWithPullback<T, U, V, R>(
 @available(*, unavailable)
 @inlinable
 public func differential<T, R>(
-  at x: T, in body: @differentiable(T) -> R
+  at x: T, in body: @differentiable (T) -> R
 ) -> @differentiable/*(linear)*/ (T.TangentVector) -> R.TangentVector {
   fatalError()
 }
@@ -406,7 +451,7 @@ public func differential<T, R>(
 @available(*, unavailable)
 @inlinable
 public func differential<T, U, R>(
-  at x: T, _ y: U, in body: @differentiable(T, U) -> R
+  at x: T, _ y: U, in body: @differentiable (T, U) -> R
 ) -> @differentiable/*(linear)*/ (T.TangentVector, U.TangentVector)
     -> R.TangentVector {
   fatalError()

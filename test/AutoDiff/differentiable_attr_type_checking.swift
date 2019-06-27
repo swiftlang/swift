@@ -341,6 +341,7 @@ extension JVPStruct {
 }
 
 // VJP
+
 @differentiable(vjp: vjpSimpleVJP)
 func vjpSimple(x: Float) -> Float {
   return x
@@ -725,6 +726,7 @@ struct TF285MissingOneDiffAttr : TF285 {
 
 
 // TF-296: Infer `@differentiable` wrt parameters to be to all parameters that conform to `Differentiable`.
+
 @differentiable
 func infer1(_ a: Float, _ b: Int) -> Float {
   return a + Float(b)
