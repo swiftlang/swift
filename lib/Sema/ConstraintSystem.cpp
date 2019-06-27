@@ -1372,8 +1372,6 @@ ConstraintSystem::getTypeOfMemberReference(
       cast<GenericTypeParamType>(outerDC->getSelfInterfaceType()
                                  ->getCanonicalType())];
     type = type.transform([&](Type t) -> Type {
-      if (auto *selfTy = t->getAs<DynamicSelfType>())
-        t = selfTy->getSelfType();
       if (t->is<TypeVariableType>())
         if (t->isEqual(selfTy))
           return baseObjTy;
