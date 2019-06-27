@@ -10,7 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+% if FACEBOOK:
+@_exported import third_party_glibc_libc
+% else
 @_exported import SwiftGlibc // Clang module
+% endif
 
 public let MAP_FAILED: UnsafeMutableRawPointer! = UnsafeMutableRawPointer(bitPattern: -1)
 
