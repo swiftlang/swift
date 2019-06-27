@@ -231,7 +231,7 @@ def main():
     if args.verbose:
         test_args = ["-a"]
     else:
-        test_args = ["-sv"]
+        test_args = ["-v"]
 
     # Test parameters.
     test_args += ['--param', 'swift_test_mode=%s' % args.mode,

@@ -149,7 +149,7 @@ EXPECTED_DEFAULTS = {
     'legacy_impl': False,
     'libdispatch_build_variant': 'Debug',
     'libicu_build_variant': 'Debug',
-    'lit_args': '-sv',
+    'lit_args': '-v',
     'llbuild_assertions': True,
     'lldb_assertions': True,
     'lldb_build_variant': 'Debug',
