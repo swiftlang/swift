@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension vDSP {
     
     /// Evaluates a polynomial using specified coefficients and independent variables. Single-precision.
@@ -25,7 +26,6 @@ extension vDSP {
     ///
     /// `result[1] = (10 * 5²) + (20 * 5¹) + (30 * 5⁰) // 380`
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func evaluatePolynomial<U>(usingCoefficients coefficients: [Float],
                                              withVariables variables: U) -> [Float]
         where
@@ -58,7 +58,6 @@ extension vDSP {
     ///
     /// `result[1] = (10 * 5²) + (20 * 5¹) + (30 * 5⁰) // 380`
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func evaluatePolynomial<U, V>(usingCoefficients coefficients: [Float],
                                                 withVariables variables: U,
                                                 result: inout V)
@@ -96,7 +95,6 @@ extension vDSP {
     ///
     /// `result[1] = (10 * 5²) + (20 * 5¹) + (30 * 5⁰) // 380`
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func evaluatePolynomial<U>(usingCoefficients coefficients: [Double],
                                              withVariables variables: U) -> [Double]
         where
@@ -129,7 +127,6 @@ extension vDSP {
     ///
     /// `result[1] = (10 * 5²) + (20 * 5¹) + (30 * 5⁰) // 380`
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func evaluatePolynomial<U, V>(usingCoefficients coefficients: [Double],
                                                 withVariables variables: U,
                                                 result: inout V)
