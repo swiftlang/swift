@@ -38,6 +38,7 @@ add_swift_target_library(swiftStdlibStubs
                     ${swift_stubs_c_compile_flags}
                   LINK_FLAGS
                     ${SWIFT_RUNTIME_CORE_LINK_FLAGS}
+                  SWIFT_COMPILE_FLAGS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
                   INSTALL_IN_COMPONENT
                     stdlib)
 

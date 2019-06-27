@@ -10,6 +10,7 @@ if(SWIFT_BUILD_DYNAMIC_STDLIB)
                              ${SWIFT_RUNTIME_CXX_FLAGS} -DswiftRemoteMirror_EXPORTS
                            LINK_FLAGS
                              ${SWIFT_RUNTIME_LINK_FLAGS}
+                           SWIFT_COMPILE_FLAGS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
                            INSTALL_IN_COMPONENT
                              swift-remote-mirror)
 endif()
