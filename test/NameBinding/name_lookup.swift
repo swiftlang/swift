@@ -609,3 +609,19 @@ class ShadowingGenericParameter<T> {
 }
 
 _ = ShadowingGenericParameter<String>().foo(t: "hi")
+
+// rdar://problem/51266778
+struct PatternBindingWithTwoVars1 { var x = 3, y = x }
+// expected-error@-1 {{cannot use instance member 'x' within property initializer; property initializers run before 'self' is available}}
+
+struct PatternBindingWithTwoVars2 { var x = y, y = 3 }
+// expected-error@-1 {{type 'PatternBindingWithTwoVars2' has no member 'y'}}
+// expected-note@-2 {{did you mean 'x'?}}
+// expected-note@-3 {{did you mean 'y'?}}
+
+// This one should be accepted, but for now PatternBindingDecl validation
+// circularity detection is not fine grained enough.
+struct PatternBindingWithTwoVars3 { var x = y, y = x }
+// expected-error@-1 {{type 'PatternBindingWithTwoVars3' has no member 'y'}}
+// expected-note@-2 {{did you mean 'x'?}}
+// expected-note@-3 {{did you mean 'y'?}}
