@@ -2867,6 +2867,7 @@ void Serializer::writeDecl(const Decl *D) {
                                            discriminator);
     }
   }
+  }
 
   void writeDiscriminatorsIfNeeded(const ValueDecl *value) {
     using namespace decls_block;
