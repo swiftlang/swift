@@ -317,7 +317,9 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
     llvm::FoldingSet<GenericSignature> GenericSignatures;
 
     /// Stored generic signature builders for canonical generic signatures.
-    llvm::DenseMap<GenericSignature *, std::unique_ptr<GenericSignatureBuilder>>
+    llvm::DenseMap<GenericSignature *,
+                   std::unique_ptr<GenericSignatureBuilder,
+                                   default_destroy<GenericSignatureBuilder>>>
       GenericSignatureBuilders;
 
     /// Canonical generic environments for canonical generic signatures.
@@ -1480,15 +1482,14 @@ void ASTContext::registerGenericSignatureBuilder(
   auto arena = getArena(sig);
   auto &genericSignatureBuilders =
       getImpl().getArena(arena).GenericSignatureBuilders;
-  auto known = genericSignatureBuilders.find(canSig);
-  if (known != genericSignatureBuilders.end()) {
+  auto &entry = genericSignatureBuilders[canSig];
+  if (entry) {
     ++NumRegisteredGenericSignatureBuildersAlready;
     return;
   }
 
   ++NumRegisteredGenericSignatureBuilders;
-  genericSignatureBuilders[canSig] =
-    llvm::make_unique<GenericSignatureBuilder>(std::move(builder));
+  entry.reset(AllocateObjectCopy(std::move(builder), arena));
 }
 
 GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
@@ -1498,16 +1499,15 @@ GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
   auto arena = getArena(sig);
   auto &genericSignatureBuilders =
       getImpl().getArena(arena).GenericSignatureBuilders;
-  auto known = genericSignatureBuilders.find(sig);
-  if (known != genericSignatureBuilders.end())
-    return known->second.get();
+  auto &entry = genericSignatureBuilders[sig];
+  if (entry)
+    return entry.get();
 
   // Create a new generic signature builder with the given signature.
-  auto builder = new GenericSignatureBuilder(*this);
+  auto builder = AllocateObjectCopy(GenericSignatureBuilder(*this), arena);
 
   // Store this generic signature builder (no generic environment yet).
-  genericSignatureBuilders[sig] =
-    std::unique_ptr<GenericSignatureBuilder>(builder);
+  entry.reset(builder);
 
   builder->addGenericSignature(sig);
 

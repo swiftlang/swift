@@ -878,6 +878,14 @@ Iterator removeAdjacentIf(const Iterator first, const Iterator last,
   return insertionPoint;
 }
 
+/// Like std::default_delete, but only destroys the object in place.
+template <typename T>
+struct default_destroy {
+  static_assert(!std::is_array<T>::value, "not supported for arrays");
+  void operator()(T* ptr) const {
+    ptr->~T();
+  }
+};
 
 } // end namespace swift
 
