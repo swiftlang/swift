@@ -2048,6 +2048,7 @@ extension BinaryFloatingPoint {
   /// following formula, where `**` is exponentiation:
   ///
   ///     let magnitude = x.significand * F.radix ** x.exponent
+  @inlinable @inline(__always)
   public static var radix: Int { return 2 }
 
   /// Creates a new floating-point value using the sign of one value and the
