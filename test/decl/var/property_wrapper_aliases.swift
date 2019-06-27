@@ -6,7 +6,7 @@
 struct Delegate<T> {
   var wrappedValue: T
 
-  var delegateValue: Wrapper<T> { // expected-warning{{property wrapper's `delegateValue` property should be renamed to 'wrapperValue'; use of 'delegateValue' is deprecated}}{{7-20=wrapperValue}}
+  var delegateValue: Wrapper<T> { // expected-warning{{property wrapper's `delegateValue` property should be renamed to 'projectedValue'; use of 'delegateValue' is deprecated}}{{7-20=projectedValue}}
     return Wrapper(wrappedValue: wrappedValue)
   }
 }
@@ -34,5 +34,14 @@ struct TestOldValue {
 
   func f() -> String {
     return x
+  }
+}
+
+@propertyWrapper
+struct OldWrapper<T> {
+  var wrappedValue: T
+
+  var wrapperValue: Wrapper<T> { // expected-warning{{property wrapper's `wrapperValue` property should be renamed to 'projectedValue'; use of 'wrapperValue' is deprecated}}{{7-19=projectedValue}}
+    return Wrapper(wrappedValue: wrappedValue)
   }
 }

@@ -40,19 +40,19 @@ func forceHasMemberwiseInit() {
   _ = HasMemberwiseInit<Int>()
 }
 
-  // CHECK: sil_global private @$s17property_wrappers9UseStaticV13$staticWibble33_{{.*}}AA4LazyOySaySiGGvpZ : $Lazy<Array<Int>>
+  // CHECK: sil_global private @$s17property_wrappers9UseStaticV13_staticWibble33_{{.*}}AA4LazyOySaySiGGvpZ : $Lazy<Array<Int>>
 
 // HasMemberwiseInit.x.setter
 // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers17HasMemberwiseInitV1xSbvs : $@convention(method) <T where T : DefaultInit> (Bool, @inout HasMemberwiseInit<T>) -> () {
 // CHECK: bb0(%0 : $Bool, %1 : $*HasMemberwiseInit<T>):
 // CHECK: [[MODIFY_SELF:%.*]] = begin_access [modify] [unknown] %1 : $*HasMemberwiseInit<T>
-// CHECK: [[X_BACKING:%.*]] = struct_element_addr [[MODIFY_SELF]] : $*HasMemberwiseInit<T>, #HasMemberwiseInit.$x
+// CHECK: [[X_BACKING:%.*]] = struct_element_addr [[MODIFY_SELF]] : $*HasMemberwiseInit<T>, #HasMemberwiseInit._x
 // CHECK: [[X_BACKING_VALUE:%.*]] = struct_element_addr [[X_BACKING]] : $*Wrapper<Bool>, #Wrapper.value
 // CHECK: assign %0 to [[X_BACKING_VALUE]] : $*Bool
 // CHECK: end_access [[MODIFY_SELF]] : $*HasMemberwiseInit<T>
 
-// variable initialization expression of HasMemberwiseInit.$x
-// CHECK-LABEL: sil hidden [transparent] [ossa] @$s17property_wrappers17HasMemberwiseInitV2$x33_{{.*}}AA7WrapperVySbGvpfi : $@convention(thin) <T where T : DefaultInit> () -> Wrapper<Bool> {
+// variable initialization expression of HasMemberwiseInit._x
+// CHECK-LABEL: sil hidden [transparent] [ossa] @$s17property_wrappers17HasMemberwiseInitV2_x33_{{.*}}AA7WrapperVySbGvpfi : $@convention(thin) <T where T : DefaultInit> () -> Wrapper<Bool> {
 // CHECK: integer_literal $Builtin.Int1, 0
 // CHECK-NOT: return
 // CHECK: function_ref @$sSb22_builtinBooleanLiteralSbBi1__tcfC : $@convention(method) (Builtin.Int1, @thin Bool.Type) -> Bool
@@ -61,13 +61,13 @@ func forceHasMemberwiseInit() {
 // CHECK: return {{%.*}} : $Wrapper<Bool>
 
 // variable initialization expression of HasMemberwiseInit.$y
-// CHECK-LABEL: sil hidden [transparent] [ossa] @$s17property_wrappers17HasMemberwiseInitV2$y33_{{.*}}23WrapperWithInitialValueVyxGvpfi : $@convention(thin) <T where T : DefaultInit> () -> @out 
+// CHECK-LABEL: sil hidden [transparent] [ossa] @$s17property_wrappers17HasMemberwiseInitV2_y33_{{.*}}23WrapperWithInitialValueVyxGvpfi : $@convention(thin) <T where T : DefaultInit> () -> @out 
 // CHECK: bb0(%0 : $*T):
 // CHECK-NOT: return
 // CHECK: witness_method $T, #DefaultInit.init!allocator.1 : <Self where Self : DefaultInit> (Self.Type) -> () -> Self : $@convention(witness_method: DefaultInit) <τ_0_0 where τ_0_0 : DefaultInit> (@thick τ_0_0.Type) -> @out τ_0_0
 
-// variable initialization expression of HasMemberwiseInit.$z
-// CHECK-LABEL: sil hidden [transparent] [ossa] @$s17property_wrappers17HasMemberwiseInitV2$z33_{{.*}}23WrapperWithInitialValueVySiGvpfi : $@convention(thin) <T where T : DefaultInit> () -> WrapperWithInitialValue<Int> {
+// variable initialization expression of HasMemberwiseInit._z
+// CHECK-LABEL: sil hidden [transparent] [ossa] @$s17property_wrappers17HasMemberwiseInitV2_z33_{{.*}}23WrapperWithInitialValueVySiGvpfi : $@convention(thin) <T where T : DefaultInit> () -> WrapperWithInitialValue<Int> {
 // CHECK: bb0:
 // CHECK-NOT: return
 // CHECK: integer_literal $Builtin.IntLiteral, 17
@@ -89,21 +89,21 @@ func forceHasMemberwiseInit() {
 
 // Initialization of x
 // CHECK-NOT: return
-// CHECK: function_ref @$s17property_wrappers17HasMemberwiseInitV2$x33_{{.*}}7WrapperVySbGvpfi : $@convention(thin) <τ_0_0 where τ_0_0 : DefaultInit> () -> Wrapper<Bool>
+// CHECK: function_ref @$s17property_wrappers17HasMemberwiseInitV2_x33_{{.*}}7WrapperVySbGvpfi : $@convention(thin) <τ_0_0 where τ_0_0 : DefaultInit> () -> Wrapper<Bool>
 
 // Initialization of y
 // CHECK-NOT: return
-// CHECK: function_ref @$s17property_wrappers17HasMemberwiseInitV2$y33_{{.*}}23WrapperWithInitialValueVyxGvpfi : $@convention(thin) <τ_0_0 where τ_0_0 : DefaultInit> () -> @out τ_0_0
+// CHECK: function_ref @$s17property_wrappers17HasMemberwiseInitV2_y33_{{.*}}23WrapperWithInitialValueVyxGvpfi : $@convention(thin) <τ_0_0 where τ_0_0 : DefaultInit> () -> @out τ_0_0
 // CHECK-NOT: return
 // CHECK: function_ref @$s17property_wrappers23WrapperWithInitialValueV07initialF0ACyxGx_tcfC : $@convention(method) <τ_0_0> (@in τ_0_0, @thin WrapperWithInitialValue<τ_0_0>.Type) -> @out WrapperWithInitialValue<τ_0_0>
 
 // Initialization of z
 // CHECK-NOT: return
-// CHECK: function_ref @$s17property_wrappers17HasMemberwiseInitV2$z33_{{.*}}23WrapperWithInitialValueVySiGvpfi : $@convention(thin) <τ_0_0 where τ_0_0 : DefaultInit> () -> WrapperWithInitialValue<Int>
+// CHECK: function_ref @$s17property_wrappers17HasMemberwiseInitV2_z33_{{.*}}23WrapperWithInitialValueVySiGvpfi : $@convention(thin) <τ_0_0 where τ_0_0 : DefaultInit> () -> WrapperWithInitialValue<Int>
 
 // CHECK: return
 
-// CHECK-LABEL: sil hidden [transparent] [ossa] @$s17property_wrappers9HasNestedV2$y33_{{.*}}14PrivateWrapperAELLVyx_SayxGGvpfi : $@convention(thin) <T> () -> @owned Array<T> {
+// CHECK-LABEL: sil hidden [transparent] [ossa] @$s17property_wrappers9HasNestedV2_y33_{{.*}}14PrivateWrapperAELLVyx_SayxGGvpfi : $@convention(thin) <T> () -> @owned Array<T> {
 // CHECK: bb0:
 // CHECK: function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF
 struct HasNested<T> {
@@ -147,7 +147,7 @@ struct WrapperWithAccessors {
   // Synthesized setter
   // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers20WrapperWithAccessorsV1xSivs : $@convention(method) (Int, @inout WrapperWithAccessors) -> ()
   // CHECK-NOT: return
-  // CHECK: struct_element_addr {{%.*}} : $*WrapperWithAccessors, #WrapperWithAccessors.$x
+  // CHECK: struct_element_addr {{%.*}} : $*WrapperWithAccessors, #WrapperWithAccessors._x
 
   mutating func test() {
     x = 17
@@ -160,7 +160,7 @@ func consumeNewValue(_: Int) { }
 struct WrapperWithDidSetWillSet {
   // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers021WrapperWithDidSetWillF0V1xSivs
   // CHECK: function_ref @$s17property_wrappers021WrapperWithDidSetWillF0V1xSivw
-  // CHECK: struct_element_addr {{%.*}} : $*WrapperWithDidSetWillSet, #WrapperWithDidSetWillSet.$x
+  // CHECK: struct_element_addr {{%.*}} : $*WrapperWithDidSetWillSet, #WrapperWithDidSetWillSet._x
   // CHECK-NEXT: struct_element_addr {{%.*}} : $*Wrapper<Int>, #Wrapper.value
   // CHECK-NEXT: assign %0 to {{%.*}} : $*Int
   // CHECK: function_ref @$s17property_wrappers021WrapperWithDidSetWillF0V1xSivW
@@ -184,16 +184,16 @@ struct WrapperWithDidSetWillSet {
 struct WrapperWithStorageValue<T> {
   var value: T
 
-  var wrapperValue: Wrapper<T> {
+  var projectedValue: Wrapper<T> {
     return Wrapper(value: value)
   }
 }
 
 struct UseWrapperWithStorageValue {
-  // UseWrapperWithStorageValue.$x.getter
+  // UseWrapperWithStorageValue._x.getter
   // CHECK-LABEL: sil hidden [transparent] [ossa] @$s17property_wrappers26UseWrapperWithStorageValueV2$xAA0D0VySiGvg : $@convention(method) (UseWrapperWithStorageValue) -> Wrapper<Int>
   // CHECK-NOT: return
-  // CHECK: function_ref @$s17property_wrappers23WrapperWithStorageValueV07wrapperF0AA0C0VyxGvg
+  // CHECK: function_ref @$s17property_wrappers23WrapperWithStorageValueV09projectedF0AA0C0VyxGvg
   @WrapperWithStorageValue(value: 17) var x: Int
 }
 
@@ -229,7 +229,7 @@ struct UseLazy<T: DefaultInit> {
   @Lazy var wibble = [1, 2, 3]
 
   // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers7UseLazyV3foo3bar6wibbleACyxGSi_xSaySiGtcfC : $@convention(method) <T where T : DefaultInit> (Int, @in T, @owned Array<Int>, @thin UseLazy<T>.Type) -> @out UseLazy<T>
-  // CHECK: function_ref @$s17property_wrappers7UseLazyV4$foo33_{{.*}}AA0D0OySiGvpfiSiycfu_ : $@convention(thin) (@owned Int) -> Int
+  // CHECK: function_ref @$s17property_wrappers7UseLazyV4_foo33_{{.*}}AA0D0OySiGvpfiSiycfu_ : $@convention(thin) (@owned Int) -> Int
   // CHECK: function_ref @$s17property_wrappers4LazyO12initialValueACyxGxyXA_tcfC : $@convention(method) <τ_0_0> (@owned @callee_guaranteed () -> @out τ_0_0, @thin Lazy<τ_0_0>.Type) -> @out Lazy<τ_0_0>
 }
 
@@ -244,7 +244,7 @@ func triggerUseLazy() {
 
 struct UseStatic {
   // CHECK: sil hidden [ossa] @$s17property_wrappers9UseStaticV12staticWibbleSaySiGvgZ
-  // CHECK: sil private [global_init] [ossa] @$s17property_wrappers9UseStaticV13$staticWibble33_{{.*}}4LazyOySaySiGGvau
+  // CHECK: sil private [global_init] [ossa] @$s17property_wrappers9UseStaticV13_staticWibble33_{{.*}}4LazyOySaySiGGvau
   // CHECK: sil hidden [ossa] @$s17property_wrappers9UseStaticV12staticWibbleSaySiGvsZ
   @Lazy static var staticWibble = [1, 2, 3]
 }
@@ -260,8 +260,8 @@ class ClassUsingWrapper {
 extension ClassUsingWrapper {
   // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers17ClassUsingWrapperC04testcdE01cyAC_tF : $@convention(method) (@guaranteed ClassUsingWrapper, @guaranteed ClassUsingWrapper) -> () {
   func testClassUsingWrapper(c: ClassUsingWrapper) {
-    // CHECK: ref_element_addr %1 : $ClassUsingWrapper, #ClassUsingWrapper.$x
-    self.$x.test()
+    // CHECK: ref_element_addr %1 : $ClassUsingWrapper, #ClassUsingWrapper._x
+    self._x.test()
   }
 }
 
@@ -288,7 +288,7 @@ class UseWrapperWithDefaultInit {
   @WrapperWithDefaultInit var name: String
 }
 
-// CHECK-LABEL: sil hidden [transparent] [ossa] @$s17property_wrappers25UseWrapperWithDefaultInitC5$name33_F728088E0028E14D18C6A10CF68512E8LLAA0defG0VySSGvpfi : $@convention(thin) () -> @owned WrapperWithDefaultInit<String>
+// CHECK-LABEL: sil hidden [transparent] [ossa] @$s17property_wrappers25UseWrapperWithDefaultInitC5_name33_F728088E0028E14D18C6A10CF68512E8LLAA0defG0VySSGvpfi : $@convention(thin) () -> @owned WrapperWithDefaultInit<String>
 // CHECK: function_ref @$s17property_wrappers22WrapperWithDefaultInitVACyxGycfC
 // CHECK: return {{%.*}} : $WrapperWithDefaultInit<String>
 
@@ -324,7 +324,7 @@ struct CompositionMembers {
   // CompositionMembers.p1.getter
   // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers18CompositionMembersV2p1SiSgvg : $@convention(method) (@guaranteed CompositionMembers) -> Optional<Int>
   // CHECK: bb0([[SELF:%.*]] : @guaranteed $CompositionMembers):
-  // CHECK: [[P1:%.*]] = struct_extract [[SELF]] : $CompositionMembers, #CompositionMembers.$p1
+  // CHECK: [[P1:%.*]] = struct_extract [[SELF]] : $CompositionMembers, #CompositionMembers._p1
   // CHECK: [[P1_VALUE:%.*]] = struct_extract [[P1]] : $WrapperA<WrapperB<WrapperC<Int>>>, #WrapperA.value
   // CHECK: [[P1_VALUE2:%.*]] = struct_extract [[P1_VALUE]] : $WrapperB<WrapperC<Int>>, #WrapperB.value
   // CHECK: [[P1_VALUE3:%.*]] = struct_extract [[P1_VALUE2]] : $WrapperC<Int>, #WrapperC.value
@@ -333,7 +333,7 @@ struct CompositionMembers {
   @WrapperA @WrapperB @WrapperC var p2 = "Hello"
 
   // variable initialization expression of CompositionMembers.$p2
-  // CHECK-LABEL: sil hidden [transparent] [ossa] @$s17property_wrappers18CompositionMembersV3$p233_{{.*}}8WrapperAVyAA0N1BVyAA0N1CVySSGGGvpfi : $@convention(thin) () -> @owned Optional<String> {
+  // CHECK-LABEL: sil hidden [transparent] [ossa] @$s17property_wrappers18CompositionMembersV3_p233_{{.*}}8WrapperAVyAA0N1BVyAA0N1CVySSGGGvpfi : $@convention(thin) () -> @owned Optional<String> {
   // CHECK: %0 = string_literal utf8 "Hello"
 
   // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers18CompositionMembersV2p12p2ACSiSg_SSSgtcfC : $@convention(method) (Optional<Int>, @owned Optional<String>, @thin CompositionMembers.Type) -> @owned CompositionMembers
@@ -399,7 +399,7 @@ struct ObservingTest {
 // Tuple initial values.
 struct WithTuples {
 	// CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers10WithTuplesVACycfC : $@convention(method) (@thin WithTuples.Type) -> WithTuples {
-	// CHECK: function_ref @$s17property_wrappers10WithTuplesV10$fractions33_F728088E0028E14D18C6A10CF68512E8LLAA07WrapperC12InitialValueVySd_S2dtGvpfi : $@convention(thin) () -> (Double, Double, Double)
+	// CHECK: function_ref @$s17property_wrappers10WithTuplesV10_fractions33_F728088E0028E14D18C6A10CF68512E8LLAA07WrapperC12InitialValueVySd_S2dtGvpfi : $@convention(thin) () -> (Double, Double, Double)
 	// CHECK: function_ref @$s17property_wrappers23WrapperWithInitialValueV07initialF0ACyxGx_tcfC : $@convention(method) <τ_0_0> (@in τ_0_0, @thin WrapperWithInitialValue<τ_0_0>.Type) -> @out WrapperWithInitialValue<τ_0_0>
   @WrapperWithInitialValue var fractions = (1.3, 0.7, 0.3)
 
