@@ -3016,14 +3016,6 @@ ERROR(method_call_in_closure_without_explicit_self,none,
 ERROR(implicit_use_of_self_in_closure,none,
       "implicit use of 'self' in closure; use 'self.' to make"
       " capture semantics explicit", ())
-ERROR(capture_before_declaration,none,
-      "cannot capture %0 before it is declared", (Identifier))
-ERROR(transitive_capture_before_declaration,none,
-      "cannot capture %0, which would use %1 before it is declared",
-      (Identifier, Identifier))
-NOTE(transitive_capture_through_here,none,
-     "%0, declared here, captures %1",
-     (Identifier, Identifier))
 
 WARNING(recursive_accessor_reference,none,
         "attempting to %select{access|modify}1 %0 within its own "
