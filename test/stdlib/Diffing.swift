@@ -657,9 +657,6 @@ if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
       }
     }
   }
-} // if #available
-else {
-    fatalError("Unexpected failure of future availability")
 }
 
 runAllTests()
