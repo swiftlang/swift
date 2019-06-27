@@ -154,7 +154,7 @@ public:
 
   /// Add the specified capture to the closure's capture list, diagnosing it
   /// if invalid.
-  void addCapture(CapturedValue capture, SourceLoc Loc) {
+  void addCapture(CapturedValue capture) {
     auto VD = capture.getDecl();
 
     // Check to see if we already have an entry for this decl.
@@ -166,9 +166,9 @@ public:
       // If this already had an entry in the capture list, make sure to merge
       // the information together.  If one is noescape but the other isn't,
       // then the result is escaping.
-      unsigned Flags =
-        Captures[entryNumber-1].getFlags() & capture.getFlags();
-      capture = CapturedValue(VD, Flags);
+      auto existing = Captures[entryNumber-1];
+      unsigned flags = existing.getFlags() & capture.getFlags();
+      capture = CapturedValue(VD, flags, existing.getLoc());
       Captures[entryNumber-1] = capture;
     }
 
@@ -298,7 +298,7 @@ public:
     if (AFR.isKnownNoEscape())
       Flags |= CapturedValue::IsNoEscape;
 
-    addCapture(CapturedValue(D, Flags), DRE->getStartLoc());
+    addCapture(CapturedValue(D, Flags, DRE->getStartLoc()));
     return { false, DRE };
   }
 
@@ -327,7 +327,7 @@ public:
       if (!isNoEscapeClosure)
         Flags &= ~CapturedValue::IsNoEscape;
 
-      addCapture(CapturedValue(capture.getDecl(), Flags), captureLoc);
+      addCapture(CapturedValue(capture.getDecl(), Flags, captureLoc));
     }
 
     if (GenericParamCaptureLoc.isInvalid())
@@ -542,7 +542,7 @@ public:
     if (auto *superE = dyn_cast<SuperRefExpr>(E)) {
       auto CurDC = AFR.getAsDeclContext();
       if (CurDC->isChildContextOf(superE->getSelf()->getDeclContext()))
-        addCapture(CapturedValue(superE->getSelf(), 0), superE->getLoc());
+        addCapture(CapturedValue(superE->getSelf(), 0, superE->getLoc()));
       return { false, superE };
     }
 

@@ -14,6 +14,7 @@
 #define SWIFT_AST_CAPTURE_INFO_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/SourceLoc.h"
 #include "swift/AST/TypeAlignments.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerIntPair.h"
@@ -44,8 +45,9 @@ public:
 
 private:
   Storage Value;
+  SourceLoc Loc;
 
-  explicit CapturedValue(Storage V) : Value(V) {}
+  explicit CapturedValue(Storage V, SourceLoc Loc) : Value(V), Loc(Loc) {}
 
 public:
   friend struct llvm::DenseMapInfo<CapturedValue>;
@@ -61,12 +63,14 @@ public:
     IsNoEscape = 1 << 1
   };
 
-  CapturedValue(llvm::PointerUnion<ValueDecl*, OpaqueValueExpr*> Ptr,
-                unsigned Flags)
-      : Value(Ptr, Flags) {}
+  CapturedValue(ValueDecl *Val, unsigned Flags, SourceLoc Loc)
+      : Value(Val, Flags), Loc(Loc) {}
+
+  CapturedValue(OpaqueValueExpr *Val, unsigned Flags)
+      : Value(Val, Flags), Loc(SourceLoc()) {}
 
   static CapturedValue getDynamicSelfMetadata() {
-    return CapturedValue((ValueDecl *)nullptr, 0);
+    return CapturedValue((ValueDecl *)nullptr, 0, SourceLoc());
   }
 
   bool isDirect() const { return Value.getInt() & IsDirect; }
@@ -80,7 +84,9 @@ public:
   CapturedValue mergeFlags(CapturedValue cv) {
     assert(Value.getPointer() == cv.Value.getPointer() &&
            "merging flags on two different value decls");
-    return CapturedValue(Value.getPointer(), getFlags() & cv.getFlags());
+    return CapturedValue(
+        Storage(Value.getPointer(), getFlags() & cv.getFlags()),
+        Loc);
   }
 
   ValueDecl *getDecl() const {
@@ -95,6 +101,7 @@ public:
     return Value.getPointer().dyn_cast<OpaqueValueExpr *>();
   }
 
+  SourceLoc getLoc() const { return Loc; }
 
   unsigned getFlags() const { return Value.getInt(); }
 };
