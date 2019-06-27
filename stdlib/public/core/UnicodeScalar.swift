@@ -428,9 +428,10 @@ extension Unicode.Scalar.UTF16View : RandomAccessCollection {
   ///   `endIndex` property.
   @inlinable
   public subscript(position: Int) -> UTF16.CodeUnit {
-    return position == 0 ? (
-      endIndex == 1 ? UTF16.CodeUnit(value.value) : UTF16.leadSurrogate(value)
-    ) : UTF16.trailSurrogate(value)
+    _internalInvariant((0..<self.count).contains(position))
+    if position == 1 { return UTF16.trailSurrogate(value) }
+    if endIndex == 1 { return UTF16.CodeUnit(value.value) }
+    return UTF16.leadSurrogate(value)
   }
 }
 

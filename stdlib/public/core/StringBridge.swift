@@ -173,17 +173,17 @@ internal enum _KnownCocoaString {
 #if !(arch(i386) || arch(arm))
   case tagged
 #endif
-  
+
   @inline(__always)
   init(_ str: _CocoaString) {
-    
+
 #if !(arch(i386) || arch(arm))
     if _isObjCTaggedPointer(str) {
       self = .tagged
       return
     }
 #endif
-    
+
     switch unsafeBitCast(_swift_classOfObjCHeapObject(str), to: UInt.self) {
     case unsafeBitCast(__StringStorage.self, to: UInt.self):
       self = .storage
@@ -272,13 +272,13 @@ internal func _bridgeCocoaString(_ cocoaString: _CocoaString) -> _StringGuts {
     //   3) If it's mutable with associated information, must make the call
     let immutableCopy
       = _stdlib_binary_CFStringCreateCopy(cocoaString) as AnyObject
-    
+
 #if !(arch(i386) || arch(arm))
     if _isObjCTaggedPointer(immutableCopy) {
       return _StringGuts(_SmallString(taggedCocoa: immutableCopy))
     }
 #endif
-    
+
     let (fastUTF8, isASCII): (Bool, Bool)
     switch _getCocoaStringPointer(immutableCopy) {
     case .ascii(_): (fastUTF8, isASCII) = (true, true)
@@ -286,7 +286,7 @@ internal func _bridgeCocoaString(_ cocoaString: _CocoaString) -> _StringGuts {
     default:  (fastUTF8, isASCII) = (false, false)
     }
     let length = _stdlib_binary_CFStringGetLength(immutableCopy)
-    
+
     return _StringGuts(
       cocoa: immutableCopy,
       providesFastUTF8: fastUTF8,
@@ -420,6 +420,6 @@ extension String {
   ) {
     _internalInvariant(buffer.count >= range.count)
     let indexRange = self._toUTF16Indices(range)
-    self._nativeCopyUTF16CodeUnits(into: buffer, range: indexRange)
+    self.utf16._nativeCopy(into: buffer, alignedRange: indexRange)
   }
 }
