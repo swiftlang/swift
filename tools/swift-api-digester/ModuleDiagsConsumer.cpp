@@ -33,7 +33,6 @@ enum LocalDiagID : uint32_t {
 static StringRef getCategoryName(uint32_t ID) {
   switch(ID) {
   case LocalDiagID::removed_decl:
-  case LocalDiagID::removed_setter:
     return "/* Removed Decls */";
   case LocalDiagID::moved_decl:
   case LocalDiagID::decl_kind_changed:
