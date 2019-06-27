@@ -626,6 +626,7 @@ if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, * ) {
 
                 // Validate application
                 expectEqual(b, a.applying(diff)!)
+                expectEqual(a, b.applying(diff.inverse())!)
               }}}}}}
   }
 
@@ -645,6 +646,7 @@ if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, * ) {
       expectNotNil(applied)
       if let applied = applied {
         expectEqual(b, applied)
+        expectEqual(a, applied.applying(d.inverse()))
         if (b != applied) {
           print("""
             // repro:
@@ -652,6 +654,7 @@ if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, * ) {
             let b = \(b)
             let d = b.difference(from: a)
             expectEqual(b, a.applying(d))
+            expectEqual(a, applied.applying(d.inverse()))
             """)
           break
         }
