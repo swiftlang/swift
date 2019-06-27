@@ -140,7 +140,8 @@ void ExtensionError::anchor() {}
 /// Returns true if the next entry is a record of type \p recordKind.
 /// Destroys the stream position if the next entry is not a record.
 static void skipRecord(llvm::BitstreamCursor &cursor, unsigned recordKind) {
-  Expected<llvm::BitstreamEntry> maybeNext = cursor.advance(AF_DontPopBlockAtEnd);
+  Expected<llvm::BitstreamEntry> maybeNext =
+      cursor.advance(AF_DontPopBlockAtEnd);
   if (!maybeNext) {
     // FIXME this drops the error on the floor.
     consumeError(maybeNext.takeError());
@@ -261,13 +262,15 @@ ParameterList *ModuleFile::readParameterList() {
   using namespace decls_block;
 
   SmallVector<uint64_t, 8> scratch;
-  Expected<llvm::BitstreamEntry> maybeEntry = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
+  Expected<llvm::BitstreamEntry> maybeEntry =
+      DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
   if (!maybeEntry) {
     // FIXME this drops the error on the floor.
     consumeError(maybeEntry.takeError());
   }
   llvm::BitstreamEntry entry = maybeEntry.get();
-  Expected<unsigned> maybeRecordID = DeclTypeCursor.readRecord(entry.ID, scratch);
+  Expected<unsigned> maybeRecordID =
+      DeclTypeCursor.readRecord(entry.ID, scratch);
   if (!maybeRecordID) {
     // FIXME this drops the error on the floor.
     consumeError(maybeRecordID.takeError());
@@ -304,7 +307,8 @@ Expected<Pattern *> ModuleFile::readPattern(DeclContext *owningDC) {
   SmallVector<uint64_t, 8> scratch;
 
   BCOffsetRAII restoreOffset(DeclTypeCursor);
-  Expected<llvm::BitstreamEntry> maybeNext = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
+  Expected<llvm::BitstreamEntry> maybeNext =
+      DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
   if (!maybeNext) {
     // FIXME this drops the error diagnostic on the floor.
     consumeError(maybeNext.takeError());
@@ -472,7 +476,8 @@ SILLayout *ModuleFile::readSILLayout(llvm::BitstreamCursor &Cursor) {
 
   SmallVector<uint64_t, 16> scratch;
 
-  Expected<llvm::BitstreamEntry> maybeNext = Cursor.advance(AF_DontPopBlockAtEnd);
+  Expected<llvm::BitstreamEntry> maybeNext =
+      Cursor.advance(AF_DontPopBlockAtEnd);
   if (!maybeNext) {
     // FIXME this drops the error diagnostic on the floor.
     error();
@@ -524,7 +529,8 @@ ProtocolConformanceRef ModuleFile::readConformance(
 
   SmallVector<uint64_t, 16> scratch;
 
-  Expected<llvm::BitstreamEntry> maybeNext = Cursor.advance(AF_DontPopBlockAtEnd);
+  Expected<llvm::BitstreamEntry> maybeNext =
+      Cursor.advance(AF_DontPopBlockAtEnd);
   if (!maybeNext) {
     // FIXME this drops the error diagnostic on the floor.
     consumeError(maybeNext.takeError());
@@ -762,7 +768,8 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC) {
   SmallVector<uint64_t, 8> scratch;
   StringRef blobData;
 
-  Expected<llvm::BitstreamEntry> maybeNext = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
+  Expected<llvm::BitstreamEntry> maybeNext =
+      DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
   if (!maybeNext) {
     // FIXME this drops the error diagnostic on the floor.
     consumeError(maybeNext.takeError());
@@ -772,7 +779,8 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC) {
   if (next.Kind != llvm::BitstreamEntry::Record)
     return nullptr;
 
-  Expected<unsigned> maybeKind = DeclTypeCursor.readRecord(next.ID, scratch, &blobData);
+  Expected<unsigned> maybeKind =
+      DeclTypeCursor.readRecord(next.ID, scratch, &blobData);
   if (!maybeKind) {
     // FIXME this drops the error on the floor.
     consumeError(maybeKind.takeError());
@@ -815,7 +823,8 @@ void ModuleFile::readGenericRequirements(
     lastRecordOffset.reset();
     bool shouldContinue = true;
 
-    Expected<llvm::BitstreamEntry> maybeEntry = Cursor.advance(AF_DontPopBlockAtEnd);
+    Expected<llvm::BitstreamEntry> maybeEntry =
+        Cursor.advance(AF_DontPopBlockAtEnd);
     if (!maybeEntry) {
       // FIXME this drops the error diagnostic on the floor.
       consumeError(maybeEntry.takeError());
@@ -826,7 +835,8 @@ void ModuleFile::readGenericRequirements(
       break;
 
     scratch.clear();
-    Expected<unsigned> maybeRecordID = DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
+    Expected<unsigned> maybeRecordID =
+        DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
     if (!maybeRecordID) {
       // FIXME this drops the error on the floor.
       consumeError(maybeRecordID.takeError());
@@ -1016,7 +1026,8 @@ GenericSignature *ModuleFile::getGenericSignature(
   StringRef blobData;
   SmallVector<uint64_t, 8> scratch;
 
-  Expected<llvm::BitstreamEntry> maybeEntry = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
+  Expected<llvm::BitstreamEntry> maybeEntry =
+      DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
   if (!maybeEntry) {
     // FIXME this drops the error diagnostic on the floor.
     consumeError(maybeEntry.takeError());
@@ -1029,7 +1040,8 @@ GenericSignature *ModuleFile::getGenericSignature(
     return nullptr;
   }
 
-  Expected<unsigned> maybeRecordID = DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
+  Expected<unsigned> maybeRecordID =
+      DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
   if (!maybeRecordID) {
     // FIXME this drops the error on the floor.
     consumeError(maybeRecordID.takeError());
@@ -1118,7 +1130,8 @@ ModuleFile::getGenericSignatureOrEnvironment(
     // own internal tracking.)
     BCOffsetRAII lastRecordOffset(DeclTypeCursor);
 
-    Expected<llvm::BitstreamEntry> maybeEntry = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
+    Expected<llvm::BitstreamEntry> maybeEntry =
+        DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
     if (!maybeEntry) {
       // FIXME this drops the error diagnostic on the floor.
       consumeError(maybeEntry.takeError());
@@ -1129,7 +1142,8 @@ ModuleFile::getGenericSignatureOrEnvironment(
     if (entry.Kind != llvm::BitstreamEntry::Record)
       return result;
 
-    Expected<unsigned> maybeRecordID = DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
+    Expected<unsigned> maybeRecordID =
+        DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
     if (!maybeRecordID) {
       // FIXME this drops the error on the floor.
       consumeError(maybeRecordID.takeError());
@@ -1234,7 +1248,8 @@ SubstitutionMap ModuleFile::getSubstitutionMap(
   DeserializingEntityRAII deserializingEntity(*this);
 
   // Read the substitution map.
-  Expected<llvm::BitstreamEntry> maybeEntry = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
+  Expected<llvm::BitstreamEntry> maybeEntry =
+      DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
   if (!maybeEntry) {
     // FIXME this drops the error diagnostic on the floor.
     consumeError(maybeEntry.takeError());
@@ -1249,7 +1264,8 @@ SubstitutionMap ModuleFile::getSubstitutionMap(
 
   StringRef blobData;
   SmallVector<uint64_t, 8> scratch;
-  Expected<unsigned> maybeRecordID = DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
+  Expected<unsigned> maybeRecordID =
+      DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
   if (!maybeRecordID) {
     // FIXME this drops the error on the floor.
     consumeError(maybeRecordID.takeError());
@@ -1301,7 +1317,8 @@ SubstitutionMap ModuleFile::getSubstitutionMap(
 bool ModuleFile::readDefaultWitnessTable(ProtocolDecl *proto) {
   using namespace decls_block;
 
-  Expected<llvm::BitstreamEntry> maybeEntry = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
+  Expected<llvm::BitstreamEntry> maybeEntry =
+      DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
   if (!maybeEntry) {
     // FIXME this drops the error diagnostic on the floor.
     consumeError(maybeEntry.takeError());
@@ -1313,7 +1330,8 @@ bool ModuleFile::readDefaultWitnessTable(ProtocolDecl *proto) {
 
   SmallVector<uint64_t, 16> witnessIDBuffer;
 
-  Expected<unsigned> maybeKind = DeclTypeCursor.readRecord(entry.ID, witnessIDBuffer);
+  Expected<unsigned> maybeKind =
+      DeclTypeCursor.readRecord(entry.ID, witnessIDBuffer);
   if (!maybeKind) {
     // FIXME this drops the error on the floor.
     consumeError(maybeKind.takeError());
@@ -1468,7 +1486,8 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
   assert(baseModule && "missing dependency");
   PrettyXRefTrace pathTrace(*baseModule);
 
-  Expected<llvm::BitstreamEntry> maybeEntry = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
+  Expected<llvm::BitstreamEntry> maybeEntry =
+      DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
   if (!maybeEntry) {
     // FIXME this drops the error diagnostic on the floor.
     consumeError(maybeEntry.takeError());
@@ -1490,7 +1509,8 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
   // In particular, operator path pieces represent actual operators here, but
   // filters on operator functions when they appear later on.
   scratch.clear();
-  Expected<unsigned> maybeRecordID = DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
+  Expected<unsigned> maybeRecordID =
+      DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
   if (!maybeRecordID) {
     // FIXME this drops the error on the floor.
     consumeError(maybeRecordID.takeError());
@@ -1601,7 +1621,8 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
   auto getXRefDeclNameForError = [&]() -> DeclName {
     DeclName result = pathTrace.getLastName();
     while (--pathLen) {
-      Expected<llvm::BitstreamEntry> maybeEntry = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
+      Expected<llvm::BitstreamEntry> maybeEntry =
+          DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
       if (!maybeEntry) {
         // FIXME this drops the error on the floor.
         consumeError(maybeEntry.takeError());
@@ -1612,7 +1633,8 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
         return Identifier();
 
       scratch.clear();
-      Expected<unsigned> maybeRecordID = DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
+      Expected<unsigned> maybeRecordID =
+          DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
       if (!maybeRecordID) {
         // FIXME this drops the error on the floor.
         consumeError(maybeRecordID.takeError());
@@ -1681,7 +1703,8 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
 
   // For remaining path pieces, filter or drill down into the results we have.
   while (--pathLen) {
-    Expected<llvm::BitstreamEntry> maybeEntry = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
+    Expected<llvm::BitstreamEntry> maybeEntry =
+        DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
     if (!maybeEntry) {
       // FIXME this drops the error diagnostic on the floor.
       consumeError(maybeEntry.takeError());
@@ -1695,7 +1718,8 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
     }
 
     scratch.clear();
-    Expected<unsigned> maybeRecordID = DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
+    Expected<unsigned> maybeRecordID =
+        DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
     if (!maybeRecordID) {
       // FIXME this drops the error on the floor.
       consumeError(maybeRecordID.takeError());
@@ -2126,7 +2150,8 @@ DeclContext *ModuleFile::getLocalDeclContext(DeclContextID DCID) {
   SmallVector<uint64_t, 64> scratch;
   StringRef blobData;
 
-  Expected<unsigned> maybeRecordID = DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
+  Expected<unsigned> maybeRecordID =
+      DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
   if (!maybeRecordID) {
     // FIXME this drops the error on the floor.
     consumeError(maybeRecordID.takeError());
@@ -2235,7 +2260,8 @@ DeclContext *ModuleFile::getDeclContext(DeclContextID DCID) {
   SmallVector<uint64_t, 64> scratch;
   StringRef blobData;
 
-  Expected<unsigned> maybeRecordID = DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
+  Expected<unsigned> maybeRecordID =
+      DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
   if (!maybeRecordID) {
     // FIXME this drops the error on the floor.
     consumeError(maybeRecordID.takeError());
@@ -4270,7 +4296,8 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
       return llvm::Error::success();
     }
 
-    Expected<unsigned> maybeRecordID = MF.DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
+    Expected<unsigned> maybeRecordID =
+        MF.DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
     if (!maybeRecordID) {
       MF.error();
       return maybeRecordID.takeError();
@@ -4591,7 +4618,8 @@ DeclDeserializer::getDeclCheckedImpl() {
 
   SmallVector<uint64_t, 64> scratch;
   StringRef blobData;
-  Expected<unsigned> maybeRecordID = MF.DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
+  Expected<unsigned> maybeRecordID =
+      MF.DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
   if (!maybeRecordID) {
     MF.error();
     return maybeRecordID.takeError();
@@ -4973,7 +5001,8 @@ public:
     // The tuple record itself is empty. Read all trailing elements.
     SmallVector<TupleTypeElt, 8> elements;
     while (true) {
-      Expected<llvm::BitstreamEntry> maybeEntry = MF.DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
+      Expected<llvm::BitstreamEntry> maybeEntry =
+          MF.DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
       if (!maybeEntry) {
         MF.error();
         return maybeEntry.takeError();
@@ -4983,7 +5012,8 @@ public:
         break;
 
       scratch.clear();
-      Expected<unsigned> maybeRecordID = MF.DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
+      Expected<unsigned> maybeRecordID =
+          MF.DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
       if (!maybeRecordID) {
         MF.error();
         return maybeRecordID.takeError();
@@ -5043,7 +5073,8 @@ public:
 
     SmallVector<AnyFunctionType::Param, 8> params;
     while (true) {
-      Expected<llvm::BitstreamEntry> maybeEntry = MF.DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
+      Expected<llvm::BitstreamEntry> maybeEntry =
+          MF.DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
       if (!maybeEntry) {
         MF.error();
         return maybeEntry.takeError();
@@ -5053,7 +5084,8 @@ public:
         break;
 
       scratch.clear();
-      Expected<unsigned> maybeRecordID = MF.DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
+      Expected<unsigned> maybeRecordID =
+          MF.DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
       if (!maybeRecordID) {
         MF.error();
         return maybeRecordID.takeError();
@@ -5657,7 +5689,8 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
 
   SmallVector<uint64_t, 64> scratch;
   StringRef blobData;
-  Expected<unsigned> maybeRecordID = MF.DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
+  Expected<unsigned> maybeRecordID =
+      MF.DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
   if (!maybeRecordID) {
     MF.error();
     return maybeRecordID.takeError();
@@ -5812,7 +5845,8 @@ void ModuleFile::loadAllMembers(Decl *container, uint64_t contextData) {
 
   SmallVector<uint64_t, 16> memberIDBuffer;
 
-  Expected<unsigned> maybeKind = DeclTypeCursor.readRecord(entry.ID, memberIDBuffer);
+  Expected<unsigned> maybeKind =
+      DeclTypeCursor.readRecord(entry.ID, memberIDBuffer);
   if (!maybeKind) {
     // FIXME this drops the error diagnostic on the floor.
     consumeError(maybeKind.takeError());
@@ -6159,7 +6193,8 @@ Optional<StringRef> ModuleFile::maybeReadInlinableBodyText() {
   BCOffsetRAII restoreOffset(DeclTypeCursor);
   StringRef blobData;
 
-  Expected<llvm::BitstreamEntry> maybeNext = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
+  Expected<llvm::BitstreamEntry> maybeNext =
+      DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
   if (!maybeNext) {
     // FIXME this drops the error on the floor.
     consumeError(maybeNext.takeError());
@@ -6169,7 +6204,8 @@ Optional<StringRef> ModuleFile::maybeReadInlinableBodyText() {
   if (next.Kind != llvm::BitstreamEntry::Record)
     return None;
 
-  Expected<unsigned> maybeRecKind = DeclTypeCursor.readRecord(next.ID, scratch, &blobData);
+  Expected<unsigned> maybeRecKind =
+      DeclTypeCursor.readRecord(next.ID, scratch, &blobData);
   if (!maybeRecKind) {
     // FIXME this drops the error diagnostic on the floor.
     consumeError(maybeRecKind.takeError());
@@ -6190,7 +6226,8 @@ Optional<ForeignErrorConvention> ModuleFile::maybeReadForeignErrorConvention() {
 
   BCOffsetRAII restoreOffset(DeclTypeCursor);
 
-  Expected<llvm::BitstreamEntry> maybeNext = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
+  Expected<llvm::BitstreamEntry> maybeNext =
+      DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
   if (!maybeNext) {
     // FIXME this drops the error on the floor.
     consumeError(maybeNext.takeError());

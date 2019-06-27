@@ -43,7 +43,8 @@ static bool checkModuleSignature(llvm::BitstreamCursor &cursor,
   for (unsigned char byte : signature) {
     if (cursor.AtEndOfStream())
       return false;
-    if (Expected<llvm::SimpleBitstreamCursor::word_t> maybeRead = cursor.Read(8)) {
+    if (Expected<llvm::SimpleBitstreamCursor::word_t> maybeRead =
+            cursor.Read(8)) {
       if (maybeRead.get() != byte)
         return false;
     } else {
@@ -122,7 +123,8 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
 
     scratch.clear();
     StringRef blobData;
-    Expected<unsigned> maybeKind = cursor.readRecord(entry.ID, scratch, &blobData);
+    Expected<unsigned> maybeKind =
+        cursor.readRecord(entry.ID, scratch, &blobData);
     if (!maybeKind) {
       // FIXME this drops the error on the floor.
       consumeError(maybeKind.takeError());
@@ -214,7 +216,8 @@ validateControlBlock(llvm::BitstreamCursor &cursor,
 
     scratch.clear();
     StringRef blobData;
-    Expected<unsigned> maybeKind = cursor.readRecord(entry.ID, scratch, &blobData);
+    Expected<unsigned> maybeKind =
+        cursor.readRecord(entry.ID, scratch, &blobData);
     if (!maybeKind) {
       // FIXME this drops the error on the floor.
       consumeError(maybeKind.takeError());
@@ -309,7 +312,8 @@ static bool validateInputBlock(
 
     scratch.clear();
     StringRef blobData;
-    Expected<unsigned> maybeKind = cursor.readRecord(entry.ID, scratch, &blobData);
+    Expected<unsigned> maybeKind =
+        cursor.readRecord(entry.ID, scratch, &blobData);
     if (!maybeKind) {
       // FIXME this drops the error on the floor.
       consumeError(maybeKind.takeError());
@@ -382,7 +386,8 @@ ValidationInfo serialization::validateSerializedAST(
   llvm::BitstreamEntry topLevelEntry;
 
   while (!cursor.AtEndOfStream()) {
-    Expected<llvm::BitstreamEntry> maybeEntry = cursor.advance(AF_DontPopBlockAtEnd);
+    Expected<llvm::BitstreamEntry> maybeEntry =
+        cursor.advance(AF_DontPopBlockAtEnd);
     if (!maybeEntry) {
       // FIXME this drops the error on the floor.
       consumeError(maybeEntry.takeError());
@@ -936,7 +941,8 @@ bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
     case llvm::BitstreamEntry::SubBlock:
       if (entry.ID == DECL_MEMBER_TABLES_BLOCK_ID) {
         DeclMemberTablesCursor = cursor;
-        if (llvm::Error Err = DeclMemberTablesCursor.EnterSubBlock(DECL_MEMBER_TABLES_BLOCK_ID)) {
+        if (llvm::Error Err = DeclMemberTablesCursor.EnterSubBlock(
+                DECL_MEMBER_TABLES_BLOCK_ID)) {
           // FIXME this drops the error on the floor.
           consumeError(std::move(Err));
           return false;
@@ -945,8 +951,9 @@ bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
         do {
           // Scan forward, to load the cursor with any abbrevs we'll need while
           // seeking inside this block later.
-          Expected<llvm::BitstreamEntry> maybeEntry = DeclMemberTablesCursor.advance(
-            llvm::BitstreamCursor::AF_DontPopBlockAtEnd);
+          Expected<llvm::BitstreamEntry> maybeEntry =
+              DeclMemberTablesCursor.advance(
+                  llvm::BitstreamCursor::AF_DontPopBlockAtEnd);
           if (!maybeEntry) {
             // FIXME this drops the error on the floor.
             consumeError(maybeEntry.takeError());
@@ -964,7 +971,8 @@ bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
     case llvm::BitstreamEntry::Record:
       scratch.clear();
       blobData = {};
-      Expected<unsigned> maybeKind = cursor.readRecord(entry.ID, scratch, &blobData);
+      Expected<unsigned> maybeKind =
+          cursor.readRecord(entry.ID, scratch, &blobData);
       if (!maybeKind) {
         // FIXME this drops the error on the floor.
         consumeError(maybeKind.takeError());
@@ -1193,7 +1201,8 @@ bool ModuleFile::readCommentBlock(llvm::BitstreamCursor &cursor) {
 
     case llvm::BitstreamEntry::Record:
       scratch.clear();
-      Expected<unsigned> maybeKind = cursor.readRecord(entry.ID, scratch, &blobData);
+      Expected<unsigned> maybeKind =
+          cursor.readRecord(entry.ID, scratch, &blobData);
       if (!maybeKind) {
         // FIXME this drops the error on the floor.
         consumeError(maybeKind.takeError());
@@ -1314,7 +1323,8 @@ bool ModuleFile::readModuleDocIfPresent() {
   ValidationInfo info;
 
   while (!docCursor.AtEndOfStream()) {
-    Expected<llvm::BitstreamEntry> maybeEntry = docCursor.advance(AF_DontPopBlockAtEnd);
+    Expected<llvm::BitstreamEntry> maybeEntry =
+        docCursor.advance(AF_DontPopBlockAtEnd);
     if (!maybeEntry) {
       // FIXME this drops the error on the floor.
       consumeError(maybeEntry.takeError());
@@ -1395,7 +1405,8 @@ ModuleFile::ModuleFile(
   llvm::BitstreamEntry topLevelEntry;
 
   while (!cursor.AtEndOfStream()) {
-    Expected<llvm::BitstreamEntry> maybeEntry = cursor.advance(AF_DontPopBlockAtEnd);
+    Expected<llvm::BitstreamEntry> maybeEntry =
+        cursor.advance(AF_DontPopBlockAtEnd);
     if (!maybeEntry) {
       // FIXME this drops the error diagnostic on the floor.
       consumeError(maybeEntry.takeError());
@@ -1456,7 +1467,8 @@ ModuleFile::ModuleFile(
       while (next.Kind == llvm::BitstreamEntry::Record) {
         scratch.clear();
         StringRef blobData;
-        Expected<unsigned> maybeKind = cursor.readRecord(next.ID, scratch, &blobData);
+        Expected<unsigned> maybeKind =
+            cursor.readRecord(next.ID, scratch, &blobData);
         if (!maybeKind) {
           // FIXME this drops the error on the floor.
           consumeError(maybeKind.takeError());
@@ -1551,7 +1563,8 @@ ModuleFile::ModuleFile(
       // The decls-and-types block is lazily loaded. Save the cursor and load
       // any abbrev records at the start of the block.
       DeclTypeCursor = cursor;
-      if (llvm::Error Err = DeclTypeCursor.EnterSubBlock(DECLS_AND_TYPES_BLOCK_ID)) {
+      if (llvm::Error Err =
+              DeclTypeCursor.EnterSubBlock(DECLS_AND_TYPES_BLOCK_ID)) {
         // FIXME this drops the error on the floor.
         consumeError(std::move(Err));
         error();
@@ -1589,7 +1602,8 @@ ModuleFile::ModuleFile(
         return;
       }
 
-      Expected<llvm::BitstreamEntry> maybeNext = cursor.advanceSkippingSubblocks();
+      Expected<llvm::BitstreamEntry> maybeNext =
+          cursor.advanceSkippingSubblocks();
       if (!maybeNext) {
         // FIXME this drops the error on the floor.
         consumeError(maybeNext.takeError());
@@ -1600,7 +1614,8 @@ ModuleFile::ModuleFile(
       while (next.Kind == llvm::BitstreamEntry::Record) {
         scratch.clear();
         StringRef blobData;
-        Expected<unsigned> maybeKind = cursor.readRecord(next.ID, scratch, &blobData);
+        Expected<unsigned> maybeKind =
+            cursor.readRecord(next.ID, scratch, &blobData);
         if (!maybeKind) {
           // FIXME this drops the error on the floor.
           consumeError(maybeKind.takeError());
@@ -2221,7 +2236,8 @@ ModuleFile::loadNamedMembers(const IterableDeclContext *IDC, DeclBaseName N,
       error();
       return None;
     }
-    Expected<llvm::BitstreamEntry> maybeEntry = DeclMemberTablesCursor.advance();
+    Expected<llvm::BitstreamEntry> maybeEntry =
+        DeclMemberTablesCursor.advance();
     if (!maybeEntry) {
       // FIXME this drops the error on the floor.
       consumeError(maybeEntry.takeError());
@@ -2235,7 +2251,8 @@ ModuleFile::loadNamedMembers(const IterableDeclContext *IDC, DeclBaseName N,
     }
     SmallVector<uint64_t, 64> scratch;
     StringRef blobData;
-    Expected<unsigned> maybeKind = DeclMemberTablesCursor.readRecord(entry.ID, scratch, &blobData);
+    Expected<unsigned> maybeKind =
+        DeclMemberTablesCursor.readRecord(entry.ID, scratch, &blobData);
     if (!maybeKind) {
       // FIXME this drops the error on the floor.
       consumeError(maybeKind.takeError());

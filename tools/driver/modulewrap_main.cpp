@@ -150,7 +150,8 @@ int modulewrap_main(ArrayRef<const char *> Args, const char *Argv0,
   for (unsigned char Byte : serialization::SWIFTMODULE_SIGNATURE)
     if (Cursor.AtEndOfStream()) {
       Instance.getDiags().diagnose(SourceLoc(), diag::error_parse_input_file,
-                                   Filename, "signature mismatch, end of stream");
+                                   Filename,
+                                   "signature mismatch, end of stream");
       return 1;
     } else if (llvm::Expected<unsigned> MaybeRead = Cursor.Read(8)) {
       if (MaybeRead.get() != Byte) {

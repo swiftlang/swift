@@ -167,7 +167,8 @@ SILDeserializer::SILDeserializer(
     SmallVector<uint64_t, 4> scratch;
     StringRef blobData;
     unsigned prevKind = kind;
-    llvm::Expected<unsigned> maybeKind = cursor.readRecord(next.ID, scratch, &blobData);
+    llvm::Expected<unsigned> maybeKind =
+        cursor.readRecord(next.ID, scratch, &blobData);
     if (!maybeKind) {
       // FIXME this drops the error on the floor.
       consumeError(maybeKind.takeError());
@@ -480,7 +481,8 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   if (llvm::Error Err = SILCursor.JumpToBit(cacheEntry.getOffset()))
     return std::move(Err);
 
-  llvm::Expected<llvm::BitstreamEntry> maybeEntry = SILCursor.advance(AF_DontPopBlockAtEnd);
+  llvm::Expected<llvm::BitstreamEntry> maybeEntry =
+      SILCursor.advance(AF_DontPopBlockAtEnd);
   if (!maybeEntry)
     return maybeEntry.takeError();
   llvm::BitstreamEntry entry = maybeEntry.get();
@@ -492,9 +494,11 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
 
   SmallVector<uint64_t, 64> scratch;
   StringRef blobData;
-  llvm::Expected<unsigned> maybeKind = SILCursor.readRecord(entry.ID, scratch, &blobData);
+  llvm::Expected<unsigned> maybeKind =
+      SILCursor.readRecord(entry.ID, scratch, &blobData);
   if (!maybeKind) {
-    LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in readSILFunction: " << toString(maybeKind.takeError()) << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in readSILFunction: "
+                            << toString(maybeKind.takeError()) << "\n");
     MF->error();
     return nullptr;
   }
@@ -654,7 +658,8 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
 
   // Read and instantiate the specialize attributes.
   while (numSpecAttrs--) {
-    llvm::Expected<llvm::BitstreamEntry> maybeNext = SILCursor.advance(AF_DontPopBlockAtEnd);
+    llvm::Expected<llvm::BitstreamEntry> maybeNext =
+        SILCursor.advance(AF_DontPopBlockAtEnd);
     if (!maybeNext)
       return maybeNext.takeError();
     llvm::BitstreamEntry next = maybeNext.get();
@@ -785,7 +790,8 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
 
     // Fetch the next record.
     scratch.clear();
-    llvm::Expected<llvm::BitstreamEntry> maybeEntry = SILCursor.advance(AF_DontPopBlockAtEnd);
+    llvm::Expected<llvm::BitstreamEntry> maybeEntry =
+        SILCursor.advance(AF_DontPopBlockAtEnd);
     if (!maybeEntry)
       return maybeEntry.takeError();
     llvm::BitstreamEntry entry = maybeEntry.get();
@@ -2562,14 +2568,17 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
 
   BCOffsetRAII restoreOffset(SILCursor);
   if (llvm::Error Err = SILCursor.JumpToBit(cacheEntry.getOffset())) {
-    LLVM_DEBUG(llvm::dbgs() << "Cursor jump error in hasSILFunction: " << toString(std::move(Err)) << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Cursor jump error in hasSILFunction: "
+                            << toString(std::move(Err)) << "\n");
     MF->error();
     return false;
   }
 
-  llvm::Expected<llvm::BitstreamEntry> maybeEntry = SILCursor.advance(AF_DontPopBlockAtEnd);
+  llvm::Expected<llvm::BitstreamEntry> maybeEntry =
+      SILCursor.advance(AF_DontPopBlockAtEnd);
   if (!maybeEntry) {
-    LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in hasSILFunction: " << toString(maybeEntry.takeError()) << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in hasSILFunction: "
+                            << toString(maybeEntry.takeError()) << "\n");
     MF->error();
     return false;
   }
@@ -2582,9 +2591,11 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
 
   SmallVector<uint64_t, 64> scratch;
   StringRef blobData;
-  llvm::Expected<unsigned> maybeKind = SILCursor.readRecord(entry.ID, scratch, &blobData);
+  llvm::Expected<unsigned> maybeKind =
+      SILCursor.readRecord(entry.ID, scratch, &blobData);
   if (!maybeKind) {
-    LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in hasSILFunction: " << toString(maybeKind.takeError()) << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in hasSILFunction: "
+                            << toString(maybeKind.takeError()) << "\n");
     MF->error();
     return false;
   }
@@ -2675,13 +2686,16 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name) {
 
   BCOffsetRAII restoreOffset(SILCursor);
   if (llvm::Error Err = SILCursor.JumpToBit(globalVarOrOffset)) {
-    LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in hasSILFunction: " << toString(std::move(Err)) << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in hasSILFunction: "
+                            << toString(std::move(Err)) << "\n");
     MF->error();
     return nullptr;
   }
-  llvm::Expected<llvm::BitstreamEntry> maybeEntry = SILCursor.advance(AF_DontPopBlockAtEnd);
+  llvm::Expected<llvm::BitstreamEntry> maybeEntry =
+      SILCursor.advance(AF_DontPopBlockAtEnd);
   if (!maybeEntry) {
-    LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in hasSILFunction: " << toString(maybeEntry.takeError()) << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in hasSILFunction: "
+                            << toString(maybeEntry.takeError()) << "\n");
     MF->error();
     return nullptr;
   }
@@ -2693,9 +2707,11 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name) {
 
   SmallVector<uint64_t, 64> scratch;
   StringRef blobData;
-  llvm::Expected<unsigned> maybeKind = SILCursor.readRecord(entry.ID, scratch, &blobData);
+  llvm::Expected<unsigned> maybeKind =
+      SILCursor.readRecord(entry.ID, scratch, &blobData);
   if (!maybeKind) {
-    LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in readGlobalVar: " << toString(maybeKind.takeError()) << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in readGlobalVar: "
+                            << toString(maybeKind.takeError()) << "\n");
     MF->error();
     return nullptr;
   }
@@ -2779,13 +2795,16 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
 
   BCOffsetRAII restoreOffset(SILCursor);
   if (llvm::Error Err = SILCursor.JumpToBit(vTableOrOffset)) {
-    LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in readVTable: " << toString(std::move(Err)) << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in readVTable: "
+                            << toString(std::move(Err)) << "\n");
     MF->error();
     return nullptr;
   }
-  llvm::Expected<llvm::BitstreamEntry> maybeEntry = SILCursor.advance(AF_DontPopBlockAtEnd);
+  llvm::Expected<llvm::BitstreamEntry> maybeEntry =
+      SILCursor.advance(AF_DontPopBlockAtEnd);
   if (!maybeEntry) {
-    LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in readVTable: " << toString(maybeEntry.takeError()) << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in readVTable: "
+                            << toString(maybeEntry.takeError()) << "\n");
     MF->error();
     return nullptr;
   }
@@ -2797,9 +2816,11 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
 
   SmallVector<uint64_t, 64> scratch;
   StringRef blobData;
-  llvm::Expected<unsigned> maybeKind = SILCursor.readRecord(entry.ID, scratch, &blobData);
+  llvm::Expected<unsigned> maybeKind =
+      SILCursor.readRecord(entry.ID, scratch, &blobData);
   if (!maybeKind) {
-    LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in readVTable: " << toString(maybeKind.takeError()) << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in readVTable: "
+                            << toString(maybeKind.takeError()) << "\n");
     MF->error();
     return nullptr;
   }
@@ -2823,7 +2844,8 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
   scratch.clear();
   maybeEntry = SILCursor.advance(AF_DontPopBlockAtEnd);
   if (!maybeEntry) {
-    LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in readVTable: " << toString(maybeEntry.takeError()) << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in readVTable: "
+                            << toString(maybeEntry.takeError()) << "\n");
     MF->error();
     return nullptr;
   }
@@ -2833,7 +2855,8 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
     return nullptr;
   maybeKind = SILCursor.readRecord(entry.ID, scratch);
   if (!maybeKind) {
-    LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in readVTable: " << toString(maybeKind.takeError()) << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in readVTable: "
+                            << toString(maybeKind.takeError()) << "\n");
     MF->error();
     return nullptr;
   }
@@ -2865,7 +2888,8 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
     scratch.clear();
     maybeEntry = SILCursor.advance(AF_DontPopBlockAtEnd);
     if (!maybeEntry) {
-      LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in readVTable: " << toString(maybeEntry.takeError()) << "\n");
+      LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in readVTable: "
+                              << toString(maybeEntry.takeError()) << "\n");
       MF->error();
       return nullptr;
     }
@@ -2875,7 +2899,8 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
       break;
     maybeKind = SILCursor.readRecord(entry.ID, scratch);
     if (!maybeKind) {
-      LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in readVTable: " << toString(maybeKind.takeError()) << "\n");
+      LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in readVTable: "
+                              << toString(maybeKind.takeError()) << "\n");
       MF->error();
       return nullptr;
     }
@@ -2926,13 +2951,16 @@ SILProperty *SILDeserializer::readProperty(DeclID PId) {
 
   BCOffsetRAII restoreOffset(SILCursor);
   if (llvm::Error Err = SILCursor.JumpToBit(propOrOffset.getOffset())) {
-    LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in readProperty: " << toString(std::move(Err)) << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in readProperty: "
+                            << toString(std::move(Err)) << "\n");
     MF->error();
     return nullptr;
   }
-  llvm::Expected<llvm::BitstreamEntry> maybeEntry = SILCursor.advance(AF_DontPopBlockAtEnd);
+  llvm::Expected<llvm::BitstreamEntry> maybeEntry =
+      SILCursor.advance(AF_DontPopBlockAtEnd);
   if (!maybeEntry) {
-    LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in readProperty: " << toString(maybeEntry.takeError()) << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in readProperty: "
+                            << toString(maybeEntry.takeError()) << "\n");
     MF->error();
     return nullptr;
   }
@@ -2944,9 +2972,11 @@ SILProperty *SILDeserializer::readProperty(DeclID PId) {
 
   SmallVector<uint64_t, 64> scratch;
   StringRef blobData;
-  llvm::Expected<unsigned> maybeKind = SILCursor.readRecord(entry.ID, scratch, &blobData);
+  llvm::Expected<unsigned> maybeKind =
+      SILCursor.readRecord(entry.ID, scratch, &blobData);
   if (!maybeKind) {
-    LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in readProperty: " << toString(maybeKind.takeError()) << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in readProperty: "
+                            << toString(maybeKind.takeError()) << "\n");
     return nullptr;
   }
   unsigned kind = maybeKind.get();
@@ -2981,7 +3011,9 @@ void SILDeserializer::readWitnessTableEntries(
   SmallVector<uint64_t, 64> scratch;
   llvm::Expected<unsigned> maybeKind = SILCursor.readRecord(entry.ID, scratch);
   if (!maybeKind) {
-    LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in readWitnessTableEntries: " << toString(maybeKind.takeError()) << "\n");
+    LLVM_DEBUG(llvm::dbgs()
+               << "Cursor advance error in readWitnessTableEntries: "
+               << toString(maybeKind.takeError()) << "\n");
     MF->error();
     return;
   }
@@ -3047,9 +3079,12 @@ void SILDeserializer::readWitnessTableEntries(
 
     // Fetch the next record.
     scratch.clear();
-    llvm::Expected<llvm::BitstreamEntry> maybeEntry = SILCursor.advance(AF_DontPopBlockAtEnd);
+    llvm::Expected<llvm::BitstreamEntry> maybeEntry =
+        SILCursor.advance(AF_DontPopBlockAtEnd);
     if (!maybeEntry) {
-      LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in readWitnessTableEntries: " << toString(maybeEntry.takeError()) << "\n");
+      LLVM_DEBUG(llvm::dbgs()
+                 << "Cursor advance error in readWitnessTableEntries: "
+                 << toString(maybeEntry.takeError()) << "\n");
       MF->error();
       return;
     }
@@ -3059,7 +3094,9 @@ void SILDeserializer::readWitnessTableEntries(
       break;
     maybeKind = SILCursor.readRecord(entry.ID, scratch);
     if (!maybeKind) {
-      LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in readWitnessTableEntries: " << toString(maybeKind.takeError()) << "\n");
+      LLVM_DEBUG(llvm::dbgs()
+                 << "Cursor advance error in readWitnessTableEntries: "
+                 << toString(maybeKind.takeError()) << "\n");
       MF->error();
       return;
     }
@@ -3080,13 +3117,16 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
 
   BCOffsetRAII restoreOffset(SILCursor);
   if (llvm::Error Err = SILCursor.JumpToBit(wTableOrOffset.getOffset())) {
-    LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in readWitnessTable: " << toString(std::move(Err)) << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in readWitnessTable: "
+                            << toString(std::move(Err)) << "\n");
     MF->error();
     return nullptr;
   }
-  llvm::Expected<llvm::BitstreamEntry> maybeEntry = SILCursor.advance(AF_DontPopBlockAtEnd);
+  llvm::Expected<llvm::BitstreamEntry> maybeEntry =
+      SILCursor.advance(AF_DontPopBlockAtEnd);
   if (!maybeEntry) {
-    LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in readWitnessTable: " << toString(maybeEntry.takeError()) << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in readWitnessTable: "
+                            << toString(maybeEntry.takeError()) << "\n");
     MF->error();
     return nullptr;
   }
@@ -3098,9 +3138,11 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
 
   SmallVector<uint64_t, 64> scratch;
   StringRef blobData;
-  llvm::Expected<unsigned> maybeKind = SILCursor.readRecord(entry.ID, scratch, &blobData);
+  llvm::Expected<unsigned> maybeKind =
+      SILCursor.readRecord(entry.ID, scratch, &blobData);
   if (!maybeKind) {
-    LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in readWitnessTable: " << toString(maybeKind.takeError()) << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in readWitnessTable: "
+                            << toString(maybeKind.takeError()) << "\n");
     return nullptr;
   }
   unsigned kind = maybeKind.get();
@@ -3174,7 +3216,8 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
   scratch.clear();
   maybeEntry = SILCursor.advance(AF_DontPopBlockAtEnd);
   if (!maybeEntry) {
-    LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in readWitnessTable: " << toString(maybeEntry.takeError()) << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in readWitnessTable: "
+                            << toString(maybeEntry.takeError()) << "\n");
     MF->error();
     return nullptr;
   }
@@ -3246,13 +3289,18 @@ readDefaultWitnessTable(DeclID WId, SILDefaultWitnessTable *existingWt) {
 
   BCOffsetRAII restoreOffset(SILCursor);
   if (llvm::Error Err = SILCursor.JumpToBit(wTableOrOffset.getOffset())) {
-    LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in readDefaultWitnessTable: " << toString(std::move(Err)) << "\n");
+    LLVM_DEBUG(llvm::dbgs()
+               << "Cursor advance error in readDefaultWitnessTable: "
+               << toString(std::move(Err)) << "\n");
     MF->error();
     return nullptr;
   }
-  llvm::Expected<llvm::BitstreamEntry> maybeEntry = SILCursor.advance(AF_DontPopBlockAtEnd);
+  llvm::Expected<llvm::BitstreamEntry> maybeEntry =
+      SILCursor.advance(AF_DontPopBlockAtEnd);
   if (!maybeEntry) {
-    LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in readDefaultWitnessTable: " << toString(maybeEntry.takeError()) << "\n");
+    LLVM_DEBUG(llvm::dbgs()
+               << "Cursor advance error in readDefaultWitnessTable: "
+               << toString(maybeEntry.takeError()) << "\n");
     return nullptr;
   }
   llvm::BitstreamEntry entry = maybeEntry.get();
@@ -3264,9 +3312,12 @@ readDefaultWitnessTable(DeclID WId, SILDefaultWitnessTable *existingWt) {
 
   SmallVector<uint64_t, 64> scratch;
   StringRef blobData;
-  llvm::Expected<unsigned> maybeKind = SILCursor.readRecord(entry.ID, scratch, &blobData);
+  llvm::Expected<unsigned> maybeKind =
+      SILCursor.readRecord(entry.ID, scratch, &blobData);
   if (!maybeKind) {
-    LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in readDefaultWitnessTable: " << toString(maybeKind.takeError()) << "\n");
+    LLVM_DEBUG(llvm::dbgs()
+               << "Cursor advance error in readDefaultWitnessTable: "
+               << toString(maybeKind.takeError()) << "\n");
     return nullptr;
   }
   unsigned kind = maybeKind.get();
@@ -3321,7 +3372,9 @@ readDefaultWitnessTable(DeclID WId, SILDefaultWitnessTable *existingWt) {
   scratch.clear();
   maybeEntry = SILCursor.advance(AF_DontPopBlockAtEnd);
   if (!maybeEntry) {
-    LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in readDefaultWitnessTable: " << toString(maybeEntry.takeError()) << "\n");
+    LLVM_DEBUG(llvm::dbgs()
+               << "Cursor advance error in readDefaultWitnessTable: "
+               << toString(maybeEntry.takeError()) << "\n");
     return nullptr;
   }
   entry = maybeEntry.get();

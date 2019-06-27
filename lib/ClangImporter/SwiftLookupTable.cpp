@@ -1479,7 +1479,7 @@ SwiftLookupTableReader::create(clang::ModuleFileExtension *extension,
       // API notes format.
       if (cursor.SkipBlock())
         return nullptr;
-      
+
       maybeNext = cursor.advance();
       if (!maybeNext) {
         // FIXME this drops the error on the floor.
@@ -1492,7 +1492,8 @@ SwiftLookupTableReader::create(clang::ModuleFileExtension *extension,
 
     scratch.clear();
     StringRef blobData;
-    llvm::Expected<unsigned> maybeKind = cursor.readRecord(next.ID, scratch, &blobData);
+    llvm::Expected<unsigned> maybeKind =
+        cursor.readRecord(next.ID, scratch, &blobData);
     if (!maybeKind) {
       // FIXME this drops the error on the floor.
       consumeError(maybeNext.takeError());
