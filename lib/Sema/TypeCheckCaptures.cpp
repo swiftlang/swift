@@ -272,6 +272,10 @@ public:
         return { false, DRE };
     }
 
+    // Don't "capture" type definitions at all.
+    if (isa<TypeDecl>(D))
+      return { false, DRE };
+
     // Only capture var decls at global scope.  Other things can be captured
     // if they are local.
     if (!isa<VarDecl>(D) && !DC->isLocalContext())
