@@ -826,8 +826,17 @@ GenericSignature *GenericContext::getGenericSignature() const {
 
   // The signature of a Protocol is trivial (Self: TheProtocol) so let's compute
   // it.
-  if (auto PD = dyn_cast<ProtocolDecl>(this))
-    return getGenericEnvironment()->getGenericSignature();
+  if (auto PD = dyn_cast<ProtocolDecl>(this)) {
+    const_cast<ProtocolDecl *>(PD)->createGenericParamsIfMissing();
+    auto self = PD->getSelfInterfaceType()->castTo<GenericTypeParamType>();
+    auto req =
+        Requirement(RequirementKind::Conformance, self, PD->getDeclaredType());
+    auto *genericSig = GenericSignature::get({self}, {req});
+
+    // Save it for next time.
+    const_cast<GenericContext *>(this)->GenericSigOrEnv = genericSig;
+    return genericSig;
+  }
 
   return nullptr;
 }
@@ -838,23 +847,8 @@ GenericEnvironment *GenericContext::getGenericEnvironment() const {
     return genericEnv;
 
   // If we only have a generic signature, build the generic environment.
-  if (GenericSigOrEnv.dyn_cast<GenericSignature *>())
+  if (GenericSigOrEnv.dyn_cast<GenericSignature *>() || isa<ProtocolDecl>(this))
     return getLazyGenericEnvironmentSlow();
-
-  // The signature of a Protocol is trivial (Self: TheProtocol) so let's compute
-  // it.
-  if (auto PD = dyn_cast<ProtocolDecl>(this)) {
-    const_cast<ProtocolDecl *>(PD)->createGenericParamsIfMissing();
-    auto self = PD->getSelfInterfaceType()->castTo<GenericTypeParamType>();
-    auto req =
-        Requirement(RequirementKind::Conformance, self, PD->getDeclaredType());
-    auto *genericSig = GenericSignature::get({self}, {req});
-
-    // Save it for next time.
-    const_cast<GenericContext *>(this)
-      ->setGenericEnvironment(genericSig->createGenericEnvironment());
-    return getGenericEnvironment();
-  }
 
   return nullptr;
 }
@@ -876,7 +870,15 @@ void GenericContext::setGenericEnvironment(GenericEnvironment *genericEnv) {
 GenericEnvironment *
 GenericContext::getLazyGenericEnvironmentSlow() const {
   assert(GenericSigOrEnv.is<GenericSignature *>() &&
-         "not a lazily deserialized generic environment");
+         "not a lazily computed generic environment");
+
+  if (auto PD = dyn_cast<ProtocolDecl>(this)) {
+    // The signature of a Protocol is trivial (Self: TheProtocol) so let's
+    // compute it directly.
+    auto *genericEnv = getGenericSignature()->createGenericEnvironment();
+    const_cast<GenericContext *>(this)->setGenericEnvironment(genericEnv);
+    return genericEnv;
+  }
 
   auto contextData = getASTContext().getOrCreateLazyGenericContextData(
     this, nullptr);
