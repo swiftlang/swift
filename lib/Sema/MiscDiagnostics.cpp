@@ -4019,6 +4019,11 @@ void swift::fixItAccess(InFlightDiagnostic &diag, ValueDecl *VD,
       attr->setInvalid();
     }
 
+  } else if (auto *override = VD->getAttrs().getAttribute<OverrideAttr>()) {
+    // Insert the access in front of 'override', if it exists, in order to
+    // match the same keyword order as produced by method autocompletion.
+    diag.fixItInsert(override->getLocation(), fixItString);
+
   } else if (auto var = dyn_cast<VarDecl>(VD)) {
     if (auto PBD = var->getParentPatternBinding())
       diag.fixItInsert(PBD->getStartLoc(), fixItString);
