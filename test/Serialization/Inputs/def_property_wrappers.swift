@@ -1,9 +1,17 @@
+public struct OtherWrapper<T> {
+  var value: T
+}
+
 @propertyWrapper
 public struct SomeWrapper<T> {
-  public var value: T
+  public var wrappedValue: T
 
   public init(initialValue: T) {
-    self.value = initialValue
+    self.wrappedValue = initialValue
+  }
+
+  public var projectedValue: OtherWrapper<T> {
+    OtherWrapper(value: wrappedValue)
   }
 }
 

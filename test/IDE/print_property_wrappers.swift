@@ -36,7 +36,7 @@ func foo() -> Int { return 17 }
 struct HasWrappers {
   // CHECK: @Wrapper var x: Int {
   // CHECK-NEXT:  get
-  // CHECK: var $x: Wrapper<Int>
+  // CHECK: var _x: Wrapper<Int>
   @Wrapper(closure: foo)
   var x: Int
 

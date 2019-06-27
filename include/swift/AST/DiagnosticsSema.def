@@ -998,7 +998,7 @@ ERROR(missing_address_of_yield,none,
       "yielding mutable value of type %0 requires explicit '&'",
       (Type))
 ERROR(extraneous_property_wrapper_unwrap,none,
-      "property %0 will be unwrapped to value of type %1, use '$' to refer to "
+      "property %0 will be unwrapped to value of type %1, use '_' to refer to "
       "wrapper type %2",
       (DeclName, Type, Type))
 ERROR(extraneous_address_of,none,
@@ -4506,10 +4506,15 @@ ERROR(property_wrapper_type_not_usable_from_inline,none,
       (bool, bool))
 WARNING(property_wrapper_delegateValue,none,
         "property wrapper's `delegateValue` property should be renamed to "
-        "'wrapperValue'; use of 'delegateValue' is deprecated", ())
+        "'projectedValue'; use of 'delegateValue' is deprecated", ())
+WARNING(property_wrapper_wrapperValue,none,
+        "property wrapper's `wrapperValue` property should be renamed to "
+        "'projectedValue'; use of 'wrapperValue' is deprecated", ())
 WARNING(property_wrapper_value,none,
         "property wrapper's `value` property should be renamed to "
         "'wrappedValue'; use of 'value' is deprecated", ())
+ERROR(property_wrapper_projection_value_missing,none,
+      "could not find projection value property %0", (Identifier))
 
 //------------------------------------------------------------------------------
 // MARK: function builder diagnostics
