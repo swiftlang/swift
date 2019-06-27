@@ -4798,18 +4798,19 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       return SolutionKind::Solved;
     }
 
-    auto solveWithNewBaseOrName = [&](Type baseType,
-                                      DeclName memberName) -> SolutionKind {
+    auto solveWithNewBaseOrName = [&](Type baseType, DeclName memberName,
+                                      bool allowFixes = true) -> SolutionKind {
       // Let's re-enable fixes for this member, because
       // the base or member name has been changed.
-      MissingMembers.remove(locator);
+      if (allowFixes)
+        MissingMembers.remove(locator);
       return simplifyMemberConstraint(kind, baseType, memberName, memberTy,
                                       useDC, functionRefKind, outerAlternatives,
                                       flags, locatorB);
     };
 
     // Check if any property wrappers on the base of the member lookup have
-    // mactching members that we can fall back to, or if the type wraps any
+    // matching members that we can fall back to, or if the type wraps any
     // properties that have matching members.
     if (auto dotExpr =
             dyn_cast_or_null<UnresolvedDotExpr>(locator->getAnchor())) {
@@ -4817,38 +4818,42 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       auto resolvedOverload = findSelectedOverloadFor(baseExpr);
 
       if (resolvedOverload) {
-        auto wrapper = getStorageWrapperInformation(resolvedOverload);
-        if (!wrapper)
-          wrapper = getPropertyWrapperInformation(resolvedOverload);
-        if (wrapper) {
-          auto wrapperTy = wrapper->second;
-          auto result = solveWithNewBaseOrName(wrapperTy, member);
+        if (auto storageWrapper =
+                getStorageWrapperInformation(resolvedOverload)) {
+          auto wrapperTy = storageWrapper->second;
+          auto result =
+              solveWithNewBaseOrName(wrapperTy, member, /*allowFixes=*/false);
           if (result == SolutionKind::Solved) {
-            auto *fix = UsePropertyWrapperType::create(
-                *this, member, baseTy, wrapperTy,
-                /*isMemberAccess=*/true, locator);
+            auto *fix = UsePropertyWrapper::create(
+                *this, storageWrapper->first, member,
+                /*usingStorageWrapper=*/true, baseTy, wrapperTy, locator);
             return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
           }
         }
 
-        if (auto wrappedProperty = getWrappedPropertyInformation(
-                resolvedOverload, baseTy, useDC)) {
+        if (auto wrapper = getPropertyWrapperInformation(resolvedOverload)) {
+          auto wrapperTy = wrapper->second;
+          auto result =
+              solveWithNewBaseOrName(wrapperTy, member, /*allowFixes=*/false);
+          if (result == SolutionKind::Solved) {
+            auto *fix = UsePropertyWrapper::create(
+                *this, wrapper->first, member,
+                /*usingStorageWrappeer=*/false, baseTy, wrapperTy,
+                locator);
+            return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+          }
+        }
+
+        if (auto wrappedProperty =
+                getWrappedPropertyInformation(resolvedOverload)) {
           auto wrappedTy = wrappedProperty->second;
-          auto result = solveWithNewBaseOrName(wrappedTy, member);
+          auto result =
+              solveWithNewBaseOrName(wrappedTy, member, /*allowFixes=*/false);
 
           if (result == SolutionKind::Solved) {
-            auto name = wrappedProperty->first->getName();
-
-            bool fromStorageWrapper = true;
-            if (!name.empty()) {
-              auto nameStr = name.str();
-              assert(!nameStr.empty() && nameStr[0] == '$');
-              fromStorageWrapper = nameStr.size() >= 2 && nameStr[1] != '$';
-            }
-
-            auto *fix = UseWrappedPropertyType::create(
-                *this, member, baseTy, wrappedTy, /*isMemberAccess=*/true,
-                fromStorageWrapper, locator);
+            auto *fix =
+                UseWrappedValue::create(*this, wrappedProperty->first, member,
+                                        baseTy, wrappedTy, locator);
             return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
           }
         }
@@ -6825,8 +6830,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::TreatKeyPathSubscriptIndexAsHashable:
   case FixKind::AllowInvalidRefInKeyPath:
   case FixKind::ExplicitlySpecifyGenericArguments:
-  case FixKind::UsePropertyWrapperType:
-  case FixKind::UseWrappedPropertyType:
+  case FixKind::UsePropertyWrapper:
+  case FixKind::UseWrappedValue:
   case FixKind::GenericArgumentsMismatch:
     llvm_unreachable("handled elsewhere");
   }
