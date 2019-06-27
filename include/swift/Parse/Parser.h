@@ -996,8 +996,6 @@ public:
                StaticSpellingKind StaticSpelling,
                SourceLoc TryLoc);
 
-  void consumeGetSetBody(AbstractFunctionDecl *AFD, SourceLoc LBLoc);
-
   struct ParsedAccessors;
   ParserStatus parseGetSet(ParseDeclOptions Flags,
                            GenericParamList *GenericParams,
@@ -1006,9 +1004,6 @@ public:
                            ParsedAccessors &accessors,
                            AbstractStorageDecl *storage,
                            SourceLoc StaticLoc);
-  void recordAccessors(AbstractStorageDecl *storage, ParseDeclOptions flags,
-                       TypeLoc elementTy, const DeclAttributes &attrs,
-                       SourceLoc staticLoc, ParsedAccessors &accessors);
   ParserResult<VarDecl> parseDeclVarGetSet(Pattern *pattern,
                                            ParseDeclOptions Flags,
                                            SourceLoc StaticLoc,
@@ -1324,9 +1319,7 @@ public:
   ParserResult<Expr> parseExprKeyPath();
   ParserResult<Expr> parseExprSelector();
   ParserResult<Expr> parseExprSuper();
-  ParserResult<Expr> parseExprConfiguration();
   ParserResult<Expr> parseExprStringLiteral();
-  ParserResult<Expr> parseExprTypeOf();
 
   StringRef copyAndStripUnderscores(StringRef text);
 
@@ -1424,10 +1417,6 @@ public:
 
   ParserResult<Expr> parseTrailingClosure(SourceRange calleeRange);
 
-  // NOTE: used only for legacy support for old object literal syntax.
-  // Will be removed in the future.
-  bool isCollectionLiteralStartingWithLSquareLit();
-
   /// Parse an object literal.
   ///
   /// \param LK The literal kind as determined by the first token.
@@ -1437,7 +1426,6 @@ public:
                                          bool isExprBasic);
   ParserResult<Expr> parseExprCollection();
   ParserResult<Expr> parseExprCollectionElement(Optional<bool> &isDictionary);
-  ParserResult<Expr> parseExprPoundAssert();
   ParserResult<Expr> parseExprPoundUnknown(SourceLoc LSquareLoc);
   ParserResult<Expr>
   parseExprPoundCodeCompletion(Optional<StmtKind> ParentKind);
