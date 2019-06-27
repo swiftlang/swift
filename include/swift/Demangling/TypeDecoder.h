@@ -792,9 +792,11 @@ class TypeDecoder {
         return BuiltType();
       auto ordinal = ordinalNode->getIndex();
 
-      std::vector<BuiltType> genericArgs;
+      std::vector<BuiltType> genericArgsBuf;
+      std::vector<unsigned> genericArgsLevels;
       auto boundGenerics = Node->getChild(2);
       for (unsigned i = 0; i < boundGenerics->getNumChildren(); ++i) {
+        genericArgsLevels.push_back(genericArgsBuf.size());
         auto genericsNode = boundGenerics->getChild(i);
         if (genericsNode->getKind() != NodeKind::TypeList)
           break;
@@ -802,8 +804,15 @@ class TypeDecoder {
           auto arg = decodeMangledType(argNode);
           if (!arg)
             return BuiltType();
-          genericArgs.push_back(arg);
+          genericArgsBuf.push_back(arg);
         }
+      }
+      genericArgsLevels.push_back(genericArgsBuf.size());
+      std::vector<ArrayRef<BuiltType>> genericArgs;
+      for (unsigned i = 0; i < genericArgsLevels.size() - 1; ++i) {
+        auto start = genericArgsLevels[i], end = genericArgsLevels[i+1];
+        genericArgs.emplace_back(genericArgsBuf.data() + start,
+                                 end - start);
       }
       
       return Builder.resolveOpaqueType(descriptor, genericArgs, ordinal);
