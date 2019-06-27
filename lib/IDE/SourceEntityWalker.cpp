@@ -552,8 +552,11 @@ std::pair<bool, Pattern *> SemaAnnotator::walkToPatternPre(Pattern *P) {
 }
 
 bool SemaAnnotator::handleCustomAttributes(Decl *D) {
+  // CustomAttrs of non-param VarDecls are handled when this method is called
+  // on their containing PatternBindingDecls (see below).
   if (isa<VarDecl>(D) && !isa<ParamDecl>(D))
     return true;
+
   if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
     if (auto *SingleVar = PBD->getSingleVar()) {
       D = SingleVar;

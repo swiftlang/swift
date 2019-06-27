@@ -495,9 +495,9 @@ private:
   }
 
   Decl *getContainingDecl() const {
-    auto Containers = (SymbolRoleSet)SymbolRole::Definition | (SymbolRoleSet)SymbolRole::Declaration;
     for (const auto &Entity: EntitiesStack) {
-      if (isa<AbstractFunctionDecl>(Entity.D) && (Entity.Roles & Containers)) {
+      if (isa<AbstractFunctionDecl>(Entity.D) &&
+          (Entity.Roles & (SymbolRoleSet)SymbolRole::Definition)) {
         return Entity.D;
       }
     }
