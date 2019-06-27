@@ -4158,9 +4158,9 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
 
     // See if we have an instance method, instance member or static method,
     // and check if it can be accessed on our base type.
+
     if (decl->isInstanceMember()) {
-      if ((isa<FuncDecl>(decl) && !hasInstanceMethods) ||
-          (!isa<FuncDecl>(decl) && !hasInstanceMembers)) {
+      if (baseObjTy->is<AnyMetatypeType>()) {
         // `AnyObject` has special semantics, so let's just let it be.
         // Otherwise adjust base type and reference kind to make it
         // look as if lookup was done on the instance, that helps
@@ -4169,8 +4169,20 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
                           ? candidate
                           : OverloadChoice(instanceTy, decl,
                                            FunctionRefKind::SingleApply);
+        // If this is an instance member referenced from metatype
+        // let's add unviable result to the set because it could be
+        // either curried reference or an  invalid call.
+        //
+        // New candidate shouldn't affect performance because such
+        // choice would only be attempted when solver is in diagnostic mode.
         result.addUnviable(choice, MemberLookupResult::UR_InstanceMemberOnType);
-        return;
+
+        bool invalidMethodRef = isa<FuncDecl>(decl) && !hasInstanceMethods;
+        bool invalidMemberRef = !isa<FuncDecl>(decl) && !hasInstanceMembers;
+        // If this is definitely an invalid way to reference a method or member
+        // on the metatype, let's stop here.
+        if (invalidMethodRef || invalidMemberRef)
+          return;
       }
 
     // If the underlying type of a typealias is fully concrete, it is legal
