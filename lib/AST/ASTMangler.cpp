@@ -973,9 +973,8 @@ void ASTMangler::appendType(Type type, const ValueDecl *forDecl) {
       auto opaqueType = cast<OpaqueTypeArchetypeType>(tybase);
       auto opaqueDecl = opaqueType->getDecl();
       if (opaqueDecl->getNamingDecl() == forDecl) {
-        if (opaqueType->getSubstitutions().isIdentity()) {
-          return appendOperator("Qr");
-        }
+        assert(opaqueType->getSubstitutions().isIdentity());
+        return appendOperator("Qr");
       }
       
       // Otherwise, try to substitute it.

@@ -695,13 +695,25 @@ void SubstitutionMap::profile(llvm::FoldingSetNodeID &id) const {
 }
 
 bool SubstitutionMap::isIdentity() const {
-  for (unsigned i : indices(getReplacementTypes())) {
-    auto replacement = dyn_cast<GenericTypeParamType>(
-      getReplacementTypes()[i]->getCanonicalType(getGenericSignature()));
-    if (!replacement)
-      return false;
-    if (getGenericSignature()->getGenericParamOrdinal(replacement) != i)
-      return false;
-  }
-  return true;
+  if (empty())
+    return true;
+
+  GenericSignature *sig = getGenericSignature();
+  unsigned countOfGenericParams = 0;
+  bool hasNonIdentityReplacement = false;
+
+  sig->forEachParam([&](GenericTypeParamType *paramTy, bool isCanonical) {
+    ++countOfGenericParams;
+    if (!isCanonical)
+      return;
+
+    auto replacementTy = Type(paramTy).subst(*this);
+    if (!paramTy->isEqual(replacementTy))
+      hasNonIdentityReplacement = true;
+  });
+
+  assert(countOfGenericParams == getReplacementTypes().size());
+  (void)countOfGenericParams;
+
+  return !hasNonIdentityReplacement;
 }
