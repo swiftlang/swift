@@ -407,7 +407,7 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   };
 
   /// The current constraint solver arena, if any.
-  std::unique_ptr<ConstraintSolverArena> CurrentConstraintSolverArena;
+  ConstraintSolverArena *CurrentConstraintSolverArena = nullptr;
 
   Arena &getArena(AllocationArena arena) {
     switch (arena) {
@@ -438,15 +438,23 @@ ASTContext::Implementation::~Implementation() {
 
 ConstraintCheckerArenaRAII::
 ConstraintCheckerArenaRAII(ASTContext &self, llvm::BumpPtrAllocator &allocator)
-  : Self(self), Data(self.getImpl().CurrentConstraintSolverArena.release())
+  : Self(self), Data(self.getImpl().CurrentConstraintSolverArena)
 {
-  Self.getImpl().CurrentConstraintSolverArena.reset(
-    new ASTContext::Implementation::ConstraintSolverArena(allocator));
+  using ConstraintSolverArena =
+      ASTContext::Implementation::ConstraintSolverArena;
+
+  void *arenaBuffer = allocator.Allocate<ConstraintSolverArena>();
+  Self.getImpl().CurrentConstraintSolverArena =
+      new (arenaBuffer) ConstraintSolverArena(allocator);
 }
 
 ConstraintCheckerArenaRAII::~ConstraintCheckerArenaRAII() {
-  Self.getImpl().CurrentConstraintSolverArena.reset(
-    (ASTContext::Implementation::ConstraintSolverArena *)Data);
+  using ConstraintSolverArena =
+      ASTContext::Implementation::ConstraintSolverArena;
+
+  Self.getImpl().CurrentConstraintSolverArena->~ConstraintSolverArena();
+  Self.getImpl().CurrentConstraintSolverArena =
+      static_cast<ConstraintSolverArena *>(Data);
 }
 
 static ModuleDecl *createBuiltinModule(ASTContext &ctx) {
