@@ -1710,7 +1710,7 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
   VarDecl *storageVar = nullptr;
   if (wrapperInfo.projectedValueVar) {
     storageVar = synthesizePropertyWrapperStorageWrapperProperty(
-        ctx, var, storageInterfaceType, wrapperInfo.projectedValueVar);
+        ctx, var, storageType, wrapperInfo.projectedValueVar);
   }
 
   // Get the property wrapper information.
