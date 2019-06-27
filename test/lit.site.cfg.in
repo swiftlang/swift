@@ -27,26 +27,29 @@ config.variant_triple = "@VARIANT_TRIPLE@"
 config.variant_sdk = "@VARIANT_SDK@"
 config.variant_suffix = "@VARIANT_SUFFIX@"
 config.swiftlib_dir = "@LIT_SWIFTLIB_DIR@"
-config.swift_stdlib_msvc_runtime = None
-if "@SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY@" == "MultiThreaded":
-    config.swift_stdlib_msvc_runtime = 'MT'
-elif "@SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY@" == "MultiThreadedDebug":
-    config.swift_stdlib_msvc_runtime = 'MTd'
-elif "@SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY@" == "MultiThreadedDLL":
-    config.swift_stdlib_msvc_runtime = 'MD'
-elif "@SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY@" == "MultiThreadedDebugDLL":
-    config.swift_stdlib_msvc_runtime = 'MDd'
-else:
-    assert(False)
-
 config.swift_test_results_dir = \
     lit_config.params.get("swift_test_results_dir", "@SWIFT_TEST_RESULTS_DIR@")
-config.darwin_xcrun_toolchain = "@SWIFT_DARWIN_XCRUN_TOOLCHAIN@"
-config.android_ndk_path = "@SWIFT_ANDROID_NDK_PATH@"
-config.android_ndk_gcc_version = "@SWIFT_ANDROID_NDK_GCC_VERSION@"
 
 config.coverage_mode = "@SWIFT_ANALYZE_CODE_COVERAGE@"
 config.lldb_build_root = "@LLDB_BUILD_DIR@"
+config.libdispatch_build_path = "@SWIFT_PATH_TO_LIBDISPATCH_BUILD@"
+
+# --- Darwin ---
+config.darwin_xcrun_toolchain = "@SWIFT_DARWIN_XCRUN_TOOLCHAIN@"
+
+# --- android ---
+config.android_ndk_path = "@SWIFT_ANDROID_NDK_PATH@"
+config.android_ndk_gcc_version = "@SWIFT_ANDROID_NDK_GCC_VERSION@"
+
+# --- Windows ---
+msvc_runtime_flags = {
+  'MultiThreaded': 'MT',
+  'MultiThreadedDebug': 'MTd',
+  'MultiThreadedDLL': 'MD',
+  'MultiThreadedDebugDLL': 'MDd',
+}
+config.swift_stdlib_msvc_runtime = \
+    msvc_runtime_flags["@SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY@"]
 
 # Please remember to handle empty strings and/or unset variables correctly.
 
@@ -111,6 +114,9 @@ if "@SWIFT_ENABLE_LLD_LINKER@" == "TRUE":
 else:
     # even if SWIFT_ENABLE_GOLD_LINKER isn't set, we cannot use BFD for Android
     config.android_linker_name = "gold"
+
+if '@SWIFT_INCLUDE_TOOLS@' == 'TRUE':
+    config.available_features.add('swift_tools_extra')
 
 # Let the main config do the real work.
 if config.test_exec_root is None:

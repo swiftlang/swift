@@ -310,16 +310,6 @@ static StringRef getDefaultArgumentKindString(DefaultArgumentKind value) {
 
   llvm_unreachable("Unhandled DefaultArgumentKind in switch.");
 }
-static StringRef getAccessorKindString(AccessorKind value) {
-  switch (value) {
-#define ACCESSOR(ID)
-#define SINGLETON_ACCESSOR(ID, KEYWORD) \
-  case AccessorKind::ID: return #KEYWORD;
-#include "swift/AST/AccessorKinds.def"
-  }
-
-  llvm_unreachable("Unhandled AccessorKind in switch.");
-}
 static StringRef
 getMagicIdentifierLiteralExprKindString(MagicIdentifierLiteralExpr::Kind value) {
   switch (value) {
@@ -1967,6 +1957,8 @@ public:
   void visitObjectLiteralExpr(ObjectLiteralExpr *E) {
     printCommon(E, "object_literal") 
       << " kind='" << E->getLiteralKindPlainName() << "'";
+    PrintWithColorRAII(OS, LiteralValueColor) << " initializer=";
+    E->getInitializer().dump(PrintWithColorRAII(OS, LiteralValueColor).getOS());
     printArgumentLabels(E->getArgumentLabels());
     OS << "\n";
     printRec(E->getArg());
@@ -2125,16 +2117,16 @@ public:
       OS << '\n';
       printRec(elt);
     }
-    printSemanticExpr(E->getSemanticExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitDictionaryExpr(DictionaryExpr *E) {
     printCommon(E, "dictionary_expr");
+    PrintWithColorRAII(OS, LiteralValueColor) << " initializer=";
+    E->getInitializer().dump(PrintWithColorRAII(OS, LiteralValueColor).getOS());
     for (auto elt : E->getElements()) {
       OS << '\n';
       printRec(elt);
     }
-    printSemanticExpr(E->getSemanticExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitSubscriptExpr(SubscriptExpr *E) {
@@ -2635,7 +2627,19 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitEditorPlaceholderExpr(EditorPlaceholderExpr *E) {
-    printCommon(E, "editor_placeholder_expr") << '\n';
+    printCommon(E, "editor_placeholder_expr") << ' ';
+
+    // Print the trailing angle bracket location
+    if (auto Ty = GetTypeOfExpr(E)) {
+      auto &Ctx = Ty->getASTContext();
+      auto TABL = E->getTrailingAngleBracketLoc();
+      if (TABL.isValid()) {
+        PrintWithColorRAII(OS, LocationColor) << " trailing_angle_bracket_loc=";
+        TABL.print(PrintWithColorRAII(OS, LocationColor).getOS(),
+                   Ctx.SourceMgr);
+      }
+    }
+    OS << '\n';
     auto *TyR = E->getTypeLoc().getTypeRepr();
     auto *ExpTyR = E->getTypeForExpansion();
     if (TyR)
@@ -3744,4 +3748,15 @@ void GenericEnvironment::dump(raw_ostream &os) const {
 
 void GenericEnvironment::dump() const {
   dump(llvm::errs());
+}
+
+StringRef swift::getAccessorKindString(AccessorKind value) {
+  switch (value) {
+#define ACCESSOR(ID)
+#define SINGLETON_ACCESSOR(ID, KEYWORD) \
+  case AccessorKind::ID: return #KEYWORD;
+#include "swift/AST/AccessorKinds.def"
+  }
+
+  llvm_unreachable("Unhandled AccessorKind in switch.");
 }

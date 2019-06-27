@@ -1629,6 +1629,34 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     }
     break;
   }
+
+  case DAK_ProjectedValueProperty: {
+    if (!consumeIf(tok::l_paren)) {
+      diagnose(Loc, diag::attr_expected_lparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
+      return false;
+    }
+
+    if (Tok.isNot(tok::identifier)) {
+      diagnose(Loc, diag::projection_value_property_not_identifier);
+      return false;
+    }
+
+    Identifier name;
+    consumeIdentifier(&name, /*allowDollarIdentifier=*/true);
+
+    auto range = SourceRange(Loc, Tok.getRange().getStart());
+
+    if (!consumeIf(tok::r_paren)) {
+      diagnose(Loc, diag::attr_expected_rparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
+      return false;
+    }
+
+    Attributes.add(new (Context) ProjectedValuePropertyAttr(
+        name, AtLoc, range, /*implicit*/ false));
+    break;
+  }
   }
 
   if (DuplicateAttribute) {
@@ -1746,13 +1774,26 @@ static PatternBindingInitializer *findAttributeInitContent(
 /// Note that various attributes (like mutating, weak, and unowned) are parsed
 /// but rejected since they have context-sensitive keywords.
 ///
-bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
+ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
   // If this not an identifier, the attribute is malformed.
   if (Tok.isNot(tok::identifier) &&
       Tok.isNot(tok::kw_in) &&
       Tok.isNot(tok::kw_inout)) {
+
+    if (Tok.is(tok::code_complete)) {
+      if (CodeCompletion) {
+        // If the next token is not on the same line, this attribute might be
+        // starting new declaration instead of adding attribute to existing
+        // decl.
+        auto isIndependent = peekToken().isAtStartOfLine();
+        CodeCompletion->completeDeclAttrBeginning(isInSILMode(), isIndependent);
+      }
+      consumeToken(tok::code_complete);
+      return makeParserCodeCompletionStatus();
+    }
+
     diagnose(Tok, diag::expected_attribute_name);
-    return true;
+    return makeParserError();
   }
 
   // If the attribute follows the new representation, switch
@@ -1792,6 +1833,12 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
     checkInvalidAttrName("_inlineable", "inlinable", DAK_Inlinable);
   }
 
+  // Other names of property wrappers...
+  checkInvalidAttrName("propertyDelegate", "propertyWrapper",
+                       DAK_PropertyWrapper, diag::attr_renamed_warning);
+  checkInvalidAttrName("_propertyWrapper", "propertyWrapper",
+                       DAK_PropertyWrapper, diag::attr_renamed_warning);
+
   if (DK == DAK_Count && Tok.getText() == "warn_unused_result") {
     // The behavior created by @warn_unused_result is now the default. Emit a
     // Fix-It to remove.
@@ -1802,7 +1849,8 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
       diagnose(AtLoc, diag::attr_warn_unused_result_removed)
         .fixItRemove(SourceRange(AtLoc, attrLoc));
 
-      return false;
+      // Recovered.
+      return makeParserSuccess();
     }
 
     // @warn_unused_result with arguments.
@@ -1823,11 +1871,14 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
     diagnose(AtLoc, diag::attr_warn_unused_result_removed)
       .fixItRemove(SourceRange(AtLoc, rParenLoc));
 
-    return false;
+    // Recovered.
+    return makeParserSuccess();
   }
 
-  if (DK != DAK_Count && !DeclAttribute::shouldBeRejectedByParser(DK))
-    return parseNewDeclAttribute(Attributes, AtLoc, DK);
+  if (DK != DAK_Count && !DeclAttribute::shouldBeRejectedByParser(DK)) {
+    parseNewDeclAttribute(Attributes, AtLoc, DK);
+    return makeParserSuccess();
+  }
 
   if (TypeAttributes::getAttrKindFromString(Tok.getText()) != TAK_Count)
     diagnose(Tok, diag::type_attribute_applied_to_decl);
@@ -1842,7 +1893,7 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
       if (Tok.is(tok::l_paren))
         skipSingle();
 
-      return true;
+      return ParserStatus(type);
     }
 
     // Parse the optional arguments.
@@ -1852,6 +1903,7 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
     SmallVector<SourceLoc, 2> argLabelLocs;
     Expr *trailingClosure = nullptr;
     bool hasInitializer = false;
+    ParserStatus status;
 
     // If we're not in a local context, we'll need a context to parse
     // initializers into (should we have one).  This happens for properties
@@ -1859,32 +1911,39 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
     PatternBindingInitializer *initContext = nullptr;
 
     if (Tok.isFollowingLParen()) {
+      if (peekToken().is(tok::code_complete)) {
+        consumeToken(tok::l_paren);
+        if (CodeCompletion) {
+          auto typeE = new (Context) TypeExpr(type.get());
+          auto CCE = new (Context) CodeCompletionExpr(Tok.getLoc());
+          CodeCompletion->completePostfixExprParen(typeE, CCE);
+        }
+        consumeToken(tok::code_complete);
+        skipUntil(tok::r_paren);
+        consumeIf(tok::r_paren);
+        status.setHasCodeCompletion();
+      } else {
+        // If we have no local context to parse the initial value into, create
+        // one for the PBD we'll eventually create.  This allows us to have
+        // reasonable DeclContexts for any closures that may live inside of
+        // initializers.
+        Optional<ParseFunctionBody> initParser;
+        if (!CurDeclContext->isLocalContext()) {
+          initContext = findAttributeInitContent(Attributes);
+          if (!initContext)
+            initContext =
+                new (Context) PatternBindingInitializer(CurDeclContext);
 
-      // If we have no local context to parse the initial value into, create one
-      // for the PBD we'll eventually create.  This allows us to have reasonable
-      // DeclContexts for any closures that may live inside of initializers.
-      Optional<ParseFunctionBody> initParser;
-      if (!CurDeclContext->isLocalContext()) {
-        initContext = findAttributeInitContent(Attributes);
-        if (!initContext)
-          initContext = new (Context) PatternBindingInitializer(CurDeclContext);
-
-        initParser.emplace(*this, initContext);
+          initParser.emplace(*this, initContext);
+        }
+        status |= parseExprList(tok::l_paren, tok::r_paren,
+                                /*isPostfix=*/false, /*isExprBasic=*/true,
+                                lParenLoc, args, argLabels, argLabelLocs,
+                                rParenLoc, trailingClosure,
+                                SyntaxKind::FunctionCallArgumentList);
+        assert(!trailingClosure && "Cannot parse a trailing closure here");
+        hasInitializer = true;
       }
-
-      ParserStatus status = parseExprList(tok::l_paren, tok::r_paren,
-                                          /*isPostfix=*/false,
-                                          /*isExprBasic=*/true,
-                                          lParenLoc, args, argLabels,
-                                          argLabelLocs,
-                                          rParenLoc,
-                                          trailingClosure,
-                                          SyntaxKind::FunctionCallArgumentList);
-      if (status.hasCodeCompletion())
-        return true;
-
-      assert(!trailingClosure && "Cannot parse a trailing closure here");
-      hasInitializer = true;
     }
 
     // Form the attribute.
@@ -1892,7 +1951,7 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
                                    initContext, lParenLoc, args, argLabels,
                                    argLabelLocs, rParenLoc);
     Attributes.add(attr);
-    return false;
+    return status;
   }
 
   // Recover by eating @foo(...) when foo is not known.
@@ -1900,7 +1959,7 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
   if (Tok.is(tok::l_paren))
     skipSingle();
 
-  return true;
+  return makeParserError();
 }
 
 bool Parser::canParseTypeAttribute() {
@@ -2180,30 +2239,18 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, bool justChecking) {
 ///   attribute-list-clause:
 ///     '@' attribute
 /// \endverbatim
-bool Parser::parseDeclAttributeList(DeclAttributes &Attributes,
-                                    bool &FoundCCToken) {
-  FoundCCToken = false;
+ParserStatus Parser::parseDeclAttributeList(DeclAttributes &Attributes) {
   if (Tok.isNot(tok::at_sign))
-    return false;
+    return makeParserSuccess();
 
-  bool error = false;
-
+  ParserStatus Status;
   SyntaxParsingContext AttrListCtx(SyntaxContext, SyntaxKind::AttributeList);
   do {
-    if (peekToken().is(tok::code_complete)) {
-      consumeToken(tok::at_sign);
-      consumeToken(tok::code_complete);
-      FoundCCToken = true;
-      continue;
-    }
     SyntaxParsingContext AttrCtx(SyntaxContext, SyntaxKind::Attribute);
     SourceLoc AtLoc = consumeToken();
-    if (parseDeclAttribute(Attributes, AtLoc)) {
-      // Consume any remaining attributes for better error recovery.
-      error = true;
-    }
+    Status |= parseDeclAttribute(Attributes, AtLoc);
   } while (Tok.is(tok::at_sign));
-  return error;
+  return Status;
 }
 
 /// \verbatim
@@ -2788,8 +2835,7 @@ Parser::parseDecl(ParseDeclOptions Flags,
   DeclAttributes Attributes;
   if (Tok.hasComment())
     Attributes.add(new (Context) RawDocCommentAttr(Tok.getCommentRange()));
-  bool FoundCCTokenInAttr;
-  parseDeclAttributeList(Attributes, FoundCCTokenInAttr);
+  ParserStatus AttrStatus = parseDeclAttributeList(Attributes);
 
   // Parse modifiers.
   // Keep track of where and whether we see a contextual keyword on the decl.
@@ -2936,14 +2982,6 @@ Parser::parseDecl(ParseDeclOptions Flags,
 
   // Obvious nonsense.
   default:
-    if (FoundCCTokenInAttr) {
-      if (!CodeCompletion) {
-        delayParseFromBeginningToHere(BeginParserPosition, Flags);
-      } else {
-        CodeCompletion->completeDeclAttrKeyword(nullptr, isInSILMode(), false);
-      }
-    }
-
     diagnose(Tok, diag::expected_decl);
 
     if (CurDeclContext) {
@@ -2959,7 +2997,6 @@ Parser::parseDecl(ParseDeclOptions Flags,
         }
       }
     }
-    return makeParserErrorResult<Decl>();
   }
 
   if (DeclResult.isParseError() && Tok.is(tok::code_complete)) {
@@ -2998,23 +3035,12 @@ Parser::parseDecl(ParseDeclOptions Flags,
     consumeToken(tok::code_complete);
   }
 
-  if (auto SF = CurDeclContext->getParentSourceFile()) {
-    if (!getScopeInfo().isInactiveConfigBlock()) {
-      for (auto Attr : Attributes) {
-        if (isa<ObjCAttr>(Attr) ||
-            /* Pre Swift 5 dymamic implied @objc */
-            (!Context.LangOpts.isSwiftVersionAtLeast(5) &&
-             isa<DynamicAttr>(Attr)))
-          SF->AttrsRequiringFoundation.insert(Attr);
-      }
-    }
-  }
-
-  if (FoundCCTokenInAttr) {
+  if (AttrStatus.hasCodeCompletion()) {
     if (CodeCompletion) {
-      CodeCompletion->completeDeclAttrKeyword(DeclResult.getPtrOrNull(),
-                                              isInSILMode(),
-                                              false);
+      Optional<DeclKind> DK;
+      if (DeclResult.isNonNull())
+        DK = DeclResult.get()->getKind();
+      CodeCompletion->setAttrTargetDeclKind(DK);
     } else {
       delayParseFromBeginningToHere(BeginParserPosition, Flags);
       return makeParserError();
@@ -3028,6 +3054,18 @@ Parser::parseDecl(ParseDeclOptions Flags,
     consumeDecl(BeginParserPosition, Flags, /*IsTopLevel=*/false);
 
     return makeParserError();
+  }
+
+  if (auto SF = CurDeclContext->getParentSourceFile()) {
+    if (!getScopeInfo().isInactiveConfigBlock()) {
+      for (auto Attr : Attributes) {
+        if (isa<ObjCAttr>(Attr) ||
+            /* Pre Swift 5 dymamic implied @objc */
+            (!Context.LangOpts.isSwiftVersionAtLeast(5) &&
+             isa<DynamicAttr>(Attr)))
+          SF->AttrsRequiringFoundation.insert(Attr);
+      }
+    }
   }
 
   if (DeclResult.isNonNull()) {
@@ -3134,6 +3172,8 @@ void Parser::parseDeclDelayed() {
         NTD->addMember(D);
       } else if (auto *ED = dyn_cast<ExtensionDecl>(parent)) {
         ED->addMember(D);
+      } else if (auto *SF = dyn_cast<SourceFile>(parent)) {
+        SF->Decls.push_back(D);
       }
     }
   });
@@ -4179,24 +4219,6 @@ static AccessorDecl *createAccessorFunc(SourceLoc DeclLoc,
                                  ValueArg, ReturnType,
                                  P->CurDeclContext);
 
-  // Non-static set/willSet/didSet/mutableAddress default to mutating.
-  // get/address default to non-mutating.
-  switch (Kind) {
-  case AccessorKind::Address:
-  case AccessorKind::Get:
-  case AccessorKind::Read:
-    break;
-
-  case AccessorKind::MutableAddress:
-  case AccessorKind::Set:
-  case AccessorKind::WillSet:
-  case AccessorKind::DidSet:
-  case AccessorKind::Modify:
-    if (D->isInstanceMember())
-      D->setSelfAccessKind(SelfAccessKind::Mutating);
-    break;
-  }
-
   return D;
 }
 
@@ -4402,8 +4424,7 @@ static bool parseAccessorIntroducer(Parser &P,
                                     AccessorKind &Kind,
                                     SourceLoc &Loc) {
   assert(Attributes.isEmpty());
-  bool FoundCCToken;
-  P.parseDeclAttributeList(Attributes, FoundCCToken);
+  P.parseDeclAttributeList(Attributes);
 
   // Parse the contextual keywords for 'mutating' and 'nonmutating' before
   // get and set.
@@ -4680,8 +4701,9 @@ static void fillInAccessorTypeErrors(Parser &P,
 /// Parse the brace-enclosed getter and setter for a variable.
 ParserResult<VarDecl>
 Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
-                           SourceLoc StaticLoc, SourceLoc VarLoc,
-                           bool hasInitializer,
+                           SourceLoc StaticLoc,
+                           StaticSpellingKind StaticSpelling,
+                           SourceLoc VarLoc, bool hasInitializer,
                            const DeclAttributes &Attributes,
                            SmallVectorImpl<Decl *> &Decls) {
   bool Invalid = false;
@@ -4745,7 +4767,7 @@ Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
     PatternBindingEntry entry(pattern, /*EqualLoc*/ SourceLoc(),
                               /*Init*/ nullptr, /*InitContext*/ nullptr);
     auto binding = PatternBindingDecl::create(Context, StaticLoc,
-                                              StaticSpellingKind::None,
+                                              StaticSpelling,
                                               VarLoc, entry, CurDeclContext);
     binding->setInvalid(true);
     storage->setParentPatternBinding(binding);
@@ -4964,32 +4986,6 @@ Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
   if (auto *subscript = dyn_cast<SubscriptDecl>(storage))
     genericParams = subscript->getGenericParams();
 
-  // Create an implicit accessor declaration.
-  auto createImplicitAccessor = [&](AccessorKind kind,
-                                    AccessorDecl *funcForParams = nullptr) {
-    // We never use this to create addressors.
-    assert(kind != AccessorKind::Address &&
-           kind != AccessorKind::MutableAddress);
-
-    // Create the paramter list for a setter.
-    ParameterList *argList = nullptr;
-    if (kind == AccessorKind::Set) {
-      assert(funcForParams);
-      auto argLoc = funcForParams->getStartLoc();
-
-      auto argument = createSetterAccessorArgument(
-          argLoc, Identifier(), AccessorKind::Set, P, elementTy);
-      argList = ParameterList::create(P.Context, argument);
-    }
-
-    auto accessor = createAccessorFunc(SourceLoc(), argList,
-                                       genericParams, indices, elementTy,
-                                       staticLoc, flags, kind,
-                                       storage, &P, SourceLoc());
-    accessor->setImplicit();
-    add(accessor);
-  };
-
   // If there was a problem parsing accessors, mark all parsed accessors
   // as invalid to avoid tripping up later invariants.
   // We also want to avoid diagnose missing accessors if something
@@ -5016,12 +5012,6 @@ Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
 
     // Otherwise, we have either a stored or inherited observing property.
     } else {
-      // Observing properties will have getters and setters synthesized
-      // by Sema.  Create their prototypes now.
-      auto argFunc = (WillSet ? WillSet : DidSet);
-      createImplicitAccessor(AccessorKind::Get);
-      createImplicitAccessor(AccessorKind::Set, argFunc);
-
       if (attrs.hasAttribute<OverrideAttr>()) {
         return StorageImplInfo(ReadImplKind::Inherited,
                                WriteImplKind::InheritedWithObservers,
@@ -5062,7 +5052,7 @@ Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
                  isa<SubscriptDecl>(storage),
                  getAccessorNameForDiagnostic(mutator, /*article*/ true));
     }
-    createImplicitAccessor(AccessorKind::Get);
+
     readImpl = ReadImplKind::Get;
 
   // Subscripts always have to have some sort of accessor; they can't be
@@ -5072,7 +5062,6 @@ Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
       P.diagnose(LBLoc, diag::subscript_without_get);
     }
 
-    createImplicitAccessor(AccessorKind::Get);
     readImpl = ReadImplKind::Get;
 
   // Otherwise, it's stored.
@@ -5367,9 +5356,9 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
     // var-get-set clause, parse the var-get-set clause.
     if (Tok.is(tok::l_brace)) {
       HasAccessors = true;
-      auto boundVar = parseDeclVarGetSet(pattern, Flags, StaticLoc, VarLoc,
-                                         PatternInit != nullptr,Attributes,
-                                         Decls);
+      auto boundVar =
+          parseDeclVarGetSet(pattern, Flags, StaticLoc, StaticSpelling, VarLoc,
+                             PatternInit != nullptr, Attributes, Decls);
       if (boundVar.hasCodeCompletion())
         return makeResult(makeParserCodeCompletionStatus());
       if (PatternInit && boundVar.isNonNull() &&

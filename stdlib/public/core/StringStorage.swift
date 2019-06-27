@@ -72,9 +72,8 @@ extension _AbstractStringStorage {
     _ outputPtr: UnsafeMutablePointer<UInt8>, _ maxLength: Int, _ encoding: UInt
   ) -> Int8 {
     switch (encoding, isASCII) {
-    case (_cocoaASCIIEncoding, true):
-      fallthrough
-    case (_cocoaUTF8Encoding, _):
+    case (_cocoaASCIIEncoding, true),
+         (_cocoaUTF8Encoding, _):
       guard maxLength >= count + 1 else { return 0 }
       outputPtr.initialize(from: start, count: count)
       outputPtr[count] = 0
@@ -88,9 +87,8 @@ extension _AbstractStringStorage {
   @_effects(readonly)
   internal func _cString(encoding: UInt) -> UnsafePointer<UInt8>? {
     switch (encoding, isASCII) {
-    case (_cocoaASCIIEncoding, true):
-      fallthrough
-    case (_cocoaUTF8Encoding, _):
+    case (_cocoaASCIIEncoding, true),
+         (_cocoaUTF8Encoding, _):
       return start
     default:
       return _cocoaCStringUsingEncodingTrampoline(self, encoding)
@@ -143,9 +141,9 @@ extension _AbstractStringStorage {
       // one of ours.
 
       defer { _fixLifetime(other) }
-      
+
       let otherUTF16Length = _stdlib_binary_CFStringGetLength(other)
-      
+
       // CFString will only give us ASCII bytes here, but that's fine.
       // We already handled non-ASCII UTF8 strings earlier since they're Swift.
       if let otherStart = _cocoaUTF8Pointer(other) {
@@ -156,11 +154,11 @@ extension _AbstractStringStorage {
         return (start == otherStart ||
           (memcmp(start, otherStart, count) == 0)) ? 1 : 0
       }
-      
+
       if UTF16Length != otherUTF16Length {
         return 0
       }
-      
+
       /*
        The abstract implementation of -isEqualToString: falls back to -compare:
        immediately, so when we run out of fast options to try, do the same.

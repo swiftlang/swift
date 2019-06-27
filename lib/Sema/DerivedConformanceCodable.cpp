@@ -72,26 +72,23 @@ enum CodableConformanceType {
 /// Returns whether the given type conforms to the given {En,De}codable
 /// protocol.
 ///
-/// \param tc The typechecker to use in validating {En,De}codable conformance.
-///
 /// \param context The \c DeclContext the var declarations belong to.
 ///
 /// \param target The \c Type to validate.
 ///
 /// \param proto The \c ProtocolDecl to check conformance to.
-static CodableConformanceType typeConformsToCodable(TypeChecker &tc,
-                                                    DeclContext *context,
+static CodableConformanceType typeConformsToCodable(DeclContext *context,
                                                     Type target, bool isIUO,
                                                     ProtocolDecl *proto) {
   target = context->mapTypeIntoContext(target);
 
   if (isIUO)
-    return typeConformsToCodable(tc, context, target->getOptionalObjectType(),
+    return typeConformsToCodable(context, target->getOptionalObjectType(),
                                  false, proto);
 
-  return tc.conformsToProtocol(target, proto, context,
-                               ConformanceCheckFlags::Used) ? Conforms
-                                                            : DoesNotConform;
+  return (TypeChecker::conformsToProtocol(target, proto, context, None)
+          ? Conforms
+          : DoesNotConform);
 }
 
 /// Returns whether the given variable conforms to the given {En,De}codable
@@ -132,8 +129,16 @@ static CodableConformanceType varConformsToCodable(TypeChecker &tc,
 
   bool isIUO =
       varDecl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
-  return typeConformsToCodable(tc, context, varDecl->getValueInterfaceType(),
+  return typeConformsToCodable(context, varDecl->getValueInterfaceType(),
                                isIUO, proto);
+}
+
+/// Retrieve the variable name for the purposes of encoding/decoding.
+static Identifier getVarNameForCoding(VarDecl *var) {
+  if (auto originalVar = var->getOriginalWrappedProperty())
+    return originalVar->getName();
+
+  return var->getName();
 }
 
 /// Validates the given CodingKeys enum decl by ensuring its cases are a 1-to-1
@@ -162,7 +167,7 @@ static bool validateCodingKeysEnum(DerivedConformance &derived,
     if (varDecl->getAttrs().hasAttribute<LazyAttr>())
       continue;
 
-    properties[varDecl->getName()] = varDecl;
+    properties[getVarNameForCoding(varDecl)] = varDecl;
   }
 
   bool propertiesAreValid = true;
@@ -280,9 +285,9 @@ static CodingKeysValidity hasValidCodingKeysEnum(DerivedConformance &derived) {
 
   // Ensure that the type we found conforms to the CodingKey protocol.
   auto *codingKeyProto = C.getProtocol(KnownProtocolKind::CodingKey);
-  if (!tc.conformsToProtocol(codingKeysType, codingKeyProto,
-                             derived.getConformanceContext(),
-                             ConformanceCheckFlags::Used)) {
+  if (!TypeChecker::conformsToProtocol(codingKeysType, codingKeyProto,
+                                       derived.getConformanceContext(),
+                                       None)) {
     // If CodingKeys is a typealias which doesn't point to a valid nominal type,
     // codingKeysTypeDecl will be nullptr here. In that case, we need to warn on
     // the location of the usage, since there isn't an underlying type to
@@ -365,7 +370,8 @@ static EnumDecl *synthesizeCodingKeysEnum(DerivedConformance &derived) {
     switch (conformance) {
       case Conforms:
       {
-        auto *elt = new (C) EnumElementDecl(SourceLoc(), varDecl->getName(),
+        auto *elt = new (C) EnumElementDecl(SourceLoc(),
+                                            getVarNameForCoding(varDecl),
                                             nullptr, SourceLoc(), nullptr,
                                             enumDecl);
         elt->setImplicit();
@@ -518,6 +524,11 @@ lookupVarDeclForCodingKeysCase(DeclContext *conformanceDC,
                                NominalTypeDecl *targetDecl) {
   for (auto decl : targetDecl->lookupDirect(DeclName(elt->getName()))) {
     if (auto *vd = dyn_cast<VarDecl>(decl)) {
+      // If we found a property with an attached wrapper, retrieve the
+      // backing property.
+      if (auto backingVar = vd->getPropertyWrapperBackingProperty())
+        vd = backingVar;
+
       if (!vd->isStatic()) {
         // This is the VarDecl we're looking for.
 
@@ -1069,8 +1080,8 @@ static bool canSynthesize(DerivedConformance &derived, ValueDecl *requirement) {
     if (auto *superclassDecl = classDecl->getSuperclassDecl()) {
       DeclName memberName;
       auto superType = superclassDecl->getDeclaredInterfaceType();
-      if (tc.conformsToProtocol(superType, proto, superclassDecl,
-                                ConformanceCheckFlags::Used)) {
+      if (TypeChecker::conformsToProtocol(superType, proto, superclassDecl,
+                                          None)) {
         // super.init(from:) must be accessible.
         memberName = cast<ConstructorDecl>(requirement)->getFullName();
       } else {
@@ -1085,8 +1096,8 @@ static bool canSynthesize(DerivedConformance &derived, ValueDecl *requirement) {
 
       if (result.empty()) {
         // No super initializer for us to call.
-        tc.diagnose(superclassDecl, diag::decodable_no_super_init_here,
-                    requirement->getFullName(), memberName);
+        superclassDecl->diagnose(diag::decodable_no_super_init_here,
+                                 requirement->getFullName(), memberName);
         return false;
       } else if (result.size() > 1) {
         // There are multiple results for this lookup. We'll end up producing a
@@ -1099,22 +1110,21 @@ static bool canSynthesize(DerivedConformance &derived, ValueDecl *requirement) {
         auto conformanceDC = derived.getConformanceContext();
         if (!initializer->isDesignatedInit()) {
           // We must call a superclass's designated initializer.
-          tc.diagnose(initializer,
-                      diag::decodable_super_init_not_designated_here,
-                      requirement->getFullName(), memberName);
+          initializer->diagnose(diag::decodable_super_init_not_designated_here,
+                                requirement->getFullName(), memberName);
           return false;
         } else if (!initializer->isAccessibleFrom(conformanceDC)) {
           // Cannot call an inaccessible method.
           auto accessScope = initializer->getFormalAccessScope(conformanceDC);
-          tc.diagnose(initializer, diag::decodable_inaccessible_super_init_here,
-                      requirement->getFullName(), memberName,
-                      accessScope.accessLevelForDiagnostics());
+          initializer->diagnose(diag::decodable_inaccessible_super_init_here,
+                                requirement->getFullName(), memberName,
+                                accessScope.accessLevelForDiagnostics());
           return false;
         } else if (initializer->getFailability() != OTK_None) {
           // We can't call super.init() if it's failable, since init(from:)
           // isn't failable.
-          tc.diagnose(initializer, diag::decodable_super_init_is_failable_here,
-                      requirement->getFullName(), memberName);
+          initializer->diagnose(diag::decodable_super_init_is_failable_here,
+                                requirement->getFullName(), memberName);
           return false;
         }
       }

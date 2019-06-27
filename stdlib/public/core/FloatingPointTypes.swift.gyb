@@ -54,11 +54,11 @@ else:
 }%
 
 % if bits == 80:
-#if !os(Windows) && (arch(i386) || arch(x86_64))
+#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
 % end
 
 ${SelfDocComment}
-@_fixed_layout
+@frozen
 public struct ${Self} {
   public // @testable
   var _value: Builtin.FPIEEE${bits}
@@ -318,7 +318,7 @@ extension ${Self}: BinaryFloatingPoint {
   }
 %else:
   // Internal implementation details of x86 Float80
-  @_fixed_layout
+  @frozen
   @usableFromInline
   internal struct _Representation {
     @usableFromInline
@@ -1664,7 +1664,7 @@ extension ${Self} {
 %   That = src_type.stdlib_name
 
 %   if (srcBits == 80) and (bits != 80):
-#if !os(Windows) && (arch(i386) || arch(x86_64))
+#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
 %   end
 
 %   if srcBits == bits:
@@ -1909,7 +1909,7 @@ internal struct _${Self}AnyHashableBox: _AnyHashableBox {
 #else
 
 ${SelfDocComment}
-@_fixed_layout
+@frozen
 @available(*, unavailable, message: "Float80 is only available on non-Windows x86 targets.")
 public struct ${Self} {
   /// Creates a value initialized to zero.

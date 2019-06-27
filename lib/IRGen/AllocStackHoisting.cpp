@@ -352,7 +352,7 @@ bool indicatesDynamicAvailabilityCheckUse(SILInstruction *I) {
     return false;
   if (Apply->hasSemantics("availability.osversion"))
     return true;
-  auto *FunRef = Apply->getReferencedFunction();
+  auto *FunRef = Apply->getReferencedFunctionOrNull();
   if (!FunRef)
     return false;
   if (FunRef->getName().equals("_swift_stdlib_operatingSystemVersion"))

@@ -88,6 +88,9 @@ enum class FixKind : uint8_t {
   /// like the types are aligned.
   ContextualMismatch,
 
+  /// Fix up the generic arguments of two types so they match each other.
+  GenericArgumentsMismatch,
+
   /// Fix up @autoclosure argument to the @autoclosure parameter,
   /// to for a call to be able to foward it properly, since
   /// @autoclosure conversions are unsupported starting from
@@ -99,6 +102,9 @@ enum class FixKind : uint8_t {
 
   /// Add explicit `()` at the end of function or member to call it.
   InsertCall,
+
+  /// Add one or more property unwrap operators ('$')
+  InsertPropertyWrapperUnwrap,
 
   /// Instead of spelling out `subscript` directly, use subscript operator.
   UseSubscriptOperator,
@@ -124,6 +130,11 @@ enum class FixKind : uint8_t {
   /// derived (rather than an arbitrary value of metatype type) or the
   /// referenced constructor must be required.
   AllowInvalidInitRef,
+
+  /// Allow an invalid member access on a value of protocol type as if
+  /// that protocol type were a generic constraint requiring conformance
+  /// to that protocol.
+  AllowMemberRefOnExistential,
 
   /// If there are fewer arguments than parameters, let's fix that up
   /// by adding new arguments to the list represented as type variables.
@@ -153,6 +164,16 @@ enum class FixKind : uint8_t {
   /// Remove `return` or default last expression of single expression
   /// function to `Void` to conform to expected result type.
   RemoveReturn,
+
+  /// Generic parameters could not be inferred and have to be explicitly
+  /// specified in the source. This fix groups all of the missing arguments
+  /// associated with single declaration.
+  ExplicitlySpecifyGenericArguments,
+
+  /// Skip any unhandled constructs that occur within a closure argument that
+  /// matches up with a
+  /// parameter that has a function builder.
+  SkipUnhandledConstructInFunctionBuilder,
 };
 
 class ConstraintFix {
@@ -217,11 +238,14 @@ public:
 class ForceOptional final : public ConstraintFix {
   Type BaseType;
   Type UnwrappedType;
+  ConstraintLocator *FullLocator;
 
   ForceOptional(ConstraintSystem &cs, Type baseType, Type unwrappedType,
-                ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::ForceOptional, locator), BaseType(baseType),
-        UnwrappedType(unwrappedType) {
+                ConstraintLocator *simplifiedLocator,
+                ConstraintLocator *fullLocator)
+      : ConstraintFix(cs, FixKind::ForceOptional, simplifiedLocator),
+        BaseType(baseType), UnwrappedType(unwrappedType),
+        FullLocator(fullLocator) {
     assert(baseType && "Base type must not be null");
     assert(unwrappedType && "Unwrapped type must not be null");
   }
@@ -474,6 +498,60 @@ public:
                                     ConstraintLocator *locator);
 };
 
+/// Detect situations where two type's generic arguments must
+/// match but are not convertible e.g.
+///
+/// ```swift
+/// struct F<G> {}
+/// let _:F<Int> = F<Bool>()
+/// ```
+class GenericArgumentsMismatch final
+    : public ConstraintFix,
+      private llvm::TrailingObjects<GenericArgumentsMismatch, unsigned> {
+  friend TrailingObjects;
+
+  BoundGenericType *Actual;
+  BoundGenericType *Required;
+
+  unsigned NumMismatches;
+
+protected:
+  GenericArgumentsMismatch(ConstraintSystem &cs, BoundGenericType *actual,
+                           BoundGenericType *required,
+                           llvm::ArrayRef<unsigned> mismatches,
+                           ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::GenericArgumentsMismatch, locator),
+        Actual(actual), Required(required), NumMismatches(mismatches.size()) {
+    std::uninitialized_copy(mismatches.begin(), mismatches.end(),
+                            getMismatchesBuf().begin());
+  }
+
+public:
+  std::string getName() const override {
+    return "fix generic argument mismatch";
+  }
+
+  BoundGenericType *getActual() const { return Actual; }
+  BoundGenericType *getRequired() const { return Required; }
+
+  ArrayRef<unsigned> getMismatches() const {
+    return {getTrailingObjects<unsigned>(), NumMismatches};
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static GenericArgumentsMismatch *create(ConstraintSystem &cs,
+                                          BoundGenericType *actual,
+                                          BoundGenericType *required,
+                                          llvm::ArrayRef<unsigned> mismatches,
+                                          ConstraintLocator *locator);
+
+private:
+  MutableArrayRef<unsigned> getMismatchesBuf() {
+    return {getTrailingObjects<unsigned>(), NumMismatches};
+  }
+};
+
 /// Detect situations where key path doesn't have capability required
 /// by the context e.g. read-only vs. writable, or either root or value
 /// types are incorrect e.g.
@@ -554,6 +632,34 @@ public:
                                     ConstraintLocator *locator);
 };
 
+class InsertPropertyWrapperUnwrap final : public ConstraintFix {
+  DeclName PropertyName;
+  Type Base;
+  Type Wrapper;
+
+  InsertPropertyWrapperUnwrap(ConstraintSystem &cs, DeclName propertyName,
+                              Type base, Type wrapper,
+                              ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::InsertPropertyWrapperUnwrap, locator),
+        PropertyName(propertyName), Base(base), Wrapper(wrapper) {}
+
+public:
+  std::string getName() const override {
+    return "insert a $ to unwrap the property wrapper";
+  }
+
+  DeclName getPropertyName() const { return PropertyName; }
+  Type getBase() const { return Base; }
+  Type getWrapper() const { return Wrapper; }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static InsertPropertyWrapperUnwrap *create(ConstraintSystem &cs,
+                                             DeclName propertyName, Type base,
+                                             Type wrapper,
+                                             ConstraintLocator *locator);
+};
+
 class UseSubscriptOperator final : public ConstraintFix {
   UseSubscriptOperator(ConstraintSystem &cs, ConstraintLocator *locator)
       : ConstraintFix(cs, FixKind::UseSubscriptOperator, locator) {}
@@ -592,7 +698,33 @@ public:
                                         DeclName member,
                                         ConstraintLocator *locator);
 };
-	
+
+class AllowMemberRefOnExistential final : public ConstraintFix {
+  Type BaseType;
+  DeclName Name;
+
+  AllowMemberRefOnExistential(ConstraintSystem &cs, Type baseType,
+                              DeclName memberName, ValueDecl *member,
+                              ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowMemberRefOnExistential, locator),
+        BaseType(baseType), Name(memberName) {}
+
+public:
+  std::string getName() const override {
+    llvm::SmallVector<char, 16> scratch;
+    auto memberName = Name.getString(scratch);
+    return "allow access to invalid member '" + memberName.str() +
+           "' on value of protocol type";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static AllowMemberRefOnExistential *create(ConstraintSystem &cs,
+                                             Type baseType, ValueDecl *member,
+                                             DeclName memberName,
+                                             ConstraintLocator *locator);
+};
+
 class AllowTypeOrInstanceMember final : public ConstraintFix {
   Type BaseType;
   ValueDecl *Member;
@@ -859,6 +991,7 @@ public:
     case RefKind::Method:
       return "allow reference to a method as a key path component";
     }
+    llvm_unreachable("covered switch");
   }
 
   bool diagnose(Expr *root, bool asNote = false) const override;
@@ -915,6 +1048,73 @@ public:
   static CollectionElementContextualMismatch *
   create(ConstraintSystem &cs, Type srcType, Type dstType,
          ConstraintLocator *locator);
+};
+
+class ExplicitlySpecifyGenericArguments final
+    : public ConstraintFix,
+      private llvm::TrailingObjects<ExplicitlySpecifyGenericArguments,
+                                    GenericTypeParamType *> {
+  friend TrailingObjects;
+
+  unsigned NumMissingParams;
+
+  ExplicitlySpecifyGenericArguments(ConstraintSystem &cs,
+                                    ArrayRef<GenericTypeParamType *> params,
+                                    ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::ExplicitlySpecifyGenericArguments, locator),
+        NumMissingParams(params.size()) {
+    assert(!params.empty());
+    std::uninitialized_copy(params.begin(), params.end(),
+                            getParametersBuf().begin());
+  }
+
+public:
+  std::string getName() const override {
+    return "default missing generic arguments to `Any`";
+  }
+
+  ArrayRef<GenericTypeParamType *> getParameters() const {
+    return {getTrailingObjects<GenericTypeParamType *>(), NumMissingParams};
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static ExplicitlySpecifyGenericArguments *
+  create(ConstraintSystem &cs, ArrayRef<GenericTypeParamType *> params,
+         ConstraintLocator *locator);
+
+private:
+  MutableArrayRef<GenericTypeParamType *> getParametersBuf() {
+    return {getTrailingObjects<GenericTypeParamType *>(), NumMissingParams};
+  }
+};
+
+class SkipUnhandledConstructInFunctionBuilder final : public ConstraintFix {
+public:
+  using UnhandledNode = llvm::PointerUnion<Stmt *, Decl *>;
+
+private:
+  UnhandledNode unhandled;
+  NominalTypeDecl *builder;
+
+  SkipUnhandledConstructInFunctionBuilder(ConstraintSystem &cs,
+                                          UnhandledNode unhandled,
+                                          NominalTypeDecl *builder,
+                                          ConstraintLocator *locator)
+    : ConstraintFix(cs, FixKind::SkipUnhandledConstructInFunctionBuilder,
+                    locator),
+      unhandled(unhandled), builder(builder) { }
+
+public:
+  std::string getName() const override {
+    return "skip unhandled constructs when applying a function builder";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static SkipUnhandledConstructInFunctionBuilder *
+  create(ConstraintSystem &cs, UnhandledNode unhandledNode,
+         NominalTypeDecl *builder, ConstraintLocator *locator);
 };
 
 } // end namespace constraints

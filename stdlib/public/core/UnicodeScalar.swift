@@ -32,7 +32,7 @@ extension Unicode {
   ///     let airplane = Unicode.Scalar(9992)
   ///     print(airplane)
   ///     // Prints "✈︎"
-  @_fixed_layout
+  @frozen
   public struct Scalar {
     @inlinable
     internal init(_value: UInt32) {
@@ -386,7 +386,7 @@ extension Unicode.Scalar : Comparable {
 }
 
 extension Unicode.Scalar {
-  @_fixed_layout
+  @frozen
   public struct UTF16View {
     @inlinable
     internal init(value: Unicode.Scalar) {
@@ -428,15 +428,16 @@ extension Unicode.Scalar.UTF16View : RandomAccessCollection {
   ///   `endIndex` property.
   @inlinable
   public subscript(position: Int) -> UTF16.CodeUnit {
-    return position == 0 ? (
-      endIndex == 1 ? UTF16.CodeUnit(value.value) : UTF16.leadSurrogate(value)
-    ) : UTF16.trailSurrogate(value)
+    _internalInvariant((0..<self.count).contains(position))
+    if position == 1 { return UTF16.trailSurrogate(value) }
+    if endIndex == 1 { return UTF16.CodeUnit(value.value) }
+    return UTF16.leadSurrogate(value)
   }
 }
 
 extension Unicode.Scalar {
   @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
-  @_fixed_layout
+  @frozen
   public struct UTF8View {
     @inlinable
     internal init(value: Unicode.Scalar) {

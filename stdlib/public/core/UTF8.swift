@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 extension Unicode {
-  @_frozen
+  @frozen
   public enum UTF8 {
   case _swift3Buffer(Unicode.UTF8.ForwardParser)
   }
@@ -99,7 +99,7 @@ extension Unicode.UTF8 : _UnicodeEncoding {
       return Unicode.Scalar(_unchecked: value)
     }
   }
-  
+
   @inline(__always)
   @inlinable
   public static func encode(
@@ -136,7 +136,7 @@ extension Unicode.UTF8 : _UnicodeEncoding {
   ) -> EncodedScalar? {
     if _fastPath(FromEncoding.self == UTF16.self) {
       let c = _identityCast(content, to: UTF16.EncodedScalar.self)
-      var u0 = UInt16(truncatingIfNeeded: c._storage) 
+      var u0 = UInt16(truncatingIfNeeded: c._storage)
       if _fastPath(u0 < 0x80) {
         return EncodedScalar(_containing: UInt8(truncatingIfNeeded: u0))
       }
@@ -161,7 +161,7 @@ extension Unicode.UTF8 : _UnicodeEncoding {
     return encode(FromEncoding.decode(content))
   }
 
-  @_fixed_layout
+  @frozen
   public struct ForwardParser {
     public typealias _Buffer = _UIntBuffer<UInt8>
     @inline(__always)
@@ -169,8 +169,8 @@ extension Unicode.UTF8 : _UnicodeEncoding {
     public init() { _buffer = _Buffer() }
     public var _buffer: _Buffer
   }
-  
-  @_fixed_layout
+
+  @frozen
   public struct ReverseParser {
     public typealias _Buffer = _UIntBuffer<UInt8>
     @inline(__always)
@@ -246,7 +246,7 @@ extension UTF8.ReverseParser : Unicode.Parser, _UTFParser {
     }
     return 1
   }
-  
+
   @inline(__always)
   @inlinable
   public func _bufferedScalar(bitCount: UInt8) -> Encoding.EncodedScalar {
@@ -263,7 +263,7 @@ extension Unicode.UTF8.ForwardParser : Unicode.Parser, _UTFParser {
   @inlinable
   public func _parseMultipleCodeUnits() -> (isValid: Bool, bitCount: UInt8) {
     _internalInvariant(_buffer._storage & 0x80 != 0) // this case handled elsewhere
-    
+
     if _buffer._storage & 0b0__1100_0000__1110_0000
                        == 0b0__1000_0000__1100_0000 {
       // 2-byte sequence. At least one of the top 4 bits of the decoded result
@@ -317,7 +317,7 @@ extension Unicode.UTF8.ForwardParser : Unicode.Parser, _UTFParser {
     }
     return 1
   }
-  
+
   @inlinable
   public func _bufferedScalar(bitCount: UInt8) -> Encoding.EncodedScalar {
     let x = UInt32(_buffer._storage) &+ 0x01010101

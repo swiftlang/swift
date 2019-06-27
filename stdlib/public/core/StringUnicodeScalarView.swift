@@ -60,7 +60,7 @@ extension String {
   ///         print(asciiPrefix)
   ///     }
   ///     // Prints "My favorite emoji is "
-  @_fixed_layout
+  @frozen
   public struct UnicodeScalarView {
     @usableFromInline
     internal var _guts: _StringGuts
@@ -106,15 +106,21 @@ extension String.UnicodeScalarView: BidirectionalCollection {
   /// - Precondition: The next location exists.
   @inlinable @inline(__always)
   public func index(after i: Index) -> Index {
+    let i = _guts.scalarAlign(i)
     _internalInvariant(i < endIndex)
     // TODO(String performance): isASCII fast-path
 
     if _fastPath(_guts.isFastUTF8) {
       let len = _guts.fastUTF8ScalarLength(startingAt: i._encodedOffset)
-      return i.encoded(offsetBy: len)
+      return i.encoded(offsetBy: len)._aligned
     }
 
     return _foreignIndex(after: i)
+  }
+
+  @_alwaysEmitIntoClient // Swift 5.1 bug fix
+  public func distance(from start: Index, to end: Index) -> Int {
+    return _distance(from: _guts.scalarAlign(start), to: _guts.scalarAlign(end))
   }
 
   /// Returns the previous consecutive location before `i`.
@@ -122,6 +128,7 @@ extension String.UnicodeScalarView: BidirectionalCollection {
   /// - Precondition: The previous location exists.
   @inlinable @inline(__always)
   public func index(before i: Index) -> Index {
+    let i = _guts.scalarAlign(i)
     precondition(i._encodedOffset > 0)
     // TODO(String performance): isASCII fast-path
 
@@ -130,7 +137,7 @@ extension String.UnicodeScalarView: BidirectionalCollection {
         return _utf8ScalarLength(utf8, endingAt: i._encodedOffset)
       }
       _internalInvariant(len <= 4, "invalid UTF8")
-      return i.encoded(offsetBy: -len)
+      return i.encoded(offsetBy: -len)._aligned
     }
 
     return _foreignIndex(before: i)
@@ -161,7 +168,7 @@ extension String.UnicodeScalarView: BidirectionalCollection {
 }
 
 extension String.UnicodeScalarView {
-  @_fixed_layout
+  @frozen
   public struct Iterator: IteratorProtocol {
     @usableFromInline
     internal var _guts: _StringGuts
@@ -412,7 +419,7 @@ extension String.UnicodeScalarView {
     let cu = _guts.foreignErrorCorrectedUTF16CodeUnit(at: i)
     let len = UTF16.isLeadSurrogate(cu) ? 2 : 1
 
-    return i.encoded(offsetBy: len)
+    return i.encoded(offsetBy: len)._aligned
   }
 
   @usableFromInline @inline(never)
@@ -423,6 +430,6 @@ extension String.UnicodeScalarView {
     let cu = _guts.foreignErrorCorrectedUTF16CodeUnit(at: priorIdx)
     let len = UTF16.isTrailSurrogate(cu) ? 2 : 1
 
-    return i.encoded(offsetBy: -len)
+    return i.encoded(offsetBy: -len)._aligned
   }
 }

@@ -217,6 +217,8 @@ enum ContextualTypePurpose {
   CTP_DictionaryValue,  ///< DictionaryExpr values should have a specific type.
   CTP_CoerceOperand,    ///< CoerceExpr operand coerced to specific type.
   CTP_AssignSource,     ///< AssignExpr source operand coerced to result type.
+  CTP_SubscriptAssignSource, ///< AssignExpr source operand coerced to subscript
+                             ///< result type.
 
   CTP_CannotFail,       ///< Conversion can never fail. abort() if it does.
 };
@@ -488,29 +490,18 @@ enum class RequirementCheckResult {
 enum class ConformanceCheckFlags {
   /// Whether we're performing the check from within an expression.
   InExpression = 0x01,
-  /// Whether we will be using the conformance in the AST.
-  ///
-  /// This implies that the conformance will have to be complete.
-  Used = 0x02,
   /// Whether to suppress dependency tracking entirely.
   ///
   /// FIXME: This deals with some oddities with the
   /// _ObjectiveCBridgeable conformances.
-  SuppressDependencyTracking = 0x04,
+  SuppressDependencyTracking = 0x02,
   /// Whether to skip the check for any conditional conformances.
   ///
   /// When set, the caller takes responsibility for any
   /// conditional requirements required for the conformance to be
   /// correctly used. Otherwise (the default), all of the conditional
   /// requirements will be checked.
-  SkipConditionalRequirements = 0x08,
-
-  /// Whether to require that the conditional requirements have been computed.
-  ///
-  /// When set, if the conditional requirements aren't available, they are just
-  /// skipped, and the caller is responsible for detecting and handling this
-  /// case (likely via another call to getConditionalRequirementsIfAvailable).
-  AllowUnavailableConditionalRequirements = 0x10,
+  SkipConditionalRequirements = 0x04,
 };
 
 /// Options that control protocol conformance checking.
@@ -550,10 +541,6 @@ public:
 
   /// Declarations that need their conformances checked.
   llvm::SmallVector<Decl *, 8> ConformanceContexts;
-
-  /// The list of protocol conformances that were "used" and will need to be
-  /// completed before type checking is considered complete.
-  llvm::SetVector<NormalProtocolConformance *> UsedConformances;
 
   /// The list of protocol conformances whose requirements could not be
   /// fully checked and, therefore, should be checked again at the top
@@ -664,6 +651,9 @@ private:
   /// when executing scripts.
   bool InImmediateMode = false;
 
+  /// Closure expressions that have already been prechecked.
+  llvm::SmallPtrSet<ClosureExpr *, 2> precheckedClosures;
+
   /// A helper to construct and typecheck call to super.init().
   ///
   /// \returns NULL if the constructed expression does not typecheck.
@@ -671,6 +661,7 @@ private:
 
   TypeChecker(ASTContext &Ctx);
   friend class ASTContext;
+  friend class constraints::ConstraintSystem;
 
 public:
   /// Create a new type checker instance for the given ASTContext, if it
@@ -1030,6 +1021,7 @@ public:
   bool typeCheckDestructorBodyUntil(DestructorDecl *DD,
                                     SourceLoc EndTypeCheckLoc);
 
+  bool typeCheckFunctionBuilderFuncBody(FuncDecl *FD, Type builderType);
   bool typeCheckClosureBody(ClosureExpr *closure);
 
   bool typeCheckTapBody(TapExpr *expr, DeclContext *DC);
@@ -1191,7 +1183,7 @@ public:
       ArrayRef<Requirement> requirements,
       TypeSubstitutionFn substitutions,
       LookupConformanceFn conformances,
-      ConformanceCheckOptions conformanceOptions = ConformanceCheckFlags::Used,
+      ConformanceCheckOptions conformanceOptions,
       GenericRequirementsCheckListener *listener = nullptr,
       SubstOptions options = None);
 
@@ -1656,11 +1648,6 @@ public:
                                            ConformanceCheckOptions options,
                                            SourceLoc ComplainLoc = SourceLoc());
 
-  /// Mark the given protocol conformance as "used" from the given declaration
-  /// context.
-  void markConformanceUsed(ProtocolConformanceRef conformance,
-                           DeclContext *dc) override final;
-
   /// Functor class suitable for use as a \c LookupConformanceFn to look up a
   /// conformance through a particular declaration context using the given
   /// type checker.
@@ -1680,8 +1667,7 @@ public:
   void checkConformance(NormalProtocolConformance *conformance);
 
   /// Check the requirement signature of the given conformance.
-  void checkConformanceRequirements(NormalProtocolConformance *conformance)
-         override ;
+  void checkConformanceRequirements(NormalProtocolConformance *conformance);
 
   /// Check all of the conformances in the given context.
   void checkConformancesInContext(DeclContext *dc,
@@ -2034,7 +2020,7 @@ public:
   void checkFunctionErrorHandling(AbstractFunctionDecl *D);
   void checkInitializerErrorHandling(Initializer *I, Expr *E);
   void checkEnumElementErrorHandling(EnumElementDecl *D);
-  void checkPropertyDelegateErrorHandling(PatternBindingDecl *binding,
+  void checkPropertyWrapperErrorHandling(PatternBindingDecl *binding,
                                           Expr *expr);
 
   void addExprForDiagnosis(Expr *E1, Expr *Result) {
@@ -2155,6 +2141,24 @@ bool isValidStringDynamicMemberLookup(SubscriptDecl *decl, DeclContext *DC,
 /// takes a single non-variadic parameter of `{Writable}KeyPath<T, U>` type.
 bool isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl, TypeChecker &TC);
 
+/// Compute the wrapped value type for the given property that has attached
+/// property wrappers, when the backing storage is known to have the given type.
+///
+/// \param var A property that has attached property wrappers.
+/// \param backingStorageType The type of the backing storage property.
+/// \param limit How many levels of unwrapping to perform, where 0 means to return the
+/// \c backingStorageType directly and the maximum is the number of attached property wrappers
+/// (which will produce the original property type). If not specified, defaults to the maximum.
+Type computeWrappedValueType(VarDecl *var, Type backingStorageType,
+                             Optional<unsigned> limit = None);
+  
+/// Build a call to the init(initialValue:) initializers of the property wrappers, filling in the given
+/// \c value as the original value.
+Expr *buildPropertyWrapperInitialValueCall(VarDecl *var,
+                                           Type backingStorageType,
+                                           Expr *value,
+                                           bool ignoreAttributeArgs);
+  
 /// Whether an overriding declaration requires the 'override' keyword.
 enum class OverrideRequiresKeyword {
   /// The keyword is never required.

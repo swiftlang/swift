@@ -92,14 +92,20 @@ extension String {
 ///   when there is no other reference to the original string. Storing
 ///   substrings may, therefore, prolong the lifetime of string data that is
 ///   no longer otherwise accessible, which can appear to be memory leakage.
-@_fixed_layout
+@frozen
 public struct Substring {
   @usableFromInline
   internal var _slice: Slice<String>
 
-  @inlinable @inline(__always)
+  @inlinable
   internal init(_ slice: Slice<String>) {
-    self._slice = slice
+    let _guts = slice.base._guts
+    let start = _guts.scalarAlign(slice.startIndex)
+    let end = _guts.scalarAlign(slice.endIndex)
+
+    self._slice = Slice(
+      base: slice.base,
+      bounds: Range(uncheckedBounds: (start, end)))
     _invariantCheck()
   }
 
@@ -123,15 +129,10 @@ extension Substring {
   @inlinable @inline(__always)
   internal var _wholeGuts: _StringGuts { return base._guts }
 
-  @inlinable
+  @inlinable @inline(__always)
   internal var _offsetRange: Range<Int> {
-    @inline(__always) get {
-      let start = _slice.startIndex
-      let end = _slice.endIndex
-      _internalInvariant(start.transcodedOffset == 0 && end.transcodedOffset == 0)
-
-      return Range(uncheckedBounds: (start._encodedOffset, end._encodedOffset))
-    }
+    return Range(
+      uncheckedBounds: (startIndex._encodedOffset, endIndex._encodedOffset))
   }
 
   #if !INTERNAL_CHECKS_ENABLED
@@ -139,6 +140,11 @@ extension Substring {
   #else
   @usableFromInline @inline(never) @_effects(releasenone)
   internal func _invariantCheck() {
+    // Indices are always scalar aligned
+    _internalInvariant(
+      _slice.startIndex == base._guts.scalarAlign(_slice.startIndex) &&
+      _slice.endIndex == base._guts.scalarAlign(_slice.endIndex))
+
     self.base._invariantCheck()
   }
   #endif // INTERNAL_CHECKS_ENABLED
@@ -322,7 +328,7 @@ extension Substring : LosslessStringConvertible {
 }
 
 extension Substring {
-  @_fixed_layout
+  @frozen
   public struct UTF8View {
     @usableFromInline
     internal var _slice: Slice<String.UTF8View>
@@ -448,7 +454,7 @@ extension String {
   }
 }
 extension Substring {
-  @_fixed_layout
+  @frozen
   public struct UTF16View {
     @usableFromInline
     internal var _slice: Slice<String.UTF16View>
@@ -574,7 +580,7 @@ extension String {
   }
 }
 extension Substring {
-  @_fixed_layout
+  @frozen
   public struct UnicodeScalarView {
     @usableFromInline
     internal var _slice: Slice<String.UnicodeScalarView>

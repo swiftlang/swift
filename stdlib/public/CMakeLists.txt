@@ -52,6 +52,7 @@ if(CXX_SUPPORTS_DEFAULT_HIDDEN_VISIBILITY)
   list(APPEND SWIFT_RUNTIME_CORE_CXX_FLAGS "-fvisibility=hidden")
 endif()
 
+add_subdirectory(legacy_layouts)
 add_subdirectory(SwiftShims)
 
 if(SWIFT_BUILD_STDLIB)
@@ -61,6 +62,8 @@ if(SWIFT_BUILD_STDLIB)
   add_subdirectory(stubs)
   add_subdirectory(core)
   add_subdirectory(SwiftOnoneSupport)
+  add_subdirectory(Compatibility50)
+  add_subdirectory(CompatibilityDynamicReplacements)
 endif()
 
 if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_REMOTE_MIRROR)

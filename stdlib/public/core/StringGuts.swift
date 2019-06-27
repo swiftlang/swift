@@ -16,7 +16,7 @@ import SwiftShims
 // StringGuts is a parameterization over String's representations. It provides
 // functionality and guidance for efficiently working with Strings.
 //
-@_fixed_layout
+@frozen
 public // SPI(corelibs-foundation)
 struct _StringGuts {
   @usableFromInline
@@ -268,11 +268,11 @@ extension _StringGuts {
 
   @inlinable @inline(__always)
   internal var startIndex: String.Index {
-   return Index(_encodedOffset: 0)
+   return Index(_encodedOffset: 0)._aligned
   }
   @inlinable @inline(__always)
   internal var endIndex: String.Index {
-    return Index(_encodedOffset: self.count)
+    return Index(_encodedOffset: self.count)._aligned
   }
 }
 

@@ -255,7 +255,7 @@ Type ASTBuilder::createBoundGenericType(GenericTypeDecl *decl,
 }
 
 Type ASTBuilder::resolveOpaqueType(NodePointer opaqueDescriptor,
-                                   ArrayRef<Type> args,
+                                   ArrayRef<ArrayRef<Type>> args,
                                    unsigned ordinal) {
   if (opaqueDescriptor->getKind() == Node::Kind::OpaqueReturnTypeOf) {
     auto definingDecl = opaqueDescriptor->getChild(0);
@@ -278,9 +278,14 @@ Type ASTBuilder::resolveOpaqueType(NodePointer opaqueDescriptor,
     assert(ordinal == 0 && "not implemented");
     if (ordinal != 0)
       return Type();
+    
+    SmallVector<Type, 8> allArgs;
+    for (auto argSet : args) {
+      allArgs.append(argSet.begin(), argSet.end());
+    }
 
     SubstitutionMap subs = createSubstitutionMapFromGenericArgs(
-                         opaqueDecl->getGenericSignature(), args, parentModule);
+                      opaqueDecl->getGenericSignature(), allArgs, parentModule);
     return OpaqueTypeArchetypeType::get(opaqueDecl, subs);
   }
   
@@ -378,10 +383,14 @@ Type ASTBuilder::createFunctionType(
 
   auto einfo = AnyFunctionType::ExtInfo(representation,
                                         /*throws*/ flags.throws());
-  if (flags.isEscaping())
-    einfo = einfo.withNoEscape(false);
-  else
-    einfo = einfo.withNoEscape(true);
+
+  if (representation == FunctionTypeRepresentation::Swift ||
+      representation == FunctionTypeRepresentation::Block) {
+    if (flags.isEscaping())
+      einfo = einfo.withNoEscape(false);
+    else
+      einfo = einfo.withNoEscape(true);
+  }
 
   // The result type must be materializable.
   if (!output->isMaterializable()) return Type();
@@ -428,6 +437,7 @@ getParameterConvention(ImplParameterConvention conv) {
   case Demangle::ImplParameterConvention::Direct_Guaranteed:
     return ParameterConvention::Direct_Guaranteed;
   }
+  llvm_unreachable("covered switch");
 }
 
 static ResultConvention getResultConvention(ImplResultConvention conv) {
@@ -443,6 +453,7 @@ static ResultConvention getResultConvention(ImplResultConvention conv) {
   case Demangle::ImplResultConvention::Autoreleased:
     return ResultConvention::Autoreleased;
   }
+  llvm_unreachable("covered switch");
 }
 
 Type ASTBuilder::createImplFunctionType(
@@ -539,6 +550,7 @@ getMetatypeRepresentation(ImplMetatypeRepresentation repr) {
   case Demangle::ImplMetatypeRepresentation::ObjC:
     return MetatypeRepresentation::ObjC;
   }
+  llvm_unreachable("covered switch");
 }
 
 Type ASTBuilder::createExistentialMetatypeType(Type instance,

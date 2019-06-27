@@ -154,7 +154,7 @@ internal func validateUTF8(_ buf: UnsafeBufferPointer<UInt8>) -> UTF8ValidationR
 }
 
 internal func repairUTF8(_ input: UnsafeBufferPointer<UInt8>, firstKnownBrokenRange: Range<Int>) -> String {
-  _internalInvariant(input.count > 0, "empty input doesn't need to be repaired")
+  _internalInvariant(!input.isEmpty, "empty input doesn't need to be repaired")
   _internalInvariant(firstKnownBrokenRange.clamped(to: input.indices) == firstKnownBrokenRange)
   // During this process, `remainingInput` contains the remaining bytes to process. It's split into three
   // non-overlapping sub-regions:
@@ -176,8 +176,8 @@ internal func repairUTF8(_ input: UnsafeBufferPointer<UInt8>, firstKnownBrokenRa
   var brokenRange: Range<Int> = firstKnownBrokenRange
   var remainingInput = input
   repeat {
-    _internalInvariant(brokenRange.count > 0, "broken range empty")
-    _internalInvariant(remainingInput.count > 0, "empty remaining input doesn't need to be repaired")
+    _internalInvariant(!brokenRange.isEmpty, "broken range empty")
+    _internalInvariant(!remainingInput.isEmpty, "empty remaining input doesn't need to be repaired")
     let goodChunk = remainingInput[..<brokenRange.startIndex]
 
     // very likely this capacity reservation does not actually do anything because we reserved space for the entire
@@ -199,6 +199,6 @@ internal func repairUTF8(_ input: UnsafeBufferPointer<UInt8>, firstKnownBrokenRa
     case .error(let newBrokenRange):
       brokenRange = newBrokenRange
     }
-  } while remainingInput.count > 0
+  } while !remainingInput.isEmpty
   return String(result)
 }

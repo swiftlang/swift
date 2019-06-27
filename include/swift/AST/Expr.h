@@ -1009,8 +1009,6 @@ public:
     return Loc;
   }
   SourceLoc getTrailingQuoteLoc() const {
-    // Except when computing a SourceRange for an ASTScope. Then the range
-    // must be (Start - TrainingQuoteLoc).
     return TrailingQuoteLoc;
   }
 
@@ -1135,6 +1133,7 @@ private:
   Expr *Arg;
   Expr *SemanticExpr;
   SourceLoc PoundLoc;
+  ConcreteDeclRef Initializer;
 
   ObjectLiteralExpr(SourceLoc PoundLoc, LiteralKind LitKind,
                     Expr *Arg,
@@ -1194,6 +1193,15 @@ public:
   StringRef getLiteralKindRawName() const;
 
   StringRef getLiteralKindPlainName() const;
+
+  /// Retrieve the initializer that will be used to construct the 'object'
+  /// literal from the result of the initializer.
+  ConcreteDeclRef getInitializer() const { return Initializer; }
+
+  /// Set the initializer that will be used to construct the 'object' literal.
+  void setInitializer(ConcreteDeclRef initializer) {
+    Initializer = initializer;
+  }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::ObjectLiteral;
@@ -2118,8 +2126,6 @@ class CollectionExpr : public Expr {
   SourceLoc RBracketLoc;
   ConcreteDeclRef Initializer;
 
-  Expr *SemanticExpr = nullptr;
-
   /// Retrieve the intrusive pointer storage from the subtype
   Expr *const *getTrailingObjectsPointer() const;
   Expr **getTrailingObjectsPointer() {
@@ -2184,9 +2190,6 @@ public:
   SourceRange getSourceRange() const {
     return SourceRange(LBracketLoc, RBracketLoc);
   }
-  
-  Expr *getSemanticExpr() const { return SemanticExpr; }
-  void setSemanticExpr(Expr *e) { SemanticExpr = e; }
 
   static bool classof(const Expr *e) {
     return e->getKind() >= ExprKind::First_CollectionExpr &&
@@ -2264,6 +2267,8 @@ public:
   static bool classof(const Expr *e) {
     return e->getKind() == ExprKind::Dictionary;
   }
+
+  Type getElementType();
 };
 
 /// Subscripting expressions like a[i] that refer to an element within a
@@ -4685,6 +4690,9 @@ public:
   SourceRange getSourceRange() const { return Loc; }
   TypeLoc &getTypeLoc() { return PlaceholderTy; }
   TypeLoc getTypeLoc() const { return PlaceholderTy; }
+  SourceLoc getTrailingAngleBracketLoc() const {
+    return Loc.getAdvancedLoc(Placeholder.getLength() - 1);
+  }
 
   /// The TypeRepr to be considered for placeholder expansion.
   TypeRepr *getTypeForExpansion() const { return ExpansionTyR; }

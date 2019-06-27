@@ -19,6 +19,7 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/Comment.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -94,7 +95,7 @@ static bool contributesToParentTypeStorage(const AbstractStorageDecl *ASD) {
   return !ND->isResilient() && ASD->hasStorage() && !ASD->isStatic();
 }
 
-PrintOptions PrintOptions::printParseableInterfaceFile() {
+PrintOptions PrintOptions::printParseableInterfaceFile(bool preferTypeRepr) {
   PrintOptions result;
   result.PrintLongAttrsOnSeparateLines = true;
   result.TypeDefinitions = true;
@@ -110,6 +111,7 @@ PrintOptions PrintOptions::printParseableInterfaceFile() {
   result.EnumRawValues = EnumRawValueMode::PrintObjCOnly;
   result.OpaqueReturnTypePrinting =
       OpaqueReturnTypePrintingMode::StableReference;
+  result.PreferTypeRepr = preferTypeRepr;
 
   // We should print __consuming, __owned, etc for the module interface file.
   result.SkipUnderscoredKeywords = false;
@@ -125,6 +127,10 @@ PrintOptions PrintOptions::printParseableInterfaceFile() {
 
   class ShouldPrintForParseableInterface : public ShouldPrintChecker {
     bool shouldPrint(const Decl *D, const PrintOptions &options) override {
+      // Skip anything that is marked `@_implementationOnly` itself.
+      if (D->getAttrs().hasAttribute<ImplementationOnlyAttr>())
+        return false;
+
       // Skip anything that isn't 'public' or '@usableFromInline'.
       if (auto *VD = dyn_cast<ValueDecl>(D)) {
         if (!isPublicOrUsableFromInline(VD)) {
@@ -243,24 +249,6 @@ std::string ASTPrinter::sanitizeUtf8(StringRef Text) {
     Data += Step;
   }
   return Builder.str();
-}
-
-ValueDecl* ASTPrinter::findConformancesWithDocComment(ValueDecl *VD) {
-  assert(VD->getRawComment().isEmpty());
-  std::queue<ValueDecl*> AllConformances;
-  AllConformances.push(VD);
-  while (!AllConformances.empty()) {
-    auto *VD = AllConformances.front();
-    AllConformances.pop();
-    if (VD->getRawComment().isEmpty()) {
-      for (auto *Req : VD->getSatisfiedProtocolRequirements()) {
-        AllConformances.push(Req);
-      }
-    } else {
-      return VD;
-    }
-  }
-  return nullptr;
 }
 
 void ASTPrinter::anchor() {}
@@ -564,20 +552,14 @@ class PrintAST : public ASTVisitor<PrintAST> {
   }
 
   void printSwiftDocumentationComment(const Decl *D) {
-    auto RC = D->getRawComment();
-    if (RC.isEmpty() && !Options.ElevateDocCommentFromConformance)
+    if (Options.CascadeDocComment)
+      D = getDocCommentProvidingDecl(D);
+    if (!D)
       return;
-
-    if (RC.isEmpty()) {
-      if (auto *VD = dyn_cast<ValueDecl>(D)) {
-        if (auto *Req = ASTPrinter::findConformancesWithDocComment(
-            const_cast<ValueDecl*>(VD))) {
-          printRawComment(Req->getRawComment());
-        }
-      }
-    } else {
-      printRawComment(RC);
-    }
+    auto RC = D->getRawComment();
+    if (RC.isEmpty())
+      return;
+    printRawComment(RC);
   }
 
   void printDocumentationComment(const Decl *D) {
@@ -1004,7 +986,18 @@ void PrintAST::printAttributes(const Decl *D) {
 void PrintAST::printTypedPattern(const TypedPattern *TP) {
   printPattern(TP->getSubPattern());
   Printer << ": ";
-  printTypeLoc(TP->getTypeLoc());
+
+  // Make sure to check if the underlying var decl is an implicitly unwrapped
+  // optional.
+  bool isIUO = false;
+  if (auto *named = dyn_cast<NamedPattern>(TP->getSubPattern()))
+    if (auto decl = named->getDecl())
+      isIUO = decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+
+  if (isIUO)
+    printTypeLocForImplicitlyUnwrappedOptional(TP->getTypeLoc());
+  else
+    printTypeLoc(TP->getTypeLoc());
 }
 
 /// Determines if we are required to print the name of a property declaration,
@@ -2530,6 +2523,14 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
       tyLoc = TypeLoc::withoutLoc(decl->getInterfaceType());
 
     Printer.printDeclResultTypePre(decl, tyLoc);
+
+    // HACK: When printing result types for vars with opaque result types,
+    //       always print them using the `some` keyword instead of printing
+    //       the full stable reference.
+    llvm::SaveAndRestore<PrintOptions::OpaqueReturnTypePrintingMode>
+    x(Options.OpaqueReturnTypePrinting,
+      PrintOptions::OpaqueReturnTypePrintingMode::WithOpaqueKeyword);
+
     if (decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
       printTypeLocForImplicitlyUnwrappedOptional(tyLoc);
     else
@@ -2590,6 +2591,7 @@ void PrintAST::printOneParameter(const ParamDecl *param,
 
   auto TheTypeLoc = param->getTypeLoc();
 
+  printAttributes(param);
   printArgName();
 
   if (!TheTypeLoc.getTypeRepr() && param->hasInterfaceType())
@@ -2744,12 +2746,13 @@ void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
 }
 
 void PrintAST::visitFuncDecl(FuncDecl *decl) {
+  ASTContext &Ctx = decl->getASTContext();
+
   printDocumentationComment(decl);
   printAttributes(decl);
   printAccess(decl);
 
   if (Options.PrintOriginalSourceText && decl->getStartLoc().isValid()) {
-    ASTContext &Ctx = decl->getASTContext();
     SourceLoc StartLoc = decl->getStartLoc();
     SourceLoc EndLoc;
     if (!decl->getBodyResultTypeLoc().isNull()) {
@@ -2791,19 +2794,47 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
     Type ResultTy = decl->getResultInterfaceType();
     if (ResultTy && !ResultTy->isVoid()) {
       TypeLoc ResultTyLoc = decl->getBodyResultTypeLoc();
+
+      // When printing a protocol requirement with types substituted for a
+      // conforming class, replace occurrences of the 'Self' generic parameter
+      // in the result type with DynamicSelfType, instead of the static
+      // conforming type.
+      auto *proto = dyn_cast<ProtocolDecl>(decl->getDeclContext());
+      if (proto && Options.TransformContext) {
+        auto BaseType = Options.TransformContext->getBaseType();
+        if (BaseType->getClassOrBoundGenericClass()) {
+          ResultTy = ResultTy.subst(
+            [&](Type t) -> Type {
+              if (t->isEqual(proto->getSelfInterfaceType()))
+                return DynamicSelfType::get(t, Ctx);
+              return t;
+            },
+            MakeAbstractConformanceForGenericType());
+          ResultTyLoc = TypeLoc::withoutLoc(ResultTy);
+        }
+      }
+
       if (!ResultTyLoc.getTypeRepr())
         ResultTyLoc = TypeLoc::withoutLoc(ResultTy);
       // FIXME: Hacky way to workaround the fact that 'Self' as return
       // TypeRepr is not getting 'typechecked'. See
       // \c resolveTopLevelIdentTypeComponent function in TypeCheckType.cpp.
       if (auto *simId = dyn_cast_or_null<SimpleIdentTypeRepr>(ResultTyLoc.getTypeRepr())) {
-        if (simId->getIdentifier().str() == "Self")
+        if (simId->getIdentifier() == Ctx.Id_Self)
           ResultTyLoc = TypeLoc::withoutLoc(ResultTy);
       }
       Printer << " -> ";
 
       Printer.printDeclResultTypePre(decl, ResultTyLoc);
       Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
+
+      // HACK: When printing result types for funcs with opaque result types,
+      //       always print them using the `some` keyword instead of printing
+      //       the full stable reference.
+      llvm::SaveAndRestore<PrintOptions::OpaqueReturnTypePrintingMode>
+      x(Options.OpaqueReturnTypePrinting,
+        PrintOptions::OpaqueReturnTypePrintingMode::WithOpaqueKeyword);
+
       if (decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
         printTypeLocForImplicitlyUnwrappedOptional(ResultTyLoc);
       else
@@ -2946,6 +2977,14 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
   Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
   if (!elementTy.getTypeRepr())
     elementTy = TypeLoc::withoutLoc(decl->getElementInterfaceType());
+
+  // HACK: When printing result types for subscripts with opaque result types,
+  //       always print them using the `some` keyword instead of printing
+  //       the full stable reference.
+  llvm::SaveAndRestore<PrintOptions::OpaqueReturnTypePrintingMode>
+  x(Options.OpaqueReturnTypePrinting,
+    PrintOptions::OpaqueReturnTypePrintingMode::WithOpaqueKeyword);
+
   if (decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
     printTypeLocForImplicitlyUnwrappedOptional(elementTy);
   else
@@ -3415,7 +3454,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     }
 
     bool isSimple = T->hasSimpleTypeRepr();
-    if (isSimple && T->is<OpaqueTypeArchetypeType>()) {
+    if (!isSimple && T->is<OpaqueTypeArchetypeType>()) {
       auto opaqueTy = T->castTo<OpaqueTypeArchetypeType>();
       switch (Options.OpaqueReturnTypePrinting) {
       case PrintOptions::OpaqueReturnTypePrintingMode::StableReference:
@@ -4207,7 +4246,7 @@ public:
   void visitOpaqueTypeArchetypeType(OpaqueTypeArchetypeType *T) {
     switch (Options.OpaqueReturnTypePrinting) {
     case PrintOptions::OpaqueReturnTypePrintingMode::WithOpaqueKeyword:
-      Printer << "some ";
+      Printer.printKeyword("some", Options, /*Suffix=*/" ");
       LLVM_FALLTHROUGH;
     case PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword: {
       visit(T->getExistentialType());

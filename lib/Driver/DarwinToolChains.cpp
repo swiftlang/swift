@@ -33,6 +33,7 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/Program.h"
+#include "llvm/Support/VersionTuple.h"
 
 using namespace swift;
 using namespace swift::driver;
@@ -222,7 +223,7 @@ static bool wantsObjCRuntime(const llvm::Triple &triple) {
 }
 
 ToolChain::InvocationInfo
-toolchains::Darwin::constructInvocation(const LinkJobAction &job,
+toolchains::Darwin::constructInvocation(const DynamicLinkJobAction &job,
                                         const JobContext &context) const {
   assert(context.Output.getPrimaryOutputType() == file_types::TY_Image &&
          "Invalid linker output type.");
@@ -284,6 +285,8 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
   case LinkKind::DynamicLibrary:
     Arguments.push_back("-dylib");
     break;
+  case LinkKind::StaticLibrary:
+    llvm_unreachable("the dynamic linker cannot build static libraries");
   }
 
   assert(Triple.isOSDarwin());
@@ -392,6 +395,55 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
   SmallString<128> RuntimeLibPath;
   getRuntimeLibraryPath(RuntimeLibPath, context.Args, /*Shared=*/true);
 
+  // Link compatibility libraries, if we're deploying back to OSes that
+  // have an older Swift runtime.
+  Optional<llvm::VersionTuple> runtimeCompatibilityVersion;
+  
+  if (context.Args.hasArg(options::OPT_runtime_compatibility_version)) {
+    auto value = context.Args.getLastArgValue(
+                                    options::OPT_runtime_compatibility_version);
+    if (value.equals("5.0")) {
+      runtimeCompatibilityVersion = llvm::VersionTuple(5, 0);
+    } else if (value.equals("none")) {
+      runtimeCompatibilityVersion = None;
+    } else {
+      // TODO: diagnose unknown runtime compatibility version?
+    }
+  } else if (job.getKind() == LinkKind::Executable) {
+    runtimeCompatibilityVersion
+                         = getSwiftRuntimeCompatibilityVersionForTarget(Triple);
+  }
+  
+  if (runtimeCompatibilityVersion) {
+    if (*runtimeCompatibilityVersion <= llvm::VersionTuple(5, 0)) {
+      // Swift 5.0 compatibility library
+      SmallString<128> BackDeployLib;
+      BackDeployLib.append(RuntimeLibPath);
+      llvm::sys::path::append(BackDeployLib, "libswiftCompatibility50.a");
+      
+      if (llvm::sys::fs::exists(BackDeployLib)) {
+        Arguments.push_back("-force_load");
+        Arguments.push_back(context.Args.MakeArgString(BackDeployLib));
+      }
+    }
+  }
+    
+  if (job.getKind() == LinkKind::Executable) {
+    if (runtimeCompatibilityVersion)
+      if (*runtimeCompatibilityVersion <= llvm::VersionTuple(5, 0)) {
+        // Swift 5.0 dynamic replacement compatibility library.
+        SmallString<128> BackDeployLib;
+        BackDeployLib.append(RuntimeLibPath);
+        llvm::sys::path::append(BackDeployLib,
+                                "libswiftCompatibilityDynamicReplacements.a");
+
+        if (llvm::sys::fs::exists(BackDeployLib)) {
+          Arguments.push_back("-force_load");
+          Arguments.push_back(context.Args.MakeArgString(BackDeployLib));
+        }
+      }
+  }
+
   // Link the standard library.
   Arguments.push_back("-L");
   if (context.Args.hasFlag(options::OPT_static_stdlib,
@@ -486,6 +538,41 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
 
   // This should be the last option, for convenience in checking output.
   Arguments.push_back("-o");
+  Arguments.push_back(
+      context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
+
+  return II;
+}
+
+
+ToolChain::InvocationInfo
+toolchains::Darwin::constructInvocation(const StaticLinkJobAction &job,
+                                        const JobContext &context) const {
+   assert(context.Output.getPrimaryOutputType() == file_types::TY_Image &&
+         "Invalid linker output type.");
+
+  // Configure the toolchain.
+  const char *LibTool = "libtool";
+
+  InvocationInfo II = {LibTool};
+  ArgStringList &Arguments = II.Arguments;
+
+  Arguments.push_back("-static");
+
+  if (context.shouldUseInputFileList()) {
+    Arguments.push_back("-filelist");
+    Arguments.push_back(context.getTemporaryFilePath("inputs", "LinkFileList"));
+    II.FilelistInfos.push_back({Arguments.back(), file_types::TY_Object,
+                                FilelistInfo::WhichFiles::Input});
+  } else {
+    addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
+                           file_types::TY_Object);
+  }
+
+  addInputsOfType(Arguments, context.InputActions, file_types::TY_Object);
+
+  Arguments.push_back("-o");
+
   Arguments.push_back(
       context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
 

@@ -904,8 +904,9 @@ NormalProtocolConformance::getAssociatedConformance(Type assocType,
   // Fill in the signature conformances, if we haven't done so yet.
   if (getSignatureConformances().empty()) {
     assocType->getASTContext().getLazyResolver()
-      ->checkConformanceRequirements(
-        const_cast<NormalProtocolConformance *>(this));
+      ->resolveTypeWitness(
+        const_cast<NormalProtocolConformance *>(this),
+        nullptr);
   }
 
   assert(!getSignatureConformances().empty() &&
@@ -965,8 +966,23 @@ Witness SelfProtocolConformance::getWitness(ValueDecl *requirement,
 ConcreteDeclRef
 RootProtocolConformance::getWitnessDeclRef(ValueDecl *requirement,
                                            LazyResolver *resolver) const {
-  if (auto witness = getWitness(requirement, resolver))
-    return witness.getDeclRef();
+  if (auto witness = getWitness(requirement, resolver)) {
+    auto *witnessDecl = witness.getDecl();
+
+    // If the witness is generic, you have to call getWitness() and build
+    // your own substitutions in terms of the synthetic environment.
+    if (auto *witnessDC = dyn_cast<DeclContext>(witnessDecl))
+      assert(!witnessDC->isInnermostContextGeneric());
+
+    // If the witness is not generic, use type substitutions from the
+    // witness's parent. Don't use witness.getSubstitutions(), which
+    // are written in terms of the synthetic environment.
+    auto subs =
+      getType()->getContextSubstitutionMap(getDeclContext()->getParentModule(),
+                                           witnessDecl->getDeclContext());
+    return ConcreteDeclRef(witness.getDecl(), subs);
+  }
+
   return ConcreteDeclRef();
 }
 
@@ -1119,11 +1135,6 @@ SpecializedProtocolConformance::getWitnessDeclRef(
   auto witnessMap = baseWitness.getSubstitutions();
 
   auto combinedMap = witnessMap.subst(specializationMap);
-
-  // Fast path if the substitutions didn't change.
-  if (combinedMap == baseWitness.getSubstitutions())
-    return baseWitness;
-
   return ConcreteDeclRef(witnessDecl, combinedMap);
 }
 

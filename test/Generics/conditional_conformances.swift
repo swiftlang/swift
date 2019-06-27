@@ -402,3 +402,14 @@ extension BinaryInteger {
             // expected-error@-1 {{referencing instance method 'reduce' on 'ClosedRange' requires that 'Self.Stride' conform to 'SignedInteger'}}
   }
 }
+
+// SR-10992
+
+protocol SR_10992_P {}
+struct SR_10992_S<T> {}
+extension SR_10992_S: SR_10992_P where T: SR_10992_P {} // expected-note {{requirement from conditional conformance of 'SR_10992_S<String>' to 'SR_10992_P'}}
+	
+func sr_10992_foo(_ fn: (SR_10992_S<String>) -> Void) {}
+func sr_10992_bar(_ fn: (SR_10992_P) -> Void) {
+  sr_10992_foo(fn) // expected-error {{global function 'sr_10992_foo' requires that 'String' conform to 'SR_10992_P'}}
+}

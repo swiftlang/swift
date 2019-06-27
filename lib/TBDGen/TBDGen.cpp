@@ -197,8 +197,6 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
     addSymbol(LinkEntity::forDynamicallyReplaceableFunctionVariable(
         AFD, useAllocator));
     addSymbol(
-        LinkEntity::forDynamicallyReplaceableFunctionImpl(AFD, useAllocator));
-    addSymbol(
         LinkEntity::forDynamicallyReplaceableFunctionKey(AFD, useAllocator));
 
   }
@@ -524,6 +522,7 @@ static bool isValidProtocolMemberForTBDGen(const Decl *D) {
   case DeclKind::PostfixOperator:
     return false;
   }
+  llvm_unreachable("covered switch");
 }
 #endif
 

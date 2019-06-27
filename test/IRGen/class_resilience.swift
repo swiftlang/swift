@@ -255,7 +255,7 @@ extension ResilientGenericOutsideParent {
 // to their best-known value and made non-constant if that value might
 // disagree with the dynamic value.
 
-@_fixed_layout
+@frozen
 public struct Empty {}
 
 public class ClassWithEmptyThenResilient {

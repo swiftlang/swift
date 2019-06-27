@@ -1411,7 +1411,7 @@ static bool isApplyOfBuiltin(SILInstruction &I, BuiltinValueKind kind) {
 
 static bool isApplyOfStringConcat(SILInstruction &I) {
   if (auto *AI = dyn_cast<ApplyInst>(&I))
-    if (auto *Fn = AI->getReferencedFunction())
+    if (auto *Fn = AI->getReferencedFunctionOrNull())
       if (Fn->hasSemanticsAttr("string.concat"))
         return true;
   return false;

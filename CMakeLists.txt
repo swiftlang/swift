@@ -223,6 +223,17 @@ option(SWIFT_STDLIB_ENABLE_SIB_TARGETS
        "Should we generate sib targets for the stdlib or not?"
        FALSE)
 
+
+set(SWIFT_DARWIN_SUPPORTED_ARCHS "" CACHE STRING
+  "Semicolon-separated list of architectures to configure on Darwin platforms. \
+If left empty all default architectures are configured.")
+
+set(SWIFT_DARWIN_MODULE_ARCHS "" CACHE STRING
+  "Semicolon-separated list of architectures to configure Swift module-only \
+targets on Darwin platforms. These targets are in addition to the full \
+library targets.")
+
+
 #
 # User-configurable Android specific options.
 #
@@ -610,9 +621,9 @@ endif()
 if(SWIFT_HOST_VARIANT_ARCH)
   set(SWIFT_HOST_VARIANT_ARCH_default "${SWIFT_HOST_VARIANT_ARCH}")
 else()
-  if("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "x86_64")
+  if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
     set(SWIFT_HOST_VARIANT_ARCH_default "x86_64")
-  elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "aarch64")
+  elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|ARM64")
     set(SWIFT_HOST_VARIANT_ARCH_default "aarch64")
   elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "ppc64")
     set(SWIFT_HOST_VARIANT_ARCH_default "powerpc64")
@@ -625,8 +636,6 @@ else()
     set(SWIFT_HOST_VARIANT_ARCH_default "armv6")
   elseif("${CMAKE_SYSTEM_PROCESSOR}" MATCHES "armv7l|armv7-a")
     set(SWIFT_HOST_VARIANT_ARCH_default "armv7")
-  elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "AMD64")
-    set(SWIFT_HOST_VARIANT_ARCH_default "x86_64")
   elseif("${CMAKE_SYSTEM_PROCESSOR}" STREQUAL "IA64")
     set(SWIFT_HOST_VARIANT_ARCH_default "itanium")
   elseif("${CMAKE_SYSTEM_PROCESSOR}" MATCHES "(x86|i686)")
@@ -834,14 +843,18 @@ if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin" AND NOT CMAKE_CROSSCOMPILING)
   set(CMAKE_OSX_DEPLOYMENT_TARGET "")
 endif()
 
-message(STATUS "Building host Swift tools for ${SWIFT_HOST_VARIANT_SDK} ${SWIFT_HOST_VARIANT_ARCH}")
-message(STATUS "  Build type:     ${CMAKE_BUILD_TYPE}")
-message(STATUS "  Assertions:     ${LLVM_ENABLE_ASSERTIONS}")
-message(STATUS "  LTO:            ${SWIFT_TOOLS_ENABLE_LTO}")
-message(STATUS "")
+if(SWIFT_INCLUDE_TOOLS)
+  message(STATUS "Building host Swift tools for ${SWIFT_HOST_VARIANT_SDK} ${SWIFT_HOST_VARIANT_ARCH}")
+  message(STATUS "  Build type:     ${CMAKE_BUILD_TYPE}")
+  message(STATUS "  Assertions:     ${LLVM_ENABLE_ASSERTIONS}")
+  message(STATUS "  LTO:            ${SWIFT_TOOLS_ENABLE_LTO}")
+  message(STATUS "")
+else()
+  message(STATUS "Not building host Swift tools")
+  message(STATUS "")
+endif()
 
-if (SWIFT_BUILD_STDLIB OR SWIFT_BUILD_SDK_OVERLAY)
-
+if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_SDK_OVERLAY)
   message(STATUS "Building Swift standard library and overlays for SDKs: ${SWIFT_SDKS}")
   message(STATUS "  Build type:       ${SWIFT_STDLIB_BUILD_TYPE}")
   message(STATUS "  Assertions:       ${SWIFT_STDLIB_ASSERTIONS}")
@@ -850,12 +863,9 @@ if (SWIFT_BUILD_STDLIB OR SWIFT_BUILD_SDK_OVERLAY)
   message(STATUS "Building Swift runtime with:")
   message(STATUS "  Leak Detection Checker Entrypoints: ${SWIFT_RUNTIME_ENABLE_LEAK_CHECKER}")
   message(STATUS "")
-
 else()
-
   message(STATUS "Not building Swift standard library, SDK overlays, and runtime")
   message(STATUS "")
-
 endif()
 
 #
@@ -1068,10 +1078,13 @@ endif()
 if(SWIFT_BUILD_STDLIB)
   add_subdirectory(stdlib)
 else()
+  add_subdirectory(stdlib/public/legacy_layouts)
+
   # Some tools (e.g. swift-reflection-dump) rely on a host swiftReflection, so
   # ensure we build that when building tools.
   if(SWIFT_INCLUDE_TOOLS)
     add_subdirectory(stdlib/public/Reflection)
+    add_subdirectory(stdlib/public/SwiftShims)
   endif()
 endif()
 

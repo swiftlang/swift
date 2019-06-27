@@ -30,11 +30,14 @@
 namespace swift {
 
 class GenericParamList;
-struct PropertyDelegateBackingPropertyInfo;
+struct PropertyWrapperBackingPropertyInfo;
 class RequirementRepr;
 class SpecializeAttr;
 class TypeAliasDecl;
 struct TypeLoc;
+class ValueDecl;
+class AbstractStorageDecl;
+enum class OpaqueReadOwnership: uint8_t;
 
 /// Display a nominal type or extension thereof.
 void simple_display(
@@ -469,11 +472,11 @@ private:
   Type &getCache() const;
 };
 
-/// Retrieve information about a property delegate type.
-class PropertyDelegateTypeInfoRequest
-  : public SimpleRequest<PropertyDelegateTypeInfoRequest,
+/// Retrieve information about a property wrapper type.
+class PropertyWrapperTypeInfoRequest
+  : public SimpleRequest<PropertyWrapperTypeInfoRequest,
                          CacheKind::Cached,
-                         PropertyDelegateTypeInfo,
+                         PropertyWrapperTypeInfo,
                          NominalTypeDecl *> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -482,7 +485,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<PropertyDelegateTypeInfo>
+  llvm::Expected<PropertyWrapperTypeInfo>
       evaluate(Evaluator &eval, NominalTypeDecl *nominal) const;
 
 public:
@@ -496,10 +499,10 @@ public:
 
 /// Request the nominal type declaration to which the given custom attribute
 /// refers.
-class AttachedPropertyDelegateRequest :
-    public SimpleRequest<AttachedPropertyDelegateRequest,
+class AttachedPropertyWrappersRequest :
+    public SimpleRequest<AttachedPropertyWrappersRequest,
                          CacheKind::Cached,
-                         CustomAttr *,
+                         llvm::TinyPtrVector<CustomAttr *>,
                          VarDecl *> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -508,7 +511,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<CustomAttr *>
+  llvm::Expected<llvm::TinyPtrVector<CustomAttr *>>
   evaluate(Evaluator &evaluator, VarDecl *) const;
 
 public:
@@ -520,13 +523,13 @@ public:
   void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
-/// Request the raw (possibly unbound generic) type of the property delegate
+/// Request the raw (possibly unbound generic) type of the property wrapper
 /// that is attached to the given variable.
-class AttachedPropertyDelegateTypeRequest :
-    public SimpleRequest<AttachedPropertyDelegateTypeRequest,
+class AttachedPropertyWrapperTypeRequest :
+    public SimpleRequest<AttachedPropertyWrapperTypeRequest,
                          CacheKind::Cached,
                          Type,
-                         VarDecl *> {
+                         VarDecl *, unsigned> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -535,7 +538,7 @@ private:
 
   // Evaluation.
   llvm::Expected<Type>
-  evaluate(Evaluator &evaluator, VarDecl *var) const;
+  evaluate(Evaluator &evaluator, VarDecl *var, unsigned i) const;
 
 public:
   // Caching
@@ -548,8 +551,8 @@ public:
 
 /// Request the nominal type declaration to which the given custom attribute
 /// refers.
-class PropertyDelegateBackingPropertyTypeRequest :
-    public SimpleRequest<PropertyDelegateBackingPropertyTypeRequest,
+class PropertyWrapperBackingPropertyTypeRequest :
+    public SimpleRequest<PropertyWrapperBackingPropertyTypeRequest,
                          CacheKind::Cached,
                          Type,
                          VarDecl *> {
@@ -573,11 +576,11 @@ public:
 };
 
 /// Request information about the backing property for properties that have
-/// attached property delegates.
-class PropertyDelegateBackingPropertyInfoRequest :
-    public SimpleRequest<PropertyDelegateBackingPropertyInfoRequest,
+/// attached property wrappers.
+class PropertyWrapperBackingPropertyInfoRequest :
+    public SimpleRequest<PropertyWrapperBackingPropertyInfoRequest,
                          CacheKind::Cached,
-                         PropertyDelegateBackingPropertyInfo,
+                         PropertyWrapperBackingPropertyInfo,
                          VarDecl *> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -586,7 +589,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<PropertyDelegateBackingPropertyInfo>
+  llvm::Expected<PropertyWrapperBackingPropertyInfo>
   evaluate(Evaluator &evaluator, VarDecl *var) const;
 
 public:
@@ -622,6 +625,187 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Request the custom attribute which attaches a function builder to the
+/// given declaration.
+class AttachedFunctionBuilderRequest :
+    public SimpleRequest<AttachedFunctionBuilderRequest,
+                         CacheKind::Cached,
+                         CustomAttr *,
+                         ValueDecl *> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<CustomAttr *>
+  evaluate(Evaluator &evaluator, ValueDecl *decl) const;
+
+public:
+  // Caching
+  bool isCached() const;
+
+  // Cycle handling
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+};
+
+/// Request the function builder type attached to the given declaration,
+/// if any.
+class FunctionBuilderTypeRequest :
+    public SimpleRequest<FunctionBuilderTypeRequest,
+                         CacheKind::Cached,
+                         Type,
+                         ValueDecl *> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  llvm::Expected<Type>
+  evaluate(Evaluator &evaluator, ValueDecl *decl) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+
+  // Cycle handling
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+};
+
+/// Request a function's self access kind.
+class SelfAccessKindRequest :
+    public SimpleRequest<SelfAccessKindRequest,
+                         CacheKind::SeparatelyCached,
+                         SelfAccessKind,
+                         FuncDecl *> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<SelfAccessKind>
+  evaluate(Evaluator &evaluator, FuncDecl *func) const;
+
+public:
+  // Cycle handling
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<SelfAccessKind> getCachedResult() const;
+  void cacheResult(SelfAccessKind value) const;
+};
+
+/// Request whether the storage has a mutating getter.
+class IsGetterMutatingRequest :
+    public SimpleRequest<IsGetterMutatingRequest,
+                         CacheKind::SeparatelyCached,
+                         bool, AbstractStorageDecl *> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool>
+  evaluate(Evaluator &evaluator, AbstractStorageDecl *func) const;
+
+public:
+  // Cycle handling
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<bool> getCachedResult() const;
+  void cacheResult(bool value) const;
+};
+
+/// Request whether the storage has a mutating getter.
+class IsSetterMutatingRequest :
+    public SimpleRequest<IsSetterMutatingRequest,
+                         CacheKind::SeparatelyCached,
+                         bool, AbstractStorageDecl *> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool>
+  evaluate(Evaluator &evaluator, AbstractStorageDecl *func) const;
+
+public:
+  // Cycle handling
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<bool> getCachedResult() const;
+  void cacheResult(bool value) const;
+};
+
+/// Request whether reading the storage yields a borrowed value.
+class OpaqueReadOwnershipRequest :
+    public SimpleRequest<OpaqueReadOwnershipRequest,
+                         CacheKind::SeparatelyCached,
+                         OpaqueReadOwnership,
+                         AbstractStorageDecl *> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<OpaqueReadOwnership>
+  evaluate(Evaluator &evaluator, AbstractStorageDecl *storage) const;
+
+public:
+  // Cycle handling
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<OpaqueReadOwnership> getCachedResult() const;
+  void cacheResult(OpaqueReadOwnership value) const;
+};
+
+/// Request to build the underlying storage for a lazy property.
+class LazyStoragePropertyRequest :
+    public SimpleRequest<LazyStoragePropertyRequest,
+                         CacheKind::Cached,
+                         VarDecl *,
+                         VarDecl *> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<VarDecl *>
+  evaluate(Evaluator &evaluator, VarDecl *lazyVar) const;
+
+public:
+  // Cycle handling
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+
+  bool isCached() const { return true; }
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>
@@ -631,7 +815,7 @@ inline bool AnyValue::Holder<Type>::equals(const HolderBase &other) const {
       static_cast<const Holder<Type> &>(other).value.getPointer();
 }
 
-void simple_display(llvm::raw_ostream &out, const Type &type);
+void simple_display(llvm::raw_ostream &out, Type value);
 
 /// The zone number for the type checker.
 #define SWIFT_TYPE_CHECKER_REQUESTS_TYPEID_ZONE 10

@@ -36,7 +36,7 @@ struct A: Hashable {
   func hash(into hasher: inout Hasher) { fatalError() }
 }
 struct B {}
-struct C<T> {
+struct C<T> { // expected-note 2 {{'T' declared as parameter to type 'C'}}
   var value: T
   subscript() -> T { get { return value } }
   subscript(sub: Sub) -> T { get { return value } set { } }
@@ -190,7 +190,7 @@ func testKeyPath(sub: Sub, optSub: OptSub,
   let _: AnyKeyPath = \A.property
   let _: AnyKeyPath = \C<A>.value
   let _: AnyKeyPath = \.property // expected-error{{ambiguous}}
-  let _: AnyKeyPath = \C.value // expected-error{{cannot convert}} (need to improve diagnostic)
+  let _: AnyKeyPath = \C.value // expected-error{{generic parameter 'T' could not be inferred}}
   let _: AnyKeyPath = \.value // expected-error{{ambiguous}}
 
   let _ = \Prop.[nonHashableSub] // expected-error{{subscript index of type 'NonHashableSub' in a key path must be Hashable}}
@@ -282,9 +282,8 @@ func tupleGeneric<T, U>(_ v: (T, U)) {
 
   _ = ("tuple", "too", "big")[keyPath: tuple_el_1()]
   // expected-note@-12 {{}}
-  // expected-error@-2 {{cannot be applied}}
-  // expected-error@-3 {{cannot be applied}}
-  // expected-error@-4 {{could not be inferred}}
+  // expected-error@-2 {{generic parameter 'T' could not be inferred}}
+  // expected-error@-3 {{generic parameter 'U' could not be inferred}}
 }
 
 struct Z { }
@@ -685,7 +684,8 @@ func testSubtypeKeypathClass(_ keyPath: ReferenceWritableKeyPath<Base, Int>) {
 
 func testSubtypeKeypathProtocol(_ keyPath: ReferenceWritableKeyPath<PP, Int>) {
   testSubtypeKeypathProtocol(\Base.i)
-  // expected-error@-1 {{cannot convert value of type 'ReferenceWritableKeyPath<Base, Int>' to specified type 'ReferenceWritableKeyPath<PP, Int>'}}
+  // expected-error@-1 {{cannot convert value of type 'ReferenceWritableKeyPath<Base, Int>' to expected argument type 'ReferenceWritableKeyPath<PP, Int>'}}
+  // expected-note@-2 {{arguments to generic parameter 'Root' ('Base' and 'PP') are expected to be equal}}
 }
 
 // rdar://problem/32057712

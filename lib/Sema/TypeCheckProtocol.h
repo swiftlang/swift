@@ -658,11 +658,6 @@ class ConformanceChecker : public WitnessChecker {
          ValueDecl *requirement, bool isError,
          std::function<void(NormalProtocolConformance *)> fn);
 
-  void
-  addUsedConformances(ProtocolConformance *conformance,
-                      llvm::SmallPtrSetImpl<ProtocolConformance *> &visited);
-  void addUsedConformances(ProtocolConformance *conformance);
-
   ArrayRef<ValueDecl*> getLocalMissingWitness() {
     return GlobalMissingWitnesses.getArrayRef().
       slice(LocalMissingWitnessesStartIndex,

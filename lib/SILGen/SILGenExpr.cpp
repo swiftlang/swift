@@ -462,8 +462,7 @@ namespace {
     RValue visitKeyPathExpr(KeyPathExpr *E, SGFContext C);
     RValue visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E,
                                            SGFContext C);
-    RValue visitArrayExpr(ArrayExpr *E, SGFContext C);
-    RValue visitDictionaryExpr(DictionaryExpr *E, SGFContext C);
+    RValue visitCollectionExpr(CollectionExpr *E, SGFContext C);
     RValue visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E,
                                             SGFContext C);
     RValue visitInjectIntoOptionalExpr(InjectIntoOptionalExpr *E, SGFContext C);
@@ -2346,7 +2345,14 @@ visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
 
 RValue RValueEmitter::
 visitObjectLiteralExpr(ObjectLiteralExpr *E, SGFContext C) {
-  return visit(E->getSemanticExpr(), C);
+  ConcreteDeclRef init = E->getInitializer();
+  auto *decl = cast<ConstructorDecl>(init.getDecl());
+  AnyFunctionType *fnTy = decl->getMethodInterfaceType()
+                              .subst(init.getSubstitutions())
+                              ->getAs<AnyFunctionType>();
+  PreparedArguments args(fnTy->getParams(), E->getArg());
+  return SGF.emitApplyAllocatingInitializer(SILLocation(E), init,
+                                            std::move(args), E->getType(), C);
 }
 
 RValue RValueEmitter::
@@ -3240,6 +3246,7 @@ static ProtocolConformance *mapConformanceOutOfContext(
                .mapReplacementTypesOutOfContext());
   }
   }
+  llvm_unreachable("covered switch");
 }
 
 /// Map the given protocol conformance out of context, replacing archetypes
@@ -3282,23 +3289,32 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
                                 ArrayRef<ProtocolConformanceRef> indexHashables,
                                 CanType baseTy,
                                 bool forPropertyDescriptor) {
+  auto baseDecl = storage;
+
+  // ABI-compatible overrides do not have property descriptors, so we need
+  // to reference the overridden declaration instead.
+  if (isa<ClassDecl>(baseDecl->getDeclContext())) {
+    while (!baseDecl->isValidKeyPathComponent())
+      baseDecl = baseDecl->getOverriddenDecl();
+  }
+
   /// Returns true if a key path component for the given property or
   /// subscript should be externally referenced.
   auto shouldUseExternalKeyPathComponent = [&]() -> bool {
     return (!forPropertyDescriptor &&
-            (storage->getModuleContext() != SwiftModule ||
-             storage->isResilient(SwiftModule, expansion)) &&
+            (baseDecl->getModuleContext() != SwiftModule ||
+             baseDecl->isResilient(SwiftModule, expansion)) &&
             // Protocol requirements don't have nor need property descriptors.
-            !isa<ProtocolDecl>(storage->getDeclContext()) &&
+            !isa<ProtocolDecl>(baseDecl->getDeclContext()) &&
             // Properties that only dispatch via ObjC lookup do not have nor
             // need property descriptors, since the selector identifies the
             // storage.
             // Properties that are not public don't need property descriptors
             // either.
-            (!storage->hasAnyAccessors() ||
-             (!getAccessorDeclRef(getRepresentativeAccessorForKeyPath(storage))
+            (!baseDecl->hasAnyAccessors() ||
+             (!getAccessorDeclRef(getRepresentativeAccessorForKeyPath(baseDecl))
                    .isForeign &&
-              getAccessorDeclRef(getRepresentativeAccessorForKeyPath(storage))
+              getAccessorDeclRef(getRepresentativeAccessorForKeyPath(baseDecl))
                       .getLinkage(ForDefinition) <= SILLinkage::PublicNonABI)));
   };
 
@@ -3328,10 +3344,7 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
 
     // ABI-compatible overrides do not have property descriptors, so we need
     // to reference the overridden declaration instead.
-    auto *baseDecl = externalDecl;
-    if (isa<ClassDecl>(baseDecl->getDeclContext())) {
-      while (!baseDecl->isValidKeyPathComponent())
-        baseDecl = baseDecl->getOverriddenDecl();
+    if (baseDecl != externalDecl) {
       externalSubs = SubstitutionMap::getOverrideSubstitutions(baseDecl,
                                                                externalDecl,
                                                                externalSubs);
@@ -3627,28 +3640,43 @@ visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, SGFContext C) {
       SGF.getLoweredType(UnsafeRawPointer->getDeclaredInterfaceType());
     SILType BuiltinRawPtrTy = SILType::getRawPointerType(SGF.getASTContext());
 
+    SILModule &M = SGF.SGM.M;
+    SILBuilder &B = SGF.B;
 
-    auto DSOGlobal = SGF.SGM.M.lookUpGlobalVariable("__dso_handle");
-    if (!DSOGlobal)
-      DSOGlobal = SILGlobalVariable::create(SGF.SGM.M,
-                                            SILLinkage::PublicExternal,
-                                            IsNotSerialized, "__dso_handle",
-                                            BuiltinRawPtrTy);
-    auto DSOAddr = SGF.B.createGlobalAddr(SILLoc, DSOGlobal);
+    StructInst *S = nullptr;
+    if (M.getASTContext().LangOpts.Target.isOSWindows()) {
+      auto ImageBase = M.lookUpGlobalVariable("__ImageBase");
+      if (!ImageBase)
+        ImageBase =
+            SILGlobalVariable::create(M, SILLinkage::Public, IsNotSerialized,
+                                      "__ImageBase", BuiltinRawPtrTy);
 
-    auto DSOPointer = SGF.B.createAddressToPointer(SILLoc, DSOAddr,
-                                                   BuiltinRawPtrTy);
+      auto ImageBaseAddr = B.createGlobalAddr(SILLoc, ImageBase);
+      auto ImageBasePointer =
+          B.createAddressToPointer(SILLoc, ImageBaseAddr, BuiltinRawPtrTy);
+      S = B.createStruct(SILLoc, UnsafeRawPtrTy, { ImageBasePointer });
+    } else {
+      auto DSOGlobal = M.lookUpGlobalVariable("__dso_handle");
+      if (!DSOGlobal)
+        DSOGlobal =
+            SILGlobalVariable::create(M, SILLinkage::PublicExternal,
+                                      IsNotSerialized, "__dso_handle",
+                                      BuiltinRawPtrTy);
 
-    auto UnsafeRawPtrStruct = SGF.B.createStruct(SILLoc, UnsafeRawPtrTy,
-                                                 { DSOPointer });
-    return RValue(SGF, E, ManagedValue::forUnmanaged(UnsafeRawPtrStruct));
+      auto DSOAddr = B.createGlobalAddr(SILLoc, DSOGlobal);
+      auto DSOPointer =
+          B.createAddressToPointer(SILLoc, DSOAddr, BuiltinRawPtrTy);
+      S = B.createStruct(SILLoc, UnsafeRawPtrTy, { DSOPointer });
+    }
+
+    return RValue(SGF, E, ManagedValue::forUnmanaged(S));
   }
   }
 
   llvm_unreachable("Unhandled MagicIdentifierLiteralExpr in switch.");
 }
 
-RValue RValueEmitter::visitArrayExpr(ArrayExpr *E, SGFContext C) {
+RValue RValueEmitter::visitCollectionExpr(CollectionExpr *E, SGFContext C) {
   auto loc = SILLocation(E);
   ArgumentScope scope(SGF, loc);
 
@@ -3656,7 +3684,12 @@ RValue RValueEmitter::visitArrayExpr(ArrayExpr *E, SGFContext C) {
   // of emitting varargs.
   CanType arrayType, elementType;
   if (E->getInitializer()) {
-    elementType = E->getElementType()->getCanonicalType();
+    if (auto *arrayExpr = dyn_cast<ArrayExpr>(E)) {
+      elementType = arrayExpr->getElementType()->getCanonicalType();
+    } else {
+      auto *dictionaryExpr = cast<DictionaryExpr>(E);
+      elementType = dictionaryExpr->getElementType()->getCanonicalType();
+    }
     arrayType = ArraySliceType::get(elementType)->getCanonicalType();
   } else {
     arrayType = E->getType()->getCanonicalType();
@@ -3717,10 +3750,6 @@ RValue RValueEmitter::visitArrayExpr(ArrayExpr *E, SGFContext C) {
 
   return SGF.emitApplyAllocatingInitializer(
       loc, E->getInitializer(), std::move(args), E->getType(), C);
-}
-
-RValue RValueEmitter::visitDictionaryExpr(DictionaryExpr *E, SGFContext C) {
-  return visit(E->getSemanticExpr(), C);
 }
 
 /// Flattens one level of optional from a nested optional value.

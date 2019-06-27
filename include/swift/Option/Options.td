@@ -312,6 +312,14 @@ def enable_library_evolution : Flag<["-"], "enable-library-evolution">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Build the module to allow binary-compatible library evolution">;
 
+def require_explicit_availability : Flag<["-"], "require-explicit-availability">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Require explicit availability on public declarations">;
+def require_explicit_availability_target : Separate<["-"], "require-explicit-availability-target">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Suggest fix-its adding @available(<target>, *) to public declarations without availability">,
+  MetaVarName<"<target>">;
+
 def module_name : Separate<["-"], "module-name">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Name of the module to build">;
@@ -367,6 +375,10 @@ def emit_objc_header_path : Separate<["-"], "emit-objc-header-path">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild,
          ArgumentIsPath]>,
   MetaVarName<"<path>">, HelpText<"Emit an Objective-C header file to <path>">;
+
+def static : Flag<["-"], "static">,
+  Flags<[FrontendOption, ModuleInterfaceOption, NoInteractiveOption]>,
+  HelpText<"Make this module statically linkable and make the output of -emit-library a static library.">;
 
 def import_cf_types : Flag<["-"], "import-cf-types">,
   Flags<[FrontendOption, HelpHidden]>,
@@ -807,7 +819,7 @@ def resource_dir : Separate<["-"], "resource-dir">,
 
 def target : Separate<["-"], "target">,
   Flags<[FrontendOption, ModuleWrapOption, ModuleInterfaceOption]>,
-  HelpText<"Generate code for the given target">;
+  HelpText<"Generate code for the given target <triple>, such as x86_64-apple-macos10.9">, MetaVarName<"<triple>">;
 def target_legacy_spelling : Joined<["--"], "target=">,
   Flags<[FrontendOption]>, Alias<target>;
 
@@ -853,6 +865,13 @@ def sanitize_coverage_EQ : CommaJoined<["-"], "sanitize-coverage=">,
   HelpText<"Specify the type of coverage instrumentation for Sanitizers and"
   " additional options separated by commas">;
 
+def enable_astscope_lookup : Flag<["-"], "enable-astscope-lookup">,
+  Flags<[FrontendOption]>,
+  HelpText<"Enable ASTScope-based unqualified name lookup">;
+
+def disable_parser_lookup : Flag<["-"], "disable_parser_lookup">,
+  HelpText<"Disable parser lookup & use ast scope lookup only (experimental)">;
+
 def index_file : Flag<["-"], "index-file">,
   HelpText<"Produce index data for a source file">, ModeOpt,
   Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
@@ -887,5 +906,20 @@ def vfsoverlay : JoinedOrSeparate<["-"], "vfsoverlay">,
   HelpText<"Add directory to VFS overlay file">;
 def vfsoverlay_EQ : Joined<["-"], "vfsoverlay=">,
   Alias<vfsoverlay>;
+
+// Runtime compatibility version
+def runtime_compatibility_version : Separate<["-"], "runtime-compatibility-version">,
+  Flags<[FrontendOption]>,
+  HelpText<"Link compatibility library for Swift runtime version, or 'none'">;
+
+def disable_autolinking_runtime_compatibility : Flag<["-"], "disable-autolinking-runtime-compatibility">,
+  Flags<[FrontendOption]>,
+  HelpText<"Do not use autolinking for runtime compatibility libraries">;
+
+def disable_autolinking_runtime_compatibility_dynamic_replacements
+    : Flag<[ "-" ], "disable-autolinking-runtime-compatibility-dynamic-replacements">,
+      Flags<[ FrontendOption ]>,
+      HelpText<"Do not use autolinking for the dynamic replacement runtime "
+               "compatibility library">;
 
 include "FrontendOptions.td"

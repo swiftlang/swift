@@ -28,7 +28,7 @@ function(_report_sdk prefix)
       message(STATUS "  ${arch} LIB: ${${arch}_LIB}")
     endforeach()
   elseif("${prefix}" STREQUAL "ANDROID")
-    message(STATUS " NDK Dir: $ENV{SWIFT_ANDROID_NDK_PATH}")
+    message(STATUS " NDK: $ENV{SWIFT_ANDROID_NDK_PATH}")
     foreach(arch ${SWIFT_SDK_${prefix}_ARCHITECTURES})
       swift_android_include_for_arch(${arch} ${arch}_INCLUDE)
       swift_android_lib_for_arch(${arch} ${arch}_LIB)
@@ -51,6 +51,9 @@ function(_report_sdk prefix)
     message(STATUS "  Triple name: ${SWIFT_SDK_${prefix}_TRIPLE_NAME}")
   endif()
   message(STATUS "  Architectures: ${SWIFT_SDK_${prefix}_ARCHITECTURES}")
+  if(SWIFT_SDK_${prefix}_MODULE_ARCHITECTURES)
+    message(STATUS "  Module Architectures: ${SWIFT_SDK_${prefix}_MODULE_ARCHITECTURES}")
+  endif()
   if(NOT prefix IN_LIST SWIFT_APPLE_PLATFORMS)
     if(SWIFT_BUILD_STDLIB)
       foreach(arch ${SWIFT_SDK_${prefix}_ARCHITECTURES})
@@ -141,9 +144,30 @@ macro(configure_sdk_darwin
   set(SWIFT_SDK_${prefix}_LIB_SUBDIR "${xcrun_name}")
   set(SWIFT_SDK_${prefix}_VERSION_MIN_NAME "${version_min_name}")
   set(SWIFT_SDK_${prefix}_TRIPLE_NAME "${triple_name}")
-  set(SWIFT_SDK_${prefix}_ARCHITECTURES "${architectures}")
   set(SWIFT_SDK_${prefix}_OBJECT_FORMAT "MACHO")
 
+  set(SWIFT_SDK_${prefix}_ARCHITECTURES ${architectures})
+  if(SWIFT_DARWIN_SUPPORTED_ARCHS)
+    list_intersect(
+      "${architectures}"                  # lhs
+      "${SWIFT_DARWIN_SUPPORTED_ARCHS}"   # rhs
+      SWIFT_SDK_${prefix}_ARCHITECTURES)  # result
+  endif()
+
+  list_intersect(
+    "${SWIFT_DARWIN_MODULE_ARCHS}"            # lhs
+    "${architectures}"                        # rhs
+    SWIFT_SDK_${prefix}_MODULE_ARCHITECTURES) # result
+
+  # Ensure the architectures and module-only architectures lists are mutually
+  # exclusive.
+  list_subtract(
+    "${SWIFT_SDK_${prefix}_MODULE_ARCHITECTURES}" # lhs
+    "${SWIFT_SDK_${prefix}_ARCHITECTURES}"        # rhs
+    SWIFT_SDK_${prefix}_MODULE_ARCHITECTURES)     # result
+
+  # Configure variables for _all_ architectures even if we aren't "building"
+  # them because they aren't supported.
   foreach(arch ${architectures})
     # On Darwin, all archs share the same SDK path.
     set(SWIFT_SDK_${prefix}_ARCH_${arch}_PATH "${SWIFT_SDK_${prefix}_PATH}")
@@ -186,18 +210,40 @@ macro(configure_sdk_unix name architectures)
         set(SWIFT_SDK_ANDROID_ARCH_${arch}_ALT_SPELLING "aarch64")
         set(SWIFT_SDK_ANDROID_ARCH_${arch}_PATH "${SWIFT_ANDROID_NDK_PATH}/platforms/android-${SWIFT_ANDROID_API_LEVEL}/arch-arm64")
         set(SWIFT_SDK_ANDROID_ARCH_${arch}_TRIPLE "aarch64-unknown-linux-android")
+      elseif("${arch}" STREQUAL "i686")
+        set(SWIFT_SDK_ANDROID_ARCH_${arch}_NDK_TRIPLE "i686-linux-android")
+        set(SWIFT_SDK_ANDROID_ARCH_${arch}_ALT_SPELLING "i686")
+        set(SWIFT_SDK_ANDROID_ARCH_${arch}_PATH "${SWIFT_ANDROID_NDK_PATH}/platforms/android-${SWIFT_ANDROID_API_LEVEL}/arch-x86")
+        set(SWIFT_SDK_ANDROID_ARCH_${arch}_TRIPLE "i686-unknown-linux-android")
+      elseif("${arch}" STREQUAL "x86_64")
+        set(SWIFT_SDK_ANDROID_ARCH_${arch}_NDK_TRIPLE "x86_64-linux-android")
+        set(SWIFT_SDK_ANDROID_ARCH_${arch}_ALT_SPELLING "x86_64")
+        set(SWIFT_SDK_ANDROID_ARCH_${arch}_PATH "${SWIFT_ANDROID_NDK_PATH}/platforms/android-${SWIFT_ANDROID_API_LEVEL}/arch-x86_64")
+        set(SWIFT_SDK_ANDROID_ARCH_${arch}_TRIPLE "x86_64-unknown-linux-android")
       else()
         message(FATAL_ERROR "unknown arch for android SDK: ${arch}")
       endif()
 
       # Get the prebuilt suffix to create the correct toolchain path when using the NDK
-      if("${CMAKE_HOST_SYSTEM_NAME}" STREQUAL "Darwin")
-        set(_swift_android_prebuilt_build "darwin-x86_64")
-      elseif("${CMAKE_HOST_SYSTEM_NAME}" STREQUAL "Linux")
-        set(_swift_android_prebuilt_build "linux-x86_64")
+      if(CMAKE_HOST_SYSTEM_NAME STREQUAL Darwin)
+        set(_swift_android_prebuilt_build darwin-x86_64)
+      elseif(CMAKE_HOST_SYSTEM_NAME STREQUAL Linux)
+        set(_swift_android_prebuilt_build linux-x86_64)
+      elseif(CMAKE_HOST_SYSTEM_NAME STREQUAL Windows)
+        set(_swift_android_prebuilt_build Windows-x86_64)
+      else()
+        message(SEND_ERROR "cannot cross-compile to android from ${CMAKE_HOST_SYSTEM_NAME}")
       endif()
-      set(SWIFT_SDK_ANDROID_ARCH_${arch}_NDK_PREBUILT_PATH
+      if("${arch}" STREQUAL "i686")
+        set(SWIFT_SDK_ANDROID_ARCH_${arch}_NDK_PREBUILT_PATH
+          "${SWIFT_ANDROID_NDK_PATH}/toolchains/x86-${SWIFT_ANDROID_NDK_GCC_VERSION}/prebuilt/${_swift_android_prebuilt_build}")
+      elseif("${arch}" STREQUAL "x86_64")
+        set(SWIFT_SDK_ANDROID_ARCH_${arch}_NDK_PREBUILT_PATH
+          "${SWIFT_ANDROID_NDK_PATH}/toolchains/x86_64-${SWIFT_ANDROID_NDK_GCC_VERSION}/prebuilt/${_swift_android_prebuilt_build}")
+      else()
+        set(SWIFT_SDK_ANDROID_ARCH_${arch}_NDK_PREBUILT_PATH
           "${SWIFT_ANDROID_NDK_PATH}/toolchains/${SWIFT_SDK_ANDROID_ARCH_${arch}_NDK_TRIPLE}-${SWIFT_ANDROID_NDK_GCC_VERSION}/prebuilt/${_swift_android_prebuilt_build}")
+      endif()
     else()
       if(NOT SWIFT_SDK_${prefix}_ARCH_${arch}_PATH)
         set(SWIFT_SDK_${prefix}_ARCH_${arch}_PATH "/")

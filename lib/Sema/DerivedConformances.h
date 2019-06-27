@@ -69,6 +69,18 @@ public:
                                          NominalTypeDecl *nominal,
                                          ProtocolDecl *protocol);
 
+  /// Diagnose problems, if any, preventing automatic derivation of protocol
+  /// requirements
+  ///
+  /// \param nominal The nominal type for which we would like to diagnose
+  /// derivation failures
+  ///
+  /// \param protocol The protocol with requirements we would like to diagnose
+  /// derivation failures for
+  static void tryDiagnoseFailedDerivation(DeclContext *DC,
+                                          NominalTypeDecl *nominal,
+                                          ProtocolDecl *protocol);
+
   /// Determine the derivable requirement that would satisfy the given
   /// requirement, if there is one.
   ///
@@ -128,6 +140,14 @@ public:
   /// \returns the derived member, which will also be added to the type.
   ValueDecl *deriveEquatable(ValueDecl *requirement);
 
+  /// Diagnose problems, if any, preventing automatic derivation of Equatable
+  /// requirements
+  ///
+  /// \param nominal The nominal type for which we would like to diagnose
+  /// derivation failures
+  static void tryDiagnoseFailedEquatableDerivation(DeclContext *DC,
+                                                   NominalTypeDecl *nominal);
+
   /// Determine if a Hashable requirement can be derived for a type.
   ///
   /// This is implemented for enums without associated values or all-Hashable
@@ -143,6 +163,14 @@ public:
   ///
   /// \returns the derived member, which will also be added to the type.
   ValueDecl *deriveHashable(ValueDecl *requirement);
+
+  /// Diagnose problems, if any, preventing automatic derivation of Hashable
+  /// requirements
+  ///
+  /// \param nominal The nominal type for which we would like to diagnose
+  /// derivation failures
+  static void tryDiagnoseFailedHashableDerivation(DeclContext *DC,
+                                                  NominalTypeDecl *nominal);
 
   /// Derive a _BridgedNSError requirement for an @objc enum type.
   ///

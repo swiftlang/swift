@@ -16,26 +16,30 @@ import SwiftShims
 
 String's Index has the following layout:
 
- ┌──────────┬───────────────────┬────────────────┬──────────┐
- │ b63:b16  │      b15:b14      │     b13:b8     │ b7:b0    │
- ├──────────┼───────────────────┼────────────────┼──────────┤
- │ position │ transcoded offset │ grapheme cache │ reserved │
- └──────────┴───────────────────┴────────────────┴──────────┘
+ ┌──────────┬───────────────────┬─────────╥────────────────┬──────────┐
+ │ b63:b16  │      b15:b14      │   b13   ║     b12:b8     │  b6:b0   │
+ ├──────────┼───────────────────┼─────────╫────────────────┼──────────┤
+ │ position │ transcoded offset │ aligned ║ grapheme cache │ reserved │
+ └──────────┴───────────────────┴─────────╨────────────────┴──────────┘
 
-- grapheme cache: A 6-bit value remembering the distance to the next grapheme
+Position, transcoded offset, and aligned are fully exposed in the ABI. Grapheme
+cache and reserved are partially resilient: the fact that there are 13 bits with
+a default value of `0` is ABI, but not the layout, construction, or
+interpretation of those bits. All use of grapheme cache should be behind
+non-inlinable function calls.
+
+- position aka `encodedOffset`: A 48-bit offset into the string's code units
+- transcoded offset: a 2-bit sub-scalar offset, derived from transcoding
+- aligned, whether this index is known to be scalar-aligned (see below)
+<resilience barrier>
+- grapheme cache: A 5-bit value remembering the distance to the next grapheme
 boundary
-- position aka `encodedOffset`: An offset into the string's code units
-- transcoded offset: a sub-scalar offset, derived from transcoding
-
-The use and interpretation of both `reserved` and `grapheme cache` is not part
-of Index's ABI; it should be hidden behind non-inlinable calls. However, the
-position of the sequence of 14 bits allocated is part of Index's ABI, as well as
-the default value being `0`.
+- reserved: 8-bit for future use.
 
 */
 extension String {
   /// A position of a character or code unit in a string.
-  @_fixed_layout
+  @frozen
   public struct Index {
     @usableFromInline
     internal var _rawBits: UInt64
@@ -82,7 +86,7 @@ extension String.Index {
 
   @usableFromInline
   internal var characterStride: Int? {
-    let value = (_rawBits & 0x3F00) &>> 8
+    let value = (_rawBits & 0x1F00) &>> 8
     return value > 0 ? Int(truncatingIfNeeded: value) : nil
   }
 
@@ -132,9 +136,7 @@ extension String.Index {
     encodedOffset: Int, transcodedOffset: Int, characterStride: Int
   ) {
     self.init(encodedOffset: encodedOffset, transcodedOffset: transcodedOffset)
-    if _slowPath(characterStride > 63) { return }
-
-    _internalInvariant(characterStride == characterStride & 0x3F)
+    if _slowPath(characterStride > 0x1F) { return }
     self._rawBits |= UInt64(truncatingIfNeeded: characterStride &<< 8)
     self._invariantCheck()
   }
@@ -150,6 +152,9 @@ extension String.Index {
   @usableFromInline @inline(never) @_effects(releasenone)
   internal func _invariantCheck() {
     _internalInvariant(_encodedOffset >= 0)
+    if self._isAligned {
+      _internalInvariant(transcodedOffset == 0)
+    }
   }
   #endif // INTERNAL_CHECKS_ENABLED
 }
@@ -188,6 +193,7 @@ extension String.Index {
       transcodedOffset: self.transcodedOffset &- 1)
   }
 
+
   // Get an index with an encoded offset relative to this one.
   // Note: strips any transcoded offset.
   @inlinable @inline(__always)
@@ -200,7 +206,59 @@ extension String.Index {
     _internalInvariant(self.transcodedOffset == 0)
     return String.Index(encodedOffset: self._encodedOffset, transcodedOffset: n)
   }
+}
 
+/*
+  Index Alignment
+
+  SE-0180 unifies the Index type of String and all its views and allows
+  non-scalar-aligned indices to be used across views. In order to guarantee
+  behavior, we often have to check and perform scalar alignment. To speed up
+  these checks, we allocate a bit denoting known-to-be-aligned, so that the
+  alignment check can skip the load. The below shows what views need to check
+  for alignment before they can operate, and whether the indices they produce
+  are aligned.
+
+  ┌───────────────╥────────────────────┬──────────────────────────┐
+  │ View          ║ Requires Alignment │ Produces Aligned Indices │
+  ╞═══════════════╬════════════════════╪══════════════════════════╡
+  │ Native UTF8   ║ no                 │ no                       │
+  ├───────────────╫────────────────────┼──────────────────────────┤
+  │ Native UTF16  ║ yes                │ no                       │
+  ╞═══════════════╬════════════════════╪══════════════════════════╡
+  │ Foreign UTF8  ║ yes                │ no                       │
+  ├───────────────╫────────────────────┼──────────────────────────┤
+  │ Foreign UTF16 ║ no                 │ no                       │
+  ╞═══════════════╬════════════════════╪══════════════════════════╡
+  │ UnicodeScalar ║ yes                │ yes                      │
+  ├───────────────╫────────────────────┼──────────────────────────┤
+  │ Character     ║ yes                │ yes                      │
+  └───────────────╨────────────────────┴──────────────────────────┘
+
+  The "requires alignment" applies to any operation taking a String.Index that's
+  not defined entirely in terms of other operations taking a String.Index. These
+  include:
+
+  * index(after:)
+  * index(before:)
+  * subscript
+  * distance(from:to:) (since `to` is compared against directly)
+  * UTF16View._nativeGetOffset(for:)
+
+*/
+extension String.Index {
+  @_alwaysEmitIntoClient // Swift 5.1
+  @inline(__always)
+  internal var _isAligned: Bool { return 0 != _rawBits & 0x2000 }
+
+  @_alwaysEmitIntoClient // Swift 5.1
+  @inline(__always)
+  internal var _aligned: String.Index {
+    var idx = self
+    idx._rawBits |= 0x2000
+    idx._invariantCheck()
+    return idx
+  }
 }
 
 extension String.Index: Equatable {

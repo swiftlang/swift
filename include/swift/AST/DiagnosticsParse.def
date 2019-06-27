@@ -68,6 +68,10 @@ ERROR(extra_tokens_conditional_compilation_directive,none,
       "extra tokens following conditional compilation directive", ())
 ERROR(unexpected_rbrace_in_conditional_compilation_block,none,
       "unexpected '}' in conditional compilation block", ())
+ERROR(unexpected_if_following_else_compilation_directive,none,
+      "unexpected 'if' keyword following '#else' conditional compilation "
+      "directive; did you mean '#elseif'?",
+      ())
 
 ERROR(pound_diagnostic_expected_string,none,
       "expected string literal in %select{#warning|#error}0 directive",(bool))
@@ -1107,7 +1111,8 @@ ERROR(numeric_literal_numeric_member,none,
 ERROR(standalone_dollar_identifier,none,
      "'$' is not an identifier; use backticks to escape it", ())
 ERROR(dollar_identifier_decl,none,
-     "cannot declare entity %0 with a '$' prefix", (Identifier))
+     "cannot declare entity named %0; the '$' prefix is reserved for "
+     "implicitly-synthesized declarations", (Identifier))
 
 ERROR(anon_closure_arg_not_in_closure,none,
       "anonymous closure argument not contained in a closure", ())
@@ -1326,6 +1331,9 @@ ERROR(objc_runtime_name_must_be_identifier,none,
 
 ERROR(attr_only_at_non_local_scope, none,
       "attribute '%0' can only be used in a non-local scope", (StringRef))
+
+ERROR(projection_value_property_not_identifier,none,
+      "@_projectedValueProperty name must be an identifier", ())
 
 // Access control
 ERROR(attr_access_expected_set,none,
@@ -1570,8 +1578,8 @@ ERROR(avail_query_expected_version_number,PointsToFirstBadToken,
 ERROR(avail_query_expected_rparen,PointsToFirstBadToken,
       "expected ')' in availability query", ())
 
-ERROR(avail_query_unrecognized_platform_name,
-      PointsToFirstBadToken, "unrecognized platform name %0", (Identifier))
+WARNING(avail_query_unrecognized_platform_name,
+        PointsToFirstBadToken, "unrecognized platform name %0", (Identifier))
 
 ERROR(avail_query_disallowed_operator, PointsToFirstBadToken,
       "'%0' cannot be used in an availability condition", (StringRef))

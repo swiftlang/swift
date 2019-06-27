@@ -349,7 +349,7 @@ struct PrintOptions {
 
   /// Whether to print the doc-comment from the conformance if a member decl
   /// has no associated doc-comment by itself.
-  bool ElevateDocCommentFromConformance = false;
+  bool CascadeDocComment = false;
 
   /// Whether to print the content of an extension decl inside the type decl where it
   /// extends from.
@@ -480,7 +480,7 @@ struct PrintOptions {
     result.SkipDeinit = true;
     result.ExcludeAttrList.push_back(DAK_DiscardableResult);
     result.EmptyLineBetweenMembers = true;
-    result.ElevateDocCommentFromConformance = true;
+    result.CascadeDocComment = true;
     result.ShouldQualifyNestedDeclarations =
         QualifyNestedDeclarations::Always;
     result.PrintDocumentationComments = true;
@@ -494,7 +494,7 @@ struct PrintOptions {
   /// consistent and well-formed.
   ///
   /// \see swift::emitParseableInterface
-  static PrintOptions printParseableInterfaceFile();
+  static PrintOptions printParseableInterfaceFile(bool preferTypeRepr);
 
   static PrintOptions printModuleInterface();
   static PrintOptions printTypeInterface(Type T);

@@ -30,7 +30,7 @@
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
-#include "swift/AST/PropertyDelegates.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeCheckerDebugConsumer.h"
@@ -80,12 +80,9 @@ GenericTypeParamType *
 TypeVariableType::Implementation::getGenericParameter() const {
   // Check whether we have a path that terminates at a generic parameter
   // locator.
-  if (!locator || locator->getPath().empty() ||
-      locator->getPath().back().getKind() != ConstraintLocator::GenericParameter)
-    return nullptr;
-
-  // Retrieve the archetype.
-  return locator->getPath().back().getGenericParameter();
+  return locator && locator->isForGenericParameter()
+             ? locator->getGenericParameter()
+             : nullptr;
 }
 
 // Only allow allocation of resolved overload set list items using the
@@ -1975,15 +1972,21 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
   Type type;
   if (typeExpr->getTypeLoc().wasValidated()) {
     type = typeExpr->getTypeLoc().getType();
-  } else if (auto *rep = typeExpr->getTypeRepr()) {
+  } else {
     TypeResolutionOptions options(TypeResolverContext::InExpression);
     options |= TypeResolutionFlags::AllowUnboundGenerics;
-    auto resolution = TypeResolution::forContextual(DC);
-    type = resolution.resolveType(rep, options);
-    typeExpr->getTypeLoc().setType(type);
+
+    auto &typeLoc = typeExpr->getTypeLoc();
+    bool hadError =
+        TC.validateType(typeLoc, TypeResolution::forContextual(DC), options);
+
+    if (hadError)
+      return nullptr;
+
+    type = typeLoc.getType();
   }
 
-  if (!type)
+  if (!type || !type->getAnyNominal())
     return nullptr;
 
   // Don't bother to convert deprecated selector syntax.
@@ -1992,16 +1995,13 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
       return nullptr;
   }
 
-  ConformanceCheckOptions options;
-  options |= ConformanceCheckFlags::InExpression;
-  options |= ConformanceCheckFlags::SkipConditionalRequirements;
-
-  auto result = TC.conformsToProtocol(type, protocol, DC, options);
-  if (!result || !result->isConcrete())
-    return nullptr;
-
-  return CoerceExpr::forLiteralInit(TC.Context, argExpr, call->getSourceRange(),
-                                    typeExpr->getTypeLoc());
+  auto *NTD = type->getAnyNominal();
+  SmallVector<ProtocolConformance *, 2> conformances;
+  return NTD->lookupConformance(DC->getParentModule(), protocol, conformances)
+             ? CoerceExpr::forLiteralInit(TC.Context, argExpr,
+                                          call->getSourceRange(),
+                                          typeExpr->getTypeLoc())
+             : nullptr;
 }
 
 /// Pre-check the expression, validating any types that occur in the
@@ -2184,6 +2184,9 @@ Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
   if (options.contains(TypeCheckExprFlags::ConvertTypeIsOpaqueReturnType))
     csOptions |= ConstraintSystemFlags::UnderlyingTypeForOpaqueReturnType;
 
+  if (options.contains(TypeCheckExprFlags::SubExpressionDiagnostics))
+    csOptions |= ConstraintSystemFlags::SubExpressionDiagnostics;
+
   ConstraintSystem cs(*this, dc, csOptions, expr);
   cs.baseCS = baseCS;
 
@@ -2222,8 +2225,8 @@ Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
   Type convertTo = convertType.getType();
   if (options.contains(TypeCheckExprFlags::ExpressionTypeMustBeOptional)) {
     assert(!convertTo && "convertType and type check options conflict");
-    auto *convertTypeLocator = cs.getConstraintLocator(
-        cs.getConstraintLocator(expr), ConstraintLocator::ContextualType);
+    auto *convertTypeLocator =
+        cs.getConstraintLocator(expr, LocatorPathElt::getContextualType());
     Type var = cs.createTypeVariable(convertTypeLocator, TVO_CanBindToNoEscape);
     convertTo = getOptionalType(expr->getLoc(), var);
   }
@@ -2571,35 +2574,53 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
     /// The locator we're using.
     ConstraintLocator *Locator;
 
-    /// The context in which we are performing type checking.
-    DeclContext *dc;
-
     /// The type of the initializer.
     Type initType;
 
-    /// Whether we applied a property delegate to the initializer expression.
-    PropertyDelegateTypeInfo appliedPropertyDelegate;
+    /// The variable to that has property wrappers that have been applied to the initializer expression.
+    VarDecl *wrappedVar = nullptr;
 
   public:
     explicit BindingListener(TypeChecker &tc, Pattern *&pattern,
-                             Expr *&initializer, DeclContext *dc)
+                             Expr *&initializer)
       : tc(tc), pattern(pattern), initializer(initializer),
-        Locator(nullptr), dc(dc) {
-      maybeApplyPropertyDelegate();
+        Locator(nullptr) {
+      maybeApplyPropertyWrapper();
     }
 
     /// Retrieve the type to which the pattern should be coerced.
-    Type getPatternInitType() const {
-      if (!appliedPropertyDelegate || initType->hasError() ||
+    Type getPatternInitType(ConstraintSystem *cs) const {
+      if (!wrappedVar || initType->hasError() ||
           initType->is<TypeVariableType>())
         return initType;
 
-      // We applied a property delegate, so dig the pattern initialization
-      // type out of the value property of the delegate.
-      return initType->getTypeOfMember(
-          dc->getParentModule(),
-          appliedPropertyDelegate.valueVar,
-          appliedPropertyDelegate.valueVar->getValueInterfaceType());
+      // When we have an active constraint system, form value-member
+      // constraints to dig in to the appropriate resulting property.
+      if (cs) {
+        Type valueType = LValueType::get(initType);
+        auto dc = wrappedVar->getInnermostDeclContext();
+        auto emptyLocator = cs->getConstraintLocator(nullptr);
+
+        for (unsigned i : indices(wrappedVar->getAttachedPropertyWrappers())) {
+          auto wrapperInfo = wrappedVar->getAttachedPropertyWrapperTypeInfo(i);
+          Type memberType =
+              cs->createTypeVariable(emptyLocator, TVO_CanBindToLValue);
+          cs->addValueMemberConstraint(
+              valueType, wrapperInfo.valueVar->getFullName(),
+              memberType, dc, FunctionRefKind::Unapplied, { }, emptyLocator);
+          valueType = memberType;
+        }
+        
+        // Set up an equality constraint to drop the lvalue-ness of the value
+        // type we produced.
+        Type propertyType = cs->createTypeVariable(emptyLocator, 0);
+        cs->addConstraint(ConstraintKind::Equal, propertyType, valueType,
+                          emptyLocator);
+        return propertyType;
+      }
+      
+      // Otherwise, compute the wrapped value type directly.
+      return computeWrappedValueType(wrappedVar, initType);
     }
 
     bool builtConstraints(ConstraintSystem &cs, Expr *expr) override {
@@ -2607,22 +2628,22 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
 
       // Save the locator we're using for the expression.
       Locator =
-          cs.getConstraintLocator(expr, ConstraintLocator::ContextualType);
+          cs.getConstraintLocator(expr, LocatorPathElt::getContextualType());
 
       // Collect constraints from the pattern.
       Type patternType = cs.generateConstraints(pattern, Locator);
       if (!patternType)
         return true;
 
-      if (appliedPropertyDelegate) {
-        // When we have applied a property delegate, the initializer type
-        // is the initialization of the property delegate instance.
+      if (wrappedVar) {
+        // When we have applied a property wrapper, the initializer type
+        // is the initialization of the property wrapper instance.
         initType = cs.getType(expr);
 
         // Add a conversion constraint between the pattern type and the
-        // property delegate's "value" type.
+        // property wrapper's "value" type.
         cs.addConstraint(ConstraintKind::Conversion, patternType,
-                         getPatternInitType(), Locator, /*isFavored*/true);
+                         getPatternInitType(&cs), Locator, /*isFavored*/true);
       } else {
         // The initializer type is the type of the pattern.
         initType = patternType;
@@ -2655,16 +2676,16 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
 
       assert(solution.getConstraintSystem().getType(expr)->isEqual(initType));
 
-      // Record the property delegate type and note that the initializer has
+      // Record the property wrapper type and note that the initializer has
       // been subsumed by the backing property.
-      if (appliedPropertyDelegate) {
-        auto var = pattern->getSingleVar();
-        var->getParentPatternBinding()->setInitializerSubsumed(0);
-        tc.Context.setSideCachedPropertyDelegateBackingPropertyType(
-            var, initType->mapTypeOutOfContext());
+      if (wrappedVar) {
+        wrappedVar->getParentPatternBinding()->setInitializerSubsumed(0);
+        tc.Context.setSideCachedPropertyWrapperBackingPropertyType(
+            wrappedVar, initType->mapTypeOutOfContext());
 
-        // Record the semantic initializer.
-        var->getAttachedPropertyDelegate()->setSemanticInit(expr);
+        // Record the semantic initializer on the outermost property wrapper.
+        wrappedVar->getAttachedPropertyWrappers().front()
+            ->setSemanticInit(expr);
       }
 
       initializer = expr;
@@ -2673,77 +2694,57 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
 
   private:
     // If the pattern contains a single variable that has an attached
-    // property delegate, set up the initializer expression to initialize
+    // property wrapper, set up the initializer expression to initialize
     // the backing storage.
-    void maybeApplyPropertyDelegate() {
+    void maybeApplyPropertyWrapper() {
       auto singleVar = pattern->getSingleVar();
       if (!singleVar)
         return;
 
-      auto delegateAttr = singleVar->getAttachedPropertyDelegate();
-      if (!delegateAttr)
+      auto wrapperAttrs = singleVar->getAttachedPropertyWrappers();
+      if (wrapperAttrs.empty())
         return;
 
-      auto delegateNominal = evaluateOrDefault(
-          tc.Context.evaluator, CustomAttrNominalRequest{delegateAttr, dc},
-          nullptr);
-      if (!delegateNominal)
-        return;
-
-      auto delegateInfo = delegateNominal->getPropertyDelegateTypeInfo();
-      if (!delegateInfo)
-        return;
-
-      Type delegateType = singleVar->getAttachedPropertyDelegateType();
-      if (!delegateType)
-        return;
-
-      // If the property delegate is directly initialized, form the
+      // If the outermost property wrapper is directly initialized, form the
       // call.
       auto &ctx = singleVar->getASTContext();
-      auto typeExpr =
-          TypeExpr::createImplicitHack(delegateAttr->getTypeLoc().getLoc(),
-                                       Type(delegateType), ctx);
-      if (delegateAttr->getArg() != nullptr) {
-        if (initializer) {
-          singleVar->diagnose(diag::property_delegate_and_normal_init,
-                              singleVar->getFullName())
-            .highlight(delegateAttr->getRange())
-            .highlight(initializer->getSourceRange());
-        }
+      auto outermostWrapperAttr = wrapperAttrs.front();
+      if (initializer) {
+        // Form init(initialValue:) call(s).
+        Expr *wrappedInitializer =
+            buildPropertyWrapperInitialValueCall(
+                singleVar, Type(), initializer, /*ignoreAttributeArgs=*/false);
+        if (!wrappedInitializer)
+          return;
 
+        initializer = wrappedInitializer;
+      } else if (auto outermostArg = outermostWrapperAttr->getArg()) {
+        Type outermostWrapperType =
+            singleVar->getAttachedPropertyWrapperType(0);
+        if (!outermostWrapperType)
+          return;
+        
+        auto typeExpr = TypeExpr::createImplicitHack(
+            outermostWrapperAttr->getTypeLoc().getLoc(),
+            outermostWrapperType, ctx);
         initializer = CallExpr::create(
-            ctx, typeExpr, delegateAttr->getArg(),
-            delegateAttr->getArgumentLabels(),
-            delegateAttr->getArgumentLabelLocs(), /*hasTrailingClosure=*/false,
+            ctx, typeExpr, outermostArg,
+            outermostWrapperAttr->getArgumentLabels(),
+            outermostWrapperAttr->getArgumentLabelLocs(),
+            /*hasTrailingClosure=*/false,
             /*implicit=*/false);
-      } else if (delegateInfo.initialValueInit) {
-        // FIXME: we want to use the initialValueInit we found.
-        assert(initializer);
-        initializer = CallExpr::createImplicit(
-            ctx, typeExpr, {initializer}, {ctx.Id_initialValue});
       } else {
-        singleVar->diagnose(diag::property_delegate_init_without_initial_value,
-                            singleVar->getFullName(), delegateType)
-          .highlight(initializer->getSourceRange());
-        ctx.Diags.diagnose(delegateAttr->getLocation(),
-                           diag::property_delegate_direct_init)
-          .fixItInsertAfter(initializer->getSourceRange().End,
-                            "(<# initializer args #>)");
-        delegateNominal->diagnose(diag::kind_declname_declared_here,
-                                  delegateNominal->getDescriptiveKind(),
-                                  delegateNominal->getFullName());
-        return;
+        llvm_unreachable("No initializer anywhere?");
       }
+      wrapperAttrs[0]->setSemanticInit(initializer);
 
-      // Note that we have applied to property delegate, so we can adjust
+      // Note that we have applied to property wrapper, so we can adjust
       // the initializer type later.
-      appliedPropertyDelegate = delegateInfo;
+      wrappedVar = singleVar;
     }
-
   };
 
-  BindingListener listener(*this, pattern, initializer, DC);
+  BindingListener listener(*this, pattern, initializer);
   if (!initializer)
     return true;
 
@@ -2786,7 +2787,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
     // FIXME: initTy should be the same as resultTy; now that typeCheckExpression()
     // returns a Type and not bool, we should be able to simplify the listener
     // implementation here.
-    auto initTy = listener.getPatternInitType();
+    auto initTy = listener.getPatternInitType(nullptr);
     if (initTy->hasDependentMember())
       return true;
 
@@ -4373,8 +4374,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   if (Context.LangOpts.EnableObjCInterop) {
     if (auto errorTypeProto = Context.getProtocol(KnownProtocolKind::Error)) {
       if (conformsToProtocol(toType, errorTypeProto, dc,
-                             (ConformanceCheckFlags::InExpression|
-                              ConformanceCheckFlags::Used))) {
+                             ConformanceCheckFlags::InExpression)) {
         auto nsError = Context.getNSErrorDecl();
         if (nsError) {
           if (!nsError->hasInterfaceType()) {

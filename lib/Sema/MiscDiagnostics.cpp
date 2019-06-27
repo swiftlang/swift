@@ -124,6 +124,10 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       if (isa<TypeExpr>(Base))
         checkUseOfMetaTypeName(Base);
 
+      if (auto *OLE = dyn_cast<ObjectLiteralExpr>(E)) {
+        CallArgs.insert(OLE->getArg());
+      }
+
       if (auto *SE = dyn_cast<SubscriptExpr>(E))
         CallArgs.insert(SE->getIndex());
 
@@ -383,6 +387,8 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         TC.diagnose(c->getLoc(), diag::collection_literal_empty)
           .highlight(c->getSourceRange());
       else {
+        assert(c->getType()->hasTypeRepr() &&
+               "a defaulted type should always be printable");
         TC.diagnose(c->getLoc(), diag::collection_literal_heterogeneous,
                     c->getType())
           .highlight(c->getSourceRange())
@@ -3373,6 +3379,8 @@ public:
               fnType = fnType->getResult()->getAs<FunctionType>();
 
             // Coerce to this type.
+            assert(fnType->hasTypeRepr() &&
+                   "Objective-C methods should always have printable types");
             out << " as ";
             fnType->print(out);
           }
@@ -3537,6 +3545,9 @@ static void diagnoseUnintendedOptionalBehavior(TypeChecker &TC, const Expr *E,
     }
 
     void emitSilenceOptionalAnyWarningWithCoercion(Expr *E, Type destType) {
+      assert(destType->hasTypeRepr() &&
+             "coercion to Any should always be printable");
+
       SmallString<16> coercionString;
       coercionString += " as ";
       coercionString += destType->getWithoutParens()->getString();
@@ -4008,6 +4019,11 @@ void swift::fixItAccess(InFlightDiagnostic &diag, ValueDecl *VD,
       attr->setInvalid();
     }
 
+  } else if (auto *override = VD->getAttrs().getAttribute<OverrideAttr>()) {
+    // Insert the access in front of 'override', if it exists, in order to
+    // match the same keyword order as produced by method autocompletion.
+    diag.fixItInsert(override->getLocation(), fixItString);
+
   } else if (auto var = dyn_cast<VarDecl>(VD)) {
     if (auto PBD = var->getParentPatternBinding())
       diag.fixItInsert(PBD->getStartLoc(), fixItString);
@@ -4166,15 +4182,13 @@ Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
   // Handle contextual type, result type, and returnsSelf.
   Type contextType = afd->getDeclContext()->getDeclaredInterfaceType();
   Type resultType;
-  bool returnsSelf = false;
+  bool returnsSelf = afd->hasDynamicSelfResult();
 
   if (auto func = dyn_cast<FuncDecl>(afd)) {
     resultType = func->getResultInterfaceType();
     resultType = func->mapTypeIntoContext(resultType);
-    returnsSelf = func->hasDynamicSelf();
   } else if (isa<ConstructorDecl>(afd)) {
     resultType = contextType;
-    returnsSelf = true;
   }
 
   // Figure out the first parameter name.

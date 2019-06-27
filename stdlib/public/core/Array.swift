@@ -296,7 +296,7 @@
 /// - Note: The `ContiguousArray` and `ArraySlice` types are not bridged;
 ///   instances of those types always have a contiguous block of memory as
 ///   their storage.
-@_fixed_layout
+@frozen
 public struct Array<Element>: _DestructorSafeContainer {
   #if _runtime(_ObjC)
   @usableFromInline
@@ -884,7 +884,7 @@ extension Array: RangeReplaceableCollection {
     return _Buffer(_buffer: newBuffer, shiftedToStartIndex: 0)
   }
 
-  /// Construct a Array of `count` uninitialized elements.
+  /// Construct an Array of `count` uninitialized elements.
   @inlinable
   internal init(_uninitializedCount count: Int) {
     _precondition(count >= 0, "Can't construct Array with count < 0")
@@ -903,7 +903,7 @@ extension Array: RangeReplaceableCollection {
   }
 
   /// Entry point for `Array` literal construction; builds and returns
-  /// a Array of `count` uninitialized elements.
+  /// an Array of `count` uninitialized elements.
   @inlinable
   @_semantics("array.uninitialized")
   internal static func _allocateUninitialized(
@@ -936,7 +936,7 @@ extension Array: RangeReplaceableCollection {
   }
 
   /// Entry point for aborting literal construction: deallocates
-  /// a Array containing only uninitialized elements.
+  /// an Array containing only uninitialized elements.
   @inlinable
   internal mutating func _deallocateUninitialized() {
     // Set the count to zero and just release as normal.

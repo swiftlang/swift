@@ -1437,6 +1437,8 @@ public:
   llvm::Function *getAddrOfOpaqueTypeDescriptorAccessFunction(
       OpaqueTypeDecl *decl, ForDefinition_t forDefinition, bool implementation);
 
+  void createReplaceableProlog(IRGenFunction &IGF, SILFunction *f);
+
   void emitOpaqueTypeDescriptorAccessor(OpaqueTypeDecl *);
 
 private:

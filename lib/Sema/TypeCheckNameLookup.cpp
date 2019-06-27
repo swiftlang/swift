@@ -231,11 +231,9 @@ namespace {
 
       // Dig out the protocol conformance.
       auto *foundProto = cast<ProtocolDecl>(foundDC);
-      auto resolver = DC->getASTContext().getLazyResolver();
-      assert(resolver && "Need an active resolver");
-      auto &tc = *static_cast<TypeChecker *>(resolver);
-      auto conformance = tc.conformsToProtocol(conformingType, foundProto, DC,
-                                               conformanceOptions);
+      auto conformance = TypeChecker::conformsToProtocol(conformingType,
+                                                         foundProto, DC,
+                                                         conformanceOptions);
       if (!conformance) {
         // If there's no conformance, we have an existential
         // and we found a member from one of the protocols, and
@@ -557,7 +555,9 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
       auto typeDecl =
         concrete->getTypeWitnessAndDecl(assocType, lazyResolver).second;
 
-      assert(typeDecl && "Missing type witness?");
+      // Circularity.
+      if (!typeDecl)
+        continue;
 
       auto memberType =
           substMemberTypeWithBase(dc->getParentModule(), typeDecl, type);

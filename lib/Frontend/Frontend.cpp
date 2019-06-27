@@ -175,6 +175,26 @@ void CompilerInstance::recordPrimarySourceFile(SourceFile *SF) {
     recordPrimaryInputBuffer(SF->getBufferID().getValue());
 }
 
+bool CompilerInstance::setUpASTContextIfNeeded() {
+  if (Invocation.getFrontendOptions().RequestedAction ==
+      FrontendOptions::ActionType::CompileModuleFromInterface) {
+    // Compiling a module interface from source uses its own CompilerInstance
+    // with options read from the input file. Don't bother setting up an
+    // ASTContext at this level.
+    return false;
+  }
+
+  Context.reset(ASTContext::get(Invocation.getLangOptions(),
+                                Invocation.getSearchPathOptions(), SourceMgr,
+                                Diagnostics));
+  registerTypeCheckerRequestFunctions(Context->evaluator);
+
+  if (setUpModuleLoaders())
+    return true;
+
+  return false;
+}
+
 bool CompilerInstance::setup(const CompilerInvocation &Invok) {
   Invocation = Invok;
 
@@ -196,20 +216,18 @@ bool CompilerInstance::setup(const CompilerInvocation &Invok) {
     Invocation.getLangOptions().AttachCommentsToDecls = true;
   }
 
-  Context.reset(ASTContext::get(Invocation.getLangOptions(),
-                                Invocation.getSearchPathOptions(), SourceMgr,
-                                Diagnostics));
-  registerTypeCheckerRequestFunctions(Context->evaluator);
-
-  if (setUpModuleLoaders())
-    return true;
-
   assert(Lexer::isIdentifier(Invocation.getModuleName()));
 
   if (isInSILMode())
     Invocation.getLangOptions().EnableAccessControl = false;
 
-  return setUpInputs();
+  if (setUpInputs())
+    return true;
+
+  if (setUpASTContextIfNeeded())
+    return true;
+
+  return false;
 }
 
 static bool loadAndValidateVFSOverlay(
@@ -807,6 +825,18 @@ void CompilerInstance::parseAndCheckTypesUpTo(
                         options.WarnLongExpressionTypeChecking,
                         options.SolverExpressionTimeThreshold,
                         options.SwitchCheckingInvocationThreshold);
+
+    if (!Context->hadError() && Invocation.getFrontendOptions().PCMacro) {
+      performPCMacro(SF, PersistentState.getTopLevelContext());
+    }
+
+    // Playground transform knows to look out for PCMacro's changes and not
+    // to playground log them.
+    if (!Context->hadError() &&
+        Invocation.getFrontendOptions().PlaygroundTransform) {
+      performPlaygroundTransform(
+          SF, Invocation.getFrontendOptions().PlaygroundHighPerformance);
+    }
   });
 
   if (Invocation.isCodeCompletion()) {
@@ -947,17 +977,6 @@ void CompilerInstance::parseAndTypeCheckMainFileUpTo(
     performDebuggerTestingTransform(MainFile);
   }
 
-  if (mainIsPrimary && !Context->hadError() &&
-      Invocation.getFrontendOptions().PCMacro) {
-    performPCMacro(MainFile, PersistentState.getTopLevelContext());
-  }
-
-  // Playground transform knows to look out for PCMacro's changes and not
-  // to playground log them.
-  if (mainIsPrimary && !Context->hadError() &&
-      Invocation.getFrontendOptions().PlaygroundTransform)
-    performPlaygroundTransform(
-        MainFile, Invocation.getFrontendOptions().PlaygroundHighPerformance);
   if (!mainIsPrimary) {
     performNameBinding(MainFile);
   }

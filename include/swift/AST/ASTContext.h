@@ -53,6 +53,7 @@ namespace swift {
   class AvailabilityContext;
   class BoundGenericType;
   class ClangNode;
+  class ConcreteDeclRef;
   class ConstructorDecl;
   class Decl;
   class DeclContext;
@@ -253,13 +254,6 @@ public:
   // Define the set of known identifiers.
 #define IDENTIFIER_WITH_NAME(Name, IdStr) Identifier Id_##Name;
 #include "swift/AST/KnownIdentifiers.def"
-
-  /// The list of external definitions imported by this context.
-  llvm::SetVector<Decl *> ExternalDefinitions;
-
-  /// FIXME: HACK HACK HACK
-  /// This state should be tracked somewhere else.
-  unsigned LastCheckedExternalDefinition = 0;
 
   /// A consumer of type checker debug output.
   std::unique_ptr<TypeCheckerDebugConsumer> TypeCheckerDebug;
@@ -514,7 +508,20 @@ public:
   bool hasArrayLiteralIntrinsics() const;
 
   /// Retrieve the declaration of Swift.Bool.init(_builtinBooleanLiteral:)
-  ConstructorDecl *getBoolBuiltinInitDecl() const;
+  ConcreteDeclRef getBoolBuiltinInitDecl() const;
+
+  /// Retrieve the witness for init(_builtinIntegerLiteral:).
+  ConcreteDeclRef getIntBuiltinInitDecl(NominalTypeDecl *intDecl) const;
+
+  /// Retrieve the witness for init(_builtinFloatLiteral:).
+  ConcreteDeclRef getFloatBuiltinInitDecl(NominalTypeDecl *floatDecl) const;
+
+  /// Retrieve the witness for (_builtinStringLiteral:utf8CodeUnitCount:isASCII:).
+  ConcreteDeclRef getStringBuiltinInitDecl(NominalTypeDecl *stringDecl) const;
+
+  ConcreteDeclRef getBuiltinInitDecl(NominalTypeDecl *decl,
+                                     KnownProtocolKind builtinProtocol,
+                llvm::function_ref<DeclName (ASTContext &ctx)> initName) const;
 
   /// Retrieve the declaration of Swift.==(Int, Int) -> Bool.
   FuncDecl *getEqualIntDecl() const;
@@ -566,14 +573,8 @@ public:
                                ForeignLanguage language,
                                const DeclContext *dc);
 
-  /// Add a declaration to a list of declarations that need to be emitted
-  /// as part of the current module or source file, but are otherwise not
-  /// nested within it.
-  void addExternalDecl(Decl *decl);
-
   /// Add a declaration that was synthesized to a per-source file list if
-  /// if is part of a source file, or the external declarations list if
-  /// it is part of an imported type context.
+  /// if is part of a source file.
   void addSynthesizedDecl(Decl *decl);
 
   /// Add a cleanup function to be called when the ASTContext is deallocated.
@@ -588,6 +589,10 @@ public:
   
   /// Get the runtime availability of the opaque types language feature for the target platform.
   AvailabilityContext getOpaqueTypeAvailability();
+
+  /// Get the runtime availability of features introduced in the Swift 5.1
+  /// compiler for the target platform.
+  AvailabilityContext getSwift51Availability();
 
   //===--------------------------------------------------------------------===//
   // Diagnostics Helper functions
@@ -837,11 +842,11 @@ public:
                                               const IterableDeclContext *idc,
                                               LazyMemberLoader *lazyLoader);
 
-  /// Access the side cache for property delegate backing property types,
+  /// Access the side cache for property wrapper backing property types,
   /// used because TypeChecker::typeCheckBinding() needs somewhere to stash
   /// the backing property type.
-  Type getSideCachedPropertyDelegateBackingPropertyType(VarDecl *var) const;
-  void setSideCachedPropertyDelegateBackingPropertyType(VarDecl *var,
+  Type getSideCachedPropertyWrapperBackingPropertyType(VarDecl *var) const;
+  void setSideCachedPropertyWrapperBackingPropertyType(VarDecl *var,
                                                         Type type);
   
   /// Returns memory usage of this ASTContext.

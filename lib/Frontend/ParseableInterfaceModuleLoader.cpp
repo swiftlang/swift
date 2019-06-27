@@ -18,6 +18,7 @@
 #include "swift/AST/FileSystem.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/Lazy.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/STLExtras.h"
@@ -222,27 +223,19 @@ static bool serializedASTLooksValid(const llvm::MemoryBuffer &buf) {
 }
 
 static std::unique_ptr<llvm::MemoryBuffer> getBufferOfDependency(
-  llvm::vfs::FileSystem &fs, StringRef depPath, StringRef interfacePath,
-  DiagnosticEngine &diags, SourceLoc diagnosticLoc) {
+  llvm::vfs::FileSystem &fs, StringRef depPath) {
   auto depBuf = fs.getBufferForFile(depPath, /*FileSize=*/-1,
                                     /*RequiresNullTerminator=*/false);
   if (!depBuf) {
-    diags.diagnose(diagnosticLoc,
-                   diag::missing_dependency_of_module_interface,
-                   depPath, interfacePath, depBuf.getError().message());
     return nullptr;
   }
   return std::move(depBuf.get());
 }
 
 static Optional<llvm::vfs::Status> getStatusOfDependency(
-  llvm::vfs::FileSystem &fs, StringRef depPath, StringRef interfacePath,
-  DiagnosticEngine &diags, SourceLoc diagnosticLoc) {
+  llvm::vfs::FileSystem &fs, StringRef depPath) {
   auto status = fs.status(depPath);
   if (!status) {
-    diags.diagnose(diagnosticLoc,
-                   diag::missing_dependency_of_module_interface,
-                   depPath, interfacePath, status.getError().message());
     return None;
   }
   return status.get();
@@ -280,7 +273,6 @@ static Optional<StringRef> getRelativeDepPath(StringRef DepPath,
 /// output path.
 /// \note Needs to be in the swift namespace so CompilerInvocation can see it.
 class swift::ParseableInterfaceBuilder {
-  ASTContext &ctx;
   llvm::vfs::FileSystem &fs;
   DiagnosticEngine &diags;
   const StringRef interfacePath;
@@ -293,6 +285,7 @@ class swift::ParseableInterfaceBuilder {
   const SourceLoc diagnosticLoc;
   DependencyTracker *const dependencyTracker;
   CompilerInvocation subInvocation;
+  SmallVector<StringRef, 3> extraDependencies;
 
   void configureSubInvocationInputsAndOutputs(StringRef OutPath) {
     auto &SubFEOpts = subInvocation.getFrontendOptions();
@@ -307,10 +300,9 @@ class swift::ParseableInterfaceBuilder {
       .setMainAndSupplementaryOutputs({MainOut}, {SOPs});
   }
 
-  void configureSubInvocation() {
-    auto &SearchPathOpts = ctx.SearchPathOpts;
-    auto &LangOpts = ctx.LangOpts;
-
+  void configureSubInvocation(const SearchPathOptions &SearchPathOpts,
+                              const LangOptions &LangOpts,
+                              ClangModuleLoader *ClangLoader) {
     // Start with a SubInvocation that copies various state from our
     // invoking ASTContext.
     subInvocation.setImportSearchPaths(SearchPathOpts.ImportSearchPaths);
@@ -329,7 +321,7 @@ class swift::ParseableInterfaceBuilder {
     // Respect the detailed-record preprocessor setting of the parent context.
     // This, and the "raw" clang module format it implicitly enables, are
     // required by sourcekitd.
-    if (auto *ClangLoader = ctx.getClangModuleLoader()) {
+    if (ClangLoader) {
       auto &Opts = ClangLoader->getClangInstance().getPreprocessorOpts();
       if (Opts.DetailedRecord) {
         subInvocation.getClangImporterOptions().DetailedPreprocessingRecord = true;
@@ -407,6 +399,8 @@ class swift::ParseableInterfaceBuilder {
     auto DTDeps = SubInstance.getDependencyTracker()->getDependencies();
     SmallVector<StringRef, 16> InitialDepNames(DTDeps.begin(), DTDeps.end());
     InitialDepNames.push_back(interfacePath);
+    InitialDepNames.insert(InitialDepNames.end(),
+                           extraDependencies.begin(), extraDependencies.end());
     llvm::StringSet<> AllDepNames;
     SmallString<128> Scratch;
 
@@ -434,8 +428,7 @@ class swift::ParseableInterfaceBuilder {
       if (DepName.startswith(ResourcePath))
         continue;
 
-      auto Status = getStatusOfDependency(fs, DepName, interfacePath,
-                                          diags, diagnosticLoc);
+      auto Status = getStatusOfDependency(fs, DepName);
       if (!Status)
         return true;
 
@@ -445,8 +438,7 @@ class swift::ParseableInterfaceBuilder {
       std::unique_ptr<llvm::MemoryBuffer> DepBuf = nullptr;
       auto getDepBuf = [&]() -> llvm::MemoryBuffer * {
         if (DepBuf) return DepBuf.get();
-        if (auto Buf = getBufferOfDependency(fs, DepName, interfacePath,
-                                             diags, diagnosticLoc)) {
+        if (auto Buf = getBufferOfDependency(fs, DepName)) {
           DepBuf = std::move(Buf);
           return DepBuf.get();
         }
@@ -472,7 +464,10 @@ class swift::ParseableInterfaceBuilder {
   }
 
 public:
-  ParseableInterfaceBuilder(ASTContext &ctx,
+  ParseableInterfaceBuilder(SourceManager &sourceMgr, DiagnosticEngine &diags,
+                            const SearchPathOptions &searchPathOpts,
+                            const LangOptions &langOpts,
+                            ClangModuleLoader *clangImporter,
                             StringRef interfacePath,
                             StringRef moduleName,
                             StringRef moduleCachePath,
@@ -482,18 +477,24 @@ public:
                             bool remarkOnRebuildFromInterface = false,
                             SourceLoc diagnosticLoc = SourceLoc(),
                             DependencyTracker *tracker = nullptr)
-  : ctx(ctx), fs(*ctx.SourceMgr.getFileSystem()), diags(ctx.Diags),
-  interfacePath(interfacePath), moduleName(moduleName),
-  moduleCachePath(moduleCachePath), prebuiltCachePath(prebuiltCachePath),
-  serializeDependencyHashes(serializeDependencyHashes),
-  trackSystemDependencies(trackSystemDependencies),
-  remarkOnRebuildFromInterface(remarkOnRebuildFromInterface),
-  diagnosticLoc(diagnosticLoc), dependencyTracker(tracker) {
-    configureSubInvocation();
+    : fs(*sourceMgr.getFileSystem()), diags(diags),
+      interfacePath(interfacePath), moduleName(moduleName),
+      moduleCachePath(moduleCachePath), prebuiltCachePath(prebuiltCachePath),
+      serializeDependencyHashes(serializeDependencyHashes),
+      trackSystemDependencies(trackSystemDependencies),
+      remarkOnRebuildFromInterface(remarkOnRebuildFromInterface),
+      diagnosticLoc(diagnosticLoc), dependencyTracker(tracker) {
+    configureSubInvocation(searchPathOpts, langOpts, clangImporter);
   }
 
   const CompilerInvocation &getSubInvocation() const {
     return subInvocation;
+  }
+
+  /// Ensures the requested file name is added as a dependency of the resulting
+  /// module.
+  void addExtraDependency(StringRef path) {
+    extraDependencies.push_back(path);
   }
 
   bool buildSwiftModule(StringRef OutPath, bool ShouldSerializeDeps,
@@ -562,6 +563,17 @@ public:
       SubInstance.addDiagnosticConsumer(&FDC);
 
       SubInstance.createDependencyTracker(FEOpts.TrackSystemDeps);
+
+      SWIFT_DEFER {
+        // Make sure to emit a generic top-level error if a module fails to
+        // load. This is not only good for users; it also makes sure that we've
+        // emitted an error in the parent diagnostic engine, which is what
+        // determines whether the process exits with a proper failure status.
+        if (SubInstance.getASTContext().hadError()) {
+          diags.diagnose(diagnosticLoc, diag::serialization_load_failed,
+                         moduleName);
+        }
+      };
 
       if (SubInstance.setup(subInvocation)) {
         SubError = true;
@@ -643,6 +655,7 @@ struct ModuleRebuildInfo {
     Optional<serialization::Status> serializationStatus;
     ModuleKind kind;
     SmallVector<std::string, 10> outOfDateDependencies;
+    SmallVector<std::string, 10> missingDependencies;
   };
   SmallVector<OutOfDateModule, 3> outOfDateModules;
 
@@ -650,7 +663,7 @@ struct ModuleRebuildInfo {
     for (auto &mod : outOfDateModules) {
       if (mod.path == path) return mod;
     }
-    outOfDateModules.push_back({path, None, ModuleKind::Normal, {}});
+    outOfDateModules.push_back({path, None, ModuleKind::Normal, {}, {}});
     return outOfDateModules.back();
   }
 
@@ -671,6 +684,22 @@ struct ModuleRebuildInfo {
   void addOutOfDateDependency(StringRef modulePath, StringRef depPath) {
     getOrInsertOutOfDateModule(modulePath)
       .outOfDateDependencies.push_back(depPath);
+  }
+
+  /// Registers a missing dependency at \c depPath for the module
+  /// at \c modulePath.
+  void addMissingDependency(StringRef modulePath, StringRef depPath) {
+    getOrInsertOutOfDateModule(modulePath)
+      .missingDependencies.push_back(depPath);
+  }
+
+  /// Determines if we saw the given module path and registered is as out of
+  /// date.
+  bool sawOutOfDateModule(StringRef modulePath) {
+    for (auto &mod : outOfDateModules)
+      if (mod.path == modulePath)
+        return true;
+    return false;
   }
 
   const char *invalidModuleReason(serialization::Status status) {
@@ -707,6 +736,11 @@ struct ModuleRebuildInfo {
       for (auto &dep : mod.outOfDateDependencies) {
         ctx.Diags.diagnose(loc, diag::module_interface_dependency_out_of_date,
                            dep);
+      }
+
+      // Diagnose any missing dependencies in this module.
+      for (auto &dep : mod.missingDependencies) {
+        ctx.Diags.diagnose(loc, diag::module_interface_dependency_missing, dep);
       }
 
       // If there was a compiled module that wasn't able to be read, diagnose
@@ -822,31 +856,44 @@ class ParseableInterfaceModuleLoaderImpl {
     return StringRef(scratch.data(), scratch.size());
   }
 
+  enum class DependencyStatus {
+    UpToDate,
+    OutOfDate,
+    Missing
+  };
+
   // Checks that a dependency read from the cached module is up to date compared
   // to the interface file it represents.
-  bool dependencyIsUpToDate(const FileDependency &dep, StringRef fullPath) {
-    auto status = getStatusOfDependency(fs, fullPath, interfacePath,
-                                        diags, diagnosticLoc);
-    if (!status) return false;
+  DependencyStatus checkDependency(StringRef modulePath,
+                                   const FileDependency &dep,
+                                   StringRef fullPath) {
+    auto status = getStatusOfDependency(fs, fullPath);
+    if (!status)
+      return DependencyStatus::Missing;
 
     // If the sizes differ, then we know the file has changed.
-    if (status->getSize() != dep.getSize()) return false;
+    if (status->getSize() != dep.getSize())
+      return DependencyStatus::OutOfDate;
 
     // Otherwise, if this dependency is verified by modification time, check
     // it vs. the modification time of the file.
     if (dep.isModificationTimeBased()) {
       uint64_t mtime =
         status->getLastModificationTime().time_since_epoch().count();
-      return mtime == dep.getModificationTime();
+      return mtime == dep.getModificationTime() ?
+          DependencyStatus::UpToDate :
+          DependencyStatus::OutOfDate;
     }
 
     // Slow path: if the dependency is verified by content hash, check it vs.
     // the hash of the file.
-    auto buf = getBufferOfDependency(fs, fullPath, interfacePath,
-                                     diags, diagnosticLoc);
-    if (!buf) return false;
+    auto buf = getBufferOfDependency(fs, fullPath);
+    if (!buf)
+      return DependencyStatus::Missing;
 
-    return xxHash64(buf->getBuffer()) == dep.getContentHash();
+    return xxHash64(buf->getBuffer()) == dep.getContentHash() ?
+        DependencyStatus::UpToDate :
+        DependencyStatus::OutOfDate;
   }
 
   // Check if all the provided file dependencies are up-to-date compared to
@@ -856,13 +903,19 @@ class ParseableInterfaceModuleLoaderImpl {
     SmallString<128> SDKRelativeBuffer;
     for (auto &in : deps) {
       StringRef fullPath = getFullDependencyPath(in, SDKRelativeBuffer);
-      if (!dependencyIsUpToDate(in, fullPath)) {
-        LLVM_DEBUG(llvm::dbgs() << "Dep " << fullPath
-                   << " is directly out of date\n");
+      switch (checkDependency(modulePath, in, fullPath)) {
+      case DependencyStatus::UpToDate:
+        LLVM_DEBUG(llvm::dbgs() << "Dep " << fullPath << " is up to date\n");
+        break;
+      case DependencyStatus::OutOfDate:
+        LLVM_DEBUG(llvm::dbgs() << "Dep " << fullPath << " is out of date\n");
         rebuildInfo.addOutOfDateDependency(modulePath, fullPath);
         return false;
+      case DependencyStatus::Missing:
+        LLVM_DEBUG(llvm::dbgs() << "Dep " << fullPath << " is missing\n");
+        rebuildInfo.addMissingDependency(modulePath, fullPath);
+        return false;
       }
-      LLVM_DEBUG(llvm::dbgs() << "Dep " << fullPath << " is up to date\n");
     }
     return true;
   }
@@ -872,7 +925,12 @@ class ParseableInterfaceModuleLoaderImpl {
   bool serializedASTBufferIsUpToDate(
       StringRef path, const llvm::MemoryBuffer &buf,
       SmallVectorImpl<FileDependency> &allDeps) {
-    LLVM_DEBUG(llvm::dbgs() << "Validating deps of " << modulePath << "\n");
+
+    // Clear the existing dependencies, because we're going to re-fill them
+    // in validateSerializedAST.
+    allDeps.clear();
+
+    LLVM_DEBUG(llvm::dbgs() << "Validating deps of " << path << "\n");
     auto validationInfo = serialization::validateSerializedAST(
         buf.getBuffer(), /*ExtendedValidationInfo=*/nullptr, &allDeps);
 
@@ -903,6 +961,13 @@ class ParseableInterfaceModuleLoaderImpl {
       StringRef path, const ForwardingModule &fwd,
       SmallVectorImpl<FileDependency> &deps,
       std::unique_ptr<llvm::MemoryBuffer> &moduleBuffer) {
+
+    // Clear the existing dependencies, because we're going to re-fill them
+    // from the forwarding module.
+    deps.clear();
+
+    LLVM_DEBUG(llvm::dbgs() << "Validating deps of " << path << "\n");
+
     // First, make sure the underlying module path exists and is valid.
     auto modBuf = fs.getBufferForFile(fwd.underlyingModulePath);
     if (!modBuf || !serializedASTLooksValid(*modBuf.get()))
@@ -1147,6 +1212,9 @@ class ParseableInterfaceModuleLoaderImpl {
                                   ModuleRebuildInfo::ModuleKind::Normal);
       }
     } else if (adjacentModuleBuffer.getError() != notFoundError) {
+      LLVM_DEBUG(llvm::dbgs() << "Found unreadable module at "
+                              << modulePath
+                              << "; deferring to serialized module loader\n");
       return std::make_error_code(std::errc::not_supported);
     }
 
@@ -1236,9 +1304,11 @@ class ParseableInterfaceModuleLoaderImpl {
     // Set up a builder if we need to build the module. It'll also set up
     // the subinvocation we'll need to use to compute the cache paths.
     ParseableInterfaceBuilder builder(
-      ctx, interfacePath, moduleName, cacheDir, prebuiltCacheDir,
-      /*serializeDependencyHashes*/false, trackSystemDependencies,
-      remarkOnRebuildFromInterface, diagnosticLoc, dependencyTracker);
+      ctx.SourceMgr, ctx.Diags, ctx.SearchPathOpts, ctx.LangOpts,
+      ctx.getClangModuleLoader(), interfacePath, moduleName, cacheDir,
+      prebuiltCacheDir, /*serializeDependencyHashes*/false,
+      trackSystemDependencies, remarkOnRebuildFromInterface, diagnosticLoc,
+      dependencyTracker);
     auto &subInvocation = builder.getSubInvocation();
 
     // Compute the output path if we're loading or emitting a cached module.
@@ -1290,6 +1360,14 @@ class ParseableInterfaceModuleLoaderImpl {
       rebuildInfo.diagnose(ctx, diagnosticLoc, moduleName,
                            interfacePath);
     }
+
+    // If we found an out-of-date .swiftmodule, we still want to add it as
+    // a dependency of the .swiftinterface. That way if it's updated, but
+    // the .swiftinterface remains the same, we invalidate the cache and
+    // check the new .swiftmodule, because it likely has more information
+    // about the state of the world.
+    if (rebuildInfo.sawOutOfDateModule(modulePath))
+      builder.addExtraDependency(modulePath);
 
     if (builder.buildSwiftModule(cachedOutputPath, /*shouldSerializeDeps*/true,
                                  &moduleBuffer))
@@ -1373,12 +1451,15 @@ std::error_code ParseableInterfaceModuleLoader::findModuleFilesInDirectory(
 
 
 bool ParseableInterfaceModuleLoader::buildSwiftModuleFromSwiftInterface(
-  ASTContext &Ctx, StringRef CacheDir, StringRef PrebuiltCacheDir,
-  StringRef ModuleName, StringRef InPath, StringRef OutPath,
-  bool SerializeDependencyHashes, bool TrackSystemDependencies,
-  bool RemarkOnRebuildFromInterface) {
-  ParseableInterfaceBuilder builder(Ctx, InPath, ModuleName,
-                                    CacheDir, PrebuiltCacheDir,
+    SourceManager &SourceMgr, DiagnosticEngine &Diags,
+    const SearchPathOptions &SearchPathOpts, const LangOptions &LangOpts,
+    StringRef CacheDir, StringRef PrebuiltCacheDir,
+    StringRef ModuleName, StringRef InPath, StringRef OutPath,
+    bool SerializeDependencyHashes, bool TrackSystemDependencies,
+    bool RemarkOnRebuildFromInterface) {
+  ParseableInterfaceBuilder builder(SourceMgr, Diags, SearchPathOpts, LangOpts,
+                                    /*clangImporter*/nullptr, InPath,
+                                    ModuleName, CacheDir, PrebuiltCacheDir,
                                     SerializeDependencyHashes,
                                     TrackSystemDependencies,
                                     RemarkOnRebuildFromInterface);

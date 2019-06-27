@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeChecker.h"
+#include "TypeCheckAvailability.h"
 #include "TypeCheckType.h"
 #include "MiscDiagnostics.h"
 #include "ConstraintSystem.h"
@@ -52,8 +53,8 @@ using namespace swift;
 
 #ifndef NDEBUG
 /// Determine whether the given context is for the backing property of a
-/// property delegate.
-static bool isPropertyDelegateBackingInitContext(DeclContext *dc) {
+/// property wrapper.
+static bool isPropertyWrapperBackingInitContext(DeclContext *dc) {
   auto initContext = dyn_cast<Initializer>(dc);
   if (!initContext) return false;
 
@@ -66,7 +67,7 @@ static bool isPropertyDelegateBackingInitContext(DeclContext *dc) {
   auto singleVar = binding->getSingleVar();
   if (!singleVar) return false;
 
-  return singleVar->getOriginalDelegatedProperty() != nullptr;
+  return singleVar->getOriginalWrappedProperty() != nullptr;
 }
 #endif
 
@@ -132,7 +133,7 @@ namespace {
             // its parent to the auto closure parent.
             assert((ParentDC->getContextKind() ==
                       DeclContextKind::AbstractClosureExpr ||
-                    isPropertyDelegateBackingInitContext(ParentDC)) &&
+                    isPropertyWrapperBackingInitContext(ParentDC)) &&
                    "Incorrect parent decl context for closure");
             CE->setParent(ParentDC);
           }
@@ -739,9 +740,9 @@ public:
     {
       Type sequenceType = sequence->getType();
       auto conformance =
-        TC.conformsToProtocol(sequenceType, sequenceProto, DC,
-                              ConformanceCheckFlags::InExpression,
-                              sequence->getLoc());
+        TypeChecker::conformsToProtocol(sequenceType, sequenceProto, DC,
+                                        ConformanceCheckFlags::InExpression,
+                                        sequence->getLoc());
       if (!conformance)
         return nullptr;
 
@@ -789,9 +790,9 @@ public:
     // FIXME: Would like to customize the diagnostic emitted in
     // conformsToProtocol().
     auto genConformance =
-      TC.conformsToProtocol(generatorTy, generatorProto, DC,
-                            ConformanceCheckFlags::InExpression,
-                            sequence->getLoc());
+      TypeChecker::conformsToProtocol(generatorTy, generatorProto, DC,
+                                      ConformanceCheckFlags::InExpression,
+                                      sequence->getLoc());
     if (!genConformance)
       return nullptr;
 
@@ -1913,6 +1914,20 @@ bool TypeChecker::typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD) {
   return false;
 }
 
+static Type getFunctionBuilderType(FuncDecl *FD) {
+  Type builderType = FD->getFunctionBuilderType();
+
+  // For getters, fall back on looking on the attribute on the storage.
+  if (!builderType) {
+    auto accessor = dyn_cast<AccessorDecl>(FD);
+    if (accessor && accessor->getAccessorKind() == AccessorKind::Get) {
+      builderType = accessor->getStorage()->getFunctionBuilderType();
+    }
+  }
+
+  return builderType;
+}
+
 // Type check a function body (defined with the func keyword) that is either a
 // named function or an anonymous func expression.
 bool TypeChecker::typeCheckFunctionBodyUntil(FuncDecl *FD,
@@ -1924,6 +1939,10 @@ bool TypeChecker::typeCheckFunctionBodyUntil(FuncDecl *FD,
 
   BraceStmt *BS = FD->getBody();
   assert(BS && "Should have a body");
+
+  if (Type builderType = getFunctionBuilderType(FD)) {
+    return typeCheckFunctionBuilderFuncBody(FD, builderType);
+  }
 
   if (FD->hasSingleExpressionBody()) {
     auto resultTypeLoc = FD->getBodyResultTypeLoc();
@@ -2032,8 +2051,19 @@ static bool checkSuperInit(TypeChecker &tc, ConstructorDecl *fromCtor,
       // super.init() call.
       return true;
     }
+
+    // Make sure we can reference the designated initializer correctly.
+    if (fromCtor->getResilienceExpansion() == ResilienceExpansion::Minimal) {
+      TypeChecker::FragileFunctionKind fragileKind;
+      bool treatUsableFromInlineAsPublic;
+      std::tie(fragileKind, treatUsableFromInlineAsPublic) =
+        tc.getFragileFunctionKind(fromCtor);
+      tc.diagnoseInlinableDeclRef(
+          fromCtor->getLoc(), ctor, fromCtor, fragileKind,
+          treatUsableFromInlineAsPublic);
+    }
   }
-  
+
   return false;
 }
 

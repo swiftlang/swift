@@ -1720,7 +1720,7 @@ internal struct KeyPathBuffer {
 
     // fetch type, which is in the buffer unless it's the final component
     let nextType: Any.Type?
-    if data.count == 0 {
+    if data.isEmpty {
       nextType = nil
     } else {
       nextType = _pop(from: &data, as: Any.Type.self)
@@ -2244,7 +2244,7 @@ internal func _appendingKeyPaths<
           }
         }
         
-        _internalInvariant(destBuffer.count == 0,
+        _internalInvariant(destBuffer.isEmpty,
                      "did not fill entire result buffer")
       }
 
@@ -2507,7 +2507,7 @@ internal enum KeyPathPatternStoredOffset {
   case inline(UInt32)
   case outOfLine(UInt32)
   case unresolvedFieldOffset(UInt32)
-  case unresolvedIndirectOffset(UnsafePointer<UInt32>)
+  case unresolvedIndirectOffset(UnsafePointer<UInt>)
 }
 internal struct KeyPathPatternComputedArguments {
   var getLayout: KeyPathComputedArgumentLayoutFn
@@ -2602,7 +2602,7 @@ internal func _walkKeyPathPattern<W: KeyPathPatternVisitor>(
                                 as: Int32.self)
       let ptr = _resolveRelativeIndirectableAddress(base, relativeOffset)
       offset = .unresolvedIndirectOffset(
-                                       ptr.assumingMemoryBound(to: UInt32.self))
+                                       ptr.assumingMemoryBound(to: UInt.self))
     default:
       offset = .inline(header.storedOffsetPayload)
     }
@@ -3151,7 +3151,8 @@ internal struct InstantiateKeyPathBuffer : KeyPathPatternVisitor {
       case .unresolvedIndirectOffset(let pointerToOffset):
         // Look up offset in the indirectly-referenced variable we have a
         // pointer.
-        let offset = UInt32(pointerToOffset.pointee)
+        assert(pointerToOffset.pointee <= UInt32.max)
+        let offset = UInt32(truncatingIfNeeded: pointerToOffset.pointee)
         let header = RawKeyPathComponent.Header(storedWithOutOfLineOffset: kind,
                                                 mutable: mutable)
         pushDest(header)

@@ -50,7 +50,7 @@ static bool canInlineBeginApply(BeginApplyInst *BA) {
   // potentially after the resumption site when there are un-mergeable
   // values alive across it.
   bool hasYield = false;
-  for (auto &B : BA->getReferencedFunction()->getBlocks()) {
+  for (auto &B : BA->getReferencedFunctionOrNull()->getBlocks()) {
     if (isa<YieldInst>(B.getTerminator())) {
       if (hasYield) return false;
       hasYield = true;
@@ -341,6 +341,7 @@ std::pair<SILBasicBlock::iterator, SILBasicBlock *>
 SILInliner::inlineFullApply(FullApplySite apply,
                             SILInliner::InlineKind inlineKind,
                             SILOptFunctionBuilder &funcBuilder) {
+  assert(apply.canOptimize());
   SmallVector<SILValue, 8> appliedArgs;
   for (const auto &arg : apply.getArguments())
     appliedArgs.push_back(arg);
@@ -355,7 +356,7 @@ SILInliner::inlineFullApply(FullApplySite apply,
 
   SILInliner Inliner(funcBuilder, inlineKind, apply.getSubstitutionMap(),
                      OpenedArchetypesTracker);
-  return Inliner.inlineFunction(apply.getReferencedFunction(), apply,
+  return Inliner.inlineFunction(apply.getReferencedFunctionOrNull(), apply,
                                 appliedArgs);
 }
 
@@ -558,15 +559,20 @@ SILValue SILInlineCloner::borrowFunctionArgument(SILValue callArg,
       || callArg.getOwnershipKind() != ValueOwnershipKind::Owned) {
     return callArg;
   }
-  auto *borrow = getBuilder().createBeginBorrow(AI.getLoc(), callArg);
+
+  SILBuilderWithScope beginBuilder(AI.getInstruction(), getBuilder());
+  auto *borrow = beginBuilder.createBeginBorrow(AI.getLoc(), callArg);
   if (auto *tryAI = dyn_cast<TryApplyInst>(AI)) {
-    SILBuilder returnBuilder(tryAI->getNormalBB()->begin());
+    SILBuilderWithScope returnBuilder(tryAI->getNormalBB()->begin(),
+                                      getBuilder());
     returnBuilder.createEndBorrow(AI.getLoc(), borrow, callArg);
 
-    SILBuilder throwBuilder(tryAI->getErrorBB()->begin());
+    SILBuilderWithScope throwBuilder(tryAI->getErrorBB()->begin(),
+                                     getBuilder());
     throwBuilder.createEndBorrow(AI.getLoc(), borrow, callArg);
   } else {
-    SILBuilder returnBuilder(std::next(AI.getInstruction()->getIterator()));
+    SILBuilderWithScope returnBuilder(
+        std::next(AI.getInstruction()->getIterator()), getBuilder());
     returnBuilder.createEndBorrow(AI.getLoc(), borrow, callArg);
   }
   return borrow;
@@ -758,7 +764,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::ValueMetatypeInst:
   case SILInstructionKind::WitnessMethodInst:
   case SILInstructionKind::AssignInst:
-  case SILInstructionKind::AssignByDelegateInst:
+  case SILInstructionKind::AssignByWrapperInst:
   case SILInstructionKind::BranchInst:
   case SILInstructionKind::CheckedCastBranchInst:
   case SILInstructionKind::CheckedCastValueBranchInst:

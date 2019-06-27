@@ -285,15 +285,14 @@ public:
     assert(Cancelled || ManuallyVisitedAccessorStack.empty());
   }
 
-  void visitModule(ModuleDecl &Mod, StringRef Hash);
+  void visitModule(ModuleDecl &Mod);
   void visitDeclContext(DeclContext *DC);
 
 private:
   bool visitImports(SourceFileOrModule Mod,
                     llvm::SmallPtrSetImpl<ModuleDecl *> &Visited);
 
-  bool handleSourceOrModuleFile(SourceFileOrModule SFOrMod, StringRef KnownHash,
-                                bool &HashIsKnown);
+  bool handleSourceOrModuleFile(SourceFileOrModule SFOrMod);
 
   bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
     // Do not handle unavailable decls.
@@ -565,10 +564,6 @@ private:
   /// \returns false if AST visitation should stop.
   bool handleWitnesses(Decl *D, SmallVectorImpl<IndexedWitness> &explicitWitnesses);
 
-  void getModuleHash(SourceFileOrModule SFOrMod, llvm::raw_ostream &OS);
-  llvm::hash_code hashModule(llvm::hash_code code, SourceFileOrModule SFOrMod);
-  llvm::hash_code hashFileReference(llvm::hash_code code,
-                                    SourceFileOrModule SFOrMod);
   void getRecursiveModuleImports(ModuleDecl &Mod,
                                  SmallVectorImpl<ModuleDecl *> &Imports);
   void
@@ -601,7 +596,7 @@ void IndexSwiftASTWalker::visitDeclContext(DeclContext *Context) {
     ManuallyVisitedAccessorStack.pop_back();
 }
 
-void IndexSwiftASTWalker::visitModule(ModuleDecl &Mod, StringRef KnownHash) {
+void IndexSwiftASTWalker::visitModule(ModuleDecl &Mod) {
   SourceFile *SrcFile = nullptr;
   for (auto File : Mod.getFiles()) {
     if (auto SF = dyn_cast<SourceFile>(File)) {
@@ -613,41 +608,23 @@ void IndexSwiftASTWalker::visitModule(ModuleDecl &Mod, StringRef KnownHash) {
     }
   }
 
-  bool HashIsKnown;
   if (SrcFile != nullptr) {
     IsModuleFile = false;
-    if (!handleSourceOrModuleFile(*SrcFile, KnownHash, HashIsKnown))
+    if (!handleSourceOrModuleFile(*SrcFile))
       return;
-    if (HashIsKnown)
-      return; // No need to report symbols.
     walk(*SrcFile);
   } else {
     IsModuleFile = true;
     isSystemModule = Mod.isSystemModule();
-    if (!handleSourceOrModuleFile(Mod, KnownHash, HashIsKnown))
+    if (!handleSourceOrModuleFile(Mod))
       return;
-    if (HashIsKnown)
-      return; // No need to report symbols.
     walk(Mod);
   }
 }
 
-bool IndexSwiftASTWalker::handleSourceOrModuleFile(SourceFileOrModule SFOrMod,
-                                                   StringRef KnownHash,
-                                                   bool &HashIsKnown) {
+bool IndexSwiftASTWalker::handleSourceOrModuleFile(SourceFileOrModule SFOrMod) {
   // Common reporting for TU/module file.
 
-  SmallString<32> HashBuf;
-  {
-    llvm::raw_svector_ostream HashOS(HashBuf);
-    getModuleHash(SFOrMod, HashOS);
-    StringRef Hash = HashOS.str();
-    HashIsKnown = Hash == KnownHash;
-    if (!IdxConsumer.recordHash(Hash, HashIsKnown))
-      return false;
-  }
-
-  // We always report the dependencies, even if the hash is known.
   llvm::SmallPtrSet<ModuleDecl *, 16> Visited;
   return visitImports(SFOrMod, Visited);
 }
@@ -703,16 +680,8 @@ bool IndexSwiftASTWalker::visitImports(
       continue;
     bool IsClangModule = *IsClangModuleOpt;
 
-    StringRef Hash;
-    SmallString<32> HashBuf;
-    if (!IsClangModule) {
-      llvm::raw_svector_ostream HashOS(HashBuf);
-      getModuleHash(*Mod, HashOS);
-      Hash = HashOS.str();
-    }
-
     if (!IdxConsumer.startDependency(Mod->getName().str(), Path, IsClangModule,
-                                     Mod->isSystemModule(), Hash))
+                                     Mod->isSystemModule()))
       return false;
     if (!IsClangModule)
       if (!visitImports(*Mod, Visited))
@@ -1244,17 +1213,24 @@ bool IndexSwiftASTWalker::initFuncDeclIndexSymbol(FuncDecl *D,
     Info.roles |= (SymbolRoleSet)SymbolRole::Dynamic;
   }
 
-  if (D->getAttrs().hasAttribute<IBActionAttr>()) {
-    // Relate with type of the first parameter using RelationIBTypeOf.
-    if (D->hasImplicitSelfDecl()) {
-      auto paramList = D->getParameters();
-      if (!paramList->getArray().empty()) {
-        auto param = paramList->get(0);
-        if (auto nominal = param->getType()->getAnyNominal()) {
-          addRelation(Info, (SymbolRoleSet) SymbolRole::RelationIBTypeOf, nominal);
-        }
-      }
+  if (D->hasImplicitSelfDecl()) {
+    // If this is an @IBAction or @IBSegueAction method, find the sender
+    // parameter (if present) and relate the method to its type.
+    ParamDecl *senderParam = nullptr;
+
+    auto paramList = D->getParameters();
+    if (D->getAttrs().hasAttribute<IBActionAttr>()) {
+      if (paramList->size() > 0)
+        senderParam = paramList->get(0);
+    } else if (D->getAttrs().hasAttribute<IBSegueActionAttr>()) {
+      if (paramList->size() > 1)
+        senderParam = paramList->get(1);
     }
+
+    if (senderParam)
+      if (auto nominal = senderParam->getType()->getAnyNominal())
+        addRelation(Info, (SymbolRoleSet) SymbolRole::RelationIBTypeOf,
+                    nominal);
   }
 
   if (auto Group = D->getGroupName())
@@ -1398,9 +1374,9 @@ bool IndexSwiftASTWalker::indexComment(const Decl *D) {
 
   swift::markup::MarkupContext MC;
   auto DC = getSingleDocComment(MC, D);
-  if (!DC.hasValue())
+  if (!DC)
     return true;
-  for (StringRef tagName : DC.getValue()->getTags()) {
+  for (StringRef tagName : DC->getTags()) {
     tagName = tagName.trim();
     if (tagName.empty())
       continue;
@@ -1432,43 +1408,6 @@ bool IndexSwiftASTWalker::indexComment(const Decl *D) {
     }
   }
   return !Cancelled;
-}
-
-llvm::hash_code
-IndexSwiftASTWalker::hashFileReference(llvm::hash_code code,
-                                       SourceFileOrModule SFOrMod) {
-  StringRef Filename = SFOrMod.getFilename();
-  if (Filename.empty())
-    return code;
-
-  // FIXME: FileManager for swift ?
-
-  llvm::sys::fs::file_status Status;
-  if (std::error_code Ret = llvm::sys::fs::status(Filename, Status)) {
-    // Failure to read the file, just use filename to recover.
-    warn([&](llvm::raw_ostream &OS) {
-      OS << "failed to stat file: " << Filename << " (" << Ret.message() << ')';
-    });
-    return hash_combine(code, Filename);
-  }
-
-  // Don't use inode because it can easily change when you update the repository
-  // even though the file is supposed to be the same (same size/time).
-  code = hash_combine(code, Filename);
-  auto mtime = Status.getLastModificationTime().time_since_epoch().count();
-  return hash_combine(code, Status.getSize(), mtime);
-}
-
-llvm::hash_code IndexSwiftASTWalker::hashModule(llvm::hash_code code,
-                                                SourceFileOrModule SFOrMod) {
-  code = hashFileReference(code, SFOrMod);
-
-  SmallVector<ModuleDecl *, 16> Imports;
-  getRecursiveModuleImports(SFOrMod.getModule(), Imports);
-  for (auto Import : Imports)
-    code = hashFileReference(code, *Import);
-
-  return code;
 }
 
 void IndexSwiftASTWalker::getRecursiveModuleImports(
@@ -1568,13 +1507,6 @@ void IndexSwiftASTWalker::collectRecursiveModuleImports(
   }
 }
 
-void IndexSwiftASTWalker::getModuleHash(SourceFileOrModule Mod,
-                                        llvm::raw_ostream &OS) {
-  // FIXME: Use a longer hash string to minimize possibility for conflicts.
-  llvm::hash_code code = hashModule(0, Mod);
-  OS << llvm::APInt(64, code).toString(36, /*Signed=*/false);
-}
-
 static Type getContextFreeInterfaceType(ValueDecl *VD) {
   if (auto AFD = dyn_cast<AbstractFunctionDecl>(VD)) {
     return AFD->getMethodInterfaceType();
@@ -1654,19 +1586,17 @@ void index::indexDeclContext(DeclContext *DC, IndexDataConsumer &consumer) {
   consumer.finish();
 }
 
-void index::indexSourceFile(SourceFile *SF, StringRef hash,
-                            IndexDataConsumer &consumer) {
+void index::indexSourceFile(SourceFile *SF, IndexDataConsumer &consumer) {
   assert(SF);
   unsigned bufferID = SF->getBufferID().getValue();
   IndexSwiftASTWalker walker(consumer, SF->getASTContext(), bufferID);
-  walker.visitModule(*SF->getParentModule(), hash);
+  walker.visitModule(*SF->getParentModule());
   consumer.finish();
 }
 
-void index::indexModule(ModuleDecl *module, StringRef hash,
-                        IndexDataConsumer &consumer) {
+void index::indexModule(ModuleDecl *module, IndexDataConsumer &consumer) {
   assert(module);
   IndexSwiftASTWalker walker(consumer, module->getASTContext());
-  walker.visitModule(*module, hash);
+  walker.visitModule(*module);
   consumer.finish();
 }

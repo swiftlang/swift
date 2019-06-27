@@ -1210,7 +1210,7 @@ public protocol FloatingPoint : SignedNumeric, Strideable, Hashable
 }
 
 /// The sign of a floating-point value.
-@_frozen // FIXME(sil-serialize-all)
+@frozen
 public enum FloatingPointSign: Int {
   /// The sign for a positive value.
   case plus
@@ -1259,7 +1259,7 @@ public enum FloatingPointSign: Int {
 }
 
 /// The IEEE 754 floating-point classes.
-@_frozen // FIXME(sil-serialize-all)
+@frozen
 public enum FloatingPointClassification {
   /// A signaling NaN ("not a number").
   ///
@@ -1497,7 +1497,7 @@ public protocol BinaryFloatingPoint: FloatingPoint, ExpressibleByFloatLiteral {
   /// - Parameter value: A floating-point value to be converted.
   init(_ value: Double)
 
-#if !os(Windows) && (arch(i386) || arch(x86_64))
+#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
   /// Creates a new instance from the given value, rounded to the closest
   /// possible representation.
   ///
@@ -2031,6 +2031,7 @@ extension BinaryFloatingPoint {
   /// following formula, where `**` is exponentiation:
   ///
   ///     let magnitude = x.significand * F.radix ** x.exponent
+  @inlinable @inline(__always)
   public static var radix: Int { return 2 }
 
   /// Creates a new floating-point value using the sign of one value and the

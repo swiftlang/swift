@@ -38,8 +38,7 @@ public struct Logger {
 
   /// Log a string interpolation at a given level. The level is `default` if
   /// it is not specified.
-  @inlinable
-  @_semantics("oslog.log")
+  @_transparent
   @_optimize(none)
   public func log(level: OSLogType = .default, _ message: OSLogMessage) {
     osLog(logObject, level, message)
@@ -103,8 +102,7 @@ internal func osLog(
 ///   - message: An instance of `OSLogMessage` created from string interpolation
 ///   - assertion: A closure that takes a format string and a pointer to a
 ///     byte buffer and asserts a condition.
-@inlinable
-@_semantics("oslog.log.test_helper")
+@_transparent
 @_optimize(none)
 public // @testable
 func _checkFormatStringAndBuffer(

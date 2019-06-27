@@ -3121,10 +3121,6 @@ struct MetadataCompletionContext {
 /// it may be called many times as successive dependencies are resolved.
 /// If the function ever completes successfully (by returning null), it
 /// will not be called again for the same type.
-///
-/// \return null to indicate that the type has been completed, or a non-null
-///   pointer to indicate that completion is blocked on the completion of
-///   some other type
 using MetadataCompleter =
   SWIFT_CC(swift)
   MetadataDependency(const Metadata *type,
@@ -3361,6 +3357,11 @@ public:
   
   explicit operator bool() const {
     return Function != nullptr;
+  }
+
+  /// For debugging purposes only.
+  explicit operator void*() const {
+    return reinterpret_cast<void *>(Function);
   }
   
   /// Invoke with an array of arguments of dynamic size.
@@ -3641,6 +3642,11 @@ public:
     return cd->getKind() >= ContextDescriptorKind::Type_First
         && cd->getKind() <= ContextDescriptorKind::Type_Last;
   }
+
+#ifndef NDEBUG
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const,
+                            "Only meant for use in the debugger");
+#endif
 };
 
 using TypeContextDescriptor = TargetTypeContextDescriptor<InProcess>;
@@ -4242,6 +4248,11 @@ public:
   static bool classof(const TargetContextDescriptor<Runtime> *cd) {
     return cd->getKind() == ContextDescriptorKind::Enum;
   }
+
+#ifndef NDEBUG
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const,
+                            "Only meant for use in the debugger");
+#endif
 };
 
 using EnumDescriptor = TargetEnumDescriptor<InProcess>;
@@ -4446,4 +4457,4 @@ public:
 
 #pragma clang diagnostic pop
 
-#endif /* SWIFT_ABI_METADATA_H */
+#endif // SWIFT_ABI_METADATA_H

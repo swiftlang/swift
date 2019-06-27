@@ -47,8 +47,16 @@ def get_sdk_path(platform):
     return check_output(['xcrun', '-sdk', platform, '-show-sdk-path'])
 
 
-def prepare_module_list(platform, file):
-    check_call([INFER_IMPORT_PATH, '-s', get_sdk_path(platform)], output=file)
+def prepare_module_list(platform, file, verbose, swift_frameworks_only):
+    cmd = [INFER_IMPORT_PATH, '-s', get_sdk_path(platform)]
+    if swift_frameworks_only:
+        cmd.extend(['--swift-frameworks-only'])
+    if verbose:
+        cmd.extend(['--v'])
+    check_call(cmd, output=file)
+    # The fixed modules are all objc frameworks.
+    if swift_frameworks_only:
+        return
     with open(INFER_IMPORT_DIR + '/fixed-modules-common.txt', 'r') as extra:
         file.write(extra.read())
     with open(INFER_IMPORT_DIR + '/fixed-modules-' + platform + '.txt',
@@ -78,7 +86,8 @@ class DumpConfig:
             self.sdk + '/System/Library/Frameworks/',
             os.path.realpath(self.sdk + '/../../Library/Frameworks/')]
 
-    def run(self, output, module, swift_ver, opts, verbose):
+    def run(self, output, module, swift_ver, opts, verbose,
+            swift_frameworks_only):
         cmd = [self.tool_path, '-o', output, '-sdk', self.sdk, '-target',
                self.target, '-dump-sdk', '-module-cache-path',
                '/tmp/ModuleCache', '-swift-version',
@@ -93,7 +102,8 @@ class DumpConfig:
             check_call(cmd, verbose=verbose)
         else:
             with tempfile.NamedTemporaryFile() as tmp:
-                prepare_module_list(self.platform, tmp)
+                prepare_module_list(self.platform, tmp, verbose,
+                                    swift_frameworks_only)
                 cmd.extend(['-module-list-file', tmp.name])
                 check_call(cmd, verbose=verbose)
 
@@ -104,7 +114,7 @@ class DiagnoseConfig:
 
     def run(self, opts, before, after, output, verbose):
         cmd = [self.tool_path, '-diagnose-sdk', '-input-paths', before,
-               '-input-paths', after]
+               '-input-paths', after, '-print-module']
         if output:
             cmd.extend(['-o', output])
         cmd.extend(['-' + o for o in opts])
@@ -147,6 +157,10 @@ A convenient wrapper for swift-api-digester.
         name of the module/framework to generate baseline, e.g. Foundation
         ''')
 
+    basic_group.add_argument('--swift-frameworks-only',
+                             action='store_true',
+                             help='Only include Swift frameworks in the dump')
+
     basic_group.add_argument('--opts', nargs='+', default=[], help='''
         additional flags to pass to swift-api-digester
         ''')
@@ -176,7 +190,8 @@ A convenient wrapper for swift-api-digester.
         runner = DumpConfig(tool_path=args.tool_path, platform=args.target)
         runner.run(output=args.output, module=args.module,
                    swift_ver=args.swift_version, opts=args.opts,
-                   verbose=args.v)
+                   verbose=args.v,
+                   swift_frameworks_only=args.swift_frameworks_only)
     elif args.action == 'diagnose':
         if not args.dump_before:
             fatal_error("Need to specify --dump-before")

@@ -837,13 +837,13 @@ public:
                                  Qualifier));
   }
 
-  AssignByDelegateInst *createAssignByDelegate(SILLocation Loc,
+  AssignByWrapperInst *createAssignByWrapper(SILLocation Loc,
                                                SILValue Src, SILValue Dest,
                                                SILValue Initializer,
                                                SILValue Setter,
                                           AssignOwnershipQualifier Qualifier) {
     return insert(new (getModule())
-                  AssignByDelegateInst(getSILDebugLocation(Loc), Src, Dest,
+                  AssignByWrapperInst(getSILDebugLocation(Loc), Src, Dest,
                                        Initializer, Setter, Qualifier));
   }
 
@@ -1277,6 +1277,13 @@ public:
     SILType EltType =
         Operand->getType().getEnumElementType(Element, getModule());
     return createUncheckedEnumData(Loc, Operand, Element, EltType);
+  }
+
+  /// Return unchecked_enum_data %Operand, #Optional<T>.some.
+  SILValue emitExtractOptionalPayloadOperation(SILLocation Loc,
+                                               SILValue Operand) {
+    auto *Decl = F->getASTContext().getOptionalSomeDecl();
+    return createUncheckedEnumData(Loc, Operand, Decl);
   }
 
   UncheckedTakeEnumDataAddrInst *
@@ -2085,6 +2092,16 @@ public:
     lowering.emitDestroyValue(*this, Loc, v);
   }
 
+  /// Convenience function for destroying objects and addresses.
+  ///
+  /// Objects are destroyed using emitDestroyValueOperation and addresses by
+  /// emitting destroy_addr.
+  void emitDestroyOperation(SILLocation loc, SILValue v) {
+    if (v->getType().isObject())
+      return emitDestroyValueOperation(loc, v);
+    createDestroyAddr(loc, v);
+  }
+
   SILValue emitTupleExtract(SILLocation Loc, SILValue Operand, unsigned FieldNo,
                             SILType ResultTy) {
     // Fold tuple_extract(tuple(x,y,z),2)
@@ -2224,6 +2241,9 @@ public:
 
   explicit SILBuilderWithScope(SILBasicBlock::iterator I)
       : SILBuilderWithScope(&*I) {}
+
+  explicit SILBuilderWithScope(SILBasicBlock::iterator I, SILBuilder &B)
+      : SILBuilder(&*I, &*I->getDebugScope(), B.getBuilderContext()) {}
 
   explicit SILBuilderWithScope(SILInstruction *I,
                                SILInstruction *InheritScopeFrom)

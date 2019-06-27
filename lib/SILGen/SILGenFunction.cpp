@@ -20,7 +20,7 @@
 #include "SILGenFunctionBuilder.h"
 #include "Scope.h"
 #include "swift/AST/Initializer.h"
-#include "swift/AST/PropertyDelegates.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILProfiler.h"
 #include "swift/SIL/SILUndef.h"
@@ -612,7 +612,8 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
   }
 }
 
-void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value) {
+void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value,
+                                           bool EmitProfilerIncrement) {
   MagicFunctionName = SILGenModule::getMagicFunctionName(function);
 
   RegularLocation Loc(value);
@@ -635,6 +636,8 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value) {
   auto interfaceType = value->getType()->mapTypeOutOfContext();
   emitProlog(/*paramList=*/nullptr, /*selfParam=*/nullptr, interfaceType,
              dc, false);
+  if (EmitProfilerIncrement)
+    emitProfilerIncrement(value);
   prepareEpilog(value->getType(), false, CleanupLocation::get(Loc));
   emitReturnExpr(Loc, value);
   emitEpilog(Loc);
@@ -652,10 +655,10 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, VarDecl *var) {
   auto varType = var->getType();
 
   // If this is the backing storage for a property with an attached
-  // delegate that was initialized with '=', the stored property initializer
+  // wrapper that was initialized with '=', the stored property initializer
   // will be in terms of the original property's type.
-  if (auto originalProperty = var->getOriginalDelegatedProperty()) {
-    if (originalProperty->isPropertyDelegateInitializedWithInitialValue()) {
+  if (auto originalProperty = var->getOriginalWrappedProperty()) {
+    if (originalProperty->isPropertyWrapperInitializedWithInitialValue()) {
       interfaceType = originalProperty->getValueInterfaceType();
       varType = originalProperty->getType();
     }

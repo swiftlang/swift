@@ -126,7 +126,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   //                               Attributes
   //===--------------------------------------------------------------------===//
   bool visitCustomAttributes(Decl *D) {
-    for (auto *customAttr : D->getAttrs().getAttributes<CustomAttr>()) {
+    for (auto *customAttr : D->getAttrs().getAttributes<CustomAttr, true>()) {
       CustomAttr *mutableCustomAttr = const_cast<CustomAttr *>(customAttr);
       if (doIt(mutableCustomAttr->getTypeLoc()))
         return true;
@@ -177,13 +177,13 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
 
   bool visitPatternBindingDecl(PatternBindingDecl *PBD) {
     // If there is a single variable, walk it's attributes.
-    bool isPropertyDelegateBackingProperty = false;
+    bool isPropertyWrapperBackingProperty = false;
     if (auto singleVar = PBD->getSingleVar()) {
       if (visitCustomAttributes(singleVar))
         return true;
 
-      isPropertyDelegateBackingProperty =
-        singleVar->getOriginalDelegatedProperty() != nullptr;
+      isPropertyWrapperBackingProperty =
+        singleVar->getOriginalWrappedProperty() != nullptr;
     }
 
     unsigned idx = 0U-1;
@@ -194,7 +194,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       else
         return true;
       if (entry.getInit() &&
-          !isPropertyDelegateBackingProperty &&
+          !isPropertyWrapperBackingProperty &&
           (!entry.isInitializerSubsumed() ||
            Walker.shouldWalkIntoLazyInitializers())) {
 #ifndef NDEBUG
@@ -525,8 +525,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   Expr *visitCollectionExpr(CollectionExpr *E) {
-    HANDLE_SEMANTIC_EXPR(E);
-
     for (auto &elt : E->getElements())
       if (Expr *Sub = doIt(elt))
         elt = Sub;
@@ -1154,13 +1152,16 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       // Walk each parameter's decl and typeloc and default value.
       if (doIt(P))
         return true;
-      
+
+      // Visit any custom attributes on the parameter.
+      visitCustomAttributes(P);
+
       // Don't walk into the type if the decl is implicit, or if the type is
       // implicit.
       if (!P->isImplicit() && !P->isTypeLocImplicit() &&
           doIt(P->getTypeLoc()))
         return true;
-      
+
       if (auto *E = P->getDefaultValue()) {
         auto res = doIt(E);
         if (!res) return true;

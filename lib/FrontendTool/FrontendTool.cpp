@@ -26,13 +26,13 @@
 #include "TBD.h"
 
 #include "swift/Subsystems.h"
-#include "swift/AST/ASTScope.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExperimentalDependencies.h"
 #include "swift/AST/FileSystem.h"
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ReferencedNameTracker.h"
 #include "swift/AST/TypeRefinementContext.h"
@@ -509,7 +509,6 @@ static void countStatsPostSema(UnifiedStatsReporter &Stats,
 
   auto const &AST = Instance.getASTContext();
   C.NumLoadedModules = AST.LoadedModules.size();
-  C.NumImportedExternalDefinitions = AST.ExternalDefinitions.size();
 
   if (auto *D = Instance.getDependencyTracker()) {
     C.NumDependencies = D->getDependencies().size();
@@ -598,7 +597,9 @@ static bool buildModuleFromParseableInterface(CompilerInvocation &Invocation,
   StringRef InputPath = FEOpts.InputsAndOutputs.getFilenameOfFirstInput();
   StringRef PrebuiltCachePath = FEOpts.PrebuiltModuleCachePath;
   return ParseableInterfaceModuleLoader::buildSwiftModuleFromSwiftInterface(
-      Instance.getASTContext(), Invocation.getClangModuleCachePath(),
+      Instance.getSourceMgr(), Instance.getDiags(),
+      Invocation.getSearchPathOptions(), Invocation.getLangOptions(),
+      Invocation.getClangModuleCachePath(),
       PrebuiltCachePath, Invocation.getModuleName(), InputPath,
       Invocation.getOutputFilename(),
       FEOpts.SerializeModuleInterfaceDependencyHashes,
@@ -662,52 +663,19 @@ static void verifyGenericSignaturesIfNeeded(CompilerInvocation &Invocation,
     GenericSignatureBuilder::verifyGenericSignaturesInModule(module);
 }
 
-static void dumpOneScopeMapLocation(unsigned bufferID,
-                                    std::pair<unsigned, unsigned> lineColumn,
-                                    SourceManager &sourceMgr, ASTScope &scope) {
-  SourceLoc loc =
-      sourceMgr.getLocForLineCol(bufferID, lineColumn.first, lineColumn.second);
-  if (loc.isInvalid())
-    return;
-
-  llvm::errs() << "***Scope at " << lineColumn.first << ":" << lineColumn.second
-               << "***\n";
-  auto locScope = scope.findInnermostEnclosingScope(loc);
-  locScope->print(llvm::errs(), 0, false, false);
-
-  // Dump the AST context, too.
-  if (auto dc = locScope->getDeclContext()) {
-    dc->printContext(llvm::errs());
-  }
-
-  // Grab the local bindings introduced by this scope.
-  auto localBindings = locScope->getLocalBindings();
-  if (!localBindings.empty()) {
-    llvm::errs() << "Local bindings: ";
-    interleave(localBindings.begin(), localBindings.end(),
-               [&](ValueDecl *value) { llvm::errs() << value->getFullName(); },
-               [&]() { llvm::errs() << " "; });
-    llvm::errs() << "\n";
-  }
-}
-
 static void dumpAndPrintScopeMap(CompilerInvocation &Invocation,
                                  CompilerInstance &Instance, SourceFile *SF) {
-  ASTScope &scope = SF->getScope();
+  const ASTScope &scope = SF->getScope();
 
   if (Invocation.getFrontendOptions().DumpScopeMapLocations.empty()) {
-    scope.expandAll();
-  } else if (auto bufferID = SF->getBufferID()) {
-    SourceManager &sourceMgr = Instance.getSourceMgr();
-    // Probe each of the locations, and dump what we find.
-    for (auto lineColumn :
-         Invocation.getFrontendOptions().DumpScopeMapLocations)
-      dumpOneScopeMapLocation(*bufferID, lineColumn, sourceMgr, scope);
-
     llvm::errs() << "***Complete scope map***\n";
+    scope.print(llvm::errs());
+    return;
   }
-  // Print the resulting map.
-  scope.print(llvm::errs());
+  // Probe each of the locations, and dump what we find.
+  for (auto lineColumn :
+       Invocation.getFrontendOptions().DumpScopeMapLocations)
+    scope.dumpOneScopeMapLocation(lineColumn);
 }
 
 static SourceFile *getPrimaryOrMainSourceFile(CompilerInvocation &Invocation,

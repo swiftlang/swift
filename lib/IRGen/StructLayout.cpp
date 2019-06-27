@@ -78,7 +78,7 @@ StructLayout::StructLayout(IRGenModule &IGM,
   } else {
     MinimumAlign = builder.getAlignment();
     MinimumSize = builder.getSize();
-    SpareBits = std::move(builder.getSpareBits());
+    SpareBits = builder.getSpareBits();
     IsFixedLayout = builder.isFixedLayout();
     IsKnownPOD = builder.isPOD();
     IsKnownBitwiseTakable = builder.isBitwiseTakable();
@@ -93,7 +93,7 @@ StructLayout::StructLayout(IRGenModule &IGM,
 
   assert(typeToFill == nullptr || Ty == typeToFill);
 
-  // If the struct is not @_fixed_layout, it will have a dynamic
+  // If the struct is not @frozen, it will have a dynamic
   // layout outside of its resilience domain.
   if (decl) {
     if (IGM.isResilient(decl, ResilienceExpansion::Minimal))
@@ -263,9 +263,11 @@ void StructLayoutBuilder::addFixedSizeElement(ElementLayout &elt) {
     if (isFixedLayout()) {
       auto paddingTy = llvm::ArrayType::get(IGM.Int8Ty, paddingRequired);
       StructFields.push_back(paddingTy);
-      
+
       // The padding can be used as spare bits by enum layout.
-      CurSpareBits.appendSetBits(Size(paddingRequired).getValueInBits());
+      auto numBits = Size(paddingRequired).getValueInBits();
+      auto mask = llvm::APInt::getAllOnesValue(numBits);
+      CurSpareBits.push_back(SpareBitVector::fromAPInt(mask));
     }
   }
 
@@ -318,7 +320,7 @@ void StructLayoutBuilder::addElementAtFixedOffset(ElementLayout &elt) {
   StructFields.push_back(elt.getType().getStorageType());
   
   // Carry over the spare bits from the element.
-  CurSpareBits.append(eltTI.getSpareBits());
+  CurSpareBits.push_back(eltTI.getSpareBits());
 }
 
 /// Add an element at a non-fixed offset to the aggregate.
@@ -326,7 +328,7 @@ void StructLayoutBuilder::addElementAtNonFixedOffset(ElementLayout &elt) {
   assert(!isFixedLayout());
   elt.completeNonFixed(elt.getType().isPOD(ResilienceExpansion::Maximal),
                        NextNonFixedOffsetIndex);
-  CurSpareBits.clear();
+  CurSpareBits = SmallVector<SpareBitVector, 8>(); // clear spare bits
 }
 
 /// Add a non-fixed-size element to the aggregate at offset zero.
@@ -335,7 +337,7 @@ void StructLayoutBuilder::addNonFixedSizeElementAtOffsetZero(ElementLayout &elt)
   assert(!isa<FixedTypeInfo>(elt.getType()));
   assert(CurSize.isZero());
   elt.completeInitialNonFixedSize(elt.getType().isPOD(ResilienceExpansion::Maximal));
-  CurSpareBits.clear();
+  CurSpareBits = SmallVector<SpareBitVector, 8>(); // clear spare bits
 }
 
 /// Produce the current fields as an anonymous structure.
@@ -357,4 +359,28 @@ void StructLayoutBuilder::setAsBodyOfStruct(llvm::StructType *type) const {
           || IGM.DataLayout.getStructLayout(type)->getSizeInBytes()
             == CurSize.getValue())
          && "LLVM size of fixed struct type does not match StructLayout size");
+}
+
+/// Return the spare bit mask of the structure built so far.
+SpareBitVector StructLayoutBuilder::getSpareBits() const {
+  // Calculate the size up front to reduce possible allocations.
+  unsigned numBits = 0;
+  for (auto &v : CurSpareBits) {
+    numBits += v.size();
+  }
+  if (numBits == 0) {
+    return SpareBitVector();
+  }
+  // Assemble the spare bit mask.
+  auto mask = llvm::APInt::getNullValue(numBits);
+  unsigned offset = 0;
+  for (auto &v : CurSpareBits) {
+    if (v.size() == 0) {
+      continue;
+    }
+    mask.insertBits(v.asAPInt(), offset);
+    offset += v.size();
+  }
+  assert(offset == numBits);
+  return SpareBitVector::fromAPInt(std::move(mask));
 }

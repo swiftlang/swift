@@ -214,7 +214,7 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
     return SymbolicValue::getString(sli->getValue(), evaluator.getAllocator());
 
   if (auto *fri = dyn_cast<FunctionRefInst>(value))
-    return SymbolicValue::getFunction(fri->getReferencedFunction());
+    return SymbolicValue::getFunction(fri->getInitiallyReferencedFunction());
 
   // If we have a reference to a metatype, constant fold any substitutable
   // types.
@@ -448,30 +448,35 @@ ConstExprFunctionState::computeConstantValueBuiltin(BuiltinInst *inst) {
       if (operand.getKind() != SymbolicValue::Integer)
         return unknownResult();
 
-      auto operandVal = operand.getIntegerValue();
+      APInt operandVal = operand.getIntegerValue();
       uint32_t srcBitWidth = operandVal.getBitWidth();
       auto dstBitWidth =
           builtin.Types[1]->castTo<BuiltinIntegerType>()->getGreatestWidth();
 
-      APInt result = operandVal.trunc(dstBitWidth);
+      // Note that the if the source type is a Builtin.IntLiteral, operandVal
+      // could have fewer bits than the destination bit width and may only
+      // require a sign extension.
+      APInt result = operandVal.sextOrTrunc(dstBitWidth);
 
-      // Compute the overflow by re-extending the value back to its source and
-      // checking for loss of value.
-      APInt reextended =
-          dstSigned ? result.sext(srcBitWidth) : result.zext(srcBitWidth);
-      bool overflowed = (operandVal != reextended);
+      // Determine if there is a overflow.
+      if (operandVal.getBitWidth() > dstBitWidth) {
+        // Re-extend the value back to its source and check for loss of value.
+        APInt reextended =
+            dstSigned ? result.sext(srcBitWidth) : result.zext(srcBitWidth);
+        bool overflowed = (operandVal != reextended);
 
-      if (!srcSigned && dstSigned)
-        overflowed |= result.isSignBitSet();
+        if (!srcSigned && dstSigned)
+          overflowed |= result.isSignBitSet();
 
-      if (overflowed)
-        return evaluator.getUnknown(SILValue(inst), UnknownReason::Overflow);
+        if (overflowed)
+          return evaluator.getUnknown(SILValue(inst), UnknownReason::Overflow);
+      }
 
       auto &allocator = evaluator.getAllocator();
       // Build the Symbolic value result for our truncated value.
       return SymbolicValue::getAggregate(
           {SymbolicValue::getInteger(result, allocator),
-           SymbolicValue::getInteger(APInt(1, overflowed), allocator)},
+           SymbolicValue::getInteger(APInt(1, false), allocator)},
           allocator);
     };
 
@@ -1359,14 +1364,31 @@ ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
                           injectEnumInst->getOperand());
   }
 
-  // If the instruction produces normal results, try constant folding it.
+  // If the instruction produces a result, try constant folding it.
   // If this fails, then we fail.
-  if (inst->getNumResults() != 0) {
+  if (isa<SingleValueInstruction>(inst)) {
     auto oneResultVal = inst->getResults()[0];
     auto result = getConstantValue(oneResultVal);
     if (!result.isConstant())
       return result;
     LLVM_DEBUG(llvm::dbgs() << "  RESULT: "; result.dump());
+    return None;
+  }
+
+  if (isa<DestructureTupleInst>(inst) || isa<DestructureStructInst>(inst)) {
+    auto *mvi = cast<MultipleValueInstruction>(inst);
+    SymbolicValue aggVal = getConstantValue(mvi->getOperand(0));
+    if (!aggVal.isConstant()) {
+      return aggVal;
+    }
+    assert(aggVal.getKind() == SymbolicValue::Aggregate);
+
+    ArrayRef<SymbolicValue> aggElems = aggVal.getAggregateValue();
+    assert(aggElems.size() == mvi->getNumResults());
+
+    for (unsigned i = 0; i < mvi->getNumResults(); ++i) {
+      setValue(mvi->getResult(i), aggElems[i]);
+    }
     return None;
   }
 

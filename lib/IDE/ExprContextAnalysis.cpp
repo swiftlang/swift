@@ -57,14 +57,15 @@ void typeCheckContextImpl(DeclContext *DC, SourceLoc Loc) {
 
   case DeclContextKind::Initializer:
     if (auto *patternInit = dyn_cast<PatternBindingInitializer>(DC)) {
-      auto *PBD = patternInit->getBinding();
-      auto i = patternInit->getBindingIndex();
-      if (PBD->getInit(i)) {
-        PBD->getPattern(i)->forEachVariable([](VarDecl *VD) {
-          typeCheckCompletionDecl(VD);
-        });
-        if (!PBD->isInitializerChecked(i))
-          typeCheckPatternBinding(PBD, i);
+      if (auto *PBD = patternInit->getBinding()) {
+        auto i = patternInit->getBindingIndex();
+        if (PBD->getInit(i)) {
+          PBD->getPattern(i)->forEachVariable([](VarDecl *VD) {
+            typeCheckCompletionDecl(VD);
+          });
+          if (!PBD->isInitializerChecked(i))
+            typeCheckPatternBinding(PBD, i);
+        }
       }
     }
     break;
@@ -712,6 +713,31 @@ class ExprContextAnalyzer {
     }
   }
 
+  void analyzeInitializer(Initializer *initDC) {
+    switch (initDC->getInitializerKind()) {
+    case swift::InitializerKind::PatternBinding: {
+      auto initDC = cast<PatternBindingInitializer>(DC);
+      auto PBD = initDC->getBinding();
+      if (!PBD)
+        break;
+      auto pat = PBD->getPattern(initDC->getBindingIndex());
+      if (pat->hasType())
+        recordPossibleType(pat->getType());
+      break;
+    }
+    case InitializerKind::DefaultArgument: {
+      auto initDC = cast<DefaultArgumentInitializer>(DC);
+      auto AFD = dyn_cast<AbstractFunctionDecl>(initDC->getParent());
+      if (!AFD)
+        return;
+      auto param = AFD->getParameters()->get(initDC->getIndex());
+      if (param->hasInterfaceType())
+        recordPossibleType(AFD->mapTypeIntoContext(param->getInterfaceType()));
+      break;
+    }
+    }
+  }
+
   /// Whether the given \c BraceStmt, which must be the body of a function or
   /// closure, should be treated as a single-expression return for the purposes
   /// of code-completion.
@@ -807,13 +833,17 @@ public:
         return false;
     });
 
-    // For 'Initializer' context, we need to look into its parent because it
-    // might constrain the initializer's type.
+    // For 'Initializer' context, we need to look into its parent.
     auto analyzeDC = isa<Initializer>(DC) ? DC->getParent() : DC;
     analyzeDC->walkContext(Finder);
 
-    if (Finder.Ancestors.empty())
+    if (Finder.Ancestors.empty()) {
+      // There's no parent context in DC. But still, the parent of the
+      // initializer might constrain the initializer's type.
+      if (auto initDC = dyn_cast<Initializer>(DC))
+        analyzeInitializer(initDC);
       return;
+    }
 
     auto &P = Finder.Ancestors.back();
     if (auto Parent = P.getAsExpr()) {

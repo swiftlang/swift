@@ -489,7 +489,7 @@ BeginApplyInst::create(SILDebugLocation loc, SILValue callee,
 
 bool swift::doesApplyCalleeHaveSemantics(SILValue callee, StringRef semantics) {
   if (auto *FRI = dyn_cast<FunctionRefBaseInst>(callee))
-    if (auto *F = FRI->getReferencedFunction())
+    if (auto *F = FRI->getReferencedFunctionOrNull())
       return F->hasSemanticsAttr(semantics);
   return false;
 }
@@ -573,14 +573,14 @@ FunctionRefBaseInst::FunctionRefBaseInst(SILInstructionKind Kind,
 }
 
 void FunctionRefBaseInst::dropReferencedFunction() {
-  if (auto *Function = getReferencedFunction())
+  if (auto *Function = getInitiallyReferencedFunction())
     Function->decrementRefCount();
   f = nullptr;
 }
 
 FunctionRefBaseInst::~FunctionRefBaseInst() {
-  if (getReferencedFunction())
-    getReferencedFunction()->decrementRefCount();
+  if (getInitiallyReferencedFunction())
+    getInitiallyReferencedFunction()->decrementRefCount();
 }
 
 FunctionRefInst::FunctionRefInst(SILDebugLocation Loc, SILFunction *F)
@@ -818,14 +818,14 @@ AssignInst::AssignInst(SILDebugLocation Loc, SILValue Src, SILValue Dest,
   SILInstruction::Bits.AssignInst.OwnershipQualifier = unsigned(Qualifier);
 }
 
-AssignByDelegateInst::AssignByDelegateInst(SILDebugLocation Loc,
+AssignByWrapperInst::AssignByWrapperInst(SILDebugLocation Loc,
                                            SILValue Src, SILValue Dest,
                                            SILValue Initializer,
                                            SILValue Setter,
                                           AssignOwnershipQualifier Qualifier) :
     AssignInstBase(Loc, Src, Dest, Initializer, Setter) {
   assert(Initializer->getType().is<SILFunctionType>());
-  SILInstruction::Bits.AssignByDelegateInst.OwnershipQualifier =
+  SILInstruction::Bits.AssignByWrapperInst.OwnershipQualifier =
       unsigned(Qualifier);
 }
 

@@ -62,7 +62,7 @@ public protocol ElementaryFunctions {
 
 %for type in all_floating_point_types():
 % if type.bits == 80:
-#if (arch(i386) || arch(x86_64)) && !os(Windows)
+#if (arch(i386) || arch(x86_64)) && !(os(Windows) || os(Android))
 % end
 % Self = type.stdlib_name
 extension ${Self}: ElementaryFunctions {
@@ -95,7 +95,7 @@ extension ${Self}: ElementaryFunctions {
     guard x >= 0 || n % 2 != 0 else { return .nan }
     // TODO: this implementation isn't quite right for n so large that
     // the conversion to `${Self}` rounds.
-    return ${Self}(signOf: x, magnitudeOf: pow(x, 1/${Self}(n)))
+    return ${Self}(signOf: x, magnitudeOf: pow(x.magnitude, 1/${Self}(n)))
   }
 
   @_alwaysEmitIntoClient

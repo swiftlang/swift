@@ -1642,7 +1642,7 @@ public:
     // Note: in SingleFunction mode, we relax some of these checks because
     // we may not have linked everything yet.
 
-    SILFunction *RefF = FRI->getReferencedFunction();
+    SILFunction *RefF = FRI->getInitiallyReferencedFunction();
 
     if (isa<FunctionRefInst>(FRI))
       require(
@@ -1657,7 +1657,7 @@ public:
               "[dynamic_replacement_for:...] function");
     } else if (isa<DynamicFunctionRefInst>(FRI))
       require(RefF->isDynamicallyReplaceable(),
-              "dynamic_function_ref cannot reference a "
+              "dynamic_function_ref must reference a "
               "[dynamically_replaceable] function");
 
     // In canonical SIL, direct reference to a shared_external declaration
@@ -1961,7 +1961,7 @@ public:
             "Store operand type and dest type mismatch");
   }
 
-  void checkAssignByDelegateInst(AssignByDelegateInst *AI) {
+  void checkAssignByWrapperInst(AssignByWrapperInst *AI) {
     SILValue Src = AI->getSrc(), Dest = AI->getDest();
     require(AI->getModule().getStage() == SILStage::Raw,
             "assign instruction can only exist in raw SIL");
@@ -2843,7 +2843,7 @@ public:
 
     // If the method returns Self, substitute AnyObject for the result type.
     if (auto fnDecl = dyn_cast<FuncDecl>(method.getDecl())) {
-      if (fnDecl->hasDynamicSelf()) {
+      if (fnDecl->hasDynamicSelfResult()) {
         auto anyObjectTy = C.getAnyObjectType();
         for (auto &dynResult : dynResults) {
           auto newResultTy

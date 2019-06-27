@@ -67,6 +67,25 @@ print the SIL *and* the LLVM IR, you have to run the compiler twice.
 The output of all these dump options (except ``-dump-ast``) can be redirected
 with an additional ``-o <file>`` option.
 
+Debugging Diagnostic Emission
+-----------------------------
+
+Asserting on first emitted Warning/Assert Diagnostic
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When changing the type checker and various SIL passes, one can cause a series of
+cascading diagnostics (errors/warnings) to be emitted. Since Swift does not by
+default assert when emitting such diagnostics, it becomes difficult to know
+where to stop in the debugger. Rather than trying to guess/check if one has an
+asserts swift compiler, one can use the following options to cause the
+diagnostic engine to assert on the first error/warning:
+
+* -Xllvm -swift-diagnostics-assert-on-error=1
+* -Xllvm -swift-diagnostics-assert-on-warning=1
+
+These allow one to dump a stack trace of where the diagnostic is being emitted
+(if run without a debugger) or drop into the debugger if a debugger is attached.
+
 Debugging the Type Checker
 --------------------------
 
@@ -130,16 +149,6 @@ typing ``:constraints debug on``::
   ***  The full REPL is built as part of LLDB.   ***
   ***  Type ':help' for assistance.              ***
   (swift) :constraints debug on
-
-Asserting on First Error
-~~~~~~~~~~~~~~~~~~~~~~~~
-
-When changing the typechecker, one can cause a series of cascading errors. Since
-Swift doesn't assert on such errors, one has to know more about the typechecker
-to know where to stop in the debugger. Rather than doing that, one can use the
-option ``-Xllvm -swift-diagnostics-assert-on-error=1`` to cause the
-DiagnosticsEngine to assert upon the first error, providing the signal that the
-debugger needs to know that it should attach.
 
 Debugging on SIL Level
 ----------------------
@@ -456,6 +465,44 @@ as follows::
 One can also use shell regex to visit multiple files in the same directory. Example::
 
     clang-tidy -p=$PATH_TO_BUILD/swift-macosx-x86_64/compile_commands.json $FULL_PATH_TO_DIR/*.cpp
+
+Identifying an optimizer bug
+----------------------------
+
+If a compiled executable is crashing when built with optimizations, but not
+crashing when built with -Onone, it's most likely one of the SIL optimizations
+which causes the miscompile.
+
+Currently there is no tool to automatically identify the bad optimization, but
+it's quite easy to do this manually:
+
+1. Find the offending optimization with bisecting:
+
+  a. Add the compiler option ``-Xllvm -sil-opt-pass-count=<n>``, where ``<n>``
+     is the number of optimizations to run.
+  b. Bisect: find n where the executable crashes, but does not crash with n-1.
+     Note that n can be quite large, e.g. > 100000 (just try
+     n = 10, 100, 1000, 10000, etc. to find an upper bound).
+  c. Add another option ``-Xllvm -sil-print-pass-name``. The output can be
+     large, so it's best to redirect stderr to a file (``2> output``).
+     In the output search for the last pass before ``stage Address Lowering``.
+     It should be the ``Run #<n-1>``. This line tells you the name of the bad
+     optimization pass and on which function it run.
+
+2. Get the SIL before and after the bad optimization.
+
+  a. Add the compiler options
+     ``-Xllvm -sil-print-all -Xllvm -sil-print-only-function='<function>'``
+     where ``<function>`` is the function name (including the preceding ``$``).
+     For example:
+     ``-Xllvm -sil-print-all -Xllvm -sil-print-only-function='$s4test6testityS2iF'``.
+     Again, the output can be large, so it's best to redirect stderr to a file.
+  b. From the output, copy the SIL of the function *before* the bad
+     run into a separate file and the SIL *after* the bad run into a file.
+  c. Compare both SIL files and try to figure out what the optimization pass
+     did wrong. To simplify the comparison, it's sometimes helpful to replace
+     all SIL values (e.g. ``%27``) with a constant string (e.g. ``%x``).
+
 
 Debugging Swift Executables
 ===========================

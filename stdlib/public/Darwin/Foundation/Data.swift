@@ -602,7 +602,7 @@ internal class __NSSwiftData : NSData {
 #endif
 }
 
-@_fixed_layout
+@frozen
 public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessCollection, MutableCollection, RangeReplaceableCollection, MutableDataProtocol, ContiguousBytes {
     public typealias ReferenceType = NSData
 
@@ -618,7 +618,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     // A small inline buffer of bytes suitable for stack-allocation of small data.
     // Inlinability strategy: everything here should be inlined for direct operation on the stack wherever possible.
     @usableFromInline
-    @_fixed_layout
+    @frozen
     internal struct InlineData {
 #if arch(x86_64) || arch(arm64) || arch(s390x) || arch(powerpc64) || arch(powerpc64le)
         @usableFromInline typealias Buffer = (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
@@ -639,7 +639,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
         @inlinable // This is @inlinable as a convenience initializer.
         init(_ srcBuffer: UnsafeRawBufferPointer) {
             self.init(count: srcBuffer.count)
-            if srcBuffer.count > 0 {
+            if !srcBuffer.isEmpty {
                 Swift.withUnsafeMutableBytes(of: &bytes) { dstBuffer in
                     dstBuffer.baseAddress?.copyMemory(from: srcBuffer.baseAddress!, byteCount: srcBuffer.count)
                 }
@@ -688,7 +688,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
                 return Int(length)
             }
             set(newValue) {
-                precondition(newValue <= MemoryLayout<Buffer>.size)
+                assert(newValue <= MemoryLayout<Buffer>.size)
                 length = UInt8(newValue)
             }
         }
@@ -729,7 +729,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
 
         @inlinable // This is @inlinable as trivially computable.
         mutating func append(contentsOf buffer: UnsafeRawBufferPointer) {
-            guard buffer.count > 0 else { return }
+            guard !buffer.isEmpty else { return }
             assert(count + buffer.count <= MemoryLayout<Buffer>.size)
             let cnt = count
             _ = Swift.withUnsafeMutableBytes(of: &bytes) { rawBuffer in
@@ -777,7 +777,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
             assert(subrange.upperBound <= MemoryLayout<Buffer>.size)
             assert(count - (subrange.upperBound - subrange.lowerBound) + replacementLength <= MemoryLayout<Buffer>.size)
             precondition(subrange.lowerBound <= length, "index \(subrange.lowerBound) is out of bounds of 0..<\(length)")
-            precondition(subrange.upperBound <= length, "index \(subrange.lowerBound) is out of bounds of 0..<\(length)")
+            precondition(subrange.upperBound <= length, "index \(subrange.upperBound) is out of bounds of 0..<\(length)")
             let currentLength = count
             let resultingLength = currentLength - (subrange.upperBound - subrange.lowerBound) + replacementLength
             let shift = resultingLength - currentLength
@@ -839,7 +839,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     // A buffer of bytes too large to fit in an InlineData, but still small enough to fit a storage pointer + range in two words.
     // Inlinability strategy: everything here should be easily inlinable as large _DataStorage methods should not inline into here.
     @usableFromInline
-    @_fixed_layout
+    @frozen
     internal struct InlineSlice {
         // ***WARNING***
         // These ivars are specifically laid out so that they cause the enum _Representation to be 16 bytes on 64 bit platforms. This means we _MUST_ have the class type thing last
@@ -1085,7 +1085,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     // A buffer of bytes whose range is too large to fit in a signle word. Used alongside a RangeReference to make it fit into _Representation's two-word size.
     // Inlinability strategy: everything here should be easily inlinable as large _DataStorage methods should not inline into here.
     @usableFromInline
-    @_fixed_layout
+    @frozen
     internal struct LargeSlice {
         // ***WARNING***
         // These ivars are specifically laid out so that they cause the enum _Representation to be 16 bytes on 64 bit platforms. This means we _MUST_ have the class type thing last
@@ -1261,7 +1261,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     // The actual storage for Data's various representations.
     // Inlinability strategy: almost everything should be inlinable as forwarding the underlying implementations. (Inlining can also help avoid retain-release traffic around pulling values out of enums.)
     @usableFromInline
-    @_frozen
+    @frozen
     internal enum _Representation {
         case empty
         case inline(InlineData)
@@ -1270,7 +1270,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
 
         @inlinable // This is @inlinable as a trivial initializer.
         init(_ buffer: UnsafeRawBufferPointer) {
-            if buffer.count == 0 {
+            if buffer.isEmpty {
                 self = .empty
             } else if InlineData.canStore(count: buffer.count) {
                 self = .inline(InlineData(buffer))
@@ -1283,7 +1283,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
 
         @inlinable // This is @inlinable as a trivial initializer.
         init(_ buffer: UnsafeRawBufferPointer, owner: AnyObject) {
-            if buffer.count == 0 {
+            if buffer.isEmpty {
                 self = .empty
             } else if InlineData.canStore(count: buffer.count) {
                 self = .inline(InlineData(buffer))
@@ -1580,7 +1580,6 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
                     precondition(range.lowerBound <= endIndex, "index \(range.lowerBound) is out of bounds of \(startIndex)..<\(endIndex)")
                     self = .large(LargeSlice(count: range.upperBound))
                 }
-                break
             case .inline(var inline):
                 if inline.count < range.upperBound {
                     if InlineSlice.canStore(count: range.upperBound) {
@@ -1596,7 +1595,6 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
                     inline.resetBytes(in: range)
                     self = .inline(inline)
                 }
-                break
             case .slice(var slice):
                 if InlineSlice.canStore(count: range.upperBound) {
                     self = .empty
@@ -1608,7 +1606,6 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
                     newSlice.resetBytes(in: range)
                     self = .large(newSlice)
                 }
-                break
             case .large(var slice):
                 self = .empty
                 slice.resetBytes(in: range)
@@ -1630,7 +1627,6 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
                 } else {
                     self = .large(LargeSlice(UnsafeRawBufferPointer(start: bytes, count: cnt)))
                 }
-                break
             case .inline(var inline):
                 let resultingCount = inline.count + cnt - (subrange.upperBound - subrange.lowerBound)
                 if resultingCount == 0 {
@@ -1647,7 +1643,6 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
                     slice.replaceSubrange(subrange, with: bytes, count: cnt)
                     self = .large(slice)
                 }
-                break
             case .slice(var slice):
                 let resultingUpper = slice.endIndex + cnt - (subrange.upperBound - subrange.lowerBound)
                 if slice.startIndex == 0 && resultingUpper == 0 {
@@ -1820,7 +1815,6 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
                 return
             case .inline(let inline):
                 inline.copyBytes(to: pointer, from: range)
-                break
             case .slice(let slice):
                 slice.copyBytes(to: pointer, from: range)
             case .large(let slice):
@@ -2194,7 +2188,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     
     @inlinable // This is @inlinable as trivially forwarding.
     internal func _copyBytesHelper(to pointer: UnsafeMutableRawPointer, from range: Range<Int>) {
-        if range.upperBound - range.lowerBound == 0 { return }
+        if range.isEmpty { return }
         _representation.copyBytes(to: pointer, from: range)
     }
     
@@ -2319,7 +2313,7 @@ public struct Data : ReferenceConvertible, Equatable, Hashable, RandomAccessColl
     }
     
     public mutating func append(_ other: Data) {
-        guard other.count > 0 else { return }
+        guard !other.isEmpty else { return }
         other.withUnsafeBytes { (buffer: UnsafeRawBufferPointer) in
             _representation.append(contentsOf: buffer)
         }

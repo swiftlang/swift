@@ -76,7 +76,7 @@ Please make sure you use Python 2.x. Python 3.x is not supported currently.
 
 #### macOS
 
-To build for macOS, you need [Xcode 10.2 beta](https://developer.apple.com/xcode/downloads/).
+To build for macOS, you need [Xcode 11 beta](https://developer.apple.com/xcode/downloads/).
 The required version of Xcode changes frequently, and is often a beta release.
 Check this document or the host information on <https://ci.swift.org> for the
 current required version.
@@ -98,7 +98,7 @@ Instructions for installing CMake and Ninja directly can be found [below](#build
 
 For Ubuntu, you'll need the following development dependencies:
 
-    sudo apt-get install git cmake ninja-build clang python uuid-dev libicu-dev icu-devtools libbsd-dev libedit-dev libxml2-dev libsqlite3-dev swig libpython-dev libncurses5-dev pkg-config libblocksruntime-dev libcurl4-openssl-dev systemtap-sdt-dev tzdata rsync
+    sudo apt-get install git cmake ninja-build clang python uuid-dev libicu-dev icu-devtools libedit-dev libxml2-dev libsqlite3-dev swig libpython-dev libncurses5-dev pkg-config libcurl4-openssl-dev systemtap-sdt-dev tzdata rsync
 
 **Note:** LLDB currently requires at least `swig-1.3.40` but will successfully build
 with version 2 shipped with Ubuntu.
@@ -141,26 +141,26 @@ more environments.
 
 To build using Ninja, run:
 
-    utils/build-script --release-debuginfo
+    swift/utils/build-script --release-debuginfo
 
 When developing Swift, it helps to build what you're working on in a debug
 configuration while building the rest of the project with optimizations. Below
 are some examples of using debug variants:
 
-    utils/build-script --release-debuginfo --debug-swift # Swift frontend built in debug
-    utils/build-script --release-debuginfo --debug-swift-stdlib # Standard library built in debug
-    utils/build-script --release-debuginfo --debug-swift --force-optimized-typechecker # Swift frontend sans type checker built in debug
+    swift/utils/build-script --release-debuginfo --debug-swift # Swift frontend built in debug
+    swift/utils/build-script --release-debuginfo --debug-swift-stdlib # Standard library built in debug
+    swift/utils/build-script --release-debuginfo --debug-swift --force-optimized-typechecker # Swift frontend sans type checker built in debug
 
 Limiting the amount of debug code in the compiler has a very large impact on
 Swift compile times, and in turn the test execution time. If you want to build
 the entire project in debug, you can run:
 
-    utils/build-script --debug
+    swift/utils/build-script --debug
 
 For documentation of all available arguments, as well as additional usage
 information, see the inline help:
 
-    utils/build-script -h
+    swift/utils/build-script -h
 
 #### Xcode
 
@@ -223,7 +223,7 @@ script is used by swift.org's CI to produce snapshots and can allow for one to
 locally reproduce such builds for development or distribution purposes. E.x.:
 
 ```
-  $ ./utils/build-toolchain $BUNDLE_PREFIX
+  $ ./swift/utils/build-toolchain $BUNDLE_PREFIX
 ```
 
 where ``$BUNDLE_PREFIX`` is a string that will be prepended to the build 

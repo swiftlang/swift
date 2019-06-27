@@ -23,7 +23,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Pattern.h"
-#include "swift/AST/PropertyDelegates.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/Types.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/SILArgument.h"
@@ -1777,10 +1777,10 @@ static CanAnyFunctionType getStoredPropertyInitializerInterfaceType(
           ->getCanonicalType();
 
   // If this is the backing storage for a property with an attached
-  // delegate that was initialized with '=', the stored property initializer
+  // wrapper that was initialized with '=', the stored property initializer
   // will be in terms of the original property's type.
-  if (auto originalProperty = VD->getOriginalDelegatedProperty()) {
-    if (originalProperty->isPropertyDelegateInitializedWithInitialValue())
+  if (auto originalProperty = VD->getOriginalWrappedProperty()) {
+    if (originalProperty->isPropertyWrapperInitializedWithInitialValue())
       resultTy = originalProperty->getValueInterfaceType()->getCanonicalType();
   }
 
@@ -2426,6 +2426,9 @@ TypeConverter::checkFunctionForABIDifferences(SILFunctionType *fnTy1,
   if (fnTy1->getNumResults() != fnTy2->getNumResults())
     return ABIDifference::NeedsThunk;
 
+  if (fnTy1->getNumYields() != fnTy2->getNumYields())
+    return ABIDifference::NeedsThunk;
+
   // If we don't have a context but the other type does, we'll return
   // ABIDifference::ThinToThick below.
   if (fnTy1->getExtInfo().hasContext() &&
@@ -2440,8 +2443,22 @@ TypeConverter::checkFunctionForABIDifferences(SILFunctionType *fnTy1,
       return ABIDifference::NeedsThunk;
 
     if (checkForABIDifferences(result1.getSILStorageType(),
-                             result2.getSILStorageType(),
-              /*thunk iuos*/ fnTy1->getLanguage() == SILFunctionLanguage::Swift)
+                               result2.getSILStorageType(),
+             /*thunk iuos*/ fnTy1->getLanguage() == SILFunctionLanguage::Swift)
+        != ABIDifference::Trivial)
+      return ABIDifference::NeedsThunk;
+  }
+
+  for (unsigned i : indices(fnTy1->getYields())) {
+    auto yield1 = fnTy1->getYields()[i];
+    auto yield2 = fnTy2->getYields()[i];
+
+    if (yield1.getConvention() != yield2.getConvention())
+      return ABIDifference::NeedsThunk;
+
+    if (checkForABIDifferences(yield1.getSILStorageType(),
+                               yield2.getSILStorageType(),
+             /*thunk iuos*/ fnTy1->getLanguage() == SILFunctionLanguage::Swift)
         != ABIDifference::Trivial)
       return ABIDifference::NeedsThunk;
   }

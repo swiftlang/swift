@@ -201,7 +201,7 @@ public func _encodeBitsAsWords<T>(_ x: T) -> [Int] {
   let result = [Int](
     repeating: 0,
     count: (MemoryLayout<T>.size + MemoryLayout<Int>.size - 1) / MemoryLayout<Int>.size)
-  _internalInvariant(result.count > 0)
+  _internalInvariant(!result.isEmpty)
   var tmp = x
   // FIXME: use UnsafeMutablePointer.assign(from:) instead of memcpy.
   _memcpy(dest: UnsafeMutablePointer(result._baseAddressIfContiguous!),
@@ -400,7 +400,7 @@ extension Double : _CVarArgPassedAsDouble, _CVarArgAligned {
   }
 }
 
-#if !os(Windows) && (arch(i386) || arch(x86_64))
+#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
 extension Float80 : CVarArg, _CVarArgAligned {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
@@ -430,7 +430,7 @@ extension Float80 : CVarArg, _CVarArgAligned {
 @usableFromInline // c-abi
 final internal class __VaListBuilder {
   #if arch(x86_64) || arch(s390x)
-  @_fixed_layout // c-abi
+  @frozen // c-abi
   @usableFromInline
   internal struct Header {
     @inlinable // c-abi

@@ -101,9 +101,6 @@ NOTE(note_typo_candidate,none,
 NOTE(profile_read_error,none,
      "failed to load profile data '%0': '%1'", (StringRef, StringRef))
 
-ERROR(generic_signature_not_minimal,none,
-      "generic requirement '%0' is redundant in %1", (StringRef, StringRef))
-
 WARNING(protocol_extension_redundant_requirement,none,
       "requirement of '%1' to '%2' is redundant in an extension of '%0'",
       (StringRef, StringRef, StringRef))
@@ -113,6 +110,15 @@ ERROR(attr_only_on_parameters, none,
 
 ERROR(function_type_no_parens,none,
       "single argument function types require parentheses", ())
+
+// Used by -verify-generic-signatures
+ERROR(generic_signature_not_minimal,none,
+      "generic requirement '%0' is redundant in %1", (StringRef, StringRef))
+ERROR(generic_signature_not_valid,none,
+      "generic signature %0 is invalid", (StringRef))
+ERROR(generic_signature_not_equal,none,
+      "generic signature %0 is not equal to new signature %1",
+      (StringRef, StringRef))
 
 // FIXME: Used by swift-api-digester. Don't want to set up a separate diagnostics
 // file just for a few errors.
@@ -126,6 +132,8 @@ ERROR(sdk_node_unrecognized_decl_attr_kind,none,
       "unrecognized declaration attribute '%0' in SDK node", (StringRef))
 ERROR(sdk_node_unrecognized_decl_kind,none,
       "unrecognized declaration kind '%0' in SDK node", (StringRef))
+ERROR(sdk_node_unrecognized_accessor_kind,none,
+      "unrecognized accessor kind '%0' in SDK node", (StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Circular reference diagnostics

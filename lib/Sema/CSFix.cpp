@@ -67,16 +67,17 @@ ForceDowncast *ForceDowncast::create(ConstraintSystem &cs, Type toType,
 
 bool ForceOptional::diagnose(Expr *root, bool asNote) const {
   MissingOptionalUnwrapFailure failure(root, getConstraintSystem(), BaseType,
-                                       UnwrappedType, getLocator());
+                                       UnwrappedType, FullLocator);
   return failure.diagnose(asNote);
 }
 
 ForceOptional *ForceOptional::create(ConstraintSystem &cs, Type baseType,
                                      Type unwrappedType,
                                      ConstraintLocator *locator) {
-  return new (cs.getAllocator()) ForceOptional(
-      cs, baseType, unwrappedType,
-      cs.getConstraintLocator(simplifyLocatorToAnchor(cs, locator)));
+  auto *simplifiedLocator =
+      cs.getConstraintLocator(simplifyLocatorToAnchor(cs, locator));
+  return new (cs.getAllocator())
+      ForceOptional(cs, baseType, unwrappedType, simplifiedLocator, locator);
 }
 
 bool UnwrapOptionalBase::diagnose(Expr *root, bool asNote) const {
@@ -228,6 +229,23 @@ ContextualMismatch *ContextualMismatch::create(ConstraintSystem &cs, Type lhs,
   return new (cs.getAllocator()) ContextualMismatch(cs, lhs, rhs, locator);
 }
 
+bool GenericArgumentsMismatch::diagnose(Expr *root, bool asNote) const {
+  auto failure = GenericArgumentsMismatchFailure(root, getConstraintSystem(),
+                                                 getActual(), getRequired(),
+                                                 getMismatches(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+GenericArgumentsMismatch *GenericArgumentsMismatch::create(
+    ConstraintSystem &cs, BoundGenericType *actual, BoundGenericType *required,
+    llvm::ArrayRef<unsigned> mismatches, ConstraintLocator *locator) {
+  unsigned size = totalSizeToAlloc<unsigned>(mismatches.size());
+  void *mem =
+      cs.getAllocator().Allocate(size, alignof(GenericArgumentsMismatch));
+  return new (mem)
+      GenericArgumentsMismatch(cs, actual, required, mismatches, locator);
+}
+
 bool AutoClosureForwarding::diagnose(Expr *root, bool asNote) const {
   auto failure =
       AutoClosureForwardingFailure(getConstraintSystem(), getLocator());
@@ -260,6 +278,21 @@ InsertExplicitCall *InsertExplicitCall::create(ConstraintSystem &cs,
   return new (cs.getAllocator()) InsertExplicitCall(cs, locator);
 }
 
+bool InsertPropertyWrapperUnwrap::diagnose(Expr *root, bool asNote) const {
+  auto failure = MissingPropertyWrapperUnwrapFailure(
+      root, getConstraintSystem(), getPropertyName(), getBase(), getWrapper(),
+      getLocator());
+  return failure.diagnose(asNote);
+}
+
+InsertPropertyWrapperUnwrap *
+InsertPropertyWrapperUnwrap::create(ConstraintSystem &cs, DeclName propertyName,
+                                    Type base, Type wrapper,
+                                    ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      InsertPropertyWrapperUnwrap(cs, propertyName, base, wrapper, locator);
+}
+
 bool UseSubscriptOperator::diagnose(Expr *root, bool asNote) const {
   auto failure = SubscriptMisuseFailure(root, getConstraintSystem(), getLocator());
   return failure.diagnose(asNote);
@@ -281,6 +314,20 @@ DefineMemberBasedOnUse::create(ConstraintSystem &cs, Type baseType,
                                DeclName member, ConstraintLocator *locator) {
   return new (cs.getAllocator())
       DefineMemberBasedOnUse(cs, baseType, member, locator);
+}
+
+AllowMemberRefOnExistential *
+AllowMemberRefOnExistential::create(ConstraintSystem &cs, Type baseType,
+                                    ValueDecl *member, DeclName memberName,
+                                    ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowMemberRefOnExistential(cs, baseType, memberName, member, locator);
+}
+
+bool AllowMemberRefOnExistential::diagnose(Expr *root, bool asNote) const {
+  auto failure = InvalidMemberRefOnExistential(root, getConstraintSystem(),
+                                               BaseType, Name, getLocator());
+  return failure.diagnose(asNote);
 }
 
 bool AllowTypeOrInstanceMember::diagnose(Expr *root, bool asNote) const {
@@ -331,6 +378,7 @@ bool AllowInvalidInitRef::diagnose(Expr *root, bool asNote) const {
     return failure.diagnose(asNote);
   }
   }
+  llvm_unreachable("covered switch");
 }
 
 AllowInvalidInitRef *AllowInvalidInitRef::dynamicOnMetatype(
@@ -464,6 +512,7 @@ bool AllowInvalidRefInKeyPath::diagnose(Expr *root, bool asNote) const {
     return failure.diagnose(asNote);
   }
   }
+  llvm_unreachable("covered switch");
 }
 
 AllowInvalidRefInKeyPath *
@@ -539,4 +588,37 @@ CollectionElementContextualMismatch::create(ConstraintSystem &cs, Type srcType,
                                             ConstraintLocator *locator) {
   return new (cs.getAllocator())
       CollectionElementContextualMismatch(cs, srcType, dstType, locator);
+}
+
+bool ExplicitlySpecifyGenericArguments::diagnose(Expr *root,
+                                                 bool asNote) const {
+  auto &cs = getConstraintSystem();
+  MissingGenericArgumentsFailure failure(root, cs, getParameters(),
+                                         getLocator());
+  return failure.diagnose(asNote);
+}
+
+ExplicitlySpecifyGenericArguments *ExplicitlySpecifyGenericArguments::create(
+    ConstraintSystem &cs, ArrayRef<GenericTypeParamType *> params,
+    ConstraintLocator *locator) {
+  unsigned size = totalSizeToAlloc<GenericTypeParamType *>(params.size());
+  void *mem = cs.getAllocator().Allocate(
+      size, alignof(ExplicitlySpecifyGenericArguments));
+  return new (mem) ExplicitlySpecifyGenericArguments(cs, params, locator);
+}
+
+SkipUnhandledConstructInFunctionBuilder *
+SkipUnhandledConstructInFunctionBuilder::create(ConstraintSystem &cs,
+                                                UnhandledNode unhandled,
+                                                NominalTypeDecl *builder,
+                                                ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+    SkipUnhandledConstructInFunctionBuilder(cs, unhandled, builder, locator);
+}
+
+bool SkipUnhandledConstructInFunctionBuilder::diagnose(Expr *root,
+                                                       bool asNote) const {
+  SkipUnhandledConstructInFunctionBuilderFailure failure(
+      root, getConstraintSystem(), unhandled, builder, getLocator());
+  return failure.diagnose(asNote);
 }

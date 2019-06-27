@@ -239,8 +239,8 @@ static void unownedReleaseALot(TestObject *object, uint64_t count) {
   }
 }
 
-// Maximum legal unowned retain count. 31 bits with no implicit +1.
-const uint64_t maxURC = (1ULL << (32 - 1)) - 1;
+// Maximum legal unowned retain count. 31 bits minus one with no implicit +1.
+const uint64_t maxURC = (1ULL << (32 - 1)) - 2;
 
 TEST(LongRefcountingTest, unowned_retain_max) {
   // Don't generate millions of failures if something goes wrong.
@@ -282,7 +282,7 @@ TEST(LongRefcountingTest, unowned_retain_overflow_DeathTest) {
   auto object = allocTestObject(&deinited, 1);
 
   // URC is 1. Retain to maxURC, then retain again and verify overflow error.
-  unownedRetainALot<true>(object, maxURC - 1);
+  unownedRetainALot<true>(object, maxURC);
   EXPECT_EQ(0u, deinited);
   EXPECT_ALLOCATED(object);
   ASSERT_DEATH(swift_unownedRetain(object),
@@ -329,7 +329,7 @@ TEST(LongRefcountingTest, nonatomic_unowned_retain_overflow_DeathTest) {
   auto object = allocTestObject(&deinited, 1);
 
   // URC is 1. Retain to maxURC, then retain again and verify overflow error.
-  unownedRetainALot<false>(object, maxURC - 1);
+  unownedRetainALot<false>(object, maxURC);
   EXPECT_EQ(0u, deinited);
   EXPECT_ALLOCATED(object);
   ASSERT_DEATH(swift_nonatomic_unownedRetain(object),

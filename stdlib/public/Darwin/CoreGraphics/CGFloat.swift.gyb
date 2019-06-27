@@ -22,7 +22,7 @@ word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 @_exported import CoreGraphics
 import Darwin
 
-@_fixed_layout
+@frozen
 public struct CGFloat {
 #if arch(i386) || arch(arm)
   /// The native type used to store the CGFloat, which is Float on
@@ -46,7 +46,7 @@ public struct CGFloat {
     self.native = NativeType(value)
   }
 
-#if !os(Windows) && (arch(i386) || arch(x86_64))
+#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
   @_transparent public init(_ value: Float80) {
     self.native = NativeType(value)
   }

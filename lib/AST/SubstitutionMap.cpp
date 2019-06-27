@@ -416,17 +416,6 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
       // to use that.
       if (normal->getState() == ProtocolConformanceState::CheckingTypeWitnesses)
         return None;
-
-      auto lazyResolver = type->getASTContext().getLazyResolver();
-      if (lazyResolver == nullptr)
-        return None;
-
-      lazyResolver->resolveTypeWitness(normal, nullptr);
-
-      // Error case: the conformance is broken, so we cannot handle this
-      // substitution.
-      if (normal->getSignatureConformances().empty())
-        return None;
     }
 
     // Get the associated conformance.
@@ -695,13 +684,25 @@ void SubstitutionMap::profile(llvm::FoldingSetNodeID &id) const {
 }
 
 bool SubstitutionMap::isIdentity() const {
-  for (unsigned i : indices(getReplacementTypes())) {
-    auto replacement = dyn_cast<GenericTypeParamType>(
-      getReplacementTypes()[i]->getCanonicalType(getGenericSignature()));
-    if (!replacement)
-      return false;
-    if (getGenericSignature()->getGenericParamOrdinal(replacement) != i)
-      return false;
-  }
-  return true;
+  if (empty())
+    return true;
+
+  GenericSignature *sig = getGenericSignature();
+  unsigned countOfGenericParams = 0;
+  bool hasNonIdentityReplacement = false;
+
+  sig->forEachParam([&](GenericTypeParamType *paramTy, bool isCanonical) {
+    ++countOfGenericParams;
+    if (!isCanonical)
+      return;
+
+    auto replacementTy = Type(paramTy).subst(*this);
+    if (!paramTy->isEqual(replacementTy))
+      hasNonIdentityReplacement = true;
+  });
+
+  assert(countOfGenericParams == getReplacementTypes().size());
+  (void)countOfGenericParams;
+
+  return !hasNonIdentityReplacement;
 }

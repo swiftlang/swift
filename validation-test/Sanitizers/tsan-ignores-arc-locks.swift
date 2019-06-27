@@ -1,9 +1,9 @@
 // RUN: %target-build-swift -target %sanitizers-target-triple -sanitize=thread %s -o %t_binary
-// RUN: %env-TSAN_OPTIONS=ignore_interceptors_accesses=1:halt_on_error=1 %target-run %t_binary
+// RUN: %env-TSAN_OPTIONS=halt_on_error=1 %target-run %t_binary
 // REQUIRES: executable_test
 // REQUIRES: stress_test
 // REQUIRES: tsan_runtime
-// REQUIRES: objc_interop
+// REQUIRES: foundation
 
 // Check that TSan ignores the retain count update locks in the runtime.
 

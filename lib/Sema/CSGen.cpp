@@ -360,7 +360,7 @@ namespace {
   /// expression, attempt to derive a favored type for it.
   bool computeFavoredTypeForExpr(Expr *expr, ConstraintSystem &CS) {
     LinkedTypeInfo lti;
-    
+
     expr->walk(LinkedExprAnalyzer(lti, CS));
 
     // Link anonymous closure params of the same index.
@@ -381,41 +381,21 @@ namespace {
       }
     }
 
-    // Link integer literal tyvars.
-    if (lti.intLiteralTyvars.size() > 1) {
-      auto rep1 = CS.getRepresentative(lti.intLiteralTyvars[0]);
+    auto mergeTypeVariables = [&](ArrayRef<TypeVariableType *> typeVars) {
+      if (typeVars.size() < 2)
+        return;
 
-      for (size_t i = 1; i < lti.intLiteralTyvars.size(); i++) {
-        auto rep2 = CS.getRepresentative(lti.intLiteralTyvars[i]);
-
+      auto rep1 = CS.getRepresentative(typeVars.front());
+      for (unsigned i = 1, n = typeVars.size(); i != n; ++i) {
+        auto rep2 = CS.getRepresentative(typeVars[i]);
         if (rep1 != rep2)
           CS.mergeEquivalenceClasses(rep1, rep2, /*updateWorkList*/ false);
       }
-    }
+    };
 
-    // Link float literal tyvars.
-    if (lti.floatLiteralTyvars.size() > 1) {
-      auto rep1 = CS.getRepresentative(lti.floatLiteralTyvars[0]);
-
-      for (size_t i = 1; i < lti.floatLiteralTyvars.size(); i++) {
-        auto rep2 = CS.getRepresentative(lti.floatLiteralTyvars[i]);
-        
-        if (rep1 != rep2)
-          CS.mergeEquivalenceClasses(rep1, rep2, /*updateWorkList*/ false);
-      }
-    }
-
-    // Link string literal tyvars.
-    if (lti.stringLiteralTyvars.size() > 1) {
-      auto rep1 = CS.getRepresentative(lti.stringLiteralTyvars[0]);
-
-      for (size_t i = 1; i < lti.stringLiteralTyvars.size(); i++) {
-        auto rep2 = CS.getRepresentative(lti.stringLiteralTyvars[i]);
-
-        if (rep1 != rep2)
-          CS.mergeEquivalenceClasses(rep1, rep2, /*updateWorkList*/ false);
-      }
-    }
+    mergeTypeVariables(lti.intLiteralTyvars);
+    mergeTypeVariables(lti.floatLiteralTyvars);
+    mergeTypeVariables(lti.stringLiteralTyvars);
 
     if (lti.collectedTypes.size() == 1) {
       // TODO: Compute the BCT.
@@ -577,8 +557,8 @@ namespace {
       // the literal.
       if (otherArgTy && otherArgTy->getAnyNominal()) {
         if (otherArgTy->isEqual(paramTy) &&
-            tc.conformsToProtocol(otherArgTy, literalProto, CS.DC,
-                                  ConformanceCheckFlags::InExpression))
+            TypeChecker::conformsToProtocol(otherArgTy, literalProto, CS.DC,
+                                            ConformanceCheckFlags::InExpression))
           return true;
       } else if (Type defaultType = tc.getDefaultType(literalProto, CS.DC)) {
         // If there is a default type for the literal protocol, check whether
@@ -1121,7 +1101,9 @@ namespace {
     }
 
   public:
-    ConstraintGenerator(ConstraintSystem &CS) : CS(CS), CurDC(CS.DC) { }
+    ConstraintGenerator(ConstraintSystem &CS, DeclContext *DC)
+      : CS(CS), CurDC(DC ? DC : CS.DC) { }
+
     virtual ~ConstraintGenerator() {
       // We really ought to have this assertion:
       //   assert(DCStack.empty() && CurDC == CS.DC);
@@ -1408,6 +1390,8 @@ namespace {
         type = typeLoc.getType();
       } else if (typeLoc.hasLocation()) {
         type = resolveTypeReferenceInExpression(typeLoc);
+      } else if (E->isImplicit() && CS.hasType(&typeLoc)) {
+        type = CS.getType(typeLoc);
       }
 
       if (!type || type->hasError()) return Type();
@@ -1774,11 +1758,7 @@ namespace {
       }
 
       // Assume that ExpressibleByArrayLiteral contains a single associated type.
-      AssociatedTypeDecl *elementAssocTy = nullptr;
-      for (auto decl : arrayProto->getMembers()) {
-        if ((elementAssocTy = dyn_cast<AssociatedTypeDecl>(decl)))
-          break;
-      }
+      auto *elementAssocTy = arrayProto->getAssociatedTypeMembers()[0];
       if (!elementAssocTy)
         return Type();
 
@@ -1838,10 +1818,8 @@ namespace {
       }
 
       // The array element type defaults to 'Any'.
-      if (arrayElementTy->isTypeVariableOrMember()) {
-        CS.addConstraint(ConstraintKind::Defaultable, arrayElementTy,
-                         tc.Context.TheAnyType, locator);
-      }
+      CS.addConstraint(ConstraintKind::Defaultable, arrayElementTy,
+                       tc.Context.TheAnyType, locator);
 
       return arrayTy;
     }
@@ -2107,7 +2085,7 @@ namespace {
         // Otherwise, create a new type variable.
         auto ty = Type();
         if (!var->hasNonPatternBindingInit() &&
-            !var->getAttachedPropertyDelegate()) {
+            !var->hasAttachedPropertyWrapper()) {
           if (auto boundExpr = locator.trySimplifyToExpr()) {
             if (!boundExpr->isSemanticallyInOutExpr())
               ty = CS.getType(boundExpr)->getRValueType();
@@ -3102,8 +3080,7 @@ namespace {
 
     Type visitTapExpr(TapExpr *expr) {
       DeclContext *varDC = expr->getVar()->getDeclContext();
-      assert(varDC == CS.DC || (varDC && isa<AbstractClosureExpr>(varDC) &&
-              cast<AbstractClosureExpr>(varDC)->hasSingleExpressionBody()) &&
+      assert(varDC == CS.DC || (varDC && isa<AbstractClosureExpr>(varDC)) &&
              "TapExpr var should be in the same DeclContext we're checking it in!");
       
       auto locator = CS.getConstraintLocator(expr);
@@ -3320,9 +3297,7 @@ namespace {
         }
 
         // Remove any semantic expression injected by typechecking.
-        if (auto CE = dyn_cast<CollectionExpr>(expr)) {
-          CE->setSemanticExpr(nullptr);
-        } else if (auto ISLE = dyn_cast<InterpolatedStringLiteralExpr>(expr)) {
+        if (auto ISLE = dyn_cast<InterpolatedStringLiteralExpr>(expr)) {
           ISLE->setSemanticExpr(nullptr);
         } else if (auto OLE = dyn_cast<ObjectLiteralExpr>(expr)) {
           OLE->setSemanticExpr(nullptr);
@@ -3631,8 +3606,6 @@ namespace {
           if (closureTy && closureTy->hasError())
             return nullptr;
 
-          CS.setType(closure, closureTy);
-
           // Visit the body. It's type needs to be convertible to the function's
           // return type.
           auto resultTy = closureTy->castTo<FunctionType>()->getResult();
@@ -3725,7 +3698,7 @@ namespace {
 
 } // end anonymous namespace
 
-Expr *ConstraintSystem::generateConstraints(Expr *expr) {
+Expr *ConstraintSystem::generateConstraints(Expr *expr, DeclContext *dc) {
   // Remove implicit conversions from the expression.
   expr = expr->walk(SanitizeExpr(*this));
 
@@ -3733,7 +3706,7 @@ Expr *ConstraintSystem::generateConstraints(Expr *expr) {
   expr->walk(ArgumentLabelWalker(*this, expr));
 
   // Walk the expression, generating constraints.
-  ConstraintGenerator cg(*this);
+  ConstraintGenerator cg(*this, dc);
   ConstraintWalker cw(cg);
   
   Expr* result = expr->walk(cw);
@@ -3746,7 +3719,7 @@ Expr *ConstraintSystem::generateConstraints(Expr *expr) {
 
 Type ConstraintSystem::generateConstraints(Pattern *pattern,
                                            ConstraintLocatorBuilder locator) {
-  ConstraintGenerator cg(*this);
+  ConstraintGenerator cg(*this, nullptr);
   return cg.getTypeForPattern(pattern, locator);
 }
 
@@ -3798,7 +3771,8 @@ bool swift::isExtensionApplied(const DeclContext *DC, Type BaseTy,
                                const ExtensionDecl *ED) {
   // We can't do anything if the base type has unbound generic parameters.
   // We can't leak type variables into another constraint system.
-  if (BaseTy->hasTypeVariable() || BaseTy->hasUnboundGenericType())
+  if (BaseTy->hasTypeVariable() || BaseTy->hasUnboundGenericType() ||
+      BaseTy->hasUnresolvedType() || BaseTy->hasError())
     return true;
 
   if (!ED->isConstrainedExtension())
@@ -3818,7 +3792,8 @@ bool swift::isMemberDeclApplied(const DeclContext *DC, Type BaseTy,
                                 const ValueDecl *VD) {
   // We can't leak type variables into another constraint system.
   // We can't do anything if the base type has unbound generic parameters.
-  if (BaseTy->hasTypeVariable() || BaseTy->hasUnboundGenericType())
+  if (BaseTy->hasTypeVariable() || BaseTy->hasUnboundGenericType()||
+      BaseTy->hasUnresolvedType() || BaseTy->hasError())
     return true;
 
   const GenericContext *genericDecl = VD->getAsGenericContext();

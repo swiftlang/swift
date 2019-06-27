@@ -294,7 +294,6 @@ static void bindExtensions(SourceFile &SF, TypeChecker &TC) {
 
 static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) {
   unsigned currentFunctionIdx = 0;
-  unsigned currentExternalDef = TC.Context.LastCheckedExternalDefinition;
   unsigned currentSynthesizedDecl = SF.LastCheckedSynthesizedDecl;
   do {
     // Type check conformance contexts.
@@ -321,24 +320,6 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
       auto *AFD = TC.definedFunctions[currentFunctionIdx];
 
       TC.typeCheckAbstractFunctionBody(AFD);
-    }
-
-    // Type check external definitions.
-    for (unsigned n = TC.Context.ExternalDefinitions.size();
-         currentExternalDef != n;
-         ++currentExternalDef) {
-      auto decl = TC.Context.ExternalDefinitions[currentExternalDef];
-
-      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(decl)) {
-        TC.typeCheckAbstractFunctionBody(AFD);
-        TC.checkFunctionErrorHandling(AFD);
-        continue;
-      }
-      if (isa<NominalTypeDecl>(decl))
-        continue;
-      if (isa<VarDecl>(decl))
-        continue;
-      llvm_unreachable("Unhandled external definition kind");
     }
 
     // Validate any referenced declarations for SIL's purposes.
@@ -375,24 +356,13 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
     }
     TC.PartiallyCheckedConformances.clear();
 
-    // Complete any conformances that we used.
-    for (unsigned i = 0; i != TC.UsedConformances.size(); ++i) {
-      auto conformance = TC.UsedConformances[i];
-      if (conformance->isIncomplete())
-        TC.checkConformance(conformance);
-    }
-    TC.UsedConformances.clear();
-
   } while (currentFunctionIdx < TC.definedFunctions.size() ||
-           currentExternalDef < TC.Context.ExternalDefinitions.size() ||
            currentSynthesizedDecl < SF.SynthesizedDecls.size() ||
            TC.NextDeclToFinalize < TC.DeclsToFinalize.size() ||
            !TC.ConformanceContexts.empty() ||
-           !TC.UsedConformances.empty() ||
            !TC.PartiallyCheckedConformances.empty());
 
   // FIXME: Horrible hack. Store this somewhere more appropriate.
-  TC.Context.LastCheckedExternalDefinition = currentExternalDef;
   SF.LastCheckedSynthesizedDecl = currentSynthesizedDecl;
 
   // Now that all types have been finalized, run any delayed
@@ -455,6 +425,8 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
   // Make sure that name binding has been completed before doing any type
   // checking.
   performNameBinding(SF, StartElem);
+                                  
+  // Could build scope maps here because the AST is stable now.
 
   {
     SharedTimer timer("Type checking and Semantic analysis");

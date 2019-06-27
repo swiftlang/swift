@@ -973,9 +973,8 @@ void ASTMangler::appendType(Type type, const ValueDecl *forDecl) {
       auto opaqueType = cast<OpaqueTypeArchetypeType>(tybase);
       auto opaqueDecl = opaqueType->getDecl();
       if (opaqueDecl->getNamingDecl() == forDecl) {
-        if (opaqueType->getSubstitutions().isIdentity()) {
-          return appendOperator("Qr");
-        }
+        assert(opaqueType->getSubstitutions().isIdentity());
+        return appendOperator("Qr");
       }
       
       // Otherwise, try to substitute it.
@@ -1911,6 +1910,10 @@ void ASTMangler::appendFunctionType(AnyFunctionType *fn, bool isAutoClosure,
   // changes to better support thin functions.
   switch (fn->getRepresentation()) {
   case AnyFunctionType::Representation::Block:
+    // We distinguish escaping and non-escaping blocks, but only in the DWARF
+    // mangling, because the ABI is already set.
+    if (!fn->isNoEscape() && DWARFMangling)
+      return appendOperator("XL");
     return appendOperator("XB");
   case AnyFunctionType::Representation::Thin:
     return appendOperator("Xf");

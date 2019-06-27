@@ -854,7 +854,7 @@ static bool hasDependentTypeWitness(
     return false;
 
   // Check whether any of the associated types are dependent.
-  if (conformance->forEachTypeWitness(nullptr,
+  if (conformance->forEachTypeWitness(DC->getASTContext().getLazyResolver(),
         [&](AssociatedTypeDecl *requirement, Type type,
             TypeDecl *explicitDecl) -> bool {
           // Skip associated types that don't have witness table entries.

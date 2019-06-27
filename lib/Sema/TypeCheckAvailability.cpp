@@ -2627,10 +2627,10 @@ static bool isIntegerOrFloatingPointType(Type ty, DeclContext *DC,
   if (!integerType || !floatingType) return false;
 
   return
-    TC.conformsToProtocol(ty, integerType, DC,
-                          ConformanceCheckFlags::InExpression) ||
-    TC.conformsToProtocol(ty, floatingType, DC,
-                          ConformanceCheckFlags::InExpression);
+    TypeChecker::conformsToProtocol(ty, integerType, DC,
+                                    ConformanceCheckFlags::InExpression) ||
+    TypeChecker::conformsToProtocol(ty, floatingType, DC,
+                                    ConformanceCheckFlags::InExpression);
 }
 
 
@@ -2787,4 +2787,61 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *Decl,
 {
   AvailabilityWalker AW(TC, DC);
   return AW.diagAvailability(const_cast<ValueDecl *>(Decl), R, nullptr, Flags);
+}
+
+void swift::checkExplicitAvailability(Decl *decl) {
+  // Check only if the command line option was set.
+  if (!decl->getASTContext().LangOpts.RequireExplicitAvailability)
+    return;
+
+  // Skip nominal type members as the type should be annotated.
+  auto declContext = decl->getDeclContext();
+  if (isa<NominalTypeDecl>(declContext))
+    return;
+
+  ValueDecl *valueDecl = dyn_cast<ValueDecl>(decl);
+  if (valueDecl == nullptr) {
+    // decl should be either a ValueDecl or an ExtensionDecl
+    auto extension = cast<ExtensionDecl>(decl);
+    valueDecl = extension->getExtendedNominal();
+    if (!valueDecl)
+      return;
+  }
+
+  // Skip decls that are not public and not usable from inline.
+  AccessScope scope =
+    valueDecl->getFormalAccessScope(/*useDC*/nullptr,
+                                  /*treatUsableFromInlineAsPublic*/true);
+  if (!scope.isPublic() ||
+      decl->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+    return;
+
+  // Warn on decls without an introduction version.
+  auto &ctx = decl->getASTContext();
+  auto safeRangeUnderApprox = AvailabilityInference::availableRange(decl, ctx);
+  if (!safeRangeUnderApprox.getOSVersion().hasLowerEndpoint()) {
+    auto diag = decl->diagnose(diag::public_decl_needs_availability);
+
+    auto suggestPlatform = decl->getASTContext().LangOpts.RequireExplicitAvailabilityTarget;
+    if (!suggestPlatform.empty()) {
+      auto InsertLoc = decl->getAttrs().getStartLoc(/*forModifiers=*/false);
+      if (InsertLoc.isInvalid())
+        InsertLoc = decl->getStartLoc();
+
+      if (InsertLoc.isInvalid())
+        return;
+
+      std::string AttrText;
+      {
+         llvm::raw_string_ostream Out(AttrText);
+
+         StringRef OriginalIndent = Lexer::getIndentationForLine(
+           ctx.SourceMgr, InsertLoc);
+         Out << "@available(" << suggestPlatform << ", *)\n"
+             << OriginalIndent;
+      }
+
+      diag.fixItInsert(InsertLoc, AttrText);
+    }
+  }
 }

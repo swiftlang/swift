@@ -332,9 +332,14 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
   if (!DeclAttrs)
     return;
 
+  SmallVector<const DeclAttribute *, 8> orderedAttributes(begin(), end());
+  print(Printer, Options, orderedAttributes, D);
+}
+
+void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
+                           ArrayRef<const DeclAttribute *> FlattenedAttrs,
+                           const Decl *D) {
   using AttributeVector = SmallVector<const DeclAttribute *, 8>;
-  AttributeVector orderedAttributes(begin(), end());
-  std::reverse(orderedAttributes.begin(), orderedAttributes.end());
 
   // Process attributes in passes.
   AttributeVector shortAvailableAttributes;
@@ -344,7 +349,7 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
   AttributeVector attributes;
   AttributeVector modifiers;
 
-  for (auto DA : orderedAttributes) {
+  for (auto DA : llvm::reverse(FlattenedAttrs)) {
     if (!Options.PrintImplicitAttrs && DA->isImplicit())
       continue;
     if (!Options.PrintUserInaccessibleAttrs &&
@@ -629,6 +634,13 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
+  case DAK_ProjectedValueProperty:
+    Printer.printAttrName("@_projectedValueProperty");
+    Printer << "(";
+    Printer << cast<ProjectedValuePropertyAttr>(this)->ProjectionPropertyName;
+    Printer << ")";
+    break;
+
   case DAK_Count:
     llvm_unreachable("exceed declaration attribute kinds");
 
@@ -757,6 +769,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "_clangImporterSynthesizedType";
   case DAK_Custom:
     return "<<custom>>";
+  case DAK_ProjectedValueProperty:
+    return "_projectedValueProperty";
   }
   llvm_unreachable("bad DeclAttrKind");
 }

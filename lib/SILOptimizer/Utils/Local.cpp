@@ -208,15 +208,15 @@ void swift::recursivelyDeleteTriviallyDeadInstructions(
       // If we have a function ref inst, we need to especially drop its function
       // argument so that it gets a proper ref decrement.
       auto *FRI = dyn_cast<FunctionRefInst>(I);
-      if (FRI && FRI->getReferencedFunction())
+      if (FRI && FRI->getInitiallyReferencedFunction())
         FRI->dropReferencedFunction();
 
       auto *DFRI = dyn_cast<DynamicFunctionRefInst>(I);
-      if (DFRI && DFRI->getReferencedFunction())
+      if (DFRI && DFRI->getInitiallyReferencedFunction())
         DFRI->dropReferencedFunction();
 
       auto *PFRI = dyn_cast<PreviousDynamicFunctionRefInst>(I);
-      if (PFRI && PFRI->getReferencedFunction())
+      if (PFRI && PFRI->getInitiallyReferencedFunction())
         PFRI->dropReferencedFunction();
     }
 
@@ -740,7 +740,7 @@ public:
 /// Returns false if optimization is not possible.
 /// Returns true and initializes internal fields if optimization is possible.
 bool StringConcatenationOptimizer::extractStringConcatOperands() {
-  auto *Fn = AI->getReferencedFunction();
+  auto *Fn = AI->getReferencedFunctionOrNull();
   if (!Fn)
     return false;
 
@@ -760,8 +760,8 @@ bool StringConcatenationOptimizer::extractStringConcatOperands() {
   if (!FRILeft || !FRIRight)
     return false;
 
-  auto *FRILeftFun = FRILeft->getReferencedFunction();
-  auto *FRIRightFun = FRIRight->getReferencedFunction();
+  auto *FRILeftFun = FRILeft->getReferencedFunctionOrNull();
+  auto *FRIRightFun = FRIRight->getReferencedFunctionOrNull();
 
   if (FRILeftFun->getEffectsKind() >= EffectsKind::ReleaseNone ||
       FRIRightFun->getEffectsKind() >= EffectsKind::ReleaseNone)
@@ -931,6 +931,9 @@ swift::tryToConcatenateStrings(ApplyInst *AI, SILBuilder &B) {
 //                              Closure Deletion
 //===----------------------------------------------------------------------===//
 
+/// NOTE: Instructions with transitive ownership kind are assumed to not keep
+/// the underlying closure alive as well. This is meant for instructions only
+/// with non-transitive users.
 static bool useDoesNotKeepClosureAlive(const SILInstruction *I) {
   switch (I->getKind()) {
   case SILInstructionKind::StrongRetainInst:
@@ -939,6 +942,7 @@ static bool useDoesNotKeepClosureAlive(const SILInstruction *I) {
   case SILInstructionKind::RetainValueInst:
   case SILInstructionKind::ReleaseValueInst:
   case SILInstructionKind::DebugValueInst:
+  case SILInstructionKind::EndBorrowInst:
     return true;
   default:
     return false;
@@ -951,9 +955,9 @@ static bool useHasTransitiveOwnership(const SILInstruction *I) {
   if (isa<ConvertEscapeToNoEscapeInst>(I))
     return true;
 
-  // Look through copy_value. It is inert for our purposes, but we need to look
-  // through it.
-  return isa<CopyValueInst>(I);
+  // Look through copy_value, begin_borrow. They are inert for our purposes, but
+  // we need to look through it.
+  return isa<CopyValueInst>(I) || isa<BeginBorrowInst>(I);
 }
 
 static SILValue createLifetimeExtendedAllocStack(

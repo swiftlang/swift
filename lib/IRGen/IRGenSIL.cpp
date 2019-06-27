@@ -60,6 +60,7 @@
 #include "GenCast.h"
 #include "GenClass.h"
 #include "GenConstant.h"
+#include "GenDecl.h"
 #include "GenEnum.h"
 #include "GenExistential.h"
 #include "GenFunc.h"
@@ -933,8 +934,8 @@ public:
   void visitAssignInst(AssignInst *i) {
     llvm_unreachable("assign is not valid in canonical SIL");
   }
-  void visitAssignByDelegateInst(AssignByDelegateInst *i) {
-    llvm_unreachable("assign_by_delegate is not valid in canonical SIL");
+  void visitAssignByWrapperInst(AssignByWrapperInst *i) {
+    llvm_unreachable("assign_by_wrapper is not valid in canonical SIL");
   }
   void visitMarkUninitializedInst(MarkUninitializedInst *i) {
     llvm_unreachable("mark_uninitialized is not valid in canonical SIL");
@@ -1243,6 +1244,10 @@ IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM, SILFunction *f)
   // replacement.
   if (f->getDynamicallyReplacedFunction()) {
     IGM.emitDynamicReplacementOriginalFunctionThunk(f);
+  }
+
+  if (f->isDynamicallyReplaceable()) {
+    IGM.createReplaceableProlog(*this, f);
   }
 }
 
@@ -1646,7 +1651,7 @@ void IRGenSILFunction::emitSILFunction() {
     IGM.DebugInfo->emitFunction(*CurSILFn, CurFn);
 
   // Map the entry bb.
-  LoweredBBs[&*CurSILFn->begin()] = LoweredBB(&*CurFn->begin(), {});
+  LoweredBBs[&*CurSILFn->begin()] = LoweredBB(&CurFn->back(), {});
   // Create LLVM basic blocks for the other bbs.
   for (auto bi = std::next(CurSILFn->begin()), be = CurSILFn->end(); bi != be;
        ++bi) {
@@ -1842,7 +1847,7 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
 }
 
 void IRGenSILFunction::visitFunctionRefBaseInst(FunctionRefBaseInst *i) {
-  auto fn = i->getReferencedFunction();
+  auto fn = i->getInitiallyReferencedFunction();
 
   llvm::Constant *fnPtr = IGM.getAddrOfSILFunction(
       fn, NotForDefinition, false /*isDynamicallyReplaceableImplementation*/,
@@ -1870,6 +1875,11 @@ void IRGenSILFunction::visitDynamicFunctionRefInst(DynamicFunctionRefInst *i) {
 
 void IRGenSILFunction::visitPreviousDynamicFunctionRefInst(
     PreviousDynamicFunctionRefInst *i) {
+  if (UseBasicDynamicReplacement) {
+    IGM.unimplemented(i->getLoc().getSourceLoc(),
+      ": calling the original implementation of a dynamic function is not "
+      "supported with -Xllvm -basic-dynamic-replacement");
+  }
   visitFunctionRefBaseInst(i);
 }
 

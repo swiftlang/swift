@@ -1,92 +1,111 @@
 
 /* Generic Signature Changes */
-cake1: Func P1.P1Constraint() has generic signature change from <τ_0_0 where τ_0_0 : P1, τ_0_0 : P2> to <τ_0_0 where τ_0_0 : P1>
-cake1: Protocol P3 has generic signature change from <τ_0_0 : cake.P1, τ_0_0 : cake.P2> to <τ_0_0 : cake.P1, τ_0_0 : cake.P4>
+cake: Func P1.P1Constraint() has generic signature change from <τ_0_0 where τ_0_0 : P1, τ_0_0 : P2> to <τ_0_0 where τ_0_0 : P1>
+cake: Protocol P3 has generic signature change from <τ_0_0 : cake.P1, τ_0_0 : cake.P2> to <τ_0_0 : cake.P1, τ_0_0 : cake.P4>
 
 /* RawRepresentable Changes */
 
 /* Removed Decls */
-cake1: Accessor GlobalVarChangedToLet.Set() has been removed
-cake1: Accessor RemoveSetters.Value.Set() has been removed
-cake1: AssociatedType RequiementChanges.removedType has been removed
-cake1: Class C3 has been removed
-cake1: Constructor Somestruct2.init(_:) has been removed
-cake1: Func C4.foo() has been removed
-cake1: Func RequiementChanges.removedFunc() has been removed
-cake1: Subscript RemoveSetters.subscript(_:) has removed its setter
-cake1: Var GlobalVarChangedToLet has removed its setter
-cake1: Var RemoveSetters.Value has removed its setter
-cake1: Var RequiementChanges.removedVar has been removed
+Swift: Extension Int has been removed
+cake: Accessor GlobalVarChangedToLet.Modify() has been removed
+cake: Accessor GlobalVarChangedToLet.Set() has been removed
+cake: Accessor RemoveSetters.Value.Modify() has been removed
+cake: Accessor RemoveSetters.Value.Set() has been removed
+cake: Accessor RemoveSetters.subscript(_:).Modify() has been removed
+cake: Accessor RemoveSetters.subscript(_:).Set() has been removed
+cake: Accessor fixedLayoutStruct.height.Read() has been removed
+cake: AssociatedType RequiementChanges.removedType has been removed
+cake: Class C3 has been removed
+cake: Constructor Somestruct2.init(_:) has been removed
+cake: Func C4.foo() has been removed
+cake: Func RequiementChanges.removedFunc() has been removed
+cake: Var RequiementChanges.removedVar has been removed
 
 /* Moved Decls */
-cake1: Class ClassToStruct has been changed to a Struct
-cake1: InfixOperator ..*.. has been changed to a PrefixOperator
-cake1: Protocol ProtocolToEnum has been changed to a Enum
+cake: Class ClassToStruct has been changed to a Struct
+cake: InfixOperator ..*.. has been changed to a PrefixOperator
+cake: Protocol ProtocolToEnum has been changed to a Enum
 
 /* Renamed Decls */
-cake1: Func S1.foo5(x:y:) has been renamed to Func foo5(x:y:z:)
-cake1: Struct Somestruct2 has been renamed to Struct NSSomestruct2
+cake: Func S1.foo5(x:y:) has been renamed to Func foo5(x:y:z:)
+cake: Struct Somestruct2 has been renamed to Struct NSSomestruct2
 
 /* Type Changes */
-cake1: AssociatedType AssociatedTypePro.T3 has default type change from C1 to C6
-cake1: Class TChangesFromIntToString has type witness type for AssociatedTypesProtocol.T changing from Int to String
-cake1: Constructor S1.init(_:) has parameter 0 type change from Int to Double
-cake1: Func C1.foo2(_:) has parameter 0 type change from Int to () -> ()
-cake1: Func C7.foo(_:_:) has removed default argument from parameter 0
-cake1: Func C7.foo(_:_:) has removed default argument from parameter 1
-cake1: Func EscapingFunctionType.addedEscaping(_:) has added @escaping in parameter 0
-cake1: Func EscapingFunctionType.removedEscaping(_:) has removed @escaping in parameter 0
-cake1: Func Somestruct2.foo1(_:) has parameter 0 type change from C3 to C1
-cake1: Func ownershipChange(_:_:) has parameter 0 changing from InOut to Default
-cake1: Func ownershipChange(_:_:) has parameter 1 changing from Shared to Owned
+cake: AssociatedType AssociatedTypePro.T3 has default type change from C1 to C6
+cake: Class TChangesFromIntToString has type witness type for AssociatedTypesProtocol.T changing from Int to String
+cake: Constructor S1.init(_:) has parameter 0 type change from Int to Double
+cake: Func C1.foo2(_:) has parameter 0 type change from Int to () -> ()
+cake: Func C7.foo(_:_:) has removed default argument from parameter 0
+cake: Func C7.foo(_:_:) has removed default argument from parameter 1
+cake: Func EscapingFunctionType.addedEscaping(_:) has added @escaping in parameter 0
+cake: Func EscapingFunctionType.removedEscaping(_:) has removed @escaping in parameter 0
+cake: Func Somestruct2.foo1(_:) has parameter 0 type change from C3 to C1
+cake: Func ownershipChange(_:_:) has parameter 0 changing from InOut to Default
+cake: Func ownershipChange(_:_:) has parameter 1 changing from Shared to Owned
 
 /* Decl Attribute changes */
-cake1: Class C5 is now without @objc
-cake1: Enum IceKind is now without @_frozen
-cake1: Func C1.foo1() is now not static
-cake1: Func C5.dy_foo() is now with dynamic
-cake1: Func FinalFuncContainer.NewFinalFunc() is now with final
-cake1: Func FinalFuncContainer.NoLongerFinalFunc() is now without final
-cake1: Func HasMutatingMethodClone.foo() has self access kind changing from Mutating to NonMutating
-cake1: Func S1.foo1() has self access kind changing from NonMutating to Mutating
-cake1: Func S1.foo3() is now static
-cake1: Func _NoResilientClass.NoLongerFinalFunc() is now without final
-cake1: Struct C6 is now with @_fixed_layout
-cake1: Var C1.CIIns1 changes from weak to strong
-cake1: Var C1.CIIns2 changes from strong to weak
-cake1: Var GlobalLetChangedToVar changes from let to var
-cake1: Var GlobalVarChangedToLet changes from var to let
+cake: Accessor GlobalLetChangedToVar.Modify() is a new API without @available attribute
+cake: Accessor GlobalLetChangedToVar.Set() is a new API without @available attribute
+cake: Accessor fixedLayoutStruct2.BecomeFixedBinaryOrder.Modify() is a new API without @available attribute
+cake: Accessor fixedLayoutStruct2.BecomeFixedBinaryOrder.Set() is a new API without @available attribute
+cake: AssociatedType RequiementChanges.addedTypeWithDefault is a new API without @available attribute
+cake: AssociatedType RequiementChanges.addedTypeWithoutDefault is a new API without @available attribute
+cake: Class C0 is a new API without @available attribute
+cake: Class C5 is now without @objc
+cake: Class C8 is a new API without @available attribute
+cake: Constructor C1.init(_:) is a new API without @available attribute
+cake: Enum IceKind is now without @frozen
+cake: EnumElement FrozenKind.AddedCase is a new API without @available attribute
+cake: Func C1.foo1() is now not static
+cake: Func C5.dy_foo() is now with dynamic
+cake: Func FinalFuncContainer.NewFinalFunc() is now with final
+cake: Func FinalFuncContainer.NoLongerFinalFunc() is now without final
+cake: Func HasMutatingMethodClone.foo() has self access kind changing from Mutating to NonMutating
+cake: Func RequiementChanges.addedFunc() is a new API without @available attribute
+cake: Func S1.foo1() has self access kind changing from NonMutating to Mutating
+cake: Func S1.foo3() is now static
+cake: Func _NoResilientClass.NoLongerFinalFunc() is now without final
+cake: Func fixedLayoutStruct.OKChange() is a new API without @available attribute
+cake: Protocol P4 is a new API without @available attribute
+cake: Struct C6 is now with @frozen
+cake: Var C1.CIIns1 changes from weak to strong
+cake: Var C1.CIIns2 changes from strong to weak
+cake: Var GlobalLetChangedToVar changes from let to var
+cake: Var GlobalVarChangedToLet changes from var to let
+cake: Var RequiementChanges.addedVar is a new API without @available attribute
+cake: Var fixedLayoutStruct.$__lazy_storage_$_lazy_d is a new API without @available attribute
+cake: Var fixedLayoutStruct.c is a new API without @available attribute
 
-/* Fixed-layout Type changes */
-cake1: EnumElement FrozenKind.Fixed in a non-resilient type changes position from 1 to 2
-cake1: EnumElement FrozenKind.Rigid in a non-resilient type changes position from 2 to 1
-cake1: Var fixedLayoutStruct.a in a non-resilient type changes position from 1 to 0
-cake1: Var fixedLayoutStruct.b in a non-resilient type changes position from 0 to 1
-cake1: Var fixedLayoutStruct2.BecomeFixedBinaryOrder is now a stored property
-cake1: Var fixedLayoutStruct2.NoLongerWithFixedBinaryOrder is no longer a stored property
-cake2: EnumElement FrozenKind.AddedCase is added to a non-resilient type
-cake2: Var fixedLayoutStruct.$__lazy_storage_$_lazy_d is added to a non-resilient type
-cake2: Var fixedLayoutStruct.c is added to a non-resilient type
+/* Fixed-layout Type Changes */
+cake: EnumElement FrozenKind.AddedCase is added to a non-resilient type
+cake: EnumElement FrozenKind.Fixed in a non-resilient type changes position from 1 to 2
+cake: EnumElement FrozenKind.Rigid in a non-resilient type changes position from 2 to 1
+cake: Var fixedLayoutStruct.$__lazy_storage_$_lazy_d is added to a non-resilient type
+cake: Var fixedLayoutStruct.a in a non-resilient type changes position from 1 to 0
+cake: Var fixedLayoutStruct.b in a non-resilient type changes position from 0 to 1
+cake: Var fixedLayoutStruct.c is added to a non-resilient type
+cake: Var fixedLayoutStruct2.BecomeFixedBinaryOrder is now a stored property
+cake: Var fixedLayoutStruct2.NoLongerWithFixedBinaryOrder is no longer a stored property
 
-/* Conformance changes */
-cake1: Func ObjCProtocol.addOptional() is now an optional requirement
-cake1: Func ObjCProtocol.removeOptional() is no longer an optional requirement
-cake1: Protocol P3 has removed inherited protocol P2
-cake1: Struct fixedLayoutStruct has removed conformance to P1
-cake2: Class C7 has added a conformance to an existing protocol P1
-cake2: Class SuperClassChange has added a conformance to an existing protocol P1
-cake2: Protocol P3 has added inherited protocol P4
-cake2: Struct fixedLayoutStruct has added a conformance to an existing protocol P2
+/* Protocol Conformance Change */
+cake: Class C7 has added a conformance to an existing protocol P1
+cake: Class SuperClassChange has added a conformance to an existing protocol P1
+cake: Func ObjCProtocol.addOptional() is now an optional requirement
+cake: Func ObjCProtocol.removeOptional() is no longer an optional requirement
+cake: Protocol P3 has added inherited protocol P4
+cake: Protocol P3 has removed inherited protocol P2
+cake: Struct fixedLayoutStruct has added a conformance to an existing protocol P2
+cake: Struct fixedLayoutStruct has removed conformance to P1
 
 /* Protocol Requirement Change */
-cake1: Accessor HasMutatingMethodClone.bar.Get() now requires new witness table entry
-cake1: AssociatedType AssociatedTypePro.T1 has removed default type Int
-cake1: Func HasMutatingMethodClone.foo() now requires new witness table entry
-cake2: AssociatedType RequiementChanges.addedTypeWithoutDefault has been added as a protocol requirement
-cake2: Func RequiementChanges.addedFunc() has been added as a protocol requirement
-cake2: Var RequiementChanges.addedVar has been added as a protocol requirement
+cake: Accessor HasMutatingMethodClone.bar.Get() now requires  new witness table entry
+cake: AssociatedType AssociatedTypePro.T1 has removed default type Int
+cake: AssociatedType RequiementChanges.addedTypeWithoutDefault has been added as a protocol requirement
+cake: Func HasMutatingMethodClone.foo() now requires  new witness table entry
+cake: Func RequiementChanges.addedFunc() has been added as a protocol requirement
+cake: Var RequiementChanges.addedVar has been added as a protocol requirement
 
 /* Class Inheritance Change */
-cake1: Class C4 has changed its super class from OldType to NewType
-cake1: Class SubGenericClass has changed its super class from GenericClass<P1> to GenericClass<P2>
-cake1: Class SuperClassRemoval has removed its super class C3
+cake: Class C4 has changed its super class from OldType to NewType
+cake: Class SubGenericClass has changed its super class from GenericClass<P1> to GenericClass<P2>
+cake: Class SuperClassRemoval has removed its super class C3

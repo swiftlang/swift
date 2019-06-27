@@ -1255,6 +1255,8 @@ static bool maybeBuildingExecutable(const OutputInfo &OI,
     return true;
   case LinkKind::DynamicLibrary:
     return false;
+  case LinkKind::StaticLibrary:
+    return false;
   case LinkKind::None:
     break;
   }
@@ -1319,14 +1321,14 @@ static bool isSDKTooOld(StringRef sdkPath, llvm::VersionTuple minVersion,
 /// the given target.
 static bool isSDKTooOld(StringRef sdkPath, const llvm::Triple &target) {
   if (target.isMacOSX()) {
-    return isSDKTooOld(sdkPath, llvm::VersionTuple(10, 14), "OSX");
+    return isSDKTooOld(sdkPath, llvm::VersionTuple(10, 15), "OSX");
 
   } else if (target.isiOS()) {
     // Includes both iOS and TVOS.
-    return isSDKTooOld(sdkPath, llvm::VersionTuple(12, 0), "Simulator", "OS");
+    return isSDKTooOld(sdkPath, llvm::VersionTuple(13, 0), "Simulator", "OS");
 
   } else if (target.isWatchOS()) {
-    return isSDKTooOld(sdkPath, llvm::VersionTuple(5, 0), "Simulator", "OS");
+    return isSDKTooOld(sdkPath, llvm::VersionTuple(6, 0), "Simulator", "OS");
 
   } else {
     return false;
@@ -1366,13 +1368,22 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
 
     switch (OutputModeArg->getOption().getID()) {
     case options::OPT_emit_executable:
+      if (Args.hasArg(options::OPT_static))
+        Diags.diagnose(SourceLoc(),
+                       diag::error_static_emit_executable_disallowed);
+                       
       OI.LinkAction = LinkKind::Executable;
       OI.CompilerOutputType = file_types::TY_Object;
       break;
 
     case options::OPT_emit_library:
-      OI.LinkAction = LinkKind::DynamicLibrary;
+      OI.LinkAction = Args.hasArg(options::OPT_static) ?
+                      LinkKind::StaticLibrary :
+                      LinkKind::DynamicLibrary;
       OI.CompilerOutputType = file_types::TY_Object;
+      break;
+
+    case options::OPT_static:
       break;
 
     case options::OPT_emit_object:
@@ -1550,7 +1561,8 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
     OI.ModuleName = "REPL";
   } else if (const Arg *A = Args.getLastArg(options::OPT_o)) {
     OI.ModuleName = llvm::sys::path::stem(A->getValue());
-    if (OI.LinkAction == LinkKind::DynamicLibrary &&
+    if ((OI.LinkAction == LinkKind::DynamicLibrary ||
+         OI.LinkAction == LinkKind::StaticLibrary) &&
         !llvm::sys::path::extension(A->getValue()).empty() &&
         StringRef(OI.ModuleName).startswith("lib")) {
       // Chop off a "lib" prefix if we're building a library.
@@ -1949,8 +1961,15 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
   }
 
   if (OI.shouldLink() && !AllLinkerInputs.empty()) {
-    auto *LinkAction = C.createAction<LinkJobAction>(AllLinkerInputs,
-                                                     OI.LinkAction);
+    JobAction *LinkAction = nullptr;
+
+    if (OI.LinkAction == LinkKind::StaticLibrary) {
+      LinkAction = C.createAction<StaticLinkJobAction>(AllLinkerInputs,
+                                                    OI.LinkAction);
+    } else {
+      LinkAction = C.createAction<DynamicLinkJobAction>(AllLinkerInputs,
+                                                 OI.LinkAction);
+    }
 
     // On ELF platforms there's no built in autolinking mechanism, so we
     // pull the info we need from the .o files directly and pass them as an
@@ -2177,7 +2196,15 @@ static StringRef baseNameForImage(const JobAction *JA, const OutputInfo &OI,
                                   StringRef BaseInput, StringRef BaseName) {
   if (JA->size() == 1 && OI.ModuleNameIsFallback && BaseInput != "-")
     return llvm::sys::path::stem(BaseInput);
-  auto link = dyn_cast<LinkJobAction>(JA);
+  
+  if (auto link = dyn_cast<StaticLinkJobAction>(JA)) {
+    Buffer = "lib";
+    Buffer.append(BaseName);
+    Buffer.append(Triple.isOSWindows() ? ".lib" : ".a");
+    return Buffer.str();
+  }
+  
+  auto link = dyn_cast<DynamicLinkJobAction>(JA);
   if (!link)
     return BaseName;
   if (link->getKind() != LinkKind::DynamicLibrary)
@@ -3059,6 +3086,20 @@ void Driver::printHelp(bool ShowHidden) const {
   getOpts().PrintHelp(llvm::outs(), Name.c_str(), "Swift compiler",
                       IncludedFlagsBitmask, ExcludedFlagsBitmask,
                       /*ShowAllAliases*/false);
+
+  // These strings match the descriptions found in the corresponding swiftpm 
+  // help pages
+  if (driverKind == DriverKind::Interactive) {
+    llvm::outs() << "\nSEE ALSO - PACKAGE MANAGER COMMANDS: \n"
+        "\t\"swift build\" Build sources into binary products \n"
+        "\t\"swift package\" Perform operations on Swift packages \n"
+        "\t\"swift run\" Build and run an executable product \n"
+        "\t\"swift test\" Build and run tests \n";
+  } else {
+    llvm::outs() << "\nSEE ALSO: swift build, swift run, swift package, " 
+                    "swift test \n";
+  }
+
 }
 
 bool OutputInfo::mightHaveExplicitPrimaryInputs(

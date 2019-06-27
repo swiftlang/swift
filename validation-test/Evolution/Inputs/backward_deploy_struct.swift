@@ -25,7 +25,7 @@ public func getVersion() -> Int {
   }
 }
 
-@_weakLinked @_fixed_layout public struct FixedLayoutStruct {
+@_weakLinked @frozen public struct FixedLayoutStruct {
   public init() {}
 
   public func fn(_ x: Int) {}

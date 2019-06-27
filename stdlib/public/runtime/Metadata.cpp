@@ -2698,8 +2698,8 @@ _swift_initClassMetadataImpl(ClassMetadata *self,
 
   initClassFieldOffsetVector(self, numFields, fieldTypes, fieldOffsets);
 
-  auto *description = self->getDescription();
 #if SWIFT_OBJC_INTEROP
+  auto *description = self->getDescription();
   if (description->isGeneric()) {
     assert(!description->hasObjCResilientClassStub());
     initGenericObjCClass(self, numFields, fieldTypes, fieldOffsets);
@@ -2730,7 +2730,7 @@ _swift_initClassMetadataImpl(ClassMetadata *self,
     }
   }
 #else
-  assert(!description->hasObjCResilientClassStub());
+  assert(!self->getDescription()->hasObjCResilientClassStub());
 #endif
 
   return MetadataDependency();
@@ -3850,24 +3850,6 @@ static const WitnessTable *_getForeignWitnessTable(
 /*** Other metadata routines ***********************************************/
 /***************************************************************************/
 
-template<> const ClassMetadata *
-Metadata::getClassObject() const {
-  switch (getKind()) {
-  case MetadataKind::Class: {
-    // Native Swift class metadata is also the class object.
-    return static_cast<const ClassMetadata *>(this);
-  }
-  case MetadataKind::ObjCClassWrapper: {
-    // Objective-C class objects are referenced by their Swift metadata wrapper.
-    auto wrapper = static_cast<const ObjCClassWrapperMetadata *>(this);
-    return wrapper->Class;
-  }
-  // Other kinds of types don't have class objects.
-  default:
-    return nullptr;
-  }
-}
-
 template <> OpaqueValue *Metadata::allocateBoxForExistentialIn(ValueBuffer *buffer) const {
   auto *vwt = getValueWitnesses();
   if (vwt->isValueInline())
@@ -3952,6 +3934,10 @@ StringRef swift::getStringForMetadataKind(MetadataKind kind) {
   }
 }
 
+/***************************************************************************/
+/*** Debugging dump methods ************************************************/
+/***************************************************************************/
+
 #ifndef NDEBUG
 template <>
 LLVM_ATTRIBUTE_USED
@@ -3962,6 +3948,33 @@ void Metadata::dump() const {
   printf("Class Object: %p.\n", getClassObject());
   printf("Type Context Description: %p.\n", getTypeContextDescriptor());
   printf("Generic Args: %p.\n", getGenericArgs());
+}
+
+template <>
+LLVM_ATTRIBUTE_USED
+void TypeContextDescriptor::dump() const {
+  printf("TargetTypeContextDescriptor.\n");
+  printf("Flags: 0x%x.\n", this->Flags.getIntValue());
+  printf("Parent: %p.\n", this->Parent.get());
+  printf("Name: %s.\n", Name.get());
+  printf("Access function: %p.\n", static_cast<void *>(getAccessFunction()));
+  printf("Fields: %p.\n", Fields.get());
+}
+
+template<>
+LLVM_ATTRIBUTE_USED
+void EnumDescriptor::dump() const {
+  printf("TargetEnumDescriptor.\n");
+  printf("Flags: 0x%x.\n", this->Flags.getIntValue());
+  printf("Parent: %p.\n", this->Parent.get());
+  printf("Name: %s.\n", Name.get());
+  printf("Access function: %p.\n", static_cast<void *>(getAccessFunction()));
+  printf("Fields: %p.\n", Fields.get());
+  printf("NumPayloadCasesAndPayloadSizeOffset: 0x%08x "
+         "(payload cases: %u - payload size offset: %zu).\n",
+         NumPayloadCasesAndPayloadSizeOffset,
+         getNumPayloadCases(), getPayloadSizeOffset());
+  printf("NumEmptyCases: %u\n", NumEmptyCases);
 }
 #endif
 

@@ -14,10 +14,10 @@ public protocol SimpleProto {
   func inference(_: Inferred)
 } // CHECK: {{^}$}}
 
-// CHECK-LABEL: public struct SimpleImpl<Element> : SimpleProto {
+// CHECK-LABEL: public struct SimpleImpl<Element> : conformances.SimpleProto {
 public struct SimpleImpl<Element>: SimpleProto {
   // NEGATIVE-NOT: typealias Element =
-  // CHECK: public func inference(_: Int){{$}}
+  // CHECK: public func inference(_: Swift.Int){{$}}
   public func inference(_: Int) {}
   // CHECK: public typealias Inferred = Swift.Int
 } // CHECK: {{^}$}}
@@ -26,10 +26,10 @@ public struct SimpleImpl<Element>: SimpleProto {
 public protocol PublicProto {}
 private protocol PrivateProto {}
 
-// CHECK: public struct A1 : PublicProto {
+// CHECK: public struct A1 : conformances.PublicProto {
 // NEGATIVE-NOT: extension conformances.A1
 public struct A1: PublicProto, PrivateProto {}
-// CHECK: public struct A2 : PublicProto {
+// CHECK: public struct A2 : conformances.PublicProto {
 // NEGATIVE-NOT: extension conformances.A2
 public struct A2: PrivateProto, PublicProto {}
 // CHECK: public struct A3 {
@@ -45,31 +45,31 @@ private protocol PrivateSubProto: PublicBaseProto {}
 // CHECK: public struct B1 {
 // CHECK-END: extension conformances.B1 : conformances.PublicBaseProto {}
 public struct B1: PrivateSubProto {}
-// CHECK: public struct B2 : PublicBaseProto {
+// CHECK: public struct B2 : conformances.PublicBaseProto {
 // NEGATIVE-NOT: extension conformances.B2
 public struct B2: PublicBaseProto, PrivateSubProto {}
 // CHECK: public struct B3 {
 // CHECK-END: extension conformances.B3 : conformances.PublicBaseProto {}
 public struct B3: PublicBaseProto & PrivateSubProto {}
-// CHECK: public struct B4 : PublicBaseProto {
+// CHECK: public struct B4 : conformances.PublicBaseProto {
 // NEGATIVE-NOT: extension B4 {
 // NEGATIVE-NOT: extension conformances.B4
 public struct B4: PublicBaseProto {}
 extension B4: PrivateSubProto {}
 // CHECK: public struct B5 {
-// CHECK: extension B5 : PublicBaseProto {
+// CHECK: extension B5 : conformances.PublicBaseProto {
 // NEGATIVE-NOT: extension conformances.B5
 public struct B5: PrivateSubProto {}
 extension B5: PublicBaseProto {}
 // CHECK: public struct B6 {
 // NEGATIVE-NOT: extension B6 {
-// CHECK: extension B6 : PublicBaseProto {
+// CHECK: extension B6 : conformances.PublicBaseProto {
 // NEGATIVE-NOT: extension conformances.B6
 public struct B6 {}
 extension B6: PrivateSubProto {}
 extension B6: PublicBaseProto {}
 // CHECK: public struct B7 {
-// CHECK: extension B7 : PublicBaseProto {
+// CHECK: extension B7 : conformances.PublicBaseProto {
 // NEGATIVE-NOT: extension B7 {
 // NEGATIVE-NOT: extension conformances.B7
 public struct B7 {}
@@ -115,10 +115,10 @@ extension C3: AnotherPrivateSubProto {}
 public protocol PublicSubProto: PublicBaseProto {}
 public protocol APublicSubProto: PublicBaseProto {}
 
-// CHECK: public struct D1 : PublicSubProto {
+// CHECK: public struct D1 : conformances.PublicSubProto {
 // NEGATIVE-NOT: extension conformances.D1
 public struct D1: PublicSubProto, PrivateSubProto {}
-// CHECK: public struct D2 : PublicSubProto {
+// CHECK: public struct D2 : conformances.PublicSubProto {
 // NEGATIVE-NOT: extension conformances.D2
 public struct D2: PrivateSubProto, PublicSubProto {}
 // CHECK: public struct D3 {
@@ -130,11 +130,11 @@ public struct D3: PrivateSubProto & PublicSubProto {}
 // CHECK-END: extension conformances.D4 : conformances.PublicBaseProto {}
 public struct D4: APublicSubProto & PrivateSubProto {}
 // CHECK: public struct D5 {
-// CHECK: extension D5 : PublicSubProto {
+// CHECK: extension D5 : conformances.PublicSubProto {
 // NEGATIVE-NOT: extension conformances.D5
 public struct D5: PrivateSubProto {}
 extension D5: PublicSubProto {}
-// CHECK: public struct D6 : PublicSubProto {
+// CHECK: public struct D6 : conformances.PublicSubProto {
 // NEGATIVE-NOT: extension D6 {
 // NEGATIVE-NOT: extension conformances.D6
 public struct D6: PublicSubProto {}
@@ -162,7 +162,7 @@ public class Base {}
 private protocol BaseConstrainedProto: Base, PublicProto {}
 
 public class H1: Base, ClassConstrainedProto {}
-// CHECK: public class H1 : Base {
+// CHECK: public class H1 : conformances.Base {
 // CHECK-END: extension conformances.H1 : conformances.PublicProto {}
 
 public struct MultiGeneric<T, U, V> {}
@@ -195,21 +195,21 @@ extension Bool: ExtraHashable {}
 @available(macOS, unavailable)
 public struct CoolTVType: PrivateSubProto {}
 // CHECK: public struct CoolTVType {
-// CHECK-END: @available(OSX, unavailable)
-// CHECK-END-NEXT: @available(iOS, unavailable)
+// CHECK-END: @available(iOS, unavailable)
+// CHECK-END-NEXT: @available(OSX, unavailable)
 // CHECK-END-NEXT: extension conformances.CoolTVType : conformances.PublicBaseProto {}
 
 @available(macOS 10.99, *)
 public struct VeryNewMacType: PrivateSubProto {}
 // CHECK: public struct VeryNewMacType {
-// CHECK-END: @available(OSX, introduced: 10.99)
+// CHECK-END: @available(OSX 10.99, *)
 // CHECK-END-NEXT: extension conformances.VeryNewMacType : conformances.PublicBaseProto {}
 
 public struct VeryNewMacProto {}
 @available(macOS 10.98, *)
 extension VeryNewMacProto: PrivateSubProto {}
 // CHECK: public struct VeryNewMacProto {
-// CHECK-END: @available(OSX, introduced: 10.98)
+// CHECK-END: @available(OSX 10.98, *)
 // CHECK-END-NEXT: extension conformances.VeryNewMacProto : conformances.PublicBaseProto {}
 
 public struct PrivateProtoConformer {}
@@ -218,7 +218,7 @@ extension PrivateProtoConformer : PrivateProto {
 }
 // CHECK: public struct PrivateProtoConformer {
 // CHECK: extension PrivateProtoConformer {
-// CHECK-NEXT: public var member: Int {
+// CHECK-NEXT: public var member: Swift.Int {
 // CHECK-NEXT:   get
 // CHECK-NEXT: }
 // CHECK-NEXT: {{^}$}}
@@ -226,6 +226,20 @@ extension PrivateProtoConformer : PrivateProto {
 
 // NEGATIVE-NOT: extension {{(Swift.)?}}Bool{{.+}}Hashable
 // NEGATIVE-NOT: extension {{(Swift.)?}}Bool{{.+}}Equatable
+
+
+@available(macOS 10.97, iOS 22, *)
+@available(tvOS, unavailable)
+@available(swift 4.2.123)
+public struct NestedAvailabilityOuter {
+  @available(iOS 23, *)
+  public struct Inner: PrivateSubProto {}
+}
+
+// CHECK-END: @available(swift 4.2.123)
+// CHECK-END-NEXT: @available(OSX 10.97, iOS 23, *)
+// CHECK-END-NEXT: @available(tvOS, unavailable)
+// CHECK-END-NEXT: extension conformances.NestedAvailabilityOuter.Inner : conformances.PublicBaseProto {}
 
 
 // CHECK-END: @usableFromInline

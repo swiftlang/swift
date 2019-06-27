@@ -78,8 +78,8 @@ namespace swift {
   class ParameterTypeFlags;
   class Pattern;
   struct PrintOptions;
-  struct PropertyDelegateBackingPropertyInfo;
-  struct PropertyDelegateTypeInfo;
+  struct PropertyWrapperBackingPropertyInfo;
+  struct PropertyWrapperTypeInfo;
   class ProtocolDecl;
   class ProtocolType;
   struct RawComment;
@@ -344,13 +344,7 @@ protected:
     IsUserAccessible : 1
   );
 
-  SWIFT_INLINE_BITFIELD(AbstractStorageDecl, ValueDecl, 1+1+1+1+2+1+1+1,
-    /// Whether the getter is mutating.
-    IsGetterMutating : 1,
-
-    /// Whether the setter is mutating.
-    IsSetterMutating : 1,
-
+  SWIFT_INLINE_BITFIELD(AbstractStorageDecl, ValueDecl, 1+1+2+1+1+1,
     /// Whether this represents physical storage.
     HasStorage : 1,
 
@@ -387,12 +381,11 @@ protected:
     /// It is up to the debugger to instruct SIL how to access this variable.
     IsDebuggerVar : 1,
 
-    /// Whether this is a property defined in the debugger's REPL.
-    /// FIXME: Remove this once LLDB has proper support for resilience.
-    IsREPLVar : 1,
+    /// Whether this is the backing storage for a lazy property.
+    IsLazyStorageProperty : 1,
 
-    /// Whether this is the backing storage for a property delegate.
-    IsPropertyDelegateBackingProperty : 1
+    /// Whether this is the backing storage for a property wrapper.
+    IsPropertyWrapperBackingProperty : 1
   );
 
   SWIFT_INLINE_BITFIELD(ParamDecl, VarDecl, 1 + NumDefaultArgumentKindBits,
@@ -450,8 +443,8 @@ protected:
     /// Whether we are statically dispatched even if overridable
     ForcedStaticDispatch : 1,
 
-    /// Whether this function has a dynamic Self return type.
-    HasDynamicSelf : 1,
+    /// Whether we've computed the 'self' access kind yet.
+    SelfAccessComputed : 1,
 
     /// Backing bits for 'self' access kind.
     SelfAccess : 2
@@ -553,7 +546,7 @@ protected:
     NumRequirementsInSignature : 16
   );
 
-  SWIFT_INLINE_BITFIELD(ClassDecl, NominalTypeDecl, 1+2+1+2+1+6+1+1+1,
+  SWIFT_INLINE_BITFIELD(ClassDecl, NominalTypeDecl, 1+2+1+2+1+6+1+1+1+1,
     /// Whether this class requires all of its instance variables to
     /// have in-class initializers.
     RequiresStoredPropertyInits : 1,
@@ -581,7 +574,11 @@ protected:
     AncestryComputed : 1,
 
     HasMissingDesignatedInitializers : 1,
-    HasMissingVTableEntries : 1
+    HasMissingVTableEntries : 1,
+
+    /// Whether instances of this class are incompatible
+    /// with weak and unowned references.
+    IsIncompatibleWithWeakReferences : 1
   );
 
   SWIFT_INLINE_BITFIELD(StructDecl, NominalTypeDecl, 1,
@@ -602,7 +599,7 @@ protected:
     HasAnyUnavailableValues : 1
   );
 
-  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1,
     /// If the module was or is being compiled with `-enable-testing`.
     TestingEnabled : 1,
 
@@ -617,14 +614,18 @@ protected:
     /// Whether all imports have been resolved. Used to detect circular imports.
     HasResolvedImports : 1,
 
-    // If the module was or is being compiled with `-enable-private-imports`.
+    /// If the module was or is being compiled with `-enable-private-imports`.
     PrivateImportsEnabled : 1,
 
-    // If the module is compiled with `-enable-implicit-dynamic`.
+    /// If the module is compiled with `-enable-implicit-dynamic`.
     ImplicitDynamicEnabled : 1,
 
-    // Whether the module is a system module.
-    IsSystemModule : 1
+    /// Whether the module is a system module.
+    IsSystemModule : 1,
+
+    /// Whether the module was imported from Clang (or, someday, maybe another
+    /// language).
+    IsNonSwiftModule : 1
   );
 
   SWIFT_INLINE_BITFIELD(PrecedenceGroupDecl, Decl, 1+2,
@@ -2693,7 +2694,20 @@ public:
   /// True if this is a C function that was imported as a member of a type in
   /// Swift.
   bool isImportAsMember() const;
-  
+
+  /// Returns true if the declaration's interface type is a function type with a
+  /// curried self parameter.
+  bool hasCurriedSelf() const;
+
+  /// Returns true if the declaration has a parameter list associated with it.
+  ///
+  /// Note that not all declarations with function interface types have
+  /// parameter lists, for example an enum element without associated values.
+  bool hasParameterList() const;
+
+  /// Returns the number of curry levels in the declaration's interface type.
+  unsigned getNumCurryLevels() const;
+
   /// Get the decl for this value's opaque result type, if it has one.
   OpaqueTypeDecl *getOpaqueResultTypeDecl() const;
 
@@ -2705,6 +2719,14 @@ public:
   /// `this` must be of a decl type that supports opaque return types, and
   /// must not have previously had an opaque result type set.
   void setOpaqueResultTypeDecl(OpaqueTypeDecl *D);
+
+  /// Retrieve the attribute associating this declaration with a
+  /// function builder, if there is one.
+  CustomAttr *getAttachedFunctionBuilder() const;
+
+  /// Retrieve the @functionBuilder type attached to this declaration,
+  /// if there is one.
+  Type getFunctionBuilderType() const;
 };
 
 /// This is a common base class for declarations which declare a type.
@@ -2824,6 +2846,11 @@ public:
                  GenericTypeParamType *UnderlyingInterfaceType);
   
   ValueDecl *getNamingDecl() const { return NamingDecl; }
+  
+  void setNamingDecl(ValueDecl *D) {
+    assert(!NamingDecl && "already have naming decl");
+    NamingDecl = D;
+  }
   
   GenericSignature *getOpaqueInterfaceGenericSignature() const {
     return OpaqueInterfaceGenericSignature;
@@ -3394,8 +3421,8 @@ public:
   /// Is this a key path type?
   Optional<KeyPathTypeKind> getKeyPathTypeKind() const;
 
-  /// Retrieve information about this type as a property delegate.
-  PropertyDelegateTypeInfo getPropertyDelegateTypeInfo() const;
+  /// Retrieve information about this type as a property wrapper.
+  PropertyWrapperTypeInfo getPropertyWrapperTypeInfo() const;
 
 private:
   /// Predicate used to filter StoredPropertyRange.
@@ -3858,6 +3885,17 @@ public:
 
   void setHasMissingVTableEntries(bool newValue = true) {
     Bits.ClassDecl.HasMissingVTableEntries = newValue;
+  }
+
+  /// Returns true if this class cannot be used with weak or unowned
+  /// references.
+  /// 
+  /// Note that this is true if this class or any of its ancestor classes
+  /// are marked incompatible.
+  bool isIncompatibleWithWeakReferences() const;
+
+  void setIsIncompatibleWithWeakReferences(bool newValue = true) {
+    Bits.ClassDecl.IsIncompatibleWithWeakReferences = newValue;
   }
 
   /// Find a method of a class that overrides a given method.
@@ -4346,6 +4384,10 @@ public:
 /// SubscriptDecl, representing potentially settable memory locations.
 class AbstractStorageDecl : public ValueDecl {
   friend class SetterAccessLevelRequest;
+  friend class IsGetterMutatingRequest;
+  friend class IsSetterMutatingRequest;
+  friend class OpaqueReadOwnershipRequest;
+
 public:
   static const size_t MaxNumAccessors = 255;
 private:
@@ -4413,6 +4455,15 @@ private:
     Bits.AbstractStorageDecl.SupportsMutation = implInfo.supportsMutation();
   }
 
+  struct {
+    unsigned IsGetterMutatingComputed : 1;
+    unsigned IsGetterMutating : 1;
+    unsigned IsSetterMutatingComputed : 1;
+    unsigned IsSetterMutating : 1;
+    unsigned OpaqueReadOwnershipComputed : 1;
+    unsigned OpaqueReadOwnership : 2;
+  } LazySemanticInfo = { };
+
 protected:
   AbstractStorageDecl(DeclKind Kind, bool IsStatic, DeclContext *DC,
                       DeclName Name, SourceLoc NameLoc,
@@ -4420,10 +4471,6 @@ protected:
     : ValueDecl(Kind, DC, Name, NameLoc) {
     Bits.AbstractStorageDecl.HasStorage = true;
     Bits.AbstractStorageDecl.SupportsMutation = supportsMutation;
-    Bits.AbstractStorageDecl.IsGetterMutating = false;
-    Bits.AbstractStorageDecl.IsSetterMutating = true;
-    Bits.AbstractStorageDecl.OpaqueReadOwnership =
-      unsigned(OpaqueReadOwnership::Owned);
     Bits.AbstractStorageDecl.IsStatic = IsStatic;
   }
 
@@ -4507,29 +4554,26 @@ public:
   }
 
   /// Return the ownership of values opaquely read from this storage.
-  OpaqueReadOwnership getOpaqueReadOwnership() const {
-    return OpaqueReadOwnership(Bits.AbstractStorageDecl.OpaqueReadOwnership);
-  }
+  OpaqueReadOwnership getOpaqueReadOwnership() const;
   void setOpaqueReadOwnership(OpaqueReadOwnership ownership) {
-    Bits.AbstractStorageDecl.OpaqueReadOwnership = unsigned(ownership);
+    LazySemanticInfo.OpaqueReadOwnership = unsigned(ownership);
+    LazySemanticInfo.OpaqueReadOwnershipComputed = true;
   }
 
   /// Return true if reading this storage requires the ability to
   /// modify the base value.
-  bool isGetterMutating() const {
-    return Bits.AbstractStorageDecl.IsGetterMutating;
-  }
+  bool isGetterMutating() const;
   void setIsGetterMutating(bool isMutating) {
-    Bits.AbstractStorageDecl.IsGetterMutating = isMutating;
+    LazySemanticInfo.IsGetterMutating = isMutating;
+    LazySemanticInfo.IsGetterMutatingComputed = true;
   }
   
   /// Return true if modifying this storage requires the ability to
   /// modify the base value.
-  bool isSetterMutating() const {
-    return Bits.AbstractStorageDecl.IsSetterMutating;
-  }
+  bool isSetterMutating() const;
   void setIsSetterMutating(bool isMutating) {
-    Bits.AbstractStorageDecl.IsSetterMutating = isMutating;
+    LazySemanticInfo.IsSetterMutating = isMutating;
+    LazySemanticInfo.IsSetterMutatingComputed = true;
   }
 
   AccessorDecl *getAccessor(AccessorKind kind) const {
@@ -4745,14 +4789,14 @@ public:
 };
 
 /// Describes which synthesized property for a property with an attached
-/// delegate is being referenced.
-enum class PropertyDelegateSynthesizedPropertyKind {
+/// wrapper is being referenced.
+enum class PropertyWrapperSynthesizedPropertyKind {
   /// The backing storage property, which is a stored property of the
-  /// delegate type.
+  /// wrapper type.
   Backing,
-  /// A storage delegate (e.g., `$foo`), which is a wrapper over the
-  /// delegate instance's `delegateValue` property.
-  StorageDelegate,
+  /// A storage wrapper (e.g., `$foo`), which is a wrapper over the
+  /// wrapper instance's `projectedValue` property.
+  StorageWrapper,
 };
 
 /// VarDecl - 'var' and 'let' declarations.
@@ -4783,9 +4827,9 @@ protected:
     Bits.VarDecl.Specifier = static_cast<unsigned>(Sp);
     Bits.VarDecl.IsCaptureList = IsCaptureList;
     Bits.VarDecl.IsDebuggerVar = false;
-    Bits.VarDecl.IsREPLVar = false;
+    Bits.VarDecl.IsLazyStorageProperty = false;
     Bits.VarDecl.HasNonPatternBindingInit = false;
-    Bits.VarDecl.IsPropertyDelegateBackingProperty = false;
+    Bits.VarDecl.IsPropertyWrapperBackingProperty = false;
   }
 
   /// This is the type specified, including location information.
@@ -5064,7 +5108,7 @@ public:
   /// exposed to clients.
   /// There's a very narrow case when we would: if the decl is an instance
   /// member with an initializer expression and the parent type is
-  /// @_fixed_layout and resides in a resilient module.
+  /// @frozen and resides in a resilient module.
   bool isInitExposedToClients() const;
   
   /// Is this a special debugger variable?
@@ -5072,72 +5116,93 @@ public:
   void setDebuggerVar(bool IsDebuggerVar) {
     Bits.VarDecl.IsDebuggerVar = IsDebuggerVar;
   }
-  
-  /// Is this a special debugger REPL variable?
-  /// FIXME: Remove this once LLDB has proper support for resilience.
-  bool isREPLVar() const { return Bits.VarDecl.IsREPLVar; }
-  void setREPLVar(bool IsREPLVar) {
-    Bits.VarDecl.IsREPLVar = IsREPLVar;
+
+  /// Is this the synthesized storage for a 'lazy' property?
+  bool isLazyStorageProperty() const {
+    return Bits.VarDecl.IsLazyStorageProperty;
+  }
+  void setLazyStorageProperty(bool IsLazyStorage) {
+    Bits.VarDecl.IsLazyStorageProperty = IsLazyStorage;
   }
 
-  /// Retrieve the custom attribute that attaches a property delegate to this
-  /// property.
-  CustomAttr *getAttachedPropertyDelegate() const;
+  /// Retrieve the custom attributes that attach property wrappers to this
+  /// property. The returned list contains all of the attached property wrapper attributes in source order,
+  /// which means the outermost wrapper attribute is provided first.
+  llvm::TinyPtrVector<CustomAttr *> getAttachedPropertyWrappers() const;
 
-  /// Retrieve the type of the attached property delegate as a contextual
+  /// Whether this property has any attached property wrappers.
+  bool hasAttachedPropertyWrapper() const;
+  
+  /// Whether all of the attached property wrappers have an init(initialValue:) initializer.
+  bool allAttachedPropertyWrappersHaveInitialValueInit() const;
+  
+  /// Retrieve the type of the attached property wrapper as a contextual
   /// type.
   ///
-  /// \returns a NULL type for properties without attached delegates,
-  /// an error type when the property delegate type itself is erroneous,
-  /// or the delegate type itself, which may involve unbound generic
+  /// \param index Which property wrapper type is being computed, where 0
+  /// indicates the first (outermost) attached property wrapper.
+  ///
+  /// \returns a NULL type for properties without attached wrappers,
+  /// an error type when the property wrapper type itself is erroneous,
+  /// or the wrapper type itself, which may involve unbound generic
   /// types.
-  Type getAttachedPropertyDelegateType() const;
+  Type getAttachedPropertyWrapperType(unsigned index) const;
 
-  /// Retrieve information about the attached property delegate type.
-  PropertyDelegateTypeInfo getAttachedPropertyDelegateTypeInfo() const;
+  /// Retrieve information about the attached property wrapper type.
+  ///
+  /// \param i Which attached property wrapper type is being queried, where 0 is the outermost (first)
+  /// attached property wrapper type.
+  PropertyWrapperTypeInfo getAttachedPropertyWrapperTypeInfo(unsigned i) const;
 
-  /// Retrieve the fully resolved attached property delegate type.
+  /// Retrieve the fully resolved attached property wrapper type.
   ///
   /// This type will be the fully-resolved form of
-  /// \c getAttachedPropertyDelegateType(), which will not contain any
+  /// \c getAttachedPropertyWrapperType(0), which will not contain any
   /// unbound generic types. It will be the type of the backing property.
-  Type getPropertyDelegateBackingPropertyType() const;
+  Type getPropertyWrapperBackingPropertyType() const;
 
   /// Retrieve information about the backing properties of the attached
-  /// property delegate.
-  PropertyDelegateBackingPropertyInfo
-      getPropertyDelegateBackingPropertyInfo() const;
+  /// property wrapper.
+  PropertyWrapperBackingPropertyInfo
+      getPropertyWrapperBackingPropertyInfo() const;
 
   /// Retrieve the backing storage property for a property that has an
-  /// attached property delegate.
+  /// attached property wrapper.
   ///
   /// The backing storage property will be a stored property of the
-  /// delegate's type. This will be equivalent to
-  /// \c getAttachedPropertyDelegateType() when it is fully-specified;
-  /// if \c getAttachedPropertyDelegateType() involves an unbound
+  /// wrapper's type. This will be equivalent to
+  /// \c getAttachedPropertyWrapperType(0) when it is fully-specified;
+  /// if \c getAttachedPropertyWrapperType(0) involves an unbound
   /// generic type, the backing storage property will be the appropriate
   /// bound generic version.
-  VarDecl *getPropertyDelegateBackingProperty() const;
+  VarDecl *getPropertyWrapperBackingProperty() const;
 
-  /// Whether this is a property with a property delegate that was initialized
+  /// Retrieve the backing storage property for a lazy property.
+  VarDecl *getLazyStorageProperty() const;
+
+  /// Whether this is a property with a property wrapper that was initialized
   /// via a value of the original type, e.g.,
   ///
   /// \code
   /// @Lazy var i = 17
   /// \end
-  bool isPropertyDelegateInitializedWithInitialValue() const;
+  bool isPropertyWrapperInitializedWithInitialValue() const;
+
+  /// Whether the memberwise initializer parameter for a property with a property wrapper type
+  /// uses the wrapped type.
+  bool isPropertyMemberwiseInitializedWithWrappedType() const;
 
   /// If this property is the backing storage for a property with an attached
-  /// property delegate, return the original property.
+  /// property wrapper, return the original property.
   ///
   /// \param kind If not \c None, only returns the original property when
   /// \c this property is the specified synthesized property.
-  VarDecl *getOriginalDelegatedProperty(
-      Optional<PropertyDelegateSynthesizedPropertyKind> kind = None) const;
+  VarDecl *getOriginalWrappedProperty(
+      Optional<PropertyWrapperSynthesizedPropertyKind> kind = None) const;
 
-  /// Set the property that delegates to this property as it's backing
+  /// Set the property that wraps to this property as it's backing
   /// property.
-  void setOriginalDelegatedProperty(VarDecl *originalProperty);
+  void setOriginalWrappedProperty(VarDecl *originalProperty);
 
   /// Return the Objective-C runtime name for this property.
   Identifier getObjCPropertyName() const;
@@ -5164,7 +5229,7 @@ public:
   /// initializer.
   ///
   /// \param preferDeclaredProperties When encountering a `lazy` property
-  /// or a property that has an attached property delegate, prefer the
+  /// or a property that has an attached property wrapper, prefer the
   /// actual declared property (which may or may not be considered "stored"
   /// as the moment) to the backing storage property. Otherwise, the stored
   /// backing property will be treated as the member-initialized property.
@@ -5319,7 +5384,7 @@ public:
     assert(isVariadic());
     return getVarargBaseTy(getInterfaceType());
   }
-  
+
   SourceRange getSourceRange() const;
 
   AnyFunctionType::Param toFunctionParam(Type type = Type()) const;
@@ -5738,6 +5803,11 @@ public:
     return Bits.AbstractFunctionDecl.NeedsNewVTableEntry;
   }
 
+  bool isEffectiveLinkageMoreVisibleThan(ValueDecl *other) const {
+    return (std::min(getEffectiveAccess(), AccessLevel::Public) >
+            std::min(other->getEffectiveAccess(), AccessLevel::Public));
+  }
+
   bool isSynthesized() const {
     return Bits.AbstractFunctionDecl.Synthesized;
   }
@@ -5850,8 +5920,13 @@ public:
   /// True if the declaration is forced to be statically dispatched.
   bool hasForcedStaticDispatch() const;
 
-  /// Get the interface type of this decl and remove the Self context.
+  /// Get the type of this declaration without the Self clause.
+  /// Asserts if not in type context.
   Type getMethodInterfaceType() const;
+
+  /// Tests if this is a function returning a DynamicSelfType, or a
+  /// constructor.
+  bool hasDynamicSelfResult() const;
 
   using DeclContext::operator new;
   using Decl::getASTContext;
@@ -5871,6 +5946,7 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SelfAccessKind SAK);
 /// FuncDecl - 'func' declaration.
 class FuncDecl : public AbstractFunctionDecl {
   friend class AbstractFunctionDecl;
+  friend class SelfAccessKindRequest;
 
   SourceLoc StaticLoc;  // Location of the 'static' token or invalid.
   SourceLoc FuncLoc;    // Location of the 'func' token.
@@ -5899,9 +5975,10 @@ protected:
       StaticLoc.isValid() || StaticSpelling != StaticSpellingKind::None;
     Bits.FuncDecl.StaticSpelling = static_cast<unsigned>(StaticSpelling);
 
-    Bits.FuncDecl.HasDynamicSelf = false;
     Bits.FuncDecl.ForcedStaticDispatch = false;
-    Bits.FuncDecl.SelfAccess = static_cast<unsigned>(SelfAccessKind::NonMutating);
+    Bits.FuncDecl.SelfAccess =
+      static_cast<unsigned>(SelfAccessKind::NonMutating);
+    Bits.FuncDecl.SelfAccessComputed = false;
   }
 
 private:
@@ -5913,6 +5990,13 @@ private:
                               GenericParamList *GenericParams,
                               DeclContext *Parent,
                               ClangNode ClangN);
+
+  Optional<SelfAccessKind> getCachedSelfAccessKind() const {
+    if (Bits.FuncDecl.SelfAccessComputed)
+      return static_cast<SelfAccessKind>(Bits.FuncDecl.SelfAccess);
+
+    return None;
+  }
 
 public:
   /// Factory function only for use by deserialization.
@@ -5948,7 +6032,7 @@ public:
   void setStatic(bool IsStatic = true) {
     Bits.FuncDecl.IsStatic = IsStatic;
   }
-      
+
   bool isMutating() const {
     return getSelfAccessKind() == SelfAccessKind::Mutating;
   }
@@ -5960,11 +6044,11 @@ public:
   }
   bool isCallAsFunctionMethod() const;
 
-  SelfAccessKind getSelfAccessKind() const {
-    return static_cast<SelfAccessKind>(Bits.FuncDecl.SelfAccess);
-  }
+  SelfAccessKind getSelfAccessKind() const;
+
   void setSelfAccessKind(SelfAccessKind mod) {
     Bits.FuncDecl.SelfAccess = static_cast<unsigned>(mod);
+    Bits.FuncDecl.SelfAccessComputed = true;
   }
 
   SourceLoc getStaticLoc() const { return StaticLoc; }
@@ -6004,15 +6088,6 @@ public:
   /// This also allows the binary-operator-ness of a func decl to be determined
   /// prior to type checking.
   bool isBinaryOperator() const;
-  
-  /// Determine whether this function has a dynamic \c Self return
-  /// type.
-  bool hasDynamicSelf() const { return Bits.FuncDecl.HasDynamicSelf; }
-
-  /// Set whether this function has a dynamic \c Self return or not.
-  void setDynamicSelf(bool hasDynamicSelf) { 
-    Bits.FuncDecl.HasDynamicSelf = hasDynamicSelf;
-  }
 
   void getLocalCaptures(SmallVectorImpl<CapturedValue> &Result) const {
     return getCaptureInfo().getLocalCaptures(Result);
@@ -6065,8 +6140,8 @@ public:
   /// True if the function is a defer body.
   bool isDeferBody() const;
 
-  /// Perform basic checking to determine whether the @IBAction attribute can
-  /// be applied to this function.
+  /// Perform basic checking to determine whether the @IBAction or
+  /// @IBSegueAction attribute can be applied to this function.
   bool isPotentialIBActionTarget() const;
 };
 
@@ -7141,13 +7216,35 @@ inline bool ValueDecl::isImportAsMember() const {
   return false;
 }
 
+inline bool ValueDecl::hasCurriedSelf() const {
+  if (auto *afd = dyn_cast<AbstractFunctionDecl>(this))
+    return afd->hasImplicitSelfDecl();
+  if (isa<EnumElementDecl>(this))
+    return true;
+  return false;
+}
+
+inline bool ValueDecl::hasParameterList() const {
+  if (auto *eed = dyn_cast<EnumElementDecl>(this))
+    return eed->hasAssociatedValues();
+  return isa<AbstractFunctionDecl>(this) || isa<SubscriptDecl>(this);
+}
+
+inline unsigned ValueDecl::getNumCurryLevels() const {
+  unsigned curryLevels = 0;
+  if (hasParameterList())
+    curryLevels++;
+  if (hasCurriedSelf())
+    curryLevels++;
+  return curryLevels;
+}
+
 inline bool Decl::isPotentiallyOverridable() const {
   if (isa<VarDecl>(this) ||
       isa<SubscriptDecl>(this) ||
       isa<FuncDecl>(this) ||
       isa<DestructorDecl>(this)) {
-    return getDeclContext()->getSelfClassDecl() ||
-           isa<ProtocolDecl>(getDeclContext());
+    return getDeclContext()->getSelfClassDecl();
   } else {
     return false;
   }
@@ -7206,7 +7303,7 @@ inline EnumElementDecl *EnumDecl::getUniqueElement(bool hasValue) const {
 }
 
 /// Retrieve parameter declaration from the given source at given index.
-const ParamDecl *getParameterAt(ValueDecl *source, unsigned index);
+const ParamDecl *getParameterAt(const ValueDecl *source, unsigned index);
 
 /// Display Decl subclasses.
 void simple_display(llvm::raw_ostream &out, const Decl *decl);

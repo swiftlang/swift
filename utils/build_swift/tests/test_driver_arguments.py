@@ -8,6 +8,7 @@
 
 
 import os
+import platform
 import sys
 import unittest
 from contextlib import contextmanager
@@ -344,7 +345,10 @@ class TestDriverArgumentParserMeta(type):
     def generate_preset_test(cls, preset_name, preset_args):
         def test(self):
             try:
-                self.parse_default_args(preset_args, check_impl_args=True)
+                # Windows cannot run build-script-impl to check the impl args.
+                is_windows = platform.system() == 'Windows'
+                self.parse_default_args(preset_args,
+                                        check_impl_args=not is_windows)
             except ParserError as e:
                 self.fail('failed to parse preset "{}": {}'.format(
                     preset_name, e))
@@ -640,10 +644,10 @@ class TestDriverArgumentParser(unittest.TestCase):
             namespace = self.parse_default_args(['--test-optimize-for-size'])
             self.assertTrue(namespace.test)
 
-    def test_implied_defaults_test_optimize_none_implicit_dynamic(self):
+    def test_implied_defaults_test_optimize_none_with_implicit_dynamic(self):
         with self.assertNotRaises(ParserError):
             namespace = self.parse_default_args(
-                ['--test-optimize-none-implicit-dynamic'])
+                ['--test-optimize-none-with-implicit-dynamic'])
             self.assertTrue(namespace.test)
 
     def test_implied_defaults_skip_all_tests(self):

@@ -1,11 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: if [ %target-runtime == "objc" ]; \
-// RUN: then \
-// RUN:   %target-clang -fobjc-arc %S/Inputs/NSSlowString/NSSlowString.m -c -o %t/NSSlowString.o && \
-// RUN:   %target-build-swift -I %S/Inputs/NSSlowString/ %t/NSSlowString.o %s -o %t/String; \
-// RUN: else \
-// RUN:   %target-build-swift %s -o %t/String; \
-// RUN: fi
+// RUN: %target-clang -fobjc-arc %S/Inputs/NSSlowString/NSSlowString.m -c -o %t/NSSlowString.o
+// RUN: %target-build-swift -I %S/Inputs/NSSlowString/ %t/NSSlowString.o %s -o %t/String
 
 // RUN: %target-codesign %t/String
 // RUN: %target-run %t/String

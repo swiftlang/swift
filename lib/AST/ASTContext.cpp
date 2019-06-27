@@ -31,7 +31,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
-#include "swift/AST/PropertyDelegates.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/RawComment.h"
 #include "swift/AST/SubstitutionMap.h"
@@ -183,9 +183,6 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
 #define FUNC_DECL(Name, Id) FuncDecl *Get##Name = nullptr;
 #include "swift/AST/KnownDecls.def"
   
-  /// Swift.Bool.init(_builtinBooleanLiteral:)
-  ConstructorDecl *BoolBuiltinInitDecl = nullptr;
-  
   /// func ==(Int, Int) -> Bool
   FuncDecl *EqualIntDecl = nullptr;
 
@@ -271,11 +268,15 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
       DefaultTypeRequestCaches;
 
   /// Mapping from property declarations to the backing variable types.
-  llvm::DenseMap<const VarDecl *, Type> PropertyDelegateBackingVarTypes;
+  llvm::DenseMap<const VarDecl *, Type> PropertyWrapperBackingVarTypes;
 
-  /// A mapping from the backing storage of a property that has a delegate
-  /// to the original property with the delegate.
-  llvm::DenseMap<const VarDecl *, VarDecl *> OriginalDelegatedProperties;
+  /// A mapping from the backing storage of a property that has a wrapper
+  /// to the original property with the wrapper.
+  llvm::DenseMap<const VarDecl *, VarDecl *> OriginalWrappedProperties;
+
+  /// The builtin initializer witness for a literal. Used when building
+  /// LiteralExprs in fully-checked AST.
+  llvm::DenseMap<const NominalTypeDecl *, ConcreteDeclRef> BuiltinInitWitness;
 
   /// Structure that captures data that is segregated into different
   /// arenas.
@@ -963,27 +964,80 @@ lookupOperatorFunc(const ASTContext &ctx, StringRef oper, Type contextType,
   return nullptr;
 }
 
-ConstructorDecl *ASTContext::getBoolBuiltinInitDecl() const {
-  if (getImpl().BoolBuiltinInitDecl)
-    return getImpl().BoolBuiltinInitDecl;
-
-  if (!getBoolDecl())
-    return nullptr;
-
-  DeclName initName(*const_cast<ASTContext *>(this),
-                    DeclBaseName::createConstructor(),
+ConcreteDeclRef ASTContext::getBoolBuiltinInitDecl() const {
+  auto fn = [&](ASTContext &ctx) {
+    return DeclName(ctx, DeclBaseName::createConstructor(),
                     { Id_builtinBooleanLiteral });
-  auto members = getBoolDecl()->lookupDirect(initName);
+  };
+  auto builtinProtocolKind =
+    KnownProtocolKind::ExpressibleByBuiltinBooleanLiteral;
+  return getBuiltinInitDecl(getBoolDecl(), builtinProtocolKind, fn);
+}
 
-  if (members.size() != 1)
-    return nullptr;
+ConcreteDeclRef
+ASTContext::getIntBuiltinInitDecl(NominalTypeDecl *intDecl) const {
+  auto fn = [&](ASTContext &ctx) {
+    return DeclName(ctx, DeclBaseName::createConstructor(),
+                    { Id_builtinIntegerLiteral });
+  };
+  auto builtinProtocolKind =
+    KnownProtocolKind::ExpressibleByBuiltinIntegerLiteral;
+  return getBuiltinInitDecl(intDecl, builtinProtocolKind, fn);
+}
 
-  if (auto init = dyn_cast<ConstructorDecl>(members[0])) {
-    getImpl().BoolBuiltinInitDecl = init;
-    return init;
+ConcreteDeclRef
+ASTContext::getFloatBuiltinInitDecl(NominalTypeDecl *floatDecl) const {
+  auto fn = [&](ASTContext &ctx) {
+    return DeclName(ctx, DeclBaseName::createConstructor(),
+                    { Id_builtinFloatLiteral });
+  };
+
+  auto builtinProtocolKind =
+    KnownProtocolKind::ExpressibleByBuiltinFloatLiteral;
+  return getBuiltinInitDecl(floatDecl, builtinProtocolKind, fn);
+}
+
+ConcreteDeclRef
+ASTContext::getStringBuiltinInitDecl(NominalTypeDecl *stringDecl) const {
+  auto fn = [&](ASTContext &ctx) {
+    return DeclName(ctx, DeclBaseName::createConstructor(),
+                    { Id_builtinStringLiteral,
+                      getIdentifier("utf8CodeUnitCount"),
+                      getIdentifier("isASCII") });
+  };
+
+  auto builtinProtocolKind =
+    KnownProtocolKind::ExpressibleByBuiltinStringLiteral;
+  return getBuiltinInitDecl(stringDecl, builtinProtocolKind, fn);
+}
+
+ConcreteDeclRef
+ASTContext::getBuiltinInitDecl(NominalTypeDecl *decl,
+                               KnownProtocolKind builtinProtocolKind,
+               llvm::function_ref<DeclName (ASTContext &ctx)> initName) const {
+  auto &witness = getImpl().BuiltinInitWitness[decl];
+  if (witness)
+    return witness;
+
+  auto type = decl->getDeclaredType();
+  auto builtinProtocol = getProtocol(builtinProtocolKind);
+  auto builtinConformance = getStdlibModule()->lookupConformance(
+      type, builtinProtocol);
+  if (!builtinConformance) {
+    assert(false && "Missing required conformance");
+    witness = ConcreteDeclRef();
+    return witness;
   }
 
-  return nullptr;
+  auto *ctx = const_cast<ASTContext *>(this);
+  witness = builtinConformance->getWitnessByName(type, initName(*ctx));
+  if (!witness) {
+    assert(false && "Missing required witness");
+    witness = ConcreteDeclRef();
+    return witness;
+  }
+
+  return witness;
 }
 
 FuncDecl *ASTContext::getEqualIntDecl() const {
@@ -1308,20 +1362,10 @@ bool ASTContext::hasArrayLiteralIntrinsics() const {
     && getDeallocateUninitializedArray();
 }
 
-void ASTContext::addExternalDecl(Decl *decl) {
-  ExternalDefinitions.insert(decl);
-}
-
 void ASTContext::addSynthesizedDecl(Decl *decl) {
-  auto *mod = cast<FileUnit>(decl->getDeclContext()->getModuleScopeContext());
-  if (mod->getKind() == FileUnitKind::ClangModule ||
-      mod->getKind() == FileUnitKind::DWARFModule ||
-      mod->getKind() == FileUnitKind::SerializedAST) {
-    ExternalDefinitions.insert(decl);
-    return;
-  }
-
-  cast<SourceFile>(mod)->SynthesizedDecls.push_back(decl);
+  auto *fileUnit = decl->getDeclContext()->getModuleScopeContext();
+  if (auto *sf = dyn_cast<SourceFile>(fileUnit))
+    sf->SynthesizedDecls.push_back(decl);
 }
 
 void ASTContext::addCleanup(std::function<void(void)> cleanup) {
@@ -1996,7 +2040,6 @@ ASTContext::takeDelayedConformanceDiags(NormalProtocolConformance *conformance){
 size_t ASTContext::getTotalMemory() const {
   size_t Size = sizeof(*this) +
     // LoadedModules ?
-    // ExternalDefinitions ?
     llvm::capacity_in_bytes(CanonicalGenericTypeParamTypeNames) +
     // RemappedTypes ?
     sizeof(getImpl()) +
@@ -2369,10 +2412,16 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
     isStatic = FD->isStatic();
     selfAccess = FD->getSelfAccessKind();
 
+    // `self`s type for subscripts and properties
+    if (auto *AD = dyn_cast<AccessorDecl>(AFD)) {
+      if (wantDynamicSelf && AD->getStorage()
+          ->getValueInterfaceType()->hasDynamicSelfType())
+        isDynamicSelf = true;
+    }
     // Methods returning 'Self' have a dynamic 'self'.
     //
     // FIXME: All methods of non-final classes should have this.
-    if (wantDynamicSelf && FD->hasDynamicSelf())
+    else if (wantDynamicSelf && FD->hasDynamicSelfResult())
       isDynamicSelf = true;
   } else if (auto *CD = dyn_cast<ConstructorDecl>(AFD)) {
     if (isInitializingCtor) {
@@ -4146,6 +4195,10 @@ bool ASTContext::isTypeBridgedInExternalModule(
           nominal == getFloatDecl() ||
           nominal == getDoubleDecl() ||
           nominal == getArrayDecl() ||
+          nominal == getCollectionDifferenceDecl() ||
+          (nominal->getDeclContext()->getAsDecl() ==
+            getCollectionDifferenceDecl() &&
+            nominal->getBaseName() == Id_Change) ||
           nominal == getDictionaryDecl() ||
           nominal == getSetDecl() ||
           nominal == getStringDecl() ||
@@ -4396,42 +4449,43 @@ Type &ASTContext::getDefaultTypeRequestCache(SourceFile *SF,
   return getImpl().DefaultTypeRequestCaches[SF][size_t(kind)];
 }
 
-Type ASTContext::getSideCachedPropertyDelegateBackingPropertyType(
+Type ASTContext::getSideCachedPropertyWrapperBackingPropertyType(
     VarDecl *var) const {
-  return getImpl().PropertyDelegateBackingVarTypes[var];
+  return getImpl().PropertyWrapperBackingVarTypes[var];
 }
 
-void ASTContext::setSideCachedPropertyDelegateBackingPropertyType(
+void ASTContext::setSideCachedPropertyWrapperBackingPropertyType(
     VarDecl *var, Type type) {
-  assert(!getImpl().PropertyDelegateBackingVarTypes[var] ||
-         getImpl().PropertyDelegateBackingVarTypes[var]->isEqual(type));
-  getImpl().PropertyDelegateBackingVarTypes[var] = type;
+  assert(!getImpl().PropertyWrapperBackingVarTypes[var] ||
+         getImpl().PropertyWrapperBackingVarTypes[var]->isEqual(type));
+  getImpl().PropertyWrapperBackingVarTypes[var] = type;
 }
 
-VarDecl *VarDecl::getOriginalDelegatedProperty(
-    Optional<PropertyDelegateSynthesizedPropertyKind> kind) const {
-  if (!Bits.VarDecl.IsPropertyDelegateBackingProperty)
+VarDecl *VarDecl::getOriginalWrappedProperty(
+    Optional<PropertyWrapperSynthesizedPropertyKind> kind) const {
+  if (!Bits.VarDecl.IsPropertyWrapperBackingProperty)
     return nullptr;
 
   ASTContext &ctx = getASTContext();
-  assert(ctx.getImpl().OriginalDelegatedProperties.count(this) > 0);
-  auto original = ctx.getImpl().OriginalDelegatedProperties[this];
+  assert(ctx.getImpl().OriginalWrappedProperties.count(this) > 0);
+  auto original = ctx.getImpl().OriginalWrappedProperties[this];
   if (!kind)
     return original;
 
-  auto delegateInfo = original->getPropertyDelegateBackingPropertyInfo();
+  auto wrapperInfo = original->getPropertyWrapperBackingPropertyInfo();
   switch (*kind) {
-  case PropertyDelegateSynthesizedPropertyKind::Backing:
-    return this == delegateInfo.backingVar ? original : nullptr;
+  case PropertyWrapperSynthesizedPropertyKind::Backing:
+    return this == wrapperInfo.backingVar ? original : nullptr;
 
-  case PropertyDelegateSynthesizedPropertyKind::StorageDelegate:
-    return this == delegateInfo.storageDelegateVar ? original : nullptr;
+  case PropertyWrapperSynthesizedPropertyKind::StorageWrapper:
+    return this == wrapperInfo.storageWrapperVar ? original : nullptr;
   }
+  llvm_unreachable("covered switch");
 }
 
-void VarDecl::setOriginalDelegatedProperty(VarDecl *originalProperty) {
-  Bits.VarDecl.IsPropertyDelegateBackingProperty = true;
+void VarDecl::setOriginalWrappedProperty(VarDecl *originalProperty) {
+  Bits.VarDecl.IsPropertyWrapperBackingProperty = true;
   ASTContext &ctx = getASTContext();
-  assert(ctx.getImpl().OriginalDelegatedProperties.count(this) == 0);
-  ctx.getImpl().OriginalDelegatedProperties[this] = originalProperty;
+  assert(ctx.getImpl().OriginalWrappedProperties.count(this) == 0);
+  ctx.getImpl().OriginalWrappedProperties[this] = originalProperty;
 }

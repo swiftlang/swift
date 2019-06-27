@@ -264,7 +264,7 @@ static llvm::cl::list<std::string>
 SwiftVersion("swift-version", llvm::cl::desc("Swift version"),
              llvm::cl::cat(Category));
 
-static llvm::cl::opt<std::string>
+static llvm::cl::list<std::string>
 ModuleCachePath("module-cache-path", llvm::cl::desc("Clang module cache path"),
                 llvm::cl::cat(Category));
 
@@ -2334,8 +2334,8 @@ public:
 
     swift::markup::MarkupContext MC;
     auto DC = getSingleDocComment(MC, D);
-    if (DC.hasValue())
-      swift::markup::dump(DC.getValue()->getDocument(), OS);
+    if (DC)
+      swift::markup::dump(DC->getDocument(), OS);
 
     return true;
   }
@@ -2971,12 +2971,11 @@ namespace {
     bool indexLocals() override { return shouldIndexLocals; }
     void failed(StringRef error) override {}
 
-    bool recordHash(StringRef hash, bool isKnown) override { return true; }
     bool startDependency(StringRef name, StringRef path, bool isClangModule,
-                         bool isSystem, StringRef hash) override {
+                         bool isSystem) override {
       OS << (isClangModule ? "clang-module" : "module") << " | ";
       OS << (isSystem ? "system" : "user") << " | ";
-      OS << name << " | " << path << "-" << hash << "\n";
+      OS << name << " | " << path << "\n";
       return true;
     }
     bool finishDependency(bool isClangModule) override {
@@ -3041,7 +3040,7 @@ static int doPrintIndexedSymbols(const CompilerInvocation &InitInvok,
   llvm::outs() << llvm::sys::path::filename(SF->getFilename()) << '\n';
   llvm::outs() << "------------\n";
   PrintIndexDataConsumer consumer(llvm::outs(), indexLocals);
-  indexSourceFile(SF, StringRef(), consumer);
+  indexSourceFile(SF, consumer);
 
   return 0;
 }
@@ -3073,7 +3072,7 @@ static int doPrintIndexedSymbolsFromModule(const CompilerInvocation &InitInvok,
   }
 
   PrintIndexDataConsumer consumer(llvm::outs());
-  indexModule(M, StringRef(), consumer);
+  indexModule(M, consumer);
 
   return 0;
 }
@@ -3267,8 +3266,11 @@ int main(int argc, char *argv[]) {
         InitInvok.getLangOptions().EffectiveLanguageVersion = actual.getValue();
     }
   }
-  InitInvok.getClangImporterOptions().ModuleCachePath =
-    options::ModuleCachePath;
+  if (!options::ModuleCachePath.empty()) {
+    // Honor the *last* -module-cache-path specified.
+    InitInvok.getClangImporterOptions().ModuleCachePath =
+        options::ModuleCachePath[options::ModuleCachePath.size()-1];
+  }
   InitInvok.getClangImporterOptions().PrecompiledHeaderOutputDir =
     options::PCHOutputDir;
   InitInvok.setImportSearchPaths(options::ImportPaths);

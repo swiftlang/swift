@@ -841,7 +841,7 @@ OperandOwnershipKindClassifier::visitAssignInst(AssignInst *i) {
 }
 
 OperandOwnershipKindMap
-OperandOwnershipKindClassifier::visitAssignByDelegateInst(AssignByDelegateInst *i) {
+OperandOwnershipKindClassifier::visitAssignByWrapperInst(AssignByWrapperInst *i) {
   if (getValue() != i->getSrc()) {
     return Map::allLive();
   }

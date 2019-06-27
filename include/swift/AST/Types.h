@@ -336,16 +336,16 @@ protected:
     NumProtocols : 16
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(TypeVariableType, TypeBase, 64-NumTypeBaseBits,
+  SWIFT_INLINE_BITFIELD_FULL(TypeVariableType, TypeBase, 20+4+20,
     /// The unique number assigned to this type variable.
-    ID : 32 - NumTypeBaseBits,
+    ID : 20,
 
     /// Type variable options.
     Options : 4,
 
     ///  Index into the list of type variables, as used by the
     ///  constraint graph.
-    GraphIndex : 28
+    GraphIndex : 20
   );
 
   SWIFT_INLINE_BITFIELD(SILFunctionType, TypeBase, NumSILExtInfoBits+3+1+2,
@@ -1070,6 +1070,13 @@ public:
   void print(raw_ostream &OS,
              const PrintOptions &PO = PrintOptions()) const;
   void print(ASTPrinter &Printer, const PrintOptions &PO) const;
+
+  /// Can this type be written in source at all?
+  ///
+  /// If not, it shouldn't be shown in fix-its, for instance. The primary
+  /// example is opaque result types, which are written `some P` at the point
+  /// of definition but cannot be uttered anywhere else.
+  bool hasTypeRepr() const;
 
   /// Does this type have grammatically simple syntax?
   bool hasSimpleTypeRepr() const;
@@ -3113,12 +3120,32 @@ BEGIN_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
   }
 END_CAN_TYPE_WRAPPER(FunctionType, AnyFunctionType)
 
-/// Map the given parameter list onto a bitvector describing whether
-/// the argument type at each index has a default argument associated with
-/// it.
-SmallBitVector
-computeDefaultMap(ArrayRef<AnyFunctionType::Param> params,
-                  const ValueDecl *paramOwner, bool skipCurriedSelf);
+/// Provides information about the parameter list of a given declaration, including whether each parameter
+/// has a default argument.
+struct ParameterListInfo {
+  SmallBitVector defaultArguments;
+  std::vector<Type> functionBuilderTypes;
+
+public:
+  ParameterListInfo() { }
+
+  ParameterListInfo(ArrayRef<AnyFunctionType::Param> params,
+                    const ValueDecl *paramOwner, bool skipCurriedSelf);
+
+  /// Whether the parameter at the given index has a default argument.
+  bool hasDefaultArgument(unsigned paramIdx) const;
+
+  /// Retrieve the number of non-defaulted parameters.
+  unsigned numNonDefaultedParameters() const {
+    return defaultArguments.count();
+  }
+
+  /// Retrieve the number of parameters for which we have information.
+  unsigned size() const { return defaultArguments.size(); }
+
+  /// Retrieve the function builder type for the given parameter.
+  Type getFunctionBuilderType(unsigned paramIdx) const;
+};
 
 /// Turn a param list into a symbolic and printable representation that does not
 /// include the types, something like (: , b:, c:)
@@ -3172,6 +3199,7 @@ public:
   /// Substitute the given generic arguments into this generic
   /// function type and return the resulting non-generic type.
   FunctionType *substGenericArgs(SubstitutionMap subs);
+  FunctionType *substGenericArgs(llvm::function_ref<Type(Type)> substFn) const;
 
   void Profile(llvm::FoldingSetNodeID &ID) {
     Profile(ID, getGenericSignature(), getParams(), getResult(),
@@ -5203,8 +5231,11 @@ TypeVariableType : public TypeBase {
   TypeVariableType(const ASTContext &C, unsigned ID)
     : TypeBase(TypeKind::TypeVariable, &C,
                RecursiveTypeProperties::HasTypeVariable) {
-    // Note: the ID may overflow, but its only used for printing.
+    // Note: the ID may overflow (current limit is 2^20 - 1).
     Bits.TypeVariableType.ID = ID;
+    if (Bits.TypeVariableType.ID != ID) {
+      llvm::report_fatal_error("Type variable id overflow");
+    }
   }
 
   class Implementation;
@@ -5240,8 +5271,10 @@ public:
     return reinterpret_cast<Implementation *>(this + 1);
   }
 
-  /// Type variable IDs are not globally unique and are only meant as a visual
-  /// aid when dumping AST.
+  /// Type variable IDs are not globally unique and are
+  /// used in equivalence class merging (so representative
+  /// is always a type variable with smaller id), as well
+  /// as a visual aid when dumping AST.
   unsigned getID() const { return Bits.TypeVariableType.ID; }
 
   // Implement isa/cast/dyncast/etc.
@@ -5578,6 +5611,7 @@ inline bool TypeBase::hasSimpleTypeRepr() const {
   case TypeKind::NestedArchetype:
     return cast<NestedArchetypeType>(this)->getParent()->hasSimpleTypeRepr();
       
+  case TypeKind::OpaqueTypeArchetype:
   case TypeKind::OpenedArchetype:
     return false;
 

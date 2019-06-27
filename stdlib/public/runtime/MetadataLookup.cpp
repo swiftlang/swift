@@ -1028,6 +1028,35 @@ Optional<const ProtocolRequirement *> findAssociatedTypeByName(
   swift_runtime_unreachable("associated type names don't line up");
 }
 
+namespace {
+  static Lazy<Mutex> DynamicReplacementLock;
+}
+
+namespace {
+struct OpaqueTypeMappings {
+  llvm::DenseMap<const OpaqueTypeDescriptor *, const OpaqueTypeDescriptor *>
+      descriptorMapping;
+  const OpaqueTypeDescriptor* find(const OpaqueTypeDescriptor *orig) {
+    const OpaqueTypeDescriptor *replacement = nullptr;
+    DynamicReplacementLock.get().withLock([&] {
+      auto entry = descriptorMapping.find(orig);
+      if (entry != descriptorMapping.end())
+        replacement = entry->second;
+    });
+    return replacement;
+  }
+
+  // We take a mutex argument to make sure someone is holding the lock.
+  void insert(const OpaqueTypeDescriptor *orig,
+              const OpaqueTypeDescriptor *replacement, const Mutex &) {
+    descriptorMapping[orig] = replacement;
+  }
+};
+} // end unnamed namespace
+
+static Lazy<OpaqueTypeMappings> opaqueTypeMappings;
+
+
 static const OpaqueTypeDescriptor *
 _findOpaqueTypeDescriptor(NodePointer demangleNode,
                           Demangler &dem) {
@@ -1035,7 +1064,11 @@ _findOpaqueTypeDescriptor(NodePointer demangleNode,
   if (demangleNode->getKind()
         == Node::Kind::OpaqueTypeDescriptorSymbolicReference) {
     auto context = (const ContextDescriptor *)demangleNode->getIndex();
-    return cast<OpaqueTypeDescriptor>(context);
+    auto *orig = cast<OpaqueTypeDescriptor>(context);
+    if (auto *entry = opaqueTypeMappings.get().find(orig)) {
+      return entry;
+    }
+    return orig;
   }
   
   // TODO: Find non-symbolic-referenced opaque decls.
@@ -1073,19 +1106,24 @@ public:
   Demangle::NodeFactory &getNodeFactory() { return demangler; }
 
   BuiltType resolveOpaqueType(NodePointer opaqueDecl,
-                              ArrayRef<BuiltType> genericArgs,
+                              ArrayRef<ArrayRef<BuiltType>> genericArgs,
                               unsigned ordinal) {
     auto descriptor = _findOpaqueTypeDescriptor(opaqueDecl, demangler);
     if (!descriptor)
       return BuiltType();
     auto outerContext = descriptor->Parent.get();
     
+    SmallVector<BuiltType, 8> allGenericArgs;
+    for (auto argSet : genericArgs) {
+      allGenericArgs.append(argSet.begin(), argSet.end());
+    }
+    
     // Gather the generic parameters we need to parameterize the opaque decl.
     SmallVector<unsigned, 8> genericParamCounts;
     SmallVector<const void *, 8> allGenericArgsVec;
     
     if (!_gatherGenericParameters(outerContext,
-                                  genericArgs,
+                                  allGenericArgs,
                                   BuiltType(), /* no parent */
                                   genericParamCounts, allGenericArgsVec,
                                   demangler))
@@ -1644,12 +1682,13 @@ buildDescriptorPath(const ContextDescriptor *context) const {
       hasNonKeyGenericParams = true;
   }
 
-  // Form the path element.
-  descriptorPath.push_back(PathElement{localGenericParams,
-                                       context->getNumGenericParams(),
-                                       numKeyGenericParamsInParent,
-                                       numKeyGenericParamsHere,
-                                       hasNonKeyGenericParams});
+  // Form the path element if there are any generic parameters to be found.
+  if (numKeyGenericParamsHere != 0)
+    descriptorPath.push_back(PathElement{localGenericParams,
+                                         context->getNumGenericParams(),
+                                         numKeyGenericParamsInParent,
+                                         numKeyGenericParamsHere,
+                                         hasNonKeyGenericParams});
   return numKeyGenericParamsInParent + numKeyGenericParamsHere;
 }
 
@@ -1976,6 +2015,7 @@ void DynamicReplacementDescriptor::disableReplacement() const {
 }
 
 /// An automatic dymamic replacement entry.
+namespace {
 class AutomaticDynamicReplacementEntry {
   RelativeDirectPointer<DynamicReplacementScope, false> replacementScope;
   uint32_t flags;
@@ -2010,18 +2050,105 @@ public:
     for (auto &replacementEntry : getReplacementEntries())
       replacementEntry.enable();
   }
+
+  uint32_t getNumScopes() const { return numScopes; }
 };
 
-namespace {
-  static Lazy<Mutex> DynamicReplacementLock;
-}
+/// A map from original to replaced opaque type descriptor of a some type.
+class DynamicReplacementSomeDescriptor {
+  RelativeIndirectablePointer<const OpaqueTypeDescriptor, false>
+      originalOpaqueTypeDesc;
+  RelativeDirectPointer<const OpaqueTypeDescriptor, false>
+      replacementOpaqueTypeDesc;
+
+public:
+  void enable(const Mutex &lock) const {
+    opaqueTypeMappings.get().insert(originalOpaqueTypeDesc.get(),
+                                    replacementOpaqueTypeDesc.get(), lock);
+  }
+};
+
+/// A list of dynamic replacements of some types.
+class AutomaticDynamicReplacementsSome
+    : private swift::ABI::TrailingObjects<AutomaticDynamicReplacementsSome,
+                                          DynamicReplacementSomeDescriptor> {
+  uint32_t flags;
+  uint32_t numEntries;
+  using TrailingObjects =
+      swift::ABI::TrailingObjects<AutomaticDynamicReplacementsSome,
+                                  DynamicReplacementSomeDescriptor>;
+  friend TrailingObjects;
+
+
+  ArrayRef<DynamicReplacementSomeDescriptor> getReplacementEntries() const {
+    return {
+        this->template getTrailingObjects<DynamicReplacementSomeDescriptor>(),
+        numEntries};
+  }
+
+public:
+  void enableReplacements(const Mutex &lock) const {
+    for (auto &replacementEntry : getReplacementEntries())
+      replacementEntry.enable(lock);
+  }
+  uint32_t getNumEntries() const { return numEntries; }
+};
+
+} // anonymous namespace
 
 void swift::addImageDynamicReplacementBlockCallback(
-    const void *replacements, uintptr_t replacementsSize) {
+    const void *replacements, uintptr_t replacementsSize,
+    const void *replacementsSome, uintptr_t replacementsSomeSize) {
+
   auto *automaticReplacements =
       reinterpret_cast<const AutomaticDynamicReplacements *>(replacements);
-  DynamicReplacementLock.get().withLock(
-      [&] { automaticReplacements->enableReplacements(); });
+
+  const AutomaticDynamicReplacementsSome *someReplacements = nullptr;
+  if (replacementsSomeSize) {
+    someReplacements =
+        reinterpret_cast<const AutomaticDynamicReplacementsSome *>(
+            replacementsSome);
+  }
+
+  auto sizeOfCurrentEntry = sizeof(AutomaticDynamicReplacements) +
+                            (automaticReplacements->getNumScopes() *
+                             sizeof(AutomaticDynamicReplacementEntry));
+  auto sizeOfCurrentSomeEntry =
+      replacementsSomeSize == 0
+          ? 0
+          : sizeof(AutomaticDynamicReplacementsSome) +
+                (someReplacements->getNumEntries() *
+                 sizeof(DynamicReplacementSomeDescriptor));
+
+  auto &lock = DynamicReplacementLock.get();
+  lock.withLock([&] {
+    auto endOfAutomaticReplacements =
+        ((const char *)automaticReplacements) + replacementsSize;
+    while (((const char *)automaticReplacements) < endOfAutomaticReplacements) {
+      automaticReplacements->enableReplacements();
+      automaticReplacements =
+          reinterpret_cast<const AutomaticDynamicReplacements *>(
+              ((const char *)automaticReplacements) + sizeOfCurrentEntry);
+      if ((const char*)automaticReplacements <  endOfAutomaticReplacements)
+        sizeOfCurrentEntry = sizeof(AutomaticDynamicReplacements) +
+                             (automaticReplacements->getNumScopes() *
+                              sizeof(AutomaticDynamicReplacementEntry));
+    }
+    if (!replacementsSomeSize)
+      return;
+    auto endOfSomeReplacements =
+        ((const char *)someReplacements) + replacementsSomeSize;
+    while (((const char *)someReplacements) < endOfSomeReplacements) {
+      someReplacements->enableReplacements(lock);
+      someReplacements =
+          reinterpret_cast<const AutomaticDynamicReplacementsSome *>(
+              ((const char *)someReplacements) + sizeOfCurrentSomeEntry);
+      if  ((const char*) someReplacements < endOfSomeReplacements)
+        sizeOfCurrentSomeEntry = sizeof(AutomaticDynamicReplacementsSome) +
+                                 (someReplacements->getNumEntries() *
+                                  sizeof(DynamicReplacementSomeDescriptor));
+    }
+  });
 }
 
 void swift::swift_enableDynamicReplacementScope(

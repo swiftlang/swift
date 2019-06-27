@@ -530,6 +530,38 @@ bool TypeBase::isLegalFormalType() {
   return ::isLegalFormalType(getCanonicalType());
 }
 
+bool TypeBase::hasTypeRepr() const {
+  // A type has a source-printable representation if none of its sub-pieces do
+  // /not/ have a source-printable representation.
+  return !Type(const_cast<TypeBase *>(this)).findIf([](Type subTy) -> bool {
+    switch (subTy->getKind()) {
+    case TypeKind::Error:
+    case TypeKind::Unresolved:
+    case TypeKind::TypeVariable:
+      return true;
+
+    case TypeKind::OpenedArchetype:
+    case TypeKind::OpaqueTypeArchetype:
+    case TypeKind::GenericFunction:
+    case TypeKind::LValue:
+      return true;
+
+#define REF_STORAGE(Name, ...) \
+    case TypeKind::Name##Storage: return true;
+#include "swift/AST/ReferenceStorage.def"
+
+    case TypeKind::SILFunction:
+    case TypeKind::SILBlockStorage:
+    case TypeKind::SILBox:
+    case TypeKind::SILToken:
+      return true;
+
+    default:
+      return false;
+    }
+  });
+}
+
 bool TypeBase::isVoid() {
   if (auto TT = getAs<TupleType>())
     return TT->getNumElements() == 0;
@@ -729,57 +761,77 @@ Type TypeBase::replaceCovariantResultType(Type newResultType,
   return FunctionType::get(inputType, resultType, fnType->getExtInfo());
 }
 
-SmallBitVector
-swift::computeDefaultMap(ArrayRef<AnyFunctionType::Param> params,
-                         const ValueDecl *paramOwner, bool skipCurriedSelf) {
-  SmallBitVector resultVector(params.size());
+ParameterListInfo::ParameterListInfo(
+    ArrayRef<AnyFunctionType::Param> params,
+    const ValueDecl *paramOwner,
+    bool skipCurriedSelf) {
+  defaultArguments.resize(params.size());
+  functionBuilderTypes.resize(params.size());
+
   // No parameter owner means no parameter list means no default arguments
   // - hand back the zeroed bitvector.
   //
   // FIXME: We ought to not request default argument info in this case.
   if (!paramOwner)
-    return resultVector;
+    return;
+
+  // If the decl has a curried self, but we're not allowed to skip it, return.
+  if (paramOwner->hasCurriedSelf() && !skipCurriedSelf)
+    return;
 
   // Find the corresponding parameter list.
   const ParameterList *paramList = nullptr;
   if (auto *func = dyn_cast<AbstractFunctionDecl>(paramOwner)) {
-    if (func->hasImplicitSelfDecl()) {
-      if (skipCurriedSelf)
-        paramList = func->getParameters();
-    } else if (!skipCurriedSelf)
-      paramList = func->getParameters();
+    paramList = func->getParameters();
   } else if (auto *subscript = dyn_cast<SubscriptDecl>(paramOwner)) {
-    if (skipCurriedSelf)
-      paramList = subscript->getIndices();
+    paramList = subscript->getIndices();
   } else if (auto *enumElement = dyn_cast<EnumElementDecl>(paramOwner)) {
-    if (skipCurriedSelf)
-      paramList = enumElement->getParameterList();
+    paramList = enumElement->getParameterList();
   }
 
   // No parameter list means no default arguments - hand back the zeroed
   // bitvector.
-  if (!paramList)
-    return resultVector;
+  if (!paramList) {
+    assert(!paramOwner->hasParameterList());
+    return;
+  }
 
   switch (params.size()) {
   case 0:
-    return resultVector;
+    return;
 
   default:
     // Arguments and parameters are not guaranteed to always line-up
     // perfectly, e.g. failure diagnostics tries to match argument type
     // to different "candidate" parameters.
     if (params.size() != paramList->size())
-      return resultVector;
+      return;
 
-    for (auto i : range(0, params.size())) {
-      if (paramList->get(i)->isDefaultArgument()) {
-        resultVector.set(i);
-      }
-    }
     break;
   }
-  return resultVector;
+
+  // Note which parameters have default arguments and/or function builders.
+  for (auto i : range(0, params.size())) {
+    auto param = paramList->get(i);
+    if (param->isDefaultArgument()) {
+      defaultArguments.set(i);
+    }
+
+    if (Type functionBuilderType = param->getFunctionBuilderType()) {
+      functionBuilderTypes[i] = functionBuilderType;
+    }
+  }
+}
+
+bool ParameterListInfo::hasDefaultArgument(unsigned paramIdx) const {
+  return paramIdx < defaultArguments.size() ? defaultArguments[paramIdx]
+      : false;
+}
+
+Type ParameterListInfo::getFunctionBuilderType(unsigned paramIdx) const {
+  return paramIdx < functionBuilderTypes.size()
+      ? functionBuilderTypes[paramIdx]
+      : Type();
 }
 
 /// Turn a param list into a symbolic and printable representation that does not
@@ -1765,9 +1817,11 @@ getObjCObjectRepresentable(Type type, const DeclContext *dc) {
     return ForeignRepresentableKind::Bridged;
   }
 
-  // Look through DynamicSelfType.
+  // DynamicSelfType is always representable in Objective-C, even if
+  // the class is not @objc, allowing Self-returning methods to witness
+  // @objc protocol requirements.
   if (auto dynSelf = type->getAs<DynamicSelfType>())
-    type = dynSelf->getSelfType();
+    return ForeignRepresentableKind::Object;
 
   // @objc classes.
   if (auto classDecl = type->getClassOrBoundGenericClass()) {
@@ -1792,13 +1846,19 @@ getObjCObjectRepresentable(Type type, const DeclContext *dc) {
     return ForeignRepresentableKind::Bridged;
   }
 
-  // Class-constrained generic parameters, from ObjC generic classes.
-  if (auto tyContext = dc->getInnermostTypeContext())
-    if (auto clas = tyContext->getSelfClassDecl())
-      if (clas->hasClangNode())
+  if (auto tyContext = dc->getInnermostTypeContext()) {
+    // Class-constrained generic parameters, from ObjC generic classes.
+    if (auto *classDecl = tyContext->getSelfClassDecl())
+      if (classDecl->hasClangNode())
         if (auto archetype = type->getAs<ArchetypeType>())
           if (archetype->requiresClass())
             return ForeignRepresentableKind::Object;
+
+    // The 'Self' parameter in a protocol is representable in Objective-C.
+    if (auto *protoDecl = dyn_cast<ProtocolDecl>(tyContext))
+      if (type->isEqual(dc->mapTypeIntoContext(protoDecl->getSelfInterfaceType())))
+        return ForeignRepresentableKind::Object;
+  }
 
   return ForeignRepresentableKind::None;
 }
@@ -2286,7 +2346,7 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
 
   // Class-to-class.
   if (matchMode.contains(TypeMatchFlags::AllowOverride))
-    if (t2->isExactSuperclassOf(t1))
+    if (t2->eraseDynamicSelfType()->isExactSuperclassOf(t1))
       return true;
 
   if (matchMode.contains(TypeMatchFlags::AllowABICompatible))
@@ -2530,10 +2590,10 @@ operator()(SubstitutableType *maybeOpaqueType) const {
   }
 
   auto subs = opaqueRoot->getDecl()->getUnderlyingTypeSubstitutions();
-  // TODO: Check the resilience expansion, and handle opaque types with
-  // unknown underlying types. For now, all opaque types are always
-  // fragile.
-  assert(subs.hasValue() && "resilient opaque types not yet supported");
+  // If the body of the opaque decl providing decl has not been type checked we
+  // don't have a underlying subsitution.
+  if (!subs.hasValue())
+    return maybeOpaqueType;
 
   // Apply the underlying type substitutions to the interface type of the
   // archetype in question. This will map the inner generic signature of the
@@ -2581,7 +2641,10 @@ operator()(CanType maybeOpaqueType, Type replacementType,
   }
 
   auto subs = opaqueRoot->getDecl()->getUnderlyingTypeSubstitutions();
-  assert(subs.hasValue());
+  // If the body of the opaque decl providing decl has not been type checked we
+  // don't have a underlying subsitution.
+  if (!subs.hasValue())
+    return abstractRef;
 
   // Apply the underlying type substitutions to the interface type of the
   // archetype in question. This will map the inner generic signature of the
@@ -2693,11 +2756,9 @@ void ArchetypeType::populateNestedTypes() const {
   llvm::SmallPtrSet<Identifier, 4> knownNestedTypes;
   ProtocolType::visitAllProtocols(getConformsTo(),
                                   [&](ProtocolDecl *proto) -> bool {
-    for (auto member : proto->getMembers()) {
-      if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
-        if (knownNestedTypes.insert(assocType->getName()).second)
-          nestedTypes.push_back({ assocType->getName(), Type() });
-      }
+    for (auto assocType : proto->getAssociatedTypeMembers()) {
+      if (knownNestedTypes.insert(assocType->getName()).second)
+        nestedTypes.push_back({ assocType->getName(), Type() });
     }
 
     return false;
@@ -2880,6 +2941,22 @@ GenericFunctionType::substGenericArgs(SubstitutionMap subs) {
                            substFn->getResult(), getExtInfo());
 }
 
+FunctionType *GenericFunctionType::substGenericArgs(
+    llvm::function_ref<Type(Type)> substFn) const {
+  llvm::SmallVector<AnyFunctionType::Param, 4> params;
+  params.reserve(getNumParams());
+
+  llvm::transform(getParams(), std::back_inserter(params),
+                  [&](const AnyFunctionType::Param &param) {
+                    return param.withType(substFn(param.getPlainType()));
+                  });
+
+  auto resultTy = substFn(getResult());
+
+  // Build the resulting (non-generic) function type.
+  return FunctionType::get(params, resultTy, getExtInfo());
+}
+
 CanFunctionType
 CanGenericFunctionType::substGenericArgs(SubstitutionMap subs) const {
   return cast<FunctionType>(
@@ -2913,6 +2990,9 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
 
   // If we don't have a substituted base type, fail.
   if (!substBase) return failed();
+
+  if (auto *selfType = substBase->getAs<DynamicSelfType>())
+    substBase = selfType->getSelfType();
 
   // Error recovery path.
   // FIXME: Generalized existentials will look here.
@@ -3500,17 +3580,19 @@ Type TypeBase::adjustSuperclassMemberDeclType(const ValueDecl *baseDecl,
   }
 
   auto type = memberType.subst(subs, SubstFlags::UseErrorType);
+  if (baseDecl->getDeclContext()->getSelfProtocolDecl())
+    return type;
 
-  if (isa<AbstractFunctionDecl>(baseDecl) &&
-      !baseDecl->getDeclContext()->getSelfProtocolDecl()) {
+  if (auto *afd = dyn_cast<AbstractFunctionDecl>(baseDecl)) {
     type = type->replaceSelfParameterType(this);
-    if (auto func = dyn_cast<FuncDecl>(baseDecl)) {
-      if (func->hasDynamicSelf()) {
-        type = type->replaceCovariantResultType(this, /*uncurryLevel=*/2);
-      }
-    } else if (isa<ConstructorDecl>(baseDecl)) {
+    if (afd->hasDynamicSelfResult())
       type = type->replaceCovariantResultType(this, /*uncurryLevel=*/2);
-    }
+  } else if (auto *sd = dyn_cast<SubscriptDecl>(baseDecl)) {
+    if (sd->getElementInterfaceType()->hasDynamicSelfType())
+      type = type->replaceCovariantResultType(this, /*uncurryLevel=*/1);
+  } else if (auto *vd = dyn_cast<VarDecl>(baseDecl)) {
+    if (vd->getValueInterfaceType()->hasDynamicSelfType())
+      type = type->replaceCovariantResultType(this, /*uncurryLevel=*/0);
   }
 
   return type;

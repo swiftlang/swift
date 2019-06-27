@@ -88,13 +88,21 @@ namespace swift {
     bool DisableAvailabilityChecking = false;
 
     /// Maximum number of typo corrections we are allowed to perform.
-    unsigned TypoCorrectionLimit = 10;
+    /// This is disabled by default until we can get typo-correction working within acceptable performance bounds.
+    unsigned TypoCorrectionLimit = 0;
     
     /// Should access control be respected?
     bool EnableAccessControl = true;
 
     /// Enable 'availability' restrictions for App Extensions.
     bool EnableAppExtensionRestrictions = false;
+
+    /// Require public declarations to declare an introduction OS version.
+    bool RequireExplicitAvailability = false;
+
+    /// Introduction platform and version to suggest as fix-it
+    /// when using RequireExplicitAvailability.
+    std::string RequireExplicitAvailabilityTarget;
 
     ///
     /// Support for alternate usage modes
@@ -240,6 +248,12 @@ namespace swift {
 
     /// Should we use \c ASTScope-based resolution for unqualified name lookup?
     bool EnableASTScopeLookup = false;
+    
+    /// Someday, ASTScopeLookup will supplant lookup in the parser
+    bool DisableParserLookup = false;
+
+    /// Sound we compare to ASTScope-based resolution for debugging?
+    bool CompareToASTScopeLookup = false;
 
     /// Whether to use the import as member inference system
     ///
@@ -304,11 +318,6 @@ namespace swift {
     /// To experiment with including file-private and private dependency info,
     /// set to true.
     bool ExperimentalDependenciesIncludeIntrafileOnes = false;
-
-    /// Enable experimental support for emitting Objective-C resilient class
-    /// stubs. This is a language option since it also determines if we admit
-    /// @objc members in extensions of classes with resilient ancestry.
-    bool EnableObjCResilientClassStubs = false;
 
     /// Sets the target we are building for and updates platform conditions
     /// to match.
@@ -402,6 +411,15 @@ namespace swift {
     // - tvOS 12.2
     // - watchOS 5.2
     bool doesTargetSupportObjCGetClassHook() const;
+
+    // The following deployment targets ship an Objective-C runtime supporting
+    // the objc_loadClassref() entry point:
+    //
+    // - macOS 10.15
+    // - iOS 13
+    // - tvOS 13
+    // - watchOS 6
+    bool doesTargetSupportObjCClassStubs() const;
 
     /// Returns true if the given platform condition argument represents
     /// a supported target operating system.

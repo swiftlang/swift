@@ -55,7 +55,7 @@ public:
   explicit AbstractFunction(AbstractFunctionDecl *fn)
     : TheKind(Kind::Function),
       IsRethrows(fn->getAttrs().hasAttribute<RethrowsAttr>()),
-      ParamCount(fn->hasImplicitSelfDecl() ? 2 : 1) {
+      ParamCount(fn->getNumCurryLevels()) {
     TheFunction = fn;
   }
 
@@ -896,7 +896,7 @@ public:
     }
 
     return Context(getKindForFunctionBody(
-        D->getInterfaceType(), D->hasImplicitSelfDecl() ? 2 : 1));
+        D->getInterfaceType(), D->getNumCurryLevels()));
   }
 
   static Context forDeferBody() {
@@ -1669,7 +1669,7 @@ void TypeChecker::checkEnumElementErrorHandling(EnumElementDecl *elt) {
   }
 }
 
-void TypeChecker::checkPropertyDelegateErrorHandling(
+void TypeChecker::checkPropertyWrapperErrorHandling(
     PatternBindingDecl *binding, Expr *expr) {
   CheckErrorCoverage checker(*this, Context::forPatternBinding(binding));
   expr->walk(checker);
