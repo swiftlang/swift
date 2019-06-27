@@ -773,8 +773,6 @@ lowerCaptureContextParameters(SILModule &M, AnyFunctionRef function,
                               expansion);
     auto loweredTy = loweredTL.getLoweredType();
     switch (Types.getDeclCaptureKind(capture, expansion)) {
-    case CaptureKind::None:
-      break;
     case CaptureKind::Constant: {
       // Constants are captured by value.
       ParameterConvention convention;

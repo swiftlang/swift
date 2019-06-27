@@ -356,9 +356,6 @@ static void emitCaptureArguments(SILGenFunction &SGF,
 
   auto expansion = SGF.F.getResilienceExpansion();
   switch (SGF.SGM.Types.getDeclCaptureKind(capture, expansion)) {
-  case CaptureKind::None:
-    break;
-
   case CaptureKind::Constant: {
     auto type = getVarTypeInCaptureContext();
     auto &lowering = SGF.getTypeLowering(type);
