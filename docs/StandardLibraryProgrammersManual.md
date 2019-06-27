@@ -44,6 +44,20 @@ TODO: Should this subsume or link to [AccessControlInStdlib.rst](https://github.
 1. Frequently Encountered Issues
 
 
+## Coding style
+
+- The stdlib currently has a hard line length limit of 80 characters. 
+
+   To break long lines, please closely follow the indentation conventions you see in the existing codebase. (FIXME: Describe.)
+  
+- All entities that aren't public API must include at least one underscored component in their fully qualified names. This includes symbols that are technically declared public but that aren't considered part of the public stdlib API, as well as `@usableFromInline internal`, plain `internal` and `[file]private` types and members. 
+
+    The underscored component need not be the last. For example, `Swift.Dictionary._worble()` is a good name for an internal helper method, but so is `Swift._NativeDictionary.worble()` -- the `_NativeDictionary` type already has the underscore.
+    
+    Initializers don't have a dedicated name we can put the underscore on; instead, we add the underscore on the first argument label: `init(_value: Int)`. If the initializer doesn't have any parameter, then we add a dummy parameter of type Void with an underscored label: for example, `UnsafeBufferPointer.init(_empty: ())`.
+
+    This rule ensures we don't accidentally clutter the public namespace with `@usableFromInline` things (which could prevent us from choosing the best names for new public API), and it also makes it easy to see at a glance if a piece of stdlib code uses any non-public entities.
+
 ## Internals
 
 #### Unwrapping Optionals
