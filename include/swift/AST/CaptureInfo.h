@@ -95,48 +95,11 @@ public:
     return Value.getPointer().dyn_cast<OpaqueValueExpr *>();
   }
 
+
   unsigned getFlags() const { return Value.getInt(); }
-
-  bool operator==(CapturedValue RHS) const {
-    return Value == RHS.Value;
-  }
-
-  bool operator!=(CapturedValue RHS) const {
-    return Value != RHS.Value;
-  }
-
-  bool operator<(CapturedValue RHS) const {
-    return Value < RHS.Value;
-  }
 };
 
 } // end swift namespace
-
-namespace llvm {
-
-template <> struct DenseMapInfo<swift::CapturedValue> {
-  using CapturedValue = swift::CapturedValue;
-
-  using PtrIntPairDenseMapInfo = DenseMapInfo<CapturedValue::Storage>;
-
-  static inline swift::CapturedValue getEmptyKey() {
-    return CapturedValue{PtrIntPairDenseMapInfo::getEmptyKey()};
-  }
-
-  static inline CapturedValue getTombstoneKey() {
-    return CapturedValue{PtrIntPairDenseMapInfo::getTombstoneKey()};
-  }
-
-  static unsigned getHashValue(const CapturedValue &Val) {
-    return PtrIntPairDenseMapInfo::getHashValue(Val.Value);
-  }
-
-  static bool isEqual(const CapturedValue &LHS, const CapturedValue &RHS) {
-    return PtrIntPairDenseMapInfo::isEqual(LHS.Value, RHS.Value);
-  }
-};
-
-} // end llvm namespace
 
 namespace swift {
 
