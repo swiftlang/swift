@@ -948,8 +948,10 @@ struct Bar<T, V> {
 @propertyWrapper
 struct Baz<T> {
   var wrappedValue: T
+  
+  func onPropertyWrapper() {}
 
-  var wrapperValue: V {
+  var projectedValue: V {
     return V()
   }
 }
@@ -974,14 +976,16 @@ struct MissingPropertyWrapperUnwrap {
   @Baz var usesWrapperValue: W
 
   func baz() {
-    self.x.foo() // expected-error {{value of type 'Int' has no member 'foo', requires wrapper type 'Foo<Int>'}}{{10-10=$}}
-    self.y.bar() // expected-error {{value of type 'Int' has no member 'bar', requires wrapper type 'Bar<Int, Bool>'}}{{10-10=$}}
-    self.y.barWhereVIsString() // expected-error {{value of type 'Int' has no member 'barWhereVIsString', requires wrapper type 'Bar<Int, Bool>'}}{{10-10=$}}
+    self.x.foo() // expected-error {{referencing member 'foo' requires wrapper 'Foo<Int>'}}{{10-10=_}}
+    self.y.bar() // expected-error {{referencing member 'bar' requires wrapper 'Bar<Int, Bool>'}}{{10-10=_}}
+    self.y.barWhereVIsString() // expected-error {{referencing member 'barWhereVIsString' requires wrapper 'Bar<Int, Bool>'}}{{10-10=_}}
     // expected-error@-1 {{referencing instance method 'barWhereVIsString()' on 'Bar' requires the types 'Bool' and 'String' be equivalent}}
-    self.z.barWhereVIsString() // expected-error {{value of type 'Int' has no member 'barWhereVIsString', requires wrapper type 'Bar<Int, String>'}}{{10-10=$}}
-    self.$w.onWrapped() // expected-error {{value of type 'Foo<W>' has no member 'onWrapped', requires wrapped type 'W'}} {{10-10=}}
-    self.usesWrapperValue.onWrapperValue() // expected-error {{value of type 'W' has no member 'onWrapperValue', requires wrapper type 'V'}}{{10-10=$}}
-    self.$usesWrapperValue.onWrapped() // expected-error {{value of type 'V' has no member 'onWrapped', requires wrapped type 'W'}}{{10-10=}}
-    self.$$usesWrapperValue.onWrapped() // expected-error {{value of type 'Baz<W>' has no member 'onWrapped', requires wrapped type 'W'}}{{10-11=}}
+    self.z.barWhereVIsString() // expected-error {{referencing member 'barWhereVIsString' requires wrapper 'Bar<Int, String>'}}{{10-10=_}}
+    self.usesWrapperValue.onPropertyWrapper() // expected-error {{referencing member 'onPropertyWrapper' requires wrapper 'Baz<W>'}}{{10-10=_}}
+
+    self._w.onWrapped() // expected-error {{referencing member 'onWrapped' requires wrapped value of type 'W'}}{{10-11=}}
+    self.usesWrapperValue.onWrapperValue() // expected-error {{referencing member 'onWrapperValue' requires wrapper 'V'}}{{10-10=$}}
+    self.$usesWrapperValue.onWrapped() // expected-error {{referencing member 'onWrapped' requires wrapped value of type 'W'}}{{10-11=}}
+    self._usesWrapperValue.onWrapped() // expected-error {{referencing member 'onWrapped' requires wrapped value of type 'W'}}{{10-11=}}
   }
 }

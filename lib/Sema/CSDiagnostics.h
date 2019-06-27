@@ -808,51 +808,51 @@ public:
 };
 
 class PropertyWrapperReferenceFailure : public ContextualFailure {
-  DeclName Name;
-  bool IsMemberAccess;
+  VarDecl *Property;
+  DeclName MemberName;
+  bool UsingStorageWrapper;
 
 public:
   PropertyWrapperReferenceFailure(Expr *root, ConstraintSystem &cs,
-                                  DeclName name, Type base, Type wrapper,
-                                  bool isMemberAccess,
-                                  ConstraintLocator *locator)
-      : ContextualFailure(root, cs, base, wrapper, locator), Name(name),
-        IsMemberAccess(isMemberAccess) {}
+                                  VarDecl *property, DeclName memberName,
+                                  bool usingStorageWrapper, Type base,
+                                  Type wrapper, ConstraintLocator *locator)
+      : ContextualFailure(root, cs, base, wrapper, locator), Property(property),
+        MemberName(memberName), UsingStorageWrapper(usingStorageWrapper) {}
 
-  DeclName getName() const { return Name; }
-  bool isMemberAccess() const { return IsMemberAccess; }
+  VarDecl *getProperty() const { return Property; }
+  StringRef getPropertyName() const { return Property->getName().str(); }
+  DeclName getMemberName() const { return MemberName; }
+  bool usingStorageWrapper() const { return UsingStorageWrapper; }
 };
 
 class ExtraneousPropertyWrapperUnwrapFailure final
     : public PropertyWrapperReferenceFailure {
 public:
   ExtraneousPropertyWrapperUnwrapFailure(Expr *root, ConstraintSystem &cs,
-                                         DeclName name, Type base, Type wrapper,
-                                         bool isMemberAccess,
+                                         VarDecl *property, DeclName memberName,
+                                         bool usingStorageWrapper, Type base,
+                                         Type wrapper,
                                          ConstraintLocator *locator)
-      : PropertyWrapperReferenceFailure(root, cs, name, base, wrapper,
-                                        isMemberAccess, locator) {}
+      : PropertyWrapperReferenceFailure(root, cs, property, memberName,
+                                        usingStorageWrapper, base, wrapper,
+                                        locator) {}
 
   bool diagnoseAsError() override;
 };
 
 class MissingPropertyWrapperUnwrapFailure final
     : public PropertyWrapperReferenceFailure {
-  bool FromStorageWrapper;
-
 public:
   MissingPropertyWrapperUnwrapFailure(Expr *root, ConstraintSystem &cs,
-                                      DeclName name, Type base, Type wrapper,
-                                      bool isMemberAccess,
-                                      bool fromStorageWrapper,
-                                      ConstraintLocator *locator)
-      : PropertyWrapperReferenceFailure(root, cs, name, base, wrapper,
-                                        isMemberAccess, locator),
-        FromStorageWrapper(fromStorageWrapper) {}
+                                      VarDecl *property, DeclName memberName,
+                                      bool usingStorageWrapper, Type base,
+                                      Type wrapper, ConstraintLocator *locator)
+      : PropertyWrapperReferenceFailure(root, cs, property, memberName,
+                                        usingStorageWrapper, base, wrapper,
+                                        locator) {}
 
   bool diagnoseAsError() override;
-
-  bool isFromStorageWrapper() const { return FromStorageWrapper; }
 };
 
 class SubscriptMisuseFailure final : public FailureDiagnostic {

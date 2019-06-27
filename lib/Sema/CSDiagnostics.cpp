@@ -1974,28 +1974,37 @@ bool MissingCallFailure::diagnoseAsError() {
 }
 
 bool ExtraneousPropertyWrapperUnwrapFailure::diagnoseAsError() {
-  auto diagnostic = diag::extraneous_property_wrapper_unwrap;
-  if (isMemberAccess())
-    diagnostic = diag::extraneous_property_wrapper_unwrap_member_access;
+  auto newPrefix = usingStorageWrapper() ? "$" : "_";
+  if (auto member = getMemberName()) {
+    emitDiagnostic(getAnchor()->getLoc(),
+                   diag::incorrect_property_wrapper_reference_member, member,
+                   false, getToType())
+        .fixItInsert(getAnchor()->getLoc(), newPrefix);
+    return true;
+  }
 
-  emitDiagnostic(getAnchor()->getLoc(), diagnostic, getName(), getFromType(),
-                 getToType())
-      .fixItInsert(getAnchor()->getLoc(), "$");
+  emitDiagnostic(getAnchor()->getLoc(),
+                 diag::incorrect_property_wrapper_reference,
+                 getProperty()->getName(), getFromType(), getToType(), false)
+      .fixItInsert(getAnchor()->getLoc(), newPrefix);
   return true;
 }
 
 bool MissingPropertyWrapperUnwrapFailure::diagnoseAsError() {
-  auto diagnostic = diag::missing_property_wrapper_unwrap;
-  if (isMemberAccess())
-    diagnostic = diag::missing_property_wrapper_unwrap_member_access;
+  auto endLoc = getAnchor()->getLoc().getAdvancedLoc(1);
+  if (auto member = getMemberName()) {
+    emitDiagnostic(getAnchor()->getLoc(),
+                   diag::incorrect_property_wrapper_reference_member, member,
+                   true, getToType())
+        .fixItRemoveChars(getAnchor()->getLoc(), endLoc);
+    return true;
+  }
 
-  // If we're going from a storage wrapper, remove only one $. Remove two
-  // if we're coming from the backing storage.
-  auto endLoc =
-      getAnchor()->getLoc().getAdvancedLoc(isFromStorageWrapper() ? 0 : 1);
-  emitDiagnostic(getAnchor()->getLoc(), diagnostic, getName(), getFromType(),
-                 getToType())
+  emitDiagnostic(getAnchor()->getLoc(),
+                 diag::incorrect_property_wrapper_reference,
+                 getProperty()->getName(), getFromType(), getToType(), true)
       .fixItRemoveChars(getAnchor()->getLoc(), endLoc);
+
   return true;
 }
 
