@@ -948,6 +948,10 @@ static GenericSignature *getNewGenericSignature(ValueDecl *base,
     return nullptr;
   }
 
+  if (derivedClass->getSuperclass().isNull()) {
+    return nullptr;
+  }
+
   auto subMap = derivedClass->getSuperclass()->getContextSubstitutionMap(
       derivedClass->getModuleContext(), baseClass);
 
