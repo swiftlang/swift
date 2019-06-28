@@ -1926,6 +1926,19 @@ void ASTMangler::appendFunctionType(AnyFunctionType *fn, bool isAutoClosure,
   case AnyFunctionType::Representation::Thin:
     return appendOperator("Xf");
   case AnyFunctionType::Representation::Swift:
+    // SWIFT_ENABLE_TENSORFLOW
+    if (fn->getDifferentiabilityKind() == DifferentiabilityKind::Normal) {
+      if (fn->isNoEscape())
+        return appendOperator("XF");
+      else
+        return appendOperator("XG");
+    }
+    if (fn->getDifferentiabilityKind() == DifferentiabilityKind::Linear) {
+      if (fn->isNoEscape())
+        return appendOperator("XH");
+      else
+        return appendOperator("XI");
+    }
     if (isAutoClosure) {
       if (fn->isNoEscape())
         return appendOperator("XK");

@@ -72,18 +72,18 @@ CustomDerivativesTests.test("Checkpointing") {
 
 CustomDerivativesTests.test("SumOfGradPieces") {
   var grad: Float = 0
-  let addToGrad = { grad += $0 }
+  func addToGrad(_ x: inout Float) { grad += x }
   _ = gradient(at: 4) { (x: Float) in
-    x.withGradient(addToGrad)
-      * x.withGradient(addToGrad)
-        * x.withGradient(addToGrad)
+    x.withDerivative(addToGrad)
+      * x.withDerivative(addToGrad)
+        * x.withDerivative(addToGrad)
   }
   expectEqual(48, grad)
 }
 
 CustomDerivativesTests.test("ModifyGradientOfSum") {
   expectEqual(30, gradient(at: 4) { (x: Float) in
-    x.withGradient { $0 *= 10 } + x.withGradient { $0 *= 20 }
+    x.withDerivative { $0 *= 10 } + x.withDerivative { $0 *= 20 }
   })
 }
 

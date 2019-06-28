@@ -219,15 +219,20 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
   // `@differentiable` attribute.
   auto diffAttrs = AFD->getAttrs().getAttributes<DifferentiableAttr>();
   for (auto *DA : diffAttrs) {
+    // If a method-self-reordering thunk is generated for the original function,
+    // emit symbol.
+    auto isSelfReorderedMethod = AFD && AFD->isInstanceMember() &&
+        AFD->hasImplicitSelfDecl() &&
+        DA->getParameterIndices()->parameters.count() > 1;
     // FIXME: When we get rid of `vjp:` and `jvp:` arguments in `@differentiable`,
     // we will no longer need to see whether they are specified.
-    if (!DA->getJVPFunction()) {
+    if (!DA->getJVPFunction() || isSelfReorderedMethod) {
       auto *id = AutoDiffAssociatedFunctionIdentifier::get(
           AutoDiffAssociatedFunctionKind::JVP, /*differentiationOrder*/ 1,
           DA->getParameterIndices(), AFD->getASTContext());
       addSymbol(SILDeclRef(AFD).asAutoDiffAssociatedFunction(id));
     }
-    if (!DA->getVJPFunction()) {
+    if (!DA->getVJPFunction() || isSelfReorderedMethod) {
       auto *id = AutoDiffAssociatedFunctionIdentifier::get(
           AutoDiffAssociatedFunctionKind::VJP, /*differentiationOrder*/ 1,
           DA->getParameterIndices(), AFD->getASTContext());
@@ -304,15 +309,21 @@ void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
   // with a `@differentiable` attribute.
   auto diffAttrs = ASD->getAttrs().getAttributes<DifferentiableAttr>();
   for (auto *DA : diffAttrs) {
+    // If a method-self-reordering thunk is generated for the original function,
+    // emit symbol.
+    auto isSelfReorderedMethod = ASD->getGetter() &&
+        ASD->getGetter()->isInstanceMember() &&
+        ASD->getGetter()->hasImplicitSelfDecl() &&
+        DA->getParameterIndices()->parameters.count() > 1;
     // FIXME: When we get rid of `vjp:` and `jvp:` arguments in `@differentiable`,
     // we will no longer need to see whether they are specified.
-    if (!DA->getJVPFunction()) {
+    if (!DA->getJVPFunction() || isSelfReorderedMethod) {
       auto *id = AutoDiffAssociatedFunctionIdentifier::get(
           AutoDiffAssociatedFunctionKind::JVP, /*differentiationOrder*/ 1,
           DA->getParameterIndices(), ASD->getASTContext());
       addSymbol(SILDeclRef(ASD->getGetter()).asAutoDiffAssociatedFunction(id));
     }
-    if (!DA->getVJPFunction()) {
+    if (!DA->getVJPFunction() || isSelfReorderedMethod) {
       auto *id = AutoDiffAssociatedFunctionIdentifier::get(
           AutoDiffAssociatedFunctionKind::VJP, /*differentiationOrder*/ 1,
           DA->getParameterIndices(), ASD->getASTContext());

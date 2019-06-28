@@ -1065,6 +1065,23 @@ namespace {
         break;
       }
 
+      // SWIFT_ENABLE_TENSORFLOW
+      FunctionMetadataDifferentiabilityKind metadataDifferentiabilityKind;
+      switch (type->getDifferentiabilityKind()) {
+      case DifferentiabilityKind::NonDifferentiable:
+        metadataDifferentiabilityKind =
+            FunctionMetadataDifferentiabilityKind::NonDifferentiable;
+        break;
+      case DifferentiabilityKind::Normal:
+        metadataDifferentiabilityKind =
+            FunctionMetadataDifferentiabilityKind::Normal;
+        break;
+      case DifferentiabilityKind::Linear:
+        metadataDifferentiabilityKind =
+            FunctionMetadataDifferentiabilityKind::Linear;
+        break;
+      }
+
       auto flagsVal = FunctionTypeFlags()
                           .withNumParameters(numParams)
                           .withConvention(metadataConvention)
@@ -1072,7 +1089,8 @@ namespace {
                           .withParameterFlags(hasFlags)
                           // SWIFT_ENABLE_TENSORFLOW
                           .withEscaping(isEscaping)
-                          .withDifferentiable(type->isDifferentiable());
+                          .withDifferentiabilityKind(
+                              metadataDifferentiabilityKind);
 
       auto flags = llvm::ConstantInt::get(IGF.IGM.SizeTy,
                                           flagsVal.getIntValue());

@@ -2715,6 +2715,18 @@ NodePointer Demangler::demangleSpecialType() {
       return popFunctionType(Node::Kind::ObjCBlock);
     case 'C':
       return popFunctionType(Node::Kind::CFunctionPointer);
+    // SWIFT_ENABLE_TENSORFLOW
+    case 'F':
+      return popFunctionType(Node::Kind::DifferentiableFunctionType);
+    // SWIFT_ENABLE_TENSORFLOW
+    case 'G':
+      return popFunctionType(Node::Kind::EscapingDifferentiableFunctionType);
+    // SWIFT_ENABLE_TENSORFLOW
+    case 'H':
+      return popFunctionType(Node::Kind::LinearFunctionType);
+    // SWIFT_ENABLE_TENSORFLOW
+    case 'I':
+      return popFunctionType(Node::Kind::EscapingLinearFunctionType);
     case 'o':
       return createType(createWithChild(Node::Kind::Unowned,
                                         popNode(Node::Kind::Type)));
