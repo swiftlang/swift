@@ -79,8 +79,9 @@ struct InvocationOptions {
 
   InvocationOptions(ArrayRef<const char *> CArgs, StringRef PrimaryFile,
                     CompilerInvocation Invok)
-      : Args(_convertArgs(CArgs)), PrimaryFile(PrimaryFile),
-        Invok(std::move(Invok)) {
+    : Args(_convertArgs(CArgs)),
+      PrimaryFile(PrimaryFile),
+      Invok(std::move(Invok)) {
     // Assert invocation with a primary file. We want to avoid full typechecking
     // for all files.
     assert(!this->PrimaryFile.empty());

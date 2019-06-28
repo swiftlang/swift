@@ -21,7 +21,6 @@
 #include "SourceKit/Core/LangSupport.h"
 #include "SourceKit/Core/NotificationCenter.h"
 #include "SourceKit/Support/Concurrency.h"
-#include "SourceKit/Support/FileSystemProvider.h"
 #include "SourceKit/Support/Logging.h"
 #include "SourceKit/Support/Statistic.h"
 #include "SourceKit/Support/Tracing.h"
@@ -119,7 +118,6 @@ void sourcekitd::initialize() {
   GlobalCtx->getNotificationCenter()->addDocumentUpdateNotificationReceiver(
     onDocumentUpdateNotification);
 }
-
 void sourcekitd::shutdown() {
   delete GlobalCtx;
   GlobalCtx = nullptr;
