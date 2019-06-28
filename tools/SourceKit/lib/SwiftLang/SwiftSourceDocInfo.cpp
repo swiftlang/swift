@@ -408,6 +408,15 @@ static void printAnnotatedDeclaration(const ValueDecl *VD,
   while (VD->isImplicit() && VD->getOverriddenDecl())
     VD = VD->getOverriddenDecl();
 
+  // If this is a property wrapper backing property (_foo) or projected value
+  // ($foo) and the wrapped property is not implicit, still print it.
+  if (auto *VarD = dyn_cast<VarDecl>(VD)) {
+    if (auto *Wrapped = VarD->getOriginalWrappedProperty()) {
+      if (!Wrapped->isImplicit())
+        PO.TreatAsExplicitDeclList.push_back(VD);
+    }
+  }
+
   // Wrap this up in XML, as that's what we'll use for documentation comments.
   OS<<"<Declaration>";
   VD->print(Printer, PO);
@@ -430,6 +439,14 @@ void SwiftLangSupport::printFullyAnnotatedDeclaration(const ValueDecl *VD,
   while (VD->isImplicit() && VD->getOverriddenDecl())
     VD = VD->getOverriddenDecl();
 
+  // If this is a property wrapper backing property (_foo) or projected value
+  // ($foo) and the wrapped property is not implicit, still print it.
+  if (auto *VarD = dyn_cast<VarDecl>(VD)) {
+    if (auto *Wrapped = VarD->getOriginalWrappedProperty()) {
+      if (!Wrapped->isImplicit())
+        PO.TreatAsExplicitDeclList.push_back(VD);
+    }
+  }
   VD->print(Printer, PO);
 }
 
@@ -736,10 +753,19 @@ static bool passCursorInfoForDecl(SourceFile* SF,
   }
   unsigned NameEnd = SS.size();
 
+  // If VD is the syntehsized property wrapper backing storage (_foo) or
+  // projected value ($foo) of a property (foo), use that property's USR instead
+  // so that a rename refactoring renames all three (foo, $foo, and _foo).
+  const ValueDecl* OriginalProperty = VD;
+  if (auto *VarD = dyn_cast<VarDecl>(VD)) {
+    if (auto *Wrapped = VarD->getOriginalWrappedProperty())
+        OriginalProperty = Wrapped;
+  }
+
   unsigned USRBegin = SS.size();
   {
     llvm::raw_svector_ostream OS(SS);
-    SwiftLangSupport::printUSR(VD, OS);
+    SwiftLangSupport::printUSR(OriginalProperty, OS);
     if (InSynthesizedExtension) {
         OS << LangSupport::SynthesizedUSRSeparator;
         SwiftLangSupport::printUSR(BaseType->getAnyNominal(), OS);
@@ -770,10 +796,13 @@ static bool passCursorInfoForDecl(SourceFile* SF,
   }
   unsigned MangledContainerTypeEnd = SS.size();
 
+  // If VD is the syntehsized property wrapper backing storage (_foo) or
+  // projected value ($foo) of a property (foo), use that property's
+  // documentation instead.
   unsigned DocCommentBegin = SS.size();
   {
     llvm::raw_svector_ostream OS(SS);
-    ide::getDocumentationCommentAsXML(VD, OS);
+    ide::getDocumentationCommentAsXML(OriginalProperty, OS);
   }
   unsigned DocCommentEnd = SS.size();
 
@@ -905,9 +934,12 @@ static bool passCursorInfoForDecl(SourceFile* SF,
   StringRef LocalizationKey = StringRef(SS.begin() + LocalizationBegin,
                                         LocalizationEnd - LocalizationBegin);
 
+  // If VD is the syntehsized property wrapper backing storage (_foo) or
+  // projected value ($foo) of a property (foo), base the location on that
+  // property instead.
   llvm::Optional<std::pair<unsigned, unsigned>> DeclarationLoc;
   StringRef Filename;
-  getLocationInfo(VD, DeclarationLoc, Filename);
+  getLocationInfo(OriginalProperty, DeclarationLoc, Filename);
   if (DeclarationLoc.hasValue()) {
     DeclarationLoc = tryRemappingLocToLatestSnapshot(Lang,
                                                      *DeclarationLoc,
@@ -1875,6 +1907,13 @@ public:
       //   case .third(let x)
       //     print(x)
       Dcl = V->getCanonicalVarDecl();
+
+      // If we have a prioperty wrapper backing property or projected value, use
+      // the wrapped property instead (i.e. if this is _foo or $foo, pretend
+      // it's foo).
+      if (auto *Wrapped = V->getOriginalWrappedProperty()) {
+        Dcl = Wrapped;
+      }
     } else {
       Dcl = D;
     }
@@ -1884,22 +1923,37 @@ private:
   bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
     if (Cancelled)
       return false;
-    if (auto *V = dyn_cast<VarDecl>(D))
-        D = V->getCanonicalVarDecl();
+    if (auto *V = dyn_cast<VarDecl>(D)) {
+      // Handle references to the implicitly generated vars in case statements
+      // matching multiple patterns
+      D = V->getCanonicalVarDecl();
+    }
     if (D == Dcl)
       return passId(Range);
     return true;
   }
+
   bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
                           TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type T,
                           ReferenceMetaData Data) override {
     if (Cancelled)
       return false;
 
-    if (auto *V = dyn_cast<VarDecl>(D))
+    if (auto *V = dyn_cast<VarDecl>(D)) {
       D = V->getCanonicalVarDecl();
-    else if (CtorTyRef)
+
+      // If we have a prioperty wrapper backing property or projected value, use
+      // the wrapped property for comparison instead (i.e. if this is _foo or
+      // $foo, pretend it's foo).
+      if (auto *Wrapped = V->getOriginalWrappedProperty()) {
+        assert(Range.getByteLength() > 1 &&
+               (Range.str().front() == '_' || Range.str().front() == '$'));
+        D = Wrapped;
+        Range = CharSourceRange(Range.getStart().getAdvancedLoc(1), Range.getByteLength() - 1);
+      }
+    } else if (CtorTyRef) {
       D = CtorTyRef;
+    }
 
     if (D == Dcl)
       return passId(Range);
