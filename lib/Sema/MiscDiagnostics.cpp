@@ -2963,7 +2963,7 @@ void swift::fixItEncloseTrailingClosure(TypeChecker &TC,
 static void checkStmtConditionTrailingClosure(TypeChecker &TC, const Expr *E) {
   if (E == nullptr || isa<ErrorExpr>(E)) return;
 
-  // Walk into expressions which might have invalid trailing closures
+  // Shallow walker. just dig into implicit expression.
   class DiagnoseWalker : public ASTWalker {
     TypeChecker &TC;
 
@@ -2998,22 +2998,13 @@ static void checkStmtConditionTrailingClosure(TypeChecker &TC, const Expr *E) {
     bool shouldWalkIntoNonSingleExpressionClosure() override { return false; }
 
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-      switch (E->getKind()) {
-      case ExprKind::Paren:
-      case ExprKind::Tuple:
-      case ExprKind::Array:
-      case ExprKind::Dictionary:
-      case ExprKind::InterpolatedStringLiteral:
-        // If a trailing closure appears as a child of one of these types of
-        // expression, don't diagnose it as there is no ambiguity.
-        return {E->isImplicit(), E};
-      case ExprKind::Call:
-        diagnoseIt(cast<CallExpr>(E));
-        break;
-      default:
-        break;
-      }
-      return {true, E};
+      // Dig into implicit expression.
+      if (E->isImplicit()) return { true, E };
+      // Diagnose call expression.
+      if (auto CE = dyn_cast<CallExpr>(E))
+        diagnoseIt(CE);
+      // Don't dig any further.
+      return { false, E };
     }
   };
 
@@ -3033,12 +3024,9 @@ static void checkStmtConditionTrailingClosure(TypeChecker &TC, const Expr *E) {
 static void checkStmtConditionTrailingClosure(TypeChecker &TC, const Stmt *S) {
   if (auto LCS = dyn_cast<LabeledConditionalStmt>(S)) {
     for (auto elt : LCS->getCond()) {
-      if (elt.getKind() == StmtConditionElement::CK_PatternBinding) {
+      if (elt.getKind() == StmtConditionElement::CK_PatternBinding)
         checkStmtConditionTrailingClosure(TC, elt.getInitializer());
-        if (auto *exprPattern = dyn_cast<ExprPattern>(elt.getPattern())) {
-          checkStmtConditionTrailingClosure(TC, exprPattern->getMatchExpr());
-        }
-      } else if (elt.getKind() == StmtConditionElement::CK_Boolean)
+      else if (elt.getKind() == StmtConditionElement::CK_Boolean)
         checkStmtConditionTrailingClosure(TC, elt.getBoolean());
       // No trailing closure for CK_Availability: e.g. `if #available() {}`.
     }
