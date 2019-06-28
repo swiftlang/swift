@@ -126,9 +126,9 @@ public:
     : Captures(nullptr), DynamicSelf(nullptr), OpaqueValue(nullptr), Count(0),
       GenericParamCaptures(0), Computed(0) { }
 
-  bool hasBeenComputed() { return Computed; }
+  bool hasBeenComputed() const { return Computed; }
 
-  bool isTrivial() {
+  bool isTrivial() const {
     return Count == 0 && !GenericParamCaptures && !DynamicSelf && !OpaqueValue;
   }
 

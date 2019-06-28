@@ -52,10 +52,18 @@ public:
     }
   }
 
-  CaptureInfo &getCaptureInfo() const {
+  const CaptureInfo &getCaptureInfo() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
       return AFD->getCaptureInfo();
     return TheFunction.get<AbstractClosureExpr *>()->getCaptureInfo();
+  }
+
+  void setCaptureInfo(const CaptureInfo &captures) const {
+    if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
+      AFD->setCaptureInfo(captures);
+      return;
+    }
+    TheFunction.get<AbstractClosureExpr *>()->setCaptureInfo(captures);
   }
 
   void getLocalCaptures(SmallVectorImpl<CapturedValue> &Result) const {

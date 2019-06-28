@@ -658,14 +658,16 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
     }
   }
 
-  AFR.getCaptureInfo() = finder.getCaptureInfo();
+  auto captures = finder.getCaptureInfo();
 
   // A generic function always captures outer generic parameters.
   auto *AFD = AFR.getAbstractFunctionDecl();
   if (AFD) {
     if (AFD->getGenericParams())
-      AFR.getCaptureInfo().setGenericParamCaptures(true);
+      captures.setGenericParamCaptures(true);
   }
+
+  AFR.setCaptureInfo(captures);
 
   // Extensions of generic ObjC functions can't use generic parameters from
   // their context.

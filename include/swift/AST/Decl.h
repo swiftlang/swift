@@ -5846,8 +5846,8 @@ public:
   /// Retrieve the source range of the function declaration name + patterns.
   SourceRange getSignatureSourceRange() const;
 
-  CaptureInfo &getCaptureInfo() { return Captures; }
   const CaptureInfo &getCaptureInfo() const { return Captures; }
+  void setCaptureInfo(const CaptureInfo &captures) { Captures = captures; }
 
   /// Retrieve the Objective-C selector that names this method.
   ObjCSelector getObjCSelector(DeclName preferredName = DeclName(),
