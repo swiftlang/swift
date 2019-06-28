@@ -4685,7 +4685,9 @@ makeFunctionType(
 // Compute the original function type corresponding to the given transpose
 // function type.
 AnyFunctionType *
-AnyFunctionType::getTransposeOriginalFunctionType(TransposingAttr *attr) {
+AnyFunctionType::getTransposeOriginalFunctionType(
+    TransposingAttr *attr,
+    AutoDiffIndexSubset *wrtParamIndices) {
   auto transposeParams = getParams();
   unsigned transposeParamsIndex = 0;
   auto transposeResult = getResult();
@@ -4726,25 +4728,9 @@ AnyFunctionType::getTransposeOriginalFunctionType(TransposingAttr *attr) {
     transposeResultTypes = ArrayRef<TupleTypeElt>(transposeResult);
   }
   assert(!transposeResultTypes.empty());
-  
-  // TODO(bartchr): use set when optimizing.
-//  llvm::SmallSet<unsigned, 2> wrtParamSet;
-  bool wrtSelf = false;
-  for (auto param : wrtParams) {
-    switch (param.getKind()) {
-    case ParsedAutoDiffParameter::Kind::Self:
-      wrtSelf = true;
-      break;
-    case ParsedAutoDiffParameter::Kind::Named:
-        llvm_unreachable(
-            "'@transposing' does not support named 'wrt:' arguments");
-      break;
-    case ParsedAutoDiffParameter::Kind::Ordered:
-//      wrtParamSet.insert(param.getIndex());
-      break;
-    }
-  }
-  
+
+  bool wrtSelf = wrtParamIndices->contains(wrtParamIndices->getCapacity() - 1);
+
   // If the function is curried and is transposing WRT 'self', then grab
   // the type from the result list (guaranteed to be the first since 'self'
   // is first in WRT list) and remove it. If it's still curried but not
@@ -4754,18 +4740,12 @@ AnyFunctionType::getTransposeOriginalFunctionType(TransposingAttr *attr) {
     selfType = transposeResultTypes[transposeResultTypesIndex].getType();
     transposeResultTypesIndex++;
   }
-  
+
   SmallVector<AnyFunctionType::Param, 8> originalParams;
   unsigned numberOriginalParameters =
       transposeParams.size() + wrtParams.size() - 1;
   for (auto i : range(numberOriginalParameters)) {
-    bool isWrt = false;
-    for (auto wrt : wrtParams) {
-      if (wrt.getIndex() == i) {
-        isWrt = true;
-        break;
-      }
-    }
+    bool isWrt = wrtParamIndices->contains(i);
     if (isWrt) {
       // If in WRT list, the item in the result tuple must be a parameter in the
       // original function.

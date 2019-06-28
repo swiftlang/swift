@@ -3113,7 +3113,8 @@ public:
   /// Given the type of a transposing associated function, returns the
   /// corresponding original function type.
   AnyFunctionType *getTransposeOriginalFunctionType(
-      TransposingAttr *attr);
+      TransposingAttr *attr,
+      AutoDiffIndexSubset *wrtParamIndices);
 
   AnyFunctionType *getWithoutDifferentiability() const;
 

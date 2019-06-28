@@ -3913,7 +3913,7 @@ void AttributeChecker::visitTransposingAttr(TransposingAttr *attr) {
   
   auto *expectedOriginalFnType =
       transposeInterfaceType->getTransposeOriginalFunctionType(
-          attr);
+          attr, wrtParamIndices);
   
   // `R` result type must conform to `Differentiable`.
   auto diffableProto = ctx.getProtocol(KnownProtocolKind::Differentiable);
