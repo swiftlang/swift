@@ -2656,6 +2656,21 @@ static bool conformsToDifferentiable(Type type, DeclContext *DC) {
 };
 
 // SWIFT_ENABLE_TENSORFLOW
+/// Returns true if the given type's `TangentVector` is equal to itself in the given
+/// module.
+static bool TangentVectorEqualSelf(Type type, DeclContext *DC) {
+  assert(conformsToDifferentiable(type, DC));
+  auto &ctx = type->getASTContext();
+  auto *differentiableProto =
+      ctx.getProtocol(KnownProtocolKind::Differentiable);
+  auto conf = TypeChecker::conformsToProtocol(
+                  type, differentiableProto, DC,
+                  ConformanceCheckFlags::InExpression);
+  auto tanType = conf->getTypeWitnessByName(type, ctx.Id_TangentVector);
+  return type->getCanonicalType() == tanType->getCanonicalType();
+};
+
+// SWIFT_ENABLE_TENSORFLOW
 /// Creates a `AutoDiffParameterIndices` for the given function type,
 /// inferring all differentiation parameters.
 /// The differentiation parameters are inferred to be:
@@ -3147,7 +3162,7 @@ ArrayRef<ParsedAutoDiffParameter> parsedWrtParams, SourceLoc attrLoc) {
       wrtParamType = wrtParamType->mapTypeOutOfContext();
     if (derivativeGenEnv)
       wrtParamType =
-      derivativeGenEnv->mapTypeIntoContext(wrtParamType);
+          derivativeGenEnv->mapTypeIntoContext(wrtParamType);
     else
       wrtParamType = AFD->mapTypeIntoContext(wrtParamType);
     SourceLoc loc = parsedWrtParams.empty()
@@ -3169,10 +3184,12 @@ ArrayRef<ParsedAutoDiffParameter> parsedWrtParams, SourceLoc attrLoc) {
                   wrtParamType);
       return true;
     }
-    // Parameter must conform to `Differentiable`.
-    if (!conformsToDifferentiable(wrtParamType, AFD)) {
-      TC.diagnose(loc, diag::diff_params_clause_param_not_differentiable,
-                  wrtParamType);
+    // Parameter must conform to `Differentiable`
+    // and `Type.TangentVector == Type`.
+    if (!conformsToDifferentiable(wrtParamType, AFD) ||
+        !TangentVectorEqualSelf(wrtParamType, AFD)) {
+      TC.diagnose(loc, diag::transpose_params_clause_param_not_differentiable,
+                  wrtParamType.getString());
       return true;
     }
   }
@@ -3965,14 +3982,22 @@ void AttributeChecker::visitTransposingAttr(TransposingAttr *attr) {
   // Set the checked differentiation parameter indices in the attribute.
   attr->setParameterIndices(checkedWrtParamIndices);
   
-  // `value: R` result type must conform to `Differentiable`.
+  // `R` result type must conform to `Differentiable`.
   auto diffableProto = ctx.getProtocol(KnownProtocolKind::Differentiable);
   auto valueResultType = expectedOriginalFnType->getResult();
-  if (expectedOriginalFnType->getResult()->hasTypeParameter())
+  if (valueResultType->hasTypeParameter())
     valueResultType = transpose->mapTypeIntoContext(valueResultType);
-  auto valueResultConf = TC.conformsToProtocol(expectedOriginalFnType->getResult(), diffableProto,
-                                               transpose->getDeclContext(),
-                                               None);
+  auto valueResultConf = TC.conformsToProtocol(
+                             valueResultType, diffableProto,
+                             transpose->getDeclContext(), None);
+  
+  if (!valueResultConf) {
+    TC.diagnose(attr->getLocation(),
+                diag::transposing_attr_result_value_not_differentiable,
+                expectedOriginalFnType);
+    attr->setInvalid();
+    return;
+  }
   
   // Gather differentiation parameters.
   SmallVector<Type, 4> wrtParamTypes;

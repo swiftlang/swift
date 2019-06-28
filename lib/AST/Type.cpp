@@ -4687,6 +4687,7 @@ makeFunctionType(
 AnyFunctionType *
 AnyFunctionType::getTransposeOriginalFunctionType(TransposingAttr *attr) {
   auto transposeParams = getParams();
+  unsigned transposeParamsIndex = 0;
   auto transposeResult = getResult();
   
   // Get the original function's result.
@@ -4716,6 +4717,7 @@ AnyFunctionType::getTransposeOriginalFunctionType(TransposingAttr *attr) {
 
   auto wrtParams = attr->getParsedParameters();
   ArrayRef<TupleTypeElt> transposeResultTypes;
+  unsigned transposeResultTypesIndex = 0;
   // Return type of '@transposing' function can have single type or tuples
   // of types.
   if (auto t = transposeResult->getAs<TupleType>()) {
@@ -4749,8 +4751,8 @@ AnyFunctionType::getTransposeOriginalFunctionType(TransposingAttr *attr) {
   // transposing WRT 'self', then the 'Self' type is the same as the result.
   Type selfType = originalResult;
   if (isCurried && wrtSelf) {
-    selfType = transposeResultTypes.front().getType();
-    transposeResultTypes = transposeResultTypes.drop_front();
+    selfType = transposeResultTypes[transposeResultTypesIndex].getType();
+    transposeResultTypesIndex++;
   }
   
   SmallVector<AnyFunctionType::Param, 8> originalParams;
@@ -4767,16 +4769,17 @@ AnyFunctionType::getTransposeOriginalFunctionType(TransposingAttr *attr) {
     if (isWrt) {
       // If in WRT list, the item in the result tuple must be a parameter in the
       // original function.
-      auto g = transposeResultTypes.front().getType();
-      // TODO(bartchr): this prevents a segfault occuring when converting 'g' to 'Param'
-      llvm::nulls() << g;
-      originalParams.push_back(AnyFunctionType::Param(g));
-      transposeResultTypes = transposeResultTypes.drop_front();
+      auto resultType = transposeResultTypes[transposeResultTypesIndex].getType();
+      // TODO(bartchr): this prevents a segfault occuring when converting 'g'
+      // to 'Param'.
+      llvm::nulls() << resultType;
+      originalParams.push_back(AnyFunctionType::Param(resultType));
+      transposeResultTypesIndex++;
     } else {
       // Else if not in the WRT list, the parameter in the transposing function
       // is a parameter in the original function.
-      originalParams.push_back(transposeParams.front());
-      transposeParams = transposeParams.drop_front();
+      originalParams.push_back(transposeParams[transposeParamsIndex]);
+      transposeParamsIndex++;
     }
   }
   

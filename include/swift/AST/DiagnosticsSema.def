@@ -2825,14 +2825,17 @@ ERROR(differentiating_attr_original_already_has_derivative,none,
       "a derivative already exists for %0", (DeclName))
 
 // transposing
-ERROR(transposing_attr_result_value_not_differentiable,none,
-      "'@differentiating' attribute requires function to return a differentiable "
-      "type. %0 does not conform to 'Differentiable", (Type))
+ERROR(transpose_params_clause_param_not_differentiable,none,
+      "can only differentiate with respect to parameters that conform to "
+      "'Differentiable' and where '%0 == %0.TangentVector'", (StringRef))
 ERROR(transposing_attr_overload_not_found,none,
       "could not find function %0 with expected type %1", (DeclName, Type))
 ERROR(transposing_attr_cant_use_named_wrt_params,none,
       "cannot use named wrt parameters in '@transposing' attribute, found %0",
       (Identifier))
+ERROR(transposing_attr_result_value_not_differentiable,none,
+      "'@transposing' attribute requires original function result to "
+      "conform to 'Differentiable'", (Type))
 
 // differentiation `wrt` parameters clause
 ERROR(diff_function_no_parameters,none,
