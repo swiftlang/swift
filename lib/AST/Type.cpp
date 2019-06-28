@@ -4728,7 +4728,7 @@ AnyFunctionType::getTransposeOriginalFunctionType(TransposingAttr *attr) {
   assert(!transposeResultTypes.empty());
   
   // TODO(bartchr): use set when optimizing.
-//  SmallPtrSet<unsigned, 8> wrtParamSet;
+//  llvm::SmallSet<unsigned, 2> wrtParamSet;
   bool wrtSelf = false;
   for (auto param : wrtParams) {
     switch (param.getKind()) {

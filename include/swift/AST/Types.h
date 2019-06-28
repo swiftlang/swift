@@ -3112,7 +3112,8 @@ public:
   
   /// Given the type of a transposing associated function, returns the
   /// corresponding original function type.
-  AnyFunctionType *getTransposeOriginalFunctionType(TransposingAttr *attr);
+  AnyFunctionType *getTransposeOriginalFunctionType(
+      TransposingAttr *attr);
 
   AnyFunctionType *getWithoutDifferentiability() const;
 

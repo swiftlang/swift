@@ -3890,8 +3890,30 @@ void AttributeChecker::visitTransposingAttr(TransposingAttr *attr) {
   auto *transposeInterfaceType = transpose->getInterfaceType()
                                      ->eraseDynamicSelfType()
                                      ->castTo<AnyFunctionType>();
+  
+  // Get checked wrt param indices.
+  AutoDiffIndexSubset *wrtParamIndices =
+  attr->getParameterIndexSubset();
+  
+  // Get the parsed wrt param indices, which have not yet been checked.
+  // This is defined for parsed attributes.
+  auto parsedWrtParams = attr->getParsedParameters();
+  
+  // If checked wrt param indices are not specified, compute them.
+  bool isCurried = transposeInterfaceType->getResult()->is<AnyFunctionType>();
+  if (!wrtParamIndices)
+    wrtParamIndices =
+    computeTransposingParameters(TC, parsedWrtParams, transpose, isCurried,
+                                 transpose->getGenericEnvironment(),
+                                 attr->getLocation());
+  if (!wrtParamIndices) {
+    attr->setInvalid();
+    return;
+  }
+  
   auto *expectedOriginalFnType =
-      transposeInterfaceType->getTransposeOriginalFunctionType(attr);
+      transposeInterfaceType->getTransposeOriginalFunctionType(
+          attr);
   
   // `R` result type must conform to `Differentiable`.
   auto diffableProto = ctx.getProtocol(KnownProtocolKind::Differentiable);
@@ -3989,26 +4011,6 @@ void AttributeChecker::visitTransposingAttr(TransposingAttr *attr) {
     return;
   }
   attr->setOriginalFunction(originalFn);
-  
-  // Get checked wrt param indices.
-  AutoDiffIndexSubset *wrtParamIndices =
-      attr->getParameterIndexSubset();
-  
-  // Get the parsed wrt param indices, which have not yet been checked.
-  // This is defined for parsed attributes.
-  auto parsedWrtParams = attr->getParsedParameters();
-  
-  // If checked wrt param indices are not specified, compute them.
-  bool isCurried = transposeInterfaceType->getResult()->is<AnyFunctionType>();
-  if (!wrtParamIndices)
-    wrtParamIndices =
-        computeTransposingParameters(TC, parsedWrtParams, transpose, isCurried,
-                                     transpose->getGenericEnvironment(),
-                                     attr->getLocation());
-  if (!wrtParamIndices) {
-    attr->setInvalid();
-    return;
-  }
   
   // Gather differentiation parameters.
   // Differentiation parameters are with respect to the original function.
