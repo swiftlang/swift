@@ -817,6 +817,32 @@ void ModuleFile::readGenericRequirements(
   }
 }
 
+/// Advances past any records that might be part of a requirement signature.
+static void skipGenericRequirements(llvm::BitstreamCursor &Cursor) {
+  using namespace decls_block;
+
+  BCOffsetRAII lastRecordOffset(Cursor);
+
+  while (true) {
+    auto entry = Cursor.advance(AF_DontPopBlockAtEnd);
+    if (entry.Kind != llvm::BitstreamEntry::Record)
+      break;
+
+    unsigned recordID = Cursor.skipRecord(entry.ID);
+    switch (recordID) {
+    case GENERIC_REQUIREMENT:
+    case LAYOUT_REQUIREMENT:
+      break;
+
+    default:
+      // This record is not a generic requirement.
+      return;
+    }
+
+    lastRecordOffset.reset();
+  }
+}
+
 void ModuleFile::configureGenericEnvironment(
              GenericContext *genericDecl,
              serialization::GenericEnvironmentID envID) {
@@ -3266,14 +3292,13 @@ public:
     IdentifierID nameID;
     DeclContextID contextID;
     bool isImplicit, isClassBounded, isObjC, existentialTypeSupported;
-    GenericEnvironmentID genericEnvID;
     uint8_t rawAccessLevel;
     ArrayRef<uint64_t> rawInheritedIDs;
 
     decls_block::ProtocolLayout::readRecord(scratch, nameID, contextID,
                                             isImplicit, isClassBounded, isObjC,
                                             existentialTypeSupported,
-                                            genericEnvID, rawAccessLevel, rawInheritedIDs);
+                                            rawAccessLevel, rawInheritedIDs);
 
     auto DC = MF.getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -3300,8 +3325,6 @@ public:
 
     handleInherited(proto, rawInheritedIDs);
 
-    MF.configureGenericEnvironment(proto, genericEnvID);
-
     if (isImplicit)
       proto->setImplicit();
     proto->setIsObjC(isObjC);
@@ -3310,12 +3333,9 @@ public:
 
     proto->setCircularityCheck(CircularityCheck::Checked);
 
-    // Establish the requirement signature.
-    {
-      SmallVector<Requirement, 4> requirements;
-      MF.readGenericRequirements(requirements, MF.DeclTypeCursor);
-      proto->setRequirementSignature(requirements);
-    }
+    proto->setLazyRequirementSignature(&MF,
+                                       MF.DeclTypeCursor.GetCurrentBitNo());
+    skipGenericRequirements(MF.DeclTypeCursor);
 
     proto->setMemberLoader(&MF, MF.DeclTypeCursor.GetCurrentBitNo());
 
@@ -5732,6 +5752,14 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
 GenericEnvironment *ModuleFile::loadGenericEnvironment(const DeclContext *decl,
                                                        uint64_t contextData) {
   return getGenericEnvironment(contextData);
+}
+
+void ModuleFile::loadRequirementSignature(const ProtocolDecl *decl,
+                                          uint64_t contextData,
+                                          SmallVectorImpl<Requirement> &reqs) {
+  BCOffsetRAII restoreOffset(DeclTypeCursor);
+  DeclTypeCursor.JumpToBit(contextData);
+  readGenericRequirements(reqs, DeclTypeCursor);
 }
 
 static Optional<ForeignErrorConvention::Kind>

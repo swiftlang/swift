@@ -507,7 +507,7 @@ protected:
     HasLazyConformances : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+2+1+8+16,
+  SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+2+1+1+8+16,
     /// Whether the \c RequiresClass bit is valid.
     RequiresClassValid : 1,
 
@@ -535,6 +535,9 @@ protected:
 
     /// Whether we've computed the inherited protocols list yet.
     InheritedProtocolsValid : 1,
+
+    /// Whether we have a lazy-loaded requirement signature.
+    HasLazyRequirementSignature : 1,
 
     : NumPadBits,
 
@@ -4119,6 +4122,10 @@ class ProtocolDecl final : public NominalTypeDecl {
 
   ArrayRef<ProtocolDecl *> getInheritedProtocolsSlow();
 
+  bool hasLazyRequirementSignature() const {
+    return Bits.ProtocolDecl.HasLazyRequirementSignature;
+  }
+
   friend class SuperclassDeclRequest;
   friend class SuperclassTypeRequest;
   friend class RequirementSignatureRequest;
@@ -4354,6 +4361,9 @@ public:
   }
 
   void setRequirementSignature(ArrayRef<Requirement> requirements);
+
+  void setLazyRequirementSignature(LazyMemberLoader *lazyLoader,
+                                   uint64_t requirementSignatureData);
 
 private:
   ArrayRef<Requirement> getCachedRequirementSignature() const;
