@@ -29,29 +29,6 @@
 #include "llvm/ADT/SmallPtrSet.h"
 using namespace swift;
 
-static SourceLoc getCaptureLoc(AnyFunctionRef AFR) {
-  if (auto AFD = AFR.getAbstractFunctionDecl()) {
-    if (auto *FD = dyn_cast<FuncDecl>(AFD)) {
-      if (FD->isDeferBody()) {
-        // HACK: Defer statements generate implicit FuncDecls, and hence do
-        // not have valid source locations.  Instead, use the location of
-        // the body.
-        return FD->getBody()->getLBraceLoc();
-      }
-    }
-
-    return AFD->getLoc();
-  } else {
-    auto ACE = AFR.getAbstractClosureExpr();
-    if (auto CE = dyn_cast<ClosureExpr>(ACE)) {
-      if (!CE->getInLoc().isInvalid())
-        return CE->getInLoc();
-    }
-
-    return ACE->getLoc();
-  }
-}
-
 namespace {
 
 class FindCapturedVars : public ASTWalker {
@@ -80,7 +57,7 @@ public:
         DynamicSelf(DynamicSelf),
         OpaqueValue(OpaqueValue),
         AFR(AFR) {
-    CaptureLoc = getCaptureLoc(AFR);
+    CaptureLoc = AFR.getLoc();
   }
 
   /// Check if the type of an expression references any generic
@@ -177,7 +154,7 @@ public:
 
   /// Add the specified capture to the closure's capture list, diagnosing it
   /// if invalid.
-  void addCapture(CapturedValue capture, SourceLoc Loc) {
+  void addCapture(CapturedValue capture) {
     auto VD = capture.getDecl();
 
     // Check to see if we already have an entry for this decl.
@@ -189,9 +166,9 @@ public:
       // If this already had an entry in the capture list, make sure to merge
       // the information together.  If one is noescape but the other isn't,
       // then the result is escaping.
-      unsigned Flags =
-        Captures[entryNumber-1].getFlags() & capture.getFlags();
-      capture = CapturedValue(VD, Flags);
+      auto existing = Captures[entryNumber-1];
+      unsigned flags = existing.getFlags() & capture.getFlags();
+      capture = CapturedValue(VD, flags, existing.getLoc());
       Captures[entryNumber-1] = capture;
     }
 
@@ -295,77 +272,13 @@ public:
         return { false, DRE };
     }
 
+    // Don't "capture" type definitions at all.
+    if (isa<TypeDecl>(D))
+      return { false, DRE };
+
     // Only capture var decls at global scope.  Other things can be captured
     // if they are local.
     if (!isa<VarDecl>(D) && !DC->isLocalContext())
-      return { false, DRE };
-
-    // Can only capture a variable that is declared before the capturing
-    // entity.
-    llvm::DenseSet<ValueDecl *> checkedCaptures;
-    llvm::SmallVector<FuncDecl *, 2> capturePath;
-
-    std::function<bool (ValueDecl *)>
-    validateForwardCapture = [&](ValueDecl *capturedDecl) -> bool {
-      if (!checkedCaptures.insert(capturedDecl).second)
-        return true;
-
-      // Captures at nonlocal scope are order-invariant.
-      if (!capturedDecl->getDeclContext()->isLocalContext())
-        return true;
-
-      // Assume implicit decl captures are OK.
-      if (!CaptureLoc.isValid() || !capturedDecl->getLoc().isValid())
-        return true;
-
-      // Check the order of the declarations.
-      if (!TC.Context.SourceMgr.isBeforeInBuffer(CaptureLoc,
-                                                 capturedDecl->getLoc()))
-        return true;
-
-      // Forward captures of functions are OK, if the function doesn't
-      // transitively capture variables ahead of the original function.
-      if (auto func = dyn_cast<FuncDecl>(capturedDecl)) {
-        if (!func->getCaptureInfo().hasBeenComputed()) {
-          // Check later.
-          TC.ForwardCapturedFuncs[func].push_back(AFR);
-          return true;
-        }
-        // Recursively check the transitive captures.
-        capturePath.push_back(func);
-        SWIFT_DEFER { capturePath.pop_back(); };
-        for (auto capture : func->getCaptureInfo().getCaptures())
-          if (!validateForwardCapture(capture.getDecl()))
-            return false;
-        return true;
-      }
-
-      // Diagnose the improper forward capture.
-      if (Diagnosed.insert(capturedDecl).second) {
-        if (capturedDecl == DRE->getDecl()) {
-          TC.diagnose(DRE->getLoc(), diag::capture_before_declaration,
-                      capturedDecl->getBaseName().getIdentifier());
-        } else {
-          TC.diagnose(DRE->getLoc(),
-                      diag::transitive_capture_before_declaration,
-                      DRE->getDecl()->getBaseName().getIdentifier(),
-                      capturedDecl->getBaseName().getIdentifier());
-          ValueDecl *prevDecl = capturedDecl;
-          for (auto path : reversed(capturePath)) {
-            TC.diagnose(path->getLoc(),
-                        diag::transitive_capture_through_here,
-                        path->getName(),
-                        prevDecl->getBaseName().getIdentifier());
-            prevDecl = path;
-          }
-        }
-        TC.diagnose(capturedDecl, diag::decl_declared_here,
-                    capturedDecl->getFullName());
-      }
-      return false;
-    };
-
-    if (!validateForwardCapture(DRE->getDecl()))
       return { false, DRE };
 
     // We're going to capture this, compute flags for the capture.
@@ -389,7 +302,7 @@ public:
     if (AFR.isKnownNoEscape())
       Flags |= CapturedValue::IsNoEscape;
 
-    addCapture(CapturedValue(D, Flags), DRE->getStartLoc());
+    addCapture(CapturedValue(D, Flags, DRE->getStartLoc()));
     return { false, DRE };
   }
 
@@ -418,16 +331,16 @@ public:
       if (!isNoEscapeClosure)
         Flags &= ~CapturedValue::IsNoEscape;
 
-      addCapture(CapturedValue(capture.getDecl(), Flags), captureLoc);
+      addCapture(CapturedValue(capture.getDecl(), Flags, captureLoc));
     }
 
     if (GenericParamCaptureLoc.isInvalid())
       if (captureInfo.hasGenericParamCaptures())
-        GenericParamCaptureLoc = getCaptureLoc(innerClosure);
+        GenericParamCaptureLoc = innerClosure.getLoc();
 
     if (DynamicSelfCaptureLoc.isInvalid())
       if (captureInfo.hasDynamicSelfCapture()) {
-        DynamicSelfCaptureLoc = getCaptureLoc(innerClosure);
+        DynamicSelfCaptureLoc = innerClosure.getLoc();
         DynamicSelf = captureInfo.getDynamicSelfType();
       }
 
@@ -633,7 +546,7 @@ public:
     if (auto *superE = dyn_cast<SuperRefExpr>(E)) {
       auto CurDC = AFR.getAsDeclContext();
       if (CurDC->isChildContextOf(superE->getSelf()->getDeclContext()))
-        addCapture(CapturedValue(superE->getSelf(), 0), superE->getLoc());
+        addCapture(CapturedValue(superE->getSelf(), 0, superE->getLoc()));
       return { false, superE };
     }
 
@@ -711,7 +624,7 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
     AFR.getBody()->walk(finder);
 
   if (AFR.hasType() && !AFR.isObjC()) {
-    finder.checkType(AFR.getType(), getCaptureLoc(AFR));
+    finder.checkType(AFR.getType(), AFR.getLoc());
   }
 
   // If this is an init(), explicitly walk the initializer values for members of

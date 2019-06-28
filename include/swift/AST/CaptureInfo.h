@@ -14,6 +14,7 @@
 #define SWIFT_AST_CAPTURE_INFO_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/SourceLoc.h"
 #include "swift/AST/TypeAlignments.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerIntPair.h"
@@ -44,8 +45,9 @@ public:
 
 private:
   Storage Value;
+  SourceLoc Loc;
 
-  explicit CapturedValue(Storage V) : Value(V) {}
+  explicit CapturedValue(Storage V, SourceLoc Loc) : Value(V), Loc(Loc) {}
 
 public:
   friend struct llvm::DenseMapInfo<CapturedValue>;
@@ -61,12 +63,14 @@ public:
     IsNoEscape = 1 << 1
   };
 
-  CapturedValue(llvm::PointerUnion<ValueDecl*, OpaqueValueExpr*> Ptr,
-                unsigned Flags)
-      : Value(Ptr, Flags) {}
+  CapturedValue(ValueDecl *Val, unsigned Flags, SourceLoc Loc)
+      : Value(Val, Flags), Loc(Loc) {}
+
+  CapturedValue(OpaqueValueExpr *Val, unsigned Flags)
+      : Value(Val, Flags), Loc(SourceLoc()) {}
 
   static CapturedValue getDynamicSelfMetadata() {
-    return CapturedValue((ValueDecl *)nullptr, 0);
+    return CapturedValue((ValueDecl *)nullptr, 0, SourceLoc());
   }
 
   bool isDirect() const { return Value.getInt() & IsDirect; }
@@ -80,7 +84,9 @@ public:
   CapturedValue mergeFlags(CapturedValue cv) {
     assert(Value.getPointer() == cv.Value.getPointer() &&
            "merging flags on two different value decls");
-    return CapturedValue(Value.getPointer(), getFlags() & cv.getFlags());
+    return CapturedValue(
+        Storage(Value.getPointer(), getFlags() & cv.getFlags()),
+        Loc);
   }
 
   ValueDecl *getDecl() const {
@@ -95,48 +101,12 @@ public:
     return Value.getPointer().dyn_cast<OpaqueValueExpr *>();
   }
 
+  SourceLoc getLoc() const { return Loc; }
+
   unsigned getFlags() const { return Value.getInt(); }
-
-  bool operator==(CapturedValue RHS) const {
-    return Value == RHS.Value;
-  }
-
-  bool operator!=(CapturedValue RHS) const {
-    return Value != RHS.Value;
-  }
-
-  bool operator<(CapturedValue RHS) const {
-    return Value < RHS.Value;
-  }
 };
 
 } // end swift namespace
-
-namespace llvm {
-
-template <> struct DenseMapInfo<swift::CapturedValue> {
-  using CapturedValue = swift::CapturedValue;
-
-  using PtrIntPairDenseMapInfo = DenseMapInfo<CapturedValue::Storage>;
-
-  static inline swift::CapturedValue getEmptyKey() {
-    return CapturedValue{PtrIntPairDenseMapInfo::getEmptyKey()};
-  }
-
-  static inline CapturedValue getTombstoneKey() {
-    return CapturedValue{PtrIntPairDenseMapInfo::getTombstoneKey()};
-  }
-
-  static unsigned getHashValue(const CapturedValue &Val) {
-    return PtrIntPairDenseMapInfo::getHashValue(Val.Value);
-  }
-
-  static bool isEqual(const CapturedValue &LHS, const CapturedValue &RHS) {
-    return PtrIntPairDenseMapInfo::isEqual(LHS.Value, RHS.Value);
-  }
-};
-
-} // end llvm namespace
 
 namespace swift {
 
