@@ -15,6 +15,14 @@ public struct Wrapper<T> {
   // CHECK: [[@LINE-1]]:10 | constructor/Swift | init(body:) | [[WrapperBodyInit_USR:.*]] | Def,RelChild | rel: 1
     self.wrappedValue = body()
   }
+
+  public var projectedValue: Projection<T> {
+    get { Projection(item: wrappedValue) }
+  }
+}
+
+public struct Projection<T> {
+    var item: T
 }
 
 var globalInt: Int { return 17 }
@@ -54,12 +62,13 @@ public struct HasWrappers {
   // CHECK: [[@LINE-1]]:14 | instance-property/Swift | z | [[z_USR:.*]] | Def,RelChild | rel: 1
 
   func backingUse() {
-    _ = $y.wrappedValue + $z.wrappedValue + x + $x.wrappedValue
+    _ = _y.wrappedValue + _z.wrappedValue + x + _x.wrappedValue + $y.item
     // CHECK: [[@LINE-1]]:10 | instance-property/Swift | y | [[y_USR]] | Ref,Read,RelCont | rel: 1
     // CHECK: [[@LINE-2]]:12 | instance-property/Swift | wrappedValue | [[wrappedValue_USR:.*]] | Ref,Read,RelCont | rel: 1
     // CHECK: [[@LINE-3]]:28 | instance-property/Swift | z | [[z_USR]] | Ref,Read,RelCont | rel: 1
     // CHECK: [[@LINE-4]]:45 | instance-property/Swift | x | [[x_USR]] | Ref,Read,RelCont | rel: 1
     // CHECK: [[@LINE-5]]:50 | instance-property/Swift | x | [[x_USR]] | Ref,Read,RelCont | rel: 1
+    // CHECK: [[@LINE-6]]:68 | instance-property/Swift | y | [[y_USR]] | Ref,Read,RelCont | rel: 1
   }
 }
 

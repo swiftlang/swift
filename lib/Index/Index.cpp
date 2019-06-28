@@ -451,12 +451,13 @@ private:
     if (!reportRef(D, Loc, Info, Data.AccKind))
       return false;
 
-    // If this is a reference to a property wrapper backing property, report a
-    // reference to the wrapped property too (i.e. report an occurrence of `foo`
-    // in `$foo`.
+    // If this is a reference to a property wrapper backing property or
+    // projected value, report a reference to the wrapped property too (i.e.
+    // report an occurrence of `foo` in `_foo` and '$foo').
     if (auto *VD = dyn_cast<VarDecl>(D)) {
       if (auto *Wrapped = VD->getOriginalWrappedProperty()) {
-        assert(Range.getByteLength() > 1 && Range.str().front() == '$');
+        assert(Range.getByteLength() > 1 &&
+               (Range.str().front() == '_' || Range.str().front() == '$'));
         auto AfterDollar = Loc.getAdvancedLoc(1);
         reportRef(Wrapped, AfterDollar, Info, None);
       }
