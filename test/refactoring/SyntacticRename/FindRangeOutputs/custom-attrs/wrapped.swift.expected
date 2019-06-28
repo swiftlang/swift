@@ -7,6 +7,13 @@ struct /*wrapper:def*/Foo<T> {
     init(initialValue: T, otherThing: Bool) {
         self.init(initialValue: initialValue)
     }
+    var projectedValue: Projection<T> {
+      get { Projection(item: wrappedValue) }
+    }
+}
+
+struct Projection<T> {
+    var item: T
 }
 
 @_functionBuilder
@@ -41,10 +48,11 @@ struct Bar {
     }
 
     func baz() {
-        let _: /*wrapper*/Foo<Int> = /*wrapped+1*/$<base>foo</base>
-        let _: Int = /*wrapped+1*/$<base>foo</base>.wrappedValue
+        let _: /*wrapper*/Foo<Int> = /*wrapped+1*/_<base>foo</base>
+        let _: Int = /*wrapped+1*/_<base>foo</base>.wrappedValue
         let _: Int = /*wrapped*/<base>foo</base>
-        let _: /*wrapper*/Foo<String> = $bar
+        let _: Projection<Int> = /*wrapped+1*/$<base>foo</base>
+        let _: /*wrapper*/Foo<String> = _bar
     }
 }
 

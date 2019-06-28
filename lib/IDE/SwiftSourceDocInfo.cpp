@@ -91,11 +91,6 @@ bool CursorInfoResolver::tryResolve(ValueDecl *D, TypeDecl *CtorTyRef,
         VD = Parent;
       }
     }
-    // If this is the backing property of a property wrapper, treat it as
-    // the wrapped value instead.
-    if (auto *Wrapped = VD->getOriginalWrappedProperty()) {
-      D = Wrapped;
-    }
   }
   CursorInfo.setValueRef(D, CtorTyRef, ExtTyRef, IsRef, Ty, ContainerType);
   return true;
@@ -791,9 +786,10 @@ bool NameMatcher::tryResolve(ASTWalker::ParentTy Node, SourceLoc NameLoc,
       WasResolved = true;
     }
 
-    if (Range.getByteLength() > 1 && Range.str().front() == '$') {
-      // Also try after any leading dollar for name references of wrapped
-      // properties, e.g. 'foo' in '$foo' occurrences.
+    if (Range.getByteLength() > 1 &&
+        (Range.str().front() == '_' || Range.str().front() == '$')) {
+      // Also try after any leading _ or $ for name references of wrapped
+      // properties, e.g. 'foo' in '_foo' and '$foo' occurrences.
       auto NewRange = CharSourceRange(Range.getStart().getAdvancedLoc(1),
                                       Range.getByteLength() - 1);
       if (NewRange.getStart() == Next.Loc) {
