@@ -960,6 +960,14 @@ static GenericSignature *getNewGenericSignature(ValueDecl *base,
     GenericSignatureBuilder builder(ctx);
     builder.addGenericSignature(derivedClass->getGenericSignature());
 
+    if (auto derivedGenericCtx = derived->getAsGenericContext()) {
+      if (derivedGenericCtx->isGeneric()) {
+        for (auto param : *derivedGenericCtx->getGenericParams()) {
+          builder.addGenericParameter(param);
+        }
+      }
+    }
+
     auto source =
         GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
 
