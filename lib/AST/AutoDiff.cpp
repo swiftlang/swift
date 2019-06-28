@@ -203,10 +203,24 @@ void AutoDiffParameterIndices::getSubsetParameterTypes(
   }
 }
 
+/// Pushes the subset's parameter's types to `paramTypes`, in the order in
+/// which they appear in the function type. For example,
+///
+///   functionType = (A, B, C) -> R
+///   if "A" and "C" are in the set,
+///   ==> pushes {A, C} to `paramTypes`.
+///
+///   functionType = (A, B) -> (C, D) -> R
+///   ==> pushes {A, C, D} to `paramTypes` if `reverseCurryLevels` is true,
+///    or pushes {C, D, A} otherwise.
+///
+///   functionType = (Self) -> (A, B, C) -> R
+///   ==> pushes {Self, C} to `paramTypes` if `reverseCurryLevels` is true,
+///    or pushes {C, Self} otherwise.
+///
 void AutoDiffIndexSubset::getIndexSubsetParameterTypes(
-AnyFunctionType *functionType,
-SmallVectorImpl<Type> &paramTypes,
-bool reverseCurryLevels) const {
+    AnyFunctionType *functionType, SmallVectorImpl<Type> &paramTypes,
+    bool reverseCurryLevels) const {
   SmallVector<AnyFunctionType *, 2> curryLevels;
   unwrapCurryLevels(functionType, curryLevels);
   
@@ -227,11 +241,14 @@ bool reverseCurryLevels) const {
   for (unsigned curryLevelIndex : indices(curryLevels)) {
     auto *curryLevel = curryLevels[curryLevelIndex];
     unsigned parameterIndexOffset =
-    curryLevelParameterIndexOffsets[curryLevelIndex];
-    for (unsigned paramIndex : range(curryLevel->getNumParams()))
-      if (getBitWord(parameterIndexOffset + paramIndex))
+        curryLevelParameterIndexOffsets[curryLevelIndex];
+    for (unsigned paramIndex : range(curryLevel->getNumParams())) {
+      if (((parameterIndexOffset + paramIndex) < getNumBitWords()) &&
+          getBitWord(parameterIndexOffset + paramIndex)) {
         paramTypes.push_back(
-                             curryLevel->getParams()[paramIndex].getPlainType());
+            curryLevel->getParams()[paramIndex].getPlainType());
+      }
+    }
   }
 }
 

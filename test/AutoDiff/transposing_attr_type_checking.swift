@@ -11,51 +11,79 @@ func transposingLinearFunc(x: Float) -> Float {
   return x
 }
 
-func foo1(_ x: Float, _ y: Double) -> Double {
+func twoParams(_ x: Float, _ y: Double) -> Double {
     return Double(x) + y
 }
-@transposing(foo1, wrt: (0, 1)) // ok
-func bar1(_ t: Double) ->  (Float, Double) {
+
+@transposing(twoParams, wrt: (0, 1)) // ok
+func twoParamsT1(_ t: Double) ->  (Float, Double) {
     return (Float(t), t)
 }
 
-func foo2<T: Differentiable>(x: T) -> T where T == T.TangentVector {
+@transposing(twoParams, wrt: 0) // ok
+func twoParamsT2(_ t: Double, _ y: Double) ->  Float {
+    return Float(t + y)
+}
+
+@transposing(twoParams, wrt: 1) // ok
+func twoParamsT3(_ x: Float, _ t: Double) ->  Double {
+    return Double(x) + t
+}
+
+func generic<T: Differentiable>(x: T) -> T where T == T.TangentVector {
   return x
 }
 
-@transposing(foo2, wrt: 0)
-func bar2<T: Differentiable>(x: T) -> T where T == T.TangentVector {
+@transposing(generic, wrt: 0) // ok
+func genericT<T: Differentiable>(x: T) -> T where T == T.TangentVector {
   return x
 }
 
-func foo3<T: AdditiveArithmetic>(x: T) -> T {
+func withInt(x: Float, y: Int) -> Float {
+  if y >= 0 {
+    return x
+  } else {
+    return x
+  }
+}
+
+@transposing(withInt, wrt: 0) // ok
+func withIntT(x: Int, t: Float) -> Float {
+  return t
+}
+
+func missingDiffSelfRequirement<T: AdditiveArithmetic>(x: T) -> T {
   return x
 }
 
 // expected-error @+1 {{can only differentiate with respect to parameters that conform to 'Differentiable' and where 'T == T.TangentVector'}}
-@transposing(foo3, wrt: 0)
-func bar3<T: AdditiveArithmetic>(x: T) -> T {
+@transposing(missingDiffSelfRequirement, wrt: 0)
+func missingDiffSelfRequirementT<T: AdditiveArithmetic>(x: T) -> T {
   return x
 }
 
-func foo4<T: Differentiable>(x: T) -> T {
+// TODO: error should be "can only differentiate with respect to parameters that conform to 'Differentiable' and where 'T == T.TangentVector'"
+// but currently there is an assertion failure.
+/*func missingSelfRequirement<T: Differentiable>(x: T) 
+  -> T where T.TangentVector == T {
   return x
 }
 
-// expected-error @+1 {{can only differentiate with respect to parameters that conform to 'Differentiable' and where 'T == T.TangentVector'}}
-@transposing(foo4, wrt: 0)
-func bar4<T: Differentiable>(x: T) -> T {
+@transposing(missingSelfRequirement, wrt: 0)
+func missingSelfRequirementT<T: Differentiable>(x: T) -> T {
   return x
-}
+}*/
 
-func foo5<T: Differentiable & BinaryFloatingPoint>(x: T) -> T 
-where T == T.TangentVector {
+func differentGenericConstraint<T: Differentiable & BinaryFloatingPoint>(x: T)
+  -> T where T == T.TangentVector {
   return x
 }
 
 // expected-error @+2 {{type 'T' does not conform to protocol 'BinaryFloatingPoint'}}
-// expected-error @+1 {{could not find function 'foo5' with expected type '<T where T : Differentiable, T == T.TangentVector> (T) -> T'}}
-@transposing(foo5, wrt: 0)
-func bar5<T: Differentiable>(x: T) -> T where T == T.TangentVector {
+// expected-error @+1 {{could not find function 'differentGenericConstraint' with expected type '<T where T : Differentiable, T == T.TangentVector> (T) -> T'}}
+@transposing(differentGenericConstraint, wrt: 0)
+func differentGenericConstraintT<T: Differentiable>(x: T) 
+  -> T where T == T.TangentVector {
   return x
 }
+

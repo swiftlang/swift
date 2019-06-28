@@ -3030,8 +3030,8 @@ static AutoDiffIndexSubset *computeTransposingParameters(
 //        function, derivativeGenEnv);
   
   // Otherwise, build parameter indices from parsed differentiation parameters.
-  auto paramIndices = SmallBitVector(parsedWrtParams.size());
   unsigned numParams = params.size() + transposeResultTypes.size() - 1;
+  auto paramIndices = SmallBitVector(numParams);
   int lastIndex = -1;
   for (unsigned i : indices(parsedWrtParams)) {
     auto paramLoc = parsedWrtParams[i].getLoc();
@@ -3143,7 +3143,7 @@ static bool checkDifferentiationParameters(
 // diagnostics.
 static bool checkTransposingParameters(
     TypeChecker &TC, AbstractFunctionDecl *AFD,
-    AutoDiffIndexSubset *indices, AnyFunctionType *functionType,
+    AutoDiffIndexSubset *indices, SmallVector<Type, 4> wrtParamTypes,
     GenericEnvironment *derivativeGenEnv, ModuleDecl *module,
 ArrayRef<ParsedAutoDiffParameter> parsedWrtParams, SourceLoc attrLoc) {
   // Diagnose empty parameter indices. This occurs when no `wrt` clause is
@@ -3154,8 +3154,6 @@ ArrayRef<ParsedAutoDiffParameter> parsedWrtParams, SourceLoc attrLoc) {
   }
   
   // Check that differentiation parameters have allowed types.
-  SmallVector<Type, 4> wrtParamTypes;
-  indices->getIndexSubsetParameterTypes(functionType, wrtParamTypes);
   for (unsigned i : range(wrtParamTypes.size())) {
     auto wrtParamType = wrtParamTypes[i];
     if (!wrtParamType->hasTypeParameter())
@@ -3166,8 +3164,8 @@ ArrayRef<ParsedAutoDiffParameter> parsedWrtParams, SourceLoc attrLoc) {
     else
       wrtParamType = AFD->mapTypeIntoContext(wrtParamType);
     SourceLoc loc = parsedWrtParams.empty()
-    ? attrLoc
-    : parsedWrtParams[i].getLoc();
+        ? attrLoc
+        : parsedWrtParams[i].getLoc();
     // Parameter cannot have a class or existential type.
     if ((!wrtParamType->hasTypeParameter() &&
          wrtParamType->isAnyClassReferenceType()) ||
@@ -3884,6 +3882,7 @@ void AttributeChecker::visitTransposingAttr(TransposingAttr *attr) {
           if (!source)
             return false;
           // Check if target's requirements are satisfied by source.
+          // TODO: Assertion failure!
           return TC.checkGenericArguments(
                      transpose, original.Loc.getBaseNameLoc(),
                      original.Loc.getBaseNameLoc(), Type(),
@@ -3951,7 +3950,7 @@ void AttributeChecker::visitTransposingAttr(TransposingAttr *attr) {
   attr->setOriginalFunction(originalFn);
   
   // Get checked wrt param indices.
-  AutoDiffIndexSubset *checkedWrtParamIndices =
+  AutoDiffIndexSubset *wrtParamIndices =
       attr->getParameterIndexSubset();
   
   // Get the parsed wrt param indices, which have not yet been checked.
@@ -3960,19 +3959,25 @@ void AttributeChecker::visitTransposingAttr(TransposingAttr *attr) {
   
   // If checked wrt param indices are not specified, compute them.
   bool isCurried = transposeInterfaceType->getResult()->is<AnyFunctionType>();
-  if (!checkedWrtParamIndices)
-    checkedWrtParamIndices =
-    computeTransposingParameters(TC, parsedWrtParams, transpose, isCurried,
-                                 transpose->getGenericEnvironment(),
-                                 attr->getLocation());
-  if (!checkedWrtParamIndices) {
+  if (!wrtParamIndices)
+    wrtParamIndices =
+        computeTransposingParameters(TC, parsedWrtParams, transpose, isCurried,
+                                     transpose->getGenericEnvironment(),
+                                     attr->getLocation());
+  if (!wrtParamIndices) {
     attr->setInvalid();
     return;
   }
   
+  // Gather differentiation parameters.
+  SmallVector<Type, 4> wrtParamTypes;
+  wrtParamIndices->getIndexSubsetParameterTypes(
+      expectedOriginalFnType,
+      wrtParamTypes);
+
   // Check if differentiation parameter indices are valid.
   if (checkTransposingParameters(
-          TC, originalFn, checkedWrtParamIndices, expectedOriginalFnType,
+          TC, originalFn, wrtParamIndices, wrtParamTypes,
           transpose->getGenericEnvironment(), transpose->getModuleContext(),
           parsedWrtParams, attr->getLocation())) {
     attr->setInvalid();
@@ -3980,7 +3985,7 @@ void AttributeChecker::visitTransposingAttr(TransposingAttr *attr) {
   }
   
   // Set the checked differentiation parameter indices in the attribute.
-  attr->setParameterIndices(checkedWrtParamIndices);
+  attr->setParameterIndices(wrtParamIndices);
   
   // `R` result type must conform to `Differentiable`.
   auto diffableProto = ctx.getProtocol(KnownProtocolKind::Differentiable);
@@ -3999,12 +4004,7 @@ void AttributeChecker::visitTransposingAttr(TransposingAttr *attr) {
     return;
   }
   
-  // Gather differentiation parameters.
-  SmallVector<Type, 4> wrtParamTypes;
-  checkedWrtParamIndices->getIndexSubsetParameterTypes(
-      expectedOriginalFnType,
-      wrtParamTypes);
-  
+  // TODO(bartchr): I'm not using this array anywhere.
   auto diffParamElts =
       map<SmallVector<TupleTypeElt, 4>>(wrtParamTypes, [&](Type paramType) {
         if (paramType->hasTypeParameter())
