@@ -1,28 +1,27 @@
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -emit-library %s -module-name ARCHIVER -static 2>&1 > %t.macos.txt
+// RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -emit-library %s -module-name ARCHIVER -static 2>&1 | %FileCheck -check-prefix CHECK-MACOS %s
 
-// CHECK: swift
-// CHECK: -o [[OBJECTFILE:.*]]
+// CHECK-MACOS: swift
+// CHECK-MACOS: -o [[OBJECTFILE:.*]]
 
-// CHECK-NEXT: {{(bin/)?}}libtool{{"? }} -static
-// CHECK-DAG: [[OBJECTFILE]]
-// CHECK: -o {{[^ ]+}}
+// CHECK-MACOS-NEXT: {{(bin/)?}}libtool{{"?}} -static
+// CHECK-MACOS-DAG: [[OBJECTFILE]]
+// CHECK-MACOS: -o {{[^ ]+}}
 
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-linux-gnu -emit-library %s -module-name ARCHIVER -static 2>&1 > %t.linux.txt
+// RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-linux-gnu -emit-library %s -module-name ARCHIVER -static 2>&1 | %FileCheck -check-prefix CHECK-LINUX %s
 
-// CHECK: swift
-// CHECK: -o [[OBJECTFILE:.*]]
+// CHECK-LINUX: swift
+// CHECK-LINUX: -o [[OBJECTFILE:.*]]
 
-// CHECK-NEXT: {{(bin/)?}}{{(llvm-)?}}ar{{"? }} crs
-// CHECK-NEXT: {{[^ ]+}}
+// CHECK-LINUX: {{(bin/)?(llvm-)?}}ar{{"?}} crs
 
-// RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-windows-msvc -emit-library %s -module-name ARCHIVER -static 2>&1 > %t.windows.txt
+// RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-windows-msvc -emit-library %s -module-name ARCHIVER -static 2>&1 | %FileCheck -check-prefix CHECK-WINDOWS %s
 
-// CHECK: swift
-// CHECK: -o [[OBJECTFILE:.*]]
+// CHECK-WINDOWS: swift
+// CHECK-WINDOWS: -o [[OBJECTFILE:.*]]
 
-// CHECK-NEXT: lib -link
-// CHECK-DAG: [[OBJECTFILE]]
-// CHECK: /OUT:{{[^ ]+}}
+// CHECK-WINDOWS-NEXT: link{{(.exe)?"?}} -lib
+// CHECK-WINDOWS-DAG: [[OBJECTFILE]]
+// CHECK-WINDOWS: /OUT:{{[^ ]+}}
 
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -emit-library %s -module-name ARCHIVER -static | %FileCheck -check-prefix INFERRED_NAME_DARWIN %s
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-linux-gnu -emit-library %s -module-name ARCHIVER -static | %FileCheck -check-prefix INFERRED_NAME_LINUX %s
