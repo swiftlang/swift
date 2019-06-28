@@ -1974,37 +1974,38 @@ bool MissingCallFailure::diagnoseAsError() {
 }
 
 bool ExtraneousPropertyWrapperUnwrapFailure::diagnoseAsError() {
+  auto loc = getAnchor()->getLoc();
   auto newPrefix = usingStorageWrapper() ? "$" : "_";
-  if (auto member = getMemberName()) {
-    emitDiagnostic(getAnchor()->getLoc(),
-                   diag::incorrect_property_wrapper_reference_member, member,
-                   false, getToType())
-        .fixItInsert(getAnchor()->getLoc(), newPrefix);
+
+  if (auto *member = getReferencedMember()) {
+    emitDiagnostic(loc, diag::incorrect_property_wrapper_reference_member,
+                   member->getDescriptiveKind(), member->getFullName(), false,
+                   getToType())
+        .fixItInsert(loc, newPrefix);
     return true;
   }
 
-  emitDiagnostic(getAnchor()->getLoc(),
-                 diag::incorrect_property_wrapper_reference,
-                 getProperty()->getName(), getFromType(), getToType(), false)
-      .fixItInsert(getAnchor()->getLoc(), newPrefix);
+  emitDiagnostic(loc, diag::incorrect_property_wrapper_reference,
+                 getPropertyName(), getFromType(), getToType(), false)
+      .fixItInsert(loc, newPrefix);
   return true;
 }
 
 bool MissingPropertyWrapperUnwrapFailure::diagnoseAsError() {
+  auto loc = getAnchor()->getLoc();
   auto endLoc = getAnchor()->getLoc().getAdvancedLoc(1);
-  if (auto member = getMemberName()) {
-    emitDiagnostic(getAnchor()->getLoc(),
-                   diag::incorrect_property_wrapper_reference_member, member,
-                   true, getToType())
-        .fixItRemoveChars(getAnchor()->getLoc(), endLoc);
+
+  if (auto *member = getReferencedMember()) {
+    emitDiagnostic(loc, diag::incorrect_property_wrapper_reference_member,
+                   member->getDescriptiveKind(), member->getFullName(), true,
+                   getToType())
+        .fixItRemoveChars(loc, endLoc);
     return true;
   }
 
-  emitDiagnostic(getAnchor()->getLoc(),
-                 diag::incorrect_property_wrapper_reference,
-                 getProperty()->getName(), getFromType(), getToType(), true)
-      .fixItRemoveChars(getAnchor()->getLoc(), endLoc);
-
+  emitDiagnostic(loc, diag::incorrect_property_wrapper_reference,
+                 getPropertyName(), getFromType(), getToType(), true)
+      .fixItRemoveChars(loc, endLoc);
   return true;
 }
 

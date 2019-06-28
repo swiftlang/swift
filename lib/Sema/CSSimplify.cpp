@@ -4815,18 +4815,17 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
     if (auto dotExpr =
             dyn_cast_or_null<UnresolvedDotExpr>(locator->getAnchor())) {
       auto baseExpr = dotExpr->getBase();
-      auto resolvedOverload = findSelectedOverloadFor(baseExpr);
 
-      if (resolvedOverload) {
+      if (auto resolvedOverload = findSelectedOverloadFor(baseExpr)) {
         if (auto storageWrapper =
                 getStorageWrapperInformation(resolvedOverload)) {
           auto wrapperTy = storageWrapper->second;
           auto result =
               solveWithNewBaseOrName(wrapperTy, member, /*allowFixes=*/false);
           if (result == SolutionKind::Solved) {
-            auto *fix = UsePropertyWrapper::create(
-                *this, storageWrapper->first, member,
-                /*usingStorageWrapper=*/true, baseTy, wrapperTy, locator);
+            auto *fix = UsePropertyWrapper::create(*this, storageWrapper->first,
+                                                   /*usingStorageWrapper=*/true,
+                                                   baseTy, wrapperTy, locator);
             return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
           }
         }
@@ -4837,9 +4836,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
               solveWithNewBaseOrName(wrapperTy, member, /*allowFixes=*/false);
           if (result == SolutionKind::Solved) {
             auto *fix = UsePropertyWrapper::create(
-                *this, wrapper->first, member,
-                /*usingStorageWrappeer=*/false, baseTy, wrapperTy,
-                locator);
+                *this, wrapper->first,
+                /*usingStorageWrappeer=*/false, baseTy, wrapperTy, locator);
             return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
           }
         }
@@ -4851,9 +4849,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
               solveWithNewBaseOrName(wrappedTy, member, /*allowFixes=*/false);
 
           if (result == SolutionKind::Solved) {
-            auto *fix =
-                UseWrappedValue::create(*this, wrappedProperty->first, member,
-                                        baseTy, wrappedTy, locator);
+            auto *fix = UseWrappedValue::create(*this, wrappedProperty->first,
+                                                baseTy, wrappedTy, locator);
             return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
           }
         }

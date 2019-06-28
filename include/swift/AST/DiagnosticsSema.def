@@ -1012,11 +1012,12 @@ ERROR(cannot_pass_inout_arg_to_subscript,none,
       "to a pointer", ())
 
 ERROR(incorrect_property_wrapper_reference,none,
-      "cannot convert value %0 of type %1 to expected type %2, use %select{wrapper| wrapped value}3 instead",
+      "cannot convert value %0 of type %1 to expected type %2, "
+      "use %select{wrapper| wrapped value}3 instead",
       (Identifier, Type, Type, bool))
 ERROR(incorrect_property_wrapper_reference_member,none,
-      "referencing member %0 requires %select{wrapper|wrapped value of type}1 %2",
-      (DeclName, bool, Type))
+      "referencing %0 %1 requires %select{wrapper|wrapped value of type}2 %3",
+      (DescriptiveDeclKind, DeclName, bool, Type))
 
 ERROR(missing_init_on_metatype_initialization,none,
       "initializing from a metatype value must reference 'init' explicitly",

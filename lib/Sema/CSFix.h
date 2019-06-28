@@ -639,18 +639,16 @@ public:
 
 class UsePropertyWrapper final : public ConstraintFix {
   VarDecl *Wrapped;
-  DeclName MemberName;
   bool UsingStorageWrapper;
   Type Base;
   Type Wrapper;
 
   UsePropertyWrapper(ConstraintSystem &cs, VarDecl *wrapped,
-                     DeclName memberName, bool usingStorageWrapper, Type base,
-                     Type wrapper, ConstraintLocator *locator)
+                     bool usingStorageWrapper, Type base, Type wrapper,
+                     ConstraintLocator *locator)
       : ConstraintFix(cs, FixKind::UsePropertyWrapper, locator),
-        Wrapped(wrapped), MemberName(memberName),
-        UsingStorageWrapper(usingStorageWrapper), Base(base), Wrapper(wrapper) {
-  }
+        Wrapped(wrapped), UsingStorageWrapper(usingStorageWrapper), Base(base),
+        Wrapper(wrapper) {}
 
 public:
   std::string getName() const override {
@@ -660,23 +658,19 @@ public:
   bool diagnose(Expr *root, bool asNote = false) const override;
 
   static UsePropertyWrapper *create(ConstraintSystem &cs, VarDecl *wrapped,
-                                    DeclName memberName,
                                     bool usingStorageWrapper, Type base,
                                     Type wrapper, ConstraintLocator *locator);
 };
 
 class UseWrappedValue final : public ConstraintFix {
   VarDecl *PropertyWrapper;
-  DeclName MemberName;
   Type Base;
   Type Wrapper;
 
-  UseWrappedValue(ConstraintSystem &cs, VarDecl *propertyWrapper,
-                  DeclName memberName, Type base, Type wrapper,
-                  ConstraintLocator *locator)
+  UseWrappedValue(ConstraintSystem &cs, VarDecl *propertyWrapper, Type base,
+                  Type wrapper, ConstraintLocator *locator)
       : ConstraintFix(cs, FixKind::UseWrappedValue, locator),
-        PropertyWrapper(propertyWrapper), MemberName(memberName), Base(base),
-        Wrapper(wrapper) {}
+        PropertyWrapper(propertyWrapper), Base(base), Wrapper(wrapper) {}
 
   bool usingStorageWrapper() const {
     auto nameStr = PropertyWrapper->getName().str();
@@ -691,7 +685,7 @@ public:
   bool diagnose(Expr *root, bool asNote = false) const override;
 
   static UseWrappedValue *create(ConstraintSystem &cs, VarDecl *propertyWrapper,
-                                 DeclName memberName, Type base, Type wrapper,
+                                 Type base, Type wrapper,
                                  ConstraintLocator *locator);
 };
 
