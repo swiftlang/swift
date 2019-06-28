@@ -1197,6 +1197,30 @@ void Remangler::mangleFunctionType(Node *node) {
   Buffer << 'c';
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+void Remangler::mangleDifferentiableFunctionType(Node *node) {
+  mangleFunctionSignature(node);
+  Buffer << "XF";
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+void Remangler::mangleEscapingDifferentiableFunctionType(Node *node) {
+  mangleFunctionSignature(node);
+  Buffer << "XG";
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+void Remangler::mangleLinearFunctionType(Node *node) {
+  mangleFunctionSignature(node);
+  Buffer << "XH";
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+void Remangler::mangleEscapingLinearFunctionType(Node *node) {
+  mangleFunctionSignature(node);
+  Buffer << "XI";
+}
+
 void Remangler::mangleGenericProtocolWitnessTable(Node *node) {
   mangleSingleChildNode(node);
   Buffer << "WG";

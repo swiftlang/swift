@@ -516,6 +516,10 @@ Types
   FUNCTION-KIND ::= 'C'                      // C function pointer type
   FUNCTION-KIND ::= 'A'                      // @auto_closure function type (escaping)
   FUNCTION-KIND ::= 'E'                      // function type (noescape)
+  FUNCTION-KIND ::= 'F'                      // @differentiable function type
+  FUNCTION-KIND ::= 'G'                      // @differentiable function type (escaping)
+  FUNCTION-KIND ::= 'H'                      // @differentiable(linear) function type
+  FUNCTION-KIND ::= 'I'                      // @differentiable(linear) function type (escaping)
 
   function-signature ::= params-type params-type throws? // results and parameters
 

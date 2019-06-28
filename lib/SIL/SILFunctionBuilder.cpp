@@ -80,23 +80,42 @@ void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
       !constant.isStoredPropertyInitializer() &&
       !constant.isThunk()) {
     for (auto *A : Attrs.getAttributes<DifferentiableAttr>()) {
-      std::string jvpName, vjpName;
-      // Get JVP/VJP names.
-      if (auto *jvpFn = A->getJVPFunction())
-        jvpName = SILDeclRef(jvpFn).mangle();
-      if (auto *vjpFn = A->getVJPFunction())
-        vjpName = SILDeclRef(vjpFn).mangle();
       // Get lowered argument indices.
-      auto paramIndices = A->getParameterIndices();
+      auto *paramIndices = A->getParameterIndices();
       // NOTE: If `A->getParameterIndices()` is `nullptr`, continue. This is a
       // necessary hack regarding deserialization.
       if (!paramIndices)
         continue;
-      auto loweredParamIndices = paramIndices->getLowered(
+      auto *loweredParamIndices = paramIndices->getLowered(
           F->getASTContext(),
           decl->getInterfaceType()->castTo<AnyFunctionType>());
       SILAutoDiffIndices indices(/*source*/ 0, loweredParamIndices);
-      auto silDiffAttr = SILDifferentiableAttr::create(
+      // Get JVP/VJP names.
+      std::string jvpName, vjpName;
+      // If a method-self-reordering thunk is generated for the original
+      // function, use mangled JVP/VJP symbols.
+      auto *AFD = constant.getAbstractFunctionDecl();
+      auto selfParamIndex =
+          F->getLoweredFunctionType()->getNumParameters() - 1;
+      if (AFD && AFD->isInstanceMember() &&
+          F->getLoweredFunctionType()->hasSelfParam() &&
+          indices.isWrtParameter(selfParamIndex) &&
+          indices.parameters->getNumIndices() > 1) {
+        auto &ctx = F->getASTContext();
+        if (A->getJVPFunction())
+          jvpName = ctx.getIdentifier(
+              "AD__" + constant.mangle() + "__jvp_" + indices.mangle()).str();
+        if (A->getVJPFunction()) {
+          vjpName = ctx.getIdentifier(
+              "AD__" + constant.mangle() + "__vjp_" + indices.mangle()).str();
+        }
+      } else {
+        if (auto *jvpFn = A->getJVPFunction())
+          jvpName = SILDeclRef(jvpFn).mangle();
+        if (auto *vjpFn = A->getVJPFunction())
+          vjpName = SILDeclRef(vjpFn).mangle();
+      }
+      auto *silDiffAttr = SILDifferentiableAttr::create(
           M, indices, A->getRequirements(), M.allocateCopy(jvpName),
           M.allocateCopy(vjpName));
 #ifndef NDEBUG
