@@ -2912,7 +2912,7 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
     if (resultDC->isLocalContext() || access == AccessLevel::Private)
       return AccessScope(resultDC, /*private*/true);
 
-    if (auto enclosingNominal = dyn_cast<NominalTypeDecl>(resultDC)) {
+    if (auto enclosingNominal = dyn_cast<GenericTypeDecl>(resultDC)) {
       auto enclosingAccess =
           getAdjustedFormalAccess(enclosingNominal, useDC,
                                   treatUsableFromInlineAsPublic);
