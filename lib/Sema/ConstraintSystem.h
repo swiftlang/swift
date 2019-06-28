@@ -1867,14 +1867,6 @@ public:
     return ParamTypes.find(P)->second;
   }
 
-  Type getType(const VarDecl *D, bool wantInterfaceType = true) const {
-    if (auto *P = dyn_cast<ParamDecl>(D))
-      return getType(P);
-
-    assert(D->hasValidSignature());
-    return wantInterfaceType ? D->getInterfaceType() : D->getType();
-  }
-
   Type getType(const KeyPathExpr *KP, unsigned I) const {
     assert(hasType(KP, I) && "Expected type to have been set!");
     return KeyPathComponentTypes.find(std::make_pair(KP, I))->second;

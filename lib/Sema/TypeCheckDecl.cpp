@@ -3901,8 +3901,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     if (PBD->isBeingValidated())
       return;
 
-    DeclValidationRAII IBV(D);
-
     if (!VD->hasInterfaceType()) {
       // Attempt to infer the type using initializer expressions.
       validatePatternBindingEntries(*this, PBD);
@@ -3920,7 +3918,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     // We're not really done with processing the signature yet, but
     // @objc checking requires the declaration to call itself validated
     // so that it can be considered as a witness.
-    D->setSignatureIsValidated();
+    D->setValidationToChecked();
 
     checkDeclAttributesEarly(VD);
     validateAttributes(*this, VD);
