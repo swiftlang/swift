@@ -2230,7 +2230,7 @@ ModuleFile::loadNamedMembers(const IterableDeclContext *IDC, DeclBaseName N,
   if (!subTable) {
     BCOffsetRAII restoreOffset(DeclMemberTablesCursor);
     fatalIfNotSuccess(DeclMemberTablesCursor.JumpToBit(subTableOffset));
-    auto entry = fatalIfUnexpected<llvm::BitstreamEntry>(
+    llvm::BitstreamEntry entry = fatalIfUnexpected(
         DeclMemberTablesCursor.advance());
     if (entry.Kind != llvm::BitstreamEntry::Record) {
       error();
@@ -2238,7 +2238,7 @@ ModuleFile::loadNamedMembers(const IterableDeclContext *IDC, DeclBaseName N,
     }
     SmallVector<uint64_t, 64> scratch;
     StringRef blobData;
-    unsigned kind = fatalIfUnexpected<unsigned>(
+    unsigned kind = fatalIfUnexpected(
         DeclMemberTablesCursor.readRecord(entry.ID, scratch, &blobData));
     assert(kind == decl_member_tables_block::DECL_MEMBERS);
     (void)kind;
