@@ -35,17 +35,16 @@ using namespace swift;
 using namespace namelookup;
 using namespace ast_scope;
 
-Optional<bool> ASTScopeImpl::unqualifiedLookup(
+llvm::SmallVector<const ASTScopeImpl *, 0> ASTScopeImpl::unqualifiedLookup(
     SourceFile *sourceFile, const DeclName name, const SourceLoc loc,
-    const DeclContext *const startingContext,
-    const Optional<bool> isCascadingUseArg, DeclConsumer consumer) {
+    const DeclContext *const startingContext, DeclConsumer consumer) {
+  SmallVector<const ASTScopeImpl *, 0> history;
+
   const auto *start =
       findStartingScopeForLookup(sourceFile, name, loc, startingContext);
-  if (!start)
-    return isCascadingUseArg;
-
-  return start->lookup(NullablePtr<DeclContext>(), nullptr, nullptr,
-                       isCascadingUseArg, consumer);
+  if (start)
+    start->lookup(history, nullptr, nullptr, consumer);
+  return history;
 }
 
 const ASTScopeImpl *ASTScopeImpl::findStartingScopeForLookup(
@@ -171,242 +170,209 @@ bool GenericParamScope::doesContextMatchStartingContext(
 
 #pragma mark lookup methods that run once per scope
 
-Optional<bool> ASTScopeImpl::lookup(
-    const NullablePtr<DeclContext> selfDC,
-    const NullablePtr<const ASTScopeImpl> limit,
-    const NullablePtr<const Decl> scopeWhoseTypeWasAlreadySearched,
-    const Optional<bool> isCascadingUseArg, DeclConsumer consumer) const {
+void ASTScopeImpl::lookup(SmallVectorImpl<const ASTScopeImpl *> &history,
+                          const NullablePtr<const ASTScopeImpl> limit,
+                          NullablePtr<const GenericParamList> lastListSearched,
+                          DeclConsumer consumer) const {
+
+  history.push_back(this);
+
 #ifndef NDEBUG
-  consumer.stopForDebuggingIfTargetLookup();
+  consumer.startingNextLookupStep();
 #endif
 
   // Certain illegal nestings, e.g. protocol nestled inside a struct,
   // require that lookup stop at the outer scope.
-  if (this == limit.getPtrOrNull())
-    return isCascadingUseArg;
-
-  const Optional<bool> isCascadingUseForThisScope =
-      resolveIsCascadingUseForThisScope(isCascadingUseArg);
-  // Check local variables, etc. first.
-  if (lookupLocalBindings(isCascadingUseForThisScope, consumer))
-    return isCascadingUseForThisScope;
-
-  /// Because a body scope nests in a generic param scope, etc, we might look in
-  /// the self type twice. That's why we pass scopeWhoseTypeWasAlreadySearched.
-  /// Look in the generics and self type only iff haven't already looked there.
-  const bool skipSearchForGenericsAndMembers =
-      scopeWhoseTypeWasAlreadySearched &&
-      scopeWhoseTypeWasAlreadySearched == getDecl().getPtrOrNull();
+  if (this == limit.getPtrOrNull()) {
+#ifndef NDEBUG
+    consumer.finishingLookup("limit return");
+#endif
+    return;
+  }
 
   // Look for generics before members in violation of lexical ordering because
   // you can say "self.name" to get a name shadowed by a generic but you
   // can't do the opposite to get a generic shadowed by a name.
-  if (!skipSearchForGenericsAndMembers) {
-    if (lookInMyGenericParameters(isCascadingUseForThisScope, consumer))
-      return isCascadingUseForThisScope;
-  }
-  // Dig out the type we're looking into.
-  // Perform lookup into the type
-  Optional<bool> isCascadingUseResult = isCascadingUseForThisScope;
-  if (!skipSearchForGenericsAndMembers) {
-    bool isDone;
-    std::tie(isDone, isCascadingUseResult) =
-        lookupInSelfType(selfDC, isCascadingUseResult, consumer);
-    if (isDone)
-      return isCascadingUseResult;
-  }
+  const auto doneAndListSearched =
+      lookInMyGenericParameters(lastListSearched, consumer);
+  if (doneAndListSearched.first)
+    return;
 
-  return lookupInParent(selfDC, limit, scopeWhoseTypeWasAlreadySearched,
-                        isCascadingUseResult, consumer);
-}
-
-Optional<bool> ASTScopeImpl::lookupInParent(
-    const NullablePtr<DeclContext> selfDC,
-    const NullablePtr<const ASTScopeImpl> limit,
-    const NullablePtr<const Decl> scopeWhoseTypeWasAlreadySearched,
-    const Optional<bool> isCascadingUse, DeclConsumer consumer) const {
+  if (lookupLocalsOrMembers(history, consumer))
+    return;
 
   const auto *const lookupParent = getLookupParent().getPtrOrNull();
-  if (!lookupParent)
-    return isCascadingUse;
-
-  // If this scope has an associated Decl, we have already searched its generics
-  // and selfType, so no need to look again.
-  NullablePtr<const Decl> scopeWhoseTypeWasAlreadySearchedForParent =
-      getDecl() ? getDecl().getPtrOrNull() : scopeWhoseTypeWasAlreadySearched;
+  if (!lookupParent) {
+#ifndef NDEBUG
+    consumer.finishingLookup("Finished lookup; no parent");
+#endif
+    return;
+  }
 
   // If there is no limit and this scope induces one, pass that on.
   const NullablePtr<const ASTScopeImpl> limitForParent =
       limit ? limit : getLookupLimit();
 
-  return lookupParent->lookup(computeSelfDCForParent(selfDC), limitForParent,
-                              scopeWhoseTypeWasAlreadySearchedForParent,
-                              isCascadingUse, consumer);
+  return lookupParent->lookup(history, limitForParent, lastListSearched,
+                              consumer);
 }
 
-#pragma mark lookInMyGenericParameters
+#pragma mark genericParams()
 
-bool ASTScopeImpl::lookInMyGenericParameters(Optional<bool> isCascadingUse,
-                                             ASTScopeImpl::DeclConsumer) const {
-  return false;
+NullablePtr<const GenericParamList> ASTScopeImpl::genericParams() const {
+  return nullptr;
 }
-
-bool AbstractFunctionDeclScope::lookInMyGenericParameters(
-    Optional<bool> isCascadingUse, ASTScopeImpl::DeclConsumer consumer) const {
-  return lookInGenericParametersOf(decl->getGenericParams(), isCascadingUse,
-                                   consumer);
+NullablePtr<const GenericParamList>
+AbstractFunctionDeclScope::genericParams() const {
+  return decl->getGenericParams();
 }
-
-bool SubscriptDeclScope::lookInMyGenericParameters(
-    Optional<bool> isCascadingUse, ASTScopeImpl::DeclConsumer consumer) const {
-  return lookInGenericParametersOf(decl->getGenericParams(), isCascadingUse,
-                                   consumer);
+NullablePtr<const GenericParamList> SubscriptDeclScope::genericParams() const {
+  return decl->getGenericParams();
 }
-
-bool GenericTypeScope::lookInMyGenericParameters(
-    Optional<bool> isCascadingUse, ASTScopeImpl::DeclConsumer consumer) const {
+NullablePtr<const GenericParamList> GenericTypeScope::genericParams() const {
   // For Decls:
   // WAIT, WHAT?! Isn't this covered by the GenericParamScope
-  // lookupLocalBindings? No, that's for use of generics in the body. This is
+  // lookupLocalsOrMembers? No, that's for use of generics in the body. This is
   // for generic restrictions.
 
   // For Bodies:
   // Sigh... These must be here so that from body, we search generics before
   // members. But they also must be on the Decl scope for lookups starting from
   // generic parameters, where clauses, etc.
-  return lookInGenericParametersOf(getGenericContext()->getGenericParams(),
-                                   isCascadingUse, consumer);
+  return getGenericContext()->getGenericParams();
+}
+NullablePtr<const GenericParamList> ExtensionScope::genericParams() const {
+  return decl->getGenericParams();
 }
 
-bool ExtensionScope::lookInMyGenericParameters(
-    Optional<bool> isCascadingUse, ASTScopeImpl::DeclConsumer consumer) const {
+#pragma mark lookInMyGenericParameters
+
+std::pair<bool, NullablePtr<const GenericParamList>>
+ASTScopeImpl::lookInMyGenericParameters(
+    NullablePtr<const GenericParamList> formerListSearched,
+    ASTScopeImpl::DeclConsumer consumer) const {
+  auto listToSearch = genericParams();
+  if (listToSearch == formerListSearched)
+    return std::make_pair(false, formerListSearched);
+
   // For extensions of nested types, must check outer parameters
-  for (auto *params = decl->getGenericParams(); params;
+  for (auto *params = listToSearch.getPtrOrNull(); params;
        params = params->getOuterParameters()) {
-    if (lookInGenericParametersOf(params, isCascadingUse, consumer))
-      return true;
+    if (lookInGenericParametersOf(params, consumer))
+      return std::make_pair(true, listToSearch);
   }
-  return false;
+  return std::make_pair(false, listToSearch);
 }
 
 bool ASTScopeImpl::lookInGenericParametersOf(
     const NullablePtr<const GenericParamList> paramList,
-    Optional<bool> isCascadingUse, ASTScopeImpl::DeclConsumer consumer) {
+    ASTScopeImpl::DeclConsumer consumer) {
   if (!paramList)
     return false;
   SmallVector<ValueDecl *, 32> bindings;
   for (auto *param : paramList.get()->getParams())
     bindings.push_back(param);
-  if (consumer.consume(bindings, DeclVisibilityKind::GenericParameter,
-                       isCascadingUse))
+  if (consumer.consume(bindings, DeclVisibilityKind::GenericParameter))
     return true;
   return false;
 }
 
-#pragma mark lookupInSelfType
+#pragma mark looking in locals or members - members
 
-std::pair<bool, Optional<bool>>
-ASTScopeImpl::lookupInSelfType(NullablePtr<DeclContext>,
-                               const Optional<bool> isCascadingUse,
-                               DeclConsumer) const {
-  return doNotLookupInSelfType(isCascadingUse);
+bool ASTScopeImpl::lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
+                                         DeclConsumer) const {
+  return false; // many kinds of scopes have none
 }
 
-std::pair<bool, Optional<bool>> GenericTypeOrExtensionScope::lookupInSelfType(
-    NullablePtr<DeclContext> selfDC, const Optional<bool> isCascadingUse,
+bool GenericTypeOrExtensionScope::lookupLocalsOrMembers(
+    ArrayRef<const ASTScopeImpl *> history,
     ASTScopeImpl::DeclConsumer consumer) const {
-  return portion->lookupInSelfTypeOf(this, selfDC, isCascadingUse, consumer);
+  // isCascadingUseArg must have already been resolved, for a real lookup
+  // but may be \c None for dumping.
+  return portion->lookupMembersOf(this, history, consumer);
 }
 
-std::pair<bool, Optional<bool>> Portion::lookupInSelfTypeOf(
-    const GenericTypeOrExtensionScope *scope, NullablePtr<DeclContext> selfDC,
-    const Optional<bool> isCascadingUse, ASTScopeImpl::DeclConsumer) const {
-  return scope->doNotLookupInSelfType(isCascadingUse);
+bool Portion::lookupMembersOf(const GenericTypeOrExtensionScope *,
+                              ArrayRef<const ASTScopeImpl *>,
+                              ASTScopeImpl::DeclConsumer) const {
+  return false;
 }
 
-std::pair<bool, Optional<bool>>
-GenericTypeOrExtensionWhereOrBodyPortion::lookupInSelfTypeOf(
-    const GenericTypeOrExtensionScope *scope, NullablePtr<DeclContext> selfDC,
-    const Optional<bool> isCascadingUse,
+bool GenericTypeOrExtensionWhereOrBodyPortion::lookupMembersOf(
+    const GenericTypeOrExtensionScope *scope,
+    ArrayRef<const ASTScopeImpl *> history,
     ASTScopeImpl::DeclConsumer consumer) const {
   auto nt = scope->getCorrespondingNominalTypeDecl().getPtrOrNull();
   if (!nt)
-    return Portion::lookupInSelfTypeOf(scope, selfDC, isCascadingUse, consumer);
-  return consumer.lookupInSelfType(selfDC, scope->getDeclContext().get(), nt,
-                                   isCascadingUse);
+    return false;
+  auto selfDC = computeSelfDC(history);
+  return consumer.lookInMembers(selfDC, scope->getDeclContext().get(), nt,
+                                [&](Optional<bool> initialIsCascadingUse) {
+                                  return ASTScopeImpl::computeIsCascadingUse(
+                                             history, initialIsCascadingUse)
+                                      .getValueOr(true);
+                                });
 }
 
-#pragma mark lookupLocalBindings
+#pragma mark looking in locals or members - locals
 
-bool ASTScopeImpl::lookupLocalBindings(Optional<bool> isCascadingUse,
-                                       DeclConsumer consumer) const {
-  return false; // most kinds of scopes have none
-}
-
-bool GenericParamScope::lookupLocalBindings(Optional<bool> isCascadingUse,
-                                            DeclConsumer consumer) const {
+bool GenericParamScope::lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
+                                              DeclConsumer consumer) const {
   auto *param = paramList->getParams()[index];
-  return consumer.consume({param}, DeclVisibilityKind::GenericParameter,
-                          isCascadingUse);
+  return consumer.consume({param}, DeclVisibilityKind::GenericParameter);
 }
 
-bool PatternEntryUseScope::lookupLocalBindings(Optional<bool> isCascadingUse,
-                                               DeclConsumer consumer) const {
+bool PatternEntryUseScope::lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
+                                                 DeclConsumer consumer) const {
   if (vis != DeclVisibilityKind::LocalVariable)
     return false; // look in self type will find this later
-  return lookupLocalBindingsInPattern(getPattern(), isCascadingUse, vis,
-                                      consumer);
+  return lookupLocalBindingsInPattern(getPattern(), vis, consumer);
 }
 
-bool ForEachPatternScope::lookupLocalBindings(Optional<bool> isCascadingUse,
-                                              DeclConsumer consumer) const {
-  return lookupLocalBindingsInPattern(stmt->getPattern(), isCascadingUse,
-                                      DeclVisibilityKind::LocalVariable,
-                                      consumer);
+bool ForEachPatternScope::lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
+                                                DeclConsumer consumer) const {
+  return lookupLocalBindingsInPattern(
+      stmt->getPattern(), DeclVisibilityKind::LocalVariable, consumer);
 }
 
-bool CatchStmtScope::lookupLocalBindings(Optional<bool> isCascadingUse,
-                                         DeclConsumer consumer) const {
-  return lookupLocalBindingsInPattern(stmt->getErrorPattern(), isCascadingUse,
-                                      DeclVisibilityKind::LocalVariable,
-                                      consumer);
+bool CatchStmtScope::lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
+                                           DeclConsumer consumer) const {
+  return lookupLocalBindingsInPattern(
+      stmt->getErrorPattern(), DeclVisibilityKind::LocalVariable, consumer);
 }
 
-bool CaseStmtScope::lookupLocalBindings(Optional<bool> isCascadingUse,
-                                        DeclConsumer consumer) const {
+bool CaseStmtScope::lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
+                                          DeclConsumer consumer) const {
   for (auto &item : stmt->getMutableCaseLabelItems())
-    if (lookupLocalBindingsInPattern(item.getPattern(), isCascadingUse,
-                                     DeclVisibilityKind::LocalVariable,
-                                     consumer))
+    if (lookupLocalBindingsInPattern(
+            item.getPattern(), DeclVisibilityKind::LocalVariable, consumer))
       return true;
   return false;
 }
 
-bool AbstractFunctionBodyScope::lookupLocalBindings(
-    Optional<bool> isCascadingUse, DeclConsumer consumer) const {
+bool AbstractFunctionBodyScope::lookupLocalsOrMembers(
+    ArrayRef<const ASTScopeImpl *>, DeclConsumer consumer) const {
   if (auto *paramList = decl->getParameters()) {
     for (auto *paramDecl : *paramList)
-      if (consumer.consume({paramDecl}, DeclVisibilityKind::FunctionParameter,
-                           isCascadingUse))
+      if (consumer.consume({paramDecl}, DeclVisibilityKind::FunctionParameter))
         return true;
   }
   return false;
 }
 
-bool MethodBodyScope::lookupLocalBindings(Optional<bool> isCascadingUse,
-                                          DeclConsumer consumer) const {
-  assert(decl->getImplicitSelfDecl());
-  if (AbstractFunctionBodyScope::lookupLocalBindings(isCascadingUse, consumer))
+bool MethodBodyScope::lookupLocalsOrMembers(
+    ArrayRef<const ASTScopeImpl *> history, DeclConsumer consumer) const {
+  assert(isAMethod(decl));
+  if (AbstractFunctionBodyScope::lookupLocalsOrMembers(history, consumer))
     return true;
   return consumer.consume({decl->getImplicitSelfDecl()},
-                          DeclVisibilityKind::FunctionParameter,
-                          isCascadingUse);
+                          DeclVisibilityKind::FunctionParameter);
 }
 
-bool PureFunctionBodyScope::lookupLocalBindings(Optional<bool> isCascadingUse,
-                                                DeclConsumer consumer) const {
-  assert(!decl->getImplicitSelfDecl());
-  if (AbstractFunctionBodyScope::lookupLocalBindings(isCascadingUse, consumer))
+bool PureFunctionBodyScope::lookupLocalsOrMembers(
+    ArrayRef<const ASTScopeImpl *> history, DeclConsumer consumer) const {
+  assert(!isAMethod(decl));
+  if (AbstractFunctionBodyScope::lookupLocalsOrMembers(history, consumer))
     return true;
 
   // Consider \c var t: T { (did/will/)get/set { ... t }}
@@ -415,25 +381,23 @@ bool PureFunctionBodyScope::lookupLocalBindings(Optional<bool> isCascadingUse,
   // then t needs to be found as a local binding:
   if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {
     if (auto *storage = accessor->getStorage())
-      if (consumer.consume({storage}, DeclVisibilityKind::LocalVariable,
-                           isCascadingUse))
+      if (consumer.consume({storage}, DeclVisibilityKind::LocalVariable))
         return true;
   }
   return false;
 }
 
-bool SpecializeAttributeScope::lookupLocalBindings(
-    Optional<bool> isCascadingUse, DeclConsumer consumer) const {
+bool SpecializeAttributeScope::lookupLocalsOrMembers(
+    ArrayRef<const ASTScopeImpl *>, DeclConsumer consumer) const {
   if (auto *params = whatWasSpecialized->getGenericParams())
     for (auto *param : params->getParams())
-      if (consumer.consume({param}, DeclVisibilityKind::GenericParameter,
-                           isCascadingUse))
+      if (consumer.consume({param}, DeclVisibilityKind::GenericParameter))
         return true;
   return false;
 }
 
-bool BraceStmtScope::lookupLocalBindings(Optional<bool> isCascadingUse,
-                                         DeclConsumer consumer) const {
+bool BraceStmtScope::lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
+                                           DeclConsumer consumer) const {
   // All types and functions are visible anywhere within a brace statement
   // scope. When ordering matters (i.e. var decl) we will have split the brace
   // statement into nested scopes.
@@ -448,50 +412,48 @@ bool BraceStmtScope::lookupLocalBindings(Optional<bool> isCascadingUse,
         localBindings.push_back(cast<ValueDecl>(localBinding));
     }
   }
-  return consumer.consume(localBindings, DeclVisibilityKind::LocalVariable,
-                          isCascadingUse);
+  return consumer.consume(localBindings, DeclVisibilityKind::LocalVariable);
 }
 
-bool PatternEntryInitializerScope::lookupLocalBindings(
-    Optional<bool> isCascadingUse, DeclConsumer consumer) const {
+bool PatternEntryInitializerScope::lookupLocalsOrMembers(
+    ArrayRef<const ASTScopeImpl *>, DeclConsumer consumer) const {
   // 'self' is available within the pattern initializer of a 'lazy' variable.
   auto *initContext = cast_or_null<PatternBindingInitializer>(
       decl->getPatternList()[0].getInitContext());
   if (initContext) {
     if (auto *selfParam = initContext->getImplicitSelfDecl()) {
-      return consumer.consume(
-          {selfParam}, DeclVisibilityKind::FunctionParameter, isCascadingUse);
+      return consumer.consume({selfParam},
+                              DeclVisibilityKind::FunctionParameter);
     }
   }
   return false;
 }
 
-bool ClosureParametersScope::lookupLocalBindings(Optional<bool> isCascadingUse,
-                                                 DeclConsumer consumer) const {
+bool ClosureParametersScope::lookupLocalsOrMembers(
+    ArrayRef<const ASTScopeImpl *>, DeclConsumer consumer) const {
   if (auto *cl = captureList.getPtrOrNull()) {
     CaptureListExpr *mutableCL =
         const_cast<CaptureListExpr *>(captureList.get());
     for (auto &e : mutableCL->getCaptureList()) {
-      if (consumer.consume({e.Var}, DeclVisibilityKind::LocalVariable,
-                           isCascadingUse)) // or FunctionParameter??
+      if (consumer.consume(
+              {e.Var},
+              DeclVisibilityKind::LocalVariable)) // or FunctionParameter??
         return true;
     }
   }
   for (auto param : *closureExpr->getParameters())
-    if (consumer.consume({param}, DeclVisibilityKind::FunctionParameter,
-                         isCascadingUse))
+    if (consumer.consume({param}, DeclVisibilityKind::FunctionParameter))
       return true;
   return false;
 }
 
-bool ConditionalClausePatternUseScope::lookupLocalBindings(
-    Optional<bool> isCascadingUse, DeclConsumer consumer) const {
+bool ConditionalClausePatternUseScope::lookupLocalsOrMembers(
+    ArrayRef<const ASTScopeImpl *>, DeclConsumer consumer) const {
   return lookupLocalBindingsInPattern(
-      pattern, isCascadingUse, DeclVisibilityKind::LocalVariable, consumer);
+      pattern, DeclVisibilityKind::LocalVariable, consumer);
 }
 
 bool ASTScopeImpl::lookupLocalBindingsInPattern(Pattern *p,
-                                                Optional<bool> isCascadingUse,
                                                 DeclVisibilityKind vis,
                                                 DeclConsumer consumer) {
   if (!p)
@@ -499,9 +461,36 @@ bool ASTScopeImpl::lookupLocalBindingsInPattern(Pattern *p,
   bool isDone = false;
   p->forEachVariable([&](VarDecl *var) {
     if (!isDone)
-      isDone = consumer.consume({var}, vis, isCascadingUse);
+      isDone = consumer.consume({var}, vis);
   });
   return isDone;
+}
+
+#pragma mark computeSelfDC
+
+NullablePtr<DeclContext>
+GenericTypeOrExtensionWhereOrBodyPortion::computeSelfDC(
+    ArrayRef<const ASTScopeImpl *> history) {
+  assert(history.size() != 0 && "includes current scope");
+  size_t i = history.size() - 1; // skip last entry (this scope)
+  while (i != 0) {
+    Optional<NullablePtr<DeclContext>> maybeSelfDC =
+        history[--i]->computeSelfDCForParent();
+    if (maybeSelfDC)
+      return *maybeSelfDC;
+  }
+  return nullptr;
+}
+
+#pragma mark compute isCascadingUse
+
+Optional<bool> ASTScopeImpl::computeIsCascadingUse(
+    ArrayRef<const ASTScopeImpl *> history,
+    const Optional<bool> initialIsCascadingUse) {
+  Optional<bool> isCascadingUse = initialIsCascadingUse;
+  for (const auto *scope : history)
+    isCascadingUse = scope->resolveIsCascadingUseForThisScope(isCascadingUse);
+  return isCascadingUse;
 }
 
 #pragma mark getLookupLimit
@@ -543,6 +532,12 @@ NominalTypeScope::getLookupLimitForDecl() const {
       [&](const Decl *const d) { return isa<ProtocolDecl>(d); });
 }
 
+NullablePtr<const ASTScopeImpl> ExtensionScope::getLookupLimitForDecl() const {
+  // Extensions can only be legally nested in a SourceFile,
+  // so any other kind of Decl is illegal
+  return parentIfNotChildOfTopScope();
+}
+
 NullablePtr<const ASTScopeImpl> ASTScopeImpl::ancestorWithDeclSatisfying(
     function_ref<bool(const Decl *)> predicate) const {
   for (NullablePtr<const ASTScopeImpl> s = getParent(); s;
@@ -563,19 +558,19 @@ NullablePtr<const ASTScopeImpl> ASTScopeImpl::ancestorWithDeclSatisfying(
 
 // By default, propagate the selfDC up to a NomExt decl, body,
 // or where clause
-NullablePtr<DeclContext>
-ASTScopeImpl::computeSelfDCForParent(NullablePtr<DeclContext> selfDC) const {
-  return selfDC;
+Optional<NullablePtr<DeclContext>>
+ASTScopeImpl::computeSelfDCForParent() const {
+  return None;
 }
 
 // Forget the "self" declaration:
-NullablePtr<DeclContext> GenericTypeOrExtensionScope::computeSelfDCForParent(
-    NullablePtr<DeclContext>) const {
-  return nullptr;
+Optional<NullablePtr<DeclContext>>
+GenericTypeOrExtensionScope::computeSelfDCForParent() const {
+  return NullablePtr<DeclContext>();
 }
 
-NullablePtr<DeclContext> PatternEntryInitializerScope::computeSelfDCForParent(
-    NullablePtr<DeclContext> selfDC) const {
+Optional<NullablePtr<DeclContext>>
+PatternEntryInitializerScope::computeSelfDCForParent() const {
   // Pattern binding initializers are only interesting insofar as they
   // affect lookup in an enclosing nominal type or extension thereof.
   if (auto *ic = getPatternEntry().getInitContext()) {
@@ -583,19 +578,16 @@ NullablePtr<DeclContext> PatternEntryInitializerScope::computeSelfDCForParent(
       // Lazy variable initializer contexts have a 'self' parameter for
       // instance member lookup.
       if (bindingInit->getImplicitSelfDecl()) {
-        assert((selfDC.isNull() || selfDC == bindingInit) &&
-               "Would lose information");
-        return bindingInit;
+        return NullablePtr<DeclContext>(bindingInit);
       }
     }
   }
-  return selfDC;
+  return None;
 }
 
-NullablePtr<DeclContext>
-MethodBodyScope::computeSelfDCForParent(NullablePtr<DeclContext> selfDC) const {
-  assert(!selfDC && "Losing selfDC");
-  return decl;
+Optional<NullablePtr<DeclContext>>
+MethodBodyScope::computeSelfDCForParent() const {
+  return NullablePtr<DeclContext>(decl);
 }
 
 #pragma mark ifUnknownIsCascadingUseAccordingTo
@@ -636,6 +628,7 @@ Optional<bool> AbstractFunctionBodyScope::resolveIsCascadingUseForThisScope(
 
 Optional<bool> GenericTypeOrExtensionScope::resolveIsCascadingUseForThisScope(
     Optional<bool> isCascadingUse) const {
+  // Could override for ExtensionScope and just return true
   return ifUnknownIsCascadingUseAccordingTo(isCascadingUse,
                                             getDeclContext().get());
 }

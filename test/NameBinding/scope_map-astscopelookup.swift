@@ -1,4 +1,4 @@
-// XFAIL: enable-astscope-lookup
+// REQUIRES: enable-astscope-lookup
 // Note: test of the scope map. All of these tests are line- and
 // column-sensitive, so any additions should go at the end.
 
@@ -199,7 +199,7 @@ class LazyProperties {
 
 
 // CHECK-EXPANDED:      ***Complete scope map***
-// CHECK-EXPANDED-NEXT: ASTSourceFileScope {{.*}}, [1:1 - 52{{[0-9]}}:1] 'SOURCE_DIR{{[/\\]}}test{{[/\\]}}NameBinding{{[/\\]}}scope_map.swift'
+// CHECK-EXPANDED-NEXT: ASTSourceFileScope {{.*}}, [1:1 - 52{{[0-9]}}:1] 'SOURCE_DIR{{[/]}}test{{[/]}}NameBinding{{[/]}}scope_map-astscopelookup.swift'
 // CHECK-EXPANDED-NEXT: |-NominalTypeDeclScope {{.*}}, [5:1 - 7:1] 'S0'
 // CHECK-EXPANDED-NEXT:   `-NominalTypeBodyScope {{.*}}, [5:11 - 7:1] 'S0'
 // CHECK-EXPANDED-NEXT:     `-NominalTypeDeclScope {{.*}}, [6:3 - 6:19] 'InnerC0'
@@ -283,9 +283,9 @@ class LazyProperties {
 // CHECK-EXPANDED-NEXT:                         |-TypeAliasDeclScope {{.*}}, [61:3 - 61:23] <no extended nominal?!>
 // CHECK-EXPANDED-NEXT:                         |-IfStmtScope {{.*}}, [63:3 - 67:3]
 // CHECK-EXPANDED-NEXT:                           |-ConditionalClauseScope, [63:6 - 65:3] index 0
-// CHECK-EXPANDED-NEXT:                             `-ConditionalClausePatternUseScope, [63:18 - 65:3] let b1?
+// CHECK-EXPANDED-NEXT:                             `-ConditionalClausePatternUseScope, [63:18 - 65:3] let b1
 // CHECK-EXPANDED-NEXT:                               `-ConditionalClauseScope, [63:18 - 65:3] index 1
-// CHECK-EXPANDED-NEXT:                                 `-ConditionalClausePatternUseScope, [63:29 - 65:3] let b2?
+// CHECK-EXPANDED-NEXT:                                 `-ConditionalClausePatternUseScope, [63:29 - 65:3] let b2
 // CHECK-EXPANDED-NEXT:                                   `-BraceStmtScope {{.*}}, [63:29 - 65:3]
 // CHECK-EXPANDED-NEXT:                                     `-PatternEntryDeclScope {{.*}}, [64:9 - 64:14] entry 0 'c1'
 // CHECK-EXPANDED-NEXT:                                       |-PatternEntryInitializerScope {{.*}}, [64:14 - 64:14] entry 0 'c1'
@@ -296,13 +296,13 @@ class LazyProperties {
 // CHECK-EXPANDED-NEXT:                               `-PatternEntryUseScope {{.*}}, [66:14 - 66:14] entry 0 'c2'
 // CHECK-EXPANDED-NEXT:                         `-GuardStmtScope {{.*}}, [69:3 - 100:38]
 // CHECK-EXPANDED-NEXT:                           |-ConditionalClauseScope, [69:9 - 69:53] index 0
-// CHECK-EXPANDED-NEXT:                             `-ConditionalClausePatternUseScope, [69:21 - 69:53] let b1?
+// CHECK-EXPANDED-NEXT:                             `-ConditionalClausePatternUseScope, [69:21 - 69:53] let b1
 // CHECK-EXPANDED-NEXT:                               `-ConditionalClauseScope, [69:21 - 69:53] index 1
 // CHECK-EXPANDED-NEXT:                                 |-WholeClosureScope {{.*}}, [69:21 - 69:30]
 // CHECK-EXPANDED-NEXT:                                   `-ClosureBodyScope {{.*}}, [69:21 - 69:30]
 // CHECK-EXPANDED-NEXT:                                     `-BraceStmtScope {{.*}}, [69:21 - 69:30]
 // CHECK-EXPANDED-NEXT:                                 `-ConditionalClauseScope, [69:37 - 69:53] index 2
-// CHECK-EXPANDED-NEXT:                                   `-ConditionalClausePatternUseScope, [69:53 - 69:53] let b2?
+// CHECK-EXPANDED-NEXT:                                   `-ConditionalClausePatternUseScope, [69:53 - 69:53] let b2
 // CHECK-EXPANDED-NEXT:                           |-BraceStmtScope {{.*}}, [69:53 - 72:3]
 // CHECK-EXPANDED-NEXT:                             `-PatternEntryDeclScope {{.*}}, [70:9 - 70:13] entry 0 'c'
 // CHECK-EXPANDED-NEXT:                               |-PatternEntryInitializerScope {{.*}}, [70:13 - 70:13] entry 0 'c'
@@ -310,9 +310,9 @@ class LazyProperties {
 // CHECK-EXPANDED-NEXT:                           `-GuardStmtUseScope, [72:3 - 100:38]
 // CHECK-EXPANDED-NEXT:                             |-WhileStmtScope {{.*}}, [74:3 - 76:3]
 // CHECK-EXPANDED-NEXT:                               `-ConditionalClauseScope, [74:9 - 76:3] index 0
-// CHECK-EXPANDED-NEXT:                                 `-ConditionalClausePatternUseScope, [74:21 - 76:3] let b3?
+// CHECK-EXPANDED-NEXT:                                 `-ConditionalClausePatternUseScope, [74:21 - 76:3] let b3
 // CHECK-EXPANDED-NEXT:                                   `-ConditionalClauseScope, [74:21 - 76:3] index 1
-// CHECK-EXPANDED-NEXT:                                     `-ConditionalClausePatternUseScope, [74:32 - 76:3] let b4?
+// CHECK-EXPANDED-NEXT:                                     `-ConditionalClausePatternUseScope, [74:32 - 76:3] let b4
 // CHECK-EXPANDED-NEXT:                                       `-BraceStmtScope {{.*}}, [74:32 - 76:3]
 // CHECK-EXPANDED-NEXT:                                         `-PatternEntryDeclScope {{.*}}, [75:9 - 75:13] entry 0 'c'
 // CHECK-EXPANDED-NEXT:                                           |-PatternEntryInitializerScope {{.*}}, [75:13 - 75:13] entry 0 'c'
@@ -350,7 +350,7 @@ class LazyProperties {
 // CHECK-EXPANDED-NEXT:   `-NominalTypeBodyScope {{.*}}, [109:13 - 113:1] 'MyEnum'
 // CHECK-EXPANDED-NEXT: |-NominalTypeDeclScope {{.*}}, [115:1 - 131:1] 'StructContainsAbstractStorageDecls'
 // CHECK-EXPANDED-NEXT:   `-NominalTypeBodyScope {{.*}}, [115:43 - 131:1] 'StructContainsAbstractStorageDecls'
-// CHECK-EXPANDED-NEXT:     |-SubscriptDeclScope {{.*}}, [116:3 - 122:3] scope_map.(file).StructContainsAbstractStorageDecls.subscript(_:_:)@SOURCE_DIR{{[/\]}}test{{[/\]}}NameBinding{{[/\]}}scope_map.swift:116:3
+// CHECK-EXPANDED-NEXT:     |-SubscriptDeclScope {{.*}}, [116:3 - 122:3] main.(file).StructContainsAbstractStorageDecls.subscript(_:_:)@SOURCE_DIR{{[/]}}test{{[/]}}NameBinding{{[/]}}scope_map-astscopelookup.swift:116:3
 // CHECK-EXPANDED-NEXT:       `-AbstractFunctionParamsScope {{.*}}, [116:13 - 122:3]
 // CHECK-EXPANDED-NEXT:         |-AbstractFunctionDeclScope {{.*}}, [117:5 - 118:5] '_'
 // CHECK-EXPANDED-NEXT:           `-MethodBodyScope {{.*}}, [117:9 - 118:5]
@@ -360,7 +360,7 @@ class LazyProperties {
 // CHECK-EXPANDED-NEXT:             `-BraceStmtScope {{.*}}, [119:9 - 121:5]
 // CHECK-EXPANDED-NEXT:     `-PatternEntryDeclScope {{.*}}, [124:7 - 130:3] entry 0 'computed'
 // CHECK-EXPANDED-NEXT:       `-PatternEntryUseScope {{.*}}, [124:17 - 130:3] entry 0 'computed'
-// CHECK-EXPANDED-NEXT:         `-VarDeclScope {{.*}}, [124:21 - 130:3] scope_map.(file).StructContainsAbstractStorageDecls.computed@SOURCE_DIR{{[/\]}}test{{[/\]}}NameBinding{{[/\]}}scope_map.swift:124:7
+// CHECK-EXPANDED-NEXT:         `-VarDeclScope {{.*}}, [124:21 - 130:3] main.(file).StructContainsAbstractStorageDecls.computed@SOURCE_DIR{{[/]}}test{{[/]}}NameBinding{{[/]}}scope_map-astscopelookup.swift:124:7
 // CHECK-EXPANDED-NEXT:           |-AbstractFunctionDeclScope {{.*}}, [125:5 - 127:5] '_'
 // CHECK-EXPANDED-NEXT:             `-MethodBodyScope {{.*}}, [125:9 - 127:5]
 // CHECK-EXPANDED-NEXT:               `-BraceStmtScope {{.*}}, [125:9 - 127:5]
@@ -372,14 +372,14 @@ class LazyProperties {
 // CHECK-EXPANDED-NEXT:     |-PatternEntryDeclScope {{.*}}, [134:7 - 136:3] entry 0 'willSetProperty'
 // CHECK-EXPANDED-NEXT:       |-PatternEntryInitializerScope {{.*}}, [134:30 - 134:30] entry 0 'willSetProperty'
 // CHECK-EXPANDED-NEXT:       `-PatternEntryUseScope {{.*}}, [134:30 - 136:3] entry 0 'willSetProperty'
-// CHECK-EXPANDED-NEXT:         `-VarDeclScope {{.*}}, [134:32 - 136:3] scope_map.(file).ClassWithComputedProperties.willSetProperty@SOURCE_DIR{{[/\]}}test{{[/\]}}NameBinding{{[/\]}}scope_map.swift:134:7
+// CHECK-EXPANDED-NEXT:         `-VarDeclScope {{.*}}, [134:32 - 136:3] main.(file).ClassWithComputedProperties.willSetProperty@SOURCE_DIR{{[/]}}test{{[/]}}NameBinding{{[/]}}scope_map-astscopelookup.swift:134:7
 // CHECK-EXPANDED-NEXT:           `-AbstractFunctionDeclScope {{.*}}, [135:5 - 135:15] '_'
 // CHECK-EXPANDED-NEXT:             `-MethodBodyScope {{.*}}, [135:13 - 135:15]
 // CHECK-EXPANDED-NEXT:               `-BraceStmtScope {{.*}}, [135:13 - 135:15]
 // CHECK-EXPANDED-NEXT:     `-PatternEntryDeclScope {{.*}}, [138:7 - 140:3] entry 0 'didSetProperty'
 // CHECK-EXPANDED-NEXT:       |-PatternEntryInitializerScope {{.*}}, [138:29 - 138:29] entry 0 'didSetProperty'
 // CHECK-EXPANDED-NEXT:       `-PatternEntryUseScope {{.*}}, [138:29 - 140:3] entry 0 'didSetProperty'
-// CHECK-EXPANDED-NEXT:         `-VarDeclScope {{.*}}, [138:31 - 140:3] scope_map.(file).ClassWithComputedProperties.didSetProperty@SOURCE_DIR{{[/\]}}test{{[/\]}}NameBinding{{[/\]}}scope_map.swift:138:7
+// CHECK-EXPANDED-NEXT:         `-VarDeclScope {{.*}}, [138:31 - 140:3] main.(file).ClassWithComputedProperties.didSetProperty@SOURCE_DIR{{[/]}}test{{[/]}}NameBinding{{[/]}}scope_map-astscopelookup.swift:138:7
 // CHECK-EXPANDED-NEXT:           `-AbstractFunctionDeclScope {{.*}}, [139:5 - 139:14] '_'
 // CHECK-EXPANDED-NEXT:             `-MethodBodyScope {{.*}}, [139:12 - 139:14]
 // CHECK-EXPANDED-NEXT:               `-BraceStmtScope {{.*}}, [139:12 - 139:14]
@@ -389,7 +389,7 @@ class LazyProperties {
 // CHECK-EXPANDED-NEXT:       `-BraceStmtScope {{.*}}, [143:41 - 156:1]
 // CHECK-EXPANDED-NEXT:         `-PatternEntryDeclScope {{.*}}, [144:7 - 155:8] entry 0 'computed'
 // CHECK-EXPANDED-NEXT:           `-PatternEntryUseScope {{.*}}, [144:17 - 155:8] entry 0 'computed'
-// CHECK-EXPANDED-NEXT:             |-VarDeclScope {{.*}}, [144:21 - 150:3] scope_map.(file).funcWithComputedProperties(i:).computed@SOURCE_DIR{{[/\]}}test{{[/\]}}NameBinding{{[/\]}}scope_map.swift:144:7
+// CHECK-EXPANDED-NEXT:             |-VarDeclScope {{.*}}, [144:21 - 150:3] main.(file).funcWithComputedProperties(i:).computed@SOURCE_DIR{{[/]}}test{{[/]}}NameBinding{{[/]}}scope_map-astscopelookup.swift:144:7
 // CHECK-EXPANDED-NEXT:               |-AbstractFunctionDeclScope {{.*}}, [145:5 - 146:5] '_'
 // CHECK-EXPANDED-NEXT:                 `-PureFunctionBodyScope {{.*}}, [145:9 - 146:5]
 // CHECK-EXPANDED-NEXT:                   `-BraceStmtScope {{.*}}, [145:9 - 146:5]
@@ -401,7 +401,7 @@ class LazyProperties {
 // CHECK-EXPANDED-NEXT:               `-PatternEntryUseScope {{.*}}, [150:36 - 155:8] entry 1 'stored1' 'stored2'
 // CHECK-EXPANDED-NEXT:                 `-PatternEntryDeclScope {{.*}}, [151:3 - 155:8] entry 2 'alsoComputed'
 // CHECK-EXPANDED-NEXT:                   `-PatternEntryUseScope {{.*}}, [151:21 - 155:8] entry 2 'alsoComputed'
-// CHECK-EXPANDED-NEXT:                     |-VarDeclScope {{.*}}, [151:25 - 153:3] scope_map.(file).funcWithComputedProperties(i:).alsoComputed@SOURCE_DIR{{[/\]}}test{{[/\]}}NameBinding{{[/\]}}scope_map.swift:151:7
+// CHECK-EXPANDED-NEXT:                     |-VarDeclScope {{.*}}, [151:25 - 153:3] main.(file).funcWithComputedProperties(i:).alsoComputed@SOURCE_DIR{{[/]}}test{{[/]}}NameBinding{{[/]}}scope_map-astscopelookup.swift:151:7
 // CHECK-EXPANDED-NEXT:                       `-AbstractFunctionDeclScope {{.*}}, [151:25 - 153:3] '_'
 // CHECK-EXPANDED-NEXT:                         `-PureFunctionBodyScope {{.*}}, [151:25 - 153:3]
 // CHECK-EXPANDED-NEXT:                           `-BraceStmtScope {{.*}}, [151:25 - 153:3]
@@ -435,7 +435,7 @@ class LazyProperties {
 // CHECK-EXPANDED-NEXT:               `-BraceStmtScope {{.*}}, [168:32 - 168:42]
 // CHECK-EXPANDED-NEXT:         `-PureFunctionBodyScope {{.*}}, [168:51 - 176:1]
 // CHECK-EXPANDED-NEXT:           `-BraceStmtScope {{.*}}, [168:51 - 176:1]
-// CHECK-EXPANDED-NEXT:             `-AbstractFunctionDeclScope {{.*}}, [170:3 - 172:3] 'localWithDefaults(i:j:)'
+// CHECK-EXPANDED-NEXT:             |-AbstractFunctionDeclScope {{.*}}, [170:3 - 172:3] 'localWithDefaults(i:j:)'
 // CHECK-EXPANDED-NEXT:               `-AbstractFunctionParamsScope {{.*}}, [170:25 - 172:3]
 // CHECK-EXPANDED-NEXT:                 |-DefaultArgumentInitializerScope {{.*}}, [170:35 - 170:35]
 // CHECK-EXPANDED-NEXT:                 |-DefaultArgumentInitializerScope {{.*}}, [171:35 - 171:51]
@@ -444,6 +444,12 @@ class LazyProperties {
 // CHECK-EXPANDED-NEXT:                       `-BraceStmtScope {{.*}}, [171:35 - 171:45]
 // CHECK-EXPANDED-NEXT:                 `-PureFunctionBodyScope {{.*}}, [171:54 - 172:3]
 // CHECK-EXPANDED-NEXT:                   `-BraceStmtScope {{.*}}, [171:54 - 172:3]
+// CHECK-EXPANDED-NEXT:             `-PatternEntryDeclScope {{.*}}, [174:7 - 175:11] entry 0 'a'
+// CHECK-EXPANDED-NEXT:               |-PatternEntryInitializerScope {{.*}}, [174:11 - 175:11] entry 0 'a'
+// CHECK-EXPANDED-NEXT:                 `-WholeClosureScope {{.*}}, [175:3 - 175:8]
+// CHECK-EXPANDED-NEXT:                   `-ClosureBodyScope {{.*}}, [175:3 - 175:8]
+// CHECK-EXPANDED-NEXT:                     `-BraceStmtScope {{.*}}, [175:3 - 175:8]
+// CHECK-EXPANDED-NEXT:               `-PatternEntryUseScope {{.*}}, [175:11 - 175:11] entry 0 'a'
 // CHECK-EXPANDED-NEXT:     |-NominalTypeDeclScope {{.*}}, [178:1 - 181:1] 'PatternInitializers'
 // CHECK-EXPANDED-NEXT:       `-NominalTypeBodyScope {{.*}}, [178:28 - 181:1] 'PatternInitializers'
 // CHECK-EXPANDED-NEXT:         `-PatternEntryDeclScope {{.*}}, [179:7 - 180:25] entry 0 'a' 'b'
@@ -455,7 +461,7 @@ class LazyProperties {
 // CHECK-EXPANDED-NEXT:     |-NominalTypeDeclScope {{.*}}, [183:1 - 185:1] 'ProtoWithSubscript'
 // CHECK-EXPANDED-NEXT:       `-GenericParamScope {{.*}}, [183:29 - 185:1] param 0 'Self : ProtoWithSubscript'
 // CHECK-EXPANDED-NEXT:         `-NominalTypeBodyScope {{.*}}, [183:29 - 185:1] 'ProtoWithSubscript'
-// CHECK-EXPANDED-NEXT:           `-SubscriptDeclScope {{.*}}, [184:3 - 184:43] scope_map.(file).ProtoWithSubscript.subscript(_:)@SOURCE_DIR{{[/\]}}test{{[/\]}}NameBinding{{[/\]}}scope_map.swift:184:3
+// CHECK-EXPANDED-NEXT:           `-SubscriptDeclScope {{.*}}, [184:3 - 184:43] main.(file).ProtoWithSubscript.subscript(_:)@SOURCE_DIR{{[/]}}test{{[/]}}NameBinding{{[/]}}scope_map-astscopelookup.swift:184:3
 // CHECK-EXPANDED-NEXT:             `-AbstractFunctionParamsScope {{.*}}, [184:12 - 184:43]
 // CHECK-EXPANDED-NEXT:               |-AbstractFunctionDeclScope {{.*}}, [184:35 - 184:35] '_'
 // CHECK-EXPANDED-NEXT:               `-AbstractFunctionDeclScope {{.*}}, [184:39 - 184:39] '_'
@@ -479,12 +485,8 @@ class LazyProperties {
 // CHECK-EXPANDED-NEXT:           `-PatternEntryUseScope {{.*}}, [194:29 - 194:29] entry 0 'prop'
 
 
-
-
-
 // RUN: not %target-swift-frontend -dump-scope-maps 71:8,27:20,6:18,167:32,180:18,194:26 %s 2> %t.searches
 // RUN: %FileCheck -check-prefix CHECK-SEARCHES %s < %t.searches
-
 
 // CHECK-SEARCHES:      ***Scope at 71:8***
 // CHECK-SEARCHES-NEXT: BraceStmtScope {{.*}}, [69:53 - 72:3]
@@ -492,29 +494,28 @@ class LazyProperties {
 // CHECK-SEARCHES-NEXT: AbstractFunctionParamsScope {{.*}}, [27:13 - 28:3]
 // CHECK-SEARCHES-NEXT: ***Scope at 6:18***
 // CHECK-SEARCHES-NEXT: NominalTypeBodyScope {{.*}}, [6:17 - 6:19] 'InnerC0'
-// CHECK-SEARCHES-NEXT: {{.*}} Module name=scope_map
-// CHECK-SEARCHES-NEXT:   {{.*}} FileUnit file="SOURCE_DIR{{[/]}}test{{[/]}}NameBinding{{[/]}}scope_map.swift"
+// CHECK-SEARCHES-NEXT: {{.*}} Module name=main
+// CHECK-SEARCHES-NEXT:   {{.*}} FileUnit file="SOURCE_DIR{{[/]}}test{{[/]}}NameBinding{{[/]}}scope_map-astscopelookup.swift"
 // CHECK-SEARCHES-NEXT:     {{.*}} StructDecl name=S0
 // CHECK-SEARCHES-NEXT:       {{.*}} ClassDecl name=InnerC0
 // CHECK-SEARCHES-NEXT: ***Scope at 167:32***
 // CHECK-SEARCHES-NEXT: DefaultArgumentInitializerScope {{.*}}, [167:32 - 167:32]
-// CHECK-SEARCHES-NEXT: {{.*}} Module name=scope_map
-// CHECK-SEARCHES-NEXT:   {{.*}} FileUnit file="SOURCE_DIR{{[/]}}test{{[/]}}NameBinding{{[/]}}scope_map.swift"
+// CHECK-SEARCHES-NEXT: {{.*}} Module name=main
+// CHECK-SEARCHES-NEXT:   {{.*}} FileUnit file="SOURCE_DIR{{[/]}}test{{[/]}}NameBinding{{[/]}}scope_map-astscopelookup.swift"
 // CHECK-SEARCHES-NEXT:     {{.*}} AbstractFunctionDecl name=defaultArguments(i:j:) : (Int, Int) -> ()
 // CHECK-SEARCHES-NEXT:       {{.*}} Initializer DefaultArgument index=0
 // CHECK-SEARCHES-NEXT: ***Scope at 180:18***
 // CHECK-SEARCHES-NEXT: PatternEntryInitializerScope {{.*}}, [180:16 - 180:25] entry 1 'c' 'd'
-// CHECK-SEARCHES-NEXT: {{.*}} Module name=scope_map
-// CHECK-SEARCHES-NEXT:   {{.*}} FileUnit file="SOURCE_DIR{{[/]}}test{{[/]}}NameBinding{{[/]}}scope_map.swift"
+// CHECK-SEARCHES-NEXT: {{.*}} Module name=main
+// CHECK-SEARCHES-NEXT:   {{.*}} FileUnit file="SOURCE_DIR{{[/]}}test{{[/]}}NameBinding{{[/]}}scope_map-astscopelookup.swift"
 // CHECK-SEARCHES-NEXT:     {{.*}} StructDecl name=PatternInitializers
 // CHECK-SEARCHES-NEXT:       {{.*}} Initializer PatternBinding {{.*}} #1
 // CHECK-SEARCHES-NEXT: ***Scope at 194:26***
 // CHECK-SEARCHES-NEXT: PatternEntryInitializerScope {{.*}}, [194:24 - 194:29] entry 0 'prop'
-// CHECK-SEARCHES-NEXT: {{.*}} Module name=scope_map
-// CHECK-SEARCHES-NEXT:   {{.*}} FileUnit file="SOURCE_DIR{{[/]}}test{{[/]}}NameBinding{{[/]}}scope_map.swift"
+// CHECK-SEARCHES-NEXT: {{.*}} Module name=main
+// CHECK-SEARCHES-NEXT:   {{.*}} FileUnit file="SOURCE_DIR{{[/]}}test{{[/]}}NameBinding{{[/]}}scope_map-astscopelookup.swift"
 // CHECK-SEARCHES-NEXT:     {{.*}} ClassDecl name=LazyProperties
 // CHECK-SEARCHES-NEXT:       {{.*}} Initializer PatternBinding {{.*}} #0
 // CHECK-SEARCHES-NEXT: Local bindings: self
-
 
 // CHECK-SEARCHES-NOT:  ***Complete scope map***
