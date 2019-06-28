@@ -327,7 +327,8 @@ struct SynthesizedExtensionAnalyzer::Implementation {
           // conformance instead of subtyping
           if (!canPossiblyConvertTo(First, Second, *DC))
             return true;
-          else if (!isConvertibleTo(First, Second, *DC))
+          else if (!isConvertibleTo(First, Second, /*openArchetypes=*/false,
+                                    *DC))
             MergeInfo.addRequirement(GenericSig, First, Second, Kind);
           break;
 
