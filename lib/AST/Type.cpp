@@ -4750,10 +4750,15 @@ AnyFunctionType::getTransposeOriginalFunctionType(
       // If in WRT list, the item in the result tuple must be a parameter in the
       // original function.
       auto resultType = transposeResultTypes[transposeResultTypesIndex].getType();
+      assert(resultType && resultType.getPointer() &&
+             "resultType should not be null");
       // TODO(bartchr): this prevents a segfault occuring when converting 'g'
       // to 'Param'.
       llvm::nulls() << resultType;
-      originalParams.push_back(AnyFunctionType::Param(resultType));
+      auto param = AnyFunctionType::Param(resultType);
+      assert(param.getPlainType() && param.getPlainType().getPointer() &&
+             "param should not be null");
+      originalParams.push_back(param);
       transposeResultTypesIndex++;
     } else {
       // Else if not in the WRT list, the parameter in the transposing function

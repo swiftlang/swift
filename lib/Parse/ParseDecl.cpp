@@ -1014,7 +1014,7 @@ bool Parser::parseTransposingParametersClause(
   }
   // If no opening '(' for parameter list, parse a single parameter.
   else {
-    if (parseParam(/*parseTrailingComma*/ false))
+    if (parseParam(/*parseTrailingComma=*/false))
       return errorAndSkipToEnd();
   }
   return false;
