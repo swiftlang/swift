@@ -723,14 +723,7 @@ void ModuleFile::readGenericRequirements(
       break;
 
     scratch.clear();
-    Expected<unsigned> maybeRecordID =
-        DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
-    if (!maybeRecordID) {
-      // FIXME this drops the error on the floor.
-      consumeError(maybeRecordID.takeError());
-      return;
-    }
-    unsigned recordID = maybeRecordID.get();
+    unsigned recordID = fatalIfUnexpected(DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
     switch (recordID) {
     case GENERIC_REQUIREMENT: {
       uint8_t rawKind;
@@ -916,15 +909,7 @@ GenericSignature *ModuleFile::getGenericSignature(
     return nullptr;
   }
 
-  Expected<unsigned> maybeRecordID =
-      DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
-  if (!maybeRecordID) {
-    // FIXME this drops the error on the floor.
-    consumeError(maybeRecordID.takeError());
-    error();
-    return nullptr;
-  }
-  unsigned recordID = maybeRecordID.get();
+  unsigned recordID = fatalIfUnexpected(DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
   if (recordID != GENERIC_SIGNATURE) {
     error();
     return nullptr;
@@ -1006,15 +991,7 @@ ModuleFile::getGenericSignatureOrEnvironment(
     if (entry.Kind != llvm::BitstreamEntry::Record)
       return result;
 
-    Expected<unsigned> maybeRecordID =
-        DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
-    if (!maybeRecordID) {
-      // FIXME this drops the error on the floor.
-      consumeError(maybeRecordID.takeError());
-      error();
-      return nullptr;
-    }
-    unsigned recordID = maybeRecordID.get();
+    unsigned recordID = fatalIfUnexpected(DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
     if (recordID != SIL_GENERIC_ENVIRONMENT) {
       error();
       return result;
@@ -1116,15 +1093,7 @@ SubstitutionMap ModuleFile::getSubstitutionMap(
 
   StringRef blobData;
   SmallVector<uint64_t, 8> scratch;
-  Expected<unsigned> maybeRecordID =
-      DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
-  if (!maybeRecordID) {
-    // FIXME this drops the error on the floor.
-    consumeError(maybeRecordID.takeError());
-    error();
-    return SubstitutionMap();
-  }
-  unsigned recordID = maybeRecordID.get();
+  unsigned recordID = fatalIfUnexpected(DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
   if (recordID != SUBSTITUTION_MAP) {
     error();
     return SubstitutionMap();
@@ -1342,15 +1311,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
   // In particular, operator path pieces represent actual operators here, but
   // filters on operator functions when they appear later on.
   scratch.clear();
-  Expected<unsigned> maybeRecordID =
-      DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
-  if (!maybeRecordID) {
-    // FIXME this drops the error on the floor.
-    consumeError(maybeRecordID.takeError());
-    error();
-    return nullptr;
-  }
-  unsigned recordID = maybeRecordID.get();
+  unsigned recordID = fatalIfUnexpected(DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
   switch (recordID) {
   case XREF_TYPE_PATH_PIECE:
   case XREF_VALUE_PATH_PIECE: {
@@ -1460,14 +1421,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
         return Identifier();
 
       scratch.clear();
-      Expected<unsigned> maybeRecordID =
-          DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
-      if (!maybeRecordID) {
-        // FIXME this drops the error on the floor.
-        consumeError(maybeRecordID.takeError());
-        return Identifier();
-      }
-      unsigned recordID = maybeRecordID.get();
+      unsigned recordID = fatalIfUnexpected(DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
       switch (recordID) {
       case XREF_TYPE_PATH_PIECE: {
         IdentifierID IID;
@@ -1538,15 +1492,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
     }
 
     scratch.clear();
-    Expected<unsigned> maybeRecordID =
-        DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
-    if (!maybeRecordID) {
-      // FIXME this drops the error on the floor.
-      consumeError(maybeRecordID.takeError());
-      error();
-      return nullptr;
-    }
-    unsigned recordID = maybeRecordID.get();
+    unsigned recordID = fatalIfUnexpected(DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
     switch (recordID) {
     case XREF_TYPE_PATH_PIECE: {
       if (values.size() == 1 && isa<NominalTypeDecl>(values.front())) {
@@ -1958,15 +1904,7 @@ DeclContext *ModuleFile::getLocalDeclContext(DeclContextID DCID) {
   SmallVector<uint64_t, 64> scratch;
   StringRef blobData;
 
-  Expected<unsigned> maybeRecordID =
-      DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
-  if (!maybeRecordID) {
-    // FIXME this drops the error on the floor.
-    consumeError(maybeRecordID.takeError());
-    error();
-    return nullptr;
-  }
-  unsigned recordID = maybeRecordID.get();
+  unsigned recordID = fatalIfUnexpected(DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
   switch(recordID) {
   case decls_block::ABSTRACT_CLOSURE_EXPR_CONTEXT: {
     TypeID closureTypeID;
@@ -2056,15 +1994,7 @@ DeclContext *ModuleFile::getDeclContext(DeclContextID DCID) {
   SmallVector<uint64_t, 64> scratch;
   StringRef blobData;
 
-  Expected<unsigned> maybeRecordID =
-      DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
-  if (!maybeRecordID) {
-    // FIXME this drops the error on the floor.
-    consumeError(maybeRecordID.takeError());
-    error();
-    return nullptr;
-  }
-  unsigned recordID = maybeRecordID.get();
+  unsigned recordID = fatalIfUnexpected(DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
 
   if (recordID != decls_block::DECL_CONTEXT)
     llvm_unreachable("Expected a DECL_CONTEXT record");
@@ -4087,13 +4017,7 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
       return llvm::Error::success();
     }
 
-    Expected<unsigned> maybeRecordID =
-        MF.DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
-    if (!maybeRecordID) {
-      MF.error();
-      return maybeRecordID.takeError();
-    }
-    unsigned recordID = maybeRecordID.get();
+    unsigned recordID = MF.fatalIfUnexpected(MF.DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
 
     if (isDeclAttrRecord(recordID)) {
       DeclAttribute *Attr = nullptr;
@@ -4405,13 +4329,7 @@ DeclDeserializer::getDeclCheckedImpl() {
 
   SmallVector<uint64_t, 64> scratch;
   StringRef blobData;
-  Expected<unsigned> maybeRecordID =
-      MF.DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
-  if (!maybeRecordID) {
-    MF.error();
-    return maybeRecordID.takeError();
-  }
-  unsigned recordID = maybeRecordID.get();
+  unsigned recordID = MF.fatalIfUnexpected(MF.DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
 
   PrettyDeclDeserialization stackTraceEntry(
      &MF, declOrOffset, static_cast<decls_block::RecordKind>(recordID));
@@ -4794,13 +4712,7 @@ public:
         break;
 
       scratch.clear();
-      Expected<unsigned> maybeRecordID =
-          MF.DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
-      if (!maybeRecordID) {
-        MF.error();
-        return maybeRecordID.takeError();
-      }
-      unsigned recordID = maybeRecordID.get();
+      unsigned recordID = MF.fatalIfUnexpected(MF.DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
       if (recordID != decls_block::TUPLE_TYPE_ELT)
         break;
 
@@ -4861,13 +4773,7 @@ public:
         break;
 
       scratch.clear();
-      Expected<unsigned> maybeRecordID =
-          MF.DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
-      if (!maybeRecordID) {
-        MF.error();
-        return maybeRecordID.takeError();
-      }
-      unsigned recordID = maybeRecordID.get();
+      unsigned recordID = MF.fatalIfUnexpected(MF.DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
       if (recordID != decls_block::FUNCTION_PARAM)
         break;
 
@@ -5456,13 +5362,7 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
 
   SmallVector<uint64_t, 64> scratch;
   StringRef blobData;
-  Expected<unsigned> maybeRecordID =
-      MF.DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
-  if (!maybeRecordID) {
-    MF.error();
-    return maybeRecordID.takeError();
-  }
-  unsigned recordID = maybeRecordID.get();
+  unsigned recordID = MF.fatalIfUnexpected(MF.DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
 
   switch (recordID) {
 #define CASE(RECORD_NAME) \
@@ -5923,14 +5823,7 @@ Optional<StringRef> ModuleFile::maybeReadInlinableBodyText() {
   if (next.Kind != llvm::BitstreamEntry::Record)
     return None;
 
-  Expected<unsigned> maybeRecKind =
-      DeclTypeCursor.readRecord(next.ID, scratch, &blobData);
-  if (!maybeRecKind) {
-    // FIXME this drops the error diagnostic on the floor.
-    consumeError(maybeRecKind.takeError());
-    return None;
-  }
-  unsigned recKind = maybeRecKind.get();
+  unsigned recKind = fatalIfUnexpected(DeclTypeCursor.readRecord(next.ID, scratch, &blobData));
   if (recKind != INLINABLE_BODY_TEXT)
     return None;
 
@@ -5950,13 +5843,7 @@ Optional<ForeignErrorConvention> ModuleFile::maybeReadForeignErrorConvention() {
   if (next.Kind != llvm::BitstreamEntry::Record)
     return None;
 
-  Expected<unsigned> maybeRecKind = DeclTypeCursor.readRecord(next.ID, scratch);
-  if (!maybeRecKind) {
-    // FIXME this drops the error diagnostic on the floor.
-    consumeError(maybeRecKind.takeError());
-    return None;
-  }
-  unsigned recKind = maybeRecKind.get();
+  unsigned recKind = fatalIfUnexpected(DeclTypeCursor.readRecord(next.ID, scratch));
   switch (recKind) {
   case FOREIGN_ERROR_CONVENTION:
     restoreOffset.reset();

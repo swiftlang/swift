@@ -141,11 +141,7 @@ SILDeserializer::SILDeserializer(
     return;
 
   // Load any abbrev records at the start of the block.
-  if (llvm::Expected<llvm::BitstreamEntry> Advanced = SILCursor.advance()) {
-    // FIXME this drops the error on the floor.
-    consumeError(Advanced.takeError());
-    return;
-  }
+  MF->fatalIfUnexpected(SILCursor.advance());
 
   llvm::BitstreamCursor cursor = SILIndexCursor;
   // We expect SIL_FUNC_NAMES first, then SIL_VTABLE_NAMES, then
@@ -154,27 +150,14 @@ SILDeserializer::SILDeserializer(
   // omitted if no entries exist in the module file.
   unsigned kind = 0;
   while (kind != sil_index_block::SIL_PROPERTY_OFFSETS) {
-    llvm::Expected<llvm::BitstreamEntry> maybeNext = cursor.advance();
-    if (!maybeNext) {
-      // FIXME this drops the error on the floor.
-      consumeError(maybeNext.takeError());
-      return;
-    }
-    llvm::BitstreamEntry next = maybeNext.get();
+    llvm::BitstreamEntry next = MF->fatalIfUnexpected(cursor.advance());
     if (next.Kind == llvm::BitstreamEntry::EndBlock)
       return;
 
     SmallVector<uint64_t, 4> scratch;
     StringRef blobData;
     unsigned prevKind = kind;
-    llvm::Expected<unsigned> maybeKind =
-        cursor.readRecord(next.ID, scratch, &blobData);
-    if (!maybeKind) {
-      // FIXME this drops the error on the floor.
-      consumeError(maybeKind.takeError());
-      return;
-    }
-    kind = maybeKind.get();
+    kind = MF->fatalIfUnexpected(cursor.readRecord(next.ID, scratch, &blobData));
     assert((next.Kind == llvm::BitstreamEntry::Record &&
             kind > prevKind &&
             (kind == sil_index_block::SIL_FUNC_NAMES ||
@@ -204,21 +187,9 @@ SILDeserializer::SILDeserializer(
     }
 
     // Read SIL_FUNC|VTABLE|GLOBALVAR_OFFSETS record.
-    maybeNext = cursor.advance();
-    if (!maybeNext) {
-      // FIXME this drops the error on the floor.
-      consumeError(maybeNext.takeError());
-      return;
-    }
-    next = maybeNext.get();
+    next = MF->fatalIfUnexpected(cursor.advance());
     scratch.clear();
-    maybeKind = cursor.readRecord(next.ID, scratch, &blobData);
-    if (!maybeKind) {
-      // FIXME this drops the error on the floor.
-      consumeError(maybeKind.takeError());
-      return;
-    }
-    unsigned offKind = maybeKind.get();
+    unsigned offKind = MF->fatalIfUnexpected(cursor.readRecord(next.ID, scratch, &blobData));
     (void)offKind;
     if (kind == sil_index_block::SIL_FUNC_NAMES) {
       assert((next.Kind == llvm::BitstreamEntry::Record &&
