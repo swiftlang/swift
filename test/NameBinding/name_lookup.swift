@@ -625,3 +625,9 @@ struct PatternBindingWithTwoVars3 { var x = y, y = x }
 // expected-error@-1 {{type 'PatternBindingWithTwoVars3' has no member 'y'}}
 // expected-note@-2 {{did you mean 'x'?}}
 // expected-note@-3 {{did you mean 'y'?}}
+
+// https://bugs.swift.org/browse/SR-9015
+func sr9015() {
+  let closure1 = { closure2() } // expected-error {{let 'closure1' references itself}}
+  let closure2 = { closure1() }
+}

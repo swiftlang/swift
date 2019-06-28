@@ -789,7 +789,21 @@ Type ConstraintSystem::getUnopenedTypeOfReference(VarDecl *value, Type baseType,
                                                   bool wantInterfaceType) {
   return TC.getUnopenedTypeOfReference(
       value, baseType, UseDC,
-      [&](VarDecl *var) -> Type { return getType(var, wantInterfaceType); },
+      [&](VarDecl *var) -> Type {
+        if (auto *param = dyn_cast<ParamDecl>(var))
+          return getType(param);
+
+        if (!var->hasValidSignature()) {
+          if (!var->isInvalid()) {
+            TC.diagnose(var->getLoc(), diag::recursive_decl_reference,
+                        var->getDescriptiveKind(), var->getName());
+            var->markInvalid();
+          }
+          return ErrorType::get(TC.Context);
+        }
+
+        return wantInterfaceType ? var->getInterfaceType() : var->getType();
+      },
       base, wantInterfaceType);
 }
 
