@@ -907,16 +907,12 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
     // If this is a method whose result type is dynamic Self, replace
     // DynamicSelf with the actual object type.
-    if (!func->getDeclContext()->getSelfProtocolDecl()) {
-      if (func->getResultInterfaceType()->hasDynamicSelfType()) {
-        auto params = openedType->getParams();
-        assert(params.size() == 1);
-        Type selfTy = params.front().getPlainType()->getMetatypeInstanceType();
-        openedType = openedType->replaceCovariantResultType(selfTy, 2)
-                         ->castTo<FunctionType>();
-      }
-    } else {
-      openedType = openedType->eraseDynamicSelfType()->castTo<FunctionType>();
+    if (func->getResultInterfaceType()->hasDynamicSelfType()) {
+      auto params = openedType->getParams();
+      assert(params.size() == 1);
+      Type selfTy = params.front().getPlainType()->getMetatypeInstanceType();
+      openedType = openedType->replaceCovariantResultType(selfTy, 2)
+                        ->castTo<FunctionType>();
     }
 
     // The reference implicitly binds 'self'.
@@ -1312,11 +1308,6 @@ ConstraintSystem::getTypeOfMemberReference(
         openedType = openedType->replaceCovariantResultType(baseObjTy, 1);
       }
     }
-  } else {
-    // Protocol requirements returning Self have a dynamic Self return
-    // type. Erase the dynamic Self since it only comes into play during
-    // protocol conformance checking.
-    openedType = openedType->eraseDynamicSelfType();
   }
 
   // If we are looking at a member of an existential, open the existential.
