@@ -1115,6 +1115,7 @@ emitStoredPropertyInitialization(PatternBindingDecl *pbd, unsigned i) {
   auto *var = pbdEntry.getAnchoringVarDecl();
   auto *init = pbdEntry.getInit();
   auto *initDC = pbdEntry.getInitContext();
+  auto &captureInfo = pbdEntry.getCaptureInfo();
   assert(!pbdEntry.isInitializerSubsumed());
 
   // If this is the backing storage for a property with an attached wrapper
@@ -1131,7 +1132,7 @@ emitStoredPropertyInitialization(PatternBindingDecl *pbd, unsigned i) {
 
   SILDeclRef constant(var, SILDeclRef::Kind::StoredPropertyInitializer);
   emitOrDelayFunction(*this, constant,
-                      [this,constant,init,initDC,var](SILFunction *f) {
+                      [this,var,captureInfo,constant,init,initDC](SILFunction *f) {
     preEmitFunction(constant, init, f, init);
     PrettyStackTraceSILFunction X("silgen emitStoredPropertyInitialization", f);
 
@@ -1139,7 +1140,19 @@ emitStoredPropertyInitialization(PatternBindingDecl *pbd, unsigned i) {
     f->setProfiler(
         getOrCreateProfilerForConstructors(var->getDeclContext(), nullptr));
 
-    SILGenFunction(*this, *f, initDC).emitGeneratorFunction(constant, init);
+    SILGenFunction SGF(*this, *f, initDC);
+
+    // If this is a stored property initializer inside a type at global scope,
+    // it may close over a global variable. If we're emitting top-level code,
+    // then emit a "mark_function_escape" that lists the captured global
+    // variables so that definite initialization can reason about this
+    // escape point.
+    if (!var->getDeclContext()->isLocalContext() &&
+        TopLevelSGF && TopLevelSGF->B.hasValidInsertionPoint()) {
+      emitMarkFunctionEscapeForTopLevelCodeGlobals(var, captureInfo);
+    }
+
+    SGF.emitGeneratorFunction(constant, init);
     postEmitFunction(constant, f);
   });
 }

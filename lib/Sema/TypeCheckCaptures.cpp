@@ -716,35 +716,10 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
                           AFR.getAsDeclContext(),
                           AFR.isKnownNoEscape(),
                           AFR.isObjC());
-  if (AFR.getBody())
-    AFR.getBody()->walk(finder);
+  AFR.getBody()->walk(finder);
 
   if (AFR.hasType() && !AFR.isObjC()) {
     finder.checkType(AFR.getType(), getCaptureLoc(AFR));
-  }
-
-  // If this is an init(), explicitly walk the initializer values for members of
-  // the type.  They will be implicitly emitted by SILGen into the generated
-  // initializer.
-  if (auto CD =
-        dyn_cast_or_null<ConstructorDecl>(AFR.getAbstractFunctionDecl())) {
-    auto *typeDecl = dyn_cast<NominalTypeDecl>(CD->getDeclContext());
-    if (typeDecl && CD->isDesignatedInit()) {
-      for (auto member : typeDecl->getMembers()) {
-        // Ignore everything other than PBDs.
-        auto *PBD = dyn_cast<PatternBindingDecl>(member);
-        if (!PBD) continue;
-        // Walk the initializers for all properties declared in the type with
-        // an initializer.
-        for (auto &elt : PBD->getPatternList()) {
-          if (elt.isInitializerSubsumed())
-            continue;
-
-          if (auto *init = elt.getInit())
-            init->walk(finder);
-        }
-      }
-    }
   }
 
   auto captures = finder.getCaptureInfo();
@@ -788,4 +763,32 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
   if (cFunctionPointers != LocalCFunctionPointers.end())
     for (auto *expr : cFunctionPointers->second)
       maybeDiagnoseCaptures(expr, AFR);
+}
+
+void TypeChecker::checkPatternBindingCaptures(NominalTypeDecl *typeDecl) {
+  for (auto member : typeDecl->getMembers()) {
+    // Ignore everything other than PBDs.
+    auto *PBD = dyn_cast<PatternBindingDecl>(member);
+    if (!PBD) continue;
+    // Walk the initializers for all properties declared in the type with
+    // an initializer.
+    for (unsigned i = 0, e = PBD->getNumPatternEntries(); i < e; ++i) {
+      if (PBD->isInitializerSubsumed(i))
+        continue;
+
+      auto *init = PBD->getInit(i);
+      if (init == nullptr)
+        continue;
+
+      FindCapturedVars finder(*this,
+                              init->getLoc(),
+                              PBD->getInitContext(i),
+                              /*NoEscape=*/false,
+                              /*ObjC=*/false);
+      init->walk(finder);
+
+      auto captures = finder.getCaptureInfo();
+      PBD->setCaptureInfo(i, captures);
+    }
+  }
 }

@@ -60,9 +60,8 @@ var w: String  // expected-note {{variable defined here}}
                // expected-note@-1 {{variable defined here}}
                // expected-note@-2 {{variable defined here}}
 
-// FIXME: the error should blame the class definition: <rdar://41490541>.
-class TestClass1 { // expected-error {{variable 'w' used by function definition before being initialized}}
-  let fld = w
+class TestClass1 {
+  let fld = w // expected-error {{variable 'w' used by function definition before being initialized}}
 }
 
 class TestClass2 {
