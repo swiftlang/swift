@@ -502,6 +502,17 @@ public:
   /// Emits one last diagnostic, logs the error, and then aborts for the stack
   /// trace.
   LLVM_ATTRIBUTE_NORETURN void fatal(llvm::Error error);
+  void fatalIfNotSuccess(llvm::Error error) {
+    if (error)
+      fatal(std::move(error));
+  }
+  template<typename T>
+  T fatalIfUnexpected(llvm::Expected<T> expected) {
+    if (expected)
+      return std::move(expected.get());
+    fatal(expected.takeError());
+  }
+      
 
   ASTContext &getContext() const {
     assert(FileContext && "no associated context yet");

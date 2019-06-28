@@ -137,16 +137,9 @@ void ExtensionError::anchor() {}
 
 /// Skips a single record in the bitstream.
 ///
-/// Returns true if the next entry is a record of type \p recordKind.
 /// Destroys the stream position if the next entry is not a record.
 static void skipRecord(llvm::BitstreamCursor &cursor, unsigned recordKind) {
-  Expected<llvm::BitstreamEntry> maybeNext =
-      cursor.advance(AF_DontPopBlockAtEnd);
-  if (!maybeNext) {
-    // FIXME this drops the error on the floor.
-    consumeError(maybeNext.takeError());
-  }
-  llvm::BitstreamEntry next = maybeNext.get();
+  auto next = llvm::cantFail<llvm::BitstreamEntry>(cursor.advance(AF_DontPopBlockAtEnd));
   assert(next.Kind == llvm::BitstreamEntry::Record);
 
 #if NDEBUG
@@ -154,12 +147,7 @@ static void skipRecord(llvm::BitstreamCursor &cursor, unsigned recordKind) {
 #else
   SmallVector<uint64_t, 64> scratch;
   StringRef blobData;
-  Expected<unsigned> maybeKind = cursor.readRecord(next.ID, scratch, &blobData);
-  if (!maybeKind) {
-    // FIXME this drops the error on the floor.
-    consumeError(maybeNext.takeError());
-  }
-  unsigned kind = maybeKind.get();
+  auto kind = llvm::cantFail<unsigned>(cursor.readRecord(next.ID, scratch, &blobData));
   (void)kind;
   assert(kind == recordKind);
 #endif
@@ -262,20 +250,8 @@ ParameterList *ModuleFile::readParameterList() {
   using namespace decls_block;
 
   SmallVector<uint64_t, 8> scratch;
-  Expected<llvm::BitstreamEntry> maybeEntry =
-      DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
-  if (!maybeEntry) {
-    // FIXME this drops the error on the floor.
-    consumeError(maybeEntry.takeError());
-  }
-  llvm::BitstreamEntry entry = maybeEntry.get();
-  Expected<unsigned> maybeRecordID =
-      DeclTypeCursor.readRecord(entry.ID, scratch);
-  if (!maybeRecordID) {
-    // FIXME this drops the error on the floor.
-    consumeError(maybeRecordID.takeError());
-  }
-  unsigned recordID = maybeRecordID.get();
+  auto entry = fatalIfUnexpected<llvm::BitstreamEntry>(DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
+  auto recordID = fatalIfUnexpected<unsigned>(DeclTypeCursor.readRecord(entry.ID, scratch));
   assert(recordID == PARAMETERLIST);
   (void) recordID;
 
@@ -307,15 +283,7 @@ Expected<Pattern *> ModuleFile::readPattern(DeclContext *owningDC) {
   SmallVector<uint64_t, 8> scratch;
 
   BCOffsetRAII restoreOffset(DeclTypeCursor);
-  Expected<llvm::BitstreamEntry> maybeNext =
-      DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
-  if (!maybeNext) {
-    // FIXME this drops the error diagnostic on the floor.
-    consumeError(maybeNext.takeError());
-    error();
-    return nullptr;
-  }
-  llvm::BitstreamEntry next = maybeNext.get();
+  auto next = fatalIfUnexpected<llvm::BitstreamEntry>(DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
   if (next.Kind != llvm::BitstreamEntry::Record) {
     error();
     return nullptr;
@@ -329,14 +297,7 @@ Expected<Pattern *> ModuleFile::readPattern(DeclContext *owningDC) {
       pattern->setType(type);
   };
 
-  Expected<unsigned> maybeKind = DeclTypeCursor.readRecord(next.ID, scratch);
-  if (!maybeKind) {
-    // FIXME this drops the error on the floor.
-    consumeError(maybeKind.takeError());
-    error();
-    return nullptr;
-  }
-  unsigned kind = maybeKind.get();
+  auto kind = fatalIfUnexpected<unsigned>(DeclTypeCursor.readRecord(next.ID, scratch));
   switch (kind) {
   case decls_block::PAREN_PATTERN: {
     bool isImplicit;
@@ -367,24 +328,10 @@ Expected<Pattern *> ModuleFile::readPattern(DeclContext *owningDC) {
     SmallVector<TuplePatternElt, 8> elements;
     for ( ; count > 0; --count) {
       scratch.clear();
-      maybeNext = DeclTypeCursor.advance();
-      if (!maybeNext) {
-        // FIXME this drops the error diagnostic on the floor.
-        consumeError(maybeNext.takeError());
-        error();
-        return nullptr;
-      }
-      next = maybeNext.get();
+      next = fatalIfUnexpected<llvm::BitstreamEntry>(DeclTypeCursor.advance());
       assert(next.Kind == llvm::BitstreamEntry::Record);
 
-      maybeKind = DeclTypeCursor.readRecord(next.ID, scratch);
-      if (!maybeKind) {
-        // FIXME this drops the error on the floor.
-        consumeError(maybeKind.takeError());
-        error();
-        return nullptr;
-      }
-      kind = maybeKind.get();
+      kind = fatalIfUnexpected<unsigned>(DeclTypeCursor.readRecord(next.ID, scratch));
       assert(kind == decls_block::TUPLE_PATTERN_ELT);
 
       // FIXME: Add something for this record or remove it.
@@ -476,24 +423,10 @@ SILLayout *ModuleFile::readSILLayout(llvm::BitstreamCursor &Cursor) {
 
   SmallVector<uint64_t, 16> scratch;
 
-  Expected<llvm::BitstreamEntry> maybeNext =
-      Cursor.advance(AF_DontPopBlockAtEnd);
-  if (!maybeNext) {
-    // FIXME this drops the error diagnostic on the floor.
-    error();
-    return nullptr;
-  }
-  llvm::BitstreamEntry next = maybeNext.get();
+  auto next = fatalIfUnexpected<llvm::BitstreamEntry>(Cursor.advance(AF_DontPopBlockAtEnd));
   assert(next.Kind == llvm::BitstreamEntry::Record);
 
-  Expected<unsigned> maybeKind = Cursor.readRecord(next.ID, scratch);
-  if (!maybeKind) {
-    // FIXME this drops the error on the floor.
-    consumeError(maybeKind.takeError());
-    error();
-    return nullptr;
-  }
-  unsigned kind = maybeKind.get();
+  auto kind = fatalIfUnexpected<unsigned>(Cursor.readRecord(next.ID, scratch));
   switch (kind) {
   case decls_block::SIL_LAYOUT: {
     GenericSignatureID rawGenericSig;
@@ -529,30 +462,13 @@ ProtocolConformanceRef ModuleFile::readConformance(
 
   SmallVector<uint64_t, 16> scratch;
 
-  Expected<llvm::BitstreamEntry> maybeNext =
-      Cursor.advance(AF_DontPopBlockAtEnd);
-  if (!maybeNext) {
-    // FIXME this drops the error diagnostic on the floor.
-    consumeError(maybeNext.takeError());
-    error();
-    ProtocolConformance *conformance = nullptr;
-    return ProtocolConformanceRef(conformance); // FIXME: this will assert
-  }
-  llvm::BitstreamEntry next = maybeNext.get();
+  auto next = fatalIfUnexpected<llvm::BitstreamEntry>(Cursor.advance(AF_DontPopBlockAtEnd));
   assert(next.Kind == llvm::BitstreamEntry::Record);
 
   if (getContext().Stats)
     getContext().Stats->getFrontendCounters().NumConformancesDeserialized++;
 
-  Expected<unsigned> maybeKind = Cursor.readRecord(next.ID, scratch);
-  if (!maybeKind) {
-    // FIXME this drops the error on the floor.
-    consumeError(maybeKind.takeError());
-    error();
-    ProtocolConformance *conformance = nullptr;
-    return ProtocolConformanceRef(conformance); // FIXME: this will assert
-  }
-  unsigned kind = maybeKind.get();
+  auto kind = fatalIfUnexpected<unsigned>(Cursor.readRecord(next.ID, scratch));
   switch (kind) {
   case INVALID_PROTOCOL_CONFORMANCE: {
     return ProtocolConformanceRef::forInvalid();
@@ -685,20 +601,8 @@ NormalProtocolConformance *ModuleFile::readNormalConformance(
 
   // Find the conformance record.
   BCOffsetRAII restoreOffset(DeclTypeCursor);
-  if (llvm::Error Err = DeclTypeCursor.JumpToBit(conformanceEntry)) {
-    // FIXME this drops the error diagnostic on the floor.
-    consumeError(std::move(Err));
-    error();
-    return nullptr;
-  }
-  Expected<llvm::BitstreamEntry> maybeEntry = DeclTypeCursor.advance();
-  if (!maybeEntry) {
-    // FIXME this drops the error diagnostic on the floor.
-    consumeError(maybeEntry.takeError());
-    error();
-    return nullptr;
-  }
-  llvm::BitstreamEntry entry = maybeEntry.get();
+  fatalIfNotSuccess(DeclTypeCursor.JumpToBit(conformanceEntry));
+  auto entry = fatalIfUnexpected<llvm::BitstreamEntry>(DeclTypeCursor.advance());
   if (entry.Kind != llvm::BitstreamEntry::Record) {
     error();
     return nullptr;
@@ -710,14 +614,7 @@ NormalProtocolConformance *ModuleFile::readNormalConformance(
   ArrayRef<uint64_t> rawIDs;
   SmallVector<uint64_t, 16> scratch;
 
-  Expected<unsigned> maybeKind = DeclTypeCursor.readRecord(entry.ID, scratch);
-  if (!maybeKind) {
-    // FIXME this drops the error on the floor.
-    consumeError(maybeKind.takeError());
-    error();
-    return nullptr;
-  }
-  unsigned kind = maybeKind.get();
+  auto kind = fatalIfUnexpected<unsigned>(DeclTypeCursor.readRecord(entry.ID, scratch));
   if (kind != NORMAL_PROTOCOL_CONFORMANCE) {
     error();
     return nullptr;
@@ -768,25 +665,11 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC) {
   SmallVector<uint64_t, 8> scratch;
   StringRef blobData;
 
-  Expected<llvm::BitstreamEntry> maybeNext =
-      DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
-  if (!maybeNext) {
-    // FIXME this drops the error diagnostic on the floor.
-    consumeError(maybeNext.takeError());
-    return nullptr;
-  }
-  llvm::BitstreamEntry next = maybeNext.get();
+  auto next = fatalIfUnexpected<llvm::BitstreamEntry>(DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
   if (next.Kind != llvm::BitstreamEntry::Record)
     return nullptr;
 
-  Expected<unsigned> maybeKind =
-      DeclTypeCursor.readRecord(next.ID, scratch, &blobData);
-  if (!maybeKind) {
-    // FIXME this drops the error on the floor.
-    consumeError(maybeKind.takeError());
-    return nullptr;
-  }
-  unsigned kind = maybeKind.get();
+  auto kind = fatalIfUnexpected<unsigned>(DeclTypeCursor.readRecord(next.ID, scratch, &blobData));
   if (kind != GENERIC_PARAM_LIST)
     return nullptr;
   lastRecordOffset.reset();
@@ -823,14 +706,7 @@ void ModuleFile::readGenericRequirements(
     lastRecordOffset.reset();
     bool shouldContinue = true;
 
-    Expected<llvm::BitstreamEntry> maybeEntry =
-        Cursor.advance(AF_DontPopBlockAtEnd);
-    if (!maybeEntry) {
-      // FIXME this drops the error diagnostic on the floor.
-      consumeError(maybeEntry.takeError());
-      return;
-    }
-    llvm::BitstreamEntry entry = maybeEntry.get();
+    auto entry = fatalIfUnexpected<llvm::BitstreamEntry>(       Cursor.advance(AF_DontPopBlockAtEnd));
     if (entry.Kind != llvm::BitstreamEntry::Record)
       break;
 
@@ -1013,12 +889,7 @@ GenericSignature *ModuleFile::getGenericSignature(
 
   // Read the generic signature.
   BCOffsetRAII restoreOffset(DeclTypeCursor);
-  if (llvm::Error Err = DeclTypeCursor.JumpToBit(sigOrOffset)) {
-    // FIXME this drops the error diagnostic on the floor.
-    consumeError(std::move(Err));
-    error();
-    return nullptr;
-  }
+  fatalIfNotSuccess(DeclTypeCursor.JumpToBit(sigOrOffset));
   DeserializingEntityRAII deserializingEntity(*this);
 
   // Read the parameter types.
@@ -1026,15 +897,7 @@ GenericSignature *ModuleFile::getGenericSignature(
   StringRef blobData;
   SmallVector<uint64_t, 8> scratch;
 
-  Expected<llvm::BitstreamEntry> maybeEntry =
-      DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
-  if (!maybeEntry) {
-    // FIXME this drops the error diagnostic on the floor.
-    consumeError(maybeEntry.takeError());
-    error();
-    return nullptr;
-  }
-  llvm::BitstreamEntry entry = maybeEntry.get();
+  auto entry = fatalIfUnexpected<llvm::BitstreamEntry>(     DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
   if (entry.Kind != llvm::BitstreamEntry::Record) {
     error();
     return nullptr;
@@ -1110,12 +973,7 @@ ModuleFile::getGenericSignatureOrEnvironment(
 
     // Read the generic environment.
     BCOffsetRAII restoreOffset(DeclTypeCursor);
-    if (llvm::Error Err = DeclTypeCursor.JumpToBit(bitOffset)) {
-      // FIXME this drops the error diagnostic on the floor.
-      consumeError(std::move(Err));
-      error();
-      return nullptr;
-    }
+    fatalIfNotSuccess(DeclTypeCursor.JumpToBit(bitOffset));
     DeserializingEntityRAII deserializingEntity(*this);
 
     SmallVector<GenericTypeParamType *, 4> paramTypes;
@@ -1130,15 +988,7 @@ ModuleFile::getGenericSignatureOrEnvironment(
     // own internal tracking.)
     BCOffsetRAII lastRecordOffset(DeclTypeCursor);
 
-    Expected<llvm::BitstreamEntry> maybeEntry =
-        DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
-    if (!maybeEntry) {
-      // FIXME this drops the error diagnostic on the floor.
-      consumeError(maybeEntry.takeError());
-      error();
-      return nullptr;
-    }
-    llvm::BitstreamEntry entry = maybeEntry.get();
+    auto entry = fatalIfUnexpected<llvm::BitstreamEntry>(       DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
     if (entry.Kind != llvm::BitstreamEntry::Record)
       return result;
 
@@ -1239,24 +1089,11 @@ SubstitutionMap ModuleFile::getSubstitutionMap(
 
   // Read the substitution map.
   BCOffsetRAII restoreOffset(DeclTypeCursor);
-  if (llvm::Error Err = DeclTypeCursor.JumpToBit(substitutionsOrOffset)) {
-    // FIXME this drops the error diagnostic on the floor.
-    consumeError(std::move(Err));
-    error();
-    return SubstitutionMap();
-  }
+  fatalIfNotSuccess(DeclTypeCursor.JumpToBit(substitutionsOrOffset));
   DeserializingEntityRAII deserializingEntity(*this);
 
   // Read the substitution map.
-  Expected<llvm::BitstreamEntry> maybeEntry =
-      DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
-  if (!maybeEntry) {
-    // FIXME this drops the error diagnostic on the floor.
-    consumeError(maybeEntry.takeError());
-    error();
-    return SubstitutionMap();
-  }
-  llvm::BitstreamEntry entry = maybeEntry.get();
+  auto entry = fatalIfUnexpected<llvm::BitstreamEntry>(     DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
   if (entry.Kind != llvm::BitstreamEntry::Record) {
     error();
     return SubstitutionMap();
@@ -1317,27 +1154,13 @@ SubstitutionMap ModuleFile::getSubstitutionMap(
 bool ModuleFile::readDefaultWitnessTable(ProtocolDecl *proto) {
   using namespace decls_block;
 
-  Expected<llvm::BitstreamEntry> maybeEntry =
-      DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
-  if (!maybeEntry) {
-    // FIXME this drops the error diagnostic on the floor.
-    consumeError(maybeEntry.takeError());
-    return false;
-  }
-  llvm::BitstreamEntry entry = maybeEntry.get();
+  auto entry = fatalIfUnexpected<llvm::BitstreamEntry>(     DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
   if (entry.Kind != llvm::BitstreamEntry::Record)
     return true;
 
   SmallVector<uint64_t, 16> witnessIDBuffer;
 
-  Expected<unsigned> maybeKind =
-      DeclTypeCursor.readRecord(entry.ID, witnessIDBuffer);
-  if (!maybeKind) {
-    // FIXME this drops the error on the floor.
-    consumeError(maybeKind.takeError());
-    return false;
-  }
-  unsigned kind = maybeKind.get();
+  auto kind = fatalIfUnexpected<unsigned>(DeclTypeCursor.readRecord(entry.ID, witnessIDBuffer));
   assert(kind == DEFAULT_WITNESS_TABLE);
   (void)kind;
 
@@ -1486,15 +1309,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
   assert(baseModule && "missing dependency");
   PrettyXRefTrace pathTrace(*baseModule);
 
-  Expected<llvm::BitstreamEntry> maybeEntry =
-      DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
-  if (!maybeEntry) {
-    // FIXME this drops the error diagnostic on the floor.
-    consumeError(maybeEntry.takeError());
-    error();
-    return nullptr;
-  }
-  llvm::BitstreamEntry entry = maybeEntry.get();
+  auto entry = fatalIfUnexpected<llvm::BitstreamEntry>(     DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
   if (entry.Kind != llvm::BitstreamEntry::Record) {
     error();
     return nullptr;
@@ -1621,14 +1436,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
   auto getXRefDeclNameForError = [&]() -> DeclName {
     DeclName result = pathTrace.getLastName();
     while (--pathLen) {
-      Expected<llvm::BitstreamEntry> maybeEntry =
-          DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
-      if (!maybeEntry) {
-        // FIXME this drops the error on the floor.
-        consumeError(maybeEntry.takeError());
-        return Identifier();
-      }
-      llvm::BitstreamEntry entry = maybeEntry.get();
+      auto entry = fatalIfUnexpected<llvm::BitstreamEntry>(         DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
       if (entry.Kind != llvm::BitstreamEntry::Record)
         return Identifier();
 
@@ -1703,15 +1511,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
 
   // For remaining path pieces, filter or drill down into the results we have.
   while (--pathLen) {
-    Expected<llvm::BitstreamEntry> maybeEntry =
-        DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
-    if (!maybeEntry) {
-      // FIXME this drops the error diagnostic on the floor.
-      consumeError(maybeEntry.takeError());
-      error();
-      return nullptr;
-    }
-    llvm::BitstreamEntry entry = maybeEntry.get();
+    auto entry = fatalIfUnexpected<llvm::BitstreamEntry>(       DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
     if (entry.Kind != llvm::BitstreamEntry::Record) {
       error();
       return nullptr;
@@ -2126,20 +1926,8 @@ DeclContext *ModuleFile::getLocalDeclContext(DeclContextID DCID) {
     return declContextOrOffset;
 
   BCOffsetRAII restoreOffset(DeclTypeCursor);
-  if (llvm::Error Err = DeclTypeCursor.JumpToBit(declContextOrOffset)) {
-    // FIXME this drops the error diagnostic on the floor.
-    consumeError(std::move(Err));
-    error();
-    return nullptr;
-  }
-  Expected<llvm::BitstreamEntry> maybeEntry = DeclTypeCursor.advance();
-  if (!maybeEntry) {
-    // FIXME this drops the error diagnostic on the floor.
-    consumeError(maybeEntry.takeError());
-    error();
-    return nullptr;
-  }
-  llvm::BitstreamEntry entry = maybeEntry.get();
+  fatalIfNotSuccess(DeclTypeCursor.JumpToBit(declContextOrOffset));
+  auto entry = fatalIfUnexpected<llvm::BitstreamEntry>(DeclTypeCursor.advance());
 
   if (entry.Kind != llvm::BitstreamEntry::Record) {
     error();
@@ -2237,20 +2025,8 @@ DeclContext *ModuleFile::getDeclContext(DeclContextID DCID) {
     return declContextOrOffset;
 
   BCOffsetRAII restoreOffset(DeclTypeCursor);
-  if (llvm::Error Err = DeclTypeCursor.JumpToBit(declContextOrOffset)) {
-    // FIXME this drops the error diagnostic on the floor.
-    consumeError(std::move(Err));
-    error();
-    return nullptr;
-  }
-  Expected<llvm::BitstreamEntry> maybeEntry = DeclTypeCursor.advance();
-  if (!maybeEntry) {
-    // FIXME this drops the error diagnostic on the floor.
-    consumeError(maybeEntry.takeError());
-    error();
-    return nullptr;
-  }
-  llvm::BitstreamEntry entry = maybeEntry.get();
+  fatalIfNotSuccess(DeclTypeCursor.JumpToBit(declContextOrOffset));
+  auto entry = fatalIfUnexpected<llvm::BitstreamEntry>(DeclTypeCursor.advance());
 
   if (entry.Kind != llvm::BitstreamEntry::Record) {
     error();
@@ -4254,8 +4030,7 @@ ModuleFile::getDeclChecked(DeclID DID) {
   if (!declOrOffset.isComplete()) {
     ++NumDeclsLoaded;
     BCOffsetRAII restoreOffset(DeclTypeCursor);
-    if (llvm::Error Err = DeclTypeCursor.JumpToBit(declOrOffset))
-      return std::move(Err);
+    fatalIfNotSuccess(DeclTypeCursor.JumpToBit(declOrOffset));
 
     ModuleFile::DeserializingEntityRAII deserializingEntity(*this);
     Expected<Decl *> deserialized =
@@ -4284,12 +4059,7 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
   StringRef blobData;
   while (true) {
     BCOffsetRAII restoreOffset(MF.DeclTypeCursor);
-    Expected<llvm::BitstreamEntry> maybeEntry = MF.DeclTypeCursor.advance();
-    if (!maybeEntry) {
-      MF.error();
-      return maybeEntry.takeError();
-    }
-    llvm::BitstreamEntry entry = maybeEntry.get();
+    auto entry = MF.fatalIfUnexpected<llvm::BitstreamEntry>(MF.DeclTypeCursor.advance());
     if (entry.Kind != llvm::BitstreamEntry::Record) {
       // We don't know how to serialize decls represented by sub-blocks.
       MF.error();
@@ -4604,12 +4374,7 @@ DeclDeserializer::getDeclCheckedImpl() {
   if (declOrOffset.isComplete())
     return declOrOffset;
 
-  Expected<llvm::BitstreamEntry> maybeEntry = MF.DeclTypeCursor.advance();
-  if (!maybeEntry) {
-    MF.error();
-    return maybeEntry.takeError();
-  }
-  llvm::BitstreamEntry entry = maybeEntry.get();
+  auto entry = MF.fatalIfUnexpected<llvm::BitstreamEntry>(MF.DeclTypeCursor.advance());
   if (entry.Kind != llvm::BitstreamEntry::Record) {
     // We don't know how to serialize decls represented by sub-blocks.
     MF.error();
@@ -5001,13 +4766,7 @@ public:
     // The tuple record itself is empty. Read all trailing elements.
     SmallVector<TupleTypeElt, 8> elements;
     while (true) {
-      Expected<llvm::BitstreamEntry> maybeEntry =
-          MF.DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
-      if (!maybeEntry) {
-        MF.error();
-        return maybeEntry.takeError();
-      }
-      llvm::BitstreamEntry entry = maybeEntry.get();
+      auto entry = MF.fatalIfUnexpected<llvm::BitstreamEntry>(         MF.DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
       if (entry.Kind != llvm::BitstreamEntry::Record)
         break;
 
@@ -5073,13 +4832,7 @@ public:
 
     SmallVector<AnyFunctionType::Param, 8> params;
     while (true) {
-      Expected<llvm::BitstreamEntry> maybeEntry =
-          MF.DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
-      if (!maybeEntry) {
-        MF.error();
-        return maybeEntry.takeError();
-      }
-      llvm::BitstreamEntry entry = maybeEntry.get();
+      auto entry = MF.fatalIfUnexpected<llvm::BitstreamEntry>(         MF.DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
       if (entry.Kind != llvm::BitstreamEntry::Record)
         break;
 
@@ -5397,12 +5150,7 @@ public:
       }
 
       BCOffsetRAII saveOffset(MF.DeclTypeCursor);
-      if (llvm::Error Err = MF.DeclTypeCursor.JumpToBit(layoutOrOffset)) {
-        // FIXME this drops the error diagnostic on the floor.
-        consumeError(std::move(Err));
-        MF.error();
-        return nullptr;
-      }
+      MF.fatalIfNotSuccess(MF.DeclTypeCursor.JumpToBit(layoutOrOffset));
       auto layout = MF.readSILLayout(MF.DeclTypeCursor);
       if (!layout) {
         MF.error();
@@ -5648,8 +5396,7 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
     return typeOrOffset;
 
   BCOffsetRAII restoreOffset(DeclTypeCursor);
-  if (llvm::Error Err = DeclTypeCursor.JumpToBit(typeOrOffset))
-    return std::move(Err);
+  fatalIfNotSuccess(DeclTypeCursor.JumpToBit(typeOrOffset));
 
   auto result = TypeDeserializer(*this).getTypeCheckedImpl();
   if (!result)
@@ -5674,12 +5421,7 @@ Expected<Type> TypeDeserializer::getTypeCheckedImpl() {
   if (auto s = ctx.Stats)
     s->getFrontendCounters().NumTypesDeserialized++;
 
-  Expected<llvm::BitstreamEntry> maybeEntry = MF.DeclTypeCursor.advance();
-  if (!maybeEntry) {
-    MF.error();
-    return maybeEntry.takeError();
-  }
-  llvm::BitstreamEntry entry = maybeEntry.get();
+  auto entry = MF.fatalIfUnexpected<llvm::BitstreamEntry>(MF.DeclTypeCursor.advance());
 
   if (entry.Kind != llvm::BitstreamEntry::Record) {
     // We don't know how to serialize types represented by sub-blocks.
@@ -5824,20 +5566,8 @@ void ModuleFile::loadAllMembers(Decl *container, uint64_t contextData) {
     IDC = cast<ExtensionDecl>(container);
 
   BCOffsetRAII restoreOffset(DeclTypeCursor);
-  if (llvm::Error Err = DeclTypeCursor.JumpToBit(contextData)) {
-    // FIXME this drops the error diagnostic on the floor.
-    consumeError(std::move(Err));
-    error();
-    return;
-  }
-  Expected<llvm::BitstreamEntry> maybeEntry = DeclTypeCursor.advance();
-  if (!maybeEntry) {
-    // FIXME this drops the error diagnostic on the floor.
-    consumeError(maybeEntry.takeError());
-    error();
-    return;
-  }
-  llvm::BitstreamEntry entry = maybeEntry.get();
+  fatalIfNotSuccess(DeclTypeCursor.JumpToBit(contextData));
+  auto entry = fatalIfUnexpected<llvm::BitstreamEntry>(DeclTypeCursor.advance());
   if (entry.Kind != llvm::BitstreamEntry::Record) {
     error();
     return;
@@ -5845,15 +5575,7 @@ void ModuleFile::loadAllMembers(Decl *container, uint64_t contextData) {
 
   SmallVector<uint64_t, 16> memberIDBuffer;
 
-  Expected<unsigned> maybeKind =
-      DeclTypeCursor.readRecord(entry.ID, memberIDBuffer);
-  if (!maybeKind) {
-    // FIXME this drops the error diagnostic on the floor.
-    consumeError(maybeKind.takeError());
-    error();
-    return;
-  }
-  unsigned kind = maybeKind.get();
+  auto kind = fatalIfUnexpected<unsigned>(DeclTypeCursor.readRecord(entry.ID, memberIDBuffer));
   assert(kind == decls_block::MEMBERS);
   (void)kind;
 
@@ -5903,12 +5625,7 @@ ModuleFile::loadAllConformances(const Decl *D, uint64_t contextData,
     = decodeLazyConformanceContextData(contextData);
 
   BCOffsetRAII restoreOffset(DeclTypeCursor);
-  if (llvm::Error Err = DeclTypeCursor.JumpToBit(bitPosition)) {
-    // FIXME this drops the error diagnostic on the floor.
-    consumeError(std::move(Err));
-    error();
-    return;
-  }
+  fatalIfNotSuccess(DeclTypeCursor.JumpToBit(bitPosition));
 
   while (numConformances--) {
     auto conf = readConformance(DeclTypeCursor);
@@ -5940,20 +5657,8 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
 
   // Find the conformance record.
   BCOffsetRAII restoreOffset(DeclTypeCursor);
-  if (llvm::Error Err = DeclTypeCursor.JumpToBit(contextData)) {
-    // FIXME this drops the error diagnostic on the floor.
-    consumeError(std::move(Err));
-    error();
-    return;
-  }
-  Expected<llvm::BitstreamEntry> maybeEntry = DeclTypeCursor.advance();
-  if (!maybeEntry) {
-    // FIXME this drops the error diagnostic on the floor.
-    consumeError(maybeEntry.takeError());
-    error();
-    return;
-  }
-  llvm::BitstreamEntry entry = maybeEntry.get();
+  fatalIfNotSuccess(DeclTypeCursor.JumpToBit(contextData));
+  auto entry = fatalIfUnexpected<llvm::BitstreamEntry>(DeclTypeCursor.advance());
   assert(entry.Kind == llvm::BitstreamEntry::Record &&
          "registered lazy loader incorrectly");
 
@@ -5963,14 +5668,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
   ArrayRef<uint64_t> rawIDs;
   SmallVector<uint64_t, 16> scratch;
 
-  Expected<unsigned> maybeKind = DeclTypeCursor.readRecord(entry.ID, scratch);
-  if (!maybeKind) {
-    // FIXME this drops the error diagnostic on the floor.
-    consumeError(maybeKind.takeError());
-    error();
-    return;
-  }
-  unsigned kind = maybeKind.get();
+  auto kind = fatalIfUnexpected<unsigned>(DeclTypeCursor.readRecord(entry.ID, scratch));
   (void) kind;
   assert(kind == NORMAL_PROTOCOL_CONFORMANCE &&
          "registered lazy loader incorrectly");
@@ -6193,14 +5891,7 @@ Optional<StringRef> ModuleFile::maybeReadInlinableBodyText() {
   BCOffsetRAII restoreOffset(DeclTypeCursor);
   StringRef blobData;
 
-  Expected<llvm::BitstreamEntry> maybeNext =
-      DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
-  if (!maybeNext) {
-    // FIXME this drops the error on the floor.
-    consumeError(maybeNext.takeError());
-    return None;
-  }
-  llvm::BitstreamEntry next = maybeNext.get();
+  auto next = fatalIfUnexpected<llvm::BitstreamEntry>(DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
   if (next.Kind != llvm::BitstreamEntry::Record)
     return None;
 
@@ -6226,14 +5917,7 @@ Optional<ForeignErrorConvention> ModuleFile::maybeReadForeignErrorConvention() {
 
   BCOffsetRAII restoreOffset(DeclTypeCursor);
 
-  Expected<llvm::BitstreamEntry> maybeNext =
-      DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
-  if (!maybeNext) {
-    // FIXME this drops the error on the floor.
-    consumeError(maybeNext.takeError());
-    return None;
-  }
-  llvm::BitstreamEntry next = maybeNext.get();
+  auto next = fatalIfUnexpected<llvm::BitstreamEntry>(DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
   if (next.Kind != llvm::BitstreamEntry::Record)
     return None;
 

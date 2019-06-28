@@ -38,9 +38,7 @@ public:
 
   ~BCOffsetRAII() {
     if (Cursor)
-      if (llvm::Error Err = Cursor->JumpToBit(Offset))
-        llvm::report_fatal_error("failed destroying BCOffset: " +
-                                 toString(std::move(Err)));
+      cantFail(Cursor->JumpToBit(Offset), "BCOffsetRAII must be able to go back");
   }
 };
 

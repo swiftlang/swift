@@ -48,7 +48,6 @@ static bool checkModuleSignature(llvm::BitstreamCursor &cursor,
       if (maybeRead.get() != byte)
         return false;
     } else {
-      // FIXME this drops the error on the floor.
       consumeError(maybeRead.takeError());
       return false;
     }
@@ -2230,36 +2229,15 @@ ModuleFile::loadNamedMembers(const IterableDeclContext *IDC, DeclBaseName N,
     DeclMembersTables[subTableOffset];
   if (!subTable) {
     BCOffsetRAII restoreOffset(DeclMemberTablesCursor);
-    if (llvm::Error Err = DeclMemberTablesCursor.JumpToBit(subTableOffset)) {
-      // FIXME this drops the error on the floor.
-      consumeError(std::move(Err));
-      error();
-      return None;
-    }
-    Expected<llvm::BitstreamEntry> maybeEntry =
-        DeclMemberTablesCursor.advance();
-    if (!maybeEntry) {
-      // FIXME this drops the error on the floor.
-      consumeError(maybeEntry.takeError());
-      error();
-      return None;
-    }
-    llvm::BitstreamEntry entry = maybeEntry.get();
+    fatalIfNotSuccess(DeclMemberTablesCursor.JumpToBit(subTableOffset));
+    auto entry = fatalIfUnexpected<llvm::BitstreamEntry>(DeclMemberTablesCursor.advance());
     if (entry.Kind != llvm::BitstreamEntry::Record) {
       error();
       return None;
     }
     SmallVector<uint64_t, 64> scratch;
     StringRef blobData;
-    Expected<unsigned> maybeKind =
-        DeclMemberTablesCursor.readRecord(entry.ID, scratch, &blobData);
-    if (!maybeKind) {
-      // FIXME this drops the error on the floor.
-      consumeError(maybeKind.takeError());
-      error();
-      return None;
-    }
-    unsigned kind = maybeKind.get();
+    unsigned kind = fatalIfUnexpected<unsigned>(DeclMemberTablesCursor.readRecord(entry.ID, scratch, &blobData));
     assert(kind == decl_member_tables_block::DECL_MEMBERS);
     (void)kind;
     subTable = readDeclMembersTable(scratch, blobData);
@@ -2278,7 +2256,7 @@ ModuleFile::loadNamedMembers(const IterableDeclContext *IDC, DeclBaseName N,
       } else {
         if (!getContext().LangOpts.EnableDeserializationRecovery)
           fatal(mem.takeError());
-        llvm::consumeError(mem.takeError());
+        consumeError(mem.takeError());
 
         // Treat this as a cache-miss to the caller and let them attempt
         // to refill through the normal loadAllMembers() path.
@@ -2405,7 +2383,7 @@ void ModuleFile::getTopLevelDecls(SmallVectorImpl<Decl *> &results) {
     if (!declOrError) {
       if (!getContext().LangOpts.EnableDeserializationRecovery)
         fatal(declOrError.takeError());
-      llvm::consumeError(declOrError.takeError());
+      consumeError(declOrError.takeError());
       continue;
     }
     results.push_back(declOrError.get());
