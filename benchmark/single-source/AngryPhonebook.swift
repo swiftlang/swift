@@ -19,6 +19,11 @@ let t: [BenchmarkCategory] = [.validation, .api, .String]
 
 public let AngryPhonebook = [
   BenchmarkInfo(
+    name: "AngryPhonebook",
+    runFunction: { angryPhonebook($0, words) },
+    tags: t,
+    legacyFactor: 7),
+  BenchmarkInfo(
     name: "AngryPhonebook.Latin",
     runFunction: { angryPhonebook($0, latin) },
     tags: t,
@@ -35,15 +40,19 @@ public let AngryPhonebook = [
     setUpFunction: { blackHole(cyrillic) })
 ]
 
+let words = [
+  "James", "John", "Robert", "Michael", "William", "David", "Richard", "Joseph",
+  "Charles", "Thomas", "Christopher", "Daniel", "Matthew", "Donald", "Anthony",
+  "Paul", "Mark", "George", "Steven", "Kenneth", "Andrew", "Edward", "Brian",
+  "Joshua", "Kevin", "Ronald", "Timothy", "Jason", "Jeffrey", "Gary", "Ryan",
+  "Nicholas", "Eric", "Stephen", "Jacob", "Larry", "Frank"]
+
 // Workloads for various scripts. Always 20 names for 400 pairings.
 // To keep the performance of various scripts roughly comparable, aim for
 // a total length of approximately 120 characters.
-// E.g.: `latin.joined(separator: "").count == 118`
+// E.g.: `latin.joined(separator: "").count == 124`
 
-let latin = [
-  "James", "John", "Robert", "Michael", "William", "David", "Richard", "Joseph",
-  "Charles", "Thomas", "Jacob", "Daniel", "Matthew", "Donald", "Anthony",
-  "Paul", "Mark", "George", "Steven", "Kenneth"]
+let latin = Array(words.prefix(20))
 
 let armenian: [String] = [
   "Արմեն", "Աննա", "Հարութ", "Միքայել", "Մարիա", "Դավիթ", "Վարդան",
