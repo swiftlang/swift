@@ -492,16 +492,32 @@ void Demangler::clear() {
   NodeFactory::clear();
 }
 
-void Demangler::init(StringRef MangledName) {
-  NodeStack.init(*this, 16);
-  Substitutions.init(*this, 16);
-  NumWords = 0;
-  Text = MangledName;
-  Pos = 0;
+Demangler::DemangleInitRAII::DemangleInitRAII(Demangler &Dem,
+                                              StringRef MangledName)
+// Save the current demangler state so we can restore it.
+  : Dem(Dem),
+    NodeStack(Dem.NodeStack), Substitutions(Dem.Substitutions),
+    NumWords(Dem.NumWords), Text(Dem.Text), Pos(Dem.Pos)
+{
+  // Reset the demangler state for a nested job.
+  Dem.NodeStack.init(Dem, 16);
+  Dem.Substitutions.init(Dem, 16);
+  Dem.NumWords = 0;
+  Dem.Text = MangledName;
+  Dem.Pos = 0;
 }
-  
+
+Demangler::DemangleInitRAII::~DemangleInitRAII() {
+  // Restore the saved state.
+  Dem.NodeStack = NodeStack;
+  Dem.Substitutions = Substitutions;
+  Dem.NumWords = NumWords;
+  Dem.Text = Text;
+  Dem.Pos = Pos;
+}
+
 NodePointer Demangler::demangleSymbol(StringRef MangledName) {
-  init(MangledName);
+  DemangleInitRAII state(*this, MangledName);
 
   // Demangle old-style class and protocol names, which are still used in the
   // ObjC metadata.
@@ -546,7 +562,7 @@ NodePointer Demangler::demangleSymbol(StringRef MangledName) {
 }
 
 NodePointer Demangler::demangleType(StringRef MangledName) {
-  init(MangledName);
+  DemangleInitRAII state(*this, MangledName);
 
   parseAndPushNodes();
 
