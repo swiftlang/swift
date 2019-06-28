@@ -1066,12 +1066,9 @@ class ParseableInterfaceModuleLoaderImpl {
   }
 
   bool isInResourceDir(StringRef path) {
-    for (auto &RuntimeLibraryPath : ctx.SearchPathOpts.RuntimeLibraryPaths) {
-      if (path.startswith(RuntimeLibraryPath)) {
-        return true;
-      }
-    }
-    return false;
+    StringRef resourceDir = ctx.SearchPathOpts.RuntimeResourcePath;
+    if (resourceDir.empty()) return false;
+    return path.startswith(resourceDir);
   }
 
   /// Finds the most appropriate .swiftmodule, whose dependencies are up to
