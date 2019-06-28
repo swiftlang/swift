@@ -1,4 +1,10 @@
 
+# TODO(compnerd) once we have a newer CMake we should be able to use the new
+# `Swift` LANGUAGE support in CMake to simplify the build.  For now, just add
+# the project so that it is possible to start working on extracting the Swift
+# standard library from the Swift compiler build.
+project(swift-stdlib LANGUAGES C CXX)
+
 # Add path for custom CMake modules.
 list(APPEND CMAKE_MODULE_PATH
   "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
