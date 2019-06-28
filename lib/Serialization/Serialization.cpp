@@ -3298,8 +3298,6 @@ public:
                                proto->isObjC(),
                                proto->existentialTypeSupported(
                                  /*resolver=*/nullptr),
-                               S.addGenericEnvironmentRef(
-                                                proto->getGenericEnvironment()),
                                rawAccessLevel,
                                inherited);
 
