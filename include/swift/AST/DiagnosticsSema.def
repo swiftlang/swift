@@ -2763,8 +2763,10 @@ ERROR(differentiable_attr_overload_not_found,none,
       "%0 does not have expected type %1", (DeclName, Type))
 ERROR(differentiable_attr_no_currying,none,
       "'@differentiable' cannot be defined on functions that return functions", ())
+// TODO(TF-482): Change duplicate `@differentiable` attribute diagnostic to also
+// mention "same generic requirements".
 ERROR(differentiable_attr_duplicate,none,
-      "duplicate '@differentiable' attribute with same parameter indices", ())
+      "duplicate '@differentiable' attribute with same parameters", ())
 NOTE(differentiable_attr_duplicate_note,none,
      "other attribute declared here", ())
 ERROR(differentiable_attr_function_not_same_type_context,none,
