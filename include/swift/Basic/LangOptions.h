@@ -147,6 +147,12 @@ namespace swift {
     /// configuration options.
     bool EnableObjCInterop = true;
 
+    /// Enable C++ interop code generation and build configuration
+    /// options. Disabled by default because there is no way to control the
+    /// language mode of clang on a per-header or even per-module basis. Also
+    /// disabled because it is not complete.
+    bool EnableCXXInterop = false;
+
     /// On Darwin platforms, use the pre-stable ABI's mark bit for Swift
     /// classes instead of the stable ABI's bit. This is needed when
     /// targeting OSes prior to macOS 10.14.4 and iOS 12.2, where

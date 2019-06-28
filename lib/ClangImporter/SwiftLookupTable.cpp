@@ -81,6 +81,9 @@ public:
                               llvm::BitstreamWriter &stream) override;
 
   void populateTable(SwiftLookupTable &table, NameImporter &);
+
+  void populateTableWithDecl(SwiftLookupTable &table,
+                             NameImporter &nameImporter, clang::Decl *decl);
 };
 
 /// Module file extension reader for the Swift lookup tables.
@@ -1793,21 +1796,35 @@ void importer::finalizeLookupTable(SwiftLookupTable &table,
   }
 }
 
+void SwiftLookupTableWriter::populateTableWithDecl(SwiftLookupTable &table,
+                                                   NameImporter &nameImporter,
+                                                   clang::Decl *decl) {
+  // Skip anything from an AST file.
+  if (decl->isFromASTFile())
+    return;
+
+  // Iterate into extern "C" {} type declarations.
+  if (auto linkageDecl = dyn_cast<clang::LinkageSpecDecl>(decl)) {
+    for (auto *decl : linkageDecl->noload_decls()) {
+      populateTableWithDecl(table, nameImporter, decl);
+    }
+    return;
+  }
+
+  // Skip non-named declarations.
+  auto named = dyn_cast<clang::NamedDecl>(decl);
+  if (!named)
+    return;
+
+  // Add this entry to the lookup table.
+  addEntryToLookupTable(table, named, nameImporter);
+}
+
 void SwiftLookupTableWriter::populateTable(SwiftLookupTable &table,
                                            NameImporter &nameImporter) {
   auto &sema = nameImporter.getClangSema();
   for (auto decl : sema.Context.getTranslationUnitDecl()->noload_decls()) {
-    // Skip anything from an AST file.
-    if (decl->isFromASTFile())
-      continue;
-
-    // Skip non-named declarations.
-    auto named = dyn_cast<clang::NamedDecl>(decl);
-    if (!named)
-      continue;
-
-    // Add this entry to the lookup table.
-    addEntryToLookupTable(table, named, nameImporter);
+    populateTableWithDecl(table, nameImporter, decl);
   }
 
   // Add macros to the lookup table.
