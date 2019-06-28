@@ -353,14 +353,19 @@ static bool collectPossibleCalleesForApply(
   auto *fnExpr = callExpr->getFn();
 
   if (auto type = fnExpr->getType()) {
-    if (auto *funcType = type->getAs<AnyFunctionType>()) {
-      auto refDecl = fnExpr->getReferencedDecl();
-      if (!refDecl)
-        if (auto apply = dyn_cast<ApplyExpr>(fnExpr))
-          refDecl = apply->getFn()->getReferencedDecl();
-      candidates.emplace_back(funcType, refDecl.getDecl());
+    if (!type->hasUnresolvedType() && !type->hasError()) {
+      if (auto *funcType = type->getAs<AnyFunctionType>()) {
+        auto refDecl = fnExpr->getReferencedDecl();
+        if (!refDecl)
+          if (auto apply = dyn_cast<ApplyExpr>(fnExpr))
+            refDecl = apply->getFn()->getReferencedDecl();
+        candidates.emplace_back(funcType, refDecl.getDecl());
+        return true;
+      }
     }
-  } else if (auto *DRE = dyn_cast<DeclRefExpr>(fnExpr)) {
+  }
+
+  if (auto *DRE = dyn_cast<DeclRefExpr>(fnExpr)) {
     if (auto *decl = DRE->getDecl()) {
       auto declType = decl->getInterfaceType();
       if (auto *funcType = declType->getAs<AnyFunctionType>())
@@ -918,7 +923,13 @@ bool swift::ide::isReferenceableByImplicitMemberExpr(
     // because we are emitting all `.init()`s.
     if (declTy->isEqual(T))
       return false;
-    return swift::isConvertibleTo(declTy, T, *DC);
+
+    // Only non-protocol nominal type can be instantiated.
+    auto nominal = declTy->getAnyNominal();
+    if (!nominal || isa<ProtocolDecl>(nominal))
+      return false;
+
+    return swift::isConvertibleTo(declTy, T, /*openArchetypes=*/true, *DC);
   }
 
   // Only static member can be referenced.
@@ -935,5 +946,6 @@ bool swift::ide::isReferenceableByImplicitMemberExpr(
     // FIXME: This emits just 'factory'. We should emit 'factory()' instead.
     declTy = FT->getResult();
   }
-  return declTy->isEqual(T) || swift::isConvertibleTo(declTy, T, *DC);
+  return declTy->isEqual(T) ||
+         swift::isConvertibleTo(declTy, T, /*openArchetypes=*/true, *DC);
 }
