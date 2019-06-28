@@ -2230,8 +2230,8 @@ ModuleFile::loadNamedMembers(const IterableDeclContext *IDC, DeclBaseName N,
   if (!subTable) {
     BCOffsetRAII restoreOffset(DeclMemberTablesCursor);
     fatalIfNotSuccess(DeclMemberTablesCursor.JumpToBit(subTableOffset));
-    llvm::BitstreamEntry entry = fatalIfUnexpected(
-        DeclMemberTablesCursor.advance());
+    llvm::BitstreamEntry entry =
+        fatalIfUnexpected(DeclMemberTablesCursor.advance());
     if (entry.Kind != llvm::BitstreamEntry::Record) {
       error();
       return None;

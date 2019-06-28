@@ -252,9 +252,10 @@ ParameterList *ModuleFile::readParameterList() {
   using namespace decls_block;
 
   SmallVector<uint64_t, 8> scratch;
-  llvm::BitstreamEntry entry = fatalIfUnexpected(
-      DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
-  unsigned recordID = fatalIfUnexpected(DeclTypeCursor.readRecord(entry.ID, scratch));
+  llvm::BitstreamEntry entry =
+      fatalIfUnexpected(DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
+  unsigned recordID =
+      fatalIfUnexpected(DeclTypeCursor.readRecord(entry.ID, scratch));
   assert(recordID == PARAMETERLIST);
   (void) recordID;
 
@@ -286,8 +287,8 @@ Expected<Pattern *> ModuleFile::readPattern(DeclContext *owningDC) {
   SmallVector<uint64_t, 8> scratch;
 
   BCOffsetRAII restoreOffset(DeclTypeCursor);
-  llvm::BitstreamEntry next = fatalIfUnexpected(
-      DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
+  llvm::BitstreamEntry next =
+      fatalIfUnexpected(DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
   if (next.Kind != llvm::BitstreamEntry::Record) {
     error();
     return nullptr;
@@ -336,8 +337,7 @@ Expected<Pattern *> ModuleFile::readPattern(DeclContext *owningDC) {
       next = fatalIfUnexpected(DeclTypeCursor.advance());
       assert(next.Kind == llvm::BitstreamEntry::Record);
 
-      kind = fatalIfUnexpected(
-          DeclTypeCursor.readRecord(next.ID, scratch));
+      kind = fatalIfUnexpected(DeclTypeCursor.readRecord(next.ID, scratch));
       assert(kind == decls_block::TUPLE_PATTERN_ELT);
 
       // FIXME: Add something for this record or remove it.
@@ -429,8 +429,8 @@ SILLayout *ModuleFile::readSILLayout(llvm::BitstreamCursor &Cursor) {
 
   SmallVector<uint64_t, 16> scratch;
 
-  llvm::BitstreamEntry next = fatalIfUnexpected(
-      Cursor.advance(AF_DontPopBlockAtEnd));
+  llvm::BitstreamEntry next =
+      fatalIfUnexpected(Cursor.advance(AF_DontPopBlockAtEnd));
   assert(next.Kind == llvm::BitstreamEntry::Record);
 
   unsigned kind = fatalIfUnexpected(Cursor.readRecord(next.ID, scratch));
@@ -469,8 +469,8 @@ ProtocolConformanceRef ModuleFile::readConformance(
 
   SmallVector<uint64_t, 16> scratch;
 
-  llvm::BitstreamEntry next = fatalIfUnexpected(
-      Cursor.advance(AF_DontPopBlockAtEnd));
+  llvm::BitstreamEntry next =
+      fatalIfUnexpected(Cursor.advance(AF_DontPopBlockAtEnd));
   assert(next.Kind == llvm::BitstreamEntry::Record);
 
   if (getContext().Stats)
@@ -610,8 +610,7 @@ NormalProtocolConformance *ModuleFile::readNormalConformance(
   // Find the conformance record.
   BCOffsetRAII restoreOffset(DeclTypeCursor);
   fatalIfNotSuccess(DeclTypeCursor.JumpToBit(conformanceEntry));
-  llvm::BitstreamEntry entry =
-      fatalIfUnexpected(DeclTypeCursor.advance());
+  llvm::BitstreamEntry entry = fatalIfUnexpected(DeclTypeCursor.advance());
   if (entry.Kind != llvm::BitstreamEntry::Record) {
     error();
     return nullptr;
@@ -675,13 +674,13 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC) {
   SmallVector<uint64_t, 8> scratch;
   StringRef blobData;
 
-  llvm::BitstreamEntry next = fatalIfUnexpected(
-      DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
+  llvm::BitstreamEntry next =
+      fatalIfUnexpected(DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
   if (next.Kind != llvm::BitstreamEntry::Record)
     return nullptr;
 
-  unsigned kind = fatalIfUnexpected(
-      DeclTypeCursor.readRecord(next.ID, scratch, &blobData));
+  unsigned kind =
+      fatalIfUnexpected(DeclTypeCursor.readRecord(next.ID, scratch, &blobData));
   if (kind != GENERIC_PARAM_LIST)
     return nullptr;
   lastRecordOffset.reset();
@@ -718,8 +717,8 @@ void ModuleFile::readGenericRequirements(
     lastRecordOffset.reset();
     bool shouldContinue = true;
 
-    llvm::BitstreamEntry entry = fatalIfUnexpected(
-        Cursor.advance(AF_DontPopBlockAtEnd));
+    llvm::BitstreamEntry entry =
+        fatalIfUnexpected(Cursor.advance(AF_DontPopBlockAtEnd));
     if (entry.Kind != llvm::BitstreamEntry::Record)
       break;
 
@@ -910,8 +909,8 @@ GenericSignature *ModuleFile::getGenericSignature(
   StringRef blobData;
   SmallVector<uint64_t, 8> scratch;
 
-  llvm::BitstreamEntry entry = fatalIfUnexpected(
-      DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
+  llvm::BitstreamEntry entry =
+      fatalIfUnexpected(DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
   if (entry.Kind != llvm::BitstreamEntry::Record) {
     error();
     return nullptr;
@@ -1002,8 +1001,8 @@ ModuleFile::getGenericSignatureOrEnvironment(
     // own internal tracking.)
     BCOffsetRAII lastRecordOffset(DeclTypeCursor);
 
-    llvm::BitstreamEntry entry = fatalIfUnexpected(
-        DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
+    llvm::BitstreamEntry entry =
+        fatalIfUnexpected(DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
     if (entry.Kind != llvm::BitstreamEntry::Record)
       return result;
 
@@ -1108,8 +1107,8 @@ SubstitutionMap ModuleFile::getSubstitutionMap(
   DeserializingEntityRAII deserializingEntity(*this);
 
   // Read the substitution map.
-  llvm::BitstreamEntry entry = fatalIfUnexpected(
-      DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
+  llvm::BitstreamEntry entry =
+      fatalIfUnexpected(DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
   if (entry.Kind != llvm::BitstreamEntry::Record) {
     error();
     return SubstitutionMap();
@@ -1170,15 +1169,15 @@ SubstitutionMap ModuleFile::getSubstitutionMap(
 bool ModuleFile::readDefaultWitnessTable(ProtocolDecl *proto) {
   using namespace decls_block;
 
-  llvm::BitstreamEntry entry = fatalIfUnexpected(
-      DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
+  llvm::BitstreamEntry entry =
+      fatalIfUnexpected(DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
   if (entry.Kind != llvm::BitstreamEntry::Record)
     return true;
 
   SmallVector<uint64_t, 16> witnessIDBuffer;
 
-  unsigned kind = fatalIfUnexpected(
-      DeclTypeCursor.readRecord(entry.ID, witnessIDBuffer));
+  unsigned kind =
+      fatalIfUnexpected(DeclTypeCursor.readRecord(entry.ID, witnessIDBuffer));
   assert(kind == DEFAULT_WITNESS_TABLE);
   (void)kind;
 
@@ -1327,8 +1326,8 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
   assert(baseModule && "missing dependency");
   PrettyXRefTrace pathTrace(*baseModule);
 
-  llvm::BitstreamEntry entry = fatalIfUnexpected(
-      DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
+  llvm::BitstreamEntry entry =
+      fatalIfUnexpected(DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
   if (entry.Kind != llvm::BitstreamEntry::Record) {
     error();
     return nullptr;
@@ -1455,8 +1454,8 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
   auto getXRefDeclNameForError = [&]() -> DeclName {
     DeclName result = pathTrace.getLastName();
     while (--pathLen) {
-      llvm::BitstreamEntry entry = fatalIfUnexpected(
-          DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
+      llvm::BitstreamEntry entry =
+          fatalIfUnexpected(DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
       if (entry.Kind != llvm::BitstreamEntry::Record)
         return Identifier();
 
@@ -1531,8 +1530,8 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
 
   // For remaining path pieces, filter or drill down into the results we have.
   while (--pathLen) {
-    llvm::BitstreamEntry entry = fatalIfUnexpected(
-        DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
+    llvm::BitstreamEntry entry =
+        fatalIfUnexpected(DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
     if (entry.Kind != llvm::BitstreamEntry::Record) {
       error();
       return nullptr;
@@ -1948,8 +1947,7 @@ DeclContext *ModuleFile::getLocalDeclContext(DeclContextID DCID) {
 
   BCOffsetRAII restoreOffset(DeclTypeCursor);
   fatalIfNotSuccess(DeclTypeCursor.JumpToBit(declContextOrOffset));
-  llvm::BitstreamEntry entry =
-      fatalIfUnexpected(DeclTypeCursor.advance());
+  llvm::BitstreamEntry entry = fatalIfUnexpected(DeclTypeCursor.advance());
 
   if (entry.Kind != llvm::BitstreamEntry::Record) {
     error();
@@ -2048,8 +2046,7 @@ DeclContext *ModuleFile::getDeclContext(DeclContextID DCID) {
 
   BCOffsetRAII restoreOffset(DeclTypeCursor);
   fatalIfNotSuccess(DeclTypeCursor.JumpToBit(declContextOrOffset));
-  llvm::BitstreamEntry entry =
-      fatalIfUnexpected(DeclTypeCursor.advance());
+  llvm::BitstreamEntry entry = fatalIfUnexpected(DeclTypeCursor.advance());
 
   if (entry.Kind != llvm::BitstreamEntry::Record) {
     error();
@@ -4791,8 +4788,8 @@ public:
     // The tuple record itself is empty. Read all trailing elements.
     SmallVector<TupleTypeElt, 8> elements;
     while (true) {
-      llvm::BitstreamEntry entry = MF.fatalIfUnexpected(
-          MF.DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
+      llvm::BitstreamEntry entry =
+          MF.fatalIfUnexpected(MF.DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
       if (entry.Kind != llvm::BitstreamEntry::Record)
         break;
 
@@ -4858,8 +4855,8 @@ public:
 
     SmallVector<AnyFunctionType::Param, 8> params;
     while (true) {
-      llvm::BitstreamEntry entry = MF.fatalIfUnexpected(
-          MF.DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
+      llvm::BitstreamEntry entry =
+          MF.fatalIfUnexpected(MF.DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
       if (entry.Kind != llvm::BitstreamEntry::Record)
         break;
 
@@ -5595,8 +5592,7 @@ void ModuleFile::loadAllMembers(Decl *container, uint64_t contextData) {
 
   BCOffsetRAII restoreOffset(DeclTypeCursor);
   fatalIfNotSuccess(DeclTypeCursor.JumpToBit(contextData));
-  llvm::BitstreamEntry entry =
-      fatalIfUnexpected(DeclTypeCursor.advance());
+  llvm::BitstreamEntry entry = fatalIfUnexpected(DeclTypeCursor.advance());
   if (entry.Kind != llvm::BitstreamEntry::Record) {
     error();
     return;
@@ -5604,8 +5600,8 @@ void ModuleFile::loadAllMembers(Decl *container, uint64_t contextData) {
 
   SmallVector<uint64_t, 16> memberIDBuffer;
 
-  unsigned kind = fatalIfUnexpected(
-      DeclTypeCursor.readRecord(entry.ID, memberIDBuffer));
+  unsigned kind =
+      fatalIfUnexpected(DeclTypeCursor.readRecord(entry.ID, memberIDBuffer));
   assert(kind == decls_block::MEMBERS);
   (void)kind;
 
@@ -5688,8 +5684,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
   // Find the conformance record.
   BCOffsetRAII restoreOffset(DeclTypeCursor);
   fatalIfNotSuccess(DeclTypeCursor.JumpToBit(contextData));
-  llvm::BitstreamEntry entry =
-      fatalIfUnexpected(DeclTypeCursor.advance());
+  llvm::BitstreamEntry entry = fatalIfUnexpected(DeclTypeCursor.advance());
   assert(entry.Kind == llvm::BitstreamEntry::Record &&
          "registered lazy loader incorrectly");
 
@@ -5923,8 +5918,8 @@ Optional<StringRef> ModuleFile::maybeReadInlinableBodyText() {
   BCOffsetRAII restoreOffset(DeclTypeCursor);
   StringRef blobData;
 
-  llvm::BitstreamEntry next = fatalIfUnexpected(
-      DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
+  llvm::BitstreamEntry next =
+      fatalIfUnexpected(DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
   if (next.Kind != llvm::BitstreamEntry::Record)
     return None;
 
@@ -5950,8 +5945,8 @@ Optional<ForeignErrorConvention> ModuleFile::maybeReadForeignErrorConvention() {
 
   BCOffsetRAII restoreOffset(DeclTypeCursor);
 
-  llvm::BitstreamEntry next = fatalIfUnexpected(
-      DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
+  llvm::BitstreamEntry next =
+      fatalIfUnexpected(DeclTypeCursor.advance(AF_DontPopBlockAtEnd));
   if (next.Kind != llvm::BitstreamEntry::Record)
     return None;
 
