@@ -3856,6 +3856,31 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
   }
 }
 
+/// Pushes the subset's parameter's types to `paramTypes`, in the order in
+/// which they appear in the function type. For example,
+///
+///   functionType = (A, B, C) -> R
+///   if "A" and "C" are in the set,
+///   ==> pushes {A, C} to `paramTypes`.
+///
+void getIndexSubsetParameterTypes(
+    AutoDiffIndexSubset *indexSubset, AnyFunctionType *functionType,
+    SmallVectorImpl<Type> &paramTypes, bool isCurried) {
+  
+  auto *fnTy = functionType;
+  if (isCurried) {
+    fnTy = fnTy->getResult()->getAs<AnyFunctionType>();
+  }
+  
+  for (unsigned paramIndex : range(functionType->getNumParams())) {
+    if ((paramIndex < indexSubset->getCapacity()) &&
+        indexSubset->contains(paramIndex)) {
+      paramTypes.push_back(
+          functionType->getParams()[paramIndex].getPlainType());
+    }
+  }
+}
+
 void AttributeChecker::visitTransposingAttr(TransposingAttr *attr) {
   auto &ctx = TC.Context;
   auto *transpose = dyn_cast<FuncDecl>(D);
@@ -3867,7 +3892,23 @@ void AttributeChecker::visitTransposingAttr(TransposingAttr *attr) {
                                      ->castTo<AnyFunctionType>();
   auto *expectedOriginalFnType =
       transposeInterfaceType->getTransposeOriginalFunctionType(attr);
-//  auto transposeResultType = transpose->getResultInterfaceType();
+  
+  // `R` result type must conform to `Differentiable`.
+  auto diffableProto = ctx.getProtocol(KnownProtocolKind::Differentiable);
+  auto valueResultType = expectedOriginalFnType->getResult();
+  if (valueResultType->hasTypeParameter())
+    valueResultType = transpose->mapTypeIntoContext(valueResultType);
+  auto valueResultConf = TC.conformsToProtocol(
+                             valueResultType, diffableProto,
+                             transpose->getDeclContext(), None);
+  
+  if (!valueResultConf) {
+    TC.diagnose(attr->getLocation(),
+                diag::transposing_attr_result_value_not_differentiable,
+                expectedOriginalFnType);
+    attr->setInvalid();
+    return;
+  }
   
   // Compute expected original function type.
   // Lookup original function.
@@ -3970,10 +4011,13 @@ void AttributeChecker::visitTransposingAttr(TransposingAttr *attr) {
   }
   
   // Gather differentiation parameters.
+  // Differentiation parameters are with respect to the original function.
   SmallVector<Type, 4> wrtParamTypes;
-  wrtParamIndices->getIndexSubsetParameterTypes(
+  getIndexSubsetParameterTypes(
+      wrtParamIndices,
       expectedOriginalFnType,
-      wrtParamTypes);
+      wrtParamTypes,
+      isCurried);
 
   // Check if differentiation parameter indices are valid.
   if (checkTransposingParameters(
@@ -3986,23 +4030,6 @@ void AttributeChecker::visitTransposingAttr(TransposingAttr *attr) {
   
   // Set the checked differentiation parameter indices in the attribute.
   attr->setParameterIndices(wrtParamIndices);
-  
-  // `R` result type must conform to `Differentiable`.
-  auto diffableProto = ctx.getProtocol(KnownProtocolKind::Differentiable);
-  auto valueResultType = expectedOriginalFnType->getResult();
-  if (valueResultType->hasTypeParameter())
-    valueResultType = transpose->mapTypeIntoContext(valueResultType);
-  auto valueResultConf = TC.conformsToProtocol(
-                             valueResultType, diffableProto,
-                             transpose->getDeclContext(), None);
-  
-  if (!valueResultConf) {
-    TC.diagnose(attr->getLocation(),
-                diag::transposing_attr_result_value_not_differentiable,
-                expectedOriginalFnType);
-    attr->setInvalid();
-    return;
-  }
   
   // TODO(bartchr): I'm not using this array anywhere.
   auto diffParamElts =

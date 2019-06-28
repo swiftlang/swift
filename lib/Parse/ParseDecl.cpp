@@ -1242,7 +1242,6 @@ Parser::parseDifferentiatingAttribute(SourceLoc atLoc, SourceLoc loc) {
                                   original, linear, params));
 }
 
-// TODO: put in correct implementation
 ParserResult<TransposingAttr>
 Parser::parseTransposingAttribute(SourceLoc atLoc, SourceLoc loc) {
   StringRef AttrName = "transposing";

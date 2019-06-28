@@ -4782,15 +4782,7 @@ AnyFunctionType::getTransposeOriginalFunctionType(TransposingAttr *attr) {
       transposeParamsIndex++;
     }
   }
-  
-//   TODO(bartchr): do i need to append the rest of the parameters from the transposing function?
-//  for (auto result : transposeParams) {
-//    llvm::errs() << result.getPlainType() << "\n";
-//    originalParams.append(1, AnyFunctionType::Param(result));
-//  }
-//   TODO(bartchr): do I need the following?
-//  originalParams.append(transposeResultTypes.begin(), transposeResultTypes.end());
-  
+
   auto *originalType = makeFunctionType(
                           originalParams,
                           originalResult,

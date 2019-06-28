@@ -1663,7 +1663,6 @@ namespace decls_block {
   >;
 
   // SWIFT_ENABLE_TENSORFLOW
-  // TODO: linear flag
   using DifferentiatingDeclAttrLayout = BCRecordLayout<
     Differentiating_DECL_ATTR,
     BCFixed<1>, // Implicit flag.
