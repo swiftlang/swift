@@ -493,25 +493,25 @@ class LazyProperties {
 // CHECK-SEARCHES-NEXT: ***Scope at 6:18***
 // CHECK-SEARCHES-NEXT: NominalTypeBodyScope {{.*}}, [6:17 - 6:19] 'InnerC0'
 // CHECK-SEARCHES-NEXT: {{.*}} Module name=scope_map
-// CHECK-SEARCHES-NEXT:   {{.*}} FileUnit file="SOURCE_DIR{{[/]}}test{{[/]}}NameBinding{{[/]}}scope_map.swift"
+// CHECK-SEARCHES-NEXT:   {{.*}} FileUnit file="SOURCE_DIR{{[/\\]}}test{{[/\\]}}NameBinding{{[/\\]}}scope_map.swift"
 // CHECK-SEARCHES-NEXT:     {{.*}} StructDecl name=S0
 // CHECK-SEARCHES-NEXT:       {{.*}} ClassDecl name=InnerC0
 // CHECK-SEARCHES-NEXT: ***Scope at 167:32***
 // CHECK-SEARCHES-NEXT: DefaultArgumentInitializerScope {{.*}}, [167:32 - 167:32]
 // CHECK-SEARCHES-NEXT: {{.*}} Module name=scope_map
-// CHECK-SEARCHES-NEXT:   {{.*}} FileUnit file="SOURCE_DIR{{[/]}}test{{[/]}}NameBinding{{[/]}}scope_map.swift"
+// CHECK-SEARCHES-NEXT:   {{.*}} FileUnit file="SOURCE_DIR{{[/\\]}}test{{[/\\]}}NameBinding{{[/\\]}}scope_map.swift"
 // CHECK-SEARCHES-NEXT:     {{.*}} AbstractFunctionDecl name=defaultArguments(i:j:) : (Int, Int) -> ()
 // CHECK-SEARCHES-NEXT:       {{.*}} Initializer DefaultArgument index=0
 // CHECK-SEARCHES-NEXT: ***Scope at 180:18***
 // CHECK-SEARCHES-NEXT: PatternEntryInitializerScope {{.*}}, [180:16 - 180:25] entry 1 'c' 'd'
 // CHECK-SEARCHES-NEXT: {{.*}} Module name=scope_map
-// CHECK-SEARCHES-NEXT:   {{.*}} FileUnit file="SOURCE_DIR{{[/]}}test{{[/]}}NameBinding{{[/]}}scope_map.swift"
+// CHECK-SEARCHES-NEXT:   {{.*}} FileUnit file="SOURCE_DIR{{[/\\]}}test{{[/\\]}}NameBinding{{[/\\]}}scope_map.swift"
 // CHECK-SEARCHES-NEXT:     {{.*}} StructDecl name=PatternInitializers
 // CHECK-SEARCHES-NEXT:       {{.*}} Initializer PatternBinding {{.*}} #1
 // CHECK-SEARCHES-NEXT: ***Scope at 194:26***
 // CHECK-SEARCHES-NEXT: PatternEntryInitializerScope {{.*}}, [194:24 - 194:29] entry 0 'prop'
 // CHECK-SEARCHES-NEXT: {{.*}} Module name=scope_map
-// CHECK-SEARCHES-NEXT:   {{.*}} FileUnit file="SOURCE_DIR{{[/]}}test{{[/]}}NameBinding{{[/]}}scope_map.swift"
+// CHECK-SEARCHES-NEXT:   {{.*}} FileUnit file="SOURCE_DIR{{[/\\]}}test{{[/\\]}}NameBinding{{[/\\]}}scope_map.swift"
 // CHECK-SEARCHES-NEXT:     {{.*}} ClassDecl name=LazyProperties
 // CHECK-SEARCHES-NEXT:       {{.*}} Initializer PatternBinding {{.*}} #0
 // CHECK-SEARCHES-NEXT: Local bindings: self
