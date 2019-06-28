@@ -204,17 +204,16 @@ toolchains::Windows::constructInvocation(const StaticLinkJobAction &job,
 
   ArgStringList Arguments;
 
-  // Configure the toolchain.
   const char *Link = "link";
   Arguments.push_back("-lib");
+  Arguments.push_back("-nologo");
 
   addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
                          file_types::TY_Object);
   addInputsOfType(Arguments, context.InputActions, file_types::TY_Object);
 
-  Arguments.push_back(
-      context.Args.MakeArgString(Twine("/OUT:") + 
-      context.Output.getPrimaryOutputFilename()));
+  StringRef OutputFile = context.Output.getPrimaryOutputFilename();
+  Arguments.push_back(context.Args.MakeArgString(Twine("/OUT:") + OutputFile));
 
   InvocationInfo II{Link, Arguments};
   II.allowsResponseFiles = true;
