@@ -68,6 +68,12 @@ NODE(DependentProtocolConformanceInherited)
 NODE(DependentProtocolConformanceAssociated)
 CONTEXT_NODE(Destructor)
 CONTEXT_NODE(DidSet)
+// SWIFT_ENABLE_TENSORFLOW
+NODE(DifferentiableFunctionType)
+NODE(EscapingDifferentiableFunctionType)
+NODE(LinearFunctionType)
+NODE(EscapingLinearFunctionType)
+// SWIFT_ENABLE_TENSORFLOW END
 NODE(Directness)
 NODE(DynamicAttribute)
 NODE(DirectMethodReferenceAttribute)
