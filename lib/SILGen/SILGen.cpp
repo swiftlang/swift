@@ -781,6 +781,7 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
   LLVM_DEBUG(llvm::dbgs() << "lowered sil:\n";
              F->print(llvm::dbgs()));
 
+  // SWIFT_ENABLE_TENSORFLOW
   // Create self-reordering thunks for JVPs/VJPs of `@differentiable` methods.
   if (constant.hasDecl()) {
     auto *AFD = constant.getAbstractFunctionDecl();

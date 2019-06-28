@@ -42,6 +42,14 @@ public extension Float {
   }
 
   // This should generate public symbols for both JVP and VJP.
+  // Tests self-reordering-method thunking.
+  @differentiable
+  func method(x: Float, y: Float) -> Float {
+    return x
+  }
+
+  // This should generate public symbols for both JVP and VJP.
+  // Tests self-reordering-method thunking.
   @differentiable
   subscript(x: Float) -> Float {
     return x
