@@ -229,7 +229,7 @@ public: // public for debugging
 #pragma mark common queries
 public:
   virtual ASTContext &getASTContext() const;
-  virtual NullablePtr<DeclContext> getDeclContext() const { return nullptr; };
+  virtual NullablePtr<DeclContext> getDeclContext() const;
   virtual NullablePtr<Decl> getDecl() const { return nullptr; };
 
 #pragma mark - debugging and printing
@@ -286,10 +286,13 @@ public:
   using DeclConsumer = namelookup::AbstractASTScopeDeclConsumer &;
 
   /// Entry point into ASTScopeImpl-land for lookups
-  static Optional<bool> unqualifiedLookup(SourceFile *, DeclName, SourceLoc,
-                                          const DeclContext *startingContext,
-                                          Optional<bool> isCascadingUse,
-                                          DeclConsumer);
+  static llvm::SmallVector<const ASTScopeImpl *, 0>
+  unqualifiedLookup(SourceFile *, DeclName, SourceLoc,
+                    const DeclContext *startingContext, DeclConsumer);
+
+  static Optional<bool>
+  computeIsCascadingUse(ArrayRef<const ASTScopeImpl *> history,
+                        Optional<bool> initialIsCascadingUse);
 
 #pragma mark - - lookup- starting point
 private:
@@ -318,49 +321,51 @@ protected:
   /// If the lookup depends on implicit self, selfDC is its context.
   /// (Names in extensions never depend on self.)
   ///
-  /// Because a body scope nests in a generic param scope, etc, we might look in
-  /// the self type twice. That's why we pass scopeWhoseTypeWasAlreadySearched.
+  /// In a Nominal, Extension, or TypeAliasScope, the lookup can start at either
+  /// the body portion (for the first two), the where portion, or a
+  /// GenericParamScope. In every case, the generics on the type decl must be
+  /// searched, but only once. And they must be searched *before* the generic
+  /// parameters. For instance, the following is correct: \code class
+  /// ShadowingGenericParameter<T> { \code   typealias T = Int;  func foo (t :
+  /// T) {} \code } \code ShadowingGenericParameter<String>().foo(t: "hi")
+  ///
+  /// So keep track of the last generic param list searched to avoid
+  /// duplicating work.
   ///
   /// Look in this scope.
-  /// \param selfDC The context for names dependent on dynamic self,
-  /// \param limit A scope into which lookup should not go. See \c getLookupLimit.
-  /// \param scopeWhoseTypeWasAlreadySearched A \c Decl whose generics and self type have
-  /// already been searched.
-  /// \param isCascadingUse Whether the lookup results will need a cascading dependency or not.
+  /// \param history are the scopes traversed for this lookup (including this
+  /// one) \param limit A scope into which lookup should not go. See \c
+  /// getLookupLimit. \param lastListSearched Last list searched.
   /// \param consumer is the object to which found decls are reported.
-  /// \returns \c isCascadingUse
-  Optional<bool>
-  lookup(NullablePtr<DeclContext> selfDC, NullablePtr<const ASTScopeImpl> limit,
-         NullablePtr<const Decl> scopeWhoseTypeWasAlreadySearched,
-         Optional<bool> isCascadingUse, DeclConsumer consumer) const;
+  void lookup(llvm::SmallVectorImpl<const ASTScopeImpl *> &history,
+              NullablePtr<const ASTScopeImpl> limit,
+              NullablePtr<const GenericParamList> lastListSearched,
+              DeclConsumer consumer) const;
 
-  /// Same as lookup, but handles the steps to recurse into the parent scope.
-  Optional<bool>
-  lookupInParent(NullablePtr<DeclContext> selfDC,
-                 NullablePtr<const ASTScopeImpl> limit,
-                 NullablePtr<const Decl> scopeWhoseTypeWasAlreadySearched,
-                 Optional<bool> isCascadingUse, DeclConsumer) const;
+public:
+  /// Returns the SelfDC for parent (and possibly ancestor) scopes.
+  /// A return of None indicates that the previous child (in history) should be
+  /// asked.
+  virtual Optional<NullablePtr<DeclContext>> computeSelfDCForParent() const;
 
-  virtual NullablePtr<DeclContext>
-      computeSelfDCForParent(NullablePtr<DeclContext>) const;
+protected:
+  /// Find either locals or members (no scope has both)
+  /// \param history The scopes visited since the start of lookup (including
+  /// this one)
+  /// \return True if lookup is done
+  virtual bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *> history,
+                                     DeclConsumer consumer) const;
 
-  virtual std::pair<bool, Optional<bool>>
-  lookupInSelfType(NullablePtr<DeclContext> selfDC, Optional<bool>,
-                   DeclConsumer) const;
+  /// Returns isDone and the list searched, if any
+  std::pair<bool, NullablePtr<const GenericParamList>>
+  lookInMyGenericParameters(
+      NullablePtr<const GenericParamList> priorListSearched,
+      DeclConsumer consumer) const;
 
-  /// The default for anything that does not do the lookup.
-  /// Returns isFinished and isCascadingUse
-  static std::pair<bool, Optional<bool>>
-  doNotLookupInSelfType(Optional<bool> isCascadingUse) {
-    return {false, isCascadingUse};
-  }
-
-  virtual bool lookInMyGenericParameters(Optional<bool> isCascadingUse,
-                                         DeclConsumer) const;
+  virtual NullablePtr<const GenericParamList> genericParams() const;
 
   // Consume the generic parameters in the context and its outer contexts
   static bool lookInGenericParametersOf(NullablePtr<const GenericParamList>,
-                                        Optional<bool> isCascadingUse,
                                         DeclConsumer);
 
   NullablePtr<const ASTScopeImpl> parentIfNotChildOfTopScope() const {
@@ -383,11 +388,7 @@ protected:
   // A local binding is a basically a local variable defined in that very scope
   // It is not an instance variable or inherited type.
 
-  /// Return true if consumer returns true
-  virtual bool lookupLocalBindings(Optional<bool>, DeclConsumer) const;
-
   static bool lookupLocalBindingsInPattern(Pattern *p,
-                                           Optional<bool> isCascadingUse,
                                            DeclVisibilityKind vis,
                                            DeclConsumer consumer);
 
@@ -427,9 +428,7 @@ protected:
   void printSpecifics(llvm::raw_ostream &out) const override;
 
 public:
-  virtual NullablePtr<DeclContext> getDeclContext() const override {
-    return NullablePtr<DeclContext>(SF);
-  }
+  virtual NullablePtr<DeclContext> getDeclContext() const override;
 
   void addNewDeclsToTree();
 
@@ -472,11 +471,9 @@ public:
         const GenericTypeOrExtensionScope *scope) const = 0;
 
     /// Returns isDone and isCascadingUse
-    virtual std::pair<bool, Optional<bool>>
-    lookupInSelfTypeOf(const GenericTypeOrExtensionScope *scope,
-                       NullablePtr<DeclContext> selfDC,
-                       const Optional<bool> isCascadingUse,
-                       ASTScopeImpl::DeclConsumer consumer) const;
+    virtual bool lookupMembersOf(const GenericTypeOrExtensionScope *scope,
+                                 ArrayRef<const ASTScopeImpl *>,
+                                 ASTScopeImpl::DeclConsumer consumer) const;
 
     virtual NullablePtr<const ASTScopeImpl>
     getLookupLimitFor(const GenericTypeOrExtensionScope *) const;
@@ -505,11 +502,21 @@ public:
   GenericTypeOrExtensionWhereOrBodyPortion(const char *n) : Portion(n) {}
   virtual ~GenericTypeOrExtensionWhereOrBodyPortion() {}
 
-  std::pair<bool, Optional<bool>>
-  lookupInSelfTypeOf(const GenericTypeOrExtensionScope *scope,
-                     NullablePtr<DeclContext> selfDC,
-                     const Optional<bool> isCascadingUse,
-                     ASTScopeImpl::DeclConsumer consumer) const override;
+  bool lookupMembersOf(const GenericTypeOrExtensionScope *scope,
+                       ArrayRef<const ASTScopeImpl *>,
+                       ASTScopeImpl::DeclConsumer consumer) const override;
+
+private:
+  /// A client needs to know if a lookup result required the dynamic implicit
+  /// self value. It is required if the lookup originates from a method body or
+  /// a lazy pattern initializer. So, one approach would be to call the consumer
+  /// to find members right from those scopes. However, because members aren't
+  /// the first things searched, generics are, that approache ends up
+  /// duplicating code from the \c GenericTypeOrExtensionScope. So we take the
+  /// approach of doing those lookups there, and using this function to compute
+  /// the selfDC from the history.
+  static NullablePtr<DeclContext>
+  computeSelfDC(ArrayRef<const ASTScopeImpl *> history);
 };
 
 /// Behavior specific to representing the trailing where clause of a
@@ -563,21 +570,18 @@ private:
 public:
   SourceRange getChildlessSourceRange() const override;
 
-  std::pair<bool, Optional<bool>>
-  lookupInSelfType(NullablePtr<DeclContext> selfDC,
-                   const Optional<bool> isCascadingUse,
-                   ASTScopeImpl::DeclConsumer consumer) const override;
-
   virtual GenericContext *getGenericContext() const = 0;
   std::string getClassName() const override;
   virtual std::string declKindName() const = 0;
   virtual bool doesDeclHaveABody() const;
   const char *portionName() const { return portion->portionName; }
-  NullablePtr<DeclContext>
-      computeSelfDCForParent(NullablePtr<DeclContext>) const override;
+  Optional<NullablePtr<DeclContext>> computeSelfDCForParent() const override;
+
+protected:
   Optional<bool> resolveIsCascadingUseForThisScope(
       Optional<bool> isCascadingUse) const override;
 
+public:
   // Only for DeclScope, not BodyScope
   // Returns the where clause scope, or the parent if none
   virtual ASTScopeImpl *createTrailingWhereClauseScope(ASTScopeImpl *parent,
@@ -590,6 +594,9 @@ public:
   virtual void createBodyScope(ASTScopeImpl *leaf, ScopeCreator &) {}
 
 protected:
+  bool
+  lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *> history,
+                        ASTScopeImpl::DeclConsumer consumer) const override;
   void printSpecifics(llvm::raw_ostream &out) const override;
 
 public:
@@ -601,9 +608,8 @@ class GenericTypeScope : public GenericTypeOrExtensionScope {
 public:
   GenericTypeScope(const Portion *p) : GenericTypeOrExtensionScope(p) {}
   virtual ~GenericTypeScope() {}
-
-  bool lookInMyGenericParameters(Optional<bool> isCascadingUse,
-                                 DeclConsumer) const override;
+protected:
+  NullablePtr<const GenericParamList> genericParams() const override;
 };
 
 class IterableTypeScope : public GenericTypeScope {
@@ -660,8 +666,9 @@ public:
                                                ScopeCreator &) override;
   void createBodyScope(ASTScopeImpl *leaf, ScopeCreator &) override;
   NullablePtr<Decl> getDecl() const override { return decl; }
-  bool lookInMyGenericParameters(Optional<bool> isCascadingUse,
-                                 DeclConsumer) const override;
+  NullablePtr<const ASTScopeImpl> getLookupLimitForDecl() const override;
+protected:
+  NullablePtr<const GenericParamList> genericParams() const override;
 };
 
 class TypeAliasScope final : public GenericTypeScope {
@@ -731,7 +738,8 @@ public:
   }
 
 protected:
-  bool lookupLocalBindings(Optional<bool>, DeclConsumer) const override;
+  bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
+                             DeclConsumer) const override;
   bool doesContextMatchStartingContext(const DeclContext *) const override;
   Optional<bool>
   resolveIsCascadingUseForThisScope(Optional<bool>) const override;
@@ -757,9 +765,8 @@ protected:
   void printSpecifics(llvm::raw_ostream &out) const override;
 
 public:
-  virtual NullablePtr<DeclContext> getDeclContext() const override {
-    return decl;
-  }
+  virtual NullablePtr<DeclContext> getDeclContext() const override;
+  
   virtual NullablePtr<Decl> getDecl() const override { return decl; }
 
   NullablePtr<AbstractStorageDecl>
@@ -767,8 +774,9 @@ public:
 
 protected:
   Decl *getEnclosingAbstractFunctionOrSubscriptDecl() const override;
-  bool lookInMyGenericParameters(Optional<bool> isCascadingUse,
-                                 DeclConsumer) const override;
+
+  NullablePtr<const GenericParamList> genericParams() const override;
+
   Optional<bool>
   resolveIsCascadingUseForThisScope(Optional<bool>) const override;
 };
@@ -819,9 +827,11 @@ public:
     return decl;
   }
   virtual NullablePtr<Decl> getDecl() const override { return decl; }
+  static bool isAMethod(const AbstractFunctionDecl *);
 
 protected:
-  bool lookupLocalBindings(Optional<bool>, DeclConsumer) const override;
+  bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
+                             DeclConsumer) const override;
   Optional<bool>
   resolveIsCascadingUseForThisScope(Optional<bool>) const override;
 };
@@ -831,12 +841,10 @@ class MethodBodyScope final : public AbstractFunctionBodyScope {
 public:
   MethodBodyScope(AbstractFunctionDecl *e) : AbstractFunctionBodyScope(e) {}
   std::string getClassName() const override;
-  bool lookupLocalBindings(Optional<bool>,
-                           DeclConsumer consumer) const override;
+  bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
+                             DeclConsumer consumer) const override;
 
-protected:
-  NullablePtr<DeclContext>
-      computeSelfDCForParent(NullablePtr<DeclContext>) const override;
+  Optional<NullablePtr<DeclContext>> computeSelfDCForParent() const override;
 };
 
 /// Body of "pure" functions, functions without an implicit "self".
@@ -845,8 +853,8 @@ public:
   PureFunctionBodyScope(AbstractFunctionDecl *e)
       : AbstractFunctionBodyScope(e) {}
   std::string getClassName() const override;
-  bool lookupLocalBindings(Optional<bool>,
-                           DeclConsumer consumer) const override;
+  bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
+                             DeclConsumer consumer) const override;
 };
 
 class DefaultArgumentInitializerScope final : public ASTScopeImpl {
@@ -868,15 +876,15 @@ protected:
   resolveIsCascadingUseForThisScope(Optional<bool>) const override;
 };
 
-// Consider:
-//  @_propertyWrapper
-//  struct WrapperWithInitialValue {
-//  }
-//  struct HasWrapper {
-//    @WrapperWithInitialValue var y = 17
-//  }
-// Lookup has to be able to find the use of WrapperWithInitialValue, that's what
-// this scope is for. Because the source positions are screwy.
+/// Consider:
+///  @_propertyWrapper
+///  struct WrapperWithInitialValue {
+///  }
+///  struct HasWrapper {
+///    @WrapperWithInitialValue var y = 17
+///  }
+/// Lookup has to be able to find the use of WrapperWithInitialValue, that's
+/// what this scope is for. Because the source positions are screwy.
 
 class AttachedPropertyWrapperScope final : public ASTScopeImpl {
 public:
@@ -892,6 +900,9 @@ public:
   virtual NullablePtr<DeclContext> getDeclContext() const override;
 
   static SourceRange getCustomAttributesSourceRange(const VarDecl *);
+
+private:
+  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
 };
 
 /// PatternBindingDecl's (PBDs) are tricky (See the comment for \c
@@ -975,10 +986,12 @@ public:
   virtual NullablePtr<DeclContext> getDeclContext() const override;
   virtual NullablePtr<Decl> getDecl() const override { return decl; }
 
+  Optional<NullablePtr<DeclContext>> computeSelfDCForParent() const override;
+
 protected:
-  bool lookupLocalBindings(Optional<bool>, DeclConsumer) const override;
-  NullablePtr<DeclContext>
-      computeSelfDCForParent(NullablePtr<DeclContext>) const override;
+  bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
+                             DeclConsumer) const override;
+
   Optional<bool>
   resolveIsCascadingUseForThisScope(Optional<bool>) const override;
 };
@@ -1007,7 +1020,8 @@ public:
   SourceRange getChildlessSourceRange() const override;
 
 protected:
-  bool lookupLocalBindings(Optional<bool>, DeclConsumer) const override;
+  bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
+                             DeclConsumer) const override;
 };
 
 /// The scope introduced by a conditional clause in an if/guard/while
@@ -1063,7 +1077,8 @@ public:
   ASTScopeImpl *expandMe(ScopeCreator &) override;
 
 protected:
-  bool lookupLocalBindings(Optional<bool>, DeclConsumer) const override;
+  bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
+                             DeclConsumer) const override;
   void printSpecifics(llvm::raw_ostream &out) const override;
 };
 
@@ -1143,7 +1158,8 @@ public:
   ASTScopeImpl *expandMe(ScopeCreator &) override;
 
 protected:
-  bool lookupLocalBindings(Optional<bool>, DeclConsumer) const override;
+  bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
+                             DeclConsumer) const override;
   Optional<bool> resolveIsCascadingUseForThisScope(
       Optional<bool> isCascadingUse) const override;
 };
@@ -1215,7 +1231,8 @@ public:
   getEnclosingAbstractStorageDecl() const override;
 
 protected:
-  bool lookupLocalBindings(Optional<bool>, DeclConsumer) const override;
+  bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
+                             DeclConsumer) const override;
 };
 
 class SubscriptDeclScope final : public ASTScopeImpl {
@@ -1245,8 +1262,8 @@ public:
 
 protected:
   Decl *getEnclosingAbstractFunctionOrSubscriptDecl() const override;
-  bool lookInMyGenericParameters(Optional<bool> isCascadingUse,
-                                 DeclConsumer) const override;
+
+  NullablePtr<const GenericParamList> genericParams() const override;
   NullablePtr<AbstractStorageDecl>
   getEnclosingAbstractStorageDecl() const override {
     return decl;
@@ -1455,7 +1472,8 @@ public:
   SourceRange getChildlessSourceRange() const override;
 
 protected:
-  bool lookupLocalBindings(Optional<bool>, DeclConsumer) const override;
+  bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
+                             DeclConsumer) const override;
 };
 
 class CatchStmtScope final : public AbstractStmtScope {
@@ -1475,8 +1493,8 @@ public:
   Stmt *getStmt() const override { return stmt; }
 
 protected:
-  bool lookupLocalBindings(Optional<bool>,
-                           ASTScopeImpl::DeclConsumer) const override;
+  bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
+                             ASTScopeImpl::DeclConsumer) const override;
 };
 
 class CaseStmtScope final : public AbstractStmtScope {
@@ -1496,8 +1514,8 @@ public:
   Stmt *getStmt() const override { return stmt; }
 
 protected:
-  bool lookupLocalBindings(Optional<bool>,
-                           ASTScopeImpl::DeclConsumer) const override;
+  bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
+                             ASTScopeImpl::DeclConsumer) const override;
 };
 
 class BraceStmtScope final : public AbstractStmtScope {
@@ -1520,7 +1538,8 @@ public:
   Stmt *getStmt() const override { return stmt; }
 
 protected:
-  bool lookupLocalBindings(Optional<bool>, DeclConsumer) const override;
+  bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
+                             DeclConsumer) const override;
 };
 } // namespace ast_scope
 } // namespace swift
