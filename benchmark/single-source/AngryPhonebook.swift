@@ -13,7 +13,6 @@
 // This test is based on single-source/Phonebook, with
 // to test uppercase and lowercase ASCII string fast paths.
 import TestsUtils
-import Foundation
 
 public let AngryPhonebook = BenchmarkInfo(
   name: "AngryPhonebook",

@@ -2,7 +2,11 @@
 //
 // Originally written by @owensd. Used with his permission.
 
-import Foundation
+#if os(Linux)
+import Glibc
+#else
+import Darwin
+#endif
 import TestsUtils
 
 public var Radix2CooleyTukey = [

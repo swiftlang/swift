@@ -16,17 +16,16 @@
 // https://github.com/raywenderlich/swift-algorithm-club/tree/master/Bucket%20Sort
 //
 // It sorts an array of generic `SortableItem`s. If the type of `sortingAlgo`
-// is not known to the call site at line 90, the `sort` method can not be
+// is not known to the call site at line 89, the `sort` method can not be
 // specialized to integer array sorting, which will lead to a huge performance
 // loss. Since `SortingAlgorithm` and `InsertionSort` are declared to be
-// `public` and the lines 89-91 can not be inlined in `bucketSort` (due to
+// `public` and the lines 88-90 can not be inlined in `bucketSort` (due to
 // inlining heuristic limitations), compiler without ExistentialSpecializer
 // optimization can not achieve this feat. With ExistentialSpecializer which
 // enables generic specialization recursively in a call chain, we're able to
-// specialize line 90 for `InsertionSort` on integers.
+// specialize line 89 for `InsertionSort` on integers.
 
 import TestsUtils
-import Foundation
 
 public let BucketSort = BenchmarkInfo(
   name: "BucketSort",
@@ -117,7 +116,8 @@ let items: [Int] = {
 let buckets: [Bucket<Int>] = {
   let bucketCount = 10
   let maxValue = items.max()!.convertToInt()
-  let maxCapacity = Int(ceil(Double(maxValue + 1) / Double(bucketCount)))
+  let maxCapacity = Int(
+    (Double(maxValue + 1) / Double(bucketCount)).rounded(.up))
   return (0..<bucketCount).map { _ in Bucket<Int>(capacity: maxCapacity) }
 }()
 
