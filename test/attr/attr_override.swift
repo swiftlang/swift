@@ -547,7 +547,7 @@ class SR_4206_BaseGeneric_3<T> {
   func foo<T>(arg: T) {} // expected-note {{overridden declaration is here}}
 }
 
-class SR_4206_DerivedConcrete_3<T>: SR_4206_BaseGeneric_3<T> {
+class SR_4206_DerivedGeneric_3<T>: SR_4206_BaseGeneric_3<T> {
   override func foo<T: SR_4206_Protocol_1>(arg: T) {} // expected-error {{overriden method 'foo' has generic signature <T, T where T : SR_4206_Protocol_1> which is incompatible with base method's generic signature <T, T>}}
 }
 
@@ -577,7 +577,7 @@ class SR_4206_BaseConcrete_6 {
   func foo<T: SR_4206_Protocol_2>(arg: T) {} // expected-note {{overridden declaration is here}}
 }
 
-class SR_4206_DerivedConcrete_6<T>: SR_4206_BaseConcrete_6 {
+class SR_4206_DerivedGeneric_6<T>: SR_4206_BaseConcrete_6 {
   override func foo<T: SR_4206_Protocol_1>(arg: T) {} // expected-error {{overriden method 'foo' has generic signature <T, T where T : SR_4206_Protocol_1> which is incompatible with base method's generic signature <T where T : SR_4206_Protocol_2>}}
 }
 
