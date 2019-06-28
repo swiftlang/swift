@@ -53,6 +53,11 @@ class D : B {
   func bad_super_2() {
     super(0) // expected-error{{expected '.' or '[' after 'super'}}
   }
+
+  func bad_super_3() {
+    super // expected-error{{expected '.' or '[' after 'super'}}
+      [1]
+  }
 }
 
 class Closures : B {
