@@ -123,31 +123,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   //===--------------------------------------------------------------------===//
-  //                               Attributes
-  //===--------------------------------------------------------------------===//
-  bool visitCustomAttributes(Decl *D) {
-    for (auto *customAttr : D->getAttrs().getAttributes<CustomAttr, true>()) {
-      CustomAttr *mutableCustomAttr = const_cast<CustomAttr *>(customAttr);
-      if (doIt(mutableCustomAttr->getTypeLoc()))
-        return true;
-
-      if (auto semanticInit = customAttr->getSemanticInit()) {
-        if (auto newSemanticInit = doIt(semanticInit))
-          mutableCustomAttr->setSemanticInit(newSemanticInit);
-        else
-          return true;
-      } else if (auto arg = customAttr->getArg()) {
-        if (auto newArg = doIt(arg))
-          mutableCustomAttr->setArg(newArg);
-        else
-          return true;
-      }
-    }
-
-    return false;
-  }
-
-  //===--------------------------------------------------------------------===//
   //                                 Decls
   //===--------------------------------------------------------------------===//
 
@@ -179,9 +154,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     // If there is a single variable, walk it's attributes.
     bool isPropertyWrapperBackingProperty = false;
     if (auto singleVar = PBD->getSingleVar()) {
-      if (visitCustomAttributes(singleVar))
-        return true;
-
       isPropertyWrapperBackingProperty =
         singleVar->getOriginalWrappedProperty() != nullptr;
     }
@@ -1153,9 +1125,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       if (doIt(P))
         return true;
 
-      // Visit any custom attributes on the parameter.
-      visitCustomAttributes(P);
-
       // Don't walk into the type if the decl is implicit, or if the type is
       // implicit.
       if (!P->isImplicit() && !P->isTypeLocImplicit() &&
@@ -1168,7 +1137,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
         P->setDefaultValue(res);
       }
     }
-    
+
     return Walker.walkToParameterListPost(PL);
   }
   
@@ -1257,7 +1226,7 @@ public:
 
     return P;
   }
-  
+
   bool doIt(const StmtCondition &C) {
     for (auto &elt : C) {
       switch (elt.getKind()) {
