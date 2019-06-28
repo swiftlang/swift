@@ -506,13 +506,11 @@ public:
     if (error)
       fatal(std::move(error));
   }
-  template<typename T>
-  T fatalIfUnexpected(llvm::Expected<T> expected) {
+  template <typename T> T fatalIfUnexpected(llvm::Expected<T> expected) {
     if (expected)
       return std::move(expected.get());
     fatal(expected.takeError());
   }
-      
 
   ASTContext &getContext() const {
     assert(FileContext && "no associated context yet");

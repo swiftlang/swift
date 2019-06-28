@@ -38,7 +38,8 @@ public:
 
   ~BCOffsetRAII() {
     if (Cursor)
-      cantFail(Cursor->JumpToBit(Offset), "BCOffsetRAII must be able to go back");
+      cantFail(Cursor->JumpToBit(Offset),
+               "BCOffsetRAII must be able to go back");
   }
 };
 
