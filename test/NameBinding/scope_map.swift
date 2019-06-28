@@ -507,13 +507,13 @@ class LazyProperties {
 // CHECK-SEARCHES-NEXT: {{.*}} Module name=scope_map
 // CHECK-SEARCHES-NEXT:   {{.*}} FileUnit file="SOURCE_DIR{{[/]}}test{{[/]}}NameBinding{{[/]}}scope_map.swift"
 // CHECK-SEARCHES-NEXT:     {{.*}} StructDecl name=PatternInitializers
-// CHECK-SEARCHES-NEXT:       {{.*}} Initializer PatternBinding {{.*}}80 #1
+// CHECK-SEARCHES-NEXT:       {{.*}} Initializer PatternBinding {{.*}} #1
 // CHECK-SEARCHES-NEXT: ***Scope at 194:26***
 // CHECK-SEARCHES-NEXT: PatternEntryInitializerScope {{.*}}, [194:24 - 194:29] entry 0 'prop'
 // CHECK-SEARCHES-NEXT: {{.*}} Module name=scope_map
 // CHECK-SEARCHES-NEXT:   {{.*}} FileUnit file="SOURCE_DIR{{[/]}}test{{[/]}}NameBinding{{[/]}}scope_map.swift"
 // CHECK-SEARCHES-NEXT:     {{.*}} ClassDecl name=LazyProperties
-// CHECK-SEARCHES-NEXT:       {{.*}} Initializer PatternBinding {{.*}}78 #0
+// CHECK-SEARCHES-NEXT:       {{.*}} Initializer PatternBinding {{.*}} #0
 // CHECK-SEARCHES-NEXT: Local bindings: self
 
 
