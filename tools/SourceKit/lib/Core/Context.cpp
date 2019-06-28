@@ -13,7 +13,6 @@
 #include "SourceKit/Core/Context.h"
 #include "SourceKit/Core/LangSupport.h"
 #include "SourceKit/Core/NotificationCenter.h"
-#include "SourceKit/Support/FileSystemProvider.h"
 
 using namespace SourceKit;
 
