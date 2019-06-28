@@ -2825,7 +2825,7 @@ ERROR(diff_params_clause_no_inferred_parameters,PointsToFirstBadToken,
       "with respect to at least one parameter conforming to 'Differentiable'",
       ())
 ERROR(diff_params_clause_inout_argument,none,
-      "inout types (%0) cannot be differentiated with respect to", (Type))
+      "'inout' parameters (%0) cannot be differentiated with respect to", (Type))
 ERROR(diff_params_clause_cannot_diff_wrt_objects_or_existentials,none,
       "class objects and protocol existentials (%0) cannot be differentiated "
       "with respect to", (Type))
