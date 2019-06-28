@@ -202,7 +202,9 @@ namespace swift {
   /// be printed to \c OS.
   ArrayRef<ExpressionTypeInfo> collectExpressionType(SourceFile &SF,
     ArrayRef<const char *> ExpectedProtocols,
-    std::vector<ExpressionTypeInfo> &scratch, llvm::raw_ostream &OS);
+    std::vector<ExpressionTypeInfo> &scratch,
+    bool CanonicalType,
+    llvm::raw_ostream &OS);
 
   /// Resolve a list of mangled names to accessible protocol decls from
   /// the decl context.

@@ -775,6 +775,7 @@ public:
   virtual void collectExpressionTypes(StringRef FileName,
                                       ArrayRef<const char *> Args,
                                       ArrayRef<const char *> ExpectedProtocols,
+                                      bool CanonicalType,
                                       std::function<void(const
                                           RequestResult<ExpressionTypesInFile> &)> Receiver) = 0;
 

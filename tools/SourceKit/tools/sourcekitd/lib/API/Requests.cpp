@@ -1012,7 +1012,10 @@ handleSemanticRequest(RequestDict Req,
     SmallVector<const char *, 8> ExpectedProtocols;
     if (Req.getStringArray(KeyExpectedTypes, ExpectedProtocols, true))
       return Rec(createErrorRequestInvalid("invalid 'key.interested_protocols'"));
+    int64_t CanonicalTy = false;
+    Req.getInt64(KeyCanonicalizeType, CanonicalTy, /*isOptional=*/true);
     return Lang.collectExpressionTypes(*SourceFile, Args, ExpectedProtocols,
+                                       CanonicalTy,
       [Rec](const RequestResult<ExpressionTypesInFile> &Result) {
         reportExpressionTypeInfo(Result, Rec);
       });
