@@ -408,17 +408,6 @@ Type TypeBase::eraseOpenedExistential(OpenedArchetypeType *opened) {
   });
 }
 
-Type TypeBase::eraseDynamicSelfType() {
-  if (!hasDynamicSelfType())
-    return this;
-
-  return Type(this).transform([](Type t) -> Type {
-    if (auto *selfTy = dyn_cast<DynamicSelfType>(t.getPointer()))
-      return selfTy->getSelfType();
-    return t;
-  });
-}
-
 Type TypeBase::addCurriedSelfType(const DeclContext *dc) {
   if (!dc->isTypeContext())
     return this;
@@ -2346,7 +2335,7 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
 
   // Class-to-class.
   if (matchMode.contains(TypeMatchFlags::AllowOverride))
-    if (t2->eraseDynamicSelfType()->isExactSuperclassOf(t1))
+    if (t2->isExactSuperclassOf(t1))
       return true;
 
   if (matchMode.contains(TypeMatchFlags::AllowABICompatible))
