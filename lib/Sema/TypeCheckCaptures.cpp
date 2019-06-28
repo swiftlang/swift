@@ -29,29 +29,6 @@
 #include "llvm/ADT/SmallPtrSet.h"
 using namespace swift;
 
-static SourceLoc getCaptureLoc(AnyFunctionRef AFR) {
-  if (auto AFD = AFR.getAbstractFunctionDecl()) {
-    if (auto *FD = dyn_cast<FuncDecl>(AFD)) {
-      if (FD->isDeferBody()) {
-        // HACK: Defer statements generate implicit FuncDecls, and hence do
-        // not have valid source locations.  Instead, use the location of
-        // the body.
-        return FD->getBody()->getLBraceLoc();
-      }
-    }
-
-    return AFD->getLoc();
-  } else {
-    auto ACE = AFR.getAbstractClosureExpr();
-    if (auto CE = dyn_cast<ClosureExpr>(ACE)) {
-      if (!CE->getInLoc().isInvalid())
-        return CE->getInLoc();
-    }
-
-    return ACE->getLoc();
-  }
-}
-
 namespace {
 
 class FindCapturedVars : public ASTWalker {
@@ -80,7 +57,7 @@ public:
         DynamicSelf(DynamicSelf),
         OpaqueValue(OpaqueValue),
         AFR(AFR) {
-    CaptureLoc = getCaptureLoc(AFR);
+    CaptureLoc = AFR.getLoc();
   }
 
   /// Check if the type of an expression references any generic
@@ -355,11 +332,11 @@ public:
 
     if (GenericParamCaptureLoc.isInvalid())
       if (captureInfo.hasGenericParamCaptures())
-        GenericParamCaptureLoc = getCaptureLoc(innerClosure);
+        GenericParamCaptureLoc = innerClosure.getLoc();
 
     if (DynamicSelfCaptureLoc.isInvalid())
       if (captureInfo.hasDynamicSelfCapture()) {
-        DynamicSelfCaptureLoc = getCaptureLoc(innerClosure);
+        DynamicSelfCaptureLoc = innerClosure.getLoc();
         DynamicSelf = captureInfo.getDynamicSelfType();
       }
 
@@ -643,7 +620,7 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
     AFR.getBody()->walk(finder);
 
   if (AFR.hasType() && !AFR.isObjC()) {
-    finder.checkType(AFR.getType(), getCaptureLoc(AFR));
+    finder.checkType(AFR.getType(), AFR.getLoc());
   }
 
   // If this is an init(), explicitly walk the initializer values for members of

@@ -966,7 +966,7 @@ ParserResult<Stmt> Parser::parseStmtDefer() {
                        StaticSpellingKind::None,
                        /*FuncLoc=*/ SourceLoc(),
                        name,
-                       /*NameLoc=*/ SourceLoc(),
+                       /*NameLoc=*/ PreviousLoc,
                        /*Throws=*/ false, /*ThrowsLoc=*/ SourceLoc(),
                        /*generic params*/ nullptr,
                        params,
