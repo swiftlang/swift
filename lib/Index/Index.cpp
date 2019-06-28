@@ -601,6 +601,10 @@ private:
     if (D->isImplicit() && !isa<ConstructorDecl>(D))
       return false;
 
+    // Do not handle non-public imported decls.
+    if (IsModuleFile && !D->isAccessibleFrom(nullptr))
+      return false;
+
     if (!IdxConsumer.indexLocals() && isLocalSymbol(D))
       return isa<ParamDecl>(D) && !IsRef &&
         D->getDeclContext()->getContextKind() != DeclContextKind::AbstractClosureExpr;
