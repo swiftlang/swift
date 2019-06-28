@@ -59,7 +59,8 @@ static void *loadRuntimeLib(StringRef runtimeLibPathWithName) {
 #endif
 }
 
-static void *loadRuntimeLib(StringRef sharedLibName, StringRef runtimeLibPath) {
+static void *loadRuntimeLibAtPath(StringRef sharedLibName,
+                                  StringRef runtimeLibPath) {
   // FIXME: Need error-checking.
   llvm::SmallString<128> Path = runtimeLibPath;
   llvm::sys::path::append(Path, sharedLibName);
@@ -67,16 +68,16 @@ static void *loadRuntimeLib(StringRef sharedLibName, StringRef runtimeLibPath) {
 }
 
 static void *loadRuntimeLib(StringRef sharedLibName,
-                            const std::vector<std::string> runtimeLibPaths) {
+                            ArrayRef<std::string> runtimeLibPaths) {
   for (auto &runtimeLibPath : runtimeLibPaths) {
-    if (void *handle = loadRuntimeLib(sharedLibName, runtimeLibPath))
+    if (void *handle = loadRuntimeLibAtPath(sharedLibName, runtimeLibPath))
       return handle;
   }
   return nullptr;
 }
 
-void *swift::immediate::loadSwiftRuntime(const std::vector<std::string>
-                                         &runtimeLibPaths) {
+void *swift::immediate::loadSwiftRuntime(ArrayRef<std::string>
+                                         runtimeLibPaths) {
   return loadRuntimeLib("libswiftCore" LTDL_SHLIB_EXT, runtimeLibPaths);
 }
 

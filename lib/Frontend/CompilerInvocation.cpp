@@ -30,10 +30,8 @@
 using namespace swift;
 using namespace llvm::opt;
 
-#if defined(__APPLE__) && defined(__MACH__)
-/// The path for Swift libraries in the OS.
-#define OS_LIBRARY_PATH "/usr/lib/swift"
-#endif
+/// The path for Swift libraries in the OS on Darwin.
+#define DARWIN_OS_LIBRARY_PATH "/usr/lib/swift"
 
 swift::CompilerInvocation::CompilerInvocation() {
   setTargetTriple(llvm::sys::getDefaultTargetTriple());
@@ -73,9 +71,8 @@ static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
   llvm::sys::path::append(LibPath, getPlatformNameForTriple(Triple));
   SearchPathOpts.RuntimeLibraryPaths.clear();
   SearchPathOpts.RuntimeLibraryPaths.push_back(LibPath.str());
-#if defined(__APPLE__) && defined(__MACH__)
-  SearchPathOpts.RuntimeLibraryPaths.push_back(OS_LIBRARY_PATH);
-#endif
+  if (Triple.isOSDarwin())
+    SearchPathOpts.RuntimeLibraryPaths.push_back(DARWIN_OS_LIBRARY_PATH);
 
   // Set up the import paths containing the swiftmodules for the libraries in
   // RuntimeLibraryPath.

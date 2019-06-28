@@ -37,8 +37,8 @@ namespace immediate {
 /// Returns a handle to the runtime suitable for other \c dlsym or \c dlclose
 /// calls or \c null if an error occurred.
 ///
-/// \param runtimeLibPath Path to search for compiler-relative stdlib dylibs.
-void *loadSwiftRuntime(const std::vector<std::string> &runtimeLibPaths);
+/// \param runtimeLibPaths Paths to search for stdlib dylibs.
+void *loadSwiftRuntime(ArrayRef<std::string> runtimeLibPaths);
 bool tryLoadLibraries(ArrayRef<LinkLibrary> LinkLibraries,
                       SearchPathOptions SearchPathOpts,
                       DiagnosticEngine &Diags);
