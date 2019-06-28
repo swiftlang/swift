@@ -1021,6 +1021,7 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
 
     // Parse optional '...'.
     if (Tok.isEllipsis()) {
+      Tok.setKind(tok::ellipsis);
       auto ElementEllipsisLoc = consumeToken();
       if (EllipsisLoc.isInvalid()) {
         EllipsisLoc = ElementEllipsisLoc;
