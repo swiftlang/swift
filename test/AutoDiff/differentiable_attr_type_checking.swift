@@ -60,6 +60,15 @@ struct ComputedPropertyDupeAttributes<T : Differentiable> : Differentiable {
   }
 }
 
+// Test TF-568.
+protocol WrtOnlySelfProtocol : Differentiable {
+  @differentiable
+  var computedProperty: Float { get }
+
+  @differentiable
+  func method() -> Float
+}
+
 class Class {}
 // expected-error @+1 {{class objects and protocol existentials ('Class') cannot be differentiated with respect to}}
 @differentiable(wrt: x)

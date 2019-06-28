@@ -2874,6 +2874,8 @@ static AutoDiffParameterIndices *computeDifferentiationParameters(
       auto selfType = function->getImplicitSelfDecl()->getInterfaceType();
       if (derivativeGenEnv)
         selfType = derivativeGenEnv->mapTypeIntoContext(selfType);
+      else
+        selfType = function->mapTypeIntoContext(selfType);
       // FIXME(TF-568): `Differentiable`-conforming protocols cannot define
       // `@differentiable` computed properties because the check below returns
       // false.
