@@ -153,7 +153,8 @@ void ContextInfoCallbacks::getImplicitMembers(
       // Static properties which is convertible to 'Self'.
       if (isa<VarDecl>(VD) && VD->isStatic()) {
         auto declTy = T->getTypeOfMember(CurModule, VD);
-        if (declTy->isEqual(T) || swift::isConvertibleTo(declTy, T, *DC))
+        if (declTy->isEqual(T) ||
+            swift::isConvertibleTo(declTy, T, /*openArchetypes=*/true, *DC))
           return true;
       }
 
