@@ -154,8 +154,8 @@ public let NSNotFound: Int = .max
 /// Since comments aren't localized, multiline string literals can be safely
 /// used with `comment`.
 ///
-/// Restrict Autosynthesized Localizations
-/// --------------------------------------
+/// Work with Manually Managed Strings
+/// ----------------------------------
 ///
 /// If having Xcode generate strings files from code isn't desired behavior,
 /// call `Bundle.localizedString(forKey:value:table:)` instead.
