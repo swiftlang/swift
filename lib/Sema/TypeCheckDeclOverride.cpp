@@ -941,10 +941,15 @@ static GenericSignature *getNewGenericSignature(ValueDecl *base,
   }
 
   auto baseClass = base->getDeclContext()->getSelfClassDecl();
+
+  if (!baseClass) {
+    return nullptr;
+  }
+
   auto derivedClass = derived->getDeclContext()->getSelfClassDecl();
   auto *baseClassSig = baseClass->getGenericSignature();
 
-  if (!baseClass && !derivedClass) {
+  if (!derivedClass) {
     return nullptr;
   }
 
