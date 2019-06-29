@@ -80,6 +80,10 @@ public:
     return GenericParamCaptureLoc;
   }
 
+  SourceLoc getDynamicSelfCaptureLoc() const {
+    return DynamicSelfCaptureLoc;
+  }
+
   /// Check if the type of an expression references any generic
   /// type parameters, or the dynamic Self type.
   ///
@@ -697,6 +701,11 @@ void TypeChecker::checkPatternBindingCaptures(NominalTypeDecl *typeDecl) {
                               /*NoEscape=*/false,
                               /*ObjC=*/false);
       init->walk(finder);
+
+      if (finder.getDynamicSelfCaptureLoc().isValid()) {
+        diagnose(finder.getDynamicSelfCaptureLoc(),
+                 diag::dynamic_self_stored_property_init);
+      }
 
       auto captures = finder.getCaptureInfo();
       PBD->setCaptureInfo(i, captures);

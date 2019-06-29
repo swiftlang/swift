@@ -2595,6 +2595,8 @@ ERROR(dynamic_self_invalid_subscript,none,
       "covariant 'Self' can only appear at the top level of subscript element type", ())
 ERROR(dynamic_self_invalid_method,none,
       "covariant 'Self' can only appear at the top level of method result type", ())
+ERROR(dynamic_self_stored_property_init,none,
+      "covariant 'Self' type cannot be referenced from a stored property initializer", ())
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Attributes
