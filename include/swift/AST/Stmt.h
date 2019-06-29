@@ -20,6 +20,7 @@
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/Availability.h"
 #include "swift/AST/AvailabilitySpec.h"
+#include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/IfConfigClause.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/NullablePtr.h"
@@ -802,12 +803,15 @@ class ForEachStmt : public LabeledStmt {
   Expr *Sequence;
   Expr *WhereExpr = nullptr;
   BraceStmt *Body;
-  
-  /// The iterator variable along with its initializer.
-  PatternBindingDecl *Iterator = nullptr;
-  /// The expression that advances the iterator and returns an Optional with
-  /// the next value or None to signal end-of-stream.
-  Expr *IteratorNext = nullptr;
+
+  // Set by Sema:
+  Optional<ProtocolConformanceRef> sequenceConformance;
+  ConcreteDeclRef makeIterator;
+  ConcreteDeclRef iteratorNext;
+  VarDecl *iteratorVar = nullptr;
+  Expr *iteratorVarRef = nullptr;
+  OpaqueValueExpr *elementExpr = nullptr;
+  Expr *convertElementExpr = nullptr;
 
 public:
   ForEachStmt(LabeledStmtInfo LabelInfo, SourceLoc ForLoc, Pattern *Pat,
@@ -819,7 +823,32 @@ public:
       WhereExpr(WhereExpr), Body(Body) {
     setPattern(Pat);
   }
-  
+
+  void setIteratorVar(VarDecl *var) { iteratorVar = var; }
+  VarDecl *getIteratorVar() const { return iteratorVar; }
+
+  void setIteratorVarRef(Expr *var) { iteratorVarRef = var; }
+  Expr *getIteratorVarRef() const { return iteratorVarRef; }
+
+  void setElementExpr(OpaqueValueExpr *expr) { elementExpr = expr; }
+  OpaqueValueExpr *getElementExpr() const { return elementExpr; }
+
+  void setConvertElementExpr(Expr *expr) { convertElementExpr = expr; }
+  Expr *getConvertElementExpr() const { return convertElementExpr; }
+
+  void setMakeIterator(ConcreteDeclRef declRef) { makeIterator = declRef; }
+  ConcreteDeclRef getMakeIterator() const { return makeIterator; }
+
+  void setIteratorNext(ConcreteDeclRef declRef) { iteratorNext = declRef; }
+  ConcreteDeclRef getIteratorNext() const { return iteratorNext; }
+
+  void setSequenceConformance(Optional<ProtocolConformanceRef> conformance) {
+    sequenceConformance = conformance;
+  }
+  Optional<ProtocolConformanceRef> getSequenceConformance() const {
+    return sequenceConformance;
+  }
+
   /// getForLoc - Retrieve the location of the 'for' keyword.
   SourceLoc getForLoc() const { return ForLoc; }
 
@@ -840,15 +869,6 @@ public:
   /// expression to extract a range, use \c getRangeInit().
   Expr *getSequence() const { return Sequence; }
   void setSequence(Expr *S) { Sequence = S; }
-  
-  /// Retrieve the pattern binding that contains the (implicit) iterator
-  /// variable and its initialization from the container.
-  PatternBindingDecl *getIterator() const { return Iterator; }
-  void setIterator(PatternBindingDecl *It) { Iterator = It; }
-  
-  /// Retrieve the expression that advances the iterator.
-  Expr *getIteratorNext() const { return IteratorNext; }
-  void setIteratorNext(Expr *E) { IteratorNext = E; }
 
   /// getBody - Retrieve the body of the loop.
   BraceStmt *getBody() const { return Body; }

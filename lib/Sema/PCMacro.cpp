@@ -190,7 +190,7 @@ public:
 
       // point at the for stmt, to look nice
       SourceLoc StartLoc = FES->getStartLoc();
-      SourceLoc EndLoc = FES->getIterator()->getEndLoc();
+      SourceLoc EndLoc = FES->getSequence()->getEndLoc();
       // FIXME: get the 'end' of the for stmt
       // if (FD->getBodyResultTypeLoc().hasLocation()) {
       //   EndLoc = FD->getBodyResultTypeLoc().getSourceRange().End;
