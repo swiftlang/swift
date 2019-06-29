@@ -130,19 +130,19 @@ public let NSNotFound: Int = .max
 ///                                    comment: "A math equation.")
 ///     let localizedString = String.localizedStringWithFormat(format, (1 + 1))
 ///
-/// Multi-line string literals are technically supported, but will result in
+/// Multiline string literals are technically supported, but will result in
 /// unexpected behavior during internationalization. A newline will be inserted
 /// before and after the body of text within the string, and translators will
-/// likely preserve those in their internaliations.
+/// likely preserve those in their internationalizations.
 ///
 /// To preserve some of the aesthetics of having newlines in the string mirrored
 /// in their code representation, string literal concatenation with the `+`
 /// operator can be used.
 ///
-///     NSLocalizedString("multi-line-string-literal",
+///     NSLocalizedString("multiline-string-literal",
 ///                       value: """
-///     This multi-line string literal won't work as expected.
-///     An extra newline added to the beginning and end of the string.
+///     This multiline string literal won't work as expected.
+///     An extra newline is added to the beginning and end of the string.
 ///     """,
 ///                       comment: "The description of a sample of code.")
 ///
@@ -151,7 +151,7 @@ public let NSNotFound: Int = .max
 ///                            + "this other string literal works just fine.",
 ///                       comment: "The description of a sample of code.")
 ///
-/// Since comments aren't localized, multi-line string literals can be safely
+/// Since comments aren't localized, multiline string literals can be safely
 /// used with `comment`.
 ///
 /// Restrict Autosynthesized Localizations
@@ -174,7 +174,7 @@ public let NSNotFound: Int = .max
 ///
 /// - note: Although `NSLocalizedString(_:tableName:bundle:value:comment:)`
 /// and `Bundle.localizedString(forKey:value:table:)` can be used in a project
-/// at the same time, data from a manually managed strings files will be
+/// at the same time, data from manually managed strings files will be
 /// overwritten by Xcode when their table is also used to look up localized
 /// strings with `NSLocalizedString(_:tableName:bundle:value:comment:)`.
 public
