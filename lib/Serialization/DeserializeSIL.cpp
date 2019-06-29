@@ -157,7 +157,8 @@ SILDeserializer::SILDeserializer(
     SmallVector<uint64_t, 4> scratch;
     StringRef blobData;
     unsigned prevKind = kind;
-    kind = MF->fatalIfUnexpected(cursor.readRecord(next.ID, scratch, &blobData));
+    kind =
+        MF->fatalIfUnexpected(cursor.readRecord(next.ID, scratch, &blobData));
     assert((next.Kind == llvm::BitstreamEntry::Record &&
             kind > prevKind &&
             (kind == sil_index_block::SIL_FUNC_NAMES ||
@@ -189,7 +190,8 @@ SILDeserializer::SILDeserializer(
     // Read SIL_FUNC|VTABLE|GLOBALVAR_OFFSETS record.
     next = MF->fatalIfUnexpected(cursor.advance());
     scratch.clear();
-    unsigned offKind = MF->fatalIfUnexpected(cursor.readRecord(next.ID, scratch, &blobData));
+    unsigned offKind =
+        MF->fatalIfUnexpected(cursor.readRecord(next.ID, scratch, &blobData));
     (void)offKind;
     if (kind == sil_index_block::SIL_FUNC_NAMES) {
       assert((next.Kind == llvm::BitstreamEntry::Record &&
