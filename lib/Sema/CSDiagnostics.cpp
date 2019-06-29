@@ -1973,11 +1973,39 @@ bool MissingCallFailure::diagnoseAsError() {
   return true;
 }
 
+bool ExtraneousPropertyWrapperUnwrapFailure::diagnoseAsError() {
+  auto loc = getAnchor()->getLoc();
+  auto newPrefix = usingStorageWrapper() ? "$" : "_";
+
+  if (auto *member = getReferencedMember()) {
+    emitDiagnostic(loc, diag::incorrect_property_wrapper_reference_member,
+                   member->getDescriptiveKind(), member->getFullName(), false,
+                   getToType())
+        .fixItInsert(loc, newPrefix);
+    return true;
+  }
+
+  emitDiagnostic(loc, diag::incorrect_property_wrapper_reference,
+                 getPropertyName(), getFromType(), getToType(), false)
+      .fixItInsert(loc, newPrefix);
+  return true;
+}
+
 bool MissingPropertyWrapperUnwrapFailure::diagnoseAsError() {
-  emitDiagnostic(getAnchor()->getLoc(),
-                 diag::extraneous_property_wrapper_unwrap, getPropertyName(),
-                 getFromType(), getToType())
-      .fixItInsert(getAnchor()->getLoc(), "_");
+  auto loc = getAnchor()->getLoc();
+  auto endLoc = getAnchor()->getLoc().getAdvancedLoc(1);
+
+  if (auto *member = getReferencedMember()) {
+    emitDiagnostic(loc, diag::incorrect_property_wrapper_reference_member,
+                   member->getDescriptiveKind(), member->getFullName(), true,
+                   getToType())
+        .fixItRemoveChars(loc, endLoc);
+    return true;
+  }
+
+  emitDiagnostic(loc, diag::incorrect_property_wrapper_reference,
+                 getPropertyName(), getFromType(), getToType(), true)
+      .fixItRemoveChars(loc, endLoc);
   return true;
 }
 
