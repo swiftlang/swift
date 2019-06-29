@@ -568,6 +568,76 @@ namespace {
   };
 } // end anonymous namespace
 
+namespace  {
+  /// Describes the information needed to perform property wrapper access via the enclosing self.
+  struct EnclosingSelfPropertyWrapperAccess {
+    /// The (genreric) subscript that will be used to perform the access.
+    SubscriptDecl *subscript;
+
+    /// The property being accessed.
+    VarDecl *accessedProperty;
+
+    /// The backing storage property.
+    VarDecl *backingProperty;
+  };
+}
+
+/// Find the static subscript(_enclosingInstance:wrapped:storage:) that can be
+/// used to provide access to the wrapped value of a property wrapper.
+static SubscriptDecl *findEnclosingSelfSubscript(NominalTypeDecl *nominal) {
+  ASTContext &ctx = nominal->getASTContext();
+
+  // FIXME: Make these known identifiers.
+  Identifier argNames[] = {
+    ctx.getIdentifier("_enclosingInstance"),
+    ctx.getIdentifier("storage")
+  };
+  DeclName subscriptName(ctx, DeclBaseName::createSubscript(), argNames);
+
+  for (auto member : nominal->lookupDirect(subscriptName)) {
+    auto subscript = dyn_cast<SubscriptDecl>(member);
+    if (!subscript)
+      continue;
+
+    if (subscript->isInstanceMember())
+      continue;
+
+    // FIXME: Check access, types, etc, etc.
+    return subscript;
+  }
+
+  return nullptr;
+}
+
+/// Determine whether the given property should be accessed via the enclosing-self access pattern.
+static Optional<EnclosingSelfPropertyWrapperAccess>
+getEnclosingSelfPropertyWrapperAccess(VarDecl *property) {
+  // The enclosing-self pattern only applies to instance properties of
+  // classes.
+  if (!property->isInstanceMember())
+    return None;
+  auto classDecl = property->getDeclContext()->getSelfClassDecl();
+  if (!classDecl)
+    return None;
+
+  // The pattern currently only works with the outermost property wrapper.
+  Type outermostWrapperType = property->getAttachedPropertyWrapperType(0);
+  if (!outermostWrapperType)
+    return None;
+  NominalTypeDecl *wrapperTypeDecl = outermostWrapperType->getAnyNominal();
+  if (!wrapperTypeDecl)
+    return None;
+
+  // Look for a generic subscript that fits the general form we need.
+  auto subscript = findEnclosingSelfSubscript(wrapperTypeDecl);
+  if (!subscript)
+    return None;
+
+  EnclosingSelfPropertyWrapperAccess result{
+      subscript, property, property->getPropertyWrapperBackingProperty()};
+  return result;
+}
+
 /// Build an l-value for the storage of a declaration.
 static Expr *buildStorageReference(AccessorDecl *accessor,
                                    AbstractStorageDecl *storage,
@@ -575,6 +645,7 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
                                    ASTContext &ctx) {
   // Local function to "finish" the expression, creating a member reference
   // to the given sequence of underlying variables.
+  Optional<EnclosingSelfPropertyWrapperAccess> enclosingSelfAccess;
   llvm::TinyPtrVector<VarDecl *> underlyingVars;
   auto finish = [&](Expr *result) -> Expr * {
     for (auto underlyingVar : underlyingVars) {
@@ -624,7 +695,17 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
   case TargetImpl::Wrapper: {
     auto var = cast<VarDecl>(accessor->getStorage());
     storage = var->getPropertyWrapperBackingProperty();
-    for (unsigned i : indices(var->getAttachedPropertyWrappers())) {
+
+    // If the outermost property wrapper uses the enclosing self pattern,
+    // record that.
+    unsigned lastWrapperIdx = var->getAttachedPropertyWrappers().size();
+    unsigned firstWrapperIdx = 0;
+    enclosingSelfAccess = getEnclosingSelfPropertyWrapperAccess(var);
+    if (enclosingSelfAccess)
+      firstWrapperIdx = 1;
+
+    // Perform accesses to the wrappedValues along the composition chain.
+    for (unsigned i : range(firstWrapperIdx, lastWrapperIdx)) {
       underlyingVars.push_back(
           var->getAttachedPropertyWrapperTypeInfo(i).valueVar);
     }
@@ -654,7 +735,27 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
   Expr *selfDRE =
     buildSelfReference(selfDecl, selfAccessKind, ctx);
 
-  if (auto subscript = dyn_cast<SubscriptDecl>(storage)) {
+  if (enclosingSelfAccess) {
+    SubscriptDecl *subscriptDecl = enclosingSelfAccess->subscript;
+
+    Type storageType = storage->getType()->getRValueType();
+    TypeExpr *wrapperMetatype = TypeExpr::createImplicit(storageType, ctx);
+    Expr *storageKeyPath = new (ctx) KeyPathDotExpr(SourceLoc());
+    storageKeyPath = new (ctx) UnresolvedDotExpr(
+        storageKeyPath, SourceLoc(), storage->getFullName(), DeclNameLoc(),
+        /*Implicit=*/true);
+    storageKeyPath = new (ctx) KeyPathExpr(
+        SourceLoc(), nullptr, storageKeyPath);
+    Expr *args[2] = {
+      selfDRE,
+      storageKeyPath
+    };
+
+    return finish(SubscriptExpr::create(
+        ctx, wrapperMetatype, SourceLoc(), args,
+        subscriptDecl->getFullName().getArgumentNames(), { }, SourceLoc(),
+        nullptr, subscriptDecl, /*Implicit=*/true));
+  } else if (auto subscript = dyn_cast<SubscriptDecl>(storage)) {
     Expr *indices = buildSubscriptIndexReference(ctx, accessor);
     return finish(SubscriptExpr::create(ctx, selfDRE, indices, storage,
                                         IsImplicit, semantics));
