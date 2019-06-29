@@ -6,10 +6,10 @@ add_swift_target_library(swiftMapKit ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS
 
   SWIFT_COMPILE_FLAGS "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}"
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
-  SWIFT_MODULE_DEPENDS_OSX Darwin AppKit CoreData CoreGraphics CoreImage CoreLocation Dispatch Foundation IOKit ObjectiveC QuartzCore XPC # auto-updated
-  SWIFT_MODULE_DEPENDS_IOS Darwin CoreGraphics CoreImage CoreLocation Dispatch Foundation ObjectiveC os QuartzCore UIKit # auto-updated
-  SWIFT_MODULE_DEPENDS_TVOS Darwin CoreGraphics CoreImage CoreLocation Dispatch Foundation ObjectiveC QuartzCore UIKit # auto-updated
-  SWIFT_MODULE_DEPENDS_WATCHOS Darwin CoreGraphics CoreLocation Dispatch Foundation ObjectiveC # auto-updated
+  SWIFT_MODULE_DEPENDS_OSX Darwin CoreImage CoreGraphics Metal Dispatch IOKit Foundation CoreData CoreLocation QuartzCore AppKit XPC CoreFoundation ObjectiveC # auto-updated
+  SWIFT_MODULE_DEPENDS_IOS Darwin CoreImage CoreGraphics Metal UIKit Dispatch Foundation CoreLocation QuartzCore CoreFoundation ObjectiveC # auto-updated
+  SWIFT_MODULE_DEPENDS_TVOS Darwin CoreImage CoreGraphics Metal UIKit Dispatch Foundation CoreLocation QuartzCore CoreFoundation ObjectiveC # auto-updated
+  SWIFT_MODULE_DEPENDS_WATCHOS Darwin CoreGraphics UIKit Dispatch Foundation CoreLocation CoreFoundation ObjectiveC # auto-updated
     UIKit # required in some configurations but not found by tool
   FRAMEWORK_DEPENDS MapKit
 
