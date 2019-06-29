@@ -837,7 +837,8 @@ static void skipGenericRequirements(llvm::BitstreamCursor &Cursor) {
   BCOffsetRAII lastRecordOffset(Cursor);
 
   while (true) {
-    auto entry = Cursor.advance(AF_DontPopBlockAtEnd);
+    llvm::BitstreamEntry entry =
+        fatalIfUnexpected(Cursor.advance(AF_DontPopBlockAtEnd));
     if (entry.Kind != llvm::BitstreamEntry::Record)
       break;
 
@@ -5803,7 +5804,7 @@ void ModuleFile::loadRequirementSignature(const ProtocolDecl *decl,
                                           uint64_t contextData,
                                           SmallVectorImpl<Requirement> &reqs) {
   BCOffsetRAII restoreOffset(DeclTypeCursor);
-  DeclTypeCursor.JumpToBit(contextData);
+  fatalIfNotSuccess(DeclTypeCursor.JumpToBit(contextData));
   readGenericRequirements(reqs, DeclTypeCursor);
 }
 
