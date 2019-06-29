@@ -164,7 +164,8 @@ enum class DescriptiveDeclKind : uint8_t {
   Module,
   MissingMember,
   Requirement,
-  OpaqueType,
+  OpaqueResultType,
+  OpaqueVarType
 };
 
 /// Keeps track of stage of circularity checking for the given protocol.
