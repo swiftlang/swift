@@ -845,7 +845,12 @@ static CodeCompletionResult::ExpectedTypeRelation calculateTypeRelation(
   if (!Ty->hasTypeParameter() && !ExpectedTy->hasTypeParameter()) {
     if (Ty->isEqual(ExpectedTy))
       return CodeCompletionResult::ExpectedTypeRelation::Identical;
-    if (!ExpectedTy->isAny() && isConvertibleTo(Ty, ExpectedTy, *DC))
+    bool isAny = false;
+    isAny |= ExpectedTy->isAny();
+    isAny |= ExpectedTy->is<ArchetypeType>() &&
+             !ExpectedTy->castTo<ArchetypeType>()->hasRequirements();
+
+    if (!isAny && isConvertibleTo(Ty, ExpectedTy, /*openArchetypes=*/true, *DC))
       return CodeCompletionResult::ExpectedTypeRelation::Convertible;
   }
   if (auto FT = Ty->getAs<AnyFunctionType>()) {
