@@ -2207,18 +2207,49 @@ public:
     return typeVar->getImpl().getRepresentative(getSavedBindings());
   }
 
-  /// Gets the a VarDecl, and the type of its attached property wrapper if the
-  /// resolved overload has an attached property wrapper.
-  ///
-  /// \return A pair of the VarDecl and the attached property wrapper type if
-  ///         the given resolved overload has an attached property wrapper.
+  /// Gets the VarDecl associateed with resolvedOverload, and the type of the
+  /// storage wrapper if the decl has an associated storage wrapper.
+  Optional<std::pair<VarDecl *, Type>>
+  getStorageWrapperInformation(ResolvedOverloadSetListItem *resolvedOverload) {
+    assert(resolvedOverload);
+    if (resolvedOverload->Choice.isDecl()) {
+      if (auto *decl = dyn_cast<VarDecl>(resolvedOverload->Choice.getDecl())) {
+        if (decl->hasAttachedPropertyWrapper()) {
+          if (auto storageWrapper = decl->getPropertyWrapperStorageWrapper()) {
+            return std::make_pair(decl, storageWrapper->getType());
+          }
+        }
+      }
+    }
+    return None;
+  }
+
+  /// Gets the VarDecl associateed with resolvedOverload, and the type of the
+  /// backing storage if the decl has an associated property wrapper.
   Optional<std::pair<VarDecl *, Type>>
   getPropertyWrapperInformation(ResolvedOverloadSetListItem *resolvedOverload) {
-    if (resolvedOverload && resolvedOverload->Choice.isDecl()) {
+    assert(resolvedOverload);
+    if (resolvedOverload->Choice.isDecl()) {
       if (auto *decl = dyn_cast<VarDecl>(resolvedOverload->Choice.getDecl())) {
         if (decl->hasAttachedPropertyWrapper()) {
           auto wrapperTy = decl->getPropertyWrapperBackingPropertyType();
           return std::make_pair(decl, wrapperTy);
+        }
+      }
+    }
+    return None;
+  }
+
+  /// Gets the VarDecl, and the type of the type property that it wraps if
+  /// resolved overload has a decl which is the backing storage for a
+  /// property wrapper.
+  Optional<std::pair<VarDecl *, Type>>
+  getWrappedPropertyInformation(ResolvedOverloadSetListItem *resolvedOverload) {
+    assert(resolvedOverload);
+    if (resolvedOverload->Choice.isDecl()) {
+      if (auto *decl = dyn_cast<VarDecl>(resolvedOverload->Choice.getDecl())) {
+        if (auto wrapped = decl->getOriginalWrappedProperty()) {
+          return std::make_pair(decl, wrapped->getType());
         }
       }
     }

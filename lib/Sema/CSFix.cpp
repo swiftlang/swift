@@ -260,19 +260,36 @@ InsertExplicitCall *InsertExplicitCall::create(ConstraintSystem &cs,
   return new (cs.getAllocator()) InsertExplicitCall(cs, locator);
 }
 
-bool InsertPropertyWrapperUnwrap::diagnose(Expr *root, bool asNote) const {
+bool UsePropertyWrapper::diagnose(Expr *root, bool asNote) const {
+  auto &cs = getConstraintSystem();
+  auto failure = ExtraneousPropertyWrapperUnwrapFailure(
+      root, cs, Wrapped, UsingStorageWrapper, Base, Wrapper, getLocator());
+  return failure.diagnose(asNote);
+}
+
+UsePropertyWrapper *UsePropertyWrapper::create(ConstraintSystem &cs,
+                                               VarDecl *wrapped,
+                                               bool usingStorageWrapper,
+                                               Type base, Type wrapper,
+                                               ConstraintLocator *locator) {
+  return new (cs.getAllocator()) UsePropertyWrapper(
+      cs, wrapped, usingStorageWrapper, base, wrapper, locator);
+}
+
+bool UseWrappedValue::diagnose(Expr *root, bool asNote) const {
+  auto &cs = getConstraintSystem();
   auto failure = MissingPropertyWrapperUnwrapFailure(
-      root, getConstraintSystem(), getPropertyName(), getBase(), getWrapper(),
+      root, cs, PropertyWrapper, usingStorageWrapper(), Base, Wrapper,
       getLocator());
   return failure.diagnose(asNote);
 }
 
-InsertPropertyWrapperUnwrap *
-InsertPropertyWrapperUnwrap::create(ConstraintSystem &cs, DeclName propertyName,
-                                    Type base, Type wrapper,
-                                    ConstraintLocator *locator) {
+UseWrappedValue *UseWrappedValue::create(ConstraintSystem &cs,
+                                         VarDecl *propertyWrapper, Type base,
+                                         Type wrapper,
+                                         ConstraintLocator *locator) {
   return new (cs.getAllocator())
-      InsertPropertyWrapperUnwrap(cs, propertyName, base, wrapper, locator);
+      UseWrappedValue(cs, propertyWrapper, base, wrapper, locator);
 }
 
 bool UseSubscriptOperator::diagnose(Expr *root, bool asNote) const {
