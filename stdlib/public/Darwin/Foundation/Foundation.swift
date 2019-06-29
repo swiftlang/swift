@@ -107,9 +107,10 @@ public let NSNotFound: Int = .max
 /// `comment`.
 ///
 /// Xcode does not evaluate interpolated strings and string variables when
-/// generating strings files from code. Using those language features will
-/// result in exported localizations that resemble the code expression instead
-/// of its value. Translators would then translate that exported value—leaving
+/// generating strings files from code. Attempting to localize a string using
+/// those language features will cause Xcode to export something that resembles
+/// the original code expression instead of its expected value at runtime.
+/// Translators would then translate that exported value—leaving
 /// international users with a localized string containing code.
 ///
 ///     // Translators will see "1 + 1 = (1 + 1)".
