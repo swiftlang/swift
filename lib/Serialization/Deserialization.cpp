@@ -845,8 +845,10 @@ static llvm::Error skipGenericRequirements(llvm::BitstreamCursor &Cursor) {
     if (entry.Kind != llvm::BitstreamEntry::Record)
       break;
 
-    unsigned recordID = Cursor.skipRecord(entry.ID);
-    switch (recordID) {
+    Expected<unsigned> maybeRecordID = Cursor.skipRecord(entry.ID);
+    if (!maybeRecordID)
+      return maybeRecordID.takeError();
+    switch (maybeRecordID.get()) {
     case GENERIC_REQUIREMENT:
     case LAYOUT_REQUIREMENT:
       break;
