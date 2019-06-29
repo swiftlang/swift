@@ -177,3 +177,9 @@ enum E {
     return .e
   }
 }
+
+class SelfStoredPropertyInit {
+  static func myValue() -> Int { return 123 }
+
+  var value = Self.myValue() // expected-error {{covariant 'Self' type cannot be referenced from a stored property initializer}}
+}
