@@ -408,6 +408,6 @@ protocol OpaqueProtocolRequirement {
 
 func testCoercionDiagnostics() {
   var opaque = foo()
-  opaque = bar() // expected-error {{cannot assign value of type 'some P' to type 'some P'}} {{none}}
+  opaque = bar() // expected-error {{cannot assign value of type 'some opaque.P' to type 'some opaque.P'}} {{none}}
   opaque = () // expected-error {{cannot assign value of type '()' to type 'some P'}} {{none}}
 }

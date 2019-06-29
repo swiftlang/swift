@@ -1319,7 +1319,9 @@ Type SugarType::getSinglyDesugaredTypeSlow() {
     implDecl = Context->getDictionaryDecl();
     break;
   }
-  assert(implDecl && "Type has not been set yet");
+  if (!implDecl) {
+    return ErrorType::get(*Context);
+  }
 
   Bits.SugarType.HasCachedType = true;
   if (auto Ty = dyn_cast<UnarySyntaxSugarType>(this)) {
