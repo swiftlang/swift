@@ -784,6 +784,26 @@ public:
       popScope(BS);
     }
 
+    bool shouldVerify(ForEachStmt *S) {
+      if (!shouldVerify(cast<Stmt>(S)))
+        return false;
+
+      if (!S->getElementExpr())
+        return true;
+
+      assert(!OpaqueValues.count(S->getElementExpr()));
+      OpaqueValues[S->getElementExpr()] = 0;
+      return true;
+    }
+
+    void cleanup(ForEachStmt *S) {
+      if (!S->getElementExpr())
+        return;
+
+      assert(OpaqueValues.count(S->getElementExpr()));
+      OpaqueValues.erase(S->getElementExpr());
+    }
+
     bool shouldVerify(OpenExistentialExpr *expr) {
       if (!shouldVerify(cast<Expr>(expr)))
         return false;

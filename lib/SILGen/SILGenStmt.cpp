@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "ArgumentScope.h"
 #include "ArgumentSource.h"
 #include "Condition.h"
 #include "Initialization.h"
@@ -898,7 +899,20 @@ void StmtEmitter::visitRepeatWhileStmt(RepeatWhileStmt *S) {
 void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
   // Emit the 'iterator' variable that we'll be using for iteration.
   LexicalScope OuterForScope(SGF, CleanupLocation(S));
-  SGF.visitPatternBindingDecl(S->getIterator());
+  {
+    auto initialization =
+        SGF.emitInitializationForVarDecl(S->getIteratorVar(), false);
+    SILLocation loc = SILLocation(S->getSequence());
+    RValue result = SGF.emitApplyMethod(
+        loc, S->getMakeIterator(), ArgumentSource(S->getSequence()),
+        PreparedArguments(ArrayRef<AnyFunctionType::Param>({})),
+        SGFContext(initialization.get()));
+    if (!result.isInContext()) {
+      ArgumentSource(SILLocation(S->getSequence()),
+                     std::move(result).ensurePlusOne(SGF, loc))
+          .forwardInto(SGF, initialization.get());
+    }
+  }
 
   // If we ever reach an unreachable point, stop emitting statements.
   // This will need revision if we ever add goto.
@@ -908,7 +922,15 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
   // to hold the results.  This will be initialized on every entry into the loop
   // header and consumed by the loop body. On loop exit, the terminating value
   // will be in the buffer.
-  auto optTy = S->getIteratorNext()->getType()->getCanonicalType();
+  CanType optTy;
+  if (S->getConvertElementExpr()) {
+    optTy = S->getConvertElementExpr()->getType()->getCanonicalType();
+  } else {
+    optTy = OptionalType::get(S->getSequenceConformance()->getTypeWitnessByName(
+                                  S->getSequence()->getType(),
+                                  SGF.getASTContext().Id_Element))
+                ->getCanonicalType();
+  }
   auto &optTL = SGF.getTypeLowering(optTy);
   SILValue addrOnlyBuf;
   ManagedValue nextBufOrValue;
@@ -924,6 +946,25 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
   JumpDest endDest = createJumpDest(S->getBody());
   SGF.BreakContinueDestStack.push_back({ S, endDest, loopDest });
 
+  auto buildArgumentSource = [&]() {
+    if (cast<FuncDecl>(S->getIteratorNext().getDecl())->getSelfAccessKind() ==
+        SelfAccessKind::Mutating) {
+      LValue lv =
+          SGF.emitLValue(S->getIteratorVarRef(), SGFAccessKind::ReadWrite);
+      return ArgumentSource(S, std::move(lv));
+    }
+    LValue lv =
+        SGF.emitLValue(S->getIteratorVarRef(), SGFAccessKind::OwnedObjectRead);
+    return ArgumentSource(
+        S, SGF.emitLoadOfLValue(S->getIteratorVarRef(), std::move(lv),
+                                SGFContext().withFollowingSideEffects()));
+  };
+
+  auto buildElementRValue = [&](SILLocation loc, SGFContext ctx) {
+    return SGF.emitApplyMethod(
+        loc, S->getIteratorNext(), buildArgumentSource(),
+        PreparedArguments(ArrayRef<AnyFunctionType::Param>({})), ctx);
+  };
   // Then emit the loop destination block.
   //
   // Advance the generator.  Use a scope to ensure that any temporary stack
@@ -933,15 +974,32 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
     // innerForScope doesn't clean it up.
     auto nextInit = SGF.useBufferAsTemporary(addrOnlyBuf, optTL);
     {
-      Scope innerForScope(SGF.Cleanups, CleanupLocation(S->getIteratorNext()));
-      SGF.emitExprInto(S->getIteratorNext(), nextInit.get());
+      ArgumentScope innerForScope(SGF, SILLocation(S));
+      SILLocation loc = SILLocation(S);
+      RValue result;
+      if (S->getElementExpr()) {
+        result = buildElementRValue(loc, SGFContext());
+        SILGenFunction::OpaqueValueRAII pushOpaqueValue(
+            SGF, S->getElementExpr(),
+            std::move(result).getAsSingleValue(SGF, loc));
+        result = SGF.emitRValue(S->getConvertElementExpr(),
+                                SGFContext(nextInit.get()));
+      } else {
+        result = buildElementRValue(loc, SGFContext(nextInit.get()));
+      }
+      if (!result.isInContext()) {
+        ArgumentSource(SILLocation(S->getSequence()),
+                       std::move(result).ensurePlusOne(SGF, loc))
+            .forwardInto(SGF, nextInit.get());
+      }
+      innerForScope.pop();
     }
     nextBufOrValue = nextInit->getManagedAddress();
-
   } else {
-    Scope innerForScope(SGF.Cleanups, CleanupLocation(S->getIteratorNext()));
+    ArgumentScope innerForScope(SGF, SILLocation(S));
     nextBufOrValue = innerForScope.popPreservingValue(
-        SGF.emitRValueAsSingleValue(S->getIteratorNext()));
+        buildElementRValue(SILLocation(S), SGFContext())
+            .getAsSingleValue(SGF, SILLocation(S)));
   }
 
   SILBasicBlock *failExitingBlock = createBasicBlock();
