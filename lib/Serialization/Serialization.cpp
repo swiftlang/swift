@@ -3324,11 +3324,27 @@ void Serializer::writeDecl(const Decl *D) {
 
     auto contextID = addDeclContextRef(proto->getDeclContext());
 
-    SmallVector<DeclID, 8> inherited;
+    SmallVector<TypeID, 4> inheritedAndDependencyTypes;
+    llvm::SmallSetVector<Type, 4> dependencyTypes;
+
     for (auto element : proto->getInherited()) {
       assert(!element.getType()->hasArchetype());
-      inherited.push_back(addTypeRef(element.getType()));
+      inheritedAndDependencyTypes.push_back(addTypeRef(element.getType()));
+      if (element.getType()->is<ProtocolType>())
+        dependencyTypes.insert(element.getType());
     }
+
+    for (Requirement req : proto->getRequirementSignature()) {
+      // Requirements can be cyclic, so for now filter out any requirements
+      // from elsewhere in the module. This isn't perfect---something else in
+      // the module could very well fail to compile for its own reasons---but
+      // it's better than nothing.
+      collectDependenciesFromRequirement(dependencyTypes, req,
+                                         /*excluding*/M);
+    }
+
+    for (Type ty : dependencyTypes)
+      inheritedAndDependencyTypes.push_back(addTypeRef(ty));
 
     uint8_t rawAccessLevel = getRawStableAccessLevel(proto->getFormalAccess());
 
@@ -3342,8 +3358,8 @@ void Serializer::writeDecl(const Decl *D) {
                                proto->isObjC(),
                                proto->existentialTypeSupported(
                                  /*resolver=*/nullptr),
-                               rawAccessLevel,
-                               inherited);
+                               rawAccessLevel, proto->getInherited().size(),
+                               inheritedAndDependencyTypes);
 
     writeGenericParams(proto->getGenericParams());
     writeGenericRequirements(
