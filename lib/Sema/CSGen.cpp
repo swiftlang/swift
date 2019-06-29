@@ -3829,8 +3829,9 @@ bool swift::isEqual(Type T1, Type T2, DeclContext &DC) {
   return T1->isEqual(T2);
 }
 
-bool swift::isConvertibleTo(Type T1, Type T2, DeclContext &DC) {
-  return canSatisfy(T1, T2, false, ConstraintKind::Conversion, &DC);
+bool swift::isConvertibleTo(Type T1, Type T2, bool openArchetypes,
+                            DeclContext &DC) {
+  return canSatisfy(T1, T2, openArchetypes, ConstraintKind::Conversion, &DC);
 }
 
 void swift::eraseOpenedExistentials(ConstraintSystem &CS, Expr *&expr) {

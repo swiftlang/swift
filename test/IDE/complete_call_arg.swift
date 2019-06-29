@@ -464,9 +464,8 @@ struct TestBoundGeneric1 {
   func test2() {
     takeArray(#^BOUND_GENERIC_1_2^#)
   }
-// FIXME: These should be convertible to [T]. rdar://problem/24570603
-// BOUND_GENERIC_1: Decl[InstanceVar]/CurrNominal:      x[#[Int]#];
-// BOUND_GENERIC_1: Decl[InstanceVar]/CurrNominal:      y[#[Int]#];
+// BOUND_GENERIC_1: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]: x[#[Int]#];
+// BOUND_GENERIC_1: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]: y[#[Int]#];
 }
 
 func whereConvertible<T>(lhs: T, rhs: T) where T: Collection {
