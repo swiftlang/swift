@@ -51,7 +51,7 @@ public let NSNotFound: Int = .max
 ///   be found within the table, `value` is returned. However, `key` is returned
 ///   instead when `value` is the empty string.
 ///
-/// Export Localizations with Xcode
+/// Export Localizations With Xcode
 /// -------------------------------
 ///
 /// Xcode can read through a project's code to find invocations of
@@ -154,7 +154,7 @@ public let NSNotFound: Int = .max
 /// Since comments aren't localized, multiline string literals can be safely
 /// used with `comment`.
 ///
-/// Work with Manually Managed Strings
+/// Work With Manually Managed Strings
 /// ----------------------------------
 ///
 /// If having Xcode generate strings files from code isn't desired behavior,
