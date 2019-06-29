@@ -4798,31 +4798,61 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       return SolutionKind::Solved;
     }
 
-    auto solveWithNewBaseOrName = [&](Type baseType,
-                                      DeclName memberName) -> SolutionKind {
+    auto solveWithNewBaseOrName = [&](Type baseType, DeclName memberName,
+                                      bool allowFixes = true) -> SolutionKind {
       // Let's re-enable fixes for this member, because
       // the base or member name has been changed.
-      MissingMembers.remove(locator);
+      if (allowFixes)
+        MissingMembers.remove(locator);
       return simplifyMemberConstraint(kind, baseType, memberName, memberTy,
                                       useDC, functionRefKind, outerAlternatives,
                                       flags, locatorB);
     };
 
     // Check if any property wrappers on the base of the member lookup have
-    // mactching members that we can fall back to.
+    // matching members that we can fall back to, or if the type wraps any
+    // properties that have matching members.
     if (auto dotExpr =
             dyn_cast_or_null<UnresolvedDotExpr>(locator->getAnchor())) {
       auto baseExpr = dotExpr->getBase();
-      auto resolvedOverload = findSelectedOverloadFor(baseExpr);
-      if (auto wrappedProperty =
-              getPropertyWrapperInformation(resolvedOverload)) {
-        auto wrapperTy = wrappedProperty->second;
-        auto result = solveWithNewBaseOrName(wrapperTy, member);
-        if (result == SolutionKind::Solved) {
-          auto *fix = InsertPropertyWrapperUnwrap::create(
-              *this, wrappedProperty->first->getFullName(), baseTy, wrapperTy,
-              locator);
-          return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+
+      if (auto resolvedOverload = findSelectedOverloadFor(baseExpr)) {
+        if (auto storageWrapper =
+                getStorageWrapperInformation(resolvedOverload)) {
+          auto wrapperTy = storageWrapper->second;
+          auto result =
+              solveWithNewBaseOrName(wrapperTy, member, /*allowFixes=*/false);
+          if (result == SolutionKind::Solved) {
+            auto *fix = UsePropertyWrapper::create(*this, storageWrapper->first,
+                                                   /*usingStorageWrapper=*/true,
+                                                   baseTy, wrapperTy, locator);
+            return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+          }
+        }
+
+        if (auto wrapper = getPropertyWrapperInformation(resolvedOverload)) {
+          auto wrapperTy = wrapper->second;
+          auto result =
+              solveWithNewBaseOrName(wrapperTy, member, /*allowFixes=*/false);
+          if (result == SolutionKind::Solved) {
+            auto *fix = UsePropertyWrapper::create(
+                *this, wrapper->first,
+                /*usingStorageWrappeer=*/false, baseTy, wrapperTy, locator);
+            return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+          }
+        }
+
+        if (auto wrappedProperty =
+                getWrappedPropertyInformation(resolvedOverload)) {
+          auto wrappedTy = wrappedProperty->second;
+          auto result =
+              solveWithNewBaseOrName(wrappedTy, member, /*allowFixes=*/false);
+
+          if (result == SolutionKind::Solved) {
+            auto *fix = UseWrappedValue::create(*this, wrappedProperty->first,
+                                                baseTy, wrappedTy, locator);
+            return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+          }
         }
       }
     }
@@ -6797,7 +6827,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::TreatKeyPathSubscriptIndexAsHashable:
   case FixKind::AllowInvalidRefInKeyPath:
   case FixKind::ExplicitlySpecifyGenericArguments:
-  case FixKind::InsertPropertyWrapperUnwrap:
+  case FixKind::UsePropertyWrapper:
+  case FixKind::UseWrappedValue:
   case FixKind::GenericArgumentsMismatch:
     llvm_unreachable("handled elsewhere");
   }

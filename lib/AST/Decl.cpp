@@ -5552,6 +5552,10 @@ VarDecl *VarDecl::getPropertyWrapperBackingProperty() const {
   return getPropertyWrapperBackingPropertyInfo().backingVar;
 }
 
+VarDecl *VarDecl::getPropertyWrapperStorageWrapper() const {
+  return getPropertyWrapperBackingPropertyInfo().storageWrapperVar;
+}
+
 VarDecl *VarDecl::getLazyStorageProperty() const {
   auto &ctx = getASTContext();
   auto mutableThis = const_cast<VarDecl *>(this);
