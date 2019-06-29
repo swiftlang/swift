@@ -738,7 +738,7 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
   if (enclosingSelfAccess) {
     SubscriptDecl *subscriptDecl = enclosingSelfAccess->subscript;
 
-    Type storageType = storage->getType()->getRValueType();
+    Type storageType = cast<VarDecl>(storage)->getType()->getRValueType();
     TypeExpr *wrapperMetatype = TypeExpr::createImplicit(storageType, ctx);
     Expr *storageKeyPath = new (ctx) KeyPathDotExpr(SourceLoc());
     storageKeyPath = new (ctx) UnresolvedDotExpr(
