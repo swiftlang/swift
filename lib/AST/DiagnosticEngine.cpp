@@ -385,6 +385,22 @@ static bool shouldShowAKA(Type type, StringRef typeName) {
   return true;
 }
 
+/// If a type is part of an argument list which includes another, distinct type
+/// with the same string representation, it should be qualified during
+/// formatting.
+static bool shouldQualifyType(Type type, ArrayRef<DiagnosticArgument> Args) {
+  for (auto arg : Args) {
+    if (arg.getKind() == DiagnosticArgumentKind::Type) {
+      auto argType = arg.getAsType();
+      if (argType && !argType->isEqual(type) &&
+          argType->getWithoutParens().getString() == type.getString()) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 /// Format a single diagnostic argument and write it to the given
 /// stream.
 static void formatDiagnosticArgument(StringRef Modifier, 
@@ -451,7 +467,10 @@ static void formatDiagnosticArgument(StringRef Modifier,
     
     // Strip extraneous parentheses; they add no value.
     auto type = Arg.getAsType()->getWithoutParens();
-    std::string typeName = type->getString();
+
+    auto printOptions = PrintOptions();
+    printOptions.FullyQualifiedTypes = shouldQualifyType(type, Args);
+    std::string typeName = type->getString(printOptions);
 
     if (shouldShowAKA(type, typeName)) {
       llvm::SmallString<256> AkaText;
