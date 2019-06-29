@@ -831,14 +831,17 @@ void ModuleFile::readGenericRequirements(
 }
 
 /// Advances past any records that might be part of a requirement signature.
-static void skipGenericRequirements(llvm::BitstreamCursor &Cursor) {
+static llvm::Error skipGenericRequirements(llvm::BitstreamCursor &Cursor) {
   using namespace decls_block;
 
   BCOffsetRAII lastRecordOffset(Cursor);
 
   while (true) {
-    llvm::BitstreamEntry entry =
-        fatalIfUnexpected(Cursor.advance(AF_DontPopBlockAtEnd));
+    Expected<llvm::BitstreamEntry> maybeEntry =
+        Cursor.advance(AF_DontPopBlockAtEnd);
+    if (!maybeEntry)
+      return maybeEntry.takeError();
+    llvm::BitstreamEntry entry = maybeEntry.get();
     if (entry.Kind != llvm::BitstreamEntry::Record)
       break;
 
@@ -850,11 +853,12 @@ static void skipGenericRequirements(llvm::BitstreamCursor &Cursor) {
 
     default:
       // This record is not a generic requirement.
-      return;
+      return llvm::Error::success();
     }
 
     lastRecordOffset.reset();
   }
+  return llvm::Error::success();
 }
 
 void ModuleFile::configureGenericEnvironment(
@@ -3374,7 +3378,8 @@ public:
 
     proto->setLazyRequirementSignature(&MF,
                                        MF.DeclTypeCursor.GetCurrentBitNo());
-    skipGenericRequirements(MF.DeclTypeCursor);
+    if (llvm::Error Err = skipGenericRequirements(MF.DeclTypeCursor))
+      MF.fatal(std::move(Err));
 
     proto->setMemberLoader(&MF, MF.DeclTypeCursor.GetCurrentBitNo());
 
