@@ -3293,20 +3293,32 @@ public:
     DeclContextID contextID;
     bool isImplicit, isClassBounded, isObjC, existentialTypeSupported;
     uint8_t rawAccessLevel;
-    ArrayRef<uint64_t> rawInheritedIDs;
+    unsigned numInheritedTypes;
+    ArrayRef<uint64_t> rawInheritedAndDependencyIDs;
 
     decls_block::ProtocolLayout::readRecord(scratch, nameID, contextID,
                                             isImplicit, isClassBounded, isObjC,
                                             existentialTypeSupported,
-                                            rawAccessLevel, rawInheritedIDs);
+                                            rawAccessLevel, numInheritedTypes,
+                                            rawInheritedAndDependencyIDs);
+
+    Identifier name = MF.getIdentifier(nameID);
+
+    for (TypeID dependencyID :
+           rawInheritedAndDependencyIDs.slice(numInheritedTypes)) {
+      auto dependency = MF.getTypeChecked(dependencyID);
+      if (!dependency) {
+        return llvm::make_error<TypeError>(
+            name, takeErrorInfo(dependency.takeError()));
+      }
+    }
 
     auto DC = MF.getDeclContext(contextID);
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto proto = MF.createDecl<ProtocolDecl>(DC, SourceLoc(), SourceLoc(),
-                                             MF.getIdentifier(nameID), None,
-                                             /*TrailingWhere=*/nullptr);
+    auto proto = MF.createDecl<ProtocolDecl>(DC, SourceLoc(), SourceLoc(), name,
+                                             None, /*TrailingWhere=*/nullptr);
     declOrOffset = proto;
 
     proto->setRequiresClass(isClassBounded);
@@ -3323,7 +3335,8 @@ public:
     assert(genericParams && "protocol with no generic parameters?");
     proto->setGenericParams(genericParams);
 
-    handleInherited(proto, rawInheritedIDs);
+    handleInherited(proto,
+                    rawInheritedAndDependencyIDs.slice(0, numInheritedTypes));
 
     if (isImplicit)
       proto->setImplicit();
