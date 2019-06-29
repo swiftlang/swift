@@ -1537,8 +1537,33 @@ ManagedValue emitCFunctionPointer(SILGenFunction &SGF,
   }
 
   // Produce a reference to the C-compatible entry point for the function.
-  SILDeclRef constant(loc, /*uncurryLevel*/ 0, /*foreign*/ true);
+  SILDeclRef constant(loc, /*curried*/ false, /*foreign*/ true);
   SILConstantInfo constantInfo = SGF.getConstantInfo(constant);
+
+  // C function pointers cannot capture anything from their context.
+  auto captures = SGF.SGM.Types.getLoweredLocalCaptures(
+    *constant.getAnyFunctionRef());
+
+  if (captures.hasGenericParamCaptures() ||
+      captures.hasDynamicSelfCapture() ||
+      captures.hasLocalCaptures() ||
+      captures.hasOpaqueValueCapture()) {
+    unsigned kind;
+    if (captures.hasLocalCaptures())
+      kind = 0;
+    else if (captures.hasGenericParamCaptures())
+      kind = 1;
+    else if (captures.hasLocalCaptures())
+      kind = 2;
+    else
+      kind = 3;
+    SGF.SGM.diagnose(expr->getLoc(),
+                     diag::c_function_pointer_from_function_with_context,
+                     /*closure*/ constant.hasClosureExpr(),
+                     kind);
+
+    return SGF.emitUndef(constantInfo.getSILType());
+  }
 
   return convertCFunctionSignature(
                     SGF, conversionExpr,
