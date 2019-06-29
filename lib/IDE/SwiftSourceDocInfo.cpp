@@ -86,8 +86,10 @@ bool CursorInfoResolver::tryResolve(ValueDecl *D, TypeDecl *CtorTyRef,
     // Handle references to the implicitly generated vars in case statements
     // matching multiple patterns
     if (VD->isImplicit()) {
-      if (auto * Parent = VD->getParentVarDecl())
+      if (auto * Parent = VD->getParentVarDecl()) {
         D = Parent;
+        VD = Parent;
+      }
     }
   }
   CursorInfo.setValueRef(D, CtorTyRef, ExtTyRef, IsRef, Ty, ContainerType);
@@ -135,7 +137,7 @@ ResolvedCursorInfo CursorInfoResolver::resolve(SourceLoc Loc) {
 }
 
 bool CursorInfoResolver::walkToDeclPre(Decl *D, CharSourceRange Range) {
-  if (!rangeContainsLoc(D->getSourceRange()))
+  if (!rangeContainsLoc(D->getSourceRangeIncludingAttrs()))
     return false;
 
   if (isa<ExtensionDecl>(D))
@@ -354,6 +356,42 @@ static std::vector<CharSourceRange> getEnumParamListInfo(SourceManager &SM,
   return LabelRanges;
 }
 
+bool NameMatcher::handleCustomAttrs(Decl *D) {
+  // CustomAttrs of non-param VarDecls are handled when this method is called
+  // on their containing PatternBindingDecls (see below).
+  if (isa<VarDecl>(D) && !isa<ParamDecl>(D))
+    return true;
+
+  if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
+    if (auto *SingleVar = PBD->getSingleVar()) {
+      D = SingleVar;
+    } else {
+        return true;
+    }
+  }
+
+  for (auto *customAttr : D->getAttrs().getAttributes<CustomAttr, true>()) {
+    if (shouldSkip(customAttr->getRangeWithAt()))
+      continue;
+    auto *Arg = customAttr->getArg();
+    if (auto *Repr = customAttr->getTypeLoc().getTypeRepr()) {
+      // Note the associated call arguments of the semantic initializer call
+      // in case we're resolving an explicit initializer call within the
+      // CustomAttr's type, e.g. on `Wrapper` in `@Wrapper(initialValue: 10)`.
+      SWIFT_DEFER { CustomAttrArg = None; };
+      if (Arg && !Arg->isImplicit())
+        CustomAttrArg = {Repr->getLoc(), Arg};
+      if (!Repr->walk(*this))
+        return false;
+    }
+    if (Arg && !Arg->isImplicit()) {
+      if (!Arg->walk(*this))
+        return false;
+    }
+  }
+  return !isDone();
+}
+
 bool NameMatcher::walkToDeclPre(Decl *D) {
   // Handle occurrences in any preceding doc comments
   RawComment R = D->getRawComment();
@@ -369,9 +407,12 @@ bool NameMatcher::walkToDeclPre(Decl *D) {
   if (D->isImplicit())
     return !isDone();
 
-  if (shouldSkip(D->getSourceRange()))
+  if (shouldSkip(D->getSourceRangeIncludingAttrs()))
     return false;
   
+  if (!handleCustomAttrs(D))
+    return false;
+
   if (auto *ICD = dyn_cast<IfConfigDecl>(D)) {
     for (auto Clause : ICD->getClauses()) {
       if (!Clause.isActive)
@@ -575,8 +616,16 @@ bool NameMatcher::walkToTypeReprPre(TypeRepr *T) {
   if (isDone() || shouldSkip(T->getSourceRange()))
     return false;
 
-  if (isa<ComponentIdentTypeRepr>(T))
-    tryResolve(ASTWalker::ParentTy(T), T->getLoc());
+  if (isa<ComponentIdentTypeRepr>(T)) {
+    // If we're walking a CustomAttr's type we may have an associated call
+    // argument to resolve with from its semantic initializer.
+    if (CustomAttrArg.hasValue() && CustomAttrArg->first == T->getLoc()) {
+      tryResolve(ASTWalker::ParentTy(T), T->getLoc(), LabelRangeType::CallArg,
+                 getCallArgLabelRanges(getSourceMgr(), CustomAttrArg->second, LabelRangeEndAt::BeforeElemStart));
+    } else {
+      tryResolve(ASTWalker::ParentTy(T), T->getLoc());
+    }
+  }
   return !isDone();
 }
 
@@ -726,13 +775,32 @@ bool NameMatcher::tryResolve(ASTWalker::ParentTy Node, SourceLoc NameLoc,
   CharSourceRange Range = Lexer::getCharSourceRangeFromSourceRange(getSourceMgr(),
                                                                    NameLoc);
   UnresolvedLoc &Next = LocsToResolve.back();
-  if (Range.isValid() && NameLoc == Next.Loc) {
-    LocsToResolve.pop_back();
-    ResolvedLocs.push_back({Node, Range, LabelRanges, RangeType,
-      isActive(), isInSelector()});
-    return true;
+  bool WasResolved = false;
+  if (Range.isValid()) {
+    if (NameLoc == Next.Loc) {
+      LocsToResolve.pop_back();
+      ResolvedLocs.push_back({Node, Range, LabelRanges, RangeType,
+        isActive(), isInSelector()});
+      if (isDone())
+        return true;
+      WasResolved = true;
+    }
+
+    if (Range.getByteLength() > 1 &&
+        (Range.str().front() == '_' || Range.str().front() == '$')) {
+      // Also try after any leading _ or $ for name references of wrapped
+      // properties, e.g. 'foo' in '_foo' and '$foo' occurrences.
+      auto NewRange = CharSourceRange(Range.getStart().getAdvancedLoc(1),
+                                      Range.getByteLength() - 1);
+      if (NewRange.getStart() == Next.Loc) {
+        LocsToResolve.pop_back();
+        ResolvedLocs.push_back({Node, NewRange, {}, LabelRangeType::None,
+          isActive(), isInSelector()});
+        WasResolved = true;
+      }
+    }
   }
-  return false;
+  return WasResolved;
 };
 
 void ResolvedRangeInfo::print(llvm::raw_ostream &OS) {

@@ -442,6 +442,6 @@ class PropertyDelgate {
 
 // CHECK: <kw>func</kw> acceptBuilder<T>(
 func acceptBuilder<T>(
-  // CHECK: @SomeBuilder<Element> label param: () -> <type>T</type>
+  // CHECK: @<type>SomeBuilder</type><<type>Element</type>> label param: () -> <type>T</type>
   @SomeBuilder<Element> label param: () -> T
 ) {}

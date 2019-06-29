@@ -1026,22 +1026,28 @@ bool ModelASTWalker::handleSpecialDeclAttribute(const DeclAttribute *D,
                                                 ArrayRef<Token> Toks) {
   if (!D)
     return false;
-  if (isa<AvailableAttr>(D) || isa<CustomAttr>(D)) {
-    unsigned I = 0;
-    for (; I < TokenNodes.size(); ++ I) {
-      auto Node = TokenNodes[I];
-      if (SM.isBeforeInBuffer(D->getRange().End, Node.Range.getStart()))
-        break;
-      if (Node.Range.contains(D->AtLoc)) {
-        if (!passNode({SyntaxNodeKind::AttributeBuiltin, Node.Range}))
-          break;
-        continue;
+  if (isa<CustomAttr>(D) || isa<AvailableAttr>(D)) {
+    if (!passTokenNodesUntil(D->getRangeWithAt().Start,
+                        PassNodesBehavior::ExcludeNodeAtLocation))
+      return false;
+    if (auto *CA = dyn_cast<CustomAttr>(D)) {
+      if (auto *Repr = CA->getTypeLoc().getTypeRepr()) {
+        if (!Repr->walk(*this))
+          return false;
       }
-
-      if (!passNode(Node))
-        break;
+      if (auto *Arg = CA->getArg()) {
+        if (!Arg->walk(*this))
+          return false;
+      }
+    } else {
+      auto Next = TokenNodes.front();
+      TokenNodes = TokenNodes.drop_front();
+      assert(Next.Range.getStart() == D->getRangeWithAt().Start);
+      if (!passNode({SyntaxNodeKind::AttributeBuiltin, Next.Range}))
+        return false;
     }
-    TokenNodes = TokenNodes.slice(I);
+    if (!passTokenNodesUntil(D->getRange().End, PassNodesBehavior::IncludeNodeAtLocation))
+      return false;
     return true;
   }
   if (isa<RethrowsAttr>(D))
@@ -1078,6 +1084,13 @@ bool ModelASTWalker::handleAttrRanges(ArrayRef<DeclAttributeAndRange> DeclRanges
             [&](DeclAttributeAndRange LHS, DeclAttributeAndRange RHS) {
     return SM.isBeforeInBuffer(LHS.second.Start, RHS.second.End);
   });
+  // Handle duplicate synthesized attributes due to * in @available
+  auto NewEnd = std::unique(SortedRanges.begin(), SortedRanges.end(),
+                            [&](DeclAttributeAndRange LHS, DeclAttributeAndRange RHS) {
+                              return LHS.second == RHS.second;
+                            });
+  if (NewEnd != SortedRanges.end())
+    SortedRanges.erase(NewEnd, SortedRanges.end());
   DeclRanges = SortedRanges;
 
   SourceLoc BeginLoc = DeclRanges.front().second.Start;
