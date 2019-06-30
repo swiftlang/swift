@@ -520,7 +520,16 @@ ParserResult<TypeRepr> Parser::parseDeclResultType(Diag<> MessageID) {
     consumeToken(tok::code_complete);
     return makeParserCodeCompletionStatus();
   }
-  return parseType(MessageID);
+
+  auto result = parseType(MessageID);
+
+  if (result.isNonNull() && Tok.is(tok::r_square)) {
+    auto diag = diagnose(Tok, diag::extra_rbracket);
+    diag.fixItInsert(result.get()->getStartLoc(), getTokenText(tok::l_square));
+    consumeToken();
+    return makeParserErrorResult(new (Context) ErrorTypeRepr(Tok.getLoc()));
+  }
+  return result;
 }
 
 ParserStatus Parser::parseGenericArguments(SmallVectorImpl<TypeRepr *> &Args,
