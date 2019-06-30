@@ -3351,12 +3351,9 @@ namespace {
 
     bool isSyntheticArgumentExpr(const Expr *expr) {
       if (isa<DefaultArgumentExpr>(expr) ||
-          isa<CallerDefaultArgumentExpr>(expr))
+          isa<CallerDefaultArgumentExpr>(expr) ||
+          isa<VarargExpansionExpr>(expr))
         return true;
-
-      if (auto *varargExpr = dyn_cast<VarargExpansionExpr>(expr))
-        if (isa<ArrayExpr>(varargExpr->getSubExpr()))
-          return true;
 
       return false;
     }
@@ -3929,7 +3926,8 @@ swift::getOriginalArgumentList(Expr *expr) {
     }
 
     if (auto *varargExpr = dyn_cast<VarargExpansionExpr>(arg)) {
-      if (auto *arrayExpr = dyn_cast<ArrayExpr>(varargExpr->getSubExpr())) {
+      auto *arrayExpr = dyn_cast<ArrayExpr>(varargExpr->getSubExpr());
+      if (varargExpr->isImplicit() && arrayExpr) {
         for (auto *elt : arrayExpr->getElements()) {
           result.args.push_back(elt);
           result.labels.push_back(label);
