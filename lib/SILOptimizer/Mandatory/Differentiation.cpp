@@ -465,7 +465,7 @@ private:
       break;
     default:
       // When the original function has external linkage, we create an internal
-      // struct for use by our own module. This is neccessary for cross-cell
+      // struct for use by our own module. This is necessary for cross-cell
       // differentiation in Jupyter.
       // TODO: Add a test in the compiler that exercises a similar situation as
       // cross-cell differentiation in Jupyter.
@@ -729,7 +729,7 @@ void DifferentiationInvoker::print(llvm::raw_ostream &os) const {
 }
 
 // Check whether the given requirements are satisfied, with the given
-// subsitution map and in the given module.
+// substitution map and in the given module.
 static bool checkRequirementsSatisfied(
     ArrayRef<Requirement> requirements, SubstitutionMap substMap,
     SILFunction *original, ModuleDecl *swiftModule) {
@@ -2002,7 +2002,7 @@ emitAssociatedFunctionReference(
     auto *minimalAttr =
         context.lookUpMinimalDifferentiableAttr(originalFn, desiredIndices);
     if (!minimalAttr) {
-      // If the function is intentionally marked as being opauqe to
+      // If the function is intentionally marked as being opaque to
       // differentiation, then we should not create a task for it.
       if (originalFn->hasSemanticsAttr("autodiff.opaque")) {
         context.emitNondifferentiabilityError(original, invoker,

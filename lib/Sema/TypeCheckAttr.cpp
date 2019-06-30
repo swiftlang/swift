@@ -2980,7 +2980,17 @@ static bool checkDifferentiationParameters(
   SmallVector<Type, 4> wrtParamTypes;
   indices->getSubsetParameterTypes(functionType, wrtParamTypes);
   for (unsigned i : range(wrtParamTypes.size())) {
+    SourceLoc loc = parsedWrtParams.empty()
+        ? attrLoc
+        : parsedWrtParams[i].getLoc();
     auto wrtParamType = wrtParamTypes[i];
+    if (wrtParamType->is<InOutType>()) {
+      TC.diagnose(
+          loc,
+          diag::diff_params_clause_inout_argument,
+          wrtParamType);
+      return true;
+    }
     if (!wrtParamType->hasTypeParameter())
       wrtParamType = wrtParamType->mapTypeOutOfContext();
     if (derivativeGenEnv)
@@ -2988,9 +2998,6 @@ static bool checkDifferentiationParameters(
           derivativeGenEnv->mapTypeIntoContext(wrtParamType);
     else
       wrtParamType = AFD->mapTypeIntoContext(wrtParamType);
-    SourceLoc loc = parsedWrtParams.empty()
-        ? attrLoc
-        : parsedWrtParams[i].getLoc();
     // Parameter cannot have a class or existential type.
     if ((!wrtParamType->hasTypeParameter() &&
          wrtParamType->isAnyClassReferenceType()) ||
@@ -3085,7 +3092,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   }
 
   // Start type-checking the arguments of the @differentiable attribute. This
-  // covers 'wrt:', 'jvp:', and 'vjp:', all of which are optional.
+  // covers 'wrt:', 'jvp:', 'vjp:', and 'where', all of which are optional.
 
   // Handle 'where' clause, if it exists.
   // - Resolve attribute where clause requirements and store in the attribute

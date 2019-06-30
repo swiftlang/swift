@@ -274,7 +274,7 @@ class alignas(1 << TypeAlignInBits) TypeBase {
   TypeBase(const TypeBase&) = delete;
   void operator=(const TypeBase&) = delete;
   
-  /// This union contains to the ASTContext for canonical types, and is
+  /// This union contains the ASTContext for canonical types, and is
   /// otherwise lazily populated by ASTContext when the canonical form of a
   /// non-canonical type is requested. The disposition of the union is stored
   /// outside of the union for performance. See Bits.TypeBase.IsCanonical.
