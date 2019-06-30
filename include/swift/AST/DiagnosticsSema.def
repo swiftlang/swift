@@ -4452,6 +4452,9 @@ ERROR(property_wrapper_type_requirement_not_accessible,none,
       "more restrictive access than its enclosing property wrapper type %3 "
       "(which is %select{private|fileprivate|internal|public|open}4)",
       (AccessLevel, DescriptiveDeclKind, DeclName, Type, AccessLevel))
+ERROR(property_wrapper_ambiguous_enclosing_self_subscript, none,
+      "property wrapper type %0 has multiple enclosing-self subscripts %1",
+      (Type, DeclName))
 
 ERROR(property_wrapper_attribute_not_on_property, none,
       "property wrapper attribute %0 can only be applied to a property",
