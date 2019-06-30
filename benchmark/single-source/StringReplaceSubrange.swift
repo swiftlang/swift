@@ -47,6 +47,24 @@ public let StringReplaceSubrange = [
     tags: tags,
     setUpFunction: setupLargeManagedSubstring
   ),
+  BenchmarkInfo(
+    name: "Str.replaceSubrange.SmallLiteralArrChar",
+    runFunction: { replaceSubrange($0, "coffee", with: Array<Character>(["t"])) },
+    tags: tags,
+    setUpFunction: setupLargeManagedSubstring
+  ),
+  BenchmarkInfo(
+    name: "Str.replaceSubrange.LargeLiteralArrChar",
+    runFunction: { replaceSubrange($0, "coffee", with: Array<Character>(["t"])) },
+    tags: tags,
+    setUpFunction: setupLargeManagedSubstring
+  ),
+  BenchmarkInfo(
+    name: "Str.replaceSubrange.LargeManagedArrChar",
+    runFunction: { replaceSubrange($0, "coffee", with: Array<Character>(["t"])) },
+    tags: tags,
+    setUpFunction: setupLargeManagedSubstring
+  ),
 ]
 
 // MARK: - Privates for String
@@ -96,5 +114,14 @@ private func replaceSubrange(_ N: Int, _ string: String, with replacingSubstring
   let range = string.startIndex..<string.index(after: string.startIndex)
   for _ in 0 ..< 5_000 * N {
     copy.replaceSubrange(range, with: replacingSubstring)
+  }
+}
+
+@inline(never)
+private func replaceSubrange(_ N: Int, _ string: String, with replacingArrayCharacter: Array<Character>) {
+  var copy = getString(string)
+  let range = string.startIndex..<string.index(after: string.startIndex)
+  for _ in 0 ..< 5_000 * N {
+    copy.replaceSubrange(range, with: replacingArrayCharacter)
   }
 }
