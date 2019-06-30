@@ -229,6 +229,67 @@ static ConstructorDecl *findDefaultInit(ASTContext &ctx,
   return init;
 }
 
+/// Determine whether we have a suitable static subscript to which we
+/// can pass along the enclosing self + key-paths.
+static SubscriptDecl *findEnclosingSelfSubscript(ASTContext &ctx,
+                                                 NominalTypeDecl *nominal,
+                                                 Identifier propertyName) {
+  Identifier argNames[] = {
+    ctx.Id_enclosingInstance,
+    propertyName,
+    ctx.Id_storage
+  };
+  DeclName subscriptName(ctx, DeclBaseName::createSubscript(), argNames);
+
+  SmallVector<SubscriptDecl *, 2> subscripts;
+  for (auto member : nominal->lookupDirect(subscriptName)) {
+    auto subscript = dyn_cast<SubscriptDecl>(member);
+    if (!subscript)
+      continue;
+
+    if (subscript->isInstanceMember())
+      continue;
+
+    if (subscript->getDeclContext() != nominal)
+      continue;
+
+    subscripts.push_back(subscript);
+  }
+
+  switch (subscripts.size()) {
+  case 0:
+    return nullptr;
+
+  case 1:
+    break;
+
+  default:
+    // Diagnose ambiguous init() initializers.
+    nominal->diagnose(diag::property_wrapper_ambiguous_enclosing_self_subscript,
+                      nominal->getDeclaredType(), subscriptName);
+    for (auto subscript : subscripts) {
+      subscript->diagnose(diag::kind_declname_declared_here,
+                          subscript->getDescriptiveKind(),
+                          subscript->getFullName());
+    }
+    return nullptr;
+
+  }
+
+  auto subscript = subscripts.front();
+  // the subscript must be as accessible as the nominal type.
+  if (subscript->getFormalAccess() < nominal->getFormalAccess()) {
+    subscript->diagnose(diag::property_wrapper_type_requirement_not_accessible,
+                        subscript->getFormalAccess(),
+                        subscript->getDescriptiveKind(),
+                        subscript->getFullName(), nominal->getDeclaredType(),
+                        nominal->getFormalAccess());
+    return nullptr;
+  }
+
+  return subscript;
+}
+
 llvm::Expected<PropertyWrapperTypeInfo>
 PropertyWrapperTypeInfoRequest::evaluate(
     Evaluator &eval, NominalTypeDecl *nominal) const {
@@ -275,6 +336,10 @@ PropertyWrapperTypeInfoRequest::evaluate(
   result.projectedValueVar =
     findValueProperty(ctx, nominal, ctx.Id_projectedValue,
                       /*allowMissing=*/true);
+  result.enclosingInstanceWrappedSubscript =
+    findEnclosingSelfSubscript(ctx, nominal, ctx.Id_wrapped);
+  result.enclosingInstanceProjectedSubscript =
+    findEnclosingSelfSubscript(ctx, nominal, ctx.Id_projected);
 
   // If there was no projectedValue property, but there is a delegateValue
   // or wrapperValue, property, use that and warn.

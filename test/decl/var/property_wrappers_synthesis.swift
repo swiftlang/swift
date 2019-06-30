@@ -69,6 +69,7 @@ struct Observable<Value> {
   
   static subscript<EnclosingSelf>(
       _enclosingInstance observed: EnclosingSelf,
+      wrapped wrappedKeyPath: ReferenceWritableKeyPath<EnclosingSelf, Value>,
       storage storageKeyPath: ReferenceWritableKeyPath<EnclosingSelf, Self>
     ) -> Value {
     get {
@@ -85,9 +86,9 @@ class MyObservedType {
   @Observable var observedProperty = 17
 
   // CHECK: accessor_decl{{.*}}get_for=observedProperty
-  // CHECK:   subscript_expr implicit type='@lvalue Int' decl={{.*}}.Observable.subscript(_enclosingInstance:storage:)
+  // CHECK:   subscript_expr implicit type='@lvalue Int' decl={{.*}}.Observable.subscript(_enclosingInstance:wrapped:storage:)
 
   // CHECK: accessor_decl{{.*}}set_for=observedProperty
-  // CHECK:   subscript_expr implicit type='@lvalue Int' decl={{.*}}.Observable.subscript(_enclosingInstance:storage:)
+  // CHECK:   subscript_expr implicit type='@lvalue Int' decl={{.*}}.Observable.subscript(_enclosingInstance:wrapped:storage:)
 }
 
