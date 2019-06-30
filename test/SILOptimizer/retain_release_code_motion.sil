@@ -718,3 +718,20 @@ bb2:
   return %9999 : $()
 }
 
+// Hoist releases above dealloc_stack
+// CHECK-LABEL: sil @testReleaseHoistDeallocStack : $@convention(thin) (AnyObject) -> () {
+// CHECK: bb0(%0 : $AnyObject):
+// CHECK-NOT:  retain
+// CHECK:      [[A:%.*]] = alloc_stack $Int64
+// CHECK-NEXT  dealloc_stack [[A]] : $*Int64
+// CHECK-NOT:  release
+// CHECK-LABEL: } // end sil function 'testReleaseHoistDeallocStack'
+sil @testReleaseHoistDeallocStack : $@convention(thin) (AnyObject)->() {
+bb0(%0 : $AnyObject):
+  strong_retain %0 : $AnyObject
+  %alloc = alloc_stack $Int64
+  dealloc_stack %alloc : $*Int64
+  strong_release %0 : $AnyObject
+  %34 = tuple ()
+  return %34 : $()
+}

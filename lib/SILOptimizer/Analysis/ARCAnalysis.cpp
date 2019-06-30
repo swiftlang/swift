@@ -268,14 +268,15 @@ static bool canTerminatorUseValue(TermInst *TI, SILValue Ptr,
 
 
 bool swift::mayHaveSymmetricInterference(SILInstruction *User, SILValue Ptr, AliasAnalysis *AA) {
+  // If Inst is an instruction that we know can never use values with reference
+  // semantics, return true. Check this before AliasAnalysis because some memory
+  // operations, like dealloc_stack, don't use ref counted values.
+  if (canNeverUseValues(User))
+    return false;
+
   // Check whether releasing this value can call deinit and interfere with User.
   if (AA->mayValueReleaseInterfereWithInstruction(User, Ptr))
     return true;
-  
-  // If Inst is an instruction that we know can never use values with reference
-  // semantics, return true.
-  if (canNeverUseValues(User))
-    return false;
 
   // If the user is a load or a store and we can prove that it does not access
   // the object then return true.
