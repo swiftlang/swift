@@ -457,6 +457,10 @@ public:
   /// types, optionals, etc.
   TypeBase *reconstituteSugar(bool Recursive);
 
+  // If this type is a syntax sugar type, desugar it. Also desugar any nested
+  // syntax sugar types.
+  TypeBase *getWithoutSyntaxSugar();
+
   /// getASTContext - Return the ASTContext that this type belongs to.
   ASTContext &getASTContext() {
     // If this type is canonical, it has the ASTContext in it.

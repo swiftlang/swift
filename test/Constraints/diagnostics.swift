@@ -424,7 +424,7 @@ enum Color {
 }
 
 // FIXME: This used to be better: "'map' produces '[T]', not the expected contextual result type '(Int, Color)'"
-let _: (Int, Color) = [1,2].map({ ($0, .Unknown("")) }) // expected-error {{expression type '((Int) throws -> _) throws -> [_]' is ambiguous without more context}}
+let _: (Int, Color) = [1,2].map({ ($0, .Unknown("")) }) // expected-error {{expression type '((Int) throws -> _) throws -> Array<_>' is ambiguous without more context}}
 
 let _: [(Int, Color)] = [1,2].map({ ($0, .Unknown("")) })// expected-error {{missing argument label 'description:' in call}}
 
@@ -1233,3 +1233,24 @@ let baz: (Swift.Error) = Error() //expected-error {{value of type 'diagnostics.E
 let baz2: Swift.Error = (Error()) //expected-error {{value of type 'diagnostics.Error' does not conform to specified type 'Swift.Error'}}
 let baz3: (Swift.Error) = (Error()) //expected-error {{value of type 'diagnostics.Error' does not conform to specified type 'Swift.Error'}}
 let baz4: ((Swift.Error)) = (Error()) //expected-error {{value of type 'diagnostics.Error' does not conform to specified type 'Swift.Error'}}
+
+// SyntaxSugarTypes with unresolved types
+func takesGenericArray<T>(_ x: [T]) {}
+takesGenericArray(1) // expected-error {{cannot convert value of type 'Int' to expected argument type 'Array<_>'}}
+func takesNestedGenericArray<T>(_ x: [[T]]) {}
+takesNestedGenericArray(1) // expected-error {{cannot convert value of type 'Int' to expected argument type 'Array<Array<_>>'}}
+func takesSetOfGenericArrays<T>(_ x: Set<[T]>) {}
+takesSetOfGenericArrays(1) // expected-error {{cannot convert value of type 'Int' to expected argument type 'Set<Array<_>>'}}
+func takesArrayOfSetOfGenericArrays<T>(_ x: [Set<[T]>]) {}
+takesArrayOfSetOfGenericArrays(1) // expected-error {{cannot convert value of type 'Int' to expected argument type 'Array<Set<Array<_>>>'}}
+func takesArrayOfGenericOptionals<T>(_ x: [T?]) {}
+takesArrayOfGenericOptionals(1) // expected-error {{cannot convert value of type 'Int' to expected argument type 'Array<Optional<_>>'}}
+func takesGenericDictionary<T, U>(_ x: [T : U]) {}
+takesGenericDictionary(true) // expected-error {{cannot convert value of type 'Bool' to expected argument type 'Dictionary<_, _>'}}
+typealias Z = Int
+func takesGenericDictionaryWithTypealias<T>(_ x: [T : Z]) {}
+takesGenericDictionaryWithTypealias(true) // expected-error {{cannot convert value of type 'Bool' to expected argument type 'Dictionary<_, Z>'}}
+func takesGenericFunction<T>(_ x: ([T]) -> Void) {}
+takesGenericFunction(true) // expected-error {{cannot convert value of type 'Bool' to expected argument type '(Array<_>) -> Void'}}
+func takesTuple<T>(_ x: ([T], [T])) {}
+takesTuple(true) // expected-error {{cannot convert value of type 'Bool' to expected argument type '(Array<_>, Array<_>)'}}
