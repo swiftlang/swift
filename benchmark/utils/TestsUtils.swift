@@ -322,3 +322,11 @@ public func getString(_ s: String) -> String { return s }
 // The same for Substring.
 @inline(never)
 public func getSubstring(_ s: Substring) -> Substring { return s }
+
+// The same for Array<Character>.
+@inline(never)
+public func getArrayCharacter(_ a: Array<Character>) -> Array<Character> { return a }
+
+// The same for Repeated<Character>.
+@inline(never)
+public func getRepeatedCharacter(_ r: Repeated<Character>) -> Repeated<Character> { return r }
