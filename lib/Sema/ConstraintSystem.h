@@ -192,6 +192,10 @@ class TypeVariableType::Implementation {
   /// The corresponding node in the constraint graph.
   constraints::ConstraintGraphNode *GraphNode = nullptr;
 
+  ///  Index into the list of type variables, as used by the
+  ///  constraint graph.
+  unsigned GraphIndex;
+
   friend class constraints::SavedTypeVariableBinding;
 
 public:
@@ -250,12 +254,12 @@ public:
   /// Retrieve the index into the constraint graph's list of type variables.
   unsigned getGraphIndex() const { 
     assert(GraphNode && "Graph node isn't set");
-    return getTypeVariable()->Bits.TypeVariableType.GraphIndex; 
+    return GraphIndex;
   }
 
   /// Set the index into the constraint graph's list of type variables.
   void setGraphIndex(unsigned newIndex) {
-    getTypeVariable()->Bits.TypeVariableType.GraphIndex = newIndex;
+    GraphIndex = newIndex;
   }
   
   /// Check whether this type variable either has a representative that
