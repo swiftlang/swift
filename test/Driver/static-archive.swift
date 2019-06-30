@@ -19,9 +19,18 @@
 // CHECK-WINDOWS: swift
 // CHECK-WINDOWS: -o [[OBJECTFILE:.*]]
 
-// CHECK-WINDOWS-NEXT: link{{(.exe)?"?}} -lib
+// CHECK-WINDOWS-NEXT: link{{(.exe)?"?}} /lib
 // CHECK-WINDOWS-DAG: [[OBJECTFILE]]
 // CHECK-WINDOWS: /OUT:{{[^ ]+}}
+
+// RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-windows-msvc -use-ld=lld-link -emit-library %s -module-name ARCHIVER -static 2>&1 | %FileCheck -check-prefix CHECK-WINDOWS-LLD %s
+
+// CHECK-WINDOWS-LLD: swift
+// CHECK-WINDOWS-LLD: -o [[OBJECTFILE:.*]]
+
+// CHECK-WINDOWS-LLD-NEXT: lld-link{{(.exe)?"?}} /lib
+// CHECK-WINDOWS-LLD-DAG: [[OBJECTFILE]]
+// CHECK-WINDOWS-LLD: /OUT:{{[^ ]+}}
 
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -emit-library %s -module-name ARCHIVER -static | %FileCheck -check-prefix INFERRED_NAME_DARWIN %s
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-linux-gnu -emit-library %s -module-name ARCHIVER -static | %FileCheck -check-prefix INFERRED_NAME_LINUX %s
