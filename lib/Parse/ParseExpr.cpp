@@ -808,6 +808,51 @@ ParserResult<Expr> Parser::parseExprSelector() {
                                    modifierLoc, subExpr.get(), rParenLoc));
 }
 
+/// parseExprPoundVariadic
+///
+///   expr-pound-variadic:
+///     '#variadic' '(' expr ')'
+///
+ParserResult<Expr> Parser::parseExprPoundVariadic() {
+  SyntaxParsingContext ExprCtxt(SyntaxContext, SyntaxKind::VarargExpansionExpr);
+  // Consume '#variadic'.
+  SourceLoc keywordLoc = consumeToken(tok::pound_variadic);
+  
+  // Parse the leading '('.
+  if (!Tok.is(tok::l_paren)) {
+    diagnose(Tok, diag::expr_selector_expected_lparen);
+    return makeParserError();
+  }
+  SourceLoc lParenLoc = consumeToken(tok::l_paren);
+  
+  // Parse the subexpression.
+  ParserResult<Expr> subExpr =
+  parseExpr(diag::expr_selector_expected_method_expr);
+  if (subExpr.hasCodeCompletion())
+    return makeParserCodeCompletionResult<Expr>();
+  
+  // Parse the closing ')'.
+  SourceLoc rParenLoc;
+  if (subExpr.isParseError()) {
+    skipUntilDeclStmtRBrace(tok::r_paren);
+    if (Tok.is(tok::r_paren))
+      rParenLoc = consumeToken();
+    else
+      rParenLoc = PreviousLoc;
+  } else {
+    parseMatchingToken(tok::r_paren, rParenLoc,
+                       diag::expr_selector_expected_rparen, lParenLoc);
+  }
+  
+  // If the subexpression was in error, just propagate the error.
+  if (subExpr.isParseError())
+    return makeParserResult<Expr>(
+                                  new (Context) ErrorExpr(SourceRange(keywordLoc, rParenLoc)));
+  
+  return makeParserResult<Expr>(
+                                new (Context) VarargExpansionExpr(subExpr.get(), false));
+}
+
 static DeclRefKind getDeclRefKindForOperator(tok kind) {
   switch (kind) {
   case tok::oper_binary_spaced:
@@ -1657,6 +1702,9 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
     return makeParserResult(new (Context)
                                 ErrorExpr(res.get()->getSourceRange()));
   }
+      
+  case tok::pound_variadic:
+    return parseExprPoundVariadic();
 
 #define POUND_OBJECT_LITERAL(Name, Desc, Proto)                                \
   case tok::pound_##Name:                                                      \

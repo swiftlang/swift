@@ -568,4 +568,14 @@ EXPR_NODES = [
                    collection_element_name='Argument'),
              Child('RightParen', kind='RightParenToken'),
          ]),
+        
+     # e.g. "#variadic([1, 2, 3])"
+     Node('VarargExpansionExpr', kind='Expr',
+        traits=['Parenthesized'],
+        children=[
+             Child('PoundVariadic', kind='PoundVariadicToken'),
+             Child('LeftParen', kind='LeftParenToken'),
+             Child('Argument', kind='Expr'),
+             Child('RightParen', kind='RightParenToken'),
+        ]),
 ]

@@ -233,6 +233,7 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'PoundAssertStmt': 229,
     'SomeType': 230,
     'CustomAttribute': 231,
+    'VarargExpansionExpr': 232,
 }
 
 

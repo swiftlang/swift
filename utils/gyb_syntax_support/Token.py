@@ -273,6 +273,8 @@ SYNTAX_TOKENS = [
                  serialization_code=71),
     PoundKeyword('PoundAssert', 'assert', text='#assert',
                  serialization_code=117),
+    PoundKeyword('PoundVariadic', 'variadic', text='#variadic',
+                 serialization_code=121),
 
     PoundDirectiveKeyword('PoundSourceLocation', 'sourceLocation',
                           text='#sourceLocation', serialization_code=65),
