@@ -1502,12 +1502,17 @@ bool swift::shouldExpand(SILModule &Module, SILType Ty) {
   if (Module.Types.getTypeLowering(Ty, Expansion).isAddressOnly()) {
     return false;
   }
+
+  Optional<unsigned> NumFields =
+      Module.Types.countNumberOfFields(Ty, Expansion);
+  if (!NumFields.hasValue())
+    return false;
+
   if (EnableExpandAll) {
     return true;
   }
 
-  unsigned NumFields = Module.Types.countNumberOfFields(Ty, Expansion);
-  return (NumFields <= 6);
+  return NumFields.getValue() <= 6;
 }
 
 /// Some support functions for the global-opt and let-properties-opts

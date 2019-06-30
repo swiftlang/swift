@@ -740,8 +740,18 @@ public:
   /// Get the method dispatch strategy for a protocol.
   static ProtocolDispatchStrategy getProtocolDispatchStrategy(ProtocolDecl *P);
 
-  /// Count the total number of fields inside the given SIL Type
-  unsigned countNumberOfFields(SILType Ty, ResilienceExpansion expansion);
+  /// Count the total number of fields inside the given SIL Type. Returns
+  /// .some(count) if given the current resilience expansion it is safe to
+  /// expand this value. Returns .none otherwise.
+  ///
+  /// WORKAROUND WARNING: This returns an optional as a workaround for
+  /// rdar52270675. The problem is that in certain cases we are producing
+  /// TypeLowerings for value types in minimal resilience expansions where the
+  /// parent type is fragile/loadable but one of the substypes is reslient (and
+  /// thus the /whole/ type should be address only). Once that is resolved, this
+  /// should unconditionally return an unsigned.
+  Optional<unsigned> countNumberOfFields(SILType Ty,
+                                         ResilienceExpansion expansion);
 
   /// True if a protocol uses witness tables for dynamic dispatch.
   static bool protocolRequiresWitnessTable(ProtocolDecl *P) {
