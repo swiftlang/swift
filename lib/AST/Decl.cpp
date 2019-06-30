@@ -1072,6 +1072,9 @@ ExtensionDecl *ExtensionDecl::create(ASTContext &ctx, SourceLoc extensionLoc,
   if (clangNode)
     result->setClangNode(clangNode);
 
+  if (!inherited.empty())
+      ctx.InheritingExtensions[result] = true;
+
   return result;
 }
 

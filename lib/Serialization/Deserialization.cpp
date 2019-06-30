@@ -2319,8 +2319,11 @@ class swift::DeclDeserializer {
     else {
       ExtensionDecl *extension = decl.get<ExtensionDecl *>();
       extension->setInherited(inherited);
-      if (auto extended = extension->getExtendedProtocolDecl())
-        extended->inheritedProtocolsChanged();
+      if (!inherited.empty()) {
+        if (auto extended = extension->getExtendedProtocolDecl())
+          extended->inheritedProtocolsChanged();
+        extension->getASTContext().InheritingExtensions[extension] = true;
+      }
     }
   }
 

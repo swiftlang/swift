@@ -272,7 +272,8 @@ public:
   void emitObjCDestructorThunk(DestructorDecl *destructor);
 
   /// Get or emit the witness table for a protocol conformance.
-  SILWitnessTable *getWitnessTable(NormalProtocolConformance *conformance);
+  SILWitnessTable *getWitnessTable(NormalProtocolConformance *conformance,
+                                   bool emitAsPrivate = false);
 
   /// Emit a protocol witness entry point.
   SILFunction *

@@ -10,10 +10,8 @@ extension FixedWidthInteger: ExpressibleByUnicodeScalarLiteral {
   }
 }
 
-//var a: Int = "a"
 let a: [Int16] = ["a", "b", "c", "d", "e"]
 let b: [UInt32] = ["a", "b", "c", "d", "e"]
-
 
 protocol P {
 }

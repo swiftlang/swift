@@ -1100,6 +1100,8 @@ void ConformanceLookupTable::addExtendedConformances(const ExtensionDecl *ext,
     NominalTypeDecl *nominal = nominalPair.first;
     for (auto &protocolPair : nominalPair.second) {
       ProtocolDecl *proto = protocolPair.first;
+      if (!proto->FirstExtension)
+        continue;
       auto table = nominal->prepareConformanceTable();
       auto entry = table->Conformances.find(proto);
       if (entry == table->Conformances.end())

@@ -409,6 +409,10 @@ public:
       Conformance = nullptr;
   }
 
+  void setLinkage(SILLinkage Linkage) {
+    this->Linkage = Linkage;
+  }
+
   SILWitnessTable *emit() {
     // Nothing to do if this wasn't a normal conformance.
     if (!Conformance)
@@ -559,13 +563,17 @@ public:
 } // end anonymous namespace
 
 SILWitnessTable *
-SILGenModule::getWitnessTable(NormalProtocolConformance *conformance) {
+SILGenModule::getWitnessTable(NormalProtocolConformance *conformance,
+                              bool emitAsPrivate) {
   // If we've already emitted this witness table, return it.
   auto found = emittedWitnessTables.find(conformance);
   if (found != emittedWitnessTables.end())
     return found->second;
 
-  SILWitnessTable *table = SILGenConformance(*this, conformance).emit();
+  SILGenConformance conf(*this, conformance);
+  if (emitAsPrivate)
+    conf.setLinkage(SILLinkage::Private);
+  SILWitnessTable *table = conf.emit();
   emittedWitnessTables.insert({conformance, table});
 
   return table;
@@ -1055,14 +1063,16 @@ public:
     for (Decl *member : e->getMembers())
       visit(member);
 
-    // Emit witness tables for protocol conformances introduced by the
-    // extension.
-    for (auto *conformance : e->getLocalConformances(
-                               ConformanceLookupKind::All,
-                               nullptr, /*addExtended*/true)) {
-      if (conformance->isComplete()) {
-        if (auto *normal = dyn_cast<NormalProtocolConformance>(conformance))
-          SGM.getWitnessTable(normal);
+    if (!isa<ProtocolDecl>(e->getExtendedNominal())) {
+      // Emit witness tables for protocol conformances introduced by the
+      // extension.
+      for (auto *conformance : e->getLocalConformances(
+                                 ConformanceLookupKind::All,
+                                 nullptr)) {
+        if (conformance->isComplete()) {
+          if (auto *normal =dyn_cast<NormalProtocolConformance>(conformance))
+            SGM.getWitnessTable(normal);
+        }
       }
     }
   }

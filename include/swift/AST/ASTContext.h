@@ -265,6 +265,9 @@ public:
   /// Cache of remapped types (useful for diagnostics).
   llvm::StringMap<Type> RemappedTypes;
 
+  /// Track extensions that inherit for inheriting protocol extensions.
+  mutable llvm::DenseMap<ExtensionDecl *, bool> InheritingExtensions;
+
 private:
   /// The current generation number, which reflects the number of
   /// times that external modules have been loaded.

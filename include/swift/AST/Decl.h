@@ -3264,10 +3264,10 @@ protected:
 
   friend class ProtocolType;
 
-  /// Prepare the conformance table.
+public:
+  /// Prepare the conformance table (also acts as accessor).
   ConformanceLookupTable *prepareConformanceTable() const;
 
-public:
   using GenericTypeDecl::getASTContext;
 
   SourceRange getBraces() const { return Braces; }

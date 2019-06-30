@@ -226,16 +226,17 @@ static void checkInheritanceClause(
     DC = ext;
 
     inheritedClause = ext->getInherited();
+    ASTContext &ctx = ext->getASTContext();
 
     // Protocol extensions cannot have inheritance clauses.
     if (auto proto = ext->getExtendedProtocolDecl()) {
-      ASTContext &ctx = ext->getASTContext();
       TypeChecker &TC = TypeChecker::createForContext(ctx);
       auto lookupOptions = defaultMemberTypeLookupOptions;
       lookupOptions -= NameLookupFlags::PerformConformanceCheck;
       lookupOptions |= NameLookupFlags::IncludeAttributeImplements;
 
-      proto->inheritedProtocolsChanged();
+      if (!inheritedClause.empty())
+        proto->inheritedProtocolsChanged();
 
       for (unsigned i = 0, n = inheritedClause.size(); i != n; ++i) {
 

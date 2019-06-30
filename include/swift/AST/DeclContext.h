@@ -565,7 +565,7 @@ public:
   getLocalConformances(ConformanceLookupKind lookupKind
                          = ConformanceLookupKind::All,
                        SmallVectorImpl<ConformanceDiagnostic> *diagnostics
-                         = nullptr, bool addExtended = false) const;
+                         = nullptr) const;
 
   /// Retrieve the syntactic depth of this declaration context, i.e.,
   /// the number of non-module-scoped contexts.
