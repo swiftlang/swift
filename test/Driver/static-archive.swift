@@ -12,7 +12,7 @@
 // CHECK-LINUX: swift
 // CHECK-LINUX: -o [[OBJECTFILE:.*]]
 
-// CHECK-LINUX: {{(bin/)?(llvm-)?}}ar{{"?}} crs
+// CHECK-LINUX: {{(bin/)?(llvm-)?}}ar{{(.exe)?"?}} crs
 
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-unknown-windows-msvc -emit-library %s -module-name ARCHIVER -static 2>&1 | %FileCheck -check-prefix CHECK-WINDOWS %s
 
