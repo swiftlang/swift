@@ -288,8 +288,8 @@ function(_add_variant_c_compile_flags)
     endif()
   endif()
 
-  if(CFLAGS_SDK STREQUAL ANDROID)
-    if(CFLAGS_ARCH STREQUAL x86_64)
+  if(${CFLAGS_SDK} STREQUAL ANDROID)
+    if(${CFLAGS_ARCH} STREQUAL x86_64)
       # NOTE(compnerd) Android NDK 21 or lower will generate library calls to
       # `__sync_val_compare_and_swap_16` rather than lowering to the CPU's
       # `cmpxchg16b` instruction as the `cx16` feature is disabled due to a bug
