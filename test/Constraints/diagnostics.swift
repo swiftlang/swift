@@ -364,12 +364,12 @@ c.method2(1.0)(2.0) // expected-error {{cannot convert value of type 'Double' to
 CurriedClass.method1(c)()
 _ = CurriedClass.method1(c)
 CurriedClass.method1(c)(1)         // expected-error {{argument passed to call that takes no arguments}}
-CurriedClass.method1(2.0)(1)       // expected-error {{instance member 'method1' cannot be used on type 'CurriedClass'; did you mean to use a value of this type instead?}}
+CurriedClass.method1(2.0)(1)       // expected-error {{cannot convert value of type 'Double' to expected argument type 'CurriedClass'}}
 
 CurriedClass.method2(c)(32)(b: 1) // expected-error{{extraneous argument label 'b:' in call}}
 _ = CurriedClass.method2(c)
 _ = CurriedClass.method2(c)(32)
-_ = CurriedClass.method2(1,2)      // expected-error {{instance member 'method2' cannot be used on type 'CurriedClass'; did you mean to use a value of this type instead?}}
+_ = CurriedClass.method2(1,2)      // expected-error {{extra argument in call}}
 CurriedClass.method2(c)(1.0)(b: 1) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 CurriedClass.method2(c)(1)(1.0) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 CurriedClass.method2(c)(2)(c: 1.0) // expected-error {{extraneous argument label 'c:'}}
@@ -379,6 +379,7 @@ _ = CurriedClass.method3(c)
 _ = CurriedClass.method3(c)(1, 2)        // expected-error {{missing argument label 'b:' in call}} {{32-32=b: }}
 _ = CurriedClass.method3(c)(1, b: 2)(32) // expected-error {{cannot call value of non-function type '()'}}
 _ = CurriedClass.method3(1, 2)           // expected-error {{instance member 'method3' cannot be used on type 'CurriedClass'; did you mean to use a value of this type instead?}}
+// expected-error@-1 {{missing argument label 'b:' in call}}
 CurriedClass.method3(c)(1.0, b: 1)       // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 CurriedClass.method3(c)(1)               // expected-error {{missing argument for parameter 'b' in call}}
 CurriedClass.method3(c)(c: 1.0)          // expected-error {{missing argument for parameter #1 in call}}
