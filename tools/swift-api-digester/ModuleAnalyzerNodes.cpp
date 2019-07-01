@@ -1365,6 +1365,19 @@ SDKNode *swift::ide::api::
 SwiftDeclCollector::constructTypeNode(Type T, TypeInitInfo Info) {
   if (Ctx.checkingABI()) {
     T = T->getCanonicalType();
+    // If the type is a opaque result type (some Type) and we're in the ABI mode,
+    // we should substitute the opaque result type to its underlying type.
+    // Notice this only works if the opaque result type is from an inlinable
+    // function where the function body is present in the swift module file, thus
+    // allowing us to know the concrete type.
+    if (auto OTA = T->getAs<OpaqueTypeArchetypeType>()) {
+      if (auto *D = OTA->getDecl()) {
+        if (auto SubMap = D->getUnderlyingTypeSubstitutions()) {
+          T = Type(D->getUnderlyingInterfaceType()).
+            subst(*SubMap)->getCanonicalType();
+        }
+      }
+    }
   }
 
   if (auto NAT = dyn_cast<TypeAliasType>(T.getPointer())) {
