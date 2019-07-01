@@ -2022,6 +2022,44 @@ static ConstraintFix *fixRequirementFailure(ConstraintSystem &cs, Type type1,
   }
 }
 
+static ConstraintFix *fixPropertyWrapperFailure(
+    ConstraintSystem &cs, Type baseTy, Expr *anchor, ConstraintLocator *locator,
+    llvm::function_ref<bool(ResolvedOverloadSetListItem *, VarDecl *, Type)>
+        attemptFix,
+    Optional<Type> toType = None) {
+  auto resolvedOverload = cs.findSelectedOverloadFor(anchor);
+  if (!resolvedOverload)
+    return nullptr;
+
+  if (auto storageWrapper =
+          cs.getStorageWrapperInformation(resolvedOverload)) {
+    if (attemptFix(resolvedOverload, storageWrapper->first,
+                    storageWrapper->second))
+      return UsePropertyWrapper::create(
+          cs, storageWrapper->first,
+          /*usingStorageWrapper=*/true, baseTy,
+          toType.getValueOr(storageWrapper->second), locator);
+  }
+
+  if (auto wrapper = cs.getPropertyWrapperInformation(resolvedOverload)) {
+    if (attemptFix(resolvedOverload, wrapper->first, wrapper->second))
+      return UsePropertyWrapper::create(
+          cs, wrapper->first,
+          /*usingStorageWrappeer=*/false, baseTy,
+          toType.getValueOr(wrapper->second), locator);
+  }
+
+  if (auto wrappedProperty =
+          cs.getWrappedPropertyInformation(resolvedOverload)) {
+    if (attemptFix(resolvedOverload, wrappedProperty->first,
+                    wrappedProperty->second))
+      return UseWrappedValue::create(
+          cs, wrappedProperty->first, baseTy,
+          toType.getValueOr(wrappedProperty->second), locator);
+  }
+  return nullptr;
+}
+
 /// Attempt to repair typing failures and record fixes if needed.
 /// \return true if at least some of the failures has been repaired
 /// successfully, which allows type matcher to continue.
@@ -2121,13 +2159,31 @@ bool ConstraintSystem::repairFailures(
   switch (elt.getKind()) {
   case ConstraintLocator::LValueConversion:
   case ConstraintLocator::ApplyArgToParam: {
+    auto loc = getConstraintLocator(locator);
     if (repairByInsertingExplicitCall(lhs, rhs))
       return true;
 
     if (lhs->getOptionalObjectType() && !rhs->getOptionalObjectType()) {
       conversionsOrFixes.push_back(
-          ForceOptional::create(*this, lhs, lhs->getOptionalObjectType(),
-                                getConstraintLocator(locator)));
+          ForceOptional::create(*this, lhs, lhs->getOptionalObjectType(), loc));
+    }
+
+    if (elt.getKind() != ConstraintLocator::ApplyArgToParam)
+      break;
+
+    auto anchor = simplifyLocatorToAnchor(*this, loc);
+
+    if (auto *fix = fixPropertyWrapperFailure(
+            *this, lhs, anchor, loc,
+            [&](ResolvedOverloadSetListItem *overload, VarDecl *decl,
+                Type newBase) {
+              return matchTypes(newBase, rhs, ConstraintKind::Subtype,
+                                TypeMatchFlags::TMF_ApplyingFix,
+                                overload->Locator)
+                  .isSuccess();
+            },
+            rhs)) {
+      conversionsOrFixes.push_back(fix);
     }
     break;
   }
@@ -4758,45 +4814,15 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
     if (auto dotExpr =
             dyn_cast_or_null<UnresolvedDotExpr>(locator->getAnchor())) {
       auto baseExpr = dotExpr->getBase();
-
-      if (auto resolvedOverload = findSelectedOverloadFor(baseExpr)) {
-        if (auto storageWrapper =
-                getStorageWrapperInformation(resolvedOverload)) {
-          auto wrapperTy = storageWrapper->second;
-          auto result =
-              solveWithNewBaseOrName(wrapperTy, member, /*allowFixes=*/false);
-          if (result == SolutionKind::Solved) {
-            auto *fix = UsePropertyWrapper::create(*this, storageWrapper->first,
-                                                   /*usingStorageWrapper=*/true,
-                                                   baseTy, wrapperTy, locator);
-            return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
-          }
-        }
-
-        if (auto wrapper = getPropertyWrapperInformation(resolvedOverload)) {
-          auto wrapperTy = wrapper->second;
-          auto result =
-              solveWithNewBaseOrName(wrapperTy, member, /*allowFixes=*/false);
-          if (result == SolutionKind::Solved) {
-            auto *fix = UsePropertyWrapper::create(
-                *this, wrapper->first,
-                /*usingStorageWrappeer=*/false, baseTy, wrapperTy, locator);
-            return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
-          }
-        }
-
-        if (auto wrappedProperty =
-                getWrappedPropertyInformation(resolvedOverload)) {
-          auto wrappedTy = wrappedProperty->second;
-          auto result =
-              solveWithNewBaseOrName(wrappedTy, member, /*allowFixes=*/false);
-
-          if (result == SolutionKind::Solved) {
-            auto *fix = UseWrappedValue::create(*this, wrappedProperty->first,
-                                                baseTy, wrappedTy, locator);
-            return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
-          }
-        }
+      if (auto *fix = fixPropertyWrapperFailure(
+              *this, baseTy, baseExpr, locator,
+              [&](ResolvedOverloadSetListItem *overload, VarDecl *decl,
+                  Type newBase) {
+                return solveWithNewBaseOrName(newBase, member,
+                                              /*allowFixes=*/false) ==
+                       SolutionKind::Solved;
+              })) {
+        return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
       }
     }
 
@@ -6726,7 +6752,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::SkipSuperclassRequirement:
   case FixKind::ContextualMismatch:
   case FixKind::AddMissingArguments:
-  case FixKind::SkipUnhandledConstructInFunctionBuilder: {
+  case FixKind::SkipUnhandledConstructInFunctionBuilder:
+  case FixKind::UsePropertyWrapper:
+  case FixKind::UseWrappedValue: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
 
@@ -6746,8 +6774,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::TreatKeyPathSubscriptIndexAsHashable:
   case FixKind::AllowInvalidRefInKeyPath:
   case FixKind::ExplicitlySpecifyGenericArguments:
-  case FixKind::UsePropertyWrapper:
-  case FixKind::UseWrappedValue:
     llvm_unreachable("handled elsewhere");
   }
 
