@@ -89,6 +89,10 @@ static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
   if (!SearchPathOpts.SDKPath.empty()) {
     LibPath = SearchPathOpts.SDKPath;
     llvm::sys::path::append(LibPath, "usr", "lib", "swift");
+    if (!Triple.isOSDarwin()) {
+      llvm::sys::path::append(LibPath, getPlatformNameForTriple(Triple));
+      llvm::sys::path::append(LibPath, swift::getMajorArchitectureName(Triple));
+    }
     SearchPathOpts.RuntimeLibraryImportPaths.push_back(LibPath.str());
   }
 }
