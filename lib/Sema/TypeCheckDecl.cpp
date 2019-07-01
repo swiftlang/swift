@@ -2829,6 +2829,8 @@ public:
     for (Decl *Member : SD->getMembers())
       visit(Member);
 
+    TC.checkPatternBindingCaptures(SD);
+
     TC.checkDeclAttributes(SD);
 
     checkInheritanceClause(SD);
@@ -2954,6 +2956,8 @@ public:
     for (Decl *Member : CD->getMembers()) {
       visit(Member);
     }
+
+    TC.checkPatternBindingCaptures(CD);
 
     // If this class requires all of its stored properties to have
     // in-class initializers, diagnose this now.
@@ -5644,10 +5648,6 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
   stmts.push_back(new (Context) ReturnStmt(decl->getLoc(), nullptr));
   ctor->setBody(BraceStmt::create(Context, SourceLoc(), stmts, SourceLoc()));
   ctor->setBodyTypeCheckedIfPresent();
-
-  // FIXME: This is still needed so that DI can check captures for
-  // initializer expressions. Rethink that completely.
-  Context.addSynthesizedDecl(ctor);
 }
 
 static void validateAttributes(TypeChecker &TC, Decl *D) {
