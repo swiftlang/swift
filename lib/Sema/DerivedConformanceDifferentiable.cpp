@@ -950,6 +950,7 @@ deriveDifferentiable_AssociatedStruct(DerivedConformance &derived,
   bool hasNoDerivativeStoredProp = diffProperties.size() != numStoredProperties;
 
   // Check conditions for returning `Self`.
+  // - `Self` is not a class type.
   // - No `@noDerivative` stored properties exist.
   // - All stored properties must have specified associated type equal to
   //   `Self`.
@@ -967,7 +968,7 @@ deriveDifferentiable_AssociatedStruct(DerivedConformance &derived,
                             parentDC, None);
 
   // Return `Self` if conditions are met.
-  if (!hasNoDerivativeStoredProp &&
+  if (!hasNoDerivativeStoredProp && !nominal->getSelfClassDecl() &&
       (id == C.Id_AllDifferentiableVariables ||
        (allMembersAssocTypeEqualsSelf && nominalConformsToAddArith))) {
     auto selfType = parentDC->getSelfTypeInContext();
