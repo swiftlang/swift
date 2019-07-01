@@ -74,7 +74,12 @@ func classMethods(_ b: B, other: NSObject) {
   // Both class and instance methods exist.
   B.description()
   B.instanceTakesObjectClassTakesFloat(2.0)
-  B.instanceTakesObjectClassTakesFloat(other) // expected-error{{cannot convert value of type 'NSObject' to expected argument type 'Float'}}
+  // TODO(diagnostics): Once argument/parameter conversion diagnostics are implemented we should be able to
+  // diagnose this as failed conversion from NSObject to Float, but right now the problem is that there
+  // exists another overload `instanceTakesObjectClassTakesFloat: (Any?) -> Void` which makes this invocation
+  // type-check iff base is an instance of `B`.
+  B.instanceTakesObjectClassTakesFloat(other)
+  // expected-error@-1 {{instance member 'instanceTakesObjectClassTakesFloat' cannot be used on type 'B'; did you mean to use a value of this type instead?}}
 
   // Call an instance method of NSObject.
   var c: AnyClass = B.myClass() // no-warning
@@ -347,7 +352,7 @@ func testDynamicSelf(_ queen: Bee, wobbler: NSWobbling) {
   // class itself.
   // FIXME: This should be accepted.
   let baseClass: ObjCParseExtras.Base.Type = ObjCParseExtras.Base.returnMyself()
-  // expected-error@-1 {{instance member 'returnMyself' cannot be used on type 'Base'}}
+  // expected-error@-1 {{missing argument for parameter #1 in call}}
 }
 
 func testRepeatedProtocolAdoption(_ w: NSWindow) {

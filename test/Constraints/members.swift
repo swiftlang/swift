@@ -522,7 +522,7 @@ class A {}
 
 enum B {
   static func foo() {
-    bar(A()) // expected-error {{'A' is not convertible to 'B'}}
+    bar(A()) // expected-error {{instance member 'bar' cannot be used on type 'B'}}
   }
 
   func bar(_: A) {}

@@ -2382,10 +2382,13 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
       return true;
     }
 
-    if (isa<TypeExpr>(getRawAnchor())) {
-      emitDiagnostic(loc, diag::instance_member_use_on_type, instanceTy, Name)
-          .highlight(getRawAnchor()->getSourceRange());
-      return true;
+    if (auto *UDE = dyn_cast<UnresolvedDotExpr>(getRawAnchor())) {
+      auto *baseExpr = UDE->getBase();
+      if (isa<TypeExpr>(baseExpr)) {
+        emitDiagnostic(loc, diag::instance_member_use_on_type, instanceTy, Name)
+            .highlight(baseExpr->getSourceRange());
+        return true;
+      }
     }
 
     // Just emit a generic "instance member cannot be used" error
