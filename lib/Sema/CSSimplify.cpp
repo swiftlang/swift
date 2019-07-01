@@ -2241,9 +2241,14 @@ bool ConstraintSystem::repairFailures(
             *this, lhs, anchor, loc,
             [&](ResolvedOverloadSetListItem *overload, VarDecl *decl,
                 Type newBase) {
-              return matchTypes(newBase, rhs, ConstraintKind::Subtype,
-                                TypeMatchFlags::TMF_ApplyingFix,
-                                overload->Locator)
+              // FIXME: There is currently no easy way to avoid attempting
+              // fixes, matchTypes do not propagate `TMF_ApplyingFix` flag.
+              llvm::SaveAndRestore<ConstraintSystemOptions> options(
+                  Options, Options - ConstraintSystemFlags::AllowFixes);
+
+              TypeMatchOptions flags;
+              return matchTypes(newBase, rhs, ConstraintKind::Subtype, flags,
+                                getConstraintLocator(locator))
                   .isSuccess();
             },
             rhs)) {
