@@ -2424,8 +2424,8 @@ public:
                                          substObjectType));
   }
 
-  /// Any other type is would be a valid type in the AST.  Just
-  /// apply the substitution on the AST level and then lower that.
+  /// Any other type would be a valid type in the AST. Just apply the
+  /// substitution on the AST level and then lower that.
   CanType visitType(CanType origType) {
     assert(!isa<AnyFunctionType>(origType));
     assert(!isa<LValueType>(origType) && !isa<InOutType>(origType));
