@@ -1777,26 +1777,27 @@ bool SubscriptMisuseFailure::diagnoseAsError() {
 
   diag.highlight(memberRange).highlight(nameLoc.getSourceRange());
 
-  auto *parentExpr = findParentExpr(memberExpr);
-  assert(parentExpr && "Couldn't find a parent expression for a member call?!");
+  if (auto *parentExpr = dyn_cast_or_null<ApplyExpr>(findParentExpr(memberExpr))) {
+    auto *argExpr = parentExpr->getArg();
 
-  auto *argExpr = cast<ApplyExpr>(parentExpr)->getArg();
+    auto toCharSourceRange = Lexer::getCharSourceRangeFromSourceRange;
+    auto lastArgSymbol = toCharSourceRange(sourceMgr, argExpr->getEndLoc());
 
-  auto toCharSourceRange = Lexer::getCharSourceRangeFromSourceRange;
-  auto lastArgSymbol = toCharSourceRange(sourceMgr, argExpr->getEndLoc());
+    diag.fixItReplace(SourceRange(argExpr->getStartLoc()),
+                      getTokenText(tok::l_square));
+    diag.fixItRemove(nameLoc.getSourceRange());
+    diag.fixItRemove(SourceRange(memberExpr->getDotLoc()));
 
-  diag.fixItReplace(SourceRange(argExpr->getStartLoc()),
-                    getTokenText(tok::l_square));
-  diag.fixItRemove(nameLoc.getSourceRange());
-  diag.fixItRemove(SourceRange(memberExpr->getDotLoc()));
-
-  if (sourceMgr.extractText(lastArgSymbol) == getTokenText(tok::r_paren))
-    diag.fixItReplace(SourceRange(argExpr->getEndLoc()),
-                      getTokenText(tok::r_square));
-  else
-    diag.fixItInsertAfter(argExpr->getEndLoc(), getTokenText(tok::r_square));
-
+    if (sourceMgr.extractText(lastArgSymbol) == getTokenText(tok::r_paren))
+      diag.fixItReplace(SourceRange(argExpr->getEndLoc()),
+                        getTokenText(tok::r_square));
+    else
+      diag.fixItInsertAfter(argExpr->getEndLoc(), getTokenText(tok::r_square));
+  } else {
+    diag.fixItReplace(SourceRange(memberExpr->getDotLoc(), memberExpr->getLoc()), "[<#index#>]");
+  }
   diag.flush();
+
   if (auto overload = getOverloadChoiceIfAvailable(getLocator())) {
     emitDiagnostic(overload->choice.getDecl(), diag::kind_declared_here,
                    DescriptiveDeclKind::Subscript);
