@@ -1835,6 +1835,7 @@ public:
 
   void failed(StringRef ErrDescription) override;
 
+  void setCompletionKind(UIdent kind) override;
   bool handleResult(const CodeCompletionInfo &Info) override;
 };
 } // end anonymous namespace
@@ -1851,6 +1852,11 @@ static sourcekitd_response_t codeComplete(llvm::MemoryBuffer *InputBuf,
 
 void SKCodeCompletionConsumer::failed(StringRef ErrDescription) {
   ErrorDescription = ErrDescription;
+}
+
+void SKCodeCompletionConsumer::setCompletionKind(UIdent kind) {
+  assert(kind.isValid());
+  RespBuilder.getDictionary().set(KeyKind, kind);
 }
 
 bool SKCodeCompletionConsumer::handleResult(const CodeCompletionInfo &R) {
