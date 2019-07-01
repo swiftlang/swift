@@ -4,6 +4,8 @@
 
 #if os(Linux)
 import Glibc
+#elseif os(Windows)
+import MSVCRT
 #else
 import Darwin
 #endif
