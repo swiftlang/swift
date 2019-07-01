@@ -307,9 +307,10 @@ static void collectPossibleCalleesByQualifiedLookup(
       }
     }
 
-    auto fnType = baseTy->getMetatypeInstanceType()->getTypeOfMember(
-        DC.getParentModule(), VD, declaredMemberType);
-
+    auto subs = baseTy->getMetatypeInstanceType()->getMemberSubstitutionMap(
+        DC.getParentModule(), VD,
+        VD->getInnermostDeclContext()->getGenericEnvironmentOfContext());
+    auto fnType = declaredMemberType.subst(subs, SubstFlags::UseErrorType);
     if (!fnType)
       continue;
 
