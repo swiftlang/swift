@@ -6,6 +6,7 @@ add_swift_target_library(swiftCompatibilityDynamicReplacements TARGET_LIBRARY ST
   C_COMPILE_FLAGS ${swift_runtime_library_compile_flags}
   LINK_FLAGS ${swift_runtime_linker_flags}
   TARGET_SDKS ${SWIFT_APPLE_PLATFORMS}
+  SWIFT_COMPILE_FLAGS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
   INSTALL_IN_COMPONENT compiler)
 
 
