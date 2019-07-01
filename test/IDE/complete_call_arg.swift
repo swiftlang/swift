@@ -183,7 +183,7 @@ class C1 {
 // EXPECT_INT-DAG: Decl[FreeFunction]/CurrModule/TypeRelation[Identical]: intGen()[#Int#]; name=intGen()
 // EXPECT_INT-DAG: Decl[GlobalVar]/CurrModule/TypeRelation[Identical]: i1[#Int#]; name=i1
 // EXPECT_INT-DAG: Decl[GlobalVar]/CurrModule/TypeRelation[Identical]: i2[#Int#]; name=i2
-// EXPECT_INT-DAT: Decl[Struct]/OtherModule[Swift]/TypeRelation[Identical]: Int[#Int#]
+// EXPECT_INT-DAG: Decl[Struct]/OtherModule[Swift]/TypeRelation[Identical]: Int[#Int#]
 // EXPECT_INT-DAG: Decl[FreeFunction]/CurrModule:      ointGen()[#Int?#]; name=ointGen()
 // EXPECT_INT-DAG: Decl[GlobalVar]/CurrModule:         oi1[#Int?#]; name=oi1
 // EXPECT_INT-DAG: Decl[GlobalVar]/CurrModule:         os2[#String?#]; name=os2
