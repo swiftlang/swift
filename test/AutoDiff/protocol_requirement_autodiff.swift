@@ -4,12 +4,15 @@ import StdlibUnittest
 
 var ProtocolRequirementAutodiffTests = TestSuite("ProtocolRequirementAutodiff")
 
+// MARK: - Func requirements.
+
 protocol DiffReq : Differentiable {
   @differentiable(wrt: (self, x))
   func f(_ x: Float) -> Float
 }
 
 extension DiffReq where TangentVector : AdditiveArithmetic {
+  @inline(never)  // Prevent specialization, to test all witness code.
   func gradF(at x: Float) -> (Self.TangentVector, Float) {
     return (valueWithPullback(at: x) { s, x in s.f(x) }).1(1)
   }
@@ -53,7 +56,65 @@ extension Quadratic : VectorProtocol {
   }
 }
 
-// Test witness method SIL type computation.
+ProtocolRequirementAutodiffTests.test("func") {
+  expectEqual((Quadratic(0, 0, 1), 12), Quadratic(11, 12, 13).gradF(at: 0))
+  expectEqual((Quadratic(1, 1, 1), 2 * 11 + 12),
+              Quadratic(11, 12, 13).gradF(at: 1))
+  expectEqual((Quadratic(4, 2, 1), 2 * 11 * 2 + 12),
+              Quadratic(11, 12, 13).gradF(at: 2))
+}
+
+// MARK: Constructor and accessor requirements.
+
+protocol FunctionsOfX: Differentiable {
+  @differentiable
+  init(x: Float)
+
+  @differentiable
+  var x: Float { get }
+
+  @differentiable
+  var y: Float { get }
+
+  @differentiable
+  var z: Float { get }
+}
+
+struct TestFunctionsOfX: FunctionsOfX {
+  @differentiable
+  init(x: Float) {
+    self.x = x
+    self.y = x * x
+  }
+
+  /// x = x
+  var x: Float
+
+  /// y = x * x
+  var y: Float
+
+  /// z = x * x + x
+  var z: Float {
+    return y + x
+  }
+}
+
+@inline(never)  // Prevent specialization, to test all witness code.
+func derivatives<F: FunctionsOfX>(at x: Float, in: F.Type)
+  -> (Float, Float, Float)
+{
+  let dxdx = gradient(at: x) { x in F(x: x).x }
+  let dydx = gradient(at: x) { x in F(x: x).y }
+  let dzdx = gradient(at: x) { x in F(x: x).z }
+  return (dxdx, dydx, dzdx)
+}
+
+ProtocolRequirementAutodiffTests.test("constructor and accessor") {
+  expectEqual(derivatives(at: 2.0, in: TestFunctionsOfX.self), (1.0, 4.0, 5.0))
+}
+
+// MARK: - Test witness method SIL type computation.
+
 protocol P : Differentiable {
   @differentiable(wrt: (x, y))
   func foo(_ x: Float, _ y: Double) -> Float
@@ -63,14 +124,6 @@ struct S : P {
   func foo(_ x: Float, _ y: Double) -> Float {
     return x
   }
-}
-
-ProtocolRequirementAutodiffTests.test("Trivial") {
-  expectEqual((Quadratic(0, 0, 1), 12), Quadratic(11, 12, 13).gradF(at: 0))
-  expectEqual((Quadratic(1, 1, 1), 2 * 11 + 12),
-              Quadratic(11, 12, 13).gradF(at: 1))
-  expectEqual((Quadratic(4, 2, 1), 2 * 11 * 2 + 12),
-              Quadratic(11, 12, 13).gradF(at: 2))
 }
 
 runAllTests()
