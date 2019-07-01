@@ -932,7 +932,7 @@ struct TestComposition {
 // Missing Property Wrapper Unwrap Diagnostics
 // ---------------------------------------------------------------------------
 @propertyWrapper
-struct Foo<T> {
+struct Foo<T> { // expected-note {{arguments to generic parameter 'T' ('W' and 'Int') are expected to be equal}}
   var wrappedValue: T
 
   var prop: Int = 42
@@ -987,6 +987,7 @@ struct MissingPropertyWrapperUnwrap {
   func b(_: Foo<Int>) {}
   func c(_: V) {}
   func d(_: W) {}
+  func e(_: Foo<W>) {}
 
   func baz() {
     self.x.foo() // expected-error {{referencing instance method 'foo()' requires wrapper 'Foo<Int>'}}{{10-10=_}}
@@ -1005,7 +1006,10 @@ struct MissingPropertyWrapperUnwrap {
     
     a(self.w) // expected-error {{cannot convert value 'w' of type 'W' to expected type 'Foo<W>', use wrapper instead}}{{12-12=_}}
     b(self.x) // expected-error {{cannot convert value 'x' of type 'Int' to expected type 'Foo<Int>', use wrapper instead}}{{12-12=_}}
-    b(self.w) // expected-error {{cannot convert value 'w' of type 'W' to expected type 'Foo<Int>', use wrapper instead}}{{12-12=_}}
+    b(self.w) // expected-error {{cannot convert value of type 'W' to expected argument type 'Foo<Int>'}}
+    e(self.w) // expected-error {{cannot convert value 'w' of type 'W' to expected type 'Foo<W>', use wrapper instead}}{{12-12=_}}
+    b(self._w) // expected-error {{cannot convert value of type 'Foo<W>' to expected argument type 'Foo<Int>'}}
+
     c(self.usesProjectedValue) // expected-error {{cannot convert value 'usesProjectedValue' of type 'W' to expected type 'V', use wrapper instead}}{{12-12=$}}
     d(self.$usesProjectedValue) // expected-error {{cannot convert value '$usesProjectedValue' of type 'V' to expected type 'W', use wrapped value instead}}{{12-13=}}
     d(self._usesProjectedValue) // expected-error {{cannot convert value '_usesProjectedValue' of type 'Baz<W>' to expected type 'W', use wrapped value instead}}{{12-13=}}
