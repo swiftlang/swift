@@ -144,6 +144,7 @@ class C {
 
   static func staticFunc() -> Self {}
   let stored: Self = Self.staticFunc() // expected-error {{stored property cannot have covariant 'Self' type}}
+  // expected-error@-1 {{covariant 'Self' type cannot be referenced from a stored property initializer}}
 
   var prop: Self { // expected-error {{mutable property cannot have covariant 'Self' type}}
     get {
@@ -246,4 +247,10 @@ enum E {
     Self.f()
     return .e
   }
+}
+
+class SelfStoredPropertyInit {
+  static func myValue() -> Int { return 123 }
+
+  var value = Self.myValue() // expected-error {{covariant 'Self' type cannot be referenced from a stored property initializer}}
 }

@@ -1932,6 +1932,9 @@ class PatternBindingEntry {
   /// The initializer context used for this pattern binding entry.
   llvm::PointerIntPair<DeclContext *, 1, bool> InitContextAndIsText;
 
+  /// Values captured by this initializer.
+  CaptureInfo Captures;
+
   friend class PatternBindingInitializer;
 
 public:
@@ -2025,6 +2028,9 @@ public:
   /// \param omitAccessors Whether the computation should omit the accessors
   /// from the source range.
   SourceRange getSourceRange(bool omitAccessors = false) const;
+
+  const CaptureInfo &getCaptureInfo() const { return Captures; }
+  void setCaptureInfo(const CaptureInfo &captures) { Captures = captures; }
 };
 
 /// This decl contains a pattern and optional initializer for a set
@@ -2121,6 +2127,18 @@ public:
   }
   
   void setPattern(unsigned i, Pattern *Pat, DeclContext *InitContext);
+
+  DeclContext *getInitContext(unsigned i) const {
+    return getPatternList()[i].getInitContext();
+  }
+
+  const CaptureInfo &getCaptureInfo(unsigned i) const {
+    return getPatternList()[i].getCaptureInfo();
+  }
+
+  void setCaptureInfo(unsigned i, const CaptureInfo &captures) {
+    getMutablePatternList()[i].setCaptureInfo(captures);
+  }
 
   /// Given that this PBD is the parent pattern for the specified VarDecl,
   /// return the entry of the VarDecl in our PatternList.  For example, in:
@@ -5847,8 +5865,8 @@ public:
   /// Retrieve the source range of the function declaration name + patterns.
   SourceRange getSignatureSourceRange() const;
 
-  CaptureInfo &getCaptureInfo() { return Captures; }
   const CaptureInfo &getCaptureInfo() const { return Captures; }
+  void setCaptureInfo(const CaptureInfo &captures) { Captures = captures; }
 
   /// Retrieve the Objective-C selector that names this method.
   ObjCSelector getObjCSelector(DeclName preferredName = DeclName(),
