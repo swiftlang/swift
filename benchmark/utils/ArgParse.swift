@@ -10,7 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Foundation
+#if os(Linux)
+import Glibc
+#elseif os(Windows)
+import MSVCRT
+#else
+import Darwin
+#endif
 
 enum ArgumentError: Error {
   case missingValue(String)
