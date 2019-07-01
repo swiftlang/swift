@@ -175,3 +175,21 @@ public protocol HasMutatingMethodClone: HasMutatingMethod {
 public extension Int {
   public func IntEnhancer() {}
 }
+
+public protocol Animal {}
+public class Cat: Animal { public init() {} }
+public class Dog: Animal { public init() {} }
+
+public class Zoo {
+  public init() {}
+  @inlinable
+  @available(iOS 13.0, OSX 10.15, tvOS 13.0, watchOS 6.0, *)
+  public var current: some Animal {
+    return Cat()
+  }
+  @inlinable
+  @available(iOS 13.0, OSX 10.15, tvOS 13.0, watchOS 6.0, *)
+  public func getCurrentAnimalInlinable() -> some Animal {
+    return Cat()
+  }
+}
