@@ -140,7 +140,7 @@ SILDeserializer::SILDeserializer(
     return;
 
   // Load any abbrev records at the start of the block.
-  SILCursor.advance();
+  MF->fatalIfUnexpected(SILCursor.advance());
 
   llvm::BitstreamCursor cursor = SILIndexCursor;
   // We expect SIL_FUNC_NAMES first, then SIL_VTABLE_NAMES, then
@@ -149,14 +149,15 @@ SILDeserializer::SILDeserializer(
   // omitted if no entries exist in the module file.
   unsigned kind = 0;
   while (kind != sil_index_block::SIL_PROPERTY_OFFSETS) {
-    auto next = cursor.advance();
+    llvm::BitstreamEntry next = MF->fatalIfUnexpected(cursor.advance());
     if (next.Kind == llvm::BitstreamEntry::EndBlock)
       return;
 
     SmallVector<uint64_t, 4> scratch;
     StringRef blobData;
     unsigned prevKind = kind;
-    kind = cursor.readRecord(next.ID, scratch, &blobData);
+    kind =
+        MF->fatalIfUnexpected(cursor.readRecord(next.ID, scratch, &blobData));
     assert((next.Kind == llvm::BitstreamEntry::Record &&
             kind > prevKind &&
             (kind == sil_index_block::SIL_FUNC_NAMES ||
@@ -186,9 +187,10 @@ SILDeserializer::SILDeserializer(
     }
 
     // Read SIL_FUNC|VTABLE|GLOBALVAR_OFFSETS record.
-    next = cursor.advance();
+    next = MF->fatalIfUnexpected(cursor.advance());
     scratch.clear();
-    unsigned offKind = cursor.readRecord(next.ID, scratch, &blobData);
+    unsigned offKind =
+        MF->fatalIfUnexpected(cursor.readRecord(next.ID, scratch, &blobData));
     (void)offKind;
     if (kind == sil_index_block::SIL_FUNC_NAMES) {
       assert((next.Kind == llvm::BitstreamEntry::Record &&
@@ -448,9 +450,14 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     return cacheEntry.get();
 
   BCOffsetRAII restoreOffset(SILCursor);
-  SILCursor.JumpToBit(cacheEntry.getOffset());
+  if (llvm::Error Err = SILCursor.JumpToBit(cacheEntry.getOffset()))
+    return std::move(Err);
 
-  auto entry = SILCursor.advance(AF_DontPopBlockAtEnd);
+  llvm::Expected<llvm::BitstreamEntry> maybeEntry =
+      SILCursor.advance(AF_DontPopBlockAtEnd);
+  if (!maybeEntry)
+    return maybeEntry.takeError();
+  llvm::BitstreamEntry entry = maybeEntry.get();
   if (entry.Kind == llvm::BitstreamEntry::Error) {
     LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in readSILFunction.\n");
     MF->fatal();
@@ -458,7 +465,11 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
 
   SmallVector<uint64_t, 64> scratch;
   StringRef blobData;
-  unsigned kind = SILCursor.readRecord(entry.ID, scratch, &blobData);
+  llvm::Expected<unsigned> maybeKind =
+      SILCursor.readRecord(entry.ID, scratch, &blobData);
+  if (!maybeKind)
+    MF->fatal(maybeKind.takeError());
+  unsigned kind = maybeKind.get();
   assert(kind == SIL_FUNCTION && "expect a sil function");
   (void)kind;
 
@@ -491,7 +502,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
       return llvm::make_error<SILEntityError>(
           name, takeErrorInfo(astType.takeError()));
     }
-    llvm::consumeError(astType.takeError());
+    consumeError(astType.takeError());
     return existingFn;
   }
   auto ty = getSILType(astType.get(), SILValueCategory::Object);
@@ -627,11 +638,18 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
 
   // Read and instantiate the specialize attributes.
   while (numSpecAttrs--) {
-    auto next = SILCursor.advance(AF_DontPopBlockAtEnd);
+    llvm::Expected<llvm::BitstreamEntry> maybeNext =
+        SILCursor.advance(AF_DontPopBlockAtEnd);
+    if (!maybeNext)
+      return maybeNext.takeError();
+    llvm::BitstreamEntry next = maybeNext.get();
     assert(next.Kind == llvm::BitstreamEntry::Record);
 
     scratch.clear();
-    kind = SILCursor.readRecord(next.ID, scratch);
+    llvm::Expected<unsigned> maybeKind = SILCursor.readRecord(next.ID, scratch);
+    if (!maybeKind)
+      return maybeKind.takeError();
+    unsigned kind = maybeKind.get();
     assert(kind == SIL_SPECIALIZE_ATTR && "Missing specialization attribute");
 
     unsigned exported;
@@ -658,7 +676,10 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
 
   // If the next entry is the end of the block, then this function has
   // no contents.
-  entry = SILCursor.advance(AF_DontPopBlockAtEnd);
+  maybeEntry = SILCursor.advance(AF_DontPopBlockAtEnd);
+  if (!maybeEntry)
+    return maybeEntry.takeError();
+  entry = maybeEntry.get();
   bool isEmptyFunction = (entry.Kind == llvm::BitstreamEntry::EndBlock);
   assert((!isEmptyFunction || !genericEnv) &&
          "generic environment without body?!");
@@ -686,7 +707,10 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     fn->setGenericEnvironment(genericEnv);
 
   scratch.clear();
-  kind = SILCursor.readRecord(entry.ID, scratch);
+  maybeKind = SILCursor.readRecord(entry.ID, scratch);
+  if (!maybeKind)
+    return maybeKind.takeError();
+  kind = maybeKind.get();
 
   SILBasicBlock *CurrentBB = nullptr;
 
@@ -745,12 +769,19 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
 
     // Fetch the next record.
     scratch.clear();
-    entry = SILCursor.advance(AF_DontPopBlockAtEnd);
+    llvm::Expected<llvm::BitstreamEntry> maybeEntry =
+        SILCursor.advance(AF_DontPopBlockAtEnd);
+    if (!maybeEntry)
+      return maybeEntry.takeError();
+    llvm::BitstreamEntry entry = maybeEntry.get();
 
     // EndBlock means the end of this SILFunction.
     if (entry.Kind == llvm::BitstreamEntry::EndBlock)
       break;
-    kind = SILCursor.readRecord(entry.ID, scratch);
+    maybeKind = SILCursor.readRecord(entry.ID, scratch);
+    if (!maybeKind)
+      return maybeKind.takeError();
+    kind = maybeKind.get();
   }
 
   // If fn is empty, we failed to deserialize its body. Return nullptr to signal
@@ -2493,7 +2524,7 @@ SILFunction *SILDeserializer::lookupSILFunction(SILFunction *InFunc) {
                                           /*declarationOnly*/ false);
   if (!maybeFunc) {
     // Ignore the error; treat it as if we didn't have a definition.
-    llvm::consumeError(maybeFunc.takeError());
+    consumeError(maybeFunc.takeError());
     return nullptr;
   }
 
@@ -2526,9 +2557,14 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
     return !Linkage || cacheEntry.get()->getLinkage() == *Linkage;
 
   BCOffsetRAII restoreOffset(SILCursor);
-  SILCursor.JumpToBit(cacheEntry.getOffset());
+  if (llvm::Error Err = SILCursor.JumpToBit(cacheEntry.getOffset()))
+    MF->fatal(std::move(Err));
 
-  auto entry = SILCursor.advance(AF_DontPopBlockAtEnd);
+  llvm::Expected<llvm::BitstreamEntry> maybeEntry =
+      SILCursor.advance(AF_DontPopBlockAtEnd);
+  if (!maybeEntry)
+    MF->fatal(maybeEntry.takeError());
+  llvm::BitstreamEntry entry = maybeEntry.get();
   if (entry.Kind == llvm::BitstreamEntry::Error) {
     LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in hasSILFunction.\n");
     MF->fatal();
@@ -2536,7 +2572,11 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
 
   SmallVector<uint64_t, 64> scratch;
   StringRef blobData;
-  unsigned kind = SILCursor.readRecord(entry.ID, scratch, &blobData);
+  llvm::Expected<unsigned> maybeKind =
+      SILCursor.readRecord(entry.ID, scratch, &blobData);
+  if (!maybeKind)
+    MF->fatal(maybeKind.takeError());
+  unsigned kind = maybeKind.get();
   assert(kind == SIL_FUNCTION && "expect a sil function");
   (void)kind;
 
@@ -2590,7 +2630,7 @@ SILFunction *SILDeserializer::lookupSILFunction(StringRef name,
 
   if (!maybeFunc) {
     // Ignore the error; treat it as if we didn't have a definition.
-    llvm::consumeError(maybeFunc.takeError());
+    consumeError(maybeFunc.takeError());
     return nullptr;
   }
 
@@ -2625,8 +2665,13 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name) {
     return globalVarOrOffset;
 
   BCOffsetRAII restoreOffset(SILCursor);
-  SILCursor.JumpToBit(globalVarOrOffset);
-  auto entry = SILCursor.advance(AF_DontPopBlockAtEnd);
+  if (llvm::Error Err = SILCursor.JumpToBit(globalVarOrOffset))
+    MF->fatal(std::move(Err));
+  llvm::Expected<llvm::BitstreamEntry> maybeEntry =
+      SILCursor.advance(AF_DontPopBlockAtEnd);
+  if (!maybeEntry)
+    MF->fatal(maybeEntry.takeError());
+  llvm::BitstreamEntry entry = maybeEntry.get();
   if (entry.Kind == llvm::BitstreamEntry::Error) {
     LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in readGlobalVar.\n");
     return nullptr;
@@ -2634,7 +2679,11 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name) {
 
   SmallVector<uint64_t, 64> scratch;
   StringRef blobData;
-  unsigned kind = SILCursor.readRecord(entry.ID, scratch, &blobData);
+  llvm::Expected<unsigned> maybeKind =
+      SILCursor.readRecord(entry.ID, scratch, &blobData);
+  if (!maybeKind)
+    MF->fatal(maybeKind.takeError());
+  unsigned kind = maybeKind.get();
   assert(kind == SIL_GLOBALVAR && "expect a sil global var");
   (void)kind;
 
@@ -2698,7 +2747,7 @@ void SILDeserializer::getAllSILFunctions() {
                                             false/*errorIfEmptyBody*/);
     if (!maybeFunc) {
       // Ignore the error; treat it as if we didn't have a definition.
-      llvm::consumeError(maybeFunc.takeError());
+      consumeError(maybeFunc.takeError());
     }
   }
 }
@@ -2713,8 +2762,13 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
     return vTableOrOffset;
 
   BCOffsetRAII restoreOffset(SILCursor);
-  SILCursor.JumpToBit(vTableOrOffset);
-  auto entry = SILCursor.advance(AF_DontPopBlockAtEnd);
+  if (llvm::Error Err = SILCursor.JumpToBit(vTableOrOffset))
+    MF->fatal(std::move(Err));
+  llvm::Expected<llvm::BitstreamEntry> maybeEntry =
+      SILCursor.advance(AF_DontPopBlockAtEnd);
+  if (!maybeEntry)
+    MF->fatal(maybeEntry.takeError());
+  llvm::BitstreamEntry entry = maybeEntry.get();
   if (entry.Kind == llvm::BitstreamEntry::Error) {
     LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in readVTable.\n");
     return nullptr;
@@ -2722,7 +2776,11 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
 
   SmallVector<uint64_t, 64> scratch;
   StringRef blobData;
-  unsigned kind = SILCursor.readRecord(entry.ID, scratch, &blobData);
+  llvm::Expected<unsigned> maybeKind =
+      SILCursor.readRecord(entry.ID, scratch, &blobData);
+  if (!maybeKind)
+    MF->fatal(maybeKind.takeError());
+  unsigned kind = maybeKind.get();
   assert(kind == SIL_VTABLE && "expect a sil vtable");
   (void)kind;
 
@@ -2740,11 +2798,17 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
 
   // Fetch the next record.
   scratch.clear();
-  entry = SILCursor.advance(AF_DontPopBlockAtEnd);
+  maybeEntry = SILCursor.advance(AF_DontPopBlockAtEnd);
+  if (!maybeEntry)
+    MF->fatal(maybeEntry.takeError());
+  entry = maybeEntry.get();
   if (entry.Kind == llvm::BitstreamEntry::EndBlock)
     // This vtable has no contents.
     return nullptr;
-  kind = SILCursor.readRecord(entry.ID, scratch);
+  maybeKind = SILCursor.readRecord(entry.ID, scratch);
+  if (!maybeKind)
+    MF->fatal(maybeKind.takeError());
+  kind = maybeKind.get();
 
   std::vector<SILVTable::Entry> vtableEntries;
   // Another SIL_VTABLE record means the end of this VTable.
@@ -2770,11 +2834,17 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
 
     // Fetch the next record.
     scratch.clear();
-    entry = SILCursor.advance(AF_DontPopBlockAtEnd);
+    maybeEntry = SILCursor.advance(AF_DontPopBlockAtEnd);
+    if (!maybeEntry)
+      MF->fatal(maybeEntry.takeError());
+    entry = maybeEntry.get();
     if (entry.Kind == llvm::BitstreamEntry::EndBlock)
       // EndBlock means the end of this VTable.
       break;
-    kind = SILCursor.readRecord(entry.ID, scratch);
+    maybeKind = SILCursor.readRecord(entry.ID, scratch);
+    if (!maybeKind)
+      MF->fatal(maybeKind.takeError());
+    kind = maybeKind.get();
   }
 
   // If we've already serialized the module, don't mark the witness table
@@ -2820,8 +2890,13 @@ SILProperty *SILDeserializer::readProperty(DeclID PId) {
     return propOrOffset.get();
 
   BCOffsetRAII restoreOffset(SILCursor);
-  SILCursor.JumpToBit(propOrOffset.getOffset());
-  auto entry = SILCursor.advance(AF_DontPopBlockAtEnd);
+  if (llvm::Error Err = SILCursor.JumpToBit(propOrOffset.getOffset()))
+    MF->fatal(std::move(Err));
+  llvm::Expected<llvm::BitstreamEntry> maybeEntry =
+      SILCursor.advance(AF_DontPopBlockAtEnd);
+  if (!maybeEntry)
+    MF->fatal(maybeEntry.takeError());
+  llvm::BitstreamEntry entry = maybeEntry.get();
   if (entry.Kind == llvm::BitstreamEntry::Error) {
     LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in readProperty.\n");
     return nullptr;
@@ -2829,7 +2904,11 @@ SILProperty *SILDeserializer::readProperty(DeclID PId) {
 
   SmallVector<uint64_t, 64> scratch;
   StringRef blobData;
-  unsigned kind = SILCursor.readRecord(entry.ID, scratch, &blobData);
+  llvm::Expected<unsigned> maybeKind =
+      SILCursor.readRecord(entry.ID, scratch, &blobData);
+  if (!maybeKind)
+    MF->fatal(maybeKind.takeError());
+  unsigned kind = maybeKind.get();
   assert(kind == SIL_PROPERTY && "expect a sil_property");
   (void)kind;
 
@@ -2859,7 +2938,10 @@ void SILDeserializer::readWitnessTableEntries(
     std::vector<SILWitnessTable::ConditionalConformance>
       &conditionalConformances) {
   SmallVector<uint64_t, 64> scratch;
-  unsigned kind = SILCursor.readRecord(entry.ID, scratch);
+  llvm::Expected<unsigned> maybeKind = SILCursor.readRecord(entry.ID, scratch);
+  if (!maybeKind)
+    MF->fatal(maybeKind.takeError());
+  unsigned kind = maybeKind.get();
 
   // Another record means the end of this WitnessTable.
   while (kind != SIL_WITNESS_TABLE &&
@@ -2921,11 +3003,18 @@ void SILDeserializer::readWitnessTableEntries(
 
     // Fetch the next record.
     scratch.clear();
-    entry = SILCursor.advance(AF_DontPopBlockAtEnd);
+    llvm::Expected<llvm::BitstreamEntry> maybeEntry =
+        SILCursor.advance(AF_DontPopBlockAtEnd);
+    if (!maybeEntry)
+      MF->fatal(maybeEntry.takeError());
+    entry = maybeEntry.get();
     if (entry.Kind == llvm::BitstreamEntry::EndBlock)
       // EndBlock means the end of this WitnessTable.
       break;
-    kind = SILCursor.readRecord(entry.ID, scratch);
+    maybeKind = SILCursor.readRecord(entry.ID, scratch);
+    if (!maybeKind)
+      MF->fatal(maybeKind.takeError());
+    kind = maybeKind.get();
   }
 }
 
@@ -2941,8 +3030,13 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
     return wTableOrOffset.get();
 
   BCOffsetRAII restoreOffset(SILCursor);
-  SILCursor.JumpToBit(wTableOrOffset.getOffset());
-  auto entry = SILCursor.advance(AF_DontPopBlockAtEnd);
+  if (llvm::Error Err = SILCursor.JumpToBit(wTableOrOffset.getOffset()))
+    MF->fatal(std::move(Err));
+  llvm::Expected<llvm::BitstreamEntry> maybeEntry =
+      SILCursor.advance(AF_DontPopBlockAtEnd);
+  if (!maybeEntry)
+    MF->fatal(maybeEntry.takeError());
+  llvm::BitstreamEntry entry = maybeEntry.get();
   if (entry.Kind == llvm::BitstreamEntry::Error) {
     LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in readWitnessTable.\n");
     return nullptr;
@@ -2950,7 +3044,11 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
 
   SmallVector<uint64_t, 64> scratch;
   StringRef blobData;
-  unsigned kind = SILCursor.readRecord(entry.ID, scratch, &blobData);
+  llvm::Expected<unsigned> maybeKind =
+      SILCursor.readRecord(entry.ID, scratch, &blobData);
+  if (!maybeKind)
+    MF->fatal(maybeKind.takeError());
+  unsigned kind = maybeKind.get();
   assert(kind == SIL_WITNESS_TABLE && "expect a sil witnesstable");
   (void)kind;
 
@@ -3017,7 +3115,10 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
 
   // Fetch the next record.
   scratch.clear();
-  entry = SILCursor.advance(AF_DontPopBlockAtEnd);
+  maybeEntry = SILCursor.advance(AF_DontPopBlockAtEnd);
+  if (!maybeEntry)
+    MF->fatal(maybeEntry.takeError());
+  entry = maybeEntry.get();
   if (entry.Kind == llvm::BitstreamEntry::EndBlock)
     return nullptr;
 
@@ -3084,8 +3185,13 @@ readDefaultWitnessTable(DeclID WId, SILDefaultWitnessTable *existingWt) {
     return wTableOrOffset.get();
 
   BCOffsetRAII restoreOffset(SILCursor);
-  SILCursor.JumpToBit(wTableOrOffset.getOffset());
-  auto entry = SILCursor.advance(AF_DontPopBlockAtEnd);
+  if (llvm::Error Err = SILCursor.JumpToBit(wTableOrOffset.getOffset()))
+    MF->fatal(std::move(Err));
+  llvm::Expected<llvm::BitstreamEntry> maybeEntry =
+      SILCursor.advance(AF_DontPopBlockAtEnd);
+  if (!maybeEntry)
+    MF->fatal(maybeEntry.takeError());
+  llvm::BitstreamEntry entry = maybeEntry.get();
   if (entry.Kind == llvm::BitstreamEntry::Error) {
     LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in "
                                "readDefaultWitnessTable.\n");
@@ -3094,7 +3200,11 @@ readDefaultWitnessTable(DeclID WId, SILDefaultWitnessTable *existingWt) {
 
   SmallVector<uint64_t, 64> scratch;
   StringRef blobData;
-  unsigned kind = SILCursor.readRecord(entry.ID, scratch, &blobData);
+  llvm::Expected<unsigned> maybeKind =
+      SILCursor.readRecord(entry.ID, scratch, &blobData);
+  if (!maybeKind)
+    MF->fatal(maybeKind.takeError());
+  unsigned kind = maybeKind.get();
   assert(kind == SIL_DEFAULT_WITNESS_TABLE && "expect a sil default witness table");
   (void)kind;
 
@@ -3141,7 +3251,10 @@ readDefaultWitnessTable(DeclID WId, SILDefaultWitnessTable *existingWt) {
 
   // Fetch the next record.
   scratch.clear();
-  entry = SILCursor.advance(AF_DontPopBlockAtEnd);
+  maybeEntry = SILCursor.advance(AF_DontPopBlockAtEnd);
+  if (!maybeEntry)
+    MF->fatal(maybeEntry.takeError());
+  entry = maybeEntry.get();
   if (entry.Kind == llvm::BitstreamEntry::EndBlock)
     return nullptr;
 
