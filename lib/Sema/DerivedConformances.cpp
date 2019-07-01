@@ -588,7 +588,7 @@ DerivedConformance::declareDerivedProperty(Identifier name,
                                       parentDC);
   // SWIFT_ENABLE_TENSORFLOW
   // TODO: Upstream this change to master.
-  if (isFinal)
+  if (isFinal && parentDC->getSelfClassDecl())
     propDecl->getAttrs().add(new (C) FinalAttr(/*Implicit*/ true));
   propDecl->setImplicit();
   propDecl->copyFormalAccessFrom(Nominal, /*sourceIsParentContext*/ true);
