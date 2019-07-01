@@ -3759,20 +3759,20 @@ void AttributeChecker::visitNoDerivativeAttr(NoDerivativeAttr *attr) {
     return;
   if (!vd || vd->isStatic()) {
     diagnoseAndRemoveAttr(attr,
-        diag::noderivative_only_on_stored_properties_in_differentiable_structs);
+        diag::noderivative_only_on_differentiable_struct_or_class_fields);
     return;
   }
-  auto *structDecl = dyn_cast<StructDecl>(vd->getDeclContext());
-  if (!structDecl) {
+  auto *nominal = vd->getDeclContext()->getSelfNominalTypeDecl();
+  if (!nominal || (!isa<StructDecl>(nominal) && !isa<ClassDecl>(nominal))) {
     diagnoseAndRemoveAttr(attr,
-        diag::noderivative_only_on_stored_properties_in_differentiable_structs);
+        diag::noderivative_only_on_differentiable_struct_or_class_fields);
     return;
   }
   if (!conformsToDifferentiable(
-          structDecl->getDeclaredInterfaceType(),
-          structDecl->getDeclContext())) {
+          nominal->getDeclaredInterfaceType(),
+          nominal->getDeclContext())) {
     diagnoseAndRemoveAttr(attr,
-        diag::noderivative_only_on_stored_properties_in_differentiable_structs);
+        diag::noderivative_only_on_differentiable_struct_or_class_fields);
     return;
   }
 }

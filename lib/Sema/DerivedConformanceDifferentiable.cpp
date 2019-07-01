@@ -13,7 +13,7 @@
 // SWIFT_ENABLE_TENSORFLOW
 //
 // This file implements explicit derivation of the Differentiable protocol for
-// struct types.
+// struct and class types.
 //
 //===----------------------------------------------------------------------===//
 
@@ -108,8 +108,7 @@ static StructDecl *getAssociatedStructDecl(DeclContext *DC, Identifier id) {
   auto *diffableProto = C.getProtocol(KnownProtocolKind::Differentiable);
   assert(diffableProto && "`Differentiable` protocol not found");
   auto conf = TypeChecker::conformsToProtocol(DC->getSelfTypeInContext(),
-                                              diffableProto,
-                                              DC, None);
+                                              diffableProto, DC, None);
   assert(conf && "Nominal must conform to `Differentiable`");
   Type assocType = conf->getTypeWitnessByName(DC->getSelfTypeInContext(), id);
   assert(assocType && "`Differentiable` protocol associated type not found");
@@ -120,9 +119,8 @@ static StructDecl *getAssociatedStructDecl(DeclContext *DC, Identifier id) {
 
 bool DerivedConformance::canDeriveDifferentiable(NominalTypeDecl *nominal,
                                                  DeclContext *DC) {
-  // Nominal type must be a struct. (Zero stored properties is okay.)
-  auto *structDecl = dyn_cast<StructDecl>(nominal);
-  if (!structDecl)
+  // Nominal type must be a struct or class. (No stored properties is okay.)
+  if (!isa<StructDecl>(nominal) && !isa<ClassDecl>(nominal))
     return false;
   auto &C = nominal->getASTContext();
   auto *lazyResolver = C.getLazyResolver();
@@ -153,8 +151,7 @@ bool DerivedConformance::canDeriveDifferentiable(NominalTypeDecl *nominal,
     //   `X == X.TangentVector`.
     if (nominal->isImplicit() && structDecl == nominal->getDeclContext() &&
         TypeChecker::conformsToProtocol(structDecl->getDeclaredInterfaceType(),
-                                        diffableProto, DC,
-                                        None))
+                                        diffableProto, DC, None))
       return structDecl;
     // 3. Equal nominal (and conform to `AdditiveArithmetic` if flag is true).
     if (structDecl == nominal) {
@@ -199,7 +196,7 @@ bool DerivedConformance::canDeriveDifferentiable(NominalTypeDecl *nominal,
   //     initializers that initialize all stored properties, including initial
   //     value information.
   SmallVector<VarDecl *, 16> diffProperties;
-  getStoredPropertiesForDifferentiation(structDecl, DC, diffProperties);
+  getStoredPropertiesForDifferentiation(nominal, DC, diffProperties);
   return llvm::all_of(diffProperties, [&](VarDecl *v) {
     if (!v->hasInterfaceType())
       lazyResolver->resolveDeclSignature(v);
@@ -325,7 +322,8 @@ static ValueDecl *deriveDifferentiable_method(
                                     /*Throws*/ false, SourceLoc(),
                                     /*GenericParams=*/nullptr, params,
                                     TypeLoc::withoutLoc(returnType), parentDC);
-  funcDecl->setSelfAccessKind(SelfAccessKind::Mutating);
+  if (!nominal->getSelfClassDecl())
+    funcDecl->setSelfAccessKind(SelfAccessKind::Mutating);
   funcDecl->setImplicit();
   funcDecl->setBodySynthesizer(bodySynthesizer.Fn, bodySynthesizer.Context);
 
@@ -804,6 +802,8 @@ static void checkAndDiagnoseImplicitNoDerivative(TypeChecker &TC,
                                                  DeclContext* DC) {
   auto *diffableProto =
       TC.Context.getProtocol(KnownProtocolKind::Differentiable);
+  bool nominalCanDeriveAdditiveArithmetic =
+      DerivedConformance::canDeriveAdditiveArithmetic(nominal, DC);
   for (auto *vd : nominal->getStoredProperties()) {
     if (!vd->hasInterfaceType())
       TC.resolveDeclSignature(vd);
@@ -814,8 +814,7 @@ static void checkAndDiagnoseImplicitNoDerivative(TypeChecker &TC,
       continue;
     // Check whether to diagnose stored property.
     bool conformsToDifferentiable =
-        TC.conformsToProtocol(varType, diffableProto, nominal,
-                              None).hasValue();
+        TC.conformsToProtocol(varType, diffableProto, nominal, None).hasValue();
     // If stored property should not be diagnosed, continue.
     if (conformsToDifferentiable && !vd->isLet())
       continue;
@@ -829,8 +828,6 @@ static void checkAndDiagnoseImplicitNoDerivative(TypeChecker &TC,
     // `Differentiable` protocol requirements all have default implementations
     // when `Self` conforms to `AdditiveArithmetic`, so `Differentiable`
     // derived conformances will no longer be necessary.
-    bool nominalCanDeriveAdditiveArithmetic =
-        DerivedConformance::canDeriveAdditiveArithmetic(nominal, DC);
     if (!conformsToDifferentiable) {
       TC.diagnose(loc,
                   diag::differentiable_nondiff_type_implicit_noderivative_fixit,
@@ -844,7 +841,6 @@ static void checkAndDiagnoseImplicitNoDerivative(TypeChecker &TC,
                 vd->getName(), nominal->getName(),
                 nominalCanDeriveAdditiveArithmetic)
         .fixItInsert(loc, "@noDerivative ");
-
   }
 }
 
@@ -954,6 +950,7 @@ deriveDifferentiable_AssociatedStruct(DerivedConformance &derived,
   bool hasNoDerivativeStoredProp = diffProperties.size() != numStoredProperties;
 
   // Check conditions for returning `Self`.
+  // - `Self` is not a class type.
   // - No `@noDerivative` stored properties exist.
   // - All stored properties must have specified associated type equal to
   //   `Self`.
@@ -971,7 +968,7 @@ deriveDifferentiable_AssociatedStruct(DerivedConformance &derived,
                             parentDC, None);
 
   // Return `Self` if conditions are met.
-  if (!hasNoDerivativeStoredProp &&
+  if (!hasNoDerivativeStoredProp && !nominal->getSelfClassDecl() &&
       (id == C.Id_AllDifferentiableVariables ||
        (allMembersAssocTypeEqualsSelf && nominalConformsToAddArith))) {
     auto selfType = parentDC->getSelfTypeInContext();
