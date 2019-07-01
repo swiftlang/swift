@@ -2607,6 +2607,8 @@ public:
     for (Decl *Member : SD->getMembers())
       visit(Member);
 
+    TC.checkPatternBindingCaptures(SD);
+
     TC.checkDeclAttributes(SD);
 
     checkInheritanceClause(SD);
@@ -2734,6 +2736,8 @@ public:
     for (Decl *Member : CD->getMembers()) {
       visit(Member);
     }
+
+    TC.checkPatternBindingCaptures(CD);
 
     // If this class requires all of its stored properties to have
     // in-class initializers, diagnose this now.

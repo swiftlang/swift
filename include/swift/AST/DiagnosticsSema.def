@@ -2561,6 +2561,9 @@ ERROR(self_in_nominal,none,
       "'Self' is only available in a protocol or as the result of a "
       "method in a class; did you mean '%0'?", (StringRef))
 
+ERROR(dynamic_self_stored_property_init,none,
+      "covariant 'Self' type cannot be referenced from a stored property initializer", ())
+
 //------------------------------------------------------------------------------
 // MARK: Type Check Attributes
 //------------------------------------------------------------------------------
