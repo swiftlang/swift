@@ -149,6 +149,19 @@ tuplify(true) {
   }
 }
 
+// rdar://50710698
+// CHECK: ("chain5", 8, 9)
+tuplify(true) {
+  "chain5"
+  #if false
+    6
+    $0
+  #else
+    8
+    9
+  #endif
+}
+
 // CHECK: ("getterBuilder", 0, 4, 12)
 @TupleBuilder
 var globalBuilder: (String, Int, Int, Int) {

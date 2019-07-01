@@ -136,6 +136,12 @@ public:
       }
 
       if (auto decl = node.dyn_cast<Decl *>()) {
+        // Just ignore #if; the chosen children should appear in the
+        // surrounding context.  This isn't good for source tools but it
+        // at least works.
+        if (isa<IfConfigDecl>(decl))
+          continue;
+
         if (!unhandledNode)
           unhandledNode = decl;
 
