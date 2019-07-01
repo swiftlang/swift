@@ -484,16 +484,8 @@ public:
       auto funcDecl = TheFunc->getAbstractFunctionDecl();
       if (!funcDecl)
         return false;
-      // Either the function is declared with its own opaque return type...
-      if (opaque->getNamingDecl() == funcDecl)
-        return true;
-      // ...or the function is a getter for a property or subscript with an
-      // opaque return type.
-      if (auto accessor = dyn_cast<AccessorDecl>(funcDecl)) {
-        return accessor->isGetter()
-          && opaque->getNamingDecl() == accessor->getStorage();
-      }
-      return false;
+
+      return opaque->isOpaqueReturnTypeOfFunction(funcDecl);
     };
     
     if (auto opaque = ResultTy->getAs<OpaqueTypeArchetypeType>()) {
