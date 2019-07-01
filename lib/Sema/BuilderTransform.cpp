@@ -498,6 +498,11 @@ bool TypeChecker::typeCheckFunctionBuilderFuncBody(FuncDecl *FD,
           FD->getBody()->getSourceRange()))
     options |= TypeCheckExprFlags::SuppressDiagnostics;
 
+  if (auto opaque = returnType->getAs<OpaqueTypeArchetypeType>()) {
+    if (opaque->getDecl()->isOpaqueReturnTypeOfFunction(FD))
+      options |= TypeCheckExprFlags::ConvertTypeIsOpaqueReturnType;
+  }
+
   // Type-check the single result expression.
   Type returnExprType = typeCheckExpression(returnExpr, FD,
                                             TypeLoc::withoutLoc(returnType),

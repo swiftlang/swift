@@ -6445,6 +6445,21 @@ OpaqueTypeDecl::OpaqueTypeDecl(ValueDecl *NamingDecl,
   setImplicit();
 }
 
+bool OpaqueTypeDecl::isOpaqueReturnTypeOfFunction(
+                                       const AbstractFunctionDecl *func) const {
+  // Either the function is declared with its own opaque return type...
+  if (getNamingDecl() == func)
+    return true;
+
+  // ...or the function is a getter for a property or subscript with an
+  // opaque return type.
+  if (auto accessor = dyn_cast<AccessorDecl>(func)) {
+    return accessor->isGetter() && getNamingDecl() == accessor->getStorage();
+  }
+
+  return false;
+}
+
 Identifier OpaqueTypeDecl::getOpaqueReturnTypeIdentifier() const {
   assert(getNamingDecl() && "not an opaque return type");
   if (!OpaqueReturnTypeIdentifier.empty())
