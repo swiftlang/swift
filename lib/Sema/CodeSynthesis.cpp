@@ -369,6 +369,9 @@ static void maybeMarkTransparent(AccessorDecl *accessor, ASTContext &ctx) {
             return;
 
           break;
+        } else if (var->getOriginalWrappedProperty(
+                     PropertyWrapperSynthesizedPropertyKind::StorageWrapper)) {
+          break;
         }
       }
 
@@ -613,6 +616,57 @@ namespace {
   };
 } // end anonymous namespace
 
+namespace  {
+  /// Describes the information needed to perform property wrapper access via
+  /// the enclosing self.
+  struct EnclosingSelfPropertyWrapperAccess {
+    /// The (genreric) subscript that will be used to perform the access.
+    SubscriptDecl *subscript;
+
+    /// The property being accessed.
+    VarDecl *accessedProperty;
+  };
+}
+
+/// Determine whether the given property should be accessed via the enclosing-self access pattern.
+static Optional<EnclosingSelfPropertyWrapperAccess>
+getEnclosingSelfPropertyWrapperAccess(VarDecl *property, bool forProjected) {
+  // The enclosing-self pattern only applies to instance properties of
+  // classes.
+  if (!property->isInstanceMember())
+    return None;
+  auto classDecl = property->getDeclContext()->getSelfClassDecl();
+  if (!classDecl)
+    return None;
+
+  // The pattern currently only works with the outermost property wrapper.
+  Type outermostWrapperType = property->getAttachedPropertyWrapperType(0);
+  if (!outermostWrapperType)
+    return None;
+  NominalTypeDecl *wrapperTypeDecl = outermostWrapperType->getAnyNominal();
+  if (!wrapperTypeDecl)
+    return None;
+
+  // Look for a generic subscript that fits the general form we need.
+  auto wrapperInfo = wrapperTypeDecl->getPropertyWrapperTypeInfo();
+  auto subscript =
+      forProjected ? wrapperInfo.enclosingInstanceProjectedSubscript
+                   : wrapperInfo.enclosingInstanceWrappedSubscript;
+  if (!subscript)
+    return None;
+
+  EnclosingSelfPropertyWrapperAccess result;
+  result.subscript = subscript;
+
+  if (forProjected) {
+    result.accessedProperty =
+        property->getPropertyWrapperBackingPropertyInfo().storageWrapperVar;
+  } else {
+    result.accessedProperty = property;
+  }
+  return result;
+}
+
 /// Build an l-value for the storage of a declaration.
 static Expr *buildStorageReference(AccessorDecl *accessor,
                                    AbstractStorageDecl *storage,
@@ -621,6 +675,7 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
                                    ASTContext &ctx) {
   // Local function to "finish" the expression, creating a member reference
   // to the given sequence of underlying variables.
+  Optional<EnclosingSelfPropertyWrapperAccess> enclosingSelfAccess;
   llvm::TinyPtrVector<VarDecl *> underlyingVars;
   auto finish = [&](Expr *result) -> Expr * {
     for (auto underlyingVar : underlyingVars) {
@@ -699,9 +754,20 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
   case TargetImpl::Wrapper: {
     auto var = cast<VarDecl>(accessor->getStorage());
     storage = var->getPropertyWrapperBackingProperty();
-    for (unsigned i : indices(var->getAttachedPropertyWrappers())) {
-      underlyingVars.push_back(
-          var->getAttachedPropertyWrapperTypeInfo(i).valueVar);
+
+    // If the outermost property wrapper uses the enclosing self pattern,
+    // record that.
+    unsigned lastWrapperIdx = var->getAttachedPropertyWrappers().size();
+    unsigned firstWrapperIdx = 0;
+    enclosingSelfAccess =
+        getEnclosingSelfPropertyWrapperAccess(var, /*forProjected=*/false);
+    if (enclosingSelfAccess)
+      firstWrapperIdx = 1;
+
+    // Perform accesses to the wrappedValues along the composition chain.
+    for (unsigned i : range(firstWrapperIdx, lastWrapperIdx)) {
+      auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo(i);
+      underlyingVars.push_back(wrapperInfo.valueVar);
     }
     semantics = AccessSemantics::DirectToStorage;
     selfAccessKind = SelfAccessorKind::Peer;
@@ -710,9 +776,14 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
 
   case TargetImpl::WrapperStorage: {
     auto var =
-      cast<VarDecl>(accessor->getStorage())->getOriginalWrappedProperty();
+        cast<VarDecl>(accessor->getStorage())->getOriginalWrappedProperty();
     storage = var->getPropertyWrapperBackingProperty();
-    underlyingVars.push_back( var->getAttachedPropertyWrapperTypeInfo(0).projectedValueVar);
+    enclosingSelfAccess =
+        getEnclosingSelfPropertyWrapperAccess(var, /*forProjected=*/true);
+    if (!enclosingSelfAccess) {
+      underlyingVars.push_back(
+        var->getAttachedPropertyWrapperTypeInfo(0).projectedValueVar);
+    }
     semantics = AccessSemantics::DirectToStorage;
     selfAccessKind = SelfAccessorKind::Peer;
     break;
@@ -757,26 +828,82 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
     selfDRE = new (ctx) DerivedToBaseExpr(selfDRE, selfTypeForAccess);
   }
 
-  LookupExpr *lookupExpr;
+  Expr *lookupExpr;
   ConcreteDeclRef memberRef(storage, subs);
-
-  if (auto subscript = dyn_cast<SubscriptDecl>(storage)) {
-    Expr *indices = buildSubscriptIndexReference(ctx, accessor);
-    lookupExpr = SubscriptExpr::create(ctx, selfDRE, indices, memberRef,
-                                       IsImplicit, semantics);
-  } else {
-    lookupExpr = new (ctx) MemberRefExpr(selfDRE, SourceLoc(), memberRef,
-                                         DeclNameLoc(), IsImplicit, semantics);
-  }
-
-  if (selfAccessKind == SelfAccessorKind::Super)
-    lookupExpr->setIsSuper(true);
-
   auto type = storage->getValueInterfaceType()
       .subst(subs, SubstFlags::UseErrorType);
   if (isMemberLValue)
     type = LValueType::get(type);
-  lookupExpr->setType(type);
+
+  // When we are performing access via a property wrapper's static subscript
+  // that accepts the enclosing self along with key paths, form that subscript
+  // operation now.
+  if (enclosingSelfAccess) {
+    Type storageType = storage->getValueInterfaceType()
+        .subst(subs, SubstFlags::UseErrorType);
+    // Metatype instance for the wrapper type itself.
+    TypeExpr *wrapperMetatype = TypeExpr::createImplicit(storageType, ctx);
+
+    // Key path referring to the property being accessed.
+    Expr *propertyKeyPath = new (ctx) KeyPathDotExpr(SourceLoc());
+    propertyKeyPath = new (ctx) UnresolvedDotExpr(
+        propertyKeyPath, SourceLoc(),
+        enclosingSelfAccess->accessedProperty->getFullName(), DeclNameLoc(),
+        /*Implicit=*/true);
+    propertyKeyPath = new (ctx) KeyPathExpr(
+        SourceLoc(), nullptr, propertyKeyPath);
+
+    // Key path referring to the backing storage property.
+    Expr *storageKeyPath = new (ctx) KeyPathDotExpr(SourceLoc());
+    storageKeyPath = new (ctx) UnresolvedDotExpr(
+        storageKeyPath, SourceLoc(), storage->getFullName(), DeclNameLoc(),
+        /*Implicit=*/true);
+    storageKeyPath = new (ctx) KeyPathExpr(
+        SourceLoc(), nullptr, storageKeyPath);
+    Expr *args[3] = {
+      selfDRE,
+      propertyKeyPath,
+      storageKeyPath
+    };
+
+    SubscriptDecl *subscriptDecl = enclosingSelfAccess->subscript;
+    auto &tc = static_cast<TypeChecker&>(*ctx.getLazyResolver());
+    lookupExpr = SubscriptExpr::create(
+        ctx, wrapperMetatype, SourceLoc(), args,
+        subscriptDecl->getFullName().getArgumentNames(), { }, SourceLoc(),
+        nullptr, subscriptDecl, /*Implicit=*/true);
+    tc.typeCheckExpression(lookupExpr, accessor);
+
+    // Make sure we produce an lvalue only when desired.
+    if (isMemberLValue != lookupExpr->getType()->is<LValueType>()) {
+      if (isMemberLValue) {
+        // Strip off an extraneous load.
+        if (auto load = dyn_cast<LoadExpr>(lookupExpr))
+          lookupExpr = load->getSubExpr();
+      } else {
+        lookupExpr = new (ctx) LoadExpr(
+            lookupExpr, lookupExpr->getType()->getRValueType());
+      }
+    }
+  } else if (auto subscript = dyn_cast<SubscriptDecl>(storage)) {
+    Expr *indices = buildSubscriptIndexReference(ctx, accessor);
+    lookupExpr = SubscriptExpr::create(ctx, selfDRE, indices, memberRef,
+                                       IsImplicit, semantics);
+
+    if (selfAccessKind == SelfAccessorKind::Super)
+      cast<LookupExpr>(lookupExpr)->setIsSuper(true);
+
+    lookupExpr->setType(type);
+
+  } else {
+    lookupExpr = new (ctx) MemberRefExpr(selfDRE, SourceLoc(), memberRef,
+                                         DeclNameLoc(), IsImplicit, semantics);
+
+    if (selfAccessKind == SelfAccessorKind::Super)
+      cast<LookupExpr>(lookupExpr)->setIsSuper(true);
+
+    lookupExpr->setType(type);
+  }
 
   return finish(lookupExpr);
 }

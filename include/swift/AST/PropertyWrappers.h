@@ -52,6 +52,17 @@ struct PropertyWrapperTypeInfo {
   /// will be created that redirects to this property.
   VarDecl *projectedValueVar = nullptr;
 
+  /// The static subscript through which the access of instance properties
+  /// of classes can be directed (instead of wrappedValue), providing the
+  /// ability to reason about the enclosing "self".
+  SubscriptDecl *enclosingInstanceWrappedSubscript = nullptr;
+
+  /// The static subscript through which the access of instance properties
+  /// of classes can be directed (instead of projectedValue), providing the
+  /// ability to reason about the enclosing "self".
+  SubscriptDecl *enclosingInstanceProjectedSubscript = nullptr;
+
+  ///
   /// Whether this is a valid property wrapper.
   bool isValid() const {
     return valueVar != nullptr;
