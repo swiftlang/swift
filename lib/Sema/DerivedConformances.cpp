@@ -554,7 +554,9 @@ DerivedConformance::declareDerivedPropertySetter(TypeChecker &tc,
     /*GenericParams*/ nullptr, params, TypeLoc(), parentDC);
   setterDecl->setImplicit();
   setterDecl->setStatic(isStatic);
-  setterDecl->setSelfAccessKind(SelfAccessKind::Mutating);
+  // Set mutating if parent is not a class.
+  if (!parentDC->getSelfClassDecl())
+    setterDecl->setSelfAccessKind(SelfAccessKind::Mutating);
 
   // If this is supposed to be a final method, mark it as such.
   assert(isFinal || !parentDC->getSelfClassDecl());
@@ -584,6 +586,10 @@ DerivedConformance::declareDerivedProperty(Identifier name,
   VarDecl *propDecl = new (C) VarDecl(/*IsStatic*/isStatic, VarDecl::Specifier::Var,
                                       /*IsCaptureList*/false, SourceLoc(), name,
                                       parentDC);
+  // SWIFT_ENABLE_TENSORFLOW
+  // TODO: Upstream this change to master.
+  if (isFinal)
+    propDecl->getAttrs().add(new (C) FinalAttr(/*Implicit*/ true));
   propDecl->setImplicit();
   propDecl->copyFormalAccessFrom(Nominal, /*sourceIsParentContext*/ true);
   propDecl->setInterfaceType(propertyInterfaceType);

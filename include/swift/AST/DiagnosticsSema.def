@@ -2869,9 +2869,9 @@ ERROR(compiler_evaluable_ref_non_compiler_evaluable,none,
       "@compilerEvaluable functions may not reference non-@compilerEvaluable functions", ())
 
 // @noDerivative attribute
-ERROR(noderivative_only_on_stored_properties_in_differentiable_structs,none,
-      "'@noDerivative' is only allowed on stored properties in structure types "
-      "that declare a conformance to 'Differentiable'", ())
+ERROR(noderivative_only_on_stored_properties_in_differentiable_types,none,
+      "'@noDerivative' is only allowed on stored properties in structure or "
+      "class types that declare a conformance to 'Differentiable'", ())
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Expressions

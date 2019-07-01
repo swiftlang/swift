@@ -178,8 +178,10 @@ static void deriveBodyMathOperator(AbstractFunctionDecl *funcDecl,
     // If conformance reference is concrete, then use concrete witness
     // declaration for the operator.
     if (confRef->isConcrete())
-      memberOpDecl = confRef->getConcrete()->getWitnessDecl(
-          operatorReq, C.getLazyResolver());
+      if (auto *concreteMemberMethodDecl =
+              confRef->getConcrete()->getWitnessDecl(operatorReq,
+                                                     C.getLazyResolver()))
+        memberOpDecl = concreteMemberMethodDecl;
     assert(memberOpDecl && "Member operator declaration must exist");
     auto memberOpDRE =
         new (C) DeclRefExpr(memberOpDecl, DeclNameLoc(), /*Implicit*/ true);
