@@ -83,6 +83,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_SECOND | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_SECOND
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_SKIPPED | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_SKIPPED
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARCHETYPE_GENERIC_1 | %FileCheck %s -check-prefix=ARCHETYPE_GENERIC_1
+
 var i1 = 1
 var i2 = 2
 var oi1 : Int?
@@ -685,4 +687,13 @@ func testImplicitMember() {
 // IMPLICIT_MEMBER_SKIPPED: Keyword/ExprSpecific:               arg3: [#Argument name#];
 // IMPLICIT_MEMBER_SKIPPED: Keyword/ExprSpecific:               arg4: [#Argument name#];
 // IMPLICIT_MEMBER_SKIPPED: End completions
+}
+
+struct Wrap<T> {
+  func method<U>(_ fn: (T) -> U) -> Wrap<U> {}
+}
+func testGenricMethodOnGenericOfArchetype<Wrapped>(value: Wrap<Wrapped>) {
+  value.method(#^ARCHETYPE_GENERIC_1^#)
+// ARCHETYPE_GENERIC_1: Begin completions
+// ARCHETYPE_GENERIC_1: Decl[InstanceMethod]/CurrNominal:   ['(']{#(fn): (Wrapped) -> _##(Wrapped) -> _#}[')'][#Wrap<_>#];
 }
