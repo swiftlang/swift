@@ -64,7 +64,7 @@ ProtocolRequirementAutodiffTests.test("func") {
               Quadratic(11, 12, 13).gradF(at: 2))
 }
 
-// MARK: Constructor and accessor requirements.
+// MARK: Constructor, accessor, and subscript requirements.
 
 protocol FunctionsOfX: Differentiable {
   @differentiable
@@ -78,6 +78,9 @@ protocol FunctionsOfX: Differentiable {
 
   @differentiable
   var z: Float { get }
+
+  @differentiable
+  subscript() -> Float { get }
 }
 
 struct TestFunctionsOfX: FunctionsOfX {
@@ -97,20 +100,28 @@ struct TestFunctionsOfX: FunctionsOfX {
   var z: Float {
     return y + x
   }
+
+  @differentiable
+  subscript() -> Float {
+    return z
+  }
 }
 
 @inline(never)  // Prevent specialization, to test all witness code.
 func derivatives<F: FunctionsOfX>(at x: Float, in: F.Type)
-  -> (Float, Float, Float)
+  -> (Float, Float, Float, Float)
 {
   let dxdx = gradient(at: x) { x in F(x: x).x }
   let dydx = gradient(at: x) { x in F(x: x).y }
   let dzdx = gradient(at: x) { x in F(x: x).z }
-  return (dxdx, dydx, dzdx)
+  let dsubscriptdx = gradient(at: x) { x in F(x: x)[] }
+  return (dxdx, dydx, dzdx, dsubscriptdx)
 }
 
-ProtocolRequirementAutodiffTests.test("constructor and accessor") {
-  expectEqual(derivatives(at: 2.0, in: TestFunctionsOfX.self), (1.0, 4.0, 5.0))
+ProtocolRequirementAutodiffTests.test("constructor, accessor, subscript") {
+  expectEqual(
+    derivatives(at: 2.0, in: TestFunctionsOfX.self),
+    (1.0, 4.0, 5.0, 5.0))
 }
 
 // MARK: - Test witness method SIL type computation.
