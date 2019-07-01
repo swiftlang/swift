@@ -1460,7 +1460,13 @@ SwiftLookupTableReader::create(clang::ModuleFileExtension *extension,
   // Look for the base name -> entities table record.
   SmallVector<uint64_t, 64> scratch;
   auto cursor = stream;
-  auto next = cursor.advance();
+  llvm::Expected<llvm::BitstreamEntry> maybeNext = cursor.advance();
+  if (!maybeNext) {
+    // FIXME this drops the error on the floor.
+    consumeError(maybeNext.takeError());
+    return nullptr;
+  }
+  llvm::BitstreamEntry next = maybeNext.get();
   std::unique_ptr<SerializedBaseNameToEntitiesTable> serializedTable;
   std::unique_ptr<SerializedGlobalsAsMembersTable> globalsAsMembersTable;
   ArrayRef<clang::serialization::DeclID> categories;
@@ -1473,14 +1479,27 @@ SwiftLookupTableReader::create(clang::ModuleFileExtension *extension,
       // API notes format.
       if (cursor.SkipBlock())
         return nullptr;
-      
-      next = cursor.advance();
+
+      maybeNext = cursor.advance();
+      if (!maybeNext) {
+        // FIXME this drops the error on the floor.
+        consumeError(maybeNext.takeError());
+        return nullptr;
+      }
+      next = maybeNext.get();
       continue;
     }
 
     scratch.clear();
     StringRef blobData;
-    unsigned kind = cursor.readRecord(next.ID, scratch, &blobData);
+    llvm::Expected<unsigned> maybeKind =
+        cursor.readRecord(next.ID, scratch, &blobData);
+    if (!maybeKind) {
+      // FIXME this drops the error on the floor.
+      consumeError(maybeNext.takeError());
+      return nullptr;
+    }
+    unsigned kind = maybeKind.get();
     switch (kind) {
     case BASE_NAME_TO_ENTITIES_RECORD_ID: {
       // Already saw base name -> entities table.
@@ -1532,7 +1551,13 @@ SwiftLookupTableReader::create(clang::ModuleFileExtension *extension,
       break;
     }
 
-    next = cursor.advance();
+    maybeNext = cursor.advance();
+    if (!maybeNext) {
+      // FIXME this drops the error on the floor.
+      consumeError(maybeNext.takeError());
+      return nullptr;
+    }
+    next = maybeNext.get();
   }
 
   if (!serializedTable) return nullptr;

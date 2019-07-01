@@ -148,9 +148,20 @@ int modulewrap_main(ArrayRef<const char *> Args, const char *Argv0,
   // Superficially verify that the input is a swift module file.
   llvm::BitstreamCursor Cursor(ErrOrBuf.get()->getMemBufferRef());
   for (unsigned char Byte : serialization::SWIFTMODULE_SIGNATURE)
-    if (Cursor.AtEndOfStream() || Cursor.Read(8) != Byte) {
+    if (Cursor.AtEndOfStream()) {
       Instance.getDiags().diagnose(SourceLoc(), diag::error_parse_input_file,
-                                   Filename, "signature mismatch");
+                                   Filename,
+                                   "signature mismatch, end of stream");
+      return 1;
+    } else if (llvm::Expected<unsigned> MaybeRead = Cursor.Read(8)) {
+      if (MaybeRead.get() != Byte) {
+        Instance.getDiags().diagnose(SourceLoc(), diag::error_parse_input_file,
+                                     Filename, "signature mismatch");
+        return 1;
+      }
+    } else {
+      Instance.getDiags().diagnose(SourceLoc(), diag::error_parse_input_file,
+                                   Filename, toString(MaybeRead.takeError()));
       return 1;
     }
 
