@@ -39,16 +39,36 @@ class CommandRunner(object):
         return subprocess.Popen(command, **kwargs)
 
     def send(self, local_to_remote_files):
+        # Directories to make on the remote target.
+        dirs_to_make = []
+
+        # Path pairs to put.
+        local_to_remote_puts = []
+
+        for local_file, remote_file in local_to_remote_files.viewitems():
+            if os.path.isDir(local_file):
+                # Directories need to be created first and the put command
+                # has the parent directory as the remote part.
+                dirs_to_make.append(remote_file)
+                local_to_remote_puts.append((local_file,
+                                             posixpath.dirname(remote_file))
+                assert(posixpath.basename(local_file)
+                    == posixpath.basename(remote_file))
+            else:
+                # Files need their parent directory to be created and the put
+                # command can have the full path.
+                dirs_to_make.append(posixpath.dirname(remote_file))
+                local_to_remote_puts.append((local_file, remote_file))
+
         # Prepare the remote directory structure.
-        # FIXME: This could be folded into the sftp connection below.
-        dirs_to_make = self._dirnames(local_to_remote_files.viewvalues())
+        # FIXME: This could be folded into the sftp connection below, although
+        # sftp doesn't have the equivalent of -p.
         self.run_remote(['/bin/mkdir', '-p'] + dirs_to_make)
 
         # Send the local files.
         sftp_commands = ("-put {0} {1}".format(quote(local_file), 
                                                quote(remote_file))
-                         for local_file, remote_file
-                         in local_to_remote_files.viewitems())
+                         for local_file, remote_file in local_to_remote_puts)
         self.run_sftp(sftp_commands)
 
     def fetch(self, local_to_remote_files):
