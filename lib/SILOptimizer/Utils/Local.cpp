@@ -1493,8 +1493,7 @@ bool swift::simplifyUsers(SingleValueInstruction *I) {
   return Changed;
 }
 
-/// True if a type can be expanded
-/// without a significant increase to code size.
+/// True if a type can be expanded without a significant increase to code size.
 bool swift::shouldExpand(SILModule &Module, SILType Ty) {
   // FIXME: Expansion
   auto Expansion = ResilienceExpansion::Minimal;
