@@ -1012,6 +1012,10 @@ static GenericSignature *getNewGenericSignature(ValueDecl *base,
       }
     }
 
+    if (builder.getGenericParams().empty()) {
+      return nullptr;
+    }
+
     auto *genericSig = std::move(builder).computeGenericSignature(SourceLoc());
     return genericSig;
   }
