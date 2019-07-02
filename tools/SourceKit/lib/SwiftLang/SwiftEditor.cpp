@@ -623,13 +623,9 @@ public:
 
   uint64_t getASTGeneration() const;
 
-  void
-  setCompilerArgs(ArrayRef<const char *> Args,
-                  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem) {
-    assert(FileSystem);
+  void setCompilerArgs(ArrayRef<const char *> Args) {
     if (auto ASTMgr = this->ASTMgr.lock()) {
-      InvokRef =
-          ASTMgr->getInvocation(Args, Filename, FileSystem, CompilerArgsError);
+      InvokRef = ASTMgr->getInvocation(Args, Filename, CompilerArgsError);
     }
   }
 
@@ -1705,9 +1701,7 @@ SwiftEditorDocument::~SwiftEditorDocument()
 
 ImmutableTextSnapshotRef SwiftEditorDocument::initializeText(
     llvm::MemoryBuffer *Buf, ArrayRef<const char *> Args,
-    bool ProvideSemanticInfo,
-    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem) {
-  assert(FileSystem);
+    bool ProvideSemanticInfo) {
 
   llvm::sys::ScopedLock L(Impl.AccessMtx);
 
@@ -1724,7 +1718,7 @@ ImmutableTextSnapshotRef SwiftEditorDocument::initializeText(
   if (ProvideSemanticInfo || !Args.empty()) {
     Impl.SemanticInfo = new SwiftDocumentSemanticInfo(Impl.FilePath, Impl.ASTMgr,
                                                       Impl.NotificationCtr);
-    Impl.SemanticInfo->setCompilerArgs(Args, FileSystem);
+    Impl.SemanticInfo->setCompilerArgs(Args);
   }
   return Impl.EditableBuffer->getSnapshot();
 }
@@ -2121,18 +2115,15 @@ void SwiftEditorDocument::reportDocumentStructure(SourceFile &SrcFile,
 // EditorOpen
 //===----------------------------------------------------------------------===//
 
-void SwiftLangSupport::editorOpen(
-    StringRef Name, llvm::MemoryBuffer *Buf, EditorConsumer &Consumer,
-    ArrayRef<const char *> Args,
-    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem) {
-  assert(FileSystem);
+void SwiftLangSupport::editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
+                                  EditorConsumer &Consumer,
+                                  ArrayRef<const char *> Args) {
 
   ImmutableTextSnapshotRef Snapshot = nullptr;
   auto EditorDoc = EditorDocuments->getByUnresolvedName(Name);
   if (!EditorDoc) {
     EditorDoc = new SwiftEditorDocument(Name, *this);
-    Snapshot = EditorDoc->initializeText(
-        Buf, Args, Consumer.needsSemanticInfo(), FileSystem);
+    Snapshot = EditorDoc->initializeText(Buf, Args, Consumer.needsSemanticInfo());
     EditorDoc->parse(Snapshot, *this, Consumer.syntaxTreeEnabled());
     if (EditorDocuments->getOrUpdate(Name, *this, EditorDoc)) {
       // Document already exists, re-initialize it. This should only happen
@@ -2145,8 +2136,7 @@ void SwiftLangSupport::editorOpen(
   }
 
   if (!Snapshot) {
-    Snapshot = EditorDoc->initializeText(
-        Buf, Args, Consumer.needsSemanticInfo(), FileSystem);
+    Snapshot = EditorDoc->initializeText(Buf, Args, Consumer.needsSemanticInfo());
     EditorDoc->parse(Snapshot, *this, Consumer.syntaxTreeEnabled());
   }
 
@@ -2164,6 +2154,7 @@ void SwiftLangSupport::editorOpen(
                               ReusedNodeIds);
   }
 }
+
 
 //===----------------------------------------------------------------------===//
 // EditorClose

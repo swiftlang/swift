@@ -1045,8 +1045,8 @@ ClangImporter::create(ASTContext &ctx,
     if (clangFileSystem != llvm::vfs::getRealFileSystem() ||
         importerOpts.InMemoryOutputFileSystem) {
       // If the clang instance has overlays it means the user has provided
-      // -ivfsoverlay options.  We're going to clobber their file system with
-      // the Swift file system, so warn about it.
+      // -ivfsoverlay options and swift -vfsoverlay options.  We're going to
+      // clobber their file system with our own, so warn about it.
       if (!instance.getHeaderSearchOpts().VFSOverlayFiles.empty()) {
         ctx.Diags.diagnose(SourceLoc(), diag::clang_vfs_overlay_is_ignored);
       }

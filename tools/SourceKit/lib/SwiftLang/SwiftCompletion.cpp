@@ -160,8 +160,7 @@ static bool swiftCodeCompleteImpl(
 
   CompilerInvocation Invocation;
   bool Failed = Lang.getASTManager()->initCompilerInvocation(
-      Invocation, Args, CI.getDiags(), InputFile->getBufferIdentifier(),
-      FileSystem, Error);
+      Invocation, Args, CI.getDiags(), InputFile->getBufferIdentifier(), Error);
   if (Failed) {
     return false;
   }
@@ -196,7 +195,6 @@ static bool swiftCodeCompleteImpl(
   // FIXME: We need to be passing the buffers from the open documents.
   // It is not a huge problem in practice because Xcode auto-saves constantly.
 
-  CI.getSourceMgr().setFileSystem(FileSystem);
   if (CI.setup(Invocation)) {
     // FIXME: error?
     return true;
@@ -212,11 +210,10 @@ static bool swiftCodeCompleteImpl(
   return true;
 }
 
-void SwiftLangSupport::codeComplete(
-    llvm::MemoryBuffer *UnresolvedInputFile, unsigned Offset,
-    SourceKit::CodeCompletionConsumer &SKConsumer, ArrayRef<const char *> Args,
-    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem) {
-  assert(FileSystem);
+void SwiftLangSupport::codeComplete(llvm::MemoryBuffer *UnresolvedInputFile,
+                                    unsigned Offset,
+                                    SourceKit::CodeCompletionConsumer &SKConsumer,
+                                    ArrayRef<const char *> Args) {
   SwiftCodeCompletionConsumer SwiftConsumer([&](
       MutableArrayRef<CodeCompletionResult *> Results,
       SwiftCompletionInfo &info) {
@@ -254,7 +251,7 @@ void SwiftLangSupport::codeComplete(
 
   std::string Error;
   if (!swiftCodeCompleteImpl(*this, UnresolvedInputFile, Offset, SwiftConsumer,
-                             Args, FileSystem, Error)) {
+                             Args, Error)) {
     SKConsumer.failed(Error);
   }
 }
@@ -1118,7 +1115,7 @@ static void transformAndForwardResults(
       cargs.push_back(arg.c_str());
     std::string error;
     if (!swiftCodeCompleteImpl(lang, buffer.get(), str.size(), swiftConsumer,
-                               cargs, llvm::vfs::getRealFileSystem(), error)) {
+                               cargs, error)) {
       consumer.failed(error);
       return;
     }
@@ -1209,8 +1206,7 @@ void SwiftLangSupport::codeCompleteOpen(
   // Invoke completion.
   std::string error;
   if (!swiftCodeCompleteImpl(*this, inputBuf, offset, swiftConsumer,
-                             extendedArgs, llvm::vfs::getRealFileSystem(),
-                             error)) {
+                             extendedArgs, error)) {
     consumer.failed(error);
     return;
   }

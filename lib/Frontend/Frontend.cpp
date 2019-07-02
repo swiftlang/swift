@@ -256,20 +256,19 @@ static bool loadAndValidateVFSOverlay(
 }
 
 bool CompilerInstance::setUpVirtualFileSystemOverlays() {
-  auto BaseFS = SourceMgr.getFileSystem();
+  auto BaseFS = llvm::vfs::getRealFileSystem();
   auto OverlayFS = llvm::IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem>(
                     new llvm::vfs::OverlayFileSystem(BaseFS));
   bool hadAnyFailure = false;
-  bool hasOverlays = false;
   for (const auto &File : Invocation.getSearchPathOptions().VFSOverlayFiles) {
-    hasOverlays = true;
     hadAnyFailure |=
         loadAndValidateVFSOverlay(File, BaseFS, OverlayFS, Diagnostics);
   }
 
   // If we successfully loaded all the overlays, let the source manager and
   // diagnostic engine take advantage of the overlay file system.
-  if (!hadAnyFailure && hasOverlays) {
+  if (!hadAnyFailure &&
+      (OverlayFS->overlays_begin() != OverlayFS->overlays_end())) {
     SourceMgr.setFileSystem(OverlayFS);
   }
 

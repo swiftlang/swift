@@ -15,7 +15,6 @@
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Optional.h"
-#include "llvm/ADT/StringMap.h"
 #include <string>
 
 namespace sourcekitd_test {
@@ -111,7 +110,6 @@ struct TestOptions {
   bool isAsyncRequest = false;
   bool timeRequest = false;
   unsigned repeatRequest = 1;
-  llvm::StringMap<std::string> VFSFiles;
   // SWIFT_ENABLE_TENSORFLOW
   bool InMemoryClangModuleCache;
   llvm::Optional<bool> CancelOnSubsequentRequest;

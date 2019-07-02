@@ -88,10 +88,9 @@ public:
        swift::ide::CodeFormatOptions Options = swift::ide::CodeFormatOptions());
   ~SwiftEditorDocument();
 
-  ImmutableTextSnapshotRef
-  initializeText(llvm::MemoryBuffer *Buf, ArrayRef<const char *> Args,
-                 bool ProvideSemanticInfo,
-                 llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem);
+  ImmutableTextSnapshotRef initializeText(llvm::MemoryBuffer *Buf,
+                                          ArrayRef<const char *> Args,
+                                          bool ProvideSemanticInfo);
   ImmutableTextSnapshotRef replaceText(unsigned Offset, unsigned Length,
                                        llvm::MemoryBuffer *Buf,
                                        bool ProvideSemanticInfo,
@@ -416,10 +415,9 @@ public:
   void indexSource(StringRef Filename, IndexingConsumer &Consumer,
                    ArrayRef<const char *> Args) override;
 
-  void codeComplete(
-      llvm::MemoryBuffer *InputBuf, unsigned Offset,
-      SourceKit::CodeCompletionConsumer &Consumer, ArrayRef<const char *> Args,
-      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem) override;
+  void codeComplete(llvm::MemoryBuffer *InputBuf, unsigned Offset,
+                    SourceKit::CodeCompletionConsumer &Consumer,
+                    ArrayRef<const char *> Args) override;
 
   void codeCompleteOpen(StringRef name, llvm::MemoryBuffer *inputBuf,
                         unsigned offset, OptionsDictionary *options,
@@ -442,10 +440,9 @@ public:
   void
   codeCompleteSetCustom(ArrayRef<CustomCompletionInfo> completions) override;
 
-  void editorOpen(
-      StringRef Name, llvm::MemoryBuffer *Buf, EditorConsumer &Consumer,
-      ArrayRef<const char *> Args,
-      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem) override;
+  void editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
+                  EditorConsumer &Consumer,
+                  ArrayRef<const char *> Args) override;
 
   void editorOpenInterface(EditorConsumer &Consumer,
                            StringRef Name,
@@ -493,12 +490,11 @@ public:
   void editorExpandPlaceholder(StringRef Name, unsigned Offset, unsigned Length,
                                EditorConsumer &Consumer) override;
 
-  void
-  getCursorInfo(StringRef Filename, unsigned Offset, unsigned Length,
-                bool Actionables, bool CancelOnSubsequentRequest,
-                ArrayRef<const char *> Args,
-                llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
-                 std::function<void(const RequestResult<CursorInfoData> &)> Receiver) override;
+  void getCursorInfo(StringRef Filename, unsigned Offset,
+                     unsigned Length, bool Actionables,
+                     bool CancelOnSubsequentRequest,
+                     ArrayRef<const char *> Args,
+                std::function<void(const RequestResult<CursorInfoData> &)> Receiver) override;
 
   void getNameInfo(StringRef Filename, unsigned Offset,
                    NameTranslatingInfo &Input,
@@ -512,7 +508,6 @@ public:
   void getCursorInfoFromUSR(
       StringRef Filename, StringRef USR, bool CancelOnSubsequentRequest,
       ArrayRef<const char *> Args,
-      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
       std::function<void(const RequestResult<CursorInfoData> &)> Receiver) override;
 
   void findRelatedIdentifiersInFile(StringRef Filename, unsigned Offset,
