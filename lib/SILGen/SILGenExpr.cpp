@@ -1514,9 +1514,24 @@ ManagedValue emitCFunctionPointer(SILGenFunction &SGF,
   } else if (auto memberRef = dyn_cast<MemberRefExpr>(semanticExpr)) {
     setLocFromConcreteDeclRef(memberRef->getMember());
   } else if (auto closure = dyn_cast<AbstractClosureExpr>(semanticExpr)) {
-    loc = closure;
     // Emit the closure body.
     SGF.SGM.emitClosure(closure);
+
+    loc = closure;
+  } else if (auto captureList = dyn_cast<CaptureListExpr>(semanticExpr)) {
+    // Ensure that weak captures are in a separate scope.
+    DebugScope scope(SGF, CleanupLocation(captureList));
+    // CaptureListExprs evaluate their bound variables.
+    for (auto capture : captureList->getCaptureList()) {
+      SGF.visit(capture.Var);
+      SGF.visit(capture.Init);
+    }
+
+    // Emit the closure body.
+    auto *closure = captureList->getClosureBody();
+    SGF.SGM.emitClosure(closure);
+
+    loc = closure;
   } else {
     llvm_unreachable("c function pointer converted from a non-concrete decl ref");
   }
@@ -2307,7 +2322,7 @@ RValue RValueEmitter::visitDynamicTypeExpr(DynamicTypeExpr *E, SGFContext C) {
 RValue RValueEmitter::visitCaptureListExpr(CaptureListExpr *E, SGFContext C) {
   // Ensure that weak captures are in a separate scope.
   DebugScope scope(SGF, CleanupLocation(E));
-  // ClosureExpr's evaluate their bound variables.
+  // CaptureListExprs evaluate their bound variables.
   for (auto capture : E->getCaptureList()) {
     SGF.visit(capture.Var);
     SGF.visit(capture.Init);

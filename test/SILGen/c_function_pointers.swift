@@ -73,3 +73,7 @@ func pointers_to_nested_local_functions_in_generics<T>(x: T) -> Int{
 
   return calls(foo, 0)
 }
+
+func capture_list_no_captures(x: Int) {
+  calls({ [x] in $0 }, 0) // expected-warning {{capture 'x' was never used}}
+}
