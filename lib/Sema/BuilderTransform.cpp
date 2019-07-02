@@ -136,6 +136,12 @@ public:
       }
 
       if (auto decl = node.dyn_cast<Decl *>()) {
+        // Just ignore #if; the chosen children should appear in the
+        // surrounding context.  This isn't good for source tools but it
+        // at least works.
+        if (isa<IfConfigDecl>(decl))
+          continue;
+
         if (!unhandledNode)
           unhandledNode = decl;
 
@@ -484,10 +490,16 @@ bool TypeChecker::typeCheckFunctionBuilderFuncBody(FuncDecl *FD,
   if (!returnType || returnType->hasError())
     return true;
 
+  TypeCheckExprOptions options = {};
+  if (auto opaque = returnType->getAs<OpaqueTypeArchetypeType>()) {
+    if (opaque->getDecl()->isOpaqueReturnTypeOfFunction(FD))
+      options |= TypeCheckExprFlags::ConvertTypeIsOpaqueReturnType;
+  }
+
   // Type-check the single result expression.
   Type returnExprType = typeCheckExpression(returnExpr, FD,
                                             TypeLoc::withoutLoc(returnType),
-                                            CTP_ReturnStmt);
+                                            CTP_ReturnStmt, options);
   if (!returnExprType)
     return true;
   assert(returnExprType->isEqual(returnType));
