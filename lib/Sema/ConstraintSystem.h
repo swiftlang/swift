@@ -4245,14 +4245,6 @@ public:
   size_t getNumSkippedParameters() const { return NumSkippedParameters; }
 };
 
-/// Diagnose an attempt to recover from a member access into a value of
-/// optional type which needed to be unwrapped for the member to be found.
-///
-/// \returns true if a diagnostic was produced.
-bool diagnoseBaseUnwrapForMemberAccess(Expr *baseExpr, Type baseType,
-                                       DeclName memberName, bool resultOptional,
-                                       SourceRange memberRange);
-
 // Return true if, when replacing "<expr>" with "<expr> ?? T", parentheses need
 // to be added around <expr> first in order to maintain the correct precedence.
 bool exprNeedsParensBeforeAddingNilCoalescing(TypeChecker &TC,
