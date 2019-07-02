@@ -4712,8 +4712,7 @@ AnyFunctionType *AnyFunctionType::getTransposeOriginalFunctionType(
   assert(originalResult);
 
   auto wrtParams = attr->getParsedParameters();
-  SmallVector<TupleTypeElt, 1> transposeResultTypes;
-  unsigned transposeResultTypesIndex = 0;
+  SmallVector<TupleTypeElt, 4> transposeResultTypes;
   // Return type of '@transposing' function can have single type or tuples
   // of types.
   if (auto t = transposeResult->getAs<TupleType>()) {
@@ -4729,9 +4728,10 @@ AnyFunctionType *AnyFunctionType::getTransposeOriginalFunctionType(
   // is first in WRT list) and remove it. If it's still curried but not
   // transposing WRT 'self', then the 'Self' type is the first parameter
   // in the method.
+  unsigned transposeResultTypesIndex = 0;
   Type selfType;
   if (isCurried && wrtSelf) {
-    selfType = transposeResultTypes[transposeResultTypesIndex].getType();
+    selfType = transposeResultTypes.front().getType();
     transposeResultTypesIndex++;
   } else if (isCurried) {
     selfType = transposeParams.front().getPlainType();
@@ -4750,8 +4750,6 @@ AnyFunctionType *AnyFunctionType::getTransposeOriginalFunctionType(
       // If in WRT list, the item in the result tuple must be a parameter in the
       // original function.
       auto resultType = transposeResultTypes[transposeResultTypesIndex].getType();
-      // TODO(bartchr): this prevents a segfault occuring when converting 'g'
-      // to 'Param'.
       originalParams.push_back(AnyFunctionType::Param(resultType));
       transposeResultTypesIndex++;
     } else {
@@ -4764,7 +4762,7 @@ AnyFunctionType *AnyFunctionType::getTransposeOriginalFunctionType(
 
   auto *originalType =
       makeFunctionType(originalParams, originalResult,
-                       isCurried ? nullptr : getOptGenericSignature());
+                       getOptGenericSignature());
   if (isCurried) {
     assert(selfType);
     // If curried, wrap the function into the 'Self' type to get a method.

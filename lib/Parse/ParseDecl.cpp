@@ -1278,11 +1278,10 @@ bool parseQualifiedDeclName(Parser &P, Diag<> nameParseError,
       P.parseUnqualifiedDeclName(afterDot, original.Loc, nameParseError,
                                  /*allowOperators*/ true,
                                  /*allowZeroArgCompoundNames*/ true);
+
   // The base type is optional, but the final unqualified decl name is not.
   // If name could not be parsed, return true for error.
-  if (!original.Name)
-    return true;
-  return false;
+  return !original.Name;
 }
 
 ParserResult<TransposingAttr> Parser::parseTransposingAttribute(SourceLoc atLoc,
@@ -1292,7 +1291,7 @@ ParserResult<TransposingAttr> Parser::parseTransposingAttribute(SourceLoc atLoc,
   TypeRepr *baseType;
   DeclNameWithLoc original;
   SmallVector<ParsedAutoDiffParameter, 8> params;
-  
+
   // Parse trailing comma, if it exists, and check for errors.
   auto consumeIfTrailingComma = [&]() -> bool {
     if (!consumeIf(tok::comma)) return false;
@@ -1308,18 +1307,18 @@ ParserResult<TransposingAttr> Parser::parseTransposingAttribute(SourceLoc atLoc,
     }
     return false;
   };
-  
+
   // Parse '('.
   if (!consumeIf(tok::l_paren, lParenLoc)) {
     diagnose(getEndOfPreviousLoc(), diag::attr_expected_lparen, AttrName,
              /*DeclModifier*/ false);
     return makeParserError();
   }
-  
+
   {
     SyntaxParsingContext ContentContext(
-        SyntaxContext, SyntaxKind::DifferentiatingAttributeArguments);
-    
+        SyntaxContext, SyntaxKind::TransposingAttributeArguments);
+  
     {
       // Parse the optionally qualified function.
       if (parseQualifiedDeclName(*this,
@@ -1330,23 +1329,22 @@ ParserResult<TransposingAttr> Parser::parseTransposingAttribute(SourceLoc atLoc,
       if (consumeIfTrailingComma())
         return makeParserError();
     }
-    
+
     // Parse the optional 'wrt' differentiation parameters clause.
     if (Tok.is(tok::identifier) && Tok.getText() == "wrt" &&
         parseTransposingParametersClause(params, AttrName))
       return makeParserError();
   }
-  
+
   // Parse ')'.
   if (!consumeIf(tok::r_paren, rParenLoc)) {
     diagnose(getEndOfPreviousLoc(), diag::attr_expected_rparen, AttrName,
              /*DeclModifier*/ false);
     return makeParserError();
   }
-  return ParserResult<TransposingAttr>(
-             TransposingAttr::create(Context, /*implicit*/ false, atLoc,
-                                     SourceRange(loc, rParenLoc), baseType,
-                                     original, params));
+  return ParserResult<TransposingAttr>(TransposingAttr::create(
+      Context, /*implicit*/ false, atLoc, SourceRange(loc, rParenLoc), baseType,
+      original, params));
 }
 
 void Parser::parseObjCSelector(SmallVector<Identifier, 4> &Names,
