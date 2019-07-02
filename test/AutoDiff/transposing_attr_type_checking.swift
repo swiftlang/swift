@@ -76,55 +76,65 @@ func genericT<T: Differentiable>(x: T) -> T where T == T.TangentVector {
   return x
 }
 
-func genericThreeParam
-  <T: Differentiable & BinaryFloatingPoint, U: Differentiable & BinaryFloatingPoint, V: Differentiable & BinaryFloatingPoint>
-  (t: T, u: U, v: V) -> T 
-  where T == T.TangentVector,
-        U == U.TangentVector,
-        V == V.TangentVector {
+func genericThreeParam<
+  T: Differentiable & BinaryFloatingPoint, 
+  U: Differentiable & BinaryFloatingPoint, 
+  V: Differentiable & BinaryFloatingPoint>(
+  t: T, u: U, v: V
+) -> T where T == T.TangentVector,
+             U == U.TangentVector,
+             V == V.TangentVector {
   return t
 }
 
 @transposing(genericThreeParam, wrt: 1)
-func genericThreeParamT2
-  <T: Differentiable & BinaryFloatingPoint, U: Differentiable & BinaryFloatingPoint, V: Differentiable & BinaryFloatingPoint>
-  (t: T, v: V, s: T) -> U
-  where T == T.TangentVector,
-        U == U.TangentVector,
-        V == V.TangentVector {
+func genericThreeParamT2<
+  T: Differentiable & BinaryFloatingPoint, 
+  U: Differentiable & BinaryFloatingPoint, 
+  V: Differentiable & BinaryFloatingPoint>(
+  t: T, v: V, s: T
+) -> U where T == T.TangentVector,
+             U == U.TangentVector,
+             V == V.TangentVector {
   return U(1)
 }
 
 @transposing(genericThreeParam, wrt: (0, 1, 2))
-func genericThreeParamT2
-  <T: Differentiable & BinaryFloatingPoint, U: Differentiable & BinaryFloatingPoint, V: Differentiable & BinaryFloatingPoint>
-  (t: T) -> (T, U, V)
-  where T == T.TangentVector,
-        U == U.TangentVector,
-        V == V.TangentVector {
+func genericThreeParamT2<
+  T: Differentiable & BinaryFloatingPoint, 
+  U: Differentiable & BinaryFloatingPoint, 
+  V: Differentiable & BinaryFloatingPoint>(
+  t: T
+) -> (T, U, V) where T == T.TangentVector,
+                     U == U.TangentVector,
+                     V == V.TangentVector {
   return (T(1), U(1), V(1))
 }
 
-func genericOneParamFloatOneParam<T: Differentiable & BinaryFloatingPoint>
-  (t: T, f: Float) -> T where T == T.TangentVector {
+func genericOneParamFloatOneParam<T: Differentiable & BinaryFloatingPoint>(
+  t: T, f: Float
+) -> T where T == T.TangentVector {
   return T(f)
 }
 
 @transposing(genericOneParamFloatOneParam, wrt: 0)
-func genericOneParamFloatOneParamT1<T: Differentiable & BinaryFloatingPoint>
-  (f: Float, t: T) -> T where T == T.TangentVector {
+func genericOneParamFloatOneParamT1<T: Differentiable & BinaryFloatingPoint>(
+  f: Float, t: T
+) -> T where T == T.TangentVector {
   return t
 }
 
 @transposing(genericOneParamFloatOneParam, wrt: 1)
-func genericOneParamFloatOneParamT1<T: Differentiable & BinaryFloatingPoint>
-  (t1: T, t2: T) -> Float where T == T.TangentVector {
+func genericOneParamFloatOneParamT1<T: Differentiable & BinaryFloatingPoint>(
+  t1: T, t2: T
+) -> Float where T == T.TangentVector {
   return 1
 }
 
 @transposing(genericOneParamFloatOneParam, wrt: (0, 1))
-func genericOneParamFloatOneParamT1<T: Differentiable & BinaryFloatingPoint>
-  (t: T) -> (T, Float) where T == T.TangentVector {
+func genericOneParamFloatOneParamT1<T: Differentiable & BinaryFloatingPoint>(
+  t: T
+) -> (T, Float) where T == T.TangentVector {
   return (T(1), 1)
 }
 
@@ -372,32 +382,37 @@ extension Float {
 
 // Generics
 extension Float {
-  func genericOneParamFloatOneParam<T: Differentiable & BinaryFloatingPoint>
-    (t: T, f: Float) -> Float where T == T.TangentVector {
+  func genericOneParamFloatOneParam<T: Differentiable & BinaryFloatingPoint>(
+    t: T, f: Float
+  ) -> Float where T == T.TangentVector {
     return f
   }
 
   @transposing(Float.genericOneParamFloatOneParam, wrt: 0)
-  func genericOneParamFloatOneParamT1<T: Differentiable & BinaryFloatingPoint>
-    (f1: Float, f2: Float) -> T where T == T.TangentVector {
+  func genericOneParamFloatOneParamT1<T: Differentiable & BinaryFloatingPoint>(
+    f1: Float, f2: Float
+  ) -> T where T == T.TangentVector {
     return T(1)
   }
 
   @transposing(Float.genericOneParamFloatOneParam, wrt: (0, 1))
-  func genericOneParamFloatOneParamT2<T: Differentiable & BinaryFloatingPoint>
-    (f1: Float) -> (T, Float) where T == T.TangentVector {
+  func genericOneParamFloatOneParamT2<T: Differentiable & BinaryFloatingPoint>(
+    f1: Float
+  ) -> (T, Float) where T == T.TangentVector {
     return (T(1), 1)
   }
 
   @transposing(Float.genericOneParamFloatOneParam, wrt: (self, 1))
-  func genericOneParamFloatOneParamT1<T: Differentiable & BinaryFloatingPoint>
-    (t: T) -> (Float, Float) where T == T.TangentVector {
+  func genericOneParamFloatOneParamT1<T: Differentiable & BinaryFloatingPoint>(
+    t: T
+  ) -> (Float, Float) where T == T.TangentVector {
     return (1, 1)
   }
 
   @transposing(Float.genericOneParamFloatOneParam, wrt: (self, 0, 1))
-  func genericOneParamFloatOneParamT1<T: Differentiable & BinaryFloatingPoint>
-    () -> (Float, T, Float) where T == T.TangentVector {
+  func genericOneParamFloatOneParamT1<
+    T: Differentiable & BinaryFloatingPoint
+  >() -> (Float, T, Float) where T == T.TangentVector {
     return (1, T(1), 1)
   }
 }
