@@ -758,6 +758,8 @@ ERROR(expected_rbracket_dictionary_type,PointsToFirstBadToken,
       "expected ']' in dictionary type", ())
 ERROR(extra_rbracket,PointsToFirstBadToken,
       "unexpected ']' in type; did you mean to write an array type?", ())
+ERROR(extra_colon,PointsToFirstBadToken,
+      "unexpected ':' in type; did you mean to write a dictionary type?", ())
 
 // Tuple Types
 ERROR(expected_rparen_tuple_type_list,none,

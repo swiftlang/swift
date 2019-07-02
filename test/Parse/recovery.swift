@@ -470,6 +470,14 @@ struct ErrorTypeInVarDeclArrayType5 { // expected-note {{in declaration of 'Erro
   let a7: [String: Int]] // expected-error {{unexpected ']' in type; did you mean to write an array type?}} {{11-11=[}}
 }
 
+struct ErrorTypeInVarDeclDictionaryType {
+  let a1: String: // expected-error {{unexpected ':' in type; did you mean to write a dictionary type?}} {{11-11=[}}
+  // expected-error @-1 {{expected dictionary value type}}
+  let a2: String: Int] // expected-error {{unexpected ':' in type; did you mean to write a dictionary type?}} {{11-11=[}}
+  let a3: String: [Int] // expected-error {{unexpected ':' in type; did you mean to write a dictionary type?}} {{11-11=[}} {{24-24=]}}
+  let a4: String: Int // expected-error {{unexpected ':' in type; did you mean to write a dictionary type?}} {{11-11=[}} {{22-22=]}}
+}
+
 struct ErrorInFunctionSignatureResultArrayType1 {
   func foo() -> Int[ { // expected-error {{expected '{' in body of function declaration}}
     return [0]
