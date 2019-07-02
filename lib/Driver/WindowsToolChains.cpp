@@ -80,7 +80,7 @@ toolchains::Windows::constructInvocation(const DynamicLinkJobAction &job,
 
   // Configure the toolchain.
   // By default, use the system clang++ to link.
-  const char *Clang = nullptr;
+  const char *Clang = "clang++";
   if (const Arg *A = context.Args.getLastArg(options::OPT_tools_directory)) {
     StringRef toolchainPath(A->getValue());
 
@@ -89,12 +89,6 @@ toolchains::Windows::constructInvocation(const DynamicLinkJobAction &job,
             llvm::sys::findProgramByName("clang++", {toolchainPath}))
       Clang = context.Args.MakeArgString(toolchainClang.get());
   }
-  if (Clang == nullptr) {
-    if (auto pathClang = llvm::sys::findProgramByName("clang++", None))
-      Clang = context.Args.MakeArgString(pathClang.get());
-  }
-  assert(Clang &&
-         "clang++ was not found in the toolchain directory or system path.");
 
   std::string Target = getTriple().str();
   if (!Target.empty()) {
