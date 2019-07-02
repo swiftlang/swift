@@ -51,43 +51,34 @@
 using namespace swift;
 using namespace swift::immediate;
 
-/// The path for Swift libraries in the OS.
-#define OS_LIBRARY_PATH "/usr/lib/swift"
-
 static void *loadRuntimeLib(StringRef runtimeLibPathWithName) {
 #if defined(_WIN32)
   return LoadLibraryA(runtimeLibPathWithName.str().c_str());
 #else
-#if defined(__APPLE__) && defined(__MACH__)
-  if (!llvm::sys::path::is_absolute(runtimeLibPathWithName)) {
-    // Try an absolute path search for Swift in the OS first.
-    llvm::SmallString<128> absolutePath(OS_LIBRARY_PATH);
-    llvm::sys::path::append(absolutePath, runtimeLibPathWithName);
-    auto result = dlopen(absolutePath.c_str(), RTLD_LAZY | RTLD_GLOBAL);
-    if (result) return result;
-  }
-#endif
   return dlopen(runtimeLibPathWithName.str().c_str(), RTLD_LAZY | RTLD_GLOBAL);
 #endif
 }
 
-static void *loadRuntimeLib(StringRef sharedLibName, StringRef runtimeLibPath) {
+static void *loadRuntimeLibAtPath(StringRef sharedLibName,
+                                  StringRef runtimeLibPath) {
   // FIXME: Need error-checking.
   llvm::SmallString<128> Path = runtimeLibPath;
   llvm::sys::path::append(Path, sharedLibName);
   return loadRuntimeLib(Path);
 }
 
-void *swift::immediate::loadSwiftRuntime(StringRef runtimeLibPath,
-                                         bool IsDefault) {
-  StringRef LibName = "libswiftCore" LTDL_SHLIB_EXT;
-#if defined(__APPLE__) && defined(__MACH__)
-  if (IsDefault) {
-    auto result = loadRuntimeLib(LibName);
-    if (result) return result;
+static void *loadRuntimeLib(StringRef sharedLibName,
+                            ArrayRef<std::string> runtimeLibPaths) {
+  for (auto &runtimeLibPath : runtimeLibPaths) {
+    if (void *handle = loadRuntimeLibAtPath(sharedLibName, runtimeLibPath))
+      return handle;
   }
-#endif
-  return loadRuntimeLib(LibName, runtimeLibPath);
+  return nullptr;
+}
+
+void *swift::immediate::loadSwiftRuntime(ArrayRef<std::string>
+                                         runtimeLibPaths) {
+  return loadRuntimeLib("libswiftCore" LTDL_SHLIB_EXT, runtimeLibPaths);
 }
 
 static bool tryLoadLibrary(LinkLibrary linkLib,
@@ -125,9 +116,9 @@ static bool tryLoadLibrary(LinkLibrary linkLib,
     if (!success)
       success = loadRuntimeLib(stem);
 
-    // If that fails, try our runtime library path.
+    // If that fails, try our runtime library paths.
     if (!success)
-      success = loadRuntimeLib(stem, searchPathOpts.RuntimeLibraryPath);
+      success = loadRuntimeLib(stem, searchPathOpts.RuntimeLibraryPaths);
     break;
   }
   case LibraryKind::Framework: {
@@ -260,9 +251,7 @@ int swift::RunImmediately(CompilerInstance &CI, const ProcessCmdLine &CmdLine,
   //
   // This must be done here, before any library loading has been done, to avoid
   // racing with the static initializers in user code.
-  auto stdlib = loadSwiftRuntime(
-    Context.SearchPathOpts.RuntimeLibraryPath,
-    Context.SearchPathOpts.RuntimeLibraryPathIsDefault);
+  auto stdlib = loadSwiftRuntime(Context.SearchPathOpts.RuntimeLibraryPaths);
   if (!stdlib) {
     CI.getDiags().diagnose(SourceLoc(),
                            diag::error_immediate_mode_missing_stdlib);

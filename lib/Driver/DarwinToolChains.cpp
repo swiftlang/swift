@@ -39,10 +39,6 @@ using namespace swift;
 using namespace swift::driver;
 using namespace llvm::opt;
 
-/// The path for Swift libraries in the OS. (Duplicated from Immediate.cpp.
-/// Eventually we should consolidate this.)
-#define OS_LIBRARY_PATH "/usr/lib/swift"
-
 std::string
 toolchains::Darwin::findProgramRelativeToSwiftImpl(StringRef name) const {
   StringRef swiftPath = getDriver().getSwiftProgramPath();
@@ -76,15 +72,12 @@ toolchains::Darwin::constructInvocation(const InterpretJobAction &job,
                                         const JobContext &context) const {
   InvocationInfo II = ToolChain::constructInvocation(job, context);
 
-  SmallString<128> envValue(OS_LIBRARY_PATH ":");
-
   SmallString<128> runtimeLibraryPath;
   getRuntimeLibraryPath(runtimeLibraryPath, context.Args, /*Shared=*/true);
-  envValue.append(runtimeLibraryPath);
 
   addPathEnvironmentVariableIfNeeded(II.ExtraEnvironment, "DYLD_LIBRARY_PATH",
                                      ":", options::OPT_L, context.Args,
-                                     envValue);
+                                     runtimeLibraryPath);
   addPathEnvironmentVariableIfNeeded(II.ExtraEnvironment, "DYLD_FRAMEWORK_PATH",
                                      ":", options::OPT_F, context.Args);
   // FIXME: Add options::OPT_Fsystem paths to DYLD_FRAMEWORK_PATH as well.

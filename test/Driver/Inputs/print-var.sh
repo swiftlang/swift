@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
 last_arg=${@: -1}
-echo ${!last_arg:-NO_VALUE}
+echo ${!last_arg}

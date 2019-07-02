@@ -64,17 +64,15 @@ public:
   /// Path to search for compiler-relative header files.
   std::string RuntimeResourcePath;
 
-  /// Path to search for compiler-relative stdlib dylibs.
-  std::string RuntimeLibraryPath;
+  /// Paths to search for compiler-relative stdlib dylibs, in order of
+  /// preference.
+  std::vector<std::string> RuntimeLibraryPaths;
 
   /// Paths to search for stdlib modules. One of these will be compiler-relative.
   std::vector<std::string> RuntimeLibraryImportPaths;
 
   /// Don't look in for compiler-provided modules.
   bool SkipRuntimeLibraryImportPaths = false;
-  
-  /// Whether the runtime library path is set to the compiler-relative default.
-  bool RuntimeLibraryPathIsDefault = true;
 
   /// Return a hash code of any components from these options that should
   /// contribute to a Swift Bridging PCH hash.
