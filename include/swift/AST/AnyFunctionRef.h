@@ -76,6 +76,18 @@ public:
     return !TheFunction.get<AbstractClosureExpr *>()->getType().isNull();
   }
 
+  bool hasSingleExpressionBody() const {
+    if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
+      return AFD->hasSingleExpressionBody();
+    return TheFunction.get<AbstractClosureExpr *>()->hasSingleExpressionBody();
+  }
+
+  Expr *getSingleExpressionBody() const {
+    if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
+      return AFD->getSingleExpressionBody();
+    return TheFunction.get<AbstractClosureExpr *>()->getSingleExpressionBody();
+  }
+
   Type getType() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
       return AFD->getInterfaceType();

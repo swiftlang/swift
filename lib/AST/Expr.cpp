@@ -1906,6 +1906,15 @@ bool AbstractClosureExpr::hasSingleExpressionBody() const {
   return true;
 }
 
+Expr *AbstractClosureExpr::getSingleExpressionBody() const {
+  if (auto closure = dyn_cast<ClosureExpr>(this))
+    return closure->getSingleExpressionBody();
+  else if (auto autoclosure = dyn_cast<AutoClosureExpr>(this))
+    return autoclosure->getSingleExpressionBody();
+
+  return nullptr;
+}
+
 #define FORWARD_SOURCE_LOCS_TO(CLASS, NODE) \
   SourceRange CLASS::getSourceRange() const {     \
     return (NODE)->getSourceRange();              \
