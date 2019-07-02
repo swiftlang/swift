@@ -154,7 +154,7 @@ extension String.UTF16View: BidirectionalCollection {
     if len == 4 && idx.transcodedOffset == 0 {
       return idx.nextTranscoded
     }
-    return idx.strippingTranscoding.encoded(offsetBy: len)._aligned
+    return idx.strippingTranscoding.encoded(offsetBy: len)._scalarAligned
   }
 
   @inlinable @inline(__always)
@@ -178,7 +178,7 @@ extension String.UTF16View: BidirectionalCollection {
 
     // Single UTF-16 code unit
     _internalInvariant((1...3) ~= len)
-    return idx.encoded(offsetBy: -len)._aligned
+    return idx.encoded(offsetBy: -len)._scalarAligned
   }
 
   public func index(_ i: Index, offsetBy n: Int) -> Index {
@@ -587,7 +587,7 @@ extension String.UTF16View {
             _internalInvariant(utf16Len == 2)
             return Index(encodedOffset: readIdx, transcodedOffset: 1)
           }
-          return Index(_encodedOffset: readIdx &+ len)._aligned
+          return Index(_encodedOffset: readIdx &+ len)._scalarAligned
         }
 
         readIdx &+= len

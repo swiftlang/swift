@@ -112,7 +112,7 @@ extension String.UnicodeScalarView: BidirectionalCollection {
 
     if _fastPath(_guts.isFastUTF8) {
       let len = _guts.fastUTF8ScalarLength(startingAt: i._encodedOffset)
-      return i.encoded(offsetBy: len)._aligned
+      return i.encoded(offsetBy: len)._scalarAligned
     }
 
     return _foreignIndex(after: i)
@@ -137,7 +137,7 @@ extension String.UnicodeScalarView: BidirectionalCollection {
         return _utf8ScalarLength(utf8, endingAt: i._encodedOffset)
       }
       _internalInvariant(len <= 4, "invalid UTF8")
-      return i.encoded(offsetBy: -len)._aligned
+      return i.encoded(offsetBy: -len)._scalarAligned
     }
 
     return _foreignIndex(before: i)
@@ -419,7 +419,7 @@ extension String.UnicodeScalarView {
     let cu = _guts.foreignErrorCorrectedUTF16CodeUnit(at: i)
     let len = UTF16.isLeadSurrogate(cu) ? 2 : 1
 
-    return i.encoded(offsetBy: len)._aligned
+    return i.encoded(offsetBy: len)._scalarAligned
   }
 
   @usableFromInline @inline(never)
@@ -430,6 +430,6 @@ extension String.UnicodeScalarView {
     let cu = _guts.foreignErrorCorrectedUTF16CodeUnit(at: priorIdx)
     let len = UTF16.isTrailSurrogate(cu) ? 2 : 1
 
-    return i.encoded(offsetBy: -len)._aligned
+    return i.encoded(offsetBy: -len)._scalarAligned
   }
 }
