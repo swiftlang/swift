@@ -18,7 +18,7 @@ protocol P {
 protocol Q {
   func foo2() -> String
 }
-extension P: Q {
+extension P {//}: Q {
   func foo2() -> String {
     return "Foo2 \(self)!"
   }
@@ -28,10 +28,11 @@ struct S {
   let a = 99
 }
 protocol P2: P {}
+extension P2 {}
+extension Numeric: P2 {}
 
 extension C: P2 {}
 extension S: P2 {}
-extension FixedWidthInteger: P2 {}
 
 // CHECK: Foo2 main.C!
 print(C().foo2())
@@ -62,6 +63,13 @@ print(b.map {$0.foo2()})
 public func use(_ value: Int) -> Int {
     return value + "1" // ← Used ExpressibleByUnicodeScalarLiteral
 }
+//public func use<T>(_ value: T) -> T
+//  where T : FixedWidthInteger {
+//    return value + "1" // ← Used ExpressibleByUnicodeScalarLiteral
+//}
 
 print(use(1))
 
+let c: P2 = 99.0
+// CHECK: Foo2 99.0!
+print(c.foo2())

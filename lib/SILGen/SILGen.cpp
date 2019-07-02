@@ -1704,14 +1704,15 @@ void SILGenModule::emitSourceFile(SourceFile *sf) {
   }
 
   for (auto pair : getASTContext().InheritingExtensions) {
-    ExtensionDecl *ext = pair.first;
-    if (ProtocolDecl *proto = ext->getExtendedProtocolDecl()) {
-      SmallVector<ProtocolConformance *, 2> result;
-      proto->prepareConformanceTable()->addExtendedConformances(ext, result);
-      for (auto conformance : result) {
-        if (conformance->isComplete())
-          if (auto *normal = dyn_cast<NormalProtocolConformance>(conformance))
-            getWitnessTable(normal, /*emitAsPrivate*/true);
+    if (ExtensionDecl *ext = pair.first) {
+      if (ProtocolDecl *proto = ext->getExtendedProtocolDecl()) {
+        SmallVector<ProtocolConformance *, 2> result;
+        proto->prepareConformanceTable()->addExtendedConformances(ext, result);
+        for (auto conformance : result) {
+          if (conformance->isComplete())
+            if (auto *normal = dyn_cast<NormalProtocolConformance>(conformance))
+              getWitnessTable(normal, /*emitAsPrivate*/true);
+        }
       }
     }
   }

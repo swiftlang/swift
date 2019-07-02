@@ -311,11 +311,6 @@ class ConformanceLookupTable {
   llvm::MapVector<DeclContext *, SmallVector<ConformanceEntry *, 4>>
     AllConformances;
 
-  /// Tracks notionals that have an implied conformance from inheriting protocol extension
-  /// Used to know notionals that need to refresh their conformances and which witnesses to emit.
-  llvm::DenseMap<const ExtensionDecl *, llvm::DenseMap<NominalTypeDecl *,
-    llvm::DenseMap<ProtocolDecl *, bool>>> NotionalConformancesFromExtension;
-
   /// The complete set of diagnostics about erroneously superseded
   /// protocol conformances.
   llvm::SmallDenseMap<DeclContext *, std::vector<ConformanceEntry *> >
@@ -324,6 +319,11 @@ class ConformanceLookupTable {
   /// Associates a conforming decl to its protocol conformance decls.
   llvm::DenseMap<const ValueDecl *, llvm::TinyPtrVector<ValueDecl *>>
     ConformingDeclMap;
+
+  /// Tracks notionals that have an implied conformance from inheriting protocol extension
+  /// Used to know notionals that need to refresh their conformances and which witnesses to emit.
+  llvm::DenseMap<const ExtensionDecl *, llvm::DenseMap<NominalTypeDecl *,
+    llvm::DenseMap<ProtocolDecl *, bool>>> NotionalConformancesFromExtension;
 
   /// Indicates whether we are visiting the superclass.
   bool VisitingSuperclass = false;
@@ -432,7 +432,7 @@ public:
   /// Destroy the conformance table.
   void destroy();
 
-  void invalidate();
+  void invalidate(NominalTypeDecl *recurse = nullptr);
 
   /// Add a synthesized conformance to the lookup table.
   void addSynthesizedConformance(NominalTypeDecl *nominal,
