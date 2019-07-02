@@ -2886,7 +2886,7 @@ public:
         original->isDynamicallyReplaceable());
     pullback->setOwnershipEliminated();
     pullback->setDebugScope(new (module)
-                               SILDebugScope(original->getLocation(), pullback));
+                                SILDebugScope(original->getLocation(), pullback));
     return pullback;
   }
 
@@ -3000,7 +3000,7 @@ public:
     SmallVector<SILValue, 8> origResults;
     extractAllElements(origResult, builder, origResults);
 
-    // Get and partially apply the pullback to get the uncurried pullback.
+    // Get and partially apply the pullback.
     auto vjpGenericEnv = vjp->getGenericEnvironment();
     auto vjpSubstMap = vjpGenericEnv
         ? vjpGenericEnv->getForwardingSubstitutionMap()
@@ -5121,7 +5121,7 @@ public:
 } // end anonymous namespace
 
 Cleanup *PullbackEmitter::makeCleanup(SILValue value, Cleanup::Func func,
-                                     ArrayRef<Cleanup *> children) {
+                                      ArrayRef<Cleanup *> children) {
   SmallVector<Cleanup *, 2> nonnullChildren;
   for (auto *c : children)
     if (c) nonnullChildren.push_back(c);
@@ -5499,16 +5499,16 @@ SILValue PullbackEmitter::accumulateDirect(SILValue lhs, SILValue rhs) {
 void PullbackEmitter::accumulateIndirect(
     SILValue resultBufAccess, SILValue lhsBufAccess, SILValue rhsBufAccess) {
   // TODO: Optimize for the case when lhs == rhs.
-  assert(lhsBufAccess->getType() == rhsBufAccess->getType()
-         && "Pullbacks must have equal types!");
+  assert(lhsBufAccess->getType() == rhsBufAccess->getType() &&
+         "Adjoint values must have same type!");
   assert(lhsBufAccess->getType().isAddress() &&
-         rhsBufAccess->getType().isAddress()
-         && "Pullback types must be both address types!");
+         rhsBufAccess->getType().isAddress() &&
+         "Adjoint values must both have address types!");
   auto loc = resultBufAccess.getLoc();
-  auto pullbackTy = lhsBufAccess->getType();
-  auto pullbackASTTy = pullbackTy.getASTType();
+  auto adjointTy = lhsBufAccess->getType();
+  auto adjointASTTy = adjointTy.getASTType();
   auto *swiftMod = getModule().getSwiftModule();
-  auto tangentSpace = pullbackASTTy->getAutoDiffAssociatedTangentSpace(
+  auto tangentSpace = adjointASTTy->getAutoDiffAssociatedTangentSpace(
       LookUpConformanceInModule(swiftMod));
   assert(tangentSpace && "No tangent space for this type");
   switch (tangentSpace->getKind()) {
@@ -5516,23 +5516,23 @@ void PullbackEmitter::accumulateIndirect(
     auto *proto = getContext().getAdditiveArithmeticProtocol();
     auto *combinerFuncDecl = getContext().getPlusDecl();
     // Call the combiner function and return.
-    auto pullbackParentModule = tangentSpace->getNominal()
+    auto adjointParentModule = tangentSpace->getNominal()
         ? tangentSpace->getNominal()->getModuleContext()
         : getModule().getSwiftModule();
-    auto confRef = pullbackParentModule->lookupConformance(pullbackASTTy,
+    auto confRef = adjointParentModule->lookupConformance(adjointASTTy,
                                                            proto);
     assert(confRef.hasValue() && "Missing conformance to `AdditiveArithmetic`");
     SILDeclRef declRef(combinerFuncDecl, SILDeclRef::Kind::Func);
     auto silFnTy = getContext().getTypeConverter().getConstantType(declRef);
     // %0 = witness_method @+
-    auto witnessMethod = builder.createWitnessMethod(loc, pullbackASTTy,
+    auto witnessMethod = builder.createWitnessMethod(loc, adjointASTTy,
                                                      *confRef, declRef,
                                                      silFnTy);
     auto subMap = SubstitutionMap::getProtocolSubstitutions(
-        proto, pullbackASTTy, *confRef);
+        proto, adjointASTTy, *confRef);
     // %1 = metatype $T.Type
     auto metatypeType =
-        CanMetatypeType::get(pullbackASTTy, MetatypeRepresentation::Thick);
+        CanMetatypeType::get(adjointASTTy, MetatypeRepresentation::Thick);
     auto metatypeSILType = SILType::getPrimitiveObjectType(metatypeType);
     auto metatype = builder.createMetatype(loc, metatypeSILType);
     // %2 = apply $0(%result, %new, %old, %1)
@@ -5553,13 +5553,14 @@ void PullbackEmitter::accumulateIndirect(
   }
   case VectorSpace::Kind::Function: {
     llvm_unreachable(
-        "Unimplemented: Emit thunks for abstracting pullback accumulation");
+        "Unimplemented: Emit thunks for abstracting adjoint value "
+        "accumulation");
   }
   }
 }
 
 void PullbackEmitter::accumulateIndirect(SILValue lhsDestAccess,
-                                        SILValue rhsAccess) {
+                                         SILValue rhsAccess) {
   assert(lhsDestAccess->getType().isAddress() &&
          rhsAccess->getType().isAddress());
   assert(lhsDestAccess->getFunction() == &getPullback());
@@ -5607,7 +5608,8 @@ void PullbackEmitter::accumulateIndirect(SILValue lhsDestAccess,
   }
   case VectorSpace::Kind::Function: {
     llvm_unreachable(
-        "Unimplemented: Emit thunks for abstracting pullback accumulation");
+        "Unimplemented: Emit thunks for abstracting adjoint value "
+        "accumulation");
   }
   }
 }
