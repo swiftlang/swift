@@ -34,8 +34,7 @@ func tfoo(t: Float) -> Float {
   return t
 }
 
-// expected-error @+3 {{expected an original function name}}
-// expected-error @+2 {{expected ')' in 'transposing' attribute}}
+// expected-error @+2 {{expected an original function name}}
 // expected-error @+1 {{expected declaration}}
 @transposing(3)
 func tfoo(t: Float) -> Float {

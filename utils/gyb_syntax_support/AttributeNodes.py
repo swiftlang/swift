@@ -337,7 +337,7 @@ ATTRIBUTE_NODES = [
 
      # SWIFT_ENABLE_TENSORFLOW
      # The argument of '@transposing(...)'.
-     # differentiating-attr-arguments ->
+     # transposing-attr-arguments ->
      #     func-decl-name ','? differentiable-attr-parameters?
      Node('TransposingAttributeArguments', kind='Syntax',
           description='''
