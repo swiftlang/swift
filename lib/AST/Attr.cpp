@@ -434,7 +434,6 @@ static std::string getTransposingParametersClauseString(
           printer << "self";
           break;
         case ParsedAutoDiffParameter::Kind::Ordered:
-          // TODO(bartchr): add assertion that the wrt is not too big
           assert((param.getIndex() < function->getParameters()->size()) &&
                  "'wrt:' parameter index should be less than the number "
                  "of parameters");
@@ -1523,8 +1522,8 @@ TransposingAttr::TransposingAttr(
       BaseType(baseType),
       Original(std::move(original)),
       NumParsedParameters(params.size()) {
-  std::copy(params.begin(), params.end(),
-            getTrailingObjects<ParsedAutoDiffParameter>());
+  std::uninitialized_copy(params.begin(), params.end(),
+                          getTrailingObjects<ParsedAutoDiffParameter>());
 }
 
 TransposingAttr::TransposingAttr(
@@ -1541,26 +1540,26 @@ TransposingAttr::create(ASTContext &context, bool implicit,
     TypeRepr *baseType, DeclNameWithLoc original,
     ArrayRef<ParsedAutoDiffParameter> params) {
   unsigned size = totalSizeToAlloc<ParsedAutoDiffParameter>(params.size());
-  void *mem = context.Allocate(size, alignof(DifferentiatingAttr));
+  void *mem = context.Allocate(size, alignof(TransposingAttr));
   return new (mem) TransposingAttr(context, implicit, atLoc, baseRange,
                                    baseType, std::move(original), params);
 }
 
 TransposingAttr *
 TransposingAttr::create(ASTContext &context, bool implicit,
-SourceLoc atLoc, SourceRange baseRange,
-TypeRepr *baseType, DeclNameWithLoc original,
-AutoDiffIndexSubset *indices) {
-  void *mem = context.Allocate(sizeof(DifferentiatingAttr),
-                               alignof(DifferentiatingAttr));
+    SourceLoc atLoc, SourceRange baseRange,
+    TypeRepr *baseType, DeclNameWithLoc original,
+    AutoDiffIndexSubset *indices) {
+  void *mem = context.Allocate(sizeof(TransposingAttr),
+                               alignof(TransposingAttr));
   return new (mem) TransposingAttr(context, implicit, atLoc, baseRange,
                                    baseType, std::move(original), indices);
 }
 
 ImplementsAttr::ImplementsAttr(SourceLoc atLoc, SourceRange range,
-                               TypeLoc ProtocolType,
-                               DeclName MemberName,
-                               DeclNameLoc MemberNameLoc)
+    TypeLoc ProtocolType,
+    DeclName MemberName,
+    DeclNameLoc MemberNameLoc)
     : DeclAttribute(DAK_Implements, atLoc, range, /*Implicit=*/false),
       ProtocolType(ProtocolType),
       MemberName(MemberName),
