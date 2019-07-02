@@ -4716,14 +4716,15 @@ AnyFunctionType::getTransposeOriginalFunctionType(
   assert(originalResult);
 
   auto wrtParams = attr->getParsedParameters();
-  ArrayRef<TupleTypeElt> transposeResultTypes;
+  SmallVector<TupleTypeElt, 1> transposeResultTypes;
   unsigned transposeResultTypesIndex = 0;
   // Return type of '@transposing' function can have single type or tuples
   // of types.
   if (auto t = transposeResult->getAs<TupleType>()) {
-    transposeResultTypes = t->getElements();
+    transposeResultTypes.append(t->getElements().begin(),
+                                t->getElements().end());
   } else {
-    transposeResultTypes = ArrayRef<TupleTypeElt>(transposeResult);
+    transposeResultTypes.push_back(transposeResult);
   }
   assert(!transposeResultTypes.empty());
 
@@ -4755,7 +4756,6 @@ AnyFunctionType::getTransposeOriginalFunctionType(
       auto resultType = transposeResultTypes[transposeResultTypesIndex].getType();
       // TODO(bartchr): this prevents a segfault occuring when converting 'g'
       // to 'Param'.
-      llvm::nulls() << resultType;
       originalParams.push_back(AnyFunctionType::Param(resultType));
       transposeResultTypesIndex++;
     } else {
