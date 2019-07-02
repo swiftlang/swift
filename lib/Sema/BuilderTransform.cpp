@@ -484,10 +484,18 @@ bool TypeChecker::typeCheckFunctionBuilderFuncBody(FuncDecl *FD,
   if (!returnType || returnType->hasError())
     return true;
 
+  TypeCheckExprOptions options = {};
+
+  // If we are performing code-completion inside the functions body, supress
+  // diagnostics to workaround typechecking performance problems.
+  if (Context.SourceMgr.rangeContainsCodeCompletionLoc(
+          FD->getBody()->getSourceRange()))
+    options |= TypeCheckExprFlags::SuppressDiagnostics;
+
   // Type-check the single result expression.
   Type returnExprType = typeCheckExpression(returnExpr, FD,
                                             TypeLoc::withoutLoc(returnType),
-                                            CTP_ReturnStmt);
+                                            CTP_ReturnStmt, options);
   if (!returnExprType)
     return true;
   assert(returnExprType->isEqual(returnType));
@@ -561,6 +569,12 @@ ConstraintSystem::TypeMatchResult ConstraintSystem::applyFunctionBuilder(
     }
     assert(!builderType->hasTypeParameter());
   }
+
+  // If we are performing code-completion inside the closure body, supress
+  // diagnostics to workaround typechecking performance problems.
+  if (getASTContext().SourceMgr.rangeContainsCodeCompletionLoc(
+          closure->getSourceRange()))
+    Options |= ConstraintSystemFlags::SuppressDiagnostics;
 
   BuilderClosureVisitor visitor(getASTContext(), this,
                                 /*wantExpr=*/true, builderType);
