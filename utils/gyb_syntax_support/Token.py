@@ -314,7 +314,7 @@ SYNTAX_TOKENS = [
             classification='StringLiteral', serialization_code=113),
 
     Misc('Unknown', 'unknown', serialization_code=115),
-    Misc('Identifier', 'identifier', classification=None,
+    Misc('Identifier', 'identifier', classification='Identifier',
          serialization_code=105),
     Misc('UnspacedBinaryOperator', 'oper_binary_unspaced',
          serialization_code=107),
