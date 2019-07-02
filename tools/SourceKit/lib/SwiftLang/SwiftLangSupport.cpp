@@ -252,6 +252,69 @@ class InMemoryFileSystemProvider: public SourceKit::FileSystemProvider {
     return OverlayFS;
   }
 };
+
+class DirectlyPassedFileSystemProvider : public SourceKit::FileSystemProvider {
+public:
+  struct Options : public OptionsDictionary {
+    const unsigned FSID;
+
+    Options(unsigned FSID) : FSID(FSID) {}
+
+    bool valueForOption(UIdent Key, unsigned &Val) override {
+      static UIdent KeyFSID("key.fsid");
+      if (Key != KeyFSID)
+        return false;
+      Val = FSID;
+      return true;
+    }
+    bool valueForOption(UIdent Key, bool &Val) override { return true; }
+    bool valueForOption(UIdent Key, StringRef &Val) override { return false; }
+    bool
+    forEach(UIdent key,
+            llvm::function_ref<bool(OptionsDictionary &)> applier) override {
+      return false;
+    }
+  };
+
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
+  getFileSystem(OptionsDictionary &options, std::string &error) override {
+    llvm::sys::ScopedLock L(mtx);
+    static UIdent KeyFSID("key.fsid");
+    unsigned FSID;
+    if (!options.valueForOption(KeyFSID, FSID)) {
+      error = "'key.fsid' not specified";
+      return nullptr;
+    }
+
+    auto result = FileSystems.find(FSID);
+    if (result == FileSystems.end()) {
+      error = "filesystem not found";
+      return nullptr;
+    }
+
+    return result->second;
+  }
+
+  Options addFileSystem(llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fs) {
+    llvm::sys::ScopedLock L(mtx);
+    auto result = FileSystems.try_emplace(NextFSID, std::move(fs));
+    assert(result.second && "duplicate key");
+    Options ret(NextFSID);
+    ++NextFSID;
+    return ret;
+  }
+
+  void removeFileSystem(Options &options) {
+    llvm::sys::ScopedLock L(mtx);
+    FileSystems.erase(options.FSID);
+  }
+
+private:
+  llvm::sys::Mutex mtx;
+  unsigned NextFSID = 0;
+  llvm::DenseMap<unsigned, llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>>
+      FileSystems;
+};
 }
 
 SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
@@ -270,6 +333,10 @@ SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
 
   // Provide a default file system provider.
   setFileSystemProvider("in-memory-vfs", llvm::make_unique<InMemoryFileSystemProvider>());
+
+  // SWIFT_ENABLE_TENSORFLOW
+  setFileSystemProvider("directly-passed-vfs",
+                        llvm::make_unique<DirectlyPassedFileSystemProvider>());
 }
 
 SwiftLangSupport::~SwiftLangSupport() {
@@ -955,6 +1022,39 @@ void SwiftLangSupport::getStatistics(StatisticsReceiver receiver) {
 #include "SwiftStatistics.def"
   };
   receiver(stats);
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+void SwiftLangSupport::codeComplete(
+    llvm::MemoryBuffer *InputBuf, unsigned Offset,
+    CodeCompletionConsumer &Consumer, ArrayRef<const char *> Args,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS) {
+  VFSOptions vfsOptions;
+  vfsOptions.name = "directly-passed-vfs";
+  auto *provider = static_cast<DirectlyPassedFileSystemProvider *>(
+      getFileSystemProvider(vfsOptions.name));
+  assert(provider);
+  auto options = provider->addFileSystem(FS);
+  vfsOptions.options =
+      llvm::make_unique<DirectlyPassedFileSystemProvider::Options>(options);
+  codeComplete(InputBuf, Offset, Consumer, Args, std::move(vfsOptions));
+  provider->removeFileSystem(options);
+}
+
+void SwiftLangSupport::editorOpen(
+    StringRef Name, llvm::MemoryBuffer *Buf, EditorConsumer &Consumer,
+    ArrayRef<const char *> Args,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS) {
+  VFSOptions vfsOptions;
+  vfsOptions.name = "directly-passed-vfs";
+  auto *provider = static_cast<DirectlyPassedFileSystemProvider *>(
+      getFileSystemProvider(vfsOptions.name));
+  assert(provider);
+  auto options = provider->addFileSystem(FS);
+  vfsOptions.options =
+      llvm::make_unique<DirectlyPassedFileSystemProvider::Options>(options);
+  editorOpen(Name, Buf, Consumer, Args, std::move(vfsOptions));
+  provider->removeFileSystem(options);
 }
 
 FileSystemProvider *SwiftLangSupport::getFileSystemProvider(StringRef Name) {

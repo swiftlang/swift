@@ -606,6 +606,16 @@ public:
 
   void getStatistics(StatisticsReceiver) override;
 
+  // SWIFT_ENABLE_TENSORFLOW
+  void
+  codeComplete(llvm::MemoryBuffer *InputBuf, unsigned Offset,
+               CodeCompletionConsumer &Consumer, ArrayRef<const char *> Args,
+               llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS) override;
+
+  void editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
+                  EditorConsumer &Consumer, ArrayRef<const char *> Args,
+                  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS) override;
+
 private:
   swift::SourceFile *getSyntacticSourceFile(llvm::MemoryBuffer *InputBuf,
                                             ArrayRef<const char *> Args,

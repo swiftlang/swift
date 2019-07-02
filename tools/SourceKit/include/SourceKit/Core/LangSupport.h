@@ -818,6 +818,19 @@ public:
                                        ConformingMethodListConsumer &Consumer) = 0;
 
   virtual void getStatistics(StatisticsReceiver) = 0;
+
+  // SWIFT_ENABLE_TENSORFLOW
+  /// Tempoary shim for clients that want to pass the filesystem directly.
+  virtual void
+  codeComplete(llvm::MemoryBuffer *InputBuf, unsigned Offset,
+               CodeCompletionConsumer &Consumer, ArrayRef<const char *> Args,
+               llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS) = 0;
+
+  /// Tempoary shim for clients that want to pass the filesystem directly.
+  virtual void
+  editorOpen(StringRef Name, llvm::MemoryBuffer *Buf, EditorConsumer &Consumer,
+             ArrayRef<const char *> Args,
+             llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS) = 0;
 };
 } // namespace SourceKit
 
