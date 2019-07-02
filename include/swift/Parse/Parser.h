@@ -969,8 +969,8 @@ public:
   ParserResult<DifferentiatingAttr>
   parseDifferentiatingAttribute(SourceLoc AtLoc, SourceLoc Loc);
   
-  ParserResult<TransposingAttr>
-  parseTransposingAttribute(SourceLoc AtLoc, SourceLoc Loc);
+  ParserResult<TransposingAttr> parseTransposingAttribute(SourceLoc AtLoc,
+                                                          SourceLoc Loc);
 
   /// Parse a specific attribute.
   ParserStatus parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc);

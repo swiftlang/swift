@@ -203,18 +203,19 @@ extension Float {
 }
 
 // Static method.
-// struct A : Differentiable & AdditiveArithmetic {
-//   public typealias TangentVector = A
-//   var x: Double
-//   static prefix func -(a: A) -> A {
-//     return A(x: -a.x)
-//   }
+struct A : Differentiable & AdditiveArithmetic {
+  public typealias TangentVector = A
+  var x: Double
+  
+  static prefix func -(a: A) -> A {
+    return A(x: -a.x)
+  }
 
-//   @transposing(A.-, wrt: 0)
-//   static func negationT(a: A) -> A {
-//     return A(x: -a.x)
-//   }
-// }
+  @transposing(A.-, wrt: 0)
+  static func negationT(a: A) -> A {
+    return A(x: -a.x)
+  }
+}
 
 // Method with 3 parameters.
 extension Float {

@@ -977,8 +977,8 @@ bool Parser::parseTransposingParametersClause(
                 diag::transposing_params_clause_expected_parameter))
           return true;
 
-        params.push_back(ParsedAutoDiffParameter::getOrderedParameter(
-            paramLoc, paramNum));
+        params.push_back(
+            ParsedAutoDiffParameter::getOrderedParameter(paramLoc, paramNum));
         break;
       }
       case tok::kw_self: {
@@ -1252,9 +1252,8 @@ Parser::parseDifferentiatingAttribute(SourceLoc atLoc, SourceLoc loc) {
 ///
 /// Parses an optional base type, followed by a declaration name.
 /// Returns true on error (if function decl name could not be parsed).
-bool parseQualifiedDeclName(
-    Parser &P, Diag<> nameParseError, TypeRepr *&baseType,
-    DeclNameWithLoc &original) {
+bool parseQualifiedDeclName(Parser &P, Diag<> nameParseError,
+                            TypeRepr *&baseType, DeclNameWithLoc &original) {
   // If the current token is an identifier or `Self` or `Any`, then attempt to
   // parse the base type. Otherwise, base type is null.
   auto currentPosition = P.getParserPosition();
@@ -1262,7 +1261,7 @@ bool parseQualifiedDeclName(
   P.backtrackToPosition(currentPosition);
   if (canParseBaseType)
     baseType = P.parseTypeIdentifier(/*isParsingQualifiedDeclName*/ true)
-    .getPtrOrNull();
+                   .getPtrOrNull();
   else
     baseType = nullptr;
   
@@ -1275,17 +1274,19 @@ bool parseQualifiedDeclName(
       afterDot = std::distance(components.begin(), components.end()) > 0;
     }
   }
-  original.Name = P.parseUnqualifiedDeclName(afterDot, original.Loc, nameParseError,
-                                    /*allowOperators*/ true,
-                                    /*allowZeroArgCompoundNames*/ true);
+  original.Name =
+      P.parseUnqualifiedDeclName(afterDot, original.Loc, nameParseError,
+                                 /*allowOperators*/ true,
+                                 /*allowZeroArgCompoundNames*/ true);
   // The base type is optional, but the final unqualified decl name is not.
   // If name could not be parsed, return true for error.
-  if (!original.Name) return true;
+  if (!original.Name)
+    return true;
   return false;
 }
 
-ParserResult<TransposingAttr>
-Parser::parseTransposingAttribute(SourceLoc atLoc, SourceLoc loc) {
+ParserResult<TransposingAttr> Parser::parseTransposingAttribute(SourceLoc atLoc,
+                                                                SourceLoc loc) {
   StringRef AttrName = "transposing";
   SourceLoc lParenLoc = loc, rParenLoc = loc;
   TypeRepr *baseType;

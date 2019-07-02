@@ -4673,10 +4673,8 @@ AnyFunctionType::getAutoDiffOriginalFunctionType() {
 
 // SWIFT_ENABLE_TENSORFLOW
 static AnyFunctionType *
-makeFunctionType(
-    ArrayRef<AnyFunctionType::Param> params,
-    Type retTy,
-    GenericSignature *genericSignature) {
+makeFunctionType(ArrayRef<AnyFunctionType::Param> params, Type retTy,
+                 GenericSignature *genericSignature) {
   if (genericSignature)
     return GenericFunctionType::get(genericSignature, params, retTy);
   return FunctionType::get(params, retTy);
@@ -4684,11 +4682,8 @@ makeFunctionType(
 
 // Compute the original function type corresponding to the given transpose
 // function type.
-AnyFunctionType *
-AnyFunctionType::getTransposeOriginalFunctionType(
-    TransposingAttr *attr,
-    AutoDiffIndexSubset *wrtParamIndices,
-    bool wrtSelf) {
+AnyFunctionType *AnyFunctionType::getTransposeOriginalFunctionType(
+    TransposingAttr *attr, AutoDiffIndexSubset *wrtParamIndices, bool wrtSelf) {
   unsigned transposeParamsIndex = 0;
   bool isCurried = getResult()->is<AnyFunctionType>();
   
@@ -4696,7 +4691,8 @@ AnyFunctionType::getTransposeOriginalFunctionType(
   auto transposeParams = getParams();
   auto transposeResult = getResult();
   if (isCurried) {
-    auto method = getAs<AnyFunctionType>()->getResult()->getAs<AnyFunctionType>();
+    auto method =
+        getAs<AnyFunctionType>()->getResult()->getAs<AnyFunctionType>();
     transposeParams = method->getParams();
     transposeResult = method->getResult();
   }
@@ -4766,16 +4762,14 @@ AnyFunctionType::getTransposeOriginalFunctionType(
     }
   }
 
-  auto *originalType = makeFunctionType(
-                          originalParams,
-                          originalResult,
-                          isCurried ? nullptr : getOptGenericSignature());
+  auto *originalType =
+      makeFunctionType(originalParams, originalResult,
+                       isCurried ? nullptr : getOptGenericSignature());
   if (isCurried) {
     assert(selfType);
     // If curried, wrap the function into the 'Self' type to get a method.
     originalType = makeFunctionType(AnyFunctionType::Param(selfType),
-                                    originalType,
-                                    nullptr);
+                                    originalType, nullptr);
   }
   return originalType;
 }
