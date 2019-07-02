@@ -2134,9 +2134,15 @@ bool MissingMemberFailure::diagnoseAsError() {
   };
 
   if (getName().getBaseName().getKind() == DeclBaseName::Kind::Subscript) {
-    emitDiagnostic(anchor->getLoc(), diag::could_not_find_value_subscript,
-                   baseType)
+    auto loc = anchor->getLoc();
+    if (auto *metatype = baseType->getAs<MetatypeType>()) {
+      emitDiagnostic(loc, diag::could_not_find_type_member,
+                     metatype->getInstanceType(), getName())
         .highlight(baseExpr->getSourceRange());
+    } else {
+      emitDiagnostic(loc, diag::could_not_find_value_subscript, baseType)
+        .highlight(baseExpr->getSourceRange());
+    }
   } else if (getName().getBaseName() == "deinit") {
     // Specialised diagnostic if trying to access deinitialisers
     emitDiagnostic(anchor->getLoc(), diag::destructor_not_accessible)
