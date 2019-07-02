@@ -105,6 +105,18 @@ struct SwiftCodeCompletionConsumer
 };
 } // anonymous namespace
 
+/// Returns completion context kind \c UIdent to report to the client.
+/// For now, only returns "unresolved member" kind because others are unstable.
+/// Returns invalid \c UIents other cases.
+static UIdent getUIDForCodeCompletionKindToReport(CompletionKind kind) {
+  switch (kind) {
+  case CompletionKind::UnresolvedMember:
+    return UIdent("source.lang.swift.completion.unresolvedmember");
+  default:
+    return UIdent();
+  }
+}
+
 static bool swiftCodeCompleteImpl(SwiftLangSupport &Lang,
                                   llvm::MemoryBuffer *UnresolvedInputFile,
                                   unsigned Offset,
@@ -205,6 +217,12 @@ void SwiftLangSupport::codeComplete(llvm::MemoryBuffer *UnresolvedInputFile,
   SwiftCodeCompletionConsumer SwiftConsumer([&](
       MutableArrayRef<CodeCompletionResult *> Results,
       SwiftCompletionInfo &info) {
+
+    auto kind = getUIDForCodeCompletionKindToReport(
+        info.completionContext->CodeCompletionKind);
+    if (kind.isValid())
+      SKConsumer.setCompletionKind(kind);
+
     bool hasRequiredType = info.completionContext->typeContextKind == TypeContextKind::Required;
     CodeCompletionContext::sortCompletionResults(Results);
     // FIXME: this adhoc filtering should be configurable like it is in the
