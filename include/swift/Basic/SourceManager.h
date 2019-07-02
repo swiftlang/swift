@@ -103,13 +103,6 @@ public:
            rangeContainsTokenLoc(Enclosing, Inner.End);
   }
 
-  /// Returns true if range \p R contains the code-completion location, if any.
-  bool rangeContainsCodeCompletionLoc(SourceRange R) const {
-    return CodeCompletionBufferID
-               ? rangeContainsTokenLoc(R, getCodeCompletionLoc())
-               : false;
-  }
-
   /// Returns the buffer ID for the specified *valid* location.
   ///
   /// Because a valid source location always corresponds to a source buffer,
