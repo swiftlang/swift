@@ -1066,7 +1066,7 @@ class ParseableInterfaceModuleLoaderImpl {
   }
 
   bool isInResourceDir(StringRef path) {
-    StringRef resourceDir = ctx.SearchPathOpts.RuntimeLibraryPath;
+    StringRef resourceDir = ctx.SearchPathOpts.RuntimeResourcePath;
     if (resourceDir.empty()) return false;
     return path.startswith(resourceDir);
   }
