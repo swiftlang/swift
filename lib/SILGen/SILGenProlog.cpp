@@ -311,8 +311,8 @@ static void makeArgument(Type ty, ParamDecl *decl,
                          SmallVectorImpl<SILValue> &args, SILGenFunction &SGF) {
   assert(ty && "no type?!");
   
-  // Destructure tuple arguments.
-  if (TupleType *tupleTy = ty->getAs<TupleType>()) {
+  // Destructure tuple value arguments.
+  if (TupleType *tupleTy = decl->isInOut() ? nullptr : ty->getAs<TupleType>()) {
     for (auto fieldType : tupleTy->getElementTypes())
       makeArgument(fieldType, decl, args, SGF);
   } else {
