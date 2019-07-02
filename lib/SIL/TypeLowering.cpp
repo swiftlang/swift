@@ -2687,3 +2687,22 @@ unsigned TypeConverter::countNumberOfFields(SILType Ty,
   TypeFields[key] = fieldsCount;
   return std::max(fieldsCount, 1U);
 }
+
+void TypeLowering::print(llvm::raw_ostream &os) const {
+  auto BOOL = [&](bool b) -> StringRef {
+    if (b)
+      return "true";
+    return "false";
+  };
+  os << "Type Lowering for lowered type: " << LoweredType << ".\n"
+     << "Expansion: " << ResilienceExpansion(ForExpansion) << "\n"
+     << "isTrivial: " << BOOL(Properties.isTrivial()) << ".\n"
+     << "isFixedABI: " << BOOL(Properties.isFixedABI()) << ".\n"
+     << "isAddressOnly: " << BOOL(Properties.isAddressOnly()) << ".\n"
+     << "isResilient: " << BOOL(Properties.isResilient()) << ".\n"
+     << "\n";
+}
+
+void TypeLowering::dump() const {
+  print(llvm::dbgs());
+}
