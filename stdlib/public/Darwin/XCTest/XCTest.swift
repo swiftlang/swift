@@ -357,6 +357,11 @@ func _XCTCheckEqualWithAccuracy_CGFloat(_ value1: CGFloat, _ value2: CGFloat, _ 
     && (abs(value1 - value2) <= accuracy)
 }
 
+func _XCTCheckEqualWithAccuracy_Float80(_ value1: Float80, _ value2: Float80, _ accuracy: Float80) -> Bool {
+  return (!value1.isNaN && !value2.isNaN)
+    && (abs(value1 - value2) <= accuracy)
+}
+
 public func XCTAssertEqual<T : FloatingPoint>(_ expression1: @autoclosure () throws -> T, _ expression2: @autoclosure () throws -> T, accuracy: T, _ message: @autoclosure () -> String = "", file: StaticString = #file, line: UInt = #line) {
   let assertionType = _XCTAssertionType.equalWithAccuracy
   
@@ -385,7 +390,10 @@ public func XCTAssertEqual<T : FloatingPoint>(_ expression1: @autoclosure () thr
       
     case let (expressionValue1CGFloat as CGFloat, expressionValue2CGFloat as CGFloat, accuracyCGFloat as CGFloat):
       equalWithAccuracy = _XCTCheckEqualWithAccuracy_CGFloat(expressionValue1CGFloat, expressionValue2CGFloat, accuracyCGFloat)
-      
+    
+    case let (expressionValue1Float80 as Float80, expressionValue2Float80 as Float80, accuracyFloat80 as Float80):
+      equalWithAccuracy = _XCTCheckEqualWithAccuracy_Float80(expressionValue1Float80, expressionValue2Float80, accuracyFloat80)
+    
     default:
       // unknown type, fail with prejudice
       preconditionFailure("Unsupported floating-point type passed to XCTAssertEqual")
@@ -433,6 +441,11 @@ func _XCTCheckNotEqualWithAccuracy_CGFloat(_ value1: CGFloat, _ value2: CGFloat,
     || (abs(value1 - value2) > accuracy)
 }
 
+func _XCTCheckNotEqualWithAccuracy_Float80(_ value1: Float80, _ value2: Float80, _ accuracy: Float80) -> Bool {
+  return (value1.isNaN || value2.isNaN)
+    || (abs(value1 - value2) > accuracy)
+}
+
 public func XCTAssertNotEqual<T : FloatingPoint>(_ expression1: @autoclosure () throws -> T, _ expression2: @autoclosure () throws -> T, accuracy: T, _ message: @autoclosure () -> String = "", file: StaticString = #file, line: UInt = #line) {
   let assertionType = _XCTAssertionType.notEqualWithAccuracy
   
@@ -462,6 +475,9 @@ public func XCTAssertNotEqual<T : FloatingPoint>(_ expression1: @autoclosure () 
     case let (expressionValue1CGFloat as CGFloat, expressionValue2CGFloat as CGFloat, accuracyCGFloat as CGFloat):
       notEqualWithAccuracy = _XCTCheckNotEqualWithAccuracy_CGFloat(expressionValue1CGFloat, expressionValue2CGFloat, accuracyCGFloat)
       
+    case let (expressionValue1Float80 as Float80, expressionValue2Float80 as Float80, accuracyFloat80 as Float80):
+      notEqualWithAccuracy = _XCTCheckNotEqualWithAccuracy_Float80(expressionValue1Float80, expressionValue2Float80, accuracyFloat80)
+    
     default:
       // unknown type, fail with prejudice
       preconditionFailure("Unsupported floating-point type passed to XCTAssertNotEqual")
