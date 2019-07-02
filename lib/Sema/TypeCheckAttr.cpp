@@ -3881,6 +3881,7 @@ void AttributeChecker::visitTransposingAttr(TransposingAttr *attr) {
   auto lookupConformance =
       LookUpConformanceInModule(D->getDeclContext()->getParentModule());
   auto original = attr->getOriginal();
+  TC.resolveDeclSignature(transpose);
   auto *transposeInterfaceType = transpose->getInterfaceType()
                                      ->eraseDynamicSelfType()
                                      ->castTo<AnyFunctionType>();
@@ -3925,16 +3926,17 @@ void AttributeChecker::visitTransposingAttr(TransposingAttr *attr) {
           attr, wrtParamIndices, wrtSelf);
 
   // `R` result type must conform to `Differentiable`.
-  auto valueResultType = expectedOriginalFnType->getResult();
+  auto expectedOriginalResultType = expectedOriginalFnType->getResult();
   if (isCurried) {
-    valueResultType = transpose->mapTypeIntoContext(
-        valueResultType->getAs<AnyFunctionType>()->getResult());
+    expectedOriginalResultType = transpose->mapTypeIntoContext(
+        expectedOriginalResultType->getAs<AnyFunctionType>()->getResult());
   }
-  if (valueResultType->hasTypeParameter())
-    valueResultType = transpose->mapTypeIntoContext(valueResultType);
+  if (expectedOriginalResultType->hasTypeParameter())
+    expectedOriginalResultType = transpose->mapTypeIntoContext(
+        expectedOriginalResultType);
   auto diffableProto = ctx.getProtocol(KnownProtocolKind::Differentiable);
-  auto valueResultConf = TC.conformsToProtocol(
-      valueResultType, diffableProto, transpose->getDeclContext(), None);
+  auto valueResultConf = TC.conformsToProtocol(expectedOriginalResultType,
+      diffableProto, transpose->getDeclContext(), None);
 
   if (!valueResultConf) {
     TC.diagnose(attr->getLocation(),

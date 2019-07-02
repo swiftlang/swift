@@ -4760,15 +4760,18 @@ AnyFunctionType *AnyFunctionType::getTransposeOriginalFunctionType(
     }
   }
 
-  auto *originalType =
-      makeFunctionType(originalParams, originalResult,
-                       getOptGenericSignature());
+  AnyFunctionType *originalType;
   if (isCurried) {
     assert(selfType);
     // If curried, wrap the function into the 'Self' type to get a method.
+    originalType = makeFunctionType(originalParams, originalResult, nullptr);
     originalType = makeFunctionType(AnyFunctionType::Param(selfType),
-                                    originalType, nullptr);
+                                    originalType, getOptGenericSignature());
+  } else {
+    originalType = makeFunctionType(originalParams, originalResult,
+                                    getOptGenericSignature());
   }
+  assert(originalType);
   return originalType;
 }
 
