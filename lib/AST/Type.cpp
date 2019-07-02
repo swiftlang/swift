@@ -4687,19 +4687,26 @@ makeFunctionType(
 AnyFunctionType *
 AnyFunctionType::getTransposeOriginalFunctionType(
     TransposingAttr *attr,
-    AutoDiffIndexSubset *wrtParamIndices) {
-  auto transposeParams = getParams();
+    AutoDiffIndexSubset *wrtParamIndices,
+    bool wrtSelf) {
   unsigned transposeParamsIndex = 0;
-  auto transposeResult = getResult();
+  bool isCurried = getResult()->is<AnyFunctionType>();
   
   // Get the original function's result.
-  bool isCurried = getResult()->is<AnyFunctionType>();
+  auto transposeParams = getParams();
+  auto transposeResult = getResult();
+  if (isCurried) {
+    auto method = getAs<AnyFunctionType>()->getResult()->getAs<AnyFunctionType>();
+    transposeParams = method->getParams();
+    transposeResult = method->getResult();
+  }
+      
   Type originalResult;
   if (isCurried) {
-    // If it's curried, then the first parameter in the curried type,
-    // which is the 'Self' type, is the original result (no matter if we
-    // are differentiating WRT self or aren't).
-    originalResult = transposeParams.front().getPlainType();
+    // If it's curried, then the first parameter in the curried type, which is
+    // the 'Self' type, is the original result (no matter if we are
+    // differentiating WRT self or aren't).
+    originalResult = getParams().front().getPlainType();
   } else {
     // If it's not curried, the last parameter, the tangent, is always the
     // original result type as we require the last parameter of the transposing
@@ -4707,15 +4714,6 @@ AnyFunctionType::getTransposeOriginalFunctionType(
     originalResult = transposeParams.back().getPlainType();
   }
   assert(originalResult);
-
-  if (isCurried) {
-    // If it's curried, then we need to get the parameters and result of the
-    // method inside.
-    transposeParams = transposeResult->getAs<AnyFunctionType>()
-                          ->getParams();
-    transposeResult = transposeResult->getAs<AnyFunctionType>()
-                          ->getResult();
-  }
 
   auto wrtParams = attr->getParsedParameters();
   ArrayRef<TupleTypeElt> transposeResultTypes;
@@ -4729,36 +4727,36 @@ AnyFunctionType::getTransposeOriginalFunctionType(
   }
   assert(!transposeResultTypes.empty());
 
-  bool wrtSelf = wrtParamIndices->contains(wrtParamIndices->getCapacity() - 1);
-
   // If the function is curried and is transposing WRT 'self', then grab
   // the type from the result list (guaranteed to be the first since 'self'
   // is first in WRT list) and remove it. If it's still curried but not
-  // transposing WRT 'self', then the 'Self' type is the same as the result.
-  Type selfType = originalResult;
+  // transposing WRT 'self', then the 'Self' type is the first parameter
+  // in the method.
+  Type selfType;
   if (isCurried && wrtSelf) {
     selfType = transposeResultTypes[transposeResultTypesIndex].getType();
     transposeResultTypesIndex++;
+  } else if (isCurried) {
+    selfType = transposeParams.front().getPlainType();
+    transposeParamsIndex++;
   }
 
   SmallVector<AnyFunctionType::Param, 8> originalParams;
   unsigned numberOriginalParameters =
       transposeParams.size() + wrtParams.size() - 1;
   for (auto i : range(numberOriginalParameters)) {
+    // Need to check if it is the 'self' param since we handle it differently
+    // above.
+    bool lookingAtSelf = (i == (wrtParamIndices->getCapacity() - 1)) && wrtSelf;
     bool isWrt = wrtParamIndices->contains(i);
-    if (isWrt) {
+    if (isWrt && !lookingAtSelf) {
       // If in WRT list, the item in the result tuple must be a parameter in the
       // original function.
       auto resultType = transposeResultTypes[transposeResultTypesIndex].getType();
-      assert(resultType && resultType.getPointer() &&
-             "resultType should not be null");
       // TODO(bartchr): this prevents a segfault occuring when converting 'g'
       // to 'Param'.
       llvm::nulls() << resultType;
-      auto param = AnyFunctionType::Param(resultType);
-      assert(param.getPlainType() && param.getPlainType().getPointer() &&
-             "param should not be null");
-      originalParams.push_back(param);
+      originalParams.push_back(AnyFunctionType::Param(resultType));
       transposeResultTypesIndex++;
     } else {
       // Else if not in the WRT list, the parameter in the transposing function
@@ -4773,6 +4771,7 @@ AnyFunctionType::getTransposeOriginalFunctionType(
                           originalResult,
                           isCurried ? nullptr : getOptGenericSignature());
   if (isCurried) {
+    assert(selfType);
     // If curried, wrap the function into the 'Self' type to get a method.
     originalType = makeFunctionType(AnyFunctionType::Param(selfType),
                                     originalType,

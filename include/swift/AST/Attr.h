@@ -1692,6 +1692,10 @@ class TransposingAttr final
       : public DeclAttribute,
         private llvm::TrailingObjects<DifferentiableAttr,
                                       ParsedAutoDiffParameter> {
+  /// The base type of the original function.
+  /// This is non-null only when the original function is not top-level (i.e. it
+  /// is an instance/static method).
+  TypeRepr *BaseType;
   /// The original function name.
   DeclNameWithLoc Original;
   /// The original function, resolved by the type checker.
@@ -1703,25 +1707,26 @@ class TransposingAttr final
   
   explicit TransposingAttr(ASTContext &context, bool implicit,
                            SourceLoc atLoc, SourceRange baseRange,
-                           DeclNameWithLoc original,
+                           TypeRepr *baseType, DeclNameWithLoc original,
                            ArrayRef<ParsedAutoDiffParameter> params);
   
   explicit TransposingAttr(ASTContext &context, bool implicit,
                            SourceLoc atLoc, SourceRange baseRange,
-                           DeclNameWithLoc original,
+                           TypeRepr *baseType, DeclNameWithLoc original,
                            AutoDiffIndexSubset *indices);
   
 public:
   static TransposingAttr *create(ASTContext &context, bool implicit,
                                  SourceLoc atLoc, SourceRange baseRange,
-                                 DeclNameWithLoc original,
+                                 TypeRepr *baseType, DeclNameWithLoc original,
                                  ArrayRef<ParsedAutoDiffParameter> params);
   
   static TransposingAttr *create(ASTContext &context, bool implicit,
                                  SourceLoc atLoc, SourceRange baseRange,
-                                 DeclNameWithLoc original,
+                                 TypeRepr *baseType, DeclNameWithLoc original,
                                  AutoDiffIndexSubset *indices);
   
+  TypeRepr *getBaseType() const { return BaseType; }
   DeclNameWithLoc getOriginal() const { return Original; }
   
   FuncDecl *getOriginalFunction() const { return OriginalFunction; }

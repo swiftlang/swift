@@ -1014,7 +1014,7 @@ bool Parser::parseTransposingParametersClause(
   }
   // If no opening '(' for parameter list, parse a single parameter.
   else {
-    if (parseParam(/*parseTrailingComma=*/false))
+    if (parseParam(/*parseTrailingComma*/ false))
       return errorAndSkipToEnd();
   }
   return false;
@@ -1242,10 +1242,53 @@ Parser::parseDifferentiatingAttribute(SourceLoc atLoc, SourceLoc loc) {
                                   original, linear, params));
 }
 
+/// SWIFT_ENABLE_TENSORFLOW
+/// parseQualifiedDeclName
+///
+///   qualified-decl-name:
+///     type-identifier? unqualified-decl-name
+///   type-identifier:
+///     identifier generic-args? ('.' identifier generic-args?)*
+///
+/// Parses an optional base type, followed by a declaration name.
+/// Returns true on error (if function decl name could not be parsed).
+bool parseQualifiedDeclName(
+    Parser &P, Diag<> nameParseError, TypeRepr *&baseType,
+    DeclNameWithLoc &original) {
+  // If the current token is an identifier or `Self` or `Any`, then attempt to
+  // parse the base type. Otherwise, base type is null.
+  auto currentPosition = P.getParserPosition();
+  bool canParseBaseType = P.canParseTypeIdentifier();
+  P.backtrackToPosition(currentPosition);
+  if (canParseBaseType)
+    baseType = P.parseTypeIdentifier(/*isParsingQualifiedDeclName*/ true)
+    .getPtrOrNull();
+  else
+    baseType = nullptr;
+  
+  // If base type was parsed and has at least one component, then there was a
+  // dot before the current token.
+  bool afterDot = false;
+  if (baseType) {
+    if (auto ident = dyn_cast<IdentTypeRepr>(baseType)) {
+      auto components = ident->getComponentRange();
+      afterDot = std::distance(components.begin(), components.end()) > 0;
+    }
+  }
+  original.Name = P.parseUnqualifiedDeclName(afterDot, original.Loc, nameParseError,
+                                    /*allowOperators*/ true,
+                                    /*allowZeroArgCompoundNames*/ true);
+  // The base type is optional, but the final unqualified decl name is not.
+  // If name could not be parsed, return true for error.
+  if (!original.Name) return true;
+  return false;
+}
+
 ParserResult<TransposingAttr>
 Parser::parseTransposingAttribute(SourceLoc atLoc, SourceLoc loc) {
   StringRef AttrName = "transposing";
   SourceLoc lParenLoc = loc, rParenLoc = loc;
+  TypeRepr *baseType;
   DeclNameWithLoc original;
   SmallVector<ParsedAutoDiffParameter, 8> params;
   
@@ -1277,13 +1320,11 @@ Parser::parseTransposingAttribute(SourceLoc atLoc, SourceLoc loc) {
         SyntaxContext, SyntaxKind::DifferentiatingAttributeArguments);
     
     {
-      // Parse the name of the function.
-      SyntaxParsingContext FuncDeclNameContext(
-          SyntaxContext, SyntaxKind::FunctionDeclName);
-      original.Name = parseUnqualifiedDeclName(
-          /*afterDot*/ false, original.Loc,
-          diag::attr_transposing_expected_original_name,
-          /*allowOperators*/ true, /*allowZeroArgCompoundNames*/ true);
+      // Parse the optionally qualified function.
+      if (parseQualifiedDeclName(*this,
+                                 diag::attr_transposing_expected_original_name,
+                                 baseType, original))
+        return makeParserError();
       
       if (consumeIfTrailingComma())
         return makeParserError();
@@ -1302,9 +1343,9 @@ Parser::parseTransposingAttribute(SourceLoc atLoc, SourceLoc loc) {
     return makeParserError();
   }
   return ParserResult<TransposingAttr>(
-      TransposingAttr::create(Context, /*implicit*/ false, atLoc,
-                                  SourceRange(loc, rParenLoc),
-                                  original, params));
+             TransposingAttr::create(Context, /*implicit*/ false, atLoc,
+                                     SourceRange(loc, rParenLoc), baseType,
+                                     original, params));
 }
 
 void Parser::parseObjCSelector(SmallVector<Identifier, 4> &Names,

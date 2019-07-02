@@ -415,7 +415,7 @@ static std::string getTransposingParametersClauseString(
     }
     // Print remaining differentiation parameters.
     interleave(parameters.set_bits(), [&](unsigned index) {
-      printer << parsedParams[index].getIndex();
+      printer << index;
     }, [&] { printer << ", "; });
     if (parameterCount > 1)
       printer << ')';
@@ -1517,9 +1517,10 @@ DifferentiatingAttr::create(ASTContext &context, bool implicit,
 
 TransposingAttr::TransposingAttr(
     ASTContext &context, bool implicit, SourceLoc atLoc, SourceRange baseRange,
-    DeclNameWithLoc original,
+    TypeRepr *baseType, DeclNameWithLoc original,
     ArrayRef<ParsedAutoDiffParameter> params)
     : DeclAttribute(DAK_Transposing, atLoc, baseRange, implicit),
+      BaseType(baseType),
       Original(std::move(original)),
       NumParsedParameters(params.size()) {
   std::copy(params.begin(), params.end(),
@@ -1528,30 +1529,32 @@ TransposingAttr::TransposingAttr(
 
 TransposingAttr::TransposingAttr(
     ASTContext &context, bool implicit, SourceLoc atLoc, SourceRange baseRange,
-    DeclNameWithLoc original, AutoDiffIndexSubset *indices)
+    TypeRepr *baseType, DeclNameWithLoc original, AutoDiffIndexSubset *indices)
     : DeclAttribute(DAK_Differentiating, atLoc, baseRange, implicit),
-    Original(std::move(original)), ParameterIndexSubset(indices) {}
+      BaseType(baseType),
+      Original(std::move(original)),
+      ParameterIndexSubset(indices) {}
 
 TransposingAttr *
 TransposingAttr::create(ASTContext &context, bool implicit,
-SourceLoc atLoc, SourceRange baseRange,
-DeclNameWithLoc original,
-ArrayRef<ParsedAutoDiffParameter> params) {
+    SourceLoc atLoc, SourceRange baseRange,
+    TypeRepr *baseType, DeclNameWithLoc original,
+    ArrayRef<ParsedAutoDiffParameter> params) {
   unsigned size = totalSizeToAlloc<ParsedAutoDiffParameter>(params.size());
   void *mem = context.Allocate(size, alignof(DifferentiatingAttr));
   return new (mem) TransposingAttr(context, implicit, atLoc, baseRange,
-                                   std::move(original), params);
+                                   baseType, std::move(original), params);
 }
 
 TransposingAttr *
 TransposingAttr::create(ASTContext &context, bool implicit,
 SourceLoc atLoc, SourceRange baseRange,
-DeclNameWithLoc original,
+TypeRepr *baseType, DeclNameWithLoc original,
 AutoDiffIndexSubset *indices) {
   void *mem = context.Allocate(sizeof(DifferentiatingAttr),
                                alignof(DifferentiatingAttr));
   return new (mem) TransposingAttr(context, implicit, atLoc, baseRange,
-                                   std::move(original), indices);
+                                   baseType, std::move(original), indices);
 }
 
 ImplementsAttr::ImplementsAttr(SourceLoc atLoc, SourceRange range,

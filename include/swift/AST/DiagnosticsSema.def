@@ -2828,7 +2828,7 @@ ERROR(differentiating_attr_original_already_has_derivative,none,
 
 // transposing
 ERROR(transpose_params_clause_param_not_differentiable,none,
-      "can only differentiate with respect to parameters that conform to "
+      "can only transpose with respect to parameters that conform to "
       "'Differentiable' and where '%0 == %0.TangentVector'", (StringRef))
 ERROR(transposing_attr_overload_not_found,none,
       "could not find function %0 with expected type %1", (DeclName, Type))

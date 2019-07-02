@@ -3114,7 +3114,8 @@ public:
   /// corresponding original function type.
   AnyFunctionType *getTransposeOriginalFunctionType(
       TransposingAttr *attr,
-      AutoDiffIndexSubset *wrtParamIndices);
+      AutoDiffIndexSubset *wrtParamIndices,
+      bool wrtSelf);
 
   AnyFunctionType *getWithoutDifferentiability() const;
 
