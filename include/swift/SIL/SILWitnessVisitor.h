@@ -120,14 +120,16 @@ public:
 
   void visitAbstractStorageDecl(AbstractStorageDecl *sd) {
     sd->visitOpaqueAccessors([&](AccessorDecl *accessor) {
-      if (SILDeclRef::requiresNewWitnessTableEntry(accessor))
-        asDerived().addMethod(SILDeclRef(accessor, SILDeclRef::Kind::Func));
+      // SWIFT_ENABLE_TENSORFLOW
+      addMethodAndAutoDiffAssociatedMethodsIfRequired(accessor,
+                                                      SILDeclRef::Kind::Func);
     });
   }
 
   void visitConstructorDecl(ConstructorDecl *cd) {
-    if (SILDeclRef::requiresNewWitnessTableEntry(cd))
-      asDerived().addMethod(SILDeclRef(cd, SILDeclRef::Kind::Allocator));
+    // SWIFT_ENABLE_TENSORFLOW
+    addMethodAndAutoDiffAssociatedMethodsIfRequired(
+        cd, SILDeclRef::Kind::Allocator);
   }
 
   void visitAccessorDecl(AccessorDecl *func) {
@@ -137,22 +139,8 @@ public:
   void visitFuncDecl(FuncDecl *func) {
     assert(!isa<AccessorDecl>(func));
     // SWIFT_ENABLE_TENSORFLOW
-    if (!SILDeclRef::requiresNewWitnessTableEntry(func))
-      return;
-
-    auto funcDeclRef = SILDeclRef(func, SILDeclRef::Kind::Func);
-    asDerived().addMethod(funcDeclRef);
-
-    if (auto *DA = func->getAttrs().getAttribute<DifferentiableAttr>()) {
-      asDerived().addMethod(funcDeclRef.asAutoDiffAssociatedFunction(
-          AutoDiffAssociatedFunctionIdentifier::get(
-              AutoDiffAssociatedFunctionKind::JVP, /*differentiationOrder*/ 1,
-              DA->getParameterIndices(), func->getASTContext())));
-      asDerived().addMethod(funcDeclRef.asAutoDiffAssociatedFunction(
-          AutoDiffAssociatedFunctionIdentifier::get(
-              AutoDiffAssociatedFunctionKind::VJP, /*differentiationOrder*/ 1,
-              DA->getParameterIndices(), func->getASTContext())));
-    }
+    addMethodAndAutoDiffAssociatedMethodsIfRequired(func,
+                                                    SILDeclRef::Kind::Func);
   }
 
   void visitMissingMemberDecl(MissingMemberDecl *placeholder) {
@@ -178,6 +166,28 @@ public:
 
   void visitPoundDiagnosticDecl(PoundDiagnosticDecl *pdd) {
     // We don't care about diagnostics at this stage.
+  }
+
+// SWIFT_ENABLE_TENSORFLOW
+private:
+  void addMethodAndAutoDiffAssociatedMethodsIfRequired(
+      AbstractFunctionDecl *func, SILDeclRef::Kind kind) {
+    if (!SILDeclRef::requiresNewWitnessTableEntry(func))
+      return;
+
+    auto funcDeclRef = SILDeclRef(func, kind);
+    asDerived().addMethod(funcDeclRef);
+
+    if (auto *DA = func->getAttrs().getAttribute<DifferentiableAttr>()) {
+      asDerived().addMethod(funcDeclRef.asAutoDiffAssociatedFunction(
+          AutoDiffAssociatedFunctionIdentifier::get(
+              AutoDiffAssociatedFunctionKind::JVP, /*differentiationOrder*/ 1,
+              DA->getParameterIndices(), func->getASTContext())));
+      asDerived().addMethod(funcDeclRef.asAutoDiffAssociatedFunction(
+          AutoDiffAssociatedFunctionIdentifier::get(
+              AutoDiffAssociatedFunctionKind::VJP, /*differentiationOrder*/ 1,
+              DA->getParameterIndices(), func->getASTContext())));
+    }
   }
 };
 
