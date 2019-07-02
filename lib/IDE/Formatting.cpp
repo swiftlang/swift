@@ -355,6 +355,20 @@ public:
       }
     }
 
+    // func foo(a: Int,
+    //          b: Int
+    // ) {} <- Avoid adding indentation here
+    SourceLoc SignatureEnd;
+    if (auto *AFD = dyn_cast_or_null<AbstractFunctionDecl>(Cursor->getAsDecl())) {
+      SignatureEnd = AFD->getSignatureSourceRange().End;
+    } else if (auto *SD = dyn_cast_or_null<SubscriptDecl>(Cursor->getAsDecl())) {
+      SignatureEnd = SD->getSignatureSourceRange().End;
+    }
+    if (SignatureEnd.isValid() && TInfo &&
+        TInfo.StartOfLineTarget->getLoc() == SignatureEnd) {
+      return false;
+    }
+
     // If we're at the beginning of a brace on a separate line in the context
     // of anything other than BraceStmt, don't add an indent.
     // For example:
