@@ -21,11 +21,6 @@ public let StringReplaceSubrange = [
     tags: tags
   ),
   BenchmarkInfo(
-    name: "Str.replaceSubrange.LargeLiteral.String",
-    runFunction: { replaceSubrange($0, "coffee\u{301}coffeecoffeecoffee", with: "t") },
-    tags: tags
-  ),
-  BenchmarkInfo(
     name: "Str.replaceSubrange.LargeManaged.String",
     runFunction: { replaceSubrange($0, largeManagedString, with: "t") },
     tags: tags,
@@ -34,11 +29,6 @@ public let StringReplaceSubrange = [
   BenchmarkInfo(
     name: "Str.replaceSubrange.SmallLiteral.Substr",
     runFunction: { replaceSubrange($0, "coffee", with: getSubstring("t")) },
-    tags: tags
-  ),
-  BenchmarkInfo(
-    name: "Str.replaceSubrange.LargeLiteral.Substr",
-    runFunction: { replaceSubrange($0, "coffee\u{301}coffeecoffeecoffee", with: getSubstring("t")) },
     tags: tags
   ),
   BenchmarkInfo(
@@ -53,11 +43,6 @@ public let StringReplaceSubrange = [
     tags: tags
   ),
   BenchmarkInfo(
-    name: "Str.replaceSubrange.LargeLiteral.ArrChar",
-    runFunction: { replaceSubrange($0, "coffee\u{301}coffeecoffeecoffee", with: getArrayCharacter(Array<Character>(["t"]))) },
-    tags: tags
-  ),
-  BenchmarkInfo(
     name: "Str.replaceSubrange.LargeManaged.ArrChar",
     runFunction: { replaceSubrange($0, largeManagedString, with: getArrayCharacter(Array<Character>(["t"]))) },
     tags: tags,
@@ -66,11 +51,6 @@ public let StringReplaceSubrange = [
   BenchmarkInfo(
     name: "Str.replaceSubrange.SmallLiteral.RepeatedChar",
     runFunction: { replaceSubrange($0, "coffee", with: getRepeatedCharacter(repeatedCharacter)) },
-    tags: tags
-  ),
-  BenchmarkInfo(
-    name: "Str.replaceSubrange.LargeLiteral.RepeactedChar",
-    runFunction: { replaceSubrange($0, "coffee\u{301}coffeecoffeecoffee", with: getRepeatedCharacter(repeatedCharacter)) },
     tags: tags
   ),
   BenchmarkInfo(
@@ -83,14 +63,8 @@ public let StringReplaceSubrange = [
 
 // MARK: - Privates for String
 
-private func largeLiteralString() -> String {
-    return getString("coffee\u{301}coffeecoffeecoffeecoffee")
-}
-
 private var largeManagedString: String = {
-    var str = largeLiteralString()
-    str += "z"
-    return str
+    return getString("coffee\u{301}coffeecoffeecoffeecoffee")
 }()
 
 private func setupLargeManagedString() {
