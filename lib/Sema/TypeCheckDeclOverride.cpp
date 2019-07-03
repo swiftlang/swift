@@ -931,8 +931,8 @@ static void checkOverrideAccessControl(ValueDecl *baseDecl, ValueDecl *decl,
   }
 }
 
-static GenericSignature *getNewGenericSignature(ValueDecl *base,
-                                                ValueDecl *derived) {
+static GenericSignature *getOverrideGenericSignature(ValueDecl *base,
+                                                     ValueDecl *derived) {
   auto baseGenericCtx = base->getAsGenericContext();
   auto &ctx = base->getASTContext();
 
@@ -1044,7 +1044,7 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
   auto derivedGenericCtx = decl->getAsGenericContext();
 
   // If the generic signatures are different, then complain.
-  auto newSig = getNewGenericSignature(baseDecl, decl);
+  auto newSig = getOverrideGenericSignature(baseDecl, decl);
 
   if (newSig && derivedGenericCtx) {
     auto derivedSig = derivedGenericCtx->getGenericSignature();
