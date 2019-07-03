@@ -19,7 +19,6 @@
 
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/Requirement.h"
-#include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Type.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/FoldingSet.h"
@@ -273,8 +272,8 @@ public:
   ///
   /// \param otherSig Another generic signature whose generic parameters are
   /// equivalent to or a subset of the generic parameters in this signature.
-  SmallVector<Requirement, 4>
-  requirementsNotSatisfiedBy(GenericSignature *otherSig);
+  SmallVector<Requirement, 4> requirementsNotSatisfiedBy(
+                                               GenericSignature *otherSig);
 
   /// Return the canonical version of the given type under this generic
   /// signature.
