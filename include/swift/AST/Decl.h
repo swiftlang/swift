@@ -524,7 +524,7 @@ protected:
     HasLazyConformances : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+2+1+8+16,
+  SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+2+1+1+8+16,
     /// Whether the \c RequiresClass bit is valid.
     RequiresClassValid : 1,
 
@@ -552,6 +552,9 @@ protected:
 
     /// Whether we've computed the inherited protocols list yet.
     InheritedProtocolsValid : 1,
+
+    /// Whether we have a lazy-loaded requirement signature.
+    HasLazyRequirementSignature : 1,
 
     : NumPadBits,
 
@@ -4117,6 +4120,10 @@ class ProtocolDecl final : public NominalTypeDecl {
 
   ArrayRef<ProtocolDecl *> getInheritedProtocolsSlow();
 
+  bool hasLazyRequirementSignature() const {
+    return Bits.ProtocolDecl.HasLazyRequirementSignature;
+  }
+
   friend class SuperclassDeclRequest;
   friend class SuperclassTypeRequest;
   friend class TypeChecker;
@@ -4341,6 +4348,8 @@ public:
   /// protocols of the inherited protocols) are not mentioned. The conformance
   /// requirements listed here become entries in the witness table.
   ArrayRef<Requirement> getRequirementSignature() const {
+    if (!RequirementSignature && hasLazyRequirementSignature())
+      const_cast<ProtocolDecl *>(this)->computeRequirementSignature();
     assert(isRequirementSignatureComputed() &&
            "getting requirement signature before computing it");
     return llvm::makeArrayRef(RequirementSignature,
@@ -4349,12 +4358,13 @@ public:
 
   /// Has the requirement signature been computed yet?
   bool isRequirementSignatureComputed() const {
-    return RequirementSignature != nullptr;
+    return RequirementSignature != nullptr || hasLazyRequirementSignature();
   }
 
   void computeRequirementSignature();
-
   void setRequirementSignature(ArrayRef<Requirement> requirements);
+  void setLazyRequirementSignature(LazyMemberLoader *lazyLoader,
+                                   uint64_t requirementSignatureData);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
