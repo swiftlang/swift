@@ -5203,7 +5203,7 @@ void PullbackEmitter::materializeAdjointIndirect(
 }
 
 ValueWithCleanup PullbackEmitter::materializeAdjoint(AdjointValue val,
-                                                    SILLocation loc) {
+                                                     SILLocation loc) {
   if (val.isConcrete()) {
     LLVM_DEBUG(getADDebugStream()
         << "Materializing adjoint: Value is concrete.\n");
@@ -5275,7 +5275,7 @@ void PullbackEmitter::materializeAdjointIndirectHelper(
 }
 
 void PullbackEmitter::emitZeroIndirect(CanType type, SILValue bufferAccess,
-                                      SILLocation loc) {
+                                       SILLocation loc) {
   auto tangentSpace = getTangentSpace(type);
   assert(tangentSpace && "No tangent space for this type");
   switch (tangentSpace->getKind()) {
