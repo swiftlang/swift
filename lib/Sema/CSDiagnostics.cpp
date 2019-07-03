@@ -886,7 +886,7 @@ bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
     return false;
 
   auto *anchor = getAnchor();
-  auto type = getType(anchor)->getRValueType();
+  auto baseType = getType(anchor)->getRValueType();
   bool resultIsOptional = ResultTypeIsOptional;
 
   // If we've resolved the member overload to one that returns an optional
@@ -897,8 +897,27 @@ bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
   if (overload && overload->ImpliedType->getOptionalObjectType())
     resultIsOptional = true;
 
-  return diagnoseBaseUnwrapForMemberAccess(anchor, type, Member,
-                                           resultIsOptional, SourceRange());
+  auto unwrappedBaseType = baseType->getOptionalObjectType();
+  if (!unwrappedBaseType)
+    return false;
+
+  emitDiagnostic(anchor->getLoc(), diag::optional_base_not_unwrapped,
+                 baseType, Member, unwrappedBaseType);
+
+  // FIXME: It would be nice to immediately offer "base?.member ?? defaultValue"
+  // for non-optional results where that would be appropriate. For the moment
+  // always offering "?" means that if the user chooses chaining, we'll end up
+  // in MissingOptionalUnwrapFailure:diagnose() to offer a default value during
+  // the next compile.
+  emitDiagnostic(anchor->getLoc(), diag::optional_base_chain, Member)
+      .fixItInsertAfter(anchor->getEndLoc(), "?");
+
+  if (!resultIsOptional) {
+    emitDiagnostic(anchor->getLoc(), diag::unwrap_with_force_value)
+      .fixItInsertAfter(anchor->getEndLoc(), "!");
+  }
+
+  return true;
 }
 
 void MissingOptionalUnwrapFailure::offerDefaultValueUnwrapFixIt(
@@ -2134,9 +2153,15 @@ bool MissingMemberFailure::diagnoseAsError() {
   };
 
   if (getName().getBaseName().getKind() == DeclBaseName::Kind::Subscript) {
-    emitDiagnostic(anchor->getLoc(), diag::could_not_find_value_subscript,
-                   baseType)
+    auto loc = anchor->getLoc();
+    if (auto *metatype = baseType->getAs<MetatypeType>()) {
+      emitDiagnostic(loc, diag::could_not_find_type_member,
+                     metatype->getInstanceType(), getName())
         .highlight(baseExpr->getSourceRange());
+    } else {
+      emitDiagnostic(loc, diag::could_not_find_value_subscript, baseType)
+        .highlight(baseExpr->getSourceRange());
+    }
   } else if (getName().getBaseName() == "deinit") {
     // Specialised diagnostic if trying to access deinitialisers
     emitDiagnostic(anchor->getLoc(), diag::destructor_not_accessible)
