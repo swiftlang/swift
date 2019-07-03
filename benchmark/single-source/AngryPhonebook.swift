@@ -31,6 +31,11 @@ public let AngryPhonebook = [
     tags: t,
     setUpFunction: { blackHole(latin) }),
   BenchmarkInfo(
+    name: "AngryPhonebook.Strasse",
+    runFunction: { angryPhonebook($0, strasse) },
+    tags: t,
+    setUpFunction: { blackHole(strasse) }),
+  BenchmarkInfo(
     name: "AngryPhonebook.Armenian",
     runFunction: { angryPhonebook($0, armenian) },
     tags: t,
@@ -47,6 +52,11 @@ public let AngryPhonebook = [
     runFunction: { largeAngryPhonebook($0, latinLarge) },
     tags: t,
     setUpFunction: { blackHole(latinLarge) }),
+  BenchmarkInfo(
+    name: "AngryPhonebook.Strasse.Large",
+    runFunction: { largeAngryPhonebook($0, strasseLarge) },
+    tags: t,
+    setUpFunction: { blackHole(strasseLarge) }),
   BenchmarkInfo(
     name: "AngryPhonebook.Armenian.Large",
     runFunction: { largeAngryPhonebook($0, armenianLarge) },
@@ -94,6 +104,10 @@ func large(_ names: [String]) -> String {
 
 let latin = Array(words.prefix(20))
 let latinLarge = large(latin)
+
+// Pathological case, uppercase: ß -> SS
+let strasse = Array(repeating: "Straße", count: 20)
+let strasseLarge = large(strasse)
 
 let armenian = [
   "Արմեն", "Աննա", "Հարութ", "Միքայել", "Մարիա", "Դավիթ", "Վարդան",
