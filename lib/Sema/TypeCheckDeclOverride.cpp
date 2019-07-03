@@ -1044,17 +1044,13 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
   auto derivedGenericCtx = decl->getAsGenericContext();
 
   if (baseGenericCtx && derivedGenericCtx) {
-    // If the generic signatures are different, then complain.
-    auto newSig = getOverrideGenericSignature(baseDecl, decl);
+    // If the generic signatures are different, then complain
+    if (auto newSig = getOverrideGenericSignature(baseDecl, decl)) {
+      if (auto derivedSig = derivedGenericCtx->getGenericSignature()) {
+        auto requirementsSatisfied =
+            derivedSig->requirementsNotSatisfiedBy(newSig).empty();
 
-    if (newSig && derivedGenericCtx) {
-      auto derivedSig = derivedGenericCtx->getGenericSignature();
-
-      if (derivedSig) {
-        auto satOne = derivedSig->requirementsNotSatisfiedBy(newSig).empty();
-        auto satTwo = newSig->requirementsNotSatisfiedBy(derivedSig).empty();
-
-        if (!satOne || !satTwo) {
+        if (!requirementsSatisfied) {
           diags.diagnose(
               decl, diag::override_method_different_generic_sig,
               decl->getBaseName(),
