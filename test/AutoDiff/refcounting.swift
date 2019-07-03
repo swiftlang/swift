@@ -44,24 +44,24 @@ _ = pullback(at: Vector.zero, in: testOwnedVector)
 // CHECK-LABEL: enum {{.*}}testOwnedVector{{.*}}__Pred__src_0_wrt_0 {
 // CHECK-NEXT: }
 
-// CHECK-LABEL: sil hidden @{{.*}}UsesMethodOfNoDerivativeMember{{.*}}applied2to{{.*}}__adjoint_src_0_wrt_0_1
+// CHECK-LABEL: sil hidden @{{.*}}UsesMethodOfNoDerivativeMember{{.*}}applied2to{{.*}}__pullback_src_0_wrt_0_1
 // CHECK: bb0([[SEED:%.*]] : $Vector, [[PB_STRUCT:%.*]] : ${{.*}}UsesMethodOfNoDerivativeMember{{.*}}applied2to{{.*}}__PB__src_0_wrt_0_1):
 // CHECK:   [[PB:%.*]] = struct_extract [[PB_STRUCT]] : ${{.*}}UsesMethodOfNoDerivativeMember{{.*}}applied2to{{.*}}__PB__src_0_wrt_0_1
 // CHECK:   [[NEEDED_COTAN:%.*]] = apply [[PB]]([[SEED]]) : $@callee_guaranteed (@guaranteed Vector) -> @owned Vector
 // CHECK:   release_value [[SEED:%.*]] : $Vector
 
-// CHECK-LABEL sil hidden @{{.*}}subset_adjoint_releases_unused_ones{{.*}}__adjoint_src_0_wrt_0
-// CHECK: bb0([[SEED:%.*]] : $Vector, [[PB_STRUCT:%.*]] : ${{.*}}subset_adjoint_releases_unused_ones{{.*}}__PB__src_0_wrt_0):
-// CHECK:   [[PB0:%.*]] = struct_extract [[PB_STRUCT]] : ${{.*}}subset_adjoint_releases_unused_ones{{.*}}, #{{.*}}subset_adjoint_releases_unused_ones{{.*}}__PB__src_0_wrt_0.pullback_1
+// CHECK-LABEL sil hidden @{{.*}}subset_pullback_releases_unused_ones{{.*}}__pullback_src_0_wrt_0
+// CHECK: bb0([[SEED:%.*]] : $Vector, [[PB_STRUCT:%.*]] : ${{.*}}subset_pullback_releases_unused_ones{{.*}}__PB__src_0_wrt_0):
+// CHECK:   [[PB0:%.*]] = struct_extract [[PB_STRUCT]] : ${{.*}}subset_pullback_releases_unused_ones{{.*}}, #{{.*}}subset_pullback_releases_unused_ones{{.*}}__PB__src_0_wrt_0.pullback_1
 // CHECK:   [[NEEDED_COTAN0:%.*]] = apply [[PB0]]([[SEED]]) : $@callee_guaranteed (@guaranteed Vector) -> @owned Vector
 // CHECK-NOT:  release_value [[NEEDED_COTAN0]] : $Vector
-// CHECK:   [[PB1:%.*]] = struct_extract [[PB_STRUCT]] : ${{.*}}subset_adjoint_releases_unused_ones{{.*}}__PB__src_0_wrt_0, #{{.*}}subset_adjoint_releases_unused_ones{{.*}}__PB__src_0_wrt_0.pullback_0
+// CHECK:   [[PB1:%.*]] = struct_extract [[PB_STRUCT]] : ${{.*}}subset_pullback_releases_unused_ones{{.*}}__PB__src_0_wrt_0, #{{.*}}subset_pullback_releases_unused_ones{{.*}}__PB__src_0_wrt_0.pullback_0
 // CHECK:   [[NEEDED_COTAN1:%.*]] = apply [[PB1]]([[NEEDED_COTAN0]]) : $@callee_guaranteed (@guaranteed Vector) -> @owned Vector
 // CHECK:   release_value [[NEEDED_COTAN0]] : $Vector
 // CHECK:   release_value [[SEED]] : $Vector
 // CHECK:   return [[NEEDED_COTAN1]] : $Vector
 
-// CHECK-LABEL: sil hidden @{{.*}}side_effect_release_zero{{.*}}__adjoint_src_0_wrt_0
+// CHECK-LABEL: sil hidden @{{.*}}side_effect_release_zero{{.*}}__pullback_src_0_wrt_0
 // CHECK: bb0([[SEED:%.*]] : $Vector, %1 : ${{.*}}side_effect_release_zero{{.*}}_bb0__PB__src_0_wrt_0):
 // CHECK:   [[BUF:%.*]] = alloc_stack $Vector
 // CHECK:   [[BUF_ACCESS:%.*]] = begin_access [init] [static] [no_nested_conflict] [[BUF]] : $*Vector
@@ -87,9 +87,9 @@ _ = pullback(at: Vector.zero, in: testOwnedVector)
 // CHECK-NOT:   release_value [[ADD_VJP_RESULT]]
 // CHECK-NOT:   release_value [[ADD_PULLBACK]]
 
-// The adjoint should not release pullback struct argument because it has @guaranteed convention.
+// The pullback should not release pullback struct argument because it has @guaranteed convention.
 //
-// CHECK-LABEL: @{{.*}}testOwnedVector{{.*}}__adjoint_src_0_wrt_0
+// CHECK-LABEL: @{{.*}}testOwnedVector{{.*}}__pullback_src_0_wrt_0
 // CHECK: bb0({{%.*}} : $Vector, [[PB_STRUCT:%.*]] : ${{.*}}testOwnedVector{{.*}}__PB__src_0_wrt_0):
 // CHECK:   [[PULLBACK0:%.*]] = struct_extract [[PB_STRUCT]] : ${{.*}}testOwnedVector{{.*}}__PB__src_0_wrt_0, #{{.*}}testOwnedVector{{.*}}__PB__src_0_wrt_0.pullback_0
 // CHECK-NOT:   release_value [[PULLBACK0]]
@@ -105,11 +105,11 @@ func side_effect_release_zero(_ x: Vector) -> Vector {
 }
 _ = pullback(at: Vector.zero, in: side_effect_release_zero)
 
-func subset_adjoint_releases_unused_ones(_ x: Vector) -> Vector {
+func subset_pullback_releases_unused_ones(_ x: Vector) -> Vector {
   let y = x + .zero
   return .zero + y
 }
-_ = pullback(at: .zero, in: subset_adjoint_releases_unused_ones)
+_ = pullback(at: .zero, in: subset_pullback_releases_unused_ones)
 
 struct FakeMaxPool : Differentiable {
   @differentiable(wrt: (self, input))

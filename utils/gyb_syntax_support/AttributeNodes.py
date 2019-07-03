@@ -67,6 +67,9 @@ ATTRIBUTE_NODES = [
                        # SWIFT_ENABLE_TENSORFLOW
                        Child('DifferentiatingArguments',
                              kind='DifferentiatingAttributeArguments'),
+                       # SWIFT_ENABLE_TENSORFLOW
+                       Child('TransposingArguments',
+                             kind='DifferentiatingAttributeArguments'),
                        Child('NamedAttributeString',
                              kind='NamedAttributeStringArgument'),
                    ], description='''
@@ -331,6 +334,23 @@ ATTRIBUTE_NODES = [
              Child('DiffParams', kind='DifferentiationParamsClause',
                    is_optional=True),
          ]),
+
+     # SWIFT_ENABLE_TENSORFLOW
+     # The argument of '@transposing(...)'.
+     # transposing-attr-arguments ->
+     #     func-decl-name ','? differentiable-attr-parameters?
+     Node('TransposingAttributeArguments', kind='Syntax',
+          description='''
+            The arguments for the `@transposing` attribute: the original
+            function and an optional differentiation parameter list.
+            ''',
+          children=[
+                    Child('Original', kind='FunctionDeclName',
+                          description='The referenced original function.'),
+                    Child('Comma', kind='CommaToken', is_optional=True),
+                    Child('DiffParams', kind='DifferentiationParamsClause',
+                          is_optional=True),
+                    ]),
 
     # objc-selector-piece -> identifier? ':'?
     Node('ObjCSelectorPiece', kind='Syntax',

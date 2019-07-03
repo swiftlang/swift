@@ -4671,6 +4671,110 @@ AnyFunctionType::getAutoDiffOriginalFunctionType() {
   return originalType;
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+static AnyFunctionType *
+makeFunctionType(ArrayRef<AnyFunctionType::Param> params, Type retTy,
+                 GenericSignature *genericSignature) {
+  if (genericSignature)
+    return GenericFunctionType::get(genericSignature, params, retTy);
+  return FunctionType::get(params, retTy);
+}
+
+// Compute the original function type corresponding to the given transpose
+// function type.
+AnyFunctionType *AnyFunctionType::getTransposeOriginalFunctionType(
+    TransposingAttr *attr, AutoDiffIndexSubset *wrtParamIndices, bool wrtSelf) {
+  unsigned transposeParamsIndex = 0;
+  bool isCurried = getResult()->is<AnyFunctionType>();
+  
+  // Get the original function's result.
+  auto transposeParams = getParams();
+  auto transposeResult = getResult();
+  if (isCurried) {
+    auto method =
+        getAs<AnyFunctionType>()->getResult()->getAs<AnyFunctionType>();
+    transposeParams = method->getParams();
+    transposeResult = method->getResult();
+  }
+      
+  Type originalResult;
+  if (isCurried) {
+    // If it's curried, then the first parameter in the curried type, which is
+    // the 'Self' type, is the original result (no matter if we are
+    // differentiating WRT self or aren't).
+    originalResult = getParams().front().getPlainType();
+  } else {
+    // If it's not curried, the last parameter, the tangent, is always the
+    // original result type as we require the last parameter of the transposing
+    // function to be the original result.
+    originalResult = transposeParams.back().getPlainType();
+  }
+  assert(originalResult);
+
+  auto wrtParams = attr->getParsedParameters();
+  SmallVector<TupleTypeElt, 4> transposeResultTypes;
+  // Return type of '@transposing' function can have single type or tuples
+  // of types.
+  if (auto t = transposeResult->getAs<TupleType>()) {
+    transposeResultTypes.append(t->getElements().begin(),
+                                t->getElements().end());
+  } else {
+    transposeResultTypes.push_back(transposeResult);
+  }
+  assert(!transposeResultTypes.empty());
+
+  // If the function is curried and is transposing WRT 'self', then grab
+  // the type from the result list (guaranteed to be the first since 'self'
+  // is first in WRT list) and remove it. If it's still curried but not
+  // transposing WRT 'self', then the 'Self' type is the first parameter
+  // in the method.
+  unsigned transposeResultTypesIndex = 0;
+  Type selfType;
+  if (isCurried && wrtSelf) {
+    selfType = transposeResultTypes.front().getType();
+    transposeResultTypesIndex++;
+  } else if (isCurried) {
+    selfType = transposeParams.front().getPlainType();
+    transposeParamsIndex++;
+  }
+
+  SmallVector<AnyFunctionType::Param, 8> originalParams;
+  unsigned numberOriginalParameters =
+      transposeParams.size() + wrtParams.size() - 1;
+  for (auto i : range(numberOriginalParameters)) {
+    // Need to check if it is the 'self' param since we handle it differently
+    // above.
+    bool lookingAtSelf = (i == (wrtParamIndices->getCapacity() - 1)) && wrtSelf;
+    bool isWrt = wrtParamIndices->contains(i);
+    if (isWrt && !lookingAtSelf) {
+      // If in WRT list, the item in the result tuple must be a parameter in the
+      // original function.
+      auto resultType = transposeResultTypes[transposeResultTypesIndex].getType();
+      originalParams.push_back(AnyFunctionType::Param(resultType));
+      transposeResultTypesIndex++;
+    } else {
+      // Else if not in the WRT list, the parameter in the transposing function
+      // is a parameter in the original function.
+      originalParams.push_back(transposeParams[transposeParamsIndex]);
+      transposeParamsIndex++;
+    }
+  }
+
+  AnyFunctionType *originalType;
+  if (isCurried) {
+    assert(selfType);
+    // If curried, wrap the function into the 'Self' type to get a method.
+    originalType = makeFunctionType(originalParams, originalResult, nullptr);
+    originalType = makeFunctionType(AnyFunctionType::Param(selfType),
+                                    originalType, getOptGenericSignature());
+  } else {
+    originalType = makeFunctionType(originalParams, originalResult,
+                                    getOptGenericSignature());
+  }
+  assert(originalType);
+  return originalType;
+}
+
 AnyFunctionType *AnyFunctionType::getWithoutDifferentiability() const {
   SmallVector<Param, 8> newParams;
   for (auto &param : getParams()) {

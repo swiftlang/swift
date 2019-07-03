@@ -354,6 +354,13 @@ public:
   unsigned getNumIndices() const {
     return (unsigned)std::distance(begin(), end());
   }
+  
+  SmallBitVector getBitVector() const {
+    SmallBitVector indicesBitVec(capacity, false);
+    for (auto index : getIndices())
+      indicesBitVec.set(index);
+    return indicesBitVec;
+  }
 
   bool contains(unsigned index) const {
     unsigned bitWordIndex, offset;

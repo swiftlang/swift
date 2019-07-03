@@ -137,6 +137,7 @@ public:
   IGNORED_ATTR(Differentiating)
   IGNORED_ATTR(CompilerEvaluable)
   IGNORED_ATTR(NoDerivative)
+  IGNORED_ATTR(Transposing)
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
@@ -868,6 +869,7 @@ public:
   void visitDifferentiatingAttr(DifferentiatingAttr *attr);
   void visitCompilerEvaluableAttr(CompilerEvaluableAttr *attr);
   void visitNoDerivativeAttr(NoDerivativeAttr *attr);
+  void visitTransposingAttr(TransposingAttr *attr);
   void visitImplementationOnlyAttr(ImplementationOnlyAttr *attr);
 };
 } // end anonymous namespace
@@ -2654,6 +2656,21 @@ static bool conformsToDifferentiable(Type type, DeclContext *DC) {
 };
 
 // SWIFT_ENABLE_TENSORFLOW
+/// Returns true if the given type's `TangentVector` is equal to itself in the given
+/// module.
+static bool tangentVectorEqualSelf(Type type, DeclContext *DC) {
+  assert(conformsToDifferentiable(type, DC));
+  auto &ctx = type->getASTContext();
+  auto *differentiableProto =
+      ctx.getProtocol(KnownProtocolKind::Differentiable);
+  auto conf = TypeChecker::conformsToProtocol(
+                  type, differentiableProto, DC,
+                  ConformanceCheckFlags::InExpression);
+  auto tanType = conf->getTypeWitnessByName(type, ctx.Id_TangentVector);
+  return type->getCanonicalType() == tanType->getCanonicalType();
+};
+
+// SWIFT_ENABLE_TENSORFLOW
 /// Creates a `AutoDiffParameterIndices` for the given function type,
 /// inferring all differentiation parameters.
 /// The differentiation parameters are inferred to be:
@@ -2959,6 +2976,113 @@ static AutoDiffParameterIndices *computeDifferentiationParameters(
 }
 
 // SWIFT_ENABLE_TENSORFLOW
+// Computes `AutoDiffIndexSubset` from the given parsed transposing
+// parameters (possibly empty) for the given function, then verifies
+// that the parameter indices are valid.
+// - If parsed parameters are empty, infer parameter indices.
+// - Otherwise, build parameter indices from parsed parameters.
+// The attribute name/location are used in diagnostics.
+static AutoDiffIndexSubset *computeTransposingParameters(
+    TypeChecker &TC, ArrayRef<ParsedAutoDiffParameter> parsedWrtParams,
+    AbstractFunctionDecl *transposeFunc, bool isCurried,
+    GenericEnvironment *derivativeGenEnv, SourceLoc attrLoc
+) {
+  // Get function type and parameters.
+  TC.resolveDeclSignature(transposeFunc);
+  auto *functionType = transposeFunc->getInterfaceType()
+                           ->eraseDynamicSelfType()
+                           ->castTo<AnyFunctionType>();
+  
+  ArrayRef<TupleTypeElt> transposeResultTypes;
+  // Return type of '@transposing' function can have single type or tuple
+  // of types.
+  auto temp = functionType->getResult();
+  if (isCurried)
+    temp = temp->getAs<AnyFunctionType>()->getResult();
+  
+  if (auto t = temp->getAs<TupleType>()) {
+    transposeResultTypes = t->getElements();
+  } else {
+    transposeResultTypes = ArrayRef<TupleTypeElt>(temp);
+  }
+  
+  auto &params = *transposeFunc->getParameters();
+  auto isInstanceMethod = transposeFunc->isInstanceMember();
+  
+  bool wrtSelf = false;
+  if (isCurried && !parsedWrtParams.empty() &&
+      parsedWrtParams.front().getKind() == ParsedAutoDiffParameter::Kind::Self)
+    wrtSelf = true;
+  
+  // Make sure the self type is differentiable.
+  if (isCurried && wrtSelf) {
+    auto selfType = transposeFunc->getImplicitSelfDecl()->getInterfaceType();
+    if (derivativeGenEnv)
+      selfType = derivativeGenEnv->mapTypeIntoContext(selfType);
+    if (!conformsToDifferentiable(selfType, transposeFunc)) {
+      TC.diagnose(attrLoc, diag::diff_function_no_parameters,
+                  transposeFunc->getFullName())
+          .highlight(transposeFunc->getSignatureSourceRange());
+      return nullptr;
+    }
+  }
+  
+  // If parsed differentiation parameters are empty, infer parameter indices
+  // from the function type.
+  // TODO(bartchr): still need to do this!
+//  if (parsedWrtParams.empty())
+//    return TypeChecker::inferTransposingParameters(
+//        function, derivativeGenEnv);
+  
+  // Otherwise, build parameter indices from parsed differentiation parameters.
+  unsigned numParams = params.size() + transposeResultTypes.size();
+  auto paramIndices = SmallBitVector(numParams);
+  int lastIndex = -1;
+  for (unsigned i : indices(parsedWrtParams)) {
+    auto paramLoc = parsedWrtParams[i].getLoc();
+    switch (parsedWrtParams[i].getKind()) {
+    case ParsedAutoDiffParameter::Kind::Named: {
+      TC.diagnose(paramLoc, diag::transposing_attr_cant_use_named_wrt_params,
+                  parsedWrtParams[i].getName());
+      return nullptr;
+    }
+    case ParsedAutoDiffParameter::Kind::Self: {
+      // 'self' is only applicable to instance methods.
+      if (!isInstanceMethod) {
+        TC.diagnose(paramLoc,
+                    diag::diff_params_clause_self_instance_method_only);
+        return nullptr;
+      }
+      // 'self' can only be the first in the list.
+      if (i > 0) {
+        TC.diagnose(paramLoc, diag::diff_params_clause_self_must_be_first);
+        return nullptr;
+      }
+      paramIndices.set(numParams - 1);
+      break;
+    }
+    case ParsedAutoDiffParameter::Kind::Ordered: {
+      auto index = parsedWrtParams[i].getIndex();
+      if (index >= numParams) {
+        TC.diagnose(paramLoc, diag::diff_params_clause_param_index_out_of_range);
+        return nullptr;
+      }
+      // Parameter names must be specified in the original order.
+      if ((int)index <= lastIndex) {
+        TC.diagnose(paramLoc,
+                    diag::diff_params_clause_params_not_original_order);
+        return nullptr;
+      }
+      paramIndices.set(index);
+      lastIndex = index;
+      break;
+    }
+    }
+  }
+  return AutoDiffIndexSubset::get(TC.Context, paramIndices);
+}
+
+// SWIFT_ENABLE_TENSORFLOW
 // Checks if the given `AutoDiffParameterIndices` instance is valid for the
 // given function type in the given derivative generic environment and module
 // context. Returns true on error.
@@ -3018,6 +3142,55 @@ static bool checkDifferentiationParameters(
     if (!conformsToDifferentiable(wrtParamType, AFD)) {
       TC.diagnose(loc, diag::diff_params_clause_param_not_differentiable,
                   wrtParamType);
+      return true;
+    }
+  }
+  return false;
+}
+// SWIFT_ENABLE_TENSORFLOW
+// Checks if the given `AutoDiffIndexSubset` instance is valid for the
+// given function type in the given derivative generic environment and module
+// context. Returns true on error.
+// The parsed differentiation parameters and attribute location are used in
+// diagnostics.
+static bool checkTransposingParameters(
+    TypeChecker &TC, AbstractFunctionDecl *AFD,
+    SmallVector<Type, 4> wrtParamTypes, GenericEnvironment *derivativeGenEnv,
+    ModuleDecl *module, ArrayRef<ParsedAutoDiffParameter> parsedWrtParams,
+    SourceLoc attrLoc) {
+  // Check that differentiation parameters have allowed types.
+    for (unsigned i : indices(wrtParamTypes)) {
+    auto wrtParamType = wrtParamTypes[i];
+    if (!wrtParamType->hasTypeParameter())
+      wrtParamType = wrtParamType->mapTypeOutOfContext();
+    if (derivativeGenEnv)
+      wrtParamType = derivativeGenEnv->mapTypeIntoContext(wrtParamType);
+    else
+      wrtParamType = AFD->mapTypeIntoContext(wrtParamType);
+    SourceLoc loc = parsedWrtParams.empty()
+        ? attrLoc
+        : parsedWrtParams[i].getLoc();
+    // Parameter cannot have a class or existential type.
+    if ((!wrtParamType->hasTypeParameter() &&
+         wrtParamType->isAnyClassReferenceType()) ||
+         wrtParamType->isExistentialType()) {
+      TC.diagnose(
+          loc, diag::diff_params_clause_cannot_diff_wrt_objects_or_existentials,
+          wrtParamType);
+      return true;
+    }
+    // Parameter cannot have a function type.
+    if (wrtParamType->is<AnyFunctionType>()) {
+      TC.diagnose(loc, diag::diff_params_clause_cannot_diff_wrt_functions,
+                  wrtParamType);
+      return true;
+    }
+    // Parameter must conform to `Differentiable`
+    // and `Type.TangentVector == Type`.
+    if (!conformsToDifferentiable(wrtParamType, AFD) ||
+        !tangentVectorEqualSelf(wrtParamType, AFD)) {
+      TC.diagnose(loc, diag::transpose_params_clause_param_not_differentiable,
+                  wrtParamType.getString());
       return true;
     }
   }
@@ -3683,6 +3856,243 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
     }
     da->setVJPFunction(derivative);
     break;
+  }
+}
+
+/// Pushes the subset's parameter's types to `paramTypes`, in the order in
+/// which they appear in the function type. For example,
+///
+///   functionType = (A, B, C) -> R
+///   if "A" and "C" are in the set,
+///   ==> pushes {A, C} to `paramTypes`.
+///
+void getIndexSubsetParameterTypes(
+    AutoDiffIndexSubset *indexSubset, AnyFunctionType *functionType,
+    SmallVectorImpl<Type> &paramTypes, bool isCurried) {
+  auto *fnTy = functionType;
+  if (isCurried) {
+    fnTy = fnTy->getResult()->getAs<AnyFunctionType>();
+  }
+
+  for (unsigned paramIndex : range(fnTy->getNumParams())) {
+    if ((paramIndex < indexSubset->getCapacity()) &&
+        indexSubset->contains(paramIndex)) {
+      paramTypes.push_back(fnTy->getParams()[paramIndex].getPlainType());
+    }
+  }
+}
+
+void AttributeChecker::visitTransposingAttr(TransposingAttr *attr) {
+  auto &ctx = TC.Context;
+  auto *transpose = dyn_cast<FuncDecl>(D);
+  auto lookupConformance =
+      LookUpConformanceInModule(D->getDeclContext()->getParentModule());
+  auto original = attr->getOriginal();
+  TC.resolveDeclSignature(transpose);
+  auto *transposeInterfaceType = transpose->getInterfaceType()
+                                     ->eraseDynamicSelfType()
+                                     ->castTo<AnyFunctionType>();
+  
+  // Get checked wrt param indices.
+  auto *wrtParamIndices = attr->getParameterIndexSubset();
+
+  // Get the parsed wrt param indices, which have not yet been checked.
+  // This is defined for parsed attributes.
+  auto parsedWrtParams = attr->getParsedParameters();
+  
+  bool wrtSelf = false;
+  if (!parsedWrtParams.empty())
+    wrtSelf = parsedWrtParams.front().getKind() ==
+              ParsedAutoDiffParameter::Kind::Self;
+
+  // If checked wrt param indices are not specified, compute them.
+  bool isCurried = transposeInterfaceType->getResult()->is<AnyFunctionType>();
+  if (!wrtParamIndices)
+    wrtParamIndices = computeTransposingParameters(
+                          TC, parsedWrtParams, transpose, isCurried,
+                          transpose->getGenericEnvironment(),
+                          attr->getLocation());
+  if (!wrtParamIndices) {
+    D->getAttrs().removeAttribute(attr);
+    attr->setInvalid();
+    return;
+  }
+  
+  // Diagnose empty parameter indices. This occurs when no `wrt` clause is
+  // declared and no differentiation parameters can be inferred.
+  if (wrtParamIndices->isEmpty()) {
+    TC.diagnose(attr->getLocation(),
+                diag::diff_params_clause_no_inferred_parameters);
+    D->getAttrs().removeAttribute(attr);
+    attr->setInvalid();
+    return;
+  }
+
+  auto *expectedOriginalFnType =
+      transposeInterfaceType->getTransposeOriginalFunctionType(
+          attr, wrtParamIndices, wrtSelf);
+
+  // `R` result type must conform to `Differentiable`.
+  auto expectedOriginalResultType = expectedOriginalFnType->getResult();
+  if (isCurried) {
+    expectedOriginalResultType = transpose->mapTypeIntoContext(
+        expectedOriginalResultType->getAs<AnyFunctionType>()->getResult());
+  }
+  if (expectedOriginalResultType->hasTypeParameter())
+    expectedOriginalResultType = transpose->mapTypeIntoContext(
+        expectedOriginalResultType);
+  auto diffableProto = ctx.getProtocol(KnownProtocolKind::Differentiable);
+  auto valueResultConf = TC.conformsToProtocol(expectedOriginalResultType,
+      diffableProto, transpose->getDeclContext(), None);
+
+  if (!valueResultConf) {
+    TC.diagnose(attr->getLocation(),
+                diag::transposing_attr_result_value_not_differentiable,
+                expectedOriginalFnType);
+    D->getAttrs().removeAttribute(attr);
+    attr->setInvalid();
+    return;
+  }
+
+  // Compute expected original function type.
+  std::function<bool(GenericSignature *, GenericSignature *)>
+    checkGenericSignatureSatisfied = [&](GenericSignature *source,
+                                         GenericSignature *target) {
+          // If target is null, then its requirements are satisfied.
+          if (!target)
+            return true;
+          // If source is null but target is not null, then target's
+          // requirements are not satisfied.
+          if (!source)
+            return false;
+          // Check if target's requirements are satisfied by source.
+          return TC.checkGenericArguments(
+                     transpose, original.Loc.getBaseNameLoc(),
+                     original.Loc.getBaseNameLoc(), Type(),
+                     source->getGenericParams(), target->getRequirements(),
+                     [](SubstitutableType *dependentType) {
+                       return Type(dependentType);
+                     },
+                     lookupConformance, None) == RequirementCheckResult::Success;
+    };
+  
+  auto isValidOriginal = [&](FuncDecl *originalCandidate) {
+    TC.validateDeclForNameLookup(originalCandidate);
+    return checkFunctionSignature(
+        cast<AnyFunctionType>(expectedOriginalFnType->getCanonicalType()),
+        originalCandidate->getInterfaceType()->getCanonicalType(),
+        checkGenericSignatureSatisfied);
+  };
+  
+  // TODO: Do not reuse incompatible `@differentiable` attribute diagnostics.
+  // Rename compatible diagnostics so that they're not attribute-specific.
+  auto overloadDiagnostic = [&]() {
+    TC.diagnose(original.Loc, diag::differentiating_attr_overload_not_found,
+                original.Name, expectedOriginalFnType);
+  };
+  auto ambiguousDiagnostic = [&]() {
+    TC.diagnose(original.Loc,
+                diag::differentiable_attr_ambiguous_function_identifier,
+                original.Name);
+  };
+  auto notFunctionDiagnostic = [&]() {
+    TC.diagnose(original.Loc, diag::differentiable_attr_specified_not_function,
+                original.Name);
+  };
+  std::function<void()> invalidTypeContextDiagnostic = [&]() {
+    TC.diagnose(original.Loc,
+                diag::differentiable_attr_function_not_same_type_context,
+                original.Name);
+  };
+
+  // Returns true if the derivative function and original function candidate are
+  // defined in compatible type contexts. If the derivative function and the
+  // original function candidate have different parents, return false.
+  std::function<bool(FuncDecl *)> hasValidTypeContext = [&](FuncDecl *func) {
+    return true;
+  };
+
+  auto typeRes = TypeResolution::forContextual(transpose->getDeclContext());
+  auto baseType = Type();
+  if (attr->getBaseType())
+    baseType = typeRes.resolveType(attr->getBaseType(), None);
+  auto lookupOptions = (attr->getBaseType() ? defaultMemberLookupOptions
+                                            : defaultUnqualifiedLookupOptions) |
+                        NameLookupFlags::IgnoreAccessControl;
+  auto transposeTypeCtx = transpose->getInnermostTypeContext();
+  if (!transposeTypeCtx) transposeTypeCtx = transpose->getParent();
+  assert(transposeTypeCtx);
+
+  // Look up original function.
+  auto funcLoc = original.Loc.getBaseNameLoc();
+  if (attr->getBaseType())
+    funcLoc = attr->getBaseType()->getLoc();
+  auto *originalFn = TC.lookupFuncDecl(
+      original.Name, funcLoc, baseType, transposeTypeCtx, isValidOriginal,
+      overloadDiagnostic, ambiguousDiagnostic, notFunctionDiagnostic,
+      lookupOptions, hasValidTypeContext, invalidTypeContextDiagnostic);
+
+  if (!originalFn) {
+    D->getAttrs().removeAttribute(attr);
+    attr->setInvalid();
+    return;
+  }
+
+  attr->setOriginalFunction(originalFn);
+
+  // Gather differentiation parameters.
+  // Differentiation parameters are with respect to the original function.
+  SmallVector<Type, 4> wrtParamTypes;
+  getIndexSubsetParameterTypes(wrtParamIndices, expectedOriginalFnType,
+                               wrtParamTypes, isCurried);
+
+  // Check if differentiation parameter indices are valid.
+  if (checkTransposingParameters(TC, originalFn, wrtParamTypes,
+                                 transpose->getGenericEnvironment(),
+                                 transpose->getModuleContext(), parsedWrtParams,
+                                 attr->getLocation())) {
+    D->getAttrs().removeAttribute(attr);
+    attr->setInvalid();
+    return;
+  }
+
+  // Set the checked differentiation parameter indices in the attribute.
+  attr->setParameterIndices(wrtParamIndices);
+
+  // Check if original function type matches expected original function type
+  // we computed.
+  Optional<std::function<bool(GenericSignature *, GenericSignature *)>>
+     genericComparison;
+  genericComparison = [&](GenericSignature *a, GenericSignature *b) {
+    return a == b;
+  };
+  // TODO(bartchr): remove the lambda of `checkFunctionSignature` defined in
+  // `AttributeChecker::visitDifferentiableAttr`.
+  if (!checkFunctionSignature(
+           cast<AnyFunctionType>(expectedOriginalFnType->getCanonicalType()),
+           originalFn->getInterfaceType()->getCanonicalType(),
+           genericComparison)) {
+    // Emit differential/pullback type mismatch error on attribute.
+    TC.diagnose(attr->getLocation(),
+                diag::differentiating_attr_result_func_type_mismatch,
+                transpose->getName(), originalFn->getName());
+    // Emit note with expected differential/pullback type on actual type
+    // location.
+    auto *tupleReturnTypeRepr =
+    cast<TupleTypeRepr>(transpose->getBodyResultTypeLoc().getTypeRepr());
+    auto *funcEltTypeRepr = tupleReturnTypeRepr->getElementType(1);
+    TC.diagnose(funcEltTypeRepr->getStartLoc(),
+                diag::differentiating_attr_result_func_type_mismatch_note,
+                transpose->getName(), expectedOriginalFnType)
+        .highlight(funcEltTypeRepr->getSourceRange());
+    // Emit note showing original function location, if possible.
+    if (originalFn->getLoc().isValid())
+      TC.diagnose(originalFn->getLoc(),
+                  diag::differentiating_attr_result_func_original_note,
+                  originalFn->getFullName());
+    D->getAttrs().removeAttribute(attr);
+    attr->setInvalid();
+    return;
   }
 }
 

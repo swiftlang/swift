@@ -389,6 +389,67 @@ static std::string getDifferentiationParametersClauseString(
   return printer.str();
 }
 
+// Returns the differentiation parameters clause string for the given function,
+// parameter indices, and parsed parameters.
+static std::string getTransposingParametersClauseString(
+    const AbstractFunctionDecl *function, AutoDiffIndexSubset *indices,
+    ArrayRef<ParsedAutoDiffParameter> parsedParams) {
+  bool isInstanceMethod = function && function->isInstanceMember();
+  
+  std::string result;
+  llvm::raw_string_ostream printer(result);
+  
+  // Use parameters from `AutoDiffIndexSubset`, if specified.
+  if (indices) {
+    SmallBitVector parameters(indices->getBitVector());
+    auto parameterCount = parameters.count();
+    printer << "wrt: ";
+    if (parameterCount > 1)
+      printer << '(';
+    // Check if differentiating wrt `self`. If so, manually print it first.
+    if (isInstanceMethod && parameters.test(parameters.size() - 1)) {
+      parameters.reset(parameters.size() - 1);
+      printer << "self";
+      if (parameters.any())
+        printer << ", ";
+    }
+    // Print remaining differentiation parameters.
+    interleave(parameters.set_bits(), [&](unsigned index) { printer << index; },
+               [&] { printer << ", "; });
+    if (parameterCount > 1)
+      printer << ')';
+  }
+  // Otherwise, use the parsed parameters.
+  else if (!parsedParams.empty()) {
+    printer << "wrt: ";
+    if (parsedParams.size() > 1)
+      printer << '(';
+    interleave(
+        parsedParams,
+        [&](const ParsedAutoDiffParameter &param) {
+          switch (param.getKind()) {
+            case ParsedAutoDiffParameter::Kind::Named:
+              printer << param.getName();
+              break;
+            case ParsedAutoDiffParameter::Kind::Self:
+              printer << "self";
+              break;
+            case ParsedAutoDiffParameter::Kind::Ordered:
+              assert((param.getIndex() < function->getParameters()->size()) &&
+                      "'wrt:' parameter index should be less than the number "
+                      "of parameters");
+            auto *funcParam = function->getParameters()->get(param.getIndex());
+            printer << funcParam->getNameStr();
+            break;
+          }
+        },
+        [&] { printer << ", "; });
+    if (parsedParams.size() > 1)
+      printer << ')';
+  }
+  return printer.str();
+}
+
 // SWIFT_ENABLE_TENSORFLOW
 // Print the arguments of the given `@differentiable` attribute.
 static void printDifferentiableAttrArguments(
@@ -803,6 +864,22 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     Printer << ')';
     break;
   }
+      
+  // SWIFT_ENABLE_TENSORFLOW
+  case DAK_Transposing: {
+    Printer.printAttrName("@transposing");
+    Printer << '(';
+    auto *attr = cast<TransposingAttr>(this);
+    auto *transpose = dyn_cast_or_null<AbstractFunctionDecl>(D);
+    Printer << attr->getOriginal().Name;
+    auto diffParamsString = getTransposingParametersClauseString(
+        transpose, attr->getParameterIndexSubset(),
+        attr->getParsedParameters());
+    if (!diffParamsString.empty())
+      Printer << ", " << diffParamsString;
+    Printer << ')';
+    break;
+  }
 
   case DAK_DynamicReplacement: {
     Printer.printAttrName("@_dynamicReplacement");
@@ -955,6 +1032,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "differentiable";
   case DAK_Differentiating:
     return "differentiating";
+  case DAK_Transposing:
+    return "transposing";
   }
   llvm_unreachable("bad DeclAttrKind");
 }
@@ -1438,9 +1517,49 @@ DifferentiatingAttr::create(ASTContext &context, bool implicit,
                                        std::move(original), linear, indices);
 }
 
+TransposingAttr::TransposingAttr(ASTContext &context, bool implicit,
+                                 SourceLoc atLoc, SourceRange baseRange,
+                                 TypeRepr *baseType, DeclNameWithLoc original,
+                                 ArrayRef<ParsedAutoDiffParameter> params)
+    : DeclAttribute(DAK_Transposing, atLoc, baseRange, implicit),
+      BaseType(baseType), Original(std::move(original)),
+      NumParsedParameters(params.size()) {
+  std::uninitialized_copy(params.begin(), params.end(),
+                          getTrailingObjects<ParsedAutoDiffParameter>());
+}
+
+TransposingAttr::TransposingAttr(ASTContext &context, bool implicit,
+                                 SourceLoc atLoc, SourceRange baseRange,
+                                 TypeRepr *baseType, DeclNameWithLoc original,
+                                 AutoDiffIndexSubset *indices)
+    : DeclAttribute(DAK_Differentiating, atLoc, baseRange, implicit),
+      BaseType(baseType), Original(std::move(original)),
+      ParameterIndexSubset(indices) {}
+
+TransposingAttr *
+TransposingAttr::create(ASTContext &context, bool implicit, SourceLoc atLoc,
+                        SourceRange baseRange, TypeRepr *baseType,
+                        DeclNameWithLoc original,
+                        ArrayRef<ParsedAutoDiffParameter> params) {
+  unsigned size = totalSizeToAlloc<ParsedAutoDiffParameter>(params.size());
+  void *mem = context.Allocate(size, alignof(TransposingAttr));
+  return new (mem) TransposingAttr(context, implicit, atLoc, baseRange,
+                                   baseType, std::move(original), params);
+}
+
+TransposingAttr *
+TransposingAttr::create(ASTContext &context, bool implicit, SourceLoc atLoc,
+                        SourceRange baseRange, TypeRepr *baseType,
+                        DeclNameWithLoc original,
+                        AutoDiffIndexSubset *indices) {
+  void *mem =
+      context.Allocate(sizeof(TransposingAttr), alignof(TransposingAttr));
+  return new (mem) TransposingAttr(context, implicit, atLoc, baseRange,
+                                   baseType, std::move(original), indices);
+}
+
 ImplementsAttr::ImplementsAttr(SourceLoc atLoc, SourceRange range,
-                               TypeLoc ProtocolType,
-                               DeclName MemberName,
+                               TypeLoc ProtocolType, DeclName MemberName,
                                DeclNameLoc MemberNameLoc)
     : DeclAttribute(DAK_Implements, atLoc, range, /*Implicit=*/false),
       ProtocolType(ProtocolType),
