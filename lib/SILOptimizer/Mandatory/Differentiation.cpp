@@ -1658,24 +1658,21 @@ void DifferentiableActivityInfo::setUsefulAcrossArrayInitialization(
   auto uai = getAllocateUninitializedArrayIntrinsic(value);
   if (!uai) return;
   for (auto use : value->getUses()) {
-    if (auto tei = dyn_cast<TupleExtractInst>(use->getUser()->getResult(0))) {
-      // The second tuple field of the return value is the `RawPointer`.
-      if (tei->getFieldNo() == 1) {
-        for (auto use : tei->getUses()) {
-          // The `RawPointer` passes through a `pointer_to_address`. That
-          // instruction's first use is a `store` whose src is useful; its
-          // subsequent uses are `index_addr`s whose only use is a useful
-          // `store`.
-          for (auto use : use->getUser()->getResult(0)->getUses()) {
-            auto inst = use->getUser();
-            if (auto si = dyn_cast<StoreInst>(inst)) {
+    auto tei = dyn_cast<TupleExtractInst>(use->getUser()->getResult(0));
+    if (!tei || tei->getFieldNo() != 1) continue;
+    // The second tuple field of the return value is the `RawPointer`.
+    for (auto use : tei->getUses()) {
+      // The `RawPointer` passes through a `pointer_to_address`. That
+      // instruction's first use is a `store` whose src is useful; its
+      // subsequent uses are `index_addr`s whose only use is a useful `store`.
+      for (auto use : use->getUser()->getResult(0)->getUses()) {
+        auto inst = use->getUser();
+        if (auto si = dyn_cast<StoreInst>(inst)) {
+          setUseful(si->getSrc(), dependentVariableIndex);
+        } else if (auto iai = dyn_cast<IndexAddrInst>(inst)) {
+          for (auto use : iai->getUses())
+            if (auto si = dyn_cast<StoreInst>(use->getUser()))
               setUseful(si->getSrc(), dependentVariableIndex);
-            } else if (auto iai = dyn_cast<IndexAddrInst>(inst)) {
-              for (auto use : iai->getUses())
-                if (auto si = dyn_cast<StoreInst>(use->getUser()))
-                  setUseful(si->getSrc(), dependentVariableIndex);
-            }
-          }
         }
       }
     }
@@ -4708,80 +4705,72 @@ public:
     auto lookupConformance = LookUpConformanceInModule(
         getModule().getSwiftModule());
     for (auto use : ai->getUses()) {
-      if (auto tei = dyn_cast<TupleExtractInst>(
-              use->getUser()->getResult(0))) {
-        // The first tuple field of the return value is the `Array`.
-        if (tei->getFieldNo() == 0) {
-          adjointArray = getAdjointValue(
-              ai->getParent(), tei).getConcreteValue().getValue();
-          auto astType = adjointArray->getType().getASTType();
-          auto typeDecl = astType->getStructOrBoundGenericStruct();
-          auto subscriptDecl = cast<SubscriptDecl>(typeDecl->lookupDirect(
-              DeclBaseName::createSubscript()).front());
-          auto subscriptGet = subscriptDecl->getAccessor(AccessorKind::Get);
-          SILDeclRef subscriptRef(subscriptGet, SILDeclRef::Kind::Func);
-          auto fnBuilder = SILOptFunctionBuilder(getContext().getTransform());
-          auto fn = fnBuilder.getOrCreateFunction(
-              ai->getLoc(), subscriptRef, NotForDefinition);
-          genericSig = fn->getLoweredFunctionType()->getGenericSignature();
-          fnRef = builder.createFunctionRef(ai->getLoc(), fn);
-        }
-      }
+      auto tei = dyn_cast<TupleExtractInst>(use->getUser()->getResult(0));
+      if (!tei || tei->getFieldNo() != 0) continue;
+      // The first tuple field of the return value is the `Array`.
+      adjointArray = getAdjointValue(
+          ai->getParent(), tei).getConcreteValue().getValue();
+      assert(adjointArray && "Array does not have adjoint value");
+      auto astType = adjointArray->getType().getASTType();
+      auto typeDecl = astType->getStructOrBoundGenericStruct();
+      auto subscriptDecl = cast<SubscriptDecl>(typeDecl->lookupDirect(
+          DeclBaseName::createSubscript()).front());
+      auto subscriptGet = subscriptDecl->getAccessor(AccessorKind::Get);
+      SILDeclRef subscriptRef(subscriptGet, SILDeclRef::Kind::Func);
+      auto fnBuilder = SILOptFunctionBuilder(getContext().getTransform());
+      auto fn = fnBuilder.getOrCreateFunction(
+          ai->getLoc(), subscriptRef, NotForDefinition);
+      genericSig = fn->getLoweredFunctionType()->getGenericSignature();
+      assert(genericSig && "No generic signature");
+      fnRef = builder.createFunctionRef(ai->getLoc(), fn);
+      assert(fnRef && "cannot create function_ref");
     }
     // Two loops because the tuple_extract instructions can be reached in
     // either order.
     for (auto use : ai->getUses()) {
-      if (auto tei = dyn_cast<TupleExtractInst>(
-              use->getUser()->getResult(0))) {
-        // The second tuple field is the `RawPointer`.
-        if (tei->getFieldNo() == 1) {
-          for (auto use : tei->getUses()) {
-            // The `RawPointer` passes through a `pointer_to_address`. That
-            // instruction's first use is a `store` whose src is useful; its
-            // subsequent uses are `index_addr`s whose only use is a useful
-            // `store`. In the indirect case, each `store` is instead a
-            // `copy_addr`.
-            for (auto use : use->getUser()->getResult(0)->getUses()) {
-              auto inst = use->getUser();
-              if (auto si = dyn_cast<StoreInst>(inst)) {
+      auto tei = dyn_cast<TupleExtractInst>(use->getUser()->getResult(0));
+      if (!tei || tei->getFieldNo() != 1) continue;
+      // The second tuple field is the `RawPointer`.
+      for (auto use : tei->getUses()) {
+        // The `RawPointer` passes through a `pointer_to_address`. That
+        // instruction's first use is a `store` whose src is useful; its
+        // subsequent uses are `index_addr`s whose only use is a useful
+        // `store`. In the indirect case, each `store` is instead a
+        // `copy_addr`.
+        for (auto use : use->getUser()->getResult(0)->getUses()) {
+          auto inst = use->getUser();
+          if (auto si = dyn_cast<StoreInst>(inst)) {
+            auto tanType = getRemappedTangentType(si->getSrc()->getType());
+            auto subscriptBuffer = emitDifferentiableViewSubscript(
+                ai, tanType, adjointArray, fnRef, genericSig, 0);
+            accumulateDifferentiableViewSubscriptDirect(
+                ai, tanType, si, subscriptBuffer);
+          } else if (auto cai = dyn_cast<CopyAddrInst>(inst)) {
+            auto tanType = getRemappedTangentType(cai->getSrc()->getType());
+            auto subscriptBuffer = emitDifferentiableViewSubscript(
+                ai, tanType, adjointArray, fnRef, genericSig, 0);
+            accumulateDifferentiableViewSubscriptIndirect(
+                ai, cai, subscriptBuffer);
+          } else if (auto iai = dyn_cast<IndexAddrInst>(inst)) {
+            for (auto use : iai->getUses()) {
+              if (auto si = dyn_cast<StoreInst>(use->getUser())) {
+                auto literal = dyn_cast<IntegerLiteralInst>(iai->getIndex());
                 auto tanType = getRemappedTangentType(
                     si->getSrc()->getType());
                 auto subscriptBuffer = emitDifferentiableViewSubscript(
-                    ai, tanType, adjointArray, fnRef, genericSig, 0);
+                    ai, tanType, adjointArray, fnRef,
+                    genericSig, literal->getValue().getLimitedValue());
                 accumulateDifferentiableViewSubscriptDirect(
                     ai, tanType, si, subscriptBuffer);
-              } else if (auto cai = dyn_cast<CopyAddrInst>(inst)) {
+              } else if (auto cai = dyn_cast<CopyAddrInst>(use->getUser())) {
+                auto literal = dyn_cast<IntegerLiteralInst>(iai->getIndex());
                 auto tanType = getRemappedTangentType(
                     cai->getSrc()->getType());
                 auto subscriptBuffer = emitDifferentiableViewSubscript(
-                    ai, tanType, adjointArray, fnRef, genericSig, 0);
+                    ai, tanType, adjointArray, fnRef,
+                    genericSig, literal->getValue().getLimitedValue());
                 accumulateDifferentiableViewSubscriptIndirect(
                     ai, cai, subscriptBuffer);
-              } else if (auto iai = dyn_cast<IndexAddrInst>(inst)) {
-                for (auto use : iai->getUses()) {
-                  if (auto si = dyn_cast<StoreInst>(use->getUser())) {
-                    auto literal = dyn_cast<IntegerLiteralInst>(
-                        iai->getIndex());
-                    auto tanType = getRemappedTangentType(
-                        si->getSrc()->getType());
-                    auto subscriptBuffer = emitDifferentiableViewSubscript(
-                        ai, tanType, adjointArray, fnRef,
-                        genericSig, literal->getValue().getLimitedValue());
-                    accumulateDifferentiableViewSubscriptDirect(
-                        ai, tanType, si, subscriptBuffer);
-                  } else if (auto cai = dyn_cast<CopyAddrInst>(
-                                 use->getUser())) {
-                    auto literal = dyn_cast<IntegerLiteralInst>(
-                        iai->getIndex());
-                    auto tanType = getRemappedTangentType(
-                        cai->getSrc()->getType());
-                    auto subscriptBuffer = emitDifferentiableViewSubscript(
-                        ai, tanType, adjointArray, fnRef,
-                        genericSig, literal->getValue().getLimitedValue());
-                    accumulateDifferentiableViewSubscriptIndirect(
-                        ai, cai, subscriptBuffer);
-                  }
-                }
               }
             }
           }
