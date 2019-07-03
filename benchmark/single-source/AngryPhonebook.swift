@@ -20,7 +20,7 @@ let t: [BenchmarkCategory] = [.validation, .api, .String]
 public let AngryPhonebook = [
   BenchmarkInfo(
     name: "AngryPhonebook",
-    runFunction: { angryPhonebook($0, words) },
+    runFunction: run_AngryPhonebook,
     tags: t,
     legacyFactor: 7),
   BenchmarkInfo(
@@ -47,6 +47,18 @@ let words = [
   "Joshua", "Kevin", "Ronald", "Timothy", "Jason", "Jeffrey", "Gary", "Ryan",
   "Nicholas", "Eric", "Stephen", "Jacob", "Larry", "Frank"]
 
+@inline(never)
+public func run_AngryPhonebook(_ N: Int) {
+  // Permute the names.
+  for _ in 1...N {
+    for firstname in words {
+      for lastname in words {
+        _ = (firstname.uppercased(), lastname.lowercased())
+      }
+    }
+  }
+}
+
 // Workloads for various scripts. Always 20 names for 400 pairings.
 // To keep the performance of various scripts roughly comparable, aim for
 // a total length of approximately 120 characters.
@@ -54,12 +66,12 @@ let words = [
 
 let latin = Array(words.prefix(20))
 
-let armenian: [String] = [
+let armenian = [
   "Արմեն", "Աննա", "Հարութ", "Միքայել", "Մարիա", "Դավիթ", "Վարդան",
   "Նարինե", "Տիգրան", "Տաթևիկ", "Թագուհի", "Թամարա", "Ազնաուր", "Գրիգոր",
   "Կոմիտաս", "Հայկ", "Գառնիկ", "Վահրամ", "Վահագն", "Գևորգ"]
 
-let cyrillic: [String] = [
+let cyrillic = [
   "Ульяна", "Аркадий", "Аня", "Даниил", "Дмитрий", "Эдуард", "Юрій", "Давид",
   "Анна", "Дмитрий", "Евгений", "Борис", "Ксения", "Артур", "Аполлон",
   "Соломон", "Николай", "Кристи", "Надежда", "Спартак"]
