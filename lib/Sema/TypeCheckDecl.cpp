@@ -2535,6 +2535,12 @@ public:
           if (!var->hasType())
             var->markInvalid();
         };
+        
+        // Properties with an opaque return type need an initializer to
+        // determine their underlying type.
+        if (var->getOpaqueResultTypeDecl()) {
+          TC.diagnose(var->getLoc(), diag::opaque_type_var_no_init);
+        }
 
         // Non-member observing properties need an initializer.
         if (var->getWriteImpl() == WriteImplKind::StoredWithObservers &&
@@ -2593,8 +2599,9 @@ public:
       if (!PBD->isInitialized(i))
         continue;
 
-      if (!PBD->isInitializerChecked(i))
+      if (!PBD->isInitializerChecked(i)) {
         TC.typeCheckPatternBinding(PBD, i);
+      }
 
       if (!PBD->isInvalid()) {
         auto &entry = PBD->getPatternList()[i];

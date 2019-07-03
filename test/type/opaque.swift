@@ -12,10 +12,9 @@ extension Array: P, Q { func paul() {}; mutating func priscilla() {}; func quinn
 class C {}
 class D: C, P, Q { func paul() {}; func priscilla() {}; func quinn() {} }
 
-// TODO: Should be valid
-
-let property: some P = 1 // TODO expected-error{{cannot convert}}
-let deflessProperty: some P // TODO e/xpected-error{{butz}}
+let property: some P = 1
+let deflessLet: some P // expected-error{{has no initializer}}
+var deflessVar: some P // expected-error{{has no initializer}}
 
 struct GenericProperty<T: P> {
   var x: T
@@ -159,7 +158,6 @@ func typeIdentity() {
 
   // The opaque type should expose the members implied by its protocol
   // constraints
-  // TODO: associated types
   do {
     var a = alice()
     a.paul()
@@ -403,4 +401,15 @@ func testCoercionDiagnostics() {
   // FIXME: It would be nice to show the "from" info here as well.
   opaqueOpt = bar() // expected-error {{cannot assign value of type 'some P' to type '(some P)?'}} {{none}}
   opaqueOpt = () // expected-error {{cannot assign value of type '()' to type '(some P)?'}} {{none}}
+}
+
+var globalVar: some P = 17
+let globalLet: some P = 38
+
+struct Foo {
+  static var staticVar: some P = 17
+  static let staticLet: some P = 38
+
+  var instanceVar: some P = 17
+  let instanceLet: some P = 38
 }

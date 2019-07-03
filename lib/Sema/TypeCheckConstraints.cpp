@@ -2649,8 +2649,11 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
         initType = patternType;
 
         // Add a conversion constraint between the types.
-        cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
-                         patternType, Locator, /*isFavored*/true);
+        if (!cs.Options.contains(
+                   ConstraintSystemFlags::UnderlyingTypeForOpaqueReturnType)) {
+          cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
+                           patternType, Locator, /*isFavored*/true);
+        }
       }
 
       // The expression has been pre-checked; save it in case we fail later.
@@ -2762,6 +2765,13 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
     // If we already had an error, don't repeat the problem.
     if (contextualType.getType()->hasError())
       return true;
+    
+    // Allow the initializer expression to establish the underlying type of an
+    // opaque type.
+    if (auto opaqueType = pattern->getType()->getAs<OpaqueTypeArchetypeType>()){
+      flags |= TypeCheckExprFlags::ConvertTypeIsOpaqueReturnType;
+      flags -= TypeCheckExprFlags::ConvertTypeIsOnlyAHint;
+    }
 
     // Only provide a TypeLoc if it makes sense to allow diagnostics.
     if (auto *typedPattern = dyn_cast<TypedPattern>(pattern)) {
@@ -2846,10 +2856,35 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
   PBD->setPattern(patternNumber, pattern, initContext);
   PBD->setInit(patternNumber, init);
 
+  // Bind a property with an opaque return type to the underlying type
+  // given by the initializer.
+  if (auto var = pattern->getSingleVar()) {
+    if (auto opaque = var->getOpaqueResultTypeDecl()) {
+      if (auto convertedInit = dyn_cast<UnderlyingToOpaqueExpr>(init)) {
+        auto underlyingType = convertedInit->getSubExpr()->getType()
+            ->mapTypeOutOfContext();
+        auto underlyingSubs = SubstitutionMap::get(
+          opaque->getOpaqueInterfaceGenericSignature(),
+          [&](SubstitutableType *t) -> Type {
+            if (t->isEqual(opaque->getUnderlyingInterfaceType())) {
+              return underlyingType;
+            }
+            return Type(t);
+          },
+          LookUpConformanceInModule(opaque->getModuleContext()));
+        
+        opaque->setUnderlyingTypeSubstitutions(underlyingSubs);
+      } else {
+        diagnose(var->getLoc(), diag::opaque_type_var_no_underlying_type);
+      }
+    }
+  }
+  
   if (hadError)
     PBD->setInvalid();
 
   PBD->setInitializerChecked(patternNumber);
+  
   return hadError;
 }
 
