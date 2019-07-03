@@ -2151,6 +2151,12 @@ public:
   Type addJoinConstraint(ConstraintLocator *locator,
                          ArrayRef<std::pair<Type, ConstraintLocator *>> inputs);
 
+  /// Add a constraint to the constraint system with an associated fix.
+  void addFixConstraint(ConstraintFix *fix, ConstraintKind kind,
+                        Type first, Type second,
+                        ConstraintLocatorBuilder locator,
+                        bool isFavored = false);
+
   /// Add a key path application constraint to the constraint system.
   void addKeyPathApplicationConstraint(Type keypath, Type root, Type value,
                                        ConstraintLocatorBuilder locator,

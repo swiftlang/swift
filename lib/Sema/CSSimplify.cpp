@@ -8157,6 +8157,30 @@ Type ConstraintSystem::addJoinConstraint(
   return resultTy;
 }
 
+void ConstraintSystem::addFixConstraint(ConstraintFix *fix, ConstraintKind kind,
+                                        Type first, Type second,
+                                        ConstraintLocatorBuilder locator,
+                                        bool isFavored) {
+  TypeMatchOptions subflags = TMF_GenerateConstraints;
+  switch (simplifyFixConstraint(fix, first, second, kind, subflags, locator)) {
+  case SolutionKind::Error:
+    // Add a failing constraint, if needed.
+    if (shouldAddNewFailingConstraint()) {
+      auto c = Constraint::createFixed(*this, kind, fix, first, second,
+                                       getConstraintLocator(locator));
+      if (isFavored) c->setFavored();
+      addNewFailingConstraint(c);
+    }
+    return;
+
+  case SolutionKind::Unsolved:
+    llvm_unreachable("should have generated constraints");
+
+  case SolutionKind::Solved:
+    return;
+  }
+}
+
 void ConstraintSystem::addExplicitConversionConstraint(
                                            Type fromType, Type toType,
                                            bool allowFixes,
