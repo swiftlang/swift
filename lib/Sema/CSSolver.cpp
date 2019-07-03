@@ -1164,7 +1164,8 @@ ConstraintSystem::solveImpl(Expr *&expr,
     auto constraintKind = ConstraintKind::Conversion;
     
     if ((getContextualTypePurpose() == CTP_ReturnStmt ||
-         getContextualTypePurpose() == CTP_ReturnSingleExpr)
+         getContextualTypePurpose() == CTP_ReturnSingleExpr ||
+         getContextualTypePurpose() == CTP_Initialization)
         && Options.contains(ConstraintSystemFlags::UnderlyingTypeForOpaqueReturnType))
       constraintKind = ConstraintKind::OpaqueUnderlyingType;
     
