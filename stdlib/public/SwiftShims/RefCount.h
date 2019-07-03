@@ -1495,4 +1495,15 @@ _Static_assert(_Alignof(InlineRefCounts) == _Alignof(__swift_uintptr_t),
   "InlineRefCounts must be pointer-aligned");
 #endif
 
+#if defined(_WIN32) && defined(_M_ARM64)
+namespace std {
+template <>
+inline void _Atomic_storage<swift::SideTableRefCountBits, 16>::_Unlock() const noexcept {
+  __dmb(0x8);
+  __iso_volatile_store32(&reinterpret_cast<volatile int &>(_Spinlock), 0);
+  __dmb(0x8);
+}
+}
+#endif
+
 #endif
