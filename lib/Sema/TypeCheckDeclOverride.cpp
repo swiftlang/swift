@@ -957,6 +957,11 @@ static GenericSignature *getOverrideGenericSignature(ValueDecl *base,
     return nullptr;
   }
 
+  if (derivedClass->getGenericSignature() == nullptr &&
+      !baseGenericCtx->isGeneric()) {
+    return nullptr;
+  }
+
   auto subMap = derivedClass->getSuperclass()->getContextSubstitutionMap(
       derivedClass->getModuleContext(), baseClass);
 
@@ -1010,10 +1015,6 @@ static GenericSignature *getOverrideGenericSignature(ValueDecl *base,
       if (auto substReqt = reqt.subst(substFn, lookupConformanceFn)) {
         builder.addRequirement(*substReqt, source, nullptr);
       }
-    }
-
-    if (builder.getGenericParams().empty()) {
-      return nullptr;
     }
 
     auto *genericSig = std::move(builder).computeGenericSignature(SourceLoc());
