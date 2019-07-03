@@ -24,6 +24,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "llvm/Support/SaveAndRestore.h"
+#include "../Sema/TypeCheckProtocol.h"
 
 using namespace swift;
 
@@ -147,8 +148,9 @@ void ConformanceLookupTable::invalidate(NominalTypeDecl *recurse) {
     recurse->ConformanceTable = nullptr;
     return;
   }
-  Conformances.clear();
+
   LastProcessed.clear();
+  Conformances.clear();
   AllConformances.clear();
 }
 
@@ -489,11 +491,10 @@ void ConformanceLookupTable::addInheritedProtocols(
     dyn_cast_or_null<ProtocolDecl>(decl.dyn_cast<TypeDecl *>());
   // Prepare closure to register inherited protocols against extending.
   Propagator protoPropagator = [&](ProtocolDecl *inheritedProto) {
-    if (proto) {
+    if (proto)
       proto->prepareConformanceTable()
         ->addWitnessRequirement(nominal, inheritedProto, ext);
-      // Continue propagating up stack.
-    }
+    // Continue propagating up stack.
     if (propagator)
       (*propagator)(inheritedProto);
   };
@@ -1105,6 +1106,8 @@ void ConformanceLookupTable::lookupConformances(
 
 void ConformanceLookupTable::addExtendedConformances(const ExtensionDecl *ext,
                  SmallVectorImpl<ProtocolConformance *> &conformances) {
+  TypeChecker &TC = TypeChecker::createForContext(ext->getASTContext());
+  MultiConformanceChecker groupChecker(TC);
   for (auto &nominalPair : NotionalConformancesFromExtension[ext]) {
     NominalTypeDecl *nominal = nominalPair.first;
     for (auto &protocolPair : nominalPair.second) {
@@ -1116,14 +1119,13 @@ void ConformanceLookupTable::addExtendedConformances(const ExtensionDecl *ext,
       if (entry == table->Conformances.end())
         continue;
       auto conformance = table->getConformance(nominal, entry->second.back());
-      // FIXME: Bit of a hack here to force the conformance to be "complete"
-      if (auto normal = dyn_cast<NormalProtocolConformance>(conformance))
-        if (normal->getProtocol()->FirstExtension) {
-          normal->setState(ProtocolConformanceState::Complete);
-          conformances.push_back(conformance);
-        }
+      if (auto normal = dyn_cast<NormalProtocolConformance>(conformance)) {
+        conformances.push_back(conformance);
+        groupChecker.addConformance(normal);
+      }
     }
   }
+  groupChecker.checkAllConformances();
 }
 
 void ConformanceLookupTable::getAllProtocols(
