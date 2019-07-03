@@ -242,6 +242,7 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'DifferentiableAttributeFuncSpecifier': 237,
     'FunctionDeclName': 238,
     'DifferentiatingAttributeArguments': 239,
+    'TransposingAttributeArguments': 240,
 }
 
 
