@@ -564,11 +564,11 @@ class SR_4206_DerivedConcrete_4: SR_4206_BaseConcrete_4 {
 // Base class not generic w/ method generic, derived class not generic w/ method generic but removed requirement
 
 class SR_4206_BaseConcrete_5 {
-  func foo<T: SR_4206_Protocol_2>(arg: T) {} // expected-note {{overridden declaration is here}}
+  func foo<T: SR_4206_Protocol_2>(arg: T) {}
 }
 
 class SR_4206_DerivedConcrete_5: SR_4206_BaseConcrete_5 {
-  override func foo<T>(arg: T) {} // expected-error {{overridden method 'foo' has generic signature <T> which is incompatible with base method's generic signature <T where T : SR_4206_Protocol_2>}}
+  override func foo<T>(arg: T) {} // Ok?
 }
 
 // Base class not generic w/ method generic, derived class generic w/ method generic but different requirement
