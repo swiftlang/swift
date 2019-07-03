@@ -5795,8 +5795,6 @@ maybeDiagnoseUnsupportedFunctionConversion(ConstraintSystem &cs, Expr *expr,
       } else if (fn->getGenericParams()) {
         tc.diagnose(expr->getLoc(),
                     diag::c_function_pointer_from_generic_function);
-      } else {
-        tc.maybeDiagnoseCaptures(expr, fn);
       }
     };
     
@@ -5817,10 +5815,8 @@ maybeDiagnoseUnsupportedFunctionConversion(ConstraintSystem &cs, Expr *expr,
       semanticExpr = capture->getClosureBody();
     
     // Can convert a literal closure that doesn't capture context.
-    if (auto closure = dyn_cast<ClosureExpr>(semanticExpr)) {
-      tc.maybeDiagnoseCaptures(expr, closure);
+    if (auto closure = dyn_cast<ClosureExpr>(semanticExpr))
       return;
-    }
     
     tc.diagnose(expr->getLoc(),
                 diag::invalid_c_function_pointer_conversion_expr);
