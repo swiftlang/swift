@@ -569,13 +569,6 @@ public:
   /// will need to compute captures for.
   std::vector<AbstractClosureExpr *> ClosuresWithUncomputedCaptures;
 
-  /// A set of local functions from which C function pointers are derived.
-  ///
-  /// This is used to diagnose the use of local functions with captured context
-  /// as C function pointers when the function's captures have not yet been
-  /// computed.
-  llvm::DenseMap<AnyFunctionRef, std::vector<Expr*>> LocalCFunctionPointers;
-
 private:
   /// The # of times we have performed typo correction.
   unsigned NumTypoCorrections = 0;
@@ -1433,10 +1426,6 @@ public:
 
   /// Type-check a for-each loop's pattern binding and sequence together.
   bool typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt);
-
-  /// Lazily diagnose conversions to C function pointers of closures
-  /// with captures.
-  void maybeDiagnoseCaptures(Expr *E, AnyFunctionRef AFR);
 
   /// Compute the set of captures for the given function or closure.
   void computeCaptures(AnyFunctionRef AFR);
