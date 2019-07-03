@@ -192,3 +192,9 @@ struct X<T: R, U: R>: R {
   }
 }
 
+var globalOProp: some O = 0
+
+struct OpaqueProps {
+  static var staticOProp: some O = 0
+  var instanceOProp: some O = 0
+}
