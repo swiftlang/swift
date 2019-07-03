@@ -30,9 +30,9 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringExtras.h"
-#include "llvm/Bitcode/BitstreamReader.h"
-#include "llvm/Bitcode/BitstreamWriter.h"
 #include "llvm/Bitcode/RecordLayout.h"
+#include "llvm/Bitstream/BitstreamReader.h"
+#include "llvm/Bitstream/BitstreamWriter.h"
 #include "llvm/Support/DJB.h"
 #include "llvm/Support/OnDiskHashTable.h"
 

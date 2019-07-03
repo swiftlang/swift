@@ -22,7 +22,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Types.h"
 #include "llvm/Bitcode/RecordLayout.h"
-#include "llvm/Bitcode/BitCodes.h"
+#include "llvm/Bitstream/BitCodes.h"
 #include "llvm/ADT/PointerEmbeddedInt.h"
 
 namespace swift {
