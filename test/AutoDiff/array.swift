@@ -27,6 +27,34 @@ ArrayAutodiffTests.test("ArraySubscript") {
     gradient(at: [2, 3, 4, 5, 6, 7], in: sumFirstThree))
 }
 
+ArrayAutodiffTests.test("ArrayLiteral") {
+  func twoElementLiteral(_ x: Float, _ y: Float) -> [Float] {
+    return [x, y]
+  }
+
+  let (gradX, gradY) = pullback(at: Float(1), Float(1), in: twoElementLiteral)(
+    Array<Float>.DifferentiableView([Float(1), Float(2)]))
+
+  expectEqual(gradX, Float(1))
+  expectEqual(gradY, Float(2))
+}
+
+ArrayAutodiffTests.test("ArrayLiteralIndirect") {
+  func twoElementLiteralIndirect<T: Differentiable & AdditiveArithmetic>(_ x: T, _ y: T) -> [T] {
+    return [x, y]
+  }
+
+  func twoElementLiteralIndirectWrapper(_ x: Float, _ y: Float) -> [Float] {
+    return twoElementLiteralIndirect(x, y)
+  }
+
+  let (gradX, gradY) = pullback(at: Float(1), Float(1), in: twoElementLiteralIndirectWrapper)(
+    Array<Float>.DifferentiableView([Float(1), Float(2)]))
+
+  expectEqual(gradX, Float(1))
+  expectEqual(gradY, Float(2))
+}
+
 ArrayAutodiffTests.test("ArrayConcat") {
   struct TwoArrays : Differentiable {
     var a: [Float]

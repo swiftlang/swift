@@ -2046,6 +2046,14 @@ extension Array.DifferentiableView : AdditiveArithmetic
     }
     return Array.DifferentiableView(zip(lhs.base, rhs.base).map(-))
   }
+
+  public subscript(_ index: Int) -> Element {
+    if index < base.count {
+      return base[index]
+    } else {
+      return Element.zero
+    }
+  }
 }
 
 /// Makes `Array` differentiable as the product manifold of `Element`
