@@ -965,63 +965,62 @@ static GenericSignature *getOverrideGenericSignature(ValueDecl *base,
   auto subMap = derivedClass->getSuperclass()->getContextSubstitutionMap(
       derivedClass->getModuleContext(), baseClass);
 
-  if (baseGenericCtx->getGenericSignature() != nullptr) {
-    unsigned depth = 0;
+  if (baseGenericCtx->getGenericSignature() == nullptr) {
+    return nullptr;
+  }
+  unsigned depth = 0;
 
-    if (auto *genericSig = baseClass->getGenericSignature())
-      depth = genericSig->getGenericParams().back()->getDepth() + 1;
+  if (auto *genericSig = baseClass->getGenericSignature())
+    depth = genericSig->getGenericParams().back()->getDepth() + 1;
 
-    GenericSignatureBuilder builder(ctx);
-    builder.addGenericSignature(derivedClass->getGenericSignature());
+  GenericSignatureBuilder builder(ctx);
+  builder.addGenericSignature(derivedClass->getGenericSignature());
 
-    if (auto derivedGenericCtx = derived->getAsGenericContext()) {
-      if (derivedGenericCtx->isGeneric()) {
-        for (auto param : *derivedGenericCtx->getGenericParams()) {
-          builder.addGenericParameter(param);
-        }
+  if (auto derivedGenericCtx = derived->getAsGenericContext()) {
+    if (derivedGenericCtx->isGeneric()) {
+      for (auto param : *derivedGenericCtx->getGenericParams()) {
+        builder.addGenericParameter(param);
       }
     }
-
-    auto source =
-        GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
-
-    unsigned superclassDepth = 0;
-
-    if (baseClassSig) {
-      superclassDepth = baseClassSig->getGenericParams().back()->getDepth() + 1;
-    }
-
-    auto substFn = [&](SubstitutableType *type) -> Type {
-      auto *gp = cast<GenericTypeParamType>(type);
-
-      if (gp->getDepth() < superclassDepth) {
-        return Type(gp).subst(subMap);
-      }
-
-      return CanGenericTypeParamType::get(
-          gp->getDepth() - superclassDepth + depth, gp->getIndex(), ctx);
-    };
-
-    auto lookupConformanceFn =
-        [&](CanType depTy, Type substTy,
-            ProtocolDecl *proto) -> Optional<ProtocolConformanceRef> {
-      if (auto conf = subMap.lookupConformance(depTy, proto))
-        return conf;
-
-      return ProtocolConformanceRef(proto);
-    };
-
-    for (auto reqt : baseGenericCtx->getGenericSignature()->getRequirements()) {
-      if (auto substReqt = reqt.subst(substFn, lookupConformanceFn)) {
-        builder.addRequirement(*substReqt, source, nullptr);
-      }
-    }
-
-    auto *genericSig = std::move(builder).computeGenericSignature(SourceLoc());
-    return genericSig;
   }
 
-  return nullptr;
+  auto source =
+      GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
+
+  unsigned superclassDepth = 0;
+
+  if (baseClassSig) {
+    superclassDepth = baseClassSig->getGenericParams().back()->getDepth() + 1;
+  }
+
+  auto substFn = [&](SubstitutableType *type) -> Type {
+    auto *gp = cast<GenericTypeParamType>(type);
+
+    if (gp->getDepth() < superclassDepth) {
+      return Type(gp).subst(subMap);
+    }
+
+    return CanGenericTypeParamType::get(
+        gp->getDepth() - superclassDepth + depth, gp->getIndex(), ctx);
+  };
+
+  auto lookupConformanceFn =
+      [&](CanType depTy, Type substTy,
+          ProtocolDecl *proto) -> Optional<ProtocolConformanceRef> {
+    if (auto conf = subMap.lookupConformance(depTy, proto))
+      return conf;
+
+    return ProtocolConformanceRef(proto);
+  };
+
+  for (auto reqt : baseGenericCtx->getGenericSignature()->getRequirements()) {
+    if (auto substReqt = reqt.subst(substFn, lookupConformanceFn)) {
+      builder.addRequirement(*substReqt, source, nullptr);
+    }
+  }
+
+  auto *genericSig = std::move(builder).computeGenericSignature(SourceLoc());
+  return genericSig;
 }
 
 bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
