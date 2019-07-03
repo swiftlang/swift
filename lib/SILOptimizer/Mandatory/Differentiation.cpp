@@ -3378,8 +3378,8 @@ private:
   /// The JVP function.
   SILFunction *const jvp;
 
-  /// The tangent function.
-  SILFunction *tangent;
+  /// The differential function.
+  SILFunction *differential;
 
   /// The differential info.
   PullbackInfo differentialInfo;
@@ -3436,12 +3436,12 @@ public:
         differentialInfo(context, original, jvp, attr->getIndices()),
         invoker(invoker), activityInfo(getActivityInfo(
                               context, original, attr->getIndices(), jvp)) {
-    // Create empty tangent function.
-    tangent = createEmptyTangent();
-    context.getGeneratedFunctions().push_back(tangent);
+    // Create empty differential function.
+    differential = createEmptyDifferential();
+    context.getGeneratedFunctions().push_back(differential);
   }
 
-  SILFunction *createEmptyTangent() {
+  SILFunction *createEmptyDifferential() {
     auto &module = context.getModule();
     auto origTy = original->getLoweredFunctionType();
     auto lookupConformance = LookUpConformanceInModule(module.getSwiftModule());
@@ -3454,9 +3454,9 @@ public:
 
     // Given a type, returns its formal SIL parameter info.
     auto getTangentParameterInfoForOriginalResult = [&](
-        CanType tanType, ResultConvention origResConv) -> SILParameterInfo {
+        CanType diffType, ResultConvention origResConv) -> SILParameterInfo {
       auto &tl = context.getTypeConverter().getTypeLowering(
-          tanType, ResilienceExpansion::Minimal);
+          diffType, ResilienceExpansion::Minimal);
       ParameterConvention conv;
       switch (origResConv) {
       case ResultConvention::Owned:
@@ -3473,7 +3473,7 @@ public:
         conv = ParameterConvention::Indirect_In_Guaranteed;
         break;
       }
-      return {tanType, conv};
+      return {diffType, conv};
     };
 
     // Given a type, returns its formal SIL result info.
@@ -3508,14 +3508,14 @@ public:
     // - the original parameters.
     // Results of the tangent are in the tangent space of the result
     // parameters.
-    SmallVector<SILParameterInfo, 8> tanParams;
-    SmallVector<SILResultInfo, 8> adjResults;
+    SmallVector<SILParameterInfo, 8> diffParams;
+    SmallVector<SILResultInfo, 8> diffResults;
     auto origParams = origTy->getParameters();
     auto indices = attr->getIndices();
 
-    // Add tangent parameter for the seed.
+    // Add differential parameter for the seed.
     auto origResInfo = origTy->getResults()[indices.source];
-    tanParams.push_back(getTangentParameterInfoForOriginalResult(
+    diffParams.push_back(getTangentParameterInfoForOriginalResult(
         origResInfo.getType()
             ->getAutoDiffAssociatedTangentSpace(lookupConformance)
             ->getCanonicalType(), origResInfo.getConvention()));
@@ -3523,15 +3523,15 @@ public:
     // Accept a differential struct in the tangent parameter list. This is the
     // returned differential's closure context.
     auto *origExit = &*original->findReturnBB();
-    auto *pbStruct = differentialInfo.getPullbackStruct(origExit);
-    auto pbStructType = pbStruct->getDeclaredInterfaceType()
+    auto *diffStruct = differentialInfo.getPullbackStruct(origExit);
+    auto pbStructType = diffStruct->getDeclaredInterfaceType()
         ->getCanonicalType();
-    tanParams.push_back({pbStructType, ParameterConvention::Direct_Guaranteed});
+    diffParams.push_back({pbStructType, ParameterConvention::Direct_Guaranteed});
 
     // Add tangent results for the requested wrt parameters.
     for (auto i : indices.parameters->getIndices()) {
       auto origParam = origParams[i];
-      adjResults.push_back(getTangentResultInfoForOriginalParameter(
+      diffResults.push_back(getTangentResultInfoForOriginalParameter(
           origParam.getType()
               ->getAutoDiffAssociatedTangentSpace(lookupConformance)
               ->getCanonicalType(), origParam.getConvention()));
@@ -3547,7 +3547,7 @@ public:
         : nullptr;
     auto tanType = SILFunctionType::get(
         tanGenericSig, origTy->getExtInfo(), origTy->getCoroutineKind(),
-        origTy->getCalleeConvention(), tanParams, {}, adjResults, None,
+        origTy->getCalleeConvention(), diffParams, {}, diffResults, None,
         original->getASTContext());
 
     SILOptFunctionBuilder fb(context.getTransform());
@@ -3675,20 +3675,13 @@ public:
     SmallVector<SILValue, 8> origResults;
     extractAllElements(origResult, builder, origResults);
 
-    // Get and partially apply the tangent to get a pullback.
-    auto jvpGenericEnv = jvp->getGenericEnvironment();
-    auto jvpSubstMap = jvpGenericEnv
-        ? jvpGenericEnv->getForwardingSubstitutionMap()
-        : jvp->getForwardingSubstitutionMap();
-    auto *tangentRef = builder.createFunctionRef(loc, tangent);
-    auto *tangentPartialApply = builder.createPartialApply(
-        loc, tangentRef, jvpSubstMap, {pbStructVal},
-        ParameterConvention::Direct_Guaranteed);
-
-    // Return a tuple of the original result and differential.
+    // Return a tuple of the original result and an undef, which at some point
+    // will be the differential.
+    auto jvpConv = jvp->getConventions();
     SmallVector<SILValue, 8> directResults;
     directResults.append(origResults.begin(), origResults.end());
-    directResults.push_back(tangentPartialApply);
+    directResults.push_back(SILUndef::get(
+        jvp->mapTypeIntoContext(jvpConv.getSILResultType()),*jvp));
     builder.createReturn(
         ri->getLoc(), joinElements(directResults, builder, loc));
   }
@@ -6231,6 +6224,34 @@ bool VJPEmitter::run() {
   return errorOccurred;
 }
 
+bool JVPEmitter::run() {
+  LLVM_DEBUG(getADDebugStream()
+             << "Cloning original @" << original->getName()
+             << " to jvp @" << jvp->getName() << '\n');
+  // Create entry BB and arguments.
+  auto *entry = jvp->createBasicBlock();
+  createEntryArguments(jvp);
+
+  // Clone.
+  SmallVector<SILValue, 4> entryArgs(entry->getArguments().begin(),
+                                     entry->getArguments().end());
+  cloneFunctionBody(original, entry, entryArgs);
+  // If errors occurred, back out.
+  if (errorOccurred)
+    return true;
+
+  // TODO: generate undef
+  // Generate pullback code.
+//  PullbackEmitter PullbackEmitter(*this);
+//  if (PullbackEmitter.run()) {
+//    errorOccurred = true;
+//    return true;
+//  }
+  LLVM_DEBUG(getADDebugStream() << "Generated JVP for "
+             << original->getName() << ":\n" << *jvp);
+  return errorOccurred;
+}
+
 //===----------------------------------------------------------------------===//
 // `[differentiable]` attribute processing
 //===----------------------------------------------------------------------===//
@@ -6400,11 +6421,11 @@ bool ADContext::processDifferentiableAttribute(
       return true;
 
     jvp = createEmptyJVP(*this, original, attr, isAssocFnExported);
-//    getGeneratedFunctions().push_back(jvp);
-//    JVPEmitter emitter(*this, original, attr, jvp, invoker);
-//    if (emitter.run()) {
-//      return true;
-//    }
+    getGeneratedFunctions().push_back(jvp);
+    JVPEmitter emitter(*this, original, attr, jvp, invoker);
+    if (emitter.run()) {
+      return true;
+    }
   }
 
   // Try to look up VJP only if attribute specifies VJP name or if original
