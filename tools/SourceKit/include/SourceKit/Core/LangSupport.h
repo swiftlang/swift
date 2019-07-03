@@ -141,6 +141,7 @@ public:
 
   virtual void failed(StringRef ErrDescription) = 0;
 
+  virtual void setCompletionKind(UIdent kind) {};
   virtual bool handleResult(const CodeCompletionInfo &Info) = 0;
 };
 
