@@ -27,7 +27,7 @@
 #include "swift/SIL/TypeLowering.h"
 #include "swift/Subsystems.h"
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/Bitcode/BitstreamReader.h"
+#include "llvm/Bitstream/BitstreamReader.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/Option.h"
 #include "llvm/Support/FileSystem.h"
