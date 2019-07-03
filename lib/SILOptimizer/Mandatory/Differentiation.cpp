@@ -3393,10 +3393,6 @@ private:
 
   bool errorOccurred = false;
 
-  /// Mapping from original blocks to pullback values. Used to build pullback
-  /// struct instances.
-  DenseMap<SILBasicBlock *, SmallVector<SILValue, 8>> pullbackValues;
-
   ASTContext &getASTContext() const { return jvp->getASTContext(); }
   SILModule &getModule() const { return jvp->getModule(); }
   const SILAutoDiffIndices &getIndices() const { return attr->getIndices(); }
@@ -3474,12 +3470,12 @@ public:
     .getIdentifier("AD__" + original->getName().str() +
                    "__differential_" + indices.mangle())
     .str();
-    auto pbGenericSig = getAssociatedFunctionGenericSignature(attr, original);
-    auto *adjGenericEnv = pbGenericSig
-        ? pbGenericSig->createGenericEnvironment()
+    auto diffGenericSig = getAssociatedFunctionGenericSignature(attr, original);
+    auto *diffGenericEnv = diffGenericSig
+        ? diffGenericSig->createGenericEnvironment()
         : nullptr;
     auto diffType = SILFunctionType::get(
-        pbGenericSig, origTy->getExtInfo(), origTy->getCoroutineKind(),
+        diffGenericSig, origTy->getExtInfo(), origTy->getCoroutineKind(),
         origTy->getCalleeConvention(), diffParams, {}, diffResults, None,
         original->getASTContext());
 
@@ -3488,7 +3484,7 @@ public:
     // are never called cross-module.
     auto linkage = SILLinkage::Hidden;
     auto *differential = fb.createFunction(
-        linkage, diffName, diffType, adjGenericEnv, original->getLocation(),
+        linkage, diffName, diffType, diffGenericEnv, original->getLocation(),
         original->isBare(), IsNotTransparent, original->isSerialized(),
         original->isDynamicallyReplaceable());
     differential->setOwnershipEliminated();
@@ -3550,11 +3546,11 @@ public:
 
     // Return a tuple of the original result and an undef, which at some point
     // will be the differential.
-    auto jvpConv = jvp->getConventions();
     SmallVector<SILValue, 8> directResults;
     directResults.append(origResults.begin(), origResults.end());
-    directResults.push_back(SILUndef::get(
-        jvp->mapTypeIntoContext(jvpConv.getSILResultType()),*jvp));
+    directResults.push_back(
+        SILUndef::get(jvp->mapTypeIntoContext(differential->getLoweredType()),
+                      *differential));
     builder.createReturn(
         ri->getLoc(), joinElements(directResults, builder, loc));
   }
@@ -3760,7 +3756,6 @@ public:
     SILValue originalDirectResult = joinElements(originalDirectResults,
                                                  getBuilder(),
                                                  jvpCall->getLoc());
-    SILValue differential = jvpDirectResults.back();
 
     // Store the original result to the value map.
     mapValue(ai, originalDirectResult);
@@ -3770,7 +3765,6 @@ public:
         : nullptr;
     Lowering::GenericContextScope genericContextScope(
         context.getTypeConverter(), jvpGenSig);
-    pullbackValues[ai->getParent()].push_back(differential);
 
     // Some instructions that produce the callee may have been cloned.
     // If the original callee did not have any users beyond this `apply`,
@@ -6087,13 +6081,6 @@ bool JVPEmitter::run() {
   if (errorOccurred)
     return true;
 
-  // TODO: generate undef
-  // Generate pullback code.
-//  PullbackEmitter PullbackEmitter(*this);
-//  if (PullbackEmitter.run()) {
-//    errorOccurred = true;
-//    return true;
-//  }
   LLVM_DEBUG(getADDebugStream() << "Generated JVP for "
              << original->getName() << ":\n" << *jvp);
   return errorOccurred;
