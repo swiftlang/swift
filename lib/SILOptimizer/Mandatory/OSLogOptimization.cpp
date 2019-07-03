@@ -22,8 +22,10 @@
 /// arguments are packed. This pass is closely tied to the implementation of
 /// the log APIs.
 ///
-/// Pass Dependencies: MandatoryInlining. This pass also uses
-/// `ConstExprStepEvaluator` defined in `Utils/ConstExpr.cpp`.
+/// Pass Dependencies:  This pass depends on MandatoryInlining and Mandatory
+/// Linking happening before this pass and ConstantPropagation happening after
+/// this pass. This pass also uses `ConstExprStepEvaluator` defined in
+/// `Utils/ConstExpr.cpp`.
 ///
 /// Algorithm Overview:
 ///

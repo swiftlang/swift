@@ -809,6 +809,7 @@ throw MyError.A
 // CHECK-LABEL: define {{.*}}globalStringTablePointer
 // CHECK: call void @llvm.trap()
 // CHECK: ret i8* undef
+@_transparent
 func globalStringTablePointerUse(_ str: String) -> Builtin.RawPointer {
   return Builtin.globalStringTablePointer(str);
 }
