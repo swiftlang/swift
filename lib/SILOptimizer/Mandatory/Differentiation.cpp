@@ -6406,8 +6406,12 @@ void ADContext::foldAutoDiffFunctionExtraction(AutoDiffFunctionInst *source) {
     adfei->eraseFromParent();
   }
   // If the `autodiff_function` instruction has no remaining uses, erase it.
-  if (isInstructionTriviallyDead(source))
+  if (isInstructionTriviallyDead(source)) {
+    SILBuilder builder(source);
+    for (auto &assocFn : source->getAssociatedFunctions())
+      emitCleanup(builder, source->getLoc(), assocFn.get());
     source->eraseFromParent();
+  }
   // Mark `source` as processed so that it won't be reprocessed after deletion.
   processedAutoDiffFunctionInsts.insert(source);
 }
