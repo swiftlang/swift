@@ -5341,7 +5341,7 @@ void PullbackEmitter::emitCleanupForAdjointValue(AdjointValue value) {
 
 AdjointValue
 PullbackEmitter::accumulateAdjointsDirect(AdjointValue lhs,
-                                         AdjointValue rhs) {
+                                          AdjointValue rhs) {
   LLVM_DEBUG(getADDebugStream()
              << "Materializing adjoint directly.\nLHS: " << lhs
              << "\nRHS: " << rhs << '\n');
