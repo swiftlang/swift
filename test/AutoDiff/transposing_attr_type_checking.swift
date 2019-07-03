@@ -265,7 +265,7 @@ extension Float {
   // }
 }
 
-// Static method.
+// Static methods.
 struct A : Differentiable & AdditiveArithmetic {
   typealias TangentVector = A
   var x: Double
@@ -277,6 +277,40 @@ struct A : Differentiable & AdditiveArithmetic {
   @transposing(A.-, wrt: 0)
   func negationT(a: A.Type) -> A {
     return A(x: 1)
+  }
+}
+
+extension Float {
+  static func myMultiply(lhs: Float, rhs: Float) -> Float {
+    return lhs * rhs
+  }
+
+  @transposing(Float.myMultiply, wrt: 0)
+  @transposing(Float.myMultiply, wrt: 1)
+  func myMultiplyT(selfType: Float.Type, param: Float) -> Float {
+    return self + param
+  }
+
+  static func threeParamsStatic(_ x: Float, _ y: Double, _ z: Float) -> Double {
+    return Double(x + z) + y
+  }
+}
+
+extension Double {
+  @transposing(Float.threeParamsStatic, wrt: (0, 1, 2)) 
+  func threeParamsT12(staticSelf: Float.Type) -> (Float, Double, Float) {
+    return (Float(self), self, Float(self))
+  }
+
+  @transposing(Float.threeParamsStatic, wrt: (0, 2)) 
+  func threeParamsT12(staticSelf: Float.Type, _ y: Double) -> (Float, Float) {
+    let ret = Float(self + y)
+    return (ret, ret)
+  }
+
+  @transposing(Float.threeParamsStatic, wrt: 1) 
+  func threeParamsT12(staticSelf: Float.Type, _ x: Float, _ z: Float) -> Double {
+    return self + Double(x + z)
   }
 }
 
