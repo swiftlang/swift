@@ -70,6 +70,11 @@ def get_api_digester_path(tool_path):
     return check_output(['xcrun', '--find', 'swift-api-digester'])
 
 
+def create_directory(path):
+    if not os.path.isdir(path):
+        os.makedirs(path)
+
+
 class DumpConfig:
     def __init__(self, tool_path, platform):
         target_map = {
@@ -87,8 +92,8 @@ class DumpConfig:
             os.path.realpath(self.sdk + '/../../Library/Frameworks/')]
 
     def run(self, output, module, swift_ver, opts, verbose,
-            swift_frameworks_only):
-        cmd = [self.tool_path, '-o', output, '-sdk', self.sdk, '-target',
+            swift_frameworks_only, separate_by_module):
+        cmd = [self.tool_path, '-sdk', self.sdk, '-target',
                self.target, '-dump-sdk', '-module-cache-path',
                '/tmp/ModuleCache', '-swift-version',
                swift_ver, '-abort-on-module-fail']
@@ -99,13 +104,28 @@ class DumpConfig:
             cmd.extend(['-v'])
         if module:
             cmd.extend(['-module', module])
+            cmd.extend(['-o', output])
             check_call(cmd, verbose=verbose)
         else:
             with tempfile.NamedTemporaryFile() as tmp:
                 prepare_module_list(self.platform, tmp, verbose,
                                     swift_frameworks_only)
-                cmd.extend(['-module-list-file', tmp.name])
-                check_call(cmd, verbose=verbose)
+                if separate_by_module:
+                    tmp.seek(0)
+                    create_directory(output)
+                    for module in [name.strip() for name in tmp.readlines()]:
+                        dir_path = os.path.realpath(output + '/' + module)
+                        file_path = os.path.realpath(dir_path + '/' +
+                                                     self.platform + '.json')
+                        create_directory(dir_path)
+                        current_cmd = list(cmd)
+                        current_cmd.extend(['-module', module])
+                        current_cmd.extend(['-o', file_path])
+                        check_call(current_cmd, verbose=verbose)
+                else:
+                    cmd.extend(['-o', output])
+                    cmd.extend(['-module-list-file', tmp.name])
+                    check_call(cmd, verbose=verbose)
 
 
 class DiagnoseConfig:
@@ -181,6 +201,10 @@ A convenient wrapper for swift-api-digester.
         Path to the json file generated after change
         ''')
 
+    basic_group.add_argument('--separate-by-module',
+                             action='store_true',
+                             help='When importing entire SDK, dump content '
+                                  'seprately by module names')
     args = parser.parse_args(sys.argv[1:])
     if args.action == 'dump':
         if not args.target:
@@ -191,7 +215,8 @@ A convenient wrapper for swift-api-digester.
         runner.run(output=args.output, module=args.module,
                    swift_ver=args.swift_version, opts=args.opts,
                    verbose=args.v,
-                   swift_frameworks_only=args.swift_frameworks_only)
+                   swift_frameworks_only=args.swift_frameworks_only,
+                   separate_by_module=args.separate_by_module)
     elif args.action == 'diagnose':
         if not args.dump_before:
             fatal_error("Need to specify --dump-before")
