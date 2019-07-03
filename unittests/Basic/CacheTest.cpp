@@ -50,6 +50,43 @@ struct CacheValueInfo<Counter>{
 }
 
 namespace {
+struct KeyCounter {
+  int key = 0;
+  mutable int enter = 0;
+  mutable int exit = 0;
+};
+}
+
+namespace swift {
+namespace sys {
+template <>
+struct CacheKeyInfo<KeyCounter> {
+  static uintptr_t getHashValue(const KeyCounter &value) {
+    return llvm::DenseMapInfo<int>::getHashValue(value.key);
+  }
+  static bool isEqual(void *lhs, void *rhs) {
+    return static_cast<KeyCounter *>(lhs)->key ==
+        static_cast<KeyCounter *>(rhs)->key;
+  }
+  static void *enterCache(const KeyCounter &value) {
+    value.enter += 1;
+    return const_cast<KeyCounter *>(&value);
+  }
+  static void exitCache(void *value) {
+    static_cast<KeyCounter *>(value)->exit += 1;
+  }
+  static const void *getLookupKey(const KeyCounter *value) {
+    return value;
+  }
+  static const KeyCounter &getFromCache(void *value) {
+    return *static_cast<KeyCounter *>(value);
+  }
+};
+}
+}
+
+
+namespace {
 struct RefCntToken : llvm::RefCountedBase<RefCntToken> {
   bool &freed;
   RefCntToken(bool &freed) : freed(freed) {}
@@ -113,6 +150,18 @@ TEST(Cache, sameKeyValue) {
   cache.remove("a");
   EXPECT_EQ(1, c.enter);
   EXPECT_EQ(1, c.exit);
+}
+
+TEST(Cache, sameKeyValueDestroysKey) {
+  swift::sys::Cache<KeyCounter, Counter> cache(__func__);
+  KeyCounter k1, k2;
+  Counter c;
+  cache.set(k1, c);
+  cache.set(k2, c);
+  EXPECT_EQ(1, k1.enter);
+  EXPECT_EQ(1, k1.exit);
+  EXPECT_EQ(1, k2.enter);
+  EXPECT_EQ(0, k2.exit);
 }
 
 TEST(Cache, sameKeyIntrusiveRefCountPter) {
