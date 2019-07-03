@@ -1033,7 +1033,12 @@ void IRGenModule::addLinkLibrary(const LinkLibrary &linkLib) {
   }
   }
 
-  if (linkLib.shouldForceLoad()) {
+  // Don't emit the FORCE_LOAD symbols when the compiler is running
+  // on behalf of the debugger.  The debugger will read the LinkLibrary's
+  // from all the modules it sees, and hand load all the required dependencies,
+  // and since the symbol is weak it doesn't even tell us whether a
+  // required dependency is missing. So it serves no purpose in this case.
+  if (linkLib.shouldForceLoad() && !Context.LangOpts.DebuggerSupport) {
     llvm::SmallString<64> buf;
     encodeForceLoadSymbolName(buf, linkLib.getName());
     auto ForceImportThunk =
