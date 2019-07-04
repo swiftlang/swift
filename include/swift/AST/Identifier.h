@@ -264,6 +264,8 @@ public:
 
   bool isSpecial() const { return getKind() != Kind::Normal; }
 
+  bool isSubscript() const { return getKind() == Kind::Subscript; }
+
   /// Return the identifier backing the name. Assumes that the name is not
   /// special.
   Identifier getIdentifier() const {

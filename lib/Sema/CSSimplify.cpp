@@ -3973,6 +3973,19 @@ bool swift::hasDynamicMemberLookupAttribute(Type type) {
   return ::hasDynamicMemberLookupAttribute(type, DynamicMemberLookupCache);
 }
 
+static bool isForKeyPathSubscript(ConstraintSystem &cs,
+                                  ConstraintLocator *locator) {
+  if (!locator || !locator->getAnchor())
+    return false;
+
+  if (auto *SE = dyn_cast<SubscriptExpr>(locator->getAnchor())) {
+    auto *indexExpr = dyn_cast<TupleExpr>(SE->getIndex());
+    return indexExpr && indexExpr->getNumElements() == 1 &&
+           indexExpr->getElementName(0) == cs.getASTContext().Id_keyPath;
+  }
+  return false;
+}
+
 /// Given a ValueMember, UnresolvedValueMember, or TypeMember constraint,
 /// perform a lookup into the specified base type to find a candidate list.
 /// The list returned includes the viable candidates as well as the unviable
@@ -4004,14 +4017,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
   MemberLookupResult result;
   result.OverallResult = MemberLookupResult::HasResults;
 
-  // If we're looking for a subscript, consider key path operations.
-  //
-  // TODO: This logic needs to be refactored to make sure that implicit
-  // keypath result is only introduced when it makes sense e.g. if there
-  // is a single argument with `keypath:` label or `\.` syntax is used.
-  if (memberName.isSimpleName() &&
-      memberName.getBaseName().getKind() == DeclBaseName::Kind::Subscript &&
-      !(memberLocator && memberLocator->isForKeyPathDynamicMemberLookup())) {
+  if (isForKeyPathSubscript(*this, memberLocator)) {
     if (baseTy->isAnyObject()) {
       result.addUnviable(
           OverloadChoice(baseTy, OverloadChoiceKind::KeyPathApplication),
@@ -4756,17 +4762,21 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
       performMemberLookup(kind, member, baseTy, functionRefKind, locator,
                           /*includeInaccessibleMembers*/ shouldAttemptFixes());
 
-  switch (result.OverallResult) {
-  case MemberLookupResult::Unsolved:
+  auto formUnsolved = [&] {
     // If requested, generate a constraint.
     if (flags.contains(TMF_GenerateConstraints)) {
-      addUnsolvedConstraint(
-        Constraint::createMemberOrOuterDisjunction(*this, kind, baseTy, memberTy, member, useDC,
-                                                   functionRefKind, outerAlternatives, locator));
+      addUnsolvedConstraint(Constraint::createMemberOrOuterDisjunction(
+          *this, kind, baseTy, memberTy, member, useDC, functionRefKind,
+          outerAlternatives, locator));
       return SolutionKind::Solved;
     }
 
     return SolutionKind::Unsolved;
+  };
+
+  switch (result.OverallResult) {
+  case MemberLookupResult::Unsolved:
+    return formUnsolved();
 
   case MemberLookupResult::ErrorAlreadyDiagnosed:
     return SolutionKind::Error;
@@ -4779,6 +4789,18 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
   SmallVector<Constraint *, 4> candidates;
   // If we found viable candidates, then we're done!
   if (!result.ViableCandidates.empty()) {
+    // If only possible choice to refer to member is via keypath
+    // dynamic member dispatch, let's delay solving this constraint
+    // until constraint generation phase is complete, because
+    // subscript dispatch relies on presence of function application.
+    if (result.ViableCandidates.size() == 1) {
+      auto &choice = result.ViableCandidates.front();
+      if (!solverState && choice.isKeyPathDynamicMemberLookup() &&
+          member.getBaseName().isSubscript()) {
+        return formUnsolved();
+      }
+    }
+
     generateConstraints(
         candidates, memberTy, result.ViableCandidates, useDC, locator,
         result.getFavoredIndex(), /*requiresFix=*/false,
@@ -5855,7 +5877,11 @@ retry_after_fail:
     }
 
     // FIXME: Could also rewrite fnType to include this result type.
-    addConstraint(ConstraintKind::Bind, argFnType->getResult(),
+    // Introduction of `Bind` constraint here could result in the disconnect
+    // in the constraint system with unintended consequences because e.g.
+    // in case of key path application it could disconnect one of the
+    // components like subscript from the rest of the context.
+    addConstraint(ConstraintKind::Equal, argFnType->getResult(),
                   commonResultType, locator);
   }
 
