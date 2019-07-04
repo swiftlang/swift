@@ -6521,6 +6521,12 @@ static bool requiresNewVTableEntry(const AbstractFunctionDecl *decl) {
   auto overrideInterfaceTy = selfInterfaceTy->adjustSuperclassMemberDeclType(
       base, decl, baseInterfaceTy);
 
+  if (!base->getGenericSignature()
+           ->requirementsNotSatisfiedBy(decl->getGenericSignature())
+           .empty()) {
+    return true;
+  }
+
   return !derivedInterfaceTy->matches(overrideInterfaceTy,
                                       TypeMatchFlags::AllowABICompatible);
 }
