@@ -109,6 +109,13 @@ static bool isWithoutDerivative(SILValue v) {
   return false;
 }
 
+static ApplyInst *getAllocateUninitializedArrayIntrinsic(SILValue v) {
+  if (auto *applyInst = dyn_cast<ApplyInst>(v))
+    if (applyInst->hasSemantics("array.uninitialized_intrinsic"))
+      return applyInst;
+  return nullptr;
+}
+
 /// Given a function, gather all of its formal results (both direct and
 /// indirect) in an order defined by its result type. Note that "formal results"
 /// refer to result values in the body of the function, not at call sites.
@@ -1357,7 +1364,11 @@ private:
   void analyze(DominanceInfo *di, PostDominanceInfo *pdi);
 
   void setVaried(SILValue value, unsigned independentVariableIndex);
+  void setVariedAcrossArrayInitialization(SILValue value,
+                                          unsigned independentVariableIndex);
   void setUseful(SILValue value, unsigned dependentVariableIndex);
+  void setUsefulAcrossArrayInitialization(SILValue value,
+                                          unsigned dependentVariableIndex);
   void recursivelySetVaried(SILValue value, unsigned independentVariableIndex);
   void propagateUsefulThroughBuffer(SILValue value,
                                     unsigned dependentVariableIndex);
@@ -1629,22 +1640,66 @@ void DifferentiableActivityInfo::analyze(DominanceInfo *di,
   }
 }
 
+void DifferentiableActivityInfo::setVariedAcrossArrayInitialization(
+    SILValue value, unsigned independentVariableIndex) {
+  auto uai = getAllocateUninitializedArrayIntrinsic(value);
+  if (!uai) return;
+  for (auto use : value->getUses())
+    if (auto tei = dyn_cast<TupleExtractInst>(use->getUser()->getResult(0)))
+      // The first tuple field of the intrinsic's return value is the array.
+      if (tei->getFieldNo() == 0)
+        setVaried(tei->getResult(0), independentVariableIndex);
+}
+
+void DifferentiableActivityInfo::setUsefulAcrossArrayInitialization(
+    SILValue value, unsigned dependentVariableIndex) {
+  // Array initializer syntax is lowered to an intrinsic and one or more
+  // stores to a `RawPointer` returned by the intrinsic.
+  auto uai = getAllocateUninitializedArrayIntrinsic(value);
+  if (!uai) return;
+  for (auto use : value->getUses()) {
+    auto tei = dyn_cast<TupleExtractInst>(use->getUser()->getResult(0));
+    if (!tei || tei->getFieldNo() != 1) continue;
+    // The second tuple field of the return value is the `RawPointer`.
+    for (auto use : tei->getUses()) {
+      // The `RawPointer` passes through a `pointer_to_address`. That
+      // instruction's first use is a `store` whose src is useful; its
+      // subsequent uses are `index_addr`s whose only use is a useful `store`.
+      for (auto use : use->getUser()->getResult(0)->getUses()) {
+        auto inst = use->getUser();
+        if (auto si = dyn_cast<StoreInst>(inst)) {
+          setUseful(si->getSrc(), dependentVariableIndex);
+        } else if (auto iai = dyn_cast<IndexAddrInst>(inst)) {
+          for (auto use : iai->getUses())
+            if (auto si = dyn_cast<StoreInst>(use->getUser()))
+              setUseful(si->getSrc(), dependentVariableIndex);
+        }
+      }
+    }
+  }
+}
+
 void DifferentiableActivityInfo::setVaried(SILValue value,
                                            unsigned independentVariableIndex) {
   variedValueSets[independentVariableIndex].insert(value);
+  setVariedAcrossArrayInitialization(value, independentVariableIndex);
 }
 
 void DifferentiableActivityInfo::setUseful(SILValue value,
                                            unsigned dependentVariableIndex) {
   usefulValueSets[dependentVariableIndex].insert(value);
+  setUsefulAcrossArrayInitialization(value, dependentVariableIndex);
 }
 
 void DifferentiableActivityInfo::recursivelySetVaried(
     SILValue value, unsigned independentVariableIndex) {
   setVaried(value, independentVariableIndex);
-  if (auto *inst = value->getDefiningInstruction())
+  if (auto *inst = value->getDefiningInstruction()) {
+    if (auto *ai = dyn_cast<ApplyInst>(inst))
+      return;
     for (auto &op : inst->getAllOperands())
       recursivelySetVaried(op.get(), independentVariableIndex);
+  }
 }
 
 void DifferentiableActivityInfo::propagateUsefulThroughBuffer(
@@ -4584,7 +4639,149 @@ public:
     errorOccurred = true;
   }
 
+  AllocStackInst *emitDifferentiableViewSubscript(
+      ApplyInst *ai, SILType elType, SILValue adjointArray, SILValue fnRef,
+      CanGenericSignature genericSig, int index) {
+    auto &ctx = builder.getASTContext();
+    auto astType = elType.getASTType();
+    auto literal = builder.createIntegerLiteral(
+        ai->getLoc(), SILType::getBuiltinIntegerType(64, ctx), index);
+    auto intType = SILType::getPrimitiveObjectType(
+        ctx.getIntDecl()->getDeclaredType()->getCanonicalType());
+    auto intStruct = builder.createStruct(
+        ai->getLoc(), intType, {literal});
+    AllocStackInst *subscriptBuffer = builder.createAllocStack(
+        ai->getLoc(), elType);
+    auto swiftModule = getModule().getSwiftModule();
+    auto diffProto =  ctx.getProtocol(KnownProtocolKind::Differentiable);
+    auto diffConf = swiftModule->lookupConformance(
+        astType, diffProto);
+    assert(diffConf.hasValue() && "Missing conformance to `Differentiable`");
+    auto addArithProto = ctx.getProtocol(KnownProtocolKind::AdditiveArithmetic);
+    auto addArithConf = swiftModule->lookupConformance(
+        astType, addArithProto);
+    assert(addArithConf.hasValue() &&
+           "Missing conformance to `AdditiveArithmetic`");
+    auto subMap = SubstitutionMap::get(
+        genericSig, {astType},
+        {*addArithConf, *diffConf});
+    auto subscriptApply = builder.createApply(
+        ai->getLoc(), fnRef, subMap,
+        {subscriptBuffer, intStruct, adjointArray});
+    return subscriptBuffer;
+  }
+
+  void accumulateDifferentiableViewSubscriptDirect(
+      ApplyInst *ai, SILType elType, StoreInst *si,
+      AllocStackInst *subscriptBuffer) {
+    auto astType = elType.getASTType();
+    auto newAdjValue = builder.createLoad(
+        ai->getLoc(), subscriptBuffer, getBufferLOQ(astType, getPullback()));
+    addAdjointValue(
+        si->getParent(), si->getSrc(),
+        makeConcreteAdjointValue(ValueWithCleanup(
+                newAdjValue, makeCleanup(newAdjValue, emitCleanup))));
+    builder.createDeallocStack(
+        ai->getLoc(), subscriptBuffer);
+  }
+
+  void accumulateDifferentiableViewSubscriptIndirect(
+      ApplyInst *ai, CopyAddrInst *cai, AllocStackInst *subscriptBuffer) {
+    auto subscriptBufferAccess = builder.createBeginAccess(
+        ai->getLoc(), subscriptBuffer, SILAccessKind::Read,
+        SILAccessEnforcement::Static, /*noNestedConflict*/ true,
+        /*fromBuiltin*/ false);
+    addToAdjointBuffer(
+        cai->getParent(), cai->getSrc(), subscriptBufferAccess);
+    builder.createEndAccess(
+        ai->getLoc(), subscriptBufferAccess, /*aborted*/ false);
+    builder.createDeallocStack(ai->getLoc(), subscriptBuffer);
+  }
+
+  void visitArrayInitialization(ApplyInst *ai) {
+    SILValue adjointArray;
+    SILValue fnRef;
+    CanGenericSignature genericSig;
+    auto lookupConformance = LookUpConformanceInModule(
+        getModule().getSwiftModule());
+    for (auto use : ai->getUses()) {
+      auto tei = dyn_cast<TupleExtractInst>(use->getUser()->getResult(0));
+      if (!tei || tei->getFieldNo() != 0) continue;
+      // The first tuple field of the return value is the `Array`.
+      adjointArray = getAdjointValue(
+          ai->getParent(), tei).getConcreteValue().getValue();
+      assert(adjointArray && "Array does not have adjoint value");
+      auto astType = adjointArray->getType().getASTType();
+      auto typeDecl = astType->getStructOrBoundGenericStruct();
+      auto subscriptDecl = cast<SubscriptDecl>(typeDecl->lookupDirect(
+          DeclBaseName::createSubscript()).front());
+      auto subscriptGet = subscriptDecl->getAccessor(AccessorKind::Get);
+      SILDeclRef subscriptRef(subscriptGet, SILDeclRef::Kind::Func);
+      auto fnBuilder = SILOptFunctionBuilder(getContext().getTransform());
+      auto fn = fnBuilder.getOrCreateFunction(
+          ai->getLoc(), subscriptRef, NotForDefinition);
+      genericSig = fn->getLoweredFunctionType()->getGenericSignature();
+      assert(genericSig && "No generic signature");
+      fnRef = builder.createFunctionRef(ai->getLoc(), fn);
+      assert(fnRef && "cannot create function_ref");
+    }
+    // Two loops because the tuple_extract instructions can be reached in
+    // either order.
+    for (auto use : ai->getUses()) {
+      auto tei = dyn_cast<TupleExtractInst>(use->getUser()->getResult(0));
+      if (!tei || tei->getFieldNo() != 1) continue;
+      // The second tuple field is the `RawPointer`.
+      for (auto use : tei->getUses()) {
+        // The `RawPointer` passes through a `pointer_to_address`. That
+        // instruction's first use is a `store` whose src is useful; its
+        // subsequent uses are `index_addr`s whose only use is a useful
+        // `store`. In the indirect case, each `store` is instead a
+        // `copy_addr`.
+        for (auto use : use->getUser()->getResult(0)->getUses()) {
+          auto inst = use->getUser();
+          if (auto si = dyn_cast<StoreInst>(inst)) {
+            auto tanType = getRemappedTangentType(si->getSrc()->getType());
+            auto subscriptBuffer = emitDifferentiableViewSubscript(
+                ai, tanType, adjointArray, fnRef, genericSig, 0);
+            accumulateDifferentiableViewSubscriptDirect(
+                ai, tanType, si, subscriptBuffer);
+          } else if (auto cai = dyn_cast<CopyAddrInst>(inst)) {
+            auto tanType = getRemappedTangentType(cai->getSrc()->getType());
+            auto subscriptBuffer = emitDifferentiableViewSubscript(
+                ai, tanType, adjointArray, fnRef, genericSig, 0);
+            accumulateDifferentiableViewSubscriptIndirect(
+                ai, cai, subscriptBuffer);
+          } else if (auto iai = dyn_cast<IndexAddrInst>(inst)) {
+            for (auto use : iai->getUses()) {
+              if (auto si = dyn_cast<StoreInst>(use->getUser())) {
+                auto literal = dyn_cast<IntegerLiteralInst>(iai->getIndex());
+                auto tanType = getRemappedTangentType(
+                    si->getSrc()->getType());
+                auto subscriptBuffer = emitDifferentiableViewSubscript(
+                    ai, tanType, adjointArray, fnRef,
+                    genericSig, literal->getValue().getLimitedValue());
+                accumulateDifferentiableViewSubscriptDirect(
+                    ai, tanType, si, subscriptBuffer);
+              } else if (auto cai = dyn_cast<CopyAddrInst>(use->getUser())) {
+                auto literal = dyn_cast<IntegerLiteralInst>(iai->getIndex());
+                auto tanType = getRemappedTangentType(
+                    cai->getSrc()->getType());
+                auto subscriptBuffer = emitDifferentiableViewSubscript(
+                    ai, tanType, adjointArray, fnRef,
+                    genericSig, literal->getValue().getLimitedValue());
+                accumulateDifferentiableViewSubscriptIndirect(
+                    ai, cai, subscriptBuffer);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
   void visitApplyInst(ApplyInst *ai) {
+    if (ai->hasSemantics("array.uninitialized_intrinsic"))
+      return visitArrayInitialization(ai);
     // Replace a call to a function with a call to its pullback.
     auto &nestedApplyInfo = getContext().getNestedApplyInfo();
     auto applyInfoLookup = nestedApplyInfo.find(ai);
