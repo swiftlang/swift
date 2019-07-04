@@ -1009,6 +1009,15 @@ llvm::SmallString<32> getTargetDependentLibraryOption(const llvm::Triple &T,
 void IRGenModule::addLinkLibrary(const LinkLibrary &linkLib) {
   llvm::LLVMContext &ctx = Module.getContext();
 
+  // Don't emit the FORCE_LOAD symbols and metadata when the compiler is 
+  // running on behalf of the debugger.  The debugger will read the LinkLibrary's
+  // from all the modules it sees, and hand load all the required dependencies.
+  // so it doesn't need this information.  And since the FORCE_LOAD symbol is
+  // weak it doesn't even tell us whether a required dependency is missing.
+  // So it serves no purpose in this case.
+  if (!Context.LangOpts.DebuggerSupport)
+    return;
+  
   switch (linkLib.getKind()) {
   case LibraryKind::Library: {
     llvm::SmallString<32> opt =
@@ -1033,12 +1042,7 @@ void IRGenModule::addLinkLibrary(const LinkLibrary &linkLib) {
   }
   }
 
-  // Don't emit the FORCE_LOAD symbols when the compiler is running
-  // on behalf of the debugger.  The debugger will read the LinkLibrary's
-  // from all the modules it sees, and hand load all the required dependencies,
-  // and since the symbol is weak it doesn't even tell us whether a
-  // required dependency is missing. So it serves no purpose in this case.
-  if (linkLib.shouldForceLoad() && !Context.LangOpts.DebuggerSupport) {
+  if (linkLib.shouldForceLoad()) {
     llvm::SmallString<64> buf;
     encodeForceLoadSymbolName(buf, linkLib.getName());
     auto ForceImportThunk =

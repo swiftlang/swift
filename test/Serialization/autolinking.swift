@@ -15,8 +15,7 @@
 // RUN: %FileCheck %s < %t/force-load.txt
 // RUN: %FileCheck -check-prefix FORCE-LOAD-CLIENT -check-prefix FORCE-LOAD-CLIENT-%target-object-format %s < %t/force-load.txt
 
-// RUN: %target-swift-frontend -runtime-compatibility-version none -emit-ir -debugger-support -lmagic %s -I %t > %t/force-load.txt
-// RUN: %FileCheck %s < %t/force-load.txt
+// RUN: %target-swift-frontend -runtime-compatibility-version none -emit-ir -debugger-support %s -I %t > %t/force-load.txt
 // RUN: %FileCheck -check-prefix NO-FORCE-LOAD-CLIENT %s < %t/force-load.txt
 
 // RUN: %target-swift-frontend -disable-autolinking-runtime-compatibility-dynamic-replacements -runtime-compatibility-version none -emit-ir -parse-stdlib -module-name someModule -module-link-name module %S/../Inputs/empty.swift | %FileCheck --check-prefix=NO-FORCE-LOAD %s
@@ -39,6 +38,8 @@ import someModule
 // FRAMEWORK-DAG: !{{[0-9]+}} = !{!"-framework", !"someModule"}
 
 // NO-FORCE-LOAD-NOT: FORCE_LOAD
+// NO-FORCE-LOAD-NOT -lmodule
+// NO-FORCE-LOAD-NOT -lmagic
 // FORCE-LOAD: define{{( dllexport)?}} void @"_swift_FORCE_LOAD_$_module"() {
 // FORCE-LOAD:   ret void
 // FORCE-LOAD: }
