@@ -78,7 +78,11 @@ static void *loadRuntimeLib(StringRef sharedLibName,
 
 void *swift::immediate::loadSwiftRuntime(ArrayRef<std::string>
                                          runtimeLibPaths) {
+#if defined(_WIN32)
+  return loadRuntimeLib("swiftCore" LTDL_SHLIB_EXT, runtimeLibPaths);
+#else
   return loadRuntimeLib("libswiftCore" LTDL_SHLIB_EXT, runtimeLibPaths);
+#endif
 }
 
 static bool tryLoadLibrary(LinkLibrary linkLib,
