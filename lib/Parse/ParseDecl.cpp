@@ -3002,15 +3002,25 @@ Parser::parseDecl(ParseDeclOptions Flags,
       // Must not confuse it with trailing closure syntax, so we only
       // recover in contexts where there can be no statements.
 
-      if ((Tok.isIdentifierOrUnderscore() &&
-           peekToken().isAny(tok::colon, tok::equal, tok::comma)) ||
-          Tok.is(tok::l_paren)) {
+      const bool IsProbablyVarDecl =
+          Tok.isIdentifierOrUnderscore() &&
+          peekToken().isAny(tok::colon, tok::equal, tok::comma);
+
+      const bool IsProbablyTupleDecl =
+          Tok.is(tok::l_paren) && peekToken().isIdentifierOrUnderscore();
+
+      if (IsProbablyVarDecl || IsProbablyTupleDecl) {
         diagnose(Tok.getLoc(), diag::expected_keyword_in_decl, "var",
                  "property")
             .fixItInsert(Tok.getLoc(), "var ");
         parseLetOrVar(/*HasLetOrVarKeyword=*/false);
         break;
-      } else if (Tok.isIdentifierOrUnderscore() || Tok.isAnyOperator()) {
+      }
+
+      const bool IsProbablyFuncDecl =
+          Tok.isIdentifierOrUnderscore() || Tok.isAnyOperator();
+
+      if (IsProbablyFuncDecl) {
         diagnose(Tok.getLoc(), diag::expected_keyword_in_decl, "func",
                  "function")
             .fixItInsert(Tok.getLoc(), "func ");

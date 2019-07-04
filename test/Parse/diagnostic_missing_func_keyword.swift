@@ -36,7 +36,7 @@ struct Bar {
   _: Int = 42 // expected-error {{expected 'var' keyword in property declaration}} {{3-3=var }}
               // expected-error @-1 {{property declaration does not bind any variables}}
 
-  ((x, y), z) = ((1, 2), 3) // expected-error {{expected 'var' keyword in property declaration}}
-
+  (light, dark) = (100, 200)// expected-error {{expected 'var' keyword in property declaration}} {{3-3=var }}
+  
   a, b: Int // expected-error {{expected 'var' keyword in property declaration}} {{3-3=var }}
 }
