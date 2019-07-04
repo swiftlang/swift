@@ -4057,12 +4057,14 @@ CallEmission::applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
     return firstLevelResult;
   }
 
-  // Builtins.
+  // Named Builtins.
   assert(specializedEmitter.isNamedBuiltin());
   auto builtinName = specializedEmitter.getBuiltinName();
   SmallVector<SILValue, 4> consumedArgs;
   for (auto arg : uncurriedArgs) {
-    // Builtins have a special convention that takes everything at +1.
+    // Named builtins are by default assumed to take all arguments at +1 i.e.,
+    // as Owned or Trivial. Named builtins that don't follow this convention
+    // must use a specialized emitter.
     auto maybePlusOne = arg.ensurePlusOne(SGF, uncurriedLoc.getValue());
     consumedArgs.push_back(maybePlusOne.forward(SGF));
   }

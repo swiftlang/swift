@@ -114,6 +114,13 @@ static void addMandatoryOptPipeline(SILPassPipelinePlan &P) {
   // SSA based diagnostics.
   P.addPredictableMemoryAccessOptimizations();
 
+  // This phase performs optimizations necessary for correct interoperation of
+  // Swift os log APIs with C os_log ABIs.
+  // Pass dependencies: this pass depends on MandatoryInlining and Mandatory
+  // Linking happening before this pass and ConstantPropagation happening after
+  // this pass.
+  P.addOSLogOptimization();
+
   // Diagnostic ConstantPropagation must be rerun on deserialized functions
   // because it is sensitive to the assert configuration.
   // Consequently, certain optimization passes beyond this point will also rerun.
@@ -128,10 +135,6 @@ static void addMandatoryOptPipeline(SILPassPipelinePlan &P) {
   P.addDiagnoseInfiniteRecursion();
   P.addYieldOnceCheck();
   P.addEmitDFDiagnostics();
-
-  // This phase performs optimizations necessary for correct interoperation of
-  // Swift os log APIs with C os_log ABIs.
-  P.addOSLogOptimization();
 
   // Canonical swift requires all non cond_br critical edges to be split.
   P.addSplitNonCondBrCriticalEdges();

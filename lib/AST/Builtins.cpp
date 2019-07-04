@@ -951,6 +951,13 @@ static ValueDecl *getGetObjCTypeEncodingOperation(ASTContext &Context,
   return builder.build(Id);
 }
 
+static ValueDecl *getGlobalStringTablePointer(ASTContext &Context,
+                                              Identifier Id) {
+  // String -> Builtin.RawPointer
+  auto stringType = NominalType::get(Context.getStringDecl(), Type(), Context);
+  return getBuiltinFunction(Id, {stringType}, Context.TheRawPointerType);
+}
+
 static ValueDecl *getPoundAssert(ASTContext &Context, Identifier Id) {
   auto int1Type = BuiltinIntegerType::get(1, Context);
   auto optionalRawPointerType = BoundGenericEnumType::get(
@@ -1959,6 +1966,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::GetObjCTypeEncoding:
     return getGetObjCTypeEncodingOperation(Context, Id);
+
+  case BuiltinValueKind::GlobalStringTablePointer:
+    return getGlobalStringTablePointer(Context, Id);
 
   case BuiltinValueKind::PoundAssert:
     return getPoundAssert(Context, Id);

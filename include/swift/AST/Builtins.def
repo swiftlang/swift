@@ -551,6 +551,20 @@ BUILTIN_MISC_OPERATION(WillThrow, "willThrow", "", Special)
 /// poundAssert has type (Builtin.Int1, Builtin.RawPointer) -> ().
 BUILTIN_MISC_OPERATION(PoundAssert, "poundAssert", "", Special)
 
+// BUILTIN_MISC_OPERATION_WITH_SILGEN - Miscellaneous operations that are
+// specially emitted during SIL generation.
+#ifndef BUILTIN_MISC_OPERATION_WITH_SILGEN
+#define BUILTIN_MISC_OPERATION_WITH_SILGEN(Id, Name, Attrs, Overload) \
+  BUILTIN_MISC_OPERATION(Id, Name, Attrs, Overload)
+#endif
+
+/// globalStringTablePointer has type String -> Builtin.RawPointer.
+/// It returns an immortal, global string table pointer for strings constructed
+/// from string literals.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(GlobalStringTablePointer, "globalStringTablePointer", "", Special)
+
+#undef BUILTIN_MISC_OPERATION_WITH_SILGEN
+
 #undef BUILTIN_MISC_OPERATION
 
 /// Builtins for instrumentation added by sanitizers during SILGen.

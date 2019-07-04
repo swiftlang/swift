@@ -484,7 +484,7 @@ NOTE(switch_value_case_doesnt_yield, none, "missing yield in the %0 case",
 NOTE(try_branch_doesnt_yield, none, "missing yield when error is "
      "%select{not |}0thrown", (bool))
 
-// OS log optimization dianostics.
+// OS log optimization diagnostics.
 
 ERROR(oslog_message_argument_not_found, none, "no argument of type %0 in "
   " the os log call", (Identifier))
@@ -504,6 +504,9 @@ ERROR(oslog_non_constant_interpolation, none, "'OSLogInterpolation' struct is "
 
 ERROR(oslog_property_not_constant, none, "'OSLogInterpolation.%0' is not a "
       "constant: formatting and privacy options must be literals", (StringRef))
+
+ERROR(global_string_pointer_on_non_constant, none, "globalStringTablePointer "
+      "builtin must used only on string literals", ())
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

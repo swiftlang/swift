@@ -1057,6 +1057,16 @@ CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, Swift3ImplicitObjCEntrypoint)
 CONSTANT_OWNERSHIP_BUILTIN(Any, MustBeLive, PoundAssert)
 #undef CONSTANT_OWNERSHIP_BUILTIN
 
+// CONSTANT_OWNERSHIP_BUILTIN(Owned, MustBeLive, GlobalStringTablePointer)
+
+OperandOwnershipKindMap
+OperandOwnershipKindBuiltinClassifier::visitGlobalStringTablePointer(
+    BuiltinInst *bi, StringRef attr) {
+  return Map::compatibilityMap(
+      {{ValueOwnershipKind::Guaranteed, UseLifetimeConstraint::MustBeLive},
+       {ValueOwnershipKind::Owned, UseLifetimeConstraint::MustBeLive}});
+}
+
 // Builtins that should be lowered to SIL instructions so we should never see
 // them.
 #define BUILTIN_SIL_OPERATION(ID, NAME, CATEGORY)                              \

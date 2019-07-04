@@ -48,7 +48,7 @@ public var maxOSLogArgumentCount: UInt8 { return 48 }
 
 @usableFromInline
 @_transparent
-internal var bitsPerByte: Int { return 8 }
+internal var logBitsPerByte: Int { return 3 }
 
 /// Represents a string interpolation passed to the log APIs.
 ///
@@ -458,7 +458,7 @@ internal struct OSLogSerializationInfo {
   @usableFromInline
   @_transparent
   internal static func sizeForEncoding(_ type: Int.Type) -> Int {
-    return Int.bitWidth / bitsPerByte
+    return Int.bitWidth &>> logBitsPerByte
   }
 }
 
