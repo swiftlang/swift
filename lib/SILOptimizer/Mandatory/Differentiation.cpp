@@ -3548,9 +3548,11 @@ public:
     // will be the differential.
     SmallVector<SILValue, 8> directResults;
     directResults.append(origResults.begin(), origResults.end());
-    directResults.push_back(
-        SILUndef::get(jvp->mapTypeIntoContext(differential->getLoweredType()),
-                      *differential));
+    auto diffType = jvp->mapTypeIntoContext(
+        differential->getLoweredFunctionType()
+            ->getWithRepresentation(SILFunctionTypeRepresentation::Thick))->getCanonicalType();
+    
+    directResults.push_back(SILUndef::get(SILType::getPrimitiveObjectType(diffType), *differential));
     builder.createReturn(
         ri->getLoc(), joinElements(directResults, builder, loc));
   }
