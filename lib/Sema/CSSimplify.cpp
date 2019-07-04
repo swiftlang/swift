@@ -2078,11 +2078,27 @@ static ConstraintFix *fixRequirementFailure(ConstraintSystem &cs, Type type1,
 }
 
 static ConstraintFix *fixPropertyWrapperFailure(
-    ConstraintSystem &cs, Type baseTy, Expr *anchor, ConstraintLocator *locator,
+    ConstraintSystem &cs, Type baseTy, ConstraintLocator *locator,
     llvm::function_ref<bool(ResolvedOverloadSetListItem *, VarDecl *, Type)>
         attemptFix,
     Optional<Type> toType = None) {
-  auto resolvedOverload = cs.findSelectedOverloadFor(anchor);
+
+  Expr *baseExpr = nullptr;
+  if (auto *anchor = locator->getAnchor()) {
+    if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchor))
+      baseExpr = UDE->getBase();
+    else if (auto *SE = dyn_cast<SubscriptExpr>(anchor))
+      baseExpr = SE->getBase();
+    else if (auto *MRE = dyn_cast<MemberRefExpr>(anchor))
+      baseExpr = MRE->getBase();
+    else if (auto *anchor = simplifyLocatorToAnchor(cs, locator))
+      baseExpr = anchor;
+  }
+
+  if (!baseExpr)
+    return nullptr;
+
+  auto resolvedOverload = cs.findSelectedOverloadFor(baseExpr);
   if (!resolvedOverload)
     return nullptr;
 
@@ -2235,10 +2251,8 @@ bool ConstraintSystem::repairFailures(
     if (elt.getKind() != ConstraintLocator::ApplyArgToParam)
       break;
 
-    auto anchor = simplifyLocatorToAnchor(*this, loc);
-
     if (auto *fix = fixPropertyWrapperFailure(
-            *this, lhs, anchor, loc,
+            *this, lhs, loc,
             [&](ResolvedOverloadSetListItem *overload, VarDecl *decl,
                 Type newBase) {
               // FIXME: There is currently no easy way to avoid attempting
@@ -4907,19 +4921,15 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
     // Check if any property wrappers on the base of the member lookup have
     // matching members that we can fall back to, or if the type wraps any
     // properties that have matching members.
-    if (auto dotExpr =
-            dyn_cast_or_null<UnresolvedDotExpr>(locator->getAnchor())) {
-      auto baseExpr = dotExpr->getBase();
-      if (auto *fix = fixPropertyWrapperFailure(
-              *this, baseTy, baseExpr, locator,
-              [&](ResolvedOverloadSetListItem *overload, VarDecl *decl,
-                  Type newBase) {
-                return solveWithNewBaseOrName(newBase, member,
-                                              /*allowFixes=*/false) ==
-                       SolutionKind::Solved;
-              })) {
-        return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
-      }
+    if (auto *fix = fixPropertyWrapperFailure(
+            *this, baseTy, locator,
+            [&](ResolvedOverloadSetListItem *overload, VarDecl *decl,
+                Type newBase) {
+              return solveWithNewBaseOrName(newBase, member,
+                                            /*allowFixes=*/false) ==
+                     SolutionKind::Solved;
+            })) {
+      return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
     }
 
     if (auto *funcType = baseTy->getAs<FunctionType>()) {

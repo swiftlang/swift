@@ -939,6 +939,11 @@ struct Foo<T> { // expected-note {{arguments to generic parameter 'T' ('W' and '
 
   func foo() {}
   func bar(x: Int) {}
+
+  subscript(q: String) -> Int {
+    get { return 42 }
+    set { }
+  }
 }
 
 @propertyWrapper
@@ -1013,5 +1018,8 @@ struct MissingPropertyWrapperUnwrap {
     c(self.usesProjectedValue) // expected-error {{cannot convert value 'usesProjectedValue' of type 'W' to expected type 'V', use wrapper instead}}{{12-12=$}}
     d(self.$usesProjectedValue) // expected-error {{cannot convert value '$usesProjectedValue' of type 'V' to expected type 'W', use wrapped value instead}}{{12-13=}}
     d(self._usesProjectedValue) // expected-error {{cannot convert value '_usesProjectedValue' of type 'Baz<W>' to expected type 'W', use wrapped value instead}}{{12-13=}}
+
+    self.x["ultimate question"] // expected-error {{referencing subscript 'subscript(_:)' requires wrapper 'Foo<Int>'}} {{10-10=_}}
+    self.x["ultimate question"] = 42 // expected-error {{referencing subscript 'subscript(_:)' requires wrapper 'Foo<Int>'}} {{10-10=_}}
   }
 }
