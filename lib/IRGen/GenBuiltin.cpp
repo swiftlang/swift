@@ -354,6 +354,18 @@ if (Builtin.ID == BuiltinValueKind::id) { \
 #define BUILTIN(ID, Name, Attrs)  // Ignore the rest.
 #include "swift/AST/Builtins.def"
 
+  if (Builtin.ID == BuiltinValueKind::GlobalStringTablePointer) {
+    // This builtin should be used only on strings constructed from a
+    // string literal. If we ever get to the point of executing this builtin
+    // at run time, it implies an incorrect use of the builtin and must result
+    // in a trap.
+    IGF.emitTrap(/*Unreachable=*/false);
+    auto returnValue = llvm::UndefValue::get(IGF.IGM.Int8PtrTy);
+    // Consume the arguments of the builtin.
+    (void)args.claimAll();
+    return out.add(returnValue);
+  }
+
   if (Builtin.ID == BuiltinValueKind::WillThrow) {
     // willThrow is emitted like a Swift function call with the error in
     // the error return register. We also have to pass a fake context

@@ -66,32 +66,31 @@ internal func osLog(
   let preamble = message.interpolation.preamble
   let argumentCount = message.interpolation.argumentCount
   let bufferSize = message.bufferSize
+  let formatStringPointer = _getGlobalStringTablePointer(formatString)
 
   // Code that will execute at runtime.
+  guard logObject.isEnabled(type: logLevel) else { return }
+
   let arguments = message.interpolation.arguments
-  formatString.withCString { cFormatString in
 
-    guard logObject.isEnabled(type: logLevel) else { return }
+  // Ideally, we could stack allocate the buffer as it is local to this
+  // function and also its size is a compile-time constant.
+  let bufferMemory =
+    UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
+  var builder = OSLogByteBufferBuilder(bufferMemory)
 
-    // Ideally, we could stack allocate the buffer as it is local to this
-    // function and also its size is a compile-time constant.
-    let bufferMemory =
-      UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
-    var builder = OSLogByteBufferBuilder(bufferMemory)
+  builder.serialize(preamble)
+  builder.serialize(argumentCount)
+  arguments.serialize(into: &builder)
 
-    builder.serialize(preamble)
-    builder.serialize(argumentCount)
-    arguments.serialize(into: &builder)
+  ___os_log_impl(UnsafeMutableRawPointer(mutating: #dsohandle),
+                 logObject,
+                 logLevel,
+                 formatStringPointer,
+                 bufferMemory,
+                 UInt32(bufferSize))
 
-    ___os_log_impl(UnsafeMutableRawPointer(mutating: #dsohandle),
-                   logObject,
-                   logLevel,
-                   cFormatString,
-                   bufferMemory,
-                   UInt32(bufferSize))
-
-    bufferMemory.deallocate()
-  }
+  bufferMemory.deallocate()
 }
 
 /// A test helper that constructs a byte buffer and a format string from an
