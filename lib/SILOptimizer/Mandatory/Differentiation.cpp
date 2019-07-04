@@ -4676,7 +4676,7 @@ public:
       AllocStackInst *subscriptBuffer) {
     auto astType = elType.getASTType();
     auto newAdjValue = builder.createLoad(
-        ai->getLoc(), subscriptBuffer, getBufferLOQ(astType, getAdjoint()));
+        ai->getLoc(), subscriptBuffer, getBufferLOQ(astType, getPullback()));
     addAdjointValue(
         si->getParent(), si->getSrc(),
         makeConcreteAdjointValue(ValueWithCleanup(
@@ -4780,7 +4780,7 @@ public:
   }
 
   void visitApplyInst(ApplyInst *ai) {
-    if (ai->hasSemantics("array.uninitialized_intrinsic")) {
+    if (ai->hasSemantics("array.uninitialized_intrinsic"))
       return visitArrayInitialization(ai);
     // Replace a call to a function with a call to its pullback.
     auto &nestedApplyInfo = getContext().getNestedApplyInfo();
