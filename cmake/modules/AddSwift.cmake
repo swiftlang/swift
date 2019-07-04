@@ -1905,7 +1905,7 @@ function(add_swift_target_library name)
     if(SWIFTLIB_SHARED)
       if(sdk IN_LIST SWIFT_APPLE_PLATFORMS)
         list(APPEND swiftlib_link_flags_all "-dynamiclib -Wl,-headerpad_max_install_names")
-      elseif(sdk STREQUAL ANDROID)
+      elseif(${sdk} STREQUAL ANDROID)
         list(APPEND swiftlib_link_flags_all "-shared")
         # TODO: Instead of `lib${name}.so` find variable or target property which already have this value.
         list(APPEND swiftlib_link_flags_all "-Wl,-soname,lib${name}.so")
