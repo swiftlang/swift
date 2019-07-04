@@ -84,7 +84,7 @@ def get_branch_for_repo(config, repo_name, scheme_name, scheme_map,
 
 def update_single_repository(args):
     config, repo_name, scheme_name, scheme_map, tag, timestamp, \
-        reset_to_remote, should_clean, cross_repos_pr, should_fetch = args
+        reset_to_remote, should_clean, cross_repos_pr, should_update = args
     repo_path = os.path.join(SWIFT_SOURCE_ROOT, repo_name)
     if not os.path.isdir(repo_path):
         return
@@ -95,9 +95,13 @@ def update_single_repository(args):
             cross_repo = False
             checkout_target = None
 
-            if should_fetch:
-                shell.run(['git', 'fetch', '--recurse-submodules=yes',
-                           '--targs'], echo=True)
+            # Run git remote update to download updated git hashes and branches
+            # before attempting to git checkout the branches.
+            #
+            # Note: we use `git remote update` instead of `git fetch` to avoid
+            # stomping on `.git/FETCH_HEAD`.
+            if should_update:
+                shell.run(['git', 'remote', 'update'], echo=True)
 
             if tag:
                 checkout_target = confirm_tag_in_repo(tag, repo_name)
@@ -213,7 +217,7 @@ def update_all_repositories(args, config, scheme_name, cross_repos_pr):
                    args.reset_to_remote,
                    args.clean,
                    cross_repos_pr,
-                   args.fetch]
+                   args.update]
         pool_args.append(my_args)
 
     return shell.run_parallel(update_single_repository, pool_args,
@@ -438,8 +442,8 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
         help="Obtain Sources for Swift and Related Projects via SSH",
         action="store_true")
     parser.add_argument(
-        "--fetch",
-        help="Fetch the latest branches and tags before checking out code.",
+        "--update",
+        help="Update the latest branches and tags before checking out code.",
         action="store_true")
     parser.add_argument(
         "--skip-history",
