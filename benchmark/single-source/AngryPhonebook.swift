@@ -26,47 +26,47 @@ public let AngryPhonebook = [
 
   // Small String Workloads
   BenchmarkInfo(
-    name: "AngryPhonebook.Latin",
-    runFunction: { angryPhonebook($0, latin) },
+    name: "AngryPhonebook.ASCII.Small",
+    runFunction: { angryPhonebook($0, ascii) },
     tags: t,
-    setUpFunction: { blackHole(latin) }),
+    setUpFunction: { blackHole(ascii) }),
   BenchmarkInfo(
-    name: "AngryPhonebook.Strasse",
+    name: "AngryPhonebook.Strasse.Small",
     runFunction: { angryPhonebook($0, strasse) },
     tags: t,
     setUpFunction: { blackHole(strasse) }),
   BenchmarkInfo(
-    name: "AngryPhonebook.Armenian",
+    name: "AngryPhonebook.Armenian.Small",
     runFunction: { angryPhonebook($0, armenian) },
     tags: t,
     setUpFunction: { blackHole(armenian) }),
   BenchmarkInfo(
-    name: "AngryPhonebook.Cyrillic",
+    name: "AngryPhonebook.Cyrillic.Small",
     runFunction: { angryPhonebook($0, cyrillic) },
     tags: t,
     setUpFunction: { blackHole(cyrillic) }),
 
-  // Large String Workloads
+  // Regular String Workloads
   BenchmarkInfo(
-    name: "AngryPhonebook.Latin.Large",
-    runFunction: { largeAngryPhonebook($0, latinLarge) },
+    name: "AngryPhonebook.ASCII",
+    runFunction: { angryPhonebook($0, precomposed: longASCII) },
     tags: t,
-    setUpFunction: { blackHole(latinLarge) }),
+    setUpFunction: { blackHole(longASCII) }),
   BenchmarkInfo(
-    name: "AngryPhonebook.Strasse.Large",
-    runFunction: { largeAngryPhonebook($0, strasseLarge) },
+    name: "AngryPhonebook.Strasse",
+    runFunction: { angryPhonebook($0, precomposed: longStrasse) },
     tags: t,
-    setUpFunction: { blackHole(strasseLarge) }),
+    setUpFunction: { blackHole(longStrasse) }),
   BenchmarkInfo(
-    name: "AngryPhonebook.Armenian.Large",
-    runFunction: { largeAngryPhonebook($0, armenianLarge) },
+    name: "AngryPhonebook.Armenian",
+    runFunction: { angryPhonebook($0, precomposed: longArmenian) },
     tags: t,
-    setUpFunction: { blackHole(armenianLarge) }),
+    setUpFunction: { blackHole(longArmenian) }),
   BenchmarkInfo(
-    name: "AngryPhonebook.Cyrillic.Large",
-    runFunction: { largeAngryPhonebook($0, cyrillicLarge) },
+    name: "AngryPhonebook.Cyrillic",
+    runFunction: { angryPhonebook($0, precomposed: longCyrillic) },
     tags: t,
-    setUpFunction: { blackHole(cyrillicLarge) })
+    setUpFunction: { blackHole(longCyrillic) })
 ]
 
 let words = [
@@ -91,35 +91,46 @@ public func run_AngryPhonebook(_ N: Int) {
 // Workloads for various scripts. Always 20 names for 400 pairings.
 // To keep the performance of various scripts roughly comparable, aim for
 // a total length of approximately 120 characters.
-// E.g.: `latin.joined(separator: "").count == 124`
+// E.g.: `ascii.joined(separator: "").count == 124`
+// Every name should fit in 15-bytes UTF-8 encoded, to excercise the small
+// string optimization.
+// E.g.: `armenian.allSatisfy { $0._guts.isSmall } == true`
 
-/// Precompose the phonebook into one large string of comma separated names.
-func large(_ names: [String]) -> String {
-  names.map { firstName in
-    names.map { lastName in
-      firstName + " " + lastName }
-      .joined(separator: ", ")
-    }.joined(separator: ", ")
-}
+// Workload Size Statistics
+//   SMALL  | UTF-8 | UTF-16 |    REGULAR   |  UTF-8  | UTF-16
+// ---------|-------|--------|--------------|---------|--------
+//    ascii | 124 B |  248 B |    longASCII |  6158 B | 12316 B
+//  strasse | 140 B |  240 B |  longStrasse |  6798 B | 11996 B
+// armenian | 232 B |  232 B | longArmenian | 10478 B | 11676 B
+// cyrillic | 238 B |  238 B | longCyrillic | 10718 B | 11916 B
 
-let latin = Array(words.prefix(20))
-let latinLarge = large(latin)
-
+let ascii = Array(words.prefix(20))
 // Pathological case, uppercase: ß -> SS
 let strasse = Array(repeating: "Straße", count: 20)
-let strasseLarge = large(strasse)
 
 let armenian = [
   "Արմեն", "Աննա", "Հարութ", "Միքայել", "Մարիա", "Դավիթ", "Վարդան",
   "Նարինե", "Տիգրան", "Տաթևիկ", "Թագուհի", "Թամարա", "Ազնաուր", "Գրիգոր",
   "Կոմիտաս", "Հայկ", "Գառնիկ", "Վահրամ", "Վահագն", "Գևորգ"]
-let armenianLarge = large(armenian)
 
 let cyrillic = [
   "Ульяна", "Аркадий", "Аня", "Даниил", "Дмитрий", "Эдуард", "Юрій", "Давид",
   "Анна", "Дмитрий", "Евгений", "Борис", "Ксения", "Артур", "Аполлон",
   "Соломон", "Николай", "Кристи", "Надежда", "Спартак"]
-let cyrillicLarge = large(cyrillic)
+
+/// Precompose the phonebook into one large string of comma separated names.
+func phonebook(_ names: [String]) -> String {
+  names.map { firstName in
+    names.map { lastName in
+      firstName + " " + lastName
+    }.joined(separator: ", ")
+  }.joined(separator: ", ")
+}
+
+let longASCII = phonebook(ascii)
+let longStrasse = phonebook(strasse)
+let longArmenian = phonebook(armenian)
+let longCyrillic = phonebook(cyrillic)
 
 @inline(never)
 public func angryPhonebook(_ N: Int, _ names: [String]) {
@@ -135,7 +146,7 @@ public func angryPhonebook(_ N: Int, _ names: [String]) {
 }
 
 @inline(never)
-public func largeAngryPhonebook(_ N: Int, _ names: String) {
+public func angryPhonebook(_ N: Int, precomposed names: String) {
   for _ in 1...N {
     blackHole((names.uppercased(), names.lowercased()))
   }
