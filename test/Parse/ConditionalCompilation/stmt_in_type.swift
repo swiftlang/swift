@@ -8,6 +8,6 @@ struct S1 { // expected-note {{in declaration of 'S1'}}
 #if FOO
   return 1; // expected-error {{expected declaration}}
 #elseif BAR
-  foo(); // expected-error {{expected 'func' keyword in function declaration}}
+  foo(); // expected-error {{expected 'func' keyword in instance method declaration}}
 #endif
 }
