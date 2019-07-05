@@ -591,6 +591,46 @@ static bool parameterTypesMatch(const ValueDecl *derivedDecl,
   return true;
 }
 
+static bool overridesDifferentiableAttribute(const ValueDecl *derivedDecl,
+                                             const ValueDecl *baseDecl) {
+  ASTContext &ctx = baseDecl->getASTContext();
+
+  // TODO: What happens when we have multiple differentiable attributes?
+  auto derivedDA = dyn_cast<AbstractFunctionDecl>(derivedDecl)
+      ->getAttrs().getAttribute<DifferentiableAttr>();
+  auto baseDA = dyn_cast<AbstractFunctionDecl>(baseDecl)
+      ->getAttrs().getAttribute<DifferentiableAttr>();
+
+  // If there is no differentiable attribute in `derivedDecl`, then
+  // overriding is not allowed.
+  if (!derivedDA) {
+    return false;
+  }
+
+  // If there is no differentiable attribute in `baseDecl`, then
+  // overriding is allowed because `derivedDecl` adds a differentiable
+  // attribute.
+  if (!baseDA) {
+    return true;
+  }
+
+  // At this point both `derivedDecl` and `baseDecl` define a
+  // differentiable attribute and so we have to compare these attributes.
+
+  // Compare the differentiable parameter indices. If `derivedDA` has
+  // more differentiable parameter indices than `baseDA`, then overriding
+  // should be allowed.
+  auto derivedParameters = AutoDiffIndexSubset::get(
+      ctx, derivedDA->getParameterIndices()->parameters);
+  auto baseParameters = AutoDiffIndexSubset::get(
+      ctx, baseDA->getParameterIndices()->parameters);
+  if (baseParameters->isSubsetOf(derivedParameters)) {
+    return true;
+  }
+
+  return false;
+}
+
 /// Returns true if the given declaration is for the `NSObject.hashValue`
 /// property.
 static bool isNSObjectHashValue(ValueDecl *baseDecl) {
@@ -744,6 +784,10 @@ SmallVector<OverrideMatch, 2> OverrideMatcher::match(
     // Check whether there are any obvious reasons why the two given
     // declarations do not have an overriding relationship.
     if (!areOverrideCompatibleSimple(decl, parentDecl))
+      continue;
+
+    // Check whether the differentiable attribute allows overriding.
+    if (overridesDifferentiableAttribute(decl, parentDecl))
       continue;
 
     auto parentMethod = dyn_cast<AbstractFunctionDecl>(parentDecl);

@@ -137,4 +137,28 @@ struct S : P {
   }
 }
 
+// MARK: - Overridden protocol method adding differentiable attribute.
+
+public protocol Distribution {
+  associatedtype Value
+  func logProbability(of value: Value) -> Float
+}
+
+public protocol DifferentiableDistribution: Differentiable, Distribution {
+  @differentiable(wrt: self)
+  func logProbability(of value: Value) -> Float
+}
+
+struct Foo: DifferentiableDistribution {
+  @differentiable(wrt: self)
+  func logProbability(of value: Float) -> Float {
+    .zero
+  }
+}
+
+@differentiable
+func blah<T: DifferentiableDistribution>(_ x: T) -> Float where T.Value: AdditiveArithmetic {
+  x.logProbability(of: .zero)
+}
+
 runAllTests()
