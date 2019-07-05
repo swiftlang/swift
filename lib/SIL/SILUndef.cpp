@@ -16,16 +16,7 @@
 using namespace swift;
 
 static ValueOwnershipKind getOwnershipKindForUndef(SILType type, const SILFunction &f) {
-  if (type.isAddress()) {
-    // If we have an address only type and we are supposed to use
-    // lowered addresses, return Owned. Otherwise addresses are any.
-    if (type.isAddressOnly(f) && f.getConventions().useLoweredAddresses()) {
-      return ValueOwnershipKind::Owned;
-    }
-    return ValueOwnershipKind::Any;
-  }
-
-  if (type.isTrivial(f))
+  if (type.isAddress() || type.isTrivial(f))
     return ValueOwnershipKind::Any;
   return ValueOwnershipKind::Owned;
 }
