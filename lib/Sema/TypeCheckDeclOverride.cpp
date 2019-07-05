@@ -595,37 +595,38 @@ static bool overridesDifferentiableAttribute(const ValueDecl *derivedDecl,
                                              const ValueDecl *baseDecl) {
   ASTContext &ctx = baseDecl->getASTContext();
 
-  // TODO: What happens when we have multiple differentiable attributes?
-  auto derivedDA = dyn_cast<AbstractFunctionDecl>(derivedDecl)
-      ->getAttrs().getAttribute<DifferentiableAttr>();
-  auto baseDA = dyn_cast<AbstractFunctionDecl>(baseDecl)
-      ->getAttrs().getAttribute<DifferentiableAttr>();
+  auto derivedDAs = dyn_cast<AbstractFunctionDecl>(derivedDecl)
+      ->getAttrs().getAttributes<DifferentiableAttr>();
+  auto baseDAs = dyn_cast<AbstractFunctionDecl>(baseDecl)
+      ->getAttrs().getAttributes<DifferentiableAttr>();
 
   // If there is no differentiable attribute in `derivedDecl`, then
   // overriding is not allowed.
-  if (!derivedDA) {
+  if (derivedDAs.empty())
     return false;
-  }
 
-  // If there is no differentiable attribute in `baseDecl`, then
-  // overriding is allowed because `derivedDecl` adds a differentiable
-  // attribute.
-  if (!baseDA) {
-    return true;
-  }
-
-  // At this point both `derivedDecl` and `baseDecl` define a
-  // differentiable attribute and so we have to compare these attributes.
-
-  // Compare the differentiable parameter indices. If `derivedDA` has
-  // more differentiable parameter indices than `baseDA`, then overriding
-  // should be allowed.
-  auto derivedParameters = AutoDiffIndexSubset::get(
-      ctx, derivedDA->getParameterIndices()->parameters);
-  auto baseParameters = AutoDiffIndexSubset::get(
-      ctx, baseDA->getParameterIndices()->parameters);
-  if (baseParameters->isSubsetOf(derivedParameters)) {
-    return true;
+  // At this point, we have to go through all the differentiable
+  // attributes in `derivedDecl` and check if they subsume any of
+  // the differentiable attributes in `baseDecl`.
+  auto overrides = true;
+  for (auto derivedDA : derivedDAs) {
+    auto derivedParameters = AutoDiffIndexSubset::get(
+        ctx, derivedDA->getParameterIndices()->parameters);
+    overrides = true;
+    for (auto baseDA : baseDAs) {
+      auto baseParameters = AutoDiffIndexSubset::get(
+          ctx, baseDA->getParameterIndices()->parameters);
+      // Compare the differentiable parameter indices. If the
+      // differentiable indices of `derivedDA` are a subset of those
+      // of `baseDA`, then `baseDA` subsumes `derivedDA` and the
+      // function is marked as overridden.
+      if (derivedParameters->isSubsetOf(baseParameters)) {
+        overrides = false;
+        break;
+      }
+    }
+    if (overrides)
+      return overrides;
   }
 
   return false;
