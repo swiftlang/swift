@@ -5110,13 +5110,15 @@ cond_fail
 `````````
 ::
 
-  sil-instruction ::= 'cond_fail' sil-operand
+  sil-instruction ::= 'cond_fail' sil-operand, string-literal
 
-  cond_fail %0 : $Builtin.Int1
+  cond_fail %0 : $Builtin.Int1, "failure reason"
   // %0 must be of type $Builtin.Int1
 
 This instruction produces a `runtime failure`_ if the operand is one.
 Execution proceeds normally if the operand is zero.
+The second operand is a static failure message, which is displayed by the
+debugger in case the failure is triggered.
 
 Terminators
 ~~~~~~~~~~~
