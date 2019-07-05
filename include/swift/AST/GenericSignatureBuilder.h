@@ -840,6 +840,11 @@ class GenericSignatureBuilder::RequirementSource final
 
 public:
   enum Kind : uint8_t {
+    /// A covariant \c Self requirement stated explicitly. This is a subkind
+    /// of \c Explicit with the only difference that it is ranked higher
+    /// than sources for which \c isDerivedRequirement() returns \c true.
+    CovariantSelf,
+
     /// A requirement stated explicitly, e.g., in a where clause or type
     /// parameter declaration.
     ///
@@ -967,6 +972,7 @@ private:
     case InferredProtocolRequirement:
       return 1;
 
+    case CovariantSelf:
     case Explicit:
     case Inferred:
     case NestedTypeNameMatch:
@@ -1007,6 +1013,7 @@ private:
   /// Whether this kind of requirement source is a root.
   static bool isRootKind(Kind kind) {
     switch (kind) {
+    case CovariantSelf:
     case Explicit:
     case Inferred:
     case RequirementSignatureSelf:
@@ -1120,7 +1127,8 @@ public:
 public:
   /// Retrieve an abstract requirement source.
   static const RequirementSource *forAbstract(GenericSignatureBuilder &builder,
-                                              Type rootType);
+                                              Type rootType,
+                                              bool covariantSelf = false);
 
   /// Retrieve a requirement source representing an explicit requirement
   /// stated in an 'inheritance' or 'where' clause.
@@ -1361,6 +1369,9 @@ class GenericSignatureBuilder::FloatingRequirementSource {
   enum Kind {
     /// A fully-resolved requirement source, which does not need a root.
     Resolved,
+    /// An explicit covariant Self requirement lacking a root. This kind
+    /// exists merely to match up with \c RequirementSource::Kind::CovariantSelf.
+    CovariantSelf,
     /// An explicit requirement source lacking a root.
     Explicit,
     /// An inferred requirement source lacking a root.
@@ -1397,8 +1408,8 @@ public:
   FloatingRequirementSource(const RequirementSource *source)
     : FloatingRequirementSource(Resolved, source) { }
 
-  static FloatingRequirementSource forAbstract() {
-    return { Explicit, Storage() };
+  static FloatingRequirementSource forAbstract(bool covariantSelf = false) {
+    return { covariantSelf ? CovariantSelf : Explicit, Storage() };
   }
 
   static FloatingRequirementSource forExplicit(const TypeRepr *typeRepr) {

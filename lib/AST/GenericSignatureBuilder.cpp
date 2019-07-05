@@ -740,6 +740,7 @@ namespace {
 bool RequirementSource::isAcceptableStorageKind(Kind kind,
                                                 StorageKind storageKind) {
   switch (kind) {
+  case CovariantSelf:
   case Explicit:
   case Inferred:
   case RequirementSignatureSelf:
@@ -855,6 +856,7 @@ bool RequirementSource::isInferredRequirement() const {
       return false;
 
     case Concrete:
+    case CovariantSelf:
     case Explicit:
     case Parent:
     case ProtocolRequirement:
@@ -876,6 +878,7 @@ unsigned RequirementSource::classifyDiagKind() const {
 
 bool RequirementSource::isDerivedRequirement() const {
   switch (kind) {
+  case CovariantSelf:
   case Explicit:
   case Inferred:
     return false;
@@ -1062,6 +1065,7 @@ const RequirementSource *RequirementSource::getMinimalConformanceSource(
       requirementSignatureSelfProto = source->getProtocolDecl();
       LLVM_FALLTHROUGH;
 
+    case CovariantSelf:
     case Explicit:
     case Inferred:
     case NestedTypeNameMatch:
@@ -1136,11 +1140,13 @@ const RequirementSource *RequirementSource::getMinimalConformanceSource(
 
 const RequirementSource *RequirementSource::forAbstract(
                                             GenericSignatureBuilder &builder,
-                                            Type rootType) {
+                                            Type rootType,
+                                            bool covariantSelf) {
+  auto kind = covariantSelf ? CovariantSelf : Explicit;
   REQUIREMENT_SOURCE_FACTORY_BODY(
-                        (nodeID, Explicit, nullptr, rootType.getPointer(),
+                        (nodeID, kind, nullptr, rootType.getPointer(),
                          nullptr, nullptr),
-                        (Explicit, rootType, nullptr, WrittenRequirementLoc()),
+                        (kind, rootType, nullptr, WrittenRequirementLoc()),
                         0, WrittenRequirementLoc());
 }
 
@@ -1292,6 +1298,7 @@ const RequirementSource *RequirementSource::withoutRedundantSubpath(
   }
 
   switch (kind) {
+  case CovariantSelf:
   case Explicit:
   case Inferred:
   case RequirementSignatureSelf:
@@ -1373,6 +1380,7 @@ RequirementSource::visitPotentialArchetypesAlongPath(
 
   case RequirementSource::NestedTypeNameMatch:
   case RequirementSource::ConcreteTypeBinding:
+  case RequirementSource::CovariantSelf:
   case RequirementSource::Explicit:
   case RequirementSource::Inferred:
   case RequirementSource::RequirementSignatureSelf: {
@@ -1481,11 +1489,16 @@ static unsigned sourcePathLength(const RequirementSource *source) {
 }
 
 int RequirementSource::compare(const RequirementSource *other) const {
-  // Prefer the derived option, if there is one.
+  // Prefer the derived option, if there is one, unless the other
+  // one is of kind CovariantSelf.
   bool thisIsDerived = this->isDerivedRequirement();
   bool otherIsDerived = other->isDerivedRequirement();
-  if (thisIsDerived != otherIsDerived)
-    return thisIsDerived ? -1 : +1;
+  if (thisIsDerived != otherIsDerived) {
+    if (thisIsDerived) {
+      return (other->kind == Kind::CovariantSelf) ? +1 : -1;
+    }
+    return (this->kind == Kind::CovariantSelf) ? -1 : +1;
+  }
 
   // Prefer the shorter path.
   unsigned thisLength = sourcePathLength(this);
@@ -1527,6 +1540,10 @@ void RequirementSource::print(llvm::raw_ostream &out,
   switch (kind) {
   case Concrete:
     out << "Concrete";
+    break;
+
+  case CovariantSelf:
+    out << "Covariant Self";
     break;
 
   case Explicit:
@@ -1642,12 +1659,14 @@ const RequirementSource *FloatingRequirementSource::getSource(
   case Resolved:
     return storage.get<const RequirementSource *>();
 
+  case CovariantSelf:
   case Explicit:
     if (auto requirementRepr = storage.dyn_cast<const RequirementRepr *>())
       return RequirementSource::forExplicit(builder, type, requirementRepr);
     if (auto typeRepr = storage.dyn_cast<const TypeRepr *>())
       return RequirementSource::forExplicit(builder, type, typeRepr);
-    return RequirementSource::forAbstract(builder, type);
+    return RequirementSource::forAbstract(builder, type,
+                                          kind == CovariantSelf);
 
   case Inferred:
     return RequirementSource::forInferred(builder, type,
@@ -1701,6 +1720,7 @@ SourceLoc FloatingRequirementSource::getLoc() const {
 
 bool FloatingRequirementSource::isExplicit() const {
   switch (kind) {
+  case CovariantSelf:
   case Explicit:
     return true;
 
@@ -1718,6 +1738,7 @@ bool FloatingRequirementSource::isExplicit() const {
       return !protocolReq.inferred;
 
     case RequirementSource::Concrete:
+    case RequirementSource::CovariantSelf:
     case RequirementSource::Explicit:
     case RequirementSource::Inferred:
     case RequirementSource::NestedTypeNameMatch:
@@ -1733,6 +1754,7 @@ bool FloatingRequirementSource::isExplicit() const {
 
   case Resolved:
     switch (storage.get<const RequirementSource *>()->kind) {
+    case RequirementSource::CovariantSelf:
     case RequirementSource::Explicit:
       return true;
 
@@ -1760,6 +1782,7 @@ bool FloatingRequirementSource::isExplicit() const {
 FloatingRequirementSource FloatingRequirementSource::asInferred(
                                           const TypeRepr *typeRepr) const {
   switch (kind) {
+  case CovariantSelf:
   case Explicit:
     return forInferred(typeRepr);
 
@@ -4501,6 +4524,9 @@ bool GenericSignatureBuilder::updateSuperclass(
 
   // T already has a superclass; make sure it's related.
   auto existingSuperclass = equivClass->superclass;
+  if (existingSuperclass->isEqual(superclass))
+    return false;
+
   // TODO: In principle, this could be isBindableToSuperclassOf instead of
   // isExactSubclassOf. If you had:
   //
@@ -7667,8 +7693,15 @@ AbstractGenericSignatureRequest::evaluate(
   for (auto param : addedParameters)
     builder.addGenericParameter(param);
 
-  for (const auto &req : addedRequirements)
-    builder.addRequirement(req, source, nullptr);
+  for (const auto &req : addedRequirements) {
+    if (req.getKind() == RequirementKind::Superclass) {
+      auto source = GenericSignatureBuilder::FloatingRequirementSource
+        ::forAbstract(/*covariantSelf*/true);
+      builder.addRequirement(req, source, nullptr);
+    } else {
+      builder.addRequirement(req, source, nullptr);
+    }
+  }
 
   return std::move(builder).computeGenericSignature(
       SourceLoc(), /*allowConcreteGenericParams=*/true);

@@ -174,6 +174,7 @@ RequirementEnvironment::RequirementEnvironment(
   if (covariantSelf) {
     auto paramTy = GenericTypeParamType::get(/*depth=*/0, /*index=*/0, ctx);
     Requirement reqt(RequirementKind::Superclass, paramTy, substConcreteType);
+
     requirements.push_back(reqt);
   }
 

@@ -352,3 +352,12 @@ func usesProtoRefinesClass2<T : ProtoRefinesClassComposition>(_ t: T) {
   t.genericMethod((1, 2))
   let _: BaseProto = t
 }
+
+// SR-10483(Fixed)
+class A: P {}
+protocol P: A {
+  func foo()
+}
+extension P {
+  func foo() {}
+}
