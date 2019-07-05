@@ -697,9 +697,7 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
   // This is only semantically allowed in certain contexts, but we parse it
   // generally for diagnostics and recovery.
   SourceLoc opaqueLoc;
-  if (Context.LangOpts.EnableOpaqueResultTypes
-      && Tok.is(tok::identifier)
-      && Tok.getRawText() == "some") {
+  if (Tok.is(tok::identifier) && Tok.getRawText() == "some") {
     // Treat some as a keyword.
     TokReceiver->registerTokenKindChange(Tok.getLoc(), tok::contextual_keyword);
     opaqueLoc = consumeToken();
@@ -765,9 +763,7 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
     }
     
     // Diagnose invalid `some` after an ampersand.
-    if (Context.LangOpts.EnableOpaqueResultTypes
-        && Tok.is(tok::identifier)
-        && Tok.getRawText() == "some") {
+    if (Tok.is(tok::identifier) && Tok.getRawText() == "some") {
       auto badLoc = consumeToken();
       
       // TODO: Fixit to move to beginning of composition.
