@@ -23,10 +23,16 @@
 
 namespace swift {
 
+static inline llvm::IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem>
+getRealOverlayFileSystem() {
+  return llvm::IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem>(
+      new llvm::vfs::OverlayFileSystem(llvm::vfs::getRealFileSystem()));
+}
+
 /// This class manages and owns source buffers.
 class SourceManager {
   llvm::SourceMgr LLVMSourceMgr;
-  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem;
+  llvm::IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem> FileSystem;
   unsigned CodeCompletionBufferID = 0U;
   unsigned CodeCompletionOffset;
 
@@ -49,9 +55,9 @@ class SourceManager {
   mutable std::pair<const char *, const VirtualFile*> CachedVFile = {nullptr, nullptr};
 
 public:
-  SourceManager(llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS =
-                    llvm::vfs::getRealFileSystem())
-    : FileSystem(FS) {}
+  SourceManager(llvm::IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem> FS =
+                    getRealOverlayFileSystem())
+      : FileSystem(FS) {}
 
   llvm::SourceMgr &getLLVMSourceMgr() {
     return LLVMSourceMgr;
@@ -60,11 +66,12 @@ public:
     return LLVMSourceMgr;
   }
 
-  void setFileSystem(llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS) {
+  void
+  setFileSystem(llvm::IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem> FS) {
     FileSystem = FS;
   }
 
-  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> getFileSystem() {
+  llvm::IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem> getFileSystem() {
     return FileSystem;
   }
 
@@ -254,4 +261,3 @@ private:
 } // end namespace swift
 
 #endif // SWIFT_BASIC_SOURCEMANAGER_H
-

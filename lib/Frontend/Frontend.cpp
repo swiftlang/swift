@@ -235,9 +235,6 @@ static bool loadAndValidateVFSOverlay(
     const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &BaseFS,
     const llvm::IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem> &OverlayFS,
     DiagnosticEngine &Diag) {
-  // FIXME: It should be possible to allow chained lookup of later VFS overlays
-  // through the mapping defined by earlier overlays.
-  // See rdar://problem/39440687
   auto Buffer = BaseFS->getBufferForFile(File);
   if (!Buffer) {
     Diag.diagnose(SourceLoc(), diag::cannot_open_file, File,
@@ -264,14 +261,7 @@ bool CompilerInstance::setUpVirtualFileSystemOverlays() {
     hadAnyFailure |=
         loadAndValidateVFSOverlay(File, BaseFS, OverlayFS, Diagnostics);
   }
-
-  // If we successfully loaded all the overlays, let the source manager and
-  // diagnostic engine take advantage of the overlay file system.
-  if (!hadAnyFailure &&
-      (OverlayFS->overlays_begin() != OverlayFS->overlays_end())) {
-    SourceMgr.setFileSystem(OverlayFS);
-  }
-
+  SourceMgr.setFileSystem(OverlayFS);
   return hadAnyFailure;
 }
 
