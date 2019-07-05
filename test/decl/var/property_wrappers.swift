@@ -1023,3 +1023,11 @@ struct MissingPropertyWrapperUnwrap {
     self.x["ultimate question"] = 42 // expected-error {{referencing subscript 'subscript(_:)' requires wrapper 'Foo<Int>'}} {{10-10=_}}
   }
 }
+
+struct InvalidPropertyDelegateUse {
+  @Foo var x: Int = 42 // expected-error {{extra argument 'initialValue' in call}}
+
+  func test() {
+    self.x.foo() // expected-error {{alue of type 'Int' has no member 'foo'}}
+  }
+}

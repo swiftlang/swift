@@ -2102,32 +2102,51 @@ static ConstraintFix *fixPropertyWrapperFailure(
   if (!resolvedOverload)
     return nullptr;
 
-  if (auto storageWrapper =
-          cs.getStorageWrapperInformation(resolvedOverload)) {
-    if (attemptFix(resolvedOverload, storageWrapper->first,
-                    storageWrapper->second))
-      return UsePropertyWrapper::create(
-          cs, storageWrapper->first,
-          /*usingStorageWrapper=*/true, baseTy,
-          toType.getValueOr(storageWrapper->second), locator);
+  enum class Fix : uint8_t {
+    StorageWrapper,
+    PropertyWrapper,
+    WrappedValue,
+  };
+
+  auto applyFix = [&](Fix fix, VarDecl *decl, Type type) -> ConstraintFix * {
+    if (!decl->hasValidSignature() || !type)
+      return nullptr;
+
+    if (!attemptFix(resolvedOverload, decl, type))
+      return nullptr;
+
+    switch (fix) {
+    case Fix::StorageWrapper:
+    case Fix::PropertyWrapper:
+      return UsePropertyWrapper::create(cs, decl, fix == Fix::StorageWrapper,
+                                        baseTy, toType.getValueOr(type),
+                                        locator);
+
+    case Fix::WrappedValue:
+      return UseWrappedValue::create(cs, decl, baseTy, toType.getValueOr(type),
+                                     locator);
+    }
+  };
+
+  if (auto storageWrapper = cs.getStorageWrapperInformation(resolvedOverload)) {
+    if (auto *fix = applyFix(Fix::StorageWrapper, storageWrapper->first,
+                             storageWrapper->second))
+      return fix;
   }
 
   if (auto wrapper = cs.getPropertyWrapperInformation(resolvedOverload)) {
-    if (attemptFix(resolvedOverload, wrapper->first, wrapper->second))
-      return UsePropertyWrapper::create(
-          cs, wrapper->first,
-          /*usingStorageWrappeer=*/false, baseTy,
-          toType.getValueOr(wrapper->second), locator);
+    if (auto *fix =
+            applyFix(Fix::PropertyWrapper, wrapper->first, wrapper->second))
+      return fix;
   }
 
   if (auto wrappedProperty =
           cs.getWrappedPropertyInformation(resolvedOverload)) {
-    if (attemptFix(resolvedOverload, wrappedProperty->first,
-                    wrappedProperty->second))
-      return UseWrappedValue::create(
-          cs, wrappedProperty->first, baseTy,
-          toType.getValueOr(wrappedProperty->second), locator);
+    if (auto *fix = applyFix(Fix::WrappedValue, wrappedProperty->first,
+                             wrappedProperty->second))
+      return fix;
   }
+
   return nullptr;
 }
 
