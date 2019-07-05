@@ -1990,12 +1990,6 @@ auto AssociatedTypeInference::solve(ConformanceChecker &checker)
 }
 
 void ConformanceChecker::resolveTypeWitnesses() {
-  SWIFT_DEFER {
-    // Resolution attempts to have the witnesses be correct by construction, but
-    // this isn't guaranteed, so let's double check.
-    ensureRequirementsAreSatisfied(/*failUnsubstituted=*/false);
-  };
-
   // Attempt to infer associated type witnesses.
   AssociatedTypeInference inference(TC, Conformance);
   if (auto inferred = inference.solve(*this)) {
@@ -2004,7 +1998,6 @@ void ConformanceChecker::resolveTypeWitnesses() {
                         /*typeDecl=*/nullptr);
     }
 
-    ensureRequirementsAreSatisfied(/*failUnsubstituted=*/false);
     return;
   }
 

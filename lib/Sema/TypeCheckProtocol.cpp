@@ -3537,6 +3537,7 @@ static void recordConformanceDependency(DeclContext *DC,
 
 void ConformanceChecker::ensureRequirementsAreSatisfied(
                                                      bool failUnsubstituted) {
+  Conformance->finishSignatureConformances();
   auto proto = Conformance->getProtocol();
 
   if (CheckedRequirementSignature)
@@ -3544,17 +3545,10 @@ void ConformanceChecker::ensureRequirementsAreSatisfied(
 
   CheckedRequirementSignature = true;
 
-  if (!Conformance->getSignatureConformances().empty())
-    return;
-
   auto DC = Conformance->getDeclContext();
   auto substitutingType = DC->mapTypeIntoContext(Conformance->getType());
   auto substitutions = SubstitutionMap::getProtocolSubstitutions(
       proto, substitutingType, ProtocolConformanceRef(Conformance));
-
-  // Create a writer to populate the signature conformances.
-  std::function<void(ProtocolConformanceRef)> writer
-    = Conformance->populateSignatureConformances();
 
   SourceFile *fileForCheckingExportability = nullptr;
   if (getRequiredAccessScope().isPublic() || isUsableFromInlineRequired())
@@ -3563,7 +3557,6 @@ void ConformanceChecker::ensureRequirementsAreSatisfied(
   class GatherConformancesListener : public GenericRequirementsCheckListener {
     NormalProtocolConformance *conformanceBeingChecked;
     SourceFile *SF;
-    std::function<void(ProtocolConformanceRef)> &writer;
 
     void checkExportability(Type depTy, Type replacementTy,
                             const ProtocolConformance *conformance) {
@@ -3606,36 +3599,14 @@ void ConformanceChecker::ensureRequirementsAreSatisfied(
   public:
     GatherConformancesListener(
         NormalProtocolConformance *conformance,
-        std::function<void(ProtocolConformanceRef)> &writer,
         SourceFile *fileForCheckingExportability)
       : conformanceBeingChecked(conformance),
-        SF(fileForCheckingExportability), writer(writer) { }
+        SF(fileForCheckingExportability) { }
 
     void satisfiedConformance(Type depTy, Type replacementTy,
                               ProtocolConformanceRef conformance) override {
-      // The conformance will use contextual types, but we want the
-      // interface type equivalent.
-      if (conformance.isConcrete()) {
-        auto concreteConformance = conformance.getConcrete();
-
-        if (conformance.getConcrete()->getType()->hasArchetype()) {
-        // Map the conformance.
-        concreteConformance = concreteConformance->subst(
-            [](SubstitutableType *type) -> Type {
-              if (auto *archetypeType = type->getAs<ArchetypeType>())
-                return archetypeType->getInterfaceType();
-              return type;
-            },
-            MakeAbstractConformanceForGenericType());
-
-
-          conformance = ProtocolConformanceRef(concreteConformance);
-        }
-
-        checkExportability(depTy, replacementTy, concreteConformance);
-      }
-
-      writer(conformance);
+      if (conformance.isConcrete())
+        checkExportability(depTy, replacementTy, conformance.getConcrete());
     }
 
     bool diagnoseUnsatisfiedRequirement(
@@ -3648,7 +3619,7 @@ void ConformanceChecker::ensureRequirementsAreSatisfied(
 
       return false;
     }
-  } listener(Conformance, writer, fileForCheckingExportability);
+  } listener(Conformance, fileForCheckingExportability);
 
   auto result = TC.checkGenericArguments(
       DC, Loc, Loc,
@@ -3887,6 +3858,9 @@ void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
 
   // Resolve all of the type witnesses.
   resolveTypeWitnesses();
+
+  // Check the requirements from the requirement signature.
+  ensureRequirementsAreSatisfied(/*failUnsubstituted=*/true);
 
   // Diagnose missing type witnesses for now.
   diagnoseMissingWitnesses(Kind);

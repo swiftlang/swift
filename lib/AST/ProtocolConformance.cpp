@@ -918,10 +918,7 @@ NormalProtocolConformance::getAssociatedConformance(Type assocType,
 
   // Fill in the signature conformances, if we haven't done so yet.
   if (getSignatureConformances().empty()) {
-    assocType->getASTContext().getLazyResolver()
-      ->resolveTypeWitness(
-        const_cast<NormalProtocolConformance *>(this),
-        nullptr);
+    const_cast<NormalProtocolConformance *>(this)->finishSignatureConformances();
   }
 
   assert(!getSignatureConformances().empty() &&
