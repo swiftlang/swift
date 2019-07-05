@@ -3535,8 +3535,7 @@ static void recordConformanceDependency(DeclContext *DC,
                          DC->isCascadingContextForLookup(InExpression));
 }
 
-void ConformanceChecker::ensureRequirementsAreSatisfied(
-                                                     bool failUnsubstituted) {
+void ConformanceChecker::ensureRequirementsAreSatisfied() {
   Conformance->finishSignatureConformances();
   auto proto = Conformance->getProtocol();
 
@@ -3640,13 +3639,6 @@ void ConformanceChecker::ensureRequirementsAreSatisfied(
     return;
 
   case RequirementCheckResult::SubstitutionFailure:
-    // If we're not allowed to fail, record this as a partially-checked
-    // conformance.
-    if (!failUnsubstituted) {
-      TC.PartiallyCheckedConformances.insert(Conformance);
-      return;
-    }
-
     // Diagnose the failure generically.
     // FIXME: Would be nice to give some more context here!
     if (!Conformance->isInvalid()) {
@@ -3860,7 +3852,7 @@ void ConformanceChecker::checkConformance(MissingWitnessDiagnosisKind Kind) {
   resolveTypeWitnesses();
 
   // Check the requirements from the requirement signature.
-  ensureRequirementsAreSatisfied(/*failUnsubstituted=*/true);
+  ensureRequirementsAreSatisfied();
 
   // Diagnose missing type witnesses for now.
   diagnoseMissingWitnesses(Kind);
@@ -4167,23 +4159,6 @@ void TypeChecker::checkConformance(NormalProtocolConformance *conformance) {
   MultiConformanceChecker checker(*this);
   checker.addConformance(conformance);
   checker.checkAllConformances();
-}
-
-void TypeChecker::checkConformanceRequirements(
-                                     NormalProtocolConformance *conformance) {
-  // If the conformance is already invalid, there's nothing to do here.
-  if (conformance->isInvalid())
-    return;
-
-  PrettyStackTraceConformance trace(Context, "checking requirements of",
-                                    conformance);
-
-  conformance->setSignatureConformances({ });
-
-  llvm::SetVector<ValueDecl *> globalMissingWitnesses;
-  ConformanceChecker checker(*this, conformance, globalMissingWitnesses);
-  checker.ensureRequirementsAreSatisfied(/*failUnsubstituted=*/true);
-  checker.diagnoseMissingWitnesses(MissingWitnessDiagnosisKind::ErrorFixIt);
 }
 
 /// Determine the score when trying to match two identifiers together.
@@ -5207,10 +5182,7 @@ void TypeChecker::resolveTypeWitness(
                        *this, 
                        const_cast<NormalProtocolConformance*>(conformance),
                        MissingWitnesses);
-  if (!assocType)
-    checker.resolveTypeWitnesses();
-  else
-    checker.resolveSingleTypeWitness(assocType);
+  checker.resolveSingleTypeWitness(assocType);
   checker.diagnoseMissingWitnesses(MissingWitnessDiagnosisKind::ErrorFixIt);
 }
 

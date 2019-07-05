@@ -644,16 +644,6 @@ public:
   /// the normal conformance.
   void setSignatureConformances(ArrayRef<ProtocolConformanceRef> conformances);
 
-  /// Retrieves a function object that should be called with each of the
-  /// conformances required by the requirement signature.
-  ///
-  /// This can be used to iteratively build up the signature conformances in
-  /// the type checker (rather than emitting them in a batch via
-  /// \c setSignatureConformances). The callee is responsible for calling
-  /// the returned function object with protocol conformances that line up
-  /// with the conformance requirements in the requirement signature (in order).
-  std::function<void(ProtocolConformanceRef)> populateSignatureConformances();
-
   /// Populate the signature conformances without checking if they satisfy
   /// requirements. Can only be used with parsed or imported conformances.
   void finishSignatureConformances();
