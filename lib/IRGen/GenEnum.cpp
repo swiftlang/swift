@@ -6894,13 +6894,23 @@ llvm::Value *irgen::emitScatterBits(IRGenFunction &IGF,
   auto &builder = IGF.Builder;
   auto &context = IGF.IGM.getLLVMContext();
 
-  // Expand the packed bits to the destination type.
-  auto destTy = llvm::IntegerType::get(context, mask.getBitWidth());
-  source = builder.CreateZExtOrTrunc(source, destTy);
+  // Expand or contract the packed bits to the destination type.
+  auto bitSize = mask.getBitWidth();
+  auto sourceTy = cast<llvm::IntegerType>(source->getType());
+  auto destTy = llvm::IntegerType::get(context, bitSize);
+  auto usedBits = int64_t(packedLowBit);
+  if (usedBits > 0 && sourceTy->getBitWidth() > bitSize) {
+    // Need to shift before truncation if the packed value is wider
+    // than the mask.
+    source = builder.CreateLShr(source, usedBits);
+    usedBits = 0;
+  }
+  if (sourceTy->getBitWidth() != bitSize) {
+    source = builder.CreateZExtOrTrunc(source, destTy);
+  }
 
   // Shift each set of contiguous set bits into position and
   // accumulate them into the result.
-  int64_t usedBits = packedLowBit;
   llvm::Value *result = nullptr;
   while (mask != 0) {
     // Isolate the rightmost run of contiguous set bits.
@@ -6986,13 +6996,8 @@ EnumPayload irgen::interleaveSpareBits(IRGenFunction &IGF,
     if (usedBits >= 32 || spareBitsChunk.count() == 0) {
       result.PayloadValues.push_back(type);
     } else {
-      llvm::Value *payloadValue = value;
-      if (usedBits > 0) {
-        payloadValue = IGF.Builder.CreateLShr(payloadValue,
-                       llvm::ConstantInt::get(IGF.IGM.Int32Ty, usedBits));
-      }
-      payloadValue = emitScatterBits(IGF, spareBitsChunk.asAPInt(),
-                                     payloadValue, 0);
+      auto payloadValue = emitScatterBits(IGF, spareBitsChunk.asAPInt(),
+                                          value, usedBits);
       if (payloadValue->getType() != type) {
         if (type->isPointerTy())
           payloadValue = IGF.Builder.CreateIntToPtr(payloadValue, type);
