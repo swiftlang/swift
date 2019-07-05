@@ -12,3 +12,7 @@ func indirectUsage() {
 // CHECK: define hidden swiftcc void @"$s6cxx_ir24namespaceManglesIntoName3argySo2nsV1TV_tF"
 func namespaceManglesIntoName(arg: namespacedT) {
 }
+
+// CHECK: define hidden swiftcc void @"$s6cxx_ir42namespaceManglesIntoNameForUsingShadowDecl3argySo2nsV14NamespacedTypeV_tF"
+func namespaceManglesIntoNameForUsingShadowDecl(arg: NamespacedType) {
+}
