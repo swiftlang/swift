@@ -631,7 +631,8 @@ void NormalProtocolConformance::setSignatureConformances(
              !conformances[idx].getConcrete()->getType()->hasArchetype() &&
              "Should have interface types here");
       assert(idx < conformances.size());
-      assert(conformances[idx].getRequirement() ==
+      assert(conformances[idx].isInvalid() ||
+             conformances[idx].getRequirement() ==
                req.getSecondType()->castTo<ProtocolType>()->getDecl());
       ++idx;
     }
@@ -942,6 +943,98 @@ NormalProtocolConformance::getAssociatedConformance(Type assocType,
     "requested conformance was not a direct requirement of the protocol");
 }
 
+
+/// A stripped-down version of Type::subst that only works on the protocol
+/// Self type wrapped in zero or more DependentMemberTypes.
+static Type
+recursivelySubstituteBaseType(ModuleDecl *module,
+                              NormalProtocolConformance *conformance,
+                              DependentMemberType *depMemTy) {
+  Type origBase = depMemTy->getBase();
+
+  // Recursive case.
+  if (auto *depBase = origBase->getAs<DependentMemberType>()) {
+    Type substBase = recursivelySubstituteBaseType(
+        module, conformance, depBase);
+    auto result = depMemTy->substBaseType(module, substBase);
+    if (!result)
+      return ErrorType::get(substBase);
+    return result;
+  }
+
+  // Base case. The associated type's protocol should be either the
+  // conformance protocol or an inherited protocol.
+  auto *reqProto = depMemTy->getAssocType()->getProtocol();
+  assert(origBase->isEqual(reqProto->getSelfInterfaceType()));
+
+  ProtocolConformance *reqConformance = conformance;
+
+  // If we have an inherited protocol just look up the conformance.
+  if (reqProto != conformance->getProtocol()) {
+    reqConformance = module->lookupConformance(
+        conformance->getType(), reqProto)->getConcrete();
+  }
+
+  return reqConformance->getTypeWitness(depMemTy->getAssocType(),
+                                        /*resolver=*/nullptr);
+}
+
+/// Collect conformances for the requirement signature.
+void NormalProtocolConformance::finishSignatureConformances() {
+  if (!SignatureConformances.empty())
+    return;
+
+  auto *proto = getProtocol();
+  auto reqSig = proto->getRequirementSignature();
+  if (reqSig.empty())
+    return;
+
+  SmallVector<ProtocolConformanceRef, 4> reqConformances;
+  for (const auto &req : reqSig) {
+    if (req.getKind() != RequirementKind::Conformance)
+      continue;
+
+    ModuleDecl *module = getDeclContext()->getParentModule();
+
+    Type substTy;
+    auto origTy = req.getFirstType();
+    if (origTy->isEqual(proto->getSelfInterfaceType())) {
+      substTy = getType();
+    } else {
+      auto *depMemTy = origTy->castTo<DependentMemberType>();
+      substTy = recursivelySubstituteBaseType(module, this, depMemTy);
+    }
+    auto reqProto = req.getSecondType()->castTo<ProtocolType>()->getDecl();
+
+    // Looking up a conformance for a contextual type and mapping the
+    // conformance context produces a more accurate result than looking
+    // up a conformance from an interface type.
+    //
+    // This can happen if the conformance has an associated conformance
+    // depending on an associated type that is made concrete in a
+    // refining protocol.
+    //
+    // That is, the conformance of an interface type G<T> : P really
+    // depends on the generic signature of the current context, because
+    // performing the lookup in a "more" constrained extension than the
+    // one where the conformance was defined must produce concrete
+    // conformances.
+    //
+    // FIXME: Eliminate this, perhaps by adding a variant of
+    // lookupConformance() taking a generic signature.
+    if (substTy->hasTypeParameter())
+      substTy = getDeclContext()->mapTypeIntoContext(substTy);
+
+    auto reqConformance = module->lookupConformance(substTy, reqProto);
+    if (!reqConformance)
+      reqConformance = ProtocolConformanceRef::forInvalid();
+
+    reqConformance = reqConformance->mapConformanceOutOfContext();
+    reqConformances.push_back(*reqConformance);
+  }
+  setSignatureConformances(reqConformances);
+}
+
 Witness RootProtocolConformance::getWitness(ValueDecl *requirement,
                                             LazyResolver *resolver) const {
   ROOT_CONFORMANCE_SUBCLASS_DISPATCH(getWitness, (requirement, resolver))
@@ -1068,6 +1161,9 @@ SpecializedProtocolConformance::getTypeWitnessAndDecl(
                       AssociatedTypeDecl *assocType, 
                       LazyResolver *resolver,
                       SubstOptions options) const {
+  assert(getProtocol() == cast<ProtocolDecl>(assocType->getDeclContext()) &&
+         "associated type in wrong protocol");
+
   // If we've already created this type witness, return it.
   auto known = TypeWitnesses.find(assocType);
   if (known != TypeWitnesses.end()) {

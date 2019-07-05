@@ -654,6 +654,10 @@ public:
   /// with the conformance requirements in the requirement signature (in order).
   std::function<void(ProtocolConformanceRef)> populateSignatureConformances();
 
+  /// Populate the signature conformances without checking if they satisfy
+  /// requirements. Can only be used with parsed or imported conformances.
+  void finishSignatureConformances();
+
   /// Determine whether the witness for the given type requirement
   /// is the default definition.
   bool usesDefaultDefinition(AssociatedTypeDecl *requirement) const {

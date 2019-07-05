@@ -7723,58 +7723,6 @@ static void finishTypeWitnesses(
   }
 }
 
-/// A stripped-down version of Type::subst that only works on non-generic
-/// associated types.
-///
-/// This is used to finish a conformance for a concrete imported type that may
-/// rely on default associated types defined in protocol extensions...without
-/// having to do all the work of gathering conformances from scratch.
-static Type
-recursivelySubstituteBaseType(const NormalProtocolConformance *conformance,
-                              DependentMemberType *depMemTy) {
-  Type origBase = depMemTy->getBase();
-  if (auto *depBase = origBase->getAs<DependentMemberType>()) {
-    Type substBase = recursivelySubstituteBaseType(conformance, depBase);
-    ModuleDecl *module = conformance->getDeclContext()->getParentModule();
-    return depMemTy->substBaseType(module, substBase);
-  }
-
-  const ProtocolDecl *proto = conformance->getProtocol();
-  assert(origBase->isEqual(proto->getSelfInterfaceType()));
-  (void)proto;
-  return conformance->getTypeWitness(depMemTy->getAssocType(),
-                                     /*resolver=*/nullptr);
-}
-
-/// Collect conformances for the requirement signature.
-static void finishSignatureConformances(
-    NormalProtocolConformance *conformance) {
-  auto *proto = conformance->getProtocol();
-
-  SmallVector<ProtocolConformanceRef, 4> reqConformances;
-  for (const auto &req : proto->getRequirementSignature()) {
-    if (req.getKind() != RequirementKind::Conformance)
-      continue;
-
-    Type substTy;
-    auto origTy = req.getFirstType();
-    if (origTy->isEqual(proto->getSelfInterfaceType())) {
-      substTy = conformance->getType();
-    } else {
-      auto *depMemTy = origTy->castTo<DependentMemberType>();
-      substTy = recursivelySubstituteBaseType(conformance, depMemTy);
-    }
-    auto reqProto = req.getSecondType()->castTo<ProtocolType>()->getDecl();
-
-    ModuleDecl *M = conformance->getDeclContext()->getParentModule();
-    auto reqConformance = M->lookupConformance(substTy, reqProto);
-    assert(reqConformance && reqConformance->isConcrete() &&
-           "required conformance not found");
-    reqConformances.push_back(*reqConformance);
-  }
-  conformance->setSignatureConformances(reqConformances);
-}
-
 /// Create witnesses for requirements not already met.
 static void finishMissingOptionalWitnesses(
     NormalProtocolConformance *conformance) {
@@ -7820,7 +7768,7 @@ void ClangImporter::Implementation::finishNormalConformance(
                                     conformance);
 
   finishTypeWitnesses(conformance);
-  finishSignatureConformances(conformance);
+  conformance->finishSignatureConformances();
 
   // Imported conformances to @objc protocols also require additional
   // initialization to complete the requirement to witness mapping.
