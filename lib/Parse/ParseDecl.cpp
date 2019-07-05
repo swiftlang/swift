@@ -3010,8 +3010,23 @@ Parser::parseDecl(ParseDeclOptions Flags,
           Tok.is(tok::l_paren) && peekToken().isIdentifierOrUnderscore();
 
       if (IsProbablyVarDecl || IsProbablyTupleDecl) {
+
+        DescriptiveDeclKind DescriptiveKind;
+
+        switch (StaticSpelling) {
+          case StaticSpellingKind::None:
+            DescriptiveKind = DescriptiveDeclKind::Property;
+            break;
+          case StaticSpellingKind::KeywordStatic:
+            DescriptiveKind = DescriptiveDeclKind::StaticProperty;
+            break;
+          case StaticSpellingKind::KeywordClass:
+            llvm_unreachable("kw_class is only parsed as a modifier if it's "
+                             "followed by a keyword");
+        }
+
         diagnose(Tok.getLoc(), diag::expected_keyword_in_decl, "var",
-                 "property")
+                 DescriptiveKind)
             .fixItInsert(Tok.getLoc(), "var ");
         parseLetOrVar(/*HasLetOrVarKeyword=*/false);
         break;
@@ -3021,8 +3036,27 @@ Parser::parseDecl(ParseDeclOptions Flags,
           Tok.isIdentifierOrUnderscore() || Tok.isAnyOperator();
 
       if (IsProbablyFuncDecl) {
+
+        DescriptiveDeclKind DescriptiveKind;
+
+        if (Tok.isAnyOperator()) {
+          DescriptiveKind = DescriptiveDeclKind::OperatorFunction;
+        } else {
+          switch (StaticSpelling) {
+            case StaticSpellingKind::None:
+              DescriptiveKind = DescriptiveDeclKind::Method;
+              break;
+            case StaticSpellingKind::KeywordStatic:
+              DescriptiveKind = DescriptiveDeclKind::StaticMethod;
+              break;
+            case StaticSpellingKind::KeywordClass:
+              llvm_unreachable("kw_class is only parsed as a modifier if it's "
+                               "followed by a keyword");
+          }
+        }
+
         diagnose(Tok.getLoc(), diag::expected_keyword_in_decl, "func",
-                 "function")
+                 DescriptiveKind)
             .fixItInsert(Tok.getLoc(), "func ");
         parseFunc(/*HasFuncKeyword=*/false);
         break;

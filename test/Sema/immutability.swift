@@ -511,7 +511,7 @@ struct StructWithDelegatingInit {
 struct F {
   mutating mutating mutating f() { // expected-error 2 {{duplicate modifier}}
                                    // expected-note@-1 2 {{modifier already specified here}}
-                                   // expected-error@-2 {{expected 'func' keyword in function declaration}}
+                                   // expected-error@-2 {{expected 'func' keyword in instance method declaration}}
   }
   
   mutating nonmutating func g() {}  // expected-error {{method must not be declared both 'mutating' and 'nonmutating'}}

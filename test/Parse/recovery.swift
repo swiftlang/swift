@@ -542,14 +542,14 @@ func use_BracesInsideNominalDecl1() {
 
 class SR771 {
     print("No one else was in the room where it happened") // expected-note {{'print()' previously declared here}}
-    // expected-error @-1 {{expected 'func' keyword in function declaration}}
+    // expected-error @-1 {{expected 'func' keyword in instance method declaration}}
     // expected-error @-2 {{expected '{' in body of function declaration}}
     // expected-error @-3 {{expected parameter name followed by ':'}}
 }
 
 extension SR771 {
     print("The room where it happened, the room where it happened")
-    // expected-error @-1 {{expected 'func' keyword in function declaration}}
+    // expected-error @-1 {{expected 'func' keyword in instance method declaration}}
     // expected-error @-2 {{invalid redeclaration of 'print()'}}
     // expected-error @-3 {{expected parameter name followed by ':'}}
 }
@@ -558,7 +558,7 @@ extension SR771 {
 //===--- Recovery for wrong decl introducer keyword.
 
 class WrongDeclIntroducerKeyword1 {
-  notAKeyword() {} // expected-error {{expected 'func' keyword in function declaration}}
+  notAKeyword() {} // expected-error {{expected 'func' keyword in instance method declaration}}
   func foo() {}
   class func bar() {}
 }

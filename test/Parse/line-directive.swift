@@ -24,7 +24,7 @@ x x // expected-error{{consecutive statements}} {{2-2=;}}
 
 // rdar://19582475
 public struct S { // expected-note{{in declaration of 'S'}}
-// expected-error@+8{{expected 'func' keyword in function declaration}}
+// expected-error@+8{{expected 'func' keyword in operator function declaration}}
 // expected-error@+7{{operator '/' declared in type 'S' must be 'static'}}
 // expected-error@+6{{expected '(' in argument list of function declaration}}
 // expected-error@+5{{operators must have one or two arguments}}
