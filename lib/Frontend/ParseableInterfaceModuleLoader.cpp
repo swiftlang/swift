@@ -273,7 +273,7 @@ static Optional<StringRef> getRelativeDepPath(StringRef DepPath,
 /// output path.
 /// \note Needs to be in the swift namespace so CompilerInvocation can see it.
 class swift::ParseableInterfaceBuilder {
-  llvm::vfs::OverlayFileSystem &fs;
+  llvm::vfs::FileSystem &fs;
   DiagnosticEngine &diags;
   const StringRef interfacePath;
   const StringRef moduleName;
@@ -765,7 +765,7 @@ class ParseableInterfaceModuleLoaderImpl {
   using AccessPathElem = std::pair<Identifier, SourceLoc>;
   friend class swift::ParseableInterfaceModuleLoader;
   ASTContext &ctx;
-  llvm::vfs::OverlayFileSystem &fs;
+  llvm::vfs::FileSystem &fs;
   DiagnosticEngine &diags;
   ModuleRebuildInfo rebuildInfo;
   const StringRef modulePath;
