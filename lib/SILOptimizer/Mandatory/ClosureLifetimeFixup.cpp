@@ -691,7 +691,7 @@ static bool fixupCopyBlockWithoutEscaping(CopyBlockWithoutEscapingInst *cb,
       SILValue v = sentinelClosure;
       SILValue isEscaping = b.createIsEscapingClosure(
           loc, v, IsEscapingClosureInst::ObjCEscaping);
-      b.createCondFail(loc, isEscaping);
+      b.createCondFail(loc, isEscaping, "non-escaping closure has escaped");
       b.createDestroyValue(loc, v);
       return true;
     }
@@ -705,7 +705,7 @@ static bool fixupCopyBlockWithoutEscaping(CopyBlockWithoutEscapingInst *cb,
       SILValue V = sentinelClosure;
       SILValue isEscaping = B.createIsEscapingClosure(
           loc, V, IsEscapingClosureInst::ObjCEscaping);
-      B.createCondFail(loc, isEscaping);
+      B.createCondFail(loc, isEscaping, "non-escaping closure has escaped");
       B.createDestroyValue(loc, V);
     }
 
@@ -773,7 +773,7 @@ static bool fixupCopyBlockWithoutEscaping(CopyBlockWithoutEscapingInst *cb,
     SILValue v = updater.GetValueInMiddleOfBlock(singleDestroy->getParent());
     SILValue isEscaping =
         b.createIsEscapingClosure(loc, v, IsEscapingClosureInst::ObjCEscaping);
-    b.createCondFail(loc, isEscaping);
+    b.createCondFail(loc, isEscaping, "non-escaping closure has escaped");
     b.createDestroyValue(loc, v);
   }
 

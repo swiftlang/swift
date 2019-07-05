@@ -626,7 +626,7 @@ static ManagedValue emitBuiltinCondFail(SILGenFunction &SGF,
                                         SGFContext C) {
   assert(args.size() == 1 && "condfail should be given one argument");
   
-  SGF.B.createCondFail(loc, args[0].getUnmanagedValue());
+  SGF.B.createCondFail(loc, args[0].getUnmanagedValue(), "runtime failure");
   return ManagedValue::forUnmanaged(SGF.emitEmptyTuple(loc));
 }
 
