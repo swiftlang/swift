@@ -87,10 +87,8 @@ protected:
     SourceManager sourceMgr;
 
     // Create a file system that tracks how many times a file has been opened.
-    llvm::IntrusiveRefCntPtr<OpenTrackingFileSystem> baseFS(
-        new OpenTrackingFileSystem(sourceMgr.getFileSystem()));
-    auto fs = llvm::IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem>(
-        new llvm::vfs::OverlayFileSystem(baseFS));
+    llvm::IntrusiveRefCntPtr<OpenTrackingFileSystem> fs(
+      new OpenTrackingFileSystem(sourceMgr.getFileSystem()));
 
     sourceMgr.setFileSystem(fs);
     PrintingDiagnosticConsumer printingConsumer;
@@ -128,7 +126,7 @@ protected:
     ASSERT_TRUE(fs->exists(cachedModulePath));
 
     // Assert that we've only opened this file once, to write it.
-    ASSERT_EQ((unsigned)1, baseFS->numberOfOpens(cachedModulePath));
+    ASSERT_EQ((unsigned)1, fs->numberOfOpens(cachedModulePath));
 
     auto bufOrErr = fs->getBufferForFile(cachedModulePath);
     ASSERT_TRUE(bufOrErr);
