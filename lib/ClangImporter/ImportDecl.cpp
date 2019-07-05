@@ -7747,7 +7747,7 @@ static void finishMissingOptionalWitnesses(
       conformance->setWitness(valueReq, valueReq);
     } else {
       // An initializer that conforms to a requirement is required.
-      auto witness = conformance->getWitness(valueReq, nullptr).getDecl();
+      auto witness = conformance->getWitness(valueReq).getDecl();
       if (auto ctor = dyn_cast_or_null<ConstructorDecl>(witness)) {
         if (!ctor->getAttrs().hasAttribute<RequiredAttr>()) {
           auto &ctx = proto->getASTContext();

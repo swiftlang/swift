@@ -1333,7 +1333,7 @@ isUnsatisfiedReq(NormalProtocolConformance *conformance, ValueDecl *req) {
   if (isa<TypeDecl>(req)) return false;
 
   auto witness = conformance->hasWitness(req)
-    ? conformance->getWitness(req, nullptr).getDecl()
+    ? conformance->getWitness(req).getDecl()
     : nullptr;
 
   // An optional requirement might not have a witness...
@@ -2031,7 +2031,7 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
   llvm::SmallString<128> withAssocTypes;
   for (auto assocType : conformance->getProtocol()->getAssociatedTypeMembers()) {
     if (conformance->usesDefaultDefinition(assocType)) {
-      Type witness = conformance->getTypeWitness(assocType, nullptr);
+      Type witness = conformance->getTypeWitness(assocType);
       addAssocTypeDeductionString(withAssocTypes, assocType, witness);
     }
   }
@@ -2202,7 +2202,7 @@ void ConformanceChecker::recordWitness(ValueDecl *requirement,
                                        const RequirementMatch &match) {
   // If we already recorded this witness, don't do so again.
   if (Conformance->hasWitness(requirement)) {
-    assert(Conformance->getWitness(requirement, nullptr).getDecl() ==
+    assert(Conformance->getWitness(requirement).getDecl() ==
              match.Witness && "Deduced different witnesses?");
     return;
   }
@@ -2221,7 +2221,7 @@ void ConformanceChecker::recordWitness(ValueDecl *requirement,
 void ConformanceChecker::recordOptionalWitness(ValueDecl *requirement) {
   // If we already recorded this witness, don't do so again.
   if (Conformance->hasWitness(requirement)) {
-    assert(!Conformance->getWitness(requirement, nullptr).getDecl() &&
+    assert(!Conformance->getWitness(requirement).getDecl() &&
            "Already have a non-optional witness?");
     return;
   }
@@ -2235,7 +2235,7 @@ void ConformanceChecker::recordInvalidWitness(ValueDecl *requirement) {
 
   // If we already recorded this witness, don't do so again.
   if (Conformance->hasWitness(requirement)) {
-    assert(!Conformance->getWitness(requirement, nullptr).getDecl() &&
+    assert(!Conformance->getWitness(requirement).getDecl() &&
            "Already have a non-optional witness?");
     return;
   }
@@ -2393,7 +2393,7 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
 
   // If we already recoded this type witness, there's nothing to do.
   if (Conformance->hasTypeWitness(assocType)) {
-    assert(Conformance->getTypeWitness(assocType, nullptr)->isEqual(type) &&
+    assert(Conformance->getTypeWitness(assocType)->isEqual(type) &&
            "Conflicting type witness deductions");
     return;
   }
@@ -2947,7 +2947,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
   // If any of the type witnesses was erroneous, don't bother to check
   // this value witness: it will fail.
   for (auto assocType : getReferencedAssociatedTypes(requirement)) {
-    if (Conformance->getTypeWitness(assocType, nullptr)->hasError()) {
+    if (Conformance->getTypeWitness(assocType)->hasError()) {
       return ResolveWitnessResult::ExplicitFailed;
     }
   }
@@ -2957,7 +2957,6 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
 
   // Can a witness for this requirement be derived for this nominal type?
   if (auto derivable = DerivedConformance::getDerivableRequirement(
-                         TC,
                          nominal,
                          requirement)) {
     if (derivable == requirement) {
@@ -2971,7 +2970,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
             TypeChecker::conformsToProtocol(Adoptee, derivableProto,
                                             DC, None)) {
         if (conformance->isConcrete())
-          (void)conformance->getConcrete()->getWitnessDecl(derivable, &TC);
+          (void)conformance->getConcrete()->getWitnessDecl(derivable);
       }
     }
   }
@@ -3669,7 +3668,7 @@ void ConformanceChecker::resolveValueWitnesses() {
     /// Local function to finalize the witness.
     auto finalizeWitness = [&] {
       // Find the witness.
-      auto witness = Conformance->getWitness(requirement, nullptr).getDecl();
+      auto witness = Conformance->getWitness(requirement).getDecl();
       if (!witness) return;
 
       // Make sure that we finalize the witness, so we can emit this
@@ -5091,7 +5090,7 @@ swift::findWitnessedObjCRequirements(const ValueDecl *witness,
       }
       if (!*conformance) continue;
 
-      const Decl *found = (*conformance)->getWitnessDecl(req, nullptr);
+      const Decl *found = (*conformance)->getWitnessDecl(req);
 
       if (!found) {
         // If we have an optional requirement in an inherited conformance,

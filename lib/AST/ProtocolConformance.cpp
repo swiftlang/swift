@@ -202,8 +202,7 @@ ProtocolConformanceRef::getWitnessByName(Type type, DeclName name) const {
     return ConcreteDeclRef(requirement, subs);
   }
 
-  auto *resolver = proto->getASTContext().getLazyResolver();
-  return getConcrete()->getWitnessDeclRef(requirement, resolver);
+  return getConcrete()->getWitnessDeclRef(requirement);
 }
 
 void *ProtocolConformance::operator new(size_t bytes, ASTContext &context,
@@ -278,49 +277,42 @@ NormalProtocolConformance *ProtocolConformance::getImplyingConformance() const {
 }
 
 bool
-ProtocolConformance::hasTypeWitness(AssociatedTypeDecl *assocType,
-                                    LazyResolver *resolver) const {
-  CONFORMANCE_SUBCLASS_DISPATCH(hasTypeWitness, (assocType, resolver));
+ProtocolConformance::hasTypeWitness(AssociatedTypeDecl *assocType) const {
+  CONFORMANCE_SUBCLASS_DISPATCH(hasTypeWitness, (assocType));
 }
 
 std::pair<Type, TypeDecl *>
 ProtocolConformance::getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
-                                           LazyResolver *resolver,
                                            SubstOptions options) const {
   CONFORMANCE_SUBCLASS_DISPATCH(getTypeWitnessAndDecl,
-                                (assocType, resolver, options))
+                                (assocType, options))
 }
 
 Type ProtocolConformance::getTypeWitness(AssociatedTypeDecl *assocType,
-                                         LazyResolver *resolver,
                                          SubstOptions options) const {
-  return getTypeWitnessAndDecl(assocType, resolver, options).first;
+  return getTypeWitnessAndDecl(assocType, options).first;
 }
 
 ConcreteDeclRef
-ProtocolConformance::getWitnessDeclRef(ValueDecl *requirement,
-                                       LazyResolver *resolver) const {
-  CONFORMANCE_SUBCLASS_DISPATCH(getWitnessDeclRef, (requirement, resolver))
+ProtocolConformance::getWitnessDeclRef(ValueDecl *requirement) const {
+  CONFORMANCE_SUBCLASS_DISPATCH(getWitnessDeclRef, (requirement))
 }
 
-ValueDecl *ProtocolConformance::getWitnessDecl(ValueDecl *requirement,
-                                               LazyResolver *resolver) const {
+ValueDecl *ProtocolConformance::getWitnessDecl(ValueDecl *requirement) const {
   switch (getKind()) {
   case ProtocolConformanceKind::Normal:
-    return cast<NormalProtocolConformance>(this)->getWitness(requirement,
-                                                             resolver)
+    return cast<NormalProtocolConformance>(this)->getWitness(requirement)
       .getDecl();
   case ProtocolConformanceKind::Self:
-    return cast<SelfProtocolConformance>(this)->getWitness(requirement,
-                                                           resolver)
+    return cast<SelfProtocolConformance>(this)->getWitness(requirement)
       .getDecl();
   case ProtocolConformanceKind::Inherited:
     return cast<InheritedProtocolConformance>(this)
-      ->getInheritedConformance()->getWitnessDecl(requirement, resolver);
+      ->getInheritedConformance()->getWitnessDecl(requirement);
 
   case ProtocolConformanceKind::Specialized:
     return cast<SpecializedProtocolConformance>(this)
-      ->getGenericConformance()->getWitnessDecl(requirement, resolver);
+      ->getGenericConformance()->getWitnessDecl(requirement);
   }
   llvm_unreachable("unhandled kind");
 }
@@ -678,8 +670,8 @@ namespace {
   };
 } // end anonymous namespace
 
-bool NormalProtocolConformance::hasTypeWitness(AssociatedTypeDecl *assocType,
-                                               LazyResolver *resolver) const {
+bool NormalProtocolConformance::hasTypeWitness(
+                                         AssociatedTypeDecl *assocType) const {
   if (Loader)
     resolveLazyInfo();
 
@@ -687,20 +679,13 @@ bool NormalProtocolConformance::hasTypeWitness(AssociatedTypeDecl *assocType,
   if (found != TypeWitnesses.end()) {
     return !found->getSecond().first.isNull();
   }
-  if (resolver) {
-    PrettyStackTraceRequirement trace("resolving", this, assocType);
-    resolver->resolveTypeWitness(this, assocType);
-    if (TypeWitnesses.find(assocType) != TypeWitnesses.end()) {
-      return true;
-    }
-  }
+
   return false;
 }
 
 using TypeWitnessAndDecl = std::pair<Type, TypeDecl *>;
 TypeWitnessAndDecl
 NormalProtocolConformance::getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
-                                                 LazyResolver *resolver,
                                                  SubstOptions options) const {
   if (Loader)
     resolveLazyInfo();
@@ -731,7 +716,7 @@ NormalProtocolConformance::getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
 
   // Otherwise, resolve the type witness.
   PrettyStackTraceRequirement trace("resolving", this, assocType);
-  if (!resolver) resolver = assocType->getASTContext().getLazyResolver();
+  auto *resolver = assocType->getASTContext().getLazyResolver();
   assert(resolver && "Unable to resolve type witness");
 
   // Block recursive resolution of this type witness.
@@ -756,18 +741,16 @@ void NormalProtocolConformance::setTypeWitness(AssociatedTypeDecl *assocType,
   TypeWitnesses[assocType] = std::make_pair(type, typeDecl);
 }
 
-Type ProtocolConformance::getAssociatedType(Type assocType,
-                                            LazyResolver *resolver) const {
+Type ProtocolConformance::getAssociatedType(Type assocType) const {
   assert(assocType->isTypeParameter() &&
          "associated type must be a type parameter");
 
   ProtocolConformanceRef ref(const_cast<ProtocolConformance*>(this));
-  return ref.getAssociatedType(getType(), assocType, resolver);
+  return ref.getAssociatedType(getType(), assocType);
 }
 
 Type ProtocolConformanceRef::getAssociatedType(Type conformingType,
-                                               Type assocType,
-                                               LazyResolver *resolver) const {
+                                               Type assocType) const {
   assert(!isConcrete() || getConcrete()->getType()->isEqual(conformingType));
 
   auto type = assocType->getCanonicalType();
@@ -785,7 +768,7 @@ Type ProtocolConformanceRef::getAssociatedType(Type conformingType,
   if (memberType.getBase()->isEqual(proto->getSelfInterfaceType()) &&
       memberType->getAssocType()->getProtocol() == proto &&
       isConcrete())
-    return getConcrete()->getTypeWitness(memberType->getAssocType(), resolver);
+    return getConcrete()->getTypeWitness(memberType->getAssocType());
 
   // General case: consult the substitution map.
   auto substMap =
@@ -796,13 +779,12 @@ Type ProtocolConformanceRef::getAssociatedType(Type conformingType,
 ProtocolConformanceRef
 ProtocolConformanceRef::getAssociatedConformance(Type conformingType,
                                                  Type assocType,
-                                                 ProtocolDecl *protocol,
-                                                 LazyResolver *resolver) const {
+                                                 ProtocolDecl *protocol) const {
   // If this is a concrete conformance, look up the associated conformance.
   if (isConcrete()) {
     auto conformance = getConcrete();
     assert(conformance->getType()->isEqual(conformingType));
-    return conformance->getAssociatedConformance(assocType, protocol, resolver);
+    return conformance->getAssociatedConformance(assocType, protocol);
   }
 
   // Otherwise, apply the substitution {self -> conformingType}
@@ -817,16 +799,14 @@ ProtocolConformanceRef::getAssociatedConformance(Type conformingType,
 
 ProtocolConformanceRef
 ProtocolConformance::getAssociatedConformance(Type assocType,
-                                               ProtocolDecl *protocol,
-                                               LazyResolver *resolver) const {
+                                               ProtocolDecl *protocol) const {
   CONFORMANCE_SUBCLASS_DISPATCH(getAssociatedConformance,
-                                (assocType, protocol, resolver))
+                                (assocType, protocol))
 }
 
 ProtocolConformanceRef
 NormalProtocolConformance::getAssociatedConformance(Type assocType,
-                                                    ProtocolDecl *protocol,
-                                                LazyResolver *resolver) const {
+                                                ProtocolDecl *protocol) const {
   assert(assocType->isTypeParameter() &&
          "associated type must be a type parameter");
 
@@ -886,8 +866,7 @@ recursivelySubstituteBaseType(ModuleDecl *module,
         conformance->getType(), reqProto)->getConcrete();
   }
 
-  return reqConformance->getTypeWitness(depMemTy->getAssocType(),
-                                        /*resolver=*/nullptr);
+  return reqConformance->getTypeWitness(depMemTy->getAssocType());
 }
 
 /// Collect conformances for the requirement signature.
@@ -946,14 +925,12 @@ void NormalProtocolConformance::finishSignatureConformances() {
   setSignatureConformances(reqConformances);
 }
 
-Witness RootProtocolConformance::getWitness(ValueDecl *requirement,
-                                            LazyResolver *resolver) const {
-  ROOT_CONFORMANCE_SUBCLASS_DISPATCH(getWitness, (requirement, resolver))
+Witness RootProtocolConformance::getWitness(ValueDecl *requirement) const {
+  ROOT_CONFORMANCE_SUBCLASS_DISPATCH(getWitness, (requirement))
 }
 
 /// Retrieve the value witness corresponding to the given requirement.
-Witness NormalProtocolConformance::getWitness(ValueDecl *requirement,
-                                              LazyResolver *resolver) const {
+Witness NormalProtocolConformance::getWitness(ValueDecl *requirement) const {
   assert(!isa<AssociatedTypeDecl>(requirement) && "Request type witness");
   assert(requirement->isProtocolRequirement() && "Not a requirement");
 
@@ -962,7 +939,7 @@ Witness NormalProtocolConformance::getWitness(ValueDecl *requirement,
 
   auto known = Mapping.find(requirement);
   if (known == Mapping.end()) {
-    if (!resolver) resolver = requirement->getASTContext().getLazyResolver();
+    auto *resolver = requirement->getASTContext().getLazyResolver();
     assert(resolver && "Unable to resolve witness without resolver");
     resolver->resolveWitness(this, requirement);
     known = Mapping.find(requirement);
@@ -976,15 +953,13 @@ Witness NormalProtocolConformance::getWitness(ValueDecl *requirement,
   }
 }
 
-Witness SelfProtocolConformance::getWitness(ValueDecl *requirement,
-                                            LazyResolver *resolver) const {
+Witness SelfProtocolConformance::getWitness(ValueDecl *requirement) const {
   return Witness(requirement, SubstitutionMap(), nullptr, SubstitutionMap());
 }
 
 ConcreteDeclRef
-RootProtocolConformance::getWitnessDeclRef(ValueDecl *requirement,
-                                           LazyResolver *resolver) const {
-  if (auto witness = getWitness(requirement, resolver)) {
+RootProtocolConformance::getWitnessDeclRef(ValueDecl *requirement) const {
+  if (auto witness = getWitness(requirement)) {
     auto *witnessDecl = witness.getDecl();
 
     // If the witness is generic, you have to call getWitness() and build
@@ -1061,16 +1036,14 @@ void SpecializedProtocolConformance::computeConditionalRequirements() const {
 }
 
 bool SpecializedProtocolConformance::hasTypeWitness(
-                      AssociatedTypeDecl *assocType, 
-                      LazyResolver *resolver) const {
+                                         AssociatedTypeDecl *assocType) const {
   return TypeWitnesses.find(assocType) != TypeWitnesses.end() ||
-         GenericConformance->hasTypeWitness(assocType, resolver);
+         GenericConformance->hasTypeWitness(assocType);
 }
 
 std::pair<Type, TypeDecl *>
 SpecializedProtocolConformance::getTypeWitnessAndDecl(
                       AssociatedTypeDecl *assocType, 
-                      LazyResolver *resolver,
                       SubstOptions options) const {
   assert(getProtocol() == cast<ProtocolDecl>(assocType->getDeclContext()) &&
          "associated type in wrong protocol");
@@ -1090,11 +1063,11 @@ SpecializedProtocolConformance::getTypeWitnessAndDecl(
     if (root->getState() != ProtocolConformanceState::CheckingTypeWitnesses)
       return false;
 
-    return !root->hasTypeWitness(assocType, nullptr);
+    return !root->hasTypeWitness(assocType);
   };
 
   auto genericWitnessAndDecl
-    = GenericConformance->getTypeWitnessAndDecl(assocType, resolver, options);
+    = GenericConformance->getTypeWitnessAndDecl(assocType, options);
 
   auto genericWitness = genericWitnessAndDecl.first;
   if (!genericWitness)
@@ -1127,26 +1100,24 @@ SpecializedProtocolConformance::getTypeWitnessAndDecl(
 
 ProtocolConformanceRef
 SpecializedProtocolConformance::getAssociatedConformance(Type assocType,
-                                                ProtocolDecl *protocol,
-                                                LazyResolver *resolver) const {
+                                                ProtocolDecl *protocol) const {
   ProtocolConformanceRef conformance =
-    GenericConformance->getAssociatedConformance(assocType, protocol, resolver);
+    GenericConformance->getAssociatedConformance(assocType, protocol);
 
   auto subMap = getSubstitutionMap();
 
   Type origType =
     (conformance.isConcrete()
        ? conformance.getConcrete()->getType()
-       : GenericConformance->getAssociatedType(assocType, resolver));
+       : GenericConformance->getAssociatedType(assocType));
 
   return conformance.subst(origType, subMap);
 }
 
 ConcreteDeclRef
 SpecializedProtocolConformance::getWitnessDeclRef(
-                                              ValueDecl *requirement,
-                                              LazyResolver *resolver) const {
-  auto baseWitness = GenericConformance->getWitnessDeclRef(requirement, resolver);
+                                              ValueDecl *requirement) const {
+  auto baseWitness = GenericConformance->getWitnessDeclRef(requirement);
   if (!baseWitness || !baseWitness.isSpecialized())
     return baseWitness;
 
@@ -1161,11 +1132,9 @@ SpecializedProtocolConformance::getWitnessDeclRef(
 
 ProtocolConformanceRef
 InheritedProtocolConformance::getAssociatedConformance(Type assocType,
-                         ProtocolDecl *protocol,
-                         LazyResolver *resolver) const {
+                                                ProtocolDecl *protocol) const {
   auto underlying =
-    InheritedConformance->getAssociatedConformance(assocType, protocol,
-                                                   resolver);
+    InheritedConformance->getAssociatedConformance(assocType, protocol);
 
 
   // If the conformance is for Self, return an inherited conformance.
@@ -1182,10 +1151,9 @@ InheritedProtocolConformance::getAssociatedConformance(Type assocType,
 }
 
 ConcreteDeclRef
-InheritedProtocolConformance::getWitnessDeclRef(ValueDecl *requirement,
-                                                LazyResolver *resolver) const {
+InheritedProtocolConformance::getWitnessDeclRef(ValueDecl *requirement) const {
   // FIXME: substitutions?
-  return InheritedConformance->getWitnessDeclRef(requirement, resolver);
+  return InheritedConformance->getWitnessDeclRef(requirement);
 }
 
 const NormalProtocolConformance *

@@ -3829,7 +3829,7 @@ bool ClassDecl::isIncompatibleWithWeakReferences() const {
   return false;
 }
 
-bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {
+bool ClassDecl::inheritsSuperclassInitializers() {
   // Check whether we already have a cached answer.
   if (addedImplicitInitializers())
     return Bits.ClassDecl.InheritsSuperclassInits;
@@ -3848,9 +3848,7 @@ bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {
 
   // Otherwise, do all the work of resolving constructors, which will also
   // calculate the right answer.
-  if (resolver == nullptr)
-    resolver = getASTContext().getLazyResolver();
-  if (resolver)
+  if (auto *resolver = getASTContext().getLazyResolver())
     resolver->resolveImplicitConstructors(this);
 
   return Bits.ClassDecl.InheritsSuperclassInits;
@@ -4559,7 +4557,7 @@ bool ProtocolDecl::isAvailableInExistential(const ValueDecl *decl) const {
   return true;
 }
 
-bool ProtocolDecl::existentialTypeSupportedSlow(LazyResolver *resolver) {
+bool ProtocolDecl::existentialTypeSupportedSlow() {
   // Assume for now that the existential type is supported; this
   // prevents circularity issues.
   Bits.ProtocolDecl.ExistentialTypeSupportedValid = true;
@@ -4580,8 +4578,9 @@ bool ProtocolDecl::existentialTypeSupportedSlow(LazyResolver *resolver) {
 
     // For value members, look at their type signatures.
     if (auto valueMember = dyn_cast<ValueDecl>(member)) {
-      if (resolver && !valueMember->hasInterfaceType())
-        resolver->resolveDeclSignature(valueMember);
+      if (!valueMember->hasInterfaceType())
+        if (auto *resolver = getASTContext().getLazyResolver())
+          resolver->resolveDeclSignature(valueMember);
 
       if (!isAvailableInExistential(valueMember)) {
         Bits.ProtocolDecl.ExistentialTypeSupported = false;
@@ -4593,7 +4592,7 @@ bool ProtocolDecl::existentialTypeSupportedSlow(LazyResolver *resolver) {
   // Check whether all of the inherited protocols can have existential
   // types themselves.
   for (auto proto : getInheritedProtocols()) {
-    if (!proto->existentialTypeSupported(resolver)) {
+    if (!proto->existentialTypeSupported()) {
       Bits.ProtocolDecl.ExistentialTypeSupported = false;
       return false;
     }

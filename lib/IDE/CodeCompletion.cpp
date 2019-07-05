@@ -2104,8 +2104,7 @@ public:
             BaseTy, ATD->getProtocol());
         if (Conformance && Conformance->isConcrete()) {
           return Conformance->getConcrete()
-              ->getTypeWitness(const_cast<AssociatedTypeDecl *>(ATD),
-                               nullptr);
+              ->getTypeWitness(const_cast<AssociatedTypeDecl *>(ATD));
         }
       }
     }

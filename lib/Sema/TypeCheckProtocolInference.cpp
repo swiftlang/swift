@@ -355,7 +355,7 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
       // witness completely.
       if (!allUnresolved.count(result.first)) {
         auto existingWitness =
-        conformance->getTypeWitness(result.first, nullptr);
+        conformance->getTypeWitness(result.first);
         existingWitness = dc->mapTypeIntoContext(existingWitness);
 
         // If the deduced type contains an irreducible
@@ -845,8 +845,7 @@ Type AssociatedTypeInference::computeDefaultTypeWitness(
       continue;
     if (conformance->hasTypeWitness(assocType)) {
       substitutions[archetype] =
-        dc->mapTypeIntoContext(
-                        conformance->getTypeWitness(assocType, nullptr));
+        dc->mapTypeIntoContext(conformance->getTypeWitness(assocType));
     } else {
       auto known = typeWitnesses.begin(assocType);
       if (known != typeWitnesses.end())
@@ -2061,7 +2060,7 @@ void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
   // If any of the type witnesses was erroneous, don't bother to check
   // this value witness: it will fail.
   for (auto assocType : getReferencedAssociatedTypes(requirement)) {
-    if (Conformance->getTypeWitness(assocType, nullptr)->hasError()) {
+    if (Conformance->getTypeWitness(assocType)->hasError()) {
       Conformance->setInvalid();
       return;
     }

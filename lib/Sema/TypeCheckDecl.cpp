@@ -3142,7 +3142,7 @@ public:
     }
 
     // Explicitly calculate this bit.
-    (void) PD->existentialTypeSupported(&TC);
+    (void) PD->existentialTypeSupported();
 
     // Explicity compute the requirement signature to detect errors.
     (void) PD->getRequirementSignature();
@@ -5112,7 +5112,7 @@ void TypeChecker::maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl) {
   // Some heuristics to skip emitting a diagnostic if the class is already
   // irreperably busted.
   if (classDecl->isInvalid() ||
-      classDecl->inheritsSuperclassInitializers(nullptr))
+      classDecl->inheritsSuperclassInitializers())
     return;
 
   auto *superclassDecl = classDecl->getSuperclassDecl();

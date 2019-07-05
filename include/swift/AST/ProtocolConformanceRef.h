@@ -115,15 +115,13 @@ public:
 
   /// Given a dependent type (expressed in terms of this conformance's
   /// protocol), follow it from the conforming type.
-  Type getAssociatedType(Type origType, Type dependentType,
-                         LazyResolver *resolver = nullptr) const;
+  Type getAssociatedType(Type origType, Type dependentType) const;
 
   /// Given a dependent type (expressed in terms of this conformance's
   /// protocol) and conformance, follow it from the conforming type.
   ProtocolConformanceRef
   getAssociatedConformance(Type origType, Type dependentType,
-                           ProtocolDecl *requirement,
-                           LazyResolver *resolver = nullptr) const;
+                           ProtocolDecl *requirement) const;
 
   void dump() const;
   void dump(llvm::raw_ostream &out, unsigned indent = 0) const;
