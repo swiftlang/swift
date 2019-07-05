@@ -47,6 +47,24 @@ Optional<PlatformConditionKind> getPlatformConditionKind(StringRef Name) {
     .Default(None);
 }
 
+/// Get platform condition name from PlatformConditionKind.
+static StringRef getPlatformConditionName(PlatformConditionKind Kind) {
+  switch (Kind) {
+  case PlatformConditionKind::OS:
+    return "os";
+  case PlatformConditionKind::Arch:
+    return "arch";
+  case PlatformConditionKind::Endianness:
+    return "_endian";
+  case PlatformConditionKind::Runtime:
+    return "_runtime";
+  case PlatformConditionKind::CanImport:
+    return "canImport";
+  case PlatformConditionKind::TargetEnvironment:
+    return "targetEnvironment";
+  }
+}
+
 /// Extract source text of the expression.
 static StringRef extractExprSource(SourceManager &SM, Expr *E) {
   CharSourceRange Range =
@@ -265,9 +283,10 @@ public:
       return nullptr;
     }
 
-    std::vector<StringRef> suggestions;
+    PlatformConditionKind suggestedKind = *Kind;
+    std::vector<StringRef> suggestedValues;
     if (!LangOptions::checkPlatformConditionSupported(*Kind, *ArgStr,
-                                                      suggestions)) {
+                                                      suggestedKind, suggestedValues)) {
       if (Kind == PlatformConditionKind::Runtime) {
         // Error for _runtime()
         D.diagnose(Arg->getLoc(),
@@ -294,7 +313,12 @@ public:
       auto Loc = Arg->getLoc();
       D.diagnose(Loc, diag::unknown_platform_condition_argument,
                  DiagName, *KindName);
-      for (auto suggestion : suggestions)
+      if (suggestedKind != *Kind) {
+        auto suggestedKindName = getPlatformConditionName(suggestedKind);
+        D.diagnose(Loc, diag::note_typo_candidate, suggestedKindName)
+          .fixItReplace(E->getFn()->getSourceRange(), suggestedKindName);
+      }
+      for (auto suggestion : suggestedValues)
         D.diagnose(Loc, diag::note_typo_candidate, suggestion)
           .fixItReplace(Arg->getSourceRange(), suggestion);
     }

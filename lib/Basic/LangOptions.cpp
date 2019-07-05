@@ -65,15 +65,73 @@ static const StringRef SupportedConditionalCompilationTargetEnvironments[] = {
   "simulator",
 };
 
+static const PlatformConditionKind AllPlatformConditionKinds[] = {
+  PlatformConditionKind::OS,
+  PlatformConditionKind::Arch,
+  PlatformConditionKind::Endianness,
+  PlatformConditionKind::Runtime,
+  PlatformConditionKind::CanImport,
+  PlatformConditionKind::TargetEnvironment
+};
+
 template <size_t N>
-bool contains(const StringRef (&Array)[N], const StringRef &V,
-              std::vector<StringRef> &suggestions) {
+constexpr int count(const StringRef (&)[N]) {
+  return N;
+}
+
+std::pair<const StringRef*, size_t> getSupportedConditionalCompilationValues(const PlatformConditionKind &Kind) {
+  switch (Kind) {
+  case PlatformConditionKind::OS:
+    return { SupportedConditionalCompilationOSs, count(SupportedConditionalCompilationOSs) };
+  case PlatformConditionKind::Arch:
+    return { SupportedConditionalCompilationArches, count(SupportedConditionalCompilationArches) };
+  case PlatformConditionKind::Endianness:
+    return { SupportedConditionalCompilationEndianness, count(SupportedConditionalCompilationEndianness) };
+  case PlatformConditionKind::Runtime:
+    return { SupportedConditionalCompilationRuntimes, count(SupportedConditionalCompilationRuntimes) };
+  case PlatformConditionKind::CanImport:
+    return { {}, 0 };
+  case PlatformConditionKind::TargetEnvironment:
+    return { SupportedConditionalCompilationTargetEnvironments, count(SupportedConditionalCompilationTargetEnvironments) };
+  }
+}
+
+PlatformConditionKind suggestedPlatformConditionKind(PlatformConditionKind Kind, const StringRef &V,
+                                                     std::vector<StringRef> &suggestedValues) {
+  std::string lower = V.lower();
+  for (const PlatformConditionKind& candidateKind : AllPlatformConditionKinds) {
+    if (candidateKind != Kind) {
+      auto supportedValues = getSupportedConditionalCompilationValues(candidateKind);
+      auto supportedValuesArray = supportedValues.first;
+      auto supportedValuesCount = supportedValues.second;
+      for (unsigned i = 0; i < supportedValuesCount; i++) {
+        auto candidateValue = supportedValuesArray[i];
+        if (candidateValue.lower() == lower) {
+          suggestedValues.clear();
+          if (candidateValue != V) {
+            suggestedValues.emplace_back(candidateValue);
+          }
+          return candidateKind;
+        }
+      }
+    }
+  }
+  return Kind;
+}
+
+bool isMatching(PlatformConditionKind Kind, const StringRef &V,
+                PlatformConditionKind &suggestedKind, std::vector<StringRef> &suggestions) {
   // Compare against known values, ignoring case to avoid penalizing
   // characters with incorrect case.
   unsigned minDistance = std::numeric_limits<unsigned>::max();
   std::string lower = V.lower();
-  for (const StringRef& candidate : Array) {
+  auto supportedValues = getSupportedConditionalCompilationValues(Kind);
+  auto supportedValuesArray = supportedValues.first;
+  auto supportedValuesCount = supportedValues.second;
+  for (unsigned i = 0; i < supportedValuesCount; i++) {
+    auto candidate = supportedValuesArray[i];
     if (candidate == V) {
+      suggestedKind = Kind;
       suggestions.clear();
       return true;
     }
@@ -85,28 +143,21 @@ bool contains(const StringRef (&Array)[N], const StringRef &V,
     if (distance == minDistance)
       suggestions.emplace_back(candidate);
   }
+  suggestedKind = suggestedPlatformConditionKind(Kind, V, suggestions);
   return false;
 }
 
 bool LangOptions::
 checkPlatformConditionSupported(PlatformConditionKind Kind, StringRef Value,
-                                std::vector<StringRef> &suggestions) {
+                                PlatformConditionKind &suggestedKind,
+                                std::vector<StringRef> &suggestedValues) {
   switch (Kind) {
   case PlatformConditionKind::OS:
-    return contains(SupportedConditionalCompilationOSs, Value,
-                    suggestions);
   case PlatformConditionKind::Arch:
-    return contains(SupportedConditionalCompilationArches, Value,
-                    suggestions);
   case PlatformConditionKind::Endianness:
-    return contains(SupportedConditionalCompilationEndianness, Value,
-                    suggestions);
   case PlatformConditionKind::Runtime:
-    return contains(SupportedConditionalCompilationRuntimes, Value,
-                    suggestions);
   case PlatformConditionKind::TargetEnvironment:
-    return contains(SupportedConditionalCompilationTargetEnvironments, Value,
-                    suggestions);
+    return isMatching(Kind, Value, suggestedKind, suggestedValues);
   case PlatformConditionKind::CanImport:
     // All importable names are valid.
     // FIXME: Perform some kind of validation of the string?
