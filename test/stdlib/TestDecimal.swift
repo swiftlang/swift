@@ -335,6 +335,7 @@ class TestDecimal : TestDecimalSuper {
                 expectEqual(.noError, NSDecimalPower(&result, &actual, j, .plain))
                 let expected = Decimal(pow(Double(i), Double(j)))
                 expectEqual(expected, result, "\(result) == \(i)^\(j)")
+                expectEqual(expected, pow(actual, j))
             }
         }
     }

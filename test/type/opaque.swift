@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -disable-availability-checking -typecheck -verify -enable-opaque-result-types %s
+// RUN: %target-swift-frontend -disable-availability-checking -typecheck -verify %s
 
 protocol P {
   func paul()
