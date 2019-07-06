@@ -141,6 +141,20 @@ ProtocolConformanceRef::subst(Type origType,
   llvm_unreachable("Invalid conformance substitution");
 }
 
+ProtocolConformanceRef ProtocolConformanceRef::mapConformanceOutOfContext() const {
+  if (!isConcrete())
+    return *this;
+
+  auto *concrete = getConcrete()->subst(
+      [](SubstitutableType *type) -> Type {
+        if (auto *archetypeType = type->getAs<ArchetypeType>())
+          return archetypeType->getInterfaceType();
+        return type;
+      },
+      MakeAbstractConformanceForGenericType());
+  return ProtocolConformanceRef(concrete);
+}
+
 Type
 ProtocolConformanceRef::getTypeWitnessByName(Type type, Identifier name) const {
   assert(!isInvalid());

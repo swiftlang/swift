@@ -110,6 +110,9 @@ public:
                                LookupConformanceFn conformances,
                                SubstOptions options = None) const;
 
+  /// Map contextual types to interface types in the conformance.
+  ProtocolConformanceRef mapConformanceOutOfContext() const;
+
   /// Given a dependent type (expressed in terms of this conformance's
   /// protocol), follow it from the conforming type.
   Type getAssociatedType(Type origType, Type dependentType,
