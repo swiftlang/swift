@@ -3257,49 +3257,6 @@ lowerKeyPathSubscriptIndexTypes(
   }
 };
 
-/// Map the given protocol conformance out of context, replacing archetypes
-/// with their corresponding interface types.
-static ProtocolConformance *mapConformanceOutOfContext(
-                                         ProtocolConformance *conformance) {
-  if (!conformance->getType()->hasArchetype())
-    return conformance;
-
-  ASTContext &ctx = conformance->getProtocol()->getASTContext();
-  switch (conformance->getKind()) {
-  case ProtocolConformanceKind::Normal:
-  case ProtocolConformanceKind::Self:
-    llvm_unreachable("Normal and self conformances never have archetypes");
-
-  case ProtocolConformanceKind::Inherited: {
-    auto inherited = cast<InheritedProtocolConformance>(conformance);
-    return ctx.getInheritedConformance(
-             inherited->getType()->mapTypeOutOfContext(),
-             mapConformanceOutOfContext(inherited->getInheritedConformance()));
-  }
-
-  case ProtocolConformanceKind::Specialized: {
-    auto specialized = cast<SpecializedProtocolConformance>(conformance);
-    return ctx.getSpecializedConformance(
-             specialized->getType()->mapTypeOutOfContext(),
-             mapConformanceOutOfContext(specialized->getGenericConformance()),
-             specialized->getSubstitutionMap()
-               .mapReplacementTypesOutOfContext());
-  }
-  }
-  llvm_unreachable("covered switch");
-}
-
-/// Map the given protocol conformance out of context, replacing archetypes
-/// with their corresponding interface types.
-static ProtocolConformanceRef mapConformanceOutOfContext(
-                                          ProtocolConformanceRef conformance) {
-  if (conformance.isAbstract())
-    return conformance;
-
-  return ProtocolConformanceRef(
-                        mapConformanceOutOfContext(conformance.getConcrete()));
-}
-
 static void
 lowerKeyPathSubscriptIndexPatterns(
                  SmallVectorImpl<KeyPathPatternComponent::Index> &indexPatterns,
@@ -3310,7 +3267,7 @@ lowerKeyPathSubscriptIndexPatterns(
     CanType formalTy;
     SILType loweredTy;
     std::tie(formalTy, loweredTy) = indexTypes[i];
-    auto hashable = mapConformanceOutOfContext(indexHashables[i]);
+    auto hashable = indexHashables[i].mapConformanceOutOfContext();
     assert(hashable.isAbstract() ||
            hashable.getConcrete()->getType()->isEqual(formalTy));
 

@@ -38,7 +38,6 @@ class ClassDecl;
 class CanType;
 class EnumDecl;
 class GenericSignature;
-class LazyResolver;
 class ModuleDecl;
 class NominalTypeDecl;
 class GenericTypeDecl;

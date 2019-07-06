@@ -1531,7 +1531,7 @@ bool DeclContext::lookupQualified(ArrayRef<NominalTypeDecl *> typeDecls,
       // object initializers.
       bool visitSuperclass = true;
       if (member.getBaseName() == DeclBaseName::createConstructor()) {
-        if (classDecl->inheritsSuperclassInitializers(typeResolver))
+        if (classDecl->inheritsSuperclassInitializers())
           onlyCompleteObjectInits = true;
         else
           visitSuperclass = false;

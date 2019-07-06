@@ -3049,7 +3049,6 @@ static void dumpProtocolConformanceRec(
       out << " lazy";
     } else {
       normal->forEachTypeWitness(
-          nullptr,
           [&](const AssociatedTypeDecl *req, Type ty,
               const TypeDecl *) -> bool {
             out << '\n';
@@ -3060,8 +3059,8 @@ static void dumpProtocolConformanceRec(
             PrintWithColorRAII(out, ParenthesisColor) << ')';
             return false;
           });
-      normal->forEachValueWitness(nullptr, [&](const ValueDecl *req,
-                                               Witness witness) {
+      normal->forEachValueWitness([&](const ValueDecl *req,
+                                      Witness witness) {
         out << '\n';
         out.indent(indent + 2);
         PrintWithColorRAII(out, ParenthesisColor) << '(';

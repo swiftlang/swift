@@ -255,10 +255,10 @@ namespace {
       ValueDecl *witness = nullptr;
       auto concrete = conformance->getConcrete();
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(found)) {
-        witness = concrete->getTypeWitnessAndDecl(assocType, nullptr)
+        witness = concrete->getTypeWitnessAndDecl(assocType)
           .second;
       } else if (found->isProtocolRequirement()) {
-        witness = concrete->getWitnessDecl(found, nullptr);
+        witness = concrete->getWitnessDecl(found);
 
         // It is possible that a requirement is visible to us, but
         // not the witness. In this case, just return the requirement;
@@ -551,9 +551,8 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
           ProtocolConformanceState::CheckingTypeWitnesses)
         continue;
 
-      auto lazyResolver = dc->getASTContext().getLazyResolver();
       auto typeDecl =
-        concrete->getTypeWitnessAndDecl(assocType, lazyResolver).second;
+        concrete->getTypeWitnessAndDecl(assocType).second;
 
       // Circularity.
       if (!typeDecl)

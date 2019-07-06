@@ -3024,7 +3024,6 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
     return failed();
 
   // If we know the associated type, look in the witness table.
-  LazyResolver *resolver = substBase->getASTContext().getLazyResolver();
   if (assocType) {
     auto proto = assocType->getProtocol();
     Optional<ProtocolConformanceRef> conformance
@@ -3036,7 +3035,7 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
 
     // Retrieve the type witness.
     auto witness =
-      conformance->getConcrete()->getTypeWitness(assocType, resolver, options);
+      conformance->getConcrete()->getTypeWitness(assocType, options);
     if (!witness)
       return failed();
 
@@ -3098,9 +3097,7 @@ LookUpConformanceInSignature::operator()(CanType dependentType,
                                conformedProtocol);
 }
 
-Type DependentMemberType::substBaseType(ModuleDecl *module,
-                                        Type substBase,
-                                        LazyResolver *resolver) {
+Type DependentMemberType::substBaseType(ModuleDecl *module, Type substBase) {
   return substBaseType(substBase, LookUpConformanceInModule(module));
 }
 

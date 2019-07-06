@@ -2616,8 +2616,7 @@ static void maybeAddSameTypeRequirementForNestedType(
 
   // Dig out the type witness.
   auto superConformance = superSource->getProtocolConformance().getConcrete();
-  auto concreteType =
-    superConformance->getTypeWitness(assocType, builder.getLazyResolver());
+  auto concreteType = superConformance->getTypeWitness(assocType);
   if (!concreteType) return;
 
   // We should only have interface types here.
@@ -2784,8 +2783,7 @@ static void concretizeNestedTypeFromConcreteParent(
   Type witnessType;
   if (conformance.isConcrete()) {
     witnessType =
-      conformance.getConcrete()
-        ->getTypeWitness(assocType, builder.getLazyResolver());
+      conformance.getConcrete()->getTypeWitness(assocType);
     if (!witnessType || witnessType->hasError())
       return; // FIXME: should we delay here?
   } else if (auto archetype = concreteParent->getAs<ArchetypeType>()) {

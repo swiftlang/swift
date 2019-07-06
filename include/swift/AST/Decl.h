@@ -70,7 +70,6 @@ namespace swift {
   class GenericSignature;
   class GenericTypeParamDecl;
   class GenericTypeParamType;
-  class LazyResolver;
   class ModuleDecl;
   class EnumCaseDecl;
   class EnumElementDecl;
@@ -3956,10 +3955,7 @@ public:
 
   /// Determine whether this class inherits the convenience initializers
   /// from its superclass.
-  ///
-  /// \param resolver Used to resolve the signatures of initializers, which is
-  /// required for name lookup.
-  bool inheritsSuperclassInitializers(LazyResolver *resolver);
+  bool inheritsSuperclassInitializers();
 
   /// Marks that this class inherits convenience initializers from its
   /// superclass.
@@ -4143,7 +4139,7 @@ class ProtocolDecl final : public NominalTypeDecl {
 
   bool existentialConformsToSelfSlow();
 
-  bool existentialTypeSupportedSlow(LazyResolver *resolver);
+  bool existentialTypeSupportedSlow();
 
   ArrayRef<ProtocolDecl *> getInheritedProtocolsSlow();
 
@@ -4269,12 +4265,12 @@ public:
   /// conforming to this protocol. This is only permitted if the types of
   /// all the members do not contain any associated types, and do not
   /// contain 'Self' in 'parameter' or 'other' position.
-  bool existentialTypeSupported(LazyResolver *resolver) const {
+  bool existentialTypeSupported() const {
     if (Bits.ProtocolDecl.ExistentialTypeSupportedValid)
       return Bits.ProtocolDecl.ExistentialTypeSupported;
 
     return const_cast<ProtocolDecl *>(this)
-             ->existentialTypeSupportedSlow(resolver);
+             ->existentialTypeSupportedSlow();
   }
 
   /// Explicitly set the existentialTypeSupported flag, without computing

@@ -2654,7 +2654,7 @@ public:
 
           // Make sure that the replacement type only uses archetypes allowed
           // in the context where the normal conformance exists.
-          auto replacementType = normal->getTypeWitness(assocType, nullptr);
+          auto replacementType = normal->getTypeWitness(assocType);
           Verifier(M, normal->getDeclContext())
             .verifyChecked(replacementType);
           continue;
@@ -2686,7 +2686,7 @@ public:
           }
 
           // Check the witness substitutions.
-          const auto &witness = normal->getWitness(req, nullptr);
+          const auto &witness = normal->getWitness(req);
 
           if (auto *genericEnv = witness.getSyntheticEnvironment())
             GenericEnv.push_back({genericEnv});

@@ -444,8 +444,8 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
           // Skip value requirements that have corresponding witnesses. This cuts
           // down on duplicates.
           if (!NormalConformance->hasWitness(VD) ||
-              !NormalConformance->getWitness(VD, nullptr) ||
-              NormalConformance->getWitness(VD, nullptr).getDecl()->getFullName()
+              !NormalConformance->getWitness(VD) ||
+              NormalConformance->getWitness(VD).getDecl()->getFullName()
                 != VD->getFullName()) {
             Consumer.foundDecl(VD, ReasonForThisProtocol);
           }
@@ -622,7 +622,7 @@ static void lookupVisibleMemberDeclsImpl(
       Reason = getReasonForSuper(Reason);
 
       bool InheritsSuperclassInitializers =
-          CurClass->inheritsSuperclassInitializers(TypeResolver);
+          CurClass->inheritsSuperclassInitializers();
       if (LS.isOnSuperclass() && !InheritsSuperclassInitializers)
         LS = LS.withoutInheritsSuperclassInitializers();
       else if (!LS.isOnSuperclass()) {

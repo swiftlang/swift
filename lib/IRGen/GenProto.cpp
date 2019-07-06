@@ -854,7 +854,7 @@ static bool hasDependentTypeWitness(
     return false;
 
   // Check whether any of the associated types are dependent.
-  if (conformance->forEachTypeWitness(DC->getASTContext().getLazyResolver(),
+  if (conformance->forEachTypeWitness(
         [&](AssociatedTypeDecl *requirement, Type type,
             TypeDecl *explicitDecl) -> bool {
           // Skip associated types that don't have witness table entries.
@@ -863,7 +863,8 @@ static bool hasDependentTypeWitness(
 
           // RESILIENCE: this could be an opaque conformance
           return type->hasTypeParameter();
-       })) {
+       },
+       /*useResolver=*/true)) {
     return true;
   }
 
@@ -1288,7 +1289,7 @@ public:
 #endif
 
       auto associate =
-        Conformance.getTypeWitness(requirement.getAssociation(), nullptr)
+        Conformance.getTypeWitness(requirement.getAssociation())
           ->getCanonicalType();
       llvm::Constant *witness =
           IGM.getAssociatedTypeWitness(associate, /*inProtocolContext=*/false);
@@ -1609,7 +1610,7 @@ void WitnessTableBuilder::collectResilientWitnesses(
     if (entry.getKind() == SILWitnessTable::AssociatedType) {
       // Associated type witness.
       auto assocType = entry.getAssociatedTypeWitness().Requirement;
-      auto associate = conformance.getTypeWitness(assocType, nullptr)
+      auto associate = conformance.getTypeWitness(assocType)
           ->getCanonicalType();
 
       llvm::Constant *witness =

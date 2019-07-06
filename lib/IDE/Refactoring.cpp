@@ -2340,7 +2340,7 @@ getUnsatisfiedRequirements(const DeclContext *DC) {
   for(ProtocolConformance *Con : DC->getLocalConformances()) {
 
     // Collect non-witnessed requirements.
-    Con->forEachNonWitnessedRequirement(DC->getASTContext().getLazyResolver(),
+    Con->forEachNonWitnessedRequirement(
       [&](ValueDecl *VD) { NonWitnessedReqs.push_back(VD); });
   }
 
