@@ -1453,7 +1453,7 @@
       key.column: 1,
       key.filepath: main.swift,
       key.severity: source.diagnostic.severity.error,
-      key.description: "expected 'func' keyword in function declaration",
+      key.description: "expected 'func' keyword in instance method declaration",
       key.diagnostic_stage: source.diagnostic.stage.swift.parse,
       key.fixits: [
         {

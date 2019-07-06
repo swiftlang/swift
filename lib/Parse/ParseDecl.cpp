@@ -3014,15 +3014,15 @@ Parser::parseDecl(ParseDeclOptions Flags,
         DescriptiveDeclKind DescriptiveKind;
 
         switch (StaticSpelling) {
-          case StaticSpellingKind::None:
-            DescriptiveKind = DescriptiveDeclKind::Property;
-            break;
-          case StaticSpellingKind::KeywordStatic:
-            DescriptiveKind = DescriptiveDeclKind::StaticProperty;
-            break;
-          case StaticSpellingKind::KeywordClass:
-            llvm_unreachable("kw_class is only parsed as a modifier if it's "
-                             "followed by a keyword");
+        case StaticSpellingKind::None:
+          DescriptiveKind = DescriptiveDeclKind::Property;
+          break;
+        case StaticSpellingKind::KeywordStatic:
+          DescriptiveKind = DescriptiveDeclKind::StaticProperty;
+          break;
+        case StaticSpellingKind::KeywordClass:
+          llvm_unreachable("kw_class is only parsed as a modifier if it's "
+                           "followed by a keyword");
         }
 
         diagnose(Tok.getLoc(), diag::expected_keyword_in_decl, "var",
@@ -3043,15 +3043,15 @@ Parser::parseDecl(ParseDeclOptions Flags,
           DescriptiveKind = DescriptiveDeclKind::OperatorFunction;
         } else {
           switch (StaticSpelling) {
-            case StaticSpellingKind::None:
-              DescriptiveKind = DescriptiveDeclKind::Method;
-              break;
-            case StaticSpellingKind::KeywordStatic:
-              DescriptiveKind = DescriptiveDeclKind::StaticMethod;
-              break;
-            case StaticSpellingKind::KeywordClass:
-              llvm_unreachable("kw_class is only parsed as a modifier if it's "
-                               "followed by a keyword");
+          case StaticSpellingKind::None:
+            DescriptiveKind = DescriptiveDeclKind::Method;
+            break;
+          case StaticSpellingKind::KeywordStatic:
+            DescriptiveKind = DescriptiveDeclKind::StaticMethod;
+            break;
+          case StaticSpellingKind::KeywordClass:
+            llvm_unreachable("kw_class is only parsed as a modifier if it's "
+                             "followed by a keyword");
           }
         }
 
