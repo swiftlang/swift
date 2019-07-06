@@ -457,3 +457,13 @@ func test10313() {
   box.dictionary["bool"] = false
   let _: Bool = try! box("bool") // ok
 }
+
+// SR-10753
+
+@dynamicCallable
+struct B {
+	public func dynamicallyCall(withArguments arguments: [String]) {}
+}
+
+B()("hello") // ok
+B()("\(1)") // ok
