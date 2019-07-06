@@ -2198,8 +2198,8 @@ NOTE(overridden_here,none,
 NOTE(overridden_here_can_be_objc,none,
      "add '@objc' to make this declaration overridable", ())
 // SWIFT_ENABLE_TENSORFLOW
-ERROR(override_differentiable_fewer_wrt_parameters,none,
-      "%0 declared wrt parameters for differentiation are a subset of the base protocol requirement wrt parameters",
+ERROR(override_missing_differentiable,none,
+      "%0 is a missing a `@differentiable` definition that is required in the base protocol",
       (DeclName))
 // SWIFT_ENABLE_TENSORFLOW END
 

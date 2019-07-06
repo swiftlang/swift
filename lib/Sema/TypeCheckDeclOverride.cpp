@@ -602,14 +602,35 @@ static bool overridesDifferentiableAttribute(const ValueDecl *derivedDecl,
   auto baseDAs = dyn_cast<AbstractFunctionDecl>(baseDecl)
       ->getAttrs().getAttributes<DifferentiableAttr>();
 
+  // Make sure all the differentiable attributes in `baseDecl` are
+  // also declared in `derivedDecl`.
+  for (auto baseDA : baseDAs) {
+    auto baseParameters = AutoDiffIndexSubset::get(
+        ctx, baseDA->getParameterIndices()->parameters);
+    auto defined = false;
+    for (auto derivedDA : derivedDAs) {
+      auto derivedParameters = AutoDiffIndexSubset::get(
+          ctx, derivedDA->getParameterIndices()->parameters);
+      if (baseParameters->isSubsetOf(derivedParameters)) {
+        defined = true;
+      }
+    }
+    if (!defined) {
+      diags.diagnose(
+          derivedDecl,
+          diag::override_missing_differentiable,
+          derivedDecl->getFullName());
+    }
+  }
+
   // If there is no differentiable attribute in `derivedDecl`, then
   // overriding is not allowed.
   if (derivedDAs.empty())
     return false;
 
-  // At this point, we have to go through all the differentiable
-  // attributes in `derivedDecl` and check if they subsume any of
-  // the differentiable attributes in `baseDecl`.
+  // Finally, go through all differentiable attributes in
+  // `derivedDecl` and check if they subsume any of the
+  // differentiable attributes in `baseDecl`.
   auto overrides = true;
   for (auto derivedDA : derivedDAs) {
     auto derivedParameters = AutoDiffIndexSubset::get(
@@ -618,17 +639,6 @@ static bool overridesDifferentiableAttribute(const ValueDecl *derivedDecl,
     for (auto baseDA : baseDAs) {
       auto baseParameters = AutoDiffIndexSubset::get(
           ctx, baseDA->getParameterIndices()->parameters);
-      // Compare the differentiable parameter indices.
-      // If the differentiable indices of `baseDA` are not a
-      // subset of those of `derivedDA`, then `derivedDA` is
-      // more specific than `baseDA` and an error is thrown.
-      if (!baseParameters->isSubsetOf(derivedParameters)) {
-        diags.diagnose(
-            derivedDecl,
-            diag::override_differentiable_fewer_wrt_parameters,
-            derivedDecl->getFullName());
-        return false;
-      }
       // If the differentiable indices of `derivedDA` are a
       // subset of those of `baseDA`, then `baseDA` subsumes
       // `derivedDA` and the function is marked as overridden.

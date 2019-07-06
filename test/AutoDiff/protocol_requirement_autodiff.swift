@@ -175,11 +175,10 @@ func blah2<T: DoubleDifferentiableDistribution>(_ x: T, _ value: T.Value) -> Flo
   x.logProbability(of: value)
 }
 
-// Adding a more specific `@differentiable` attribute.
-public protocol WrongDifferentiableDistribution: DifferentiableDistribution
+// Missing a `@differentiable` attribute.
+public protocol MissingDifferentiableDistribution: DifferentiableDistribution
   where Value: Differentiable {
-  @differentiable(wrt: value)
-  func logProbability(of value: Value) -> Float // expected-error {{'logProbability(of:)' declared wrt parameters for differentiation are a subset of the base protocol requirement wrt parameters}}
+  func logProbability(of value: Value) -> Float // expected-error {{'logProbability(of:)' is a missing a `@differentiable` definition that is required in the base protocol}}
 }
 
 runAllTests()
