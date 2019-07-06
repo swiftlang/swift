@@ -2078,40 +2078,75 @@ static ConstraintFix *fixRequirementFailure(ConstraintSystem &cs, Type type1,
 }
 
 static ConstraintFix *fixPropertyWrapperFailure(
-    ConstraintSystem &cs, Type baseTy, Expr *anchor, ConstraintLocator *locator,
+    ConstraintSystem &cs, Type baseTy, ConstraintLocator *locator,
     llvm::function_ref<bool(ResolvedOverloadSetListItem *, VarDecl *, Type)>
         attemptFix,
     Optional<Type> toType = None) {
-  auto resolvedOverload = cs.findSelectedOverloadFor(anchor);
+
+  Expr *baseExpr = nullptr;
+  if (auto *anchor = locator->getAnchor()) {
+    if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchor))
+      baseExpr = UDE->getBase();
+    else if (auto *SE = dyn_cast<SubscriptExpr>(anchor))
+      baseExpr = SE->getBase();
+    else if (auto *MRE = dyn_cast<MemberRefExpr>(anchor))
+      baseExpr = MRE->getBase();
+    else if (auto *anchor = simplifyLocatorToAnchor(cs, locator))
+      baseExpr = anchor;
+  }
+
+  if (!baseExpr)
+    return nullptr;
+
+  auto resolvedOverload = cs.findSelectedOverloadFor(baseExpr);
   if (!resolvedOverload)
     return nullptr;
 
-  if (auto storageWrapper =
-          cs.getStorageWrapperInformation(resolvedOverload)) {
-    if (attemptFix(resolvedOverload, storageWrapper->first,
-                    storageWrapper->second))
-      return UsePropertyWrapper::create(
-          cs, storageWrapper->first,
-          /*usingStorageWrapper=*/true, baseTy,
-          toType.getValueOr(storageWrapper->second), locator);
+  enum class Fix : uint8_t {
+    StorageWrapper,
+    PropertyWrapper,
+    WrappedValue,
+  };
+
+  auto applyFix = [&](Fix fix, VarDecl *decl, Type type) -> ConstraintFix * {
+    if (!decl->hasValidSignature() || !type)
+      return nullptr;
+
+    if (!attemptFix(resolvedOverload, decl, type))
+      return nullptr;
+
+    switch (fix) {
+    case Fix::StorageWrapper:
+    case Fix::PropertyWrapper:
+      return UsePropertyWrapper::create(cs, decl, fix == Fix::StorageWrapper,
+                                        baseTy, toType.getValueOr(type),
+                                        locator);
+
+    case Fix::WrappedValue:
+      return UseWrappedValue::create(cs, decl, baseTy, toType.getValueOr(type),
+                                     locator);
+    }
+  };
+
+  if (auto storageWrapper = cs.getStorageWrapperInformation(resolvedOverload)) {
+    if (auto *fix = applyFix(Fix::StorageWrapper, storageWrapper->first,
+                             storageWrapper->second))
+      return fix;
   }
 
   if (auto wrapper = cs.getPropertyWrapperInformation(resolvedOverload)) {
-    if (attemptFix(resolvedOverload, wrapper->first, wrapper->second))
-      return UsePropertyWrapper::create(
-          cs, wrapper->first,
-          /*usingStorageWrappeer=*/false, baseTy,
-          toType.getValueOr(wrapper->second), locator);
+    if (auto *fix =
+            applyFix(Fix::PropertyWrapper, wrapper->first, wrapper->second))
+      return fix;
   }
 
   if (auto wrappedProperty =
           cs.getWrappedPropertyInformation(resolvedOverload)) {
-    if (attemptFix(resolvedOverload, wrappedProperty->first,
-                    wrappedProperty->second))
-      return UseWrappedValue::create(
-          cs, wrappedProperty->first, baseTy,
-          toType.getValueOr(wrappedProperty->second), locator);
+    if (auto *fix = applyFix(Fix::WrappedValue, wrappedProperty->first,
+                             wrappedProperty->second))
+      return fix;
   }
+
   return nullptr;
 }
 
@@ -2235,10 +2270,8 @@ bool ConstraintSystem::repairFailures(
     if (elt.getKind() != ConstraintLocator::ApplyArgToParam)
       break;
 
-    auto anchor = simplifyLocatorToAnchor(*this, loc);
-
     if (auto *fix = fixPropertyWrapperFailure(
-            *this, lhs, anchor, loc,
+            *this, lhs, loc,
             [&](ResolvedOverloadSetListItem *overload, VarDecl *decl,
                 Type newBase) {
               // FIXME: There is currently no easy way to avoid attempting
@@ -4907,19 +4940,15 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
     // Check if any property wrappers on the base of the member lookup have
     // matching members that we can fall back to, or if the type wraps any
     // properties that have matching members.
-    if (auto dotExpr =
-            dyn_cast_or_null<UnresolvedDotExpr>(locator->getAnchor())) {
-      auto baseExpr = dotExpr->getBase();
-      if (auto *fix = fixPropertyWrapperFailure(
-              *this, baseTy, baseExpr, locator,
-              [&](ResolvedOverloadSetListItem *overload, VarDecl *decl,
-                  Type newBase) {
-                return solveWithNewBaseOrName(newBase, member,
-                                              /*allowFixes=*/false) ==
-                       SolutionKind::Solved;
-              })) {
-        return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
-      }
+    if (auto *fix = fixPropertyWrapperFailure(
+            *this, baseTy, locator,
+            [&](ResolvedOverloadSetListItem *overload, VarDecl *decl,
+                Type newBase) {
+              return solveWithNewBaseOrName(newBase, member,
+                                            /*allowFixes=*/false) ==
+                     SolutionKind::Solved;
+            })) {
+      return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
     }
 
     if (auto *funcType = baseTy->getAs<FunctionType>()) {
