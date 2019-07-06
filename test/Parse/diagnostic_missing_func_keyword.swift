@@ -51,3 +51,13 @@ class Baz {
 
   static staticProperty: Int { 0 } // expected-error {{expected 'var' keyword in static property declaration}} {{10-10=var }}
 }
+
+class C1 {
+  class classMethod() {} // expected-error {{expected '{' in class}}
+}
+
+class C2 {
+  class classProperty: Int { 0 } // expected-error {{inheritance from non-protocol, non-class type 'Int'}}
+                                 // expected-note @-1 {{in declaration of 'classProperty'}}
+                                 // expected-error @-2 {{expected declaration}}
+}
