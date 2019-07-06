@@ -2197,6 +2197,11 @@ NOTE(overridden_here,none,
      "overridden declaration is here", ())
 NOTE(overridden_here_can_be_objc,none,
      "add '@objc' to make this declaration overridable", ())
+// SWIFT_ENABLE_TENSORFLOW
+ERROR(override_differentiable_fewer_wrt_parameters,none,
+      "%0 declared wrt parameters for differentiation are a subset of the base protocol requirement wrt parameters",
+      (DeclName))
+// SWIFT_ENABLE_TENSORFLOW END
 
 ERROR(missing_override,none,
       "overriding declaration requires an 'override' keyword", ())

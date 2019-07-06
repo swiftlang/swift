@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift
+// RUN: %target-swift-frontend -emit-sil -verify %s
 
 import StdlibUnittest
 
@@ -173,6 +173,13 @@ public protocol DoubleDifferentiableDistribution: DifferentiableDistribution
 func blah2<T: DoubleDifferentiableDistribution>(_ x: T, _ value: T.Value) -> Float
   where T.Value: AdditiveArithmetic {
   x.logProbability(of: value)
+}
+
+// Adding a more specific `@differentiable` attribute.
+public protocol WrongDifferentiableDistribution: DifferentiableDistribution
+  where Value: Differentiable {
+  @differentiable(wrt: value)
+  func logProbability(of value: Value) -> Float // expected-error {{'logProbability(of:)' declared wrt parameters for differentiation are a subset of the base protocol requirement wrt parameters}}
 }
 
 runAllTests()

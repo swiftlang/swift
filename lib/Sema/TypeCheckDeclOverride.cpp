@@ -591,9 +591,11 @@ static bool parameterTypesMatch(const ValueDecl *derivedDecl,
   return true;
 }
 
+// SWIFT_ENABLE_TENSORFLOW
 static bool overridesDifferentiableAttribute(const ValueDecl *derivedDecl,
                                              const ValueDecl *baseDecl) {
   ASTContext &ctx = baseDecl->getASTContext();
+  auto &diags = ctx.Diags;
 
   auto derivedDAs = dyn_cast<AbstractFunctionDecl>(derivedDecl)
       ->getAttrs().getAttributes<DifferentiableAttr>();
@@ -616,10 +618,20 @@ static bool overridesDifferentiableAttribute(const ValueDecl *derivedDecl,
     for (auto baseDA : baseDAs) {
       auto baseParameters = AutoDiffIndexSubset::get(
           ctx, baseDA->getParameterIndices()->parameters);
-      // Compare the differentiable parameter indices. If the
-      // differentiable indices of `derivedDA` are a subset of those
-      // of `baseDA`, then `baseDA` subsumes `derivedDA` and the
-      // function is marked as overridden.
+      // Compare the differentiable parameter indices.
+      // If the differentiable indices of `baseDA` are not a
+      // subset of those of `derivedDA`, then `derivedDA` is
+      // more specific than `baseDA` and an error is thrown.
+      if (!baseParameters->isSubsetOf(derivedParameters)) {
+        diags.diagnose(
+            derivedDecl,
+            diag::override_differentiable_fewer_wrt_parameters,
+            derivedDecl->getFullName());
+        return false;
+      }
+      // If the differentiable indices of `derivedDA` are a
+      // subset of those of `baseDA`, then `baseDA` subsumes
+      // `derivedDA` and the function is marked as overridden.
       if (derivedParameters->isSubsetOf(baseParameters)) {
         overrides = false;
         break;
@@ -631,6 +643,7 @@ static bool overridesDifferentiableAttribute(const ValueDecl *derivedDecl,
 
   return false;
 }
+// SWIFT_ENABLE_TENSORFLOW END
 
 /// Returns true if the given declaration is for the `NSObject.hashValue`
 /// property.
@@ -787,9 +800,11 @@ SmallVector<OverrideMatch, 2> OverrideMatcher::match(
     if (!areOverrideCompatibleSimple(decl, parentDecl))
       continue;
 
+    // SWIFT_ENABLE_TENSORFLOW
     // Check whether the differentiable attribute allows overriding.
     if (overridesDifferentiableAttribute(decl, parentDecl))
       continue;
+    // SWIFT_ENABLE_TENSORFLOW END
 
     auto parentMethod = dyn_cast<AbstractFunctionDecl>(parentDecl);
     auto parentStorage = dyn_cast<AbstractStorageDecl>(parentDecl);
