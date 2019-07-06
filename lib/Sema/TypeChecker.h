@@ -542,11 +542,6 @@ public:
   /// Declarations that need their conformances checked.
   llvm::SmallVector<Decl *, 8> ConformanceContexts;
 
-  /// The list of protocol conformances whose requirements could not be
-  /// fully checked and, therefore, should be checked again at the top
-  /// level.
-  llvm::SetVector<NormalProtocolConformance *> PartiallyCheckedConformances;
-
   /// The list of declarations that we've done at least partial validation
   /// of during type-checking, but which will need to be finalized before
   /// we can hand them off to SILGen etc.
@@ -1638,9 +1633,6 @@ public:
 
   /// Completely check the given conformance.
   void checkConformance(NormalProtocolConformance *conformance);
-
-  /// Check the requirement signature of the given conformance.
-  void checkConformanceRequirements(NormalProtocolConformance *conformance);
 
   /// Check all of the conformances in the given context.
   void checkConformancesInContext(DeclContext *dc,

@@ -428,7 +428,7 @@ namespace {
                         ConformanceCheckFlags::InExpression);
             if (conformance && conformance->isConcrete()) {
               if (auto witness =
-                      conformance->getConcrete()->getWitnessDecl(decl, &tc)) {
+                      conformance->getConcrete()->getWitnessDecl(decl)) {
                 // Hack up an AST that we can type-check (independently) to get
                 // it into the right form.
                 // FIXME: the hop through 'getDecl()' is because

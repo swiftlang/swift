@@ -5112,9 +5112,7 @@ public:
   /// Substitute the base type, looking up our associated type in it if it is
   /// non-dependent. Returns null if the member could not be found in the new
   /// base.
-  Type substBaseType(ModuleDecl *M,
-                     Type base,
-                     LazyResolver *resolver = nullptr);
+  Type substBaseType(ModuleDecl *M, Type base);
 
   /// Substitute the base type, looking up our associated type in it if it is
   /// non-dependent. Returns null if the member could not be found in the new

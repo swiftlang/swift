@@ -2080,7 +2080,7 @@ static AbstractFunctionDecl *lookupObjCMethodInClass(
 
   // Determine whether we are (still) inheriting initializers.
   inheritingInits = inheritingInits &&
-                    classDecl->inheritsSuperclassInitializers(nullptr);
+                    classDecl->inheritsSuperclassInitializers();
   if (isInitializer && !inheritingInits)
     return nullptr;
 

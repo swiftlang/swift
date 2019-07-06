@@ -467,7 +467,7 @@ public:
   }
 
   Witness getWitness(ValueDecl *decl) {
-    return Conformance->getWitness(decl, nullptr);
+    return Conformance->getWitness(decl);
   }
 
   void addPlaceholder(MissingMemberDecl *placeholder) {
@@ -516,7 +516,7 @@ public:
   void addAssociatedType(AssociatedType requirement) {
     // Find the substitution info for the witness type.
     auto td = requirement.getAssociation();
-    Type witness = Conformance->getTypeWitness(td, /*resolver=*/nullptr);
+    Type witness = Conformance->getTypeWitness(td);
 
     // Emit the record for the type itself.
     Entries.push_back(SILWitnessTable::AssociatedTypeWitness{td,

@@ -1453,8 +1453,7 @@ void Serializer::writeNormalConformance(
   unsigned numValueWitnesses = 0;
   unsigned numTypeWitnesses = 0;
 
-  conformance->forEachTypeWitness(/*resolver=*/nullptr,
-                                  [&](AssociatedTypeDecl *assocType,
+  conformance->forEachTypeWitness([&](AssociatedTypeDecl *assocType,
                                       Type type, TypeDecl *typeDecl) {
     data.push_back(addDeclRef(assocType));
     data.push_back(addTypeRef(type));
@@ -1463,8 +1462,7 @@ void Serializer::writeNormalConformance(
     return false;
   });
 
-  conformance->forEachValueWitness(nullptr,
-    [&](ValueDecl *req, Witness witness) {
+  conformance->forEachValueWitness([&](ValueDecl *req, Witness witness) {
       ++numValueWitnesses;
       data.push_back(addDeclRef(req));
       data.push_back(addDeclRef(witness.getDecl()));
@@ -3251,7 +3249,7 @@ public:
 
     bool inheritsSuperclassInitializers =
         const_cast<ClassDecl *>(theClass)->
-          inheritsSuperclassInitializers(nullptr);
+          inheritsSuperclassInitializers();
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[ClassLayout::Code];
     ClassLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
@@ -3312,8 +3310,7 @@ public:
                                const_cast<ProtocolDecl *>(proto)
                                  ->requiresClass(),
                                proto->isObjC(),
-                               proto->existentialTypeSupported(
-                                 /*resolver=*/nullptr),
+                               proto->existentialTypeSupported(),
                                rawAccessLevel, proto->getInherited().size(),
                                inheritedAndDependencyTypes);
 

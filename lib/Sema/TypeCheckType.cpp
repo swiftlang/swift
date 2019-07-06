@@ -3494,7 +3494,7 @@ public:
     
     auto comp = T->getComponentRange().back();
     if (auto *proto = dyn_cast_or_null<ProtocolDecl>(comp->getBoundDecl())) {
-      if (!proto->existentialTypeSupported(&TC)) {
+      if (!proto->existentialTypeSupported()) {
         TC.diagnose(comp->getIdLoc(), diag::unsupported_existential_type,
                     proto->getName());
         T->setInvalid();
@@ -3511,7 +3511,7 @@ public:
           for (auto *proto : layout.getProtocols()) {
             auto *protoDecl = proto->getDecl();
 
-            if (protoDecl->existentialTypeSupported(&TC))
+            if (protoDecl->existentialTypeSupported())
               continue;
             
             TC.diagnose(comp->getIdLoc(), diag::unsupported_existential_type,

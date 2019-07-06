@@ -150,7 +150,7 @@ void TBDGenVisitor::addConformances(DeclContext *DC) {
     };
 
     rootConformance->forEachValueWitness(
-        nullptr, [&](ValueDecl *valueReq, Witness witness) {
+        [&](ValueDecl *valueReq, Witness witness) {
           auto witnessDecl = witness.getDecl();
           if (isa<AbstractFunctionDecl>(valueReq)) {
             addSymbolIfNecessary(valueReq, witnessDecl);

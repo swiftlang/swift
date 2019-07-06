@@ -766,8 +766,7 @@ bool IndexSwiftASTWalker::handleWitnesses(Decl *D, SmallVectorImpl<IndexedWitnes
     if (!normal)
       continue;
 
-    normal->forEachValueWitness(nullptr,
-                                [&](ValueDecl *req, Witness witness) {
+    normal->forEachValueWitness([&](ValueDecl *req, Witness witness) {
       if (Cancelled)
         return;
 
@@ -782,8 +781,8 @@ bool IndexSwiftASTWalker::handleWitnesses(Decl *D, SmallVectorImpl<IndexedWitnes
       }
     });
 
-    normal->forEachTypeWitness(nullptr,
-                 [&](AssociatedTypeDecl *assoc, Type type, TypeDecl *typeDecl) {
+    normal->forEachTypeWitness(
+                [&](AssociatedTypeDecl *assoc, Type type, TypeDecl *typeDecl) {
       if (Cancelled)
         return true;
       if (typeDecl == nullptr)

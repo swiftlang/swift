@@ -27,7 +27,6 @@ namespace swift {
   class AbstractFunctionDecl;
   class Decl;
   class Expr;
-  class LazyResolver;
   class ExtensionDecl;
   class ProtocolDecl;
   class Type;

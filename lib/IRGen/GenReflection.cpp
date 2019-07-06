@@ -1046,7 +1046,7 @@ emitAssociatedTypeMetadataRecord(const RootProtocolConformance *conformance) {
     return false;
   };
 
-  normalConf->forEachTypeWitness(/*resolver*/ nullptr, collectTypeWitness);
+  normalConf->forEachTypeWitness(collectTypeWitness);
 
   // If there are no associated types, don't bother emitting any
   // metadata.
