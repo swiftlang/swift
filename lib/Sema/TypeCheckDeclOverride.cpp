@@ -13,6 +13,7 @@
 // This file implements semantic analysis for declaration overrides.
 //
 //===----------------------------------------------------------------------===//
+#include <iostream>
 #include "TypeChecker.h"
 #include "CodeSynthesis.h"
 #include "MiscDiagnostics.h"
@@ -597,10 +598,14 @@ static bool overridesDifferentiableAttribute(const ValueDecl *derivedDecl,
   ASTContext &ctx = baseDecl->getASTContext();
   auto &diags = ctx.Diags;
 
-  auto derivedDAs = dyn_cast<AbstractFunctionDecl>(derivedDecl)
-      ->getAttrs().getAttributes<DifferentiableAttr>();
-  auto baseDAs = dyn_cast<AbstractFunctionDecl>(baseDecl)
-      ->getAttrs().getAttributes<DifferentiableAttr>();
+  auto *derivedAFD = dyn_cast<AbstractFunctionDecl>(derivedDecl);
+  auto *baseAFD = dyn_cast<AbstractFunctionDecl>(baseDecl);
+
+  if (!derivedAFD || !baseAFD)
+    return false;
+
+  auto derivedDAs = derivedAFD->getAttrs().getAttributes<DifferentiableAttr>();
+  auto baseDAs = baseAFD->getAttrs().getAttributes<DifferentiableAttr>();
 
   // Make sure all the differentiable attributes in `baseDecl` are
   // also declared in `derivedDecl`.
@@ -648,7 +653,7 @@ static bool overridesDifferentiableAttribute(const ValueDecl *derivedDecl,
       }
     }
     if (overrides)
-      return overrides;
+      return true;
   }
 
   return false;
