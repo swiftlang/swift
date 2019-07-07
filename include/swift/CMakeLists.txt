@@ -5,6 +5,9 @@ if(SWIFT_BUILD_REMOTE_MIRROR)
 endif()
 
 if(SWIFT_INCLUDE_TOOLS)
+  if(libedit_FOUND)
+    set(HAVE_UNICODE_LIBEDIT TRUE)
+  endif()
   configure_file(Config.h.in ${CMAKE_CURRENT_BINARY_DIR}/Config.h
                 ESCAPE_QUOTES @ONLY)
   add_subdirectory(Option)
