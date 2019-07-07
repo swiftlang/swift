@@ -315,24 +315,33 @@ let array = [1,2,3]
 let arrayWithOtherEltType = ["hello", "world"]
 
 variadic(array) // expected-error {{cannot pass an array of type '[Int]' as variadic arguments of type 'Int'}}
+// expected-note@-1 {{wrap the expression in '#variadic(...)' to pass array elements as variadic arguments}} {{10-10=#variadic(}} {{15-15=)}}
 variadic([1,2,3]) // expected-error {{cannot pass an array of type '[Int]' as variadic arguments of type 'Int'}}
-// expected-note@-1 {{remove brackets to pass array elements directly}} {{10-11=}} {{16-17=}}
+// expected-note@-1 {{wrap the expression in '#variadic(...)' to pass array elements as variadic arguments}} {{10-10=#variadic(}} {{17-17=)}}
+// expected-note@-2 {{remove brackets to pass array elements directly}} {{10-11=}} {{16-17=}}
 variadic([1,2,3,]) // expected-error {{cannot pass an array of type '[Int]' as variadic arguments of type 'Int'}}
-// expected-note@-1 {{remove brackets to pass array elements directly}} {{10-11=}} {{16-17=}} {{17-18=}}
+// expected-note@-1 {{wrap the expression in '#variadic(...)' to pass array elements as variadic arguments}} {{10-10=#variadic(}} {{18-18=)}}
+// expected-note@-2 {{remove brackets to pass array elements directly}} {{10-11=}} {{16-17=}} {{17-18=}}
 variadic(0, array, 4) // expected-error {{cannot pass an array of type '[Int]' as variadic arguments of type 'Int'}}
+// expected-note@-1 {{wrap the expression in '#variadic(...)' to pass array elements as variadic arguments}}
 variadic(0, [1,2,3], 4) // expected-error {{cannot pass an array of type '[Int]' as variadic arguments of type 'Int'}}
-// expected-note@-1 {{remove brackets to pass array elements directly}} {{13-14=}} {{19-20=}}
+// expected-note@-1 {{wrap the expression in '#variadic(...)' to pass array elements as variadic arguments}}
+// expected-note@-2 {{remove brackets to pass array elements directly}} {{13-14=}} {{19-20=}}
 variadic(0, [1,2,3,], 4) // expected-error {{cannot pass an array of type '[Int]' as variadic arguments of type 'Int'}}
-// expected-note@-1 {{remove brackets to pass array elements directly}} {{13-14=}} {{19-20=}} {{20-21=}}
+// expected-note@-1 {{wrap the expression in '#variadic(...)' to pass array elements as variadic arguments}}
+// expected-note@-2 {{remove brackets to pass array elements directly}} {{13-14=}} {{19-20=}} {{20-21=}}
 variadic(arrayWithOtherEltType) // expected-error {{cannot convert value of type '[String]' to expected argument type 'Int'}}
 variadic(1, arrayWithOtherEltType) // expected-error {{cannot convert value of type '[String]' to expected argument type 'Int'}}
 variadic(["hello", "world"]) // expected-error {{cannot convert value of type '[String]' to expected argument type 'Int'}}
 
 foo[array] // expected-error {{cannot pass an array of type '[Int]' as variadic arguments of type 'Int'}}
+// expected-note@-1 {{wrap the expression in '#variadic(...)' to pass array elements as variadic arguments}} {{5-5=#variadic(}} {{10-10=)}}
 foo[[1,2,3]] // expected-error {{cannot pass an array of type '[Int]' as variadic arguments of type 'Int'}}
-// expected-note@-1 {{remove brackets to pass array elements directly}} {{5-6=}} {{11-12=}}
+// expected-note@-1 {{wrap the expression in '#variadic(...)' to pass array elements as variadic arguments}} {{5-5=#variadic(}} {{12-12=)}}
+// expected-note@-2 {{remove brackets to pass array elements directly}} {{5-6=}} {{11-12=}}
 foo[0, [1,2,3], 4] // expected-error {{cannot pass an array of type '[Int]' as variadic arguments of type 'Int'}}
-// expected-note@-1 {{remove brackets to pass array elements directly}} {{8-9=}} {{14-15=}}
+// expected-note@-1 {{wrap the expression in '#variadic(...)' to pass array elements as variadic arguments}}
+// expected-note@-2 {{remove brackets to pass array elements directly}} {{8-9=}} {{14-15=}}
 
 variadicAny(array)
 variadicAny([1,2,3])

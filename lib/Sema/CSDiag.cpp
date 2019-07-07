@@ -2293,6 +2293,9 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
                             contextualType, CS.DC)) {
     diagnose(expr->getLoc(), diag::cannot_convert_array_to_variadic, exprType,
              contextualType);
+    // Offer to pass the array elements using #variadic
+    auto range = expr->getSourceRange();
+    diagnose(expr->getLoc(), diag::suggest_pass_elements_using_pound_variadic).fixItInsert(range.Start, "#variadic(").fixItInsertAfter(range.End, ")");
     // If this is an array literal, offer to remove the brackets and pass the
     // elements directly as variadic arguments.
     if (auto *arrayExpr = dyn_cast<ArrayExpr>(expr)) {
