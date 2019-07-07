@@ -808,26 +808,26 @@ ParserResult<Expr> Parser::parseExprSelector() {
                                    modifierLoc, subExpr.get(), rParenLoc));
 }
 
-/// parseExprPoundVariadic
+/// parseExprVarargsExpansion
 ///
-///   expr-pound-variadic:
+///   expr-varargs-expansion:
 ///     '#variadic' '(' expr ')'
 ///
-ParserResult<Expr> Parser::parseExprPoundVariadic() {
+ParserResult<Expr> Parser::parseExprVarargsExpansion() {
   SyntaxParsingContext ExprCtxt(SyntaxContext, SyntaxKind::VarargExpansionExpr);
   // Consume '#variadic'.
   SourceLoc keywordLoc = consumeToken(tok::pound_variadic);
   
   // Parse the leading '('.
   if (!Tok.is(tok::l_paren)) {
-    diagnose(Tok, diag::expr_selector_expected_lparen);
+    diagnose(Tok, diag::expr_varargs_expansion_expected_lparen);
     return makeParserError();
   }
   SourceLoc lParenLoc = consumeToken(tok::l_paren);
   
   // Parse the subexpression.
   ParserResult<Expr> subExpr =
-  parseExpr(diag::expr_selector_expected_method_expr);
+  parseExpr(diag::expr_varargs_expansion_expected_expr);
   if (subExpr.hasCodeCompletion())
     return makeParserCodeCompletionResult<Expr>();
   
@@ -841,7 +841,7 @@ ParserResult<Expr> Parser::parseExprPoundVariadic() {
       rParenLoc = PreviousLoc;
   } else {
     parseMatchingToken(tok::r_paren, rParenLoc,
-                       diag::expr_selector_expected_rparen, lParenLoc);
+                       diag::expr_varargs_expansion_expected_rparen, lParenLoc);
   }
   
   // If the subexpression was in error, just propagate the error.
@@ -1704,7 +1704,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
   }
       
   case tok::pound_variadic:
-    return parseExprPoundVariadic();
+    return parseExprVarargsExpansion();
 
 #define POUND_OBJECT_LITERAL(Name, Desc, Proto)                                \
   case tok::pound_##Name:                                                      \
