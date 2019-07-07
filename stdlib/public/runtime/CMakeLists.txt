@@ -77,10 +77,6 @@ endif(LLVM_ENABLE_ASSERTIONS)
 
 # Acknowledge that the following sources are known.
 set(LLVM_OPTIONAL_SOURCES
-    MutexPThread.cpp
-    MutexWin32.cpp
-    CygwinPort.cpp
-    ImageInspectionELF.cpp
     StaticBinaryELF.cpp
     SwiftRT-COFF.cpp
     SwiftRT-ELF.cpp

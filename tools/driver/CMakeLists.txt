@@ -9,8 +9,9 @@ target_link_libraries(swift
                       PRIVATE
                         swiftDriver
                         swiftFrontendTool)
-if(HAVE_UNICODE_LIBEDIT)
-  target_link_libraries(swift PRIVATE edit)
+if(libedit_FOUND)
+  target_link_libraries(swift PRIVATE
+    ${libedit_LIBRARIES})
 endif()
 
 swift_create_post_build_symlink(swift
