@@ -77,7 +77,6 @@ endif(LLVM_ENABLE_ASSERTIONS)
 
 # Acknowledge that the following sources are known.
 set(LLVM_OPTIONAL_SOURCES
-    StaticBinaryELF.cpp
     SwiftRT-COFF.cpp
     SwiftRT-ELF.cpp
     ${swift_runtime_sources}
