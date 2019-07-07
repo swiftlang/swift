@@ -403,13 +403,6 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
       // Record the first argument for the variadic.
       parameterBindings[paramIdx].push_back(*claimed);
 
-      // If the argument is itself variadic, we're forwarding varargs
-      // with a VarargExpansionExpr; don't collect any more arguments.
-      if (args[*claimed].isVariadic()) {
-        skipClaimedArgs();
-        return;
-      }
-
       auto currentNextArgIdx = nextArgIdx;
       {
         nextArgIdx = *claimed;
