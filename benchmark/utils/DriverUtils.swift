@@ -194,7 +194,7 @@ struct TestConfig {
     afterRunSleep = c.afterRunSleep
     action = c.action ?? .run
     tests = TestConfig.filterTests(registeredBenchmarks,
-                                    specifiedTests: Set(c.tests ?? []),
+                                    tests: c.tests ?? [],
                                     tags: c.tags ?? [],
                                     skipTags: c.skipTags ?? [.unstable, .skip])
 
@@ -241,10 +241,16 @@ struct TestConfig {
   ///     specified filtering conditions.
   static func filterTests(
     _ registeredBenchmarks: [BenchmarkInfo],
-    specifiedTests: Set<String>,
+    tests: [String],
     tags: Set<BenchmarkCategory>,
     skipTags: Set<BenchmarkCategory>
   ) -> [(index: String, info: BenchmarkInfo)] {
+    var t = tests
+    let filtersIndex = t.partition { $0.hasPrefix("+") || $0.hasPrefix("-") }
+    let excludesIndex = t[filtersIndex...].partition { $0.hasPrefix("-") }
+    let specifiedTests = Set(t[..<filtersIndex])
+    let includes = t[filtersIndex..<excludesIndex].map { $0.dropFirst() }
+    let excludes = t[excludesIndex...].map { $0.dropFirst() }
     let allTests = registeredBenchmarks.sorted()
     let indices = Dictionary(uniqueKeysWithValues:
       zip(allTests.map { $0.name },
@@ -256,11 +262,27 @@ struct TestConfig {
     }
     func byNamesOrIndices(b: BenchmarkInfo) -> Bool {
       return specifiedTests.contains(b.name) ||
-        specifiedTests.contains(indices[b.name]!)
-    } // !! "`allTests` have been assigned an index"
+        // !! "`allTests` have been assigned an index"
+        specifiedTests.contains(indices[b.name]!) ||
+        (includes.contains { b.name.contains($0) } &&
+          excludes.allSatisfy { !b.name.contains($0) } )
+    }
     return allTests
-      .filter(specifiedTests.isEmpty ? byTags : byNamesOrIndices)
+      .filter(tests.isEmpty ? byTags : byNamesOrIndices)
       .map { (index: indices[$0.name]!, info: $0) }
+  }
+}
+
+extension String {
+  func contains(_ str: Substring) -> Bool {
+    guard let c = str.first else { return false }
+    var s = self[...]
+    repeat {
+      s = s[(s.firstIndex(of: c) ?? s.endIndex)...]
+      if s.starts(with: str) { return true }
+      s = s.dropFirst()
+    } while s.startIndex != s.endIndex
+    return false
   }
 }
 

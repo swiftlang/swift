@@ -100,6 +100,18 @@ ALPHASORT: FatCompactMap
 
 ````
 
+Substring filters using + and - prefix
+
+````
+RUN: %Benchmark_O --list -.A +Angry -Small AngryPhonebook.ASCII.Small \
+RUN:             | %FileCheck %s --check-prefix FILTERS
+FILTERS: AngryPhonebook.ASCII.Small
+FILTERS-NOT: AngryPhonebook.Armenian
+FILTERS-NOT: AngryPhonebook.Cyrillic.Small
+FILTERS: AngryPhonebook.Cyrillic
+FILTERS: AngryPhonebook.Strasse
+````
+
 ## Running Benchmarks
 By default, each real benchmark execution takes about a second per sample.
 To minimise the test time, multiple checks are combined into one run.
