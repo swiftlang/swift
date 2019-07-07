@@ -5421,26 +5421,38 @@ Expr *ExprRewriter::coerceCallArguments(
       else
         newLabelLocs.push_back(SourceLoc());
 
+      bool isVarargExpansion = false;
       // Convert the arguments.
       for (auto argIdx : varargIndices) {
         auto arg = getArg(argIdx);
         auto argType = cs.getType(arg);
-        
+
         if (isa<VarargExpansionExpr>(arg) && varargIndices.size() > 1) {
-          tc.diagnose(arg->getLoc(),
-                      diag::pound_variadic_must_appear_alone);
+          tc.diagnose(arg->getLoc(), diag::pound_variadic_must_appear_alone);
           return nullptr;
+        } else if (isa<VarargExpansionExpr>(arg)) {
+          isVarargExpansion = true;
         }
 
+        auto paramType =
+            isVarargExpansion ? param.getParameterType() : param.getPlainType();
+
         // If the argument type exactly matches, this just works.
-        if (argType->isEqual(param.getPlainType())) {
+        if (argType->isEqual(paramType)) {
           variadicArgs.push_back(arg);
           continue;
         }
 
+        Expr *convertedArg;
         // Convert the argument.
-        auto convertedArg = coerceToType(arg, param.getPlainType(),
-                                         getArgLocator(argIdx, paramIdx));
+        if (isVarargExpansion) {
+          convertedArg =
+              buildCollectionUpcastExpr(arg, paramType, false, locator);
+        } else {
+          convertedArg =
+              coerceToType(arg, paramType, getArgLocator(argIdx, paramIdx));
+        }
+
         if (!convertedArg)
           return nullptr;
 
@@ -5454,21 +5466,22 @@ Expr *ExprRewriter::coerceCallArguments(
         end = variadicArgs.back()->getEndLoc();
       }
 
-      // Collect them into an ArrayExpr.
-      auto *arrayExpr = ArrayExpr::create(tc.Context,
-                                          start,
-                                          variadicArgs,
-                                          {}, end,
-                                          param.getParameterType());
-      arrayExpr->setImplicit();
-      cs.cacheType(arrayExpr);
+      Expr *varargExpansionExpr;
+      if (variadicArgs.empty() || !isVarargExpansion) {
+        // Collect them into an ArrayExpr.
+        auto *arrayExpr = ArrayExpr::create(tc.Context, start, variadicArgs, {},
+                                            end, param.getParameterType());
+        arrayExpr->setImplicit();
+        cs.cacheType(arrayExpr);
 
-      // Wrap the ArrayExpr in a VarargExpansionExpr.
-      auto *varargExpansionExpr =
-        new (tc.Context) VarargExpansionExpr(arrayExpr,
-                                             /*implicit=*/true,
-                                             arrayExpr->getType());
-      cs.cacheType(varargExpansionExpr);
+        // Wrap the ArrayExpr in a VarargExpansionExpr.
+        varargExpansionExpr = new (tc.Context)
+            VarargExpansionExpr(arrayExpr,
+                                /*implicit=*/true, arrayExpr->getType());
+        cs.cacheType(varargExpansionExpr);
+      } else {
+        varargExpansionExpr = variadicArgs.front();
+      }
 
       newArgs.push_back(varargExpansionExpr);
       newParams.push_back(param);

@@ -1140,13 +1140,16 @@ namespace {
         return finish(true, expr);
       }
 
-      // Let's try to figure out if `InOutExpr` is out of place early
-      // otherwise there is a risk of producing solutions which can't
-      // be later applied to AST and would result in the crash in some
+      // Let's try to figure out if `InOutExpr` or `VarargExpansionExpr` is out
+      // of place early. Otherwise there is a risk of producing solutions which
+      // can't be later applied to AST and would result in the crash in some
       // cases. Such expressions are only allowed in argument positions
       // of function/operator calls.
-      if (isa<InOutExpr>(expr)) {
-        // If this is an implicit `inout` expression we assume that
+      if (isa<InOutExpr>(expr) || isa<VarargExpansionExpr>(expr)) {
+        auto diag = isa<InOutExpr>(expr)
+                        ? diag::extraneous_address_of
+                        : diag::pound_variadic_outside_arg_position;
+        // If this is an implicit `inout` or expansion expression we assume that
         // compiler knowns what it's doing.
         if (expr->isImplicit())
           return finish(true, expr);
@@ -1171,7 +1174,8 @@ namespace {
                   isa<UnresolvedMemberExpr>(call->getSecond()))
                 return finish(true, expr);
 
-              if (isa<SubscriptExpr>(call->getSecond())) {
+              if (isa<InOutExpr>(expr) &&
+                  isa<SubscriptExpr>(call->getSecond())) {
                 TC.diagnose(expr->getStartLoc(),
                             diag::cannot_pass_inout_arg_to_subscript);
                 return finish(false, nullptr);
@@ -1180,7 +1184,7 @@ namespace {
           }
         }
 
-        TC.diagnose(expr->getStartLoc(), diag::extraneous_address_of);
+        TC.diagnose(expr->getStartLoc(), diag);
         return finish(false, nullptr);
       }
 

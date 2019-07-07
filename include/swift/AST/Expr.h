@@ -3342,16 +3342,39 @@ public:
   }
 };
 
-/// The not-yet-actually-surfaced '...' varargs expansion operator,
-/// which splices an array into a sequence of variadic arguments.
+/// The #variadic varargs expansion operator,
+/// which expands an array into a sequence of variadic arguments.
 class VarargExpansionExpr : public Expr {
   Expr *SubExpr;
+  SourceLoc KeywordLoc;
+  SourceLoc LParenLoc;
+  SourceLoc RParenLoc;
 
 public:
-  VarargExpansionExpr(Expr *subExpr, bool implicit, Type type = Type())
-    : Expr(ExprKind::VarargExpansion, implicit, type), SubExpr(subExpr) {}
+  VarargExpansionExpr(Expr *subExpr, SourceLoc keywordLoc, SourceLoc lParenLoc,
+                      SourceLoc rParenLoc, Type type = Type())
+      : Expr(ExprKind::VarargExpansion, false, type), SubExpr(subExpr),
+        KeywordLoc(keywordLoc), LParenLoc(lParenLoc), RParenLoc(rParenLoc) {}
 
-  SWIFT_FORWARD_SOURCE_LOCS_TO(SubExpr)
+  VarargExpansionExpr(Expr *subExpr, bool implicit, Type type = Type())
+      : Expr(ExprKind::VarargExpansion, implicit, type), SubExpr(subExpr) {}
+
+  SourceLoc getStartLoc() const {
+    return isImplicit() ? SubExpr->getStartLoc() : KeywordLoc;
+  }
+
+  SourceLoc getEndLoc() const {
+    return isImplicit() ? SubExpr->getEndLoc() : RParenLoc;
+  }
+
+  SourceLoc getLoc() const {
+    return isImplicit() ? SubExpr->getLoc() : KeywordLoc;
+  }
+
+  SourceRange getSourceRange() const {
+    return isImplicit() ? SubExpr->getSourceRange()
+                        : SourceRange(KeywordLoc, RParenLoc);
+  }
 
   Expr *getSubExpr() const { return SubExpr; }
   void setSubExpr(Expr *subExpr) { SubExpr = subExpr; }

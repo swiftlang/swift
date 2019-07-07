@@ -360,15 +360,18 @@ ERROR(cannot_convert_argument_value,none,
 ERROR(cannot_convert_array_to_variadic,none,
       "cannot pass an array of type %0 as variadic arguments of type %1",
       (Type,Type))
-
 ERROR(pound_variadic_must_appear_alone,none,
       "#variadic cannot be used alongside additional variadic arguments",
       ())
+ERROR(pound_variadic_outside_arg_position,none,
+     "#variadic can only be used in an argument position",
+     ())
 
 NOTE(suggest_pass_elements_directly,none,
      "remove brackets to pass array elements directly", ())
 NOTE(suggest_pass_elements_using_pound_variadic,none,
-"wrap the expression in '#variadic(...)' to pass array elements as variadic arguments", ())
+    "wrap the expression in '#variadic(...)' to pass array elements as"
+    "variadic arguments", ())
 
 ERROR(cannot_convert_argument_value_generic,none,
       "cannot convert value of type %0 (%1) to expected argument type %2 (%3)",

@@ -817,20 +817,20 @@ ParserResult<Expr> Parser::parseExprVarargsExpansion() {
   SyntaxParsingContext ExprCtxt(SyntaxContext, SyntaxKind::VarargExpansionExpr);
   // Consume '#variadic'.
   SourceLoc keywordLoc = consumeToken(tok::pound_variadic);
-  
+
   // Parse the leading '('.
   if (!Tok.is(tok::l_paren)) {
     diagnose(Tok, diag::expr_varargs_expansion_expected_lparen);
     return makeParserError();
   }
   SourceLoc lParenLoc = consumeToken(tok::l_paren);
-  
+
   // Parse the subexpression.
   ParserResult<Expr> subExpr =
-  parseExpr(diag::expr_varargs_expansion_expected_expr);
+      parseExpr(diag::expr_varargs_expansion_expected_expr);
   if (subExpr.hasCodeCompletion())
     return makeParserCodeCompletionResult<Expr>();
-  
+
   // Parse the closing ')'.
   SourceLoc rParenLoc;
   if (subExpr.isParseError()) {
@@ -843,14 +843,14 @@ ParserResult<Expr> Parser::parseExprVarargsExpansion() {
     parseMatchingToken(tok::r_paren, rParenLoc,
                        diag::expr_varargs_expansion_expected_rparen, lParenLoc);
   }
-  
+
   // If the subexpression was in error, just propagate the error.
   if (subExpr.isParseError())
     return makeParserResult<Expr>(
-                                  new (Context) ErrorExpr(SourceRange(keywordLoc, rParenLoc)));
-  
-  return makeParserResult<Expr>(
-                                new (Context) VarargExpansionExpr(subExpr.get(), false));
+        new (Context) ErrorExpr(SourceRange(keywordLoc, rParenLoc)));
+
+  return makeParserResult<Expr>(new (Context) VarargExpansionExpr(
+      subExpr.get(), keywordLoc, lParenLoc, rParenLoc));
 }
 
 static DeclRefKind getDeclRefKindForOperator(tok kind) {
@@ -1702,7 +1702,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
     return makeParserResult(new (Context)
                                 ErrorExpr(res.get()->getSourceRange()));
   }
-      
+
   case tok::pound_variadic:
     return parseExprVarargsExpansion();
 

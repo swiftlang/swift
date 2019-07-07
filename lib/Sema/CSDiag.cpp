@@ -2284,8 +2284,8 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
     }
   }
 
-  // Diagnose passing '[T]' instead of a sequence of 'T' to a variadic argument of
-  // type 'T...'.
+  // Diagnose passing '[T]' instead of a sequence of 'T' to a variadic argument
+  // of type 'T...'.
   auto genericExprType = exprType->getAs<BoundGenericType>();
   if (CTP == CTP_VariadicCallArg && genericExprType &&
       genericExprType->getDecl() == CS.TC.Context.getArrayDecl() &&
@@ -2295,7 +2295,9 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
              contextualType);
     // Offer to pass the array elements using #variadic
     auto range = expr->getSourceRange();
-    diagnose(expr->getLoc(), diag::suggest_pass_elements_using_pound_variadic).fixItInsert(range.Start, "#variadic(").fixItInsertAfter(range.End, ")");
+    diagnose(expr->getLoc(), diag::suggest_pass_elements_using_pound_variadic)
+        .fixItInsert(range.Start, "#variadic(")
+        .fixItInsertAfter(range.End, ")");
     // If this is an array literal, offer to remove the brackets and pass the
     // elements directly as variadic arguments.
     if (auto *arrayExpr = dyn_cast<ArrayExpr>(expr)) {
