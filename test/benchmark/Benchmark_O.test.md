@@ -101,17 +101,18 @@ ALPHASORT: FatCompactMap
 ````
 
 ## Running Benchmarks
-Each real benchmark execution takes about a second per sample. If possible,
-multiple checks are combined into one run to minimise the test time.
+By default, each real benchmark execution takes about a second per sample.
+To minimise the test time, multiple checks are combined into one run.
 
 ````
 RUN: %Benchmark_O AngryPhonebook --num-iters=1 \
+RUN:                             --sample-time=0.000001 --min-samples=7 \
 RUN:              | %FileCheck %s --check-prefix NUMITERS1 \
 RUN:                              --check-prefix LOGHEADER \
 RUN:                              --check-prefix LOGBENCH
 LOGHEADER-LABEL: #,TEST,SAMPLES,MIN(μs),MAX(μs),MEAN(μs),SD(μs),MEDIAN(μs)
 LOGBENCH: {{[0-9]+}},
-NUMITERS1: AngryPhonebook,{{[0-9]+}}
+NUMITERS1: AngryPhonebook,7
 NUMITERS1-NOT: 0,0,0,0,0
 LOGBENCH-SAME: ,{{[0-9]+}},{{[0-9]+}},{{[0-9]+}},{{[0-9]+}},{{[0-9]+}}
 ````

@@ -78,6 +78,9 @@ struct TestConfig {
   /// The number of samples we should take of each test.
   let numSamples: Int?
 
+  /// The minimum number of samples we should take of each test.
+  let minSamples: Int?
+
   /// Quantiles to report in results.
   let quantile: Int?
 
@@ -105,6 +108,7 @@ struct TestConfig {
       var delim: String?
       var tags, skipTags: Set<BenchmarkCategory>?
       var numSamples: UInt?
+      var minSamples: UInt?
       var numIters: UInt?
       var quantile: UInt?
       var delta: Bool?
@@ -135,6 +139,9 @@ struct TestConfig {
                   help: "number of samples to take per benchmark;\n" +
                         "default: 1 or auto-scaled to measure for\n" +
                         "`sample-time` if num-iters is also specified\n",
+                  parser: { UInt($0) })
+    p.addArgument("--min-samples", \.minSamples,
+                  help: "minimum number of samples to take per benchmark\n",
                   parser: { UInt($0) })
     p.addArgument("--num-iters", \.numIters,
                   help: "number of iterations averaged in the sample;\n" +
@@ -179,6 +186,7 @@ struct TestConfig {
     sampleTime = c.sampleTime ?? 1.0
     numIters = c.numIters.map { Int($0) }
     numSamples = c.numSamples.map { Int($0) }
+    minSamples = c.minSamples.map { Int($0) }
     quantile = c.quantile.map { Int($0) }
     delta = c.delta ?? false
     verbose = c.verbose ?? false
@@ -206,6 +214,7 @@ struct TestConfig {
     let configuration = """
         --- CONFIG ---
         NumSamples: \(numSamples ?? 0)
+        MinSamples: \(minSamples ?? 0)
         Verbose: \(verbose)
         LogMemory: \(logMemory)
         SampleTime: \(sampleTime)
@@ -516,8 +525,11 @@ final class TestRunner {
       Int.max / 10_000, // by the inner loop multiplier inside the `testFn`.
       c.numIters ?? calibrateMeasurements())
 
-    let numSamples = c.numSamples ?? min(200, // Cap the number of samples
-      c.numIters == nil ? 1 : calibrateMeasurements())
+    let numSamples = c.numSamples ??
+      // Compute the number of samples to measure for `sample-time`,
+      // clamped in (`min-samples`, 200) range, if the `num-iters` are fixed.
+      max(c.minSamples ?? 1, min(200, c.numIters == nil ? 1 :
+        calibrateMeasurements()))
 
     samples.reserveCapacity(numSamples)
     logVerbose("    Collecting \(numSamples) samples.")
