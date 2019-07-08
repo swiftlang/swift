@@ -2199,7 +2199,7 @@ NOTE(overridden_here_can_be_objc,none,
      "add '@objc' to make this declaration overridable", ())
 // SWIFT_ENABLE_TENSORFLOW
 ERROR(override_missing_differentiable,none,
-      "%0 is a missing a `@differentiable` definition that is required in the base protocol",
+      "%0 is missing a `@differentiable` definition that is required in the base protocol",
       (DeclName))
 // SWIFT_ENABLE_TENSORFLOW END
 

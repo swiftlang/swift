@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -verify %s
+// RUN: %target-swift-frontend -typecheck -verify %s
 
 import StdlibUnittest
 
@@ -178,7 +178,7 @@ func blah2<T: DoubleDifferentiableDistribution>(_ x: T, _ value: T.Value) -> Flo
 // Missing a `@differentiable` attribute.
 public protocol MissingDifferentiableDistribution: DifferentiableDistribution
   where Value: Differentiable {
-  func logProbability(of value: Value) -> Float // expected-error {{'logProbability(of:)' is a missing a `@differentiable` definition that is required in the base protocol}}
+  func logProbability(of value: Value) -> Float // expected-error {{'logProbability(of:)' is missing a `@differentiable` definition that is required in the base protocol}}
 }
 
 runAllTests()

@@ -13,7 +13,6 @@
 // This file implements semantic analysis for declaration overrides.
 //
 //===----------------------------------------------------------------------===//
-#include <iostream>
 #include "TypeChecker.h"
 #include "CodeSynthesis.h"
 #include "MiscDiagnostics.h"
@@ -618,6 +617,7 @@ static bool overridesDifferentiableAttribute(const ValueDecl *derivedDecl,
           ctx, derivedDA->getParameterIndices()->parameters);
       if (baseParameters->isSubsetOf(derivedParameters)) {
         defined = true;
+        break;
       }
     }
     if (!defined) {
@@ -636,11 +636,10 @@ static bool overridesDifferentiableAttribute(const ValueDecl *derivedDecl,
   // Finally, go through all differentiable attributes in
   // `derivedDecl` and check if they subsume any of the
   // differentiable attributes in `baseDecl`.
-  auto overrides = true;
   for (auto derivedDA : derivedDAs) {
     auto derivedParameters = AutoDiffIndexSubset::get(
         ctx, derivedDA->getParameterIndices()->parameters);
-    overrides = true;
+    auto overrides = true;
     for (auto baseDA : baseDAs) {
       auto baseParameters = AutoDiffIndexSubset::get(
           ctx, baseDA->getParameterIndices()->parameters);
