@@ -540,19 +540,25 @@ func use_BracesInsideNominalDecl1() {
   var _ : BracesInsideNominalDecl1.A // no-error
 }
 
-class SR771 { // expected-note {{in declaration of 'SR771'}}
-    print("No one else was in the room where it happened") // expected-error {{expected declaration}}
+class SR771 {
+    print("No one else was in the room where it happened") // expected-note {{'print()' previously declared here}}
+    // expected-error @-1 {{expected 'func' keyword in instance method declaration}}
+    // expected-error @-2 {{expected '{' in body of function declaration}}
+    // expected-error @-3 {{expected parameter name followed by ':'}}
 }
 
-extension SR771 { // expected-note {{in extension of 'SR771'}}
-    print("The room where it happened, the room where it happened") // expected-error {{expected declaration}}
+extension SR771 {
+    print("The room where it happened, the room where it happened")
+    // expected-error @-1 {{expected 'func' keyword in instance method declaration}}
+    // expected-error @-2 {{invalid redeclaration of 'print()'}}
+    // expected-error @-3 {{expected parameter name followed by ':'}}
 }
 
 
 //===--- Recovery for wrong decl introducer keyword.
 
-class WrongDeclIntroducerKeyword1 { // expected-note{{in declaration of 'WrongDeclIntroducerKeyword1'}}
-  notAKeyword() {} // expected-error {{expected declaration}}
+class WrongDeclIntroducerKeyword1 {
+  notAKeyword() {} // expected-error {{expected 'func' keyword in instance method declaration}}
   func foo() {}
   class func bar() {}
 }
