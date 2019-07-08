@@ -728,20 +728,37 @@ public:
                                         ConstraintLocator *locator);
 };
 
-class AllowMemberRefOnExistential final : public ConstraintFix {
+class AllowInvalidMemberRef : public ConstraintFix {
   Type BaseType;
+  ValueDecl *Member;
   DeclName Name;
 
+protected:
+  AllowInvalidMemberRef(ConstraintSystem &cs, FixKind kind, Type baseType,
+                        ValueDecl *member, DeclName name,
+                        ConstraintLocator *locator)
+      : ConstraintFix(cs, kind, locator), BaseType(baseType), Member(member),
+        Name(name) {}
+
+public:
+  Type getBaseType() const { return BaseType; }
+
+  ValueDecl *getMember() const { return Member; }
+
+  DeclName getMemberName() const { return Name; }
+};
+
+class AllowMemberRefOnExistential final : public AllowInvalidMemberRef {
   AllowMemberRefOnExistential(ConstraintSystem &cs, Type baseType,
                               DeclName memberName, ValueDecl *member,
                               ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::AllowMemberRefOnExistential, locator),
-        BaseType(baseType), Name(memberName) {}
+      : AllowInvalidMemberRef(cs, FixKind::AllowMemberRefOnExistential,
+                              baseType, member, memberName, locator) {}
 
 public:
   std::string getName() const override {
     llvm::SmallVector<char, 16> scratch;
-    auto memberName = Name.getString(scratch);
+    auto memberName = getMemberName().getString(scratch);
     return "allow access to invalid member '" + memberName.str() +
            "' on value of protocol type";
   }
@@ -754,20 +771,16 @@ public:
                                              ConstraintLocator *locator);
 };
 
-class AllowTypeOrInstanceMember final : public ConstraintFix {
-  Type BaseType;
-  ValueDecl *Member;
-  DeclName UsedName;
-
-public:
+class AllowTypeOrInstanceMember final : public AllowInvalidMemberRef {
   AllowTypeOrInstanceMember(ConstraintSystem &cs, Type baseType,
                             ValueDecl *member, DeclName name,
                             ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::AllowTypeOrInstanceMember, locator),
-        BaseType(baseType), Member(member), UsedName(name) {
+      : AllowInvalidMemberRef(cs, FixKind::AllowTypeOrInstanceMember, baseType,
+                              member, name, locator) {
     assert(member);
   }
 
+public:
   std::string getName() const override {
     return "allow access to instance member on type or a type member on instance";
   }
@@ -934,13 +947,12 @@ public:
                                         ConstraintLocator *locator);
 };
 
-class AllowInaccessibleMember final : public ConstraintFix {
-  ValueDecl *Member;
-
-  AllowInaccessibleMember(ConstraintSystem &cs, ValueDecl *member,
+class AllowInaccessibleMember final : public AllowInvalidMemberRef {
+  AllowInaccessibleMember(ConstraintSystem &cs, Type baseType,
+                          ValueDecl *member, DeclName name,
                           ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::AllowInaccessibleMember, locator),
-        Member(member) {}
+      : AllowInvalidMemberRef(cs, FixKind::AllowInaccessibleMember, baseType,
+                              member, name, locator) {}
 
 public:
   std::string getName() const override {
@@ -949,8 +961,8 @@ public:
 
   bool diagnose(Expr *root, bool asNote = false) const override;
 
-  static AllowInaccessibleMember *create(ConstraintSystem &cs,
-                                         ValueDecl *member,
+  static AllowInaccessibleMember *create(ConstraintSystem &cs, Type baseType,
+                                         ValueDecl *member, DeclName name,
                                          ConstraintLocator *locator);
 };
 

@@ -4750,7 +4750,8 @@ fixMemberRef(ConstraintSystem &cs, Type baseTy,
 
     case MemberLookupResult::UR_Inaccessible:
       assert(choice.isDecl());
-      return AllowInaccessibleMember::create(cs, choice.getDecl(), locator);
+      return AllowInaccessibleMember::create(cs, baseTy, choice.getDecl(),
+                                             memberName, locator);
 
     case MemberLookupResult::UR_UnavailableInExistential: {
       return choice.isDecl()
