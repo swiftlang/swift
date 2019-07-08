@@ -182,14 +182,14 @@ public protocol MissingDifferentiableDistribution: DifferentiableDistribution
 }
 
 // Missing `@differentiable` attribute, without printing the 'wrt' arguments.
-protocol Example {
-  associatedtype Scalar
+protocol Example: Differentiable {
+  associatedtype Scalar: Differentiable
 
-  @differentiable(where Scalar: Differentiable)
+  @differentiable
   func test(value: Scalar) -> Float
 }
 
-protocol MissingDifferentiableTest: Example where Scalar: Differentiable {
+protocol MissingDifferentiableTest: Example {
   func test(value: Scalar) -> Float // expected-note {{candidate is missing attribute '@differentiable'}}
 }
 
