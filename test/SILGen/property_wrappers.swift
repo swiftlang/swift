@@ -1,5 +1,4 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-silgen | %FileCheck %s
-// FIXME: switch to %target-swift-emit-silgen once we have syntax tree support
+// RUN: %target-swift-emit-silgen -primary-file %s | %FileCheck %s
 
 @propertyWrapper
 struct Wrapper<T> {
