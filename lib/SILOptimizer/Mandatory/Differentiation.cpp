@@ -2941,7 +2941,8 @@ public:
         original->isDynamicallyReplaceable());
     pullback->setOwnershipEliminated();
     pullback->setDebugScope(new (module)
-                                SILDebugScope(original->getLocation(), pullback));
+                                SILDebugScope(original->getLocation(),
+                                              pullback));
     return pullback;
   }
 
@@ -3508,9 +3509,11 @@ public:
     // Add pullback result for the seed.
     auto origResInfo = origTy->getResults()[indices.source];
     diffResults.push_back(SILResultInfo(
-                                        origResInfo.getType()
-                                        ->getAutoDiffAssociatedTangentSpace(lookupConformance)
-                                        ->getCanonicalType(), origResInfo.getConvention()));
+                              origResInfo.getType()
+                                  ->getAutoDiffAssociatedTangentSpace(
+                                        lookupConformance)
+                                  ->getCanonicalType(),
+                              origResInfo.getConvention()));
 
     // Add pullback results for the requested wrt parameters.
     for (auto i : indices.parameters->getIndices()) {
@@ -3522,9 +3525,9 @@ public:
     }
 
     auto diffName = original->getASTContext()
-    .getIdentifier("AD__" + original->getName().str() +
-                   "__differential_" + indices.mangle())
-    .str();
+        .getIdentifier("AD__" + original->getName().str() + "__differential_" +
+                       indices.mangle())
+        .str();
     auto diffGenericSig = getAssociatedFunctionGenericSignature(attr, original);
     auto *diffGenericEnv = diffGenericSig
         ? diffGenericSig->createGenericEnvironment()
@@ -3544,7 +3547,25 @@ public:
         original->isDynamicallyReplaceable());
     differential->setOwnershipEliminated();
     differential->setDebugScope(new (module)
-                               SILDebugScope(original->getLocation(), differential));
+                                    SILDebugScope(original->getLocation(),
+                                                  differential));
+    // Create empty body of differential.
+    SmallVector<SILValue, 8> finalResults;
+    for (auto result : diffResults)
+      finalResults.push_back(SILUndef::get(
+                                 SILType::getPrimitiveObjectType(
+                                     result.getType()),
+                             *differential));
+    auto diffConv = differential->getConventions();
+    auto *entry = differential->createBasicBlock();
+    createEntryArguments(differential);
+    // Return undef.
+    SILBuilder builder(entry);
+    auto loc = differential->getLocation();
+    builder.createReturn(loc, SILUndef::get(
+                                  differential->mapTypeIntoContext(
+                                      diffConv.getSILResultType()),
+                                  *differential));
     return differential;
   }
 
