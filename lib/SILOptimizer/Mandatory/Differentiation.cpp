@@ -3457,6 +3457,11 @@ private:
   /// predecessor enum argument).
   SmallPtrSet<SILBasicBlock *, 4> remappedBasicBlocks;
 
+  /// Temporary boolean for determine whether we should be generating the body of the JVP.
+  /// If true, then skip the JVP generation process since we cannot generate JVPs for the
+  /// primitive VJPs defined on addition for Float for example.
+  bool vjpGenerated;
+
   bool errorOccurred = false;
 
   ASTContext &getASTContext() const { return jvp->getASTContext(); }
@@ -3489,11 +3494,12 @@ private:
 public:
   explicit JVPEmitter(ADContext &context, SILFunction *original,
                       SILDifferentiableAttr *attr, SILFunction *jvp,
-                      DifferentiationInvoker invoker)
+                      DifferentiationInvoker invoker, bool vjpGenerated)
       : TypeSubstCloner(*jvp, *original, getSubstitutionMap(original, jvp)),
         context(context), original(original), attr(attr), jvp(jvp),
         invoker(invoker), activityInfo(getActivityInfo(
-                              context, original, attr->getIndices(), jvp)) {
+                              context, original, attr->getIndices(), jvp)),
+        vjpGenerated(vjpGenerated) {
     // Create empty differential function.
     differential = createEmptyDifferential();
     context.getGeneratedFunctions().push_back(differential);
@@ -6306,13 +6312,27 @@ bool JVPEmitter::run() {
   auto *entry = jvp->createBasicBlock();
   createEntryArguments(jvp);
 
-  // Clone.
-  SmallVector<SILValue, 4> entryArgs(entry->getArguments().begin(),
-                                     entry->getArguments().end());
-  cloneFunctionBody(original, entry, entryArgs);
-  // If errors occurred, back out.
-  if (errorOccurred)
-    return true;
+  if (vjpGenerated) {
+    // Clone. Since the VJP was generated, the SIL code was verified for being
+    // differentiable, thus creating the original body of the JVP should also
+    // be possible.
+    SmallVector<SILValue, 4> entryArgs(entry->getArguments().begin(),
+                                       entry->getArguments().end());
+    cloneFunctionBody(original, entry, entryArgs);
+    // If errors occurred, back out.
+    if (errorOccurred)
+      return true;
+  } else {
+    // Create empty body of JVP if the user defined their own custom VJP.
+    // Return undef.
+    auto diffConv = differential->getConventions();
+    SILBuilder builder(entry);
+    auto loc = differential->getLocation();
+    builder.createReturn(loc, SILUndef::get(
+                                  differential->mapTypeIntoContext(
+                                      diffConv.getSILResultType()),
+                              *differential));
+  }
 
   LLVM_DEBUG(getADDebugStream() << "Generated JVP for "
              << original->getName() << ":\n" << *jvp);
@@ -6398,7 +6418,7 @@ static SILFunction *createEmptyVJP(
 
 static SILFunction *createEmptyJVP(
     ADContext &context, SILFunction *original, SILDifferentiableAttr *attr,
-    bool isExported, bool vjpGenerated) {
+    bool isExported) {
   LLVM_DEBUG({
     auto &s = getADDebugStream();
     s << "Creating JVP:\n\t";
@@ -6527,9 +6547,9 @@ bool ADContext::processDifferentiableAttribute(
         diagnoseUnsupportedControlFlow(*this, original, invoker))
       return true;
     
-    jvp = createEmptyJVP(*this, original, attr, isAssocFnExported, vjpGenerated);
+    jvp = createEmptyJVP(*this, original, attr, isAssocFnExported);
     getGeneratedFunctions().push_back(jvp);
-    JVPEmitter emitter(*this, original, attr, jvp, invoker);
+    JVPEmitter emitter(*this, original, attr, jvp, invoker, vjpGenerated);
     return emitter.run();
   }
 
