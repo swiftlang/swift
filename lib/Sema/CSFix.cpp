@@ -645,7 +645,9 @@ bool SkipUnhandledConstructInFunctionBuilder::diagnose(Expr *root,
 }
 
 bool AllowMutatingMemberOrRValueBase::diagnose(Expr *root, bool asNote) const {
-  return false;
+  auto &cs = getConstraintSystem();
+  MutatingMemberRefOnImmutableBase failure(root, cs, getMember(), getLocator());
+  return failure.diagnose(asNote);
 }
 
 AllowMutatingMemberOrRValueBase *
