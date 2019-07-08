@@ -137,6 +137,16 @@ struct S : P {
   }
 }
 
+// MARK: - Differentiable protocol requirement with 'where' clause.
+
+// Missing `@differentiable` attribute, without printing the 'wrt' arguments.
+protocol DifferentiableWhereClause: Differentiable {
+  associatedtype Scalar
+
+  @differentiable(where Scalar: Differentiable) // expected-error {{'where' clauses in '@differentiable' attributes of protocol requirements are not supported}}
+  func test(value: Scalar) -> Float
+}
+
 // MARK: - Overridden protocol method adding differentiable attribute.
 
 public protocol Distribution {
