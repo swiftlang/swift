@@ -3251,6 +3251,7 @@ namespace {
 
       // Import each of the members.
       SmallVector<VarDecl *, 4> members;
+      SmallVector<FuncDecl *, 4> methods;
       SmallVector<ConstructorDecl *, 4> ctors;
 
       // FIXME: Import anonymous union fields and support field access when
@@ -3315,6 +3316,10 @@ namespace {
           continue;
         }
 
+        if (auto MD = dyn_cast<FuncDecl>(member)) {
+          methods.push_back(MD);
+          continue;
+        }
         auto VD = cast<VarDecl>(member);
 
         if (isa<clang::IndirectFieldDecl>(nd) || decl->isUnion()) {
@@ -3392,9 +3397,13 @@ namespace {
       for (auto member : members) {
         result->addMember(member);
       }
-      
+
       for (auto ctor : ctors) {
         result->addMember(ctor);
+      }
+
+      for (auto method : methods) {
+        result->addMember(method);
       }
 
       result->setHasUnreferenceableStorage(hasUnreferenceableStorage);
@@ -3691,6 +3700,19 @@ namespace {
                                               /*throws*/ false,
                                               dc, decl);
 
+      if (auto *mdecl = dyn_cast<clang::CXXMethodDecl>(decl)) {
+        if (!mdecl->isStatic()) {
+          // Workaround until proper const support is handled: Force
+          // everything to be mutating. This implicitly makes the parameter
+          // indirect.
+          result->setSelfAccessKind(SelfAccessKind::Mutating);
+          // "self" is the first argument.
+          result->setSelfIndex(0);
+        } else {
+          result->setStatic();
+          result->setImportAsStaticMember();
+        }
+      }
       result->computeType();
       result->setValidationToChecked();
       result->setIsObjC(false);
@@ -3732,8 +3754,7 @@ namespace {
     }
 
     Decl *VisitCXXMethodDecl(const clang::CXXMethodDecl *decl) {
-      // FIXME: Import C++ member functions as methods.
-      return nullptr;
+      return VisitFunctionDecl(decl);
     }
 
     Decl *VisitFieldDecl(const clang::FieldDecl *decl) {
