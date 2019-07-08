@@ -2166,22 +2166,6 @@ static void validateAbstractStorageDecl(TypeChecker &TC,
   TC.DeclsToFinalize.insert(storage);
 }
 
-static void finalizeAbstractStorageDecl(TypeChecker &TC,
-                                        AbstractStorageDecl *storage) {
-  TC.validateDecl(storage);
-
-  // Add any mandatory accessors now.
-  maybeAddAccessorsToStorage(storage);
-
-  for (auto accessor : storage->getAllAccessors()) {
-    // Are there accessors we can safely ignore here, like maybe observers?
-    TC.validateDecl(accessor);
-
-    // Finalize the accessors as well.
-    TC.DeclsToFinalize.insert(accessor);
-  }
-}
-
 /// Check the requirements in the where clause of the given \c source
 /// to ensure that they don't introduce additional 'Self' requirements.
 static void checkProtocolSelfRequirements(ProtocolDecl *proto,
@@ -4495,20 +4479,19 @@ static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
 
     TC.DeclsToFinalize.insert(VD);
 
-    // The only thing left to do is synthesize storage for lazy variables.
+    // The only thing left to do is synthesize storage for lazy variables
+    // and property wrappers.
     auto *prop = dyn_cast<VarDecl>(D);
     if (!prop)
       continue;
 
     if (prop->getAttrs().hasAttribute<LazyAttr>() && !prop->isStatic() &&
         (!prop->getGetter() || !prop->getGetter()->hasBody())) {
-      finalizeAbstractStorageDecl(TC, prop);
       (void) prop->getLazyStorageProperty();
     }
 
     // Ensure that we create the backing variable for a wrapped property.
     if (prop->hasAttachedPropertyWrapper()) {
-      finalizeAbstractStorageDecl(TC, prop);
       (void) prop->getPropertyWrapperBackingProperty();
     }
   }
@@ -4558,7 +4541,7 @@ void TypeChecker::finalizeDecl(ValueDecl *decl) {
   if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
     finalizeType(*this, nominal);
   } else if (auto storage = dyn_cast<AbstractStorageDecl>(decl)) {
-    finalizeAbstractStorageDecl(*this, storage);
+    maybeAddAccessorsToStorage(storage);
   }
 }
 
