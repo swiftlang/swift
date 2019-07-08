@@ -718,3 +718,43 @@ bb2:
   return %9999 : $()
 }
 
+// Hoist releases above dealloc_stack
+// CHECK-LABEL: sil @testReleaseHoistDeallocStack : $@convention(thin) (AnyObject) -> () {
+// CHECK: bb0(%0 : $AnyObject):
+// CHECK-NOT:  retain
+// CHECK:      [[A:%.*]] = alloc_stack $Int64
+// CHECK-NEXT  dealloc_stack [[A]] : $*Int64
+// CHECK-NOT:  release
+// CHECK-LABEL: } // end sil function 'testReleaseHoistDeallocStack'
+sil @testReleaseHoistDeallocStack : $@convention(thin) (AnyObject)->() {
+bb0(%0 : $AnyObject):
+  strong_retain %0 : $AnyObject
+  %alloc = alloc_stack $Int64
+  dealloc_stack %alloc : $*Int64
+  strong_release %0 : $AnyObject
+  %34 = tuple ()
+  return %34 : $()
+}
+
+// Do not hoist releases above builtins that operate on object references.
+//
+// CHECK-RELEASE-HOISTING-LABEL: sil @testCopyArray : $@convention(thin) (_ContiguousArrayBuffer<AnyObject>, Builtin.Word, Builtin.Word) -> Builtin.RawPointer {
+// CHECK-RELEASE-HOISTING: bb0(%0 : $_ContiguousArrayBuffer<AnyObject>, %1 : $Builtin.Word, %2 : $Builtin.Word):
+// CHECK-RELEASE-HOISTING:   builtin "copyArray"<AnyObject>
+// CHECK-RELEASE-HOISTING:   release_value %0 : $_ContiguousArrayBuffer<AnyObject>
+// CHECK-RELEASE-HOISTING-LABEL: } // end sil function 'testCopyArray'
+sil @testCopyArray : $@convention(thin) (_ContiguousArrayBuffer<AnyObject>, Builtin.Word, Builtin.Word) -> Builtin.RawPointer {
+bb0(%0 : $_ContiguousArrayBuffer<AnyObject>, %1 : $Builtin.Word, %2 : $Builtin.Word):
+  %eltty = metatype $@thick AnyObject.Protocol
+  %newptr = builtin "allocRaw"(%1 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.RawPointer
+  bind_memory %newptr : $Builtin.RawPointer, %1 : $Builtin.Word to $*AnyObject
+  %storage = struct_extract %0 : $_ContiguousArrayBuffer<AnyObject>, #_ContiguousArrayBuffer._storage
+  %elements = ref_tail_addr %storage : $__ContiguousArrayStorageBase, $AnyObject
+  %eltptr = address_to_pointer %elements : $*AnyObject to $Builtin.RawPointer
+  %objptr = struct $UnsafePointer<AnyObject> (%eltptr : $Builtin.RawPointer)
+  %ptrdep = mark_dependence %objptr : $UnsafePointer<AnyObject> on %storage : $__ContiguousArrayStorageBase
+  %rawptr = struct_extract %ptrdep : $UnsafePointer<AnyObject>, #UnsafePointer._rawValue
+  %copy = builtin "copyArray"<AnyObject>(%eltty : $@thick AnyObject.Protocol, %newptr : $Builtin.RawPointer, %rawptr : $Builtin.RawPointer, %1 : $Builtin.Word) : $()
+  release_value %0 : $_ContiguousArrayBuffer<AnyObject>
+  return %newptr : $Builtin.RawPointer
+}
