@@ -3522,7 +3522,7 @@ public:
     auto origParams = origTy->getParameters();
     auto indices = attr->getIndices();
 
-    // Add pullback result for the seed.
+    // Add differential result for the seed.
     auto origResInfo = origTy->getResults()[indices.source];
     diffResults.push_back(SILResultInfo(
                               origResInfo.getType()
@@ -3566,12 +3566,6 @@ public:
                                     SILDebugScope(original->getLocation(),
                                                   differential));
     // Create empty body of differential.
-    SmallVector<SILValue, 8> finalResults;
-    for (auto result : diffResults)
-      finalResults.push_back(SILUndef::get(
-                                 SILType::getPrimitiveObjectType(
-                                     result.getType()),
-                             *differential));
     auto diffConv = differential->getConventions();
     auto *entry = differential->createBasicBlock();
     createEntryArguments(differential);
@@ -3640,28 +3634,21 @@ public:
     // will be the differential.
     SmallVector<SILValue, 8> directResults;
     directResults.append(origResults.begin(), origResults.end());
-    auto diffType = jvp->mapTypeIntoContext(
-        differential->getLoweredFunctionType()
-            ->getWithRepresentation(SILFunctionTypeRepresentation::Thick))
-        ->getCanonicalType();
+
+    // Get differential result type.
+    auto jvpResultArray = jvp->getLoweredFunctionType()->getResults();
+    assert(jvpResultArray.size() == 2 &&
+           "Result of JVP can only be 2 elements");
+    auto funcType = jvpResultArray[1].getType();
+    assert(funcType->is<SILFunctionType>() &&
+           "Second result must be a function");
+    auto silFuncCanType = funcType->castTo<SILFunctionType>()->getCanonicalType();
     
     directResults.push_back(SILUndef::get(
-                                SILType::getPrimitiveObjectType(diffType),
-                                *differential));
+                                SILType::getPrimitiveObjectType(silFuncCanType),
+                                *jvp));
     builder.createReturn(
         ri->getLoc(), joinElements(directResults, builder, loc));
-  }
-
-  void visitBranchInst(BranchInst *bi) {
-    llvm_unreachable("Not implemented");
-  }
-
-  void visitCondBranchInst(CondBranchInst *cbi) {
-    llvm_unreachable("Not implemented");
-  }
-
-  void visitSwitchEnumInst(SwitchEnumInst *sei) {
-    llvm_unreachable("Not implemented");
   }
 
   // If an `apply` has active results or active inout parameters, replace it
@@ -6325,13 +6312,13 @@ bool JVPEmitter::run() {
   } else {
     // Create empty body of JVP if the user defined their own custom VJP.
     // Return undef.
-    auto diffConv = differential->getConventions();
+    auto diffConv = jvp->getConventions();
     SILBuilder builder(entry);
-    auto loc = differential->getLocation();
+    auto loc = jvp->getLocation();
     builder.createReturn(loc, SILUndef::get(
-                                  differential->mapTypeIntoContext(
+                                  jvp->mapTypeIntoContext(
                                       diffConv.getSILResultType()),
-                              *differential));
+                              *jvp));
   }
 
   LLVM_DEBUG(getADDebugStream() << "Generated JVP for "
@@ -6543,8 +6530,8 @@ bool ADContext::processDifferentiableAttribute(
     // Diagnose:
     // - Functions with no return.
     // - Functions with unsupported control flow.
-    if (diagnoseNoReturn(*this, original, invoker) ||
-        diagnoseUnsupportedControlFlow(*this, original, invoker))
+    if (vjpGenerated && (diagnoseNoReturn(*this, original, invoker) ||
+        diagnoseUnsupportedControlFlow(*this, original, invoker)))
       return true;
     
     jvp = createEmptyJVP(*this, original, attr, isAssocFnExported);

@@ -5073,9 +5073,6 @@ public:
     if (F->isExternalDeclaration()) {
       if (F->hasForeignBody())
         return;
-//      llvm::errs() << "~~~~~~~~~~~~~~~~~~~~\n";
-//      llvm::errs() << *F << "\n";
-//      llvm::errs() << "~~~~~~~~~~~~~~~~~~~~\n";
       assert(F->isAvailableExternally() &&
              "external declaration of internal SILFunction not allowed");
       // If F is an external declaration, there is nothing further to do,
