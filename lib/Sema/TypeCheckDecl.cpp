@@ -4453,14 +4453,6 @@ void TypeChecker::requestMemberLayout(ValueDecl *member) {
   if (auto *protocolDecl = dyn_cast<ProtocolDecl>(dc))
     requestNominalLayout(protocolDecl);
 
-  if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
-    if (ext->getSelfClassDecl()) {
-      // Finalize members of class extensions, to ensure we compute their
-      // @objc and dynamic state.
-      DeclsToFinalize.insert(member);
-    }
-  }
-
   // If this represents (abstract) storage, form the appropriate accessors.
   if (auto storage = dyn_cast<AbstractStorageDecl>(member)) {
     validateAbstractStorageDecl(*this, storage);
