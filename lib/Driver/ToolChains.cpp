@@ -177,7 +177,9 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
 
   inputArgs.AddLastArg(arguments, options::OPT_AssertConfig);
   inputArgs.AddLastArg(arguments, options::OPT_autolink_force_load);
-  inputArgs.AddLastArg(arguments, options::OPT_color_diagnostics);
+  inputArgs.AddLastArg(arguments,
+                       options::OPT_color_diagnostics,
+                       options::OPT_no_color_diagnostics);
   inputArgs.AddLastArg(arguments, options::OPT_fixit_all);
   inputArgs.AddLastArg(arguments,
                        options::OPT_warn_swift3_objc_inference_minimal,
@@ -261,7 +263,9 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
   inputArgs.AddAllArgs(arguments, options::OPT_Xllvm);
   inputArgs.AddAllArgs(arguments, options::OPT_Xcc);
 
-  if (llvm::sys::Process::StandardErrHasColors())
+  if (!inputArgs.hasArg(options::OPT_color_diagnostics,
+                        options::OPT_no_color_diagnostics) &&
+      llvm::sys::Process::StandardErrHasColors())
     arguments.push_back("-color-diagnostics");
 }
 

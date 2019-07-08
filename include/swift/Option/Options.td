@@ -303,6 +303,8 @@ def serialize_diagnostics_path_EQ: Joined<["-"], "serialize-diagnostics-path=">,
 def color_diagnostics : Flag<["-"], "color-diagnostics">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Print diagnostics in color">;
+def no_color_diagnostics : Flag<["-"], "no-color-diagnostics">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>;
 
 def module_cache_path : Separate<["-"], "module-cache-path">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
