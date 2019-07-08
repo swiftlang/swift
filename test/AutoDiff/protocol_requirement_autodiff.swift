@@ -181,4 +181,16 @@ public protocol MissingDifferentiableDistribution: DifferentiableDistribution
   func logProbability(of value: Value) -> Float // expected-note {{candidate is missing attribute '@differentiable(wrt: self)'}}
 }
 
+// Missing `@differentiable` attribute, without printing the 'wrt' arguments.
+protocol Example {
+  associatedtype Scalar
+
+  @differentiable(where Scalar: Differentiable)
+  func test(value: Scalar) -> Float
+}
+
+protocol MissingDifferentiableTest: Example where Scalar: Differentiable {
+  func test(value: Scalar) -> Float // expected-note {{candidate is missing attribute '@differentiable'}}
+}
+
 runAllTests()
