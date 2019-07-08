@@ -3636,9 +3636,12 @@ public:
     directResults.append(origResults.begin(), origResults.end());
     auto diffType = jvp->mapTypeIntoContext(
         differential->getLoweredFunctionType()
-            ->getWithRepresentation(SILFunctionTypeRepresentation::Thick))->getCanonicalType();
+            ->getWithRepresentation(SILFunctionTypeRepresentation::Thick))
+        ->getCanonicalType();
     
-    directResults.push_back(SILUndef::get(SILType::getPrimitiveObjectType(diffType), *differential));
+    directResults.push_back(SILUndef::get(
+                                SILType::getPrimitiveObjectType(diffType),
+                                *differential));
     builder.createReturn(
         ri->getLoc(), joinElements(directResults, builder, loc));
   }
@@ -6395,7 +6398,7 @@ static SILFunction *createEmptyVJP(
 
 static SILFunction *createEmptyJVP(
     ADContext &context, SILFunction *original, SILDifferentiableAttr *attr,
-    bool isExported) {
+    bool isExported, bool vjpGenerated) {
   LLVM_DEBUG({
     auto &s = getADDebugStream();
     s << "Creating JVP:\n\t";
@@ -6475,23 +6478,6 @@ bool ADContext::processDifferentiableAttribute(
       invoker.getKind() ==
           DifferentiationInvoker::Kind::SILDifferentiableAttribute;
 
-  // If the JVP doesn't exist, need to synthesize it.
-  if (!jvp) {
-    // Diagnose:
-    // - Functions with no return.
-    // - Functions with unsupported control flow.
-    if (diagnoseNoReturn(*this, original, invoker) ||
-        diagnoseUnsupportedControlFlow(*this, original, invoker))
-      return true;
-
-    jvp = createEmptyJVP(*this, original, attr, isAssocFnExported);
-    getGeneratedFunctions().push_back(jvp);
-    JVPEmitter emitter(*this, original, attr, jvp, invoker);
-    if (emitter.run()) {
-      return true;
-    }
-  }
-
   // Try to look up VJP only if attribute specifies VJP name or if original
   // function is an external declaration. If VJP function cannot be found,
   // create an external VJP reference.
@@ -6514,6 +6500,7 @@ bool ADContext::processDifferentiableAttribute(
   }
 
   // If the JVP doesn't exist, need to synthesize it.
+  auto vjpGenerated = false;
   if (!vjp) {
     // Diagnose:
     // - Functions with no return.
@@ -6521,10 +6508,28 @@ bool ADContext::processDifferentiableAttribute(
     if (diagnoseNoReturn(*this, original, invoker) ||
         diagnoseUnsupportedControlFlow(*this, original, invoker))
       return true;
-
+    
+    vjpGenerated = true;
     vjp = createEmptyVJP(*this, original, attr, isAssocFnExported);
     getGeneratedFunctions().push_back(vjp);
     VJPEmitter emitter(*this, original, attr, vjp, invoker);
+    if (emitter.run()) {
+      return true;
+    }
+  }
+      
+  // If the JVP doesn't exist, need to synthesize it.
+  if (!jvp) {
+    // Diagnose:
+    // - Functions with no return.
+    // - Functions with unsupported control flow.
+    if (diagnoseNoReturn(*this, original, invoker) ||
+        diagnoseUnsupportedControlFlow(*this, original, invoker))
+      return true;
+    
+    jvp = createEmptyJVP(*this, original, attr, isAssocFnExported, vjpGenerated);
+    getGeneratedFunctions().push_back(jvp);
+    JVPEmitter emitter(*this, original, attr, jvp, invoker);
     return emitter.run();
   }
 
