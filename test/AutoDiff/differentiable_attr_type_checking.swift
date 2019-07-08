@@ -31,19 +31,19 @@ func no_jvp_or_vjp(_ x: Float) -> Float {
 
 // Test duplicated `@differentiable` attributes.
 
-@differentiable // expected-error {{duplicate '@differentiable' attribute}}
+@differentiable // expected-error {{duplicate '@differentiable' attribute with same parameters}}
 @differentiable // expected-note {{other attribute declared here}}
 func dupe_attributes(arg: Float) -> Float { return arg }
 
 @differentiable(wrt: arg1)
-@differentiable(wrt: arg2) // expected-error {{duplicate '@differentiable' attribute}}
+@differentiable(wrt: arg2) // expected-error {{duplicate '@differentiable' attribute with same parameters}}
 @differentiable(wrt: arg2) // expected-note {{other attribute declared here}}
 func dupe_attributes(arg1: Float, arg2: Float) -> Float { return arg1 }
 
 struct ComputedPropertyDupeAttributes<T : Differentiable> : Differentiable {
   var value: T
 
-  @differentiable // expected-error {{duplicate '@differentiable' attribute}}
+  @differentiable // expected-error {{duplicate '@differentiable' attribute with same parameters}}
   var computed1: T {
     @differentiable // expected-note {{other attribute declared here}}
     get { value }
@@ -52,12 +52,21 @@ struct ComputedPropertyDupeAttributes<T : Differentiable> : Differentiable {
 
   // TODO(TF-482): Remove diagnostics when `@differentiable` attributes are
   // also uniqued based on generic requirements.
-  @differentiable(where T == Float) // expected-error {{duplicate '@differentiable' attribute}}
+  @differentiable(where T == Float) // expected-error {{duplicate '@differentiable' attribute with same parameters}}
   @differentiable(where T == Double) // expected-note {{other attribute declared here}}
   var computed2: T {
     get { value }
     set { value = newValue }
   }
+}
+
+// Test TF-568.
+protocol WrtOnlySelfProtocol : Differentiable {
+  @differentiable
+  var computedProperty: Float { get }
+
+  @differentiable
+  func method() -> Float
 }
 
 class Class {}
@@ -760,12 +769,12 @@ func slope1(_ x: Float) -> Float {
   return 3 * x
 }
 
- @differentiable(linear, wrt: x, jvp: const3) // expected-error {{cannot specify 'vjp:' or 'jvp:' for linear functions; use 'transpose:' instead}}
+@differentiable(linear, wrt: x, jvp: const3) // expected-error {{cannot specify 'vjp:' or 'jvp:' for linear functions; use 'transpose:' instead}}
 func slope2(_ x: Float) -> Float {
   return 3 * x
 }
 
- @differentiable(linear, jvp: const3, vjp: const3) // expected-error {{cannot specify 'vjp:' or 'jvp:' for linear functions; use 'transpose:' instead}}
+@differentiable(linear, jvp: const3, vjp: const3) // expected-error {{cannot specify 'vjp:' or 'jvp:' for linear functions; use 'transpose:' instead}}
 func slope3(_ x: Float) -> Float {
   return 3 * x
 }
@@ -843,4 +852,16 @@ func two8(x: Float, y: Float) -> Float {
 @differentiable(wrt: (y, 0)) // expected-error {{parameters must be specified in original order}}
 func two9(x: Float, y: Float) -> Float {
   return x + y
+}
+
+// Inout 'wrt:' arguments.
+
+@differentiable(wrt: y) // expected-error {{cannot differentiate void function 'inout1(x:y:)'}}
+func inout1(x: Float, y: inout Float) -> Void {
+  let _ = x + y
+}
+
+@differentiable(wrt: y) // expected-error {{'inout' parameters ('inout Float') cannot be differentiated with respect to}}
+func inout2(x: Float, y: inout Float) -> Float {
+  let _ = x + y
 }

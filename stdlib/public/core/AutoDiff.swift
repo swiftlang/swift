@@ -248,33 +248,18 @@ public func differentiableFunction<T, U, R>(
 }
 
 public extension Differentiable {
-  @differentiable(wrt: self, vjp: _vjpWithGrad)
-  func withGradient(_ body: @escaping (inout TangentVector) -> Void) -> Self {
+  @differentiable(wrt: self, vjp: _vjpWithDerivative)
+  func withDerivative(_ body: @escaping (inout TangentVector) -> Void) -> Self {
     return self
   }
 
   @inlinable
-  internal func _vjpWithGrad(
+  internal func _vjpWithDerivative(
     _ body: @escaping (inout TangentVector) -> Void
   ) -> (Self, (TangentVector) -> TangentVector) {
     return (self, { grad in
       var grad = grad
       body(&grad)
-      return grad
-    })
-  }
-
-  @differentiable(wrt: self, vjp: _vjpWithGrad)
-  func withGradient(_ body: @escaping (TangentVector) -> Void) -> Self {
-    return self
-  }
-
-  @inlinable
-  internal func _vjpWithGrad(
-    _ body: @escaping (TangentVector) -> Void
-  ) -> (Self, (TangentVector) -> TangentVector) {
-    return (self, { grad in
-      body(grad)
       return grad
     })
   }

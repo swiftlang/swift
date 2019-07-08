@@ -19,6 +19,7 @@
 
 // SWIFT_ENABLE_TENSORFLOW
 #include "swift/AST/AutoDiff.h"
+#include "swift/AST/Attr.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/GenericParamKey.h"
 #include "swift/AST/Identifier.h"
@@ -274,7 +275,7 @@ class alignas(1 << TypeAlignInBits) TypeBase {
   TypeBase(const TypeBase&) = delete;
   void operator=(const TypeBase&) = delete;
   
-  /// This union contains to the ASTContext for canonical types, and is
+  /// This union contains the ASTContext for canonical types, and is
   /// otherwise lazily populated by ASTContext when the canonical form of a
   /// non-canonical type is requested. The disposition of the union is stored
   /// outside of the union for performance. See Bits.TypeBase.IsCanonical.
@@ -3093,7 +3094,7 @@ public:
   ///
   /// If `makeSelfParamFirst` is true, self's tangent is reordered to appear
   /// first. This should be used during type-checking, e.g. type-checking
-  /// `@differentiable` and `@differentiating` attributes.
+  /// `@differentiable`, `@differentiating`, and `@transposing` attributes.
   ///
   /// \note The original function type (`self`) need not be `@differentiable`.
   /// The resulting function will preserve all `ExtInfo` of the original
@@ -3108,6 +3109,13 @@ public:
   /// Given the type of an autodiff associated function, returns the
   /// corresponding original function type.
   AnyFunctionType *getAutoDiffOriginalFunctionType();
+  
+  /// Given the type of a transposing associated function, returns the
+  /// corresponding original function type.
+  AnyFunctionType *
+  getTransposeOriginalFunctionType(TransposingAttr *attr,
+                                   AutoDiffIndexSubset *wrtParamIndices,
+                                   bool wrtSelf);
 
   AnyFunctionType *getWithoutDifferentiability() const;
 

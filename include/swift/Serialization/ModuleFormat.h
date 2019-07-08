@@ -1670,6 +1670,15 @@ namespace decls_block {
     DeclIDField, // Original function declaration.
     BCArray<BCFixed<1>> // Differentiation parameter indices' bitvector.
   >;
+  
+  // SWIFT_ENABLE_TENSORFLOW
+  using TransposingDeclAttrLayout = BCRecordLayout<
+    Transposing_DECL_ATTR,
+    BCFixed<1>, // Implicit flag.
+    IdentifierIDField, // Original name.
+    DeclIDField, // Original function declaration.
+    BCArray<BCFixed<1>> // Differentiation parameter indices' bitvector.
+  >;
 
 #define SIMPLE_DECL_ATTR(X, CLASS, ...) \
   using CLASS##DeclAttrLayout = BCRecordLayout< \

@@ -18,7 +18,7 @@ public struct Foo : Differentiable {
 // CHECK-AST:   public typealias TangentVector = Foo.AllDifferentiableVariables
 
 // CHECK-SILGEN-LABEL: // Foo.a.getter
-// CHECK-SILGEN-NEXT: sil [transparent] [serialized] [differentiable source 0 wrt 0] [ossa] @$s33derived_differentiable_properties3FooV1aSfvg : $@convention(method) (Foo) -> Float
+// CHECK-SILGEN-NEXT: sil [transparent] [serialized] [differentiable source 0 wrt 0] [ossa] @$s22derived_differentiable3FooV1aSfvg : $@convention(method) (Foo) -> Float
 
 struct AdditiveTangentIsSelf : AdditiveArithmetic, Differentiable {
   var a: Float
@@ -82,9 +82,6 @@ struct GenericTanMember<T : Differentiable> : Differentiable, AdditiveArithmetic
   var x: T.TangentVector
 }
 
-// TODO(TF-316): Revisit after `Differentiable` derived conformances behavior is standardized.
-// `AllDifferentiableVariables` and `TangentVector` structs need not both be synthesized.
-
 // CHECK-AST-LABEL: internal struct GenericTanMember<T> : Differentiable, AdditiveArithmetic where T : Differentiable
 // CHECK-AST:   internal var x: T.TangentVector
 // CHECK-AST:   internal init(x: T.TangentVector)
@@ -104,4 +101,33 @@ extension ConditionallyDifferentiable : Differentiable where T : Differentiable 
 // CHECK-AST:         @differentiable(wrt: self where T : Differentiable)
 // CHECK-AST:         public var x: T
 // CHECK-AST:         internal init(x: T)
+// CHECK-AST:       }
+
+// Verify that `TangentVector` is not synthesized to be `Self` for
+// `AdditiveArithmetic`-conforming classes.
+final class AdditiveArithmeticClass<T : AdditiveArithmetic & Differentiable> : AdditiveArithmetic, Differentiable {
+  var x, y: T
+  init(x: T, y: T) {
+    self.x = x
+    self.y = y
+  }
+
+  // Dummy `AdditiveArithmetic` requirements.
+  static func == (lhs: AdditiveArithmeticClass, rhs: AdditiveArithmeticClass) -> Bool {
+    fatalError()
+  }
+  static var zero: AdditiveArithmeticClass {
+    fatalError()
+  }
+  static func + (lhs: AdditiveArithmeticClass, rhs: AdditiveArithmeticClass) -> Self {
+    fatalError()
+  }
+  static func - (lhs: AdditiveArithmeticClass, rhs: AdditiveArithmeticClass) -> Self {
+    fatalError()
+  }
+}
+
+// CHECK-AST-LABEL: final internal class AdditiveArithmeticClass<T> : AdditiveArithmetic, Differentiable where T : AdditiveArithmetic, T : Differentiable {
+// CHECK-AST:         final internal var x: T, y: T
+// CHECK-AST:         internal struct TangentVector : Differentiable, AdditiveArithmetic
 // CHECK-AST:       }

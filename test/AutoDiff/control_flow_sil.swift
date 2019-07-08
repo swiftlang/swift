@@ -61,12 +61,12 @@ func cond(_ x: Float) -> Float {
 
 // CHECK-SIL: bb3([[ORIG_RES:%.*]] : $Float, [[BB3_PRED_ARG:%.*]] : $_AD__cond_bb3__Pred__src_0_wrt_0)
 // CHECK-SIL:   [[BB3_PB_STRUCT:%.*]] = struct $_AD__cond_bb3__PB__src_0_wrt_0
-// CHECK-SIL:   [[ADJOINT_REF:%.*]] = function_ref @AD__cond__adjoint_src_0_wrt_0
-// CHECK-SIL:   [[PB:%.*]] = partial_apply [callee_guaranteed] [[ADJOINT_REF]]([[BB3_PB_STRUCT]])
+// CHECK-SIL:   [[PULLBACK_REF:%.*]] = function_ref @AD__cond__pullback_src_0_wrt_0
+// CHECK-SIL:   [[PB:%.*]] = partial_apply [callee_guaranteed] [[PULLBACK_REF]]([[BB3_PB_STRUCT]])
 // CHECK-SIL:   [[VJP_RESULT:%.*]] = tuple ([[ORIG_RES]] : $Float, [[PB]] : $@callee_guaranteed (Float) -> Float)
 // CHECK-SIL:   return [[VJP_RESULT]]
 
-// CHECK-SIL-LABEL: sil hidden @AD__cond__adjoint_src_0_wrt_0 : $@convention(thin) (Float, @guaranteed _AD__cond_bb3__PB__src_0_wrt_0) -> Float {
+// CHECK-SIL-LABEL: sil hidden @AD__cond__pullback_src_0_wrt_0 : $@convention(thin) (Float, @guaranteed _AD__cond_bb3__PB__src_0_wrt_0) -> Float {
 // CHECK-SIL: bb0([[SEED:%.*]] : $Float, [[BB3_PB_STRUCT:%.*]] : $_AD__cond_bb3__PB__src_0_wrt_0):
 // CHECK-SIL:   [[BB3_PRED:%.*]] = struct_extract %1 : $_AD__cond_bb3__PB__src_0_wrt_0, #_AD__cond_bb3__PB__src_0_wrt_0.predecessor
 // CHECK-SIL:   switch_enum [[BB3_PRED]] : $_AD__cond_bb3__Pred__src_0_wrt_0, case #_AD__cond_bb3__Pred__src_0_wrt_0.bb2!enumelt.1: bb3, case #_AD__cond_bb3__Pred__src_0_wrt_0.bb1!enumelt.1: bb1
@@ -152,7 +152,7 @@ func loop_generic<T : Differentiable & FloatingPoint>(_ x: T) -> T {
 }
 
 // Test control flow + tuple buffer.
-// Verify that adjoint buffers are not allocated for address projections.
+// Verify that pullback buffers are not allocated for address projections.
 
 @differentiable
 @_silgen_name("cond_tuple_var")
@@ -164,7 +164,7 @@ func cond_tuple_var(_ x: Float) -> Float {
   }
   return y.1
 }
-// CHECK-SIL-LABEL: sil hidden @AD__cond_tuple_var__adjoint_src_0_wrt_0 : $@convention(thin) (Float, @guaranteed _AD__cond_tuple_var_bb3__PB__src_0_wrt_0) -> Float {
+// CHECK-SIL-LABEL: sil hidden @AD__cond_tuple_var__pullback_src_0_wrt_0 : $@convention(thin) (Float, @guaranteed _AD__cond_tuple_var_bb3__PB__src_0_wrt_0) -> Float {
 // CHECK-SIL: bb0([[SEED:%.*]] : $Float, [[BB3_PB_STRUCT:%.*]] : $_AD__cond_tuple_var_bb3__PB__src_0_wrt_0):
 // CHECK-SIL:   [[BB3_PRED:%.*]] = struct_extract %1 : $_AD__cond_tuple_var_bb3__PB__src_0_wrt_0, #_AD__cond_tuple_var_bb3__PB__src_0_wrt_0.predecessor
 // CHECK-SIL:   copy_addr {{%.*}} to {{%.*}} : $*(Float, Float)

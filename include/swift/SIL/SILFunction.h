@@ -580,7 +580,7 @@ public:
   }
 
   /// Returns true if the function has parameters that are consumed by the
-  // callee.
+  /// callee.
   bool hasOwnedParameters() const {
     for (auto &ParamInfo : getLoweredFunctionType()->getParameters()) {
       if (ParamInfo.isConsumed())

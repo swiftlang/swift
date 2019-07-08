@@ -23,7 +23,7 @@
 #include "swift/Basic/Range.h"
 
 namespace swift {
-  
+
 enum class DifferentiabilityKind: uint8_t {
   NonDifferentiable = 0b00,
   Normal = 0b01,
@@ -353,6 +353,13 @@ public:
 
   unsigned getNumIndices() const {
     return (unsigned)std::distance(begin(), end());
+  }
+  
+  SmallBitVector getBitVector() const {
+    SmallBitVector indicesBitVec(capacity, false);
+    for (auto index : getIndices())
+      indicesBitVec.set(index);
+    return indicesBitVec;
   }
 
   bool contains(unsigned index) const {

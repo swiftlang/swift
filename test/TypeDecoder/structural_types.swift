@@ -131,6 +131,45 @@ do {
   blackHole(b)
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+do {
+  let f: @differentiable (Float) -> Float = { $0 }
+  // FIXME(TF-123): `@differentiable` function type + opaque abstraction
+  // pattern bug.
+  // blackHole(f)
+  _ = f
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+do {
+  let f: (@escaping @differentiable (Float) -> Float) -> () = { _ in }
+  // FIXME(TF-123): `@differentiable` function type + opaque abstraction
+  // pattern bug.
+  // blackHole(f)
+  _ = f
+}
+
+// TODO: Uncomment when `@differentiable(linear)` function types are enabled.
+/*
+// SWIFT_ENABLE_TENSORFLOW
+do {
+  let f: @differentiable(linear) (Float) -> Float = { $0 }
+  // FIXME(TF-123): `@differentiable` function type + opaque abstraction
+  // pattern bug.
+  // blackHole(f)
+  _ = f
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+do {
+  let f: (@escaping @differentiable(linear) (Float) -> Float) -> () = { _ in }
+  // FIXME(TF-123): `@differentiable` function type + opaque abstraction
+  // pattern bug.
+  // blackHole(f)
+  _ = f
+}
+*/
+
 // DEMANGLE: $syycD
 // DEMANGLE: $sySSzcD
 // DEMANGLE: $sySSncD
@@ -149,6 +188,10 @@ do {
 // DEMANGLE: $syyyccD
 // DEMANGLE: $sSayyyXCGD
 // DEMANGLE: $sSayyyyXL_yyXBtcGD
+// DEMANGLE: $sS2fXFD
+// DEMANGLE: $sS2fXGD
+// DEMANGLE: $sS2fXHD
+// DEMANGLE: $sS2fXID
 
 // CHECK: () -> ()
 // CHECK: (inout String) -> ()
@@ -168,6 +211,10 @@ do {
 // CHECK: (@escaping () -> ()) -> ()
 // CHECK: Array<@convention(c) () -> ()>
 // CHECK: Array<(@escaping @convention(block) () -> (), @convention(block) () -> ()) -> ()>
+// CHECK: @differentiable (Float) -> Float
+// CHECK: @differentiable (Float) -> Float
+// CHECK: @differentiable(linear) (Float) -> Float
+// CHECK: @differentiable(linear) (Float) -> Float
 
 // DEMANGLE: $sSimD
 // DEMANGLE: $syycmD
@@ -188,6 +235,10 @@ do {
 // DEMANGLE: $syyyccmD
 // DEMANGLE: $sSayyyXCGmD
 // DEMANGLE: $sSayyyyXL_yyXBtcGmD
+// DEMANGLE: $sS2fXFmD
+// DEMANGLE: $sS2fXGmD
+// DEMANGLE: $sS2fXHmD
+// DEMANGLE: $sS2fXImD
 
 // CHECK: Int.Type
 // CHECK: ((inout String) -> ()).Type
@@ -207,3 +258,7 @@ do {
 // CHECK: ((@escaping () -> ()) -> ()).Type
 // CHECK: Array<@convention(c) () -> ()>.Type
 // CHECK: Array<(@escaping @convention(block) () -> (), @convention(block) () -> ()) -> ()>.Type
+// CHECK: (@differentiable (Float) -> Float).Type
+// CHECK: (@differentiable (Float) -> Float).Type
+// CHECK: (@differentiable(linear) (Float) -> Float).Type
+// CHECK: (@differentiable(linear) (Float) -> Float).Type

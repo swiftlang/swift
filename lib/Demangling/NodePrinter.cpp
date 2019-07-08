@@ -345,6 +345,12 @@ private:
     case Node::Kind::DependentPseudogenericSignature:
     case Node::Kind::Destructor:
     case Node::Kind::DidSet:
+    // SWIFT_ENABLE_TENSORFLOW
+    case Node::Kind::DifferentiableFunctionType:
+    case Node::Kind::EscapingDifferentiableFunctionType:
+    case Node::Kind::LinearFunctionType:
+    case Node::Kind::EscapingLinearFunctionType:
+    // SWIFT_ENABLE_TENSORFLOW END
     case Node::Kind::DirectMethodReferenceAttribute:
     case Node::Kind::Directness:
     case Node::Kind::DynamicAttribute:
@@ -1187,6 +1193,26 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   case Node::Kind::ThinFunctionType:
     Printer << "@convention(thin) ";
+    printFunctionType(nullptr, Node);
+    return nullptr;
+  // SWIFT_ENABLE_TENSORFLOW
+  case Node::Kind::DifferentiableFunctionType:
+    Printer << "@differentiable ";
+    printFunctionType(nullptr, Node);
+    return nullptr;
+  // SWIFT_ENABLE_TENSORFLOW
+  case Node::Kind::EscapingDifferentiableFunctionType:
+    Printer << "@escaping @differentiable ";
+    printFunctionType(nullptr, Node);
+    return nullptr;
+  // SWIFT_ENABLE_TENSORFLOW
+  case Node::Kind::LinearFunctionType:
+    Printer << "@differentiable(linear) ";
+    printFunctionType(nullptr, Node);
+    return nullptr;
+  // SWIFT_ENABLE_TENSORFLOW
+  case Node::Kind::EscapingLinearFunctionType:
+    Printer << "@escaping @differentiable(linear) ";
     printFunctionType(nullptr, Node);
     return nullptr;
   case Node::Kind::FunctionType:
@@ -2455,6 +2481,16 @@ void NodePrinter::printEntityType(NodePointer Entity, NodePointer type,
         Printer << ' ';
       type = dependentType->getFirstChild();
     }
+    // SWIFT_ENABLE_TENSORFLOW
+    if (type->getKind() == Node::Kind::DifferentiableFunctionType)
+      Printer << "@differentiable ";
+    else if (type->getKind() == Node::Kind::EscapingDifferentiableFunctionType)
+      Printer << "@escaping @differentiable ";
+    else if (type->getKind() == Node::Kind::LinearFunctionType)
+      Printer << "@differentiable(linear) ";
+    else if (type->getKind() == Node::Kind::EscapingLinearFunctionType)
+      Printer << "@escaping @differentiable(linear) ";
+    // SWIFT_ENABLE_TENSORFLOW END
     printFunctionType(labelList, type);
   } else {
     print(type);

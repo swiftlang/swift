@@ -199,7 +199,7 @@ void AutoDiffParameterIndices::getSubsetParameterTypes(
     for (unsigned paramIndex : range(curryLevel->getNumParams()))
       if (parameters[parameterIndexOffset + paramIndex])
         paramTypes.push_back(
-            curryLevel->getParams()[paramIndex].getPlainType());
+            curryLevel->getParams()[paramIndex].getOldType());
   }
 }
 

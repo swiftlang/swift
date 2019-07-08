@@ -2040,7 +2040,24 @@ bool Serializer::isDeclXRef(const Decl *D) const {
   // Special-case for SIL generic parameter decls, which don't have a real
   // DeclContext.
   if (!isa<FileUnit>(topLevel)) {
-    assert(isa<GenericTypeParamDecl>(D) && "unexpected decl kind");
+    // SWIFT_ENABLE_TENSORFLOW
+    // FIXME(TF-623): Find a robust way to special-casing structs/enums
+    // synthesized during SIL differentiation transform.
+    auto isDifferentiationDataStructure = [](const Decl *D) {
+      auto *valueDecl = dyn_cast<ValueDecl>(D);
+      if (!valueDecl)
+        return false;
+      if (auto *structDecl =
+              valueDecl->getInterfaceType()->getStructOrBoundGenericStruct())
+        return structDecl->getNameStr().contains("__PB__");
+      if (auto *enumDecl =
+              valueDecl->getInterfaceType()->getEnumOrBoundGenericEnum())
+        return enumDecl->getNameStr().contains("__Pred__");
+      return false;
+    };
+    assert(
+        (isa<GenericTypeParamDecl>(D) || isDifferentiationDataStructure(D)) &&
+        "unexpected decl kind");
     return false;
   }
   return true;
@@ -2334,6 +2351,8 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       llvm_unreachable("cannot serialize attribute");
     // SWIFT_ENABLE_TENSORFLOW
     case DAK_Differentiating:
+      llvm_unreachable("cannot serialize attribute");
+    case DAK_Transposing:
       llvm_unreachable("cannot serialize attribute");
 
     case DAK_Count:

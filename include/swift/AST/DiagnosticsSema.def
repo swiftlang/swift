@@ -2763,8 +2763,10 @@ ERROR(differentiable_attr_overload_not_found,none,
       "%0 does not have expected type %1", (DeclName, Type))
 ERROR(differentiable_attr_no_currying,none,
       "'@differentiable' cannot be defined on functions that return functions", ())
+// TODO(TF-482): Change duplicate `@differentiable` attribute diagnostic to also
+// mention "same generic requirements".
 ERROR(differentiable_attr_duplicate,none,
-      "duplicate '@differentiable' attribute with same parameter indices", ())
+      "duplicate '@differentiable' attribute with same parameters", ())
 NOTE(differentiable_attr_duplicate_note,none,
      "other attribute declared here", ())
 ERROR(differentiable_attr_function_not_same_type_context,none,
@@ -2824,6 +2826,19 @@ ERROR(differentiating_attr_not_in_same_file_as_original,none,
 ERROR(differentiating_attr_original_already_has_derivative,none,
       "a derivative already exists for %0", (DeclName))
 
+// transposing
+ERROR(transpose_params_clause_param_not_differentiable,none,
+      "can only transpose with respect to parameters that conform to "
+      "'Differentiable' and where '%0 == %0.TangentVector'", (StringRef))
+ERROR(transposing_attr_overload_not_found,none,
+      "could not find function %0 with expected type %1", (DeclName, Type))
+ERROR(transposing_attr_cant_use_named_wrt_params,none,
+      "cannot use named wrt parameters in '@transposing' attribute, found %0",
+      (Identifier))
+ERROR(transposing_attr_result_value_not_differentiable,none,
+      "'@transposing' attribute requires original function result to "
+      "conform to 'Differentiable'", (Type))
+
 // differentiation `wrt` parameters clause
 ERROR(diff_function_no_parameters,none,
       "%0 has no parameters to differentiate with respect to", (DeclName))
@@ -2841,6 +2856,8 @@ ERROR(diff_params_clause_no_inferred_parameters,PointsToFirstBadToken,
       "no differentiation parameters could be inferred; must differentiate "
       "with respect to at least one parameter conforming to 'Differentiable'",
       ())
+ERROR(diff_params_clause_inout_argument,none,
+      "'inout' parameters (%0) cannot be differentiated with respect to", (Type))
 ERROR(diff_params_clause_cannot_diff_wrt_objects_or_existentials,none,
       "class objects and protocol existentials (%0) cannot be differentiated "
       "with respect to", (Type))
@@ -2865,9 +2882,9 @@ ERROR(compiler_evaluable_ref_non_compiler_evaluable,none,
       "@compilerEvaluable functions may not reference non-@compilerEvaluable functions", ())
 
 // @noDerivative attribute
-ERROR(noderivative_only_on_stored_properties_in_differentiable_structs,none,
-      "'@noDerivative' is only allowed on stored properties in structure types "
-      "that declare a conformance to 'Differentiable'", ())
+ERROR(noderivative_only_on_differentiable_struct_or_class_fields,none,
+      "'@noDerivative' is only allowed on stored properties in structure or "
+      "class types that declare a conformance to 'Differentiable'", ())
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Expressions
