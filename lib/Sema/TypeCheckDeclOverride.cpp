@@ -20,6 +20,9 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Availability.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/GenericSignature.h"
+#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -592,8 +595,31 @@ static bool parameterTypesMatch(const ValueDecl *derivedDecl,
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-static bool overridesDifferentiableAttribute(const ValueDecl *derivedDecl,
-                                             const ValueDecl *baseDecl) {
+// Compute the derivative generic environment for the given `@differentiable`
+// attribute and original function.
+static GenericEnvironment * computeDerivativeGenericEnvironment(
+    const DifferentiableAttr *attr, AbstractFunctionDecl *original) {
+  // If `@differentiable` attribute has no requirements, return original
+  // function's generic environment.
+  if (attr->getRequirements().empty())
+    return original->getGenericEnvironment();
+  // Otherwise, build derivative generic sigunature.
+  GenericSignatureBuilder builder(original->getASTContext());
+  // Add original function's generic signature.
+  builder.addGenericSignature(original->getGenericSignature());
+  using FloatingRequirementSource =
+  GenericSignatureBuilder::FloatingRequirementSource;
+  // Add `@differentiable` attribute requirements.
+  for (auto req : attr->getRequirements())
+    builder.addRequirement(req, FloatingRequirementSource::forAbstract(),
+                           original->getModuleContext());
+  auto *derivativeGenSig = std::move(builder).computeGenericSignature(
+      attr->getLocation(), /*allowConcreteGenericParams=*/true);
+  return derivativeGenSig->createGenericEnvironment();
+}
+
+static bool overridesDifferentiableAttribute(ValueDecl *derivedDecl,
+                                             ValueDecl *baseDecl) {
   ASTContext &ctx = baseDecl->getASTContext();
   auto &diags = ctx.Diags;
 
@@ -621,10 +647,22 @@ static bool overridesDifferentiableAttribute(const ValueDecl *derivedDecl,
       }
     }
     if (!defined) {
+      // Omit printing wrt clause if attribute differentiation parameters match
+      // inferred differentiation parameters.
+      auto *whereClauseGenEnv =
+          computeDerivativeGenericEnvironment(baseDA, derivedAFD);
+      auto *inferredParameters = TypeChecker::inferDifferentiableParameters(
+          derivedAFD, whereClauseGenEnv);
+      bool omitWrtClause = baseDA->getParameterIndices()->parameters.count() ==
+                           inferredParameters->parameters.count();
+      // Get `@differentiable` attribute description.
+      std::string baseDAString;
+      llvm::raw_string_ostream stream(baseDAString);
+      baseDA->print(stream, derivedDecl, omitWrtClause);
       diags.diagnose(
           derivedDecl,
-          diag::override_missing_differentiable,
-          derivedDecl->getFullName());
+          diag::protocol_witness_missing_differentiable_attr,
+          StringRef(stream.str()).trim());
     }
   }
 
