@@ -595,29 +595,6 @@ static bool parameterTypesMatch(const ValueDecl *derivedDecl,
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-// Compute the derivative generic environment for the given `@differentiable`
-// attribute and original function.
-static GenericEnvironment * computeDerivativeGenericEnvironment(
-    const DifferentiableAttr *attr, AbstractFunctionDecl *original) {
-  // If `@differentiable` attribute has no requirements, return original
-  // function's generic environment.
-  if (attr->getRequirements().empty())
-    return original->getGenericEnvironment();
-  // Otherwise, build derivative generic sigunature.
-  GenericSignatureBuilder builder(original->getASTContext());
-  // Add original function's generic signature.
-  builder.addGenericSignature(original->getGenericSignature());
-  using FloatingRequirementSource =
-  GenericSignatureBuilder::FloatingRequirementSource;
-  // Add `@differentiable` attribute requirements.
-  for (auto req : attr->getRequirements())
-    builder.addRequirement(req, FloatingRequirementSource::forAbstract(),
-                           original->getModuleContext());
-  auto *derivativeGenSig = std::move(builder).computeGenericSignature(
-      attr->getLocation(), /*allowConcreteGenericParams=*/true);
-  return derivativeGenSig->createGenericEnvironment();
-}
-
 static bool overridesDifferentiableAttribute(ValueDecl *derivedDecl,
                                              ValueDecl *baseDecl) {
   ASTContext &ctx = baseDecl->getASTContext();
@@ -649,10 +626,8 @@ static bool overridesDifferentiableAttribute(ValueDecl *derivedDecl,
     if (!defined) {
       // Omit printing wrt clause if attribute differentiation parameters match
       // inferred differentiation parameters.
-      auto *whereClauseGenEnv =
-          computeDerivativeGenericEnvironment(baseDA, derivedAFD);
       auto *inferredParameters = TypeChecker::inferDifferentiableParameters(
-          derivedAFD, whereClauseGenEnv);
+          derivedAFD, nullptr);
       bool omitWrtClause = baseDA->getParameterIndices()->parameters.count() ==
                            inferredParameters->parameters.count();
       // Get `@differentiable` attribute description.
