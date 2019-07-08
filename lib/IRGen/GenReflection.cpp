@@ -168,7 +168,15 @@ public:
   }
 };
 
-llvm::Constant *IRGenModule::getTypeRef(CanType type, MangledTypeRefRole role) {
+llvm::Constant *IRGenModule::getTypeRef(Type type,
+                                        GenericSignature *genericSig,
+                                        MangledTypeRefRole role) {
+  return getTypeRef(type->getCanonicalType(genericSig), role);
+}
+
+llvm::Constant *IRGenModule::getTypeRef(CanType type,
+                                        MangledTypeRefRole role) {
+
   switch (role) {
   case MangledTypeRefRole::DefaultAssociatedTypeWitness:
   case MangledTypeRefRole::Metadata:
@@ -365,6 +373,20 @@ protected:
   ///
   /// For reflection records which are demangled to produce type metadata
   /// in-process, pass MangledTypeRefRole::Metadata instead.
+  void addTypeRef(Type type, GenericSignature *genericSig,
+                  MangledTypeRefRole role =
+                      MangledTypeRefRole::Reflection) {
+    addTypeRef(type->getCanonicalType(genericSig), role);
+  }
+
+  /// Add a 32-bit relative offset to a mangled typeref string
+  /// in the typeref reflection section.
+  ///
+  /// By default, we use MangledTypeRefRole::Reflection, which does not
+  /// force emission of any type metadata referenced from the typeref.
+  ///
+  /// For reflection records which are demangled to produce type metadata
+  /// in-process, pass MangledTypeRefRole::Metadata instead.
   void addTypeRef(CanType type,
                   MangledTypeRefRole role =
                       MangledTypeRefRole::Reflection) {
@@ -387,8 +409,7 @@ protected:
         IGM.getAddrOfStringForTypeRef(mangledStr, role);
       B.addRelativeAddress(mangledName);
     } else {
-      CanType type = nominal->getDeclaredType()->getCanonicalType();
-      addTypeRef(type, role);
+      addTypeRef(nominal->getDeclaredType(), /*genericSig*/nullptr, role);
     }
   }
 
@@ -491,8 +512,8 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
   const uint32_t fieldRecordSize = 12;
   const NominalTypeDecl *NTD;
 
-  void addFieldDecl(const ValueDecl *value, CanType type,
-                    bool indirect=false) {
+  void addFieldDecl(const ValueDecl *value, Type type,
+                    GenericSignature *genericSig, bool indirect=false) {
     reflection::FieldRecordFlags flags;
     flags.setIsIndirectCase(indirect);
     if (auto var = dyn_cast<VarDecl>(value))
@@ -506,7 +527,7 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
       // The standard library's Mirror demangles metadata from field
       // descriptors, so use MangledTypeRefRole::Metadata to ensure
       // runtime metadata is available.
-      addTypeRef(type, MangledTypeRefRole::Metadata);
+      addTypeRef(type, genericSig, MangledTypeRefRole::Metadata);
     }
 
     if (IGM.IRGen.Opts.EnableReflectionNames) {
@@ -536,9 +557,8 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
     auto properties = NTD->getStoredProperties();
     B.addInt32(std::distance(properties.begin(), properties.end()));
     for (auto property : properties)
-      addFieldDecl(property,
-                   property->getInterfaceType()
-                       ->getCanonicalType());
+      addFieldDecl(property, property->getInterfaceType(),
+                   NTD->getGenericSignature());
   }
 
   void layoutEnum() {
@@ -562,14 +582,13 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
     for (auto enumCase : strategy.getElementsWithPayload()) {
       bool indirect = (enumCase.decl->isIndirect() ||
                        enumDecl->isIndirect());
-      addFieldDecl(enumCase.decl,
-                   enumCase.decl->getArgumentInterfaceType()
-                                ->getCanonicalType(),
+      addFieldDecl(enumCase.decl, enumCase.decl->getArgumentInterfaceType(),
+                   enumDecl->getGenericSignature(),
                    indirect);
     }
 
     for (auto enumCase : strategy.getElementsWithNoPayload()) {
-      addFieldDecl(enumCase.decl, CanType());
+      addFieldDecl(enumCase.decl, CanType(), nullptr);
     }
   }
 
@@ -596,9 +615,10 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
     auto *CD = dyn_cast<ClassDecl>(NTD);
     auto *PD = dyn_cast<ProtocolDecl>(NTD);
     if (CD && CD->getSuperclass()) {
-      addTypeRef(CD->getSuperclass()->getCanonicalType());
+      addTypeRef(CD->getSuperclass(), CD->getGenericSignature());
     } else if (PD && PD->getDeclaredType()->getSuperclass()) {
-      addTypeRef(PD->getDeclaredType()->getSuperclass()->getCanonicalType());
+      addTypeRef(PD->getDeclaredType()->getSuperclass(),
+                 PD->getGenericSignature());
     } else {
       B.addInt32(0);
     }
