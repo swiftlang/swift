@@ -2872,47 +2872,25 @@ public:
       : public SILVTableVisitor<VerifyClassMethodVisitor>
   {
   public:
-    SILDeclRef MethodToSee;
+    SILDeclRef Method;
     bool Seen = false;
-    
-    VerifyClassMethodVisitor(ClassDecl *theClass,
-                             SILDeclRef method)
-      : MethodToSee(method)
-    {
+
+    VerifyClassMethodVisitor(SILDeclRef method)
+      : Method(method.getOverriddenVTableEntry()) {
+      auto *theClass = cast<ClassDecl>(Method.getDecl()->getDeclContext());
       addVTableEntries(theClass);
     }
-    
-    bool methodMatches(SILDeclRef method) {
-      auto methodToCheck = MethodToSee;
-      do {
-        if (method == methodToCheck) {
-          return true;
-        }
-      } while ((methodToCheck = methodToCheck.getNextOverriddenVTableEntry()));
 
-      return false;
-    }
-    
     void addMethod(SILDeclRef method) {
       if (Seen)
         return;
-      if (methodMatches(method))
-        Seen = true;
-    }
-    
-    void addMethodOverride(SILDeclRef base, SILDeclRef derived) {
-      if (Seen)
-        return;
-      // The derived method should already have been checked.
-      // Test against the overridden base.
-      if (methodMatches(base))
+      if (method == Method)
         Seen = true;
     }
 
-    
-    void addPlaceholder(MissingMemberDecl *) {
-      /* no-op */
-    }
+    void addMethodOverride(SILDeclRef base, SILDeclRef derived) {}
+
+    void addPlaceholder(MissingMemberDecl *) {}
   };
 
   void checkClassMethodInst(ClassMethodInst *CMI) {
@@ -2939,10 +2917,7 @@ public:
             "extension method cannot be dispatched natively");
     
     // The method ought to appear in the class vtable.
-    require(VerifyClassMethodVisitor(
-                             operandType.getASTType()->getMetatypeInstanceType()
-                                       ->getClassOrBoundGenericClass(),
-                             member).Seen,
+    require(VerifyClassMethodVisitor(member).Seen,
             "method does not appear in the class's vtable");
   }
 
@@ -2976,10 +2951,7 @@ public:
             "super_method must look up a class method");
 
     // The method ought to appear in the class vtable.
-    require(VerifyClassMethodVisitor(
-                             operandType.getASTType()->getMetatypeInstanceType()
-                                       ->getClassOrBoundGenericClass(),
-                             member).Seen,
+    require(VerifyClassMethodVisitor(member).Seen,
             "method does not appear in the class's vtable");    
   }
 
