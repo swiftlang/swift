@@ -8,7 +8,7 @@ protocol FooProtocol {}
 
 func garbage() -> () {
   var a : Int
-  ] this line is invalid, but we will stop at the keyword below... // expected-error{{expected expression}}
+  ) this line is invalid, but we will stop at the keyword below... // expected-error{{expected expression}}
   return a + "a" // expected-error{{binary operator '+' cannot be applied to operands of type 'Int' and 'String'}} expected-note {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (String, String)}}
 }
 
@@ -435,8 +435,8 @@ struct ErrorTypeInVarDeclFunctionType1 {
   var v2 : Int
 }
 
-struct ErrorTypeInVarDeclArrayType1 { // expected-note{{in declaration of 'ErrorTypeInVarDeclArrayType1'}}
-  var v1 : Int[+] // expected-error {{expected declaration}} expected-error {{consecutive declarations on a line must be separated by ';'}}
+struct ErrorTypeInVarDeclArrayType1 {
+  var v1 : Int[+] // expected-error {{unexpected ']' in type; did you mean to write an array type?}}
   // expected-error @-1 {{expected expression after unary operator}}
   // expected-error @-2 {{expected expression}}
   var v2 : Int
@@ -455,11 +455,34 @@ struct ErrorTypeInVarDeclArrayType3 {
 
 struct ErrorTypeInVarDeclArrayType4 {
   var v1 : Int[1 // expected-error {{expected ']' in array type}} expected-note {{to match this opening '['}}
+  var v2 : Int] // expected-error {{unexpected ']' in type; did you mean to write an array type?}} {{12-12=[}}
 
+}
+
+struct ErrorTypeInVarDeclArrayType5 { // expected-note {{in declaration of 'ErrorTypeInVarDeclArrayType5'}}
+  let a1: Swift.Int] // expected-error {{unexpected ']' in type; did you mean to write an array type?}} {{11-11=[}}
+  let a2: Set<Int]> // expected-error {{expected '>' to complete generic argument list}} // expected-note {{to match this opening '<'}}
+  let a3: Set<Int>] // expected-error {{unexpected ']' in type; did you mean to write an array type?}} {{11-11=[}}
+  let a4: Int]? // expected-error {{unexpected ']' in type; did you mean to write an array type?}} {{11-11=[}}
+  // expected-error @-1 {{consecutive declarations on a line must be separated by ';'}} // expected-error @-1 {{expected declaration}}
+  let a5: Int?] // expected-error {{unexpected ']' in type; did you mean to write an array type?}} {{11-11=[}}
+  let a6: [Int]] // expected-error {{unexpected ']' in type; did you mean to write an array type?}} {{11-11=[}}
+  let a7: [String: Int]] // expected-error {{unexpected ']' in type; did you mean to write an array type?}} {{11-11=[}}
+}
+
+struct ErrorTypeInVarDeclDictionaryType {
+  let a1: String: // expected-error {{unexpected ':' in type; did you mean to write a dictionary type?}} {{11-11=[}}
+  // expected-error @-1 {{expected dictionary value type}}
+  let a2: String: Int] // expected-error {{unexpected ':' in type; did you mean to write a dictionary type?}} {{11-11=[}}
+  let a3: String: [Int] // expected-error {{unexpected ':' in type; did you mean to write a dictionary type?}} {{11-11=[}} {{24-24=]}}
+  let a4: String: Int // expected-error {{unexpected ':' in type; did you mean to write a dictionary type?}} {{11-11=[}} {{22-22=]}}
 }
 
 struct ErrorInFunctionSignatureResultArrayType1 {
   func foo() -> Int[ { // expected-error {{expected '{' in body of function declaration}}
+    return [0]
+  }
+  func bar() -> Int] { // expected-error {{unexpected ']' in type; did you mean to write an array type?}} {{17-17=[}}
     return [0]
   }
 }
