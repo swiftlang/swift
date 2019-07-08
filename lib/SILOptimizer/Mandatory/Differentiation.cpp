@@ -3253,7 +3253,6 @@ public:
       // In the VJP, specialization is also necessary for parity. The original
       // function operand is specialized with a remapped version of same
       // substitution map using an argument-less `partial_apply`.
-
       if (ai->getSubstitutionMap().empty()) {
         builder.createRetainValue(loc, original, builder.getDefaultAtomicity());
       } else {
