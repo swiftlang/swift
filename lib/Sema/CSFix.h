@@ -179,6 +179,10 @@ enum class FixKind : uint8_t {
   /// matches up with a
   /// parameter that has a function builder.
   SkipUnhandledConstructInFunctionBuilder,
+
+  /// Allow invalid reference to a member declared as `mutating`
+  /// when base is an r-value type.
+  AllowMutatingMemberOrRValueBase,
 };
 
 class ConstraintFix {
@@ -856,6 +860,25 @@ private:
                                      bool isStaticallyDerived,
                                      SourceRange baseRange,
                                      ConstraintLocator *locator);
+};
+
+class AllowMutatingMemberOrRValueBase final : public AllowInvalidMemberRef {
+  AllowMutatingMemberOrRValueBase(ConstraintSystem &cs, Type baseType,
+                                  ValueDecl *member, DeclName name,
+                                  ConstraintLocator *locator)
+      : AllowInvalidMemberRef(cs, FixKind::AllowMutatingMemberOrRValueBase,
+                              baseType, member, name, locator) {}
+
+public:
+  std::string getName() const override {
+    return "allow `mutating` method on r-value base";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static AllowMutatingMemberOrRValueBase *
+  create(ConstraintSystem &cs, Type baseType, ValueDecl *member, DeclName name,
+         ConstraintLocator *locator);
 };
 
 class AllowClosureParamDestructuring final : public ConstraintFix {

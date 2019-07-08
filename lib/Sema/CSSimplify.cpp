@@ -4761,7 +4761,13 @@ fixMemberRef(ConstraintSystem &cs, Type baseTy,
     }
 
     case MemberLookupResult::UR_MutatingMemberOnRValue:
-    case MemberLookupResult::UR_MutatingGetterOnRValue:
+    case MemberLookupResult::UR_MutatingGetterOnRValue: {
+      return choice.isDecl()
+                 ? AllowMutatingMemberOrRValueBase::create(
+                       cs, baseTy, choice.getDecl(), memberName, locator)
+                 : nullptr;
+    }
+
     case MemberLookupResult::UR_LabelMismatch:
     // TODO(diagnostics): Add a new fix that is suggests to
     // add `subscript(dynamicMember: {Writable}KeyPath<T, U>)`
@@ -6929,6 +6935,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowInvalidRefInKeyPath:
   case FixKind::ExplicitlySpecifyGenericArguments:
   case FixKind::GenericArgumentsMismatch:
+  case FixKind::AllowMutatingMemberOrRValueBase:
     llvm_unreachable("handled elsewhere");
   }
 

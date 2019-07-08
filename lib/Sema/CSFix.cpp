@@ -643,3 +643,15 @@ bool SkipUnhandledConstructInFunctionBuilder::diagnose(Expr *root,
       root, getConstraintSystem(), unhandled, builder, getLocator());
   return failure.diagnose(asNote);
 }
+
+bool AllowMutatingMemberOrRValueBase::diagnose(Expr *root, bool asNote) const {
+  return false;
+}
+
+AllowMutatingMemberOrRValueBase *
+AllowMutatingMemberOrRValueBase::create(ConstraintSystem &cs, Type baseType,
+                                        ValueDecl *member, DeclName name,
+                                        ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowMutatingMemberOrRValueBase(cs, baseType, member, name, locator);
+}
