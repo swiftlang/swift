@@ -2255,6 +2255,18 @@ public:
     if (auto VD = dyn_cast<ValueDecl>(decl)) {
       checkRedeclaration(TC, VD);
 
+      // Force some requests, which can produce diagnostics.
+
+      // Compute access level.
+      (void) VD->getFormalAccess();
+
+      // Compute overrides.
+      (void) VD->getOverriddenDecls();
+
+      // Check whether the member is @objc or dynamic.
+      (void) VD->isObjC();
+      (void) VD->isDynamic();
+
       // Make sure we finalize this declaration.
       TC.DeclsToFinalize.insert(VD);
 
@@ -2973,6 +2985,24 @@ public:
 
     TC.addImplicitConstructors(CD);
     CD->addImplicitDestructor();
+
+    // Compute @objc for each superclass member, to catch selector
+    // conflicts resulting from unintended overrides.
+    //
+    // FIXME: This should be a request so we can measure how much work
+    // we're doing here.
+    CD->walkSuperclasses(
+      [&](ClassDecl *superclass) {
+        for (auto *member : superclass->getMembers()) {
+          if (auto *vd = dyn_cast<ValueDecl>(member)) {
+            if (vd->isPotentiallyOverridable()) {
+              (void) vd->isObjC();
+            }
+          }
+        }
+
+        return TypeWalker::Action::Continue;
+      });
 
     if (auto superclassTy = CD->getSuperclass()) {
       ClassDecl *Super = superclassTy->getClassOrBoundGenericClass();
@@ -4550,16 +4580,6 @@ void TypeChecker::finalizeDecl(ValueDecl *decl) {
   } else if (auto storage = dyn_cast<AbstractStorageDecl>(decl)) {
     finalizeAbstractStorageDecl(*this, storage);
   }
-
-  // Compute access level.
-  (void)decl->getFormalAccess();
-
-  // Compute overrides.
-  (void)decl->getOverriddenDecls();
-
-  // Check whether the member is @objc or dynamic.
-  (void)decl->isObjC();
-  (void)decl->isDynamic();
 }
 
 /// Determine whether this is a "pass-through" typealias, which has the
