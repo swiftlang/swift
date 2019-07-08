@@ -1837,9 +1837,7 @@ static SILValue
 reapplyFunctionConversion(SILValue newFunc, SILValue oldFunc,
                           SILValue oldConvertedFunc, SILBuilder &builder,
                           SILLocation loc,
-                          GenericSignature* newFuncGenSig = nullptr,
-                          std::function<SILValue(SILValue)> substituteOperand =
-                              [](SILValue v) { return v; }) {
+                          GenericSignature *newFuncGenSig = nullptr) {
   // If the old func is the new func, then there's no conversion.
   if (oldFunc == oldConvertedFunc)
     return newFunc;
@@ -1847,8 +1845,7 @@ reapplyFunctionConversion(SILValue newFunc, SILValue oldFunc,
   // thin_to_thick_function
   if (auto *tttfi = dyn_cast<ThinToThickFunctionInst>(oldConvertedFunc)) {
     auto innerNewFunc = reapplyFunctionConversion(
-        newFunc, oldFunc, tttfi->getOperand(), builder, loc, newFuncGenSig,
-        substituteOperand);
+        newFunc, oldFunc, tttfi->getOperand(), builder, loc, newFuncGenSig);
     auto operandFnTy = innerNewFunc->getType().castTo<SILFunctionType>();
     auto thickTy = operandFnTy->getWithRepresentation(
         SILFunctionTypeRepresentation::Thick);
@@ -1860,11 +1857,17 @@ reapplyFunctionConversion(SILValue newFunc, SILValue oldFunc,
   if (auto *pai = dyn_cast<PartialApplyInst>(oldConvertedFunc)) {
     SmallVector<SILValue, 8> newArgs;
     newArgs.reserve(pai->getNumArguments());
-    for (auto arg : pai->getArguments())
-      newArgs.push_back(substituteOperand(arg));
+    for (auto arg : pai->getArguments()) {
+      // Retain the argument since it's to be owned by the newly created
+      // closure.
+      if (arg->getType().isObject())
+        builder.createRetainValue(loc, arg, builder.getDefaultAtomicity());
+      else if (arg->getType().isLoadable(builder.getFunction()))
+        builder.createRetainValueAddr(loc, arg, builder.getDefaultAtomicity());
+      newArgs.push_back(arg);
+    }
     auto innerNewFunc = reapplyFunctionConversion(
-        newFunc, oldFunc, pai->getCallee(), builder, loc, newFuncGenSig,
-        substituteOperand);
+        newFunc, oldFunc, pai->getCallee(), builder, loc, newFuncGenSig);
     // If new function's generic signature is specified, use it to create
     // substitution map for reapplied `partial_apply` instruction.
     auto substMap = !newFuncGenSig
@@ -1879,8 +1882,7 @@ reapplyFunctionConversion(SILValue newFunc, SILValue oldFunc,
   if (auto *cetn = dyn_cast<ConvertEscapeToNoEscapeInst>(oldConvertedFunc)) {
     auto innerNewFunc = reapplyFunctionConversion(newFunc, oldFunc,
                                                   cetn->getOperand(), builder,
-                                                  loc, newFuncGenSig,
-                                                  substituteOperand);
+                                                  loc, newFuncGenSig);
     auto operandFnTy = innerNewFunc->getType().castTo<SILFunctionType>();
     auto noEscapeType = operandFnTy->getWithExtInfo(
         operandFnTy->getExtInfo().withNoEscape());
@@ -1899,8 +1901,7 @@ reapplyFunctionConversion(SILValue newFunc, SILValue oldFunc,
         cfi->getOperand()->getType().castTo<SILFunctionType>();
     auto innerNewFunc = reapplyFunctionConversion(newFunc, oldFunc,
                                                   cfi->getOperand(), builder,
-                                                  loc, newFuncGenSig,
-                                                  substituteOperand);
+                                                  loc, newFuncGenSig);
     // Match a conversion from escaping to `@noescape`
     CanSILFunctionType targetType;
     if (!origSourceFnTy->isNoEscape() && origTargetFnTy->isNoEscape() &&
@@ -3205,7 +3206,7 @@ public:
         }
       }
       vjpValue = builder.createAutoDiffFunctionExtract(
-          original.getLoc(), AutoDiffFunctionExtractInst::Extractee::VJP,
+          loc, AutoDiffFunctionExtractInst::Extractee::VJP,
           /*differentiationOrder*/ 1, functionSource);
     }
 
@@ -3303,7 +3304,8 @@ public:
 
     // Release the differentiable function.
     if (differentiableFunc)
-      builder.createReleaseValue(loc, differentiableFunc, builder.getDefaultAtomicity());
+      builder.createReleaseValue(loc, differentiableFunc,
+                                 builder.getDefaultAtomicity());
 
     // Get the VJP results (original results and pullback).
     SmallVector<SILValue, 8> vjpDirectResults;
