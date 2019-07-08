@@ -1009,12 +1009,9 @@ llvm::SmallString<32> getTargetDependentLibraryOption(const llvm::Triple &T,
 void IRGenModule::addLinkLibrary(const LinkLibrary &linkLib) {
   llvm::LLVMContext &ctx = Module.getContext();
 
-  // Don't emit the FORCE_LOAD symbols and metadata when the compiler is 
-  // running on behalf of the debugger.  The debugger will read the LinkLibrary's
-  // from all the modules it sees, and hand load all the required dependencies.
-  // so it doesn't need this information.  And since the FORCE_LOAD symbol is
-  // weak it doesn't even tell us whether a required dependency is missing.
-  // So it serves no purpose in this case.
+  // The debugger gets the autolink information directly from
+  // the LinkLibraries of the module, so there's no reason to
+  // emit it into the IR of debugger expressions.
   if (!Context.LangOpts.DebuggerSupport)
     return;
   
