@@ -4454,20 +4454,8 @@ void TypeChecker::requestMemberLayout(ValueDecl *member) {
     requestNominalLayout(protocolDecl);
 
   // If this represents (abstract) storage, form the appropriate accessors.
-  if (auto storage = dyn_cast<AbstractStorageDecl>(member)) {
-    validateAbstractStorageDecl(*this, storage);
-
-    // Request layout of the accessors for an @objc declaration.
-    // We can't delay validation of getters and setters on @objc properties,
-    // because if they never get validated at all then conformance checkers
-    // will complain about selector mismatches.
-    if (storage->isObjC()) {
-      maybeAddAccessorsToStorage(storage);
-      for (auto accessor : storage->getAllAccessors()) {
-        requestMemberLayout(accessor);
-      }
-    }
-  }
+  if (auto storage = dyn_cast<AbstractStorageDecl>(member))
+    DeclsToFinalize.insert(storage);
 }
 
 void TypeChecker::requestNominalLayout(NominalTypeDecl *nominalDecl) {
