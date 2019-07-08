@@ -1012,7 +1012,7 @@ void IRGenModule::addLinkLibrary(const LinkLibrary &linkLib) {
   // The debugger gets the autolink information directly from
   // the LinkLibraries of the module, so there's no reason to
   // emit it into the IR of debugger expressions.
-  if (!Context.LangOpts.DebuggerSupport)
+  if (Context.LangOpts.DebuggerSupport)
     return;
   
   switch (linkLib.getKind()) {
