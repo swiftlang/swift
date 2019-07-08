@@ -1,5 +1,7 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-silgen | %FileCheck %s
-// FIXME: switch to %target-swift-emit-silgen once we have syntax tree support
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -emit-module -o %t -enable-library-evolution %S/Inputs/property_wrapper_defs.swift
+// RUN: %target-swift-emit-silgen -primary-file %s -I %t | %FileCheck %s
+import property_wrapper_defs
 
 @propertyWrapper
 struct Wrapper<T> {
@@ -407,6 +409,20 @@ struct WithTuples {
 		return .init()
 	}
 }
+
+// Resilience with DI of wrapperValue assignments.
+// rdar://problem/52467175
+class TestResilientDI {
+  @MyPublished var data: Int? = nil
+
+	// CHECK: assign_by_wrapper {{%.*}} : $Optional<Int> to {{%.*}} : $*MyPublished<Optional<Int>>, init {{%.*}} : $@callee_guaranteed (Optional<Int>) -> @out MyPublished<Optional<Int>>, set {{%.*}} : $@callee_guaranteed (Optional<Int>) -> ()
+
+  func doSomething() {
+    self.data = Int()
+  }
+}
+
+
 
 // CHECK-LABEL: sil_vtable ClassUsingWrapper {
 // CHECK-NEXT:  #ClassUsingWrapper.x!getter.1: (ClassUsingWrapper) -> () -> Int : @$s17property_wrappers17ClassUsingWrapperC1xSivg   // ClassUsingWrapper.x.getter
