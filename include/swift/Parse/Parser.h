@@ -25,6 +25,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
 #include "swift/Basic/OptionSet.h"
+#include "swift/Parse/ASTGen.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/LocalContext.h"
 #include "swift/Parse/PersistentParserState.h"
@@ -34,7 +35,6 @@
 #include "swift/Parse/ParserResult.h"
 #include "swift/Parse/SyntaxParserResult.h"
 #include "swift/Parse/SyntaxParsingContext.h"
-#include "swift/Parse/SyntaxTransformer.h"
 #include "swift/Syntax/References.h"
 #include "swift/Config.h"
 #include "llvm/ADT/SetVector.h"
@@ -378,8 +378,8 @@ public:
   /// Current syntax parsing context where call backs should be directed to.
   SyntaxParsingContext *SyntaxContext;
 
-  /// The libSyntax to AST transformer.
-  SyntaxTransformer Transformer;
+  /// The AST generator.
+  ASTGen Generator;
 
 public:
   Parser(unsigned BufferID, SourceFile &SF, DiagnosticEngine* LexerDiags,

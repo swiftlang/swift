@@ -891,7 +891,7 @@ ParserResult<Expr> Parser::parseExprSuper() {
 }
 
 StringRef Parser::copyAndStripUnderscores(StringRef orig) {
-  return SyntaxTransformer::copyAndStripUnderscores(orig, Context);
+  return ASTGen::copyAndStripUnderscores(orig, Context);
 }
 
 /// Disambiguate the parse after '{' token that is in a place that might be
@@ -1414,11 +1414,11 @@ ParserResult<Expr> Parser::parseExprAST() {
   // todo [gsoc]: improve this somehow
   if (SyntaxContext->isTopNode<SyntaxKind::UnknownExpr>()) {
     auto Expr = SyntaxContext->topNode<UnknownExprSyntax>();
-    auto ExprAST = Transformer.transform(Expr);
+    auto ExprAST = Generator.generate(Expr);
     return makeParserResult(ExprAST);
   }
   auto Expr = SyntaxContext->topNode<SyntaxNode>();
-  auto ExprAST = Transformer.transform(Expr);
+  auto ExprAST = Generator.generate(Expr);
   return makeParserResult(ExprAST);
 }
 

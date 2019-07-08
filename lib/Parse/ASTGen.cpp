@@ -1,4 +1,4 @@
-//===--- SyntaxTransformer.cpp --------------------------------------------===//
+//===--- ASTGen.cpp -------------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,66 +10,59 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Parse/SyntaxTransformer.h"
+#include "swift/Parse/ASTGen.h"
 
 using namespace swift;
 using namespace swift::syntax;
 
-IntegerLiteralExpr *
-SyntaxTransformer::transform(IntegerLiteralExprSyntax &Expr) {
+IntegerLiteralExpr *ASTGen::generate(IntegerLiteralExprSyntax &Expr) {
   TokenSyntax Digits = Expr.getDigits();
   StringRef Text = copyAndStripUnderscores(Digits.getText());
   SourceLoc Loc = topLoc();
   return new (Context) IntegerLiteralExpr(Text, Loc);
 }
 
-FloatLiteralExpr *SyntaxTransformer::transform(FloatLiteralExprSyntax &Expr) {
+FloatLiteralExpr *ASTGen::generate(FloatLiteralExprSyntax &Expr) {
   TokenSyntax FloatingDigits = Expr.getFloatingDigits();
   StringRef Text = copyAndStripUnderscores(FloatingDigits.getText());
   SourceLoc Loc = topLoc();
   return new (Context) FloatLiteralExpr(Text, Loc);
 }
 
-NilLiteralExpr *SyntaxTransformer::transform(NilLiteralExprSyntax &Expr) {
+NilLiteralExpr *ASTGen::generate(NilLiteralExprSyntax &Expr) {
   TokenSyntax Nil = Expr.getNilKeyword();
   SourceLoc Loc = topLoc();
   return new (Context) NilLiteralExpr(Loc);
 }
 
-BooleanLiteralExpr *
-SyntaxTransformer::transform(BooleanLiteralExprSyntax &Expr) {
+BooleanLiteralExpr *ASTGen::generate(BooleanLiteralExprSyntax &Expr) {
   TokenSyntax Literal = Expr.getBooleanLiteral();
   bool Value = Literal.getTokenKind() == tok::kw_true;
   SourceLoc Loc = topLoc();
   return new (Context) BooleanLiteralExpr(Value, Loc);
 }
 
-MagicIdentifierLiteralExpr *
-SyntaxTransformer::transform(PoundFileExprSyntax &Expr) {
-  return transformMagicIdentifierLiteralExpr(Expr.getPoundFile());
+MagicIdentifierLiteralExpr *ASTGen::generate(PoundFileExprSyntax &Expr) {
+  return generateMagicIdentifierLiteralExpr(Expr.getPoundFile());
 }
 
-MagicIdentifierLiteralExpr *
-SyntaxTransformer::transform(PoundLineExprSyntax &Expr) {
-  return transformMagicIdentifierLiteralExpr(Expr.getPoundLine());
+MagicIdentifierLiteralExpr *ASTGen::generate(PoundLineExprSyntax &Expr) {
+  return generateMagicIdentifierLiteralExpr(Expr.getPoundLine());
 }
 
-MagicIdentifierLiteralExpr *
-SyntaxTransformer::transform(PoundColumnExprSyntax &Expr) {
-  return transformMagicIdentifierLiteralExpr(Expr.getPoundColumn());
+MagicIdentifierLiteralExpr *ASTGen::generate(PoundColumnExprSyntax &Expr) {
+  return generateMagicIdentifierLiteralExpr(Expr.getPoundColumn());
 }
 
-MagicIdentifierLiteralExpr *
-SyntaxTransformer::transform(PoundFunctionExprSyntax &Expr) {
-  return transformMagicIdentifierLiteralExpr(Expr.getPoundFunction());
+MagicIdentifierLiteralExpr *ASTGen::generate(PoundFunctionExprSyntax &Expr) {
+  return generateMagicIdentifierLiteralExpr(Expr.getPoundFunction());
 }
 
-MagicIdentifierLiteralExpr *
-SyntaxTransformer::transform(PoundDsohandleExprSyntax &Expr) {
-  return transformMagicIdentifierLiteralExpr(Expr.getPoundDsohandle());
+MagicIdentifierLiteralExpr *ASTGen::generate(PoundDsohandleExprSyntax &Expr) {
+  return generateMagicIdentifierLiteralExpr(Expr.getPoundDsohandle());
 }
 
-Expr* SyntaxTransformer::transform(UnknownExprSyntax& Expr) {
+Expr *ASTGen::generate(UnknownExprSyntax &Expr) {
   if (Expr.getNumChildren() == 1 && Expr.getChild(0)->isToken()) {
     Syntax Token = *Expr.getChild(0);
     tok Kind = Token.getRaw()->getTokenKind();
@@ -90,12 +83,9 @@ Expr* SyntaxTransformer::transform(UnknownExprSyntax& Expr) {
   return nullptr;
 }
 
-void SyntaxTransformer::pushLoc(SourceLoc Loc) {
-  LocStack.push_back(Loc);
-}
+void ASTGen::pushLoc(SourceLoc Loc) { LocStack.push_back(Loc); }
 
-StringRef SyntaxTransformer::copyAndStripUnderscores(StringRef Orig,
-                                                     ASTContext &Context) {
+StringRef ASTGen::copyAndStripUnderscores(StringRef Orig, ASTContext &Context) {
   char *start = static_cast<char *>(Context.Allocate(Orig.size(), 1));
   char *p = start;
 
@@ -110,26 +100,25 @@ StringRef SyntaxTransformer::copyAndStripUnderscores(StringRef Orig,
   return StringRef(start, p - start);
 }
 
-StringRef SyntaxTransformer::copyAndStripUnderscores(StringRef Orig) {
+StringRef ASTGen::copyAndStripUnderscores(StringRef Orig) {
   return copyAndStripUnderscores(Orig, Context);
 }
 
-SourceLoc SyntaxTransformer::topLoc() {
+SourceLoc ASTGen::topLoc() {
   // todo [gsoc]: create SourceLoc by pointing the offset of Syntax node into
   // the source buffer
   return LocStack.back();
 }
 
 MagicIdentifierLiteralExpr *
-SyntaxTransformer::transformMagicIdentifierLiteralExpr(
-    const TokenSyntax &PoundToken) {
+ASTGen::generateMagicIdentifierLiteralExpr(const TokenSyntax &PoundToken) {
   auto Kind = getMagicIdentifierLiteralKind(PoundToken.getTokenKind());
   SourceLoc Loc = topLoc();
   return new (Context) MagicIdentifierLiteralExpr(Kind, Loc);
 }
 
 MagicIdentifierLiteralExpr::Kind
-SyntaxTransformer::getMagicIdentifierLiteralKind(tok Kind) {
+ASTGen::getMagicIdentifierLiteralKind(tok Kind) {
   switch (Kind) {
   case tok::kw___COLUMN__:
   case tok::pound_column:

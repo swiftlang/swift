@@ -1,4 +1,4 @@
-//===--- SyntaxTransformer.h ----------------------------------------------===//
+//===--- ASTGen.h ---------------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_PARSE_SYNTAXTRANSFORMER_H
-#define SWIFT_PARSE_SYNTAXTRANSFORMER_H
+#ifndef SWIFT_PARSE_ASTGEN_H
+#define SWIFT_PARSE_ASTGEN_H
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Expr.h"
@@ -19,8 +19,8 @@
 #include "llvm/ADT/DenseMap.h"
 
 namespace swift {
-/// Transforms Syntax nodes into AST nodes.
-class SyntaxTransformer {
+/// Generates AST nodes from Syntax nodes.
+class ASTGen {
   ASTContext &Context;
   // A stack of source locations of syntax constructs. Allows us to get the
   // SourceLoc necessary to create AST nodes for nodes in not-yet-complete
@@ -30,18 +30,18 @@ class SyntaxTransformer {
   llvm::SmallVector<SourceLoc, 16> LocStack;
 
 public:
-  explicit SyntaxTransformer(ASTContext &Context) : Context(Context) {}
+  explicit ASTGen(ASTContext &Context) : Context(Context) {}
 
-  IntegerLiteralExpr *transform(syntax::IntegerLiteralExprSyntax &Expr);
-  FloatLiteralExpr *transform(syntax::FloatLiteralExprSyntax &Expr);
-  NilLiteralExpr *transform(syntax::NilLiteralExprSyntax &Expr);
-  BooleanLiteralExpr *transform(syntax::BooleanLiteralExprSyntax &Expr);
-  MagicIdentifierLiteralExpr *transform(syntax::PoundFileExprSyntax &Expr);
-  MagicIdentifierLiteralExpr *transform(syntax::PoundLineExprSyntax &Expr);
-  MagicIdentifierLiteralExpr *transform(syntax::PoundColumnExprSyntax &Expr);
-  MagicIdentifierLiteralExpr *transform(syntax::PoundFunctionExprSyntax &Expr);
-  MagicIdentifierLiteralExpr *transform(syntax::PoundDsohandleExprSyntax &Expr);
-  Expr *transform(syntax::UnknownExprSyntax &Expr);
+  IntegerLiteralExpr *generate(syntax::IntegerLiteralExprSyntax &Expr);
+  FloatLiteralExpr *generate(syntax::FloatLiteralExprSyntax &Expr);
+  NilLiteralExpr *generate(syntax::NilLiteralExprSyntax &Expr);
+  BooleanLiteralExpr *generate(syntax::BooleanLiteralExprSyntax &Expr);
+  MagicIdentifierLiteralExpr *generate(syntax::PoundFileExprSyntax &Expr);
+  MagicIdentifierLiteralExpr *generate(syntax::PoundLineExprSyntax &Expr);
+  MagicIdentifierLiteralExpr *generate(syntax::PoundColumnExprSyntax &Expr);
+  MagicIdentifierLiteralExpr *generate(syntax::PoundFunctionExprSyntax &Expr);
+  MagicIdentifierLiteralExpr *generate(syntax::PoundDsohandleExprSyntax &Expr);
+  Expr *generate(syntax::UnknownExprSyntax &Expr);
 
   /// Stores source location necessary for AST creation.
   void pushLoc(SourceLoc Loc);
@@ -56,7 +56,7 @@ private:
   SourceLoc topLoc();
 
   MagicIdentifierLiteralExpr *
-  transformMagicIdentifierLiteralExpr(const syntax::TokenSyntax &PoundToken);
+  generateMagicIdentifierLiteralExpr(const syntax::TokenSyntax &PoundToken);
 
   /// Map magic literal tokens such as #file to their MagicIdentifierLiteralExpr
   /// kind.
@@ -65,4 +65,4 @@ private:
 };
 } // namespace swift
 
-#endif // SWIFT_PARSE_SYNTAXTRANSFORMER_H
+#endif // SWIFT_PARSE_ASTGEN_H

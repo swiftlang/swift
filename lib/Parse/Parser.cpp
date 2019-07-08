@@ -528,7 +528,7 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
                             L->getBufferID(),
                             SF.SyntaxParsingCache,
                             SF.getASTContext().getSyntaxArena())))),
-    Transformer(SF.getASTContext()) {
+    Generator(SF.getASTContext()) {
   State = PersistentState;
   if (!State) {
     OwnedState.reset(new PersistentParserState(Context));
@@ -590,7 +590,7 @@ ParsedTokenSyntax Parser::consumeTokenSyntax() {
 
   // todo [gsoc]: remove when possible
   // todo [gsoc]: handle backtracking properly
-  Transformer.pushLoc(Tok.getLoc());
+  Generator.pushLoc(Tok.getLoc());
 
   consumeTokenWithoutFeedingReceiver();
   return ParsedToken;

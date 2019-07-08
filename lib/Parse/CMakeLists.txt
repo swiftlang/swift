@@ -5,6 +5,7 @@ else()
 endif()
 
 add_swift_host_library(swiftParse STATIC
+  ASTGen.cpp
   Confusables.cpp
   HiddenLibSyntaxAction.cpp
   Lexer.cpp
@@ -23,7 +24,6 @@ add_swift_host_library(swiftParse STATIC
   Scope.cpp
   SyntaxParsingCache.cpp
   SyntaxParsingContext.cpp
-  SyntaxTransformer.cpp
 
   GYB_SOURCES
     ParsedSyntaxBuilders.cpp.gyb
