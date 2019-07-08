@@ -1837,9 +1837,7 @@ static SILValue
 reapplyFunctionConversion(SILValue newFunc, SILValue oldFunc,
                           SILValue oldConvertedFunc, SILBuilder &builder,
                           SILLocation loc,
-                          GenericSignature* newFuncGenSig = nullptr,
-                          std::function<SILValue(SILValue)> substituteOperand =
-                              [](SILValue v) { return v; }) {
+                          GenericSignature *newFuncGenSig = nullptr) {
   // If the old func is the new func, then there's no conversion.
   if (oldFunc == oldConvertedFunc)
     return newFunc;
@@ -1847,8 +1845,7 @@ reapplyFunctionConversion(SILValue newFunc, SILValue oldFunc,
   // thin_to_thick_function
   if (auto *tttfi = dyn_cast<ThinToThickFunctionInst>(oldConvertedFunc)) {
     auto innerNewFunc = reapplyFunctionConversion(
-        newFunc, oldFunc, tttfi->getOperand(), builder, loc, newFuncGenSig,
-        substituteOperand);
+        newFunc, oldFunc, tttfi->getOperand(), builder, loc, newFuncGenSig);
     auto operandFnTy = innerNewFunc->getType().castTo<SILFunctionType>();
     auto thickTy = operandFnTy->getWithRepresentation(
         SILFunctionTypeRepresentation::Thick);
@@ -1860,11 +1857,17 @@ reapplyFunctionConversion(SILValue newFunc, SILValue oldFunc,
   if (auto *pai = dyn_cast<PartialApplyInst>(oldConvertedFunc)) {
     SmallVector<SILValue, 8> newArgs;
     newArgs.reserve(pai->getNumArguments());
-    for (auto arg : pai->getArguments())
-      newArgs.push_back(substituteOperand(arg));
+    for (auto arg : pai->getArguments()) {
+      // Retain the argument since it's to be owned by the newly created
+      // closure.
+      if (arg->getType().isObject())
+        builder.createRetainValue(loc, arg, builder.getDefaultAtomicity());
+      else if (arg->getType().isLoadable(builder.getFunction()))
+        builder.createRetainValueAddr(loc, arg, builder.getDefaultAtomicity());
+      newArgs.push_back(arg);
+    }
     auto innerNewFunc = reapplyFunctionConversion(
-        newFunc, oldFunc, pai->getCallee(), builder, loc, newFuncGenSig,
-        substituteOperand);
+        newFunc, oldFunc, pai->getCallee(), builder, loc, newFuncGenSig);
     // If new function's generic signature is specified, use it to create
     // substitution map for reapplied `partial_apply` instruction.
     auto substMap = !newFuncGenSig
@@ -1879,8 +1882,7 @@ reapplyFunctionConversion(SILValue newFunc, SILValue oldFunc,
   if (auto *cetn = dyn_cast<ConvertEscapeToNoEscapeInst>(oldConvertedFunc)) {
     auto innerNewFunc = reapplyFunctionConversion(newFunc, oldFunc,
                                                   cetn->getOperand(), builder,
-                                                  loc, newFuncGenSig,
-                                                  substituteOperand);
+                                                  loc, newFuncGenSig);
     auto operandFnTy = innerNewFunc->getType().castTo<SILFunctionType>();
     auto noEscapeType = operandFnTy->getWithExtInfo(
         operandFnTy->getExtInfo().withNoEscape());
@@ -1899,8 +1901,7 @@ reapplyFunctionConversion(SILValue newFunc, SILValue oldFunc,
         cfi->getOperand()->getType().castTo<SILFunctionType>();
     auto innerNewFunc = reapplyFunctionConversion(newFunc, oldFunc,
                                                   cfi->getOperand(), builder,
-                                                  loc, newFuncGenSig,
-                                                  substituteOperand);
+                                                  loc, newFuncGenSig);
     // Match a conversion from escaping to `@noescape`
     CanSILFunctionType targetType;
     if (!origSourceFnTy->isNoEscape() && origTargetFnTy->isNoEscape() &&
@@ -3205,7 +3206,7 @@ public:
         }
       }
       vjpValue = builder.createAutoDiffFunctionExtract(
-          original.getLoc(), AutoDiffFunctionExtractInst::Extractee::VJP,
+          loc, AutoDiffFunctionExtractInst::Extractee::VJP,
           /*differentiationOrder*/ 1, functionSource);
     }
 
@@ -3234,6 +3235,7 @@ public:
     // on the remapped original function operand and `autodiff_function_extract`
     // the VJP. The actual JVP/VJP functions will be populated in the
     // `autodiff_function` during the transform main loop.
+    SILValue differentiableFunc;
     if (!vjpValue) {
       // FIXME: Handle indirect differentiation invokers. This may require some
       // redesign: currently, each original function + attribute pair is mapped
@@ -3251,7 +3253,9 @@ public:
       // In the VJP, specialization is also necessary for parity. The original
       // function operand is specialized with a remapped version of same
       // substitution map using an argument-less `partial_apply`.
-      if (!ai->getSubstitutionMap().empty()) {
+      if (ai->getSubstitutionMap().empty()) {
+        builder.createRetainValue(loc, original, builder.getDefaultAtomicity());
+      } else {
         auto substMap = getOpSubstitutionMap(ai->getSubstitutionMap());
         auto vjpPartialApply = getBuilder().createPartialApply(
             ai->getLoc(), original, substMap, {},
@@ -3262,6 +3266,7 @@ public:
       auto *autoDiffFuncInst = context.createAutoDiffFunction(
           getBuilder(), loc, indices.parameters, /*differentiationOrder*/ 1,
           original);
+      differentiableFunc = autoDiffFuncInst;
 
       // Record the `autodiff_function` instruction.
       context.getAutoDiffFunctionInsts().push_back(autoDiffFuncInst);
@@ -3295,6 +3300,11 @@ public:
     auto *vjpCall = getBuilder().createApply(loc, vjpValue, SubstitutionMap(),
                                              vjpArgs, ai->isNonThrowing());
     LLVM_DEBUG(getADDebugStream() << "Applied vjp function\n" << *vjpCall);
+
+    // Release the differentiable function.
+    if (differentiableFunc)
+      builder.createReleaseValue(loc, differentiableFunc,
+                                 builder.getDefaultAtomicity());
 
     // Get the VJP results (original results and pullback).
     SmallVector<SILValue, 8> vjpDirectResults;
@@ -6365,7 +6375,6 @@ SILValue ADContext::promoteToDifferentiableFunction(
           loc, assocFn, SILType::getPrimitiveObjectType(expectedAssocFnTy));
     }
 
-    builder.createRetainValue(loc, assocFn, builder.getDefaultAtomicity());
     assocFns.push_back(assocFn);
   }
 
@@ -6384,6 +6393,8 @@ SILValue ADContext::promoteToDifferentiableFunction(
 ///
 /// Folding can be disabled by the `SkipFoldingAutoDiffFunctionExtraction` flag
 /// for SIL testing purposes.
+// FIXME: This function is not correctly detecting the foldable pattern and
+// needs to be rewritten.
 void ADContext::foldAutoDiffFunctionExtraction(AutoDiffFunctionInst *source) {
   // Iterate through all `autodiff_function` instruction uses.
   for (auto use : source->getUses()) {
