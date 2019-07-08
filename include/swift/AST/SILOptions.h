@@ -145,12 +145,6 @@ public:
   // some functions that return closures that take/return large loadable types.
   bool EnableLargeLoadableTypes = false;
 
-  /// Enable serialization of the module just before differentiation.  This
-  /// allows the differentiation pass to differentiate SIL that has been loaded
-  /// from this module.  The LLDB REPL uses this so that the differentiation
-  /// pass can differentiate functions defined on different lines.
-  bool SerializeForDifferentiation = false;
-
   /// Should the default pass pipelines strip ownership during the diagnostic
   /// pipeline or after serialization.
   bool StripOwnershipAfterSerialization = false;
