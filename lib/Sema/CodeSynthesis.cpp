@@ -1837,12 +1837,19 @@ static VarDecl *synthesizePropertyWrapperStorageWrapperProperty(
 static void typeCheckSynthesizedWrapperInitializer(
     PatternBindingDecl *pbd, VarDecl *backingVar, PatternBindingDecl *parentPBD,
     Expr *&initializer) {
-  DeclContext *dc = pbd->getDeclContext();
-  ASTContext &ctx = dc->getASTContext();
+  // Figure out the context in which the initializer was written.
+  DeclContext *originalDC = parentPBD->getDeclContext();
+  if (!originalDC->isLocalContext()) {
+    auto initContext =
+        cast_or_null<PatternBindingInitializer>(parentPBD->getInitContext(0));
+    if (initContext)
+      originalDC = initContext;
+  }
 
   // Type-check the initialization.
+  ASTContext &ctx = pbd->getASTContext();
   auto &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
-  tc.typeCheckExpression(initializer, dc);
+  tc.typeCheckExpression(initializer, originalDC);
   if (auto initializerContext =
           dyn_cast_or_null<Initializer>(
             pbd->getPatternEntryForVarDecl(backingVar).getInitContext())) {
