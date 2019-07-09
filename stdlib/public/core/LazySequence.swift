@@ -86,7 +86,7 @@
 ///         (ResultElement, Base.Element) -> ResultElement
 ///     }
 ///
-/// // and finally, we can give all lazy sequences a lazy `scan` method:
+/// and finally, we can give all lazy sequences a lazy `scan` method:
 ///     
 ///     extension LazySequenceProtocol {
 ///       /// Returns a sequence containing the results of
