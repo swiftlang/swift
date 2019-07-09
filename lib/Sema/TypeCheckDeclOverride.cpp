@@ -635,6 +635,7 @@ static bool overridesDifferentiableAttribute(ValueDecl *derivedDecl,
           derivedDecl,
           diag::protocol_witness_missing_differentiable_attr,
           StringRef(stream.str()).trim());
+      return false;
     }
   }
 

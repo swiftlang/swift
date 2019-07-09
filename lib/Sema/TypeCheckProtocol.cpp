@@ -569,7 +569,11 @@ swift::matchWitness(
   // SWIFT_ENABLE_TENSORFLOW
   auto result = finalize(anyRenaming, optionalAdjustments);
   if (result.isViable()) {
-    // '@differentiable' attributes must match completely.
+    // '@differentiable' attributes must match completely. If there exists a
+    // '@differentiable' attribute with a superset of the "wrt" parameters of
+    // a requirement, then an '@differentiable' attribute is added
+    // automatically.
+    ASTContext &ctx = witness->getASTContext();
     for (auto *reqDiffAttr : reqAttrs.getAttributes<DifferentiableAttr>()) {
       auto witnessDiffAttrs = witnessAttrs
           .getAttributes<DifferentiableAttr, /*AllowInvalid*/ true>();
@@ -579,14 +583,46 @@ swift::matchWitness(
                    reqDiffAttr->getParameterIndices() &&
                    witnessDiffAttr->parametersMatch(*reqDiffAttr);
           });
+      bool reqDiffAttrSupersetMatch = llvm::any_of(
+          witnessDiffAttrs, [&](const DifferentiableAttr *witnessDiffAttr) {
+            return witnessDiffAttr->getParameterIndices() &&
+                   reqDiffAttr->getParameterIndices() &&
+                   AutoDiffIndexSubset::get(
+                       ctx, witnessDiffAttr->getParameterIndices()->parameters)
+                     ->isSupersetOf(AutoDiffIndexSubset::get(
+                         ctx, reqDiffAttr->getParameterIndices()->parameters));
+          });
       if (!reqDiffAttrMatch) {
-        if (auto *vdWitness = dyn_cast<VarDecl>(witness))
-          return RequirementMatch(
-              getStandinForAccessor(vdWitness, AccessorKind::Get),
-              MatchKind::DifferentiableConflict, reqDiffAttr);
-        else
-          return RequirementMatch(witness, MatchKind::DifferentiableConflict,
-                                  reqDiffAttr);
+        auto implicitDiffAttr = false;
+        if (reqDiffAttrSupersetMatch) {
+          auto *newAttr = DifferentiableAttr::create(
+              ctx, /*implicit*/ true, reqDiffAttr->AtLoc,
+              reqDiffAttr->getRange(), reqDiffAttr->isLinear(),
+              reqDiffAttr->getParameterIndices(), reqDiffAttr->getJVP(),
+              reqDiffAttr->getVJP(), reqDiffAttr->getRequirements());
+          newAttr->setJVPFunction(reqDiffAttr->getJVPFunction());
+          newAttr->setVJPFunction(reqDiffAttr->getVJPFunction());
+          auto insertion = ctx.DifferentiableAttrs.try_emplace(
+              {witness, newAttr->getParameterIndices()}, newAttr);
+          // Valid `@differentiable` attributes are uniqued by their parameter
+          // indices. Reject duplicate attributes for the same decl and parameter
+          // indices pair.
+          if (!insertion.second) {
+            newAttr->setInvalid();
+          } else {
+            witness->getAttrs().add(newAttr);
+            implicitDiffAttr = true;
+          }
+        }
+        if (!implicitDiffAttr) {
+          if (auto *vdWitness = dyn_cast<VarDecl>(witness))
+            return RequirementMatch(
+                getStandinForAccessor(vdWitness, AccessorKind::Get),
+                MatchKind::DifferentiableConflict, reqDiffAttr);
+          else
+            return RequirementMatch(witness, MatchKind::DifferentiableConflict,
+                                    reqDiffAttr);
+        }
       }
     }
   }
