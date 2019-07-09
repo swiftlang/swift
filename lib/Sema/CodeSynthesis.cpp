@@ -640,7 +640,7 @@ getEnclosingSelfPropertyWrapperAccess(VarDecl *property, bool forProjected) {
     return None;
 
   // The pattern currently only works with the outermost property wrapper.
-  Type outermostWrapperType = property->getAttachedPropertyWrapperType(0);
+  Type outermostWrapperType = property->getPropertyWrapperBackingPropertyType();
   if (!outermostWrapperType)
     return None;
   NominalTypeDecl *wrapperTypeDecl = outermostWrapperType->getAnyNominal();
