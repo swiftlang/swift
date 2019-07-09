@@ -2603,6 +2603,9 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
 
         for (unsigned i : indices(wrappedVar->getAttachedPropertyWrappers())) {
           auto wrapperInfo = wrappedVar->getAttachedPropertyWrapperTypeInfo(i);
+          if (!wrapperInfo)
+            break;
+
           Type memberType =
               cs->createTypeVariable(emptyLocator, TVO_CanBindToLValue);
           cs->addValueMemberConstraint(
