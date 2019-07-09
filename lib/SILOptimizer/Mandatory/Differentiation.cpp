@@ -3450,9 +3450,6 @@ private:
   /// The differentiation invoker.
   DifferentiationInvoker invoker;
 
-  /// Info from activity analysis on the original function.
-  const DifferentiableActivityInfo &activityInfo;
-
   /// Caches basic blocks whose phi arguments have been remapped (adding a
   /// predecessor enum argument).
   SmallPtrSet<SILBasicBlock *, 4> remappedBasicBlocks;
@@ -3476,29 +3473,13 @@ private:
     return substMap;
   }
 
-  static const DifferentiableActivityInfo &getActivityInfo(
-      ADContext &context, SILFunction *original,
-      const SILAutoDiffIndices &indices, SILFunction *jvp) {
-    // Get activity info of the original function.
-    auto &passManager = context.getPassManager();
-    auto *activityAnalysis =
-        passManager.getAnalysis<DifferentiableActivityAnalysis>();
-    auto &activityCollection = *activityAnalysis->get(original);
-    auto &activityInfo = activityCollection.getActivityInfo(
-        jvp->getLoweredFunctionType()->getGenericSignature());
-    LLVM_DEBUG(dumpActivityInfo(*original, indices, activityInfo,
-                                getADDebugStream()));
-    return activityInfo;
-  }
-
 public:
   explicit JVPEmitter(ADContext &context, SILFunction *original,
                       SILDifferentiableAttr *attr, SILFunction *jvp,
                       DifferentiationInvoker invoker, bool vjpGenerated)
       : TypeSubstCloner(*jvp, *original, getSubstitutionMap(original, jvp)),
         context(context), original(original), attr(attr), jvp(jvp),
-        invoker(invoker), activityInfo(getActivityInfo(
-                              context, original, attr->getIndices(), jvp)),
+        invoker(invoker),
         vjpGenerated(vjpGenerated) {
     // Create empty differential function.
     differential = createEmptyDifferential();
@@ -3637,10 +3618,9 @@ public:
 
     // Get differential result type.
     auto jvpResultArray = jvp->getLoweredFunctionType()->getResults();
-    assert(jvpResultArray.size() == 2 &&
-           "Result of JVP can only be 2 elements");
-    auto funcType = jvpResultArray[1].getType();
-    auto silFuncCanType = funcType->castTo<SILFunctionType>()->getCanonicalType();
+    auto funcType = jvpResultArray.back().getType();
+    auto silFuncCanType = funcType->castTo<SILFunctionType>()
+                              ->getCanonicalType();
 
     directResults.push_back(
         SILUndef::get(jvp->mapTypeIntoContext(SILType::getPrimitiveObjectType(
@@ -3648,215 +3628,6 @@ public:
                       *jvp));
     builder.createReturn(
         ri->getLoc(), joinElements(directResults, builder, loc));
-  }
-
-  // If an `apply` has active results or active inout parameters, replace it
-  // with an `apply` of its JVP.
-  void visitApplyInst(ApplyInst *ai) {
-    // Special handling logic only applies when `apply` has active results or
-    // active arguments at an active 'inout' parameter position. If not, just do
-    // standard cloning.
-    SmallVector<SILValue, 4> allResults;
-    allResults.push_back(ai);
-    allResults.append(ai->getIndirectSILResults().begin(),
-                      ai->getIndirectSILResults().end());
-    auto hasActiveResults = llvm::any_of(
-        allResults, [this](SILValue res) {
-      return activityInfo.isActive(res, getIndices());
-    });
-    auto hasActiveArguments = llvm::any_of(
-        ai->getArgumentsWithoutIndirectResults(), [this](SILValue arg) {
-      return activityInfo.isActive(arg, getIndices());
-    });
-    // Check for active 'inout' arguments.
-    auto paramInfos = ai->getSubstCalleeConv().getParameters();
-    bool hasActiveInoutParams = false;
-    for (unsigned i : swift::indices(paramInfos))
-      if (paramInfos[i].isIndirectInOut() &&
-          activityInfo.isActive(ai->getArgumentsWithoutIndirectResults()[i],
-                                getIndices()))
-        hasActiveInoutParams = true;
-    // Reject functions with active inout arguments. It's not yet supported.
-    if (hasActiveInoutParams) {
-      context.emitNondifferentiabilityError(ai, invoker,
-          diag::autodiff_cannot_differentiate_through_inout_arguments);
-      errorOccurred = true;
-      return;
-    }
-    // If there's no active results, this function should not be differentiated.
-    // Do standard cloning.
-    if (!hasActiveResults || !hasActiveArguments) {
-      LLVM_DEBUG(getADDebugStream() << "No active results:\n" << *ai << '\n');
-      TypeSubstCloner::visitApplyInst(ai);
-      return;
-    }
-
-    // Get the parameter indices required for differentiating this function.
-    LLVM_DEBUG(getADDebugStream() << "JVP-transforming:\n" << *ai << '\n');
-    SmallVector<unsigned, 8> activeParamIndices;
-    SmallVector<unsigned, 8> activeResultIndices;
-    collectMinimalIndicesForFunctionCall(ai, allResults, getIndices(),
-                                         activityInfo, activeParamIndices,
-                                         activeResultIndices);
-    assert(!activeParamIndices.empty() && "Parameter indices cannot be empty");
-    assert(!activeResultIndices.empty() && "Result indices cannot be empty");
-    LLVM_DEBUG(auto &s = getADDebugStream() << "Active indices: params={";
-               interleave(activeParamIndices.begin(), activeParamIndices.end(),
-                          [&s](unsigned i) { s << i; }, [&s] { s << ", "; });
-               s << "}, results={"; interleave(
-                   activeResultIndices.begin(), activeResultIndices.end(),
-                   [&s](unsigned i) { s << i; }, [&s] { s << ", "; });
-               s << "}\n";);
-    // FIXME: We don't support multiple active results yet.
-    if (activeResultIndices.size() > 1) {
-      context.emitNondifferentiabilityError(
-          ai, invoker, diag::autodiff_expression_not_differentiable_note);
-      errorOccurred = true;
-      return;
-    }
-    // Form expected indices by assuming there's only one result.
-    SILAutoDiffIndices indices(activeResultIndices.front(),
-        AutoDiffIndexSubset::get(
-            getASTContext(),
-            ai->getArgumentsWithoutIndirectResults().size(),
-            activeParamIndices));
-
-    // Emit the JVP.
-    auto loc = ai->getLoc();
-    auto &builder = getBuilder();
-    auto original = getOpValue(ai->getCallee());
-    auto functionSource = original;
-    SILValue jvpValue;
-    // If functionSource is a @differentiable function, just extract it.
-    auto originalFnTy = original->getType().castTo<SILFunctionType>();
-    if (originalFnTy->isDifferentiable()) {
-      auto paramIndices = originalFnTy->getDifferentiationParameterIndices();
-      for (auto i : indices.parameters->getIndices()) {
-        if (!paramIndices->contains(i)) {
-          context.emitNondifferentiabilityError(original, invoker,
-              diag::autodiff_function_nondiff_parameter_not_differentiable);
-          errorOccurred = true;
-          return;
-        }
-      }
-      jvpValue = builder.createAutoDiffFunctionExtract(
-          original.getLoc(), AutoDiffFunctionExtractInst::Extractee::JVP,
-          /*differentiationOrder*/ 1, functionSource);
-    }
-
-    // Check and diagnose non-differentiable arguments.
-    for (unsigned paramIndex : range(originalFnTy->getNumParameters())) {
-      if (indices.isWrtParameter(paramIndex) &&
-              !originalFnTy->getParameters()[paramIndex]
-              .getSILStorageType()
-              .isDifferentiable(getModule())) {
-        context.emitNondifferentiabilityError(
-            original, invoker, diag::autodiff_nondifferentiable_argument);
-        errorOccurred = true;
-        return;
-      }
-    }
-    // Check and diagnose non-differentiable results.
-    if (!originalFnTy->getResults()[indices.source]
-            .getSILStorageType()
-            .isDifferentiable(getModule())) {
-      context.emitNondifferentiabilityError(
-          original, invoker, diag::autodiff_nondifferentiable_result);
-      errorOccurred = true;
-      return;
-    }
-    // If JVP has not yet been found, emit an `autodiff_function` instruction
-    // on the remapped original function operand and `autodiff_function_extract`
-    // the JVP. The actual JVP/VJP functions will be populated in the
-    // `autodiff_function` during the transform main loop.
-    if (!jvpValue) {
-      // FIXME: Handle indirect differentiation invokers. This may require some
-      // redesign: currently, each original function + attribute pair is mapped
-      // only to one invoker.
-      /*
-      DifferentiationInvoker indirect(ai, attr);
-      auto insertion =
-          context.getInvokers().try_emplace({this->original, attr}, indirect);
-      auto &invoker = insertion.first->getSecond();
-      invoker = indirect;
-      */
-
-      // If the original `apply` instruction has a substitution map, then the
-      // applied function is specialized.
-      // In the JVP, specialization is also necessary for parity. The original
-      // function operand is specialized with a remapped version of same
-      // substitution map using an argument-less `partial_apply`.
-      if (!ai->getSubstitutionMap().empty()) {
-        auto substMap = getOpSubstitutionMap(ai->getSubstitutionMap());
-        auto jvpPartialApply = getBuilder().createPartialApply(
-            ai->getLoc(), original, substMap, {},
-            ParameterConvention::Direct_Guaranteed);
-        original = jvpPartialApply;
-      }
-
-      auto *autoDiffFuncInst = context.createAutoDiffFunction(
-          getBuilder(), loc, indices.parameters, /*differentiationOrder*/ 1,
-          original);
-
-      // Record the `autodiff_function` instruction.
-      context.getAutoDiffFunctionInsts().push_back(autoDiffFuncInst);
-      context.getResultIndices()[autoDiffFuncInst] =
-          activeResultIndices.front();
-
-      jvpValue = getBuilder().createAutoDiffFunctionExtract(
-          loc, AutoDiffFunctionExtractInst::Extractee::JVP,
-          /*differentiationOrder*/ 1, autoDiffFuncInst);
-    }
-
-    // Record desired/actual JVP indices.
-    // Temporarily set original pullback type to `None`.
-    NestedApplyInfo info{indices, /*originalPullbackType*/ None};
-    auto insertion = context.getNestedApplyInfo().try_emplace(ai, info);
-    auto &nestedApplyInfo = insertion.first->getSecond();
-    nestedApplyInfo = info;
-
-    // Call the JVP using the original parameters.
-    SmallVector<SILValue, 8> jvpArgs;
-    auto jvpFnTy = getOpType(jvpValue->getType()).castTo<SILFunctionType>();
-    auto numJVPArgs =
-        jvpFnTy->getNumParameters() + jvpFnTy->getNumIndirectFormalResults();
-    jvpArgs.reserve(numJVPArgs);
-    // Collect substituted arguments.
-    for (auto origArg : ai->getArguments())
-      jvpArgs.push_back(getOpValue(origArg));
-    assert(jvpArgs.size() == numJVPArgs);
-    // Apply the JVP.
-    // The JVP should be specialized, so no substitution map is necessary.
-    auto *jvpCall = getBuilder().createApply(loc, jvpValue, SubstitutionMap(),
-                                             jvpArgs, ai->isNonThrowing());
-    LLVM_DEBUG(getADDebugStream() << "Applied jvp function\n" << *jvpCall);
-
-    // Get the JVP results (original results and pullback).
-    SmallVector<SILValue, 8> jvpDirectResults;
-    extractAllElements(jvpCall, getBuilder(), jvpDirectResults);
-    ArrayRef<SILValue> originalDirectResults =
-        ArrayRef<SILValue>(jvpDirectResults).drop_back(1);
-    SILValue originalDirectResult = joinElements(originalDirectResults,
-                                                 getBuilder(),
-                                                 jvpCall->getLoc());
-
-    // Store the original result to the value map.
-    mapValue(ai, originalDirectResult);
-
-    auto jvpGenSig = SubsMap.getGenericSignature()
-        ? SubsMap.getGenericSignature()->getCanonicalSignature()
-        : nullptr;
-    Lowering::GenericContextScope genericContextScope(
-        context.getTypeConverter(), jvpGenSig);
-
-    // Some instructions that produce the callee may have been cloned.
-    // If the original callee did not have any users beyond this `apply`,
-    // recursively kill the cloned callee.
-    if (auto *origCallee = cast_or_null<SingleValueInstruction>(
-            ai->getCallee()->getDefiningInstruction()))
-      if (origCallee->hasOneUse())
-        recursivelyDeleteTriviallyDeadInstructions(
-            getOpValue(origCallee)->getDefiningInstruction());
   }
 
   void visitAutoDiffFunctionInst(AutoDiffFunctionInst *adfi) {
