@@ -1288,8 +1288,7 @@ public:
 #endif
 
       auto associate =
-        Conformance.getTypeWitness(requirement.getAssociation(), nullptr)
-          ->getCanonicalType();
+          Conformance.getTypeWitness(requirement.getAssociation(), nullptr);
       llvm::Constant *witness =
           IGM.getAssociatedTypeWitness(associate, /*inProtocolContext=*/false);
       Table.addBitCast(witness, IGM.Int8PtrTy);
@@ -1423,7 +1422,7 @@ void WitnessTableBuilder::build() {
   TableSize = Table.size();
 }
 
-llvm::Constant *IRGenModule::getAssociatedTypeWitness(CanType type,
+llvm::Constant *IRGenModule::getAssociatedTypeWitness(Type type,
                                                       bool inProtocolContext) {
   // FIXME: If we can directly reference constant type metadata, do so.
 
@@ -1432,7 +1431,7 @@ llvm::Constant *IRGenModule::getAssociatedTypeWitness(CanType type,
   auto role = inProtocolContext
     ? MangledTypeRefRole::DefaultAssociatedTypeWitness
     : MangledTypeRefRole::Metadata;
-  auto typeRef = getTypeRef(type, role);
+  auto typeRef = getTypeRef(type, /*generic signature*/nullptr, role);
 
   // Set the low bit to indicate that this is a mangled name.
   auto witness = llvm::ConstantExpr::getPtrToInt(typeRef, IntPtrTy);
@@ -1609,8 +1608,7 @@ void WitnessTableBuilder::collectResilientWitnesses(
     if (entry.getKind() == SILWitnessTable::AssociatedType) {
       // Associated type witness.
       auto assocType = entry.getAssociatedTypeWitness().Requirement;
-      auto associate = conformance.getTypeWitness(assocType, nullptr)
-          ->getCanonicalType();
+      auto associate = conformance.getTypeWitness(assocType, nullptr);
 
       llvm::Constant *witness =
           IGM.getAssociatedTypeWitness(associate, /*inProtocolContext=*/false);
