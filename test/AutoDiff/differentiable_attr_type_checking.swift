@@ -681,11 +681,6 @@ struct DiffAttrConformanceErrors : DifferentiableAttrRequirements {
   func f2(_ x: Float, _ y: Float) -> Float {
     return x + y
   }
-
-  // expected-note @+1 {{candidate is missing attribute '@differentiable(where T : Differentiable)'}}
-  func generic<T>(_ x: T) -> T {
-    return x
-  }
 }
 
 protocol NotRefiningDiffable {
