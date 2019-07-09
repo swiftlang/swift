@@ -1409,6 +1409,22 @@ private:
       }
       return { true, E };
     }
+
+    bool walkToDeclPre(Decl *D) override {
+      if (auto *ICD = dyn_cast<IfConfigDecl>(D)) {
+        // The base walker assumes the content of active IfConfigDecl clauses
+        // has been injected into the parent context and will be walked there.
+        // This doesn't hold for pre-typechecked ASTs and we need to find
+        // placeholders in inactive clauses anyway, so walk them here.
+        for (auto Clause: ICD->getClauses()) {
+          for (auto Elem: Clause.Elements) {
+            Elem.walk(*this);
+          }
+        }
+        return false;
+      }
+      return true;
+    }
   };
 
   class ClosureTypeWalker: public ASTWalker {
@@ -1570,6 +1586,8 @@ private:
         }
         return true;
       }
+
+      bool shouldWalkInactiveConfigRegion() override { return true; }
 
       Expr *findEnclosingCallArg(SourceFile &SF, SourceLoc SL) {
         EnclosingCallAndArg = {nullptr, nullptr};
