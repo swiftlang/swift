@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify %s
+// RUN: %target-run-simple-swift
 
 import StdlibUnittest
 
@@ -137,16 +137,6 @@ struct S : P {
   }
 }
 
-// MARK: - Differentiable protocol requirement with 'where' clause.
-
-// Missing `@differentiable` attribute, without printing the 'wrt' arguments.
-protocol DifferentiableWhereClause: Differentiable {
-  associatedtype Scalar
-
-  @differentiable(where Scalar: Differentiable) // expected-error {{'where' clauses in '@differentiable' attributes of protocol requirements are not supported}}
-  func test(value: Scalar) -> Float
-}
-
 // MARK: - Overridden protocol method adding differentiable attribute.
 
 public protocol Distribution {
@@ -183,24 +173,6 @@ public protocol DoubleDifferentiableDistribution: DifferentiableDistribution
 func blah2<T: DoubleDifferentiableDistribution>(_ x: T, _ value: T.Value) -> Float
   where T.Value: AdditiveArithmetic {
   x.logProbability(of: value)
-}
-
-// Missing a `@differentiable` attribute.
-public protocol MissingDifferentiableDistribution: DifferentiableDistribution
-  where Value: Differentiable {
-  func logProbability(of value: Value) -> Float // expected-note {{candidate is missing attribute '@differentiable(wrt: self)'}}
-}
-
-// Missing `@differentiable` attribute, without printing the 'wrt' arguments.
-protocol Example: Differentiable {
-  associatedtype Scalar: Differentiable
-
-  @differentiable
-  func test(value: Scalar) -> Float
-}
-
-protocol MissingDifferentiableTest: Example {
-  func test(value: Scalar) -> Float // expected-note {{candidate is missing attribute '@differentiable'}}
 }
 
 runAllTests()

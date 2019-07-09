@@ -347,3 +347,32 @@ func two6(x: Float, y: Float) -> (value: Float, pullback: (Float) -> (Float, Flo
 func two7(x: Float, y: Float) -> (value: Float, pullback: (Float) -> (Float, Float)) {
   return (x + y, { ($0, $0) })
 }
+
+// Missing `@differentiable` attribute, without printing the 'wrt' arguments.
+
+protocol DifferentiableWhereClause: Differentiable {
+  associatedtype Scalar
+
+  @differentiable(where Scalar: Differentiable) // expected-error {{'where' clauses in '@differentiable' attributes of protocol requirements are not supported}}
+  func test(value: Scalar) -> Float
+}
+
+// Missing a `@differentiable` attribute.
+
+public protocol MissingDifferentiableDistribution: DifferentiableDistribution
+  where Value: Differentiable {
+  func logProbability(of value: Value) -> Float // expected-note {{candidate is missing attribute '@differentiable(wrt: self)'}}
+}
+
+// Missing `@differentiable` attribute, without printing the 'wrt' arguments.
+
+protocol Example: Differentiable {
+  associatedtype Scalar: Differentiable
+
+  @differentiable
+  func test(value: Scalar) -> Float
+}
+
+protocol MissingDifferentiableTest: Example {
+  func test(value: Scalar) -> Float // expected-note {{candidate is missing attribute '@differentiable'}}
+}
