@@ -116,63 +116,6 @@ BuiltinUnit::BuiltinUnit(ModuleDecl &M)
 // Normal Module Name Lookup
 //===----------------------------------------------------------------------===//
 
-class SourceFile::LookupCache {
-  /// A lookup map for value decls. When declarations are added they are added
-  /// under all variants of the name they can be found under.
-  class DeclMap {
-    llvm::DenseMap<DeclName, TinyPtrVector<ValueDecl*>> Members;
-
-  public:
-    void add(ValueDecl *VD) {
-      if (!VD->hasName()) return;
-      VD->getFullName().addToLookupTable(Members, VD);
-    }
-
-    void clear() {
-      Members.shrink_and_clear();
-    }
-
-    decltype(Members)::const_iterator begin() const { return Members.begin(); }
-    decltype(Members)::const_iterator end() const { return Members.end(); }
-    decltype(Members)::const_iterator find(DeclName Name) const {
-      return Members.find(Name);
-    }
-  };
-
-  DeclMap TopLevelValues;
-  DeclMap ClassMembers;
-  bool MemberCachePopulated = false;
-
-  template<typename Range>
-  void doPopulateCache(Range decls, bool onlyOperators);
-  void addToMemberCache(DeclRange decls);
-  void populateMemberCache(const SourceFile &SF);
-public:
-  typedef ModuleDecl::AccessPathTy AccessPathTy;
-  
-  LookupCache(const SourceFile &SF);
-
-  /// Throw away as much memory as possible.
-  void invalidate();
-  
-  void lookupValue(AccessPathTy AccessPath, DeclName Name,
-                   NLKind LookupKind, SmallVectorImpl<ValueDecl*> &Result);
-  
-  void lookupVisibleDecls(AccessPathTy AccessPath,
-                          VisibleDeclConsumer &Consumer,
-                          NLKind LookupKind);
-  
-  void lookupClassMembers(AccessPathTy AccessPath,
-                          VisibleDeclConsumer &consumer,
-                          const SourceFile &SF);
-                          
-  void lookupClassMember(AccessPathTy accessPath,
-                         DeclName name,
-                         SmallVectorImpl<ValueDecl*> &results,
-                         const SourceFile &SF);
-
-  SmallVector<ValueDecl *, 0> AllVisibleValues;
-};
 using SourceLookupCache = SourceFile::LookupCache;
 
 SourceLookupCache &SourceFile::getCache() const {
