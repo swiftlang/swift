@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -172,12 +172,18 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
     arguments.push_back(inputArgs.MakeArgString(OI.SDKPath));
   }
 
+  if (llvm::sys::Process::StandardErrHasColors()) {
+    arguments.push_back("-color-diagnostics");
+  }
+
   inputArgs.AddAllArgs(arguments, options::OPT_I);
   inputArgs.AddAllArgs(arguments, options::OPT_F, options::OPT_Fsystem);
 
   inputArgs.AddLastArg(arguments, options::OPT_AssertConfig);
   inputArgs.AddLastArg(arguments, options::OPT_autolink_force_load);
-  inputArgs.AddLastArg(arguments, options::OPT_color_diagnostics);
+  inputArgs.AddLastArg(arguments,
+                       options::OPT_color_diagnostics,
+                       options::OPT_no_color_diagnostics);
   inputArgs.AddLastArg(arguments, options::OPT_fixit_all);
   inputArgs.AddLastArg(arguments,
                        options::OPT_warn_swift3_objc_inference_minimal,
@@ -260,9 +266,6 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
   // Pass through any subsystem flags.
   inputArgs.AddAllArgs(arguments, options::OPT_Xllvm);
   inputArgs.AddAllArgs(arguments, options::OPT_Xcc);
-
-  if (llvm::sys::Process::StandardErrHasColors())
-    arguments.push_back("-color-diagnostics");
 }
 
 static void addRuntimeLibraryFlags(const OutputInfo &OI,
