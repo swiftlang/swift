@@ -1609,6 +1609,10 @@ void Remangler::mangleIndex(Node *node) {
   mangleIndex(node->getIndex());
 }
 
+void Remangler::mangleUnknownIndex(Node *node) {
+  unreachable("should not be reached in an arbitrary context");
+}
+
 void Remangler::mangleProtocol(Node *node, EntityContext &ctx) {
   mangleNominalType(node, 'P', ctx);
 }

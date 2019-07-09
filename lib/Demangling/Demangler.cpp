@@ -1463,44 +1463,19 @@ NodePointer Demangler::popDependentProtocolConformance() {
 }
 
 NodePointer Demangler::demangleDependentProtocolConformanceRoot() {
-  int index = demangleIndex();
-  NodePointer conformance =
-    index > 0 ? createNode(Node::Kind::DependentProtocolConformanceRoot,
-                           index - 1)
-              : createNode(Node::Kind::DependentProtocolConformanceRoot);
-
-  if (NodePointer protocol = popProtocol())
-    conformance->addChild(protocol, *this);
-  else
-    return nullptr;
-
-  if (NodePointer dependentType = popNode(Node::Kind::Type))
-    conformance->addChild(dependentType, *this);
-  else
-    return nullptr;
-
-  return conformance;
+  NodePointer index = demangleDependentConformanceIndex();
+  NodePointer protocol = popProtocol();
+  NodePointer dependentType = popNode(Node::Kind::Type);
+  return createWithChildren(Node::Kind::DependentProtocolConformanceRoot,
+                            dependentType, protocol, index);
 }
 
 NodePointer Demangler::demangleDependentProtocolConformanceInherited() {
-  int index = demangleIndex();
-  NodePointer conformance =
-    index > 0 ? createNode(Node::Kind::DependentProtocolConformanceInherited,
-                           index - 1)
-              : createNode(Node::Kind::DependentProtocolConformanceInherited);
-
-  if (NodePointer protocol = popProtocol())
-    conformance->addChild(protocol, *this);
-  else
-    return nullptr;
-
-  if (auto nested = popDependentProtocolConformance())
-    conformance->addChild(nested, *this);
-  else
-    return nullptr;
-
-  conformance->reverseChildren();
-  return conformance;
+  NodePointer index = demangleDependentConformanceIndex();
+  NodePointer protocol = popProtocol();
+  NodePointer nested = popDependentProtocolConformance();
+  return createWithChildren(Node::Kind::DependentProtocolConformanceInherited,
+                            nested, protocol, index);
 }
 
 NodePointer Demangler::popDependentAssociatedConformance() {
@@ -1511,25 +1486,24 @@ NodePointer Demangler::popDependentAssociatedConformance() {
 }
 
 NodePointer Demangler::demangleDependentProtocolConformanceAssociated() {
+  NodePointer index = demangleDependentConformanceIndex();
+  NodePointer associatedConformance = popDependentAssociatedConformance();
+  NodePointer nested = popDependentProtocolConformance();
+  return createWithChildren(Node::Kind::DependentProtocolConformanceAssociated,
+                            nested, associatedConformance, index);
+}
+
+NodePointer Demangler::demangleDependentConformanceIndex() {
   int index = demangleIndex();
-  NodePointer conformance =
-    index > 0 ? createNode(Node::Kind::DependentProtocolConformanceRoot,
-                           index - 1)
-              : createNode(Node::Kind::DependentProtocolConformanceRoot);
+  // index < 0 indicates a demangling error.
+  // index == 0 is ill-formed by the (originally buggy) use of this production.
+  if (index <= 0) return nullptr;
 
-  if (NodePointer associatedConformance = popDependentAssociatedConformance())
-    conformance->addChild(associatedConformance, *this);
-  else
-    return nullptr;
+  // index == 1 indicates an unknown index.
+  if (index == 1) return createNode(Node::Kind::UnknownIndex);
 
-  if (auto nested = popDependentProtocolConformance())
-    conformance->addChild(nested, *this);
-  else
-    return nullptr;
-
-  conformance->reverseChildren();
-
-  return conformance;
+  // Remove the index adjustment.
+  return createNode(Node::Kind::Index, unsigned(index) - 2);
 }
 
 NodePointer Demangler::demangleRetroactiveConformance() {

@@ -2558,6 +2558,7 @@ void ASTMangler::appendDependentProtocolConformance(
       auto index =
         conformanceRequirementIndex(entry,
                                     CurGenericSignature->getRequirements());
+      // This is never an unknown index and so must be adjusted by 2 per ABI.
       appendOperator("HD", Index(index + 2));
       continue;
     }
@@ -2573,6 +2574,7 @@ void ASTMangler::appendDependentProtocolConformance(
       entry.first->isEqual(currentProtocol->getProtocolSelfType());
     if (isInheritedConformance) {
       appendProtocolName(entry.second);
+      // For now, this is never an unknown index and so must be adjusted by 2.
       appendOperator("HI", Index(index + 2));
       continue;
     }
@@ -2582,7 +2584,8 @@ void ASTMangler::appendDependentProtocolConformance(
     appendType(entry.first);
     appendProtocolName(entry.second);
 
-    // For non-resilient protocols, encode the index.
+    // For resilient protocols, the index is unknown, so we use the special
+    // value 1; otherwise we adjust by 2.
     bool isResilient =
       currentProtocol->isResilient(Mod, ResilienceExpansion::Maximal);
     appendOperator("HA", Index(isResilient ? 1 : index + 2));
