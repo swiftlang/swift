@@ -359,6 +359,16 @@ protocol DifferentiableWhereClause: Differentiable {
 
 // Missing a `@differentiable` attribute.
 
+public protocol Distribution {
+  associatedtype Value
+  func logProbability(of value: Value) -> Float
+}
+
+public protocol DifferentiableDistribution: Differentiable, Distribution {
+  @differentiable(wrt: self)
+  func logProbability(of value: Value) -> Float
+}
+
 public protocol MissingDifferentiableDistribution: DifferentiableDistribution
   where Value: Differentiable {
   func logProbability(of value: Value) -> Float // expected-note {{candidate is missing attribute '@differentiable(wrt: self)'}}
