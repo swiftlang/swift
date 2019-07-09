@@ -609,17 +609,16 @@ static bool overridesDifferentiableAttribute(ValueDecl *derivedDecl,
   // Make sure all the differentiable attributes in `baseDecl` are
   // also declared in `derivedDecl`.
   for (auto baseDA : baseDAs) {
-    if (!baseDA->getParameterIndices())
-      continue;
-    auto baseParameters = AutoDiffIndexSubset::get(
-        ctx, baseDA->getParameterIndices()->parameters);
+    auto baseParameters = baseDA->getParameterIndices();
     auto defined = false;
     for (auto derivedDA : derivedDAs) {
-      if (!derivedDA->getParameterIndices())
-        continue;
-      auto derivedParameters = AutoDiffIndexSubset::get(
-          ctx, derivedDA->getParameterIndices()->parameters);
-      if (baseParameters->isSubsetOf(derivedParameters)) {
+      auto derivedParameters = derivedDA->getParameterIndices();
+      if (derivedParameters &&
+          baseParameters &&
+          AutoDiffIndexSubset::get(
+              ctx, baseParameters->parameters)
+              ->isSubsetOf(AutoDiffIndexSubset::get(
+                  ctx, derivedParameters->parameters))) {
         defined = true;
         break;
       }
@@ -629,8 +628,9 @@ static bool overridesDifferentiableAttribute(ValueDecl *derivedDecl,
       // inferred differentiation parameters.
       auto *inferredParameters = TypeChecker::inferDifferentiableParameters(
           derivedAFD, nullptr);
-      bool omitWrtClause = baseDA->getParameterIndices()->parameters.count() ==
-                           inferredParameters->parameters.count();
+      bool omitWrtClause = !baseParameters ||
+          baseParameters->parameters.count() ==
+          inferredParameters->parameters.count();
       // Get `@differentiable` attribute description.
       std::string baseDAString;
       llvm::raw_string_ostream stream(baseDAString);
@@ -652,20 +652,19 @@ static bool overridesDifferentiableAttribute(ValueDecl *derivedDecl,
   // `derivedDecl` and check if they subsume any of the
   // differentiable attributes in `baseDecl`.
   for (auto derivedDA : derivedDAs) {
-    if (!derivedDA->getParameterIndices())
-      continue;
-    auto derivedParameters = AutoDiffIndexSubset::get(
-        ctx, derivedDA->getParameterIndices()->parameters);
+    auto derivedParameters = derivedDA->getParameterIndices();
     auto overrides = true;
     for (auto baseDA : baseDAs) {
-      if (!baseDA->getParameterIndices())
-        continue;
-      auto baseParameters = AutoDiffIndexSubset::get(
-          ctx, baseDA->getParameterIndices()->parameters);
+      auto baseParameters = baseDA->getParameterIndices();
       // If the differentiable indices of `derivedDA` are a
       // subset of those of `baseDA`, then `baseDA` subsumes
       // `derivedDA` and the function is marked as overridden.
-      if (derivedParameters->isSubsetOf(baseParameters)) {
+      if (derivedParameters &&
+            baseParameters &&
+            AutoDiffIndexSubset::get(
+                ctx, derivedParameters->parameters)
+              ->isSubsetOf(AutoDiffIndexSubset::get(
+                  ctx, baseParameters->parameters))) {
         overrides = false;
         break;
       }
