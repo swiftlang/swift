@@ -784,7 +784,7 @@ bool RefactoringActionLocalRename::performChange() {
   CursorInfoResolver Resolver(*TheFile);
   ResolvedCursorInfo CursorInfo = Resolver.resolve(StartLoc);
   if (CursorInfo.isValid() && CursorInfo.ValueD) {
-    ValueDecl *VD = CursorInfo.ValueD;
+    ValueDecl *VD = CursorInfo.CtorTyRef ? CursorInfo.CtorTyRef : CursorInfo.ValueD;
     llvm::SmallVector<DeclContext *, 8> Scopes;
     analyzeRenameScope(VD, DiagEngine, Scopes);
     if (Scopes.empty())
@@ -3352,7 +3352,7 @@ int swift::ide::findLocalRenameRanges(
     Diags.diagnose(StartLoc, diag::unresolved_location);
     return true;
   }
-  ValueDecl *VD = CursorInfo.ValueD;
+  ValueDecl *VD = CursorInfo.CtorTyRef ? CursorInfo.CtorTyRef : CursorInfo.ValueD;
   llvm::SmallVector<DeclContext *, 8> Scopes;
   analyzeRenameScope(VD, Diags, Scopes);
   if (Scopes.empty())
