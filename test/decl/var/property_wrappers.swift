@@ -870,6 +870,22 @@ struct SR_10899_Usage {
   @SR_10899_Wrapper var thing: Bool // expected-error{{property type 'Bool' does not match that of the 'wrappedValue' property of its wrapper type 'SR_10899_Wrapper'}}
 }
 
+// SR-11061 / rdar://problem/52593304 assertion with DeclContext mismatches
+class SomeValue {
+	@SomeA(closure: { $0 }) var some: Int = 100
+}
+
+@propertyWrapper
+struct SomeA<T> {
+	var wrappedValue: T
+	let closure: (T) -> (T)
+
+	init(initialValue: T, closure: @escaping (T) -> (T)) {
+		self.wrappedValue = initialValue
+		self.closure = closure
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Property wrapper composition
 // ---------------------------------------------------------------------------
