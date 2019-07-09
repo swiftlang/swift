@@ -1966,13 +1966,9 @@ public:
             "assign instruction can only exist in raw SIL");
     require(Dest->getType().isAddress(), "Must store to an address dest");
 
-    unsigned indirectInitResults = Src->getType().isAddress() ? 1 : 0;
-
     SILValue initFn = AI->getInitializer();
     CanSILFunctionType initTy = initFn->getType().castTo<SILFunctionType>();
     SILFunctionConventions initConv(initTy, AI->getModule());
-    require(initConv.getNumIndirectSILResults() == indirectInitResults,
-            "init function has wrong number of indirect results");
     unsigned firstArgIdx = initConv.getSILArgIndexOfFirstParam();
     require(initConv.getNumSILArguments() == firstArgIdx + 1,
             "init function has wrong number of arguments");
