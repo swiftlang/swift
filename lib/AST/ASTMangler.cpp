@@ -799,8 +799,10 @@ void ASTMangler::appendType(Type type, const ValueDecl *forDecl) {
     case TypeKind::BuiltinVector:
       appendType(cast<BuiltinVectorType>(tybase)->getElementType(),
                  forDecl);
+      // The mangling calls for using the actual element count, which we have
+      // to adjust by 1 in order to mangle it as an index.
       return appendOperator("Bv",
-                            cast<BuiltinVectorType>(tybase)->getNumElements());
+                  Index(cast<BuiltinVectorType>(tybase)->getNumElements() + 1));
     case TypeKind::TypeAlias: {
       assert(DWARFMangling && "sugared types are only legal for the debugger");
       auto aliasTy = cast<TypeAliasType>(tybase);
@@ -2556,7 +2558,7 @@ void ASTMangler::appendDependentProtocolConformance(
       auto index =
         conformanceRequirementIndex(entry,
                                     CurGenericSignature->getRequirements());
-      appendOperator("HD", index + 1);
+      appendOperator("HD", Index(index + 2));
       continue;
     }
 
@@ -2571,7 +2573,7 @@ void ASTMangler::appendDependentProtocolConformance(
       entry.first->isEqual(currentProtocol->getProtocolSelfType());
     if (isInheritedConformance) {
       appendProtocolName(entry.second);
-      appendOperator("HI", index + 1);
+      appendOperator("HI", Index(index + 2));
       continue;
     }
 
@@ -2583,7 +2585,7 @@ void ASTMangler::appendDependentProtocolConformance(
     // For non-resilient protocols, encode the index.
     bool isResilient =
       currentProtocol->isResilient(Mod, ResilienceExpansion::Maximal);
-    appendOperator("HA", isResilient ? 0 : index + 1);
+    appendOperator("HA", Index(isResilient ? 1 : index + 2));
   }
 }
 
