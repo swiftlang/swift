@@ -68,14 +68,9 @@
 ///           return result
 ///         }
 ///       }
-///       init(nextElement: ResultElement?, base: Base, _ nextPartialResult: @escaping (ResultElement, Base.Element) -> ResultElement) {
-///         self.nextElement = nextElement
-///         self.base = base
-///         self.nextPartialResult = nextPartialResult
-///       }
-///       private var nextElement: ResultElement? // The next result of next().
-///       private var base: Base                  // The underlying iterator.
-///       private let nextPartialResult: (ResultElement, Base.Element) -> ResultElement
+///       var nextElement: ResultElement? // The next result of next().
+///       var base: Base                  // The underlying iterator.
+///       let nextPartialResult: (ResultElement, Base.Element) -> ResultElement
 ///     }
 ///     
 ///     struct LazyScanSequence<Base: Sequence, ResultElement>
@@ -83,21 +78,15 @@
 ///     {
 ///       func makeIterator() -> LazyScanIterator<Base.Iterator, ResultElement> {
 ///         return LazyScanIterator(
-///           nextElement: initial, base: base.makeIterator(), nextPartialResult)
+///           nextElement: initial, base: base.makeIterator(), nextPartialResult: nextPartialResult)
 ///       }
-///       init(initial: ResultElement, base: Base, _ nextPartialResult: @escaping (ResultElement, Base.Element) -> ResultElement) {
-///         self.initial = initial
-///         self.base = base
-///         self.nextPartialResult = nextPartialResult
-///       }
-///
-///       private let initial: ResultElement
-///       private let base: Base
-///       private let nextPartialResult:
+///       let initial: ResultElement
+///       let base: Base
+///       let nextPartialResult:
 ///         (ResultElement, Base.Element) -> ResultElement
 ///     }
 ///
-/// and finally, we can give all lazy sequences a lazy `scan` method:
+/// // and finally, we can give all lazy sequences a lazy `scan` method:
 ///     
 ///     extension LazySequenceProtocol {
 ///       /// Returns a sequence containing the results of
@@ -115,7 +104,7 @@
 ///         _ nextPartialResult: @escaping (ResultElement, Element) -> ResultElement
 ///       ) -> LazyScanSequence<Self, ResultElement> {
 ///         return LazyScanSequence(
-///           initial: initial, base: self, nextPartialResult)
+///           initial: initial, base: self, nextPartialResult: nextPartialResult)
 ///       }
 ///     }
 ///
