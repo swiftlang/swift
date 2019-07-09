@@ -4004,7 +4004,7 @@ private:
       assert(tanFieldLookup.size() == 1);
       auto *tanField = cast<VarDecl>(tanFieldLookup.front());
       return builder.createStructElementAddr(
-         seai->getLoc(), adjSource.getValue(), tanField);
+          seai->getLoc(), adjSource.getValue(), tanField);
     }
     // Handle `tuple_element_addr`.
     if (auto *teai = dyn_cast<TupleElementAddrInst>(originalProjection)) {
@@ -4649,50 +4649,45 @@ public:
     errorOccurred = true;
   }
 
-  AllocStackInst *emitDifferentiableViewSubscript(
-      ApplyInst *ai, SILType elType, SILValue adjointArray, SILValue fnRef,
-      CanGenericSignature genericSig, int index) {
+  AllocStackInst *
+  emitDifferentiableViewSubscript(ApplyInst *ai, SILType elType,
+                                  SILValue adjointArray, SILValue fnRef,
+                                  CanGenericSignature genericSig, int index) {
     auto &ctx = builder.getASTContext();
     auto astType = elType.getASTType();
     auto literal = builder.createIntegerLiteral(
         ai->getLoc(), SILType::getBuiltinIntegerType(64, ctx), index);
     auto intType = SILType::getPrimitiveObjectType(
         ctx.getIntDecl()->getDeclaredType()->getCanonicalType());
-    auto intStruct = builder.createStruct(
-        ai->getLoc(), intType, {literal});
-    AllocStackInst *subscriptBuffer = builder.createAllocStack(
-        ai->getLoc(), elType);
+    auto intStruct = builder.createStruct(ai->getLoc(), intType, {literal});
+    AllocStackInst *subscriptBuffer =
+        builder.createAllocStack(ai->getLoc(), elType);
     auto swiftModule = getModule().getSwiftModule();
-    auto diffProto =  ctx.getProtocol(KnownProtocolKind::Differentiable);
-    auto diffConf = swiftModule->lookupConformance(
-        astType, diffProto);
+    auto diffProto = ctx.getProtocol(KnownProtocolKind::Differentiable);
+    auto diffConf = swiftModule->lookupConformance(astType, diffProto);
     assert(diffConf.hasValue() && "Missing conformance to `Differentiable`");
     auto addArithProto = ctx.getProtocol(KnownProtocolKind::AdditiveArithmetic);
-    auto addArithConf = swiftModule->lookupConformance(
-        astType, addArithProto);
+    auto addArithConf = swiftModule->lookupConformance(astType, addArithProto);
     assert(addArithConf.hasValue() &&
            "Missing conformance to `AdditiveArithmetic`");
-    auto subMap = SubstitutionMap::get(
-        genericSig, {astType},
-        {*addArithConf, *diffConf});
-    auto subscriptApply = builder.createApply(
-        ai->getLoc(), fnRef, subMap,
-        {subscriptBuffer, intStruct, adjointArray});
+    auto subMap =
+        SubstitutionMap::get(genericSig, {astType}, {*addArithConf, *diffConf});
+    builder.createApply(ai->getLoc(), fnRef, subMap,
+                        {subscriptBuffer, intStruct, adjointArray});
     return subscriptBuffer;
   }
 
-  void accumulateDifferentiableViewSubscriptDirect(
-      ApplyInst *ai, SILType elType, StoreInst *si,
-      AllocStackInst *subscriptBuffer) {
+  void
+  accumulateDifferentiableViewSubscriptDirect(ApplyInst *ai, SILType elType,
+                                              StoreInst *si,
+                                              AllocStackInst *subscriptBuffer) {
     auto astType = elType.getASTType();
-    auto newAdjValue = builder.createLoad(
-        ai->getLoc(), subscriptBuffer, getBufferLOQ(astType, getPullback()));
-    addAdjointValue(
-        si->getParent(), si->getSrc(),
-        makeConcreteAdjointValue(ValueWithCleanup(
-                newAdjValue, makeCleanup(newAdjValue, emitCleanup))));
-    builder.createDeallocStack(
-        ai->getLoc(), subscriptBuffer);
+    auto newAdjValue = builder.createLoad(ai->getLoc(), subscriptBuffer,
+                                          getBufferLOQ(astType, getPullback()));
+    addAdjointValue(si->getParent(), si->getSrc(),
+                    makeConcreteAdjointValue(ValueWithCleanup(
+                        newAdjValue, makeCleanup(newAdjValue, emitCleanup))));
+    builder.createDeallocStack(ai->getLoc(), subscriptBuffer);
   }
 
   void accumulateDifferentiableViewSubscriptIndirect(
@@ -4701,10 +4696,9 @@ public:
         ai->getLoc(), subscriptBuffer, SILAccessKind::Read,
         SILAccessEnforcement::Static, /*noNestedConflict*/ true,
         /*fromBuiltin*/ false);
-    addToAdjointBuffer(
-        cai->getParent(), cai->getSrc(), subscriptBufferAccess);
-    builder.createEndAccess(
-        ai->getLoc(), subscriptBufferAccess, /*aborted*/ false);
+    addToAdjointBuffer(cai->getParent(), cai->getSrc(), subscriptBufferAccess);
+    builder.createEndAccess(ai->getLoc(), subscriptBufferAccess,
+                            /*aborted*/ false);
     builder.createDeallocStack(ai->getLoc(), subscriptBuffer);
   }
 
@@ -4712,8 +4706,6 @@ public:
     SILValue adjointArray;
     SILValue fnRef;
     CanGenericSignature genericSig;
-    auto lookupConformance = LookUpConformanceInModule(
-        getModule().getSwiftModule());
     for (auto use : ai->getUses()) {
       auto tei = dyn_cast<TupleExtractInst>(use->getUser()->getResult(0));
       if (!tei || tei->getFieldNo() != 0) continue;
@@ -5165,9 +5157,9 @@ public:
     }
   }
 
-  // Handle `load` instruction.
-  //   Original: y = load x
-  //    Adjoint: adj[x] += adj[y]
+  /// Handle `load` instruction.
+  ///   Original: y = load x
+  ///    Adjoint: adj[x] += adj[y]
   void visitLoadInst(LoadInst *li) {
     auto *bb = li->getParent();
     auto adjVal = materializeAdjointDirect(getAdjointValue(bb, li), li->getLoc());
@@ -5199,9 +5191,9 @@ public:
     builder.createDeallocStack(li->getLoc(), localBuf);
   }
 
-  // Handle `store` instruction.
-  //   Original: store x to y
-  //    Adjoint: adj[x] += load adj[y]; adj[y] = 0
+  /// Handle `store` instruction.
+  ///   Original: store x to y
+  ///    Adjoint: adj[x] += load adj[y]; adj[y] = 0
   void visitStoreInst(StoreInst *si) {
     auto *bb = si->getParent();
     auto &adjBuf = getAdjointBuffer(bb, si->getDest());
@@ -5222,9 +5214,9 @@ public:
     emitZeroIndirect(bufType.getASTType(), adjBuf, si->getLoc());
   }
 
-  // Handle `copy_addr` instruction.
-  //   Original: copy_addr x to y
-  //    Adjoint: adj[x] += adj[y]; adj[y] = 0
+  /// Handle `copy_addr` instruction.
+  ///   Original: copy_addr x to y
+  ///    Adjoint: adj[x] += adj[y]; adj[y] = 0
   void visitCopyAddrInst(CopyAddrInst *cai) {
     auto *bb = cai->getParent();
     auto &adjDest = getAdjointBuffer(bb, cai->getDest());
@@ -5250,9 +5242,9 @@ public:
     adjDest.setCleanup(cleanup);
   }
 
-  // Handle `begin_access` instruction.
-  //   Original: y = begin_access x
-  //    Adjoint: nothing
+  /// Handle `begin_access` instruction.
+  ///   Original: y = begin_access x
+  ///    Adjoint: nothing (differentiability checks, cleanup propagation)
   void visitBeginAccessInst(BeginAccessInst *bai) {
     // Check for non-differentiable writes.
     if (bai->getAccessKind() == SILAccessKind::Modify) {
@@ -5291,7 +5283,7 @@ public:
 #define NOT_DIFFERENTIABLE(INST, DIAG) \
   void visit##INST##Inst(INST##Inst *inst) { \
     getContext().emitNondifferentiabilityError( \
-        inst, getDifferentiationTask(), DIAG); \
+        inst, getInvoker(), DIAG); \
     errorOccurred = true; \
     return; \
   }
