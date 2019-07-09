@@ -164,7 +164,6 @@ func blah<T: DifferentiableDistribution>(_ x: T) -> Float where T.Value: Additiv
 // Adding a more general `@differentiable` attribute.
 public protocol DoubleDifferentiableDistribution: DifferentiableDistribution
   where Value: Differentiable {
-  @differentiable(wrt: self)
   @differentiable(wrt: (self, value))
   func logProbability(of value: Value) -> Float
 }
