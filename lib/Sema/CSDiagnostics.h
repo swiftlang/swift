@@ -168,6 +168,10 @@ protected:
   /// in the root expression or `nullptr` otherwise.
   Expr *findParentExpr(Expr *subExpr) const;
 
+  /// If given expression is some kind of a member reference e.g.
+  /// `x.foo` or `x[0]` extract and return its base expression.
+  Expr *getBaseExprFor(Expr *anchor) const;
+
   /// \returns An argument expression if given anchor is a call, member
   /// reference or subscript, nullptr otherwise.
   Expr *getArgumentExprFor(Expr *anchor) const;
@@ -708,16 +712,6 @@ private:
 
   static Diag<StringRef> findDeclDiagonstic(ASTContext &ctx, Expr *destExpr);
 
-  static bool isLoadedLValue(Expr *expr) {
-    expr = expr->getSemanticsProvidingExpr();
-    if (isa<LoadExpr>(expr))
-      return true;
-    if (auto ifExpr = dyn_cast<IfExpr>(expr))
-      return isLoadedLValue(ifExpr->getThenExpr()) &&
-             isLoadedLValue(ifExpr->getElseExpr());
-    return false;
-  }
-
   /// Retrive an member reference associated with given member
   /// looking through dynamic member lookup on the way.
   Optional<OverloadChoice> getMemberRef(ConstraintLocator *locator) const;
@@ -1152,6 +1146,30 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose an attempt to reference member marked as `mutating`
+/// on immutable base e.g. `let` variable:
+///
+/// ```swift
+/// struct S {
+///   mutating func foo(_ i: Int) {}
+///   func foo(_ f: Float) {}
+/// }
+///
+/// func bar(_ s: S, _ answer: Int) {
+///  s.foo(answer)
+/// }
+/// ```
+class MutatingMemberRefOnImmutableBase final : public FailureDiagnostic {
+  ValueDecl *Member;
+
+public:
+  MutatingMemberRefOnImmutableBase(Expr *root, ConstraintSystem &cs,
+                                   ValueDecl *member,
+                                   ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator), Member(member) {}
+
+  bool diagnoseAsError() override;
+};
 
 // Diagnose an attempt to use AnyObject as the root type of a KeyPath
 //

@@ -105,6 +105,20 @@ Expr *FailureDiagnostic::getArgumentExprFor(Expr *anchor) const {
   return nullptr;
 }
 
+Expr *FailureDiagnostic::getBaseExprFor(Expr *anchor) const {
+  if (!anchor)
+    return nullptr;
+
+  if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchor))
+    return UDE->getBase();
+  else if (auto *SE = dyn_cast<SubscriptExpr>(anchor))
+    return SE->getBase();
+  else if (auto *MRE = dyn_cast<MemberRefExpr>(anchor))
+    return MRE->getBase();
+
+  return nullptr;
+}
+
 Optional<SelectedOverload> FailureDiagnostic::getChoiceFor(Expr *expr) const {
   auto &cs = getConstraintSystem();
   return getOverloadChoiceIfAvailable(cs.getCalleeLocator(expr));
@@ -1484,13 +1498,11 @@ bool AssignmentFailure::diagnoseAsError() {
   }
 
   if (auto IE = dyn_cast<IfExpr>(immInfo.first)) {
-    if (isLoadedLValue(IE)) {
-      emitDiagnostic(Loc, DeclDiagnostic,
-                     "result of conditional operator '? :' is never mutable")
-          .highlight(IE->getQuestionLoc())
-          .highlight(IE->getColonLoc());
-      return true;
-    }
+    emitDiagnostic(Loc, DeclDiagnostic,
+                   "result of conditional operator '? :' is never mutable")
+        .highlight(IE->getQuestionLoc())
+        .highlight(IE->getColonLoc());
+    return true;
   }
 
   emitDiagnostic(Loc, TypeDiagnostic, getType(destExpr))
@@ -3458,4 +3470,26 @@ bool SkipUnhandledConstructInFunctionBuilderFailure::diagnoseAsError() {
 bool SkipUnhandledConstructInFunctionBuilderFailure::diagnoseAsNote() {
   diagnosePrimary(/*asNote=*/true);
   return true;
+}
+
+bool MutatingMemberRefOnImmutableBase::diagnoseAsError() {
+  auto *anchor = getRawAnchor();
+  auto baseExpr = getBaseExprFor(anchor);
+  if (!baseExpr)
+    return false;
+
+  auto diagIDsubelt = diag::cannot_pass_rvalue_mutating_subelement;
+  auto diagIDmember = diag::cannot_pass_rvalue_mutating;
+
+  if (auto *storage = dyn_cast<AbstractStorageDecl>(Member)) {
+    if (storage->isGetterMutating()) {
+      diagIDsubelt = diag::cannot_pass_rvalue_mutating_getter_subelement;
+      diagIDmember = diag::cannot_pass_rvalue_mutating_getter;
+    }
+  }
+
+  auto &cs = getConstraintSystem();
+  AssignmentFailure failure(baseExpr, cs, anchor->getLoc(), diagIDsubelt,
+                            diagIDmember);
+  return failure.diagnoseAsError();
 }

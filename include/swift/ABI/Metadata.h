@@ -2485,6 +2485,12 @@ struct TargetContextDescriptor {
               ? genericContext->getGenericContextHeader().NumParams
               : 0;
   }
+
+#ifndef NDEBUG
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const,
+                            "only for use in the debugger");
+#endif
+
 private:
   TargetContextDescriptor(const TargetContextDescriptor &) = delete;
   TargetContextDescriptor(TargetContextDescriptor &&) = delete;
@@ -3649,11 +3655,6 @@ public:
     return cd->getKind() >= ContextDescriptorKind::Type_First
         && cd->getKind() <= ContextDescriptorKind::Type_Last;
   }
-
-#ifndef NDEBUG
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const,
-                            "Only meant for use in the debugger");
-#endif
 };
 
 using TypeContextDescriptor = TargetTypeContextDescriptor<InProcess>;
