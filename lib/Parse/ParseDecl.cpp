@@ -197,7 +197,7 @@ void PersistentParserState::parseMembers(IterableDeclContext *IDC) {
   // diagnostic engine here.
   Parser TheParser(BufferID, SF, /*No Lexer Diags*/nullptr, nullptr, this);
   // Disable libSyntax creation in the delayed parsing.
-  TheParser.SyntaxContext->setDiscard();
+  TheParser.SyntaxContext->disable();
   TheParser.parseDeclListDelayed(IDC);
 }
 
@@ -4568,9 +4568,11 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags,
   if (peekToken().is(tok::r_brace)) {
     accessors.LBLoc = consumeToken(tok::l_brace);
     // Give syntax node an empty accessor list.
-    SourceLoc listLoc = accessors.LBLoc.getAdvancedLoc(1);
-    SyntaxContext->addSyntax(
-      ParsedSyntaxRecorder::makeBlankAccessorList(listLoc, *SyntaxContext));
+    if (SyntaxContext->isEnabled()) {
+      SourceLoc listLoc = accessors.LBLoc.getAdvancedLoc(1);
+      SyntaxContext->addSyntax(
+        ParsedSyntaxRecorder::makeBlankAccessorList(listLoc, *SyntaxContext));
+    }
     accessors.RBLoc = consumeToken(tok::r_brace);
 
     // In the limited syntax, fall out and let the caller handle it.
