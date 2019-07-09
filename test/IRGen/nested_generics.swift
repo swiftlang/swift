@@ -105,6 +105,8 @@ protocol HasAssoc {
   associatedtype Assoc
 }
 
+class SeparateGenericSuperclass<T> {}
+
 enum Container<T : TagProtocol> {
   class _Superclass {}
   // CHECK-CONSTANTS-LABEL: @"$s15nested_generics9ContainerO9_SubclassCMn" =
@@ -127,18 +129,23 @@ enum Container<T : TagProtocol> {
   // CHECK-CONSTANTS-SAME: @"symbolic _____yx_G 15nested_generics9ContainerO11_SuperclassC"
   class _Subclass2<U: Collection>: _Superclass where T == U.Element {}
 
-
   // CHECK-CONSTANTS-LABEL: @"$s15nested_generics9ContainerO10_Subclass3CMn" =
-  // FIXME: That "qd__" still causes problems: it's (depth: 1, index: 0), but
-  // the runtime doesn't count the parameters at depth 0 correctly.
   // CHECK-CONSTANTS-SAME: @"symbolic _____y______qd__G 15nested_generics9ContainerO18_GenericSuperclassC AA5OuterO"
   class _GenericSuperclass<U> {}
   class _Subclass3<U>: _GenericSuperclass<U> where T == Outer {}
 
+  class MoreNesting {
+    // CHECK-CONSTANTS-LABEL: @"$s15nested_generics9ContainerO11MoreNestingC9_SubclassCMn" =
+    // CHECK-CONSTANTS-SAME: @"symbolic _____y______G 15nested_generics9ContainerO11_SuperclassC AA5OuterO"
+    class _Subclass<U>: _Superclass where T == Outer {}
+  }
+
+  // CHECK-CONSTANTS-LABEL: @"$s15nested_generics9ContainerO24_SeparateGenericSubclassCMn" =
+  // CHECK-CONSTANTS-SAME: @"symbolic _____yxSgG 15nested_generics25SeparateGenericSuperclassC"
+  class _SeparateGenericSubclass: SeparateGenericSuperclass<T?> {}
+
   // CHECK-CONSTANTS-LABEL: @"$s15nested_generics9ContainerO6FieldsVMF" =
   // CHECK-CONSTANTS-SAME: @"symbolic _____ 15nested_generics5OuterO"
-  // FIXME: This still causes problems: it's (depth: 1, index: 0), but
-  // the runtime doesn't count the parameters at depth 0 correctly.
   // CHECK-CONSTANTS-SAME: @"symbolic qd__"
   struct Fields<U> where T == Outer {
     var x: T
@@ -146,8 +153,6 @@ enum Container<T : TagProtocol> {
   }
 
   // CHECK-CONSTANTS-LABEL: @"$s15nested_generics9ContainerO5CasesOMF" =
-  // FIXME: This still causes problems: it's (depth: 1, index: 0), but
-  // the runtime doesn't count the parameters at depth 0 correctly.
   // CHECK-CONSTANTS-SAME: @"symbolic qd__"
   enum Cases<U> where T == Outer {
     case a(T)
