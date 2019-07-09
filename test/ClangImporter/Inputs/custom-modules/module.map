@@ -36,6 +36,10 @@ module CoreCooling {
   export *
 }
 
+module CXXInterop {
+  header "cxx_interop.h"
+}
+
 module ctypes_bits_exported {
   header "ctypes_bits_exported.h"
   export *

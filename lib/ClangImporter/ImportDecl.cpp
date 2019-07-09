@@ -8399,7 +8399,7 @@ bool ClangImporter::Implementation::addMemberAndAlternatesToExtension(
   // Quickly check the context and bail out if it obviously doesn't
   // belong here.
   if (auto *importDC = newName.getEffectiveContext().getAsDeclContext())
-    if (importDC->isTranslationUnit())
+    if (importDC->isFileContext())
       return true;
 
   // Then try to import the decl under the specified name.
