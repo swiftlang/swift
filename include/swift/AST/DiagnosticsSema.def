@@ -4432,6 +4432,8 @@ NOTE(property_wrapper_declared_here,none,
 
 ERROR(property_wrapper_local,none,
       "property wrappers are not yet supported on local properties", ())
+ERROR(property_wrapper_top_level,none,
+      "property wrappers are not yet supported in top-level code", ())
 ERROR(property_wrapper_let, none,
       "property wrapper can only be applied to a 'var'",
       ())
