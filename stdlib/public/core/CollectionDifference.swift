@@ -154,8 +154,8 @@ public struct CollectionDifference<ChangeElement> {
   }
 
   /// Internal initializer for use by algorithms that cannot produce invalid
-  /// collections of changes. These include the Myers' diff algorithm and
-  /// the move inferencer.
+  /// collections of changes. These include the Myers' diff algorithm,
+  /// self.inverse(), and the move inferencer.
   ///
   /// If parameter validity cannot be guaranteed by the caller then
   /// `CollectionDifference.init?(_:)` should be used instead.
@@ -199,6 +199,17 @@ public struct CollectionDifference<ChangeElement> {
 
     removals = Array(sortedChanges[0..<firstInsertIndex])
     insertions = Array(sortedChanges[firstInsertIndex..<sortedChanges.count])
+  }
+
+  public func inverse() -> Self {
+    return CollectionDifference(_validatedChanges: self.map { c in
+      switch c {
+        case .remove(let o, let e, let a):
+          return .insert(offset: o, element: e, associatedWith: a)
+        case .insert(let o, let e, let a):
+          return .remove(offset: o, element: e, associatedWith: a)
+      }
+    })
   }
 }
 
