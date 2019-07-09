@@ -459,6 +459,25 @@ valueHasARCDecrementOrCheckInInstructionRange(SILValue Op,
 bool
 swift::
 mayGuaranteedUseValue(SILInstruction *User, SILValue Ptr, AliasAnalysis *AA) {
+  // Instructions that check the ref count are modeled as both a potential
+  // decrement and a use.
+  if (mayCheckRefCount(User)) {
+    switch (User->getKind()) {
+    case SILInstructionKind::IsUniqueInst:
+      // This instruction takes the address of its referent, so there's no way
+      // for the optimizer to reuse the reference across it (it appears to
+      // mutate the reference itself). In fact it's operand's RC root would be
+      // the parent object. This means we can ignore it as a direct RC user.
+      return false;
+    case SILInstructionKind::IsEscapingClosureInst:
+      // FIXME: this is overly conservative. It should return true only of the
+      // RC identity of the single operand matches Ptr.
+      return true;
+    default:
+      llvm_unreachable("Unexpected check-ref-count instruction.");
+    }
+  }
+
   // Only full apply sites can require a guaranteed lifetime. If we don't have
   // one, bail.
   if (!isa<FullApplySite>(User))
