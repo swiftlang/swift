@@ -3278,7 +3278,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   if (auto whereClause = attr->getWhereClause()) {
     // 'where' clauses in '@differentiable' attributes of protocol
     // requirements are not supported.
-    if (isa<ProtocolDecl>(original->getInnermostTypeContext())) {
+    if (original->isProtocolRequirement()) {
       TC.diagnose(attr->getLocation(),
                   diag::differentiable_attr_protocol_where_clause);
       attr->setInvalid();
