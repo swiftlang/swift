@@ -324,6 +324,7 @@ function(_add_variant_c_compile_flags)
   endif()
 
   if("${CFLAGS_SDK}" STREQUAL "ANDROID")
+    list(APPEND result -nostdinc++)
     swift_android_libcxx_include_paths(CFLAGS_CXX_INCLUDES)
     swift_android_include_for_arch("${CFLAGS_ARCH}" "${CFLAGS_ARCH}_INCLUDE")
     foreach(path IN LISTS CFLAGS_CXX_INCLUDES ${CFLAGS_ARCH}_INCLUDE)
