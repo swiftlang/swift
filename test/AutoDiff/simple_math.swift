@@ -79,7 +79,7 @@ SimpleMathTests.test("GlobalDiffableFunc") {
   expectEqual(2, gradient(at: 1, in: foo_diffable))
   expectEqual(2, gradient(at: 1, in: { x in foo_diffable(x) }))
   expectEqual(1, gradient(at: 1, in: { (x: Float) -> Float in
-    foo_diffable = { x in x + 1 };
+    foo_diffable = { x in x + 1 }
     return foo_diffable(x)
   }))
   expectEqual(1, gradient(at: 1, in: foo_diffable))
