@@ -675,6 +675,10 @@ public:
   /// the given module?
   bool isTypeMetadataAccessible(CanType type);
 
+  /// Can type metadata necessary for value operations for the given sil type be
+  /// fetched in the given module?
+  bool isTypeMetadataForLayoutAccessible(SILType type);
+
   /// Run the SIL verifier to make sure that all Functions follow
   /// invariants.
   void verify() const;
