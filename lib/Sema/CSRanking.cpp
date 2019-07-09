@@ -461,8 +461,16 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
       if (tc.Context.isSwiftVersionAtLeast(5) && !isDynamicOverloadComparison) {
         auto inProto1 = isa<ProtocolDecl>(outerDC1);
         auto inProto2 = isa<ProtocolDecl>(outerDC2);
-        if (inProto1 != inProto2)
-          return inProto2;
+        if (inProto1 != inProto2) {
+          // Class initializer could only be preferred vs. one from
+          // a protocol if it's marked as `required`.
+          if (auto *init1 = dyn_cast<ConstructorDecl>(decl1)) {
+            if (isa<ClassDecl>(outerDC1) && init1->isRequired())
+              return true;
+          } else {
+            return inProto2;
+          }
+        }
       }
 
       Type type1 = decl1->getInterfaceType();
