@@ -78,7 +78,8 @@
 ///     {
 ///       func makeIterator() -> LazyScanIterator<Base.Iterator, ResultElement> {
 ///         return LazyScanIterator(
-///           nextElement: initial, base: base.makeIterator(), nextPartialResult: nextPartialResult)
+///           nextElement: initial, base: base.makeIterator(),
+///           nextPartialResult: nextPartialResult)
 ///       }
 ///       let initial: ResultElement
 ///       let base: Base
