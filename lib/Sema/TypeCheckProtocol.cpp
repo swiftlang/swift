@@ -598,10 +598,8 @@ swift::matchWitness(
           auto *newAttr = DifferentiableAttr::create(
               ctx, /*implicit*/ true, reqDiffAttr->AtLoc,
               reqDiffAttr->getRange(), reqDiffAttr->isLinear(),
-              reqDiffAttr->getParameterIndices(), reqDiffAttr->getJVP(),
-              reqDiffAttr->getVJP(), reqDiffAttr->getRequirements());
-          newAttr->setJVPFunction(reqDiffAttr->getJVPFunction());
-          newAttr->setVJPFunction(reqDiffAttr->getVJPFunction());
+              reqDiffAttr->getParameterIndices(), /*jvp*/ None,
+              /*vjp*/ None, reqDiffAttr->getRequirements());
           auto insertion = ctx.DifferentiableAttrs.try_emplace(
               {witness, newAttr->getParameterIndices()}, newAttr);
           // Valid `@differentiable` attributes are uniqued by their parameter

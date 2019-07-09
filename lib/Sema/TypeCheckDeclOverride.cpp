@@ -594,7 +594,7 @@ static bool parameterTypesMatch(const ValueDecl *derivedDecl,
 // SWIFT_ENABLE_TENSORFLOW
 static bool overridesDifferentiableAttribute(ValueDecl *derivedDecl,
                                              ValueDecl *baseDecl) {
-  ASTContext &ctx = baseDecl->getASTContext();
+  ASTContext &ctx = derivedDecl->getASTContext();
   auto &diags = ctx.Diags;
 
   auto *derivedAFD = dyn_cast<AbstractFunctionDecl>(derivedDecl);
