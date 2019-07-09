@@ -15,11 +15,8 @@
 
 #include "llvm/ADT/PointerUnion.h"
 #include "swift/Basic/SourceLoc.h"
-#include "swift/Parse/HiddenLibSyntaxAction.h"
-#include "swift/Parse/LibSyntaxGenerator.h"
 #include "swift/Parse/ParsedRawSyntaxNode.h"
 #include "swift/Parse/ParsedRawSyntaxRecorder.h"
-#include "swift/Parse/ParsedSyntaxNodes.h"
 
 namespace swift {
 
@@ -77,7 +74,6 @@ constexpr size_t SyntaxAlignInBits = 3;
 ///     // Now the context holds { '(' Expr ')' }.
 ///     // From these parts, it creates ParenExpr node and add it to the parent.
 ///   }
-// todo [gsoc]: remove when/if possible
 class alignas(1 << SyntaxAlignInBits) SyntaxParsingContext {
 public:
   /// The shared data for all syntax parsing contexts with the same root.
@@ -98,15 +94,13 @@ public:
 
     ParsedRawSyntaxRecorder Recorder;
 
-    LibSyntaxGenerator LibSyntaxCreator;
-
     llvm::BumpPtrAllocator ScratchAlloc;
 
     RootContextData(SourceFile &SF, DiagnosticEngine &Diags,
                     SourceManager &SourceMgr, unsigned BufferID,
-                    const std::shared_ptr<HiddenLibSyntaxAction>& TwoActions)
+                    std::shared_ptr<SyntaxParseActions> spActions)
         : SF(SF), Diags(Diags), SourceMgr(SourceMgr), BufferID(BufferID),
-          Recorder(TwoActions), LibSyntaxCreator(TwoActions) {}
+          Recorder(std::move(spActions)) {}
   };
 
 private:
@@ -168,6 +162,9 @@ private:
   /// true if it's in backtracking context.
   bool IsBacktracking = false;
 
+  // If false, context does nothing.
+  bool Enabled;
+
   /// Create a syntax node using the tail \c N elements of collected parts and
   /// replace those parts with the single result.
   void createNodeInPlace(SyntaxKind Kind, size_t N,
@@ -185,19 +182,18 @@ private:
   Optional<ParsedRawSyntaxNode> bridgeAs(SyntaxContextKind Kind,
                               ArrayRef<ParsedRawSyntaxNode> Parts);
 
-  ParsedRawSyntaxNode finalizeSourceFile();
-
 public:
   /// Construct root context.
   SyntaxParsingContext(SyntaxParsingContext *&CtxtHolder, SourceFile &SF,
                        unsigned BufferID,
-                       std::shared_ptr<HiddenLibSyntaxAction> SPActions);
+                       std::shared_ptr<SyntaxParseActions> SPActions);
 
   /// Designated constructor for child context.
   SyntaxParsingContext(SyntaxParsingContext *&CtxtHolder)
       : RootDataOrParent(CtxtHolder), CtxtHolder(CtxtHolder),
         RootData(CtxtHolder->RootData), Offset(RootData->Storage.size()),
-        IsBacktracking(CtxtHolder->IsBacktracking) {
+        IsBacktracking(CtxtHolder->IsBacktracking),
+        Enabled(CtxtHolder->isEnabled()) {
     assert(CtxtHolder->isTopOfContextStack() &&
            "SyntaxParsingContext cannot have multiple children");
     assert(CtxtHolder->Mode != AccumulationMode::SkippedForIncrementalUpdate &&
@@ -225,6 +221,8 @@ public:
   /// offset. If nothing is found \c 0 is returned.
   size_t lookupNode(size_t LexerOffset, SourceLoc Loc);
 
+  void disable() { Enabled = false; }
+  bool isEnabled() const { return Enabled; }
   bool isRoot() const { return RootDataOrParent.is<RootContextData*>(); }
   bool isTopOfContextStack() const { return this == CtxtHolder; }
 
@@ -240,10 +238,6 @@ public:
 
   const std::vector<ParsedRawSyntaxNode> &getStorage() const {
     return getRootData()->Storage;
-  }
-
-  LibSyntaxGenerator &getSyntaxCreator() {
-    return getRootData()->LibSyntaxCreator;
   }
 
   const SyntaxParsingContext *getRoot() const;
@@ -264,21 +258,6 @@ public:
   /// Add Syntax to the parts.
   void addSyntax(ParsedSyntax Node);
 
-  template <SyntaxKind Kind>
-  bool isTopNode() {
-    return getStorage().back().getKind() == Kind;
-  }
-
-  /// Returns the topmost Syntax node.
-  template <typename SyntaxNode> SyntaxNode topNode() {
-    ParsedRawSyntaxNode TopNode = getStorage().back();
-
-    if (IsBacktracking)
-      return getSyntaxCreator().createNode<SyntaxNode>(TopNode);
-
-    OpaqueSyntaxNode OpaqueNode = TopNode.getOpaqueNode();
-    return getSyntaxCreator().getLibSyntaxNodeFor<SyntaxNode>(OpaqueNode);
-  }
 
   template<typename SyntaxNode>
   llvm::Optional<SyntaxNode> popIf() {
@@ -319,11 +298,6 @@ public:
   void setDeferSyntax(SyntaxKind Kind) {
     Mode = AccumulationMode::DeferSyntax;
     SynKind = Kind;
-  }
-
-  /// On destruction, do not attempt to finalize the root node.
-  void setDiscard() {
-    Mode = AccumulationMode::Discard;
   }
 
   /// On destruction, if the parts size is 1 and it's kind of \c Kind, just

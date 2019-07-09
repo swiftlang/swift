@@ -1166,10 +1166,12 @@ ParserResult<Pattern> Parser::parseMatchingPattern(bool isExprBasic) {
   if (subExpr.isNull())
     return status;
 
-  if (auto UPES = PatternCtx.popIf<ParsedUnresolvedPatternExprSyntax>()) {
-    PatternCtx.addSyntax(UPES->getDeferredPattern());
-  } else {
-    PatternCtx.setCreateSyntax(SyntaxKind::ExpressionPattern);
+  if (SyntaxContext->isEnabled()) {
+    if (auto UPES = PatternCtx.popIf<ParsedUnresolvedPatternExprSyntax>()) {
+      PatternCtx.addSyntax(UPES->getDeferredPattern());
+    } else {
+      PatternCtx.setCreateSyntax(SyntaxKind::ExpressionPattern);
+    }
   }
   // The most common case here is to parse something that was a lexically
   // obvious pattern, which will come back wrapped in an immediate

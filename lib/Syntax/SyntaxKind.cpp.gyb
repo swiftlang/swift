@@ -39,7 +39,9 @@ bool isTokenTextDetermined(tok kind) {
 }
 
 StringRef getTokenText(tok kind) {
-  return getTokenTextInternal(kind);
+  auto text = getTokenTextInternal(kind);
+  assert(!text.empty() && "token kind cannot be determined");
+  return text;
 }
 
 bool parserShallOmitWhenNoChildren(syntax::SyntaxKind Kind) {
