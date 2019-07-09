@@ -3490,7 +3490,6 @@ public:
     auto &module = context.getModule();
     auto origTy = original->getLoweredFunctionType();
     auto lookupConformance = LookUpConformanceInModule(module.getSwiftModule());
-    
 
     // RAII that pushes the original function's generic signature to
     // `module.Types` so that the calls `module.Types.getTypeLowering()` below
