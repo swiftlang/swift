@@ -3640,13 +3640,12 @@ public:
     assert(jvpResultArray.size() == 2 &&
            "Result of JVP can only be 2 elements");
     auto funcType = jvpResultArray[1].getType();
-    assert(funcType->is<SILFunctionType>() &&
-           "Second result must be a function");
     auto silFuncCanType = funcType->castTo<SILFunctionType>()->getCanonicalType();
-    
-    directResults.push_back(SILUndef::get(
-                                SILType::getPrimitiveObjectType(silFuncCanType),
-                                *jvp));
+
+    directResults.push_back(
+        SILUndef::get(jvp->mapTypeIntoContext(SILType::getPrimitiveObjectType(
+                                                  silFuncCanType)),
+                      *jvp));
     builder.createReturn(
         ri->getLoc(), joinElements(directResults, builder, loc));
   }
