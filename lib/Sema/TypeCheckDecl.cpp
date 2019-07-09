@@ -2153,19 +2153,6 @@ OpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
           : OpaqueReadOwnership::Owned);
 }
 
-static void validateAbstractStorageDecl(TypeChecker &TC,
-                                        AbstractStorageDecl *storage) {
-  if (storage->getOpaqueResultTypeDecl()) {
-    if (auto sf = storage->getInnermostDeclContext()->getParentSourceFile()) {
-      sf->markDeclWithOpaqueResultTypeAsValidated(storage);
-    }
-  }
-
-  // Everything else about the accessors can wait until finalization.
-  // This will validate all the accessors.
-  TC.DeclsToFinalize.insert(storage);
-}
-
 /// Check the requirements in the where clause of the given \c source
 /// to ensure that they don't introduce additional 'Self' requirements.
 static void checkProtocolSelfRequirements(ProtocolDecl *proto,
@@ -3975,8 +3962,11 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     checkDeclAttributesEarly(VD);
     validateAttributes(*this, VD);
 
-    // Perform accessor-related validation.
-    validateAbstractStorageDecl(*this, VD);
+    if (VD->getOpaqueResultTypeDecl()) {
+      if (auto SF = VD->getInnermostDeclContext()->getParentSourceFile()) {
+        SF->markDeclWithOpaqueResultTypeAsValidated(VD);
+      }
+    }
 
     break;
   }
@@ -4254,7 +4244,11 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     }
 
     // Perform accessor-related validation.
-    validateAbstractStorageDecl(*this, SD);
+    if (SD->getOpaqueResultTypeDecl()) {
+      if (auto SF = SD->getInnermostDeclContext()->getParentSourceFile()) {
+        SF->markDeclWithOpaqueResultTypeAsValidated(SD);
+      }
+    }
 
     break;
   }
@@ -4523,12 +4517,9 @@ static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
     forceConformance(TC.Context.getProtocol(KnownProtocolKind::Hashable));
   }
 
-  // validateDeclForNameLookup will not trigger an immediate full
-  // validation of protocols, but clients will assume that things
-  // like the requirement signature have been set.
   if (auto PD = dyn_cast<ProtocolDecl>(nominal)) {
-    (void)PD->getInheritedProtocols();
-    TC.validateDecl(PD);
+    for (auto *inherited : PD->getInheritedProtocols())
+      TC.requestNominalLayout(inherited);
   }
 }
 
