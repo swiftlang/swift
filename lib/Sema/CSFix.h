@@ -182,7 +182,7 @@ enum class FixKind : uint8_t {
 
   /// Allow invalid reference to a member declared as `mutating`
   /// when base is an r-value type.
-  AllowMutatingMemberOrRValueBase,
+  AllowMutatingMemberOnRValueBase,
 };
 
 class ConstraintFix {
@@ -862,11 +862,11 @@ private:
                                      ConstraintLocator *locator);
 };
 
-class AllowMutatingMemberOrRValueBase final : public AllowInvalidMemberRef {
-  AllowMutatingMemberOrRValueBase(ConstraintSystem &cs, Type baseType,
+class AllowMutatingMemberOnRValueBase final : public AllowInvalidMemberRef {
+  AllowMutatingMemberOnRValueBase(ConstraintSystem &cs, Type baseType,
                                   ValueDecl *member, DeclName name,
                                   ConstraintLocator *locator)
-      : AllowInvalidMemberRef(cs, FixKind::AllowMutatingMemberOrRValueBase,
+      : AllowInvalidMemberRef(cs, FixKind::AllowMutatingMemberOnRValueBase,
                               baseType, member, name, locator) {}
 
 public:
@@ -876,7 +876,7 @@ public:
 
   bool diagnose(Expr *root, bool asNote = false) const override;
 
-  static AllowMutatingMemberOrRValueBase *
+  static AllowMutatingMemberOnRValueBase *
   create(ConstraintSystem &cs, Type baseType, ValueDecl *member, DeclName name,
          ConstraintLocator *locator);
 };

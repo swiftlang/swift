@@ -4763,7 +4763,7 @@ fixMemberRef(ConstraintSystem &cs, Type baseTy,
     case MemberLookupResult::UR_MutatingMemberOnRValue:
     case MemberLookupResult::UR_MutatingGetterOnRValue: {
       return choice.isDecl()
-                 ? AllowMutatingMemberOrRValueBase::create(
+                 ? AllowMutatingMemberOnRValueBase::create(
                        cs, baseTy, choice.getDecl(), memberName, locator)
                  : nullptr;
     }
@@ -6935,7 +6935,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AllowInvalidRefInKeyPath:
   case FixKind::ExplicitlySpecifyGenericArguments:
   case FixKind::GenericArgumentsMismatch:
-  case FixKind::AllowMutatingMemberOrRValueBase:
+  case FixKind::AllowMutatingMemberOnRValueBase:
     llvm_unreachable("handled elsewhere");
   }
 

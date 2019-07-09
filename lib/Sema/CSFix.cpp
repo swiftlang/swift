@@ -644,16 +644,16 @@ bool SkipUnhandledConstructInFunctionBuilder::diagnose(Expr *root,
   return failure.diagnose(asNote);
 }
 
-bool AllowMutatingMemberOrRValueBase::diagnose(Expr *root, bool asNote) const {
+bool AllowMutatingMemberOnRValueBase::diagnose(Expr *root, bool asNote) const {
   auto &cs = getConstraintSystem();
   MutatingMemberRefOnImmutableBase failure(root, cs, getMember(), getLocator());
   return failure.diagnose(asNote);
 }
 
-AllowMutatingMemberOrRValueBase *
-AllowMutatingMemberOrRValueBase::create(ConstraintSystem &cs, Type baseType,
+AllowMutatingMemberOnRValueBase *
+AllowMutatingMemberOnRValueBase::create(ConstraintSystem &cs, Type baseType,
                                         ValueDecl *member, DeclName name,
                                         ConstraintLocator *locator) {
   return new (cs.getAllocator())
-      AllowMutatingMemberOrRValueBase(cs, baseType, member, name, locator);
+      AllowMutatingMemberOnRValueBase(cs, baseType, member, name, locator);
 }
