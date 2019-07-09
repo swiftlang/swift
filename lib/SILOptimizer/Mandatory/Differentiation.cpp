@@ -2942,7 +2942,8 @@ public:
         original->isDynamicallyReplaceable());
     pullback->setOwnershipEliminated();
     pullback->setDebugScope(new (module)
-                                SILDebugScope(original->getLocation(), pullback));
+                                SILDebugScope(original->getLocation(),
+                                              pullback));
     return pullback;
   }
 
@@ -3419,6 +3420,217 @@ public:
 
   void visitAutoDiffFunctionInst(AutoDiffFunctionInst *adfi) {
     // Clone `autodiff_function` from original to VJP, then add the cloned
+    // instruction to the `autodiff_function` worklist.
+    SILClonerWithScopes::visitAutoDiffFunctionInst(adfi);
+    auto *newADFI = cast<AutoDiffFunctionInst>(getOpValue(adfi));
+    context.getAutoDiffFunctionInsts().push_back(newADFI);
+  }
+};
+} // end anonymous namespace
+
+namespace {
+class JVPEmitter final
+    : public TypeSubstCloner<JVPEmitter, SILOptFunctionBuilder> {
+private:
+  /// The global context.
+  ADContext &context;
+
+  /// The original function.
+  SILFunction *const original;
+
+  /// The `[differentiable]` attribute.
+  SILDifferentiableAttr *const attr;
+
+  /// The JVP function.
+  SILFunction *const jvp;
+
+  /// The differential function.
+  SILFunction *differential;
+
+  /// The differentiation invoker.
+  DifferentiationInvoker invoker;
+
+  /// Caches basic blocks whose phi arguments have been remapped (adding a
+  /// predecessor enum argument).
+  SmallPtrSet<SILBasicBlock *, 4> remappedBasicBlocks;
+
+  /// Temporary boolean for determine whether we should be generating the body of the JVP.
+  /// If true, then skip the JVP generation process since we cannot generate JVPs for the
+  /// primitive VJPs defined on addition for Float for example.
+  bool vjpGenerated;
+
+  bool errorOccurred = false;
+
+  ASTContext &getASTContext() const { return jvp->getASTContext(); }
+  SILModule &getModule() const { return jvp->getModule(); }
+  const SILAutoDiffIndices &getIndices() const { return attr->getIndices(); }
+
+  static SubstitutionMap getSubstitutionMap(SILFunction *original,
+                                            SILFunction *jvp) {
+    auto substMap = original->getForwardingSubstitutionMap();
+    if (auto *jvpGenEnv = jvp->getGenericEnvironment())
+      substMap = substMap.subst(jvpGenEnv->getForwardingSubstitutionMap());
+    return substMap;
+  }
+
+public:
+  explicit JVPEmitter(ADContext &context, SILFunction *original,
+                      SILDifferentiableAttr *attr, SILFunction *jvp,
+                      DifferentiationInvoker invoker, bool vjpGenerated)
+      : TypeSubstCloner(*jvp, *original, getSubstitutionMap(original, jvp)),
+        context(context), original(original), attr(attr), jvp(jvp),
+        invoker(invoker),
+        vjpGenerated(vjpGenerated) {
+    // Create empty differential function.
+    differential = createEmptyDifferential();
+    context.getGeneratedFunctions().push_back(differential);
+  }
+
+  SILFunction *createEmptyDifferential() {
+    auto &module = context.getModule();
+    auto origTy = original->getLoweredFunctionType();
+    auto lookupConformance = LookUpConformanceInModule(module.getSwiftModule());
+
+    // RAII that pushes the original function's generic signature to
+    // `module.Types` so that the calls `module.Types.getTypeLowering()` below
+    // will know the original function's generic parameter types.
+    Lowering::GenericContextScope genericContextScope(
+        module.Types, origTy->getGenericSignature());
+
+    SmallVector<SILParameterInfo, 8> diffParams;
+    SmallVector<SILResultInfo, 8> diffResults;
+    auto origParams = origTy->getParameters();
+    auto indices = attr->getIndices();
+
+    // Add differential result for the seed.
+    auto origResInfo = origTy->getResults()[indices.source];
+    diffResults.push_back(SILResultInfo(
+                              origResInfo.getType()
+                                  ->getAutoDiffAssociatedTangentSpace(
+                                        lookupConformance)
+                                  ->getCanonicalType(),
+                              origResInfo.getConvention()));
+
+    // Add pullback results for the requested wrt parameters.
+    for (auto i : indices.parameters->getIndices()) {
+      auto origParam = origParams[i];
+      diffParams.push_back(SILParameterInfo(
+          origParam.getType()
+          ->getAutoDiffAssociatedTangentSpace(lookupConformance)
+          ->getCanonicalType(), origParam.getConvention()));
+    }
+
+    auto diffName = original->getASTContext()
+        .getIdentifier("AD__" + original->getName().str() + "__differential_" +
+                       indices.mangle())
+        .str();
+    auto diffGenericSig = getAssociatedFunctionGenericSignature(attr, original);
+    auto *diffGenericEnv = diffGenericSig
+        ? diffGenericSig->createGenericEnvironment()
+        : nullptr;
+    auto diffType = SILFunctionType::get(
+        diffGenericSig, origTy->getExtInfo(), origTy->getCoroutineKind(),
+        origTy->getCalleeConvention(), diffParams, {}, diffResults, None,
+        original->getASTContext());
+
+    SILOptFunctionBuilder fb(context.getTransform());
+    // The generated tangent linkage is set to Hidden because generated tangent
+    // are never called cross-module.
+    auto linkage = SILLinkage::Hidden;
+    auto *differential = fb.createFunction(
+        linkage, diffName, diffType, diffGenericEnv, original->getLocation(),
+        original->isBare(), IsNotTransparent, original->isSerialized(),
+        original->isDynamicallyReplaceable());
+    differential->setOwnershipEliminated();
+    differential->setDebugScope(new (module)
+                                    SILDebugScope(original->getLocation(),
+                                                  differential));
+    // Create empty body of differential.
+    auto diffConv = differential->getConventions();
+    auto *entry = differential->createBasicBlock();
+    createEntryArguments(differential);
+    // Return undef.
+    SILBuilder builder(entry);
+    auto loc = differential->getLocation();
+    builder.createReturn(loc, SILUndef::get(
+                                  differential->mapTypeIntoContext(
+                                      diffConv.getSILResultType()),
+                                  *differential));
+    return differential;
+  }
+
+  /// Run JVP generation. Returns true on error.
+  bool run();
+
+  void postProcess(SILInstruction *orig, SILInstruction *cloned) {
+    if (errorOccurred)
+      return;
+    SILClonerWithScopes::postProcess(orig, cloned);
+  }
+
+  /// Remap original basic blocks, adding predecessor enum arguments.
+  SILBasicBlock *remapBasicBlock(SILBasicBlock *bb) {
+    auto *jvpBB = BBMap[bb];
+    return jvpBB;
+  }
+
+  /// General visitor for all instructions. If any error is emitted by previous
+  /// visits, bail out.
+  void visit(SILInstruction *inst) {
+    if (errorOccurred)
+      return;
+    TypeSubstCloner::visit(inst);
+  }
+
+  void visitSILInstruction(SILInstruction *inst) {
+    context.emitNondifferentiabilityError(inst, invoker,
+        diag::autodiff_expression_not_differentiable_note);
+    errorOccurred = true;
+  }
+
+private:
+  /// Get the lowered SIL type of the given nominal type declaration.
+  SILType getNominalDeclLoweredType(NominalTypeDecl *nominal) {
+    auto nomType = getOpASTType(
+        nominal->getDeclaredInterfaceType()->getCanonicalType());
+    auto nomSILType = context.getTypeConverter().getLoweredType(
+        nomType, ResilienceExpansion::Minimal);
+    return nomSILType;
+  }
+
+public:
+  void visitReturnInst(ReturnInst *ri) {
+    auto loc = ri->getOperand().getLoc();
+    auto *origExit = ri->getParent();
+    auto &builder = getBuilder();
+
+    // Get the JVP value corresponding to the original functions's return value.
+    auto *origRetInst = cast<ReturnInst>(origExit->getTerminator());
+    auto origResult = getOpValue(origRetInst->getOperand());
+    SmallVector<SILValue, 8> origResults;
+    extractAllElements(origResult, builder, origResults);
+
+    // Return a tuple of the original result and an undef, which at some point
+    // will be the differential.
+    SmallVector<SILValue, 8> directResults;
+    directResults.append(origResults.begin(), origResults.end());
+
+    // Get differential result type.
+    auto jvpResultArray = jvp->getLoweredFunctionType()->getResults();
+    auto funcType = jvpResultArray.back().getType();
+    auto silFuncCanType = funcType->castTo<SILFunctionType>()
+                              ->getCanonicalType();
+
+    directResults.push_back(
+        SILUndef::get(jvp->mapTypeIntoContext(SILType::getPrimitiveObjectType(
+                                                  silFuncCanType)),
+                      *jvp));
+    builder.createReturn(
+        ri->getLoc(), joinElements(directResults, builder, loc));
+  }
+
+  void visitAutoDiffFunctionInst(AutoDiffFunctionInst *adfi) {
+    // Clone `autodiff_function` from original to JVP, then add the cloned
     // instruction to the `autodiff_function` worklist.
     SILClonerWithScopes::visitAutoDiffFunctionInst(adfi);
     auto *newADFI = cast<AutoDiffFunctionInst>(getOpValue(adfi));
@@ -5848,6 +6060,41 @@ bool VJPEmitter::run() {
   return errorOccurred;
 }
 
+bool JVPEmitter::run() {
+  LLVM_DEBUG(getADDebugStream()
+             << "Cloning original @" << original->getName()
+             << " to jvp @" << jvp->getName() << '\n');
+  // Create entry BB and arguments.
+  auto *entry = jvp->createBasicBlock();
+  createEntryArguments(jvp);
+
+  if (vjpGenerated) {
+    // Clone. Since the VJP was generated, the SIL code was verified for being
+    // differentiable, thus creating the original body of the JVP should also
+    // be possible.
+    SmallVector<SILValue, 4> entryArgs(entry->getArguments().begin(),
+                                       entry->getArguments().end());
+    cloneFunctionBody(original, entry, entryArgs);
+    // If errors occurred, back out.
+    if (errorOccurred)
+      return true;
+  } else {
+    // Create empty body of JVP if the user defined their own custom VJP.
+    // Return undef.
+    auto diffConv = jvp->getConventions();
+    SILBuilder builder(entry);
+    auto loc = jvp->getLocation();
+    builder.createReturn(loc, SILUndef::get(
+                                  jvp->mapTypeIntoContext(
+                                      diffConv.getSILResultType()),
+                              *jvp));
+  }
+
+  LLVM_DEBUG(getADDebugStream() << "Generated JVP for "
+             << original->getName() << ":\n" << *jvp);
+  return errorOccurred;
+}
+
 //===----------------------------------------------------------------------===//
 // `[differentiable]` attribute processing
 //===----------------------------------------------------------------------===//
@@ -5873,60 +6120,6 @@ ADContext::declareExternalAssociatedFunction(
   // Note: Setting debug scope prevents crashes during later transforms.
   assocFn->setDebugScope(new (module) SILDebugScope(originalLoc, assocFn));
   return assocFn;
-}
-
-static SILFunction* createJVP(
-    ADContext &context, SILFunction *original, SILDifferentiableAttr *attr,
-    bool isExported) {
-  auto &module = context.getModule();
-  auto &indices = attr->getIndices();
-  auto originalTy = original->getLoweredFunctionType();
-
-  // === Create an empty JVP. ===
-  auto jvpName = original->getASTContext()
-                     .getIdentifier("AD__" + original->getName().str() +
-                                    "__jvp_" + indices.mangle())
-                     .str();
-  auto jvpGenericSig = getAssociatedFunctionGenericSignature(attr, original);
-  auto *jvpGenericEnv = jvpGenericSig
-      ? jvpGenericSig->createGenericEnvironment()
-      : nullptr;
-
-  // RAII that pushes the original function's generic signature to
-  // `module.Types` so that the calls `module.Types.getTypeLowering()` below
-  // will know the JVP's generic parameter types.
-  Lowering::GenericContextScope genericContextScope(
-      module.Types, jvpGenericSig);
-
-  auto jvpType = originalTy->getAutoDiffAssociatedFunctionType(
-      indices.parameters, indices.source, /*differentiationOrder*/ 1,
-      AutoDiffAssociatedFunctionKind::JVP, module,
-      LookUpConformanceInModule(module.getSwiftModule()),
-      jvpGenericSig);
-
-  SILOptFunctionBuilder fb(context.getTransform());
-  auto linkage = autodiff::getAutoDiffAssociatedFunctionLinkage(
-      original->getLinkage(), isExported);
-  auto *jvp = fb.createFunction(linkage, jvpName, jvpType, jvpGenericEnv,
-                                original->getLocation(), original->isBare(),
-                                IsNotTransparent, original->isSerialized(),
-                                // IsNotTransparent, IsNotSerialized,
-                                original->isDynamicallyReplaceable());
-  jvp->setOwnershipEliminated();
-  jvp->setDebugScope(new (module) SILDebugScope(original->getLocation(), jvp));
-  attr->setJVPName(jvpName);
-
-  // Create JVP entry BB and arguments.
-  auto jvpConv = jvp->getConventions();
-  auto *entry = jvp->createBasicBlock();
-  createEntryArguments(jvp);
-  // Return undef.
-  SILBuilder builder(entry);
-  auto loc = jvp->getLocation();
-  builder.createReturn(
-      loc, SILUndef::get(jvp->mapTypeIntoContext(jvpConv.getSILResultType()),
-                         *jvp));
-  return jvp;
 }
 
 static SILFunction *createEmptyVJP(
@@ -5979,6 +6172,56 @@ static SILFunction *createEmptyVJP(
   return vjp;
 }
 
+static SILFunction *createEmptyJVP(
+    ADContext &context, SILFunction *original, SILDifferentiableAttr *attr,
+    bool isExported) {
+  LLVM_DEBUG({
+    auto &s = getADDebugStream();
+    s << "Creating JVP:\n\t";
+    s << "Original type: " << original->getLoweredFunctionType() << "\n\t";
+  });
+
+  auto &module = context.getModule();
+  auto originalTy = original->getLoweredFunctionType();
+  auto indices = attr->getIndices();
+
+  // === Create an empty JVP. ===
+  auto jvpName = original->getASTContext()
+  .getIdentifier("AD__" + original->getName().str() +
+                 "__jvp_" + indices.mangle())
+  .str();
+  auto jvpGenericSig = getAssociatedFunctionGenericSignature(attr, original);
+
+  // RAII that pushes the original function's generic signature to
+  // `module.Types` so that the calls `module.Types.getTypeLowering()` below
+  // will know the VJP's generic parameter types.
+  Lowering::GenericContextScope genericContextScope(
+      module.Types, jvpGenericSig);
+
+  auto *jvpGenericEnv = jvpGenericSig
+      ? jvpGenericSig->createGenericEnvironment()
+      : nullptr;
+  auto jvpType = originalTy->getAutoDiffAssociatedFunctionType(
+      indices.parameters, indices.source, /*differentiationOrder*/ 1,
+      AutoDiffAssociatedFunctionKind::JVP, module,
+      LookUpConformanceInModule(module.getSwiftModule()), jvpGenericSig);
+
+  SILOptFunctionBuilder fb(context.getTransform());
+  auto linkage = autodiff::getAutoDiffAssociatedFunctionLinkage(
+      original->getLinkage(), isExported);
+  auto *jvp = fb.createFunction(linkage, jvpName, jvpType, jvpGenericEnv,
+                                original->getLocation(), original->isBare(),
+                                IsNotTransparent, original->isSerialized(),
+                                original->isDynamicallyReplaceable());
+  jvp->setOwnershipEliminated();
+  jvp->setDebugScope(new (module) SILDebugScope(original->getLocation(), jvp));
+  attr->setJVPName(jvpName);
+
+  LLVM_DEBUG(llvm::dbgs() << "JVP type: " << jvp->getLoweredFunctionType()
+             << "\n");
+  return jvp;
+}
+
 /// Returns true on error.
 bool ADContext::processDifferentiableAttribute(
     SILFunction *original, SILDifferentiableAttr *attr,
@@ -5989,7 +6232,6 @@ bool ADContext::processDifferentiableAttribute(
   // create an external JVP reference.
   StringRef jvpName;
   SILFunction *jvp = nullptr;
-  SILFunction *vjp = nullptr;
   if (attr->hasJVP()) {
     jvpName = attr->getJVPName();
   } else if (original->isExternalDeclaration()) {
@@ -6006,10 +6248,17 @@ bool ADContext::processDifferentiableAttribute(
     attr->setJVPName(jvpName);
   }
 
+  // If differentiation is triggered by `[differentiable]`, associated function
+  // should share linkage of original function.
+  auto isAssocFnExported =
+      invoker.getKind() ==
+          DifferentiationInvoker::Kind::SILDifferentiableAttribute;
+
   // Try to look up VJP only if attribute specifies VJP name or if original
   // function is an external declaration. If VJP function cannot be found,
   // create an external VJP reference.
   StringRef vjpName;
+  SILFunction *vjp = nullptr;
   if (attr->hasVJP()) {
     vjpName = attr->getVJPName();
   } else if (original->isExternalDeclaration()) {
@@ -6026,31 +6275,41 @@ bool ADContext::processDifferentiableAttribute(
     attr->setVJPName(vjpName);
   }
 
-  // If differentiation is triggered by `[differentiable]`, associated function
-  // should share linkage of original function.
-  auto isAssocFnExported =
-      invoker.getKind() ==
-          DifferentiationInvoker::Kind::SILDifferentiableAttribute;
+  // If the JVP doesn't exist, need to synthesize it.
+  auto vjpGenerated = false;
+  if (!vjp) {
+    // Diagnose:
+    // - Functions with no return.
+    // - Functions with unsupported control flow.
+    if (diagnoseNoReturn(*this, original, invoker) ||
+        diagnoseUnsupportedControlFlow(*this, original, invoker))
+      return true;
+    
+    vjpGenerated = true;
+    vjp = createEmptyVJP(*this, original, attr, isAssocFnExported);
+    getGeneratedFunctions().push_back(vjp);
+    VJPEmitter emitter(*this, original, attr, vjp, invoker);
+    if (emitter.run()) {
+      return true;
+    }
+  }
+      
+  // If the JVP doesn't exist, need to synthesize it.
+  if (!jvp) {
+    // Diagnose:
+    // - Functions with no return.
+    // - Functions with unsupported control flow.
+    if (vjpGenerated && (diagnoseNoReturn(*this, original, invoker) ||
+        diagnoseUnsupportedControlFlow(*this, original, invoker)))
+      return true;
+    
+    jvp = createEmptyJVP(*this, original, attr, isAssocFnExported);
+    getGeneratedFunctions().push_back(jvp);
+    JVPEmitter emitter(*this, original, attr, jvp, invoker, vjpGenerated);
+    return emitter.run();
+  }
 
-  // Create empty JVP, if it does not exist.
-  if (!jvp)
-    createJVP(*this, original, attr, isAssocFnExported);
-
-  // If the VJP exists, then no synthesis is needed.
-  if (vjp)
-    return false;
-
-  // Diagnose:
-  // - Functions with no return.
-  // - Functions with unsupported control flow.
-  if (diagnoseNoReturn(*this, original, invoker) ||
-      diagnoseUnsupportedControlFlow(*this, original, invoker))
-    return true;
-
-  vjp = createEmptyVJP(*this, original, attr, isAssocFnExported);
-  getGeneratedFunctions().push_back(vjp);
-  VJPEmitter emitter(*this, original, attr, vjp, invoker);
-  return emitter.run();
+  return false;
 }
 
 //===----------------------------------------------------------------------===//
