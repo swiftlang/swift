@@ -2113,12 +2113,15 @@ IsSetterMutatingRequest::evaluate(Evaluator &evaluator,
     if (setter)
       result = setter->isMutating();
 
+
     // As a special extra check, if the user also gave us a modify
     // coroutine, check that it has the same mutatingness as the setter.
     // TODO: arguably this should require the spelling to match even when
     // it's the implied value.
-    if (impl.getReadWriteImpl() == ReadWriteImplKind::Modify) {
-      auto modifyAccessor = storage->getModifyCoroutine();
+    auto modifyAccessor = storage->getModifyCoroutine();
+
+    if (impl.getReadWriteImpl() == ReadWriteImplKind::Modify &&
+        modifyAccessor != nullptr) {
       auto modifyResult = modifyAccessor->isMutating();
       if ((result || storage->isGetterMutating()) != modifyResult) {
         modifyAccessor->diagnose(
