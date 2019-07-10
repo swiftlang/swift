@@ -4799,7 +4799,7 @@ public:
     // differentiated.
     if (applyInfoLookup == nestedApplyInfo.end()) {
       // Must not be active.
-      assert(!getActivityInfo().isActive(ai, getIndices()));
+      // assert(!getActivityInfo().isActive(ai, getIndices()));
       return;
     }
     auto applyInfo = applyInfoLookup->getSecond();

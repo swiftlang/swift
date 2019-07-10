@@ -530,6 +530,22 @@ private func flattenedSubscriptIndices(
   return pyTuple(indices.map { $0.pythonObject })
 }
 
+extension PythonObject: AdditiveArithmetic {
+  public static var zero: PythonObject {
+    0
+  }
+}
+
+extension PythonObject: Differentiable {
+  public typealias TangentVector = PythonObject
+  public typealias AllDifferentiableVariables = PythonObject
+  public mutating func move(along direction: PythonObject) {
+    self += direction
+  }
+}
+
+let jax = Python.import("jax")
+
 public extension PythonObject {
   subscript(dynamicMember memberName: String) -> PythonObject {
     get {
@@ -594,6 +610,26 @@ public extension PythonObject {
       fatalError("Could not convert PythonObject to a 4-element tuple")
     }
     return result
+  }
+
+  @differentiable(wrt: args, vjp: _vjpDynamicallyCall)
+  @discardableResult
+  func dynamicallyCall(
+    withArguments args: [PythonObject] = []
+  ) -> PythonObject {
+    try! throwing.dynamicallyCall(
+      withArguments: args as [PythonConvertible]
+    )
+  }
+
+  @usableFromInline
+  internal func _vjpDynamicallyCall(withArguments args: [PythonObject])
+    -> (value: PythonObject, 
+        pullback: (PythonObject) -> Array<PythonObject>.TangentVector) {
+    let (y, pb) = jax.vjp.dynamicallyCall(withArguments: [self] + args).tuple2
+    return (y, { v in 
+      .init(Array(Python.list(pb(v))))
+    })
   }
 
   /// Call `self` with the specified positional arguments.
