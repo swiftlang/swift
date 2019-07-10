@@ -141,4 +141,94 @@ struct N {
 }
 N.testPrivate()
 
+
+protocol STSTagProtocol {}
+struct STSOuter : STSTagProtocol {}
+
+enum STSContainer<T : STSTagProtocol> {
+  class Superclass {}
+  class Subclass<U>: Superclass where T == STSOuter {
+    class ExtraNested: Superclass {}
+  }
+
+  class GenericSuperclass<U> {}
+  class Subclass2<U>: GenericSuperclass<U> where T == STSOuter {}
+
+  class Subclass3<U: Collection>: Superclass where T == U.Element {}
+
+  class MoreNesting<X> {
+    class Subclass<U>: Superclass where T == STSOuter {}
+  }
+
+  struct Fields<U> where T == STSOuter {
+    var x: T?
+    var y: U?
+  }
+
+  enum Cases<U> where T == STSOuter {
+    case a(T)
+    case b(U)
+  }
+}
+
+// A new type with an easily-recognizable, easily-strippable suffix character.
+enum STSContainer℠<T : STSTagProtocol> {
+  class Superclass {}
+  class GenericSuperclass<U> {}
+}
+extension STSContainer℠ where T == STSOuter {
+  class Subclass<U>: Superclass {
+    class ExtraNested: Superclass {}
+  }
+
+  class Subclass2<U>: GenericSuperclass<U> {}
+
+  class MoreNesting<X> {
+    class Subclass<U>: Superclass {}
+  }
+
+  struct Fields<U> {
+    var x: T?
+    var y: U?
+  }
+
+  enum Cases<U> {
+    case a(T)
+    case b(U)
+  }
+}
+
+printType(STSContainer<STSOuter>.Subclass<Int>.self)
+printType(STSContainer℠<STSOuter>.Subclass<Int>.self)
+// CHECK: STSContainer<STSOuter>.Subclass<Int>{{$}}
+// CHECK: STSContainer℠<STSOuter>.Subclass<Int>{{$}}
+
+printType(STSContainer<STSOuter>.Subclass2<Int>.self)
+printType(STSContainer℠<STSOuter>.Subclass2<Int>.self)
+// CHECK: STSContainer<STSOuter>.Subclass2<Int>{{$}}
+// CHECK: STSContainer℠<STSOuter>.Subclass2<Int>{{$}}
+
+printType(STSContainer<STSOuter>.Subclass3<[STSOuter]>.self)
+// CHECK: STSContainer<STSOuter>.Subclass3<Array<STSOuter>>{{$}}
+
+printType(STSContainer<STSOuter>.Subclass<Int>.ExtraNested.self)
+printType(STSContainer℠<STSOuter>.Subclass<Int>.ExtraNested.self)
+// CHECK: STSContainer<STSOuter>.Subclass<Int>.ExtraNested{{$}}
+// CHECK: STSContainer℠<STSOuter>.Subclass<Int>.ExtraNested{{$}}
+
+printType(STSContainer<STSOuter>.MoreNesting<Bool>.Subclass<Int>.self)
+printType(STSContainer℠<STSOuter>.MoreNesting<Bool>.Subclass<Int>.self)
+// CHECK: STSContainer<STSOuter>.MoreNesting<Bool>.Subclass<Int>{{$}}
+// CHECK: STSContainer℠<STSOuter>.MoreNesting<Bool>.Subclass<Int>{{$}}
+
+printType(STSContainer<STSOuter>.Fields<Int>.self)
+printType(STSContainer℠<STSOuter>.Fields<Int>.self)
+// CHECK: STSContainer<STSOuter>.Fields<Int>{{$}}
+// CHECK: STSContainer℠<STSOuter>.Fields<Int>{{$}}
+
+printType(STSContainer<STSOuter>.Cases<Int>.self)
+printType(STSContainer℠<STSOuter>.Cases<Int>.self)
+// CHECK: STSContainer<STSOuter>.Cases<Int>{{$}}
+// CHECK: STSContainer℠<STSOuter>.Cases<Int>{{$}}
+
 stopRemoteAST()

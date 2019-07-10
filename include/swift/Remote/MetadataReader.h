@@ -2301,11 +2301,6 @@ private:
           if (!builtArg)
             return {};
           builtSubsts.push_back(builtArg);
-        } else {
-          // TODO: If the key argument has been concretized by a same-type
-          // constraint, that should be reflected in the built nominal type
-          // decl's generic constraints. This isn't handled correctly yet.
-          return {};
         }
         break;
         

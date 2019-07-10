@@ -1,7 +1,7 @@
 // REQUIRES: no_asan
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -Xfrontend -disable-availability-checking %S/Inputs/TypeLowering.swift -parse-as-library -emit-module -emit-library -module-name TypeLowering -o %t/%target-library-name(TypesToReflect)
-// RUN: %target-swift-reflection-dump -binary-filename %t/%target-library-name(TypesToReflect) -binary-filename %platform-module-dir/%target-library-name(swiftCore) -dump-type-lowering < %s | %FileCheck %s --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-reflection-dump -binary-filename %t/%target-library-name(TypesToReflect) -binary-filename %platform-module-dir/%target-library-name(swiftCore) -dump-type-lowering < %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 12TypeLowering11BasicStructV
 // CHECK-64:      (struct TypeLowering.BasicStruct)
@@ -1188,3 +1188,56 @@ BO
 // CHECK-32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-32-NEXT:       (field name=_value offset=0
 // CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1)))))
+
+12TypeLowering12STSContainerO8SubclassCyAA8STSOuterV_SiG
+// CHECK-LABEL: (bound_generic_class TypeLowering.STSContainer.Subclass
+//  CHECK-NEXT:   (struct Swift.Int)
+//  CHECK-NEXT:   (bound_generic_enum TypeLowering.STSContainer
+//  CHECK-NEXT:     (struct TypeLowering.STSOuter)))
+//  CHECK-NEXT: (reference kind=strong refcounting=native)
+
+12TypeLowering0017STSContainer_swCgOA2A8STSOuterVRszrlE8SubclassCyAE_SiG
+// CHECK-LABEL: (bound_generic_class (extension in TypeLowering):TypeLowering.STSContainer℠< where A == TypeLowering.STSOuter>.Subclass
+//  CHECK-NEXT:   (struct Swift.Int)
+//  CHECK-NEXT:   (bound_generic_enum TypeLowering.STSContainer℠
+//  CHECK-NEXT:     (struct TypeLowering.STSOuter)))
+//  CHECK-NEXT: (reference kind=strong refcounting=native)
+
+12TypeLowering12STSContainerO9Subclass2CyAA8STSOuterV_SiG
+// CHECK-LABEL: (bound_generic_class TypeLowering.STSContainer.Subclass2
+//  CHECK-NEXT:   (struct Swift.Int)
+//  CHECK-NEXT:   (bound_generic_enum TypeLowering.STSContainer
+//  CHECK-NEXT:     (struct TypeLowering.STSOuter)))
+//  CHECK-NEXT: (reference kind=strong refcounting=native)
+
+12TypeLowering0017STSContainer_swCgOA2A8STSOuterVRszrlE9Subclass2CyAE_SiG
+// CHECK-LABEL: (bound_generic_class (extension in TypeLowering):TypeLowering.STSContainer℠< where A == TypeLowering.STSOuter>.Subclass2
+//  CHECK-NEXT:   (struct Swift.Int)
+//  CHECK-NEXT:   (bound_generic_enum TypeLowering.STSContainer℠
+//  CHECK-NEXT:     (struct TypeLowering.STSOuter)))
+//  CHECK-NEXT: (reference kind=strong refcounting=native)
+
+12TypeLowering12STSContainerO9Subclass3CyAA8STSOuterV_SayAGGG
+// CHECK-LABEL: (bound_generic_class TypeLowering.STSContainer.Subclass3
+//  CHECK-NEXT:   (bound_generic_struct Swift.Array
+//  CHECK-NEXT:     (struct TypeLowering.STSOuter))
+//  CHECK-NEXT:   (bound_generic_enum TypeLowering.STSContainer
+//  CHECK-NEXT:     (struct TypeLowering.STSOuter)))
+//  CHECK-NEXT: (reference kind=strong refcounting=native)
+
+s13nominal_types12STSContainerO8SubclassC11ExtraNestedCyAA8STSOuterV_Si_G
+// CHECK-LABEL: FIXME: finish the rest of these once the above ones are working
+
+s13nominal_types0017STSContainer_swCgOA2A8STSOuterVRszrlE8SubclassC11ExtraNestedCyAE_Si_G
+
+s13nominal_types12STSContainerO11MoreNestingC8SubclassCyAA8STSOuterV_Sb_SiG
+
+s13nominal_types0017STSContainer_swCgOA2A8STSOuterVRszrlE11MoreNestingC8SubclassCyAE_Sb_SiG
+
+s13nominal_types12STSContainerO6FieldsVyAA8STSOuterV_SiG
+
+s13nominal_types0017STSContainer_swCgOA2A8STSOuterVRszrlE6FieldsVyAE_SiG
+
+s13nominal_types12STSContainerO5CasesOyAA8STSOuterV_SiG
+
+s13nominal_types0017STSContainer_swCgOA2A8STSOuterVRszrlE5CasesOyAE_SiG

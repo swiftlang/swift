@@ -272,3 +272,60 @@ public struct RefersToOtherAssocType {
   var x: OpaqueWitness.A
   var y: OpaqueWitness.A
 }
+
+
+public protocol STSTagProtocol {}
+public struct STSOuter : STSTagProtocol {}
+
+public enum STSContainer<T : STSTagProtocol> {
+  public class Superclass {}
+  public class Subclass<U>: Superclass where T == STSOuter {
+    public class ExtraNested: Superclass {}
+  }
+
+  public class GenericSuperclass<U> {}
+  public class Subclass2<U>: GenericSuperclass<U> where T == STSOuter {}
+
+  public class Subclass3<U: Collection>: Superclass where T == U.Element {}
+
+  public class MoreNesting<X> {
+    public class Subclass<U>: Superclass where T == STSOuter {}
+  }
+
+  public struct Fields<U> where T == STSOuter {
+    var x: T?
+    var y: U?
+  }
+
+  public enum Cases<U> where T == STSOuter {
+    case a(T)
+    case b(U)
+  }
+}
+
+// A new type with an easily-recognizable, easily-strippable suffix character.
+public enum STSContainer℠<T : STSTagProtocol> {
+  public class Superclass {}
+  public class GenericSuperclass<U> {}
+}
+extension STSContainer℠ where T == STSOuter {
+  public class Subclass<U>: Superclass {
+    public class ExtraNested: Superclass {}
+  }
+
+  public class Subclass2<U>: GenericSuperclass<U> {}
+
+  public class MoreNesting<X> {
+    public class Subclass<U>: Superclass {}
+  }
+
+  public struct Fields<U> {
+    var x: T?
+    var y: U?
+  }
+
+  public enum Cases<U> {
+    case a(T)
+    case b(U)
+  }
+}
