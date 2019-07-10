@@ -233,6 +233,7 @@ class Remangler : public RemanglerBase {
       Buffer << (value - 1) << '_';
     }
   }
+  void mangleDependentConformanceIndex(Node *node);
 
   void mangleChildNodes(Node *node) {
     mangleNodes(node->begin(), node->end());
@@ -1340,6 +1341,10 @@ void Remangler::mangleIndex(Node *node) {
   unreachable("handled inline");
 }
 
+void Remangler::mangleUnknownIndex(Node *node) {
+  unreachable("handled inline");
+}
+
 void Remangler::mangleIVarInitializer(Node *node) {
   mangleSingleChildNode(node);
   Buffer << "fe";
@@ -1755,14 +1760,14 @@ void Remangler::mangleDependentProtocolConformanceRoot(Node *node) {
   mangleType(node->getChild(0));
   manglePureProtocol(node->getChild(1));
   Buffer << "HD";
-  mangleIndex(node->hasIndex() ? node->getIndex() + 1 : 0);
+  mangleDependentConformanceIndex(node->getChild(2));
 }
 
 void Remangler::mangleDependentProtocolConformanceInherited(Node *node) {
   mangleAnyProtocolConformance(node->getChild(0));
   manglePureProtocol(node->getChild(1));
   Buffer << "HI";
-  mangleIndex(node->hasIndex() ? node->getIndex() + 1 : 0);
+  mangleDependentConformanceIndex(node->getChild(2));
 }
 
 void Remangler::mangleDependentAssociatedConformance(Node *node) {
@@ -1774,7 +1779,14 @@ void Remangler::mangleDependentProtocolConformanceAssociated(Node *node) {
   mangleAnyProtocolConformance(node->getChild(0));
   mangleDependentAssociatedConformance(node->getChild(1));
   Buffer << "HA";
-  mangleIndex(node->hasIndex() ? node->getIndex() + 1 : 0);
+  mangleDependentConformanceIndex(node->getChild(2));
+}
+
+void Remangler::mangleDependentConformanceIndex(Node *node) {
+  assert(node->getKind() == Node::Kind::Index ||
+         node->getKind() == Node::Kind::UnknownIndex);
+  assert(node->hasIndex() == (node->getKind() == Node::Kind::Index));
+  mangleIndex(node->hasIndex() ? node->getIndex() + 2 : 1);
 }
 
 void Remangler::mangleAnyProtocolConformance(Node *node) {
