@@ -7,7 +7,7 @@ struct Wrapper<Value> {
     set { self = newValue }
   }
 
-  init(initialValue: Value) {
+  init(wrappedValue initialValue: Value) {
     wrappedValue = initialValue
   }
 }

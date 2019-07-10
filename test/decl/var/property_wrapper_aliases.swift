@@ -45,3 +45,28 @@ struct OldWrapper<T> {
     return Wrapper(wrappedValue: wrappedValue)
   }
 }
+
+@propertyWrapper
+struct OldWrapperWithInit<T> {
+  var wrappedValue: T
+
+  init(initialValue: T) { // expected-warning{{property wrapper's `init(initialValue:)` should be renamed to 'init(wrappedValue:)'; use of 'init(initialValue:)' is deprecated}}{{8-8=wrappedValue }}
+    self.wrappedValue = initialValue
+  }
+}
+
+@propertyWrapper
+struct OldWrapperWithInit2<T> {
+  var wrappedValue: T
+
+  init(initialValue value: T) { // expected-warning{{property wrapper's `init(initialValue:)` should be renamed to 'init(wrappedValue:)'; use of 'init(initialValue:)' is deprecated}}{{8-20=wrappedValue}}
+    self.wrappedValue = value
+  }
+}
+
+
+struct TestOldWrapperInits {
+  @OldWrapperWithInit var x = 17
+  
+  @OldWrapperWithInit2 var y = "Hello"
+}

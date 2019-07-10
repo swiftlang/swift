@@ -21,6 +21,7 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/NameLookupRequests.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/TypeCheckRequests.h"
 using namespace swift;
@@ -85,14 +86,14 @@ static VarDecl *findValueProperty(ASTContext &ctx, NominalTypeDecl *nominal,
   return var;
 }
 
-/// Determine whether we have a suitable init(initialValue:) within a property
-/// wrapper type.
+/// Determine whether we have a suitable wrapped-value initializer within
+/// a property wrapper type.
 static ConstructorDecl *findInitialValueInit(ASTContext &ctx,
                                              NominalTypeDecl *nominal,
-                                             VarDecl *valueVar) {
+                                             VarDecl *valueVar,
+                                             Identifier argumentLabel) {
   SmallVector<ConstructorDecl *, 2> initialValueInitializers;
-  DeclName initName(ctx, DeclBaseName::createConstructor(),
-                    {ctx.Id_initialValue});
+  DeclName initName(ctx, DeclBaseName::createConstructor(), {argumentLabel});
   SmallVector<ValueDecl *, 2> decls;
   nominal->lookupQualified(nominal, initName, NL_QualifiedDefault, decls);
   for (const auto &decl : decls) {
@@ -111,7 +112,7 @@ static ConstructorDecl *findInitialValueInit(ASTContext &ctx,
     break;
 
   default:
-    // Diagnose ambiguous init(initialValue:) initializers.
+    // Diagnose ambiguous initializers.
     nominal->diagnose(diag::property_wrapper_ambiguous_initial_value_init,
                       nominal->getDeclaredType());
     for (auto init : initialValueInitializers) {
@@ -121,7 +122,7 @@ static ConstructorDecl *findInitialValueInit(ASTContext &ctx,
     return nullptr;
   }
 
-  // 'init(initialValue:)' must be as accessible as the nominal type.
+  // The initializer must be as accessible as the nominal type.
   auto init = initialValueInitializers.front();
   if (init->getFormalAccess() < nominal->getFormalAccess()) {
     init->diagnose(diag::property_wrapper_type_requirement_not_accessible,
@@ -160,8 +161,8 @@ static ConstructorDecl *findInitialValueInit(ASTContext &ctx,
   // The parameter type must be the same as the type of `valueVar` or an
   // autoclosure thereof.
   if (!paramType->isEqual(valueVarType)) {
-    init->diagnose(diag::property_wrapper_wrong_initial_value_init, paramType,
-                   valueVarType);
+    init->diagnose(diag::property_wrapper_wrong_initial_value_init, initName,
+                   paramType, valueVarType);
     valueVar->diagnose(diag::decl_declared_here, valueVar->getFullName());
     return nullptr;
   }
@@ -322,8 +323,10 @@ PropertyWrapperTypeInfoRequest::evaluate(
       return PropertyWrapperTypeInfo();
     }
 
-    valueVar->diagnose(diag::property_wrapper_value)
-      .fixItReplace(valueVar->getNameLoc(), "wrappedValue");
+    if (valueVar->getLoc().isValid()) {
+      valueVar->diagnose(diag::property_wrapper_value)
+        .fixItReplace(valueVar->getNameLoc(), "wrappedValue");
+    }
   }
 
   if (!valueVar->hasInterfaceType())
@@ -331,7 +334,25 @@ PropertyWrapperTypeInfoRequest::evaluate(
 
   PropertyWrapperTypeInfo result;
   result.valueVar = valueVar;
-  result.initialValueInit = findInitialValueInit(ctx, nominal, valueVar);
+  result.wrappedValueInit =
+      findInitialValueInit(ctx, nominal, valueVar, ctx.Id_wrappedValue);
+
+  if (!result.wrappedValueInit) {
+    // Look for the older name init(initialValue:).
+    result.wrappedValueInit =
+      findInitialValueInit(ctx, nominal, valueVar, ctx.Id_initialValue);
+    if (result.wrappedValueInit &&
+        result.wrappedValueInit->getLoc().isValid()) {
+      auto diag = result.wrappedValueInit->diagnose(
+          diag::property_wrapper_init_initialValue);
+      auto param = result.wrappedValueInit->getParameters()->get(0);
+      if (param->getArgumentNameLoc().isValid())
+        diag.fixItReplace(param->getArgumentNameLoc(), "wrappedValue");
+      else
+        diag.fixItInsert(param->getLoc(), "wrappedValue ");
+    }
+  }
+
   result.defaultInit = findDefaultInit(ctx, nominal);
   result.projectedValueVar =
     findValueProperty(ctx, nominal, ctx.Id_projectedValue,
@@ -348,14 +369,17 @@ PropertyWrapperTypeInfoRequest::evaluate(
       findValueProperty(ctx, nominal, ctx.Id_wrapperValue,
                         /*allowMissing=*/true);
     if (result.projectedValueVar) {
-      result.projectedValueVar->diagnose(diag::property_wrapper_wrapperValue)
-        .fixItReplace(result.projectedValueVar->getNameLoc(),
-                      "projectedValue");
+      if (result.projectedValueVar->getLoc().isValid()) {
+        result.projectedValueVar->diagnose(diag::property_wrapper_wrapperValue)
+          .fixItReplace(result.projectedValueVar->getNameLoc(),
+                        "projectedValue");
+      }
     } else {
       result.projectedValueVar =
           findValueProperty(ctx, nominal, ctx.Id_delegateValue,
                             /*allowMissing=*/true);
-      if (result.projectedValueVar) {
+      if (result.projectedValueVar &&
+          result.projectedValueVar->getLoc().isValid()) {
         result.projectedValueVar->diagnose(
             diag::property_wrapper_delegateValue)
           .fixItReplace(result.projectedValueVar->getNameLoc(),
@@ -643,7 +667,7 @@ Type swift::computeWrappedValueType(VarDecl *var, Type backingStorageType,
 Expr *swift::buildPropertyWrapperInitialValueCall(
     VarDecl *var, Type backingStorageType, Expr *value,
     bool ignoreAttributeArgs) {
-  // From the innermost wrapper type out, form init(initialValue:) calls.
+  // From the innermost wrapper type out, form init(wrapperValue:) calls.
   ASTContext &ctx = var->getASTContext();
   auto wrapperAttrs = var->getAttachedPropertyWrappers();
   Expr *initializer = value;
@@ -659,20 +683,26 @@ Expr *swift::buildPropertyWrapperInitialValueCall(
         wrapperType, ctx);
 
     // If there were no arguments provided for the attribute at this level,
-    // call `init(initialValue:)` directly.
+    // call `init(wrappedValue:)` directly.
     auto attr = wrapperAttrs[i];
     if (!attr->getArg() || ignoreAttributeArgs) {
+      Identifier argName = ctx.Id_wrappedValue;
+      if (auto init
+              = var->getAttachedPropertyWrapperTypeInfo(i).wrappedValueInit) {
+        argName = init->getFullName().getArgumentNames()[0];
+      }
+
       initializer = CallExpr::createImplicit(
-          ctx, typeExpr, {initializer}, {ctx.Id_initialValue});
+          ctx, typeExpr, {initializer}, {argName});
       continue;
     }
 
-    // Splice `initialValue:` into the argument list.
+    // Splice `wrappedValue:` into the argument list.
     SmallVector<Expr *, 4> elements;
     SmallVector<Identifier, 4> elementNames;
     SmallVector<SourceLoc, 4> elementLocs;
     elements.push_back(initializer);
-    elementNames.push_back(ctx.Id_initialValue);
+    elementNames.push_back(ctx.Id_wrappedValue);
     elementLocs.push_back(SourceLoc());
 
     if (auto tuple = dyn_cast<TupleExpr>(attr->getArg())) {
