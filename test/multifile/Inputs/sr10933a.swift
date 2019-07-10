@@ -10,5 +10,4 @@ class Wrapper<T> {
   init(defaultValue: T) {
     self._value = defaultValue
   }
-  
 }

@@ -617,6 +617,9 @@ PropertyWrapperBackingPropertyTypeRequest::evaluate(
     
     // Retrieve the type of the wrapped value.
     auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo(i);
+    if (!wrapperInfo)
+      return Type();
+
     valueMemberType = openedWrapperType->getTypeOfMember(
         dc->getParentModule(), wrapperInfo.valueVar);
   }
@@ -651,8 +654,17 @@ Type swift::computeWrappedValueType(VarDecl *var, Type backingStorageType,
   // Follow the chain of wrapped value properties.
   Type wrappedValueType = backingStorageType;
   DeclContext *dc = var->getDeclContext();
+  ASTContext &ctx = dc->getASTContext();
   for (unsigned i : range(realLimit)) {
     auto wrappedInfo = var->getAttachedPropertyWrapperTypeInfo(i);
+    if (!wrappedInfo)
+      return wrappedValueType;
+
+    if (!wrappedInfo.valueVar->hasInterfaceType()) {
+      static_cast<TypeChecker&>(*ctx.getLazyResolver()).validateDecl(
+          wrappedInfo.valueVar);
+    }
+    
     wrappedValueType = wrappedValueType->getTypeOfMember(
         dc->getParentModule(),
         wrappedInfo.valueVar,
