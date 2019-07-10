@@ -285,3 +285,46 @@ func prefer_readonly_keypath_over_reference_writable() {
   // CHECK-NEXT: function_ref @$s29keypath_dynamic_member_lookup14RefWritableBoxV0B6Memberqd__s7KeyPathCyxqd__G_tcluig
   _ = box.foo
 }
+
+
+// rdar://problem/52779809 - condiitional conformance shadows names of members reachable through dynamic lookup
+
+protocol P {
+  var foo: Int { get }
+}
+
+@dynamicMemberLookup struct Ref<T> {
+  var value: T
+
+  subscript<U>(dynamicMember member: KeyPath<T, U>) -> U {
+    get { return value[keyPath: member] }
+  }
+}
+
+extension P {
+  var foo: Int { return 42 }
+}
+
+struct S {
+  var foo: Int { return 0 }
+  var baz: Int { return 1 }
+}
+
+struct Q {
+  var bar: Int { return 1 }
+}
+
+extension Ref : P where T == Q {
+  var baz: String { return "hello" }
+}
+
+func rdar52779809(_ ref1: Ref<S>, _ ref2: Ref<Q>) {
+  // CHECK: function_ref @$s29keypath_dynamic_member_lookup3RefV0B6Memberqd__s7KeyPathCyxqd__G_tcluig
+  _ = ref1.foo // Ok
+  // CHECK: function_ref @$s29keypath_dynamic_member_lookup3RefV0B6Memberqd__s7KeyPathCyxqd__G_tcluig
+  _ = ref1.baz // Ok
+  // CHECK: function_ref @$s29keypath_dynamic_member_lookup1PPAAE3fooSivg
+  _ = ref2.foo // Ok
+  // CHECK: function_ref @$s29keypath_dynamic_member_lookup3RefV0B6Memberqd__s7KeyPathCyxqd__G_tcluig
+  _ = ref2.bar // Ok
+}
