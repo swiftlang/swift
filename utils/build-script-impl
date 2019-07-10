@@ -3555,8 +3555,6 @@ for host in "${ALL_HOSTS[@]}"; do
                             continue
                         ;;
                     esac
-                else
-                    INSTALL_TARGETS="install-lldb"
                 fi
                 ;;
             swiftpm)
