@@ -5503,7 +5503,7 @@ bool VarDecl::hasAttachedPropertyWrapper() const {
 /// Whether all of the attached property wrappers have an init(initialValue:) initializer.
 bool VarDecl::allAttachedPropertyWrappersHaveInitialValueInit() const {
   for (unsigned i : indices(getAttachedPropertyWrappers())) {
-    if (!getAttachedPropertyWrapperTypeInfo(i).initialValueInit)
+    if (!getAttachedPropertyWrapperTypeInfo(i).wrappedValueInit)
       return false;
   }
   
@@ -5919,7 +5919,8 @@ Expr *swift::findOriginalPropertyWrapperInitialValue(VarDecl *var,
         if (auto tuple = dyn_cast<TupleExpr>(call->getArg())) {
           ASTContext &ctx = innermostNominal->getASTContext();
           for (unsigned i : range(tuple->getNumElements())) {
-            if (tuple->getElementName(i) == ctx.Id_initialValue &&
+            if ((tuple->getElementName(i) == ctx.Id_wrappedValue ||
+                 tuple->getElementName(i) == ctx.Id_initialValue) &&
                 tuple->getElementNameLoc(i).isInvalid()) {
               initArg = tuple->getElement(i);
               return { false, E };

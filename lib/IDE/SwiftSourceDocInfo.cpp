@@ -377,7 +377,7 @@ bool NameMatcher::handleCustomAttrs(Decl *D) {
     if (auto *Repr = customAttr->getTypeLoc().getTypeRepr()) {
       // Note the associated call arguments of the semantic initializer call
       // in case we're resolving an explicit initializer call within the
-      // CustomAttr's type, e.g. on `Wrapper` in `@Wrapper(initialValue: 10)`.
+      // CustomAttr's type, e.g. on `Wrapper` in `@Wrapper(wrappedValue: 10)`.
       SWIFT_DEFER { CustomAttrArg = None; };
       if (Arg && !Arg->isImplicit())
         CustomAttrArg = {Repr->getLoc(), Arg};

@@ -2117,8 +2117,8 @@ bool isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl, TypeChecker &TC);
 Type computeWrappedValueType(VarDecl *var, Type backingStorageType,
                              Optional<unsigned> limit = None);
   
-/// Build a call to the init(initialValue:) initializers of the property wrappers, filling in the given
-/// \c value as the original value.
+/// Build a call to the init(wrappedValue:) initializers of the property
+/// wrappers, filling in the given \c value as the original value.
 Expr *buildPropertyWrapperInitialValueCall(VarDecl *var,
                                            Type backingStorageType,
                                            Expr *value,

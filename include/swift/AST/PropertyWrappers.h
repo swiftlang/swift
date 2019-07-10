@@ -35,12 +35,12 @@ struct PropertyWrapperTypeInfo {
   /// directed.
   VarDecl *valueVar = nullptr;
 
-  /// The initializer init(initialValue:) that will be called when the
+  /// The initializer init(wrappedValue:) that will be called when the
   /// initializing the property wrapper type from a value of the property type.
   ///
   /// This initializer is optional, but if present will be used for the `=`
   /// initialization syntax.
-  ConstructorDecl *initialValueInit = nullptr;
+  ConstructorDecl *wrappedValueInit = nullptr;
 
   /// The initializer `init()` that will be called to default-initialize a
   /// value with an attached property wrapper.
@@ -73,7 +73,7 @@ struct PropertyWrapperTypeInfo {
   friend bool operator==(const PropertyWrapperTypeInfo &lhs,
                          const PropertyWrapperTypeInfo &rhs) {
     return lhs.valueVar == rhs.valueVar &&
-        lhs.initialValueInit == rhs.initialValueInit;
+        lhs.wrappedValueInit == rhs.wrappedValueInit;
   }
 };
 
@@ -98,7 +98,7 @@ struct PropertyWrapperBackingPropertyInfo {
   Expr *originalInitialValue = nullptr;
 
   /// An expression that initializes the backing property from a value of
-  /// the original property's type (e.g., via `init(initialValue:)`), or
+  /// the original property's type (e.g., via `init(wrappedValue:)`), or
   /// \c NULL if the backing property can only be initialized directly.
   Expr *initializeFromOriginal = nullptr;
 

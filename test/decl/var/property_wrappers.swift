@@ -5,14 +5,23 @@
 // ---------------------------------------------------------------------------
 @propertyWrapper
 struct Wrapper<T> {
-  var wrappedValue: T
+  private var _stored: T
+  init(stored: T) {
+    self._stored = stored
+  }
+  
+  var wrappedValue: T {
+    get { _stored }
+    set { _stored = newValue }
+  }
+  
 }
 
 @propertyWrapper
 struct WrapperWithInitialValue<T> {
   var wrappedValue: T
 
-  init(initialValue: T) {
+  init(wrappedValue initialValue: T) {
     self.wrappedValue = initialValue
   }
 }
@@ -39,7 +48,7 @@ struct WrapperAcceptingAutoclosure<T> {
     return fn()
   }
 
-  init(initialValue fn: @autoclosure @escaping () -> T) {
+  init(wrappedValue fn: @autoclosure @escaping () -> T) {
     self.fn = fn
   }
 
@@ -75,7 +84,7 @@ struct NonVisibleValueWrapper<Value> {
 struct NonVisibleInitWrapper<Value> {
   var wrappedValue: Value
 
-  private init(initialValue: Value) { // expected-error{{private initializer 'init(initialValue:)' cannot have more restrictive access than its enclosing property wrapper type 'NonVisibleInitWrapper' (which is internal)}}
+  private init(wrappedValue initialValue: Value) { // expected-error{{private initializer 'init(wrappedValue:)' cannot have more restrictive access than its enclosing property wrapper type 'NonVisibleInitWrapper' (which is internal)}}
     self.wrappedValue = initialValue
   }
 }
@@ -84,7 +93,7 @@ struct NonVisibleInitWrapper<Value> {
 struct InitialValueTypeMismatch<Value> {
   var wrappedValue: Value // expected-note{{'wrappedValue' declared here}}
 
-  init(initialValue: Value?) { // expected-error{{'init(initialValue:)' parameter type ('Value?') must be the same as its 'wrappedValue' property type ('Value') or an @autoclosure thereof}}
+  init(wrappedValue initialValue: Value?) { // expected-error{{'init(wrappedValue:)' parameter type ('Value?') must be the same as its 'wrappedValue' property type ('Value') or an @autoclosure thereof}}
     self.wrappedValue = initialValue!
   }
 }
@@ -93,10 +102,10 @@ struct InitialValueTypeMismatch<Value> {
 struct MultipleInitialValues<Value> { // expected-error{{property wrapper type 'MultipleInitialValues' has multiple initial-value initializers}}
   var wrappedValue: Value? = nil
 
-  init(initialValue: Int) { // expected-note{{initializer 'init(initialValue:)' declared here}}
+  init(wrappedValue initialValue: Int) { // expected-note{{initializer 'init(wrappedValue:)' declared here}}
   }
 
-  init(initialValue: Double) { // expected-note{{initializer 'init(initialValue:)' declared here}}
+  init(wrappedValue initialValue: Double) { // expected-note{{initializer 'init(wrappedValue:)' declared here}}
   }
 }
 
@@ -104,7 +113,7 @@ struct MultipleInitialValues<Value> { // expected-error{{property wrapper type '
 struct InitialValueFailable<Value> {
   var wrappedValue: Value
 
-  init?(initialValue: Value) { // expected-error{{'init(initialValue:)' cannot be failable}}
+  init?(wrappedValue initialValue: Value) { // expected-error{{'init(wrappedValue:)' cannot be failable}}
     return nil
   }
 }
@@ -113,7 +122,7 @@ struct InitialValueFailable<Value> {
 struct InitialValueFailableIUO<Value> {
   var wrappedValue: Value
 
-  init!(initialValue: Value) {  // expected-error{{'init(initialValue:)' cannot be failable}}
+  init!(wrappedValue initialValue: Value) {  // expected-error{{'init(wrappedValue:)' cannot be failable}}
     return nil
   }
 }
@@ -145,20 +154,20 @@ func testLocalContext() {
 enum SomeEnum {
   case foo
 
-  @Wrapper(wrappedValue: 17)
+  @Wrapper(stored: 17)
   var bar: Int // expected-error{{property 'bar' declared inside an enum cannot have a wrapper}}
   // expected-error@-1{{enums must not contain stored properties}}
 
-  @Wrapper(wrappedValue: 17)
+  @Wrapper(stored: 17)
   static var x: Int
 }
 
 protocol SomeProtocol {
-  @Wrapper(wrappedValue: 17)
+  @Wrapper(stored: 17)
   var bar: Int // expected-error{{property 'bar' declared inside a protocol cannot have a wrapper}}
   // expected-error@-1{{property in protocol must have explicit { get } or { get set } specifier}}
 
-  @Wrapper(wrappedValue: 17)
+  @Wrapper(stored: 17)
   static var x: Int // expected-error{{property 'x' declared inside a protocol cannot have a wrapper}}
   // expected-error@-1{{property in protocol must have explicit { get } or { get set } specifier}}
 }
@@ -166,16 +175,16 @@ protocol SomeProtocol {
 struct HasWrapper { }
 
 extension HasWrapper {
-  @Wrapper(wrappedValue: 17)
+  @Wrapper(stored: 17)
   var inExt: Int // expected-error{{property 'inExt' declared inside an extension cannot have a wrapper}}
   // expected-error@-1{{extensions must not contain stored properties}}
 
-  @Wrapper(wrappedValue: 17)
+  @Wrapper(stored: 17)
   static var x: Int
 }
 
 class ClassWithWrappers {
-  @Wrapper(wrappedValue: 17)
+  @Wrapper(stored: 17)
   var x: Int
 }
 
@@ -191,7 +200,7 @@ class SubclassOfClassWithWrappers: ClassWithWrappers {
 }
 
 class SubclassWithWrapper: Superclass {
-  @Wrapper(wrappedValue: 17)
+  @Wrapper(stored: 17)
   override var x: Int { get { return 0 } set { } } // expected-error{{property 'x' with attached wrapper cannot override another property}}
 }
 
@@ -207,8 +216,8 @@ struct BadCombinations {
 }
 
 struct MultipleWrappers {
-  @Wrapper(wrappedValue: 17)
-  @WrapperWithInitialValue // expected-error{{extra argument 'initialValue' in call}}
+  @Wrapper(stored: 17)
+  @WrapperWithInitialValue // expected-error{{extra argument 'wrappedValue' in call}}
   var x: Int = 17
 
   @WrapperWithInitialValue // expected-error 2{{property wrapper can only apply to a single variable}}
@@ -220,16 +229,16 @@ struct MultipleWrappers {
 // ---------------------------------------------------------------------------
 
 struct Initialization {
-  @Wrapper(wrappedValue: 17)
+  @Wrapper(stored: 17)
   var x: Int
 
-  @Wrapper(wrappedValue: 17)
+  @Wrapper(stored: 17)
   var x2: Double
 
-  @Wrapper(wrappedValue: 17)
-  var x3 = 42 // expected-error{{extra argument 'initialValue' in call}}
+  @Wrapper(stored: 17)
+  var x3 = 42 // expected-error{{extra argument 'wrappedValue' in call}}
 
-  @Wrapper(wrappedValue: 17)
+  @Wrapper(stored: 17)
   var x4
 
   @WrapperWithInitialValue
@@ -252,7 +261,7 @@ struct Clamping<V: Comparable> {
   let min: V
   let max: V
 
-  init(initialValue: V, min: V, max: V) {
+  init(wrappedValue initialValue: V, min: V, max: V) {
     value = initialValue
     self.min = min
     self.max = max
@@ -351,7 +360,7 @@ struct HasNestedWrapper<T> {
   @propertyWrapper
   struct NestedWrapper<U> { // expected-note{{property wrapper type 'NestedWrapper' declared here}}
     var wrappedValue: U
-    init(initialValue: U) {
+    init(wrappedValue initialValue: U) {
       self.wrappedValue = initialValue
     }
   }
@@ -359,7 +368,7 @@ struct HasNestedWrapper<T> {
   @propertyWrapper
   struct ConcreteNestedWrapper {
     var wrappedValue: T
-    init(initialValue: T) {
+    init(wrappedValue initialValue: T) {
       self.wrappedValue = initialValue
     }
   }
@@ -448,7 +457,7 @@ struct WrapperWithNonMutatingSetter<Value> {
 
   var box: Box
 
-  init(initialValue: Value) {
+  init(wrappedValue initialValue: Value) {
     self.box = Box(wrappedValue: initialValue)
   }
 
@@ -464,7 +473,7 @@ struct WrapperWithMutatingGetter<Value> {
   var writeCount = 0
   var stored: Value
 
-  init(initialValue: Value) {
+  init(wrappedValue initialValue: Value) {
     self.stored = initialValue
   }
 
@@ -484,7 +493,7 @@ struct WrapperWithMutatingGetter<Value> {
 class ClassWrapper<Value> {
   var wrappedValue: Value
 
-  init(initialValue: Value) {
+  init(wrappedValue initialValue: Value) {
     self.wrappedValue = initialValue
   }
 }
@@ -542,7 +551,7 @@ struct HasPrivateWrapper<T> {
   @propertyWrapper
   private struct PrivateWrapper<U> { // expected-note{{type declared here}}
     var wrappedValue: U
-    init(initialValue: U) {
+    init(wrappedValue initialValue: U) {
       self.wrappedValue = initialValue
     }
   }
@@ -560,7 +569,7 @@ public struct HasUsableFromInlineWrapper<T> {
   @propertyWrapper
   struct InternalWrapper<U> { // expected-note{{type declared here}}
     var wrappedValue: U
-    init(initialValue: U) {
+    init(wrappedValue initialValue: U) {
       self.wrappedValue = initialValue
     }
   }
@@ -575,7 +584,7 @@ public struct HasUsableFromInlineWrapper<T> {
 class Box<Value> {
   private(set) var wrappedValue: Value
 
-  init(initialValue: Value) {
+  init(wrappedValue initialValue: Value) {
     self.wrappedValue = initialValue
   }
 }
@@ -612,17 +621,17 @@ func testMemberwiseInits() {
   // expected-error@+1{{type '(Wrapper<Bool>, Double) -> MemberwiseInits<Double>'}}
   let _: Int = MemberwiseInits<Double>.init
 
-  _ = MemberwiseInits(x: Wrapper(wrappedValue: true), y: 17)
+  _ = MemberwiseInits(x: Wrapper(stored: true), y: 17)
 }
 
 struct DefaultedMemberwiseInits {
-  @Wrapper(wrappedValue: true)
+  @Wrapper(stored: true)
   var x: Bool
 
   @WrapperWithInitialValue
   var y: Int = 17
 
-  @WrapperWithInitialValue(initialValue: 17)
+  @WrapperWithInitialValue(wrappedValue: 17)
   var z: Int
 
   @WrapperWithDefaultInit
@@ -644,27 +653,27 @@ struct CannotDefaultMemberwiseOptionalInit { // expected-note{{'init(x:)' declar
 func testDefaultedMemberwiseInits() {
   _ = DefaultedMemberwiseInits()
   _ = DefaultedMemberwiseInits(
-    x: Wrapper(wrappedValue: false),
+    x: Wrapper(stored: false),
     y: 42,
-    z: WrapperWithInitialValue(initialValue: 42))
+    z: WrapperWithInitialValue(wrappedValue: 42))
 
   _ = DefaultedMemberwiseInits(y: 42)
-  _ = DefaultedMemberwiseInits(x: Wrapper(wrappedValue: false))
-  _ = DefaultedMemberwiseInits(z: WrapperWithInitialValue(initialValue: 42))
+  _ = DefaultedMemberwiseInits(x: Wrapper(stored: false))
+  _ = DefaultedMemberwiseInits(z: WrapperWithInitialValue(wrappedValue: 42))
   _ = DefaultedMemberwiseInits(w: WrapperWithDefaultInit())
   _ = DefaultedMemberwiseInits(optViaDefaultInit: WrapperWithDefaultInit())
   _ = DefaultedMemberwiseInits(optViaInitialValue: nil)
   _ = DefaultedMemberwiseInits(optViaInitialValue: 42)
 
   _ = CannotDefaultMemberwiseOptionalInit() // expected-error{{missing argument for parameter 'x' in call}}
-  _ = CannotDefaultMemberwiseOptionalInit(x: Wrapper(wrappedValue: nil))
+  _ = CannotDefaultMemberwiseOptionalInit(x: Wrapper(stored: nil))
 }
 
 // ---------------------------------------------------------------------------
 // Default initializers
 // ---------------------------------------------------------------------------
 struct DefaultInitializerStruct {
-  @Wrapper(wrappedValue: true)
+  @Wrapper(stored: true)
   var x
 
   @WrapperWithInitialValue
@@ -677,7 +686,7 @@ struct NoDefaultInitializerStruct { // expected-note{{'init(x:)' declared here}}
 }
 
 class DefaultInitializerClass {
-  @Wrapper(wrappedValue: true)
+  @Wrapper(stored: true)
   var x
 
   @WrapperWithInitialValue
@@ -696,20 +705,20 @@ func testDefaultInitializers() {
 }
 
 struct DefaultedPrivateMemberwiseLets {
-  @Wrapper(wrappedValue: true)
+  @Wrapper(stored: true)
   private var x: Bool
 
   @WrapperWithInitialValue
   var y: Int = 17
 
-  @WrapperWithInitialValue(initialValue: 17)
+  @WrapperWithInitialValue(wrappedValue: 17)
   private var z: Int
 }
 
 func testDefaultedPrivateMemberwiseLets() {
   _ = DefaultedPrivateMemberwiseLets()
   _ = DefaultedPrivateMemberwiseLets(y: 42)
-  _ = DefaultedPrivateMemberwiseLets(x: Wrapper(wrappedValue: false)) // expected-error{{incorrect argument label in call (have 'x:', expected 'y:')}}
+  _ = DefaultedPrivateMemberwiseLets(x: Wrapper(stored: false)) // expected-error{{incorrect argument label in call (have 'x:', expected 'y:')}}
 }
 
 
@@ -721,7 +730,7 @@ struct WrapperWithStorageRef<T> {
   var wrappedValue: T
 
   var projectedValue: Wrapper<T> {
-    return Wrapper(wrappedValue: wrappedValue)
+    return Wrapper(stored: wrappedValue)
   }
 }
 
@@ -743,7 +752,7 @@ struct TestStorageRef {
 
     // x is mutable, $x is not
     x = 17
-    $x = Wrapper(wrappedValue: 42) // expected-error{{cannot assign to property: '$x' is immutable}}
+    $x = Wrapper(stored: 42) // expected-error{{cannot assign to property: '$x' is immutable}}
   }
 }
 
@@ -773,12 +782,12 @@ func testStorageRefPrivate() {
 struct InitialValueWrapperWithStorageRef<T> {
   var wrappedValue: T
 
-  init(initialValue: T) {
+  init(wrappedValue initialValue: T) {
     wrappedValue = initialValue
   }
 
   var projectedValue: Wrapper<T> {
-    return Wrapper(wrappedValue: wrappedValue)
+    return Wrapper(stored: wrappedValue)
   }
 }
 
@@ -793,7 +802,7 @@ struct TestProjectionValuePropertyAttr {
   @WrapperWithStorageRef var a: String
 
   var wrapperA: Wrapper<String> {
-    Wrapper(wrappedValue: "blah")
+    Wrapper(stored: "blah")
   }
 
   @_projectedValueProperty(wrapperB) // expected-error{{could not find projection value property 'wrapperB'}}
@@ -834,7 +843,7 @@ struct UsesExplicitClosures {
 struct PD<Value> {
   var wrappedValue: Value
 
-  init<A>(initialValue: Value, a: A) {
+  init<A>(wrappedValue initialValue: Value, a: A) {
     self.wrappedValue = initialValue
   }
 }
@@ -880,7 +889,7 @@ struct SomeA<T> {
 	var wrappedValue: T
 	let closure: (T) -> (T)
 
-	init(initialValue: T, closure: @escaping (T) -> (T)) {
+	init(wrappedValue initialValue: T, closure: @escaping (T) -> (T)) {
 		self.wrappedValue = initialValue
 		self.closure = closure
 	}
@@ -904,7 +913,7 @@ struct TestAlias {
 struct WrapperA<Value> {
   var wrappedValue: Value
 
-  init(initialValue: Value) {
+  init(wrappedValue initialValue: Value) {
     wrappedValue = initialValue
   }
 }
@@ -913,7 +922,7 @@ struct WrapperA<Value> {
 struct WrapperB<Value> {
   var wrappedValue: Value
 
-  init(initialValue: Value) {
+  init(wrappedValue initialValue: Value) {
     wrappedValue = initialValue
   }
 }
@@ -922,7 +931,7 @@ struct WrapperB<Value> {
 struct WrapperC<Value> {
   var wrappedValue: Value?
 
-  init(initialValue: Value?) {
+  init(wrappedValue initialValue: Value?) {
     wrappedValue = initialValue
   }
 }
@@ -960,7 +969,14 @@ struct TestComposition {
 // ---------------------------------------------------------------------------
 @propertyWrapper
 struct Foo<T> { // expected-note {{arguments to generic parameter 'T' ('W' and 'Int') are expected to be equal}}
-  var wrappedValue: T
+  var wrappedValue: T {
+    get {
+      fatalError("boom")
+    }
+
+    set {
+    }
+  }
 
   var prop: Int = 42
 
@@ -1068,7 +1084,8 @@ struct MissingPropertyWrapperUnwrap {
 }
 
 struct InvalidPropertyDelegateUse {
-  @Foo var x: Int = 42 // expected-error {{extra argument 'initialValue' in call}}
+  @Foo var x: Int = 42 // expected-error {{cannot invoke initializer for ty}}
+  // expected-note@-1{{overloads for 'Foo<_>' exist with these partially matching paramet}}
 
   func test() {
     self.x.foo() // expected-error {{value of type 'Int' has no member 'foo'}}
