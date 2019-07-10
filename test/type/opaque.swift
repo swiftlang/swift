@@ -413,3 +413,27 @@ struct Foo {
   var instanceVar: some P = 17
   let instanceLet: some P = 38
 }
+
+protocol P_52528543 {
+  init()
+
+  associatedtype A: Q_52528543
+
+  var a: A { get }
+}
+
+protocol Q_52528543 {
+  associatedtype B // expected-note 2 {{associated type 'B'}}
+
+  var b: B { get }
+}
+
+extension P_52528543 {
+  func frob(a_b: A.B) -> some P_52528543 { return self }
+}
+
+func foo<T: P_52528543>(x: T) -> some P_52528543 {
+  return x
+    .frob(a_b: x.a.b)
+    .frob(a_b: x.a.b) // expected-error {{cannot convert}}
+}
