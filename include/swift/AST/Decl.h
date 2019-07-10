@@ -7345,6 +7345,14 @@ void simple_display(llvm::raw_ostream &out, const Decl *decl);
 /// Display ValueDecl subclasses.
 void simple_display(llvm::raw_ostream &out, const ValueDecl *decl);
 
+/// Extract the source location from the given declaration.
+SourceLoc extractNearestSourceLoc(const Decl *decl);
+
+/// Extract the source location from the given declaration.
+inline SourceLoc extractNearestSourceLoc(const ExtensionDecl *ext) {
+  return extractNearestSourceLoc(static_cast<const Decl *>(ext));
+}
+
 } // end namespace swift
 
 #endif

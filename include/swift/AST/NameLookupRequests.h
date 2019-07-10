@@ -176,10 +176,6 @@ public:
   bool isCached() const { return true; }
   Optional<NominalTypeDecl *> getCachedResult() const;
   void cacheResult(NominalTypeDecl *value) const;
-
-  // Cycle handling
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
 struct SelfBounds {
@@ -192,7 +188,7 @@ struct SelfBounds {
 class SelfBoundsFromWhereClauseRequest :
     public SimpleRequest<SelfBoundsFromWhereClauseRequest,
                          SelfBounds(llvm::PointerUnion<TypeDecl *,
-                                    ExtensionDecl *>),
+                                                       ExtensionDecl *>),
                          CacheKind::Uncached> {
 public:
   using SimpleRequest::SimpleRequest;
