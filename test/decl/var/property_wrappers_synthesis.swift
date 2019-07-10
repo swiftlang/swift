@@ -2,11 +2,7 @@
 
 @propertyWrapper
 struct Wrapper<T> {
-  var value: T
-
-  init(initialValue: T) {
-    self.value = initialValue
-  }
+  var wrappedValue: T
 }
 
 protocol DefaultInit {
@@ -33,7 +29,7 @@ struct UseWrapper<T: DefaultInit> {
   // CHECK-NEXT: pattern_typed implicit type='Wrapper<T>'
   // CHECK-NEXT: pattern_named implicit type='Wrapper<T>' '_wrapped'
   // CHECK: constructor_ref_call_expr
-  // CHECK-NEXT: declref_expr{{.*}}Wrapper.init(initialValue:)
+  // CHECK-NEXT: declref_expr{{.*}}Wrapper.init(wrappedValue:)
   init() { }
 }
 
