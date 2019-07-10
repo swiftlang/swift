@@ -30,7 +30,7 @@ class Bar {
 }
 
 // <rdar://problem/23681566> @objc enums with payloads rejected with no source location info
-@objc enum r23681566 : Int32 {  // expected-error {{'r23681566' declares raw type 'Int32', but does not conform to RawRepresentable and conformance could not be synthesized}} expected-note {{declared raw type 'Int32' here}}
+@objc enum r23681566 : Int32 {  // expected-error {{'r23681566' declares raw type 'Int32', but does not conform to RawRepresentable and conformance could not be synthesized}} expected-note {{declared raw type 'Int32' here}} expected-note {{do you want to add protocol stubs?}}
   case Foo(progress: Int)     // expected-error {{enum with raw type cannot have cases with arguments}}
 }
 
