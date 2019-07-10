@@ -183,6 +183,9 @@ enum class FixKind : uint8_t {
   /// Allow invalid reference to a member declared as `mutating`
   /// when base is an r-value type.
   AllowMutatingMemberOnRValueBase,
+  
+  /// If an array was passed to a variadic argument, offer to wrap it in #variadic, or drop the brackets if it's a literal
+  ExpandArrayIntoVarargs,
 };
 
 class ConstraintFix {
@@ -490,10 +493,15 @@ class ContextualMismatch : public ConstraintFix {
   Type LHS, RHS;
 
 protected:
+  ContextualMismatch(ConstraintSystem &cs, FixKind fixKind, Type lhs, Type rhs,
+                     ConstraintLocator *locator)
+      : ConstraintFix(cs, fixKind, locator), LHS(lhs),
+        RHS(rhs) {}
+  
   ContextualMismatch(ConstraintSystem &cs, Type lhs, Type rhs,
                      ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::ContextualMismatch, locator), LHS(lhs),
-        RHS(rhs) {}
+  : ConstraintFix(cs, FixKind::ContextualMismatch, locator), LHS(lhs),
+  RHS(rhs) {}
 
 public:
   std::string getName() const override { return "fix contextual mismatch"; }
@@ -575,7 +583,7 @@ private:
 class KeyPathContextualMismatch final : public ContextualMismatch {
   KeyPathContextualMismatch(ConstraintSystem &cs, Type lhs, Type rhs,
                             ConstraintLocator *locator)
-      : ContextualMismatch(cs, lhs, rhs, locator) {}
+      : ContextualMismatch(cs, FixKind::ContextualMismatch, lhs, rhs, locator) {}
 
 public:
   std::string getName() const override {
@@ -1100,7 +1108,7 @@ public:
 class CollectionElementContextualMismatch final : public ContextualMismatch {
   CollectionElementContextualMismatch(ConstraintSystem &cs, Type srcType,
                                       Type dstType, ConstraintLocator *locator)
-      : ContextualMismatch(cs, srcType, dstType, locator) {}
+  : ContextualMismatch(cs, FixKind::ContextualMismatch, srcType, dstType, locator) {}
 
 public:
   std::string getName() const override {
@@ -1179,6 +1187,23 @@ public:
   static SkipUnhandledConstructInFunctionBuilder *
   create(ConstraintSystem &cs, UnhandledNode unhandledNode,
          NominalTypeDecl *builder, ConstraintLocator *locator);
+};
+
+class ExpandArrayIntoVarargs final : public ContextualMismatch {
+  
+  ExpandArrayIntoVarargs(ConstraintSystem &cs, Type srcType, Type dstType, ConstraintLocator *locator)
+  : ContextualMismatch(cs, FixKind::ExpandArrayIntoVarargs, srcType, dstType, locator) { }
+  
+public:
+  std::string getName() const override {
+    return "require #variadic when passing Array elements as variadic arguments";
+  }
+  
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static ExpandArrayIntoVarargs *
+  create(ConstraintSystem &cs, Type srcType, Type dstType, ConstraintLocator *locator);
+  
 };
 
 } // end namespace constraints

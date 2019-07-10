@@ -1457,6 +1457,18 @@ public:
   bool diagnoseAsNote() override;
 };
 
+class ExpandArrayIntoVarargsFailure final : public ContextualFailure {
+public:
+  ExpandArrayIntoVarargsFailure(Expr *root,
+                                ConstraintSystem &cs,
+                                Type lhs,
+                                Type rhs,
+                                ConstraintLocator *locator)
+  : ContextualFailure(root, cs, lhs, rhs, locator) { }
+  
+  bool diagnoseAsError() override;
+};
+
 /// Provides information about the application of a function argument to a
 /// parameter.
 class FunctionArgApplyInfo {

@@ -657,3 +657,13 @@ AllowMutatingMemberOnRValueBase::create(ConstraintSystem &cs, Type baseType,
   return new (cs.getAllocator())
       AllowMutatingMemberOnRValueBase(cs, baseType, member, name, locator);
 }
+
+ExpandArrayIntoVarargs *
+ExpandArrayIntoVarargs::create(ConstraintSystem &cs,Type srcType, Type dstType, ConstraintLocator *locator) {
+  return new (cs.getAllocator()) ExpandArrayIntoVarargs(cs, srcType, dstType, locator);
+}
+
+bool ExpandArrayIntoVarargs::diagnose(Expr *root, bool asNote) const {
+  ExpandArrayIntoVarargsFailure failure(root, getConstraintSystem(), getFromType(), getToType(), getLocator());
+  return failure.diagnose(asNote);
+}

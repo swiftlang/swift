@@ -2280,6 +2280,13 @@ bool ConstraintSystem::repairFailures(
             rhs)) {
       conversionsOrFixes.push_back(fix);
     }
+    
+    auto elementTy = lhs->getArrayElementType();
+    if (elementTy && true) {
+      conversionsOrFixes.push_back(ExpandArrayIntoVarargs::create(*this, lhs, rhs, getConstraintLocator(locator)));
+      return true;
+    }
+
     break;
   }
 
@@ -6952,6 +6959,16 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::UsePropertyWrapper:
   case FixKind::UseWrappedValue: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+  }
+      
+  case FixKind::ExpandArrayIntoVarargs: {
+    auto result = matchTypes(type1, ArraySliceType::get(type2),
+                             matchKind, subflags, locator);
+    if (result == SolutionKind::Solved)
+      if (recordFix(fix))
+        return SolutionKind::Error;
+    
+    return result;
   }
 
   case FixKind::UseSubscriptOperator:
