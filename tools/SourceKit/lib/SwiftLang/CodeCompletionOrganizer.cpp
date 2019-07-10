@@ -817,7 +817,7 @@ static int compareLiterals(Item &a_, Item &b_) {
 
   // Sort true before false instead of alphabetically.
   if (cast<Result>(a_).value->getLiteralKind() == CodeCompletionLiteralKind::BooleanLiteral)
-    return a_.name > b_.name;
+    return b_.name.compare(a_.name);
 
   return 0;
 }
