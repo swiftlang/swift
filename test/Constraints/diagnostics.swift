@@ -332,7 +332,10 @@ variadic(0, [1,2,3,], 4) // expected-error {{cannot pass an array of type '[Int]
 // expected-note@-2 {{remove brackets to pass array elements directly}} {{13-14=}} {{19-20=}} {{20-21=}}
 variadic(arrayWithOtherEltType) // expected-error {{cannot convert value of type '[String]' to expected argument type 'Int'}}
 variadic(1, arrayWithOtherEltType) // expected-error {{cannot convert value of type '[String]' to expected argument type 'Int'}}
-variadic(["hello", "world"]) // expected-error {{cannot convert value of type '[String]' to expected argument type 'Int'}}
+variadic(["hello", "world"]) // expected-error 2 {{cannot convert value of type 'String' to expected element type 'Int'}}
+// expected-error@-1 {{cannot pass an array of type '[Int]' as variadic arguments of type 'Int'}}
+// expected-note@-2 {{wrap the expression in '#variadic(...)' to pass array elements as variadic arguments}}
+// expected-note@-3 {{remove brackets to pass array elements directly}}
 
 foo[array] // expected-error {{cannot pass an array of type '[Int]' as variadic arguments of type 'Int'}}
 // expected-note@-1 {{wrap the expression in '#variadic(...)' to pass array elements as variadic arguments}} {{5-5=#variadic(}} {{10-10=)}}

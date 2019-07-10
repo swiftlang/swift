@@ -625,7 +625,7 @@ bool ConstraintSystem::Candidate::solve(
   // constraint to the system.
   if (!CT.isNull()) {
     auto constraintKind = ConstraintKind::Conversion;
-    if (CTP == CTP_CallArgument || CTP == CTP_VariadicCallArg)
+    if (CTP == CTP_CallArgument)
       constraintKind = ConstraintKind::ArgumentConversion;
 
     cs.addConstraint(constraintKind, cs.getType(E), CT,
@@ -1213,8 +1213,7 @@ ConstraintSystem::solveImpl(Expr *&expr,
         && Options.contains(ConstraintSystemFlags::UnderlyingTypeForOpaqueReturnType))
       constraintKind = ConstraintKind::OpaqueUnderlyingType;
 
-    auto ctp = getContextualTypePurpose();
-    if (ctp == CTP_CallArgument || ctp == CTP_VariadicCallArg)
+    if (getContextualTypePurpose() == CTP_CallArgument)
       constraintKind = ConstraintKind::ArgumentConversion;
 
     // In a by-reference yield, we expect the contextual type to be an

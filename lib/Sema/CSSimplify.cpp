@@ -2281,7 +2281,8 @@ bool ConstraintSystem::repairFailures(
     }
 
     auto elementTy = lhs->getArrayElementType();
-    if (elementTy && elt.getParameterFlags().isVariadic()) {
+    if (elt.getKind() == ConstraintLocator::ApplyArgToParam &&
+        elementTy && elt.getParameterFlags().isVariadic()) {
       conversionsOrFixes.push_back(ExpandArrayIntoVarargs::create(
           *this, lhs, rhs, getConstraintLocator(locator)));
       return true;

@@ -2156,7 +2156,6 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
     nilDiag = diag::cannot_convert_yield_value_nil;
     break;
   case CTP_CallArgument:
-  case CTP_VariadicCallArg:
     diagID = diag::cannot_convert_argument_value;
     nilDiag = diag::cannot_convert_argument_value_nil;
     break;
@@ -2284,34 +2283,6 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
     }
   }
 
-  // Diagnose passing '[T]' instead of a sequence of 'T' to a variadic argument
-  // of type 'T...'.
-  auto genericExprType = exprType->getAs<BoundGenericType>();
-  if (CTP == CTP_VariadicCallArg && genericExprType &&
-      genericExprType->getDecl() == CS.TC.Context.getArrayDecl() &&
-      CS.TC.isConvertibleTo(genericExprType->getGenericArgs().front(),
-                            contextualType, CS.DC)) {
-    diagnose(expr->getLoc(), diag::cannot_convert_array_to_variadic, exprType,
-             contextualType);
-    // Offer to pass the array elements using #variadic
-    auto range = expr->getSourceRange();
-    diagnose(expr->getLoc(), diag::suggest_pass_elements_using_pound_variadic)
-        .fixItInsert(range.Start, "#variadic(")
-        .fixItInsertAfter(range.End, ")");
-    // If this is an array literal, offer to remove the brackets and pass the
-    // elements directly as variadic arguments.
-    if (auto *arrayExpr = dyn_cast<ArrayExpr>(expr)) {
-      auto diag =
-          diagnose(expr->getLoc(), diag::suggest_pass_elements_directly);
-      diag.fixItRemove(arrayExpr->getLBracketLoc())
-          .fixItRemove(arrayExpr->getRBracketLoc());
-      // Handle the case where the array literal has a trailing comma.
-      if (arrayExpr->getNumCommas() == arrayExpr->getNumElements())
-        diag.fixItRemove(arrayExpr->getCommaLocs().back());
-    }
-    return true;
-  }
-
   // Try for better/more specific diagnostics for non-escaping to @escaping
   if (diagnoseNonEscapingParameterToEscaping(expr, exprType, contextualType,
                                              CTP))
@@ -2367,7 +2338,6 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
   // Attempt to add a fixit for the error.
   switch (CTP) {
   case CTP_CallArgument:
-  case CTP_VariadicCallArg:
   case CTP_ArrayElement:
   case CTP_DictionaryKey:
   case CTP_DictionaryValue:
@@ -2636,7 +2606,6 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
     // out.  If we can't do that and the tuple has default arguments, we have to
     // punt on passing down the type information, since type checking the
     // subexpression won't be able to find the default argument provider.
-    bool isVarArg = false;
     if (argType) {
       if (auto *PT = dyn_cast<ParenType>(argType.getPointer())) {
         const auto &flags = PT->getParameterFlags();
@@ -2652,10 +2621,9 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
           // If the argument being specified is actually varargs, then we're
           // just specifying one element of a variadic list.  Use the type of
           // the individual varargs argument, not the overall array type.
-          if (arg.isVararg()) {
+          if (arg.isVararg())
             argType = arg.getVarargBaseTy();
-            isVarArg = true;
-          } else if (arg.isAutoClosure())
+          else if (arg.isAutoClosure())
             argType = arg.getType()->castTo<FunctionType>()->getResult();
           else
             argType = arg.getType();
@@ -2667,11 +2635,7 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
       }
     }
 
-    auto CTPurpose = CTP_Unused;
-    if (argType && isVarArg)
-      CTPurpose = CTP_VariadicCallArg;
-    else if (argType)
-      CTPurpose = CTP_CallArgument;
+    auto CTPurpose = argType ? CTP_CallArgument : CTP_Unused;
     return typeCheckChildIndependently(argExpr, argType, CTPurpose, options);
   }
 
@@ -2741,10 +2705,9 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
           // Determine the argument type.
           auto currentArgType = TE->getElement(inArgNo);
 
-          auto exprResult = typeCheckChildIndependently(
-              currentArgType, currentParamType,
-              param.isVariadic() ? CTP_VariadicCallArg : CTP_CallArgument,
-              options);
+          auto exprResult =
+            typeCheckChildIndependently(currentArgType, currentParamType,
+                                        CTP_CallArgument, options);
 
           // If there was an error type checking this argument, then we're done.
           if (!exprResult)
