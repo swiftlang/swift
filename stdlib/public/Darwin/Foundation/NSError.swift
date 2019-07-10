@@ -239,7 +239,11 @@ public func _getErrorDefaultUserInfo<T: Error>(_ error: T)
 
           switch key {
           case NSLocalizedDescriptionKey:
-            return (error as? LocalizedError)?.errorDescription
+            if let description = (error as? LocalizedError)?.errorDescription {
+                return description
+            }
+            // Fallback to error's description if we don't have any localized description.
+            return String(describing: error)
 
           case NSLocalizedFailureReasonErrorKey:
             return (error as? LocalizedError)?.failureReason
