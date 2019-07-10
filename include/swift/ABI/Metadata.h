@@ -2478,6 +2478,12 @@ struct TargetContextDescriptor {
               ? genericContext->getGenericContextHeader().NumParams
               : 0;
   }
+
+#ifndef NDEBUG
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const,
+                            "only for use in the debugger");
+#endif
+
 private:
   TargetContextDescriptor(const TargetContextDescriptor &) = delete;
   TargetContextDescriptor(TargetContextDescriptor &&) = delete;
@@ -3362,6 +3368,11 @@ public:
   explicit operator bool() const {
     return Function != nullptr;
   }
+
+  /// For debugging purposes only.
+  explicit operator void*() const {
+    return reinterpret_cast<void *>(Function);
+  }
   
   /// Invoke with an array of arguments of dynamic size.
   MetadataResponse operator()(MetadataRequest request,
@@ -4242,6 +4253,11 @@ public:
   static bool classof(const TargetContextDescriptor<Runtime> *cd) {
     return cd->getKind() == ContextDescriptorKind::Enum;
   }
+
+#ifndef NDEBUG
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const,
+                            "Only meant for use in the debugger");
+#endif
 };
 
 using EnumDescriptor = TargetEnumDescriptor<InProcess>;

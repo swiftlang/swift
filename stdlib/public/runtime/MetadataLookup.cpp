@@ -246,11 +246,17 @@ _findContextDescriptor(Demangle::NodePointer node,
                            Demangle::Demangler &Dem);
 
 /// Find the context descriptor for the type extended by the given extension.
+///
+/// If \p maybeExtension isn't actually an extension context, returns nullptr.
 static const ContextDescriptor *
-_findExtendedTypeContextDescriptor(const ExtensionContextDescriptor *extension,
+_findExtendedTypeContextDescriptor(const ContextDescriptor *maybeExtension,
                                    Demangler &demangler,
                                    Demangle::NodePointer *demangledNode
                                      = nullptr) {
+  auto extension = dyn_cast<ExtensionContextDescriptor>(maybeExtension);
+  if (!extension)
+    return nullptr;
+
   Demangle::NodePointer localNode;
   Demangle::NodePointer &node = demangledNode ? *demangledNode : localNode;
 
@@ -844,28 +850,26 @@ bool swift::_gatherGenericParameterCounts(
   DemanglerForRuntimeTypeResolution<> demangler;
   demangler.providePreallocatedMemory(BorrowFrom);
 
-  if (auto extension = dyn_cast<ExtensionContextDescriptor>(descriptor)) {
-    // If we have an nominal type extension descriptor, extract the extended type
+  if (auto extension = _findExtendedTypeContextDescriptor(descriptor,
+                                                          demangler)) {
+    // If we have a nominal type extension descriptor, extract the extended type
     // and use that. If the extension is not nominal, then we can use the
     // extension's own signature.
-    if (auto extendedType =
-          _findExtendedTypeContextDescriptor(extension, demangler)) {
-      descriptor = extendedType;
-    }
+    descriptor = extension;
   }
 
   // Once we hit a non-generic descriptor, we're done.
   if (!descriptor->isGeneric()) return false;
 
   // Recurse to record the parent context's generic parameters.
-  if (auto parent = descriptor->Parent.get())
-    (void)_gatherGenericParameterCounts(parent, genericParamCounts, demangler);
+  auto parent = descriptor->Parent.get();
+  (void)_gatherGenericParameterCounts(parent, genericParamCounts, demangler);
 
   // Record a new level of generic parameters if the count exceeds the
   // previous count.
-  auto myCount =
-    descriptor->getGenericContext()->getGenericContextHeader().NumParams;
-  if (genericParamCounts.empty() || myCount > genericParamCounts.back()) {
+  unsigned parentCount = parent->getNumGenericParams();
+  unsigned myCount = descriptor->getNumGenericParams();
+  if (myCount > parentCount) {
     genericParamCounts.push_back(myCount);
     return true;
   }
@@ -1658,23 +1662,41 @@ static void installGetClassHook() {
 #endif
 
 unsigned SubstGenericParametersFromMetadata::
-buildDescriptorPath(const ContextDescriptor *context) const {
+buildDescriptorPath(const ContextDescriptor *context,
+                    Demangler &borrowFrom) const {
+  assert(sourceIsMetadata);
+
   // Terminating condition: we don't have a context.
   if (!context)
     return 0;
 
+  DemanglerForRuntimeTypeResolution<> demangler;
+  demangler.providePreallocatedMemory(borrowFrom);
+
+  if (auto extension = _findExtendedTypeContextDescriptor(context, demangler)) {
+    // If we have a nominal type extension descriptor, extract the extended type
+    // and use that. If the extension is not nominal, then we can use the
+    // extension's own signature.
+    context = extension;
+  }
+
   // Add the parent's contribution to the descriptor path.
-  unsigned numKeyGenericParamsInParent =
-    buildDescriptorPath(context->Parent.get());
+  const ContextDescriptor *parent = context->Parent.get();
+  unsigned numKeyGenericParamsInParent = buildDescriptorPath(parent, demangler);
 
   // If this context is non-generic, we're done.
   if (!context->isGeneric())
     return numKeyGenericParamsInParent;
 
   // Count the number of key generic params at this level.
+  auto allGenericParams = baseContext->getGenericContext()->getGenericParams();
+  unsigned parentCount = parent->getNumGenericParams();
+  unsigned localCount = context->getNumGenericParams();
+  auto localGenericParams = allGenericParams.slice(parentCount,
+                                                   localCount - parentCount);
+
   unsigned numKeyGenericParamsHere = 0;
   bool hasNonKeyGenericParams = false;
-  auto localGenericParams = getLocalGenericParams(context);
   for (const auto &genericParam : localGenericParams) {
     if (genericParam.hasKeyArgument())
       ++numKeyGenericParamsHere;
@@ -1682,8 +1704,8 @@ buildDescriptorPath(const ContextDescriptor *context) const {
       hasNonKeyGenericParams = true;
   }
 
-  // Form the path element if there are any generic parameters to be found.
-  if (numKeyGenericParamsHere != 0)
+  // Form the path element if there are any new generic parameters.
+  if (localCount > parentCount)
     descriptorPath.push_back(PathElement{localGenericParams,
                                          context->getNumGenericParams(),
                                          numKeyGenericParamsInParent,
@@ -1738,7 +1760,8 @@ void SubstGenericParametersFromMetadata::setup() const {
     return;
 
   if (sourceIsMetadata && baseContext) {
-    numKeyGenericParameters = buildDescriptorPath(baseContext);
+    DemanglerForRuntimeTypeResolution<StackAllocatedDemangler<2048>> demangler;
+    numKeyGenericParameters = buildDescriptorPath(baseContext, demangler);
     return;
   }
 
