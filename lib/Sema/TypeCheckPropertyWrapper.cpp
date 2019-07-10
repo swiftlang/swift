@@ -401,6 +401,12 @@ AttachedPropertyWrappersRequest::evaluate(Evaluator &evaluator,
       continue;
     }
 
+    // Nor does top-level code.
+    if (var->getDeclContext()->isModuleScopeContext()) {
+      ctx.Diags.diagnose(attr->getLocation(), diag::property_wrapper_top_level);
+      continue;
+    }
+
     // Check that the variable is part of a single-variable pattern.
     auto binding = var->getParentPatternBinding();
     if (!binding || binding->getSingleVar() != var) {
