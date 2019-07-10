@@ -120,7 +120,7 @@ func structWithoutExplicitConformance() {
 
 // Structs with non-hashable/equatable stored properties don't derive conformance.
 struct NotHashable {}
-struct StructWithNonHashablePayload: Hashable { // expected-error 2 {{does not conform}}
+struct StructWithNonHashablePayload: Hashable { // expected-error 2 {{does not conform}} expected-note {{do you want to add protocol stubs?}}
   let a: NotHashable
 }
 
@@ -180,7 +180,7 @@ extension StructConformsAndImplementsInExtension : Equatable {
 struct NotExplicitlyHashableAndCannotDerive {
   let v: NotHashable
 }
-extension NotExplicitlyHashableAndCannotDerive : Hashable {}  // expected-error 2 {{does not conform}}
+extension NotExplicitlyHashableAndCannotDerive : Hashable {}  // expected-error 2 {{does not conform}} expected-note {{do you want to add protocol stubs?}}
 
 // A struct with no stored properties trivially derives conformance.
 struct NoStoredProperties: Hashable {}
@@ -237,6 +237,7 @@ struct BadGenericDeriveExtension<T> {
 }
 extension BadGenericDeriveExtension: Equatable {}
 // expected-error@-1 {{type 'BadGenericDeriveExtension<T>' does not conform to protocol 'Equatable'}}
+// expected-note@-2 {{do you want to add protocol stubs?}}
 extension BadGenericDeriveExtension: Hashable where T: Equatable {}
 // expected-error@-1 {{type 'BadGenericDeriveExtension' does not conform to protocol 'Hashable'}}
 
