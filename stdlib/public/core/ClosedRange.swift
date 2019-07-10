@@ -60,7 +60,7 @@
 /// `Stride` types, they cannot be used as the bounds of a countable range. If
 /// you need to iterate over consecutive floating-point values, see the
 /// `stride(from:through:by:)` function.
-@_fixed_layout
+@frozen
 public struct ClosedRange<Bound: Comparable> {
   /// The range's lower bound.
   public let lowerBound: Bound
@@ -127,7 +127,7 @@ where Bound: Strideable, Bound.Stride: SignedInteger {
 }
 
 extension ClosedRange where Bound : Strideable, Bound.Stride : SignedInteger {
-  @_frozen // FIXME(resilience)
+  @frozen // FIXME(resilience)
   public enum Index {
     case pastEnd
     case inRange(Bound)
@@ -338,38 +338,6 @@ extension Comparable {
   }
 }
 
-extension Strideable where Stride: SignedInteger {  
-  /// Returns a countable closed range that contains both of its bounds.
-  ///
-  /// Use the closed range operator (`...`) to create a closed range of any type
-  /// that conforms to the `Strideable` protocol with an associated signed
-  /// integer `Stride` type, such as any of the standard library's integer
-  /// types. This example creates a `ClosedRange<Int>` from zero up to,
-  /// and including, nine.
-  ///
-  ///     let singleDigits = 0...9
-  ///     print(singleDigits.contains(9))
-  ///     // Prints "true"
-  ///
-  /// You can use sequence or collection methods on the `singleDigits` range.
-  ///
-  ///     print(singleDigits.count)
-  ///     // Prints "10"
-  ///     print(singleDigits.last)
-  ///     // Prints "9"
-  ///
-  /// - Parameters:)`.
-  ///   - minimum: The lower bound for the range.
-  ///   - maximum: The upper bound for the range.
-  @_transparent
-  public static func ... (minimum: Self, maximum: Self) -> ClosedRange<Self> {
-    // FIXME: swift-3-indexing-model: tests for traps.
-    _precondition(
-      minimum <= maximum, "Can't form Range with upperBound < lowerBound")
-    return ClosedRange(uncheckedBounds: (lower: minimum, upper: maximum))
-  }
-}
-
 extension ClosedRange: Equatable {
   /// Returns a Boolean value indicating whether two ranges are equal.
   ///
@@ -465,6 +433,7 @@ extension ClosedRange where Bound: Strideable, Bound.Stride : SignedInteger {
   /// An equivalent range must be representable as a closed range.
   /// For example, passing an empty range as `other` triggers a runtime error,
   /// because an empty range cannot be represented by a closed range instance.
+  @inlinable
   public init(_ other: Range<Bound>) {
     _precondition(!other.isEmpty, "Can't form an empty closed range")
     let upperBound = other.upperBound.advanced(by: -1)
@@ -475,7 +444,12 @@ extension ClosedRange where Bound: Strideable, Bound.Stride : SignedInteger {
 extension ClosedRange {
   @inlinable
   public func overlaps(_ other: ClosedRange<Bound>) -> Bool {
-    return self.contains(other.lowerBound) || other.contains(lowerBound)
+    // Disjoint iff the other range is completely before or after our range.
+    // Unlike a `Range`, a `ClosedRange` can *not* be empty, so no check for
+    // that case is needed here.
+    let isDisjoint = other.upperBound < self.lowerBound
+      || self.upperBound < other.lowerBound
+    return !isDisjoint
   }
 
   @inlinable
@@ -488,3 +462,26 @@ extension ClosedRange {
 // shorthand. TODO: Add documentation
 public typealias CountableClosedRange<Bound: Strideable> = ClosedRange<Bound>
   where Bound.Stride : SignedInteger
+
+extension ClosedRange: Decodable where Bound: Decodable {
+  public init(from decoder: Decoder) throws {
+    var container = try decoder.unkeyedContainer()
+    let lowerBound = try container.decode(Bound.self)
+    let upperBound = try container.decode(Bound.self)
+    guard lowerBound <= upperBound else {
+      throw DecodingError.dataCorrupted(
+        DecodingError.Context(
+          codingPath: decoder.codingPath,
+          debugDescription: "Cannot initialize \(ClosedRange.self) with a lowerBound (\(lowerBound)) greater than upperBound (\(upperBound))"))
+    }
+    self.init(uncheckedBounds: (lower: lowerBound, upper: upperBound))
+  }
+}
+
+extension ClosedRange: Encodable where Bound: Encodable {
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.unkeyedContainer()
+    try container.encode(self.lowerBound)
+    try container.encode(self.upperBound)
+  }
+}

@@ -45,7 +45,7 @@ public func assert(
 ) {
   // Only assert in debug mode.
   if _isDebugAssertConfiguration() {
-    if !_branchHint(condition(), expected: true) {
+    if !_fastPath(condition()) {
       _assertionFailure("Assertion failed", message(), file: file, line: line,
         flags: _fatalErrorFlags())
     }
@@ -87,7 +87,7 @@ public func precondition(
 ) {
   // Only check in debug and release mode. In release mode just trap.
   if _isDebugAssertConfiguration() {
-    if !_branchHint(condition(), expected: true) {
+    if !_fastPath(condition()) {
       _assertionFailure("Precondition failed", message(), file: file, line: line,
         flags: _fatalErrorFlags())
     }
@@ -206,7 +206,7 @@ internal func _precondition(
 ) {
   // Only check in debug and release mode. In release mode just trap.
   if _isDebugAssertConfiguration() {
-    if !_branchHint(condition(), expected: true) {
+    if !_fastPath(condition()) {
       _fatalErrorMessage("Fatal error", message, file: file, line: line,
         flags: _fatalErrorFlags())
     }
@@ -235,7 +235,7 @@ public func _overflowChecked<T>(
 ) -> T {
   let (result, error) = args
   if _isDebugAssertConfiguration() {
-    if _branchHint(error, expected: false) {
+    if _slowPath(error) {
       _fatalErrorMessage("Fatal error", "Overflow/underflow", 
         file: file, line: line, flags: _fatalErrorFlags())
     }
@@ -260,7 +260,7 @@ internal func _debugPrecondition(
 ) {
   // Only check in debug mode.
   if _slowPath(_isDebugAssertConfiguration()) {
-    if !_branchHint(condition(), expected: true) {
+    if !_fastPath(condition()) {
       _fatalErrorMessage("Fatal error", message, file: file, line: line,
         flags: _fatalErrorFlags())
     }
@@ -285,12 +285,12 @@ internal func _debugPreconditionFailure(
 /// with the build configuration INTERNAL_CHECKS_ENABLED enabled. Otherwise, the
 /// call to this function is a noop.
 @usableFromInline @_transparent
-internal func _sanityCheck(
+internal func _internalInvariant(
   _ condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) {
 #if INTERNAL_CHECKS_ENABLED
-  if !_branchHint(condition(), expected: true) {
+  if !_fastPath(condition()) {
     _fatalErrorMessage("Fatal error", message, file: file, line: line,
       flags: _fatalErrorFlags())
   }
@@ -298,10 +298,10 @@ internal func _sanityCheck(
 }
 
 @usableFromInline @_transparent
-internal func _sanityCheckFailure(
+internal func _internalInvariantFailure(
   _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) -> Never {
-  _sanityCheck(false, message, file: file, line: line)
+  _internalInvariant(false, message, file: file, line: line)
   _conditionallyUnreachable()
 }

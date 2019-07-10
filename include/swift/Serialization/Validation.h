@@ -14,6 +14,7 @@
 #define SWIFT_SERIALIZATION_VALIDATION_H
 
 #include "swift/Basic/LLVM.h"
+#include "swift/Serialization/SerializationOptions.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
@@ -42,7 +43,7 @@ enum class Status {
   MissingDependency,
 
   /// The module file is an overlay for a Clang module, which can't be found.
-  MissingShadowedModule,
+  MissingUnderlyingModule,
 
   /// The module file depends on a module that is still being loaded, i.e.
   /// there is a circular dependency.
@@ -91,7 +92,9 @@ struct ValidationInfo {
 class ExtendedValidationInfo {
   SmallVector<StringRef, 4> ExtraClangImporterOpts;
   StringRef SDKPath;
+  StringRef ParseableInterface;
   struct {
+    unsigned ArePrivateImportsEnabled : 1;
     unsigned IsSIB : 1;
     unsigned IsTestable : 1;
     unsigned ResilienceStrategy : 2;
@@ -111,10 +114,16 @@ public:
   void addExtraClangImporterOption(StringRef option) {
     ExtraClangImporterOpts.push_back(option);
   }
+  StringRef getParseableInterface() const { return ParseableInterface; }
+  void setParseableInterface(StringRef PI) { ParseableInterface = PI; }
 
   bool isSIB() const { return Bits.IsSIB; }
   void setIsSIB(bool val) {
       Bits.IsSIB = val;
+  }
+  bool arePrivateImportsEnabled() { return Bits.ArePrivateImportsEnabled; }
+  void setPrivateImportsEnabled(bool enabled) {
+    Bits.ArePrivateImportsEnabled = enabled;
   }
   bool isTestable() const { return Bits.IsTestable; }
   void setIsTestable(bool val) {
@@ -144,9 +153,12 @@ public:
 /// \param[out] extendedInfo If present, will be populated with additional
 /// compilation options serialized into the AST at build time that may be
 /// necessary to load it properly.
-ValidationInfo
-validateSerializedAST(StringRef data,
-                      ExtendedValidationInfo *extendedInfo = nullptr);
+/// \param[out] dependencies If present, will be populated with list of
+/// input files the module depends on, if present in INPUT_BLOCK.
+ValidationInfo validateSerializedAST(
+    StringRef data, ExtendedValidationInfo *extendedInfo = nullptr,
+    SmallVectorImpl<SerializationOptions::FileDependency> *dependencies =
+        nullptr);
 
 /// Emit diagnostics explaining a failure to load a serialized AST.
 ///

@@ -13,4 +13,4 @@ following implementation details:
 - Linux, FreeBSD, and other UNIX-like platforms use `getrandom(2)` when available;
 otherwise, they read from `/dev/urandom`.
 - Fuchsia platforms use `getentropy(3)`.
-- Windows paltforms use `BCryptGenRandom`.
+- Windows platforms use `BCryptGenRandom`.

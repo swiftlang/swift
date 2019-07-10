@@ -23,7 +23,7 @@ using namespace swift;
 // MARK: Accessing the results.
 // -----------------------------------------------------------------------------
 
-bool FunctionAccessedStorage::hasNoNestedConflict(
+bool AccessedStorageResult::hasNoNestedConflict(
     const AccessedStorage &otherStorage) const {
   assert(otherStorage.isUniquelyIdentified());
   assert(!hasUnidentifiedAccess());
@@ -31,7 +31,7 @@ bool FunctionAccessedStorage::hasNoNestedConflict(
   return getStorageAccessInfo(otherStorage).hasNoNestedConflict();
 }
 
-bool FunctionAccessedStorage::mayConflictWith(
+bool AccessedStorageResult::mayConflictWith(
     SILAccessKind otherAccessKind, const AccessedStorage &otherStorage) const {
   if (hasUnidentifiedAccess()
       && accessKindMayConflict(otherAccessKind,
@@ -50,7 +50,7 @@ bool FunctionAccessedStorage::mayConflictWith(
   return false;
 }
 
-StorageAccessInfo FunctionAccessedStorage::getStorageAccessInfo(
+StorageAccessInfo AccessedStorageResult::getStorageAccessInfo(
     const AccessedStorage &otherStorage) const {
   // Construct a fake StorageAccessInfo to do a hash lookup for the real
   // StorageAccessInfo. The DenseSet key is limited to the AccessedStorage base
@@ -103,41 +103,7 @@ bool StorageAccessInfo::mergeFrom(const StorageAccessInfo &RHS) {
   return changed;
 }
 
-bool FunctionAccessedStorage::summarizeFunction(SILFunction *F) {
-  assert(storageAccessSet.empty() && "expected uninitialized results.");
-
-  if (F->isDefinition())
-    return false;
-
-  // If the function definition is unavailable, set unidentifiedAccess to a
-  // conservative value, since analyzeInstruction will never be called.
-  //
-  // If FunctionSideEffects can be summarized, use that information.
-  FunctionSideEffects functionSideEffects;
-  if (!functionSideEffects.summarizeFunction(F)) {
-    setWorstEffects();
-    // May as well consider this a successful summary since there are no
-    // instructions to visit anyway.
-    return true;
-  }
-  bool mayRead = functionSideEffects.getGlobalEffects().mayRead();
-  bool mayWrite = functionSideEffects.getGlobalEffects().mayWrite();
-  for (auto &paramEffects : functionSideEffects.getParameterEffects()) {
-    mayRead |= paramEffects.mayRead();
-    mayWrite |= paramEffects.mayWrite();
-  }
-  if (mayWrite)
-    unidentifiedAccess = SILAccessKind::Modify;
-  else if (mayRead)
-    unidentifiedAccess = SILAccessKind::Read;
-
-  // If function side effects is "readnone" then this result will have an empty
-  // storageAccessSet and unidentifiedAccess == None.
-  return true;
-}
-
-bool FunctionAccessedStorage::updateUnidentifiedAccess(
-    SILAccessKind accessKind) {
+bool AccessedStorageResult::updateUnidentifiedAccess(SILAccessKind accessKind) {
   if (unidentifiedAccess == None) {
     unidentifiedAccess = accessKind;
     return true;
@@ -145,35 +111,48 @@ bool FunctionAccessedStorage::updateUnidentifiedAccess(
   return updateAccessKind(unidentifiedAccess.getValue(), accessKind);
 }
 
-// Merge the given FunctionAccessedStorage in `other` into this
-// FunctionAccessedStorage. Use the given `transformStorage` to map `other`
+// Merge the given AccessedStorageResult in `other` into this
+// AccessedStorageResult. Use the given `transformStorage` to map `other`
 // AccessedStorage into this context. If `other` is from a callee, argument
 // substitution will be performed if possible. However, there's no guarantee
-// that the merged access values will belong to this function.
+// that the merged access values will belong to this region.
 //
-// Note that we may have `this` == `other` for self-recursion. We still need to
-// propagate and merge in that case in case arguments are recursively dependent.
-bool FunctionAccessedStorage::mergeAccesses(
-    const FunctionAccessedStorage &other,
+// Return true if these results changed, requiring further propagation through
+// the call graph.
+bool AccessedStorageResult::mergeAccesses(
+    const AccessedStorageResult &other,
     std::function<StorageAccessInfo(const StorageAccessInfo &)>
-      transformStorage) {
+        transformStorage) {
 
-  // Insertion in DenseMap invalidates the iterator in the rare case of
-  // self-recursion (`this` == `other`) that passes accessed storage though an
-  // argument. Rather than complicate the code, make a temporary copy of the
-  // AccessedStorage.
-  //
-  // Also note that the storageAccessIndex from otherStorage is relative to its
-  // original context and should not be copied into this context.
-  SmallVector<StorageAccessInfo, 8> otherStorageAccesses;
-  otherStorageAccesses.reserve(other.storageAccessSet.size());
-  otherStorageAccesses.append(other.storageAccessSet.begin(),
-                              other.storageAccessSet.end());
+  // The cost of BottomUpIPAnalysis can be quadratic for large recursive call
+  // graphs. That cost is multiplied by the size of storageAccessSet. Slowdowns
+  // can occur ~1000 elements. 200 is large enough to cover "normal" code,
+  // while ensuring compile time isn't affected.
+  if (storageAccessSet.size() > 200) {
+    setWorstEffects();
+    return true;
+  }
+  // To save compile time, if this storage already has worst-case effects, avoid
+  // growing its storageAccessSet.
+  if (hasWorstEffects())
+    return false;
 
+  // When `this` == `other` (for self-recursion), insertion in DenseMap
+  // invalidates the iterator. We still need to propagate and merge in that case
+  // because arguments can be recursively dependent. The alternative would be
+  // treating all self-recursion conservatively.
+  const AccessedStorageResult *otherRegionAccesses = &other;
+  AccessedStorageResult regionAccessCopy;
+  if (this == &other) {
+    regionAccessCopy = other;
+    otherRegionAccesses = &regionAccessCopy;
+  }
   bool changed = false;
-  for (auto &rawStorageInfo : otherStorageAccesses) {
+  // Nondeterminstically iterate for the sole purpose of inserting into another
+  // unordered set.
+  for (auto &rawStorageInfo : otherRegionAccesses->storageAccessSet) {
     const StorageAccessInfo &otherStorageInfo =
-      transformStorage(rawStorageInfo);
+        transformStorage(rawStorageInfo);
     // If transformStorage() returns invalid storage object for local storage,
     // that should not be merged with the caller.
     if (!otherStorageInfo)
@@ -199,7 +178,7 @@ bool FunctionAccessedStorage::mergeAccesses(
   return changed;
 }
 
-bool FunctionAccessedStorage::mergeFrom(const FunctionAccessedStorage &other) {
+bool AccessedStorageResult::mergeFrom(const AccessedStorageResult &other) {
   // Merge accesses from other. Both `this` and `other` are either from the same
   // function or are both callees of the same call site, so their parameters
   // indices coincide. transformStorage is the identity function.
@@ -254,13 +233,15 @@ transformCalleeStorage(const StorageAccessInfo &storage,
   case AccessedStorage::Class: {
     // If the object's value is an argument, translate it into a value on the
     // caller side.
-    SILValue obj = storage.getObjectProjection().getObject();
+    SILValue obj = storage.getObject();
     if (auto *arg = dyn_cast<SILFunctionArgument>(obj)) {
       SILValue argVal = getCallerArg(fullApply, arg->getIndex());
       if (argVal) {
-        auto *instr = storage.getObjectProjection().getInstr();
-        // Remap the argument source value and inherit the old storage info.
-        return StorageAccessInfo(AccessedStorage(argVal, instr), storage);
+        unsigned idx = storage.getPropertyIndex();
+        // Remap this storage info. The argument source value is now the new
+        // object. The old storage info is inherited.
+        return StorageAccessInfo(AccessedStorage::forClass(argVal, idx),
+                                 storage);
       }
     }
     // Otherwise, continue to reference the value in the callee because we don't
@@ -278,9 +259,16 @@ transformCalleeStorage(const StorageAccessInfo &storage,
     }
     // If the argument can't be transformed, demote it to an unidentified
     // access.
+    //
+    // This is an untested bailout. It is only reachable if the call graph
+    // contains an edge that getCallerArg is unable to analyze OR if
+    // findAccessedStorageNonNested returns an invalid SILValue, which won't
+    // pass SIL verification.
+    //
+    // FIXME: In case argVal is invalid, support Unidentified access for invalid
+    // values. This would also be useful for partially invalidating results.
     return StorageAccessInfo(
-      AccessedStorage(storage.getValue(), AccessedStorage::Unidentified),
-      storage);
+        AccessedStorage(argVal, AccessedStorage::Unidentified), storage);
   }
   case AccessedStorage::Nested:
     llvm_unreachable("Unexpected nested access");
@@ -296,8 +284,8 @@ transformCalleeStorage(const StorageAccessInfo &storage,
   llvm_unreachable("unhandled kind");
 }
 
-bool FunctionAccessedStorage::mergeFromApply(
-    const FunctionAccessedStorage &calleeAccess, FullApplySite fullApply) {
+bool AccessedStorageResult::mergeFromApply(
+    const AccessedStorageResult &calleeAccess, FullApplySite fullApply) {
   // Merge accesses from calleeAccess. Transform any Argument type
   // AccessedStorage into the caller context to be added to `this` storage map.
   return mergeAccesses(calleeAccess, [&fullApply](const StorageAccessInfo &s) {
@@ -306,7 +294,7 @@ bool FunctionAccessedStorage::mergeFromApply(
 }
 
 template <typename B>
-void FunctionAccessedStorage::visitBeginAccess(B *beginAccess) {
+void AccessedStorageResult::visitBeginAccess(B *beginAccess) {
   if (beginAccess->getEnforcement() != SILAccessEnforcement::Dynamic)
     return;
 
@@ -324,7 +312,9 @@ void FunctionAccessedStorage::visitBeginAccess(B *beginAccess) {
     result.first->mergeFrom(storageAccess);
 }
 
-void FunctionAccessedStorage::analyzeInstruction(SILInstruction *I) {
+void AccessedStorageResult::analyzeInstruction(SILInstruction *I) {
+  assert(!FullApplySite::isa(I) && "caller should merge");
+
   if (auto *BAI = dyn_cast<BeginAccessInst>(I))
     visitBeginAccess(BAI);
   else if (auto *BUAI = dyn_cast<BeginUnpairedAccessInst>(I))
@@ -340,7 +330,7 @@ void StorageAccessInfo::print(raw_ostream &os) const {
 
 void StorageAccessInfo::dump() const { print(llvm::dbgs()); }
 
-void FunctionAccessedStorage::print(raw_ostream &os) const {
+void AccessedStorageResult::print(raw_ostream &os) const {
   for (auto &storageAccess : storageAccessSet)
     storageAccess.print(os);
 
@@ -350,7 +340,45 @@ void FunctionAccessedStorage::print(raw_ostream &os) const {
   }
 }
 
-void FunctionAccessedStorage::dump() const { print(llvm::dbgs()); }
+void AccessedStorageResult::dump() const { print(llvm::dbgs()); }
+
+// -----------------------------------------------------------------------------
+// MARK: FunctionAccessedStorage, implementation of
+// GenericFunctionEffectAnalysis.
+// -----------------------------------------------------------------------------
+
+bool FunctionAccessedStorage::summarizeFunction(SILFunction *F) {
+  assert(accessResult.isEmpty() && "expected uninitialized results.");
+
+  if (F->isDefinition())
+    return false;
+
+  // If the function definition is unavailable, set unidentifiedAccess to a
+  // conservative value, since analyzeInstruction will never be called.
+  //
+  // If FunctionSideEffects can be summarized, use that information.
+  FunctionSideEffects functionSideEffects;
+  if (!functionSideEffects.summarizeFunction(F)) {
+    setWorstEffects();
+    // May as well consider this a successful summary since there are no
+    // instructions to visit anyway.
+    return true;
+  }
+  bool mayRead = functionSideEffects.getGlobalEffects().mayRead();
+  bool mayWrite = functionSideEffects.getGlobalEffects().mayWrite();
+  for (auto &paramEffects : functionSideEffects.getParameterEffects()) {
+    mayRead |= paramEffects.mayRead();
+    mayWrite |= paramEffects.mayWrite();
+  }
+  if (mayWrite)
+    accessResult.setUnidentifiedAccess(SILAccessKind::Modify);
+  else if (mayRead)
+    accessResult.setUnidentifiedAccess(SILAccessKind::Read);
+
+  // If function side effects is "readnone" then this result will have an empty
+  // storageAccessSet and unidentifiedAccess == None.
+  return true;
+}
 
 SILAnalysis *swift::createAccessedStorageAnalysis(SILModule *) {
   return new AccessedStorageAnalysis();

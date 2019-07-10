@@ -25,7 +25,22 @@ OptionalTraps.test("UnwrapNone")
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
-  var a: AnyObject? = returnNil()
+  let a: AnyObject? = returnNil()
+  expectCrashLater()
+  let unwrapped: AnyObject = a!
+  _blackHole(unwrapped)
+}
+
+OptionalTraps.test("UnwrapNone/location")
+  .skip(.custom(
+    { _isFastAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+  .crashOutputMatches(_isDebugAssertConfiguration()
+                        ? "OptionalTraps.swift, line 45"
+                        : "")
+  .code {
+  expectCrashLater()
+  let a: AnyObject? = returnNil()
   expectCrashLater()
   let unwrapped: AnyObject = a!
   _blackHole(unwrapped)

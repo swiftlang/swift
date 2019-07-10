@@ -34,7 +34,7 @@ func instanceMethods(_ b: B) {
 func extensionMethods(b b: B) {
   // CHECK:      load i8*, i8** @"\01L_selector(method:separateExtMethod:)", align 8
   // CHECK:      [[T0:%.*]] = call i8* bitcast (void ()* @objc_msgSend to i8*
-  // CHECK-NEXT: [[T1:%.*]] = {{.*}}call i8* @objc_retainAutoreleasedReturnValue(i8* [[T0]])
+  // CHECK-NEXT: [[T1:%.*]] = {{.*}}call i8* @llvm.objc.retainAutoreleasedReturnValue(i8* [[T0]])
   // CHECK-NOT:  [[T0]]
   // CHECK:      [[T1]]
   b.method(1, separateExtMethod:1.5)
@@ -49,6 +49,10 @@ func initCallToAllocInit(i i: CInt) {
 
 // CHECK-LABEL: linkonce_odr hidden {{.*}} @"$sSo1BC3intABSgs5Int32V_tcfC"
 // CHECK: call [[OPAQUE:%.*]]* @objc_allocWithZone
+
+// CHECK: linkonce_odr hidden {{.*}} @"$sSo1BC3intABSgs5Int32V_tcfcTO"
+// CHECK: load i8*, i8** @"\01L_selector(initWithInt:)"
+// CHECK: call [[OPAQUE:%.*]]* bitcast (void ()* @objc_msgSend
 
 // Indexed subscripting
 // CHECK-LABEL: define hidden swiftcc void @"$s7objc_ir19indexedSubscripting1b3idx1aySo1BC_SiSo1ACtF"
@@ -74,7 +78,7 @@ func propertyAccess(b b: B) {
    // CHECK: load i8*, i8** @"\01L_selector(setCounter:)"
    b.counter = b.counter + 1
 
-   // CHECK: load %objc_class*, %objc_class** @"\01l_OBJC_CLASS_REF_$_B"
+   // CHECK: load %objc_class*, %objc_class** @"OBJC_CLASS_REF_$_B"
    // CHECK: load i8*, i8** @"\01L_selector(sharedCounter)"
    // CHECK: load i8*, i8** @"\01L_selector(setSharedCounter:)"
    B.sharedCounter = B.sharedCounter + 1
@@ -82,10 +86,10 @@ func propertyAccess(b b: B) {
 
 // CHECK-LABEL: define hidden swiftcc %TSo1BC* @"$s7objc_ir8downcast1aSo1BCSo1AC_tF"(
 func downcast(a a: A) -> B {
-  // CHECK: [[CLASS:%.*]] = load %objc_class*, %objc_class** @"\01l_OBJC_CLASS_REF_$_B"
+  // CHECK: [[CLASS:%.*]] = load %objc_class*, %objc_class** @"OBJC_CLASS_REF_$_B"
   // CHECK: [[T0:%.*]] = call %objc_class* @swift_getInitializedObjCClass(%objc_class* [[CLASS]])
   // CHECK: [[T1:%.*]] = bitcast %objc_class* [[T0]] to i8*
-  // CHECK: call i8* @swift_dynamicCastObjCClassUnconditional(i8* [[A:%.*]], i8* [[T1]]) [[NOUNWIND:#[0-9]+]]
+  // CHECK: call i8* @swift_dynamicCastObjCClassUnconditional(i8* [[A:%.*]], i8* [[T1]], {{.*}}) [[NOUNWIND:#[0-9]+]]
   return a as! B
 }
 
@@ -352,18 +356,14 @@ func testBlocksWithGenerics(hba: HasBlockArray) -> Any {
   return hba.blockArray
 }
 
-// CHECK: linkonce_odr hidden {{.*}} @"$sSo1BC3intABSgs5Int32V_tcfcTO"
-// CHECK: load i8*, i8** @"\01L_selector(initWithInt:)"
-// CHECK: call [[OPAQUE:%.*]]* bitcast (void ()* @objc_msgSend
-
 
 // CHECK: attributes [[NOUNWIND]] = { nounwind }
 
 // CHECK: ![[SWIFT_NAME_ALIAS_VAR]] = !DILocalVariable(name: "obj", arg: 1, scope: !{{[0-9]+}}, file: !{{[0-9]+}}, line: {{[0-9]+}}, type: ![[SWIFT_NAME_ALIAS_TYPE:[0-9]+]])
-// CHECK: ![[SWIFT_NAME_ALIAS_TYPE]] = !DIDerivedType(tag: DW_TAG_typedef, name: "$sSo14SwiftNameAliasaD", scope: !{{[0-9]+}}, file: !{{[0-9]+}}, baseType: !{{[0-9]+}})
+// CHECK: ![[SWIFT_NAME_ALIAS_TYPE]] = !DIDerivedType(tag: DW_TAG_typedef, name: "$sSo14SwiftNameAliasaD", scope: !{{[0-9]+}}, file: !{{[0-9]+}}, line: {{[0-9]+}}, baseType: !{{[0-9]+}})
 
 // CHECK: ![[SWIFT_GENERIC_NAME_ALIAS_VAR]] = !DILocalVariable(name: "generic_obj", arg: 1, scope: !{{[0-9]+}}, file: !{{[0-9]+}}, line: {{[0-9]+}}, type: ![[SWIFT_GENERIC_NAME_ALIAS_TYPE:[0-9]+]])
-// CHECK: ![[SWIFT_GENERIC_NAME_ALIAS_TYPE]] = !DIDerivedType(tag: DW_TAG_typedef, name: "$sSo21SwiftGenericNameAliasaySo8NSNumberCGD", scope: !{{[0-9]+}}, file: !{{[0-9]+}}, baseType: !{{[0-9]+}})
+// CHECK: ![[SWIFT_GENERIC_NAME_ALIAS_TYPE]] = !DIDerivedType(tag: DW_TAG_typedef, name: "$sSo21SwiftGenericNameAliasaySo8NSNumberCGD", scope: !{{[0-9]+}}, file: !{{[0-9]+}}, line: {{[0-9]+}}, baseType: !{{[0-9]+}})
 
 // CHECK: ![[SWIFT_CONSTR_GENERIC_NAME_ALIAS_VAR]] = !DILocalVariable(name: "constr_generic_obj", arg: 1, scope: !{{[0-9]+}}, file: !{{[0-9]+}}, line: {{[0-9]+}}, type: ![[SWIFT_CONSTR_GENERIC_NAME_ALIAS_TYPE:[0-9]+]])
-// CHECK: ![[SWIFT_CONSTR_GENERIC_NAME_ALIAS_TYPE]] = !DIDerivedType(tag: DW_TAG_typedef, name: "$sSo27SwiftConstrGenericNameAliasaySo8NSNumberCGD", scope: !{{[0-9]+}}, file: !{{[0-9]+}}, baseType: !{{[0-9]+}})
+// CHECK: ![[SWIFT_CONSTR_GENERIC_NAME_ALIAS_TYPE]] = !DIDerivedType(tag: DW_TAG_typedef, name: "$sSo27SwiftConstrGenericNameAliasaySo8NSNumberCGD", scope: !{{[0-9]+}}, file: !{{[0-9]+}}, line: {{[0-9]+}}, baseType: !{{[0-9]+}})

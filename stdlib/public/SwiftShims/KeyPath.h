@@ -14,8 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef __SWIFT_SHIMS_KEYPATH_H__
-#define __SWIFT_SHIMS_KEYPATH_H__
+#ifndef SWIFT_STDLIB_SHIMS_KEYPATH_H
+#define SWIFT_STDLIB_SHIMS_KEYPATH_H
 
 #include "SwiftStdint.h"
 
@@ -106,10 +106,12 @@ static const __swift_uint32_t _SwiftKeyPathComponentHeader_ComputedIDResolved
   = 0x00000000U;
 static const __swift_uint32_t _SwiftKeyPathComponentHeader_ComputedIDUnresolvedIndirectPointer
   = 0x00000002U;
+static const __swift_uint32_t _SwiftKeyPathComponentHeader_ComputedIDUnresolvedFunctionCall
+  = 0x00000001U;
 
-extern void *(swift_keyPathGenericWitnessTable[]);
+extern const void *_Nonnull (swift_keyPathGenericWitnessTable[]);
 
-static inline void *__swift_keyPathGenericWitnessTable_addr(void) {
+static inline const void *_Nonnull __swift_keyPathGenericWitnessTable_addr(void) {
   return swift_keyPathGenericWitnessTable;
 }
 
@@ -118,4 +120,4 @@ static inline void *__swift_keyPathGenericWitnessTable_addr(void) {
 } // namespace swift
 #endif
 
-#endif // __SWIFT_SHIMS_KEYPATH_H__
+#endif // SWIFT_STDLIB_SHIMS_KEYPATH_H

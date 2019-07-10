@@ -33,7 +33,7 @@
 ///
 /// For more information about using arrays, see `Array` and `ArraySlice`, with
 /// which `ContiguousArray` shares most properties and methods.
-@_fixed_layout
+@frozen
 public struct ContiguousArray<Element>: _DestructorSafeContainer {
   @usableFromInline
   internal typealias _Buffer = _ContiguousArrayBuffer<Element>
@@ -520,10 +520,7 @@ extension ContiguousArray: RangeReplaceableCollection {
   /// - Parameter s: The sequence of elements to turn into an array.
   @inlinable
   public init<S: Sequence>(_ s: S) where S.Element == Element {
-    self = ContiguousArray(
-      _buffer: _Buffer(
-        _buffer: s._copyToContiguousArray()._buffer,
-        shiftedToStartIndex: 0))
+    self.init(_buffer: s._copyToContiguousArray()._buffer)
   }
 
   /// Creates a new array containing the specified number of a single, repeated
@@ -670,7 +667,7 @@ extension ContiguousArray: RangeReplaceableCollection {
       _buffer = _Buffer(
         _buffer: newBuffer, shiftedToStartIndex: _buffer.startIndex)
     }
-    _sanityCheck(capacity >= minimumCapacity)
+    _internalInvariant(capacity >= minimumCapacity)
   }
 
   /// Copy the contents of the current buffer to a new unique mutable buffer.
@@ -698,9 +695,9 @@ extension ContiguousArray: RangeReplaceableCollection {
   @_semantics("array.mutate_unknown")
   internal mutating func _reserveCapacityAssumingUniqueBuffer(oldCount: Int) {
     // This is a performance optimization. This code used to be in an ||
-    // statement in the _sanityCheck below.
+    // statement in the _internalInvariant below.
     //
-    //   _sanityCheck(_buffer.capacity == 0 ||
+    //   _internalInvariant(_buffer.capacity == 0 ||
     //                _buffer.isMutableAndUniquelyReferenced())
     //
     // SR-6437
@@ -715,7 +712,7 @@ extension ContiguousArray: RangeReplaceableCollection {
     // This specific case is okay because we will make the buffer unique in this
     // function because we request a capacity > 0 and therefore _copyToNewBuffer
     // will be called creating a new buffer.
-    _sanityCheck(capacity ||
+    _internalInvariant(capacity ||
                  _buffer.isMutableAndUniquelyReferenced())
 
     if _slowPath(oldCount + 1 > _buffer.capacity) {
@@ -729,8 +726,8 @@ extension ContiguousArray: RangeReplaceableCollection {
     _ oldCount: Int,
     newElement: __owned Element
   ) {
-    _sanityCheck(_buffer.isMutableAndUniquelyReferenced())
-    _sanityCheck(_buffer.capacity >= _buffer.count + 1)
+    _internalInvariant(_buffer.isMutableAndUniquelyReferenced())
+    _internalInvariant(_buffer.capacity >= _buffer.count + 1)
 
     _buffer.count = oldCount + 1
     (_buffer.firstElementAddress + oldCount).initialize(to: newElement)
@@ -759,7 +756,7 @@ extension ContiguousArray: RangeReplaceableCollection {
   ///   same array.
   @inlinable
   @_semantics("array.append_element")
-  public mutating func append(_ newElement: Element) {
+  public mutating func append(_ newElement: __owned Element) {
     _makeUniqueAndReserveCapacityIfNotUnique()
     let oldCount = _getCount()
     _reserveCapacityAssumingUniqueBuffer(oldCount: oldCount)
@@ -784,7 +781,7 @@ extension ContiguousArray: RangeReplaceableCollection {
   ///   array.
   @inlinable
   @_semantics("array.append_contentsOf")
-  public mutating func append<S: Sequence>(contentsOf newElements: S)
+  public mutating func append<S: Sequence>(contentsOf newElements: __owned S)
     where S.Element == Element {
 
     let newElementsCount = newElements.underestimatedCount
@@ -924,11 +921,31 @@ extension ContiguousArray: RangeReplaceableCollection {
   }
 
   @inlinable
+  public mutating func withContiguousMutableStorageIfAvailable<R>(
+    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return try withUnsafeMutableBufferPointer {
+      (bufferPointer) -> R in
+      return try body(&bufferPointer)
+    }
+  }
+  
+  @inlinable
+  public func withContiguousStorageIfAvailable<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return try withUnsafeBufferPointer {
+      (bufferPointer) -> R in
+      return try body(bufferPointer)
+    }
+  }
+
+  @inlinable
   public __consuming func _copyToContiguousArray() -> ContiguousArray<Element> {
     if let n = _buffer.requestNativeBuffer() {
       return ContiguousArray(_buffer: n)
     }
-    return _copyCollectionToContiguousArray(_buffer)
+    return _copyCollectionToContiguousArray(self)
   }
 }
 
@@ -968,6 +985,43 @@ extension ContiguousArray {
 }
 
 extension ContiguousArray {
+  /// Creates an array with the specified capacity, then calls the given
+  /// closure with a buffer covering the array's uninitialized memory.
+  ///
+  /// Inside the closure, set the `initializedCount` parameter to the number of
+  /// elements that are initialized by the closure. The memory in the range
+  /// `buffer[0..<initializedCount]` must be initialized at the end of the
+  /// closure's execution, and the memory in the range
+  /// `buffer[initializedCount...]` must be uninitialized. This postcondition
+  /// must hold even if the `initializer` closure throws an error.
+  ///
+  /// - Note: While the resulting array may have a capacity larger than the
+  ///   requested amount, the buffer passed to the closure will cover exactly
+  ///   the requested number of elements.
+  ///
+  /// - Parameters:
+  ///   - unsafeUninitializedCapacity: The number of elements to allocate
+  ///     space for in the new array.
+  ///   - initializer: A closure that initializes elements and sets the count
+  ///     of the new array.
+  ///     - Parameters:
+  ///       - buffer: A buffer covering uninitialized memory with room for the
+  ///         specified number of of elements.
+  ///       - initializedCount: The count of initialized elements in the array,
+  ///         which begins as zero. Set `initializedCount` to the number of
+  ///         elements you initialize.
+  @_alwaysEmitIntoClient @inlinable
+  public init(
+    unsafeUninitializedCapacity: Int,
+    initializingWith initializer: (
+      _ buffer: inout UnsafeMutableBufferPointer<Element>,
+      _ initializedCount: inout Int) throws -> Void
+  ) rethrows {
+    self = try ContiguousArray(Array(
+      _unsafeUninitializedCapacity: unsafeUninitializedCapacity,
+      initializingWith: initializer))
+  }
+
   /// Calls a closure with a pointer to the array's contiguous storage.
   ///
   /// Often, the optimizer can eliminate bounds checks within an array
@@ -1041,6 +1095,7 @@ extension ContiguousArray {
   ///   method's execution.
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @_semantics("array.withUnsafeMutableBufferPointer")
+  @inlinable // FIXME(inline-always)
   @inline(__always) // Performance: This method should get inlined into the
   // caller such that we can combine the partial apply with the apply in this
   // function saving on allocating a closure context. This becomes unnecessary
@@ -1202,8 +1257,8 @@ extension ContiguousArray: Equatable where Element: Equatable {
     }
 
 
-    _sanityCheck(lhs.startIndex == 0 && rhs.startIndex == 0)
-    _sanityCheck(lhs.endIndex == lhsCount && rhs.endIndex == lhsCount)
+    _internalInvariant(lhs.startIndex == 0 && rhs.startIndex == 0)
+    _internalInvariant(lhs.endIndex == lhsCount && rhs.endIndex == lhsCount)
 
     // We know that lhs.count == rhs.count, compare element wise.
     for idx in 0..<lhsCount {

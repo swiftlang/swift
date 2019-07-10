@@ -307,12 +307,23 @@ public:
   ///   <t_0_0, t_0_1, t_1_0>
   /// then this will return 0 for t_0_0, 1 for t_0_1, and 2 for t_1_0.
   unsigned getGenericParamOrdinal(GenericTypeParamType *param);
+      
+  /// Get a substitution map that maps all of the generic signature's
+  /// generic parameters to themselves.
+  SubstitutionMap getIdentitySubstitutionMap() const;
+
+  /// Whether this generic signature involves a type variable.
+  bool hasTypeVariable() const;
+
+  /// Whether the given set of requirements involves a type variable.
+  static bool hasTypeVariable(ArrayRef<Requirement> requirements);
 
   static void Profile(llvm::FoldingSetNodeID &ID,
                       TypeArrayView<GenericTypeParamType> genericParams,
                       ArrayRef<Requirement> requirements);
   
   void print(raw_ostream &OS, PrintOptions Options = PrintOptions()) const;
+  void print(ASTPrinter &Printer, PrintOptions Opts = PrintOptions()) const;
   void dump() const;
   std::string getAsString() const;
 };

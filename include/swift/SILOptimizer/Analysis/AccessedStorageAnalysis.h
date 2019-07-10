@@ -15,14 +15,18 @@
 // used by AccessEnforcementOpts to locally fold access scopes and remove
 // dynamic checks based on whole module analysis.
 //
+// This analysis may return conservative results by setting
+// FunctionAccessedStorage.unidentifiedAccess. This does not imply that all
+// accesses within the function have Unidentified AccessedStorage.
+//
 // Note: This interprocedural analysis can be easily augmented to simultaneously
 // compute FunctionSideEffects, without using a separate analysis, by adding
 // FunctionSideEffects as a member of FunctionAccessedStorage. However, passes
 // that use AccessedStorageAnalysis do not currently need SideEffectAnalysis.
 //
 //===----------------------------------------------------------------------===//
-#ifndef SWIFT_SILOPTIMIZER_ANALYSIS_ACCESSED_STORAGE_ANALYSIS_H_
-#define SWIFT_SILOPTIMIZER_ANALYSIS_ACCESSED_STORAGE_ANALYSIS_H_
+#ifndef SWIFT_SILOPTIMIZER_ANALYSIS_ACCESSED_STORAGE_ANALYSIS_H
+#define SWIFT_SILOPTIMIZER_ANALYSIS_ACCESSED_STORAGE_ANALYSIS_H
 
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/SILFunction.h"
@@ -94,9 +98,10 @@ public:
 };
 } // namespace swift
 
+namespace llvm {
 // Use the same DenseMapInfo for StorageAccessInfo as for AccessedStorage. None
 // of the subclass bitfields participate in the Key.
-template <> struct llvm::DenseMapInfo<swift::StorageAccessInfo> {
+template <> struct DenseMapInfo<swift::StorageAccessInfo> {
   static swift::StorageAccessInfo getEmptyKey() {
     auto key = DenseMapInfo<swift::AccessedStorage>::getEmptyKey();
     return static_cast<swift::StorageAccessInfo &>(key);
@@ -114,38 +119,46 @@ template <> struct llvm::DenseMapInfo<swift::StorageAccessInfo> {
     return DenseMapInfo<swift::AccessedStorage>::isEqual(LHS, RHS);
   }
 };
+}
 
 namespace swift {
-/// The per-function result of AccessedStorageAnalysis.
-///
+using AccessedStorageSet = llvm::SmallDenseSet<StorageAccessInfo, 8>;
+
 /// Records each unique AccessedStorage in a set of StorageAccessInfo
 /// objects. Hashing and equality only sees the AccesedStorage data. The
 /// additional StorageAccessInfo bits are recorded as results of this analysis.
 ///
 /// Any unidentified accesses are summarized as a single unidentifiedAccess
-/// property.
-class FunctionAccessedStorage {
-  using AccessedStorageSet = llvm::SmallDenseSet<StorageAccessInfo, 8>;
-
+/// property. This property may also be used to conservatively summarize
+/// results, either because the call graph is unknown or the access sets are too
+/// large. It does not imply that all accesses have Unidentified
+/// AccessedStorage, which is never allowed for class or global access.
+class AccessedStorageResult {
   AccessedStorageSet storageAccessSet;
   Optional<SILAccessKind> unidentifiedAccess;
 
 public:
-  FunctionAccessedStorage() {}
+  AccessedStorageResult() {}
 
   // ---------------------------------------------------------------------------
   // Accessing the results.
+
+  const AccessedStorageSet &getStorageSet() const { return storageAccessSet; }
+
+  bool isEmpty() const {
+    return storageAccessSet.empty() && !unidentifiedAccess;
+  }
 
   bool hasUnidentifiedAccess() const { return unidentifiedAccess != None; }
 
   /// Return true if the analysis has determined all accesses of otherStorage
   /// have the [no_nested_conflict] flag set.
   ///
-  /// Only call this if there is no unidentifiedAccess in the function and the
+  /// Only call this if there is no unidentifiedAccess in the region and the
   /// given storage is uniquely identified.
   bool hasNoNestedConflict(const AccessedStorage &otherStorage) const;
 
-  /// Does any of the accesses represented by this FunctionAccessedStorage
+  /// Does any of the accesses represented by this AccessedStorageResult
   /// object conflict with the given access kind and storage.
   bool mayConflictWith(SILAccessKind otherAccessKind,
                        const AccessedStorage &otherStorage) const;
@@ -162,12 +175,106 @@ public:
     unidentifiedAccess = None;
   }
 
+  /// Return true if these effects are fully conservative.
+  bool hasWorstEffects() { return unidentifiedAccess == SILAccessKind::Modify; }
+
   /// Sets the most conservative effects, if we don't know anything about the
   /// function.
   void setWorstEffects() {
     storageAccessSet.clear();
     unidentifiedAccess = SILAccessKind::Modify;
   }
+
+  void setUnidentifiedAccess(SILAccessKind kind) { unidentifiedAccess = kind; }
+
+  /// Merge effects directly from \p RHS.
+  bool mergeFrom(const AccessedStorageResult &other);
+
+  /// Merge the effects represented in calleeAccess into this
+  /// FunctionAccessedStorage object. calleeAccess must correspond to at least
+  /// one callee at the apply site `fullApply`. Merging drops any local effects,
+  /// and translates parameter effects into effects on the caller-side
+  /// arguments.
+  ///
+  /// The full caller-side effects at a call site can be obtained with
+  /// AccessedStorageAnalysis::getCallSiteEffects().
+  bool mergeFromApply(const AccessedStorageResult &calleeAccess,
+                      FullApplySite fullApply);
+
+  /// Record any access scopes entered by the given single SIL instruction. 'I'
+  /// must not be a FullApply; use mergeFromApply instead.
+  void analyzeInstruction(SILInstruction *I);
+
+  void print(raw_ostream &os) const;
+  void dump() const;
+
+protected:
+  std::pair<AccessedStorageSet::iterator, bool>
+  insertStorageAccess(StorageAccessInfo storageAccess) {
+    storageAccess.setStorageIndex(storageAccessSet.size());
+    return storageAccessSet.insert(storageAccess);
+  }
+
+  bool updateUnidentifiedAccess(SILAccessKind accessKind);
+
+  bool mergeAccesses(const AccessedStorageResult &other,
+                     std::function<StorageAccessInfo(const StorageAccessInfo &)>
+                         transformStorage);
+
+  template <typename B> void visitBeginAccess(B *beginAccess);
+};
+} // namespace swift
+
+namespace swift {
+/// The per-function result of AccessedStorageAnalysis.
+class FunctionAccessedStorage {
+  AccessedStorageResult accessResult;
+
+public:
+  FunctionAccessedStorage() {}
+
+  // ---------------------------------------------------------------------------
+  // Accessing the results.
+
+  const AccessedStorageResult &getResult() const { return accessResult; }
+
+  bool hasUnidentifiedAccess() const {
+    return accessResult.hasUnidentifiedAccess();
+  }
+
+  /// Return true if the analysis has determined all accesses of otherStorage
+  /// have the [no_nested_conflict] flag set.
+  ///
+  /// Only call this if there is no unidentifiedAccess in the function and the
+  /// given storage is uniquely identified.
+  bool hasNoNestedConflict(const AccessedStorage &otherStorage) const {
+    return accessResult.hasNoNestedConflict(otherStorage);
+  }
+
+  /// Does any of the accesses represented by this FunctionAccessedStorage
+  /// object conflict with the given access kind and storage.
+  bool mayConflictWith(SILAccessKind otherAccessKind,
+                       const AccessedStorage &otherStorage) const {
+    return accessResult.mayConflictWith(otherAccessKind, otherStorage);
+  }
+
+  /// Raw access to the result for a given AccessedStorage location.
+  StorageAccessInfo
+  getStorageAccessInfo(const AccessedStorage &otherStorage) const {
+    return accessResult.getStorageAccessInfo(otherStorage);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Constructing the results.
+
+  void clear() { accessResult.clear(); }
+
+  /// Return true if these effects are fully conservative.
+  bool hasWorstEffects() { return accessResult.hasWorstEffects(); }
+
+  /// Sets the most conservative effects, if we don't know anything about the
+  /// function.
+  void setWorstEffects() { accessResult.setWorstEffects(); }
 
   /// Summarize the given function's effects using this FunctionAccessedStorage
   /// object.
@@ -189,12 +296,14 @@ public:
   ///
   /// TODO: Summarize ArraySemanticsCall accesses.
   bool summarizeCall(FullApplySite fullApply) {
-    assert(storageAccessSet.empty() && "expected uninitialized results.");
+    assert(accessResult.isEmpty() && "expected uninitialized results.");
     return false;
   }
 
   /// Merge effects directly from \p RHS.
-  bool mergeFrom(const FunctionAccessedStorage &RHS);
+  bool mergeFrom(const FunctionAccessedStorage &RHS) {
+    return accessResult.mergeFrom(RHS.accessResult);
+  }
 
   /// Merge the effects represented in calleeAccess into this
   /// FunctionAccessedStorage object. calleeAccess must correspond to at least
@@ -205,31 +314,19 @@ public:
   /// The full caller-side effects at a call site can be obtained with
   /// AccessedStorageAnalysis::getCallSiteEffects().
   bool mergeFromApply(const FunctionAccessedStorage &calleeAccess,
-                      FullApplySite fullApply);
+                      FullApplySite fullApply) {
+    return accessResult.mergeFromApply(calleeAccess.accessResult, fullApply);
+  }
 
   /// Analyze the side-effects of a single SIL instruction \p I.
   /// Visited callees are added to \p BottomUpOrder until \p RecursionDepth
   /// reaches MaxRecursionDepth.
-  void analyzeInstruction(SILInstruction *I);
-
-  void print(raw_ostream &os) const;
-  void dump() const;
-
-protected:
-  std::pair<AccessedStorageSet::iterator, bool>
-  insertStorageAccess(StorageAccessInfo storageAccess) {
-    storageAccess.setStorageIndex(storageAccessSet.size());
-    return storageAccessSet.insert(storageAccess);
+  void analyzeInstruction(SILInstruction *I) {
+    accessResult.analyzeInstruction(I);
   }
 
-  bool updateUnidentifiedAccess(SILAccessKind accessKind);
-
-  bool mergeAccesses(
-      const FunctionAccessedStorage &other,
-      std::function<StorageAccessInfo(const StorageAccessInfo &)>
-          transformStorage);
-
-  template <typename B> void visitBeginAccess(B *beginAccess);
+  void print(raw_ostream &os) const { accessResult.print(os); }
+  void dump() const { accessResult.dump(); }
 };
 
 /// Summarizes the dynamic accesses performed within a function and its
@@ -260,4 +357,4 @@ public:
 
 } // end namespace swift
 
-#endif // SWIFT_SILOPTIMIZER_ANALYSIS_ACCESSED_STORAGE_ANALYSIS_H_
+#endif // SWIFT_SILOPTIMIZER_ANALYSIS_ACCESSED_STORAGE_ANALYSIS_H

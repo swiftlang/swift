@@ -1,5 +1,3 @@
-// REQUIRES: rdar39260564
-
 // RUN: %swift-format %s >%t.response
 // RUN: diff -u %s.response %t.response
 // RUN: %swift-format -indent-width 2 %s >%t.response

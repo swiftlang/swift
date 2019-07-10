@@ -16,6 +16,7 @@
 
 #include "swift/AST/SwiftNameTranslation.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/Basic/StringExtras.h"
@@ -49,6 +50,34 @@ getNameForObjC(const ValueDecl *VD, CustomNamesOnly_t customNamesOnly) {
   }
 
   return VD->getBaseName().getIdentifier().str();
+}
+
+std::string swift::objc_translation::
+getErrorDomainStringForObjC(const EnumDecl *ED) {
+  // Should have already been diagnosed as diag::objc_enum_generic.
+  assert(!ED->isGenericContext() && "Trying to bridge generic enum error to Obj-C");
+
+  // Clang decls have custom domains, but we shouldn't see them here anyway.
+  assert(!ED->getClangDecl() && "clang decls shouldn't be re-exported");
+
+  SmallVector<const NominalTypeDecl *, 4> outerTypes;
+  for (const NominalTypeDecl * D = ED;
+       D != nullptr;
+       D = D->getDeclContext()->getSelfNominalTypeDecl()) {
+    // We don't currently PrintAsObjC any types whose parents are private or
+    // fileprivate.
+    assert(D->getFormalAccess() >= AccessLevel::Internal &&
+            "We don't currently append private discriminators");
+    outerTypes.push_back(D);
+  }
+
+  std::string buffer = ED->getParentModule()->getNameStr();
+  for (auto D : reversed(outerTypes)) {
+    buffer += ".";
+    buffer += D->getNameStr();
+  }
+
+  return buffer;
 }
 
 bool swift::objc_translation::

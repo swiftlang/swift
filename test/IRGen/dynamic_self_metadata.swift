@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir -parse-as-library | %FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir -parse-as-library | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 
@@ -11,6 +11,18 @@
   return t
 }
 // CHECK-LABEL: define hidden swiftcc void @"$s21dynamic_self_metadata2idyxxlF"
+
+protocol P {
+  associatedtype T
+}
+
+extension P {
+  func f() {}
+}
+
+struct G<T> : P {
+  var t: T
+}
 
 class C {
   class func fromMetatype() -> Self? { return nil }
@@ -30,4 +42,15 @@ class C {
   // CHECK: [[T0:%.+]] = call swiftcc %swift.metadata_response @"$sSqMa"(i64 0, %swift.type* [[TYPE1]])
   // CHECK: [[TYPE2:%.+]] = extractvalue %swift.metadata_response [[T0]], 0
   // CHECK: call swiftcc void @"$s21dynamic_self_metadata2idyxxlF"({{.*}}, %swift.type* [[TYPE2]])
+
+  func dynamicSelfConformingType() -> Self? {
+    _ = G(t: self).f()
+    return nil
+  }
+  // CHECK-LABEL: define hidden swiftcc i64 @"$s21dynamic_self_metadata1CC0A18SelfConformingTypeACXDSgyF"(%T21dynamic_self_metadata1CC* swiftself)
+  // CHECK: [[SELF:%.*]] = bitcast %T21dynamic_self_metadata1CC* %0 to %objc_object*
+  // CHECK: [[SELF_TYPE:%.*]] = call %swift.type* @swift_getObjectType(%objc_object* [[SELF]])
+  // CHECK: [[METADATA_RESPONSE:%.*]] = call swiftcc %swift.metadata_response @"$s21dynamic_self_metadata1GVMa"(i64 0, %swift.type* [[SELF_TYPE]])
+  // CHECK: [[METADATA:%.*]] =  extractvalue %swift.metadata_response [[METADATA_RESPONSE]], 0
+  // CHECK: call i8** @swift_getWitnessTable(%swift.protocol_conformance_descriptor* bitcast ({{.*}} @"$s21dynamic_self_metadata1GVyxGAA1PAAMc" to %swift.protocol_conformance_descriptor*), %swift.type* [[METADATA]], i8*** undef)
 }

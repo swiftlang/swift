@@ -46,11 +46,12 @@ class StreamDiagConsumer : public DiagnosticConsumer {
 public:
   StreamDiagConsumer(llvm::raw_ostream &OS) : OS(OS) {}
 
-  void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
-                        DiagnosticKind Kind,
-                        StringRef FormatString,
-                        ArrayRef<DiagnosticArgument> FormatArgs,
-                        const DiagnosticInfo &Info) override {
+  void
+  handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
+                   StringRef FormatString,
+                   ArrayRef<DiagnosticArgument> FormatArgs,
+                   const DiagnosticInfo &Info,
+                   const SourceLoc bufferIndirectlyCausingDiagnostic) override {
     // FIXME: Print location info if available.
     switch (Kind) {
       case DiagnosticKind::Error: OS << "error: "; break;
@@ -175,7 +176,6 @@ namespace SourceKit {
     SmallVector<ImmutableTextSnapshotRef, 4> Snapshots;
     EditorDiagConsumer CollectDiagConsumer;
     CompilerInstance CompInst;
-    OwnedResolver TypeResolver{ nullptr, nullptr };
     WorkQueue Queue{ WorkQueue::Dequeuing::Serial, "sourcekit.swift.ConsumeAST" };
 
     Implementation(uint64_t Generation, std::shared_ptr<SwiftStatistics> Stats)
@@ -186,6 +186,15 @@ namespace SourceKit {
 
   void ASTUnit::Implementation::consumeAsync(SwiftASTConsumerRef ConsumerRef,
                                              ASTUnitRef ASTRef) {
+#if defined(_WIN32)
+	// Windows uses more up for stack space (why?) than macOS/Linux which
+	// causes stack overflows in a dispatch thread with 64k stack. Passing
+	// useDeepStack=true means it's given a _beginthreadex thread with an 8MB
+	// stack.
+	bool useDeepStack = true;
+#else
+	bool useDeepStack = false;
+#endif
     Queue.dispatch([ASTRef, ConsumerRef]{
       SwiftASTConsumer &ASTConsumer = *ConsumerRef;
 
@@ -197,7 +206,7 @@ namespace SourceKit {
         LOG_WARN_FUNC("did not find primary SourceFile");
         ConsumerRef->failed("did not find primary SourceFile");
       }
-    });
+    }, useDeepStack);
   }
 
   ASTUnit::ASTUnit(uint64_t Generation, std::shared_ptr<SwiftStatistics> Stats)
@@ -432,18 +441,28 @@ bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &Invocation,
                                              DiagnosticEngine &Diags,
                                              StringRef UnresolvedPrimaryFile,
                                              std::string &Error) {
-  SmallVector<const char *, 16> Args(OrigArgs.begin(), OrigArgs.end());
+  SmallVector<const char *, 16> Args;
+  // Make sure to put '-resource-dir' at the top to allow overriding it by
+  // the passed in arguments.
   Args.push_back("-resource-dir");
   Args.push_back(Impl.RuntimeResourcePath.c_str());
+  Args.append(OrigArgs.begin(), OrigArgs.end());
+
+  SmallString<32> ErrStr;
+  llvm::raw_svector_ostream ErrOS(ErrStr);
+  StreamDiagConsumer DiagConsumer(ErrOS);
+  Diags.addConsumer(DiagConsumer);
 
   bool HadError = driver::getSingleFrontendInvocationFromDriverArguments(
       Args, Diags, [&](ArrayRef<const char *> FrontendArgs) {
     return Invocation.parseArgs(FrontendArgs, Diags);
   });
 
+  // Remove the StreamDiagConsumer as it's no longer needed.
+  Diags.removeConsumer(DiagConsumer);
+
   if (HadError) {
-    // FIXME: Get the actual diagnostic.
-    Error = "error when parsing the compiler arguments";
+    Error = ErrOS.str();
     return true;
   }
 
@@ -491,20 +510,9 @@ bool SwiftASTManager::initCompilerInvocation(CompilerInvocation &CompInvok,
                                              ArrayRef<const char *> OrigArgs,
                                              StringRef PrimaryFile,
                                              std::string &Error) {
-
-  SmallString<32> ErrStr;
-  llvm::raw_svector_ostream ErrOS(ErrStr);
   DiagnosticEngine Diagnostics(Impl.SourceMgr);
-  StreamDiagConsumer DiagConsumer(ErrOS);
-  Diagnostics.addConsumer(DiagConsumer);
-
-  if (initCompilerInvocation(CompInvok, OrigArgs, Diagnostics, PrimaryFile,
-                             Error)) {
-    if (!ErrOS.str().empty())
-      Error = ErrOS.str();
-    return true;
-  }
-  return false;
+  return initCompilerInvocation(CompInvok, OrigArgs, Diagnostics, PrimaryFile,
+                                Error);
 }
 
 bool SwiftASTManager::initCompilerInvocationNoInputs(
@@ -790,8 +798,16 @@ static void collectModuleDependencies(ModuleDecl *TopMod,
     return;
 
   auto ClangModuleLoader = TopMod->getASTContext().getClangModuleLoader();
+
+  ModuleDecl::ImportFilter ImportFilter;
+  ImportFilter |= ModuleDecl::ImportFilterKind::Public;
+  ImportFilter |= ModuleDecl::ImportFilterKind::Private;
+  if (Visited.empty()) {
+    // Only collect implementation-only dependencies from the main module.
+    ImportFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
+  }
   SmallVector<ModuleDecl::ImportedModule, 8> Imports;
-  TopMod->getImportedModules(Imports, ModuleDecl::ImportFilter::All);
+  TopMod->getImportedModules(Imports, ImportFilter);
 
   for (auto Import : Imports) {
     ModuleDecl *Mod = Import.second;
@@ -925,11 +941,6 @@ ASTUnitRef ASTProducer::createASTUnit(SwiftASTManager::Implementation &MgrImpl,
       runSILDiagnosticPasses(*SILMod);
     }
   }
-
-  // We mirror the compiler and don't set the TypeResolver during SIL
-  // processing. This is to avoid unnecessary typechecking that can occur if the
-  // TypeResolver is set before.
-  ASTRef->Impl.TypeResolver = createLazyResolver(CompIns.getASTContext());
 
   return ASTRef;
 }

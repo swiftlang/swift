@@ -19,8 +19,13 @@ import TestsUtils
 public var LinkedList = BenchmarkInfo(
   name: "LinkedList",
   runFunction: run_LinkedList,
-  tags: [.runtime, .cpubench, .refcount]
-)
+  tags: [.runtime, .cpubench, .refcount],
+  setUpFunction: { for i in 0..<size { head = Node(n:head, d:i) } },
+  tearDownFunction: { head = Node(n:nil, d:0) },
+  legacyFactor: 40)
+
+let size = 100
+var head = Node(n:nil, d:0)
 
 final class Node {
   var next: Node?
@@ -34,16 +39,10 @@ final class Node {
 
 @inline(never)
 public func run_LinkedList(_ N: Int) {
-  let size = 100
-  var head = Node(n:nil, d:0)
-  for i in 0..<size {
-    head = Node(n:head, d:i)
-  }
-
   var sum = 0
   let ref_result = size*(size-1)/2
   var ptr = head
-  for _ in 1...5000*N {
+  for _ in 1...125*N {
     ptr = head
     sum = 0
     while let nxt = ptr.next {

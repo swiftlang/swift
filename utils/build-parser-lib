@@ -1,0 +1,301 @@
+#!/usr/bin/env python
+# utils/build-parser-lib - Helper tool for building the parser library -*- python -*-
+#
+# This source file is part of the Swift.org open source project
+#
+# Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
+# Licensed under Apache License v2.0 with Runtime Library Exception
+#
+# See https://swift.org/LICENSE.txt for license information
+# See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+
+# This is a utility for building only the syntax parser library as fast as possible
+# by only building the necessary libraries for the parser library and nothing
+# extraneous. To achieve this it does a single unified CMake configuration for
+# llvm/clang/swift and builds only the parser library target.
+# This mechanism is fundamentally different from build-script, which builds llvm/clang
+# in a separate build directory than swift.
+#
+# Even though this bypasses build-script, it does share some underlying helper
+# utilities from the python infrastructure.
+#
+# This utility also provides capability to gather profile data and build the parser
+# library with PGO optimization enabled.
+
+from __future__ import print_function
+
+import multiprocessing
+import os
+import platform
+import sys
+
+from build_swift import argparse, defaults
+from swift_build_support.swift_build_support import (
+    shell,
+)
+from swift_build_support.swift_build_support.SwiftBuildSupport import (
+    HOME,
+    SWIFT_BUILD_ROOT,
+    SWIFT_SOURCE_ROOT,
+)
+from swift_build_support.swift_build_support.toolchain import host_toolchain
+
+isDarwin = platform.system() == 'Darwin'
+
+class Builder(object):
+    def __init__(self, toolchain, args, profile_data=None, arch=None, native_build_dir=None):
+        self.toolchain = toolchain
+        self.ninja_path = args.ninja_path
+        self.build_release = args.release
+        self.enable_assertions = not args.no_assertions
+        self.lto_type = args.lto_type
+        self.pgo_type = args.pgo_type
+        self.profile_input = args.profile_input
+        self.profile_data = profile_data
+        self.dry_run = args.dry_run
+        self.jobs = args.build_jobs
+        self.verbose = args.verbose
+        self.build_dir = args.build_dir
+        self.install_destdir = args.install_destdir
+        self.install_prefix = args.install_prefix
+        self.version = args.version
+        self.arch = arch
+        self.native_build_dir = native_build_dir
+
+    def call(self, command, env=None, without_sleeping=False):
+        if without_sleeping:
+            shell.call_without_sleeping(command, env=env, dry_run=self.dry_run, echo=self.verbose)
+        else:
+            shell.call(command, env=env, dry_run=self.dry_run, echo=self.verbose)
+
+    def configure(self, enable_debuginfo, instrumentation=None, profile_data=None):
+        cmake_args = [self.toolchain.cmake, '-G', 'Ninja']
+        cmake_args += ['-DCMAKE_MAKE_PROGRAM='+self.ninja_path]
+        if isDarwin:
+            cmake_args += ['-DCMAKE_OSX_DEPLOYMENT_TARGET=10.12', '-DSWIFT_DARWIN_DEPLOYMENT_VERSION_OSX=10.12']
+            if self.arch is not None:
+                cmake_args += [
+                    '-DLLVM_HOST_TRIPLE:STRING='+self.arch+'-apple-darwin16.0',
+                    '-DSWIFT_HOST_TRIPLE:STRING='+self.arch+'-apple-darwin16.0',
+                    '-DCMAKE_C_FLAGS=-arch '+self.arch,
+                    '-DCMAKE_CXX_FLAGS=-arch '+self.arch,
+                    '-DSWIFT_HOST_VARIANT_ARCH='+self.arch,
+                ]
+            if self.native_build_dir is not None:
+                cmake_args += [
+                    '-DLLVM_TABLEGEN='+os.path.join(self.native_build_dir, 'bin', 'llvm-tblgen'),
+                    '-DCLANG_TABLEGEN='+os.path.join(self.native_build_dir, 'bin', 'clang-tblgen'),
+                    '-DLLVM_NATIVE_BUILD='+self.native_build_dir,
+                    '-DSWIFT_NATIVE_LLVM_TOOLS_PATH:STRING='+os.path.join(self.native_build_dir, 'bin'),
+                    '-DSWIFT_NATIVE_CLANG_TOOLS_PATH:STRING='+os.path.join(self.native_build_dir, 'bin'),
+                    '-DSWIFT_NATIVE_SWIFT_TOOLS_PATH:STRING='+os.path.join(self.native_build_dir, 'bin'),
+                ]
+        else:
+            dispatch_source_path = os.path.join(SWIFT_SOURCE_ROOT, 'swift-corelibs-libdispatch')
+            cmake_args += ['-DSWIFT_HOST_VARIANT=linux', '-DSWIFT_HOST_VARIANT_SDK=LINUX', '-DSWIFT_HOST_VARIANT_ARCH=x86_64',
+                '-DSWIFT_PATH_TO_LIBDISPATCH_SOURCE:PATH='+dispatch_source_path,
+                '-DLLVM_ENABLE_LLD=ON']
+        cmake_args += ['-DLLVM_TARGETS_TO_BUILD=X86']
+        if self.build_release:
+            if enable_debuginfo:
+                cmake_args += ['-DCMAKE_BUILD_TYPE:STRING=RelWithDebInfo']
+            else:
+                cmake_args += ['-DCMAKE_BUILD_TYPE:STRING=Release']
+        else:
+            cmake_args += ['-DCMAKE_BUILD_TYPE:STRING=Debug']
+        if self.enable_assertions:
+            cmake_args += ['-DLLVM_ENABLE_ASSERTIONS:BOOL=ON']
+        if instrumentation:
+            cmake_args += ['-DLLVM_BUILD_INSTRUMENTED='+instrumentation]
+        if profile_data:
+            cmake_args += ['-DLLVM_PROFDATA_FILE='+profile_data]
+        if self.lto_type and not instrumentation:
+            cmake_args += ['-DLLVM_ENABLE_LTO='+self.lto_type.upper()]
+        if self.install_prefix:
+            cmake_args += ['-DCMAKE_INSTALL_PREFIX:PATH='+self.install_prefix]
+        if self.version:
+            cmake_args += ['-DSWIFT_LIBPARSER_VER:STRING='+self.version]
+        cmake_args += ['-DLLVM_ENABLE_PROJECTS=clang;swift', '-DLLVM_EXTERNAL_PROJECTS=swift']
+        cmake_args += ['-DSWIFT_BUILD_ONLY_SYNTAXPARSERLIB=TRUE']
+        cmake_args += ['-DSWIFT_BUILD_PERF_TESTSUITE=NO', '-DSWIFT_INCLUDE_DOCS=NO']
+        cmake_args += ['-DSWIFT_BUILD_REMOTE_MIRROR=FALSE', '-DSWIFT_BUILD_DYNAMIC_STDLIB=FALSE',
+            '-DSWIFT_BUILD_STATIC_STDLIB=FALSE', '-DSWIFT_BUILD_DYNAMIC_SDK_OVERLAY=FALSE',
+            '-DSWIFT_BUILD_STATIC_SDK_OVERLAY=FALSE']
+        # We are not using cmark but initialize the CMARK variables to something so that configure can succeed.
+        cmake_args += ['-DCMARK_MAIN_INCLUDE_DIR='+os.path.join(SWIFT_SOURCE_ROOT, 'cmark'), '-DCMARK_BUILD_INCLUDE_DIR='+os.path.join(self.build_dir, 'cmark')]
+        cmake_args += ['-DLLVM_INCLUDE_TESTS=FALSE', '-DCLANG_INCLUDE_TESTS=FALSE', '-DSWIFT_INCLUDE_TESTS=FALSE']
+        cmake_args += [os.path.join(SWIFT_SOURCE_ROOT, 'llvm')]
+        self.call(cmake_args)
+
+    def build_target(self, build_dir, target, env=None):
+        invocation = [self.toolchain.cmake, '--build', build_dir]
+        invocation += ['--', '-j%d'%self.jobs]
+        if self.verbose:
+            invocation += ['-v']
+        invocation += [target]
+        self.call(invocation, env=env, without_sleeping=True)
+
+    def install(self):
+        print("--- Installing ---", file=sys.stderr)
+        env = None
+        if self.install_destdir:
+            env = {'DESTDIR': self.install_destdir}
+        self.build_target(self.build_dir, 'tools/swift/tools/libSwiftSyntaxParser/install', env=env)
+
+    def get_profile_data(self, profile_dir):
+        shell.makedirs(profile_dir, dry_run=self.dry_run)
+        instrumentation = 'IR' if self.pgo_type == 'ir' else 'Frontend'
+        with shell.pushd(profile_dir, dry_run=self.dry_run):
+            self.configure(enable_debuginfo=False, instrumentation=instrumentation)
+            self.build_target(profile_dir, 'swift-syntax-parser-test')
+            # Delete existing profile data that were generated during building from running tablegen.
+            shell.rmtree("profiles", dry_run=self.dry_run)
+            self.call([os.path.join("bin", "swift-syntax-parser-test"), self.profile_input, '-time'])
+            self.call([self.toolchain.llvm_profdata, "merge", "-output=profdata.prof", "profiles"])
+
+    def run(self):
+        shell.makedirs(self.build_dir, dry_run=self.dry_run)
+
+        with shell.pushd(self.build_dir, dry_run=self.dry_run):
+            self.configure(enable_debuginfo=True, profile_data=self.profile_data)
+
+        self.build_target(self.build_dir, 'swift-syntax-parser-test')
+
+        if self.install_destdir:
+            self.install()
+
+
+def extract_symbols(install_destdir, install_prefix, install_symroot, jobs):
+    if not isDarwin:
+        return
+    extract_script = os.path.join(SWIFT_SOURCE_ROOT, "swift", "utils", "parser-lib", "darwin-extract-symbols")
+    print("--- Extracting symbols ---", file=sys.stderr)
+    env = {'INSTALL_DIR': install_destdir,
+           'INSTALL_PREFIX': install_prefix,
+           'INSTALL_SYMROOT': install_symroot,
+           'BUILD_JOBS': str(jobs)}
+    shell.call([extract_script], env=env)
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description="""Builds Swift Syntax Parser library.""")
+    optbuilder = parser.to_builder()
+    option = optbuilder.add_option
+    store = optbuilder.actions.store
+    store_true = optbuilder.actions.store_true
+    store_int = optbuilder.actions.store_int
+    store_path = optbuilder.actions.store_path
+
+    toolchain = host_toolchain(xcrun_toolchain='default')
+    default_architectures = platform.machine()
+
+    default_profile_input = os.path.join(SWIFT_SOURCE_ROOT, "swift", "utils", "parser-lib", "profile-input.swift")
+    default_jobs = multiprocessing.cpu_count()
+    default_build_dir = os.path.join(SWIFT_BUILD_ROOT, 'parser-lib')
+    default_install_prefix = defaults.DARWIN_INSTALL_PREFIX if isDarwin else UNIX_INSTALL_PREFIX
+    default_ninja = toolchain.ninja
+
+    option('--release', store_true,
+        help='build in release mode')
+    option('--lto', store('lto_type'),
+           choices=['thin', 'full'],
+           const='full',
+           metavar='LTO_TYPE',
+           help='use lto optimization.'
+                'Options: thin, full. If no optional arg is provided, full is '
+                'chosen by default')
+    option('--pgo', store('pgo_type'),
+           choices=['frontend', 'ir'],
+           const='ir',
+           metavar='PGO_TYPE',
+           help='use pgo optimization.'
+                'Options: frontend, ir. If no optional arg is provided, ir is '
+                'chosen by default')
+    option('--profile-input', store_path,
+           default=default_profile_input,
+           help='the source file to use for PGO profiling input (default = %s)' % default_profile_input)
+    option('--no-assertions', store_true,
+        help='disable assertions')
+    option(['-v', '--verbose'], store_true,
+           help='print the commands executed during the build')
+    option('--dry-run', store_true,
+           help='print the commands to execute but not actually execute them')
+    option(['-j', '--jobs'], store_int('build_jobs'),
+           default=default_jobs,
+           help='the number of parallel build jobs to use (default = %s)' % default_jobs)
+    option('--build-dir', store_path,
+           default=default_build_dir,
+           help='the path where the build products will be placed. (default = %s)' % default_build_dir)
+    option('--architectures', store,
+           default=default_architectures,
+           help='space-separated list of architectures to build for. (default = %s)' % default_architectures)
+    option('--install-symroot', store_path,
+           help='the path to install debug symbols into')
+    option('--install-destdir', store_path,
+           help='the path to use as the filesystem root for the installation (default = \'$(build_dir)/install\')')
+    option('--install-prefix', store,
+           default = default_install_prefix,
+           help='the install prefix to use (default = %s)' % default_install_prefix)
+    option('--version', store,
+           help='version string to use for the parser library')
+    option('--ninja-path', store_path,
+           default = default_ninja,
+           help='the path to ninja (default = %s)' % default_ninja)
+
+    parser = optbuilder.build()
+    args = parser.parse_args()
+
+    if not args.install_destdir:
+        args.install_destdir = os.path.join(args.build_dir, 'install')
+
+    if isDarwin:
+        architectures = args.architectures.split(" ")
+        architectures = [arch for arch in architectures if arch != platform.machine() and arch != ""]
+        if platform.machine() in architectures: architectures = [platform.machine()] + architectures
+        architectures = [platform.machine()] + architectures
+
+        objroot = args.build_dir
+        dstroot = args.install_destdir
+        symroot = args.install_symroot
+        prefix = args.install_prefix
+
+        for arch in architectures:
+            native = platform.machine() == arch
+
+            args.build_dir = os.path.join(objroot, arch, "obj")
+            args.install_destdir = os.path.join(objroot, arch, "dst")
+            args.install_prefix = "/"
+
+            native_build_dir = None if native else os.path.join(objroot, platform.machine(), "obj")
+
+            profile_data = None
+            if args.pgo_type:
+                profile_dir = os.path.join(objroot, platform.machine()+'-profiling')
+                if native:
+                    builder = Builder(toolchain, args)
+                    builder.get_profile_data(profile_dir)
+                profile_data = os.path.join(profile_dir, "profdata.prof")
+
+            builder = Builder(toolchain, args, profile_data=profile_data, arch=arch, native_build_dir=native_build_dir)
+            builder.run()
+
+        lipo = os.path.join(SWIFT_SOURCE_ROOT, "swift", "utils", "recursive-lipo")
+        dst_dirs = [os.path.join(objroot, arch, "dst") for arch in architectures]
+        shell.call([lipo, "-v", "--destination", os.path.join(dstroot, "./"+prefix)] + dst_dirs)
+
+        if args.install_symroot:
+            extract_symbols(dstroot, prefix, symroot, args.build_jobs)
+
+        return 0
+
+    builder = Builder(toolchain, args)
+    builder.run()
+    return 0
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except KeyboardInterrupt:
+        sys.exit(1)

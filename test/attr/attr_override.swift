@@ -29,6 +29,7 @@ class A {
 
   var v1: Int { return 5 }
   var v2: Int { return 5 } // expected-note{{overridden declaration is here}}
+  internal var v21: Int { return 5 } // expected-note{{overridden declaration is here}}
   var v4: String { return "hello" }// expected-note{{attempt to override property here}}
   var v5: A { return self }
   var v6: A { return self }
@@ -57,6 +58,25 @@ class A {
     set {
     }
   }
+  
+  // FIXME(SR-10323): The second note is wrong; it should be "potential overridden class subscript 'subscript(_:)' here". This is a preexisting bug.
+  class subscript (i: String) -> String { // expected-note{{overridden declaration is here}} expected-note{{attempt to override subscript here}}
+    get {
+      return "hello"
+    }
+    
+    set {
+    }
+  }
+  
+  class subscript (typeInSuperclass a: [Int]) -> String {
+    get {
+      return "hello"
+    }
+    
+    set {
+    }
+  }
 
   subscript (i: Int8) -> A { // expected-note{{potential overridden subscript 'subscript(_:)' here}}
     get { return self }
@@ -74,9 +94,9 @@ class B : A {
   override func f0() { }
   func f1() { } // expected-error{{overriding declaration requires an 'override' keyword}}{{3-3=override }}
   override func f2() { } // expected-error{{method does not override any method from its superclass}}
-
   override var v1: Int { return 5 }
-  var v2: Int { return 5 } // expected-error{{overriding declaration requires an 'override' keyword}}
+  var v2: Int { return 5 } // expected-error{{overriding declaration requires an 'override' keyword}}{{3-3=override }}
+  internal var v21: Int { return 5 } // expected-error{{overriding declaration requires an 'override' keyword}}{{12-12=override }}
   override var v3: Int { return 5 } // expected-error{{property does not override any property from its superclass}}
   override var v4: Int { return 5 } // expected-error{{property 'v4' with type 'Int' cannot override a property with type 'String'}}
 
@@ -116,6 +136,52 @@ class B : A {
   }
 
   override subscript (f: Float) -> String { // expected-error{{subscript does not override any subscript from its superclass}}
+    get {
+      return "hello"
+    }
+
+    set {
+    }
+  }
+  
+  // FIXME(SR-10323): This error is wrong; it should be "subscript does not override any subscript from its superclass". This is a preexisting bug.
+  override class subscript (i: Int) -> String { // expected-error{{cannot override mutable subscript of type '(Int) -> String' with covariant type '(String) -> String'}}
+    get {
+      return "hello"
+    }
+    
+    set {
+    }
+  }
+  
+  static subscript (i: String) -> String { // expected-error{{overriding declaration requires an 'override' keyword}} {{10-10=override }}
+    get {
+      return "hello"
+    }
+    
+    set {
+    }
+  }
+  
+  static subscript (i: Double) -> String {
+    get {
+      return "hello"
+    }
+    
+    set {
+    }
+  }
+  
+  override class subscript (typeInSuperclass a: [Int]) -> String {
+    get {
+      return "hello"
+    }
+    
+    set {
+    }
+  }
+
+  override subscript (typeInSuperclass a: [Int]) -> String { // expected-error{{subscript does not override any subscript from its superclass}}
     get {
       return "hello"
     }

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -dump-ast > %t.ast 2>&1
+// RUN: %target-typecheck-verify-swift -dump-ast > %t.ast
 // RUN: %FileCheck %s < %t.ast
 
 // Test overriding of protocol members.

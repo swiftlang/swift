@@ -4,7 +4,7 @@
 
 :print_decl String
 // CHECK: struct String
-// CHECK: extension String : _ExpressibleByStringInterpolation
+// CHECK: extension String : StringProtocol
 
 false // CHECK: Bool = false
 (1,2) // CHECK: (Int, Int) = (1, 2)
@@ -46,22 +46,22 @@ hashValue
 // Check that we handle unmatched parentheses in REPL.
 1+1)
 
-var z = 44
+var z = 46
 +z
-// CHECK: Int = 44{{$}}
+// CHECK: Int = 46{{$}}
 
-+44
-// CHECK: Int = 44{{$}}
++48
+// CHECK: Int = 48{{$}}
 
 typealias Foo = Int
 
 var f1 : Foo = 1
-var f44 : Foo = 44
+var f50 : Foo = 50
 f1 +
-  f44
-// CHECK: Foo = 45{{$}}
-+(f44)
-// CHECK: Foo = 44{{$}}
+  f50
+// CHECK: Foo = 51{{$}}
++(f50)
+// CHECK: Foo = 50{{$}}
 
 1.5
 // CHECK: Double = 1.5{{$}}
@@ -222,3 +222,33 @@ if true && true { if true && true { print(true && true) } }
 "ok"
 // CHECK: = "ok"
 
+// Make sure that class inheritance works
+class A {
+  var foo: String { return "" }
+  func bar() -> String { return "" }
+  subscript(_ x: Int) -> String { return "" }
+}
+
+class B : A {
+  override var foo: String {
+    return "property ok"
+  }
+
+  override init() {}
+
+  override func bar() -> String {
+    return "instance ok"
+  }
+
+  override subscript(_ x: Int) -> String {
+    return "subscript ok"
+  }
+}
+
+let b = B()
+let _ = b.foo
+// CHECK: = "property ok"
+let _ = b.bar()
+// CHECK: = "instance ok"
+let _ = b[42]
+// CHECK: = "subscript ok"

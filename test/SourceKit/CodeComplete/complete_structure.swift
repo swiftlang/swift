@@ -52,7 +52,7 @@ func test2(_ x: S1) {
 }
 // Subscripts!
 // S1_POSTFIX: {name:.}
-// S1_POSTFIX: [{params:{t:Int}, {t:Int}}]
+// S1_POSTFIX: [{params:{l:x:}{t: Int}, {l:y:}{t: Int}}]
 // S1_POSTFIX: [{params:{n:x:}{t: Int}, {n:y:}{t: Int}}]
 // The dot becomes part of the name
 // S1_POSTFIX: {name:.method1}()

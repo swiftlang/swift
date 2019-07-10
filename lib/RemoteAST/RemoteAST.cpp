@@ -19,6 +19,7 @@
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTDemangler.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericSignature.h"
@@ -29,6 +30,7 @@
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/Mangler.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/Demangling/Demangler.h"
 #include "llvm/ADT/StringSwitch.h"
 
 // TODO: Develop a proper interface for this.
@@ -73,7 +75,6 @@ private:
 
   static IRGenOptions createIRGenOptions() {
     IRGenOptions IROpts;
-    IROpts.EnableResilienceBypass = true;
     return IROpts;
   }
 
@@ -85,724 +86,12 @@ public:
   }
 };
 
-/// An implementation of MetadataReader's BuilderType concept that
-/// just finds and builds things in the AST.
-class RemoteASTTypeBuilder {
-  ASTContext &Ctx;
-  Demangle::NodeFactory Factory;
-
-  /// The notional context in which we're writing and type-checking code.
-  /// Created lazily.
-  DeclContext *NotionalDC = nullptr;
-
-  Optional<Failure> CurFailure;
-
-public:
-  using BuiltType = swift::Type;
-  using BuiltNominalTypeDecl = swift::NominalTypeDecl *;
-  using BuiltProtocolDecl = swift::ProtocolDecl *;
-  explicit RemoteASTTypeBuilder(ASTContext &ctx) : Ctx(ctx) {}
-
-  std::unique_ptr<IRGenContext> createIRGenContext() {
-    return IRGenContext::create(Ctx, getNotionalDC());
-  }
-
-  template <class Result, class FailureKindTy, class... FailureArgTys>
-  Result fail(FailureKindTy kind, FailureArgTys &&...failureArgs) {
-    if (!CurFailure) {
-      CurFailure.emplace(kind, std::forward<FailureArgTys>(failureArgs)...);
-    }
-    return Result();
-  }
-
-  template <class T, class DefaultFailureKindTy, class... DefaultFailureArgTys>
-  Result<T> getFailureAsResult(DefaultFailureKindTy defaultFailureKind,
-                               DefaultFailureArgTys &&...defaultFailureArgs) {
-    // If we already have a failure, use that.
-    if (CurFailure) {
-      Result<T> result = std::move(*CurFailure);
-      CurFailure.reset();
-      return result;
-    }
-
-    // Otherwise, use the default failure.
-    return Result<T>::emplaceFailure(defaultFailureKind,
-               std::forward<DefaultFailureArgTys>(defaultFailureArgs)...);
-  }
-
-  Demangle::NodeFactory &getNodeFactory() { return Factory; }
-
-  Type createBuiltinType(const std::string &mangledName) {
-    // TODO
-    return Type();
-  }
-
-  NominalTypeDecl *createNominalTypeDecl(StringRef mangledName) {
-    Demangle::Demangler Dem;
-    Demangle::NodePointer node = Dem.demangleType(mangledName);
-    if (!node) return nullptr;
-
-    return createNominalTypeDecl(node);
-  }
-  
-  NominalTypeDecl *createNominalTypeDecl(const Demangle::NodePointer &node);
-
-  ProtocolDecl *createProtocolDecl(const Demangle::NodePointer &node) {
-    return dyn_cast_or_null<ProtocolDecl>(createNominalTypeDecl(node));
-  }
-
-  Type createNominalType(NominalTypeDecl *decl) {
-    // If the declaration is generic, fail.
-    if (decl->isGenericContext())
-      return Type();
-
-    return decl->getDeclaredType();
-  }
-
-  Type createNominalType(NominalTypeDecl *decl, Type parent) {
-    // If the declaration is generic, fail.
-    if (decl->getGenericParams())
-      return Type();
-
-    // Validate the parent type.
-    if (!validateNominalParent(decl, parent))
-      return Type();
-
-    return NominalType::get(decl, parent, Ctx);
-  }
-
-  Type createBoundGenericType(NominalTypeDecl *decl, ArrayRef<Type> args) {
-    // If the declaration isn't generic, fail.
-    if (!decl->isGenericContext())
-      return Type();
-
-    // Build a SubstitutionMap.
-    auto *genericSig = decl->getGenericSignature();
-
-    SmallVector<GenericTypeParamType *, 4> genericParams;
-    genericSig->forEachParam([&](GenericTypeParamType *gp, bool canonical) {
-      if (canonical)
-        genericParams.push_back(gp);
-    });
-    if (genericParams.size() != args.size())
-      return Type();
-
-    auto subMap = SubstitutionMap::get(
-        genericSig,
-        [&](SubstitutableType *t) -> Type {
-          for (unsigned i = 0, e = genericParams.size(); i < e; ++i) {
-            if (t->isEqual(genericParams[i]))
-              return args[i];
-          }
-          return Type();
-        },
-        // FIXME: Wrong module
-        LookUpConformanceInModule(decl->getParentModule()));
-
-    auto origType = decl->getDeclaredInterfaceType();
-
-    // FIXME: We're not checking that the type satisfies the generic
-    // requirements of the signature here.
-    auto substType = origType.subst(subMap);
-    return substType;
-  }
-
-  Type createBoundGenericType(NominalTypeDecl *decl, ArrayRef<Type> args,
-                              Type parent) {
-    // If the declaration isn't generic, fail.
-    if (!decl->getGenericParams())
-      return Type();
-
-    // Validate the parent type.
-    if (!validateNominalParent(decl, parent))
-      return Type();
-
-    // Make a generic type repr that's been resolved to this decl.
-    TypeReprList genericArgReprs(args);
-    auto genericRepr = GenericIdentTypeRepr::create(Ctx, SourceLoc(),
-                                                    decl->getName(),
-                                                    genericArgReprs.getList(),
-                                                    SourceRange());
-    // FIXME
-    genericRepr->setValue(decl, nullptr);
-
-    Type genericType;
-
-    // If we have a parent type, we need to build a compound type repr.
-    if (parent) {
-      // Life would be much easier if we could just use a FixedTypeRepr for
-      // the parent.  But we can't!  So we have to recursively expand
-      // like this; and recursing with a lambda isn't impossible, so it gets
-      // even worse.
-      SmallVector<Type, 4> ancestry;
-      for (auto p = parent; p; p = p->getNominalParent()) {
-        ancestry.push_back(p);
-      }
-
-      struct GenericRepr {
-        TypeReprList GenericArgs;
-        GenericIdentTypeRepr *Ident;
-
-        GenericRepr(const ASTContext &Ctx, BoundGenericType *type)
-          : GenericArgs(type->getGenericArgs()),
-            Ident(GenericIdentTypeRepr::create(Ctx, SourceLoc(),
-                                               type->getDecl()->getName(),
-                                               GenericArgs.getList(),
-                                               SourceRange())) {
-          // FIXME
-          Ident->setValue(type->getDecl(), nullptr);
-        }
-
-        // SmallVector::emplace_back will never need to call this because
-        // we reserve the right size, but it does try statically.
-        GenericRepr(const GenericRepr &other) : GenericArgs({}), Ident(nullptr) {
-          llvm_unreachable("should not be called dynamically");
-        }
-      };
-
-      // Pre-allocate the component vectors so that we can form references
-      // into them safely.
-      SmallVector<SimpleIdentTypeRepr, 4> simpleComponents;
-      SmallVector<GenericRepr, 4> genericComponents;
-      simpleComponents.reserve(ancestry.size());
-      genericComponents.reserve(ancestry.size());
-
-      // Build the parent hierarchy.
-      SmallVector<ComponentIdentTypeRepr*, 4> componentReprs;
-      for (size_t i = ancestry.size(); i != 0; --i) {
-        Type p = ancestry[i - 1];
-        if (auto boundGeneric = p->getAs<BoundGenericType>()) {
-          genericComponents.emplace_back(Ctx, boundGeneric);
-          componentReprs.push_back(genericComponents.back().Ident);
-        } else {
-          auto nominal = p->castTo<NominalType>();
-          simpleComponents.emplace_back(SourceLoc(),
-                                        nominal->getDecl()->getName());
-          // FIXME
-          simpleComponents.back().setValue(nominal->getDecl(), nullptr);
-          componentReprs.push_back(&simpleComponents.back());
-        }
-      }
-      componentReprs.push_back(genericRepr);
-
-      auto compoundRepr = CompoundIdentTypeRepr::create(Ctx, componentReprs);
-      genericType = checkTypeRepr(compoundRepr);
-    } else {
-      genericType = checkTypeRepr(genericRepr);
-    }
-
-    // If type-checking failed, we've failed.
-    if (!genericType) return Type();
-
-    // Validate that we used the right decl.
-    if (auto bgt = genericType->getAs<BoundGenericType>()) {
-      if (bgt->getDecl() != decl)
-        return Type();
-    }
-
-    return genericType;
-  }
-
-  Type createTupleType(ArrayRef<Type> eltTypes, StringRef labels,
-                       bool isVariadic) {
-    // Just bail out on variadic tuples for now.
-    if (isVariadic) return Type();
-
-    SmallVector<TupleTypeElt, 4> elements;
-    elements.reserve(eltTypes.size());
-    for (auto eltType : eltTypes) {
-      Identifier label;
-      if (!labels.empty()) {
-        auto split = labels.split(' ');
-        if (!split.first.empty())
-          label = Ctx.getIdentifier(split.first);
-        labels = split.second;
-      }
-      elements.emplace_back(eltType, label);
-    }
-
-    return TupleType::get(elements, Ctx);
-  }
-
-  Type createFunctionType(ArrayRef<remote::FunctionParam<Type>> params,
-                          Type output, FunctionTypeFlags flags) {
-    FunctionTypeRepresentation representation;
-    switch (flags.getConvention()) {
-    case FunctionMetadataConvention::Swift:
-      representation = FunctionTypeRepresentation::Swift;
-      break;
-    case FunctionMetadataConvention::Block:
-      representation = FunctionTypeRepresentation::Block;
-      break;
-    case FunctionMetadataConvention::Thin:
-      representation = FunctionTypeRepresentation::Thin;
-      break;
-    case FunctionMetadataConvention::CFunctionPointer:
-      representation = FunctionTypeRepresentation::CFunctionPointer;
-      break;
-    }
-
-    auto einfo = AnyFunctionType::ExtInfo(representation,
-                                          /*throws*/ flags.throws());
-    if (flags.isEscaping())
-      einfo = einfo.withNoEscape(false);
-    else
-      einfo = einfo.withNoEscape(true);
-
-    // The result type must be materializable.
-    if (!output->isMaterializable()) return Type();
-
-    llvm::SmallVector<AnyFunctionType::Param, 8> funcParams;
-    for (const auto &param : params) {
-      auto type = param.getType();
-
-      // All the argument types must be materializable.
-      if (!type->isMaterializable())
-        return Type();
-
-      auto label = Ctx.getIdentifier(param.getLabel());
-      auto flags = param.getFlags();
-      auto ownership = flags.getValueOwnership();
-      auto parameterFlags = ParameterTypeFlags()
-                                .withInOut(ownership == ValueOwnership::InOut)
-                                .withShared(ownership == ValueOwnership::Shared)
-                                .withOwned(ownership == ValueOwnership::Owned)
-                                .withVariadic(flags.isVariadic());
-
-      funcParams.push_back(AnyFunctionType::Param(type, label, parameterFlags));
-    }
-
-    return FunctionType::get(funcParams, output, einfo);
-  }
-
-  Type createProtocolCompositionType(ArrayRef<ProtocolDecl *> protocols,
-                                     Type superclass,
-                                     bool isClassBound) {
-    std::vector<Type> members;
-    for (auto protocol : protocols)
-      members.push_back(protocol->getDeclaredType());
-    if (superclass && superclass->getClassOrBoundGenericClass())
-      members.push_back(superclass);
-    return ProtocolCompositionType::get(Ctx, members, isClassBound);
-  }
-
-  Type createExistentialMetatypeType(Type instance) {
-    if (!instance->isAnyExistentialType())
-      return Type();
-    return ExistentialMetatypeType::get(instance);
-  }
-
-  Type createMetatypeType(Type instance, bool wasAbstract=false) {
-    // FIXME: Plumb through metatype representation and generalize silly
-    // 'wasAbstract' flag
-    return MetatypeType::get(instance);
-  }
-
-  Type createGenericTypeParameterType(unsigned depth, unsigned index) {
-    return GenericTypeParamType::get(depth, index, Ctx);
-  }
-
-  Type createDependentMemberType(StringRef member, Type base,
-                                 ProtocolDecl *protocol) {
-    if (!base->isTypeParameter())
-      return Type();
-
-    auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
-    flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
-    for (auto member : protocol->lookupDirect(Ctx.getIdentifier(member),
-                                              flags)) {
-      if (auto assocType = dyn_cast<AssociatedTypeDecl>(member))
-        return DependentMemberType::get(base, assocType);
-    }
-
-    return Type();
-  }
-
-#define REF_STORAGE(Name, ...) \
-  Type create##Name##StorageType(Type base) { \
-    if (!base->allowsOwnership()) \
-      return Type(); \
-    return Name##StorageType::get(base, Ctx); \
-  }
-#include "swift/AST/ReferenceStorage.def"
-
-  Type createSILBoxType(Type base) {
-    return SILBoxType::get(base->getCanonicalType());
-  }
-
-  Type createObjCClassType(StringRef name) {
-    auto typeDecl =
-        findForeignNominalTypeDecl(name, /*relatedEntityKind*/{},
-                                   ForeignModuleKind::Imported,
-                                   Demangle::Node::Kind::Class);
-    if (!typeDecl) return Type();
-    return createNominalType(typeDecl, /*parent*/ Type());
-  }
-
-  Type createForeignClassType(StringRef mangledName) {
-    auto typeDecl = createNominalTypeDecl(mangledName);
-    if (!typeDecl) return Type();
-
-    return createNominalType(typeDecl, /*parent*/ Type());
-  }
-
-  Type getUnnamedForeignClassType() {
-    return Type();
-  }
-
-  Type getOpaqueType() {
-    return Type();
-  }
-
-private:
-  bool validateNominalParent(NominalTypeDecl *decl, Type parent) {
-    auto parentDecl = decl->getDeclContext()->getSelfNominalTypeDecl();
-
-    // If we don't have a parent type, fast-path.
-    if (!parent) {
-      return parentDecl == nullptr;
-    }
-
-    // We do have a parent type.  If the nominal type doesn't, it's an error.
-    if (!parentDecl) {
-      return false;
-    }
-
-    // FIXME: validate that the parent is a correct application of the
-    // enclosing context?
-    return true;
-  }
-
-  DeclContext *findDeclContext(const Demangle::NodePointer &node);
-  ModuleDecl *findModule(const Demangle::NodePointer &node);
-  Demangle::NodePointer findModuleNode(const Demangle::NodePointer &node);
-
-  enum class ForeignModuleKind {
-    Imported,
-    SynthesizedByImporter
-  };
-
-  Optional<ForeignModuleKind>
-  getForeignModuleKind(const Demangle::NodePointer &node);
-
-  NominalTypeDecl *findNominalTypeDecl(DeclContext *dc,
-                                       Identifier name,
-                                       Identifier privateDiscriminator,
-                                       Demangle::Node::Kind kind);
-  NominalTypeDecl *findForeignNominalTypeDecl(StringRef name,
-                                              StringRef relatedEntityKind,
-                                              ForeignModuleKind lookupKind,
-                                              Demangle::Node::Kind kind);
-
-  Type checkTypeRepr(TypeRepr *repr) {
-    DeclContext *dc = getNotionalDC();
-
-    TypeLoc loc(repr);
-    if (performTypeLocChecking(Ctx, loc, dc, /*diagnose*/ false))
-      return Type();
-
-    return loc.getType();
-  }
-
-  static NominalTypeDecl *getAcceptableNominalTypeCandidate(ValueDecl *decl, 
-                                                  Demangle::Node::Kind kind) {
-    if (kind == Demangle::Node::Kind::Class) {
-      return dyn_cast<ClassDecl>(decl);
-    } else if (kind == Demangle::Node::Kind::Enum) {
-      return dyn_cast<EnumDecl>(decl);
-    } else if (kind == Demangle::Node::Kind::Protocol) {
-      return dyn_cast<ProtocolDecl>(decl);
-    } else {
-      assert(kind == Demangle::Node::Kind::Structure);
-      return dyn_cast<StructDecl>(decl);
-    }
-  }
-
-  DeclContext *getNotionalDC() {
-    if (!NotionalDC) {
-      NotionalDC = ModuleDecl::create(Ctx.getIdentifier(".RemoteAST"), Ctx);
-      NotionalDC = new (Ctx) TopLevelCodeDecl(NotionalDC);
-    }
-    return NotionalDC;
-  }
-
-  class TypeReprList {
-    SmallVector<FixedTypeRepr, 4> Reprs;
-    SmallVector<TypeRepr*, 4> Refs;
-
-  public:
-    explicit TypeReprList(ArrayRef<Type> types) {
-      Reprs.reserve(types.size());
-      Refs.reserve(types.size());
-
-      for (auto type : types) {
-        Reprs.emplace_back(type, SourceLoc());
-        Refs.push_back(&Reprs.back());
-      }
-    }
-
-    ArrayRef<TypeRepr*> getList() const {
-      return Refs;
-    }
-  };
-};
-} // end anonymous namespace
-
-NominalTypeDecl *
-RemoteASTTypeBuilder::createNominalTypeDecl(const Demangle::NodePointer &node) {
-  auto DC = findDeclContext(node);
-  if (!DC) {
-    return fail<NominalTypeDecl*>(Failure::CouldNotResolveTypeDecl,
-                                  Demangle::mangleNode(node));
-  }
-
-  auto decl = dyn_cast<NominalTypeDecl>(DC);
-  if (!decl) return nullptr;
-
-  return decl;
-}
-
-ModuleDecl *RemoteASTTypeBuilder::findModule(const Demangle::NodePointer &node){
-  assert(node->getKind() == Demangle::Node::Kind::Module);
-  const auto &moduleName = node->getText();
-  return Ctx.getModuleByName(moduleName);
-}
-
-Demangle::NodePointer
-RemoteASTTypeBuilder::findModuleNode(const Demangle::NodePointer &node) {
-  if (node->getKind() == Demangle::Node::Kind::Module)
-    return node;
-
-  if (!node->hasChildren()) return nullptr;
-  const auto &child = node->getFirstChild();
-  if (child->getKind() != Demangle::Node::Kind::DeclContext)
-    return nullptr;
-
-  return findModuleNode(child->getFirstChild());
-}
-
-Optional<RemoteASTTypeBuilder::ForeignModuleKind>
-RemoteASTTypeBuilder::getForeignModuleKind(const Demangle::NodePointer &node) {
-  if (node->getKind() == Demangle::Node::Kind::DeclContext)
-    return getForeignModuleKind(node->getFirstChild());
-
-  if (node->getKind() != Demangle::Node::Kind::Module)
-    return None;
-
-  return llvm::StringSwitch<Optional<ForeignModuleKind>>(node->getText())
-      .Case(MANGLING_MODULE_OBJC, ForeignModuleKind::Imported)
-      .Case(MANGLING_MODULE_CLANG_IMPORTER,
-            ForeignModuleKind::SynthesizedByImporter)
-      .Default(None);
-}
-
-DeclContext *
-RemoteASTTypeBuilder::findDeclContext(const Demangle::NodePointer &node) {
-  switch (node->getKind()) {
-  case Demangle::Node::Kind::DeclContext:
-  case Demangle::Node::Kind::Type:
-    return findDeclContext(node->getFirstChild());
-
-  case Demangle::Node::Kind::Module:
-    return findModule(node);
-
-  case Demangle::Node::Kind::Class:
-  case Demangle::Node::Kind::Enum:
-  case Demangle::Node::Kind::Protocol:
-  case Demangle::Node::Kind::Structure:
-  case Demangle::Node::Kind::TypeAlias: {
-    const auto &declNameNode = node->getChild(1);
-
-    // Handle local declarations.
-    if (declNameNode->getKind() == Demangle::Node::Kind::LocalDeclName) {
-      // Find the AST node for the defining module.
-      auto moduleNode = findModuleNode(node);
-      if (!moduleNode) return nullptr;
-
-      auto module = findModule(moduleNode);
-      if (!module) return nullptr;
-
-      // Look up the local type by its mangling.
-      auto mangledName = Demangle::mangleNode(node);
-      auto decl = module->lookupLocalType(mangledName);
-      if (!decl) return nullptr;
-
-      return dyn_cast<DeclContext>(decl);
-    }
-
-    StringRef name;
-    StringRef relatedEntityKind;
-    Identifier privateDiscriminator;
-    if (declNameNode->getKind() == Demangle::Node::Kind::Identifier) {
-      name = declNameNode->getText();
-
-    } else if (declNameNode->getKind() ==
-                 Demangle::Node::Kind::PrivateDeclName) {
-      name = declNameNode->getChild(1)->getText();
-      privateDiscriminator =
-        Ctx.getIdentifier(declNameNode->getChild(0)->getText());
-
-    } else if (declNameNode->getKind() ==
-                 Demangle::Node::Kind::RelatedEntityDeclName) {
-      name = declNameNode->getChild(0)->getText();
-      relatedEntityKind = declNameNode->getText();
-
-    // Ignore any other decl-name productions for now.
-    } else {
-      return nullptr;
-    }
-
-    DeclContext *dc = findDeclContext(node->getChild(0));
-    if (!dc) {
-      // Do some backup logic for foreign type declarations.
-      if (privateDiscriminator.empty()) {
-        if (auto foreignModuleKind = getForeignModuleKind(node->getChild(0))) {
-          return findForeignNominalTypeDecl(name, relatedEntityKind,
-                                            foreignModuleKind.getValue(),
-                                            node->getKind());
-        }
-      }
-      return nullptr;
-    }
-
-    return findNominalTypeDecl(dc, Ctx.getIdentifier(name),
-                               privateDiscriminator, node->getKind());
-  }
-
-  case Demangle::Node::Kind::Global:
-    return findDeclContext(node->getChild(0));
-
-  // Bail out on other kinds of contexts.
-  // TODO: extensions
-  // TODO: local contexts
-  default:
-    return nullptr;
-  }
-}
-
-NominalTypeDecl *
-RemoteASTTypeBuilder::findNominalTypeDecl(DeclContext *dc,
-                                          Identifier name,
-                                          Identifier privateDiscriminator,
-                                          Demangle::Node::Kind kind) {
-  auto module = dc->getParentModule();
-
-  SmallVector<ValueDecl *, 4> lookupResults;
-  module->lookupMember(lookupResults, dc, name, privateDiscriminator);
-
-  NominalTypeDecl *result = nullptr;
-  for (auto decl : lookupResults) {
-    // Ignore results that are not the right kind of nominal type declaration.
-    NominalTypeDecl *candidate = getAcceptableNominalTypeCandidate(decl, kind);
-    if (!candidate)
-      continue;
-
-    // Ignore results that aren't actually from the defining module.
-    if (candidate->getParentModule() != module)
-      continue;
-
-    // This is a viable result.
-
-    // If we already have a viable result, it's ambiguous, so give up.
-    if (result) return nullptr;
-    result = candidate;
-  }
-
-  return result;
-}
-
-static Optional<ClangTypeKind>
-getClangTypeKindForNodeKind(Demangle::Node::Kind kind) {
-  switch (kind) {
-  case Demangle::Node::Kind::Protocol:
-    return ClangTypeKind::ObjCProtocol;
-  case Demangle::Node::Kind::Class:
-    return ClangTypeKind::ObjCClass;
-  case Demangle::Node::Kind::TypeAlias:
-    return ClangTypeKind::Typedef;
-  case Demangle::Node::Kind::Structure:
-  case Demangle::Node::Kind::Enum:
-    return ClangTypeKind::Tag;
-  default:
-    return None;
-  }
-}
-
-NominalTypeDecl *
-RemoteASTTypeBuilder::findForeignNominalTypeDecl(StringRef name,
-                                                 StringRef relatedEntityKind,
-                                                 ForeignModuleKind foreignKind,
-                                                 Demangle::Node::Kind kind) {
-  // Check to see if we have an importer loaded.
-  auto importer = static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
-  if (!importer) return nullptr;
-
-  // Find the unique declaration that has the right kind.
-  struct Consumer : VisibleDeclConsumer {
-    Demangle::Node::Kind ExpectedKind;
-    NominalTypeDecl *Result = nullptr;
-    bool HadError = false;
-
-    explicit Consumer(Demangle::Node::Kind kind) : ExpectedKind(kind) {}
-
-    void foundDecl(ValueDecl *decl, DeclVisibilityKind reason) override {
-      if (HadError) return;
-      if (decl == Result) return;
-      if (!Result) {
-        // A synthesized type from the Clang importer may resolve to a
-        // compatibility alias.
-        if (auto resultAlias = dyn_cast<TypeAliasDecl>(decl)) {
-          if (resultAlias->isCompatibilityAlias()) {
-            Result = resultAlias->getUnderlyingTypeLoc().getType()
-                                ->getAnyNominal();
-          }
-        } else {
-          Result = dyn_cast<NominalTypeDecl>(decl);
-        }
-        HadError |= !Result;
-      } else {
-        HadError = true;
-        Result = nullptr;
-      }
-    }
-  } consumer(kind);
-
-  switch (foreignKind) {
-  case ForeignModuleKind::SynthesizedByImporter:
-    if (!relatedEntityKind.empty()) {
-      Optional<ClangTypeKind> lookupKind = getClangTypeKindForNodeKind(kind);
-      if (!lookupKind)
-        return nullptr;
-      importer->lookupRelatedEntity(name, lookupKind.getValue(),
-                                    relatedEntityKind, [&](TypeDecl *found) {
-        consumer.foundDecl(found, DeclVisibilityKind::VisibleAtTopLevel);
-      });
-      break;
-    }
-    importer->lookupValue(Ctx.getIdentifier(name), consumer);
-    if (consumer.Result)
-      consumer.Result = getAcceptableNominalTypeCandidate(consumer.Result,kind);
-    break;
-  case ForeignModuleKind::Imported: {
-    Optional<ClangTypeKind> lookupKind = getClangTypeKindForNodeKind(kind);
-    if (!lookupKind)
-      return nullptr;
-    importer->lookupTypeDecl(name, lookupKind.getValue(),
-                             [&](TypeDecl *found) {
-      consumer.foundDecl(found, DeclVisibilityKind::VisibleAtTopLevel);
-    });
-  }
-  }
-
-  return consumer.Result;
-}
-
-namespace {
-
 /// The basic implementation of the RemoteASTContext interface.
 /// The template subclasses do target-specific logic.
 class RemoteASTContextImpl {
   std::unique_ptr<IRGenContext> IRGen;
+  Optional<Failure> CurFailure;
+
 public:
   RemoteASTContextImpl() = default;
   virtual ~RemoteASTContextImpl() = default;
@@ -815,10 +104,15 @@ public:
   getDeclForRemoteNominalTypeDescriptor(RemoteAddress descriptor) = 0;
   virtual Result<RemoteAddress>
   getHeapMetadataForObject(RemoteAddress object) = 0;
-  virtual Result<std::pair<Type, RemoteAddress>>
+  virtual Result<OpenedExistential>
+  getDynamicTypeAndAddressForError(RemoteAddress object) = 0;
+  virtual Result<OpenedExistential>
   getDynamicTypeAndAddressForExistential(RemoteAddress object,
                                          Type staticType) = 0;
-
+  virtual Result<Type>
+  getUnderlyingTypeForOpaqueType(remote::RemoteAddress opaqueDescriptor,
+                                 SubstitutionMap substitutions,
+                                 unsigned ordinal) = 0;
   Result<uint64_t>
   getOffsetOfMember(Type type, RemoteAddress optMetadata, StringRef memberName){
     // Sanity check: obviously invalid arguments.
@@ -842,9 +136,24 @@ public:
   }
 
 protected:
+  template <class T, class DefaultFailureKindTy, class... DefaultFailureArgTys>
+  Result<T> getFailureAsResult(DefaultFailureKindTy defaultFailureKind,
+                               DefaultFailureArgTys &&...defaultFailureArgs) {
+    // If we already have a failure, use that.
+    if (CurFailure) {
+      Result<T> result = std::move(*CurFailure);
+      CurFailure.reset();
+      return result;
+    }
+
+    // Otherwise, use the default failure.
+    return Result<T>::emplaceFailure(defaultFailureKind,
+               std::forward<DefaultFailureArgTys>(defaultFailureArgs)...);
+  }
+
   template <class T>
   Result<T> getFailure() {
-    return getBuilder().getFailureAsResult<T>(Failure::Unknown);
+    return getFailureAsResult<T>(Failure::Unknown);
   }
 
   template <class T, class KindTy, class... ArgTys>
@@ -853,7 +162,7 @@ protected:
   }
 
 private:
-  virtual RemoteASTTypeBuilder &getBuilder() = 0;
+  virtual ASTBuilder &getBuilder() = 0;
   virtual MemoryReader &getReader() = 0;
   virtual bool readWordOffset(RemoteAddress address, int64_t *offset) = 0;
   virtual std::unique_ptr<IRGenContext> createIRGenContext() = 0;
@@ -880,7 +189,7 @@ private:
     VarDecl *member = findField(typeDecl, memberName);
 
     // If we found a member, try to find its offset statically.
-    if (member) {
+    if (member && member->hasStorage() && !typeDecl->isResilient()) {
       if (auto irgen = getIRGen()) {
         return getOffsetOfFieldFromIRGen(irgen->IGM, type, typeDecl,
                                           optMetadata, member);
@@ -918,7 +227,7 @@ private:
   getOffsetOfFieldFromIRGen(irgen::IRGenModule &IGM, Type type,
                             NominalTypeDecl *typeDecl,
                             RemoteAddress optMetadata, VarDecl *member) {
-    SILType loweredTy = IGM.getSILTypes().getLoweredType(type);
+    SILType loweredTy = IGM.getLoweredType(type);
 
     MemberAccessStrategy strategy =
       (isa<StructDecl>(typeDecl)
@@ -1021,14 +330,20 @@ private:
       return fail<uint64_t>(Failure::TypeHasNoSuchMember, memberName);
 
     // Fast path: element 0 is always at offset 0.
-    if (targetIndex == 0) return uint64_t(0);
+    if (targetIndex == 0)
+      return uint64_t(0);
 
     // Create an IRGen instance.
     auto irgen = getIRGen();
-    if (!irgen) return Result<uint64_t>::emplaceFailure(Failure::Unknown);
+    if (!irgen)
+      return Result<uint64_t>::emplaceFailure(Failure::Unknown);
     auto &IGM = irgen->IGM;
+    SILType loweredTy = IGM.getLoweredType(type);
 
-    SILType loweredTy = IGM.getSILTypes().getLoweredType(type);
+    // Only the runtime metadata knows the offsets of resilient members.
+    auto &typeInfo = IGM.getTypeInfo(loweredTy);
+    if (!isa<irgen::FixedTypeInfo>(&typeInfo))
+      return Result<uint64_t>::emplaceFailure(Failure::NotFixedLayout);
 
     // If the type has a statically fixed offset, return that.
     if (auto offset =
@@ -1092,9 +407,9 @@ private:
 /// RemoteASTContext interface.
 template <class Runtime>
 class RemoteASTContextConcreteImpl final : public RemoteASTContextImpl {
-  MetadataReader<Runtime, RemoteASTTypeBuilder> Reader;
+  MetadataReader<Runtime, ASTBuilder> Reader;
 
-  RemoteASTTypeBuilder &getBuilder() override {
+  ASTBuilder &getBuilder() override {
     return Reader.Builder;
   }
 
@@ -1138,12 +453,13 @@ public:
   getDeclForRemoteNominalTypeDescriptor(RemoteAddress descriptor) override {
     if (auto result =
           Reader.readNominalTypeFromDescriptor(descriptor.getAddressData()))
-      return result;
+      return dyn_cast<NominalTypeDecl>((GenericTypeDecl *) result);
     return getFailure<NominalTypeDecl*>();
   }
 
   std::unique_ptr<IRGenContext> createIRGenContext() override {
-    return getBuilder().createIRGenContext();
+    return IRGenContext::create(getBuilder().getASTContext(),
+                                getBuilder().getNotionalDC());
   }
 
   Result<uint64_t>
@@ -1171,58 +487,89 @@ public:
     return getFailure<RemoteAddress>();
   }
 
-  Result<std::pair<Type, RemoteAddress>>
+  Result<OpenedExistential>
   getDynamicTypeAndAddressClassExistential(RemoteAddress object) {
     auto pointerval = Reader.readPointerValue(object.getAddressData());
     if (!pointerval)
-      return getFailure<std::pair<Type, RemoteAddress>>();
+      return getFailure<OpenedExistential>();
     auto result = Reader.readMetadataFromInstance(*pointerval);
     if (!result)
-      return getFailure<std::pair<Type, RemoteAddress>>();
+      return getFailure<OpenedExistential>();
     auto typeResult = Reader.readTypeFromMetadata(result.getValue());
     if (!typeResult)
-      return getFailure<std::pair<Type, RemoteAddress>>();
-    return std::make_pair<Type, RemoteAddress>(std::move(typeResult),
-                                               std::move(object));
+      return getFailure<OpenedExistential>();
+    return OpenedExistential(std::move(typeResult),
+                             RemoteAddress(*pointerval));
   }
 
-  Result<std::pair<Type, RemoteAddress>>
-  getDynamicTypeAndAddressErrorExistential(RemoteAddress object) {
-    auto pointerval = Reader.readPointerValue(object.getAddressData());
-    if (!pointerval)
-      return getFailure<std::pair<Type, RemoteAddress>>();
+  Result<OpenedExistential>
+  getDynamicTypeAndAddressErrorExistential(RemoteAddress object,
+                                           bool dereference=true) {
+    if (dereference) {
+      auto pointerval = Reader.readPointerValue(object.getAddressData());
+      if (!pointerval)
+        return getFailure<OpenedExistential>();
+      object = RemoteAddress(*pointerval);
+    }
+
     auto result =
-        Reader.readMetadataAndValueErrorExistential(RemoteAddress(*pointerval));
+        Reader.readMetadataAndValueErrorExistential(object);
     if (!result)
-      return getFailure<std::pair<Type, RemoteAddress>>();
-    RemoteAddress metadataAddress = result->first;
-    RemoteAddress valueAddress = result->second;
+      return getFailure<OpenedExistential>();
 
     auto typeResult =
-        Reader.readTypeFromMetadata(metadataAddress.getAddressData());
+        Reader.readTypeFromMetadata(result->MetadataAddress.getAddressData());
     if (!typeResult)
-      return getFailure<std::pair<Type, RemoteAddress>>();
-    return std::make_pair<Type, RemoteAddress>(std::move(typeResult),
-                                               std::move(valueAddress));
+      return getFailure<OpenedExistential>();
+
+
+    // When the existential wraps a class type, LLDB expects that the
+    // address returned is the class instance itself and not the address
+    // of the reference.
+    auto payloadAddress = result->PayloadAddress;
+    if (!result->IsBridgedError &&
+        typeResult->getClassOrBoundGenericClass()) {
+      auto pointerval = Reader.readPointerValue(
+          payloadAddress.getAddressData());
+      if (!pointerval)
+        return getFailure<OpenedExistential>();
+
+      payloadAddress = RemoteAddress(*pointerval);
+    }
+
+    return OpenedExistential(std::move(typeResult),
+                             std::move(payloadAddress));
   }
 
-  Result<std::pair<Type, RemoteAddress>>
+  Result<OpenedExistential>
   getDynamicTypeAndAddressOpaqueExistential(RemoteAddress object) {
     auto result = Reader.readMetadataAndValueOpaqueExistential(object);
     if (!result)
-      return getFailure<std::pair<Type, RemoteAddress>>();
-    RemoteAddress metadataAddress = result->first;
-    RemoteAddress valueAddress = result->second;
+      return getFailure<OpenedExistential>();
 
     auto typeResult =
-        Reader.readTypeFromMetadata(metadataAddress.getAddressData());
+        Reader.readTypeFromMetadata(result->MetadataAddress.getAddressData());
     if (!typeResult)
-      return getFailure<std::pair<Type, RemoteAddress>>();
-    return std::make_pair<Type, RemoteAddress>(std::move(typeResult),
-                                               std::move(valueAddress));
+      return getFailure<OpenedExistential>();
+
+    // When the existential wraps a class type, LLDB expects that the
+    // address returned is the class instance itself and not the address
+    // of the reference.
+    auto payloadAddress = result->PayloadAddress;
+    if (typeResult->getClassOrBoundGenericClass()) {
+      auto pointerval = Reader.readPointerValue(
+          payloadAddress.getAddressData());
+      if (!pointerval)
+        return getFailure<OpenedExistential>();
+
+      payloadAddress = RemoteAddress(*pointerval);
+    }
+
+    return OpenedExistential(std::move(typeResult),
+                             std::move(payloadAddress));
   }
 
-  Result<std::pair<Type, RemoteAddress>>
+  Result<OpenedExistential>
   getDynamicTypeAndAddressExistentialMetatype(RemoteAddress object) {
     // The value of the address is just the input address.
     // The type is obtained through the following sequence of steps:
@@ -1231,27 +578,36 @@ public:
     // 3) Wrapping the resolved type in an existential metatype.
     auto pointerval = Reader.readPointerValue(object.getAddressData());
     if (!pointerval)
-      return getFailure<std::pair<Type, RemoteAddress>>();
+      return getFailure<OpenedExistential>();
     auto typeResult = Reader.readTypeFromMetadata(*pointerval);
     if (!typeResult)
-      return getFailure<std::pair<Type, RemoteAddress>>();
+      return getFailure<OpenedExistential>();
     auto wrappedType = ExistentialMetatypeType::get(typeResult);
     if (!wrappedType)
-      return getFailure<std::pair<Type, RemoteAddress>>();
-    return std::make_pair<Type, RemoteAddress>(std::move(wrappedType),
-                                               std::move(object));
+      return getFailure<OpenedExistential>();
+    return OpenedExistential(std::move(wrappedType),
+                             std::move(object));
+  }
+
+  /// Resolve the dynamic type and the value address of an error existential
+  /// object, Unlike getDynamicTypeAndAddressForExistential(), this function
+  /// takes the address of the instance and not the address of the reference.
+  Result<OpenedExistential>
+  getDynamicTypeAndAddressForError(RemoteAddress object) override {
+    return getDynamicTypeAndAddressErrorExistential(object,
+                                                    /*dereference=*/false);
   }
 
   /// Resolve the dynamic type and the value address of an existential,
   /// given its address and its static type. For class and error existentials,
   /// this API takes a pointer to the instance reference rather than the
   /// instance reference itself.
-  Result<std::pair<Type, RemoteAddress>>
+  Result<OpenedExistential>
   getDynamicTypeAndAddressForExistential(RemoteAddress object,
                                          Type staticType) override {
     // If this is not an existential, give up.
     if (!staticType->isAnyExistentialType())
-      return getFailure<std::pair<Type, RemoteAddress>>();
+      return getFailure<OpenedExistential>();
 
     // Handle the case where this is an ExistentialMetatype.
     if (!staticType->isExistentialType())
@@ -1268,6 +624,20 @@ public:
       return getDynamicTypeAndAddressOpaqueExistential(object);
     }
     llvm_unreachable("invalid type kind");
+  }
+  
+  Result<Type>
+  getUnderlyingTypeForOpaqueType(remote::RemoteAddress opaqueDescriptor,
+                                 SubstitutionMap substitutions,
+                                 unsigned ordinal) override {
+    auto underlyingType = Reader
+      .readUnderlyingTypeForOpaqueTypeDescriptor(opaqueDescriptor.getAddressData(),
+                                                 ordinal);
+    
+    if (!underlyingType)
+      return getFailure<Type>();
+    
+    return underlyingType.subst(substitutions);
   }
 };
 
@@ -1327,9 +697,24 @@ RemoteASTContext::getHeapMetadataForObject(remote::RemoteAddress address) {
   return asImpl(Impl)->getHeapMetadataForObject(address);
 }
 
-Result<std::pair<Type, remote::RemoteAddress>>
+Result<OpenedExistential>
+RemoteASTContext::getDynamicTypeAndAddressForError(
+    remote::RemoteAddress address) {
+  return asImpl(Impl)->getDynamicTypeAndAddressForError(address);
+}
+
+Result<OpenedExistential>
 RemoteASTContext::getDynamicTypeAndAddressForExistential(
     remote::RemoteAddress address, Type staticType) {
   return asImpl(Impl)->getDynamicTypeAndAddressForExistential(address,
                                                               staticType);
+}
+
+Result<Type>
+RemoteASTContext::getUnderlyingTypeForOpaqueType(
+    remote::RemoteAddress opaqueDescriptor,
+    SubstitutionMap substitutions,
+    unsigned ordinal) {
+  return asImpl(Impl)->getUnderlyingTypeForOpaqueType(opaqueDescriptor,
+                                                      substitutions, ordinal);
 }

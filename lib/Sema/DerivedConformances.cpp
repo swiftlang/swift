@@ -137,8 +137,23 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
   return false;
 }
 
-ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
-                                                       NominalTypeDecl *nominal,
+void DerivedConformance::tryDiagnoseFailedDerivation(DeclContext *DC,
+                                                     NominalTypeDecl *nominal,
+                                                     ProtocolDecl *protocol) {
+  auto knownProtocol = protocol->getKnownProtocolKind();
+  if (!knownProtocol)
+    return;
+
+  if (*knownProtocol == KnownProtocolKind::Equatable) {
+    tryDiagnoseFailedEquatableDerivation(DC, nominal);
+  }
+
+  if (*knownProtocol == KnownProtocolKind::Hashable) {
+    tryDiagnoseFailedHashableDerivation(DC, nominal);
+  }
+}
+
+ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
                                                        ValueDecl *requirement) {
   // Note: whenever you update this function, also update
   // TypeChecker::deriveProtocolRequirement.
@@ -152,7 +167,7 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
     auto proto = ctx.getProtocol(kind);
     if (!proto) return nullptr;
 
-    if (auto conformance = tc.conformsToProtocol(
+    if (auto conformance = TypeChecker::conformsToProtocol(
             nominal->getDeclaredInterfaceType(), proto, nominal,
             ConformanceCheckFlags::SkipConditionalRequirements)) {
       auto DC = conformance->getConcrete()->getDeclContext();
@@ -263,11 +278,10 @@ DerivedConformance::createSelfDeclRef(AbstractFunctionDecl *fn) {
 }
 
 AccessorDecl *DerivedConformance::
-addGetterToReadOnlyDerivedProperty(TypeChecker &tc,
-                                   VarDecl *property,
+addGetterToReadOnlyDerivedProperty(VarDecl *property,
                                    Type propertyContextType) {
   auto getter =
-    declareDerivedPropertyGetter(tc, property, propertyContextType);
+    declareDerivedPropertyGetter(property, propertyContextType);
 
   property->setAccessors(StorageImplInfo::getImmutableComputed(),
                          SourceLoc(), {getter}, SourceLoc());
@@ -276,13 +290,11 @@ addGetterToReadOnlyDerivedProperty(TypeChecker &tc,
 }
 
 AccessorDecl *
-DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
-                                                 VarDecl *property,
+DerivedConformance::declareDerivedPropertyGetter(VarDecl *property,
                                                  Type propertyContextType) {
   bool isStatic = property->isStatic();
-  bool isFinal = property->isFinal();
 
-  auto &C = tc.Context;
+  auto &C = property->getASTContext();
   auto parentDC = property->getDeclContext();
   ParameterList *params = ParameterList::createEmpty(C);
 
@@ -290,18 +302,13 @@ DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
   
   auto getterDecl = AccessorDecl::create(C,
     /*FuncLoc=*/SourceLoc(), /*AccessorKeywordLoc=*/SourceLoc(),
-    AccessorKind::Get, AddressorKind::NotAddressor, property,
+    AccessorKind::Get, property,
     /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
     /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
     /*GenericParams=*/nullptr, params,
     TypeLoc::withoutLoc(propertyInterfaceType), parentDC);
   getterDecl->setImplicit();
   getterDecl->setStatic(isStatic);
-
-  // If this is supposed to be a final method, mark it as such.
-  assert(isFinal || !parentDC->getSelfClassDecl());
-  if (isFinal && parentDC->getSelfClassDecl() && !getterDecl->isFinal())
-    getterDecl->getAttrs().add(new (C) FinalAttr(/*IsImplicit=*/true));
 
   // Compute the interface type of the getter.
   if (auto env = parentDC->getGenericEnvironmentOfContext())
@@ -311,7 +318,7 @@ DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
   getterDecl->copyFormalAccessFrom(property);
   getterDecl->setValidationToChecked();
 
-  tc.Context.addSynthesizedDecl(getterDecl);
+  C.addSynthesizedDecl(getterDecl);
 
   return getterDecl;
 }
@@ -331,11 +338,6 @@ DerivedConformance::declareDerivedProperty(Identifier name,
   propDecl->copyFormalAccessFrom(Nominal, /*sourceIsParentContext*/ true);
   propDecl->setInterfaceType(propertyInterfaceType);
   propDecl->setValidationToChecked();
-
-  // If this is supposed to be a final property, mark it as such.
-  assert(isFinal || !parentDC->getSelfClassDecl());
-  if (isFinal && parentDC->getSelfClassDecl() && !propDecl->isFinal())
-    propDecl->getAttrs().add(new (C) FinalAttr(/*IsImplicit=*/true));
 
   Pattern *propPat = new (C) NamedPattern(propDecl, /*implicit*/ true);
   propPat->setType(propertyContextType);
@@ -358,19 +360,6 @@ bool DerivedConformance::checkAndDiagnoseDisallowedContext(
       Protocol->isSpecificProtocol(KnownProtocolKind::Hashable)) {
     auto ED = dyn_cast<EnumDecl>(Nominal);
     allowCrossfileExtensions = ED && ED->hasOnlyCasesWithoutAssociatedValues();
-  }
-
-  if (TC.Context.isSwiftVersion3()) {
-    // In Swift 3, a 'private' property can't be accessed in any extensions, so
-    // we can't synthesize anything that uses them. Thus, we stick to the old
-    // rule for synthesis, which is never in an extension except for the
-    // Equatable/Hashable cases mentioned above.
-    if (!allowCrossfileExtensions && Nominal != ConformanceDecl) {
-      TC.diagnose(ConformanceDecl->getLoc(),
-                  diag::swift3_cannot_synthesize_in_extension,
-                  getProtocolType());
-      return true;
-    }
   }
 
   if (!allowCrossfileExtensions &&

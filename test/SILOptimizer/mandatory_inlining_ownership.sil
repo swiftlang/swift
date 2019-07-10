@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -mandatory-inlining -enable-sil-ownership | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -mandatory-inlining | %FileCheck %s
 
 sil_stage raw
 
@@ -7,17 +7,19 @@ import Swift
 
 class C {
   var i: Builtin.Int64
-  init(i: Builtin.Int64) { self.i = i }
+  init(i: Builtin.Int64)
 }
 
-sil [transparent] @calleeWithGuaranteed : $@convention(thin) (@guaranteed C) -> Builtin.Int64 {
+class Klass {}
+
+sil [transparent] [ossa] @calleeWithGuaranteed : $@convention(thin) (@guaranteed C) -> Builtin.Int64 {
 bb(%0 : @guaranteed $C):
   %1 = ref_element_addr %0 : $C, #C.i
   %2 = load [trivial] %1 : $*Builtin.Int64
   return %2 : $Builtin.Int64
 }
 
-// CHECK-LABEL: sil @callerWithOwned : $@convention(thin) (@owned C) -> Builtin.Int64 {
+// CHECK-LABEL: sil [ossa] @callerWithOwned : $@convention(thin) (@owned C) -> Builtin.Int64 {
 // CHECK: bb0(%0 : @owned $C):
 // CHECK:   [[BORROW:%.*]] = begin_borrow %0 : $C
 // CHECK:   [[ADDR:%.*]] = ref_element_addr [[BORROW]] : $C, #C.i
@@ -26,7 +28,7 @@ bb(%0 : @guaranteed $C):
 // CHECK:   destroy_value %0 : $C
 // CHECK:   return [[VAL]] : $Builtin.Int64
 // CHECK-LABEL: } // end sil function 'callerWithOwned'
-sil @callerWithOwned : $@convention(thin) (@owned C) -> Builtin.Int64 {
+sil [ossa] @callerWithOwned : $@convention(thin) (@owned C) -> Builtin.Int64 {
 bb(%0 : @owned $C):
   %fn = function_ref @calleeWithGuaranteed : $@convention(thin) (@guaranteed C) -> Builtin.Int64
   %call = apply %fn(%0) : $@convention(thin) (@guaranteed C) -> Builtin.Int64
@@ -36,7 +38,7 @@ bb(%0 : @owned $C):
 
 struct MyError : Error {}
 
-sil [transparent] @calleeWithGuaranteedThrows : $@convention(thin) (@guaranteed C) -> (Builtin.Int64, @error Error) {
+sil [transparent] [ossa] @calleeWithGuaranteedThrows : $@convention(thin) (@guaranteed C) -> (Builtin.Int64, @error Error) {
 bb(%0 : @guaranteed $C):
   %1 = ref_element_addr %0 : $C, #C.i
   %2 = load [trivial] %1 : $*Builtin.Int64
@@ -52,30 +54,363 @@ bb2:
   return %2 : $Builtin.Int64
 }
 
-// CHECK-LABEL: sil @callerWithThrow : $@convention(thin) (@owned C) -> (Builtin.Int64, @error Error) {
+// CHECK-LABEL: sil [ossa] @callerWithThrow : $@convention(thin) (@owned C) -> (Builtin.Int64, @error Error) {
 // CHECK: bb0(%0 : @owned $C):
 // CHECK:   [[BORROW:%.*]] = begin_borrow %0 : $C
 // CHECK:   [[ADDR:%.*]] = ref_element_addr [[BORROW]] : $C, #C.i
 // CHECK:   [[VAL:%.*]] = load [trivial] [[ADDR]] : $*Builtin.Int64
-// CHECK: bb{{.*}}([[RET:%.*]] : @trivial $Builtin.Int64):
-// CHECK:   end_borrow [[BORROW]] : $C
-// CHECK:   destroy_value %0 : $C
-// CHECK:   return [[RET]] : $Builtin.Int64
-// CHECK: bb{{.*}}([[ERR:%.*]] : @owned $Error):
+// CHECK: bb{{.*}}:
+// CHECK:   [[ERR:%.*]] = alloc_existential_box $Error, $MyError
 // CHECK:   end_borrow [[BORROW]] : $C
 // CHECK:   destroy_value %0 : $C
 // CHECK:   throw [[ERR]] : $Error
+// CHECK: bb{{.*}}:
+// CHECK:   end_borrow [[BORROW]] : $C
+// CHECK:   destroy_value %0 : $C
+// CHECK:   return [[VAL]] : $Builtin.Int64
 // CHECK-LABEL: } // end sil function 'callerWithThrow'
-sil @callerWithThrow : $@convention(thin) (@owned C) -> (Builtin.Int64, @error Error) {
+sil [ossa] @callerWithThrow : $@convention(thin) (@owned C) -> (Builtin.Int64, @error Error) {
 bb(%0 : @owned $C):
   %fn = function_ref @calleeWithGuaranteedThrows : $@convention(thin) (@guaranteed C) -> (Builtin.Int64, @error Error)
   try_apply %fn(%0) : $@convention(thin) (@guaranteed C) -> (Builtin.Int64, @error Error), normal bb1, error bb2
 
-bb1(%4 : @trivial $Builtin.Int64):
+bb1(%4 : $Builtin.Int64):
   destroy_value %0 : $C
   return %4 : $Builtin.Int64
 
 bb2(%5 : @owned $Error):
   destroy_value %0 : $C
   throw %5 : $Error
+}
+
+// Partial Apply copy_value, begin_borrow
+
+sil @nativeobject_plus : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+sil @partial_apply_user : $@convention(thin) (@owned @callee_owned (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject) -> ()
+sil @partial_apply_user_guaranteed : $@convention(thin) (@guaranteed @callee_guaranteed (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject) -> ()
+
+sil [ossa] [transparent] @test_partial_nativeobject_baz : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+bb0(%0 : @owned $Builtin.NativeObject, %1 : @owned $Builtin.NativeObject):
+  %6 = function_ref @nativeobject_plus : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  %7 = apply %6(%0, %1) : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  return %7 : $Builtin.NativeObject
+}
+
+sil [ossa] [transparent] @test_partial_nativeobject_bar : $@convention(thin) (@owned @callee_owned (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+bb0(%0 : @owned $@callee_owned (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject, %1 : @owned $Builtin.NativeObject):
+  %7 = apply %0(%1) : $@callee_owned (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  return %7 : $Builtin.NativeObject
+}
+
+sil [ossa] [transparent] @test_partial_nativeobject_bar_guaranteed : $@convention(thin) (@guaranteed @callee_guaranteed (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+bb0(%0 : @guaranteed $@callee_guaranteed (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject, %1 : @owned $Builtin.NativeObject):
+  %7 = apply %0(%1) : $@callee_guaranteed (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  return %7 : $Builtin.NativeObject
+}
+
+// CHECK-LABEL: sil [transparent] [ossa] @test_partial_nativeobject_foo : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+// CHECK: bb0([[ARG:%.*]] : @owned $Builtin.NativeObject):
+// CHECK:   [[FN:%.*]] = function_ref @test_partial_nativeobject_baz :
+// CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK:   [[ARG_COPY_2:%.*]] = copy_value [[ARG_COPY]]
+// CHECK:   [[PAI:%.*]] = partial_apply [[FN]]([[ARG_COPY]])
+// CHECK:   [[ARG_COPY_3:%.*]] = copy_value [[ARG]]
+// CHECK:   [[PAI_COPY:%.*]] = copy_value [[PAI]]
+// CHECK:   [[FN2:%.*]] = function_ref @nativeobject_plus :
+// CHECK:   [[RESULT:%.*]] = apply [[FN2]]([[ARG_COPY_3]], [[ARG_COPY_2]])
+// CHECK:   destroy_value [[PAI_COPY]]
+// CHECK:   [[PAI_COPY_2:%.*]] = copy_value [[PAI]]
+// CHECK:   [[OPAQUE_FN:%.*]] = function_ref @partial_apply_user
+// CHECK:   apply [[OPAQUE_FN]]([[PAI_COPY_2]])
+// CHECK:   destroy_value [[PAI]]
+// CHECK:   destroy_value [[ARG]]
+// CHECK:   return [[RESULT]]
+// CHECK: } // end sil function 'test_partial_nativeobject_foo'
+sil [transparent] [ossa] @test_partial_nativeobject_foo : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %2 = function_ref @test_partial_nativeobject_bar : $@convention(thin) (@owned @callee_owned (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  %3 = function_ref @test_partial_nativeobject_baz : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  br bb1
+
+bb1:
+  %0copy1 = copy_value %0 : $Builtin.NativeObject
+  %5 = partial_apply %3(%0copy1) : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  br bb2
+
+bb2:
+  %0copy2 = copy_value %0 : $Builtin.NativeObject
+  %5copy1 = copy_value %5 : $@callee_owned (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  %13 = apply %2(%5copy1, %0copy2) : $@convention(thin) (@owned @callee_owned (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  br bb3
+
+bb3:
+  %5copy2 = copy_value %5 : $@callee_owned (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  %15 = function_ref @partial_apply_user : $@convention(thin) (@owned @callee_owned (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject) -> ()
+  apply %15(%5copy2) : $@convention(thin) (@owned @callee_owned (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject) -> ()
+  destroy_value %5 : $@callee_owned (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  destroy_value %0 : $Builtin.NativeObject
+  return %13 : $Builtin.NativeObject
+}
+
+// Make sure we do not eliminate the actual closure but do the inlining.
+//
+// CHECK-LABEL: sil [transparent] [ossa] @test_partial_nativeobject_foo_guaranteed_explicit_borrow : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+// CHECK: [[PAI:%.*]] = partial_apply [callee_guaranteed]
+// CHECK: [[NATIVEOBJECT_PLUS_FUNC:%.*]] = function_ref @nativeobject_plus : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+// CHECK-NEXT: apply [[NATIVEOBJECT_PLUS_FUNC]](
+// CHECK: } // end sil function 'test_partial_nativeobject_foo_guaranteed_explicit_borrow'
+sil [transparent] [ossa] @test_partial_nativeobject_foo_guaranteed_explicit_borrow : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %2 = function_ref @test_partial_nativeobject_bar_guaranteed : $@convention(thin) (@guaranteed @callee_guaranteed (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  %3 = function_ref @test_partial_nativeobject_baz : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  br bb1
+
+bb1:
+  %0copy1 = copy_value %0 : $Builtin.NativeObject
+  %5 = partial_apply [callee_guaranteed] %3(%0copy1) : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  %6 = begin_borrow %5 : $@callee_guaranteed (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  br bb2
+
+bb2:
+  %0copy2 = copy_value %0 : $Builtin.NativeObject
+  %13 = apply %2(%6, %0copy2) : $@convention(thin) (@guaranteed @callee_guaranteed (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  end_borrow %6 : $@callee_guaranteed (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  br bb3
+
+bb3:
+  %15 = function_ref @partial_apply_user_guaranteed : $@convention(thin) (@guaranteed @callee_guaranteed (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject) -> ()
+  apply %15(%5) : $@convention(thin) (@guaranteed @callee_guaranteed (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject) -> ()
+  destroy_value %5 : $@callee_guaranteed (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  destroy_value %0 : $Builtin.NativeObject
+  return %13 : $Builtin.NativeObject
+}
+
+// Make sure we do the inlining and delete the closure.
+// CHECK-LABEL: sil [transparent] [ossa] @test_partial_nativeobject_foo_guaranteed_explicit_borrow_dead_pa : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+// CHECK-NOT: partial_apply
+// CHECK: [[NATIVEOBJECT_PLUS_FUNC:%.*]] = function_ref @nativeobject_plus : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+// CHECK-NEXT: apply [[NATIVEOBJECT_PLUS_FUNC]](
+// CHECK-NOT: partial_apply
+// CHECK: } // end sil function 'test_partial_nativeobject_foo_guaranteed_explicit_borrow_dead_pa'
+sil [transparent] [ossa] @test_partial_nativeobject_foo_guaranteed_explicit_borrow_dead_pa : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %2 = function_ref @test_partial_nativeobject_bar_guaranteed : $@convention(thin) (@guaranteed @callee_guaranteed (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  %3 = function_ref @test_partial_nativeobject_baz : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  br bb1
+
+bb1:
+  %0copy1 = copy_value %0 : $Builtin.NativeObject
+  %5 = partial_apply [callee_guaranteed] %3(%0copy1) : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  %6 = begin_borrow %5 : $@callee_guaranteed (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  br bb2
+
+bb2:
+  %0copy2 = copy_value %0 : $Builtin.NativeObject
+  %13 = apply %2(%6, %0copy2) : $@convention(thin) (@guaranteed @callee_guaranteed (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  end_borrow %6 : $@callee_guaranteed (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  br bb3
+
+bb3:
+  destroy_value %5 : $@callee_guaranteed (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  destroy_value %0 : $Builtin.NativeObject
+  return %13 : $Builtin.NativeObject
+}
+
+// CHECK-LABEL: sil [transparent] [ossa] @test_partial_nativeobject_foo_guaranteed_implicit_borrow : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+// We shouldn't delete the PAI here.
+// CHECK: [[PAI:%.*]] = partial_apply [callee_guaranteed]
+// CHECK: [[NATIVEOBJECT_PLUS_FUNC:%.*]] = function_ref @nativeobject_plus : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+// CHECK: apply [[NATIVEOBJECT_PLUS_FUNC]](
+// CHECK: } // end sil function 'test_partial_nativeobject_foo_guaranteed_implicit_borrow'
+sil [transparent] [ossa] @test_partial_nativeobject_foo_guaranteed_implicit_borrow : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %2 = function_ref @test_partial_nativeobject_bar_guaranteed : $@convention(thin) (@guaranteed @callee_guaranteed (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  %3 = function_ref @test_partial_nativeobject_baz : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  br bb1
+
+bb1:
+  %0copy1 = copy_value %0 : $Builtin.NativeObject
+  %5 = partial_apply [callee_guaranteed] %3(%0copy1) : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  br bb2
+
+bb2:
+  %0copy2 = copy_value %0 : $Builtin.NativeObject
+  %13 = apply %2(%5, %0copy2) : $@convention(thin) (@guaranteed @callee_guaranteed (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  br bb3
+
+bb3:
+  %15 = function_ref @partial_apply_user_guaranteed : $@convention(thin) (@guaranteed @callee_guaranteed (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject) -> ()
+  apply %15(%5) : $@convention(thin) (@guaranteed @callee_guaranteed (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject) -> ()
+  destroy_value %5 : $@callee_guaranteed (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  destroy_value %0 : $Builtin.NativeObject
+  return %13 : $Builtin.NativeObject
+}
+
+sil [transparent] [ossa] @term_ossa_checked_cast_addr_br_takealways_callee : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = alloc_stack $Builtin.NativeObject
+  %2 = alloc_stack $Klass
+  store %0 to [init] %1 : $*Builtin.NativeObject
+  checked_cast_addr_br take_always Builtin.NativeObject in %1 : $*Builtin.NativeObject to Klass in %2 : $*Klass, bb1, bb2
+
+bb1:
+  destroy_addr %2 : $*Klass
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  dealloc_stack %2 : $*Klass
+  dealloc_stack %1 : $*Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+
+// CHECK-LABEL: sil [ossa] @term_nonossa_checked_cast_addr_br_takealways_caller : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK-NEXT:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK-NEXT:   [[SRC_ADDR:%.*]] = alloc_stack $Builtin.NativeObject
+// CHECK-NEXT:   [[DEST_ADDR:%.*]] = alloc_stack $Klass
+// CHECK-NEXT:   store [[ARG_COPY]] to [init] [[SRC_ADDR]]
+// CHECK-NEXT:   [[RELOADED_ARG:%.*]] = load [take] [[SRC_ADDR]]
+// CHECK-NEXT:   checked_cast_br [[RELOADED_ARG]] : $Builtin.NativeObject to $Klass, [[SUCCESS_BB:bb[0-9]+]], [[FAILURE_BB:bb[0-9]+]]
+//
+// ==> On success, we store the value into dest. The destroy is not from the
+// ==> optimizer, but from the code.
+// CHECK: [[SUCCESS_BB]]([[CAST_VALUE:%.*]] :
+// CHECK-NEXT:   store [[CAST_VALUE]] to [init] [[DEST_ADDR]]
+// CHECK-NEXT:   destroy_addr [[DEST_ADDR]]
+// CHECK-NEXT:   br [[CONT_BB:bb[0-9]+]]
+//
+// ==> take_always implies we destroy in failure
+// CHECK: [[FAILURE_BB]]([[FAILURE_ARG:%.*]] :
+// CHECK-NEXT:   destroy_value [[FAILURE_ARG]]
+// CHECK-NEXT:   br [[CONT_BB]]
+//
+// CHECK: [[CONT_BB]]:
+// CHECK:   destroy_value [[ARG]]
+// CHECK: } // end sil function 'term_nonossa_checked_cast_addr_br_takealways_caller'
+sil [ossa] @term_nonossa_checked_cast_addr_br_takealways_caller : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %3 = function_ref @term_ossa_checked_cast_addr_br_takealways_callee : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  %1 = copy_value %0 : $Builtin.NativeObject
+  apply %3(%1) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  destroy_value %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil [transparent] [ossa] @term_ossa_checked_cast_addr_br_takeonsuccess_callee : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = alloc_stack $Builtin.NativeObject
+  %2 = alloc_stack $Klass
+  store %0 to [init] %1 : $*Builtin.NativeObject
+  checked_cast_addr_br take_on_success Builtin.NativeObject in %1 : $*Builtin.NativeObject to Klass in %2 : $*Klass, bb1, bb2
+
+bb1:
+  destroy_addr %2 : $*Klass
+  br bb3
+
+bb2:
+  destroy_addr %1 : $*Builtin.NativeObject
+  br bb3
+
+bb3:
+  dealloc_stack %2 : $*Klass
+  dealloc_stack %1 : $*Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @checked_cast_addr_br_takeonsuccess_caller : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK-NEXT:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK-NEXT:   [[SRC_ADDR:%.*]] = alloc_stack $Builtin.NativeObject
+// CHECK-NEXT:   [[DEST_ADDR:%.*]] = alloc_stack $Klass
+// CHECK-NEXT:   store [[ARG_COPY]] to [init] [[SRC_ADDR]]
+// CHECK-NEXT:   [[RELOADED_ARG:%.*]] = load [take] [[SRC_ADDR]]
+// CHECK-NEXT:   checked_cast_br [[RELOADED_ARG]] : $Builtin.NativeObject to $Klass, [[SUCCESS_BB:bb[0-9]+]], [[FAILURE_BB:bb[0-9]+]]
+//
+// CHECK: [[SUCCESS_BB]]([[CAST_VALUE:%.*]] :
+// ==> On success, we store into dest and destroy dest.
+// CHECK-NEXT:   store [[CAST_VALUE]] to [init] [[DEST_ADDR]]
+// CHECK-NEXT:   destroy_addr [[DEST_ADDR]]
+// CHECK-NEXT:   br [[CONT_BB:bb[0-9]+]]
+//
+// ==> Since we are doing a take on success and we failed... store the original
+// ==> value back into the memory slot.
+// CHECK: [[FAILURE_BB]]([[FAIL_ARG:%.*]] :
+// CHECK-NEXT:   store [[FAIL_ARG]] to [init] [[SRC_ADDR]]
+// CHECK-NEXT:   destroy_addr [[SRC_ADDR]]
+// CHECK-NEXT:   br [[CONT_BB]]
+//
+// CHECK: } // end sil function 'checked_cast_addr_br_takeonsuccess_caller'
+sil [ossa] @checked_cast_addr_br_takeonsuccess_caller : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %2 = function_ref @term_ossa_checked_cast_addr_br_takeonsuccess_callee : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  %1 = copy_value %0 : $Builtin.NativeObject
+  apply %2(%1) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  destroy_value %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil [transparent] [ossa] @term_ossa_checked_cast_addr_br_copyonsuccess_callee : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = alloc_stack $Builtin.NativeObject
+  %2 = alloc_stack $Klass
+  store %0 to [init] %1 : $*Builtin.NativeObject
+  checked_cast_addr_br copy_on_success Builtin.NativeObject in %1 : $*Builtin.NativeObject to Klass in %2 : $*Klass, bb1, bb2
+
+bb1:
+  destroy_addr %2 : $*Klass
+  destroy_addr %1 : $*Builtin.NativeObject
+  br bb3
+
+bb2:
+  destroy_addr %1 : $*Builtin.NativeObject
+  br bb3
+
+bb3:
+  dealloc_stack %2 : $*Klass
+  dealloc_stack %1 : $*Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @checked_cast_addr_br_copyonsuccess_caller : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK-NEXT:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
+// CHECK-NEXT:   [[SRC_ADDR:%.*]] = alloc_stack $Builtin.NativeObject
+// CHECK-NEXT:   [[DEST_ADDR:%.*]] = alloc_stack $Klass
+// CHECK-NEXT:   store [[ARG_COPY]] to [init] [[SRC_ADDR]]
+// CHECK-NEXT:   [[RELOADED_ARG:%.*]] = load_borrow [[SRC_ADDR]]
+// CHECK-NEXT:   checked_cast_br [[RELOADED_ARG]] : $Builtin.NativeObject to $Klass, [[SUCCESS_BB:bb[0-9]+]], [[FAILURE_BB:bb[0-9]+]]
+//
+// CHECK: [[SUCCESS_BB]]([[CAST_VALUE:%.*]] : @guaranteed
+// CHECK-NEXT:   [[CAST_VALUE_COPY:%.*]] = copy_value [[CAST_VALUE]]
+// CHECK-NEXT:   end_borrow [[CAST_VALUE]]
+// CHECK-NEXT:   end_borrow [[RELOADED_ARG]]
+// CHECK-NEXT:   store [[CAST_VALUE_COPY]] to [init] [[DEST_ADDR]]
+// CHECK-NEXT:   destroy_addr [[DEST_ADDR]]
+// CHECK-NEXT:   destroy_addr [[SRC_ADDR]]
+// CHECK-NEXT:   br [[CONT_BB:bb[0-9]+]]
+//
+// CHECK: [[FAILURE_BB]]([[FAILURE_BORROWED_ARG:%.*]] :
+// CHECK-NEXT:   end_borrow [[FAILURE_BORROWED_ARG]]
+// CHECK-NEXT:   end_borrow [[RELOADED_ARG]]
+// CHECK-NEXT:   destroy_addr [[SRC_ADDR]]
+// CHECK-NEXT:   br [[CONT_BB]]
+//
+// CHECK: } // end sil function 'checked_cast_addr_br_copyonsuccess_caller'
+sil [ossa] @checked_cast_addr_br_copyonsuccess_caller : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = function_ref @term_ossa_checked_cast_addr_br_copyonsuccess_callee : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  %2 = copy_value %0 : $Builtin.NativeObject
+  apply %1(%2) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  destroy_value %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
 }

@@ -161,6 +161,18 @@ SILInstruction *SILCombiner::optimizeBuiltinZextOrBitCast(BuiltinInst *I) {
     replaceInstUsesWith(*I, NI);
     return eraseInstFromFunction(*I);
   }
+  // Optimize a sequence of conversion of an builtin integer to and from
+  // BridgeObject. This sequence appears in the String implementation.
+  if (auto *BO2W = dyn_cast<BridgeObjectToWordInst>(Op)) {
+    if (auto *V2BO = dyn_cast<ValueToBridgeObjectInst>(BO2W->getOperand())) {
+      if (auto *SI = dyn_cast<StructInst>(V2BO->getOperand())) {
+        if (SI->getNumOperands() == 1 && SI->getOperand(0)->getType() == I->getType()) {
+          replaceInstUsesWith(*I, SI->getOperand(0));
+          return eraseInstFromFunction(*I);
+        }
+      }
+    }
+  }
   return nullptr;
 }
 
@@ -294,12 +306,13 @@ static SILValue createIndexAddrFrom(IndexRawPointerInst *I,
                                     SILType RawPointerTy,
                                     SILBuilder &Builder) {
   Builder.setCurrentDebugScope(I->getDebugScope());
-  SILType InstanceType =
-    Metatype->getType().getMetatypeInstanceType(I->getModule());
+
+  CanType InstanceType =
+    Metatype->getType().castTo<MetatypeType>().getInstanceType();
 
   // index_raw_pointer's address type is currently always strict.
   auto *NewPTAI = Builder.createPointerToAddress(
-    I->getLoc(), Ptr, InstanceType.getAddressType(),
+    I->getLoc(), Ptr, SILType::getPrimitiveAddressType(InstanceType),
     /*isStrict*/ true, /*isInvariant*/ false);
 
   auto *DistanceAsWord =
@@ -602,7 +615,7 @@ SILInstruction *SILCombiner::visitBuiltinInst(BuiltinInst *I) {
     // Check if the element type is a trivial type.
     if (Substs.getReplacementTypes().size() == 1) {
       Type ElemType = Substs.getReplacementTypes()[0];
-      auto &SILElemTy = I->getModule().Types.getTypeLowering(ElemType);
+      auto &SILElemTy = I->getFunction()->getTypeLowering(ElemType);
       // Destroying an array of trivial types is a no-op.
       if (SILElemTy.isTrivial())
         return eraseInstFromFunction(*I);

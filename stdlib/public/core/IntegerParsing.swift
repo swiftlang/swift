@@ -10,6 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
+/// Returns c as a UTF16.CodeUnit.  Meant to be used as _ascii16("x").
+@inlinable
+internal func _ascii16(_ c: Unicode.Scalar) -> UTF16.CodeUnit {
+  _internalInvariant(c.value >= 0 && c.value <= 0x7F, "not ASCII")
+  return UTF16.CodeUnit(c.value)
+}
+
 @inlinable
 @inline(__always)
 internal func _asciiDigit<CodeUnit : UnsignedInteger, Result : BinaryInteger>(
@@ -139,29 +146,31 @@ extension FixedWidthInteger {
   ///     `radix`.
   ///   - radix: The radix, or base, to use for converting `text` to an integer
   ///     value. `radix` must be in the range `2...36`. The default is 10.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable // @specializable
   @_semantics("optimize.sil.specialize.generic.partial.never")
   public init?<S : StringProtocol>(_ text: S, radix: Int = 10) {
     _precondition(2...36 ~= radix, "Radix not in range 2...36")
-    let r = Self(radix)
-    let range = text._encodedOffsetRange
-    let guts = text._wholeString._guts
-    let result: Self?
-    result = _visitGuts(guts,
-      range: (range, false), args: r,
-      ascii: { view, radix in
-        var i = view.makeIterator()
-        return _parseASCII(codeUnits: &i, radix: radix) },
-      utf16: { view, radix in
-        var i = view.makeIterator()
-        return Self._parseASCIISlowPath(codeUnits: &i, radix: radix) },
-      opaque: { view, radix in
-        var i = view.makeIterator()
-        return Self._parseASCIISlowPath(codeUnits: &i, radix: radix) }
-    )
 
-    guard _fastPath(result != nil) else { return nil }
-    self = result._unsafelyUnwrappedUnchecked
+    if let str = text as? String, str._guts.isFastUTF8 {
+      guard let ret = str._guts.withFastUTF8 ({ utf8 -> Self? in
+        var iter = utf8.makeIterator()
+        return _parseASCII(codeUnits: &iter, radix: Self(radix))
+      }) else {
+        return nil
+      }
+      self = ret
+      return
+    }
+
+    // TODO(String performance): We can provide fast paths for common radices,
+    // native UTF-8 storage, etc.
+
+    var iter = text.utf8.makeIterator()
+    guard let ret = Self._parseASCIISlowPath(
+      codeUnits: &iter, radix: Self(radix)
+    ) else { return nil }
+
+    self = ret
   }
 
   /// Creates a new integer value from the given string.
@@ -182,7 +191,7 @@ extension FixedWidthInteger {
   ///     Int("10000000000000000000000000") // Out of range
   ///
   /// - Parameter description: The ASCII representation of a number.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   @_semantics("optimize.sil.specialize.generic.partial.never")
   @inline(__always)
   public init?(_ description: String) {

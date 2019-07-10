@@ -12,7 +12,7 @@ class SubscriptAsFunction {
   func `subscript`()
 }
 
-sil hidden @$s4test19SubscriptAsFunctionC9subscriptyyF : $@convention(method) (@guaranteed SubscriptAsFunction) -> () {
+sil hidden [ossa] @$s4test19SubscriptAsFunctionC9subscriptyyF : $@convention(method) (@guaranteed SubscriptAsFunction) -> () {
 bb0(%0 : @guaranteed $SubscriptAsFunction):
   return undef : $()
 }

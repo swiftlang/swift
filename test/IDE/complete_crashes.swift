@@ -16,7 +16,7 @@ func badMembers1(_ a: BadMembers1) {
 }
 // BAD_MEMBERS_1: Begin completions
 // BAD_MEMBERS_1-NEXT: Decl[InstanceVar]/CurrNominal: .prop[#Int#]{{; name=.+$}}
-// BAD_MEMBERS_1-NEXT: Decl[Subscript]/CurrNominal:   [{#Int#}][#Double#]{{; name=.+$}}
+// BAD_MEMBERS_1-NEXT: Decl[Subscript]/CurrNominal:   [{#(i): Int#}][#Double#]{{; name=.+$}}
 // BAD_MEMBERS_1: End completions
 
 protocol BadMembers2 {
@@ -32,7 +32,7 @@ func badMembers2(_ a: BadMembers2) {
 }
 // BAD_MEMBERS_2: Begin completions, 3 items
 // BAD_MEMBERS_2-NEXT: Decl[InstanceVar]/CurrNominal: .prop[#Int#]{{; name=.+$}}
-// BAD_MEMBERS_2-NEXT: Decl[Subscript]/CurrNominal:   [{#Int#}][#Double#]{{; name=.+$}}
+// BAD_MEMBERS_2-NEXT: Decl[Subscript]/CurrNominal:   [{#(i): Int#}][#Double#]{{; name=.+$}}
 // BAD_MEMBERS_2-NEXT: Keyword[self]/CurrNominal:     .self[#BadMembers2#]; name=self
 // BAD_MEMBERS_2-NEXT: End completions
 
@@ -67,8 +67,8 @@ while true {
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_PARAM_AND_ASSOC_TYPE | %FileCheck %s -check-prefix=GENERIC_PARAM_AND_ASSOC_TYPE
 struct CustomGenericCollection<Key> : ExpressibleByDictionaryLiteral {
   // GENERIC_PARAM_AND_ASSOC_TYPE: Begin completions
-  // GENERIC_PARAM_AND_ASSOC_TYPE-DAG: Decl[InstanceVar]/CurrNominal:      count[#Int#]; name=count
-  // GENERIC_PARAM_AND_ASSOC_TYPE-DAG: Decl[GenericTypeParam]/CurrNominal: Key[#Key#]; name=Key
+  // GENERIC_PARAM_AND_ASSOC_TYPE-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Identical]:      count[#Int#]; name=count
+  // GENERIC_PARAM_AND_ASSOC_TYPE-DAG: Decl[GenericTypeParam]/Local:       Key[#Key#]; name=Key
   // GENERIC_PARAM_AND_ASSOC_TYPE-DAG: Decl[TypeAlias]/CurrNominal:        Value[#CustomGenericCollection<Key>.Value#]; name=Value
   // GENERIC_PARAM_AND_ASSOC_TYPE: End completions
 
@@ -154,7 +154,7 @@ func rdar22835966() {
   }
 }
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_22834017 | %FileCheck %s -check-prefix=INVALID_TYPE_INIT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_22834017 | %FileCheck %s -check-prefix=RDAR_22834017
 struct Foo {
   let a: Anosuchtype
   let b: Bnosuchtype
@@ -164,8 +164,9 @@ struct Foo {
 func rdar22834017() {
   Foo(#^RDAR_22834017^#)
 }
-// FIXME: We could provide a useful completion here. rdar://problem/22846558
-// INVALID_TYPE_INIT-NOT: Begin completions
+// RDAR_22834017: Begin completions, 1 items
+// RDAR_22834017: Decl[Constructor]/CurrNominal:      ['(']{#a: <<error type>>#}, {#b: <<error type>>#}, {#c: <<error type>>#}[')'][#Foo#];
+// RDAR_22834017: End completions
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RDAR_23173692 | %FileCheck %s -check-prefix=RDAR_23173692
 func rdar23173692() {
@@ -299,8 +300,8 @@ func test_28188259(x: ((Int) -> Void) -> Void) {
   x({_ in }#^RDAR_28188259^#)
 }
 // RDAR_28188259: Begin completions
-// RDAR_28188259-DAG: Pattern/CurrModule:                 ({#_#})[#Void#]; name=(_)
-// RDAR_28188259-DAG: Keyword[self]/CurrNominal:          .self[#(_) -> ()#]; name=self
+// RDAR_28188259-DAG: Pattern/CurrModule:                 ({#Int#})[#Void#]; name=(Int)
+// RDAR_28188259-DAG: Keyword[self]/CurrNominal:          .self[#(Int) -> ()#]; name=self
 // RDAR_28188259: End completions
 
 // rdar://problem/40956846

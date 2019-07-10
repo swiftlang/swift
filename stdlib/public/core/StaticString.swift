@@ -24,7 +24,7 @@
 /// commonly used `String` type. A static string can store its value as a
 /// pointer to an ASCII code unit sequence, as a pointer to a UTF-8 code unit
 /// sequence, or as a single Unicode scalar value.
-@_fixed_layout
+@frozen
 public struct StaticString
   : _ExpressibleByBuiltinUnicodeScalarLiteral,
     _ExpressibleByBuiltinExtendedGraphemeClusterLiteral,
@@ -253,13 +253,7 @@ public struct StaticString
 
   /// A string representation of the static string.
   public var description: String {
-    return withUTF8Buffer { (buffer) in
-      if isASCII {
-        return String._fromASCII(buffer)
-      } else {
-        return String._fromWellFormedUTF8(buffer)
-      }
-    }
+    return withUTF8Buffer { String._uncheckedFromUTF8($0) }
   }
 
   /// A textual representation of the static string, suitable for debugging.

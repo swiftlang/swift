@@ -1,19 +1,21 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir -sanitize=address -sanitize-coverage=func %s | %FileCheck %s -check-prefix=SANCOV
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir -sanitize=address -sanitize-coverage=bb %s | %FileCheck %s -check-prefix=SANCOV
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir -sanitize=address -sanitize-coverage=edge %s | %FileCheck %s -check-prefix=SANCOV
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir -sanitize=fuzzer %s | %FileCheck %s -check-prefix=SANCOV
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir -sanitize=address -sanitize-coverage=edge,trace-cmp %s | %FileCheck %s -check-prefix=SANCOV -check-prefix=SANCOV_TRACE_CMP
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir -sanitize=address -sanitize-coverage=edge,trace-bb %s | %FileCheck %s -check-prefix=SANCOV -check-prefix=SANCOV_TRACE_BB
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir -sanitize=address -sanitize-coverage=edge,indirect-calls %s | %FileCheck %s -check-prefix=SANCOV -check-prefix=SANCOV_INDIRECT_CALLS
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir -sanitize=address -sanitize-coverage=edge,8bit-counters %s | %FileCheck %s -check-prefix=SANCOV -check-prefix=SANCOV_8BIT_COUNTERS
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir -sanitize=fuzzer %s | %FileCheck %s -check-prefix=SANCOV -check-prefix=SANCOV_TRACE_CMP
+// RUN: %target-swift-frontend -emit-ir -sanitize=address -sanitize-coverage=func %s | %FileCheck %s -check-prefix=SANCOV
+// RUN: %target-swift-frontend -emit-ir -sanitize=address -sanitize-coverage=bb %s | %FileCheck %s -check-prefix=SANCOV
+// RUN: %target-swift-frontend -emit-ir -sanitize=address -sanitize-coverage=edge %s | %FileCheck %s -check-prefix=SANCOV
+// RUN: %target-swift-frontend -emit-ir -sanitize=fuzzer %s | %FileCheck %s -check-prefix=SANCOV
+// RUN: %target-swift-frontend -emit-ir -sanitize=address -sanitize-coverage=edge,trace-cmp %s | %FileCheck %s -check-prefix=SANCOV -check-prefix=SANCOV_TRACE_CMP
+// RUN: %target-swift-frontend -emit-ir -sanitize=address -sanitize-coverage=edge,trace-bb %s | %FileCheck %s -check-prefix=SANCOV -check-prefix=SANCOV_TRACE_BB
+// RUN: %target-swift-frontend -emit-ir -sanitize=address -sanitize-coverage=edge,indirect-calls %s | %FileCheck %s -check-prefix=SANCOV -check-prefix=SANCOV_INDIRECT_CALLS
+// RUN: %target-swift-frontend -emit-ir -sanitize=address -sanitize-coverage=edge,8bit-counters %s | %FileCheck %s -check-prefix=SANCOV -check-prefix=SANCOV_8BIT_COUNTERS
+// RUN: %target-swift-frontend -emit-ir -sanitize=fuzzer %s | %FileCheck %s -check-prefix=SANCOV -check-prefix=SANCOV_TRACE_CMP
 
-#if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
-import Darwin
-#elseif os(Android) || os(Cygwin) || os(FreeBSD) || os(Linux)
-import Glibc
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+  import Darwin
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
+  import Glibc
 #elseif os(Windows)
-import MSVCRT
+  import MSVCRT
+#else
+#error("Unsupported platform")
 #endif
 
 // FIXME: We should have a reliable way of triggering an indirect call in the

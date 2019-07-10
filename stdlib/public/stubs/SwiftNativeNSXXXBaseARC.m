@@ -66,22 +66,6 @@ swift_stdlib_NSStringHashValuePointer(void *opaque, bool isASCII) {
   }
 }
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
-NS_RETURNS_RETAINED NSString *
-swift_stdlib_NSStringLowercaseString(NSString *str) {
-  AUTORELEASEPOOL {
-    return str.lowercaseString;
-  }
-}
-
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
-NS_RETURNS_RETAINED NSString *
-swift_stdlib_NSStringUppercaseString(NSString *str) {
-  AUTORELEASEPOOL {
-    return str.uppercaseString;
-  }
-}
-
 #else
 
 extern char ignore_pedantic_warning;

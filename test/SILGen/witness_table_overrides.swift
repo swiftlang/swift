@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen %s | %FileCheck %s
 
 // Test the use of "override" on protocol requirements.
 
@@ -18,7 +18,7 @@ protocol P3: P0, P2 {
   override func foo()
 }
 
-// CHECK-LABEL: sil hidden @$s23witness_table_overrides7callFoo1tyx_tAA2P3RzlF
+// CHECK-LABEL: sil hidden [ossa] @$s23witness_table_overrides7callFoo1tyx_tAA2P3RzlF
 func callFoo<T: P3>(t: T) {
   // CHECK: witness_method $T, #P0.foo!1 : <Self where Self : P0> (Self) -> () -> ()
   t.foo()

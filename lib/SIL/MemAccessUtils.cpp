@@ -13,7 +13,9 @@
 #define DEBUG_TYPE "sil-access-utils"
 
 #include "swift/SIL/MemAccessUtils.h"
+#include "swift/SIL/ApplySite.h"
 #include "swift/SIL/SILGlobalVariable.h"
+#include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
 
 using namespace swift;
@@ -31,7 +33,7 @@ AccessedStorage::Kind AccessedStorage::classify(SILValue base) {
     return Global;
   case ValueKind::ApplyInst: {
     FullApplySite apply(cast<ApplyInst>(base));
-    if (auto *funcRef = apply.getReferencedFunction()) {
+    if (auto *funcRef = apply.getReferencedFunctionOrNull()) {
       if (getVariableOfGlobalInit(funcRef))
         return Global;
     }
@@ -81,14 +83,15 @@ AccessedStorage::AccessedStorage(SILValue base, Kind kind) {
     value = base;
     break;
   case Argument:
-    paramIndex = cast<SILFunctionArgument>(base)->getIndex();
+    value = base;
+    setElementIndex(cast<SILFunctionArgument>(base)->getIndex());
     break;
   case Global:
     if (auto *GAI = dyn_cast<GlobalAddrInst>(base))
       global = GAI->getReferencedGlobal();
     else {
       FullApplySite apply(cast<ApplyInst>(base));
-      auto *funcRef = apply.getReferencedFunction();
+      auto *funcRef = apply.getReferencedFunctionOrNull();
       assert(funcRef);
       global = getVariableOfGlobalInit(funcRef);
       assert(global);
@@ -101,15 +104,17 @@ AccessedStorage::AccessedStorage(SILValue base, Kind kind) {
   case Class: {
     // Do a best-effort to find the identity of the object being projected
     // from. It is OK to be unsound here (i.e. miss when two ref_element_addrs
-    // actually refer the same address) because these will be dynamically
-    // checked.
+    // actually refer the same address) because these addresses will be
+    // dynamically checked, and static analysis will be sufficiently
+    // conservative given that classes are not "uniquely identified".
     auto *REA = cast<RefElementAddrInst>(base);
-    objProj = ObjectProjection(REA);
+    value = stripBorrow(REA->getOperand());
+    setElementIndex(REA->getFieldNo());
   }
   }
 }
 
-const ValueDecl *AccessedStorage::getDecl(SILFunction *F) const {
+const ValueDecl *AccessedStorage::getDecl() const {
   switch (getKind()) {
   case Box:
     return cast<AllocBoxInst>(value)->getLoc().getAsASTNode<VarDecl>();
@@ -120,11 +125,12 @@ const ValueDecl *AccessedStorage::getDecl(SILFunction *F) const {
   case Global:
     return global->getDecl();
 
-  case Class:
-    return objProj.getProjection().getVarDecl(objProj.getObject()->getType());
-
+  case Class: {
+    auto *decl = getObject()->getType().getNominalOrBoundGenericNominal();
+    return *std::next(decl->getStoredProperties().begin(), getPropertyIndex());
+  }
   case Argument:
-    return getArgument(F)->getDecl();
+    return getArgument()->getDecl();
 
   case Yield:
     return nullptr;
@@ -171,15 +177,17 @@ void AccessedStorage::print(raw_ostream &os) const {
     os << value;
     break;
   case Argument:
-    os << "index: " << paramIndex << "\n";
+    os << value;
     break;
   case Global:
     os << *global;
     break;
   case Class:
-    os << objProj.getObject() << "  ";
-    objProj.getProjection().print(os, objProj.getObject()->getType());
-    os << "\n";
+    os << getObject();
+    os << "  Field: ";
+    getDecl()->print(os);
+    os << " Index: " << getPropertyIndex() << "\n";
+    break;
   }
 }
 
@@ -189,7 +197,7 @@ void AccessedStorage::dump() const { print(llvm::dbgs()); }
 // module.
 static bool isExternalGlobalAddressor(ApplyInst *AI) {
   FullApplySite apply(AI);
-  auto *funcRef = apply.getReferencedFunction();
+  auto *funcRef = apply.getReferencedFunctionOrNull();
   if (!funcRef)
     return false;
   
@@ -206,10 +214,10 @@ static bool isUnsafePointerExtraction(StructExtractInst *SEI) {
     || decl == C.getUnsafePointerDecl();
 }
 
-// Given an address base is a block argument, verify that it is actually a box
-// projected from a switch_enum. This is a valid pattern at any SIL stage
-// resulting in a block-type phi. In later SIL stages, the optimizer may form
-// address-type phis, causing this assert if called on those cases.
+// Given a block argument address base, check if it is actually a box projected
+// from a switch_enum. This is a valid pattern at any SIL stage resulting in a
+// block-type phi. In later SIL stages, the optimizer may form address-type
+// phis, causing this assert if called on those cases.
 static void checkSwitchEnumBlockArg(SILPhiArgument *arg) {
   assert(!arg->getType().isAddress());
   SILBasicBlock *Pred = arg->getParent()->getSinglePredecessorBlock();
@@ -243,138 +251,204 @@ static bool isAddressForLocalInitOnly(SILValue sourceAddr) {
   }
 }
 
+namespace {
+// The result of an accessed storage query. A complete result produces an
+// AccessedStorage object, which may or may not be valid. An incomplete result
+// produces a SILValue representing the source address for use with deeper
+// queries. The source address is not necessarily a SIL address type because
+// the query can extend past pointer-to-address casts.
+class AccessedStorageResult {
+  AccessedStorage storage;
+  SILValue address;
+  bool complete;
+
+  explicit AccessedStorageResult(SILValue address)
+    : address(address), complete(false) {}
+
+public:
+  AccessedStorageResult(const AccessedStorage &storage)
+    : storage(storage), complete(true) {}
+
+  static AccessedStorageResult incomplete(SILValue address) {
+    return AccessedStorageResult(address);
+  }
+
+  bool isComplete() const { return complete; }
+
+  AccessedStorage getStorage() const { assert(complete); return storage; }
+
+  SILValue getAddress() const { assert(!complete); return address; }
+};
+} // namespace
+
 // AccessEnforcementWMO makes a strong assumption that all accesses are either
 // identified or are *not* accessing a global variable or class property defined
 // in this module. Consequently, we cannot simply bail out on
 // PointerToAddressInst as an Unidentified access.
-AccessedStorage swift::findAccessedStorage(SILValue sourceAddr) {
-  SILValue address = sourceAddr;
-  while (true) {
-    AccessedStorage::Kind kind = AccessedStorage::classify(address);
-    // First handle identified cases: these are always valid as the base of
-    // a formal access.
-    if (kind != AccessedStorage::Unidentified)
-      return AccessedStorage(address, kind);
+static AccessedStorageResult getAccessedStorageFromAddress(SILValue sourceAddr) {
+  AccessedStorage::Kind kind = AccessedStorage::classify(sourceAddr);
+  // First handle identified cases: these are always valid as the base of
+  // a formal access.
+  if (kind != AccessedStorage::Unidentified)
+    return AccessedStorage(sourceAddr, kind);
 
-    // If the address producer cannot immediately be classified, follow the
-    // use-def chain of address, box, or RawPointer producers.
-    assert(address->getType().isAddress()
-           || isa<SILBoxType>(address->getType().getASTType())
-           || isa<BuiltinRawPointerType>(address->getType().getASTType()));
+  // If the sourceAddr producer cannot immediately be classified, follow the
+  // use-def chain of sourceAddr, box, or RawPointer producers.
+  assert(sourceAddr->getType().isAddress()
+         || isa<SILBoxType>(sourceAddr->getType().getASTType())
+         || isa<BuiltinRawPointerType>(sourceAddr->getType().getASTType()));
 
-    // Handle other unidentified address sources.
-    switch (address->getKind()) {
-    default:
-      if (isAddressForLocalInitOnly(address))
-        return AccessedStorage(address, AccessedStorage::Unidentified);
-      return AccessedStorage();
+  // Handle other unidentified address sources.
+  switch (sourceAddr->getKind()) {
+  default:
+    if (isAddressForLocalInitOnly(sourceAddr))
+      return AccessedStorage(sourceAddr, AccessedStorage::Unidentified);
+    return AccessedStorage();
 
-    case ValueKind::SILUndef:
-      return AccessedStorage(address, AccessedStorage::Unidentified);
+  case ValueKind::SILUndef:
+    return AccessedStorage(sourceAddr, AccessedStorage::Unidentified);
 
-    case ValueKind::ApplyInst:
-      if (isExternalGlobalAddressor(cast<ApplyInst>(address)))
-        return AccessedStorage(address, AccessedStorage::Unidentified);
+  case ValueKind::ApplyInst:
+    if (isExternalGlobalAddressor(cast<ApplyInst>(sourceAddr)))
+      return AccessedStorage(sourceAddr, AccessedStorage::Unidentified);
 
-      // Don't currently allow any other calls to return an accessed address.
-      return AccessedStorage();
+    // Don't currently allow any other calls to return an accessed address.
+    return AccessedStorage();
 
-    case ValueKind::StructExtractInst:
-      // Handle nested access to a KeyPath projection. The projection itself
-      // uses a Builtin. However, the returned UnsafeMutablePointer may be
-      // converted to an address and accessed via an inout argument.
-      if (isUnsafePointerExtraction(cast<StructExtractInst>(address)))
-        return AccessedStorage(address, AccessedStorage::Unidentified);
-      return AccessedStorage();
+  case ValueKind::StructExtractInst:
+    // Handle nested access to a KeyPath projection. The projection itself
+    // uses a Builtin. However, the returned UnsafeMutablePointer may be
+    // converted to an address and accessed via an inout argument.
+    if (isUnsafePointerExtraction(cast<StructExtractInst>(sourceAddr)))
+      return AccessedStorage(sourceAddr, AccessedStorage::Unidentified);
+    return AccessedStorage();
 
-    // A block argument may be a box value projected out of
+  case ValueKind::SILPhiArgument: {
+    auto *phiArg = cast<SILPhiArgument>(sourceAddr);
+    if (phiArg->isPhiArgument())
+      return AccessedStorageResult::incomplete(phiArg);
+
+    // A non-phi block argument may be a box value projected out of
     // switch_enum. Address-type block arguments are not allowed.
-    case ValueKind::SILPhiArgument:
-      if (address->getType().isAddress())
-        return AccessedStorage();
-
-      checkSwitchEnumBlockArg(cast<SILPhiArgument>(address));
-      return AccessedStorage(address, AccessedStorage::Unidentified);
-
-    // Load a box from an indirect payload of an opaque enum.
-    // We must have peeked past the project_box earlier in this loop.
-    // (the indirectness makes it a box, the load is for address-only).
-    //
-    // %payload_adr = unchecked_take_enum_data_addr %enum : $*Enum, #Enum.case
-    // %box = load [take] %payload_adr : $*{ var Enum }
-    //
-    // FIXME: this case should go away with opaque values.
-    //
-    // Otherwise return invalid AccessedStorage.
-    case ValueKind::LoadInst: {
-      if (address->getType().is<SILBoxType>()) {
-        address = cast<LoadInst>(address)->getOperand();
-        assert(isa<UncheckedTakeEnumDataAddrInst>(address));
-        continue;
-      }
+    if (sourceAddr->getType().isAddress())
       return AccessedStorage();
-    }
 
-    // ref_tail_addr project an address from a reference.
-    // This is a valid address producer for nested @inout argument
-    // access, but it is never used for formal access of identified objects.
-    case ValueKind::RefTailAddrInst:
-      return AccessedStorage(address, AccessedStorage::Unidentified);
-
-    // Inductive cases:
-    // Look through address casts to find the source address.
-    case ValueKind::MarkUninitializedInst:
-    case ValueKind::OpenExistentialAddrInst:
-    case ValueKind::UncheckedAddrCastInst:
-    // Inductive cases that apply to any type.
-    case ValueKind::CopyValueInst:
-    case ValueKind::MarkDependenceInst:
-    // Look through a project_box to identify the underlying alloc_box as the
-    // accesed object. It must be possible to reach either the alloc_box or the
-    // containing enum in this loop, only looking through simple value
-    // propagation such as copy_value.
-    case ValueKind::ProjectBoxInst:
-    // Handle project_block_storage just like project_box.
-    case ValueKind::ProjectBlockStorageInst:
-    // Look through begin_borrow in case a local box is borrowed.
-    case ValueKind::BeginBorrowInst:
-      address = cast<SingleValueInstruction>(address)->getOperand(0);
-      continue;
-
-    // Access to a Builtin.RawPointer. Treat this like the inductive cases
-    // above because some RawPointers originate from identified locations. See
-    // the special case for global addressors, which return RawPointer, above.
-    //
-    // If the inductive search does not find a valid addressor, it will
-    // eventually reach the default case that returns in invalid location. This
-    // is correct for RawPointer because, although accessing a RawPointer is
-    // legal SIL, there is no way to guarantee that it doesn't access class or
-    // global storage, so returning a valid unidentified storage object would be
-    // incorrect. It is the caller's responsibility to know that formal access
-    // to such a location can be safely ignored.
-    //
-    // For example:
-    //
-    // - KeyPath Builtins access RawPointer. However, the caller can check
-    // that the access `isFromBuilin` and ignore the storage.
-    //
-    // - lldb generates RawPointer access for debugger variables, but SILGen
-    // marks debug VarDecl access as 'Unsafe' and SIL passes don't need the
-    // AccessedStorage for 'Unsafe' access.
-    case ValueKind::PointerToAddressInst:
-      address = cast<SingleValueInstruction>(address)->getOperand(0);
-      continue;
-
-    // Address-to-address subobject projections.
-    case ValueKind::StructElementAddrInst:
-    case ValueKind::TupleElementAddrInst:
-    case ValueKind::UncheckedTakeEnumDataAddrInst:
-    case ValueKind::TailAddrInst:
-    case ValueKind::IndexAddrInst:
-      address = cast<SingleValueInstruction>(address)->getOperand(0);
-      continue;
-    }
+    checkSwitchEnumBlockArg(cast<SILPhiArgument>(sourceAddr));
+    return AccessedStorage(sourceAddr, AccessedStorage::Unidentified);
   }
+  // Load a box from an indirect payload of an opaque enum.
+  // We must have peeked past the project_box earlier in this loop.
+  // (the indirectness makes it a box, the load is for address-only).
+  //
+  // %payload_adr = unchecked_take_enum_data_addr %enum : $*Enum, #Enum.case
+  // %box = load [take] %payload_adr : $*{ var Enum }
+  //
+  // FIXME: this case should go away with opaque values.
+  //
+  // Otherwise return invalid AccessedStorage.
+  case ValueKind::LoadInst:
+    if (sourceAddr->getType().is<SILBoxType>()) {
+      SILValue operAddr = cast<LoadInst>(sourceAddr)->getOperand();
+      assert(isa<UncheckedTakeEnumDataAddrInst>(operAddr));
+      return AccessedStorageResult::incomplete(operAddr);
+    }
+    return AccessedStorage();
+
+  // ref_tail_addr project an address from a reference.
+  // This is a valid address producer for nested @inout argument
+  // access, but it is never used for formal access of identified objects.
+  case ValueKind::RefTailAddrInst:
+    return AccessedStorage(sourceAddr, AccessedStorage::Unidentified);
+
+  // Inductive single-operand cases:
+  // Look through address casts to find the source address.
+  case ValueKind::MarkUninitializedInst:
+  case ValueKind::OpenExistentialAddrInst:
+  case ValueKind::UncheckedAddrCastInst:
+  // Inductive cases that apply to any type.
+  case ValueKind::CopyValueInst:
+  case ValueKind::MarkDependenceInst:
+  // Look through a project_box to identify the underlying alloc_box as the
+  // accesed object. It must be possible to reach either the alloc_box or the
+  // containing enum in this loop, only looking through simple value
+  // propagation such as copy_value.
+  case ValueKind::ProjectBoxInst:
+  // Handle project_block_storage just like project_box.
+  case ValueKind::ProjectBlockStorageInst:
+  // Look through begin_borrow in case a local box is borrowed.
+  case ValueKind::BeginBorrowInst:
+    return AccessedStorageResult::incomplete(
+      cast<SingleValueInstruction>(sourceAddr)->getOperand(0));
+
+  // Access to a Builtin.RawPointer. Treat this like the inductive cases
+  // above because some RawPointers originate from identified locations. See
+  // the special case for global addressors, which return RawPointer,
+  // above. AddressToPointer is also handled because it results from inlining a
+  // global addressor without folding the AddressToPointer->PointerToAddress.
+  //
+  // If the inductive search does not find a valid addressor, it will
+  // eventually reach the default case that returns in invalid location. This
+  // is correct for RawPointer because, although accessing a RawPointer is
+  // legal SIL, there is no way to guarantee that it doesn't access class or
+  // global storage, so returning a valid unidentified storage object would be
+  // incorrect. It is the caller's responsibility to know that formal access
+  // to such a location can be safely ignored.
+  //
+  // For example:
+  //
+  // - KeyPath Builtins access RawPointer. However, the caller can check
+  // that the access `isFromBuilin` and ignore the storage.
+  //
+  // - lldb generates RawPointer access for debugger variables, but SILGen
+  // marks debug VarDecl access as 'Unsafe' and SIL passes don't need the
+  // AccessedStorage for 'Unsafe' access.
+  case ValueKind::PointerToAddressInst:
+  case ValueKind::AddressToPointerInst:
+    return AccessedStorageResult::incomplete(
+      cast<SingleValueInstruction>(sourceAddr)->getOperand(0));
+
+  // Address-to-address subobject projections.
+  case ValueKind::StructElementAddrInst:
+  case ValueKind::TupleElementAddrInst:
+  case ValueKind::UncheckedTakeEnumDataAddrInst:
+  case ValueKind::TailAddrInst:
+  case ValueKind::IndexAddrInst:
+    return AccessedStorageResult::incomplete(
+      cast<SingleValueInstruction>(sourceAddr)->getOperand(0));
+  }
+}
+
+AccessedStorage swift::findAccessedStorage(SILValue sourceAddr) {
+  SmallVector<SILValue, 8> addressWorklist({sourceAddr});
+  SmallPtrSet<SILPhiArgument *, 4> visitedPhis;
+  Optional<AccessedStorage> storage;
+
+  while (!addressWorklist.empty()) {
+    AccessedStorageResult result =
+      getAccessedStorageFromAddress(addressWorklist.pop_back_val());
+
+    if (!result.isComplete()) {
+      SILValue operAddr = result.getAddress();
+      if (auto *phiArg = dyn_cast<SILPhiArgument>(operAddr)) {
+        if (phiArg->isPhiArgument()) {
+          if (visitedPhis.insert(phiArg).second)
+            phiArg->getIncomingPhiValues(addressWorklist);
+          continue;
+        }
+      }
+      addressWorklist.push_back(operAddr);
+      continue;
+    }
+    if (!storage.hasValue()) {
+      storage = result.getStorage();
+      continue;
+    }
+    // `storage` may still be invalid. If both `storage` and `result` are
+    // invalid, this check passes, but we return an invalid storage below.
+    if (!storage.getValue().hasIdenticalBase(result.getStorage()))
+      return AccessedStorage();
+  }
+  return storage.getValueOr(AccessedStorage());
 }
 
 AccessedStorage swift::findAccessedStorageNonNested(SILValue sourceAddr) {
@@ -389,7 +463,7 @@ AccessedStorage swift::findAccessedStorageNonNested(SILValue sourceAddr) {
 
 // Return true if the given access is on a 'let' lvalue.
 static bool isLetAccess(const AccessedStorage &storage, SILFunction *F) {
-  if (auto *decl = dyn_cast_or_null<VarDecl>(storage.getDecl(F)))
+  if (auto *decl = dyn_cast_or_null<VarDecl>(storage.getDecl()))
     return decl->isLet();
 
   // It's unclear whether a global will ever be missing it's varDecl, but
@@ -427,10 +501,7 @@ bool swift::memInstMustInitialize(Operand *memOper) {
     return cast<StoreInst>(memInst)->getOwnershipQualifier()
            == StoreOwnershipQualifier::Init;
 
-#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-  case SILInstructionKind::Store##Name##Inst: \
-    return cast<Store##Name##Inst>(memInst)->isInitializationOfDest();
-#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+#define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   case SILInstructionKind::Store##Name##Inst: \
     return cast<Store##Name##Inst>(memInst)->isInitializationOfDest();
 #include "swift/AST/ReferenceStorage.def"
@@ -627,6 +698,7 @@ void swift::visitAccessedAddress(SILInstruction *I,
     llvm_unreachable("unexpected memory access.");
 
   case SILInstructionKind::AssignInst:
+  case SILInstructionKind::AssignByWrapperInst:
     visitor(&I->getAllOperands()[AssignInst::Dest]);
     return;
 
@@ -640,9 +712,7 @@ void swift::visitAccessedAddress(SILInstruction *I,
     visitor(&I->getAllOperands()[CopyAddrInst::Dest]);
     return;
 
-#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-  case SILInstructionKind::Store##Name##Inst:
-#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+#define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   case SILInstructionKind::Store##Name##Inst:
 #include "swift/AST/ReferenceStorage.def"
   case SILInstructionKind::StoreInst:
@@ -654,9 +724,7 @@ void swift::visitAccessedAddress(SILInstruction *I,
     visitor(&I->getAllOperands()[0]);
     return;
 
-#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-  case SILInstructionKind::Load##Name##Inst:
-#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+#define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   case SILInstructionKind::Load##Name##Inst:
 #include "swift/AST/ReferenceStorage.def"
   case SILInstructionKind::InitExistentialAddrInst:
@@ -678,7 +746,7 @@ void swift::visitAccessedAddress(SILInstruction *I,
   }
   // Non-access cases: these are marked with memory side effects, but, by
   // themselves, do not access formal memory.
-#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   case SILInstructionKind::Copy##Name##ValueInst:
 #include "swift/AST/ReferenceStorage.def"
   case SILInstructionKind::AbortApplyInst:

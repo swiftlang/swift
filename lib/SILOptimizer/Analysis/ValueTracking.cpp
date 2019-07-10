@@ -296,25 +296,6 @@ Optional<bool> swift::computeSignBit(SILValue V) {
         continue;
       }
 
-      // Source and target type sizes are the same.
-      // S->U conversion can only succeed if
-      // the sign bit of its operand is 0, i.e. it is >= 0.
-      // The sign bit of a result is 0 only if the sign
-      // bit of a source operand is 0.
-      case BuiltinValueKind::SUCheckedConversion:
-        Value = BI->getArguments()[0];
-        continue;
-
-      // Source and target type sizes are the same.
-      // U->S conversion can only succeed if
-      // the top bit of its operand is 0, i.e.
-      // it is representable as a signed integer >=0.
-      // The sign bit of a result is 0 only if the sign
-      // bit of a source operand is 0.
-      case BuiltinValueKind::USCheckedConversion:
-        Value = BI->getArguments()[0];
-        continue;
-
       // Sign bit of the operand is promoted.
       case BuiltinValueKind::SExt:
         Value = BI->getArguments()[0];

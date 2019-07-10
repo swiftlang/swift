@@ -22,17 +22,12 @@ namespace swift {
 class Decl;
 class TypeChecker;
 
-/// Checks the given declaration's signature does not reference any other
-/// declarations that are less visible than the declaration itself.
+/// Performs access-related checks for \p D.
 ///
-/// \p D must be a ValueDecl or a Decl that can appear in a type context.
+/// At a high level, this checks the given declaration's signature does not
+/// reference any other declarations that are less visible than the declaration
+/// itself. Related checks may also be performed.
 void checkAccessControl(TypeChecker &TC, Decl *D);
-
-/// Checks that the generic parameters of the given extension do not reference
-/// any other declarations that are less visible than the user-specified access
-/// on the extension.
-void checkExtensionGenericParamAccess(TypeChecker &TC, const ExtensionDecl *ED,
-                                      AccessLevel userSpecifiedAccess);
 
 } // end namespace swift
 

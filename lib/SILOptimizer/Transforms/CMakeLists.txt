@@ -1,6 +1,8 @@
 silopt_register_sources(
   ARCCodeMotion.cpp
+  AccessEnforcementDom.cpp
   AccessEnforcementOpts.cpp
+  AccessEnforcementReleaseSinking.cpp 
   AccessEnforcementWMO.cpp
   AllocBoxToStack.cpp
   ArrayCountPropagation.cpp
@@ -16,7 +18,6 @@ silopt_register_sources(
   Devirtualizer.cpp
   GenericSpecializer.cpp
   MergeCondFail.cpp
-  MarkUninitializedFixup.cpp
   Outliner.cpp
   ObjectOutliner.cpp
   OwnershipModelEliminator.cpp
@@ -30,6 +31,7 @@ silopt_register_sources(
   SILSROA.cpp
   SimplifyCFG.cpp
   Sink.cpp
+  SpecializeOpaqueArchetypes.cpp
   SpeculativeDevirtualizer.cpp
   StackPromotion.cpp
   UnsafeGuaranteedPeephole.cpp

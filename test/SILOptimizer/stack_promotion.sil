@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -stack-promotion -enable-sil-verify-all %s | %FileCheck %s
+// RUN: %target-sil-opt -stack-promotion -enable-sil-verify-all %s | %FileCheck %s
 
 sil_stage canonical
 
@@ -7,20 +7,20 @@ import Swift
 import SwiftShims
 
 class XX {
-	@sil_stored var x: Int32
+	@_hasStorage var x: Int32
 
 	init()
 }
 
 class YY {
-	@sil_stored var xx: XX
+	@_hasStorage var xx: XX
 
 	init(newx: XX)
 }
 
 class DummyArrayStorage<Element> {
-  @sil_stored var count : Int
-  @sil_stored var capacity : Int
+  @_hasStorage var count : Int
+  @_hasStorage var capacity : Int
   init()
 }
 
@@ -624,7 +624,7 @@ bb0(%0 : $Int, %closure: $@callee_owned (@inout Int) -> (@out (), @error Error))
   // pass the array to the withUnsafeMutableBufferPointer closure.
   %21 = function_ref @withUnsafeMutableBufferPointer : $@convention(method) (@owned @callee_owned (@inout Int) -> (@out (), @error Error), @inout Array<Int>) -> (@out (), @error Error)
   %22 = alloc_stack $()
-  %23 = apply [nothrow]%21(%22, %closure, %the_array) : $@convention(method) (@owned @callee_owned (@inout Int) -> (@out (), @error Error), @inout Array<Int>) -> (@out (), @error Error)
+  %23 = apply [nothrow] %21(%22, %closure, %the_array) : $@convention(method) (@owned @callee_owned (@inout Int) -> (@out (), @error Error), @inout Array<Int>) -> (@out (), @error Error)
   dealloc_stack %22 : $*()
 
   dealloc_stack %the_array: $*Array<Int>
@@ -741,3 +741,82 @@ bb0(%0 : $Int, %another: $Array<Int>):
   %24 = tuple ()
   return %24 : $()
 }
+
+
+// CHECK-LABEL: sil @promote_with_unreachable_block_nest_bug
+// CHECK: bb3:
+// CHECK: dealloc_ref [stack] %{{.*}}
+// CHECK: bb4:
+// CHECK: br bb5
+// CHECK: bb5:
+// CHECK: dealloc_ref [stack] %{{.*}}
+// CHECK: bb6:
+// CHECK: dealloc_ref [stack] %{{.*}}
+// CHECK: bb11:
+// CHECK: alloc_ref [stack] $XX
+// CHECK: return
+sil @promote_with_unreachable_block_nest_bug : $@convention(thin) () -> Int32 {
+bb0:
+  %0 = alloc_stack $Builtin.Int32                 // user: %30
+  %1 = alloc_stack $Builtin.Int32                 // users: %29, %27
+  cond_br undef, bb1, bb7                         // id: %2
+
+bb1:                                              // Preds: bb0
+  br bb14                                         // id: %3
+
+bb2:                                              // Preds: bb10
+  cond_br undef, bb5, bb3                         // id: %4
+
+bb3:                                              // Preds: bb2
+  strong_release %20 : $XX                        // id: %5
+  br bb6                                          // id: %6
+
+bb4:                                              // Preds: bb10
+  %7 = integer_literal $Builtin.Int32, 0          // user: %8
+  %8 = struct $Int32 (%7 : $Builtin.Int32)        // user: %9
+  br bb13(%8 : $Int32)                            // id: %9
+
+bb5:                                              // Preds: bb2
+  strong_release %20 : $XX                        // id: %10
+  br bb6                                          // id: %11
+
+bb6:                                              // Preds: bb5 bb3
+  br bb12                                         // id: %12
+
+bb7:                                              // Preds: bb0
+  cond_br undef, bb8, bb9                         // id: %13
+
+bb8:                                              // Preds: bb7
+  cond_br undef, bb10, bb11                       // id: %14
+
+bb9:                                              // Preds: bb7
+  %15 = integer_literal $Builtin.Int32, 0         // user: %16
+  %16 = struct $Int32 (%15 : $Builtin.Int32)      // user: %17
+  br bb13(%16 : $Int32)                           // id: %17
+
+bb10:                                             // Preds: bb8
+  %18 = alloc_ref $XX                             // user: %20
+  // function_ref xx_init
+  %19 = function_ref @xx_init : $@convention(thin) (@guaranteed XX) -> XX // user: %20
+  %20 = apply %19(%18) : $@convention(thin) (@guaranteed XX) -> XX // users: %21, %5, %10
+  %21 = ref_element_addr %20 : $XX, #XX.x         // user: %22
+  %22 = load %21 : $*Int32
+  cond_br undef, bb2, bb4                         // id: %23
+
+bb11:                                             // Preds: bb8
+  unreachable                                     // id: %24
+
+bb12:                                             // Preds: bb6
+  br bb14                                         // id: %25
+
+bb13(%26 : $Int32):                               // Preds: bb9 bb4
+  dealloc_stack %1 : $*Builtin.Int32              // id: %27
+  unreachable                                     // id: %28
+
+bb14:                                             // Preds: bb12 bb1
+  dealloc_stack %1 : $*Builtin.Int32              // id: %29
+  dealloc_stack %0 : $*Builtin.Int32              // id: %30
+  %31 = integer_literal $Builtin.Int32, 0         // user: %32
+  %32 = struct $Int32 (%31 : $Builtin.Int32)      // user: %33
+  return %32 : $Int32                             // id: %33
+} // end sil function 'promote_with_unreachable_block_nest_bug'

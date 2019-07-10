@@ -22,7 +22,7 @@ module ClangModuleUser {
   export *
 }
 
-module ClangModuleWithAdapter {
+module ClangModuleWithOverlay {
   link "UnderlyingClangLibrary"
 }
 
@@ -34,6 +34,10 @@ module CoreData {
 module CoreCooling {
   header "CoreCooling.h"
   export *
+}
+
+module CXXInterop {
+  header "cxx_interop.h"
 }
 
 module ctypes_bits_exported {
@@ -85,6 +89,10 @@ module MoreSwiftNewtypes {
 
 module Newtype {
   header "Newtype.h"
+}
+
+module NewtypeSystem [system] {
+  header "NewtypeSystem.h"
 }
 
 module ImportAsMember {
@@ -201,6 +209,10 @@ module IndirectFields {
 
 module ObjCBridgeNonconforming {
   header "ObjCBridgeNonconforming.h"
+}
+
+module BlocksReturningBool {
+  header "BlocksReturningBool.h"
 }
 
 module Warnings1 { header "Warnings1.h" }

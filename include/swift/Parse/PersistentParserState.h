@@ -29,7 +29,7 @@ namespace swift {
   class LazyMemberParser;
   class ASTContext;
 
-/// \brief Parser state persistent across multiple parses.
+/// Parser state persistent across multiple parses.
 class PersistentParserState: public LazyMemberParser {
 public:
   struct ParserPos {
@@ -118,7 +118,7 @@ private:
                      std::unique_ptr<FunctionBodyState>>;
   DelayedFunctionBodiesTy DelayedFunctionBodies;
 
-  /// \brief Parser sets this if it stopped parsing before the buffer ended.
+  /// Parser sets this if it stopped parsing before the buffer ended.
   ParserPosition MarkedPos;
 
   std::unique_ptr<DelayedDeclState> CodeCompletionDelayedDeclState;
@@ -190,7 +190,7 @@ public:
     this->InPoundLineEnvironment = InPoundLineEnvironment;
   }
 
-  /// \brief Returns the marked parser position and resets it.
+  /// Returns the marked parser position and resets it.
   ParserPosition takeParserPosition() {
     ParserPosition Pos = MarkedPos;
     MarkedPos = ParserPosition();

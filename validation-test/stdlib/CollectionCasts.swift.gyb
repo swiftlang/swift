@@ -18,12 +18,12 @@
 import StdlibUnittest
 
 class Base : Hashable {
+  var value: Int
   init(_ value: Int) {
     self.value = value
   }
-  var value: Int
-  var hashValue : Int {
-    return value.hashValue
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(value)
   }
 }
 

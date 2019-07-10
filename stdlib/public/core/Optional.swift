@@ -118,7 +118,7 @@
 ///
 /// Unconditionally unwrapping a `nil` instance with `!` triggers a runtime
 /// error.
-@_frozen
+@frozen
 public enum Optional<Wrapped> : ExpressibleByNilLiteral {
   // The compiler has special knowledge of Optional<Wrapped>, including the fact
   // that it is an `enum` with cases named `none` and `some`.
@@ -139,7 +139,7 @@ public enum Optional<Wrapped> : ExpressibleByNilLiteral {
   /// Evaluates the given closure when this `Optional` instance is not `nil`,
   /// passing the unwrapped value as a parameter.
   ///
-  /// Use the `map` method with a closure that returns a nonoptional value.
+  /// Use the `map` method with a closure that returns a non-optional value.
   /// This example performs an arithmetic operation on an
   /// optional integer.
   ///
@@ -259,7 +259,7 @@ public enum Optional<Wrapped> : ExpressibleByNilLiteral {
       if let x = self {
         return x
       }
-      _sanityCheckFailure("_unsafelyUnwrappedUnchecked of nil optional")
+      _internalInvariantFailure("_unsafelyUnwrappedUnchecked of nil optional")
     }
   }
 }
@@ -300,7 +300,9 @@ func _diagnoseUnexpectedNilOptional(_filenameStart: Builtin.RawPointer,
                                     _filenameIsASCII: Builtin.Int1,
                                     _line: Builtin.Word,
                                     _isImplicitUnwrap: Builtin.Int1) {
-  _preconditionFailure(
+  // Cannot use _preconditionFailure as the file and line info would not be
+  // printed.
+  preconditionFailure(
     Bool(_isImplicitUnwrap)
       ? "Unexpectedly found nil while implicitly unwrapping an Optional value"
       : "Unexpectedly found nil while unwrapping an Optional value",
@@ -328,8 +330,8 @@ extension Optional : Equatable where Wrapped : Equatable {
   ///     }
   ///     // Prints "The two groups start the same."
   ///
-  /// You can also use this operator to compare a nonoptional value to an
-  /// optional that wraps the same type. The nonoptional value is wrapped as an
+  /// You can also use this operator to compare a non-optional value to an
+  /// optional that wraps the same type. The non-optional value is wrapped as an
   /// optional before the comparison is made. In the following example, the
   /// `numberToMatch` constant is wrapped as an optional before comparing to the
   /// optional `numberFromString`:
@@ -388,7 +390,7 @@ extension Optional: Hashable where Wrapped: Hashable {
 
 // Enable pattern matching against the nil literal, even if the element type
 // isn't equatable.
-@_fixed_layout
+@frozen
 public struct _OptionalNilComparisonType : ExpressibleByNilLiteral {
   /// Create an instance initialized with `nil`.
   @_transparent
@@ -570,7 +572,7 @@ extension Optional {
 ///
 /// A nil-coalescing operation unwraps the left-hand side if it has a value, or
 /// it returns the right-hand side as a default. The result of this operation
-/// will have the nonoptional type of the left-hand side's `Wrapped` type.
+/// will have the non-optional type of the left-hand side's `Wrapped` type.
 ///
 /// This operator uses short-circuit evaluation: `optional` is checked first,
 /// and `defaultValue` is evaluated only if `optional` is `nil`. For example:
@@ -643,7 +645,7 @@ public func ?? <T>(optional: T?, defaultValue: @autoclosure () throws -> T)
 ///
 /// If `userPrefs[greetingKey]` has a value, that value is assigned to
 /// `greeting`. If not, any value in `defaults[greetingKey]` will succeed, and
-/// if not that, `greeting` will be set to the nonoptional default value,
+/// if not that, `greeting` will be set to the non-optional default value,
 /// `"Greetings!"`.
 ///
 /// - Parameters:
@@ -668,13 +670,11 @@ public func ?? <T>(optional: T?, defaultValue: @autoclosure () throws -> T?)
 #if _runtime(_ObjC)
 extension Optional : _ObjectiveCBridgeable {
   // The object that represents `none` for an Optional of this type.
-  @inlinable // FIXME(sil-serialize-all)
   internal static var _nilSentinel : AnyObject {
     @_silgen_name("_swift_Foundation_getOptionalNilSentinelObject")
     get
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   public func _bridgeToObjectiveC() -> AnyObject {
     // Bridge a wrapped value by unwrapping.
     if let value = self {
@@ -684,7 +684,6 @@ extension Optional : _ObjectiveCBridgeable {
     return type(of: self)._nilSentinel
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   public static func _forceBridgeFromObjectiveC(
     _ source: AnyObject,
     result: inout Optional<Wrapped>?
@@ -702,7 +701,6 @@ extension Optional : _ObjectiveCBridgeable {
     result = .some(.some(unwrappedResult))
   }
 
-  @inlinable // FIXME(sil-serialize-all)
   public static func _conditionallyBridgeFromObjectiveC(
     _ source: AnyObject,
     result: inout Optional<Wrapped>?
@@ -726,7 +724,7 @@ extension Optional : _ObjectiveCBridgeable {
     }
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @_effects(readonly)
   public static func _unconditionallyBridgeFromObjectiveC(_ source: AnyObject?)
       -> Optional<Wrapped> {
     if let nonnullSource = source {

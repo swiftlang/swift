@@ -12,6 +12,30 @@
 
 //===--- Compiler conversion/casting entry points for Dictionary<K, V> ----===//
 
+extension Dictionary {
+  @_alwaysEmitIntoClient @inlinable // Introduced in 5.1
+  @inline(__always)
+  internal init?<C: Collection>(
+    _mapping source: C,
+    allowingDuplicates: Bool,
+    transform: (C.Element) -> (key: Key, value: Value)?
+  ) {
+    var target = _NativeDictionary<Key, Value>(capacity: source.count)
+    if allowingDuplicates {
+      for member in source {
+        guard let (key, value) = transform(member) else { return nil }
+        target._unsafeUpdate(key: key, value: value)
+      }
+    } else {
+      for member in source {
+        guard let (key, value) = transform(member) else { return nil }
+        target._unsafeInsertNew(key: key, value: value)
+      }
+    }
+    self.init(_native: target)
+  }
+}
+
 /// Perform a non-bridged upcast that always succeeds.
 ///
 /// - Precondition: `BaseKey` and `BaseValue` are base classes or base `@objc`
@@ -21,12 +45,15 @@
 public func _dictionaryUpCast<DerivedKey, DerivedValue, BaseKey, BaseValue>(
     _ source: Dictionary<DerivedKey, DerivedValue>
 ) -> Dictionary<BaseKey, BaseValue> {
-  var result = Dictionary<BaseKey, BaseValue>(minimumCapacity: source.count)
-
-  for (k, v) in source {
-    result[k as! BaseKey] = (v as! BaseValue)
-  }
-  return result
+  return Dictionary(
+    _mapping: source,
+    // String and NSString have different concepts of equality, so
+    // NSString-keyed Dictionaries may generate key collisions when "upcasted"
+    // to String. See rdar://problem/35995647
+    allowingDuplicates: (BaseKey.self == String.self)
+  ) { k, v in
+    (k as! BaseKey, v as! BaseValue)
+  }!
 }
 
 /// Called by the casting machinery.
@@ -56,17 +83,30 @@ public func _dictionaryDownCast<BaseKey, BaseValue, DerivedKey, DerivedValue>(
   && _isClassOrObjCExistential(DerivedKey.self)
   && _isClassOrObjCExistential(DerivedValue.self) {
 
-    switch source._variant {
-    case .native(let native):
-      // Note: it is safe to treat the buffer as immutable here because
-      // Dictionary will not mutate buffer with reference count greater than 1.
-      return Dictionary(_immutableCocoaDictionary: native.bridged())
-    case .cocoa(let cocoa):
-      return Dictionary(_immutableCocoaDictionary: cocoa.object)
+    guard source._variant.isNative else {
+      return Dictionary(
+        _immutableCocoaDictionary: source._variant.asCocoa.object)
     }
+    // Note: it is safe to treat the buffer as immutable here because
+    // Dictionary will not mutate buffer with reference count greater than 1.
+    return Dictionary(
+      _immutableCocoaDictionary: source._variant.asNative.bridged())
   }
 #endif
-  return _dictionaryDownCastConditional(source)!
+
+  // Note: We can't delegate this call to _dictionaryDownCastConditional,
+  // because we rely on as! to generate nice runtime errors when the downcast
+  // fails.
+
+  return Dictionary(
+    _mapping: source,
+    // String and NSString have different concepts of equality, so
+    // NSString-keyed Dictionaries may generate key collisions when downcasted
+    // to String. See rdar://problem/35995647
+    allowingDuplicates: (DerivedKey.self == String.self)
+  ) { k, v in
+    (k as! DerivedKey, v as! DerivedValue)
+  }!
 }
 
 /// Called by the casting machinery.
@@ -97,12 +137,19 @@ public func _dictionaryDownCastConditional<
 >(
   _ source: Dictionary<BaseKey, BaseValue>
 ) -> Dictionary<DerivedKey, DerivedValue>? {
-
-  var result = Dictionary<DerivedKey, DerivedValue>()
-  for (k, v) in source {
-    guard let k1 = k as? DerivedKey, let v1 = v as? DerivedValue
-    else { return nil }
-    result[k1] = v1
+  return Dictionary(
+    _mapping: source,
+    // String and NSString have different concepts of equality, so
+    // NSString-keyed Dictionaries may generate key collisions when downcasted
+    // to String. See rdar://problem/35995647
+    allowingDuplicates: (DerivedKey.self == String.self)
+  ) { k, v in
+    guard
+      let key = k as? DerivedKey,
+      let value = v as? DerivedValue
+    else {
+      return nil
+    }
+    return (key, value)
   }
-  return result
 }

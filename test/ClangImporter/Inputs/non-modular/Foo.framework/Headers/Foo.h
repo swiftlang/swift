@@ -1,3 +1,3 @@
-#import <NonModular.h>
+#include <NonModular.h>
 
 extern int x;

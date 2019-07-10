@@ -9,6 +9,7 @@ silopt_register_sources(
   CallerAnalysisPrinter.cpp
   ComputeDominanceInfo.cpp
   ComputeLoopInfo.cpp
+  ConstantEvaluatorTester.cpp
   EpilogueARCMatcherDumper.cpp
   EpilogueRetainReleaseMatcherDumper.cpp
   EscapeAnalysisDumper.cpp
@@ -27,5 +28,5 @@ silopt_register_sources(
   SideEffectsDumper.cpp
   SimplifyUnreachableContainingBlocks.cpp
   StripDebugInfo.cpp
-  ValueOwnershipKindDumper.cpp
+  OwnershipDumper.cpp
 )

@@ -17,7 +17,7 @@ internal protocol _HashTableDelegate {
 }
 
 @usableFromInline
-@_fixed_layout
+@frozen
 internal struct _HashTable {
   @usableFromInline
   internal typealias Word = _UnsafeBitset.Word
@@ -31,7 +31,7 @@ internal struct _HashTable {
   @inlinable
   @inline(__always)
   internal init(words: UnsafeMutablePointer<Word>, bucketCount: Int) {
-    _sanityCheck(bucketCount > 0 && bucketCount & (bucketCount - 1) == 0,
+    _internalInvariant(bucketCount > 0 && bucketCount & (bucketCount - 1) == 0,
       "bucketCount must be a power of two")
     self.words = words
     // The bucket count is a power of two, so subtracting 1 will never overflow
@@ -77,10 +77,10 @@ extension _HashTable {
     // two greater than or equal to the minimum entry count. Calculate its
     // exponent.
     let exponent = (Swift.max(minimumEntries, 2) - 1)._binaryLogarithm() + 1
-    _sanityCheck(exponent >= 0 && exponent < Int.bitWidth)
+    _internalInvariant(exponent >= 0 && exponent < Int.bitWidth)
     // The scale is the exponent corresponding to the bucket count.
     let scale = Int8(truncatingIfNeeded: exponent)
-    _sanityCheck(self.capacity(forScale: scale) >= capacity)
+    _internalInvariant(self.capacity(forScale: scale) >= capacity)
     return scale
   }
 
@@ -94,7 +94,6 @@ extension _HashTable {
     for object: AnyObject,
     scale: Int8
   ) -> Int {
-#if false // FIXME: Enable per-instance seeding
     // We generate a new hash seed whenever a new hash table is allocated and
     // whenever an existing table is resized, so that we avoid certain copy
     // operations becoming quadratic.  (For background details, see
@@ -115,15 +114,11 @@ extension _HashTable {
     // guarantee that no two tables with the same seed can coexist at the same
     // time (apart from copy-on-write derivatives of the same table).
     return unsafeBitCast(object, to: Int.self)
-#else
-    // Use per-capacity seeding for now.
-    return Int(scale)
-#endif
   }
 }
 
 extension _HashTable {
-  @_fixed_layout
+  @frozen
   @usableFromInline
   internal struct Bucket {
     @usableFromInline
@@ -132,7 +127,6 @@ extension _HashTable {
     @inlinable
     @inline(__always)
     internal init(offset: Int) {
-      _sanityCheck(offset >= 0)
       self.offset = offset
     }
 
@@ -178,7 +172,7 @@ extension _HashTable.Bucket: Comparable {
 
 extension _HashTable {
   @usableFromInline
-  @_fixed_layout
+  @frozen
   internal struct Index {
     @usableFromInline
     let bucket: Bucket
@@ -223,7 +217,7 @@ extension _HashTable.Index: Comparable {
 
 extension _HashTable: Sequence {
   @usableFromInline
-  @_fixed_layout
+  @frozen
   internal struct Iterator: IteratorProtocol {
     @usableFromInline
     let hashTable: _HashTable
@@ -277,7 +271,7 @@ extension _HashTable {
   @inlinable
   @inline(__always)
   internal func _isOccupied(_ bucket: Bucket) -> Bool {
-    _sanityCheck(isValid(bucket))
+    _internalInvariant(isValid(bucket))
     return words[bucket.word].uncheckedContains(bucket.bit)
   }
 
@@ -297,7 +291,7 @@ extension _HashTable {
   @inlinable
   @inline(__always)
   internal func _firstOccupiedBucket(fromWord word: Int) -> Bucket {
-    _sanityCheck(word >= 0 && word <= wordCount)
+    _internalInvariant(word >= 0 && word <= wordCount)
     var word = word
     while word < wordCount {
       if let bit = words[word].minimum {
@@ -310,7 +304,7 @@ extension _HashTable {
 
   @inlinable
   internal func occupiedBucket(after bucket: Bucket) -> Bucket {
-    _sanityCheck(isValid(bucket))
+    _internalInvariant(isValid(bucket))
     let word = bucket.word
     if let bit = words[word].intersecting(elementsAbove: bucket.bit).minimum {
       return Bucket(word: word, bit: bit)
@@ -352,7 +346,7 @@ extension _HashTable {
 extension _HashTable {
   @inlinable
   internal func previousHole(before bucket: Bucket) -> Bucket {
-    _sanityCheck(isValid(bucket))
+    _internalInvariant(isValid(bucket))
     // Note that if we have only a single partial word, its out-of-bounds bits
     // are guaranteed to be all set, so the formula below gives correct results.
     var word = bucket.word
@@ -379,7 +373,7 @@ extension _HashTable {
 
   @inlinable
   internal func nextHole(atOrAfter bucket: Bucket) -> Bucket {
-    _sanityCheck(isValid(bucket))
+    _internalInvariant(isValid(bucket))
     // Note that if we have only a single partial word, its out-of-bounds bits
     // are guaranteed to be all set, so the formula below gives correct results.
     var word = bucket.word
@@ -392,7 +386,7 @@ extension _HashTable {
     }
     var wrap = false
     while true {
-      word += 1
+      word &+= 1
       if word == wordCount {
         _precondition(!wrap, "Hash table has no holes")
         wrap = true
@@ -410,8 +404,8 @@ extension _HashTable {
   @inline(__always)
   @_effects(releasenone)
   internal func copyContents(of other: _HashTable) {
-    _sanityCheck(bucketCount == other.bucketCount)
-    self.words.assign(from: other.words, count: bucketCount)
+    _internalInvariant(bucketCount == other.bucketCount)
+    self.words.assign(from: other.words, count: wordCount)
   }
 
   /// Insert a new entry with the specified hash value into the table.
@@ -428,7 +422,7 @@ extension _HashTable {
   @inlinable
   @inline(__always)
   internal func insert(_ bucket: Bucket) {
-    _sanityCheck(!isOccupied(bucket))
+    _internalInvariant(!isOccupied(bucket))
     words[bucket.word].uncheckedInsert(bucket.bit)
   }
 
@@ -451,7 +445,7 @@ extension _HashTable {
     at bucket: Bucket,
     with delegate: D
   ) {
-    _sanityCheck(isOccupied(bucket))
+    _internalInvariant(isOccupied(bucket))
 
     // If we've put a hole in a chain of contiguous elements, some element after
     // the hole may belong where the new hole is.

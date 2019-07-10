@@ -41,10 +41,11 @@ private:
   CompilerInvocation CompInv;
   std::unique_ptr<ParserUnit> Parser;
   class FormatterDiagConsumer : public swift::DiagnosticConsumer {
-    void handleDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
-                          StringRef FormatString,
-                          ArrayRef<DiagnosticArgument> FormatArgs,
-                          const swift::DiagnosticInfo &Info) override {
+    void handleDiagnostic(
+        SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
+        StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
+        const swift::DiagnosticInfo &Info,
+        const SourceLoc bufferIndirectlyCausingDiagnostic) override {
       llvm::errs() << "Parse error: ";
       DiagnosticEngine::formatDiagnosticText(llvm::errs(), FormatString,
                                              FormatArgs);
@@ -65,10 +66,7 @@ public:
                                 BufferID, CompInv.getLangOptions(),
                                 CompInv.getModuleName()));
     Parser->getDiagnosticEngine().addConsumer(DiagConsumer);
-    auto &P = Parser->getParser();
-    for (bool Done = false; !Done; Done = P.Tok.is(tok::eof)) {
-      P.parseTopLevel();
-    }
+    Parser->parse();
   }
 
   std::pair<LineRange, std::string> reformat(LineRange Range,
@@ -211,7 +209,7 @@ public:
           Formatted = "";
 
         Output.replace(Offset, Length, Formatted);
-        Doc.updateCode(llvm::MemoryBuffer::getMemBuffer(Output));        
+        Doc.updateCode(llvm::MemoryBuffer::getMemBufferCopy(Output));
       }
       if (Filename == "-" || (!InPlace && OutputFilename == "-")) {
         llvm::outs() << Output;

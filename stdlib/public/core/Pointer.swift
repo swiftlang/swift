@@ -93,34 +93,6 @@ extension _Pointer {
     guard let unwrapped = other else { return nil }
     self.init(unwrapped._rawValue)
   }
-
-  // all pointers are creatable from mutable pointers
-  
-  /// Creates a new pointer from the given mutable pointer.
-  ///
-  /// Use this initializer to explicitly convert `other` to an `UnsafeRawPointer`
-  /// instance. This initializer creates a new pointer to the same address as
-  /// `other` and performs no allocation or copying.
-  ///
-  /// - Parameter other: The typed pointer to convert.
-  @_transparent
-  public init<T>(_ other: UnsafeMutablePointer<T>) {
-    self.init(other._rawValue)
-  }
-
-  /// Creates a new raw pointer from the given typed pointer.
-  ///
-  /// Use this initializer to explicitly convert `other` to an `UnsafeRawPointer`
-  /// instance. This initializer creates a new pointer to the same address as
-  /// `other` and performs no allocation or copying.
-  ///
-  /// - Parameter other: The typed pointer to convert. If `other` is `nil`, the
-  ///   result is `nil`.
-  @_transparent
-  public init?<T>(_ other: UnsafeMutablePointer<T>?) {
-    guard let unwrapped = other else { return nil }
-    self.init(unwrapped)
-  }
 }
 
 // well, this is pretty annoying
@@ -165,7 +137,7 @@ extension _Pointer /*: Strideable*/ {
   ///
   /// - Returns: A pointer advanced from this pointer by
   ///   `MemoryLayout<Pointee>.stride` bytes.
-  @inlinable
+  @_transparent
   public func successor() -> Self {
     return advanced(by: 1)
   }
@@ -177,7 +149,7 @@ extension _Pointer /*: Strideable*/ {
   ///
   /// - Returns: A pointer shifted backward from this pointer by
   ///   `MemoryLayout<Pointee>.stride` bytes.
-  @inlinable
+  @_transparent
   public func predecessor() -> Self {
     return advanced(by: -1)
   }
@@ -199,7 +171,7 @@ extension _Pointer /*: Strideable*/ {
   /// - Returns: The distance from this pointer to `end`, in strides of the
   ///   pointer's `Pointee` type. To access the stride, use
   ///   `MemoryLayout<Pointee>.stride`.
-  @inlinable
+  @_transparent
   public func distance(to end: Self) -> Int {
     return
       Int(Builtin.sub_Word(Builtin.ptrtoint_Word(end._rawValue),
@@ -222,7 +194,7 @@ extension _Pointer /*: Strideable*/ {
   ///   zero.
   /// - Returns: A pointer offset from this pointer by `n` instances of the
   ///   `Pointee` type.
-  @inlinable
+  @_transparent
   public func advanced(by n: Int) -> Self {
     return Self(Builtin.gep_Word(
       self._rawValue, n._builtinWordValue, Pointee.self))
@@ -264,7 +236,7 @@ extension Int {
   ///
   /// - Parameter pointer: The pointer to use as the source for the new
   ///   integer.
-  @inlinable
+  @_transparent
   public init<P: _Pointer>(bitPattern pointer: P?) {
     if let pointer = pointer {
       self = Int(Builtin.ptrtoint_Word(pointer._rawValue))
@@ -282,7 +254,7 @@ extension UInt {
   ///
   /// - Parameter pointer: The pointer to use as the source for the new
   ///   integer.
-  @inlinable
+  @_transparent
   public init<P: _Pointer>(bitPattern pointer: P?) {
     if let pointer = pointer {
       self = UInt(Builtin.ptrtoint_Word(pointer._rawValue))
@@ -387,7 +359,6 @@ func _convertMutableArrayToPointerArgument<
 }
 
 /// Derive a UTF-8 pointer argument from a value string parameter.
-@inlinable // FIXME(sil-serialize-all)
 public // COMPILER_INTRINSIC
 func _convertConstStringToUTF8PointerArgument<
   ToPointer : _Pointer

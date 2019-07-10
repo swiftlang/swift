@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir -enable-objc-interop -disable-objc-attr-requires-foundation-module | %FileCheck %s -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend %s -emit-ir -enable-objc-interop -disable-objc-attr-requires-foundation-module | %FileCheck %s -DINT=i%target-ptrsize
 
 // REQUIRES: CPU=i386 || CPU=x86_64
 

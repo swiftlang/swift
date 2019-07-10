@@ -1,4 +1,4 @@
-//===--- CastOptimizer.h --------------------------------------------------===//
+//===--- CastOptimizer.h ----------------------------------*- C++ -*-------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -21,6 +21,7 @@
 #include "swift/SILOptimizer/Analysis/ClassHierarchyAnalysis.h"
 #include "swift/SILOptimizer/Analysis/EpilogueARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Support/Allocator.h"
 #include <functional>
@@ -29,54 +30,55 @@
 namespace swift {
 
 class SILOptFunctionBuilder;
+struct SILDynamicCastInst;
 
-/// \brief This is a helper class used to optimize casts.
+/// This is a helper class used to optimize casts.
 class CastOptimizer {
-  SILOptFunctionBuilder &FunctionBuilder;
+  SILOptFunctionBuilder &functionBuilder;
 
-  // Callback to be called when uses of an instruction should be replaced.
-  std::function<void(SingleValueInstruction *I, ValueBase *V)>
-      ReplaceInstUsesAction;
+  /// Temporary context for clients that do not provide their own.
+  SILBuilderContext tempBuilderContext;
 
-  // Callback to call when an instruction needs to be erased.
-  std::function<void(SILInstruction *)> EraseInstAction;
+  /// Reference to the provided SILBuilderContext.
+  SILBuilderContext &builderContext;
 
-  // Callback to call after an optimization was performed based on the fact
-  // that a cast will succeed.
-  std::function<void()> WillSucceedAction;
+  /// Callback that replaces the first SILValue's uses with a use of the second
+  /// value.
+  std::function<void(SILValue, SILValue)> replaceValueUsesAction;
 
-  // Callback to call after an optimization was performed based on the fact
-  // that a cast will fail.
-  std::function<void()> WillFailAction;
+  /// Callback that replaces a SingleValueInstruction with a ValueBase after
+  /// updating any status in the caller.
+  std::function<void(SingleValueInstruction *, ValueBase *)>
+      replaceInstUsesAction;
 
-  /// Optimize a cast from a bridged ObjC type into
-  /// a corresponding Swift type implementing _ObjectiveCBridgeable.
-  SILInstruction *optimizeBridgedObjCToSwiftCast(
-      SILInstruction *Inst, bool isConditional, SILValue Src, SILValue Dest,
-      CanType Source, CanType Target, Type BridgedSourceTy,
-      Type BridgedTargetTy, SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB);
+  /// Callback that erases an instruction and performs any state updates in the
+  /// caller required.
+  std::function<void(SILInstruction *)> eraseInstAction;
 
-  /// Optimize a cast from a Swift type implementing _ObjectiveCBridgeable
-  /// into a bridged ObjC type.
-  SILInstruction *optimizeBridgedSwiftToObjCCast(
-      SILInstruction *Inst, CastConsumptionKind ConsumptionKind,
-      bool isConditional, SILValue Src, SILValue Dest, CanType Source,
-      CanType Target, Type BridgedSourceTy, Type BridgedTargetTy,
-      SILBasicBlock *SuccessBB, SILBasicBlock *FailureBB);
+  /// Callback to call after an optimization was performed based on the fact
+  /// that a cast will succeed.
+  std::function<void()> willSucceedAction;
 
-  void deleteInstructionsAfterUnreachable(SILInstruction *UnreachableInst,
-                                          SILInstruction *TrapInst);
+  /// Callback to call after an optimization was performed based on the fact
+  /// that a cast will fail.
+  std::function<void()> willFailAction;
 
 public:
   CastOptimizer(SILOptFunctionBuilder &FunctionBuilder,
-                std::function<void(SingleValueInstruction *I, ValueBase *V)>
+                SILBuilderContext *BuilderContext,
+                std::function<void(SILValue, SILValue)> ReplaceValueUsesAction,
+                std::function<void(SingleValueInstruction *, ValueBase *)>
                     ReplaceInstUsesAction,
                 std::function<void(SILInstruction *)> EraseAction,
                 std::function<void()> WillSucceedAction,
                 std::function<void()> WillFailAction = []() {})
-      : FunctionBuilder(FunctionBuilder), ReplaceInstUsesAction(ReplaceInstUsesAction),
-        EraseInstAction(EraseAction), WillSucceedAction(WillSucceedAction),
-        WillFailAction(WillFailAction) {}
+      : functionBuilder(FunctionBuilder),
+        tempBuilderContext(FunctionBuilder.getModule()),
+        builderContext(BuilderContext ? *BuilderContext : tempBuilderContext),
+        replaceValueUsesAction(ReplaceValueUsesAction),
+        replaceInstUsesAction(ReplaceInstUsesAction),
+        eraseInstAction(EraseAction), willSucceedAction(WillSucceedAction),
+        willFailAction(WillFailAction) {}
 
   // This constructor is used in
   // 'SILOptimizer/Mandatory/ConstantPropagation.cpp'. MSVC2015 compiler
@@ -84,11 +86,14 @@ public:
   // arguments. It seems the number of the default argument with lambda is
   // limited.
   CastOptimizer(SILOptFunctionBuilder &FunctionBuilder,
+                SILBuilderContext *BuilderContext,
+                std::function<void(SILValue, SILValue)> ReplaceValueUsesAction,
                 std::function<void(SingleValueInstruction *I, ValueBase *V)>
                     ReplaceInstUsesAction,
                 std::function<void(SILInstruction *)> EraseAction =
                     [](SILInstruction *) {})
-      : CastOptimizer(FunctionBuilder, ReplaceInstUsesAction, EraseAction, []() {}, []() {}) {}
+      : CastOptimizer(FunctionBuilder, BuilderContext, ReplaceValueUsesAction,
+                      ReplaceInstUsesAction, EraseAction, []() {}, []() {}) {}
 
   /// Simplify checked_cast_br. It may change the control flow.
   SILInstruction *simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst);
@@ -122,13 +127,25 @@ public:
       UnconditionalCheckedCastAddrInst *Inst);
 
   /// Check if it is a bridged cast and optimize it.
+  ///
   /// May change the control flow.
-  SILInstruction *optimizeBridgedCasts(SILInstruction *Inst,
-                                       CastConsumptionKind ConsumptionKind,
-                                       bool isConditional, SILValue Src,
-                                       SILValue Dest, CanType Source,
-                                       CanType Target, SILBasicBlock *SuccessBB,
-                                       SILBasicBlock *FailureBB);
+  SILInstruction *optimizeBridgedCasts(SILDynamicCastInst cast);
+
+  /// Optimize a cast from a bridged ObjC type into
+  /// a corresponding Swift type implementing _ObjectiveCBridgeable.
+  SILInstruction *
+  optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast);
+
+  /// Optimize a cast from a Swift type implementing _ObjectiveCBridgeable
+  /// into a bridged ObjC type.
+  SILInstruction *
+  optimizeBridgedSwiftToObjCCast(SILDynamicCastInst dynamicCast);
+
+  void deleteInstructionsAfterUnreachable(SILInstruction *UnreachableInst,
+                                          SILInstruction *TrapInst);
+
+  SILValue optimizeMetatypeConversion(ConversionInst *mci,
+                                      MetatypeRepresentation representation);
 };
 
 } // namespace swift

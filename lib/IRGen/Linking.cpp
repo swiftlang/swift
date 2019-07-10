@@ -18,6 +18,8 @@
 #include "IRGenMangler.h"
 #include "IRGenModule.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/Availability.h"
+#include "swift/AST/IRGenOptions.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/SILGlobalVariable.h"
 #include "swift/SIL/FormalLinkage.h"
@@ -31,20 +33,58 @@ using namespace swift;
 using namespace irgen;
 using namespace Mangle;
 
+const IRLinkage IRLinkage::InternalLinkOnceODR = {
+  llvm::GlobalValue::LinkOnceODRLinkage,
+  llvm::GlobalValue::HiddenVisibility,
+  llvm::GlobalValue::DefaultStorageClass,
+};
+
+const IRLinkage IRLinkage::InternalWeakODR = {
+  llvm::GlobalValue::WeakODRLinkage,
+  llvm::GlobalValue::HiddenVisibility,
+  llvm::GlobalValue::DefaultStorageClass,
+};
+
+const IRLinkage IRLinkage::Internal = {
+  llvm::GlobalValue::InternalLinkage,
+  llvm::GlobalValue::DefaultVisibility,
+  llvm::GlobalValue::DefaultStorageClass,
+};
+
+const IRLinkage IRLinkage::ExternalImport = {
+  llvm::GlobalValue::ExternalLinkage,
+  llvm::GlobalValue::DefaultVisibility,
+  llvm::GlobalValue::DLLImportStorageClass,
+};
+
+const IRLinkage IRLinkage::ExternalWeakImport = {
+  llvm::GlobalValue::ExternalWeakLinkage,
+  llvm::GlobalValue::DefaultVisibility,
+  llvm::GlobalValue::DLLImportStorageClass,
+};
+
+const IRLinkage IRLinkage::ExternalExport = {
+  llvm::GlobalValue::ExternalLinkage,
+  llvm::GlobalValue::DefaultVisibility,
+  llvm::GlobalValue::DLLExportStorageClass,
+};
+
 bool swift::irgen::useDllStorage(const llvm::Triple &triple) {
   return triple.isOSBinFormatCOFF() && !triple.isOSCygMing();
 }
 
 UniversalLinkageInfo::UniversalLinkageInfo(IRGenModule &IGM)
     : UniversalLinkageInfo(IGM.Triple, IGM.IRGen.hasMultipleIGMs(),
+                           IGM.IRGen.Opts.ForcePublicLinkage,
                            IGM.getSILModule().isWholeModule()) {}
 
 UniversalLinkageInfo::UniversalLinkageInfo(const llvm::Triple &triple,
                                            bool hasMultipleIGMs,
+                                           bool forcePublicDecls,
                                            bool isWholeModule)
     : IsELFObject(triple.isOSBinFormatELF()),
       UseDLLStorage(useDllStorage(triple)), HasMultipleIGMs(hasMultipleIGMs),
-      IsWholeModule(isWholeModule) {}
+      ForcePublicDecls(forcePublicDecls), IsWholeModule(isWholeModule) {}
 
 /// Mangle this entity into the given buffer.
 void LinkEntity::mangle(SmallVectorImpl<char> &buffer) const {
@@ -142,11 +182,20 @@ std::string LinkEntity::mangleAsString() const {
     return mangler.mangleTypeMetadataPattern(
                                         cast<NominalTypeDecl>(getDecl()));
 
-  case Kind::ForeignTypeMetadataCandidate:
-    return mangler.mangleTypeMetadataFull(getType());
-
   case Kind::SwiftMetaclassStub:
     return mangler.mangleClassMetaClass(cast<ClassDecl>(getDecl()));
+
+  case Kind::ObjCMetadataUpdateFunction:
+    return mangler.mangleObjCMetadataUpdateFunction(cast<ClassDecl>(getDecl()));
+
+  case Kind::ObjCResilientClassStub:
+    switch (getMetadataAddress()) {
+    case TypeMetadataAddress::FullMetadata:
+      return mangler.mangleFullObjCResilientClassStub(cast<ClassDecl>(getDecl()));
+    case TypeMetadataAddress::AddressPoint:
+      return mangler.mangleObjCResilientClassStub(cast<ClassDecl>(getDecl()));
+    }
+    llvm_unreachable("invalid metadata address");
 
   case Kind::ClassMetadataBaseOffset:               // class metadata base offset
     return mangler.mangleClassMetadataBaseOffset(cast<ClassDecl>(getDecl()));
@@ -154,6 +203,25 @@ std::string LinkEntity::mangleAsString() const {
   case Kind::NominalTypeDescriptor:
     return mangler.mangleNominalTypeDescriptor(
                                         cast<NominalTypeDecl>(getDecl()));
+
+  case Kind::OpaqueTypeDescriptor:
+    return mangler.mangleOpaqueTypeDescriptor(cast<OpaqueTypeDecl>(getDecl()));
+
+  case Kind::OpaqueTypeDescriptorAccessor:
+    return mangler.mangleOpaqueTypeDescriptorAccessor(
+        cast<OpaqueTypeDecl>(getDecl()));
+
+  case Kind::OpaqueTypeDescriptorAccessorImpl:
+    return mangler.mangleOpaqueTypeDescriptorAccessorImpl(
+        cast<OpaqueTypeDecl>(getDecl()));
+
+  case Kind::OpaqueTypeDescriptorAccessorKey:
+    return mangler.mangleOpaqueTypeDescriptorAccessorKey(
+        cast<OpaqueTypeDecl>(getDecl()));
+
+  case Kind::OpaqueTypeDescriptorAccessorVar:
+    return mangler.mangleOpaqueTypeDescriptorAccessorVar(
+        cast<OpaqueTypeDecl>(getDecl()));
 
   case Kind::PropertyDescriptor:
     return mangler.manglePropertyDescriptor(
@@ -166,7 +234,7 @@ std::string LinkEntity::mangleAsString() const {
     return mangler.mangleExtensionDescriptor(getExtension());
 
   case Kind::AnonymousDescriptor:
-    return mangler.mangleAnonymousDescriptor(getDeclContext());
+    return mangler.mangleAnonymousDescriptor(getAnonymousDeclContext());
 
   case Kind::ProtocolDescriptor:
     return mangler.mangleProtocolDescriptor(cast<ProtocolDecl>(getDecl()));
@@ -187,6 +255,13 @@ std::string LinkEntity::mangleAsString() const {
              assocConformance.second);
   }
 
+  case Kind::BaseConformanceDescriptor: {
+    auto assocConformance = getAssociatedConformance();
+    return mangler.mangleBaseConformanceDescriptor(
+             cast<ProtocolDecl>(getDecl()),
+             assocConformance.second);
+  }
+
   case Kind::DefaultAssociatedConformanceAccessor: {
     auto assocConformance = getAssociatedConformance();
     return mangler.mangleDefaultAssociatedConformanceAccessor(
@@ -197,7 +272,7 @@ std::string LinkEntity::mangleAsString() const {
 
   case Kind::ProtocolConformanceDescriptor:
     return mangler.mangleProtocolConformanceDescriptor(
-                   cast<NormalProtocolConformance>(getProtocolConformance()));
+                                                  getRootProtocolConformance());
 
   case Kind::EnumCase:
     return mangler.mangleEnumCase(getDecl());
@@ -205,22 +280,11 @@ std::string LinkEntity::mangleAsString() const {
   case Kind::FieldOffset:
     return mangler.mangleFieldOffset(getDecl());
 
-  case Kind::DirectProtocolWitnessTable:
-    return mangler.mangleDirectProtocolWitnessTable(getProtocolConformance());
-
-  case Kind::GenericProtocolWitnessTableCache:
-    return mangler.mangleGenericProtocolWitnessTableCache(
-                                                    getProtocolConformance());
+  case Kind::ProtocolWitnessTable:
+    return mangler.mangleWitnessTable(getRootProtocolConformance());
 
   case Kind::GenericProtocolWitnessTableInstantiationFunction:
     return mangler.mangleGenericProtocolWitnessTableInstantiationFunction(
-                                                    getProtocolConformance());
-
-  case Kind::ResilientProtocolWitnessTable:
-    return mangler.mangleResilientProtocolWitnessTable(getProtocolConformance());
-
-  case Kind::ProtocolWitnessTableAccessFunction:
-    return mangler.mangleProtocolWitnessTableAccessFunction(
                                                     getProtocolConformance());
 
   case Kind::ProtocolWitnessTablePattern:
@@ -236,6 +300,11 @@ std::string LinkEntity::mangleAsString() const {
 
   case Kind::AssociatedTypeWitnessTableAccessFunction: {
     auto assocConf = getAssociatedConformance();
+    if (isa<GenericTypeParamType>(assocConf.first)) {
+      return mangler.mangleBaseWitnessTableAccessFunction(
+                  getProtocolConformance(), assocConf.second);
+    }
+    
     return mangler.mangleAssociatedTypeWitnessTableAccessFunction(
                 getProtocolConformance(), assocConf.first, assocConf.second);
   }
@@ -249,7 +318,7 @@ std::string LinkEntity::mangleAsString() const {
   case Kind::ObjCClassRef: {
     llvm::SmallString<64> tempBuffer;
     StringRef name = cast<ClassDecl>(getDecl())->getObjCRuntimeName(tempBuffer);
-    std::string Result("\01l_OBJC_CLASS_REF_$_");
+    std::string Result("OBJC_CLASS_REF_$_");
     Result.append(name.data(), name.size());
     return Result;
   }
@@ -272,8 +341,67 @@ std::string LinkEntity::mangleAsString() const {
     return Result;
   }
 
-  case Kind::SILFunction:
-    return getSILFunction()->getName();
+  case Kind::SILFunction: {
+    std::string Result(getSILFunction()->getName());
+    if (isDynamicallyReplaceable()) {
+      Result.append("TI");
+    }
+    return Result;
+  }
+  case Kind::DynamicallyReplaceableFunctionImpl: {
+    assert(isa<AbstractFunctionDecl>(getDecl()));
+    std::string Result;
+    if (auto *Constructor = dyn_cast<ConstructorDecl>(getDecl())) {
+      Result = mangler.mangleConstructorEntity(Constructor, isAllocator(),
+                                               /*isCurried=*/false);
+    } else  {
+      Result = mangler.mangleEntity(getDecl(), /*isCurried=*/false);
+    }
+    Result.append("TI");
+    return Result;
+  }
+
+  case Kind::DynamicallyReplaceableFunctionVariable: {
+    std::string Result(getSILFunction()->getName());
+    Result.append("TX");
+    return Result;
+  }
+
+  case Kind::DynamicallyReplaceableFunctionKey: {
+    std::string Result(getSILFunction()->getName());
+    Result.append("Tx");
+    return Result;
+  }
+
+
+  case Kind::DynamicallyReplaceableFunctionVariableAST: {
+    assert(isa<AbstractFunctionDecl>(getDecl()));
+    std::string Result;
+    if (auto *Constructor = dyn_cast<ConstructorDecl>(getDecl())) {
+      Result =
+          mangler.mangleConstructorEntity(Constructor, isAllocator(),
+                                          /*isCurried=*/false);
+    } else  {
+      Result = mangler.mangleEntity(getDecl(), /*isCurried=*/false);
+    }
+    Result.append("TX");
+    return Result;
+  }
+
+  case Kind::DynamicallyReplaceableFunctionKeyAST: {
+    assert(isa<AbstractFunctionDecl>(getDecl()));
+    std::string Result;
+    if (auto *Constructor = dyn_cast<ConstructorDecl>(getDecl())) {
+      Result =
+          mangler.mangleConstructorEntity(Constructor, isAllocator(),
+                                          /*isCurried=*/false);
+    } else  {
+      Result = mangler.mangleEntity(getDecl(), /*isCurried=*/false);
+    }
+    Result.append("Tx");
+    return Result;
+  }
+
   case Kind::SILGlobalVariable:
     return getSILGlobalVariable()->getName();
 
@@ -288,44 +416,17 @@ std::string LinkEntity::mangleAsString() const {
   llvm_unreachable("bad entity kind!");
 }
 
-/// Get SIL-linkage for something that's not required to be visible
-/// and doesn't actually need to be uniqued.
-static SILLinkage getNonUniqueSILLinkage(FormalLinkage linkage,
-                                         ForDefinition_t forDefinition) {
-  switch (linkage) {
-  case FormalLinkage::PublicUnique:
-  case FormalLinkage::PublicNonUnique:
-    return (forDefinition ? SILLinkage::Shared : SILLinkage::PublicExternal);
-
-  case FormalLinkage::HiddenUnique:
-    return (forDefinition ? SILLinkage::Shared : SILLinkage::HiddenExternal);
-
-  case FormalLinkage::Private:
-    return SILLinkage::Private;
-  }
-  llvm_unreachable("bad formal linkage");
-}
-
 SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   // For when `this` is a protocol conformance of some kind.
   auto getLinkageAsConformance = [&] {
     return getLinkageForProtocolConformance(
-        getProtocolConformance()->getRootNormalConformance(), forDefinition);
+        getProtocolConformance()->getRootConformance(), forDefinition);
   };
 
   switch (getKind()) {
   case Kind::DispatchThunk:
   case Kind::DispatchThunkInitializer:
-  case Kind::DispatchThunkAllocator: {
-    auto *decl = getDecl();
-
-    // Protocol requirements don't have their own access control
-    if (auto *proto = dyn_cast<ProtocolDecl>(decl->getDeclContext()))
-      decl = proto;
-
-    return getSILLinkage(getDeclLinkage(decl), forDefinition);
-  }
-
+  case Kind::DispatchThunkAllocator:
   case Kind::MethodDescriptor:
   case Kind::MethodDescriptorInitializer:
   case Kind::MethodDescriptorAllocator: {
@@ -334,14 +435,6 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     // Protocol requirements don't have their own access control
     if (auto *proto = dyn_cast<ProtocolDecl>(decl->getDeclContext()))
       decl = proto;
-
-    // Method descriptors for internal class initializers can be referenced
-    // from outside the module.
-    if (auto *ctor = dyn_cast<ConstructorDecl>(decl)) {
-      auto *classDecl = cast<ClassDecl>(ctor->getDeclContext());
-      if (classDecl->getEffectiveAccess() == AccessLevel::Open)
-        decl = classDecl;
-    }
 
     return getSILLinkage(getDeclLinkage(decl), forDefinition);
   }
@@ -362,6 +455,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     return SILLinkage::Private;
   }
 
+  case Kind::ObjCMetadataUpdateFunction:
   case Kind::TypeMetadataInstantiationCache:
   case Kind::TypeMetadataInstantiationFunction:
   case Kind::TypeMetadataSingletonInitializationCache:
@@ -380,13 +474,18 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     return SILLinkage::Private;
   }
 
-  case Kind::TypeMetadata:
+  case Kind::TypeMetadata: {
+    auto *nominal = getType().getAnyNominal();
     switch (getMetadataAddress()) {
     case TypeMetadataAddress::FullMetadata:
+      // For imported types, the full metadata object is a candidate
+      // for uniquing.
+      if (getDeclLinkage(nominal) == FormalLinkage::PublicNonUnique)
+        return SILLinkage::Shared;
+
       // The full metadata object is private to the containing module.
       return SILLinkage::Private;
     case TypeMetadataAddress::AddressPoint: {
-      auto *nominal = getType().getAnyNominal();
       return getSILLinkage(nominal
                            ? getDeclLinkage(nominal)
                            : FormalLinkage::PublicUnique,
@@ -394,16 +493,15 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     }
     }
     llvm_unreachable("bad kind");
+  }
 
   // ...but we don't actually expose individual value witnesses (right now).
-  case Kind::ValueWitness:
-    return getNonUniqueSILLinkage(getDeclLinkage(getType().getAnyNominal()),
-                                  forDefinition);
-
-  // Foreign type metadata candidates are always shared; the runtime
-  // does the uniquing.
-  case Kind::ForeignTypeMetadataCandidate:
-    return SILLinkage::Shared;
+  case Kind::ValueWitness: {
+    auto *nominal = getType().getAnyNominal();
+    if (getDeclLinkage(nominal) == FormalLinkage::PublicNonUnique)
+      return SILLinkage::Shared;
+    return forDefinition ? SILLinkage::Private : SILLinkage::PrivateExternal;
+  }
 
   case Kind::TypeMetadataAccessFunction:
     switch (getTypeMetadataAccessStrategy(getType())) {
@@ -427,6 +525,21 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     return SILLinkage::PublicExternal;
 
 
+  case Kind::ObjCResilientClassStub: {
+    switch (getMetadataAddress()) {
+    case TypeMetadataAddress::FullMetadata:
+      // The full class stub object is private to the containing module,
+      // excpet for foreign types.
+      return SILLinkage::Private;
+    case TypeMetadataAddress::AddressPoint: {
+      auto *classDecl = cast<ClassDecl>(getDecl());
+      return getSILLinkage(getDeclLinkage(classDecl),
+                           forDefinition);
+    }
+    }
+    llvm_unreachable("invalid metadata address");
+  }
+
   case Kind::EnumCase: {
     auto *elementDecl = cast<EnumElementDecl>(getDecl());
     return getSILLinkage(getDeclLinkage(elementDecl), forDefinition);
@@ -437,7 +550,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
 
     auto linkage = getDeclLinkage(varDecl);
 
-    // Resilient classes don't expose field offset symbols.
+    // Classes with resilient storage don't expose field offset symbols.
     if (cast<ClassDecl>(varDecl->getDeclContext())->isResilient()) {
       assert(linkage != FormalLinkage::PublicNonUnique &&
             "Cannot have a resilient class with non-unique linkage");
@@ -458,6 +571,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   }
 
   case Kind::AssociatedConformanceDescriptor:
+  case Kind::BaseConformanceDescriptor:
   case Kind::ObjCClass:
   case Kind::ObjCMetaclass:
   case Kind::SwiftMetaclassStub:
@@ -466,19 +580,23 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   case Kind::ProtocolDescriptor:
   case Kind::ProtocolRequirementsBaseDescriptor:
   case Kind::MethodLookupFunction:
+  case Kind::OpaqueTypeDescriptor:
+  case Kind::OpaqueTypeDescriptorAccessor:
+  case Kind::OpaqueTypeDescriptorAccessorImpl:
+  case Kind::OpaqueTypeDescriptorAccessorKey:
+  case Kind::OpaqueTypeDescriptorAccessorVar:
     return getSILLinkage(getDeclLinkage(getDecl()), forDefinition);
 
   case Kind::AssociatedTypeDescriptor:
     return getSILLinkage(getDeclLinkage(getAssociatedType()->getProtocol()),
                          forDefinition);
 
-  case Kind::DirectProtocolWitnessTable:
-  case Kind::ProtocolWitnessTableAccessFunction:
+  case Kind::ProtocolWitnessTable:
   case Kind::ProtocolConformanceDescriptor:
-    return getLinkageAsConformance();
+    return getLinkageForProtocolConformance(getRootProtocolConformance(),
+                                            forDefinition);
 
   case Kind::ProtocolWitnessTablePattern:
-  case Kind::ResilientProtocolWitnessTable:
     if (getLinkageAsConformance() == SILLinkage::Shared)
       return SILLinkage::Shared;
     return SILLinkage::Private;
@@ -497,12 +615,22 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
 
   case Kind::AssociatedTypeWitnessTableAccessFunction:
   case Kind::DefaultAssociatedConformanceAccessor:
-  case Kind::GenericProtocolWitnessTableCache:
   case Kind::GenericProtocolWitnessTableInstantiationFunction:
     return SILLinkage::Private;
 
+  case Kind::DynamicallyReplaceableFunctionKey:
   case Kind::SILFunction:
     return getSILFunction()->getEffectiveSymbolLinkage();
+
+  case Kind::DynamicallyReplaceableFunctionImpl:
+  case Kind::DynamicallyReplaceableFunctionKeyAST:
+    return getSILLinkage(getDeclLinkage(getDecl()), forDefinition);
+
+
+  case Kind::DynamicallyReplaceableFunctionVariable:
+    return getSILFunction()->getEffectiveSymbolLinkage();
+  case Kind::DynamicallyReplaceableFunctionVariableAST:
+    return getSILLinkage(getDeclLinkage(getDecl()), forDefinition);
 
   case Kind::SILGlobalVariable:
     return getSILGlobalVariable()->getLinkage();
@@ -527,6 +655,11 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     return SILLinkage::Shared;
   }
   llvm_unreachable("bad link entity kind");
+}
+
+static bool isAvailableExternally(IRGenModule &IGM, SILFunction *F) {
+  // TODO
+  return true;
 }
 
 static bool isAvailableExternally(IRGenModule &IGM, const DeclContext *dc) {
@@ -585,16 +718,13 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
   case Kind::TypeMetadata:
     return ::isAvailableExternally(IGM, getType());
 
-  case Kind::ForeignTypeMetadataCandidate:
-    assert(!::isAvailableExternally(IGM, getType()));
-    return false;
-
   case Kind::ObjCClass:
   case Kind::ObjCMetaclass:
     // FIXME: Removing this triggers a linker bug
     return true;
 
   case Kind::AssociatedConformanceDescriptor:
+  case Kind::BaseConformanceDescriptor:
   case Kind::SwiftMetaclassStub:
   case Kind::ClassMetadataBaseOffset:
   case Kind::PropertyDescriptor:
@@ -602,6 +732,11 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
   case Kind::ProtocolDescriptor:
   case Kind::ProtocolRequirementsBaseDescriptor:
   case Kind::MethodLookupFunction:
+  case Kind::OpaqueTypeDescriptor:
+  case Kind::OpaqueTypeDescriptorAccessor:
+  case Kind::OpaqueTypeDescriptorAccessorImpl:
+  case Kind::OpaqueTypeDescriptorAccessorKey:
+  case Kind::OpaqueTypeDescriptorAccessorVar:
     return ::isAvailableExternally(IGM, getDecl());
 
   case Kind::AssociatedTypeDescriptor:
@@ -612,12 +747,12 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
   case Kind::EnumCase:
     return ::isAvailableExternally(IGM, getDecl());
 
-  case Kind::DirectProtocolWitnessTable:
+  case Kind::ProtocolWitnessTable:
   case Kind::ProtocolConformanceDescriptor:
-    return ::isAvailableExternally(IGM, getProtocolConformance()->getDeclContext());
+    return ::isAvailableExternally(IGM,
+                             getRootProtocolConformance()->getDeclContext());
 
   case Kind::ProtocolWitnessTablePattern:
-  case Kind::ResilientProtocolWitnessTable:
   case Kind::ObjCClassRef:
   case Kind::ModuleDescriptor:
   case Kind::ExtensionDescriptor:
@@ -629,24 +764,422 @@ bool LinkEntity::isAvailableExternally(IRGenModule &IGM) const {
   case Kind::TypeMetadataPattern:
   case Kind::DefaultAssociatedConformanceAccessor:
     return false;
+  case Kind::DynamicallyReplaceableFunctionKey:
+  case Kind::DynamicallyReplaceableFunctionVariable:
+    return true;
 
+  case Kind::SILFunction:
+    return ::isAvailableExternally(IGM, getSILFunction());
+
+  case Kind::FieldOffset: {
+    return ::isAvailableExternally(IGM,
+                                   cast<VarDecl>(getDecl())
+                                     ->getDeclContext()
+                                     ->getInnermostTypeContext());
+  }
+  
+  case Kind::ObjCMetadataUpdateFunction:
+  case Kind::ObjCResilientClassStub:
   case Kind::ValueWitness:
   case Kind::TypeMetadataAccessFunction:
   case Kind::TypeMetadataLazyCacheVariable:
-  case Kind::FieldOffset:
-  case Kind::ProtocolWitnessTableAccessFunction:
   case Kind::ProtocolWitnessTableLazyAccessFunction:
   case Kind::ProtocolWitnessTableLazyCacheVariable:
   case Kind::AssociatedTypeWitnessTableAccessFunction:
-  case Kind::GenericProtocolWitnessTableCache:
   case Kind::GenericProtocolWitnessTableInstantiationFunction:
-  case Kind::SILFunction:
   case Kind::SILGlobalVariable:
   case Kind::ReflectionBuiltinDescriptor:
   case Kind::ReflectionFieldDescriptor:
   case Kind::ReflectionAssociatedTypeDescriptor:
   case Kind::CoroutineContinuationPrototype:
+  case Kind::DynamicallyReplaceableFunctionVariableAST:
+  case Kind::DynamicallyReplaceableFunctionImpl:
+  case Kind::DynamicallyReplaceableFunctionKeyAST:
     llvm_unreachable("Relative reference to unsupported link entity");
   }
   llvm_unreachable("bad link entity kind");
+}
+
+llvm::Type *LinkEntity::getDefaultDeclarationType(IRGenModule &IGM) const {
+  switch (getKind()) {
+  case Kind::ModuleDescriptor:
+  case Kind::ExtensionDescriptor:
+  case Kind::AnonymousDescriptor:
+  case Kind::NominalTypeDescriptor:
+  case Kind::PropertyDescriptor:
+    return IGM.TypeContextDescriptorTy;
+  case Kind::OpaqueTypeDescriptor:
+    return IGM.OpaqueTypeDescriptorTy;
+  case Kind::ProtocolDescriptor:
+    return IGM.ProtocolDescriptorStructTy;
+  case Kind::AssociatedTypeDescriptor:
+  case Kind::AssociatedConformanceDescriptor:
+  case Kind::BaseConformanceDescriptor:
+  case Kind::ProtocolRequirementsBaseDescriptor:
+    return IGM.ProtocolRequirementStructTy;
+  case Kind::ProtocolConformanceDescriptor:
+    return IGM.ProtocolConformanceDescriptorTy;
+  case Kind::ObjCClassRef:
+    return IGM.ObjCClassPtrTy;
+  case Kind::ObjCClass:
+  case Kind::ObjCMetaclass:
+  case Kind::SwiftMetaclassStub:
+    return IGM.ObjCClassStructTy;
+  case Kind::TypeMetadataLazyCacheVariable:
+    return IGM.TypeMetadataPtrTy;
+  case Kind::TypeMetadataSingletonInitializationCache:
+    // TODO: put a cache variable on IGM
+    return llvm::StructType::get(IGM.getLLVMContext(),
+                                 {IGM.TypeMetadataPtrTy, IGM.Int8PtrTy});
+  case Kind::TypeMetadata:
+    switch (getMetadataAddress()) {
+    case TypeMetadataAddress::FullMetadata:
+      if (getType().getClassOrBoundGenericClass())
+        return IGM.FullHeapMetadataStructTy;
+      else
+        return IGM.FullTypeMetadataStructTy;
+    case TypeMetadataAddress::AddressPoint:
+      return IGM.TypeMetadataStructTy;
+    }
+    llvm_unreachable("invalid metadata address");
+    
+  case Kind::TypeMetadataPattern:
+    // TODO: Use a real type?
+    return IGM.Int8Ty;
+    
+  case Kind::ClassMetadataBaseOffset:
+    // TODO: put a cache variable on IGM
+    return llvm::StructType::get(IGM.getLLVMContext(), {
+      IGM.SizeTy,  // Immediate members offset
+      IGM.Int32Ty, // Negative size in words
+      IGM.Int32Ty  // Positive size in words
+    });
+    
+  case Kind::TypeMetadataInstantiationCache:
+    // TODO: put a cache variable on IGM
+    return llvm::ArrayType::get(IGM.Int8PtrTy,
+                                NumGenericMetadataPrivateDataWords);
+  case Kind::ReflectionBuiltinDescriptor:
+  case Kind::ReflectionFieldDescriptor:
+  case Kind::ReflectionAssociatedTypeDescriptor:
+    return IGM.FieldDescriptorTy;
+  case Kind::ValueWitnessTable: // TODO: use ValueWitnessTableTy
+  case Kind::ProtocolWitnessTable:
+  case Kind::ProtocolWitnessTablePattern:
+    return IGM.WitnessTableTy;
+  case Kind::FieldOffset:
+    return IGM.SizeTy;
+  case Kind::EnumCase:
+    return IGM.Int32Ty;
+  case Kind::ProtocolWitnessTableLazyCacheVariable:
+    return IGM.WitnessTablePtrTy;
+  case Kind::SILFunction:
+    return IGM.FunctionPtrTy->getPointerTo();
+  case Kind::MethodDescriptor:
+  case Kind::MethodDescriptorInitializer:
+  case Kind::MethodDescriptorAllocator:
+    return IGM.MethodDescriptorStructTy;
+  case Kind::DynamicallyReplaceableFunctionKey:
+  case Kind::OpaqueTypeDescriptorAccessorKey:
+    return IGM.DynamicReplacementKeyTy;
+  case Kind::DynamicallyReplaceableFunctionVariable:
+  case Kind::OpaqueTypeDescriptorAccessorVar:
+    return IGM.DynamicReplacementLinkEntryTy;
+  case Kind::ObjCMetadataUpdateFunction:
+    return IGM.ObjCUpdateCallbackTy;
+  case Kind::ObjCResilientClassStub:
+    switch (getMetadataAddress()) {
+    case TypeMetadataAddress::FullMetadata:
+      return IGM.ObjCFullResilientClassStubTy;
+    case TypeMetadataAddress::AddressPoint:
+      return IGM.ObjCResilientClassStubTy;
+    }
+    llvm_unreachable("invalid metadata address");
+  default:
+    llvm_unreachable("declaration LLVM type not specified");
+  }
+}
+
+Alignment LinkEntity::getAlignment(IRGenModule &IGM) const {
+  switch (getKind()) {
+  case Kind::ModuleDescriptor:
+  case Kind::ExtensionDescriptor:
+  case Kind::AnonymousDescriptor:
+  case Kind::NominalTypeDescriptor:
+  case Kind::ProtocolDescriptor:
+  case Kind::AssociatedTypeDescriptor:
+  case Kind::AssociatedConformanceDescriptor:
+  case Kind::BaseConformanceDescriptor:
+  case Kind::ProtocolConformanceDescriptor:
+  case Kind::ProtocolRequirementsBaseDescriptor:
+  case Kind::ReflectionBuiltinDescriptor:
+  case Kind::ReflectionFieldDescriptor:
+  case Kind::ReflectionAssociatedTypeDescriptor:
+  case Kind::PropertyDescriptor:
+  case Kind::EnumCase:
+  case Kind::MethodDescriptor:
+  case Kind::MethodDescriptorInitializer:
+  case Kind::MethodDescriptorAllocator:
+  case Kind::OpaqueTypeDescriptor:
+    return Alignment(4);
+  case Kind::ObjCClassRef:
+  case Kind::ObjCClass:
+  case Kind::TypeMetadataLazyCacheVariable:
+  case Kind::TypeMetadataSingletonInitializationCache:
+  case Kind::TypeMetadata:
+  case Kind::TypeMetadataPattern:
+  case Kind::ClassMetadataBaseOffset:
+  case Kind::TypeMetadataInstantiationCache:
+  case Kind::ValueWitnessTable:
+  case Kind::FieldOffset:
+  case Kind::ProtocolWitnessTableLazyCacheVariable:
+  case Kind::ProtocolWitnessTable:
+  case Kind::ProtocolWitnessTablePattern:
+  case Kind::ObjCMetaclass:
+  case Kind::SwiftMetaclassStub:
+  case Kind::DynamicallyReplaceableFunctionVariable:
+  case Kind::DynamicallyReplaceableFunctionKey:
+  case Kind::OpaqueTypeDescriptorAccessorKey:
+  case Kind::OpaqueTypeDescriptorAccessorVar:
+  case Kind::ObjCResilientClassStub:
+    return IGM.getPointerAlignment();
+  case Kind::SILFunction:
+    return Alignment(1);
+  default:
+    llvm_unreachable("alignment not specified");
+  }
+}
+
+bool LinkEntity::isWeakImported(ModuleDecl *module,
+                                AvailabilityContext context) const {
+  switch (getKind()) {
+  case Kind::SILGlobalVariable:
+    if (getSILGlobalVariable()->getDecl()) {
+      return getSILGlobalVariable()->getDecl()
+          ->isWeakImported(module, context);
+    }
+    return false;
+  case Kind::DynamicallyReplaceableFunctionKey:
+  case Kind::DynamicallyReplaceableFunctionVariable:
+  case Kind::SILFunction: {
+    // For imported functions check the Clang declaration.
+    if (auto clangOwner = getSILFunction()->getClangNodeOwner())
+      return clangOwner->isWeakImported(module, context);
+
+    // For native functions check a flag on the SILFunction
+    // itself.
+    if (getSILFunction()->isWeakLinked())
+      return getSILFunction()->isAvailableExternally();
+    return false;
+  }
+
+  case Kind::AssociatedConformanceDescriptor:
+  case Kind::DefaultAssociatedConformanceAccessor: {
+    // Associated conformance descriptors use the protocol as
+    // their declaration, but are weak linked if the associated
+    // type stored in extra storage area is weak linked.
+    auto assocConformance = getAssociatedConformance();
+    auto *depMemTy = assocConformance.first->castTo<DependentMemberType>();
+    return depMemTy->getAssocType()->isWeakImported(module, context);
+  }
+
+  case Kind::BaseConformanceDescriptor:
+    return cast<ProtocolDecl>(getDecl())->isWeakImported(module, context);
+
+  case Kind::TypeMetadata:
+  case Kind::TypeMetadataAccessFunction: {
+    if (auto *nominalDecl = getType()->getAnyNominal())
+      return nominalDecl->isWeakImported(module, context);
+    return false;
+  }
+
+  case Kind::DispatchThunk:
+  case Kind::DispatchThunkInitializer:
+  case Kind::DispatchThunkAllocator:
+  case Kind::MethodDescriptor:
+  case Kind::MethodDescriptorInitializer:
+  case Kind::MethodDescriptorAllocator:
+  case Kind::MethodLookupFunction:
+  case Kind::EnumCase:
+  case Kind::FieldOffset:
+  case Kind::ObjCClass:
+  case Kind::ObjCClassRef:
+  case Kind::ObjCMetaclass:
+  case Kind::SwiftMetaclassStub:
+  case Kind::ClassMetadataBaseOffset:
+  case Kind::PropertyDescriptor:
+  case Kind::NominalTypeDescriptor:
+  case Kind::ModuleDescriptor:
+  case Kind::ProtocolDescriptor:
+  case Kind::ProtocolRequirementsBaseDescriptor:
+  case Kind::AssociatedTypeDescriptor:
+  case Kind::DynamicallyReplaceableFunctionKeyAST:
+  case Kind::DynamicallyReplaceableFunctionVariableAST:
+  case Kind::DynamicallyReplaceableFunctionImpl:
+  case Kind::OpaqueTypeDescriptor:
+  case Kind::OpaqueTypeDescriptorAccessor:
+  case Kind::OpaqueTypeDescriptorAccessorImpl:
+  case Kind::OpaqueTypeDescriptorAccessorKey:
+  case Kind::OpaqueTypeDescriptorAccessorVar:
+    return getDecl()->isWeakImported(module, context);
+
+  case Kind::ProtocolWitnessTable:
+  case Kind::ProtocolConformanceDescriptor:
+    return getProtocolConformance()->getRootConformance()
+                                   ->isWeakImported(module, context);
+
+  // TODO: Revisit some of the below, for weak conformances.
+  case Kind::ObjCMetadataUpdateFunction:
+  case Kind::ObjCResilientClassStub:
+  case Kind::TypeMetadataPattern:
+  case Kind::TypeMetadataInstantiationCache:
+  case Kind::TypeMetadataInstantiationFunction:
+  case Kind::TypeMetadataSingletonInitializationCache:
+  case Kind::TypeMetadataCompletionFunction:
+  case Kind::ExtensionDescriptor:
+  case Kind::AnonymousDescriptor:
+  case Kind::ProtocolWitnessTablePattern:
+  case Kind::GenericProtocolWitnessTableInstantiationFunction:
+  case Kind::AssociatedTypeWitnessTableAccessFunction:
+  case Kind::ReflectionAssociatedTypeDescriptor:
+  case Kind::ProtocolWitnessTableLazyAccessFunction:
+  case Kind::ProtocolWitnessTableLazyCacheVariable:
+  case Kind::ValueWitness:
+  case Kind::ValueWitnessTable:
+  case Kind::TypeMetadataLazyCacheVariable:
+  case Kind::ReflectionBuiltinDescriptor:
+  case Kind::ReflectionFieldDescriptor:
+  case Kind::CoroutineContinuationPrototype:
+    return false;
+  }
+
+  llvm_unreachable("Bad link entity kind");
+}
+
+const SourceFile *LinkEntity::getSourceFileForEmission() const {
+  const SourceFile *sf;
+  
+  // Shared-linkage entities don't get emitted with any particular file.
+  if (hasSharedVisibility(getLinkage(NotForDefinition)))
+    return nullptr;
+  
+  auto getSourceFileForDeclContext =
+  [](const DeclContext *dc) -> const SourceFile * {
+    if (!dc)
+      return nullptr;
+    return dc->getParentSourceFile();
+  };
+  
+  switch (getKind()) {
+  case Kind::DispatchThunk:
+  case Kind::DispatchThunkInitializer:
+  case Kind::DispatchThunkAllocator:
+  case Kind::MethodDescriptor:
+  case Kind::MethodDescriptorInitializer:
+  case Kind::MethodDescriptorAllocator:
+  case Kind::MethodLookupFunction:
+  case Kind::EnumCase:
+  case Kind::FieldOffset:
+  case Kind::ObjCClass:
+  case Kind::ObjCMetaclass:
+  case Kind::SwiftMetaclassStub:
+  case Kind::ObjCMetadataUpdateFunction:
+  case Kind::ObjCResilientClassStub:
+  case Kind::ClassMetadataBaseOffset:
+  case Kind::PropertyDescriptor:
+  case Kind::NominalTypeDescriptor:
+  case Kind::TypeMetadataPattern:
+  case Kind::TypeMetadataInstantiationCache:
+  case Kind::TypeMetadataInstantiationFunction:
+  case Kind::TypeMetadataSingletonInitializationCache:
+  case Kind::TypeMetadataCompletionFunction:
+  case Kind::ProtocolDescriptor:
+  case Kind::ProtocolRequirementsBaseDescriptor:
+  case Kind::AssociatedTypeDescriptor:
+  case Kind::AssociatedConformanceDescriptor:
+  case Kind::DefaultAssociatedConformanceAccessor:
+  case Kind::BaseConformanceDescriptor:
+  case Kind::DynamicallyReplaceableFunctionVariableAST:
+  case Kind::DynamicallyReplaceableFunctionKeyAST:
+  case Kind::DynamicallyReplaceableFunctionImpl:
+  case Kind::OpaqueTypeDescriptor:
+  case Kind::OpaqueTypeDescriptorAccessor:
+  case Kind::OpaqueTypeDescriptorAccessorImpl:
+  case Kind::OpaqueTypeDescriptorAccessorKey:
+  case Kind::OpaqueTypeDescriptorAccessorVar:
+    sf = getSourceFileForDeclContext(getDecl()->getDeclContext());
+    if (!sf)
+      return nullptr;
+    break;
+  
+  case Kind::SILFunction:
+  case Kind::DynamicallyReplaceableFunctionVariable:
+  case Kind::DynamicallyReplaceableFunctionKey:
+    sf = getSourceFileForDeclContext(getSILFunction()->getDeclContext());
+    if (!sf)
+      return nullptr;
+    break;
+  
+  case Kind::SILGlobalVariable:
+    if (auto decl = getSILGlobalVariable()->getDecl()) {
+      sf = getSourceFileForDeclContext(decl->getDeclContext());
+      if (!sf)
+        return nullptr;
+    } else {
+      return nullptr;
+    }
+    break;
+    
+  case Kind::ProtocolWitnessTable:
+  case Kind::ProtocolConformanceDescriptor:
+    sf = getSourceFileForDeclContext(
+                              getRootProtocolConformance()->getDeclContext());
+    if (!sf)
+      return nullptr;
+    break;
+
+  case Kind::ProtocolWitnessTablePattern:
+  case Kind::GenericProtocolWitnessTableInstantiationFunction:
+  case Kind::AssociatedTypeWitnessTableAccessFunction:
+  case Kind::ReflectionAssociatedTypeDescriptor:
+  case Kind::ProtocolWitnessTableLazyCacheVariable:
+  case Kind::ProtocolWitnessTableLazyAccessFunction:
+    sf = getSourceFileForDeclContext(
+      getProtocolConformance()->getRootConformance()->getDeclContext());
+    if (!sf)
+      return nullptr;
+    break;
+    
+  case Kind::TypeMetadata: {
+    auto ty = getType();
+    // Only fully concrete nominal type metadata gets emitted eagerly.
+    auto nom = ty->getAnyNominal();
+    if (!nom || nom->isGenericContext())
+      return nullptr;
+    
+    sf = getSourceFileForDeclContext(nom);
+    if (!sf)
+      return nullptr;
+    break;
+  }
+
+  // Always shared linkage
+  case Kind::ModuleDescriptor:
+  case Kind::ExtensionDescriptor:
+  case Kind::AnonymousDescriptor:
+  case Kind::ObjCClassRef:
+  case Kind::TypeMetadataAccessFunction:
+  case Kind::TypeMetadataLazyCacheVariable:
+    return nullptr;
+
+  // TODO
+  case Kind::CoroutineContinuationPrototype:
+  case Kind::ReflectionFieldDescriptor:
+  case Kind::ReflectionBuiltinDescriptor:
+  case Kind::ValueWitness:
+  case Kind::ValueWitnessTable:
+    return nullptr;
+  }
+  
+  return sf;
 }

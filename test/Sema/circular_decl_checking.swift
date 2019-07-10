@@ -43,10 +43,9 @@ func TopLevelGenericFunc2<T : TopLevelGenericFunc2>(x: T) -> T { return x} // ex
 var TopLevelVar: TopLevelVar? { return nil } // expected-error {{use of undeclared type 'TopLevelVar'}}
 
 
-// FIXME: The first error is redundant, isn't correct in what it states, and
-// also should be emitted on the inheritance clause.
-protocol AProtocol { // expected-error {{type 'Self.e' constrained to non-protocol, non-class type 'Self.e'}}
-  associatedtype e : e // expected-error {{inheritance from non-protocol, non-class type 'Self.e'}}
+protocol AProtocol {
+  associatedtype e : e
+  // expected-error@-1 {{type 'Self.e' constrained to non-protocol, non-class type 'Self.e'}}
 }
 
 
@@ -65,7 +64,8 @@ class X {
 
 // <rdar://problem/17144076> recursive typealias causes a segfault in the type checker
 struct SomeStruct<A> {
-  typealias A = A // expected-error {{type alias 'A' references itself}}
+  typealias A = A // this is OK now -- the underlying type is the generic parameter 'A'
+  typealias B = B // expected-error {{type alias 'B' references itself}}
   // expected-note@-1 {{type declared here}}
 }
 

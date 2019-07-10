@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -sil-verify-all -emit-sil  %s | %FileCheck %s
+// RUN: %target-swift-frontend -O -sil-verify-all -emit-sil -enforce-exclusivity=unchecked  %s | %FileCheck %s
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
 
 // This is an end-to-end test of the array(contentsOf) -> array(Element) optimization

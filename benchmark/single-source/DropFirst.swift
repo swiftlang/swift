@@ -22,7 +22,7 @@ let sequenceCount = 4096
 let dropCount = 1024
 let suffixCount = sequenceCount - dropCount
 let sumCount = suffixCount * (2 * sequenceCount - suffixCount - 1) / 2
-
+let array: [Int] = Array(0..<sequenceCount)
 
 public let DropFirst = [
   BenchmarkInfo(
@@ -52,7 +52,8 @@ public let DropFirst = [
   BenchmarkInfo(
     name: "DropFirstArray",
     runFunction: run_DropFirstArray,
-    tags: [.validation, .api, .Array]),
+    tags: [.validation, .api, .Array],
+    setUpFunction: { blackHole(array) }),
   BenchmarkInfo(
     name: "DropFirstCountableRangeLazy",
     runFunction: run_DropFirstCountableRangeLazy,
@@ -80,7 +81,8 @@ public let DropFirst = [
   BenchmarkInfo(
     name: "DropFirstArrayLazy",
     runFunction: run_DropFirstArrayLazy,
-    tags: [.validation, .api]),
+    tags: [.validation, .api, .Array],
+    setUpFunction: { blackHole(array) }),
 ]
 
 @inline(never)
@@ -151,7 +153,7 @@ public func run_DropFirstAnyCollection(_ N: Int) {
 }
 @inline(never)
 public func run_DropFirstArray(_ N: Int) {
-  let s = Array(0..<sequenceCount)
+  let s = array
   for _ in 1...20*N {
     var result = 0
     for element in s.dropFirst(dropCount) {
@@ -228,7 +230,7 @@ public func run_DropFirstAnyCollectionLazy(_ N: Int) {
 }
 @inline(never)
 public func run_DropFirstArrayLazy(_ N: Int) {
-  let s = (Array(0..<sequenceCount)).lazy
+  let s = (array).lazy
   for _ in 1...20*N {
     var result = 0
     for element in s.dropFirst(dropCount) {

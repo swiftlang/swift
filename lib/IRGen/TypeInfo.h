@@ -402,42 +402,48 @@ public:
   /// Does this type statically have extra inhabitants, or may it dynamically
   /// have extra inhabitants based on type arguments?
   virtual bool mayHaveExtraInhabitants(IRGenModule &IGM) const = 0;
-  
-  /// Map an extra inhabitant representation in memory to a unique 31-bit
-  /// identifier, and map a valid representation of the type to -1.
-  ///
-  /// Calls to this witness must be dominated by a runtime check that the type
-  /// has extra inhabitants.
-  virtual llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
-                                               Address src,
-                                               SILType T,
-                                               bool isOutlined) const = 0;
-  
-  /// Store the extra inhabitant representation indexed by a 31-bit identifier
-  /// to memory.
-  ///
-  /// Calls to this witness must be dominated by a runtime check that the type
-  /// has extra inhabitants.
-  virtual void storeExtraInhabitant(IRGenFunction &IGF,
-                                    llvm::Value *index,
-                                    Address dest,
-                                    SILType T,
-                                    bool isOutlined) const = 0;
-  
+
   /// Get the tag of a single payload enum with a payload of this type (\p T) e.g
   /// Optional<T>.
   virtual llvm::Value *getEnumTagSinglePayload(IRGenFunction &IGF,
                                                llvm::Value *numEmptyCases,
                                                Address enumAddr,
-                                               SILType T) const = 0;
+                                               SILType T,
+                                               bool isOutlined) const = 0;
 
   /// Store the tag of a single payload enum with a payload of this type.
   virtual void storeEnumTagSinglePayload(IRGenFunction &IGF,
                                          llvm::Value *whichCase,
                                          llvm::Value *numEmptyCases,
                                          Address enumAddr,
-                                         SILType T) const = 0;
-  
+                                         SILType T,
+                                         bool isOutlined) const = 0;
+
+  /// Return an extra-inhabitant tag for the given type, which will be
+  /// 0 for a value that's not an extra inhabitant or else a value in
+  /// 1...extraInhabitantCount.  Note that the range is off by one relative
+  /// to the expectations of FixedTypeInfo::getExtraInhabitantIndex!
+  ///
+  /// Most places in IRGen shouldn't be using this.
+  ///
+  /// knownXICount can be null.
+  llvm::Value *getExtraInhabitantTagDynamic(IRGenFunction &IGF,
+                                            Address address,
+                                            SILType T,
+                                            llvm::Value *knownXICount,
+                                            bool isOutlined) const;
+
+  /// Store an extra-inhabitant tag for the given type, which is known to be
+  /// in 1...extraInhabitantCount.  Note that the range is off by one
+  /// relative to the expectations of FixedTypeInfo::storeExtraInhabitant!
+  ///
+  /// Most places in IRGen shouldn't be using this.
+  void storeExtraInhabitantTagDynamic(IRGenFunction &IGF,
+                                      llvm::Value *index,
+                                      Address address,
+                                      SILType T,
+                                      bool isOutlined) const;
+
   /// Compute the packing of values of this type into a fixed-size buffer.
   /// A value might not be stored in the fixed-size buffer because it does not
   /// fit or because it is not bit-wise takable. Non bit-wise takable values are

@@ -35,7 +35,7 @@ class Traversal : public TypeVisitor<Traversal, bool>
   bool visitErrorType(ErrorType *ty) { return false; }
   bool visitUnresolvedType(UnresolvedType *ty) { return false; }
   bool visitBuiltinType(BuiltinType *ty) { return false; }
-  bool visitNameAliasType(NameAliasType *ty) {
+  bool visitTypeAliasType(TypeAliasType *ty) {
     if (auto parent = ty->getParent())
       if (doIt(parent)) return true;
 
@@ -167,6 +167,19 @@ class Traversal : public TypeVisitor<Traversal, bool>
       if (doIt(arg))
         return true;
 
+    return false;
+  }
+  
+  bool visitArchetypeType(ArchetypeType *ty) {
+    // If the root is an opaque archetype, visit its substitution replacement
+    // types.
+    if (auto opaqueRoot = dyn_cast<OpaqueTypeArchetypeType>(ty->getRoot())) {
+      for (auto arg : opaqueRoot->getSubstitutions().getReplacementTypes()) {
+        if (doIt(arg)) {
+          return true;
+        }
+      }
+    }
     return false;
   }
 

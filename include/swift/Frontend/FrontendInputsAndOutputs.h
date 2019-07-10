@@ -173,7 +173,7 @@ public:
 
 private:
   friend class ArgsToFrontendOptionsConverter;
-
+  friend class ParseableInterfaceBuilder;
   void setMainAndSupplementaryOutputs(
       ArrayRef<std::string> outputFiles,
       ArrayRef<SupplementaryOutputPaths> supplementaryOutputs);
@@ -235,7 +235,7 @@ public:
   bool hasLoadedModuleTracePath() const;
   bool hasModuleOutputPath() const;
   bool hasModuleDocOutputPath() const;
-  bool hasModuleInterfaceOutputPath() const;
+  bool hasParseableInterfaceOutputPath() const;
   bool hasTBDPath() const;
 
   bool hasDependencyTrackerPath() const;
@@ -243,4 +243,4 @@ public:
 
 } // namespace swift
 
-#endif /* SWIFT_FRONTEND_FRONTENDINPUTS_H */
+#endif // SWIFT_FRONTEND_FRONTENDINPUTS_H

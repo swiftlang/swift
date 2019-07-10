@@ -397,7 +397,7 @@ CanType TypeJoin::visitProtocolCompositionType(CanType second) {
 
   // FIXME: Handle other types here.
   if (!First->isExistentialType())
-    return TheAnyType;
+    return Unimplemented;
 
   SmallVector<Type, 1> protocolType;
   ArrayRef<Type> firstMembers;

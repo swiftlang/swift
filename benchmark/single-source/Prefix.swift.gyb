@@ -22,6 +22,7 @@ import TestsUtils
 let sequenceCount = 4096
 let prefixCount = sequenceCount - 1024
 let sumCount = prefixCount * (prefixCount - 1) / 2
+let array: [Int] = Array(0..<sequenceCount)
 %{
 # Name and initializer Expression pairs for Sequences to test.
 
@@ -34,7 +35,7 @@ Sequences = [
   ('AnySeqCntRange', 'AnySequence(0..<sequenceCount)'),
   ('AnySeqCRangeIter', 'AnySequence((0..<sequenceCount).makeIterator())'),
   ('AnyCollection', 'AnyCollection(0..<sequenceCount)'),
-  ('Array', 'Array(0..<sequenceCount)'),
+  ('Array', 'array'),
 ]
 def lazy ((Name, Expr)) : return (Name + 'Lazy', '(' + Expr + ').lazy')
 
@@ -46,7 +47,9 @@ public let Prefix = [
   BenchmarkInfo(
     name: "Prefix${Name}",
     runFunction: run_Prefix${Name},
-    tags: [.validation, .api${', .Array' if Name == 'Array' else ''}]),
+    tags: [.validation, .api${
+    ', .Array],\n    setUpFunction: { blackHole(array) })' if 'Array' in Name else
+    '])' },
 % end
 ]
 

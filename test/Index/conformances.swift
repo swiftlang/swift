@@ -98,3 +98,37 @@ extension InheritingP { // CHECK: [[@LINE]]:11 | extension/ext-protocol/Swift | 
     // CHECK-NEXT: RelOver | instance-method/Swift | foo() | [[InheritingP_foo_USR]]
     // CHECK-NEXT: RelChild | extension/ext-protocol/Swift | InheritingP | [[InheritingP_USR]]
 }
+
+protocol WithAssocType {
+  associatedtype T // CHECK: [[@LINE]]:18 | type-alias/associated-type/Swift | T | [[WithAssocT_USR:.*]] | Def
+  func foo() -> T // CHECK: [[@LINE]]:17 | type-alias/associated-type/Swift | T | [[WithAssocT_USR]] | Ref
+}
+
+struct SAssocTypeAlias: WithAssocType {
+  typealias T = Int // CHECK: [[@LINE]]:13 | type-alias/Swift | T | [[SAssocT:.*]] | Def,RelChild,RelOver | rel: 2
+    // CHECK-NEXT: RelOver | type-alias/associated-type/Swift | T | [[WithAssocT_USR]]
+    // CHECK-NEXT: RelChild | struct/Swift | SAssocTypeAlias
+  func foo() -> T { return 0 } // CHECK: [[@LINE]]:17 | type-alias/Swift | T | [[SAssocT:.*]] | Ref
+}
+
+struct SAssocTypeInferred: WithAssocType {
+  func foo() -> Int { return 1 }
+  func bar() -> T { return 2 } // CHECK: [[@LINE]]:17 |  type-alias/associated-type/Swift | T | [[WithAssocT_USR]] | Ref
+}
+
+struct AssocViaExtension {
+  struct T {} // CHECK: [[@LINE]]:10 | struct/Swift | T | [[AssocViaExtensionT_USR:.*]] | Def
+  func foo() -> T { return T() }
+}
+
+extension AssocViaExtension: WithAssocType {} // CHECK: [[@LINE]]:11 | struct/Swift | T | [[AssocViaExtensionT_USR]] | Impl,RelOver,RelCont | rel: 2
+  // CHECK-NEXT: RelOver | type-alias/associated-type/Swift | T | [[WithAssocT_USR]]
+  // CHECK-NEXT: RelCont | extension/ext-struct/Swift | AssocViaExtension
+
+func returnOpaqueResultType() -> some BaseConfFromBase & P1 & WithAssocType {} // CHECK: [[@LINE]]:6 | function/Swift | returnOpaqueResultType() | s:14swift_ide_test22returnOpaqueResultTypeQryF | Def | rel: 0
+// CHECK: [[@LINE-1]]:39 | class/Swift | BaseConfFromBase | s:14swift_ide_test012BaseConfFromD0C | Ref,RelCont | rel: 1
+// CHECK-NEXT:   RelCont | function/Swift | returnOpaqueResultType() | s:14swift_ide_test22returnOpaqueResultTypeQryF
+// CHECK: [[@LINE-3]]:58 | protocol/Swift | P1 | s:14swift_ide_test2P1P | Ref,RelCont | rel: 1
+// CHECK-NEXT:   RelCont | function/Swift | returnOpaqueResultType() | s:14swift_ide_test22returnOpaqueResultTypeQryF
+// CHECK: [[@LINE-5]]:63 | protocol/Swift | WithAssocType | s:14swift_ide_test13WithAssocTypeP | Ref,RelCont | rel: 1
+// CHECK-NEXT:   RelCont | function/Swift | returnOpaqueResultType() | s:14swift_ide_test22returnOpaqueResultTypeQryF

@@ -1,15 +1,15 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-irgen-test-overlays
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t -I %S/../IDE/Inputs/custom-modules) %s -emit-ir | %FileCheck %s
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t -I %S/../IDE/Inputs/custom-modules) %s -emit-ir -O | %FileCheck %s -check-prefix=OPT
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t -I %S/../IDE/Inputs/custom-modules) %s -emit-ir | %FileCheck %s -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t -I %S/../IDE/Inputs/custom-modules) %s -emit-ir -O | %FileCheck %s -check-prefix=OPT -DINT=i%target-ptrsize
 import CoreFoundation
 import Foundation
 import Newtype
 
 // REQUIRES: objc_interop
 
-// Witness table for synthesized ClosedEnums : _ObjectiveCBridgeable.
-// CHECK: @"$sSo13SNTClosedEnumas21_ObjectiveCBridgeableSCWp" = linkonce_odr
+// Conformance descriptor for synthesized ClosedEnums : _ObjectiveCBridgeable.
+// CHECK: @"$sSo13SNTClosedEnumas21_ObjectiveCBridgeableSCMc" =
 
 // CHECK-LABEL: define swiftcc %TSo8NSStringC* @"$s7newtype14getErrorDomainSo08SNTErrorD0ayF"()
 public func getErrorDomain() -> ErrorDomain {
@@ -133,14 +133,22 @@ public func anchor() -> Bool {
 
 class ObjCTest {
   // CHECK-LABEL: define hidden %0* @"$s7newtype8ObjCTestC19optionalPassThroughySo14SNTErrorDomainaSgAGFTo"
-  // CHECK: [[CASTED:%.+]] = ptrtoint %0* %2 to i{{32|64}}
-  // CHECK: [[RESULT:%.+]] = call swiftcc i{{32|64}} @"$s7newtype8ObjCTestC19optionalPassThroughySo14SNTErrorDomainaSgAGF"(i{{32|64}} [[CASTED]], %T7newtype8ObjCTestC* swiftself {{%.+}})
-  // CHECK: [[OPAQUE_RESULT:%.+]] = inttoptr i{{32|64}} [[RESULT]] to %0*
+  // CHECK: [[CASTED:%.+]] = ptrtoint %0* %2 to [[INT]]
+  // CHECK: [[RESULT:%.+]] = call swiftcc [[INT]] @"$s7newtype8ObjCTestC19optionalPassThroughySo14SNTErrorDomainaSgAGF"([[INT]] [[CASTED]], %T7newtype8ObjCTestC* swiftself {{%.+}})
+  // CHECK: [[CAST_RESULT:%.+]] = inttoptr [[INT]] [[RESULT]] to i8*
+  // CHECK: [[AUTORELEASE_RESULT:%.+]] = {{(tail )?}}call i8* @llvm.objc.autoreleaseReturnValue(i8* [[CAST_RESULT]])
+  // CHECK: [[CAST_AUTORELEASE_RESULT:%.+]] = ptrtoint i8* [[AUTORELEASE_RESULT]] to [[INT]]
+  // CHECK: [[OPAQUE_RESULT:%.+]] = inttoptr [[INT]] [[CAST_AUTORELEASE_RESULT]] to %0*
   // CHECK: ret %0* [[OPAQUE_RESULT]]
   // CHECK: {{^}$}}
 
   // OPT-LABEL: define hidden %0* @"$s7newtype8ObjCTestC19optionalPassThroughySo14SNTErrorDomainaSgAGFTo"
-  // OPT: ret %0* %2
+  // OPT: [[ARG_CASTED:%.*]] = bitcast %0* %2 to %objc_object*
+  // OPT: [[ARG_RECASTED:%.*]] = bitcast %objc_object* [[ARG_CASTED]] to i8*
+  // OPT: [[ARG_CASTED2:%.*]] = bitcast %0* %2 to i8*
+  // OPT: tail call i8* @llvm.objc.retainAutoreleaseReturnValue(i8* [[ARG_RECASTED]])
+  // OPT: [[CAST_FOR_RETURN:%.*]] = bitcast i8* [[ARG_CASTED2]] to %0*
+  // OPT: ret %0* [[CAST_FOR_RETURN]]
   // OPT: {{^}$}}
   @objc func optionalPassThrough(_ ed: ErrorDomain?) -> ErrorDomain? {
     return ed

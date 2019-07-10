@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -enable-objc-interop -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-objc-interop -emit-ir %s | %FileCheck %s -check-prefix CHECK -check-prefix CHECK-%target-import-type
 
 // REQUIRES: CPU=x86_64
 
@@ -18,29 +18,31 @@ sil_vtable C {}
 // <rdar://14812566>: include _Tt prefix here
 //   CHECK: [[C_NAME:@.*]] = private unnamed_addr constant [13 x i8] c"_TtC5class1C\00"
 
-//   CHECK: @_DATA__TtC5class1C = private constant {{.*}} {
-// \ CHECK:   i32 128,
-// \ CHECK:   i32 16,
-// \ CHECK:   i32 16,
-// \ CHECK:   i32 0,
-// \ CHECK:   i8* null,
-// \ CHECK:   i8* getelementptr inbounds ([13 x i8], [13 x i8]* [[C_NAME]], i64 0, i64 0),
-// \ CHECK:   i8* null,
-// \ CHECK:   i8* null,
-// \ CHECK:   i8* null,
-// \ CHECK:   i8* null,
-// \ CHECK:   i8* null
-// \ CHECK: }
+// CHECK:      @_DATA__TtC5class1C = private constant {{.*}} {
+// CHECK-SAME:   i32 128,
+// CHECK-SAME:   i32 16,
+// CHECK-SAME:   i32 16,
+// CHECK-SAME:   i32 0,
+// CHECK-SAME:   i8* null,
+// CHECK-SAME:   i8* getelementptr inbounds ([13 x i8], [13 x i8]* [[C_NAME]], i64 0, i64 0),
+// CHECK-SAME:   i8* null,
+// CHECK-SAME:   i8* null,
+// CHECK-SAME:   i8* null,
+// CHECK-SAME:   i8* null,
+// CHECK-SAME:   i8* null
+// CHECK-SAME: }
 
-//   CHECK: @"$s5class1CCMf" = internal global <{ {{.*}} }> <{
-// \ CHECK:   void ([[C_CLASS]]*)* @"$s5class1CCfD",
-// \ CHECK:   i8** @"$sBoWV",
-// \ CHECK:   i64 ptrtoint ([[OBJCCLASS]]* @"$s5class1CCMm" to i64),
-// \ CHECK:   [[OBJCCLASS]]* @"OBJC_CLASS_$_{{(_TtCs12_)?}}SwiftObject",
-// \ CHECK:   [[OPAQUE]]* @_objc_empty_cache,
-// \ CHECK:   [[OPAQUE]]* null,
-// \ CHECK:   i64 add (i64 ptrtoint ({{.*}}* @_DATA__TtC5class1C to i64), i64 1)
-// \ CHECK: }>
+// CHECK:      @"$s5class1CCMf" = internal global <{ {{.*}} }> <{
+// CHECK-SAME:   void ([[C_CLASS]]*)* @"$s5class1CCfD",
+// CHECK-DIRECT-SAME:   i8** @"$sBoWV",
+// CHECK-INDIRECT-SAME:   i8** null,
+// CHECK-SAME:   i64 ptrtoint ([[OBJCCLASS]]* @"$s5class1CCMm" to i64),
+// CHECK-DIRECT-SAME:     [[OBJCCLASS]]* @"OBJC_CLASS_$_{{(_TtCs12_)?}}SwiftObject",
+// CHECK-INDIRECT-SAME:   %swift.type* null,
+// CHECK-SAME:   [[OPAQUE]]* @_objc_empty_cache,
+// CHECK-SAME:   [[OPAQUE]]* null,
+// CHECK-SAME:   i64 add (i64 ptrtoint ({{.*}}* @_DATA__TtC5class1C to i64), i64 [[IS_SWIFT_BIT:1|2]])
+// CHECK-SAME: }>
 
 // Destroying destructor
 // CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc [[REF]]* @"$s5class1CCfd"([[C_CLASS]]* swiftself) {{.*}} {
@@ -105,8 +107,8 @@ bb0(%0 : $@thick C.Type):
 }
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc %T5class1CC* @autorelease(%T5class1CC*) {{.*}} {
-// CHECK:         %1 = bitcast %T5class1CC* %0 to %objc_object*
-// CHECK:         call %objc_object* @objc_autorelease(%objc_object* %1)
+// CHECK:         %1 = bitcast %T5class1CC* %0 to i8*
+// CHECK:         call i8* @llvm.objc.autorelease(i8* %1)
 // CHECK:         ret %T5class1CC* %0
 sil @autorelease : $@convention(thin) (@owned C) -> C {
 entry(%c : $C):
@@ -115,8 +117,8 @@ entry(%c : $C):
 }
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i64 @autorelease_optional(i64) {{.*}} {
-// CHECK:         %1 = inttoptr i64 %0 to %objc_object*
-// CHECK:         call %objc_object* @objc_autorelease(%objc_object* %1)
+// CHECK:         %1 = inttoptr i64 %0 to i8*
+// CHECK:         call i8* @llvm.objc.autorelease(i8* %1)
 // CHECK:         ret i64 %0
 sil @autorelease_optional : $@convention(thin) (@owned C?) -> C? {
 entry(%c : $C?):

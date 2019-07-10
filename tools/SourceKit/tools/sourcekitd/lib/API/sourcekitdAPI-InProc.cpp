@@ -17,6 +17,7 @@
 #include "sourcekitd/DocSupportAnnotationArray.h"
 #include "sourcekitd/RawData.h"
 #include "sourcekitd/TokenAnnotationsArray.h"
+#include "sourcekitd/ExpressionTypeArray.h"
 #include "sourcekitd/Logging.h"
 #include "SourceKit/Core/LLVM.h"
 #include "SourceKit/Support/UIdent.h"
@@ -256,6 +257,7 @@ public:
       case CustomBufferKind::InheritedTypesArray:
       case CustomBufferKind::DocStructureElementArray:
       case CustomBufferKind::AttributesArray:
+      case CustomBufferKind::ExpressionTypeArray:
         return SOURCEKITD_VARIANT_TYPE_ARRAY;
       case CustomBufferKind::RawData:
         return SOURCEKITD_VARIANT_TYPE_DATA;
@@ -790,15 +792,15 @@ Optional<int64_t> RequestDict::getOptionalInt64(SourceKit::UIdent Key) {
 }
 
 sourcekitd_response_t
-sourcekitd::createErrorRequestInvalid(const char *Description) {
+sourcekitd::createErrorRequestInvalid(StringRef Description) {
   return retained(new SKDError(SOURCEKITD_ERROR_REQUEST_INVALID, 
-                               StringRef(Description)));
+                               Description));
 }
 
 sourcekitd_response_t
-sourcekitd::createErrorRequestFailed(const char *Description) {
+sourcekitd::createErrorRequestFailed(StringRef Description) {
   return retained(new SKDError(SOURCEKITD_ERROR_REQUEST_FAILED, 
-                      StringRef(Description)));
+                               Description));
 }
 
 sourcekitd_response_t
@@ -981,6 +983,9 @@ static sourcekitd_variant_t variantFromSKDObject(SKDObjectRef Object) {
           (uintptr_t)DataObject->getDataPtr(), 0 }};
       case CustomBufferKind::AttributesArray:
         return {{ (uintptr_t)getVariantFunctionsForAttributesArray(),
+          (uintptr_t)DataObject->getDataPtr(), 0 }};
+      case CustomBufferKind::ExpressionTypeArray:
+        return {{ (uintptr_t)getVariantFunctionsForExpressionTypeArray(),
           (uintptr_t)DataObject->getDataPtr(), 0 }};
       case CustomBufferKind::RawData:
         return {{ (uintptr_t)getVariantFunctionsForRawData(),

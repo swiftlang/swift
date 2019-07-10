@@ -120,6 +120,37 @@ Type swift::getMemberTypeForComparison(ASTContext &ctx, ValueDecl *member,
   return memberType;
 }
 
+static bool areAccessorsOverrideCompatible(AbstractStorageDecl *storage,
+                                           AbstractStorageDecl *parentStorage) {
+  // It's okay for the storage to disagree about whether to use a getter or
+  // a read accessor; we'll patch up any differences when setting overrides
+  // for the accessors.  We don't want to diagnose anything involving
+  // `@_borrowed` because it is not yet part of the language.
+
+  // All the other checks are for non-static storage only.
+  if (storage->isStatic())
+    return true;
+
+  // The storage must agree on whether reads are mutating.  For accessors,
+  // this is sufficient to imply that they use the same SelfAccessKind
+  // because we do not allow accessors to be consuming.
+  if (storage->isGetterMutating() != parentStorage->isGetterMutating())
+    return false;
+
+  // We allow covariance about whether the storage itself is mutable, so we
+  // can only check mutating-ness of setters if both have one.
+  if (storage->supportsMutation() && parentStorage->supportsMutation()) {
+    // The storage must agree on whether writes are mutating.
+    if (storage->isSetterMutating() != parentStorage->isSetterMutating())
+      return false;
+
+    // Those together should imply that read-write accesses have the same
+    // mutability.
+  }
+
+  return true;
+}
+
 bool swift::isOverrideBasedOnType(ValueDecl *decl, Type declTy,
                                   ValueDecl *parentDecl, Type parentDeclTy) {
   auto *genericSig =
@@ -149,6 +180,23 @@ bool swift::isOverrideBasedOnType(ValueDecl *decl, Type declTy,
     auto fnType2 = parentDeclTy->castTo<AnyFunctionType>();
     return AnyFunctionType::equalParams(fnType1->getParams(),
                                         fnType2->getParams());
+
+  // In a non-static protocol requirement, verify that the self access kind
+  // matches.
+  } else if (auto func = dyn_cast<FuncDecl>(decl)) {
+    // We only compare `isMutating()` rather than `getSelfAccessKind()`
+    // because we don't want to complain about `nonmutating` vs. `__consuming`
+    // conflicts at this time, especially since `__consuming` is not yet
+    // officially part of the language.
+    if (!func->isStatic() &&
+        func->isMutating() != cast<FuncDecl>(parentDecl)->isMutating())
+      return false;
+
+  // In abstract storage, verify that the accessor mutating-ness matches.
+  } else if (auto storage = dyn_cast<AbstractStorageDecl>(decl)) {
+    auto parentStorage = cast<AbstractStorageDecl>(parentDecl);
+    if (!areAccessorsOverrideCompatible(storage, parentStorage))
+      return false;
   }
 
   return canDeclTy == canParentDeclTy;
@@ -186,30 +234,21 @@ static bool areOverrideCompatibleSimple(ValueDecl *decl,
   if (parentDecl->isInvalid())
     return false;
 
-  if (auto func = dyn_cast<FuncDecl>(decl)) {
-    // Specific checking for methods.
-    auto parentFunc = cast<FuncDecl>(parentDecl);
-    if (func->isStatic() != parentFunc->isStatic())
-      return false;
-    if (func->isGeneric() != parentFunc->isGeneric())
-      return false;
-  } else if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
-    auto parentCtor = cast<ConstructorDecl>(parentDecl);
-    if (ctor->isGeneric() != parentCtor->isGeneric())
-      return false;
+  // If their staticness is different, they aren't compatible.
+  if (decl->isStatic() != parentDecl->isStatic())
+    return false;
 
-    // Factory initializers cannot be overridden.
-    if (parentCtor->isFactoryInit())
-      return false;
-  } else if (auto var = dyn_cast<VarDecl>(decl)) {
-    auto parentVar = cast<VarDecl>(parentDecl);
-    if (var->isStatic() != parentVar->isStatic())
-      return false;
-  } else if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
-    auto parentSubscript = cast<SubscriptDecl>(parentDecl);
-    if (subscript->isGeneric() != parentSubscript->isGeneric())
+  // If their genericity is different, they aren't compatible.
+  if (auto genDecl = decl->getAsGenericContext()) {
+    auto genParentDecl = parentDecl->getAsGenericContext();
+    if (genDecl->isGeneric() != genParentDecl->isGeneric())
       return false;
   }
+
+  // Factory initializers cannot be overridden.
+  if (auto parentCtor = dyn_cast<ConstructorDecl>(parentDecl))
+    if (parentCtor->isFactoryInit())
+      return false;
 
   return true;
 }
@@ -512,25 +551,37 @@ static bool parameterTypesMatch(const ValueDecl *derivedDecl,
                                                         /*derivedSubs=*/None);
 
   for (auto i : indices(baseParams->getArray())) {
-    auto baseItfTy = baseParams->get(i)->getInterfaceType();
-    auto baseParamTy =
-        baseDecl->getAsGenericContext()->mapTypeIntoContext(baseItfTy);
+    auto *baseParam = baseParams->get(i);
+    auto *derivedParam = derivedParams->get(i);
+
+    // Make sure inout-ness and varargs match.
+    if (baseParam->isInOut() != derivedParam->isInOut() ||
+        baseParam->isVariadic() != derivedParam->isVariadic()) {
+      return false;
+    }
+
+    auto baseParamTy = baseParam->getInterfaceType();
     baseParamTy = baseParamTy.subst(subs);
-    auto derivedParamTy = derivedParams->get(i)->getInterfaceType();
+    auto derivedParamTy = derivedParam->getInterfaceType();
 
-    // Attempt contravariant match.
-    if (baseParamTy->matchesParameter(derivedParamTy, matchMode))
-      continue;
-
-    // Try once more for a match, using the underlying type of an
-    // IUO if we're allowing that.
-    if (baseParams->get(i)
-            ->getAttrs()
-            .hasAttribute<ImplicitlyUnwrappedOptionalAttr>() &&
-        matchMode.contains(TypeMatchFlags::AllowNonOptionalForIUOParam)) {
-      baseParamTy = baseParamTy->getOptionalObjectType();
-      if (baseParamTy->matches(derivedParamTy, matchMode))
+    if (baseParam->isInOut() || baseParam->isVariadic()) {
+      // Inout and vararg parameters must match exactly.
+      if (baseParamTy->isEqual(derivedParamTy))
         continue;
+    } else {
+      // Attempt contravariant match.
+      if (baseParamTy->matchesParameter(derivedParamTy, matchMode))
+        continue;
+
+      // Try once more for a match, using the underlying type of an
+      // IUO if we're allowing that.
+      if (baseParam->getAttrs()
+              .hasAttribute<ImplicitlyUnwrappedOptionalAttr>() &&
+          matchMode.contains(TypeMatchFlags::AllowNonOptionalForIUOParam)) {
+        baseParamTy = baseParamTy->getOptionalObjectType();
+        if (baseParamTy->matches(derivedParamTy, matchMode))
+          continue;
+      }
     }
 
     // If there is no match, then we're done.
@@ -538,6 +589,22 @@ static bool parameterTypesMatch(const ValueDecl *derivedDecl,
   }
 
   return true;
+}
+
+/// Returns true if the given declaration is for the `NSObject.hashValue`
+/// property.
+static bool isNSObjectHashValue(ValueDecl *baseDecl) {
+  ASTContext &ctx = baseDecl->getASTContext();
+
+  if (auto baseVar = dyn_cast<VarDecl>(baseDecl)) {
+    if (auto classDecl = baseVar->getDeclContext()->getSelfClassDecl()) {
+      return baseVar->getName() == ctx.Id_hashValue &&
+        classDecl->getName().is("NSObject") &&
+        (classDecl->getModuleContext()->getName() == ctx.Id_Foundation ||
+         classDecl->getModuleContext()->getName() == ctx.Id_ObjectiveC);
+    }
+  }
+  return false;
 }
 
 namespace {
@@ -549,7 +616,7 @@ namespace {
 
     /// The set of declarations in which we'll look for overridden
     /// methods.
-    DirectlyReferencedTypeDecls superContexts;
+    SmallVector<NominalTypeDecl *, 2> superContexts;
 
     /// Cached member lookup results.
     SmallVector<ValueDecl *, 4> members;
@@ -759,6 +826,108 @@ SmallVector<OverrideMatch, 2> OverrideMatcher::match(
   return matches;
 }
 
+static void checkOverrideAccessControl(ValueDecl *baseDecl, ValueDecl *decl,
+                                       ASTContext &ctx) {
+  if (ctx.isAccessControlDisabled())
+    return;
+
+  if (isa<ProtocolDecl>(decl->getDeclContext()))
+    return;
+
+  auto &diags = ctx.Diags;
+
+  auto dc = decl->getDeclContext();
+  auto classDecl = dc->getSelfClassDecl();
+  assert(classDecl != nullptr && "Should have ruled out protocols above");
+
+  bool isAccessor = isa<AccessorDecl>(decl);
+
+  // Check that the override has the required access level.
+  // Overrides have to be at least as accessible as what they
+  // override, except:
+  //   - they don't have to be more accessible than their class and
+  //   - a final method may be public instead of open.
+  // Also diagnose attempts to override a non-open method from outside its
+  // defining module.  This is not required for constructors, which are
+  // never really "overridden" in the intended sense here, because of
+  // course derived classes will change how the class is initialized.
+  bool baseHasOpenAccess = baseDecl->hasOpenAccess(dc);
+  if (!isAccessor &&
+      !baseHasOpenAccess &&
+      baseDecl->getModuleContext() != decl->getModuleContext() &&
+      !isa<ConstructorDecl>(decl)) {
+    // NSObject.hashValue was made non-overridable in Swift 5; one should
+    // override NSObject.hash instead.
+    if (isNSObjectHashValue(baseDecl)) {
+      diags.diagnose(decl, diag::override_nsobject_hashvalue_error)
+        .fixItReplace(SourceRange(decl->getNameLoc()), "hash");
+    } else {
+      diags.diagnose(decl, diag::override_of_non_open,
+                     decl->getDescriptiveKind());
+    }
+  } else if (baseHasOpenAccess &&
+             classDecl->hasOpenAccess(dc) &&
+             decl->getFormalAccess() < AccessLevel::Public &&
+             !decl->isFinal()) {
+    {
+      auto diag = diags.diagnose(decl, diag::override_not_accessible,
+                                 /*setter*/false,
+                                 decl->getDescriptiveKind(),
+                                 /*fromOverridden*/true);
+      fixItAccess(diag, decl, AccessLevel::Open);
+    }
+    diags.diagnose(baseDecl, diag::overridden_here);
+
+  } else if (!isa<ConstructorDecl>(decl)) {
+    auto matchAccessScope =
+      baseDecl->getFormalAccessScope(dc);
+    auto classAccessScope =
+      classDecl->getFormalAccessScope(dc);
+    auto requiredAccessScope =
+      matchAccessScope.intersectWith(classAccessScope);
+    auto scopeDC = requiredAccessScope->getDeclContext();
+
+    bool shouldDiagnose = !decl->isAccessibleFrom(scopeDC);
+
+    bool shouldDiagnoseSetter = false;
+    if (!shouldDiagnose && baseDecl->isSettable(dc)){
+      auto matchASD = cast<AbstractStorageDecl>(baseDecl);
+      if (matchASD->isSetterAccessibleFrom(dc)) {
+        // Match sure we've created the setter.
+        if (!matchASD->getSetter())
+          maybeAddAccessorsToStorage(matchASD);
+
+        auto matchSetterAccessScope = matchASD->getSetter()
+          ->getFormalAccessScope(dc);
+        auto requiredSetterAccessScope =
+          matchSetterAccessScope.intersectWith(classAccessScope);
+        auto setterScopeDC = requiredSetterAccessScope->getDeclContext();
+
+        const auto *ASD = cast<AbstractStorageDecl>(decl);
+        shouldDiagnoseSetter =
+            ASD->isSettable(setterScopeDC) &&
+            !ASD->isSetterAccessibleFrom(setterScopeDC);
+      }
+    }
+
+    if (shouldDiagnose || shouldDiagnoseSetter) {
+      bool overriddenForcesAccess =
+        (requiredAccessScope->hasEqualDeclContextWith(matchAccessScope) &&
+         !baseHasOpenAccess);
+      AccessLevel requiredAccess =
+        requiredAccessScope->requiredAccessForDiagnostics();
+      {
+        auto diag = diags.diagnose(decl, diag::override_not_accessible,
+                                   shouldDiagnoseSetter,
+                                   decl->getDescriptiveKind(),
+                                   overriddenForcesAccess);
+        fixItAccess(diag, decl, requiredAccess, shouldDiagnoseSetter);
+      }
+      diags.diagnose(baseDecl, diag::overridden_here);
+    }
+  }
+}
+
 bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
                                     OverrideCheckingAttempt attempt) {
   auto &diags = ctx.Diags;
@@ -809,91 +978,7 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
     diags.diagnose(baseDecl, diag::overridden_here);
   }
 
-  bool isAccessor = isa<AccessorDecl>(decl);
-
-  // Check that the override has the required access level.
-  // Overrides have to be at least as accessible as what they
-  // override, except:
-  //   - they don't have to be more accessible than their class and
-  //   - a final method may be public instead of open.
-  // Also diagnose attempts to override a non-open method from outside its
-  // defining module.  This is not required for constructors, which are
-  // never really "overridden" in the intended sense here, because of
-  // course derived classes will change how the class is initialized.
-  bool baseHasOpenAccess = baseDecl->hasOpenAccess(dc);
-  if (!isAccessor &&
-      !baseHasOpenAccess &&
-      baseDecl->getModuleContext() != decl->getModuleContext() &&
-      !isa<ConstructorDecl>(decl) &&
-      !isa<ProtocolDecl>(decl->getDeclContext())) {
-    diags.diagnose(decl, diag::override_of_non_open,
-                   decl->getDescriptiveKind());
-
-  } else if (baseHasOpenAccess &&
-             classDecl->hasOpenAccess(dc) &&
-             decl->getFormalAccess() != AccessLevel::Open &&
-             !decl->isFinal()) {
-    {
-      auto diag = diags.diagnose(decl, diag::override_not_accessible,
-                                 /*setter*/false,
-                                 decl->getDescriptiveKind(),
-                                 /*fromOverridden*/true);
-      fixItAccess(diag, decl, AccessLevel::Open);
-    }
-    diags.diagnose(baseDecl, diag::overridden_here);
-
-  } else if (!isa<ConstructorDecl>(decl) &&
-             !isa<ProtocolDecl>(decl->getDeclContext())) {
-    auto matchAccessScope =
-      baseDecl->getFormalAccessScope(dc);
-    auto classAccessScope =
-      classDecl->getFormalAccessScope(dc);
-    auto requiredAccessScope =
-      matchAccessScope.intersectWith(classAccessScope);
-    auto scopeDC = requiredAccessScope->getDeclContext();
-
-    bool shouldDiagnose = !decl->isAccessibleFrom(scopeDC);
-
-    bool shouldDiagnoseSetter = false;
-    if (!shouldDiagnose && baseDecl->isSettable(dc)){
-      auto matchASD = cast<AbstractStorageDecl>(baseDecl);
-      if (matchASD->isSetterAccessibleFrom(dc)) {
-        // Match sure we've created the setter.
-        if (!matchASD->getSetter()) {
-          maybeAddAccessorsToStorage(
-                           *static_cast<TypeChecker *>(ctx.getLazyResolver()),
-                           matchASD);
-        }
-
-        auto matchSetterAccessScope = matchASD->getSetter()
-          ->getFormalAccessScope(dc);
-        auto requiredSetterAccessScope =
-          matchSetterAccessScope.intersectWith(classAccessScope);
-        auto setterScopeDC = requiredSetterAccessScope->getDeclContext();
-
-        const auto *ASD = cast<AbstractStorageDecl>(decl);
-        shouldDiagnoseSetter =
-            ASD->isSettable(setterScopeDC) &&
-            !ASD->isSetterAccessibleFrom(setterScopeDC);
-      }
-    }
-
-    if (shouldDiagnose || shouldDiagnoseSetter) {
-      bool overriddenForcesAccess =
-        (requiredAccessScope->hasEqualDeclContextWith(matchAccessScope) &&
-         !baseHasOpenAccess);
-      AccessLevel requiredAccess =
-        requiredAccessScope->requiredAccessForDiagnostics();
-      {
-        auto diag = diags.diagnose(decl, diag::override_not_accessible,
-                                   shouldDiagnoseSetter,
-                                   decl->getDescriptiveKind(),
-                                   overriddenForcesAccess);
-        fixItAccess(diag, decl, requiredAccess, shouldDiagnoseSetter);
-      }
-      diags.diagnose(baseDecl, diag::overridden_here);
-    }
-  }
+  checkOverrideAccessControl(baseDecl, decl, ctx);
 
   bool mayHaveMismatchedOptionals =
       (attempt == OverrideCheckingAttempt::MismatchedOptional ||
@@ -1164,11 +1249,15 @@ namespace  {
 #define UNINTERESTING_ATTR(CLASS)                                              \
     void visit##CLASS##Attr(CLASS##Attr *) {}
 
+    // Please keep these alphabetical.
     UNINTERESTING_ATTR(AccessControl)
     UNINTERESTING_ATTR(Alignment)
+    UNINTERESTING_ATTR(AlwaysEmitIntoClient)
+    UNINTERESTING_ATTR(Borrowed)
     UNINTERESTING_ATTR(CDecl)
     UNINTERESTING_ATTR(Consuming)
     UNINTERESTING_ATTR(Dynamic)
+    UNINTERESTING_ATTR(DynamicCallable)
     UNINTERESTING_ATTR(DynamicMemberLookup)
     UNINTERESTING_ATTR(SILGenName)
     UNINTERESTING_ATTR(Exported)
@@ -1178,6 +1267,7 @@ namespace  {
     UNINTERESTING_ATTR(IBDesignable)
     UNINTERESTING_ATTR(IBInspectable)
     UNINTERESTING_ATTR(IBOutlet)
+    UNINTERESTING_ATTR(IBSegueAction)
     UNINTERESTING_ATTR(Indirect)
     UNINTERESTING_ATTR(Inline)
     UNINTERESTING_ATTR(Optimize)
@@ -1191,7 +1281,6 @@ namespace  {
     UNINTERESTING_ATTR(NonMutating)
     UNINTERESTING_ATTR(NonObjC)
     UNINTERESTING_ATTR(NonOverride)
-    UNINTERESTING_ATTR(NoReturn)
     UNINTERESTING_ATTR(NSApplicationMain)
     UNINTERESTING_ATTR(NSCopying)
     UNINTERESTING_ATTR(NSManaged)
@@ -1203,6 +1292,7 @@ namespace  {
     UNINTERESTING_ATTR(Convenience)
     UNINTERESTING_ATTR(Semantics)
     UNINTERESTING_ATTR(SetterAccess)
+    UNINTERESTING_ATTR(HasStorage)
     UNINTERESTING_ATTR(UIApplicationMain)
     UNINTERESTING_ATTR(UsableFromInline)
     UNINTERESTING_ATTR(ObjCNonLazyRealization)
@@ -1210,6 +1300,8 @@ namespace  {
     UNINTERESTING_ATTR(SwiftNativeObjCRuntimeBase)
     UNINTERESTING_ATTR(ShowInInterface)
     UNINTERESTING_ATTR(Specialize)
+    UNINTERESTING_ATTR(DynamicReplacement)
+    UNINTERESTING_ATTR(PrivateImport)
 
     // These can't appear on overridable declarations.
     UNINTERESTING_ATTR(Prefix)
@@ -1220,7 +1312,6 @@ namespace  {
     UNINTERESTING_ATTR(SynthesizedProtocol)
     UNINTERESTING_ATTR(RequiresStoredPropertyInits)
     UNINTERESTING_ATTR(Transparent)
-    UNINTERESTING_ATTR(SILStored)
     UNINTERESTING_ATTR(Testable)
 
     UNINTERESTING_ATTR(WarnUnqualifiedAccess)
@@ -1236,6 +1327,12 @@ namespace  {
     UNINTERESTING_ATTR(WeakLinked)
     UNINTERESTING_ATTR(Frozen)
     UNINTERESTING_ATTR(HasInitialValue)
+    UNINTERESTING_ATTR(ImplementationOnly)
+    UNINTERESTING_ATTR(Custom)
+    UNINTERESTING_ATTR(PropertyWrapper)
+    UNINTERESTING_ATTR(DisfavoredOverload)
+    UNINTERESTING_ATTR(FunctionBuilder)
+    UNINTERESTING_ATTR(ProjectedValueProperty)
 #undef UNINTERESTING_ATTR
 
     void visitAvailableAttr(AvailableAttr *attr) {
@@ -1314,7 +1411,7 @@ OverrideRequiresKeyword swift::overrideRequiresKeyword(ValueDecl *overridden) {
   return OverrideRequiresKeyword::Always;
 }
 
-/// \brief Returns true if the availability of the overriding declaration
+/// Returns true if the availability of the overriding declaration
 /// makes it a safe override, given the availability of the base declaration.
 static bool isAvailabilitySafeForOverride(ValueDecl *override,
                                           ValueDecl *base) {
@@ -1465,7 +1562,7 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     // read-only.  Observing properties look at change, read-only properties
     // have nothing to observe!
     bool baseIsSettable = baseASD->isSettable(baseASD->getDeclContext());
-    if (baseIsSettable && ctx.LangOpts.EnableAccessControl) {
+    if (baseIsSettable) {
       baseIsSettable =
          baseASD->isSetterAccessibleFrom(overrideASD->getDeclContext());
     }
@@ -1509,12 +1606,19 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
   // Non-Objective-C declarations in extensions cannot override or
   // be overridden.
   if (!isAccessor &&
-      (base->getDeclContext()->isExtensionContext() ||
-       override->getDeclContext()->isExtensionContext()) &&
+      (isa<ExtensionDecl>(base->getDeclContext()) ||
+       isa<ExtensionDecl>(override->getDeclContext())) &&
       !base->isObjC()) {
+    // Suppress this diagnostic for overrides of a non-open NSObject.hashValue
+    // property; these are diagnosed elsewhere. An error message complaining
+    // about extensions would be misleading in this case; the correct fix is to
+    // override NSObject.hash instead.
+    if (isNSObjectHashValue(base) && 
+        !base->hasOpenAccess(override->getDeclContext()))
+      return true;
     bool baseCanBeObjC = canBeRepresentedInObjC(base);
     diags.diagnose(override, diag::override_decl_extension, baseCanBeObjC,
-                   !base->getDeclContext()->isExtensionContext());
+                   !isa<ExtensionDecl>(base->getDeclContext()));
     if (baseCanBeObjC) {
       SourceLoc insertionLoc =
         override->getAttributeInsertionLoc(/*forModifier=*/false);
@@ -1533,18 +1637,19 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
       overrideRequiresKeyword(base) != OverrideRequiresKeyword::Never &&
       !override->isImplicit() &&
       override->getDeclContext()->getParentSourceFile()) {
-    // FIXME: rdar://16320042 - For properties, we don't have a useful
-    // location for the 'var' token.  Instead of emitting a bogus fixit, only
-    // emit the fixit for 'func's.
     auto theDiag =
       overrideRequiresKeyword(base) == OverrideRequiresKeyword::Always
         ? diag::missing_override
         : diag::missing_override_warn;
-    if (!isa<VarDecl>(override))
-      diags.diagnose(override, theDiag)
-          .fixItInsert(override->getStartLoc(), "override ");
-    else
-      diags.diagnose(override, theDiag);
+
+    auto diagLoc = override->getStartLoc();
+    // If dynamic cast to VarDecl succeeds, use the location of its parent
+    // pattern binding which will return the VarLoc.
+    if (auto VD = dyn_cast<VarDecl>(override)) {
+      diagLoc = VD->getParentPatternBinding()->getLoc();
+    }
+
+    diags.diagnose(override, theDiag).fixItInsert(diagLoc, "override ");
     diags.diagnose(base, diag::overridden_here);
   }
 
@@ -1557,12 +1662,9 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
   if (auto *baseDecl = dyn_cast<ClassDecl>(base->getDeclContext())) {
     if (!isAccessor &&
         baseDecl->hasKnownSwiftImplementation() &&
-        !base->isDynamic() &&
-        override->getDeclContext()->isExtensionContext()) {
-      // For compatibility, only generate a warning in Swift 3
-      diags.diagnose(override, (ctx.isSwiftVersion3()
-        ? diag::override_class_declaration_in_extension_warning
-        : diag::override_class_declaration_in_extension));
+        !base->isObjCDynamic() &&
+        isa<ExtensionDecl>(override->getDeclContext())) {
+      diags.diagnose(override, diag::override_class_declaration_in_extension);
       diags.diagnose(base, diag::overridden_here);
     }
   }
@@ -1591,6 +1693,7 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     switch (baseKind) {
     case DescriptiveDeclKind::StaticProperty:
     case DescriptiveDeclKind::StaticMethod:
+    case DescriptiveDeclKind::StaticSubscript:
       override->diagnose(diag::override_static, baseKind);
       break;
     default:
@@ -1615,15 +1718,12 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
 
   // Overrides of NSObject.hashValue are deprecated; one should override
   // NSObject.hash instead.
-  if (auto baseVar = dyn_cast<VarDecl>(base)) {
-    if (auto classDecl = baseVar->getDeclContext()->getSelfClassDecl()) {
-      if (baseVar->getName() == ctx.Id_hashValue &&
-          classDecl->getName().is("NSObject") &&
-          (classDecl->getModuleContext()->getName() == ctx.Id_Foundation ||
-           classDecl->getModuleContext()->getName() == ctx.Id_ObjectiveC)) {
-        override->diagnose(diag::override_nsobject_hashvalue);
-      }
-    }
+  // FIXME: Remove this when NSObject.hashValue becomes non-open in
+  // swift-corelibs-foundation.
+  if (isNSObjectHashValue(base) &&
+      base->hasOpenAccess(override->getDeclContext())) {
+    override->diagnose(diag::override_nsobject_hashvalue_warning)
+      .fixItReplace(SourceRange(override->getNameLoc()), "hash");
   }
 
   /// Check attributes associated with the base; some may need to merged with
@@ -1758,13 +1858,9 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
 
     // Check the various overridden storage declarations.
     SmallVector<OverrideMatch, 2> matches;
-    ASTContext &ctx = decl->getASTContext();
     for (auto overridden : overridingASD->getOverriddenDecls()) {
       auto baseASD = cast<AbstractStorageDecl>(overridden);
-      if (auto lazyResolver = ctx.getLazyResolver()) {
-        maybeAddAccessorsToStorage(*static_cast<TypeChecker *>(lazyResolver),
-                                   baseASD);
-      }
+      maybeAddAccessorsToStorage(baseASD);
 
       auto kind = accessor->getAccessorKind();
 
@@ -1777,21 +1873,15 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
       auto baseAccessor = baseASD->getAccessor(kind);
       if (!baseAccessor) continue;
 
-      switch (kind) {
-      case AccessorKind::Read:
-        if (baseASD->getReadCoroutine()->hasForcedStaticDispatch())
-          continue;
-        LLVM_FALLTHROUGH;
+      if (baseAccessor->hasForcedStaticDispatch())
+        continue;
 
+      switch (kind) {
       case AccessorKind::Get:
+      case AccessorKind::Read:
         break;
 
       case AccessorKind::Modify:
-        if (baseASD->getModifyCoroutine()->hasForcedStaticDispatch())
-          continue;
-
-        LLVM_FALLTHROUGH;
-
       case AccessorKind::Set:
         // For setter accessors, we need the base's setter to be
         // accessible from the overriding context, or it's not an override.

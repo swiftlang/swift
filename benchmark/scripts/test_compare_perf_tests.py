@@ -35,15 +35,15 @@ from test_utils import captured_output
 class TestSample(unittest.TestCase):
     def test_has_named_fields(self):
         s = Sample(1, 2, 3)
-        self.assertEquals(s.i, 1)
-        self.assertEquals(s.num_iters, 2)
-        self.assertEquals(s.runtime, 3)
+        self.assertEqual(s.i, 1)
+        self.assertEqual(s.num_iters, 2)
+        self.assertEqual(s.runtime, 3)
 
     def test_is_iterable(self):
         s = Sample(1, 2, 3)
-        self.assertEquals(s[0], 1)
-        self.assertEquals(s[1], 2)
-        self.assertEquals(s[2], 3)
+        self.assertEqual(s[0], 1)
+        self.assertEqual(s[1], 2)
+        self.assertEqual(s[2], 3)
 
 
 class TestPerformanceTestSamples(unittest.TestCase):
@@ -52,34 +52,34 @@ class TestPerformanceTestSamples(unittest.TestCase):
         self.samples.add(Sample(7, 42, 1000))
 
     def test_has_name(self):
-        self.assertEquals(self.samples.name, 'B1')
+        self.assertEqual(self.samples.name, 'B1')
 
     def test_stores_samples(self):
-        self.assertEquals(self.samples.count, 1)
+        self.assertEqual(self.samples.count, 1)
         s = self.samples.samples[0]
         self.assertTrue(isinstance(s, Sample))
-        self.assertEquals(s.i, 7)
-        self.assertEquals(s.num_iters, 42)
-        self.assertEquals(s.runtime, 1000)
+        self.assertEqual(s.i, 7)
+        self.assertEqual(s.num_iters, 42)
+        self.assertEqual(s.runtime, 1000)
 
     def test_quantile(self):
-        self.assertEquals(self.samples.quantile(1), 1000)
-        self.assertEquals(self.samples.quantile(0), 1000)
+        self.assertEqual(self.samples.quantile(1), 1000)
+        self.assertEqual(self.samples.quantile(0), 1000)
         self.samples.add(Sample(2, 1, 1100))
-        self.assertEquals(self.samples.quantile(0), 1000)
-        self.assertEquals(self.samples.quantile(1), 1100)
+        self.assertEqual(self.samples.quantile(0), 1000)
+        self.assertEqual(self.samples.quantile(1), 1100)
         self.samples.add(Sample(3, 1, 1050))
-        self.assertEquals(self.samples.quantile(0), 1000)
-        self.assertEquals(self.samples.quantile(.5), 1050)
-        self.assertEquals(self.samples.quantile(1), 1100)
+        self.assertEqual(self.samples.quantile(0), 1000)
+        self.assertEqual(self.samples.quantile(.5), 1050)
+        self.assertEqual(self.samples.quantile(1), 1100)
 
     def assertEqualFiveNumberSummary(self, ss, expected_fns):
         e_min, e_q1, e_median, e_q3, e_max = expected_fns
-        self.assertEquals(ss.min, e_min)
-        self.assertEquals(ss.q1, e_q1)
-        self.assertEquals(ss.median, e_median)
-        self.assertEquals(ss.q3, e_q3)
-        self.assertEquals(ss.max, e_max)
+        self.assertEqual(ss.min, e_min)
+        self.assertEqual(ss.q1, e_q1)
+        self.assertEqual(ss.median, e_median)
+        self.assertEqual(ss.q3, e_q3)
+        self.assertEqual(ss.max, e_max)
 
     def test_computes_five_number_summary(self):
         self.assertEqualFiveNumberSummary(
@@ -98,38 +98,38 @@ class TestPerformanceTestSamples(unittest.TestCase):
             self.samples, (1000, 1025, 1050, 1075, 1100))
 
     def test_computes_inter_quartile_range(self):
-        self.assertEquals(self.samples.iqr, 0)
+        self.assertEqual(self.samples.iqr, 0)
         self.samples.add(Sample(2, 1, 1025))
         self.samples.add(Sample(3, 1, 1050))
         self.samples.add(Sample(4, 1, 1075))
         self.samples.add(Sample(5, 1, 1100))
-        self.assertEquals(self.samples.iqr, 50)
+        self.assertEqual(self.samples.iqr, 50)
 
-    def assertEqualStats(self, stats, expected_stats):
+    def assertEqualtats(self, stats, expected_stats):
         for actual, expected in zip(stats, expected_stats):
             self.assertAlmostEquals(actual, expected, places=2)
 
     def test_computes_mean_sd_cv(self):
         ss = self.samples
-        self.assertEqualStats(
+        self.assertEqualtats(
             (ss.mean, ss.sd, ss.cv), (1000.0, 0.0, 0.0))
         self.samples.add(Sample(2, 1, 1100))
-        self.assertEqualStats(
+        self.assertEqualtats(
             (ss.mean, ss.sd, ss.cv), (1050.0, 70.71, 6.7 / 100))
 
     def test_computes_range_spread(self):
         ss = self.samples
-        self.assertEqualStats(
+        self.assertEqualtats(
             (ss.range, ss.spread), (0, 0))
         self.samples.add(Sample(2, 1, 1100))
-        self.assertEqualStats(
+        self.assertEqualtats(
             (ss.range, ss.spread), (100, 10.0 / 100))
 
     def test_init_with_samples(self):
         self.samples = PerformanceTestSamples(
             'B2', [Sample(0, 1, 1000), Sample(1, 1, 1100)])
-        self.assertEquals(self.samples.count, 2)
-        self.assertEqualStats(
+        self.assertEqual(self.samples.count, 2)
+        self.assertEqualtats(
             (self.samples.mean, self.samples.sd,
              self.samples.range, self.samples.spread),
             (1050.0, 70.71, 100, 9.52 / 100))
@@ -138,7 +138,7 @@ class TestPerformanceTestSamples(unittest.TestCase):
         # guard against dividing by 0
         self.samples = PerformanceTestSamples('Zero')
         self.samples.add(Sample(0, 1, 0))
-        self.assertEqualStats(
+        self.assertEqualtats(
             (self.samples.mean, self.samples.sd, self.samples.cv,
              self.samples.range, self.samples.spread),
             (0, 0, 0.0, 0, 0.0))
@@ -149,17 +149,17 @@ class TestPerformanceTestSamples(unittest.TestCase):
               '5 1 1000, 6 1 1025, 7 1 1050, 8 1 1075, 9 1 1100, '
               '10 1 1050, 11 1 949, 12 1 1151'.split(',')]
         self.samples = PerformanceTestSamples('Outliers', ss)
-        self.assertEquals(self.samples.count, 13)
-        self.assertEqualStats(
+        self.assertEqual(self.samples.count, 13)
+        self.assertEqualtats(
             (self.samples.mean, self.samples.sd), (1050, 52.36))
 
         self.samples.exclude_outliers()
 
-        self.assertEquals(self.samples.count, 11)
-        self.assertEquals(self.samples.outliers, ss[11:])
+        self.assertEqual(self.samples.count, 11)
+        self.assertEqual(self.samples.outliers, ss[11:])
         self.assertEqualFiveNumberSummary(
             self.samples, (1000, 1025, 1050, 1075, 1100))
-        self.assertEqualStats(
+        self.assertEqualtats(
             (self.samples.mean, self.samples.sd), (1050, 35.36))
 
     def test_excludes_outliers_zero_IQR(self):
@@ -168,12 +168,12 @@ class TestPerformanceTestSamples(unittest.TestCase):
         self.samples.add(Sample(1, 2, 18))
         self.samples.add(Sample(2, 2, 18))
         self.samples.add(Sample(3, 2, 18))
-        self.assertEquals(self.samples.iqr, 0)
+        self.assertEqual(self.samples.iqr, 0)
 
         self.samples.exclude_outliers()
 
-        self.assertEquals(self.samples.count, 3)
-        self.assertEqualStats(
+        self.assertEqual(self.samples.count, 3)
+        self.assertEqualtats(
             (self.samples.min, self.samples.max), (18, 18))
 
     def test_excludes_outliers_top_only(self):
@@ -181,62 +181,169 @@ class TestPerformanceTestSamples(unittest.TestCase):
               '0 1 1, 1 1 2, 2 1 2, 3 1 2, 4 1 3'.split(',')]
         self.samples = PerformanceTestSamples('Top', ss)
         self.assertEqualFiveNumberSummary(self.samples, (1, 2, 2, 2, 3))
-        self.assertEquals(self.samples.iqr, 0)
+        self.assertEqual(self.samples.iqr, 0)
 
         self.samples.exclude_outliers(top_only=True)
 
-        self.assertEquals(self.samples.count, 4)
-        self.assertEqualStats((self.samples.min, self.samples.max), (1, 2))
+        self.assertEqual(self.samples.count, 4)
+        self.assertEqualtats((self.samples.min, self.samples.max), (1, 2))
 
 
 class TestPerformanceTestResult(unittest.TestCase):
     def test_init(self):
         log_line = '1,AngryPhonebook,20,10664,12933,11035,576,10884'
         r = PerformanceTestResult(log_line.split(','))
-        self.assertEquals(r.test_num, '1')
-        self.assertEquals(r.name, 'AngryPhonebook')
-        self.assertEquals(
+        self.assertEqual(r.test_num, '1')
+        self.assertEqual(r.name, 'AngryPhonebook')
+        self.assertEqual(
             (r.num_samples, r.min, r.max, r.mean, r.sd, r.median),
             (20, 10664, 12933, 11035, 576, 10884))
-        self.assertEquals(r.samples, None)
+        self.assertEqual(r.samples, None)
 
         log_line = '1,AngryPhonebook,1,12045,12045,12045,0,12045,10510336'
         r = PerformanceTestResult(log_line.split(','))
-        self.assertEquals(r.max_rss, 10510336)
+        self.assertEqual(r.max_rss, 10510336)
+
+    def test_init_quantiles(self):
+        # #,TEST,SAMPLES,MIN(μs),MEDIAN(μs),MAX(μs)
+        log = '1,Ackermann,3,54383,54512,54601'
+        r = PerformanceTestResult(log.split(','), quantiles=True)
+        self.assertEqual(r.test_num, '1')
+        self.assertEqual(r.name, 'Ackermann')
+        self.assertEqual((r.num_samples, r.min, r.median, r.max),
+                         (3, 54383, 54512, 54601))
+        self.assertAlmostEquals(r.mean, 54498.67, places=2)
+        self.assertAlmostEquals(r.sd, 109.61, places=2)
+        self.assertEqual(r.samples.count, 3)
+        self.assertEqual(r.samples.num_samples, 3)
+        self.assertEqual([s.runtime for s in r.samples.all_samples],
+                         [54383, 54512, 54601])
+
+        # #,TEST,SAMPLES,MIN(μs),MEDIAN(μs),MAX(μs),MAX_RSS(B)
+        log = '1,Ackermann,3,54529,54760,55807,266240'
+        r = PerformanceTestResult(log.split(','), quantiles=True, memory=True)
+        self.assertEqual((r.samples.count, r.max_rss), (3, 266240))
+        # #,TEST,SAMPLES,MIN(μs),Q1(μs),Q2(μs),Q3(μs),MAX(μs)
+        log = '1,Ackermann,5,54570,54593,54644,57212,58304'
+        r = PerformanceTestResult(log.split(','), quantiles=True, memory=False)
+        self.assertEqual((r.num_samples, r.min, r.median, r.max),
+                         (5, 54570, 54644, 58304))
+        self.assertEqual((r.samples.q1, r.samples.q3), (54593, 57212))
+        self.assertEqual(r.samples.count, 5)
+        # #,TEST,SAMPLES,MIN(μs),Q1(μs),Q2(μs),Q3(μs),MAX(μs),MAX_RSS(B)
+        log = '1,Ackermann,5,54686,54731,54774,55030,63466,270336'
+        r = PerformanceTestResult(log.split(','), quantiles=True, memory=True)
+        self.assertEqual(r.samples.num_samples, 5)
+        self.assertEqual(r.samples.count, 4)  # outlier was excluded
+        self.assertEqual(r.max_rss, 270336)
+
+    def test_init_delta_quantiles(self):
+        # #,TEST,SAMPLES,MIN(μs),𝚫MEDIAN,𝚫MAX
+        # 2-quantile from 2 samples in repeated min, when delta encoded,
+        # the difference is 0, which is ommited -- only separator remains
+        log = '202,DropWhileArray,2,265,,22'
+        r = PerformanceTestResult(log.split(','), quantiles=True, delta=True)
+        self.assertEqual((r.num_samples, r.min, r.median, r.max),
+                         (2, 265, 265, 287))
+        self.assertEqual(r.samples.count, 2)
+        self.assertEqual(r.samples.num_samples, 2)
+
+    def test_init_oversampled_quantiles(self):
+        """When num_samples is < quantile + 1, some of the measurements are
+        repeated in the report summary. Samples should contain only true
+        values, discarding the repetated artifacts from quantile estimation.
+
+        The test string is slightly massaged output of the following R script:
+        subsample <- function(x, q) {
+          quantile(1:x, probs=((0:(q-1))/(q-1)), type=1)}
+        tbl <- function(s) t(sapply(1:s, function(x) {
+          qs <- subsample(x, s); c(qs[1], diff(qs)) }))
+        sapply(c(3, 5, 11, 21), tbl)
+        """
+        def validatePTR(deq):  # construct from delta encoded quantiles string
+            deq = deq.split(',')
+            num_samples = deq.count('1')
+            r = PerformanceTestResult(['0', 'B', str(num_samples)] + deq,
+                                      quantiles=True, delta=True)
+            self.assertEqual(r.samples.num_samples, num_samples)
+            self.assertEqual([s.runtime for s in r.samples.all_samples],
+                             range(1, num_samples + 1))
+
+        delta_encoded_quantiles = """
+1,,
+1,,1
+1,,,,
+1,,,1,
+1,,1,1,
+1,,1,1,1
+1,,,,,,,,,,
+1,,,,,,1,,,,
+1,,,,1,,,1,,,
+1,,,1,,,1,,1,,
+1,,,1,,1,,1,,1,
+1,,1,,1,,1,1,,1,
+1,,1,1,,1,1,,1,1,
+1,,1,1,1,,1,1,1,1,
+1,,1,1,1,1,1,1,1,1,
+1,,1,1,1,1,1,1,1,1,1
+1,,,,,,,,,,,,,,,,,,,,
+1,,,,,,,,,,,1,,,,,,,,,
+1,,,,,,,1,,,,,,,1,,,,,,
+1,,,,,,1,,,,,1,,,,,1,,,,
+1,,,,,1,,,,1,,,,1,,,,1,,,
+1,,,,1,,,1,,,,1,,,1,,,1,,,
+1,,,1,,,1,,,1,,,1,,,1,,,1,,
+1,,,1,,,1,,1,,,1,,1,,,1,,1,,
+1,,,1,,1,,1,,1,,,1,,1,,1,,1,,
+1,,,1,,1,,1,,1,,1,,1,,1,,1,,1,
+1,,1,,1,,1,,1,,1,1,,1,,1,,1,,1,
+1,,1,,1,,1,1,,1,,1,1,,1,,1,1,,1,
+1,,1,,1,1,,1,1,,1,1,,1,1,,1,1,,1,
+1,,1,1,,1,1,,1,1,,1,1,1,,1,1,,1,1,
+1,,1,1,,1,1,1,,1,1,1,,1,1,1,,1,1,1,
+1,,1,1,1,,1,1,1,1,,1,1,1,1,,1,1,1,1,
+1,,1,1,1,1,1,,1,1,1,1,1,1,,1,1,1,1,1,
+1,,1,1,1,1,1,1,1,1,,1,1,1,1,1,1,1,1,1,
+1,,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+1,,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1"""
+        map(validatePTR, delta_encoded_quantiles.split('\n')[1:])
 
     def test_repr(self):
         log_line = '1,AngryPhonebook,20,10664,12933,11035,576,10884'
         r = PerformanceTestResult(log_line.split(','))
-        self.assertEquals(
+        self.assertEqual(
             str(r),
             '<PerformanceTestResult name:\'AngryPhonebook\' samples:20 '
             'min:10664 max:12933 mean:11035 sd:576 median:10884>'
         )
 
     def test_merge(self):
-        tests = """1,AngryPhonebook,1,12045,12045,12045,0,12045,10510336
+        tests = """
+1,AngryPhonebook,1,12045,12045,12045,0,12045
 1,AngryPhonebook,1,12325,12325,12325,0,12325,10510336
 1,AngryPhonebook,1,11616,11616,11616,0,11616,10502144
-1,AngryPhonebook,1,12270,12270,12270,0,12270,10498048""".split('\n')
+1,AngryPhonebook,1,12270,12270,12270,0,12270,10498048""".split('\n')[1:]
         results = map(PerformanceTestResult,
                       [line.split(',') for line in tests])
+        results[2].setup = 9
+        results[3].setup = 7
 
         def as_tuple(r):
             return (r.num_samples, r.min, r.max, round(r.mean, 2),
-                    r.sd, r.median, r.max_rss)
+                    r.sd, r.median, r.max_rss, r.setup)
 
         r = results[0]
-        self.assertEquals(as_tuple(r),
-                          (1, 12045, 12045, 12045, 0, 12045, 10510336))
+        self.assertEqual(as_tuple(r),
+                         (1, 12045, 12045, 12045, 0, 12045, None, None))
         r.merge(results[1])
-        self.assertEquals(as_tuple(r),  # drops SD and median
-                          (2, 12045, 12325, 12185, 0, 0, 10510336))
+        self.assertEqual(as_tuple(r),  # drops SD and median, +max_rss
+                         (2, 12045, 12325, 12185, None, None, 10510336, None))
         r.merge(results[2])
-        self.assertEquals(as_tuple(r),  # picks smaller of the MAX_RSS
-                          (3, 11616, 12325, 11995.33, 0, 0, 10502144))
+        self.assertEqual(as_tuple(r),  # picks smaller of the MAX_RSS, +setup
+                         (3, 11616, 12325, 11995.33, None, None, 10502144, 9))
         r.merge(results[3])
-        self.assertEquals(as_tuple(r),
-                          (4, 11616, 12325, 12064, 0, 0, 10498048))
+        self.assertEqual(as_tuple(r),  # picks smaller of the setup values
+                         (4, 11616, 12325, 12064, None, None, 10498048, 7))
 
 
 class TestResultComparison(unittest.TestCase):
@@ -252,14 +359,14 @@ class TestResultComparison(unittest.TestCase):
 
     def test_init(self):
         rc = ResultComparison(self.r1, self.r2)
-        self.assertEquals(rc.name, 'AngryPhonebook')
+        self.assertEqual(rc.name, 'AngryPhonebook')
         self.assertAlmostEquals(rc.ratio, 12325.0 / 11616.0)
         self.assertAlmostEquals(rc.delta, (((11616.0 / 12325.0) - 1) * 100),
                                 places=3)
         # handle test results that sometimes change to zero, when compiler
         # optimizes out the body of the incorrectly written test
         rc = ResultComparison(self.r0, self.r0)
-        self.assertEquals(rc.name, 'GlobalClass')
+        self.assertEqual(rc.name, 'GlobalClass')
         self.assertAlmostEquals(rc.ratio, 1)
         self.assertAlmostEquals(rc.delta, 0, places=3)
         rc = ResultComparison(self.r0, self.r01)
@@ -336,23 +443,29 @@ class OldAndNewLog(unittest.TestCase):
 
 class TestLogParser(unittest.TestCase):
     def test_parse_results_csv(self):
-        """Ignores header row, empty lines and Totals row."""
+        """Ignores uknown lines, extracts data from supported formats."""
         log = """#,TEST,SAMPLES,MIN(us),MAX(us),MEAN(us),SD(us),MEDIAN(us)
-34,BitCount,20,3,4,4,0,4
+7,Array.append.Array.Int?,20,10,10,10,0,10
+21,Bridging.NSArray.as!.Array.NSString,20,11,11,11,0,11
+42,Flatten.Array.Tuple4.lazy.for-in.Reserve,20,3,4,4,0,4
 
 Total performance tests executed: 1
 """
         parser = LogParser()
         results = parser.parse_results(log.splitlines())
         self.assertTrue(isinstance(results[0], PerformanceTestResult))
-        self.assertEquals(results[0].name, 'BitCount')
+        self.assertEquals(results[0].name, 'Array.append.Array.Int?')
+        self.assertEquals(results[1].name,
+                          'Bridging.NSArray.as!.Array.NSString')
+        self.assertEquals(results[2].name,
+                          'Flatten.Array.Tuple4.lazy.for-in.Reserve')
 
     def test_parse_results_tab_delimited(self):
         log = '34\tBitCount\t20\t3\t4\t4\t0\t4'
         parser = LogParser()
         results = parser.parse_results(log.splitlines())
         self.assertTrue(isinstance(results[0], PerformanceTestResult))
-        self.assertEquals(results[0].name, 'BitCount')
+        self.assertEqual(results[0].name, 'BitCount')
 
     def test_parse_results_formatted_text(self):
         """Parse format that Benchmark_Driver prints to console"""
@@ -366,8 +479,43 @@ Total performance tests executed: 1
         results = parser.parse_results(log.splitlines()[1:])  # without 1st \n
         self.assertTrue(isinstance(results[0], PerformanceTestResult))
         r = results[0]
-        self.assertEquals(r.name, 'Array2D')
-        self.assertEquals(r.max_rss, 20915200)
+        self.assertEqual(r.name, 'Array2D')
+        self.assertEqual(r.max_rss, 20915200)
+
+    def test_parse_quantiles(self):
+        """Gathers samples from reported quantiles. Handles optional memory."""
+        r = LogParser.results_from_string(
+            """#,TEST,SAMPLES,MIN(μs),MEDIAN(μs),MAX(μs)
+1,Ackermann,3,54383,54512,54601""")['Ackermann']
+        self.assertEqual([s.runtime for s in r.samples.all_samples],
+                         [54383, 54512, 54601])
+        r = LogParser.results_from_string(
+            """#,TEST,SAMPLES,MIN(μs),MEDIAN(μs),MAX(μs),MAX_RSS(B)
+1,Ackermann,3,54529,54760,55807,266240""")['Ackermann']
+        self.assertEqual([s.runtime for s in r.samples.all_samples],
+                         [54529, 54760, 55807])
+        self.assertEqual(r.max_rss, 266240)
+
+    def test_parse_delta_quantiles(self):
+        r = LogParser.results_from_string(  # 2-quantile aka. median
+            '#,TEST,SAMPLES,MIN(μs),𝚫MEDIAN,𝚫MAX\n0,B,1,101,,')['B']
+        self.assertEqual(
+            (r.num_samples, r.min, r.median, r.max, r.samples.count),
+            (1, 101, 101, 101, 1))
+        r = LogParser.results_from_string(
+            '#,TEST,SAMPLES,MIN(μs),𝚫MEDIAN,𝚫MAX\n0,B,2,101,,1')['B']
+        self.assertEqual(
+            (r.num_samples, r.min, r.median, r.max, r.samples.count),
+            (2, 101, 101, 102, 2))
+        r = LogParser.results_from_string(  # 20-quantiles aka. ventiles
+            '#,TEST,SAMPLES,MIN(μs),𝚫V1,𝚫V2,𝚫V3,𝚫V4,𝚫V5,𝚫V6,𝚫V7,𝚫V8,' +
+            '𝚫V9,𝚫VA,𝚫VB,𝚫VC,𝚫VD,𝚫VE,𝚫VF,𝚫VG,𝚫VH,𝚫VI,𝚫VJ,𝚫MAX\n' +
+            '202,DropWhileArray,200,214,,,,,,,,,,,,1,,,,,,2,16,464'
+        )['DropWhileArray']
+        self.assertEqual(
+            (r.num_samples, r.min, r.max, r.samples.count),
+            # last 3 ventiles were outliers and were excluded from the sample
+            (200, 214, 215, 18))
 
     def test_parse_results_verbose(self):
         """Parse multiple performance test results with 2 sample formats:
@@ -383,8 +531,11 @@ Running AngryPhonebook for 3 samples.
     Sample 2,11467
 1,AngryPhonebook,3,11467,13898,12392,1315,11812
 Running Array2D for 3 samples.
+    SetUp 14444
     Sample 0,369900
+    Yielding after ~369918 μs
     Sample 1,381039
+    Yielding after ~381039 μs
     Sample 2,371043
 3,Array2D,3,369900,381039,373994,6127,371043
 
@@ -393,22 +544,28 @@ Totals,2"""
         results = parser.parse_results(verbose_log.split('\n'))
 
         r = results[0]
-        self.assertEquals(
+        self.assertEqual(
             (r.name, r.min, r.max, int(r.mean), int(r.sd), r.median),
             ('AngryPhonebook', 11467, 13898, 12392, 1315, 11812)
         )
-        self.assertEquals(r.num_samples, r.samples.num_samples)
-        self.assertEquals(results[0].samples.all_samples,
-                          [(0, 78, 11812), (1, 90, 13898), (2, 90, 11467)])
+        self.assertEqual(r.num_samples, r.samples.num_samples)
+        self.assertEqual(results[0].samples.all_samples,
+                         [(0, 78, 11812), (1, 90, 13898), (2, 90, 11467)])
+        self.assertEqual(r.yields, None)
 
         r = results[1]
-        self.assertEquals(
+        self.assertEqual(
             (r.name, r.min, r.max, int(r.mean), int(r.sd), r.median),
             ('Array2D', 369900, 381039, 373994, 6127, 371043)
         )
-        self.assertEquals(r.num_samples, r.samples.num_samples)
-        self.assertEquals(results[1].samples.all_samples,
-                          [(0, 1, 369900), (1, 1, 381039), (2, 1, 371043)])
+        self.assertEqual(r.setup, 14444)
+        self.assertEqual(r.num_samples, r.samples.num_samples)
+        self.assertEqual(results[1].samples.all_samples,
+                         [(0, 1, 369900), (1, 1, 381039), (2, 1, 371043)])
+        yielded = r.yields[0]
+        self.assertEqual(yielded.before_sample, 1)
+        self.assertEqual(yielded.after, 369918)
+        self.assertEqual(r.yields, [(1, 369918), (2, 381039)])
 
     def test_parse_environment_verbose(self):
         """Parse stats about environment in verbose mode."""
@@ -421,26 +578,26 @@ Totals,2"""
         results = parser.parse_results(verbose_log.split('\n'))
 
         r = results[0]
-        self.assertEquals(r.max_rss, 32768)
-        self.assertEquals(r.mem_pages, 8)
-        self.assertEquals(r.voluntary_cs, 1)
-        self.assertEquals(r.involuntary_cs, 1109)
+        self.assertEqual(r.max_rss, 32768)
+        self.assertEqual(r.mem_pages, 8)
+        self.assertEqual(r.voluntary_cs, 1)
+        self.assertEqual(r.involuntary_cs, 1109)
 
     def test_results_from_merge(self):
         """Parsing concatenated log merges same PerformanceTestResults"""
         concatenated_logs = """4,ArrayAppend,20,23641,29000,24990,0,24990
 4,ArrayAppend,1,20000,20000,20000,0,20000"""
         results = LogParser.results_from_string(concatenated_logs)
-        self.assertEquals(results.keys(), ['ArrayAppend'])
+        self.assertEqual(results.keys(), ['ArrayAppend'])
         result = results['ArrayAppend']
         self.assertTrue(isinstance(result, PerformanceTestResult))
-        self.assertEquals(result.min, 20000)
-        self.assertEquals(result.max, 29000)
+        self.assertEqual(result.min, 20000)
+        self.assertEqual(result.max, 29000)
 
     def test_results_from_merge_verbose(self):
         """Parsing verbose log  merges all PerformanceTestSamples.
         ...this should technically be on TestPerformanceTestResult, but it's
-        easier to write here. ¯\_(ツ)_/¯"""
+        easier to write here. ¯\\_(ツ)_/¯"""
         concatenated_logs = """
     Sample 0,355883
     Sample 1,358817
@@ -453,18 +610,18 @@ Totals,2"""
     Sample 3,364245
 3,Array2D,4,363094,376131,368159,5931,369169"""
         results = LogParser.results_from_string(concatenated_logs)
-        self.assertEquals(results.keys(), ['Array2D'])
+        self.assertEqual(results.keys(), ['Array2D'])
         result = results['Array2D']
         self.assertTrue(isinstance(result, PerformanceTestResult))
-        self.assertEquals(result.min, 350815)
-        self.assertEquals(result.max, 376131)
-        self.assertEquals(result.median, 358817)
+        self.assertEqual(result.min, 350815)
+        self.assertEqual(result.max, 376131)
+        self.assertEqual(result.median, 358817)
         self.assertAlmostEquals(result.sd, 8443.37, places=2)
         self.assertAlmostEquals(result.mean, 361463.25, places=2)
-        self.assertEquals(result.num_samples, 8)
+        self.assertEqual(result.num_samples, 8)
         samples = result.samples
         self.assertTrue(isinstance(samples, PerformanceTestSamples))
-        self.assertEquals(samples.count, 8)
+        self.assertEqual(samples.count, 8)
 
     def test_excludes_outliers_from_samples(self):
         verbose_log = """Running DropFirstAnySeqCntRangeLazy for 10 samples.
@@ -492,9 +649,9 @@ Totals,2"""
 """
         parser = LogParser()
         result = parser.parse_results(verbose_log.split('\n'))[0]
-        self.assertEquals(result.num_samples, 10)
-        self.assertEquals(result.samples.count, 8)
-        self.assertEquals(len(result.samples.outliers), 2)
+        self.assertEqual(result.num_samples, 10)
+        self.assertEqual(result.samples.count, 8)
+        self.assertEqual(len(result.samples.outliers), 2)
 
 
 class TestTestComparator(OldAndNewLog):
@@ -503,34 +660,34 @@ class TestTestComparator(OldAndNewLog):
             return [t.name for t in tests]
 
         tc = TestComparator(self.old_results, self.new_results, 0.05)
-        self.assertEquals(names(tc.unchanged), ['AngryPhonebook', 'Array2D'])
-        self.assertEquals(names(tc.increased), ['ByteSwap', 'ArrayAppend'])
-        self.assertEquals(names(tc.decreased), ['BitCount'])
-        self.assertEquals(names(tc.added), ['TwoSum'])
-        self.assertEquals(names(tc.removed), ['AnyHashableWithAClass'])
+        self.assertEqual(names(tc.unchanged), ['AngryPhonebook', 'Array2D'])
+        self.assertEqual(names(tc.increased), ['ByteSwap', 'ArrayAppend'])
+        self.assertEqual(names(tc.decreased), ['BitCount'])
+        self.assertEqual(names(tc.added), ['TwoSum'])
+        self.assertEqual(names(tc.removed), ['AnyHashableWithAClass'])
         # other way around
         tc = TestComparator(self.new_results, self.old_results, 0.05)
-        self.assertEquals(names(tc.unchanged), ['AngryPhonebook', 'Array2D'])
-        self.assertEquals(names(tc.increased), ['BitCount'])
-        self.assertEquals(names(tc.decreased), ['ByteSwap', 'ArrayAppend'])
-        self.assertEquals(names(tc.added), ['AnyHashableWithAClass'])
-        self.assertEquals(names(tc.removed), ['TwoSum'])
+        self.assertEqual(names(tc.unchanged), ['AngryPhonebook', 'Array2D'])
+        self.assertEqual(names(tc.increased), ['BitCount'])
+        self.assertEqual(names(tc.decreased), ['ByteSwap', 'ArrayAppend'])
+        self.assertEqual(names(tc.added), ['AnyHashableWithAClass'])
+        self.assertEqual(names(tc.removed), ['TwoSum'])
         # delta_threshold determines the sorting into change groups;
         # report only change above 100% (ByteSwap's runtime went to 0):
         tc = TestComparator(self.old_results, self.new_results, 1)
-        self.assertEquals(
+        self.assertEqual(
             names(tc.unchanged),
             ['AngryPhonebook', 'Array2D', 'ArrayAppend', 'BitCount']
         )
-        self.assertEquals(names(tc.increased), ['ByteSwap'])
-        self.assertEquals(tc.decreased, [])
+        self.assertEqual(names(tc.increased), ['ByteSwap'])
+        self.assertEqual(tc.decreased, [])
 
 
 class TestReportFormatter(OldAndNewLog):
     def setUp(self):
         super(TestReportFormatter, self).setUp()
         self.tc = TestComparator(self.old_results, self.new_results, 0.05)
-        self.rf = ReportFormatter(self.tc, '', '', changes_only=False)
+        self.rf = ReportFormatter(self.tc, changes_only=False)
         self.markdown = self.rf.markdown()
         self.git = self.rf.git()
         self.html = self.rf.html()
@@ -545,12 +702,12 @@ class TestReportFormatter(OldAndNewLog):
         self.assert_report_contains(texts, self.html)
 
     def test_values(self):
-        self.assertEquals(
+        self.assertEqual(
             ReportFormatter.values(PerformanceTestResult(
                 '1,AngryPhonebook,20,10664,12933,11035,576,10884'.split(','))),
             ('AngryPhonebook', '10664', '12933', '11035', '—')
         )
-        self.assertEquals(
+        self.assertEqual(
             ReportFormatter.values(PerformanceTestResult(
                 '1,AngryPhonebook,1,12045,12045,12045,0,12045,10510336'
                 .split(','))),
@@ -561,16 +718,16 @@ class TestReportFormatter(OldAndNewLog):
             '1,AngryPhonebook,1,12325,12325,12325,0,12325,10510336'.split(','))
         r2 = PerformanceTestResult(
             '1,AngryPhonebook,1,11616,11616,11616,0,11616,10502144'.split(','))
-        self.assertEquals(
+        self.assertEqual(
             ReportFormatter.values(ResultComparison(r1, r2)),
             ('AngryPhonebook', '12325', '11616', '-5.8%', '1.06x')
         )
-        self.assertEquals(
+        self.assertEqual(
             ReportFormatter.values(ResultComparison(r2, r1)),
             ('AngryPhonebook', '11616', '12325', '+6.1%', '0.94x')
         )
         r2.max = r1.min + 1
-        self.assertEquals(
+        self.assertEqual(
             ReportFormatter.values(ResultComparison(r1, r2))[4],
             '1.06x (?)'  # is_dubious
         )
@@ -591,18 +748,18 @@ class TestReportFormatter(OldAndNewLog):
         PerformanceTestResults.
         """
         performance_test_result = self.tc.added[0]
-        self.assertEquals(
+        self.assertEqual(
             ReportFormatter.header_for(performance_test_result),
             ('TEST', 'MIN', 'MAX', 'MEAN', 'MAX_RSS')
         )
         comparison_result = self.tc.increased[0]
-        self.assertEquals(
+        self.assertEqual(
             ReportFormatter.header_for(comparison_result),
             ('TEST', 'OLD', 'NEW', 'DELTA', 'RATIO')
         )
         self.assert_markdown_contains([
             'TEST                  | OLD    | NEW    | DELTA   | RATIO',
-            '---                   | ---    | ---    | ---     | ---    ',
+            ':---                  | ---:   | ---:   | ---:    | ---:   ',
             'TEST                  | MIN    | MAX    | MEAN    | MAX_RSS'])
         self.assert_git_contains([
             'TEST                    OLD      NEW      DELTA     RATIO',
@@ -689,7 +846,7 @@ class TestReportFormatter(OldAndNewLog):
 
     def test_report_only_changes(self):
         """Leave out tests without significant change."""
-        rf = ReportFormatter(self.tc, '', '', changes_only=True)
+        rf = ReportFormatter(self.tc, changes_only=True)
         markdown, git, html = rf.markdown(), rf.git(), rf.html()
         self.assertNotIn('No Changes', markdown)
         self.assertNotIn('AngryPhonebook', markdown)
@@ -697,6 +854,36 @@ class TestReportFormatter(OldAndNewLog):
         self.assertNotIn('AngryPhonebook', git)
         self.assertNotIn('No Changes', html)
         self.assertNotIn('AngryPhonebook', html)
+
+    def test_single_table_report(self):
+        """Single table report has inline headers and no elaborate sections."""
+        self.tc.removed = []  # test handling empty section
+        rf = ReportFormatter(self.tc, changes_only=True, single_table=True)
+        markdown = rf.markdown()
+        self.assertNotIn('<details', markdown)  # no sections
+        self.assertNotIn('\n\n', markdown)  # table must not be broken
+        self.assertNotIn('Removed', markdown)
+        self.assert_report_contains([
+            '\n**Regression** ',
+            '| **OLD**', '| **NEW**', '| **DELTA**', '| **RATIO**',
+            '\n**Added** ',
+            '| **MIN**', '| **MAX**', '| **MEAN**', '| **MAX_RSS**'
+        ], markdown)
+        # Single delimiter row:
+        self.assertIn('\n:---', markdown)  # first column is left aligned
+        self.assertEqual(markdown.count('| ---:'), 4)  # other, right aligned
+        # Separator before every inline header (new section):
+        self.assertEqual(markdown.count('&nbsp; | | | | '), 2)
+
+        git = rf.git()
+        self.assertNotIn('): \n', git)  # no sections
+        self.assertNotIn('REMOVED', git)
+        self.assert_report_contains([
+            '\nREGRESSION ', ' OLD ', ' NEW ', ' DELTA ', ' RATIO ',
+            '\n\nADDED ', ' MIN ', ' MAX ', ' MEAN ', ' MAX_RSS '
+        ], git)
+        # Separator before every inline header (new section):
+        self.assertEqual(git.count('\n\n'), 2)
 
 
 class Test_parse_args(unittest.TestCase):
@@ -708,17 +895,17 @@ class Test_parse_args(unittest.TestCase):
         self.assertIn('usage: compare_perf_tests.py', err.getvalue())
 
         args = parse_args(self.required)
-        self.assertEquals(args.old_file, 'old.log')
-        self.assertEquals(args.new_file, 'new.log')
+        self.assertEqual(args.old_file, 'old.log')
+        self.assertEqual(args.new_file, 'new.log')
 
     def test_format_argument(self):
-        self.assertEquals(parse_args(self.required).format, 'markdown')
-        self.assertEquals(
+        self.assertEqual(parse_args(self.required).format, 'markdown')
+        self.assertEqual(
             parse_args(self.required + ['--format', 'markdown']).format,
             'markdown')
-        self.assertEquals(
+        self.assertEqual(
             parse_args(self.required + ['--format', 'git']).format, 'git')
-        self.assertEquals(
+        self.assertEqual(
             parse_args(self.required + ['--format', 'html']).format, 'html')
 
         with captured_output() as (_, err):
@@ -731,14 +918,14 @@ class Test_parse_args(unittest.TestCase):
     def test_delta_threshold_argument(self):
         # default value
         args = parse_args(self.required)
-        self.assertEquals(args.delta_threshold, 0.05)
+        self.assertEqual(args.delta_threshold, 0.05)
         # float parsing
         args = parse_args(self.required + ['--delta-threshold', '0.1'])
-        self.assertEquals(args.delta_threshold, 0.1)
+        self.assertEqual(args.delta_threshold, 0.1)
         args = parse_args(self.required + ['--delta-threshold', '1'])
-        self.assertEquals(args.delta_threshold, 1.0)
+        self.assertEqual(args.delta_threshold, 1.0)
         args = parse_args(self.required + ['--delta-threshold', '.2'])
-        self.assertEquals(args.delta_threshold, 0.2)
+        self.assertEqual(args.delta_threshold, 0.2)
 
         with captured_output() as (_, err):
             self.assertRaises(SystemExit, parse_args,
@@ -748,27 +935,15 @@ class Test_parse_args(unittest.TestCase):
                       err.getvalue())
 
     def test_output_argument(self):
-        self.assertEquals(parse_args(self.required).output, None)
-        self.assertEquals(parse_args(self.required +
-                                     ['--output', 'report.log']).output,
-                          'report.log')
+        self.assertEqual(parse_args(self.required).output, None)
+        self.assertEqual(parse_args(self.required +
+                                    ['--output', 'report.log']).output,
+                         'report.log')
 
     def test_changes_only_argument(self):
         self.assertFalse(parse_args(self.required).changes_only)
         self.assertTrue(parse_args(self.required +
                                    ['--changes-only']).changes_only)
-
-    def test_branch_arguments(self):
-        # default value
-        args = parse_args(self.required)
-        self.assertEquals(args.new_branch, 'NEW_MIN')
-        self.assertEquals(args.old_branch, 'OLD_MIN')
-        # user specified
-        args = parse_args(
-            self.required + ['--old-branch', 'master',
-                             '--new-branch', 'amazing-optimization'])
-        self.assertEquals(args.old_branch, 'master')
-        self.assertEquals(args.new_branch, 'amazing-optimization')
 
 
 class Test_compare_perf_tests_main(OldAndNewLog, FileSystemIntegration):
@@ -823,7 +998,7 @@ class Test_compare_perf_tests_main(OldAndNewLog, FileSystemIntegration):
         """Writes Markdown formatted report to stdout and `--output` file."""
         report_out, report_file = (
             self.execute_main_with_format('markdown', test_output=True))
-        self.assertEquals(report_out, report_file)
+        self.assertEqual(report_out, report_file)
         self.assert_report_contains(self.markdown, report_file)
 
     def test_git(self):
@@ -835,7 +1010,7 @@ class Test_compare_perf_tests_main(OldAndNewLog, FileSystemIntegration):
         """Writes Git formatted report to stdout and `--output` file."""
         report_out, report_file = (
             self.execute_main_with_format('git', test_output=True))
-        self.assertEquals(report_out, report_file)
+        self.assertEqual(report_out, report_file)
         self.assert_report_contains(self.git, report_file)
 
     def test_html(self):
@@ -847,7 +1022,7 @@ class Test_compare_perf_tests_main(OldAndNewLog, FileSystemIntegration):
         """Writes HTML formatted report to stdout and `--output` file."""
         report_out, report_file = (
             self.execute_main_with_format('html', test_output=True))
-        self.assertEquals(report_out, report_file)
+        self.assertEqual(report_out, report_file)
         self.assert_report_contains(self.html, report_file)
 
 

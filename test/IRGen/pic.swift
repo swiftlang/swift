@@ -1,7 +1,7 @@
 // <rdar://problem/15358345> Check that we always use PIC relocations on all
 // platforms.
 
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -module-name main -S -o - | %FileCheck -check-prefix=%target-cpu %s
+// RUN: %target-swift-frontend %s -module-name main -S -o - | %FileCheck -check-prefix=%target-cpu -check-prefix=%target-cpu-%target-sdk-name %s
 
 var global: Int = 0
 
@@ -20,12 +20,26 @@ public func use_global() -> Int {
 // armv7-LABEL: {{_?}}$s4main10use_globalSiyF:
 // Check for the runtime memory enforcement call. The global address may be
 // materialized in a different register prior to that call.
-// armv7:         bl _swift_beginAccess
-// armv7:         movw [[R_ADR:r.*]], :lower16:(_$s4main6globalSivp-([[PIC_0:L.*]]+4))
-// armv7:         movt [[R_ADR]], :upper16:(_$s4main6globalSivp-([[PIC_0]]+4))
-// armv7:       [[PIC_0]]:{{$}}
-// armv7:         add [[R_ADR]], pc
-// armv7:         ldr [[R_ADR]], {{\[}}[[R_ADR]]{{\]}}
+// armv7:         bl {{_?}}swift_beginAccess
+// armv7-iphoneos:         movw [[R_ADR:r.*]], :lower16:(_$s4main6globalSivp-([[PIC_0:L.*]]+4))
+// armv7-iphoneos:         movt [[R_ADR]], :upper16:(_$s4main6globalSivp-([[PIC_0]]+4))
+// armv7-iphoneos:       [[PIC_0]]:{{$}}
+// armv7-iphoneos:         ldr [[R_ADR]], {{\[}}[[R_ADR]]{{\]}}
+
+// armv7-android:          ldr [[R_ADR:r.*]], .LCPI[[PIC_0:[0-9]_[0-9]]]
+// armv7-android:        .LPC[[PIC_0]]:{{$}}
+// armv7-android:          add [[R_ADR]], pc
+// armv7-android:          bl {{_?}}swift_endAccess
+// armv7-android:        .LCPI[[PIC_0]]:{{$}}
+// armv7-android:     	   .long	($s4main6globalSivp)-(.LPC[[PIC_0]]+8)
+
+// armv7-linux:          ldr [[R_ADR:r.*]], .LCPI[[PIC_0:[0-9]_[0-9]]]
+// armv7-linux:        .LPC[[PIC_0]]:{{$}}
+// armv7-linux:          add [[R_ADR]], pc
+// armv7-linux:          bl {{_?}}swift_endAccess
+// armv7-linux:        .LCPI[[PIC_0]]:{{$}}
+// armv7-linux:     	   .long	($s4main6globalSivp)-(.LPC[[PIC_0]]+8)
+
 
 // armv7s-LABEL: {{_?}}$s4main10use_globalSiyF:
 // armv7s:         bl _swift_beginAccess
@@ -51,3 +65,21 @@ public func use_global() -> Int {
 // arm64:        str [[REG2]], [sp]
 // arm64:        bl _swift_endAccess
 // arm64:        ldr x0, [sp]
+
+// aarch64-LABEL: $s4main10use_globalSiyF:
+// aarch64:         bl swift_beginAccess
+// aarch64-windows: adrp [[REG1:x[0-9]+]], ($s4main6globalSivp@PAGE)
+// aarch64-linux:   adrp [[REG1:x[0-9]+]], ($s4main6globalSivp)
+// aarch64-android: adrp [[REG1:x[0-9]+]], ($s4main6globalSivp)
+// aarch64:         add [[REG1]], [[REG1]], :lo12:($s4main6globalSivp)
+// aarch64:         ldr [[REG2:x[0-9]+]], {{\[}}[[REG1]]{{\]}}
+// aarch64:         str [[REG2]], [sp]
+// aarch64:         bl swift_endAccess
+// aarch64:         ldr x0, [sp]
+
+// powerpc64le-LABEL: {{_?}}$s4main10use_globalSiyF:
+// powerpc64le:        bl swift_beginAccess
+// powerpc64le:       addi 3, 3, ($s4main6globalSivp)@toc@l
+
+// s390x-LABEL: $s4main10use_globalSiyF:
+// s390x:        lgrl    %[[REG1:r[0-9]+]], ($s4main6globalSivp)

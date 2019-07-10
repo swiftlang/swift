@@ -9,6 +9,7 @@
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 import os
+import platform
 import unittest
 from argparse import Namespace
 
@@ -22,8 +23,11 @@ class CMakeTestCase(unittest.TestCase):
     def mock_distcc_path(self):
         """Return a path string of mock distcc executable
         """
-        return os.path.join(os.path.dirname(__file__),
-                            'mock-distcc')
+        if platform.system() == 'Windows':
+            executable = 'mock-distcc.cmd'
+        else:
+            executable = 'mock-distcc'
+        return os.path.join(os.path.dirname(__file__), executable)
 
     def default_args(self):
         """Return new args object with default values
@@ -39,6 +43,8 @@ class CMakeTestCase(unittest.TestCase):
                          export_compile_commands=False,
                          distcc=False,
                          cmake_generator="Ninja",
+                         cmake_c_launcher=None,
+                         cmake_cxx_launcher=None,
                          clang_compiler_version=None,
                          clang_user_visible_version=None,
                          build_jobs=8,
@@ -205,10 +211,28 @@ class CMakeTestCase(unittest.TestCase):
         self.assertEqual(
             list(cmake.common_options()),
             ["-G", "Ninja",
-             "-DCMAKE_C_COMPILER:PATH=" + self.mock_distcc_path(),
-             "-DCMAKE_C_COMPILER_ARG1=/path/to/clang",
-             "-DCMAKE_CXX_COMPILER:PATH=" + self.mock_distcc_path(),
-             "-DCMAKE_CXX_COMPILER_ARG1=/path/to/clang++",
+             "-DCMAKE_C_COMPILER_LAUNCHER:PATH=" + self.mock_distcc_path(),
+             "-DCMAKE_CXX_COMPILER_LAUNCHER:PATH=" + self.mock_distcc_path(),
+             "-DCMAKE_C_COMPILER:PATH=/path/to/clang",
+             "-DCMAKE_CXX_COMPILER:PATH=/path/to/clang++",
+             "-DCMAKE_LIBTOOL:PATH=/path/to/libtool",
+             "-DCMAKE_MAKE_PROGRAM=" + self.which_ninja(args)])
+
+    def test_common_options_launcher(self):
+        args = self.default_args()
+        cmake_c_launcher = "/path/to/c_launcher"
+        cmake_cxx_launcher = "/path/to/cxx_launcher"
+        args.cmake_c_launcher = cmake_c_launcher
+        args.cmake_cxx_launcher = cmake_cxx_launcher
+        cmake = self.cmake(args)
+        self.assertEqual(
+            list(cmake.common_options()),
+            ["-G", "Ninja",
+             "-DCMAKE_C_COMPILER_LAUNCHER:PATH=" + cmake_c_launcher,
+             "-DCMAKE_CXX_COMPILER_LAUNCHER:PATH=" + cmake_cxx_launcher,
+             "-DCMAKE_C_COMPILER:PATH=/path/to/clang",
+             "-DCMAKE_CXX_COMPILER:PATH=/path/to/clang++",
+             "-DCMAKE_LIBTOOL:PATH=/path/to/libtool",
              "-DCMAKE_MAKE_PROGRAM=" + self.which_ninja(args)])
 
     def test_common_options_xcode(self):
@@ -290,10 +314,11 @@ class CMakeTestCase(unittest.TestCase):
             ["-G", "Xcode",
              "-DLLVM_USE_SANITIZER=Address;Undefined",
              "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
-             "-DCMAKE_C_COMPILER:PATH=" + self.mock_distcc_path(),
-             "-DCMAKE_C_COMPILER_ARG1=/path/to/clang",
-             "-DCMAKE_CXX_COMPILER:PATH=" + self.mock_distcc_path(),
-             "-DCMAKE_CXX_COMPILER_ARG1=/path/to/clang++",
+             "-DCMAKE_C_COMPILER_LAUNCHER:PATH=" + self.mock_distcc_path(),
+             "-DCMAKE_CXX_COMPILER_LAUNCHER:PATH=" + self.mock_distcc_path(),
+             "-DCMAKE_C_COMPILER:PATH=/path/to/clang",
+             "-DCMAKE_CXX_COMPILER:PATH=/path/to/clang++",
+             "-DCMAKE_LIBTOOL:PATH=/path/to/libtool",
              "-DCMAKE_CONFIGURATION_TYPES=" +
              "Debug;Release;MinSizeRel;RelWithDebInfo",
              "-DLLVM_VERSION_MAJOR:STRING=9",
@@ -474,6 +499,47 @@ class CMakeOptionsTestCase(unittest.TestCase):
             "-G", "Ninja",
             "-DOPT1_1=VAL1",
             "-DOPT1_2=VAL2"])
+
+    def test_initial_options_with_tuples(self):
+        options = CMakeOptions([('FOO', 'foo'), ('BAR', True)])
+        self.assertIn('-DFOO=foo', options)
+        self.assertIn('-DBAR=TRUE', options)
+
+    def test_initial_options_with_other_options(self):
+        options = CMakeOptions()
+        options.define('FOO', 'foo')
+        options.define('BAR', True)
+        derived = CMakeOptions(options)
+        self.assertIn('-DFOO=foo', derived)
+        self.assertIn('-DBAR=TRUE', derived)
+
+    def test_booleans_are_translated(self):
+        options = CMakeOptions()
+        options.define('A_BOOLEAN_OPTION', True)
+        options.define('ANOTHER_BOOLEAN_OPTION', False)
+        self.assertIn('-DA_BOOLEAN_OPTION=TRUE', options)
+        self.assertIn('-DANOTHER_BOOLEAN_OPTION=FALSE', options)
+
+    def test_extend_with_other_options(self):
+        options = CMakeOptions()
+        options.define('FOO', 'foo')
+        options.define('BAR', True)
+        derived = CMakeOptions()
+        derived.extend(options)
+        self.assertIn('-DFOO=foo', derived)
+        self.assertIn('-DBAR=TRUE', derived)
+
+    def test_extend_with_tuples(self):
+        options = CMakeOptions()
+        options.extend([('FOO', 'foo'), ('BAR', True)])
+        self.assertIn('-DFOO=foo', options)
+        self.assertIn('-DBAR=TRUE', options)
+
+    def test_contains(self):
+        options = CMakeOptions()
+        self.assertTrue('-DFOO=foo' not in options)
+        options.define('FOO', 'foo')
+        self.assertTrue('-DFOO=foo' in options)
 
 
 if __name__ == '__main__':

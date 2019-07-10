@@ -44,6 +44,7 @@ struct EntityInfo {
   StringRef ReceiverUSR;
   bool IsDynamic = false;
   bool IsTestCandidate = false;
+  bool IsImplicit = false;
   unsigned Line = 0;
   unsigned Column = 0;
   ArrayRef<UIdent> Attrs;
@@ -59,13 +60,10 @@ public:
 
   virtual void failed(StringRef ErrDescription) = 0;
 
-  virtual bool recordHash(StringRef Hash, bool isKnown) = 0;
-
   virtual bool startDependency(UIdent Kind,
                                StringRef Name,
                                StringRef Path,
-                               bool IsSystem,
-                               StringRef Hash) = 0;
+                               bool IsSystem) = 0;
 
   virtual bool finishDependency(UIdent Kind) = 0;
 
@@ -123,6 +121,18 @@ struct CodeCompletionInfo {
   Optional<ArrayRef<ParameterStructure>> parametersStructure;
 };
 
+struct ExpressionType {
+  unsigned ExprOffset;
+  unsigned ExprLength;
+  unsigned TypeOffset;
+  std::vector<unsigned> ProtocolOffsets;
+};
+
+struct ExpressionTypesInFile {
+  std::vector<ExpressionType> Results;
+  StringRef TypeBuffer;
+};
+
 class CodeCompletionConsumer {
   virtual void anchor();
 
@@ -131,6 +141,7 @@ public:
 
   virtual void failed(StringRef ErrDescription) = 0;
 
+  virtual void setCompletionKind(UIdent kind) {};
   virtual bool handleResult(const CodeCompletionInfo &Info) = 0;
 };
 
@@ -289,6 +300,59 @@ public:
 struct Statistic;
 typedef std::function<void(ArrayRef<Statistic *> stats)> StatisticsReceiver;
 
+/// Used to wrap the result of a request. There are three possibilities:
+/// - The request succeeded (`value` is valid)
+/// - The request was cancelled
+/// - The request failed (with an `error`)
+///
+/// NOTE: This type does not own its `value` or `error`. Therefore, it's not
+/// safe to store this type, nor is it safe to store its `value` or `error`.
+/// Instead, any needed information should be fetched and stored (e.g. reading
+/// properties from `value` or getting a `std::string` from `error`).
+template <typename T>
+class RequestResult {
+  enum Type {
+    Value,
+    Error,
+    Cancelled
+  };
+  union {
+    const T *data;
+    StringRef error;
+  };
+  RequestResult::Type type;
+
+  RequestResult(const T &V): data(&V), type(Value) {}
+  RequestResult(StringRef E): error(E), type(Error) {}
+  RequestResult(): type(Cancelled) {}
+
+public:
+  static RequestResult fromResult(const T &value) {
+    return RequestResult(value);
+  }
+  static RequestResult fromError(StringRef error) {
+    return RequestResult(error);
+  }
+  static RequestResult cancelled() {
+    return RequestResult();
+  }
+
+  const T &value() const {
+    assert(type == Value);
+    return *data;
+  }
+  bool isError() const {
+    return type == Error;
+  }
+  StringRef getError() const {
+    assert(type == Error);
+    return error;
+  }
+  bool isCancelled() const {
+    return type == Cancelled;
+  }
+};
+
 struct RefactoringInfo {
   UIdent Kind;
   StringRef KindName;
@@ -296,7 +360,11 @@ struct RefactoringInfo {
 };
 
 struct CursorInfoData {
-  bool IsCancelled = false;
+  // If nonempty, a proper Info could not be resolved (and the rest of the Info
+  // will be empty). Clients can potentially use this to show a diagnostic
+  // message to the user in lieu of using the empty response.
+  StringRef InternalDiagnostic;
+
   UIdent Kind;
   StringRef Name;
   StringRef USR;
@@ -337,14 +405,17 @@ struct CursorInfoData {
 };
 
 struct RangeInfo {
-  bool IsCancelled = false;
   UIdent RangeKind;
   StringRef ExprType;
   StringRef RangeContent;
 };
 
 struct NameTranslatingInfo {
-  bool IsCancelled = false;
+  // If nonempty, a proper Info could not be resolved (and the rest of the Info
+  // will be empty). Clients can potentially use this to show a diagnostic
+  // message to the user in lieu of using the empty response.
+  StringRef InternalDiagnostic;
+
   UIdent NameKind;
   StringRef BaseName;
   std::vector<StringRef> ArgNames;
@@ -366,15 +437,12 @@ struct SemanticRefactoringInfo {
 };
 
 struct RelatedIdentsInfo {
-  bool IsCancelled = false;
   /// (Offset,Length) pairs.
   ArrayRef<std::pair<unsigned, unsigned>> Ranges;
 };
 
 /// Filled out by LangSupport::findInterfaceDocument().
 struct InterfaceDocInfo {
-  /// Non-empty if an error occurred.
-  StringRef Error;
   /// Non-empty if a generated interface editor document has previously been
   /// opened for the requested module name.
   StringRef ModuleInterfaceName;
@@ -398,6 +466,7 @@ struct DocEntityInfo {
   llvm::SmallString<64> ProvideImplementationOfUSR;
   llvm::SmallString<64> DocComment;
   llvm::SmallString<64> FullyAnnotatedDecl;
+  llvm::SmallString<64> FullyAnnotatedGenericSig;
   llvm::SmallString<64> LocalizationKey;
   std::vector<DocGenericParam> GenericParams;
   std::vector<std::string> GenericRequirements;
@@ -478,10 +547,9 @@ struct RenameLocations {
   std::vector<RenameLocation> LineColumnLocs;
 };
 
-typedef std::function<void(ArrayRef<CategorizedEdits> Edits,
-                           StringRef Error)> CategorizedEditsReceiver;
-typedef std::function<void(ArrayRef<CategorizedRenameRanges> Edits,
-                           StringRef Error)>
+typedef std::function<void(RequestResult<ArrayRef<CategorizedEdits>> Result)>
+    CategorizedEditsReceiver;
+typedef std::function<void(RequestResult<ArrayRef<CategorizedRenameRanges>> Result)>
     CategorizedRenameRangesReceiver;
 
 class DocInfoConsumer {
@@ -509,6 +577,54 @@ public:
   virtual bool handleDiagnostic(const DiagnosticEntryInfo &Info) = 0;
 };
 
+struct TypeContextInfoItem {
+  StringRef TypeName;
+  StringRef TypeUSR;
+
+  struct Member {
+    StringRef Name;
+    StringRef Description;
+    StringRef SourceText;
+    StringRef DocBrief;
+  };
+  ArrayRef<Member> ImplicitMembers;
+};
+
+class TypeContextInfoConsumer {
+  virtual void anchor();
+
+public:
+  virtual ~TypeContextInfoConsumer() {}
+
+  virtual void handleResult(const TypeContextInfoItem &Result) = 0;
+  virtual void failed(StringRef ErrDescription) = 0;
+};
+
+struct ConformingMethodListResult {
+  StringRef TypeName;
+  StringRef TypeUSR;
+
+  struct Member {
+    StringRef Name;
+    StringRef TypeName;
+    StringRef TypeUSR;
+    StringRef Description;
+    StringRef SourceText;
+    StringRef DocBrief;
+  };
+  ArrayRef<Member> Members;
+};
+
+class ConformingMethodListConsumer {
+  virtual void anchor();
+
+public:
+  virtual ~ConformingMethodListConsumer() {}
+
+  virtual void handleResult(const ConformingMethodListResult &Result) = 0;
+  virtual void failed(StringRef ErrDescription) = 0;
+};
+
 class LangSupport {
   virtual void anchor();
 
@@ -520,8 +636,7 @@ public:
 
   virtual void indexSource(StringRef Filename,
                            IndexingConsumer &Consumer,
-                           ArrayRef<const char *> Args,
-                           StringRef Hash) = 0;
+                           ArrayRef<const char *> Args) = 0;
 
   virtual void codeComplete(llvm::MemoryBuffer *InputBuf, unsigned Offset,
                             CodeCompletionConsumer &Consumer,
@@ -604,42 +719,41 @@ public:
                              unsigned Length, bool Actionables,
                              bool CancelOnSubsequentRequest,
                              ArrayRef<const char *> Args,
-                      std::function<void(const CursorInfoData &)> Receiver) = 0;
+                      std::function<void(const RequestResult<CursorInfoData> &)> Receiver) = 0;
 
 
   virtual void getNameInfo(StringRef Filename, unsigned Offset,
                            NameTranslatingInfo &Input,
                            ArrayRef<const char *> Args,
-                std::function<void(const NameTranslatingInfo &)> Receiver) = 0;
+                std::function<void(const RequestResult<NameTranslatingInfo> &)> Receiver) = 0;
 
   virtual void getRangeInfo(StringRef Filename, unsigned Offset, unsigned Length,
                             bool CancelOnSubsequentRequest,
                             ArrayRef<const char *> Args,
-                            std::function<void(const RangeInfo&)> Receiver) = 0;
+                            std::function<void(const RequestResult<RangeInfo> &)> Receiver) = 0;
 
   virtual void
   getCursorInfoFromUSR(StringRef Filename, StringRef USR,
                        bool CancelOnSubsequentRequest,
                        ArrayRef<const char *> Args,
-                     std::function<void(const CursorInfoData &)> Receiver) = 0;
+                     std::function<void(const RequestResult<CursorInfoData> &)> Receiver) = 0;
 
   virtual void findRelatedIdentifiersInFile(StringRef Filename,
                                             unsigned Offset,
                                             bool CancelOnSubsequentRequest,
                                             ArrayRef<const char *> Args,
-                   std::function<void(const RelatedIdentsInfo &)> Receiver) = 0;
+                   std::function<void(const RequestResult<RelatedIdentsInfo> &)> Receiver) = 0;
 
   virtual llvm::Optional<std::pair<unsigned, unsigned>>
       findUSRRange(StringRef DocumentName, StringRef USR) = 0;
 
   virtual void findInterfaceDocument(StringRef ModuleName,
                                      ArrayRef<const char *> Args,
-                    std::function<void(const InterfaceDocInfo &)> Receiver) = 0;
+                    std::function<void(const RequestResult<InterfaceDocInfo> &)> Receiver) = 0;
 
   virtual void findModuleGroups(StringRef ModuleName,
                                 ArrayRef<const char *> Args,
-                                std::function<void(ArrayRef<StringRef>,
-                                                   StringRef Error)> Receiver) = 0;
+                                std::function<void(const RequestResult<ArrayRef<StringRef>> &)> Receiver) = 0;
 
   virtual void syntacticRename(llvm::MemoryBuffer *InputBuf,
                                ArrayRef<RenameLocations> RenameLocations,
@@ -659,14 +773,31 @@ public:
                                    ArrayRef<const char*> Args,
                                    CategorizedEditsReceiver Receiver) = 0;
 
+  virtual void collectExpressionTypes(StringRef FileName,
+                                      ArrayRef<const char *> Args,
+                                      ArrayRef<const char *> ExpectedProtocols,
+                                      bool CanonicalType,
+                                      std::function<void(const
+                                          RequestResult<ExpressionTypesInFile> &)> Receiver) = 0;
+
   virtual void getDocInfo(llvm::MemoryBuffer *InputBuf,
                           StringRef ModuleName,
                           ArrayRef<const char *> Args,
                           DocInfoConsumer &Consumer) = 0;
 
+  virtual void getExpressionContextInfo(llvm::MemoryBuffer *inputBuf,
+                                        unsigned Offset,
+                                        ArrayRef<const char *> Args,
+                                        TypeContextInfoConsumer &Consumer) = 0;
+
+  virtual void getConformingMethodList(llvm::MemoryBuffer *inputBuf,
+                                       unsigned Offset,
+                                       ArrayRef<const char *> Args,
+                                       ArrayRef<const char *> ExpectedTypes,
+                                       ConformingMethodListConsumer &Consumer) = 0;
+
   virtual void getStatistics(StatisticsReceiver) = 0;
 };
-
 } // namespace SourceKit
 
 #endif

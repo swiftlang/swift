@@ -13,6 +13,7 @@
 #ifndef SWIFT_SIL_SILFUNCTIONBUILDER_H
 #define SWIFT_SIL_SILFUNCTIONBUILDER_H
 
+#include "swift/AST/Availability.h"
 #include "swift/SIL/SILModule.h"
 
 namespace swift {
@@ -42,13 +43,20 @@ class SILGenFunctionBuilder;
 ///    code-reuse in between these different SILFunction creation sites.
 class SILFunctionBuilder {
   SILModule &mod;
+  AvailabilityContext availCtx;
 
   friend class SILParserFunctionBuilder;
   friend class SILSerializationFunctionBuilder;
   friend class SILOptFunctionBuilder;
   friend class Lowering::SILGenFunctionBuilder;
 
-  SILFunctionBuilder(SILModule &mod) : mod(mod) {}
+  SILFunctionBuilder(SILModule &mod)
+      : SILFunctionBuilder(mod,
+                           AvailabilityContext::forDeploymentTarget(
+                             mod.getASTContext())) {}
+
+  SILFunctionBuilder(SILModule &mod, AvailabilityContext availCtx)
+      : mod(mod), availCtx(availCtx) {}
 
   /// Return the declaration of a utility function that can, but needn't, be
   /// shared between different parts of a program.
@@ -58,13 +66,15 @@ class SILFunctionBuilder {
                                          IsTransparent_t isTransparent,
                                          IsSerialized_t isSerialized,
                                          ProfileCounter entryCount,
-                                         IsThunk_t isThunk);
+                                         IsThunk_t isThunk,
+                                         IsDynamicallyReplaceable_t isDynamic);
 
   /// Return the declaration of a function, or create it if it doesn't exist.
   SILFunction *getOrCreateFunction(
       SILLocation loc, StringRef name, SILLinkage linkage,
       CanSILFunctionType type, IsBare_t isBareSILFunction,
       IsTransparent_t isTransparent, IsSerialized_t isSerialized,
+      IsDynamicallyReplaceable_t isDynamic,
       ProfileCounter entryCount = ProfileCounter(),
       IsThunk_t isThunk = IsNotThunk,
       SubclassScope subclassScope = SubclassScope::NotApplicable);
@@ -85,6 +95,7 @@ class SILFunctionBuilder {
                  CanSILFunctionType loweredType, GenericEnvironment *genericEnv,
                  Optional<SILLocation> loc, IsBare_t isBareSILFunction,
                  IsTransparent_t isTrans, IsSerialized_t isSerialized,
+                 IsDynamicallyReplaceable_t isDynamic,
                  ProfileCounter entryCount = ProfileCounter(),
                  IsThunk_t isThunk = IsNotThunk,
                  SubclassScope subclassScope = SubclassScope::NotApplicable,
@@ -92,6 +103,9 @@ class SILFunctionBuilder {
                  EffectsKind EK = EffectsKind::Unspecified,
                  SILFunction *InsertBefore = nullptr,
                  const SILDebugScope *DebugScope = nullptr);
+
+  void addFunctionAttributes(SILFunction *F, DeclAttributes &Attrs,
+                             SILModule &M, SILDeclRef constant = SILDeclRef());
 };
 } // namespace swift
 

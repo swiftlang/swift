@@ -20,6 +20,7 @@
 #include "GenType.h"
 #include "IRGen.h"
 #include "IRGenModule.h"
+#include "LegacyLayoutFormat.h"
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
@@ -58,47 +59,7 @@ public:
   }
 };
 
-struct YAMLTypeInfoNode {
-  std::string Name;
-  uint64_t Size;
-  uint64_t Alignment;
-  uint64_t NumExtraInhabitants;
-
-  bool operator<(const YAMLTypeInfoNode &other) const {
-    return Name < other.Name;
-  }
-};
-
-struct YAMLModuleNode {
-  StringRef Name;
-  std::vector<YAMLTypeInfoNode> Decls;
-};
-
 } // end anonymous namespace
-
-namespace llvm {
-namespace yaml {
-
-template <> struct MappingTraits<YAMLTypeInfoNode> {
-  static void mapping(IO &io, YAMLTypeInfoNode &node) {
-    io.mapRequired("Name", node.Name);
-    io.mapRequired("Size", node.Size);
-    io.mapRequired("Alignment", node.Alignment);
-    io.mapRequired("ExtraInhabitants", node.NumExtraInhabitants);
-  }
-};
-
-template <> struct MappingTraits<YAMLModuleNode> {
-  static void mapping(IO &io, YAMLModuleNode &node) {
-    io.mapRequired("Name", node.Name);
-    io.mapOptional("Decls", node.Decls);
-  }
-};
-
-} // namespace yaml
-} // namespace llvm
-
-LLVM_YAML_IS_SEQUENCE_VECTOR(YAMLTypeInfoNode);
 
 static std::string mangleTypeAsContext(const NominalTypeDecl *type) {
   Mangle::ASTMangler Mangler;
@@ -150,8 +111,8 @@ static void addYAMLTypeInfoNode(NominalTypeDecl *NTD,
   Result.push_back(createYAMLTypeInfoNode(NTD, IGM, fixedTI));
 }
 
-static YAMLModuleNode createYAMLModuleNode(ModuleDecl *Mod,
-                                           IRGenModule &IGM) {
+static Optional<YAMLModuleNode>
+createYAMLModuleNode(ModuleDecl *Mod, IRGenModule &IGM) {
   std::vector<NominalTypeDecl *> Decls;
   NominalTypeWalker Walker(Decls);
 
@@ -171,9 +132,12 @@ static YAMLModuleNode createYAMLModuleNode(ModuleDecl *Mod,
     }
   }
 
+  if (Nodes.empty())
+    return None;
+
   std::sort(Nodes.begin(), Nodes.end());
 
-  return {Mod->getName().str(), Nodes};
+  return YAMLModuleNode{Mod->getName().str(), Nodes};
 }
 
 void TypeLayoutDumper::write(ArrayRef<ModuleDecl *> AllModules,
@@ -183,7 +147,8 @@ void TypeLayoutDumper::write(ArrayRef<ModuleDecl *> AllModules,
   // Collect all nominal types, including nested types.
   for (auto *Mod : AllModules) {
     auto Node = createYAMLModuleNode(Mod, IGM);
-    yout << Node;
+    if (Node)
+      yout << *Node;
   }
 }
 
@@ -198,7 +163,7 @@ bool swift::performDumpTypeInfo(IRGenOptions &Opts,
   IRGenModule IGM(IRGen, IRGen.createTargetMachine(), LLVMContext);
 
   // We want to bypass resilience.
-  CompletelyFragileScope scope(IGM);
+  LoweringModeScope scope(IGM, TypeConverter::Mode::CompletelyFragile);
 
   auto *Mod = SILMod.getSwiftModule();
   SmallVector<Decl *, 16> AllDecls;

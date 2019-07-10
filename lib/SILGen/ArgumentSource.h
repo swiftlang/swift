@@ -172,6 +172,25 @@ public:
   bool isRValue() const & { return StoredKind == Kind::RValue; }
   bool isLValue() const & { return StoredKind == Kind::LValue; }
 
+  bool isDefaultArg() const {
+    switch (StoredKind) {
+    case Kind::Invalid:
+      llvm_unreachable("argument source is invalid");
+    case Kind::RValue:
+    case Kind::LValue:
+      return false;
+    case Kind::Expr:
+      return isa<DefaultArgumentExpr>(asKnownExpr());
+    }
+    llvm_unreachable("bad kind");
+  }
+
+  /// Return the default argument owner and parameter index, consuming
+  /// the argument source. Will assert if this is not a default argument.
+  DefaultArgumentExpr *asKnownDefaultArg() && {
+    return cast<DefaultArgumentExpr>(std::move(*this).asKnownExpr());
+  }
+
   /// Given that this source is storing an RValue, extract and clear
   /// that value.
   RValue &&asKnownRValue(SILGenFunction &SGF) && {
@@ -195,6 +214,8 @@ public:
   SILLocation getKnownLValueLocation() const & {
     return Storage.get<LValueStorage>(StoredKind).Loc;
   }
+
+  Expr *findStorageReferenceExprForBorrow() &&;
 
   /// Given that this source is an expression, extract and clear
   /// that expression.
@@ -238,9 +259,6 @@ public:
                            AbstractionPattern origFormalType,
                            SILType expectedType = SILType()) &&;
 
-  /// Whether this argument source is a TupleShuffleExpr.
-  bool isShuffle() const;
-
   bool isObviouslyEqual(const ArgumentSource &other) const;
 
   ArgumentSource copyForDiagnostics() const;
@@ -262,14 +280,16 @@ private:
 class PreparedArguments {
   SmallVector<AnyFunctionType::Param, 8> Params;
   std::vector<ArgumentSource> Arguments;
-  unsigned IsScalar : 1;
   unsigned IsNull : 1;
 public:
-  PreparedArguments() : IsScalar(false), IsNull(true) {}
-  PreparedArguments(ArrayRef<AnyFunctionType::Param> params, bool isScalar)
+  PreparedArguments() : IsNull(true) {}
+  explicit PreparedArguments(ArrayRef<AnyFunctionType::Param> params)
       : IsNull(true) {
-    emplace(params, isScalar);
+    emplace(params);
   }
+
+  // Decompse an argument list expression.
+  PreparedArguments(ArrayRef<AnyFunctionType::Param> params, Expr *arg);
 
   // Move-only.
   PreparedArguments(const PreparedArguments &) = delete;
@@ -277,10 +297,9 @@ public:
 
   PreparedArguments(PreparedArguments &&other)
     : Params(std::move(other.Params)), Arguments(std::move(other.Arguments)),
-      IsScalar(other.IsScalar), IsNull(other.IsNull) {}
+      IsNull(other.IsNull) {}
   PreparedArguments &operator=(PreparedArguments &&other) {
     Params = std::move(other.Params);
-    IsScalar = other.IsScalar;
     Arguments = std::move(other.Arguments);
     IsNull = other.IsNull;
     other.IsNull = true;
@@ -295,8 +314,6 @@ public:
   /// Returns true if this is a non-null and completed argument list.
   bool isValid() const {
     assert(!isNull());
-    if (IsScalar)
-      return Arguments.size() == 1;
     return Arguments.size() == Params.size();
   }
 
@@ -306,27 +323,17 @@ public:
     return Params;
   }
 
-  /// Is this a single-argument list?  Note that the argument might be a tuple.
-  bool isScalar() const {
-    assert(!isNull());
-    return IsScalar;
-  }
-
   MutableArrayRef<ArgumentSource> getSources() && {
     assert(isValid());
     return Arguments;
   }
 
   /// Emplace a (probably incomplete) argument list.
-  void emplace(ArrayRef<AnyFunctionType::Param> params, bool isScalar) {
+  void emplace(ArrayRef<AnyFunctionType::Param> params) {
     assert(isNull());
     Params.append(params.begin(), params.end());
-    IsScalar = isScalar;
     IsNull = false;
   }
-
-  /// Emplace an empty argument list.
-  void emplaceEmptyArgumentList(SILGenFunction &SGF);
 
   /// Add an emitted r-value argument to this argument list.
   void add(SILLocation loc, RValue &&arg) {

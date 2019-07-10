@@ -16,29 +16,27 @@ import SwiftShims
 
 /// Equivalent to `NSDictionary.allKeys`, but does not leave objects on the
 /// autorelease pool.
-@inlinable
 internal func _stdlib_NSDictionary_allKeys(
-  _ nsd: _NSDictionary
-) -> _HeapBuffer<Int, AnyObject> {
+  _ object: AnyObject
+) -> _BridgingBuffer {
+  let nsd = unsafeBitCast(object, to: _NSDictionary.self)
   let count = nsd.count
-  let storage = _HeapBuffer<Int, AnyObject>(
-    _HeapBufferStorage<Int, AnyObject>.self, count, count)
-
+  let storage = _BridgingBuffer(count)
   nsd.getObjects(nil, andKeys: storage.baseAddress, count: count)
   return storage
 }
 
 extension _NativeDictionary { // Bridging
   @usableFromInline
-  __consuming internal func bridged() -> _NSDictionary {
+  __consuming internal func bridged() -> AnyObject {
     // We can zero-cost bridge if our keys are verbatim
     // or if we're the empty singleton.
 
-    // Temporary var for SOME type safety before a cast.
+    // Temporary var for SOME type safety.
     let nsDictionary: _NSDictionaryCore
 
-    if _storage === _RawDictionaryStorage.empty || count == 0 {
-      nsDictionary = _RawDictionaryStorage.empty
+    if _storage === __RawDictionaryStorage.empty || count == 0 {
+      nsDictionary = __RawDictionaryStorage.empty
     } else if _isBridgedVerbatimToObjectiveC(Key.self),
       _isBridgedVerbatimToObjectiveC(Value.self) {
       nsDictionary = unsafeDowncast(
@@ -48,10 +46,7 @@ extension _NativeDictionary { // Bridging
       nsDictionary = _SwiftDeferredNSDictionary(self)
     }
 
-    // Cast from "minimal NSDictionary" to "NSDictionary"
-    // Note that if you actually ask Swift for this cast, it will fail.
-    // Never trust a shadow protocol!
-    return unsafeBitCast(nsDictionary, to: _NSDictionary.self)
+    return nsDictionary
   }
 }
 
@@ -61,34 +56,36 @@ final internal class _SwiftDictionaryNSEnumerator<Key: Hashable, Value>
   : __SwiftNativeNSEnumerator, _NSEnumerator {
 
   @nonobjc internal var base: _NativeDictionary<Key, Value>
-  @nonobjc internal var bridgedKeys: _BridgingHashBuffer?
+  @nonobjc internal var bridgedKeys: __BridgingHashBuffer?
   @nonobjc internal var nextBucket: _NativeDictionary<Key, Value>.Bucket
   @nonobjc internal var endBucket: _NativeDictionary<Key, Value>.Bucket
 
   @objc
   internal override required init() {
-    _sanityCheckFailure("don't call this designated initializer")
+    _internalInvariantFailure("don't call this designated initializer")
   }
 
   internal init(_ base: __owned _NativeDictionary<Key, Value>) {
-    _sanityCheck(_isBridgedVerbatimToObjectiveC(Key.self))
+    _internalInvariant(_isBridgedVerbatimToObjectiveC(Key.self))
     self.base = base
     self.bridgedKeys = nil
     self.nextBucket = base.hashTable.startBucket
     self.endBucket = base.hashTable.endBucket
+    super.init()
   }
 
   @nonobjc
   internal init(_ deferred: __owned _SwiftDeferredNSDictionary<Key, Value>) {
-    _sanityCheck(!_isBridgedVerbatimToObjectiveC(Key.self))
+    _internalInvariant(!_isBridgedVerbatimToObjectiveC(Key.self))
     self.base = deferred.native
     self.bridgedKeys = deferred.bridgeKeys()
     self.nextBucket = base.hashTable.startBucket
     self.endBucket = base.hashTable.endBucket
+    super.init()
   }
 
   private func bridgedKey(at bucket: _HashTable.Bucket) -> AnyObject {
-    _sanityCheck(base.hashTable.isOccupied(bucket))
+    _internalInvariant(base.hashTable.isOccupied(bucket))
     if let bridgedKeys = self.bridgedKeys {
       return bridgedKeys[bucket]
     }
@@ -162,8 +159,8 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
   internal var native: _NativeDictionary<Key, Value>
 
   internal init(_ native: __owned _NativeDictionary<Key, Value>) {
-    _sanityCheck(native.count > 0)
-    _sanityCheck(!_isBridgedVerbatimToObjectiveC(Key.self) ||
+    _internalInvariant(native.count > 0)
+    _internalInvariant(!_isBridgedVerbatimToObjectiveC(Key.self) ||
       !_isBridgedVerbatimToObjectiveC(Value.self))
     self.native = native
     super.init()
@@ -175,7 +172,7 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
     forKeys: UnsafeRawPointer,
     count: Int
   ) {
-    _sanityCheckFailure("don't call this designated initializer")
+    _internalInvariantFailure("don't call this designated initializer")
   }
 
   @nonobjc
@@ -191,41 +188,41 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
 
   /// The buffer for bridged keys, if present.
   @nonobjc
-  private var _bridgedKeys: _BridgingHashBuffer? {
+  private var _bridgedKeys: __BridgingHashBuffer? {
     guard let ref = _stdlib_atomicLoadARCRef(object: _bridgedKeysPtr) else {
       return nil
     }
-    return unsafeDowncast(ref, to: _BridgingHashBuffer.self)
+    return unsafeDowncast(ref, to: __BridgingHashBuffer.self)
   }
 
   /// The buffer for bridged values, if present.
   @nonobjc
-  private var _bridgedValues: _BridgingHashBuffer? {
+  private var _bridgedValues: __BridgingHashBuffer? {
     guard let ref = _stdlib_atomicLoadARCRef(object: _bridgedValuesPtr) else {
       return nil
     }
-    return unsafeDowncast(ref, to: _BridgingHashBuffer.self)
+    return unsafeDowncast(ref, to: __BridgingHashBuffer.self)
   }
 
   /// Attach a buffer for bridged Dictionary keys.
   @nonobjc
-  private func _initializeBridgedKeys(_ storage: _BridgingHashBuffer) {
+  private func _initializeBridgedKeys(_ storage: __BridgingHashBuffer) {
     _stdlib_atomicInitializeARCRef(object: _bridgedKeysPtr, desired: storage)
   }
 
   /// Attach a buffer for bridged Dictionary values.
   @nonobjc
-  private func _initializeBridgedValues(_ storage: _BridgingHashBuffer) {
+  private func _initializeBridgedValues(_ storage: __BridgingHashBuffer) {
     _stdlib_atomicInitializeARCRef(object: _bridgedValuesPtr, desired: storage)
   }
 
   @nonobjc
-  internal func bridgeKeys() -> _BridgingHashBuffer? {
+  internal func bridgeKeys() -> __BridgingHashBuffer? {
     if _isBridgedVerbatimToObjectiveC(Key.self) { return nil }
     if let bridgedKeys = _bridgedKeys { return bridgedKeys }
 
     // Allocate and initialize heap storage for bridged keys.
-    let bridged = _BridgingHashBuffer.allocate(
+    let bridged = __BridgingHashBuffer.allocate(
       owner: native._storage,
       hashTable: native.hashTable)
     for bucket in native.hashTable {
@@ -239,12 +236,12 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
   }
 
   @nonobjc
-  internal func bridgeValues() -> _BridgingHashBuffer? {
+  internal func bridgeValues() -> __BridgingHashBuffer? {
     if _isBridgedVerbatimToObjectiveC(Value.self) { return nil }
     if let bridgedValues = _bridgedValues { return bridgedValues }
 
     // Allocate and initialize heap storage for bridged values.
-    let bridged = _BridgingHashBuffer.allocate(
+    let bridged = __BridgingHashBuffer.allocate(
       owner: native._storage,
       hashTable: native.hashTable)
     for bucket in native.hashTable {
@@ -268,7 +265,7 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
   @inline(__always)
   private func _key(
     at bucket: Bucket,
-    bridgedKeys: _BridgingHashBuffer?
+    bridgedKeys: __BridgingHashBuffer?
   ) -> AnyObject {
     if let bridgedKeys = bridgedKeys {
       return bridgedKeys[bucket]
@@ -279,7 +276,7 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
   @inline(__always)
   private func _value(
     at bucket: Bucket,
-    bridgedValues: _BridgingHashBuffer?
+    bridgedValues: __BridgingHashBuffer?
   ) -> AnyObject {
     if let bridgedValues = bridgedValues {
       return bridgedValues[bucket]
@@ -422,29 +419,30 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
   }
 }
 
+// NOTE: older runtimes called this struct _CocoaDictionary. The two
+// must coexist without conflicting ObjC class names from the nested
+// classes, so it was renamed. The old names must not be used in the new
+// runtime.
 @usableFromInline
-@_fixed_layout
-internal struct _CocoaDictionary {
+@frozen
+internal struct __CocoaDictionary {
   @usableFromInline
-  internal let object: _NSDictionary
+  internal let object: AnyObject
 
   @inlinable
-  internal init(_ object: __owned _NSDictionary) {
+  internal init(_ object: __owned AnyObject) {
     self.object = object
   }
 }
 
-extension _CocoaDictionary: Equatable {
+extension __CocoaDictionary {
   @usableFromInline
-  internal static func ==(
-    lhs: _CocoaDictionary,
-    rhs: _CocoaDictionary
-  ) -> Bool {
-    return _stdlib_NSObject_isEqual(lhs.object, rhs.object)
+  internal func isEqual(to other: __CocoaDictionary) -> Bool {
+    return _stdlib_NSObject_isEqual(self.object, other.object)
   }
 }
 
-extension _CocoaDictionary: _DictionaryBuffer {
+extension __CocoaDictionary: _DictionaryBuffer {
   @usableFromInline
   internal typealias Key = AnyObject
   @usableFromInline
@@ -455,7 +453,7 @@ extension _CocoaDictionary: _DictionaryBuffer {
     @_effects(releasenone)
     get {
       let allKeys = _stdlib_NSDictionary_allKeys(self.object)
-      return Index(Index.Storage(self, allKeys, 0))
+      return Index(Index.Storage(self, allKeys), offset: 0)
     }
   }
 
@@ -464,30 +462,29 @@ extension _CocoaDictionary: _DictionaryBuffer {
     @_effects(releasenone)
     get {
       let allKeys = _stdlib_NSDictionary_allKeys(self.object)
-      return Index(Index.Storage(self, allKeys, allKeys.value))
+      return Index(Index.Storage(self, allKeys), offset: allKeys.count)
     }
   }
 
   @usableFromInline // FIXME(cocoa-index): Should be inlinable
   @_effects(releasenone)
   internal func index(after index: Index) -> Index {
-    var result = index.copy()
-    formIndex(after: &result, isUnique: true)
+    validate(index)
+    var result = index
+    result._offset += 1
     return result
   }
 
   internal func validate(_ index: Index) {
     _precondition(index.storage.base.object === self.object, "Invalid index")
-    _precondition(index.storage.currentKeyIndex < index.storage.allKeys.value,
+    _precondition(index._offset < index.storage.allKeys.count,
       "Attempt to access endIndex")
   }
 
   @usableFromInline // FIXME(cocoa-index): Should be inlinable
   internal func formIndex(after index: inout Index, isUnique: Bool) {
     validate(index)
-    if !isUnique { index = index.copy() }
-    let storage = index.storage // FIXME: rdar://problem/44863751
-    storage.currentKeyIndex += 1
+    index._offset += 1
   }
 
   @usableFromInline // FIXME(cocoa-index): Should be inlinable
@@ -502,37 +499,38 @@ extension _CocoaDictionary: _DictionaryBuffer {
     }
 
     let allKeys = _stdlib_NSDictionary_allKeys(object)
-    for i in 0..<allKeys.value {
+    for i in 0..<allKeys.count {
       if _stdlib_NSObject_isEqual(key, allKeys[i]) {
-        return Index(Index.Storage(self, allKeys, i))
+        return Index(Index.Storage(self, allKeys), offset: i)
       }
     }
-    _sanityCheckFailure(
+    _internalInvariantFailure(
       "An NSDictionary key wassn't listed amongst its enumerated contents")
   }
 
-  @inlinable
+  @usableFromInline
   internal var count: Int {
-    return object.count
+    let nsd = unsafeBitCast(object, to: _NSDictionary.self)
+    return nsd.count
   }
 
-  @inlinable
-  @inline(__always)
+  @usableFromInline
   internal func contains(_ key: Key) -> Bool {
-    return object.object(forKey: key) != nil
+    let nsd = unsafeBitCast(object, to: _NSDictionary.self)
+    return nsd.object(forKey: key) != nil
   }
 
-  @inlinable
-  @inline(__always)
+  @usableFromInline
   internal func lookup(_ key: Key) -> Value? {
-    return object.object(forKey: key)
+    let nsd = unsafeBitCast(object, to: _NSDictionary.self)
+    return nsd.object(forKey: key)
   }
 
   @usableFromInline // FIXME(cocoa-index): Should be inlinable
   @_effects(releasenone)
   internal func lookup(_ index: Index) -> (key: Key, value: Value) {
     _precondition(index.storage.base.object === self.object, "Invalid index")
-    let key: Key = index.storage.allKeys[index.storage.currentKeyIndex]
+    let key: Key = index.storage.allKeys[index._offset]
     let value: Value = index.storage.base.object.object(forKey: key)!
     return (key, value)
   }
@@ -548,12 +546,12 @@ extension _CocoaDictionary: _DictionaryBuffer {
   @_effects(releasenone)
   func value(at index: Index) -> Value {
     _precondition(index.storage.base.object === self.object, "Invalid index")
-    let key = index.storage.allKeys[index.storage.currentKeyIndex]
+    let key = index.storage.allKeys[index._offset]
     return index.storage.base.object.object(forKey: key)!
   }
 }
 
-extension _CocoaDictionary {
+extension __CocoaDictionary {
   @inlinable
   internal func mapValues<Key: Hashable, Value, T>(
     _ transform: (Value) throws -> T
@@ -568,21 +566,12 @@ extension _CocoaDictionary {
   }
 }
 
-extension _CocoaDictionary {
-  @_fixed_layout
+extension __CocoaDictionary {
+  @frozen
   @usableFromInline
   internal struct Index {
-    @usableFromInline
-    internal var _object: Builtin.BridgeObject
-    @usableFromInline
     internal var _storage: Builtin.BridgeObject
-
-    internal var object: AnyObject {
-      @inline(__always)
-      get {
-        return _bridgeObject(toNonTaggedObjC: _object)
-      }
-    }
+    internal var _offset: Int
 
     internal var storage: Storage {
       @inline(__always)
@@ -592,14 +581,14 @@ extension _CocoaDictionary {
       }
     }
 
-    internal init(_ storage: Storage) {
-      self._object = _bridgeObject(fromNonTaggedObjC: storage.base.object)
+    internal init(_ storage: Storage, offset: Int) {
       self._storage = _bridgeObject(fromNative: storage)
+      self._offset = offset
     }
   }
 }
 
-extension _CocoaDictionary.Index {
+extension __CocoaDictionary.Index {
   // FIXME(cocoa-index): Try using an NSEnumerator to speed this up.
   internal class Storage {
   // Assumption: we rely on NSDictionary.getObjects when being
@@ -609,30 +598,25 @@ extension _CocoaDictionary.Index {
 
     /// A reference to the NSDictionary, which owns members in `allObjects`,
     /// or `allKeys`, for NSSet and NSDictionary respectively.
-    internal let base: _CocoaDictionary
+    internal let base: __CocoaDictionary
     // FIXME: swift-3-indexing-model: try to remove the cocoa reference, but
     // make sure that we have a safety check for accessing `allKeys`.  Maybe
     // move both into the dictionary/set itself.
 
     /// An unowned array of keys.
-    internal var allKeys: _HeapBuffer<Int, AnyObject>
-
-    /// Index into `allKeys`
-    internal var currentKeyIndex: Int
+    internal var allKeys: _BridgingBuffer
 
     internal init(
-      _ base: __owned _CocoaDictionary,
-      _ allKeys: __owned _HeapBuffer<Int, AnyObject>,
-      _ currentKeyIndex: Int
+      _ base: __owned __CocoaDictionary,
+      _ allKeys: __owned _BridgingBuffer
     ) {
       self.base = base
       self.allKeys = allKeys
-      self.currentKeyIndex = currentKeyIndex
     }
   }
 }
 
-extension _CocoaDictionary.Index {
+extension __CocoaDictionary.Index {
   @usableFromInline
   internal var handleBitPattern: UInt {
     @_effects(readonly)
@@ -642,24 +626,23 @@ extension _CocoaDictionary.Index {
   }
 
   @usableFromInline
-  internal func copy() -> _CocoaDictionary.Index {
-    let storage = self.storage
-    return _CocoaDictionary.Index(Storage(
-        storage.base,
-        storage.allKeys,
-        storage.currentKeyIndex))
+  internal var dictionary: __CocoaDictionary {
+    @_effects(releasenone)
+    get {
+      return storage.base
+    }
   }
 }
 
-extension _CocoaDictionary.Index {
+extension __CocoaDictionary.Index {
   @usableFromInline // FIXME(cocoa-index): Make inlinable
   @nonobjc
   internal var key: AnyObject {
     @_effects(readonly)
     get {
-      _precondition(storage.currentKeyIndex < storage.allKeys.value,
+      _precondition(_offset < storage.allKeys.count,
         "Attempting to access Dictionary elements using an invalid index")
-      return storage.allKeys[storage.currentKeyIndex]
+      return storage.allKeys[_offset]
     }
   }
 
@@ -668,38 +651,38 @@ extension _CocoaDictionary.Index {
   internal var age: Int32 {
     @_effects(readonly)
     get {
-      return _HashTable.age(for: object)
+      return _HashTable.age(for: storage.base.object)
     }
   }
 }
 
-extension _CocoaDictionary.Index: Equatable {
+extension __CocoaDictionary.Index: Equatable {
   @usableFromInline // FIXME(cocoa-index): Make inlinable
   @_effects(readonly)
   internal static func == (
-    lhs: _CocoaDictionary.Index,
-    rhs: _CocoaDictionary.Index
+    lhs: __CocoaDictionary.Index,
+    rhs: __CocoaDictionary.Index
   ) -> Bool {
     _precondition(lhs.storage.base.object === rhs.storage.base.object,
       "Comparing indexes from different dictionaries")
-    return lhs.storage.currentKeyIndex == rhs.storage.currentKeyIndex
+    return lhs._offset == rhs._offset
   }
 }
 
-extension _CocoaDictionary.Index: Comparable {
+extension __CocoaDictionary.Index: Comparable {
   @usableFromInline // FIXME(cocoa-index): Make inlinable
   @_effects(readonly)
   internal static func < (
-    lhs: _CocoaDictionary.Index,
-    rhs: _CocoaDictionary.Index
+    lhs: __CocoaDictionary.Index,
+    rhs: __CocoaDictionary.Index
   ) -> Bool {
     _precondition(lhs.storage.base.object === rhs.storage.base.object,
       "Comparing indexes from different dictionaries")
-    return lhs.storage.currentKeyIndex < rhs.storage.currentKeyIndex
+    return lhs._offset < rhs._offset
   }
 }
 
-extension _CocoaDictionary: Sequence {
+extension __CocoaDictionary: Sequence {
   @usableFromInline
   final internal class Iterator {
     // Cocoa Dictionary iterator has to be a class, otherwise we cannot
@@ -715,7 +698,7 @@ extension _CocoaDictionary: Sequence {
     // `_fastEnumerationState`.  There's code below relying on this.
     internal var _fastEnumerationStackBuf = _CocoaFastEnumerationStackBuf()
 
-    internal let base: _CocoaDictionary
+    internal let base: __CocoaDictionary
 
     internal var _fastEnumerationStatePtr:
       UnsafeMutablePointer<_SwiftNSFastEnumerationState> {
@@ -736,7 +719,7 @@ extension _CocoaDictionary: Sequence {
     internal var itemIndex: Int = 0
     internal var itemCount: Int = 0
 
-    internal init(_ base: __owned _CocoaDictionary) {
+    internal init(_ base: __owned __CocoaDictionary) {
       self.base = base
     }
   }
@@ -748,7 +731,7 @@ extension _CocoaDictionary: Sequence {
   }
 }
 
-extension _CocoaDictionary.Iterator: IteratorProtocol {
+extension __CocoaDictionary.Iterator: IteratorProtocol {
   @usableFromInline
   internal typealias Element = (key: AnyObject, value: AnyObject)
 
@@ -796,13 +779,11 @@ extension _CocoaDictionary.Iterator: IteratorProtocol {
 
 extension Dictionary {
   @inlinable
-  public __consuming func _bridgeToObjectiveCImpl() -> _NSDictionaryCore {
-    switch _variant {
-    case .native(let nativeDictionary):
-      return nativeDictionary.bridged()
-    case .cocoa(let cocoaDictionary):
-      return cocoaDictionary.object
+  public __consuming func _bridgeToObjectiveCImpl() -> AnyObject {
+    guard _variant.isNative else {
+      return _variant.asCocoa.object
     }
+    return _variant.asNative.bridged()
   }
 
   /// Returns the native Dictionary hidden inside this NSDictionary;
@@ -821,7 +802,7 @@ extension Dictionary {
       return Dictionary(_native: _NativeDictionary(nativeStorage))
     }
 
-    if s === _RawDictionaryStorage.empty {
+    if s === __RawDictionaryStorage.empty {
       return Dictionary()
     }
 

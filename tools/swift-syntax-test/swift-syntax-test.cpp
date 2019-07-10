@@ -246,11 +246,10 @@ struct ByteBasedSourceRange {
 
   bool empty() { return Start == End; }
 
-  SourceRange toSourceRange(SourceManager &SourceMgr, unsigned BufferID) {
+  CharSourceRange toCharSourceRange(SourceManager &SourceMgr, unsigned BufferID) {
     auto StartLoc = SourceMgr.getLocForOffset(BufferID, Start);
-    // SourceRange includes the last offset, we don't. So subtract 1
-    auto EndLoc = SourceMgr.getLocForOffset(BufferID, End - 1);
-    return SourceRange(StartLoc, EndLoc);
+    auto EndLoc = SourceMgr.getLocForOffset(BufferID, End);
+    return CharSourceRange(SourceMgr, StartLoc, EndLoc);
   }
 };
 
@@ -539,12 +538,11 @@ bool verifyReusedRegions(ByteBasedSourceRangeSet ExpectedReparseRegions,
   bool NoUnexpectedParse = true;
 
   for (auto ReparseRegion : UnexpectedReparseRegions.Ranges) {
-    auto ReparseRange = ReparseRegion.toSourceRange(SourceMgr, BufferID);
+    auto ReparseRange = ReparseRegion.toCharSourceRange(SourceMgr, BufferID);
 
     // To improve the ergonomics when writing tests we do not want to complain
     // about reparsed whitespaces.
-    auto RangeStr =
-        CharSourceRange(SourceMgr, ReparseRange.Start, ReparseRange.End).str();
+    auto RangeStr = ReparseRange.str();
     llvm::Regex WhitespaceOnlyRegex("^[ \t\r\n]*$");
     if (WhitespaceOnlyRegex.match(RangeStr)) {
       continue;
@@ -602,6 +600,8 @@ int parseFile(
   Invocation.getLangOptions().VerifySyntaxTree = options::VerifySyntaxTree;
   Invocation.getLangOptions().RequestEvaluatorGraphVizPath = options::GraphVisPath;
   Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(InputFileName);
+  if (InputFileName.endswith(".swiftinterface"))
+    Invocation.setInputKind(InputFileKind::SwiftModuleInterface);
   Invocation.setMainExecutablePath(
     llvm::sys::fs::getMainExecutable(MainExecutablePath,
       reinterpret_cast<void *>(&anchorForGetMainExecutable)));
@@ -735,8 +735,7 @@ int doSerializeRawTree(const char *MainExecutablePath,
         return EXIT_FAILURE;
       }
 
-      swift::ExponentialGrowthAppendingBinaryByteStream Stream(
-          llvm::support::endianness::little);
+      auto Stream = ExponentialGrowthAppendingBinaryByteStream();
       Stream.reserve(32 * 1024);
       std::map<void *, void *> UserInfo;
       UserInfo[swift::byteTree::UserInfoKeyReusedNodeIds] = &ReusedNodeIds;

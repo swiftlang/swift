@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -105,9 +105,6 @@ FRONTEND_STATISTIC(AST, NumLinkLibraries)
 /// Number of top-level modules loaded in the AST context.
 FRONTEND_STATISTIC(AST, NumLoadedModules)
 
-/// Number of external definitions imported into the AST context.
-FRONTEND_STATISTIC(AST, NumImportedExternalDefinitions)
-
 /// Number of Clang entities imported into the AST context.
 FRONTEND_STATISTIC(AST, NumTotalClangImportedEntities)
 
@@ -141,8 +138,8 @@ FRONTEND_STATISTIC(AST, NumPrefixOperators)
 /// Number of precedence groups in the AST context.
 FRONTEND_STATISTIC(AST, NumPrecedenceGroups)
 
-/// Number of conformances used by code processed by this frontend job.
-FRONTEND_STATISTIC(AST, NumUsedConformances)
+/// Number of precedence groups in the AST context.
+FRONTEND_STATISTIC(AST, NumStoredPropertiesQueries)
 
 /// Number of full function bodies parsed.
 FRONTEND_STATISTIC(Parse, NumFunctionsParsed)
@@ -158,6 +155,15 @@ FRONTEND_STATISTIC(Sema, NumConformancesDeserialized)
 /// expression typechecker did".
 FRONTEND_STATISTIC(Sema, NumConstraintScopes)
 
+/// Number of constraint-solving scopes that were created but which
+/// did not themselves lead to the creation of further scopes, either
+/// because we successfully found a solution, or some constraint failed.
+///
+/// Note: This can vary based on the number of connected components we
+/// generate, since each connected component will itself have at least
+/// one leaf scope.
+FRONTEND_STATISTIC(Sema, NumLeafScopes)
+
 /// Number of constraints considered per attempt to
 /// contract constraint graph edges.
 /// This is a measure of complexity of the contraction algorithm.
@@ -170,6 +176,12 @@ FRONTEND_STATISTIC(Sema, NumDeclsDeserialized)
 /// Number of declarations validated.
 FRONTEND_STATISTIC(Sema, NumDeclsValidated)
 
+/// Number of declarations type checked.
+FRONTEND_STATISTIC(Sema, NumDeclsTypechecked)
+
+/// Number of declarations finalized.
+FRONTEND_STATISTIC(Sema, NumDeclsFinalized)
+
 /// Number of full function bodies typechecked.
 FRONTEND_STATISTIC(Sema, NumFunctionsTypechecked)
 
@@ -177,11 +189,17 @@ FRONTEND_STATISTIC(Sema, NumFunctionsTypechecked)
 /// amount of work the GSB does analyzing type signatures.
 FRONTEND_STATISTIC(Sema, NumGenericSignatureBuilders)
 
-/// Number of lazy generic environments built.
+/// Number of lazy generic environments registered.
 FRONTEND_STATISTIC(Sema, NumLazyGenericEnvironments)
 
 /// Number of lazy generic environments deserialized.
 FRONTEND_STATISTIC(Sema, NumLazyGenericEnvironmentsLoaded)
+
+/// Number of lazy requirement signatures registered.
+FRONTEND_STATISTIC(Sema, NumLazyRequirementSignatures)
+
+/// Number of lazy requirement signatures deserialized.
+FRONTEND_STATISTIC(Sema, NumLazyRequirementSignaturesLoaded)
 
 /// Number of lazy iterable declaration contexts constructed.
 FRONTEND_STATISTIC(Sema, NumLazyIterableDeclContexts)

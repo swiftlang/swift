@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -specdevirt -code-sinking  | %FileCheck %s
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -specdevirt -code-sinking  -wmo | %FileCheck --check-prefix=CHECK-WMO %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -specdevirt -code-sinking  | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -specdevirt -code-sinking  -wmo | %FileCheck --check-prefix=CHECK-WMO %s
 
 sil_stage canonical
 

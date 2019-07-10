@@ -75,4 +75,14 @@ BOOL identityOfData(NSData *data);
 - (BOOL)verifyKeysInRange:(NSRange)range existInDictionary:(NSDictionary *)dictionary;
 @end
 
+#pragma mark - NSString bridging
+
+static inline NSString *getNSStringEqualTestString() {
+  return [NSString stringWithUTF8String:"2166002315@874404110.1042078977"];
+}
+
+static inline BOOL NSStringBridgeTestEqual(NSString * _Nonnull a, NSString * _Nonnull b) {
+  return [a isEqual:b];
+}
+
 NS_ASSUME_NONNULL_END

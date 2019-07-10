@@ -13,20 +13,62 @@
 import TestsUtils
 import Foundation
 
+let t: [BenchmarkCategory] = [.validation, .algorithm]
+let ts: [BenchmarkCategory] = [.validation, .algorithm, .String]
+
 public let MapReduce = [
-  BenchmarkInfo(name: "MapReduce", runFunction: run_MapReduce, tags: [.validation, .algorithm]),
-  BenchmarkInfo(name: "MapReduceAnyCollection", runFunction: run_MapReduceAnyCollection, tags: [.validation, .algorithm]),
-  BenchmarkInfo(name: "MapReduceAnyCollectionShort", runFunction: run_MapReduceAnyCollectionShort, tags: [.validation, .algorithm]),
-  BenchmarkInfo(name: "MapReduceClass", runFunction: run_MapReduceClass, tags: [.validation, .algorithm]),
-  BenchmarkInfo(name: "MapReduceClassShort", runFunction: run_MapReduceClassShort, tags: [.validation, .algorithm]),
-  BenchmarkInfo(name: "MapReduceLazyCollection", runFunction: run_MapReduceLazyCollection, tags: [.validation, .algorithm]),
-  BenchmarkInfo(name: "MapReduceLazyCollectionShort", runFunction: run_MapReduceLazyCollectionShort, tags: [.validation, .algorithm]),
-  BenchmarkInfo(name: "MapReduceLazySequence", runFunction: run_MapReduceLazySequence, tags: [.validation, .algorithm]),
-  BenchmarkInfo(name: "MapReduceSequence", runFunction: run_MapReduceSequence, tags: [.validation, .algorithm]),
-  BenchmarkInfo(name: "MapReduceShort", runFunction: run_MapReduceShort, tags: [.validation, .algorithm]),
-  BenchmarkInfo(name: "MapReduceShortString", runFunction: run_MapReduceShortString, tags: [.validation, .algorithm, .String]),
-  BenchmarkInfo(name: "MapReduceString", runFunction: run_MapReduceString, tags: [.validation, .algorithm, .String]),
+  BenchmarkInfo(name: "MapReduce", runFunction: run_MapReduce, tags: t),
+  BenchmarkInfo(name: "MapReduceAnyCollection",
+    runFunction: run_MapReduceAnyCollection, tags: t),
+  BenchmarkInfo(name: "MapReduceAnyCollectionShort",
+    runFunction: run_MapReduceAnyCollectionShort, tags: t, legacyFactor: 10),
+  BenchmarkInfo(name: "MapReduceClass2",
+    runFunction: run_MapReduceClass, tags: t,
+    setUpFunction: { boxedNumbers(1000) }, tearDownFunction: releaseDecimals),
+  BenchmarkInfo(name: "MapReduceClassShort2",
+    runFunction: run_MapReduceClassShort, tags: t,
+    setUpFunction: { boxedNumbers(10) }, tearDownFunction: releaseDecimals),
+  BenchmarkInfo(name: "MapReduceNSDecimalNumber",
+    runFunction: run_MapReduceNSDecimalNumber, tags: t,
+    setUpFunction: { decimals(1000) }, tearDownFunction: releaseDecimals),
+  BenchmarkInfo(name: "MapReduceNSDecimalNumberShort",
+    runFunction: run_MapReduceNSDecimalNumberShort, tags: t,
+    setUpFunction: { decimals(10) }, tearDownFunction: releaseDecimals),
+  BenchmarkInfo(name: "MapReduceLazyCollection",
+    runFunction: run_MapReduceLazyCollection, tags: t),
+  BenchmarkInfo(name: "MapReduceLazyCollectionShort",
+    runFunction: run_MapReduceLazyCollectionShort, tags: t),
+  BenchmarkInfo(name: "MapReduceLazySequence",
+    runFunction: run_MapReduceLazySequence, tags: t),
+  BenchmarkInfo(name: "MapReduceSequence",
+    runFunction: run_MapReduceSequence, tags: t),
+  BenchmarkInfo(name: "MapReduceShort",
+    runFunction: run_MapReduceShort, tags: t, legacyFactor: 10),
+  BenchmarkInfo(name: "MapReduceShortString",
+    runFunction: run_MapReduceShortString, tags: ts),
+  BenchmarkInfo(name: "MapReduceString",
+    runFunction: run_MapReduceString, tags: ts),
 ]
+
+#if _runtime(_ObjC)
+var decimals : [NSDecimalNumber]!
+func decimals(_ n: Int) {
+  decimals = (0..<n).map { NSDecimalNumber(value: $0) }
+}
+func releaseDecimals() { decimals = nil }
+#else
+func decimals(_ n: Int) {}
+func releaseDecimals() {}
+#endif
+
+class Box {
+  var v: Int
+  init(_ v: Int) { self.v = v }
+}
+
+var boxedNumbers : [Box]!
+func boxedNumbers(_ n: Int) { boxedNumbers = (0..<n).map { Box($0) } }
+func releaseboxedNumbers() { boxedNumbers = nil }
 
 @inline(never)
 public func run_MapReduce(_ N: Int) {
@@ -57,7 +99,7 @@ public func run_MapReduceAnyCollectionShort(_ N: Int) {
   let numbers = AnyCollection([Int](0..<10))
 
   var c = 0
-  for _ in 1...N*10000 {
+  for _ in 1...N*1_000 {
     let mapped = numbers.map { $0 &+ 5 }
     c += mapped.reduce(0, &+)
   }
@@ -69,7 +111,7 @@ public func run_MapReduceShort(_ N: Int) {
   var numbers = [Int](0..<10)
 
   var c = 0
-  for _ in 1...N*10000 {
+  for _ in 1...N*1_000 {
     numbers = numbers.map { $0 &+ 5 }
     c += numbers.reduce(0, &+)
   }
@@ -147,12 +189,12 @@ public func run_MapReduceShortString(_ N: Int) {
 }
 
 @inline(never)
-public func run_MapReduceClass(_ N: Int) {
+public func run_MapReduceNSDecimalNumber(_ N: Int) {
 #if _runtime(_ObjC)
-  let numbers = (0..<1000).map { NSDecimalNumber(value: $0) }
+  let numbers: [NSDecimalNumber] = decimals
 
   var c = 0
-  for _ in 1...N*100 {
+  for _ in 1...N*10 {
     let mapped = numbers.map { $0.intValue &+ 5 }
     c += mapped.reduce(0, &+)
   }
@@ -161,12 +203,12 @@ public func run_MapReduceClass(_ N: Int) {
 }
 
 @inline(never)
-public func run_MapReduceClassShort(_ N: Int) {
+public func run_MapReduceNSDecimalNumberShort(_ N: Int) {
 #if _runtime(_ObjC)
-  let numbers = (0..<10).map { NSDecimalNumber(value: $0) }
+  let numbers: [NSDecimalNumber] = decimals
 
   var c = 0
-  for _ in 1...N*10000 {
+  for _ in 1...N*1_000 {
     let mapped = numbers.map { $0.intValue &+ 5 }
     c += mapped.reduce(0, &+)
   }
@@ -174,3 +216,27 @@ public func run_MapReduceClassShort(_ N: Int) {
 #endif
 }
 
+
+@inline(never)
+public func run_MapReduceClass(_ N: Int) {
+  let numbers: [Box] = boxedNumbers
+
+  var c = 0
+  for _ in 1...N*10 {
+    let mapped = numbers.map { $0.v &+ 5 }
+    c += mapped.reduce(0, &+)
+  }
+  CheckResults(c != 0)
+}
+
+@inline(never)
+public func run_MapReduceClassShort(_ N: Int) {
+  let numbers: [Box] = boxedNumbers
+
+  var c = 0
+  for _ in 1...N*1_000 {
+    let mapped = numbers.map { $0.v &+ 5 }
+    c += mapped.reduce(0, &+)
+  }
+  CheckResults(c != 0)
+}

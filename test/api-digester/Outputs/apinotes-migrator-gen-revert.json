@@ -155,6 +155,17 @@
   },
   {
     "DiffItemKind": "CommonDiffItem",
+    "NodeKind": "Constructor",
+    "NodeAnnotation": "UnwrapOptional",
+    "ChildIndex": "0",
+    "LeftUsr": "c:objc(cs)Cat(im)initWithName:",
+    "LeftComment": "",
+    "RightUsr": "",
+    "RightComment": "",
+    "ModuleName": "APINotesTest"
+  },
+  {
+    "DiffItemKind": "CommonDiffItem",
     "NodeKind": "TypeDecl",
     "NodeAnnotation": "Rename",
     "ChildIndex": "0",

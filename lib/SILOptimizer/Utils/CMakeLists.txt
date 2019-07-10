@@ -1,8 +1,10 @@
 silopt_register_sources(
   CFG.cpp
+  CanonicalizeInstruction.cpp
   CastOptimizer.cpp
   CheckedCastBrJumpThreading.cpp
   ConstantFolding.cpp
+  ConstExpr.cpp
   Devirtualize.cpp
   Existential.cpp
   GenericCloner.cpp

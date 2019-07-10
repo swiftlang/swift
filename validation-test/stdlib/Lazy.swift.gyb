@@ -552,8 +552,8 @@ LazyTestSuite.test("Lazy${TraversalCollection}.reversed") {
     underestimatedCount: .value(42))
   var reversed = base.lazy.reversed()
   expectType(
-    LazyCollection<
-      ${ReversedType}<Minimal${TraversalCollection}<OpaqueValue<Int>>>
+    ${ReversedType}<LazyCollection
+      <Minimal${TraversalCollection}<OpaqueValue<Int>>>
     >.self, &reversed)
 
   let expected: [OpaqueValue<Int>] = [ 90, 10, 30, 0 ].map(OpaqueValue.init)
@@ -561,10 +561,9 @@ LazyTestSuite.test("Lazy${TraversalCollection}.reversed") {
 
   var reversedTwice = reversed.reversed()
   expectType(
-    LazyCollection<
-      ${ReversedType}<${ReversedType}<
-        Minimal${TraversalCollection}<OpaqueValue<Int>>
-      >>>.self, &reversedTwice)
+    ${ReversedType}<${ReversedType}<LazyCollection<
+      Minimal${TraversalCollection}<OpaqueValue<Int>>
+    >>>.self, &reversedTwice)
 
   check${Traversal}Collection(
     [ 0, 30, 10, 90 ].map(OpaqueValue.init) as [OpaqueValue<Int>],
@@ -722,7 +721,7 @@ tests.test("LazyCollection/Passthrough") {
 
   expectSequencePassthrough(
     base.lazy,
-    base: base.lazy._base,
+    base: base.lazy.elements,
     arbitraryElement: OpaqueValue(0),
     count: Int(expected.count))
 
@@ -745,7 +744,6 @@ tests.test("LazyCollection/Passthrough") {
   CollectionLog._customIndexOfEquatableElement.expectIncrement(baseType) {
     _ = s._customIndexOfEquatableElement(OpaqueValue(0))
   }
-  CollectionLog.first.expectIncrement(baseType) { _ = s.first }
 }
 
 //===--- Map --------------------------------------------------------------===//
@@ -843,9 +841,6 @@ tests.test("LazyMapCollection/Passthrough") {
   CollectionLog.isEmpty.expectIncrement(type(of: base)) {
     _ = mapped.isEmpty
   }
-  CollectionLog.first.expectIncrement(type(of: base)) {
-    _ = mapped.first
-  }
   CollectionLog.underestimatedCount.expectIncrement(type(of: base)) {
     _ = mapped.underestimatedCount
   }
@@ -860,8 +855,7 @@ tests.test("LazyMapSequence/AssociatedTypes") {
   typealias Subject = LazyMapSequence<Base, OpaqueValue<Int32>>
   expectSequenceAssociatedTypes(
     sequenceType: Subject.self,
-    iteratorType: LazyMapSequence<Base, OpaqueValue<Int32>>.Iterator.self,
-    subSequenceType: AnySequence<OpaqueValue<Int32>>.self)
+    iteratorType: LazyMapSequence<Base, OpaqueValue<Int32>>.Iterator.self)
 }
 
 tests.test("LazyMapCollection/AssociatedTypes") {
@@ -985,7 +979,7 @@ tests.test("ReversedCollection/Lazy") {
     typealias Base = LazyMapCollection<[Int], Int>
     ExpectType<Base>.test(base)
 
-    typealias LazyReversedBase = LazyCollection<ReversedCollection<Base>>
+    typealias LazyReversedBase = ReversedCollection<Base>
 
     let reversed = base.reversed()
     ExpectType<LazyReversedBase>.test(reversed)
@@ -1002,7 +996,7 @@ tests.test("ReversedCollection/Lazy") {
     typealias Base = LazyMapCollection<String, Character>
     ExpectType<Base>.test(base)
 
-    typealias LazyReversedBase = LazyCollection<ReversedCollection<Base>>
+    typealias LazyReversedBase = ReversedCollection<Base>
 
     let reversed = base.reversed()
     ExpectType<LazyReversedBase>.test(reversed)
@@ -1140,8 +1134,7 @@ tests.test("LazyFilterSequence/AssociatedTypes") {
   typealias Subject = LazyFilterSequence<Base>
   expectSequenceAssociatedTypes(
     sequenceType: Subject.self,
-    iteratorType: LazyFilterSequence<Base>.Iterator.self,
-    subSequenceType: AnySequence<OpaqueValue<Int>>.self)
+    iteratorType: LazyFilterSequence<Base>.Iterator.self)
 }
 
 tests.test("LazyFilterCollection/AssociatedTypes") {
@@ -1257,6 +1250,7 @@ do {
 
   % for Traversal in 'Forward', 'Bidirectional':
   %   TraversalCollection = collectionForTraversal(Traversal)
+
     tests.test("FlattenCollection/${Traversal}/\(data)") {
       let base = Minimal${TraversalCollection}(
         elements: data.map { Minimal${TraversalCollection}(elements: $0) })
@@ -1295,7 +1289,9 @@ struct TryFlattenIndex<C: Collection> where C.Element: Collection {
 
 //===--- LazyPrefixWhile --------------------------------------------------===//
 
-let prefixDropWhileTests: [(data: [Int], value: Int, pivot: Int)] = [
+let prefixDropWhileTests: [(data: [Int], value: Int, pivot: Int)]
+
+prefixDropWhileTests = [
   ([],                       0,     0),
   ([0],                      0,     0),
   ([0],                     99,     1),
@@ -1307,7 +1303,8 @@ let prefixDropWhileTests: [(data: [Int], value: Int, pivot: Int)] = [
   ([0, 10, 20, 30, 40],     20,     2),
   ([0, 10, 20, 30, 40],     30,     3),
   ([0, 10, 20, 30, 40],     40,     4),
-  ([0, 10, 20, 30, 40],     99,     5) ]
+  ([0, 10, 20, 30, 40],     99,     5) 
+]
 
 % for Kind in 'Sequence', 'Forward', 'Bidirectional':
 %   Self = 'Sequence' if Kind == 'Sequence' else collectionForTraversal(Kind)
@@ -1338,8 +1335,7 @@ tests.test("LazyPrefixWhileSequence/AssociatedTypes") {
   typealias Subject = LazyPrefixWhileSequence<Base>
   expectSequenceAssociatedTypes(
     sequenceType: Subject.self,
-    iteratorType: LazyPrefixWhileSequence<Base>.Iterator.self,
-    subSequenceType: AnySequence<OpaqueValue<Int>>.self)
+    iteratorType: LazyPrefixWhileSequence<Base>.Iterator.self)
 }
 
 tests.test("LazyPrefixWhileCollection/AssociatedTypes") {
@@ -1396,8 +1392,7 @@ tests.test("LazyDropWhileSequence/AssociatedTypes") {
   typealias Subject = LazyDropWhileSequence<Base>
   expectSequenceAssociatedTypes(
     sequenceType: Subject.self,
-    iteratorType: LazyDropWhileSequence<Base>.Iterator.self,
-    subSequenceType: AnySequence<OpaqueValue<Int>>.self)
+    iteratorType: LazyDropWhileSequence<Base>.Iterator.self)
 }
 
 tests.test("LazyDropWhileCollection/AssociatedTypes") {

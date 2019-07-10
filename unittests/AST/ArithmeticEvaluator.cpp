@@ -211,7 +211,7 @@ TEST(ArithmeticEvaluator, Simple) {
 
   SourceManager sourceMgr;
   DiagnosticEngine diags(sourceMgr);
-  Evaluator evaluator(diags, CycleDiagnosticKind::FullDiagnose);
+  Evaluator evaluator(diags);
   evaluator.registerRequestFunctions(SWIFT_ARITHMETIC_EVALUATOR_ZONE,
                                      arithmeticRequestFunctions);
 
@@ -334,7 +334,7 @@ TEST(ArithmeticEvaluator, Cycle) {
 
   SourceManager sourceMgr;
   DiagnosticEngine diags(sourceMgr);
-  Evaluator evaluator(diags, CycleDiagnosticKind::FullDiagnose);
+  Evaluator evaluator(diags);
   evaluator.registerRequestFunctions(SWIFT_ARITHMETIC_EVALUATOR_ZONE,
                                      arithmeticRequestFunctions);
 

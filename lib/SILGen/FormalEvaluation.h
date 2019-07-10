@@ -23,6 +23,7 @@ namespace Lowering {
 
 class SILGenFunction;
 class LogicalPathComponent;
+class FormalEvaluationScope;
 
 class FormalAccess {
 public:
@@ -108,6 +109,9 @@ private:
 
 class FormalEvaluationContext {
   DiverseStack<FormalAccess, 128> stack;
+  FormalEvaluationScope *innermostScope = nullptr;
+
+  friend class FormalEvaluationScope;
 
 public:
   using stable_iterator = decltype(stack)::stable_iterator;
@@ -135,6 +139,10 @@ public:
   stable_iterator stable_begin() { return stabilize(begin()); }
   iterator find(stable_iterator iter) { return stack.find(iter); }
 
+  FormalAccess &findAndAdvance(stable_iterator &stable) {
+    return stack.findAndAdvance(stable);
+  }
+
   template <class U, class... ArgTypes> void push(ArgTypes &&... args) {
     stack.push<U>(std::forward<ArgTypes>(args)...);
   }
@@ -145,7 +153,13 @@ public:
   /// is the top element of the stack.
   void pop(stable_iterator stable_iter) { stack.pop(stable_iter); }
 
+  bool isInFormalEvaluationScope() const { return innermostScope != nullptr; }
+
   void dump(SILGenFunction &SGF);
+
+#ifndef NDEBUG
+  void checkCleanupDeactivation(CleanupHandle handle);
+#endif
 };
 
 /// A scope associated with the beginning of the evaluation of an lvalue.
@@ -182,8 +196,13 @@ public:
 class FormalEvaluationScope {
   SILGenFunction &SGF;
   llvm::Optional<FormalEvaluationContext::stable_iterator> savedDepth;
-  bool wasInFormalEvaluationScope;
+
+  /// The immediate outer evaluation scope.  This scope is only inserted
+  /// into the chain if it wasn't in an inout conversion scope on creation.
+  FormalEvaluationScope *previous;
   bool wasInInOutConversionScope;
+
+  friend class FormalEvaluationContext;
 
 public:
   FormalEvaluationScope(SILGenFunction &SGF);
@@ -217,6 +236,16 @@ public:
 private:
   void popImpl();
 };
+
+#ifndef NDEBUG
+inline void
+FormalEvaluationContext::checkCleanupDeactivation(CleanupHandle handle) {
+  for (auto &access : *this) {
+    assert((access.isFinished() || access.getCleanup() != handle) &&
+           "popping active formal-evaluation cleanup");
+  }
+}
+#endif
 
 } // namespace Lowering
 } // namespace swift

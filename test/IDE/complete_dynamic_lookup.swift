@@ -110,16 +110,16 @@ protocol Bar { func bar() }
 // DL_INSTANCE_NO_DOT-DAG: Decl[InstanceVar]/OtherModule[swift_ide_test]:      .topLevelObjcClass_Property1[#Int?#]{{; name=.+$}}
 // DL_INSTANCE_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   .topLevelObjcProtocol_InstanceFunc1!()[#Void#]{{; name=.+$}}
 // DL_INSTANCE_NO_DOT-DAG: Decl[InstanceVar]/OtherModule[swift_ide_test]:      .topLevelObjcProtocol_Property1[#Int?#]{{; name=.+$}}
-// DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule[bar_swift_module]:      [{#Bar_ImportedObjcClass#}][#Int?#]{{; name=.+$}}
-// DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule[foo_swift_module]:      [{#Foo_TopLevelObjcProtocol#}][#Int?#]{{; name=.+$}}
-// DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule[swift_ide_test]:        [{#Int16#}][#Int?#]{{; name=.+$}}
-// DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule[foo_swift_module]:      [{#Int32#}][#Int?#]{{; name=.+$}}
-// DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule[foo_swift_module]:      [{#Int64#}][#Int?#]{{; name=.+$}}
-// DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule[swift_ide_test]:        [{#Int8#}][#Int?#]{{; name=.+$}}
-// DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule[swift_ide_test]:        [{#TopLevelObjcClass#}][#Int?#]{{; name=.+$}}
-// DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule[swift_ide_test]:        [{#TopLevelObjcProtocol#}][#Int?#]{{; name=.+$}}
-// DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule[baz_clang_module]:      [{#Int32#}][#Any??#]{{; name=.+$}}
-// DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule[baz_clang_module]:      [{#Any!#}][#Any??#]{{; name=.+$}}
+// DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule[bar_swift_module]:      [{#(i): Bar_ImportedObjcClass#}][#Int?#]{{; name=.+$}}
+// DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule[foo_swift_module]:      [{#(i): Foo_TopLevelObjcProtocol#}][#Int?#]{{; name=.+$}}
+// DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule[swift_ide_test]:        [{#(i): Int16#}][#Int?#]{{; name=.+$}}
+// DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule[foo_swift_module]:      [{#(i): Int32#}][#Int?#]{{; name=.+$}}
+// DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule[foo_swift_module]:      [{#(i): Int64#}][#Int?#]{{; name=.+$}}
+// DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule[swift_ide_test]:        [{#(i): Int8#}][#Int?#]{{; name=.+$}}
+// DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule[swift_ide_test]:        [{#(i): TopLevelObjcClass#}][#Int?#]{{; name=.+$}}
+// DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule[swift_ide_test]:        [{#(i): TopLevelObjcProtocol#}][#Int?#]{{; name=.+$}}
+// DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule[baz_clang_module]:      [{#(idx): Int32#}][#Any??#]{{; name=.+$}}
+// DL_INSTANCE_NO_DOT-DAG: Decl[Subscript]/OtherModule[baz_clang_module]:      [{#(key): Any!#}][#Any??#]{{; name=.+$}}
 // DL_INSTANCE_NO_DOT: End completions
 // GLOBAL_NEGATIVE-NOT:.objectAtIndexedSubscript
 
@@ -161,76 +161,76 @@ protocol Bar { func bar() }
 
 // DL_CLASS_NO_DOT: Begin completions
 // DL_CLASS_NO_DOT-DAG: Decl[StaticMethod]/OtherModule[bar_swift_module]:   .bar_ImportedObjcClass_ClassFunc1()[#Void#]{{; name=.+$}}
-// DL_CLASS_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule[bar_swift_module]: .bar_ImportedObjcClass_InstanceFunc1({#self: Bar_ImportedObjcClass#})[#() -> Void#]{{; name=.+$}}
-// DL_CLASS_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   .base1_InstanceFunc1({#self: Base1#})[#() -> Void#]{{; name=.+$}}
-// DL_CLASS_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   .base1_InstanceFunc2({#self: Base1#})[#(Derived) -> Void#]{{; name=.+$}}
-// DL_CLASS_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   .base1_InstanceFunc3({#self: Base1#})[#(Derived) -> Void#]{{; name=.+$}}
-// DL_CLASS_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   .base1_InstanceFunc4({#self: Base1#})[#() -> Base#]{{; name=.+$}}
+// DL_CLASS_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule[bar_swift_module]: .bar_ImportedObjcClass_InstanceFunc1({#(self): Bar_ImportedObjcClass#})[#() -> Void#]{{; name=.+$}}
+// DL_CLASS_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   .base1_InstanceFunc1({#(self): Base1#})[#() -> Void#]{{; name=.+$}}
+// DL_CLASS_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   .base1_InstanceFunc2({#(self): Base1#})[#(Derived) -> Void#]{{; name=.+$}}
+// DL_CLASS_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   .base1_InstanceFunc3({#(self): Base1#})[#(Derived) -> Void#]{{; name=.+$}}
+// DL_CLASS_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   .base1_InstanceFunc4({#(self): Base1#})[#() -> Base#]{{; name=.+$}}
 // DL_CLASS_NO_DOT-DAG: Decl[StaticMethod]/OtherModule[baz_clang_module]:   .baz_Class_ClassFunc1()[#Void#]{{; name=.+$}}
-// DL_CLASS_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule[baz_clang_module]: .baz_Class_InstanceFunc1({#self: Baz_Class#})[#() -> Void#]{{; name=.+$}}
+// DL_CLASS_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule[baz_clang_module]: .baz_Class_InstanceFunc1({#(self): Baz_Class#})[#() -> Void#]{{; name=.+$}}
 // DL_CLASS_NO_DOT-DAG: Decl[StaticMethod]/OtherModule[baz_clang_module]:   .baz_Protocol_ClassFunc1()[#Void#]{{; name=.+$}}
-// DL_CLASS_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule[baz_clang_module]: .baz_Protocol_InstanceFunc1({#self: Self#})[#() -> Void#]{{; name=.+$}}
+// DL_CLASS_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule[baz_clang_module]: .baz_Protocol_InstanceFunc1({#(self): Baz_Protocol#})[#() -> Void#]{{; name=.+$}}
 // DL_CLASS_NO_DOT-DAG: Decl[StaticMethod]/OtherModule[foo_swift_module]:   .foo_Nested1_ObjcClassFunc1()[#Void#]{{; name=.+$}}
-// DL_CLASS_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule[foo_swift_module]: .foo_Nested1_ObjcInstanceFunc1({#self: Foo_ContainerForNestedClass1.Foo_Nested1#})[#() -> Void#]{{; name=.+$}}
+// DL_CLASS_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule[foo_swift_module]: .foo_Nested1_ObjcInstanceFunc1({#(self): Foo_ContainerForNestedClass1.Foo_Nested1#})[#() -> Void#]{{; name=.+$}}
 // DL_CLASS_NO_DOT-DAG: Decl[StaticMethod]/OtherModule[foo_swift_module]:   .foo_Nested2_ObjcClassFunc1()[#Void#]{{; name=.+$}}
-// DL_CLASS_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule[foo_swift_module]: .foo_Nested2_ObjcInstanceFunc1({#self: Foo_ContainerForNestedClass2.Foo_Nested2#})[#() -> Void#]{{; name=.+$}}
+// DL_CLASS_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule[foo_swift_module]: .foo_Nested2_ObjcInstanceFunc1({#(self): Foo_ContainerForNestedClass2.Foo_Nested2#})[#() -> Void#]{{; name=.+$}}
 // DL_CLASS_NO_DOT-DAG: Decl[StaticMethod]/OtherModule[foo_swift_module]:   .foo_TopLevelClass_ObjcClassFunc1()[#Void#]{{; name=.+$}}
-// DL_CLASS_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule[foo_swift_module]: .foo_TopLevelClass_ObjcInstanceFunc1({#self: Foo_TopLevelClass#})[#() -> Void#]{{; name=.+$}}
+// DL_CLASS_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule[foo_swift_module]: .foo_TopLevelClass_ObjcInstanceFunc1({#(self): Foo_TopLevelClass#})[#() -> Void#]{{; name=.+$}}
 // DL_CLASS_NO_DOT-DAG: Decl[StaticMethod]/OtherModule[foo_swift_module]:   .foo_TopLevelObjcClass_ClassFunc1()[#Void#]{{; name=.+$}}
-// DL_CLASS_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule[foo_swift_module]: .foo_TopLevelObjcClass_InstanceFunc1({#self: Foo_TopLevelObjcClass#})[#() -> Void#]{{; name=.+$}}
+// DL_CLASS_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule[foo_swift_module]: .foo_TopLevelObjcClass_InstanceFunc1({#(self): Foo_TopLevelObjcClass#})[#() -> Void#]{{; name=.+$}}
 // DL_CLASS_NO_DOT-DAG: Decl[StaticMethod]/OtherModule[foo_swift_module]:   .foo_TopLevelObjcProtocol_ClassFunc1()[#Void#]{{; name=.+$}}
-// DL_CLASS_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule[foo_swift_module]: .foo_TopLevelObjcProtocol_InstanceFunc1({#self: Self#})[#() -> Void#]{{; name=.+$}}
+// DL_CLASS_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule[foo_swift_module]: .foo_TopLevelObjcProtocol_InstanceFunc1({#(self): Foo_TopLevelObjcProtocol#})[#() -> Void#]{{; name=.+$}}
 // DL_CLASS_NO_DOT-DAG: Decl[StaticMethod]/OtherModule[swift_ide_test]:     .nested1_ObjcClassFunc1()[#Void#]{{; name=.+$}}
-// DL_CLASS_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   .nested1_ObjcInstanceFunc1({#self: ContainerForNestedClass1.Nested1#})[#() -> Void#]{{; name=.+$}}
+// DL_CLASS_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   .nested1_ObjcInstanceFunc1({#(self): ContainerForNestedClass1.Nested1#})[#() -> Void#]{{; name=.+$}}
 // DL_CLASS_NO_DOT-DAG: Decl[StaticMethod]/OtherModule[swift_ide_test]:     .nested2_ObjcClassFunc1()[#Void#]{{; name=.+$}}
-// DL_CLASS_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   .nested2_ObjcInstanceFunc1({#self: ContainerForNestedClass2.Nested2#})[#() -> Void#]{{; name=.+$}}
-// DL_CLASS_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   .returnsObjcClass({#self: TopLevelObjcClass#})[#(Int) -> TopLevelObjcClass#]{{; name=.+$}}
+// DL_CLASS_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   .nested2_ObjcInstanceFunc1({#(self): ContainerForNestedClass2.Nested2#})[#() -> Void#]{{; name=.+$}}
+// DL_CLASS_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   .returnsObjcClass({#(self): TopLevelObjcClass#})[#(Int) -> TopLevelObjcClass#]{{; name=.+$}}
 // DL_CLASS_NO_DOT-DAG: Decl[StaticMethod]/OtherModule[swift_ide_test]:     .topLevelClass_ObjcClassFunc1()[#Void#]{{; name=.+$}}
-// DL_CLASS_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   .topLevelClass_ObjcInstanceFunc1({#self: TopLevelClass#})[#() -> Void#]{{; name=.+$}}
+// DL_CLASS_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   .topLevelClass_ObjcInstanceFunc1({#(self): TopLevelClass#})[#() -> Void#]{{; name=.+$}}
 // DL_CLASS_NO_DOT-DAG: Decl[StaticMethod]/OtherModule[swift_ide_test]:     .topLevelObjcClass_ClassFunc1()[#Void#]{{; name=.+$}}
-// DL_CLASS_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   .topLevelObjcClass_InstanceFunc1({#self: TopLevelObjcClass#})[#() -> Void#]{{; name=.+$}}
+// DL_CLASS_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   .topLevelObjcClass_InstanceFunc1({#(self): TopLevelObjcClass#})[#() -> Void#]{{; name=.+$}}
 // DL_CLASS_NO_DOT-DAG: Decl[StaticMethod]/OtherModule[swift_ide_test]:     .topLevelObjcProtocol_ClassFunc1()[#Void#]{{; name=.+$}}
-// DL_CLASS_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   .topLevelObjcProtocol_InstanceFunc1({#self: Self#})[#() -> Void#]{{; name=.+$}}
+// DL_CLASS_NO_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   .topLevelObjcProtocol_InstanceFunc1({#(self): TopLevelObjcProtocol#})[#() -> Void#]{{; name=.+$}}
 // DL_CLASS_NO_DOT: End completions
 
 // DL_CLASS_DOT: Begin completions
 // DL_CLASS_DOT-DAG: Decl[StaticMethod]/OtherModule[bar_swift_module]:   bar_ImportedObjcClass_ClassFunc1()[#Void#]{{; name=.+$}}
-// DL_CLASS_DOT-DAG: Decl[InstanceMethod]/OtherModule[bar_swift_module]: bar_ImportedObjcClass_InstanceFunc1({#self: Bar_ImportedObjcClass#})[#() -> Void#]{{; name=.+$}}
-// DL_CLASS_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   base1_InstanceFunc1({#self: Base1#})[#() -> Void#]{{; name=.+$}}
-// DL_CLASS_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   base1_InstanceFunc2({#self: Base1#})[#(Derived) -> Void#]{{; name=.+$}}
-// DL_CLASS_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   base1_InstanceFunc3({#self: Base1#})[#(Derived) -> Void#]{{; name=.+$}}
-// DL_CLASS_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   base1_InstanceFunc4({#self: Base1#})[#() -> Base#]{{; name=.+$}}
+// DL_CLASS_DOT-DAG: Decl[InstanceMethod]/OtherModule[bar_swift_module]: bar_ImportedObjcClass_InstanceFunc1({#(self): Bar_ImportedObjcClass#})[#() -> Void#]{{; name=.+$}}
+// DL_CLASS_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   base1_InstanceFunc1({#(self): Base1#})[#() -> Void#]{{; name=.+$}}
+// DL_CLASS_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   base1_InstanceFunc2({#(self): Base1#})[#(Derived) -> Void#]{{; name=.+$}}
+// DL_CLASS_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   base1_InstanceFunc3({#(self): Base1#})[#(Derived) -> Void#]{{; name=.+$}}
+// DL_CLASS_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   base1_InstanceFunc4({#(self): Base1#})[#() -> Base#]{{; name=.+$}}
 // DL_CLASS_DOT-DAG: Decl[StaticMethod]/OtherModule[baz_clang_module]:   baz_Class_ClassFunc1()[#Void#]{{; name=.+$}}
-// DL_CLASS_DOT-DAG: Decl[InstanceMethod]/OtherModule[baz_clang_module]: baz_Class_InstanceFunc1({#self: Baz_Class#})[#() -> Void#]{{; name=.+$}}
+// DL_CLASS_DOT-DAG: Decl[InstanceMethod]/OtherModule[baz_clang_module]: baz_Class_InstanceFunc1({#(self): Baz_Class#})[#() -> Void#]{{; name=.+$}}
 // DL_CLASS_DOT-DAG: Decl[StaticMethod]/OtherModule[baz_clang_module]:   baz_Protocol_ClassFunc1()[#Void#]{{; name=.+$}}
-// DL_CLASS_DOT-DAG: Decl[InstanceMethod]/OtherModule[baz_clang_module]: baz_Protocol_InstanceFunc1({#self: Self#})[#() -> Void#]{{; name=.+$}}
+// DL_CLASS_DOT-DAG: Decl[InstanceMethod]/OtherModule[baz_clang_module]: baz_Protocol_InstanceFunc1({#(self): Baz_Protocol#})[#() -> Void#]{{; name=.+$}}
 // DL_CLASS_DOT-DAG: Decl[StaticMethod]/OtherModule[foo_swift_module]:   foo_Nested1_ObjcClassFunc1()[#Void#]{{; name=.+$}}
-// DL_CLASS_DOT-DAG: Decl[InstanceMethod]/OtherModule[foo_swift_module]: foo_Nested1_ObjcInstanceFunc1({#self: Foo_ContainerForNestedClass1.Foo_Nested1#})[#() -> Void#]{{; name=.+$}}
+// DL_CLASS_DOT-DAG: Decl[InstanceMethod]/OtherModule[foo_swift_module]: foo_Nested1_ObjcInstanceFunc1({#(self): Foo_ContainerForNestedClass1.Foo_Nested1#})[#() -> Void#]{{; name=.+$}}
 // DL_CLASS_DOT-DAG: Decl[StaticMethod]/OtherModule[foo_swift_module]:   foo_Nested2_ObjcClassFunc1()[#Void#]{{; name=.+$}}
-// DL_CLASS_DOT-DAG: Decl[InstanceMethod]/OtherModule[foo_swift_module]: foo_Nested2_ObjcInstanceFunc1({#self: Foo_ContainerForNestedClass2.Foo_Nested2#})[#() -> Void#]{{; name=.+$}}
+// DL_CLASS_DOT-DAG: Decl[InstanceMethod]/OtherModule[foo_swift_module]: foo_Nested2_ObjcInstanceFunc1({#(self): Foo_ContainerForNestedClass2.Foo_Nested2#})[#() -> Void#]{{; name=.+$}}
 // DL_CLASS_DOT-DAG: Decl[StaticMethod]/OtherModule[foo_swift_module]:   foo_TopLevelClass_ObjcClassFunc1()[#Void#]{{; name=.+$}}
-// DL_CLASS_DOT-DAG: Decl[InstanceMethod]/OtherModule[foo_swift_module]: foo_TopLevelClass_ObjcInstanceFunc1({#self: Foo_TopLevelClass#})[#() -> Void#]{{; name=.+$}}
+// DL_CLASS_DOT-DAG: Decl[InstanceMethod]/OtherModule[foo_swift_module]: foo_TopLevelClass_ObjcInstanceFunc1({#(self): Foo_TopLevelClass#})[#() -> Void#]{{; name=.+$}}
 // DL_CLASS_DOT-DAG: Decl[StaticMethod]/OtherModule[foo_swift_module]:   foo_TopLevelObjcClass_ClassFunc1()[#Void#]{{; name=.+$}}
-// DL_CLASS_DOT-DAG: Decl[InstanceMethod]/OtherModule[foo_swift_module]: foo_TopLevelObjcClass_InstanceFunc1({#self: Foo_TopLevelObjcClass#})[#() -> Void#]{{; name=.+$}}
+// DL_CLASS_DOT-DAG: Decl[InstanceMethod]/OtherModule[foo_swift_module]: foo_TopLevelObjcClass_InstanceFunc1({#(self): Foo_TopLevelObjcClass#})[#() -> Void#]{{; name=.+$}}
 // DL_CLASS_DOT-DAG: Decl[StaticMethod]/OtherModule[foo_swift_module]:   foo_TopLevelObjcProtocol_ClassFunc1()[#Void#]{{; name=.+$}}
-// DL_CLASS_DOT-DAG: Decl[InstanceMethod]/OtherModule[foo_swift_module]: foo_TopLevelObjcProtocol_InstanceFunc1({#self: Self#})[#() -> Void#]{{; name=.+$}}
+// DL_CLASS_DOT-DAG: Decl[InstanceMethod]/OtherModule[foo_swift_module]: foo_TopLevelObjcProtocol_InstanceFunc1({#(self): Foo_TopLevelObjcProtocol#})[#() -> Void#]{{; name=.+$}}
 // DL_CLASS_DOT-DAG: Decl[StaticMethod]/OtherModule[swift_ide_test]:     nested1_ObjcClassFunc1()[#Void#]{{; name=.+$}}
-// DL_CLASS_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   nested1_ObjcInstanceFunc1({#self: ContainerForNestedClass1.Nested1#})[#() -> Void#]{{; name=.+$}}
+// DL_CLASS_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   nested1_ObjcInstanceFunc1({#(self): ContainerForNestedClass1.Nested1#})[#() -> Void#]{{; name=.+$}}
 // DL_CLASS_DOT-DAG: Decl[StaticMethod]/OtherModule[swift_ide_test]:     nested2_ObjcClassFunc1()[#Void#]{{; name=.+$}}
-// DL_CLASS_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   nested2_ObjcInstanceFunc1({#self: ContainerForNestedClass2.Nested2#})[#() -> Void#]{{; name=.+$}}
-// DL_CLASS_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   returnsObjcClass({#self: TopLevelObjcClass#})[#(Int) -> TopLevelObjcClass#]{{; name=.+$}}
+// DL_CLASS_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   nested2_ObjcInstanceFunc1({#(self): ContainerForNestedClass2.Nested2#})[#() -> Void#]{{; name=.+$}}
+// DL_CLASS_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   returnsObjcClass({#(self): TopLevelObjcClass#})[#(Int) -> TopLevelObjcClass#]{{; name=.+$}}
 // DL_CLASS_DOT-DAG: Decl[StaticMethod]/OtherModule[swift_ide_test]:     topLevelClass_ObjcClassFunc1()[#Void#]{{; name=.+$}}
-// DL_CLASS_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   topLevelClass_ObjcInstanceFunc1({#self: TopLevelClass#})[#() -> Void#]{{; name=.+$}}
+// DL_CLASS_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   topLevelClass_ObjcInstanceFunc1({#(self): TopLevelClass#})[#() -> Void#]{{; name=.+$}}
 // DL_CLASS_DOT-DAG: Decl[StaticMethod]/OtherModule[swift_ide_test]:     topLevelObjcClass_ClassFunc1()[#Void#]{{; name=.+$}}
-// DL_CLASS_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   topLevelObjcClass_InstanceFunc1({#self: TopLevelObjcClass#})[#() -> Void#]{{; name=.+$}}
+// DL_CLASS_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   topLevelObjcClass_InstanceFunc1({#(self): TopLevelObjcClass#})[#() -> Void#]{{; name=.+$}}
 // DL_CLASS_DOT-DAG: Decl[StaticMethod]/OtherModule[swift_ide_test]:     topLevelObjcProtocol_ClassFunc1()[#Void#]{{; name=.+$}}
-// DL_CLASS_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   topLevelObjcProtocol_InstanceFunc1({#self: Self#})[#() -> Void#]{{; name=.+$}}
+// DL_CLASS_DOT-DAG: Decl[InstanceMethod]/OtherModule[swift_ide_test]:   topLevelObjcProtocol_InstanceFunc1({#(self): TopLevelObjcProtocol#})[#() -> Void#]{{; name=.+$}}
 // DL_CLASS_DOT: End completions
 
 // TLOC_MEMBERS_NO_DOT: Begin completions
 // TLOC_MEMBERS_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .returnsObjcClass({#(i): Int#})[#TopLevelObjcClass#]{{; name=.+$}}
 // TLOC_MEMBERS_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .topLevelObjcClass_InstanceFunc1()[#Void#]{{; name=.+$}}
-// TLOC_MEMBERS_NO_DOT-NEXT: Decl[Subscript]/CurrNominal:      [{#Int8#}][#Int#]{{; name=.+$}}
+// TLOC_MEMBERS_NO_DOT-NEXT: Decl[Subscript]/CurrNominal:      [{#(i): Int8#}][#Int#]{{; name=.+$}}
 // TLOC_MEMBERS_NO_DOT-NEXT: Decl[InstanceVar]/CurrNominal:    .topLevelObjcClass_Property1[#Int#]{{; name=.+$}}
 // TLOC_MEMBERS_NO_DOT-NEXT: Decl[InfixOperatorFunction]/OtherModule[Swift]: === {#AnyObject?#}[#Bool#];
 // TLOC_MEMBERS_NO_DOT-NEXT: Decl[InfixOperatorFunction]/OtherModule[Swift]: !== {#AnyObject?#}[#Bool#];
@@ -463,7 +463,7 @@ func testAnyObject11_(_ dl: AnyObject) {
   dl.returnsObjcClass!(#^DL_FUNC_NAME_PAREN_1^#
 }
 // DL_FUNC_NAME_PAREN_1: Begin completions
-// DL_FUNC_NAME_PAREN_1-DAG: Pattern/CurrModule: ['(']{#(i): Int#}[')'][#TopLevelObjcClass#]{{; name=.+$}}
+// DL_FUNC_NAME_PAREN_1-DAG: Decl[InstanceMethod]/CurrNominal: ['(']{#(i): Int#}[')'][#TopLevelObjcClass#]{{; name=.+$}}
 // DL_FUNC_NAME_PAREN_1: End completions
 
 func testAnyObject12(_ dl: AnyObject) {
@@ -475,7 +475,7 @@ func testAnyObject13(_ dl: AnyObject) {
   dl.returnsObjcClass!#^DL_FUNC_NAME_BANG_1^#
 }
 // DL_FUNC_NAME_BANG_1: Begin completions
-// DL_FUNC_NAME_BANG_1-NEXT: Pattern/CurrModule: ({#Int#})[#TopLevelObjcClass#]
+// DL_FUNC_NAME_BANG_1-NEXT: Decl[InstanceMethod]/CurrNominal: ({#(i): Int#})[#TopLevelObjcClass#]
 // DL_FUNC_NAME_BANG_1-NEXT: Keyword[self]/CurrNominal: .self[#(Int) -> TopLevelObjcClass#]; name=self
 // DL_FUNC_NAME_BANG_1-NEXT: End completions
 

@@ -37,8 +37,8 @@ bb0:
   // CHECK: {{^}}}
 }
 
-// Swift.Int.init (_builtinIntegerLiteral : Builtin.Int2048) -> Swift.Int
-sil [transparent] [serialized] @_TFSiCfT22_builtinIntegerLiteralBi2048__Si : $@convention(thin) (Builtin.Int2048, @thin Int.Type) -> Int
+// Swift.Int.init (_builtinIntegerLiteral : Builtin.IntLiteral) -> Swift.Int
+sil [transparent] [serialized] @_TFSiCfT22_builtinIntegerLiteralBI__Si : $@convention(thin) (Builtin.IntLiteral, @thin Int.Type) -> Int
 
 // StdlibUnittest._blackHole <A> (A) -> ()
 sil @_TF14StdlibUnittest10_blackHoleurFxT_ : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()

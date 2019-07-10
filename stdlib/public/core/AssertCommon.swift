@@ -76,6 +76,7 @@ internal func _fatalErrorFlags() -> UInt32 {
 /// bloats code.
 @usableFromInline
 @inline(never)
+@_semantics("programtermination_point")
 internal func _assertionFailure(
   _ prefix: StaticString, _ message: StaticString,
   file: StaticString, line: UInt,
@@ -106,6 +107,7 @@ internal func _assertionFailure(
 /// bloats code.
 @usableFromInline
 @inline(never)
+@_semantics("programtermination_point")
 internal func _assertionFailure(
   _ prefix: StaticString, _ message: String,
   file: StaticString, line: UInt,
@@ -113,7 +115,8 @@ internal func _assertionFailure(
 ) -> Never {
   prefix.withUTF8Buffer {
     (prefix) -> Void in
-    message._withUnsafeBufferPointerToUTF8 {
+    var message = message
+    message.withUTF8 {
       (messageUTF8) -> Void in
       file.withUTF8Buffer {
         (file) -> Void in
@@ -136,13 +139,15 @@ internal func _assertionFailure(
 /// bloats code.
 @usableFromInline
 @inline(never)
+@_semantics("programtermination_point")
 internal func _assertionFailure(
   _ prefix: StaticString, _ message: String,
   flags: UInt32
 ) -> Never {
   prefix.withUTF8Buffer {
     (prefix) -> Void in
-    message._withUnsafeBufferPointerToUTF8 {
+    var message = message
+    message.withUTF8 {
       (messageUTF8) -> Void in
       _swift_stdlib_reportFatalError(
         prefix.baseAddress!, CInt(prefix.count),
@@ -161,27 +166,18 @@ internal func _assertionFailure(
 /// bloats code.
 @usableFromInline
 @inline(never)
-@_semantics("arc.programtermination_point")
+@_semantics("programtermination_point")
 internal func _fatalErrorMessage(
   _ prefix: StaticString, _ message: StaticString,
   file: StaticString, line: UInt,
   flags: UInt32
 ) -> Never {
-  // This function breaks the infinite recursion detection pass by introducing
-  // an edge the pass doesn't look through.
-  func _withUTF8Buffer<R>(
-    _ string: StaticString,
-    _ body: (UnsafeBufferPointer<UInt8>) -> R
-  ) -> R {
-    return string.withUTF8Buffer(body)
-  }
-
 #if INTERNAL_CHECKS_ENABLED
-  _withUTF8Buffer(prefix) {
+  prefix.withUTF8Buffer() {
     (prefix) in
-    _withUTF8Buffer(message) {
+    message.withUTF8Buffer() {
       (message) in
-      _withUTF8Buffer(file) {
+      file.withUTF8Buffer() {
         (file) in
         _swift_stdlib_reportFatalErrorInFile(
           prefix.baseAddress!, CInt(prefix.count),
@@ -192,9 +188,9 @@ internal func _fatalErrorMessage(
     }
   }
 #else
-  _withUTF8Buffer(prefix) {
+  prefix.withUTF8Buffer() {
     (prefix) in
-    _withUTF8Buffer(message) {
+    message.withUTF8Buffer() {
       (message) in
       _swift_stdlib_reportFatalError(
         prefix.baseAddress!, CInt(prefix.count),
@@ -254,7 +250,6 @@ func _unimplementedInitializer(className: StaticString,
   Builtin.int_trap()
 }
 
-@inlinable // FIXME(sil-serialize-all)
 public // COMPILER_INTRINSIC
 func _undefined<T>(
   _ message: @autoclosure () -> String = String(),

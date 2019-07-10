@@ -29,16 +29,18 @@ extension NSRect: Runcible {
 // CHECK-LABEL:         @"$sSo5GizmoC33protocol_conformance_records_objc8RuncibleACMc" = constant %swift.protocol_conformance_descriptor {
 // -- protocol descriptor
 // CHECK-SAME:           [[RUNCIBLE]]
-// -- class object reference
-// CHECK-SAME:           @"\01l_OBJC_CLASS_REF_$_Gizmo"
+// -- class name reference
+// CHECK-SAME:           @[[GIZMO_NAME:[0-9]+]]
 // -- witness table
 // CHECK-SAME:           @"$sSo5GizmoC33protocol_conformance_records_objc8RuncibleACWP"
 // -- flags
-// CHECK-SAME:           i32 24
+// CHECK-SAME:           i32 16
 // CHECK-SAME:         }
 extension Gizmo: Runcible {
   public func runce() {}
 }
+
+// CHECK: @[[GIZMO_NAME]] = private constant [6 x i8] c"Gizmo\00"
 
 // CHECK-LABEL: @"\01l_protocol_conformances" = private constant [
 // CHECK-SAME: @"$sSo6NSRectV33protocol_conformance_records_objc8RuncibleACMc"

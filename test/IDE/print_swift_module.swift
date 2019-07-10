@@ -25,15 +25,24 @@ public func returnsAlias() -> Alias<Int> {
   return (0, 0)
 }
 
+@_functionBuilder
+struct BridgeBuilder {}
+
+public struct City {
+  public init(@BridgeBuilder builder: () -> ()) {}
+}
+
 // CHECK1:      /// Alias comment
 // CHECK1-NEXT: typealias Alias<T> = (T, T)
 
-// CHECK1:      public class C1 : P1 {
+// CHECK1:      public class C1 : print_swift_module.P1 {
 // CHECK1-NEXT:   /// foo1 comment from P1
 // CHECK1-NEXT:   public func foo1()
 // CHECK1-NEXT:   /// foo2 comment from C1
 // CHECK1-NEXT:   public func foo2()
 // CHECK1-NEXT: }
+
+// CHECK1: public init(@print_swift_module.BridgeBuilder builder: () -> ())
 
 // CHECK1:      public protocol P1 {
 // CHECK1-NEXT:   /// foo1 comment from P1
@@ -43,4 +52,4 @@ public func returnsAlias() -> Alias<Int> {
 // CHECK1-NEXT: }
 
 // CHECK1:      /// returnsAlias() comment
-// CHECK1-NEXT: func returnsAlias() -> Alias<Int>
+// CHECK1-NEXT: func returnsAlias() -> print_swift_module.Alias<Int>

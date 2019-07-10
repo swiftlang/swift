@@ -11,9 +11,9 @@ if(HAVE_UNICODE_LIBEDIT)
   add_sourcekit_executable(sourcekitd-repl
     sourcekitd-repl.cpp
     LINK_LIBS ${SOURCEKITD_REPL_LINK_LIBS} edit
-    LLVM_COMPONENT_DEPENDS support coverage lto
+    LLVM_LINK_COMPONENTS support coverage lto
   )
-  if(SOURCEKIT_NEED_EXPLICIT_LIBDISPATCH)
+  if(SWIFT_NEED_EXPLICIT_LIBDISPATCH)
     target_link_libraries(sourcekitd-repl PRIVATE dispatch BlocksRuntime)
   endif()
 
@@ -27,7 +27,7 @@ if(HAVE_UNICODE_LIBEDIT)
       LINK_FLAGS " -fprofile-instr-generate -fcoverage-mapping")
   endif()
 
-  swift_install_in_component(tools
-      TARGETS sourcekitd-repl
-      RUNTIME DESTINATION bin)
+  swift_install_in_component(TARGETS sourcekitd-repl
+                             RUNTIME DESTINATION bin
+                             COMPONENT tools)
 endif()

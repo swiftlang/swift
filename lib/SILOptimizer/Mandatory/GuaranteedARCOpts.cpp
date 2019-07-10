@@ -105,7 +105,7 @@ static bool couldReduceStrongRefcount(SILInstruction *Inst) {
   // to safely ignore one of those.
   if (auto *AI = dyn_cast<AssignInst>(Inst)) {
     SILType StoredType = AI->getOperand(0)->getType();
-    if (StoredType.isTrivial(Inst->getModule()) ||
+    if (StoredType.isTrivial(*Inst->getFunction()) ||
         StoredType.is<ReferenceStorageType>())
       return false;
   }
@@ -116,7 +116,7 @@ static bool couldReduceStrongRefcount(SILInstruction *Inst) {
       return false;
 
     SILType StoredType = CAI->getOperand(0)->getType().getObjectType();
-    if (StoredType.isTrivial(Inst->getModule()) ||
+    if (StoredType.isTrivial(*Inst->getFunction()) ||
         StoredType.is<ReferenceStorageType>())
       return false;
   }
@@ -129,7 +129,8 @@ static bool couldReduceStrongRefcount(SILInstruction *Inst) {
 bool GuaranteedARCOptsVisitor::visitStrongReleaseInst(StrongReleaseInst *SRI) {
   SILValue Operand = SRI->getOperand();
   // Release on a functionref is a noop.
-  if (isa<FunctionRefInst>(Operand)) {
+  if (isa<FunctionRefInst>(Operand) || isa<DynamicFunctionRefInst>(Operand) ||
+      isa<PreviousDynamicFunctionRefInst>(Operand)) {
     SRI->eraseFromParent();
     ++NumInstsEliminated;
     return true;
@@ -228,6 +229,10 @@ namespace {
 // configuration.
 struct GuaranteedARCOpts : SILFunctionTransform {
   void run() override {
+    // Skip ownership SIL. We are going to have a run of semantic arc opts here.
+    if (getFunction()->hasOwnership())
+      return;
+
     GuaranteedARCOptsVisitor Visitor;
 
     bool MadeChange = false;

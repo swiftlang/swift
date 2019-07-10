@@ -26,7 +26,7 @@ namespace swift {
 
 class SILInstruction;
 
-/// \brief Try to simplify the specified instruction, performing local
+/// Try to simplify the specified instruction, performing local
 /// analysis of the operands of the instruction, without looking at its uses
 /// (e.g. constant folding).  If a simpler result can be found, it is
 /// returned, otherwise a null SILValue is returned.
@@ -38,7 +38,7 @@ SILValue simplifyInstruction(SILInstruction *I);
 ///
 /// If it is nonnull, eraseNotify will be called before each instruction is
 /// deleted.
-void replaceAllSimplifiedUsesAndErase(
+SILBasicBlock::iterator replaceAllSimplifiedUsesAndErase(
     SILInstruction *I, SILValue result,
     std::function<void(SILInstruction *)> eraseNotify = nullptr);
 

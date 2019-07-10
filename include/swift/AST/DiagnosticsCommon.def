@@ -50,6 +50,12 @@ ERROR(not_implemented,none,
 ERROR(error_opening_output,none,
       "error opening '%0' for output: %1", (StringRef, StringRef))
 
+ERROR(cannot_find_group_info_file,none,
+      "cannot find group info file at path: '%0'", (StringRef))
+
+ERROR(cannot_parse_group_info_file,none,
+      "cannot parse group info file at path: '%0'", (StringRef))
+
 ERROR(error_no_group_info,none,
       "no group info found for file: '%0'", (StringRef))
 
@@ -78,6 +84,9 @@ ERROR(class_func_not_in_class,none,
 ERROR(class_var_not_in_class,none,
       "class properties are only allowed within classes; "
       "use 'static' to declare a %select{static|requirement fulfilled by either a static or class}0 property", (bool))
+ERROR(class_subscript_not_in_class,none,
+      "class subscripts are only allowed within classes; "
+      "use 'static' to declare a %select{static|requirement fulfilled by either a static or class}0 subscript", (bool))
 
 // FIXME: Used by both the parser and the type-checker.
 ERROR(func_decl_without_brace,PointsToFirstBadToken,
@@ -92,14 +101,24 @@ NOTE(note_typo_candidate,none,
 NOTE(profile_read_error,none,
      "failed to load profile data '%0': '%1'", (StringRef, StringRef))
 
-ERROR(generic_signature_not_minimal,none,
-      "generic requirement '%0' is redundant in %1", (StringRef, StringRef))
+WARNING(protocol_extension_redundant_requirement,none,
+      "requirement of '%1' to '%2' is redundant in an extension of '%0'",
+      (StringRef, StringRef, StringRef))
 
 ERROR(attr_only_on_parameters, none,
       "'%0' may only be used on parameters", (StringRef))
 
 ERROR(function_type_no_parens,none,
       "single argument function types require parentheses", ())
+
+// Used by -verify-generic-signatures
+ERROR(generic_signature_not_minimal,none,
+      "generic requirement '%0' is redundant in %1", (StringRef, StringRef))
+ERROR(generic_signature_not_valid,none,
+      "generic signature %0 is invalid", (StringRef))
+ERROR(generic_signature_not_equal,none,
+      "generic signature %0 is not equal to new signature %1",
+      (StringRef, StringRef))
 
 // FIXME: Used by swift-api-digester. Don't want to set up a separate diagnostics
 // file just for a few errors.
@@ -113,6 +132,8 @@ ERROR(sdk_node_unrecognized_decl_attr_kind,none,
       "unrecognized declaration attribute '%0' in SDK node", (StringRef))
 ERROR(sdk_node_unrecognized_decl_kind,none,
       "unrecognized declaration kind '%0' in SDK node", (StringRef))
+ERROR(sdk_node_unrecognized_accessor_kind,none,
+      "unrecognized accessor kind '%0' in SDK node", (StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Circular reference diagnostics

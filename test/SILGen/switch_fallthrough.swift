@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen %s | %FileCheck %s
 
 // Some fake predicates for pattern guards.
 func runced() -> Bool { return true }
@@ -18,7 +18,7 @@ func g() {}
 
 func z(_ i: Int) {}
 
-// CHECK-LABEL: sil hidden @$s18switch_fallthrough5test1yyF
+// CHECK-LABEL: sil hidden [ossa] @$s18switch_fallthrough5test1yyF
 func test1() {
   switch foo() {
   // CHECK:   cond_br {{%.*}}, [[YES_CASE1:bb[0-9]+]], {{bb[0-9]+}}
@@ -37,16 +37,14 @@ func test1() {
   case _:
   // CHECK: [[CASE3]]:
   // CHECK:   function_ref @$s18switch_fallthrough1cyyF
-  // CHECK:   br [[CONT:bb[0-9]+]]
     c()
   }
-  // CHECK: [[CONT]]:
   // CHECK:   function_ref @$s18switch_fallthrough1dyyF
   d()
 }
 
 // Fallthrough should work even if the next case is normally unreachable
-// CHECK-LABEL: sil hidden @$s18switch_fallthrough5test2yyF
+// CHECK-LABEL: sil hidden [ossa] @$s18switch_fallthrough5test2yyF
 func test2() {
   switch foo() {
   // CHECK:   cond_br {{%.*}}, [[YES_CASE1:bb[0-9]+]], {{bb[0-9]+}}
@@ -65,15 +63,13 @@ func test2() {
   case _:
   // CHECK: [[CASE3]]:
   // CHECK:   function_ref @$s18switch_fallthrough1cyyF
-  // CHECK:   br [[CONT:bb[0-9]+]]
     c()
   }
-  // CHECK: [[CONT]]:
   // CHECK:   function_ref @$s18switch_fallthrough1dyyF
   d()
 }
 
-// CHECK-LABEL: sil hidden @$s18switch_fallthrough5test3yyF
+// CHECK-LABEL: sil hidden [ossa] @$s18switch_fallthrough5test3yyF
 func test3() {
   switch (foo(), bar()) {
   // CHECK:   cond_br {{%.*}}, [[YES_CASE1:bb[0-9]+]], {{bb[0-9]+}}
@@ -98,10 +94,8 @@ func test3() {
   case (_, _):
   // CHECK: [[CASE4]]:
   // CHECK:   function_ref @$s18switch_fallthrough1dyyF
-  // CHECK:   br [[CONT:bb[0-9]+]]
     d()
   }
-  // CHECK: [[CONT]]:
   // CHECK:   function_ref @$s18switch_fallthrough1eyyF
   e()
 }
@@ -137,7 +131,7 @@ func test4() {
   // CHECK-NEXT: return
 }
 
-// Fallthrough into case block with binding // CHECK-LABEL: sil hidden @$s18switch_fallthrough5test5yyF
+// Fallthrough into case block with binding // CHECK-LABEL: sil hidden [ossa] @$s18switch_fallthrough5test5yyF
 func test5() {
   switch (foo(), bar()) {
   // CHECK:   cond_br {{%.*}}, [[YES_CASE1:bb[0-9]+]], {{bb[0-9]+}}
@@ -158,7 +152,7 @@ func test5() {
     // CHECK:   debug_value [[SECOND_N:%.*]] : $Int, let, name "n"
     // CHECK:   br [[CASE2]]([[SECOND_N]] : $Int)
     
-    // CHECK: [[CASE2]]([[INCOMING_N:%.*]] : @trivial $Int):
+    // CHECK: [[CASE2]]([[INCOMING_N:%.*]] : $Int):
     // CHECK:   [[Z:%.*]] = function_ref @$s18switch_fallthrough1zyySiF
     // CHECK    apply [[Z]]([[INCOMING_N]]) : $@convention(thin) (Int) -> ()
     // CHECK:   br [[CONT:bb[0-9]+]]

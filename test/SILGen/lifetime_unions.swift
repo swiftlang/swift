@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -parse-as-library -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -parse-as-library %s | %FileCheck %s
 
 enum TrivialUnion {
   case Foo
@@ -43,7 +43,7 @@ func getNonTrivialUnion3() -> NonTrivialUnion3 { return .Bar(C()) }
 func getAddressOnlyUnion<T>(_: T.Type) -> AddressOnlyUnion<T> { return .Foo }
  */
 
-// CHECK-LABEL: sil hidden @$s15lifetime_unions19destroyUnionRValuesyyF : $@convention(thin) () -> () {
+// CHECK-LABEL: sil hidden [ossa] @$s15lifetime_unions19destroyUnionRValuesyyF : $@convention(thin) () -> () {
 func destroyUnionRValues() {
   // CHECK:   [[GET_TRIVIAL_UNION:%.*]] = function_ref @$s15lifetime_unions15getTrivialUnionAA0dE0OyF : $@convention(thin) () -> TrivialUnion
   // CHECK:   [[TRIVIAL_UNION:%.*]] = apply [[GET_TRIVIAL_UNION]]() : $@convention(thin) () -> TrivialUnion

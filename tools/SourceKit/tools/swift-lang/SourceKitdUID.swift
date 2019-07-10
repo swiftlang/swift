@@ -33,7 +33,7 @@ public struct SourceKitdUID: Equatable, Hashable, CustomStringConvertible {
     return String(cString: sourcekitd_uid_get_string_ptr(uid))
   }
 
-  public var hashValue: Int {
-    return uid.hashValue
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(uid)
   }
 }

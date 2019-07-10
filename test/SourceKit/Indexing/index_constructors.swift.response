@@ -1,11 +1,9 @@
 {
-  key.hash: <hash>,
   key.dependencies: [
     {
       key.kind: source.lang.swift.import.module.swift,
       key.name: "Swift",
       key.filepath: Swift.swiftmodule,
-      key.hash: <hash>,
       key.is_system: 1
     }
   ],
@@ -52,14 +50,16 @@
               key.usr: "s:18index_constructors11HorseObjectC4nameXevg",
               key.line: 9,
               key.column: 7,
-              key.is_dynamic: 1
+              key.is_dynamic: 1,
+              key.is_implicit: 1
             },
             {
               key.kind: source.lang.swift.decl.function.accessor.setter,
               key.usr: "s:18index_constructors11HorseObjectC4nameXevs",
               key.line: 9,
               key.column: 7,
-              key.is_dynamic: 1
+              key.is_dynamic: 1,
+              key.is_implicit: 1
             }
           ]
         },

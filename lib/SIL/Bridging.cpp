@@ -29,21 +29,22 @@ using namespace swift;
 using namespace swift::Lowering;
 
 
-SILType TypeConverter::getLoweredTypeOfGlobal(VarDecl *var) {
+CanType TypeConverter::getLoweredTypeOfGlobal(VarDecl *var) {
   AbstractionPattern origType = getAbstractionPattern(var);
   assert(!origType.isTypeParameter());
-  return getLoweredType(origType, origType.getType()).getObjectType();
+  return getLoweredRValueType(origType, origType.getType());
 }
 
 AnyFunctionType::Param
 TypeConverter::getBridgedParam(SILFunctionTypeRepresentation rep,
                                AbstractionPattern pattern,
-                               AnyFunctionType::Param param) {
+                               AnyFunctionType::Param param,
+                               Bridgeability bridging) {
   assert(!param.getParameterFlags().isInOut() &&
          !param.getParameterFlags().isVariadic());
 
-  auto bridged = getLoweredBridgedType(pattern, param.getPlainType(), rep,
-                                       TypeConverter::ForArgument);
+  auto bridged = getLoweredBridgedType(pattern, param.getPlainType(), bridging,
+                                       rep, TypeConverter::ForArgument);
   if (!bridged) {
     Context.Diags.diagnose(SourceLoc(), diag::could_not_find_bridge_type,
                            param.getPlainType());
@@ -59,10 +60,12 @@ void TypeConverter::
 getBridgedParams(SILFunctionTypeRepresentation rep,
                  AbstractionPattern pattern,
                  ArrayRef<AnyFunctionType::Param> params,
-                 SmallVectorImpl<AnyFunctionType::Param> &bridgedParams) {
+                 SmallVectorImpl<AnyFunctionType::Param> &bridgedParams,
+                 Bridgeability bridging) {
   for (unsigned i : indices(params)) {
     auto paramPattern = pattern.getFunctionParamType(i);
-    bridgedParams.push_back(getBridgedParam(rep, paramPattern, params[i]));
+    auto bridgedParam = getBridgedParam(rep, paramPattern, params[i], bridging);
+    bridgedParams.push_back(bridgedParam);
   }
 }
 
@@ -70,9 +73,10 @@ getBridgedParams(SILFunctionTypeRepresentation rep,
 CanType TypeConverter::getBridgedResultType(SILFunctionTypeRepresentation rep,
                                             AbstractionPattern pattern,
                                             CanType result,
+                                            Bridgeability bridging,
                                             bool suppressOptional) {
   auto loweredType =
-    getLoweredBridgedType(pattern, result, rep,
+    getLoweredBridgedType(pattern, result, bridging, rep,
                           suppressOptional
                             ? TypeConverter::ForNonOptionalResult
                             : TypeConverter::ForResult);
@@ -89,6 +93,7 @@ CanType TypeConverter::getBridgedResultType(SILFunctionTypeRepresentation rep,
 
 Type TypeConverter::getLoweredBridgedType(AbstractionPattern pattern,
                                           Type t,
+                                          Bridgeability bridging,
                                           SILFunctionTypeRepresentation rep,
                                           BridgedTypePurpose purpose) {
   switch (rep) {
@@ -104,39 +109,48 @@ Type TypeConverter::getLoweredBridgedType(AbstractionPattern pattern,
   case SILFunctionTypeRepresentation::Block:
     // Map native types back to bridged types.
 
-    bool canBridgeBool = (rep == SILFunctionTypeRepresentation::ObjCMethod);
-
     // Look through optional types.
     if (auto valueTy = t->getOptionalObjectType()) {
       pattern = pattern.getOptionalObjectType();
-      auto ty = getLoweredCBridgedType(pattern, valueTy, canBridgeBool, false);
+      auto ty = getLoweredCBridgedType(pattern, valueTy, bridging, rep,
+                                      BridgedTypePurpose::ForNonOptionalResult);
       return ty ? OptionalType::get(ty) : ty;
     }
-    return getLoweredCBridgedType(pattern, t, canBridgeBool,
-                                  purpose == ForResult);
+    return getLoweredCBridgedType(pattern, t, bridging, rep, purpose);
   }
 
   llvm_unreachable("Unhandled SILFunctionTypeRepresentation in switch.");
 };
 
 Type TypeConverter::getLoweredCBridgedType(AbstractionPattern pattern,
-                                           Type t,
-                                           bool canBridgeBool,
-                                           bool bridgedCollectionsAreOptional) {
+                                           Type t, Bridgeability bridging,
+                                           SILFunctionTypeRepresentation rep,
+                                           BridgedTypePurpose purpose) {
   auto clangTy = pattern.isClangType() ? pattern.getClangType() : nullptr;
 
   // Bridge Bool back to ObjC bool, unless the original Clang type was _Bool
   // or the Darwin Boolean type.
   auto nativeBoolTy = getBoolType();
   if (nativeBoolTy && t->isEqual(nativeBoolTy)) {
+    // If we have a Clang type that was imported as Bool, it had better be
+    // one of a small set of types.
     if (clangTy) {
-      if (clangTy->isBooleanType())
+      auto builtinTy = clangTy->castAs<clang::BuiltinType>();
+      if (builtinTy->getKind() == clang::BuiltinType::Bool)
         return t;
-      if (clangTy->isSpecificBuiltinType(clang::BuiltinType::UChar))
+      if (builtinTy->getKind() == clang::BuiltinType::UChar)
         return getDarwinBooleanType();
-    }
-    if (clangTy || canBridgeBool)
+      if (builtinTy->getKind() == clang::BuiltinType::Int)
+        return getWindowsBoolType();
+      assert(builtinTy->getKind() == clang::BuiltinType::SChar);
       return getObjCBoolType();
+    }
+
+    // Otherwise, always assume ObjC methods should use ObjCBool.
+    if (bridging != Bridgeability::None &&
+        rep == SILFunctionTypeRepresentation::ObjCMethod)
+      return getObjCBoolType();
+
     return t;
   }
 
@@ -180,12 +194,13 @@ Type TypeConverter::getLoweredCBridgedType(AbstractionPattern pattern,
       // so we use the ObjCMethod representation.
       SmallVector<AnyFunctionType::Param, 8> newParams;
       getBridgedParams(SILFunctionType::Representation::ObjCMethod,
-                       pattern, funTy->getParams(), newParams);
+                       pattern, funTy->getParams(), newParams, bridging);
 
       Type newResult =
           getBridgedResultType(SILFunctionType::Representation::ObjCMethod,
                                pattern.getFunctionResultType(),
                                funTy->getResult()->getCanonicalType(),
+                               bridging,
                                /*non-optional*/false);
 
       return FunctionType::get(newParams, newResult,
@@ -208,12 +223,10 @@ Type TypeConverter::getLoweredCBridgedType(AbstractionPattern pattern,
     auto conformance = foreignRepresentation.second;
     assert(conformance && "Missing conformance?");
     Type bridgedTy =
-      ProtocolConformanceRef::getTypeWitnessByName(
-        t, ProtocolConformanceRef(conformance),
-        M.getASTContext().Id_ObjectiveCType,
-        nullptr);
+      ProtocolConformanceRef(conformance).getTypeWitnessByName(
+        t, M.getASTContext().Id_ObjectiveCType);
     assert(bridgedTy && "Missing _ObjectiveCType witness?");
-    if (bridgedCollectionsAreOptional && clangTy)
+    if (purpose == BridgedTypePurpose::ForResult && clangTy)
       bridgedTy = OptionalType::get(bridgedTy);
     return bridgedTy;
   }

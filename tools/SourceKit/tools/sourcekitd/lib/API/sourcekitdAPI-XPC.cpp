@@ -15,6 +15,7 @@
 #include "sourcekitd/DocStructureArray.h"
 #include "sourcekitd/DocSupportAnnotationArray.h"
 #include "sourcekitd/TokenAnnotationsArray.h"
+#include "sourcekitd/ExpressionTypeArray.h"
 #include "sourcekitd/RawData.h"
 #include "sourcekitd/RequestResponsePrinterBase.h"
 #include "SourceKit/Support/UIdent.h"
@@ -68,24 +69,25 @@ public:
     return getPtr()+1;
   }
 
-  static CustomXPCData createErrorRequestInvalid(const char *Description) {
+  static CustomXPCData createErrorRequestInvalid(StringRef Description) {
     return createKindAndString(Kind::ErrorRequestInvalid, Description);
   }
-  static CustomXPCData createErrorRequestFailed(const char *Description) {
+  static CustomXPCData createErrorRequestFailed(StringRef Description) {
     return createKindAndString(Kind::ErrorRequestFailed, Description);
   }
-  static CustomXPCData createErrorRequestInterrupted(const char *Description) {
+  static CustomXPCData createErrorRequestInterrupted(StringRef Description) {
     return createKindAndString(Kind::ErrorRequestInterrupted, Description);
   }
-  static CustomXPCData createErrorRequestCancelled(const char *Description) {
+  static CustomXPCData createErrorRequestCancelled(StringRef Description) {
     return createKindAndString(Kind::ErrorRequestCancelled, Description);
   }
 
 private:
-  static CustomXPCData createKindAndString(Kind K, const char *Str) {
+  static CustomXPCData createKindAndString(Kind K, StringRef Str) {
     llvm::SmallVector<char, 128> Buf;
     Buf.push_back((char)K);
-    Buf.append(Str, Str+strlen(Str)+1);
+    Buf.append(Str.begin(), Str.end());
+    Buf.push_back('\0');
     return CustomXPCData(xpc_data_create(Buf.begin(), Buf.size()));
   }
 
@@ -374,20 +376,20 @@ Optional<int64_t> RequestDict::getOptionalInt64(SourceKit::UIdent Key) {
 }
 
 sourcekitd_response_t
-sourcekitd::createErrorRequestInvalid(const char *Description) {
+sourcekitd::createErrorRequestInvalid(StringRef Description) {
   return CustomXPCData::createErrorRequestInvalid(Description).getXObj();
 }
 sourcekitd_response_t
-sourcekitd::createErrorRequestFailed(const char *Description) {
+sourcekitd::createErrorRequestFailed(StringRef Description) {
   return CustomXPCData::createErrorRequestFailed(Description).getXObj();
 }
 sourcekitd_response_t
-sourcekitd::createErrorRequestInterrupted(const char *Description) {
+sourcekitd::createErrorRequestInterrupted(StringRef Description) {
   return CustomXPCData::createErrorRequestInterrupted(Description).getXObj();
 }
 sourcekitd_response_t
 sourcekitd::createErrorRequestCancelled() {
-  return CustomXPCData::createErrorRequestCancelled("").getXObj();
+  return CustomXPCData::createErrorRequestCancelled(StringRef("")).getXObj();
 }
 
 //===----------------------------------------------------------------------===//
@@ -621,6 +623,7 @@ static sourcekitd_variant_type_t XPCVar_get_type(sourcekitd_variant_t var) {
     case CustomBufferKind::InheritedTypesArray:
     case CustomBufferKind::DocStructureElementArray:
     case CustomBufferKind::AttributesArray:
+    case CustomBufferKind::ExpressionTypeArray:
       return SOURCEKITD_VARIANT_TYPE_ARRAY;
     case CustomBufferKind::RawData:
       return SOURCEKITD_VARIANT_TYPE_DATA;
@@ -780,6 +783,9 @@ static sourcekitd_variant_t variantFromXPCObject(xpc_object_t obj) {
                 (uintptr_t)CUSTOM_BUF_START(obj), 0 }};
     case CustomBufferKind::AttributesArray:
       return {{ (uintptr_t)getVariantFunctionsForAttributesArray(),
+                (uintptr_t)CUSTOM_BUF_START(obj), 0 }};
+    case CustomBufferKind::ExpressionTypeArray:
+      return {{ (uintptr_t)getVariantFunctionsForExpressionTypeArray(),
                 (uintptr_t)CUSTOM_BUF_START(obj), 0 }};
     case sourcekitd::CustomBufferKind::RawData:
       return {{ (uintptr_t)getVariantFunctionsForRawData(),

@@ -21,12 +21,13 @@ import TestsUtils
 let sequenceCount = 4096
 let prefixCount = sequenceCount - 1024
 let sumCount = prefixCount * (prefixCount - 1) / 2
+let array: [Int] = Array(0..<sequenceCount)
 
 public let PrefixWhile = [
   BenchmarkInfo(
     name: "PrefixWhileCountableRange",
     runFunction: run_PrefixWhileCountableRange,
-    tags: [.validation, .api, .unstable]),
+    tags: [.validation, .api]),
   BenchmarkInfo(
     name: "PrefixWhileSequence",
     runFunction: run_PrefixWhileSequence,
@@ -38,7 +39,7 @@ public let PrefixWhile = [
   BenchmarkInfo(
     name: "PrefixWhileAnySeqCntRange",
     runFunction: run_PrefixWhileAnySeqCntRange,
-    tags: [.validation, .api, .unstable]),
+    tags: [.validation, .api]),
   BenchmarkInfo(
     name: "PrefixWhileAnySeqCRangeIter",
     runFunction: run_PrefixWhileAnySeqCRangeIter,
@@ -50,11 +51,12 @@ public let PrefixWhile = [
   BenchmarkInfo(
     name: "PrefixWhileArray",
     runFunction: run_PrefixWhileArray,
-    tags: [.validation, .api, .Array]),
+    tags: [.validation, .api, .Array],
+    setUpFunction: { blackHole(array) }),
   BenchmarkInfo(
     name: "PrefixWhileCountableRangeLazy",
     runFunction: run_PrefixWhileCountableRangeLazy,
-    tags: [.validation, .api, .unstable]),
+    tags: [.validation, .api]),
   BenchmarkInfo(
     name: "PrefixWhileSequenceLazy",
     runFunction: run_PrefixWhileSequenceLazy,
@@ -66,7 +68,7 @@ public let PrefixWhile = [
   BenchmarkInfo(
     name: "PrefixWhileAnySeqCntRangeLazy",
     runFunction: run_PrefixWhileAnySeqCntRangeLazy,
-    tags: [.validation, .api, .unstable]),
+    tags: [.validation, .api]),
   BenchmarkInfo(
     name: "PrefixWhileAnySeqCRangeIterLazy",
     runFunction: run_PrefixWhileAnySeqCRangeIterLazy,
@@ -78,7 +80,8 @@ public let PrefixWhile = [
   BenchmarkInfo(
     name: "PrefixWhileArrayLazy",
     runFunction: run_PrefixWhileArrayLazy,
-    tags: [.validation, .api]),
+    tags: [.validation, .api, .Array],
+    setUpFunction: { blackHole(array) }),
 ]
 
 @inline(never)
@@ -149,7 +152,7 @@ public func run_PrefixWhileAnyCollection(_ N: Int) {
 }
 @inline(never)
 public func run_PrefixWhileArray(_ N: Int) {
-  let s = Array(0..<sequenceCount)
+  let s = array
   for _ in 1...20*N {
     var result = 0
     for element in s.prefix(while: {$0 < prefixCount} ) {
@@ -226,7 +229,7 @@ public func run_PrefixWhileAnyCollectionLazy(_ N: Int) {
 }
 @inline(never)
 public func run_PrefixWhileArrayLazy(_ N: Int) {
-  let s = (Array(0..<sequenceCount)).lazy
+  let s = (array).lazy
   for _ in 1...20*N {
     var result = 0
     for element in s.prefix(while: {$0 < prefixCount} ) {

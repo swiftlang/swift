@@ -177,7 +177,7 @@ private:
 
     // Don't capture variables which aren't default-initialized.
     if (auto *VD = dyn_cast<VarDecl>(DstDecl))
-      if (!VD->getParentInitializer() && !VD->isInOut())
+      if (!VD->isParentInitialized() && !VD->isInOut())
         return {true, OriginalExpr};
 
     // Rewrite the original expression into this:
@@ -215,7 +215,7 @@ private:
     CheckExpectExpr->setThrows(false);
 
     // Create the closure.
-    TypeChecker TC{Ctx};
+    TypeChecker &TC = TypeChecker::createForContext(Ctx);
     auto *Params = ParameterList::createEmpty(Ctx);
     auto *Closure = new (Ctx)
         ClosureExpr(Params, SourceLoc(), SourceLoc(), SourceLoc(), TypeLoc(),

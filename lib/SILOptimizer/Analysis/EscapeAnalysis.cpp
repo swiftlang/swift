@@ -65,6 +65,8 @@ static SingleValueInstruction *isProjection(SILNode *node) {
 static bool isNonWritableMemoryAddress(SILNode *V) {
   switch (V->getKind()) {
   case SILNodeKind::FunctionRefInst:
+  case SILNodeKind::DynamicFunctionRefInst:
+  case SILNodeKind::PreviousDynamicFunctionRefInst:
   case SILNodeKind::WitnessMethodInst:
   case SILNodeKind::ClassMethodInst:
   case SILNodeKind::SuperMethodInst:
@@ -105,7 +107,8 @@ void EscapeAnalysis::ConnectionGraph::clear() {
 
 EscapeAnalysis::CGNode *EscapeAnalysis::ConnectionGraph::
 getNode(ValueBase *V, EscapeAnalysis *EA, bool createIfNeeded) {
-  if (isa<FunctionRefInst>(V))
+  if (isa<FunctionRefInst>(V) || isa<DynamicFunctionRefInst>(V) ||
+      isa<PreviousDynamicFunctionRefInst>(V))
     return nullptr;
   
   if (!EA->isPointer(V))
@@ -1018,7 +1021,7 @@ static bool linkBBArgs(SILBasicBlock *BB) {
 
 /// Returns true if the type \p Ty is a reference or may transitively contains
 /// a reference, i.e. if it is a "pointer" type.
-static bool mayContainReference(SILType Ty, SILModule *Mod) {
+static bool mayContainReference(SILType Ty, const SILFunction &F) {
   // Opaque types may contain a reference. Speculatively track them too.
   //
   // 1. It may be possible to optimize opaque values based on known mutation
@@ -1029,25 +1032,27 @@ static bool mayContainReference(SILType Ty, SILModule *Mod) {
   //
   // 3. A generic function may call a specialized function taking a concrete
   // reference type via devirtualization.
-  if (Ty.isAddressOnly(*Mod))
+  if (Ty.isAddressOnly(F))
     return true;
 
   if (Ty.hasReferenceSemantics())
     return true;
 
-  if (Ty.getASTType() == Mod->getASTContext().TheRawPointerType)
+  auto &Mod = F.getModule();
+
+  if (Ty.getASTType() == Mod.getASTContext().TheRawPointerType)
     return true;
 
   if (auto *Str = Ty.getStructOrBoundGenericStruct()) {
     for (auto *Field : Str->getStoredProperties()) {
-      if (mayContainReference(Ty.getFieldType(Field, *Mod), Mod))
+      if (mayContainReference(Ty.getFieldType(Field, Mod), F))
         return true;
     }
     return false;
   }
   if (auto TT = Ty.getAs<TupleType>()) {
     for (unsigned i = 0, e = TT->getNumElements(); i != e; ++i) {
-      if (mayContainReference(Ty.getTupleElementType(i), Mod))
+      if (mayContainReference(Ty.getTupleElementType(i), F))
         return true;
     }
     return false;
@@ -1055,7 +1060,7 @@ static bool mayContainReference(SILType Ty, SILModule *Mod) {
   if (auto En = Ty.getEnumOrBoundGenericEnum()) {
     for (auto *ElemDecl : En->getAllElements()) {
       if (ElemDecl->hasAssociatedValues()
-          && mayContainReference(Ty.getEnumElementType(ElemDecl, *Mod), Mod))
+          && mayContainReference(Ty.getEnumElementType(ElemDecl, Mod), F))
         return true;
     }
     return false;
@@ -1064,12 +1069,18 @@ static bool mayContainReference(SILType Ty, SILModule *Mod) {
 }
 
 bool EscapeAnalysis::isPointer(ValueBase *V) {
+  auto *F = V->getFunction();
+
+  // The function can be null, e.g. if V is an undef.
+  if (!F)
+    return false;
+
   SILType Ty = V->getType();
   auto Iter = isPointerCache.find(Ty);
   if (Iter != isPointerCache.end())
     return Iter->second;
 
-  bool IP = (Ty.isAddress() || mayContainReference(Ty, M));
+  bool IP = (Ty.isAddress() || mayContainReference(Ty, *F));
   isPointerCache[Ty] = IP;
   return IP;
 }
@@ -1180,9 +1191,9 @@ bool EscapeAnalysis::buildConnectionGraphForDestructor(
   // It should be a locally allocated object.
   if (!pointsToLocalObject(V))
     return false;
-  SILModule &M = I->getFunction()->getModule();
+
   // Determine the exact type of the value.
-  auto Ty = getExactDynamicTypeOfUnderlyingObject(V, M, nullptr);
+  auto Ty = getExactDynamicTypeOfUnderlyingObject(V, nullptr);
   if (!Ty) {
     // The object is local, but we cannot determine its type.
     return false;
@@ -1199,7 +1210,7 @@ bool EscapeAnalysis::buildConnectionGraphForDestructor(
   auto Destructor = Class->getDestructor();
   SILDeclRef DeallocRef(Destructor, SILDeclRef::Kind::Deallocator);
   // Find a SILFunction for destructor.
-  SILFunction *Dealloc = M.lookUpFunction(DeallocRef);
+  SILFunction *Dealloc = M->lookUpFunction(DeallocRef);
   if (!Dealloc)
     return false;
   CalleeList Callees(Dealloc);
@@ -1213,7 +1224,9 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
                                         int RecursionDepth) {
   ConnectionGraph *ConGraph = &FInfo->Graph;
   FullApplySite FAS = FullApplySite::isa(I);
-  if (FAS) {
+  if (FAS &&
+      // We currently don't support co-routines. In most cases co-routines will be inlined anyway.
+      !isa<BeginApplyInst>(I)) {
     ArraySemanticsCall ASC(FAS.getInstruction());
     switch (ASC.getKind()) {
       case ArrayCallKind::kArrayPropsIsNativeTypeChecked:
@@ -1239,12 +1252,6 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
           return;
         }
         break;
-      case ArrayCallKind::kGetArrayOwner:
-        if (CGNode *BufferNode = ConGraph->getNode(ASC.getSelf(), this)) {
-          ConGraph->defer(ConGraph->getNode(ASC.getCallResult(), this),
-                          BufferNode);
-        }
-        return;
       case ArrayCallKind::kGetElement:
         if (CGNode *AddrNode = ConGraph->getNode(ASC.getSelf(), this)) {
           CGNode *DestNode = nullptr;
@@ -1298,12 +1305,12 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
         break;
     }
 
-    if (FAS.getReferencedFunction()
-        && FAS.getReferencedFunction()->hasSemanticsAttr(
-               "self_no_escaping_closure")
-        && ((FAS.hasIndirectSILResults() && FAS.getNumArguments() == 3)
-            || (!FAS.hasIndirectSILResults() && FAS.getNumArguments() == 2))
-        && FAS.hasSelfArgument()) {
+    if (FAS.getReferencedFunctionOrNull() &&
+        FAS.getReferencedFunctionOrNull()->hasSemanticsAttr(
+            "self_no_escaping_closure") &&
+        ((FAS.hasIndirectSILResults() && FAS.getNumArguments() == 3) ||
+         (!FAS.hasIndirectSILResults() && FAS.getNumArguments() == 2)) &&
+        FAS.hasSelfArgument()) {
       // The programmer has guaranteed that the closure will not capture the
       // self pointer passed to it or anything that is transitively reachable
       // from the pointer.
@@ -1313,12 +1320,12 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
       return;
     }
 
-    if (FAS.getReferencedFunction()
-        && FAS.getReferencedFunction()->hasSemanticsAttr(
-               "pair_no_escaping_closure")
-        && ((FAS.hasIndirectSILResults() && FAS.getNumArguments() == 4)
-            || (!FAS.hasIndirectSILResults() && FAS.getNumArguments() == 3))
-        && FAS.hasSelfArgument()) {
+    if (FAS.getReferencedFunctionOrNull() &&
+        FAS.getReferencedFunctionOrNull()->hasSemanticsAttr(
+            "pair_no_escaping_closure") &&
+        ((FAS.hasIndirectSILResults() && FAS.getNumArguments() == 4) ||
+         (!FAS.hasIndirectSILResults() && FAS.getNumArguments() == 3)) &&
+        FAS.hasSelfArgument()) {
       // The programmer has guaranteed that the closure will not capture the
       // self pointer passed to it or anything that is transitively reachable
       // from the pointer.
@@ -1335,7 +1342,7 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
         return;
     }
 
-    if (auto *Fn = FAS.getReferencedFunction()) {
+    if (auto *Fn = FAS.getReferencedFunctionOrNull()) {
       if (Fn->getName() == "swift_bufferAllocate")
         // The call is a buffer allocation, e.g. for Array.
         return;
@@ -1618,7 +1625,8 @@ bool EscapeAnalysis::deinitIsKnownToNotCapture(SILValue V) {
     if (V->getType().is<SILBoxType>())
       return true;
 
-    if (isa<FunctionRefInst>(V))
+    if (isa<FunctionRefInst>(V) || isa<DynamicFunctionRefInst>(V) ||
+        isa<PreviousDynamicFunctionRefInst>(V))
       return true;
 
     // Check all operands of a partial_apply

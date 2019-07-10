@@ -7,7 +7,7 @@ struct SimpleModify {
 
   var modifiable: String {
     get {}
-// CHECK-LABEL: sil hidden @$s15modify_accessor12SimpleModifyV10modifiableSSvM
+// CHECK-LABEL: sil hidden [ossa] @$s15modify_accessor12SimpleModifyV10modifiableSSvM
 // CHECK-SAME:    : $@yield_once @convention(method) (@inout SimpleModify) -> @yields @inout String {
 // CHECK:         [[SELF:%.*]] = begin_access [modify] [unknown] %0 : $*SimpleModify
 // CHECK-NEXT:    [[FIELD:%.*]] = struct_element_addr [[SELF]] : $*SimpleModify, #SimpleModify.stored
@@ -24,7 +24,7 @@ struct SimpleModify {
     }
   }
 
-// CHECK-LABEL: sil hidden @$s15modify_accessor12SimpleModifyV3set6stringySS_tF
+// CHECK-LABEL: sil hidden [ossa] @$s15modify_accessor12SimpleModifyV3set6stringySS_tF
 // CHECK:         [[VALUE:%.*]] = copy_value %0 : $String
 // CHECK-NEXT:    [[SELF:%.*]] = begin_access [modify] [unknown] %1 : $*SimpleModify
 // CHECK-NEXT:    // function_ref
@@ -39,7 +39,7 @@ mutating func set(string: String) {
     modifiable = string
   }
 
-// CHECK-LABEL: sil hidden @$s15modify_accessor12SimpleModifyV0A0yyF
+// CHECK-LABEL: sil hidden [ossa] @$s15modify_accessor12SimpleModifyV0A0yyF
 // CHECK:         [[SELF:%.*]] = begin_access [modify] [unknown] %0 : $*SimpleModify
 // CHECK-NEXT:    // function_ref
 // CHECK-NEXT:    [[MODIFYFN:%.*]] = function_ref @$s15modify_accessor12SimpleModifyV10modifiableSSvM
@@ -60,7 +60,7 @@ class SetterSynthesisFromModify {
   var stored: String = "test"
   var modifiable: String {
     get { return stored }
-// CHECK: sil hidden [transparent] @$s15modify_accessor25SetterSynthesisFromModifyC10modifiableSSvs
+// CHECK: sil hidden [transparent] [ossa] @$s15modify_accessor25SetterSynthesisFromModifyC10modifiableSSvs
 // CHECK:         [[VALUE_BORROW:%.*]] = begin_borrow %0 : $String
 // CHECK-NEXT:    [[VALUE:%.*]] = copy_value [[VALUE_BORROW]] : $String
 // CHECK-NEXT:    // function_ref
@@ -87,7 +87,7 @@ struct ModifyAndSet {
     set(value) { stored = value }
   }
 
-// CHECK-LABEL: sil hidden @$s15modify_accessor12ModifyAndSetV3set6stringySS_tF
+// CHECK-LABEL: sil hidden [ossa] @$s15modify_accessor12ModifyAndSetV3set6stringySS_tF
 // CHECK:         [[VALUE:%.*]] = copy_value %0 : $String
 // CHECK-NEXT:    [[SELF:%.*]] = begin_access [modify] [unknown] %1 : $*ModifyAndSet
 // CHECK-NEXT:    // function_ref
@@ -100,7 +100,7 @@ struct ModifyAndSet {
     modifiable = string
   }
 
-  // CHECK-LABEL: sil hidden @$s15modify_accessor12ModifyAndSetV0A0yyF
+  // CHECK-LABEL: sil hidden [ossa] @$s15modify_accessor12ModifyAndSetV0A0yyF
   // CHECK:         [[SELF:%.*]] = begin_access [modify] [unknown] %0 : $*ModifyAndSet
   // CHECK-NEXT:    // function_ref
   // CHECK-NEXT:    [[MODIFYFN:%.*]] = function_ref @$s15modify_accessor12ModifyAndSetV10modifiableSSvM

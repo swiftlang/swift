@@ -17,6 +17,7 @@
 
 #define DEBUG_TYPE "sil-speculative-devirtualizer"
 
+#include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
@@ -29,7 +30,6 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/CFG.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "swift/AST/ASTContext.h"
@@ -118,14 +118,15 @@ static FullApplySite CloneApply(FullApplySite AI, SILBuilder &Builder) {
 /// Insert monomorphic inline caches for a specific class or metatype
 /// type \p SubClassTy.
 static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
-                                                SILType SubType,
+                                                CanType SubType,
+                                                ClassDecl *CD,
                                                 CheckedCastBranchInst *&CCBI) {
-  CCBI = nullptr;
-  // Bail if this class_method cannot be devirtualized.
-  if (!canDevirtualizeClassMethod(AI, SubType))
+  if (SubType->hasDynamicSelfType())
     return FullApplySite();
 
-  if (SubType.getASTType()->hasDynamicSelfType())
+  CCBI = nullptr;
+  // Bail if this class_method cannot be devirtualized.
+  if (!canDevirtualizeClassMethod(AI, CD))
     return FullApplySite();
 
   // Can't speculate begin_apply yet.
@@ -144,7 +145,9 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
   SILBasicBlock *Iden = F->createBasicBlock();
   // Virt is the block containing the slow virtual call.
   SILBasicBlock *Virt = F->createBasicBlock();
-  Iden->createPhiArgument(SubType, ValueOwnershipKind::Owned);
+  Iden->createPhiArgument(
+      SILType::getPrimitiveObjectType(SubType),
+      ValueOwnershipKind::Owned);
 
   SILBasicBlock *Continue = Entry->split(It);
 
@@ -155,8 +158,10 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
   ClassMethodInst *CMI = cast<ClassMethodInst>(AI.getCallee());
 
   CCBI = Builder.createCheckedCastBranch(AI.getLoc(), /*exact*/ true,
-                                       CMI->getOperand(), SubType, Iden,
-                                       Virt);
+                                      CMI->getOperand(),
+                                      SILType::getPrimitiveObjectType(SubType),
+                                      Iden,
+                                      Virt);
   It = CCBI->getIterator();
 
   SILBuilderWithScope VirtBuilder(Virt, AI.getInstruction());
@@ -219,7 +224,7 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
 
   // Devirtualize the apply instruction on the identical path.
   auto NewInst =
-    devirtualizeClassMethod(IdenAI, DownCastedClassInstance, nullptr);
+    devirtualizeClassMethod(IdenAI, DownCastedClassInstance, CD, nullptr);
   assert(NewInst && "Expected to be able to devirtualize apply!");
   (void)NewInst;
 
@@ -256,7 +261,7 @@ static FullApplySite speculateMonomorphicTarget(FullApplySite AI,
   return VirtAI;
 }
 
-/// \brief Returns true, if a method implementation to be called by the
+/// Returns true, if a method implementation to be called by the
 /// default case handler of a speculative devirtualization is statically
 /// known. This happens if it can be proven that generated
 /// checked_cast_br instructions cover all other possible cases.
@@ -278,8 +283,7 @@ static bool isDefaultCaseKnown(ClassHierarchyAnalysis *CHA,
 
   // If the class has an @objc ancestry it can be dynamically subclassed and we
   // can't therefore statically know the default case.
-  auto Ancestry = CD->checkObjCAncestry();
-  if (Ancestry != ObjCClassKind::NonObjC)
+  if (CD->checkAncestry(AncestryFlags::ObjC))
     return false;
 
   // Without an associated context we cannot perform any
@@ -360,7 +364,7 @@ static bool isDefaultCaseKnown(ClassHierarchyAnalysis *CHA,
   return true;
 }
 
-/// \brief Try to speculate the call target for the call \p AI. This function
+/// Try to speculate the call target for the call \p AI. This function
 /// returns true if a change was made.
 static bool tryToSpeculateTarget(FullApplySite AI, ClassHierarchyAnalysis *CHA,
                                  OptRemark::Emitter &ORE) {
@@ -381,21 +385,20 @@ static bool tryToSpeculateTarget(FullApplySite AI, ClassHierarchyAnalysis *CHA,
   // with a value whose type is closer (in the class hierarchy) to the
   // actual dynamic type.
   auto SubTypeValue = stripUpCasts(CMI->getOperand());
-  SILType SubType = SubTypeValue->getType();
+  CanType SubType = SubTypeValue->getType().getASTType();
 
   // Bail if any generic types parameters of the class instance type are
   // unbound.
   // We cannot devirtualize unbound generic calls yet.
-  if (SubType.hasArchetype())
+  if (SubType->hasArchetype())
     return false;
 
-  auto &M = CMI->getModule();
-  auto ClassType = SubType;
-  if (SubType.is<MetatypeType>())
-    ClassType = SubType.getMetatypeInstanceType(M);
+  auto *F = CMI->getFunction();
+  auto &M = F->getModule();
 
   CheckedCastBranchInst *LastCCBI = nullptr;
 
+  auto ClassType = getSelfInstanceType(SubType);
   ClassDecl *CD = ClassType.getClassOrBoundGenericClass();
   assert(CD && "Expected decl for class type!");
 
@@ -404,7 +407,7 @@ static bool tryToSpeculateTarget(FullApplySite AI, ClassHierarchyAnalysis *CHA,
     // try to devirtualize it completely.
     ClassHierarchyAnalysis::ClassList Subs;
     if (isDefaultCaseKnown(CHA, AI, CD, Subs)) {
-      auto NewInst = tryDevirtualizeClassMethod(AI, SubTypeValue, &ORE);
+      auto NewInst = tryDevirtualizeClassMethod(AI, SubTypeValue, CD, &ORE);
       if (NewInst)
         deleteDevirtualizedApply(AI);
       return bool(NewInst);
@@ -412,7 +415,7 @@ static bool tryToSpeculateTarget(FullApplySite AI, ClassHierarchyAnalysis *CHA,
 
     LLVM_DEBUG(llvm::dbgs() << "Inserting monomorphic speculative call for "
                "class " << CD->getName() << "\n");
-    return !!speculateMonomorphicTarget(AI, SubType, LastCCBI);
+    return !!speculateMonomorphicTarget(AI, SubType, CD, LastCCBI);
   }
 
   // True if any instructions were changed or generated.
@@ -438,7 +441,7 @@ static bool tryToSpeculateTarget(FullApplySite AI, ClassHierarchyAnalysis *CHA,
 
   // Try to devirtualize the static class of instance
   // if it is possible.
-  if (auto F = getTargetClassMethod(M, SubType, CMI)) {
+  if (auto F = getTargetClassMethod(M, CD, CMI)) {
     // Do not devirtualize if a method in the base class is marked
     // as non-optimizable. This way it is easy to disable the
     // devirtualization of this method in the base class and
@@ -447,7 +450,7 @@ static bool tryToSpeculateTarget(FullApplySite AI, ClassHierarchyAnalysis *CHA,
       return false;
   }
 
-  auto FirstAI = speculateMonomorphicTarget(AI, SubType, LastCCBI);
+  auto FirstAI = speculateMonomorphicTarget(AI, SubType, CD, LastCCBI);
   if (FirstAI) {
     Changed = true;
     AI = FirstAI;
@@ -501,18 +504,15 @@ static bool tryToSpeculateTarget(FullApplySite AI, ClassHierarchyAnalysis *CHA,
     }
 
     CanType CanClassType = S->getDeclaredInterfaceType()->getCanonicalType();
-    SILType ClassType = SILType::getPrimitiveObjectType(CanClassType);
 
-    auto ClassOrMetatypeType = ClassType;
-    if (auto EMT = SubType.getAs<AnyMetatypeType>()) {
-      auto InstTy = ClassType.getASTType();
-      auto *MetaTy = MetatypeType::get(InstTy, EMT->getRepresentation());
-      auto CanMetaTy = CanMetatypeType(MetaTy);
-      ClassOrMetatypeType = SILType::getPrimitiveObjectType(CanMetaTy);
+    auto ClassOrMetatypeType = CanClassType;
+    if (auto MT = dyn_cast<MetatypeType>(SubType)) {
+      ClassOrMetatypeType = CanMetatypeType::get(CanClassType,
+                                                 MT->getRepresentation());
     }
 
     // Pass the metatype of the subclass.
-    auto NewAI = speculateMonomorphicTarget(AI, ClassOrMetatypeType, LastCCBI);
+    auto NewAI = speculateMonomorphicTarget(AI, ClassOrMetatypeType, S, LastCCBI);
     if (!NewAI) {
       NotHandledSubsNum++;
       continue;
@@ -535,7 +535,7 @@ static bool tryToSpeculateTarget(FullApplySite AI, ClassHierarchyAnalysis *CHA,
         RemarkPassed R("PartialSpecDevirt", *AI.getInstruction());
         R << "Partially devirtualized call with run-time checks for "
           << NV("NumSubTypesChecked", Subs.size()) << " subclasses of "
-          << NV("ClassType", &ClassType);
+          << NV("ClassType", ClassType);
         if (NotHandledSubsNum)
           R << ", number of subclasses not devirtualized: "
             << NV("NotHandledSubsNum", NotHandledSubsNum);
@@ -549,7 +549,7 @@ static bool tryToSpeculateTarget(FullApplySite AI, ClassHierarchyAnalysis *CHA,
   auto RB = [&]() {
     return RemarkPassed("SpecDevirt", *AI.getInstruction())
            << "Devirtualized call with run-time checks for the derived classes "
-              "of " << NV("ClassType", &ClassType);
+              "of " << NV("ClassType", ClassType);
   };
 
   // At this point it is known that there is only one remaining method
@@ -567,7 +567,7 @@ static bool tryToSpeculateTarget(FullApplySite AI, ClassHierarchyAnalysis *CHA,
     ORE.emit(RB);
     return true;
   }
-  auto NewInst = tryDevirtualizeClassMethod(AI, SubTypeValue, nullptr);
+  auto NewInst = tryDevirtualizeClassMethod(AI, SubTypeValue, CD, nullptr);
   if (NewInst) {
     ORE.emit(RB);
     deleteDevirtualizedApply(AI);

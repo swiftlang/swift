@@ -95,14 +95,14 @@ emitBridgeNativeToObjectiveC(SILGenFunction &SGF,
   if (!requirement) return None;
 
   // Retrieve the _bridgeToObjectiveC witness.
-  auto witness = conformance->getWitnessDecl(requirement, nullptr);
+  auto witness = conformance->getWitnessDecl(requirement);
   assert(witness);
 
   // Determine the type we're bridging to.
   auto objcTypeReq = SGF.SGM.getBridgedObjectiveCTypeRequirement(loc);
   if (!objcTypeReq) return None;
 
-  Type objcType = conformance->getTypeWitness(objcTypeReq, nullptr);
+  Type objcType = conformance->getTypeWitness(objcTypeReq);
   assert(objcType);
 
   // Create a reference to the witness.
@@ -131,6 +131,8 @@ emitBridgeNativeToObjectiveC(SILGenFunction &SGF,
   AbstractionPattern origSelfType(witness->getInterfaceType());
   origSelfType = origSelfType.getFunctionParamType(0);
 
+  ArgumentScope scope(SGF, loc);
+
   swiftValue = SGF.emitSubstToOrigValue(loc, swiftValue,
                                         origSelfType,
                                         swiftValueType,
@@ -152,12 +154,12 @@ emitBridgeNativeToObjectiveC(SILGenFunction &SGF,
   }
 
   // Call the witness.
-  SILType resultTy = SGF.getLoweredType(objcType);
   SILValue bridgedValue =
-      SGF.B.createApply(loc, witnessRef, witnessFnTy, resultTy, typeSubMap,
+      SGF.B.createApply(loc, witnessRef, typeSubMap,
                         swiftValue.borrow(SGF, loc).getValue());
 
   auto bridgedMV = SGF.emitManagedRValueWithCleanup(bridgedValue);
+  bridgedMV = scope.popPreservingValue(bridgedMV);
 
   // The Objective-C value doesn't necessarily match the desired type.
   bridgedMV = emitUnabstractedCast(SGF, loc, bridgedMV,
@@ -185,11 +187,11 @@ emitBridgeObjectiveCToNative(SILGenFunction &SGF,
   if (!objcTypeRequirement) return None;
 
   // Retrieve the _unconditionallyBridgeFromObjectiveC witness.
-  auto witness = conformance->getWitnessDeclRef(requirement, nullptr);
+  auto witness = conformance->getWitnessDeclRef(requirement);
   assert(witness);
 
   // Retrieve the _ObjectiveCType witness.
-  auto objcType = conformance->getTypeWitness(objcTypeRequirement, nullptr);
+  auto objcType = conformance->getTypeWitness(objcTypeRequirement);
   assert(objcType);
 
   // Create a reference to the witness.
@@ -249,11 +251,8 @@ static ManagedValue emitBridgeBoolToObjCBool(SILGenFunction &SGF,
   SILValue boolToObjCBoolFn
     = SGF.emitGlobalFunctionRef(loc, SGF.SGM.getBoolToObjCBoolFn());
 
-  SILType resultTy =SGF.getLoweredLoadableType(SGF.SGM.Types.getObjCBoolType());
-
   SILValue result = SGF.B.createApply(loc, boolToObjCBoolFn,
-                                      boolToObjCBoolFn->getType(),
-                                      resultTy, {}, swiftBool.forward(SGF));
+                                      {}, swiftBool.forward(SGF));
   return SGF.emitManagedRValueWithCleanup(result);
 }
 
@@ -264,13 +263,17 @@ static ManagedValue emitBridgeBoolToDarwinBoolean(SILGenFunction &SGF,
   SILValue boolToDarwinBooleanFn
     = SGF.emitGlobalFunctionRef(loc, SGF.SGM.getBoolToDarwinBooleanFn());
 
-  SILType resultTy =
-      SGF.getLoweredLoadableType(SGF.SGM.Types.getDarwinBooleanType());
-
   SILValue result = SGF.B.createApply(loc, boolToDarwinBooleanFn,
-                                      boolToDarwinBooleanFn->getType(),
-                                      resultTy, {}, swiftBool.forward(SGF));
+                                      {}, swiftBool.forward(SGF));
   return SGF.emitManagedRValueWithCleanup(result);
+}
+
+static ManagedValue emitBridgeBoolToWindowsBool(SILGenFunction &SGF,
+                                                SILLocation L, ManagedValue b) {
+  // func _convertToWindowsBool(Bool) -> WindowsBool
+  SILValue F = SGF.emitGlobalFunctionRef(L, SGF.SGM.getBoolToWindowsBoolFn());
+  SILValue R = SGF.B.createApply(L, F, {}, b.forward(SGF), false);
+  return SGF.emitManagedRValueWithCleanup(R);
 }
 
 static ManagedValue emitBridgeForeignBoolToBool(SILGenFunction &SGF,
@@ -280,10 +283,8 @@ static ManagedValue emitBridgeForeignBoolToBool(SILGenFunction &SGF,
   // func _convertObjCBoolToBool(ObjCBool) -> Bool
   SILValue bridgingFn = SGF.emitGlobalFunctionRef(loc, bridgingFnRef);
 
-  SILType resultTy = SGF.getLoweredLoadableType(SGF.SGM.Types.getBoolType());
-
-  SILValue result = SGF.B.createApply(loc, bridgingFn, bridgingFn->getType(),
-                                      resultTy, {}, foreignBool.forward(SGF));
+  SILValue result = SGF.B.createApply(loc, bridgingFn, {},
+                                      foreignBool.forward(SGF));
   return SGF.emitManagedRValueWithCleanup(result);
 }
 
@@ -330,32 +331,24 @@ static ManagedValue emitManagedParameter(SILGenFunction &SGF, SILLocation loc,
   llvm_unreachable("bad convention");
 }
 
-static void expandTupleTypes(CanType type, SmallVectorImpl<CanType> &results) {
-  if (auto tuple = dyn_cast<TupleType>(type)) {
-    for (auto eltType : tuple.getElementTypes())
-      expandTupleTypes(eltType, results);
-  } else {
-    results.push_back(type);
-  }
-}
-
-/// Recursively expand all the tuples in the given parameter list.
-/// Callers assume that the resulting array will line up with the
-/// SILFunctionType's parameter list, which is true as along as there
-/// aren't any indirectly-passed tuples; we should be safe from that
-/// here in the bridging code.
+/// Get the type of each parameter, filtering out empty tuples.
 static SmallVector<CanType, 8>
-expandTupleTypes(AnyFunctionType::CanParamArrayRef params) {
+getParameterTypes(AnyFunctionType::CanParamArrayRef params) {
   SmallVector<CanType, 8> results;
-  for (auto param : params)
-    expandTupleTypes(param.getOldType(), results);
+  for (auto param : params) {
+    assert(!param.isInOut() && !param.isVariadic());
+    if (param.getPlainType()->isVoid())
+      continue;
+    results.push_back(param.getPlainType());
+  }
   return results;
 }
 
 static CanAnyFunctionType getBridgedBlockType(SILGenModule &SGM,
                                               CanAnyFunctionType blockType) {
   return SGM.Types.getBridgedFunctionType(AbstractionPattern(blockType),
-                                         blockType, blockType->getExtInfo());
+                                         blockType, blockType->getExtInfo(),
+                                         Bridgeability::Full);
 }
 
 static void buildFuncToBlockInvokeBody(SILGenFunction &SGF,
@@ -397,8 +390,8 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &SGF,
   assert(blockTy->getParameters().size() == funcTy->getParameters().size()
          && "block and function types don't match");
 
-  auto nativeParamTypes = expandTupleTypes(formalFuncType.getParams());
-  auto bridgedParamTypes = expandTupleTypes(formalBlockType.getParams());
+  auto nativeParamTypes = getParameterTypes(formalFuncType.getParams());
+  auto bridgedParamTypes = getParameterTypes(formalBlockType.getParams());
 
   SmallVector<ManagedValue, 4> args;
   for (unsigned i : indices(funcTy->getParameters())) {
@@ -508,7 +501,7 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
   // the block is ultimately destroyed checking that the closure is uniquely
   // referenced.
   bool useWithoutEscapingVerification = false;
-	ManagedValue escaping;
+  ManagedValue escaping;
   if (loweredFuncTy->isNoEscape()) {
     auto escapingTy = loweredFuncTy->getWithExtInfo(
         loweredFuncTy->getExtInfo().withNoEscape(false));
@@ -519,8 +512,11 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
     auto escapingAnyTy =
         funcType.withExtInfo(funcType->getExtInfo().withNoEscape(false));
     funcType = escapingAnyTy;
-    fn = B.createCopyValue(loc, escaping);
+    fn = escaping.copy(*this, loc);
     useWithoutEscapingVerification = true;
+  } else {
+    // Since we are going to be storing this into memory, we need fn at +1.
+    fn = fn.ensurePlusOne(*this, loc);
   }
 
   // Build the invoke function signature. The block will capture the original
@@ -579,7 +575,7 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
   auto thunk = SGM.getOrCreateReabstractionThunk(invokeTy,
                                                  loweredFuncTy,
                                                  loweredBlockTy,
-                                                 F.isSerialized());
+                                                 /*dynamicSelfType=*/CanType());
 
   // Build it if necessary.
   if (thunk->empty()) {
@@ -591,6 +587,7 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
     buildFuncToBlockInvokeBody(thunkSGF, loc, funcType, blockType,
                                loweredFuncTy, loweredBlockTy, storageTy,
                                useWithoutEscapingVerification);
+    SGM.emitLazyConformancesForFunction(thunk);
   }
 
   // Form the block on the stack.
@@ -598,8 +595,8 @@ ManagedValue SILGenFunction::emitFuncToBlock(SILLocation loc,
   auto storage = emitTemporaryAllocation(loc, storageAddrTy);
   auto capture = B.createProjectBlockStorage(loc, storage);
   B.createStore(loc, fn, capture, StoreOwnershipQualifier::Init);
-  auto invokeFn = B.createFunctionRef(loc, thunk);
-  
+  auto invokeFn = B.createFunctionRefFor(loc, thunk);
+
   auto stackBlock = B.createInitBlockStorageHeader(loc, storage, invokeFn,
                               SILType::getPrimitiveObjectType(loweredBlockTy),
                                                    subs);
@@ -672,7 +669,7 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &SGF,
 
     assert(SGF.SGM.getASTContext().Diags.hadAnyError() &&
            "Bridging code should have complained");
-    return SGF.emitUndef(loc, bridgedType);
+    return SGF.emitUndef(bridgedType);
   }
 
   // Bridge Error, or types that conform to it, to NSError.
@@ -701,19 +698,21 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &SGF,
   // If the input argument is known to be an existential, save the runtime
   // some work by opening it.
   if (nativeType->isExistentialType()) {
-    auto openedType = ArchetypeType::getOpened(nativeType);
+    auto openedType = OpenedArchetypeType::get(nativeType);
 
-    auto openedExistential = SGF.emitOpenExistential(
-        loc, v, openedType, SGF.getLoweredType(openedType),
+    FormalEvaluationScope scope(SGF);
+
+    v = SGF.emitOpenExistential(
+        loc, v, SGF.getLoweredType(openedType),
         AccessKind::Read);
+    v = v.ensurePlusOne(SGF, loc);
 
-    v = SGF.manageOpaqueValue(openedExistential, loc, SGFContext());
     nativeType = openedType;
   }
 
   // Call into the stdlib intrinsic.
   if (auto bridgeAnything =
-        SGF.getASTContext().getBridgeAnythingToObjectiveC(nullptr)) {
+        SGF.getASTContext().getBridgeAnythingToObjectiveC()) {
     auto *genericSig = bridgeAnything->getGenericSignature();
     auto subMap = SubstitutionMap::get(
       genericSig,
@@ -728,7 +727,7 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &SGF,
                                  nativeType);
 
     // Put the value into memory if necessary.
-    assert(v.getType().isTrivial(SGF.SGM.M) || v.hasCleanup());
+    assert(v.getType().isTrivial(SGF.F) || v.hasCleanup());
     SILModuleConventions silConv(SGF.SGM.M);
     // bridgeAnything always takes an indirect argument as @in.
     // Since we don't have the SIL type here, check the current SIL stage/mode
@@ -743,7 +742,7 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &SGF,
   }
   
   // Shouldn't get here unless the standard library is busted.
-  return SGF.emitUndef(loc, loweredBridgedTy);
+  return SGF.emitUndef(loweredBridgedTy);
 }
 
 static ManagedValue emitNativeToCBridgedValue(SILGenFunction &SGF,
@@ -828,8 +827,8 @@ static void buildBlockToFuncThunkBody(SILGenFunction &SGF,
     }
   }
 
-  auto formalBlockParams = expandTupleTypes(formalBlockTy.getParams());
-  auto formalFuncParams = expandTupleTypes(formalFuncTy.getParams());
+  auto formalBlockParams = getParameterTypes(formalBlockTy.getParams());
+  auto formalFuncParams = getParameterTypes(formalFuncTy.getParams());
   assert(formalBlockParams.size() == blockTy->getNumParameters());
   assert(formalFuncParams.size() == funcTy->getNumParameters());
 
@@ -928,14 +927,16 @@ SILGenFunction::emitBlockToFunc(SILLocation loc,
       loweredFuncTy, loweredFuncTy->getExtInfo().withNoEscape(false),
       loweredFuncTy->getWitnessMethodConformanceOrNone());
 
+  CanType dynamicSelfType;
   auto thunkTy = buildThunkType(loweredBlockTy, loweredFuncTyWithoutNoEscape,
                                 inputSubstType, outputSubstType,
-                                genericEnv, interfaceSubs);
+                                genericEnv, interfaceSubs, dynamicSelfType);
+  assert(!dynamicSelfType && "Not implemented");
 
   auto thunk = SGM.getOrCreateReabstractionThunk(thunkTy,
                                                  loweredBlockTy,
                                                  loweredFuncTyWithoutNoEscape,
-                                                 F.isSerialized());
+                                                 /*dynamicSelfType=*/CanType());
 
   // Build it if necessary.
   if (thunk->empty()) {
@@ -944,6 +945,7 @@ SILGenFunction::emitBlockToFunc(SILLocation loc,
     auto loc = RegularLocation::getAutoGeneratedLocation();
     buildBlockToFuncThunkBody(thunkSGF, loc, blockType, funcType,
                               loweredBlockTy, loweredFuncTyWithoutNoEscape);
+    SGM.emitLazyConformancesForFunction(thunk);
   }
 
   CanSILFunctionType substFnTy = thunkTy;
@@ -954,11 +956,10 @@ SILGenFunction::emitBlockToFunc(SILLocation loc,
   }
 
   // Create it in the current function.
-  auto thunkValue = B.createFunctionRef(loc, thunk);
+  auto thunkValue = B.createFunctionRefFor(loc, thunk);
   ManagedValue thunkedFn = B.createPartialApply(
-      loc, thunkValue, SILType::getPrimitiveObjectType(substFnTy),
-      interfaceSubs, block,
-      SILType::getPrimitiveObjectType(loweredFuncTyWithoutNoEscape));
+      loc, thunkValue, interfaceSubs, block,
+      loweredFuncTy->getCalleeConvention());
 
   if (!loweredFuncTy->isNoEscape()) {
     return thunkedFn;
@@ -967,7 +968,7 @@ SILGenFunction::emitBlockToFunc(SILLocation loc,
   // Handle the escaping to noescape conversion.
   assert(loweredFuncTy->isNoEscape());
   return B.createConvertEscapeToNoEscape(
-      loc, thunkedFn, SILType::getPrimitiveObjectType(loweredFuncTy), false);
+      loc, thunkedFn, SILType::getPrimitiveObjectType(loweredFuncTy));
 }
 
 static ManagedValue emitCBridgedToNativeValue(SILGenFunction &SGF,
@@ -1009,7 +1010,7 @@ static ManagedValue emitCBridgedToNativeValue(SILGenFunction &SGF,
     return SGF.emitOptionalToOptional(loc, v, loweredNativeTy, helper, C);
   }
 
-  // Bridge Bool to ObjCBool or DarwinBoolean when requested.
+  // Bridge ObjCBool, DarwinBoolean, WindowsBool to Bool when requested.
   if (nativeType == SGF.SGM.Types.getBoolType()) {
     if (bridgedType == SGF.SGM.Types.getObjCBoolType()) {
       return emitBridgeForeignBoolToBool(SGF, loc, v,
@@ -1018,6 +1019,10 @@ static ManagedValue emitCBridgedToNativeValue(SILGenFunction &SGF,
     if (bridgedType == SGF.SGM.Types.getDarwinBooleanType()) {
       return emitBridgeForeignBoolToBool(SGF, loc, v,
                                          SGF.SGM.getDarwinBooleanToBoolFn());
+    }
+    if (bridgedType == SGF.SGM.Types.getWindowsBoolType()) {
+      return emitBridgeForeignBoolToBool(SGF, loc, v,
+                                         SGF.SGM.getWindowsBoolToBoolFn());
     }
   }
 
@@ -1057,7 +1062,7 @@ static ManagedValue emitCBridgedToNativeValue(SILGenFunction &SGF,
 
     assert(SGF.SGM.getASTContext().Diags.hadAnyError() &&
            "Bridging code should have complained");
-    return SGF.emitUndef(loc, nativeType);
+    return SGF.emitUndef(nativeType);
   }
 
   // id-to-Any bridging.
@@ -1092,7 +1097,7 @@ static ManagedValue emitCBridgedToNativeValue(SILGenFunction &SGF,
     auto optionalMV =
       SGF.B.createUncheckedBitCast(loc, v, optionalBridgedTy);
     return SGF.emitApplyOfLibraryIntrinsic(loc,
-                           SGF.getASTContext().getBridgeAnyObjectToAny(nullptr),
+                           SGF.getASTContext().getBridgeAnyObjectToAny(),
                            SubstitutionMap(), optionalMV, C)
               .getAsSingleValue(SGF, loc);
   }
@@ -1125,7 +1130,7 @@ ManagedValue SILGenFunction::emitBridgedToNativeError(SILLocation loc,
     auto nativeErrorTy = SILType::getExceptionType(getASTContext());
 
     auto conformance = SGM.getNSErrorConformanceToError();
-    if (!conformance) return emitUndef(loc, nativeErrorTy);
+    if (!conformance) return emitUndef(nativeErrorTy);
     ProtocolConformanceRef conformanceArray[] = {
       ProtocolConformanceRef(conformance)
     };
@@ -1139,18 +1144,17 @@ ManagedValue SILGenFunction::emitBridgedToNativeError(SILLocation loc,
   // a standard error for a nil NSError.
   auto bridgeFn = emitGlobalFunctionRef(loc, SGM.getNSErrorToErrorFn());
   auto bridgeFnType = bridgeFn->getType().castTo<SILFunctionType>();
-  SILFunctionConventions bridgeFnConv(bridgeFnType, SGM.M);
   assert(bridgeFnType->getNumResults() == 1);
   assert(bridgeFnType->getResults()[0].getConvention()
          == ResultConvention::Owned);
-  auto nativeErrorType = bridgeFnConv.getSILType(bridgeFnType->getResults()[0]);
 
-  assert(bridgeFnType->getParameters()[0].getConvention() ==
-	 ParameterConvention::Direct_Guaranteed);
+  assert(bridgeFnType->getParameters()[0].getConvention()
+	       == ParameterConvention::Direct_Guaranteed);
+  (void) bridgeFnType;
+
   SILValue arg = bridgedError.getValue();
 
-  SILValue nativeError = B.createApply(loc, bridgeFn, bridgeFn->getType(),
-                                       nativeErrorType, {}, arg);
+  SILValue nativeError = B.createApply(loc, bridgeFn, {}, arg);
   return emitManagedRValueWithCleanup(nativeError);
 }
 
@@ -1187,19 +1191,16 @@ ManagedValue SILGenFunction::emitNativeToBridgedError(SILLocation loc,
 
   auto bridgeFn = emitGlobalFunctionRef(loc, SGM.getErrorToNSErrorFn());
   auto bridgeFnType = bridgeFn->getType().castTo<SILFunctionType>();
-  SILFunctionConventions bridgeFnConv(bridgeFnType, SGM.M);
   assert(bridgeFnType->getNumResults() == 1);
   assert(bridgeFnType->getResults()[0].getConvention()
          == ResultConvention::Owned);
-  auto loweredBridgedErrorType =
-    bridgeFnConv.getSILType(bridgeFnType->getResults()[0]);
+  assert(bridgeFnType->getParameters()[0].getConvention()
+         == ParameterConvention::Direct_Guaranteed);
+  (void) bridgeFnType;
 
-  assert(bridgeFnType->getParameters()[0].getConvention() ==
-	 ParameterConvention::Direct_Guaranteed);
   SILValue arg = nativeError.getValue();
 
-  SILValue bridgedError = B.createApply(loc, bridgeFn, bridgeFn->getType(),
-                                        loweredBridgedErrorType, {}, arg);
+  SILValue bridgedError = B.createApply(loc, bridgeFn, {}, arg);
   return emitManagedRValueWithCleanup(bridgedError);
 }
 
@@ -1284,10 +1285,10 @@ static SILFunctionType *emitObjCThunkArguments(SILGenFunction &SGF,
   assert(objcFnTy->getNumIndirectFormalResults() == 0
          && "Objective-C methods cannot have indirect results");
 
-  auto bridgedFormalTypes = expandTupleTypes(objcFormalFnTy.getParams());
+  auto bridgedFormalTypes = getParameterTypes(objcFormalFnTy.getParams());
   bridgedFormalResultTy = objcFormalFnTy.getResult();
 
-  auto nativeFormalTypes = expandTupleTypes(swiftFormalFnTy.getParams());
+  auto nativeFormalTypes = getParameterTypes(swiftFormalFnTy.getParams());
   nativeFormalResultTy = swiftFormalFnTy.getResult();
 
   // Emit the other arguments, taking ownership of arguments if necessary.
@@ -1357,6 +1358,15 @@ static SILFunctionType *emitObjCThunkArguments(SILGenFunction &SGF,
                         /*isCallResult*/ true);
     SILValue argValue;
 
+    // This can happen if the value is resilient in the calling convention
+    // but not resilient locally.
+    if (nativeInputs[i].isFormalIndirect() &&
+        !native.getType().isAddress()) {
+      auto buf = SGF.emitTemporaryAllocation(loc, native.getType());
+      native.forwardInto(SGF, loc, buf);
+      native = SGF.emitManagedBufferWithCleanup(buf);
+    }
+
     if (nativeInputs[i].isConsumed()) {
       argValue = native.forward(SGF);
     } else if (nativeInputs[i].isGuaranteed()) {
@@ -1382,7 +1392,7 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
   bool isInitializingToAllocatingInitThunk = false;
   if (native.kind == SILDeclRef::Kind::Initializer) {
     if (auto ctor = dyn_cast<ConstructorDecl>(native.getDecl())) {
-      if (!ctor->isDesignatedInit()) {
+      if (!ctor->isDesignatedInit() && !ctor->isObjC()) {
         isInitializingToAllocatingInitThunk = true;
         native = SILDeclRef(ctor, SILDeclRef::Kind::Allocator);
       }
@@ -1392,7 +1402,6 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
   auto nativeInfo = getConstantInfo(native);
   auto subs = F.getForwardingSubstitutionMap();
   auto substTy = nativeInfo.SILFnType->substGenericArgs(SGM.M, subs);
-  SILType substSILTy = SILType::getPrimitiveObjectType(substTy);
   SILFunctionConventions substConv(substTy, SGM.M);
 
   // Use the same generic environment as the native entry point.
@@ -1425,14 +1434,10 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
     }
 
     if (auto attr = decl->getAttrs().getAttribute<ObjCAttr>()) {
-      // If @objc was inferred based on the Swift 3 @objc inference rules, but
-      // we aren't compiling in Swift 3 compatibility mode, emit a call to
-      // Builtin.swift3ImplicitObjCEntrypoint() to enable runtime logging of
-      // the uses of such entrypoints.
-      if (attr->isSwift3Inferred() &&
-          !decl->isDynamic() &&
-          !getASTContext().LangOpts.isSwiftVersion3()) {
-        
+      // If @objc was inferred based on the Swift 3 @objc inference rules, emit
+      // a call to Builtin.swift3ImplicitObjCEntrypoint() to enable runtime
+      // logging of the uses of such entrypoints.
+      if (attr->isSwift3Inferred() && !decl->isObjCDynamic()) {
         // Get the starting source location of the declaration so we can say
         // exactly where to stick '@objc'.
         SourceLoc objcInsertionLoc =
@@ -1497,8 +1502,7 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
   assert(foreignError.hasValue() == substTy->hasErrorResult());
   if (!substTy->hasErrorResult()) {
     // Create the apply.
-    result = B.createApply(loc, nativeFn, substSILTy,
-                           swiftResultTy, subs, args);
+    result = B.createApply(loc, nativeFn, subs, args);
 
     if (substConv.hasIndirectSILResults()) {
       assert(substTy->getNumResults() == 1);
@@ -1516,8 +1520,7 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
     SILBasicBlock *contBB = createBasicBlock();
     SILBasicBlock *errorBB = createBasicBlock();
     SILBasicBlock *normalBB = createBasicBlock();
-    B.createTryApply(loc, nativeFn, substSILTy, subs, args,
-                     normalBB, errorBB);
+    B.createTryApply(loc, nativeFn, subs, args, normalBB, errorBB);
 
     // Emit the non-error destination.
     {
@@ -1679,9 +1682,9 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
 
     {
       auto foreignFormalParams =
-        expandTupleTypes(foreignCI.LoweredType.getParams());
+        getParameterTypes(foreignCI.LoweredType.getParams());
       auto nativeFormalParams =
-        expandTupleTypes(nativeCI.LoweredType.getParams());
+        getParameterTypes(nativeCI.LoweredType.getParams());
 
       for (unsigned nativeParamIndex : indices(params)) {
         // Bring the parameter to +1.

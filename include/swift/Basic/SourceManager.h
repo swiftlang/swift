@@ -23,10 +23,10 @@
 
 namespace swift {
 
-/// \brief This class manages and owns source buffers.
+/// This class manages and owns source buffers.
 class SourceManager {
   llvm::SourceMgr LLVMSourceMgr;
-  llvm::IntrusiveRefCntPtr<clang::vfs::FileSystem> FileSystem;
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem;
   unsigned CodeCompletionBufferID = 0U;
   unsigned CodeCompletionOffset;
 
@@ -37,7 +37,7 @@ class SourceManager {
   ///
   /// This is as much a hack to prolong the lifetime of status objects as it is
   /// to speed up stats.
-  mutable llvm::DenseMap<StringRef, clang::vfs::Status> StatusCache;
+  mutable llvm::DenseMap<StringRef, llvm::vfs::Status> StatusCache;
 
   // \c #sourceLocation directive handling.
   struct VirtualFile {
@@ -49,8 +49,8 @@ class SourceManager {
   mutable std::pair<const char *, const VirtualFile*> CachedVFile = {nullptr, nullptr};
 
 public:
-  SourceManager(llvm::IntrusiveRefCntPtr<clang::vfs::FileSystem> FS =
-                    clang::vfs::getRealFileSystem())
+  SourceManager(llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS =
+                    llvm::vfs::getRealFileSystem())
     : FileSystem(FS) {}
 
   llvm::SourceMgr &getLLVMSourceMgr() {
@@ -60,11 +60,11 @@ public:
     return LLVMSourceMgr;
   }
 
-  void setFileSystem(llvm::IntrusiveRefCntPtr<clang::vfs::FileSystem> FS) {
+  void setFileSystem(llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS) {
     FileSystem = FS;
   }
 
-  llvm::IntrusiveRefCntPtr<clang::vfs::FileSystem> getFileSystem() {
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> getFileSystem() {
     return FileSystem;
   }
 
@@ -101,6 +101,13 @@ public:
   bool rangeContains(SourceRange Enclosing, SourceRange Inner) const {
     return rangeContainsTokenLoc(Enclosing, Inner.Start) &&
            rangeContainsTokenLoc(Enclosing, Inner.End);
+  }
+
+  /// Returns true if range \p R contains the code-completion location, if any.
+  bool rangeContainsCodeCompletionLoc(SourceRange R) const {
+    return CodeCompletionBufferID
+               ? rangeContainsTokenLoc(R, getCodeCompletionLoc())
+               : false;
   }
 
   /// Returns the buffer ID for the specified *valid* location.
@@ -150,7 +157,7 @@ public:
   /// in that case.
   StringRef getIdentifierForBuffer(unsigned BufferID) const;
 
-  /// \brief Returns a SourceRange covering the entire specified buffer.
+  /// Returns a SourceRange covering the entire specified buffer.
   ///
   /// Note that the start location might not point at the first token: it
   /// might point at whitespace or a comment.
@@ -165,10 +172,10 @@ public:
     return getRangeForBuffer(BufferID).getStart();
   }
 
-  /// \brief Returns the offset in bytes for the given valid source location.
+  /// Returns the offset in bytes for the given valid source location.
   unsigned getLocOffsetInBuffer(SourceLoc Loc, unsigned BufferID) const;
 
-  /// \brief Returns the distance in bytes between the given valid source
+  /// Returns the distance in bytes between the given valid source
   /// locations.
   unsigned getByteDistance(SourceLoc Start, SourceLoc End) const;
 

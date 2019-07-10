@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %{python} %utils/chex.py < %s > %t/generic_vtable.swift
-// RUN: %target-swift-frontend %t/generic_vtable.swift -emit-ir | %FileCheck %t/generic_vtable.swift --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend %t/generic_vtable.swift -emit-ir | %FileCheck %t/generic_vtable.swift --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize -DINT=i%target-ptrsize -check-prefix CHECK-%target-import-type -check-prefix CHECK-%target-abi
 
 public class Base {
   public func m1() {}
@@ -22,7 +22,8 @@ public class Concrete : Derived<Int> {
 
 // CHECK-LABEL: @"$s14generic_vtable4BaseCMn" = {{(dllexport )?}}{{(protected )?}}constant
 // -- flags: has vtable, is class, is unique
-// CHECK-SAME: <i32 0x8000_0050>,
+// CHECK-DIRECT-SAME: <i32 0x8000_0050>,
+// CHECK-INDIRECT-SAME: <i32 0x8001_0050>,
 // -- vtable offset
 // CHECK-32-SAME: i32 16,
 // CHECK-64-SAME: i32 10,
@@ -38,6 +39,10 @@ public class Concrete : Derived<Int> {
 //// Type metadata for 'Base' has a static vtable.
 
 // CHECK-LABEL: @"$s14generic_vtable4BaseCMf" = internal global
+// -- destructor
+// CHECK-SAME: void (%T14generic_vtable4BaseC*)* @"$s14generic_vtable4BaseCfD"
+// -- value witness table
+// CHECK-SAME: i8** {{@"\$sBoWV"|null}}
 // -- vtable entry for 'm1()'
 // CHECK-SAME: void (%T14generic_vtable4BaseC*)* @"$s14generic_vtable4BaseC2m1yyF"
 // -- vtable entry for 'm2()'
@@ -64,11 +69,13 @@ public class Concrete : Derived<Int> {
 // CHECK-SAME: i32 2,
 // -- override for m2()
 // CHECK-SAME: @"$s14generic_vtable4BaseCMn"
-// CHECK-SAME: @"$s14generic_vtable4BaseCMn", i32 0, i32 14
+// CHECK-SYSV-SAME: @"$s14generic_vtable4BaseCMn", i32 0, i32 14
+// CHECK-WIN-SAME: @"$s14generic_vtable4BaseCMn", i32 0, i32 17
 // CHECK-SAME: @"$s14generic_vtable7DerivedC2m2yyF"
 // -- override for constructor
 // CHECK-SAME: @"$s14generic_vtable4BaseCMn"
-// CHECK-SAME: @"$s14generic_vtable4BaseCMn", i32 0, i32 15
+// CHECK-SYSV-SAME: @"$s14generic_vtable4BaseCMn", i32 0, i32 15
+// CHECK-WIN-SAME: @"$s14generic_vtable4BaseCMn", i32 0, i32 18
 // CHECK-SAME: @"$s14generic_vtable7DerivedCACyxGycfC"
 // CHECK-SAME: section "{{.*}}", align 4
 
@@ -102,7 +109,8 @@ public class Concrete : Derived<Int> {
 // CHECK-SAME: @"$s14generic_vtable8ConcreteC2m3yyF"
 // -- override for constructor
 // CHECK-SAME: @"$s14generic_vtable4BaseCMn"
-// CHECK-SAME: @"$s14generic_vtable4BaseCMn", i32 0, i32 15
+// CHECK-SYSV-SAME: @"$s14generic_vtable4BaseCMn", i32 0, i32 15
+// CHECK-WIN-SAME: @"$s14generic_vtable4BaseCMn", i32 0, i32 18
 // CHECK-SAME: @"$s14generic_vtable8ConcreteCACycfC"
 // --
 // CHECK-SAME: section "{{.*}}", align 4
@@ -110,6 +118,10 @@ public class Concrete : Derived<Int> {
 //// Type metadata for 'Concrete' has a static vtable.
 
 // CHECK-LABEL: @"$s14generic_vtable8ConcreteCMf" = internal global <{{.*}}> <{
+// -- destructor
+// CHECK-SAME: void (%T14generic_vtable8ConcreteC*)* @"$s14generic_vtable8ConcreteCfD",
+// -- value witness table is filled in at runtime
+// CHECK-SAME: i8** null,
 // -- nominal type descriptor
 // CHECK-SAME: @"$s14generic_vtable8ConcreteCMn",
 // -- vtable entry for 'm1()'
@@ -128,9 +140,9 @@ public class Concrete : Derived<Int> {
 
 //// Method descriptors
 
-// CHECK-LABEL: @"$s14generic_vtable4BaseC2m1yyFTq" ={{( dllexport)?}}{{( protected)?}} alias %swift.method_descriptor, getelementptr inbounds (<{{.*}}>* @"$s14generic_vtable4BaseCMn", i32 0, i32 13)
-// CHECK-LABEL: @"$s14generic_vtable4BaseC2m2yyFTq" ={{( dllexport)?}}{{( protected)?}} alias %swift.method_descriptor, getelementptr inbounds (<{{.*}}* @"$s14generic_vtable4BaseCMn", i32 0, i32 14)
-// CHECK-LABEL: @"$s14generic_vtable4BaseCACycfCTq" = hidden alias %swift.method_descriptor, getelementptr inbounds (<{{.*}}* @"$s14generic_vtable4BaseCMn", i32 0, i32 15)
+// CHECK-LABEL: @"$s14generic_vtable4BaseC2m1yyFTq" ={{( dllexport)?}}{{( protected)?}} alias %swift.method_descriptor, getelementptr inbounds (<{{.*}}>* @"$s14generic_vtable4BaseCMn", i32 0, i32 {{(13|16)}})
+// CHECK-LABEL: @"$s14generic_vtable4BaseC2m2yyFTq" ={{( dllexport)?}}{{( protected)?}} alias %swift.method_descriptor, getelementptr inbounds (<{{.*}}* @"$s14generic_vtable4BaseCMn", i32 0, i32 {{(14|17)}})
+// CHECK-LABEL: @"$s14generic_vtable4BaseCACycfCTq" = hidden alias %swift.method_descriptor, getelementptr inbounds (<{{.*}}* @"$s14generic_vtable4BaseCMn", i32 0, i32 {{(15|18)}})
 
 // CHECK-LABEL: @"$s14generic_vtable7DerivedC2m3yyFTq" ={{( dllexport)?}}{{( protected)?}} alias %swift.method_descriptor, getelementptr inbounds (<{{.*}}>* @"$s14generic_vtable7DerivedCMn", i32 0, i32 23)
 
@@ -150,7 +162,7 @@ public class Concrete : Derived<Int> {
 
 // CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$s14generic_vtable7DerivedCMr"
 // CHECK-SAME:    (%swift.type* [[METADATA:%.*]], i8*, i8**) {{.*}} {
-// CHECK: call void @swift_initClassMetadata(%swift.type* [[METADATA]], %swift.type* {{%.*}}, [[INT]] 0, {{.*}})
+// CHECK: call swiftcc %swift.metadata_response @swift_initClassMetadata2(%swift.type* [[METADATA]], [[INT]] 0, {{.*}})
 
 // CHECK: ret %swift.metadata_response
 
@@ -159,20 +171,9 @@ public class Concrete : Derived<Int> {
 // CHECK: call swiftcc %swift.metadata_response @swift_getSingletonMetadata([[INT]] %0, %swift.type_descriptor* bitcast ({{.*}} @"$s14generic_vtable8ConcreteCMn" to {{.*}}))
 // CHECK: ret
 
-//// Metadata response function for 'Concrete' sets the superclass.
+//// Metadata response function for 'Concrete' is fairly simple.
 
 // CHECK-LABEL: define internal swiftcc %swift.metadata_response @"$s14generic_vtable8ConcreteCMr"(%swift.type*, i8*, i8**)
-// CHECK: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s14generic_vtable7DerivedCySiGMa"([[INT]] 257)
-// CHECK-NEXT: [[SUPERCLASS:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
-// CHECK-NEXT: [[STATUS:%.*]] = extractvalue %swift.metadata_response [[T0]], 1
-// CHECK-NEXT: [[RESULT:%.*]] = icmp ule [[INT]] [[STATUS]], 1
-// CHECK-NEXT: br i1 [[RESULT]], label %dependency-satisfied, label %metadata-dependencies.cont
-
-// CHECK: dependency-satisfied:
-
 // -- ClassLayoutFlags is 256 / 0x100, HasStaticVTable
-// CHECK: call void @swift_initClassMetadata(%swift.type* %0, %swift.type* [[SUPERCLASS]], [[INT]] 256, {{.*}})
-// CHECK: br label %metadata-dependencies.cont
-
-// CHECK: metadata-dependencies.cont:
+// CHECK: call swiftcc %swift.metadata_response @swift_initClassMetadata2(%swift.type* %0, [[INT]] 256, {{.*}})
 // CHECK: ret %swift.metadata_response

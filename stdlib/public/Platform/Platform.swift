@@ -11,6 +11,11 @@
 //===----------------------------------------------------------------------===//
 
 import SwiftShims
+import SwiftOverlayShims
+
+#if os(Windows)
+import ucrt
+#endif
 
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
 //===----------------------------------------------------------------------===//
@@ -23,15 +28,17 @@ public var noErr: OSStatus { return 0 }
 /// Foundation.
 ///
 /// The C type is a typedef for `unsigned char`.
-@_fixed_layout
+@frozen
 public struct DarwinBoolean : ExpressibleByBooleanLiteral {
-  var _value: UInt8
+  @usableFromInline var _value: UInt8
 
+  @_transparent
   public init(_ value: Bool) {
     self._value = value ? 1 : 0
   }
 
   /// The value of `self`, expressed as a `Bool`.
+  @_transparent
   public var boolValue: Bool {
     return _value != 0
   }
@@ -58,15 +65,19 @@ extension DarwinBoolean : CustomStringConvertible {
 }
 
 extension DarwinBoolean : Equatable {
+  @_transparent
   public static func ==(lhs: DarwinBoolean, rhs: DarwinBoolean) -> Bool {
     return lhs.boolValue == rhs.boolValue
   }
 }
 
+@_transparent
 public // COMPILER_INTRINSIC
 func _convertBoolToDarwinBoolean(_ x: Bool) -> DarwinBoolean {
   return DarwinBoolean(x)
 }
+
+@_transparent
 public // COMPILER_INTRINSIC
 func _convertDarwinBooleanToBool(_ x: DarwinBoolean) -> Bool {
   return x.boolValue
@@ -80,10 +91,10 @@ func _convertDarwinBooleanToBool(_ x: DarwinBoolean) -> Bool {
 
 public var errno : Int32 {
   get {
-    return _stdlib_getErrno()
+    return _swift_stdlib_getErrno()
   }
   set(val) {
-    return _stdlib_setErrno(val)
+    return _swift_stdlib_setErrno(val)
   }
 }
 
@@ -131,6 +142,14 @@ public func snprintf(ptr: UnsafeMutablePointer<Int8>, _ len: Int, _ format: Unsa
     return vsnprintf(ptr, len, format, va_args)
   }
 }
+#elseif os(Windows)
+public var stdin: UnsafeMutablePointer<FILE> { return __acrt_iob_func(0) }
+public var stdout: UnsafeMutablePointer<FILE> { return __acrt_iob_func(1) }
+public var stderr: UnsafeMutablePointer<FILE> { return __acrt_iob_func(2) }
+
+public var STDIN_FILENO: Int32 { return _fileno(stdin) }
+public var STDOUT_FILENO: Int32 { return _fileno(stdout) }
+public var STDERR_FILENO: Int32 { return _fileno(stderr) }
 #endif
 
 
@@ -142,7 +161,7 @@ public func open(
   _ path: UnsafePointer<CChar>,
   _ oflag: Int32
 ) -> Int32 {
-  return _stdlib_open(path, oflag, 0)
+  return _swift_stdlib_open(path, oflag, 0)
 }
 
 #if os(Windows)
@@ -151,7 +170,7 @@ public func open(
   _ oflag: Int32,
   _ mode: Int32
 ) -> Int32 {
-  return _stdlib_open(path, oflag, mode)
+  return _swift_stdlib_open(path, oflag, mode)
 }
 #else
 public func open(
@@ -159,7 +178,7 @@ public func open(
   _ oflag: Int32,
   _ mode: mode_t
 ) -> Int32 {
-  return _stdlib_open(path, oflag, mode)
+  return _swift_stdlib_open(path, oflag, mode)
 }
 
 public func openat(
@@ -167,7 +186,7 @@ public func openat(
   _ path: UnsafePointer<CChar>,
   _ oflag: Int32
 ) -> Int32 {
-  return _stdlib_openat(fd, path, oflag, 0)
+  return _swift_stdlib_openat(fd, path, oflag, 0)
 }
 
 public func openat(
@@ -176,14 +195,14 @@ public func openat(
   _ oflag: Int32,
   _ mode: mode_t
 ) -> Int32 {
-  return _stdlib_openat(fd, path, oflag, mode)
+  return _swift_stdlib_openat(fd, path, oflag, mode)
 }
 
 public func fcntl(
   _ fd: Int32,
   _ cmd: Int32
 ) -> Int32 {
-  return _stdlib_fcntl(fd, cmd, 0)
+  return _swift_stdlib_fcntl(fd, cmd, 0)
 }
 
 public func fcntl(
@@ -191,7 +210,7 @@ public func fcntl(
   _ cmd: Int32,
   _ value: Int32
 ) -> Int32 {
-  return _stdlib_fcntl(fd, cmd, value)
+  return _swift_stdlib_fcntl(fd, cmd, value)
 }
 
 public func fcntl(
@@ -199,7 +218,7 @@ public func fcntl(
   _ cmd: Int32,
   _ ptr: UnsafeMutableRawPointer
 ) -> Int32 {
-  return _stdlib_fcntlPtr(fd, cmd, ptr)
+  return _swift_stdlib_fcntlPtr(fd, cmd, ptr)
 }
 
 // !os(Windows)
@@ -267,7 +286,7 @@ public func ioctl(
   _ request: UInt,
   _ value: CInt
 ) -> CInt {
-  return _stdlib_ioctl(fd, request, value)
+  return _swift_stdlib_ioctl(fd, request, value)
 }
 
 public func ioctl(
@@ -275,14 +294,14 @@ public func ioctl(
   _ request: UInt,
   _ ptr: UnsafeMutableRawPointer
 ) -> CInt {
-  return _stdlib_ioctlPtr(fd, request, ptr)
+  return _swift_stdlib_ioctlPtr(fd, request, ptr)
 }
 
 public func ioctl(
   _ fd: CInt,
   _ request: UInt
 ) -> CInt {
-  return _stdlib_ioctl(fd, request, 0)
+  return _swift_stdlib_ioctl(fd, request, 0)
 }
 
 // !os(Windows)
@@ -374,7 +393,6 @@ public func sem_open(
   _ oflag: Int32
 ) -> UnsafeMutablePointer<sem_t>? {
   return _stdlib_sem_open2(name, oflag)
-    .assumingMemoryBound(to: sem_t.self)
 }
 
 public func sem_open(
@@ -384,7 +402,6 @@ public func sem_open(
   _ value: CUnsignedInt
 ) -> UnsafeMutablePointer<sem_t>? {
   return _stdlib_sem_open4(name, oflag, mode, value)
-    .assumingMemoryBound(to: sem_t.self)
 }
 #endif
 
@@ -395,7 +412,7 @@ public func sem_open(
 // Some platforms don't have `extern char** environ` imported from C.
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(FreeBSD) || os(PS4)
 public var environ: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?> {
-  return _stdlib_getEnviron()
+  return _swift_stdlib_getEnviron()
 }
 #elseif os(Linux)
 public var environ: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?> {

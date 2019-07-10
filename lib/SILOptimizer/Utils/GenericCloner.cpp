@@ -27,11 +27,10 @@ using namespace swift;
 
 /// Create a new empty function with the correct arguments and a unique name.
 SILFunction *GenericCloner::initCloned(SILOptFunctionBuilder &FunctionBuilder,
-				       SILFunction *Orig,
-                                       IsSerialized_t Serialized,
+				                               SILFunction *Orig,
                                        const ReabstractionInfo &ReInfo,
                                        StringRef NewName) {
-  assert((!Serialized || Orig->isSerialized())
+  assert((!ReInfo.isSerialized() || Orig->isSerialized())
          && "Specialization cannot make body more resilient");
   assert((Orig->isTransparent() || Orig->isBare() || Orig->getLocation())
          && "SILFunction missing location");
@@ -43,20 +42,24 @@ SILFunction *GenericCloner::initCloned(SILOptFunctionBuilder &FunctionBuilder,
   SILFunction *NewF = FunctionBuilder.createFunction(
       getSpecializedLinkage(Orig, Orig->getLinkage()), NewName,
       ReInfo.getSpecializedType(), ReInfo.getSpecializedGenericEnvironment(),
-      Orig->getLocation(), Orig->isBare(), Orig->isTransparent(), Serialized,
-      Orig->getEntryCount(), Orig->isThunk(), Orig->getClassSubclassScope(),
-      Orig->getInlineStrategy(), Orig->getEffectsKind(), Orig,
-      Orig->getDebugScope());
+      Orig->getLocation(), Orig->isBare(), Orig->isTransparent(),
+      ReInfo.isSerialized(), IsNotDynamic, Orig->getEntryCount(),
+      Orig->isThunk(), Orig->getClassSubclassScope(),
+      Orig->getInlineStrategy(), Orig->getEffectsKind(),
+      Orig, Orig->getDebugScope());
   for (auto &Attr : Orig->getSemanticsAttrs()) {
     NewF->addSemanticsAttr(Attr);
   }
-  if (!Orig->hasQualifiedOwnership()) {
-    NewF->setUnqualifiedOwnership();
+  if (!Orig->hasOwnership()) {
+    NewF->setOwnershipEliminated();
   }
   return NewF;
 }
 
 void GenericCloner::populateCloned() {
+  assert(AllocStacks.empty() && "Stale cloner state.");
+  assert(!ReturnValueAddr && "Stale cloner state.");
+
   SILFunction *Cloned = getCloned();
 
   // Create arguments for the entry block.
@@ -64,12 +67,11 @@ void GenericCloner::populateCloned() {
   SILBasicBlock *ClonedEntryBB = Cloned->createBasicBlock();
   getBuilder().setInsertionPoint(ClonedEntryBB);
 
-  llvm::SmallVector<AllocStackInst *, 8> AllocStacks;
-  AllocStackInst *ReturnValueAddr = nullptr;
-
   // Create the entry basic block with the function arguments.
   auto origConv = Original.getConventions();
   unsigned ArgIdx = 0;
+  SmallVector<SILValue, 4> entryArgs;
+  entryArgs.reserve(OrigEntryBB->getArguments().size());
   for (auto &OrigArg : OrigEntryBB->getArguments()) {
     RegularLocation Loc((Decl *)OrigArg->getDecl());
     AllocStackInst *ASI = nullptr;
@@ -80,7 +82,6 @@ void GenericCloner::populateCloned() {
       assert(mappedType.isAddress());
       mappedType = mappedType.getObjectType();
       ASI = getBuilder().createAllocStack(Loc, mappedType);
-      ValueMap[OrigArg] = ASI;
       AllocStacks.push_back(ASI);
     };
     auto handleConversion = [&]() {
@@ -97,6 +98,7 @@ void GenericCloner::populateCloned() {
           createAllocStack();
           assert(!ReturnValueAddr);
           ReturnValueAddr = ASI;
+          entryArgs.push_back(ASI);
           return true;
         }
       } else {
@@ -121,6 +123,7 @@ void GenericCloner::populateCloned() {
               break;
             }
           }
+          entryArgs.push_back(ASI);
           return true;
         }
       }
@@ -129,45 +132,41 @@ void GenericCloner::populateCloned() {
     if (!handleConversion()) {
       auto *NewArg =
           ClonedEntryBB->createFunctionArgument(mappedType, OrigArg->getDecl());
-      ValueMap[OrigArg] = NewArg;
+      entryArgs.push_back(NewArg);
     }
     ++ArgIdx;
   }
 
-  BBMap.insert(std::make_pair(OrigEntryBB, ClonedEntryBB));
-  // Recursively visit original BBs in depth-first preorder, starting with the
-  // entry block, cloning all instructions other than terminators.
-  visitSILBasicBlock(OrigEntryBB);
-
-  // Now iterate over the BBs and fix up the terminators.
-  for (auto BI = BBMap.begin(), BE = BBMap.end(); BI != BE; ++BI) {
-    getBuilder().setInsertionPoint(BI->second);
-    TermInst *OrigTermInst = BI->first->getTerminator();
-    if (auto *RI = dyn_cast<ReturnInst>(OrigTermInst)) {
-      SILValue ReturnValue;
-      if (ReturnValueAddr) {
-        // The result is converted from indirect to direct. We have to load the
-        // returned value from the alloc_stack.
-        ReturnValue =
-            getBuilder().createLoad(ReturnValueAddr->getLoc(), ReturnValueAddr,
-                                    LoadOwnershipQualifier::Unqualified);
-      }
-      for (AllocStackInst *ASI : reverse(AllocStacks)) {
-        getBuilder().createDeallocStack(ASI->getLoc(), ASI);
-      }
-      if (ReturnValue) {
-        getBuilder().createReturn(RI->getLoc(), ReturnValue);
-        continue;
-      }
-    } else if (OrigTermInst->isFunctionExiting()) {
-      for (AllocStackInst *ASI : reverse(AllocStacks)) {
-        getBuilder().createDeallocStack(ASI->getLoc(), ASI);
-      }
-    }
-    visit(BI->first->getTerminator());
-  }
+  // Visit original BBs in depth-first preorder, starting with the
+  // entry block, cloning all instructions and terminators.
+  cloneFunctionBody(&Original, ClonedEntryBB, entryArgs);
 }
 
+void GenericCloner::visitTerminator(SILBasicBlock *BB) {
+  TermInst *OrigTermInst = BB->getTerminator();
+  if (auto *RI = dyn_cast<ReturnInst>(OrigTermInst)) {
+    SILValue ReturnValue;
+    if (ReturnValueAddr) {
+      // The result is converted from indirect to direct. We have to load the
+      // returned value from the alloc_stack.
+      ReturnValue =
+        getBuilder().createLoad(ReturnValueAddr->getLoc(), ReturnValueAddr,
+                                LoadOwnershipQualifier::Unqualified);
+    }
+    for (AllocStackInst *ASI : reverse(AllocStacks)) {
+      getBuilder().createDeallocStack(ASI->getLoc(), ASI);
+    }
+    if (ReturnValue) {
+      getBuilder().createReturn(RI->getLoc(), ReturnValue);
+      return;
+    }
+  } else if (OrigTermInst->isFunctionExiting()) {
+    for (AllocStackInst *ASI : reverse(AllocStacks)) {
+      getBuilder().createDeallocStack(ASI->getLoc(), ASI);
+    }
+  }
+  visit(OrigTermInst);
+}
 
 const SILDebugScope *GenericCloner::remapScope(const SILDebugScope *DS) {
   if (!DS)
@@ -191,4 +190,13 @@ const SILDebugScope *GenericCloner::remapScope(const SILDebugScope *DS) {
                             remapScope(DS->InlinedCallSite));
   RemappedScopeCache.insert({DS, RemappedScope});
   return RemappedScope;
+}
+
+void GenericCloner::fixUp(SILFunction *f) {
+  for (auto *apply : noReturnApplies) {
+    auto applyBlock = apply->getParent();
+    applyBlock->split(std::next(SILBasicBlock::iterator(apply)));
+    getBuilder().setInsertionPoint(applyBlock);
+    getBuilder().createUnreachable(apply->getLoc());
+  }
 }

@@ -879,7 +879,7 @@ void CopyPropagation::run() {
                           << "\n");
 
   // This algorithm fundamentally assumes ownership.
-  if (!getFunction()->hasQualifiedOwnership())
+  if (!getFunction()->hasOwnership())
     return;
 
   // Step 1. Find all copied defs.

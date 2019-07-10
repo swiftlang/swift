@@ -109,6 +109,20 @@ void SILSSAUpdater::RewriteUse(Operand &Op) {
     auto *NewFR = cast<FunctionRefInst>(FR->clone(User));
     Op.set(NewFR);
     return;
+  } else if (auto *FR = dyn_cast<PreviousDynamicFunctionRefInst>(Op.get())) {
+    assert(areIdentical(*AV) &&
+           "The function_refs need to have the same value");
+    SILInstruction *User = Op.getUser();
+    auto *NewFR = cast<PreviousDynamicFunctionRefInst>(FR->clone(User));
+    Op.set(NewFR);
+    return;
+  } else if (auto *FR = dyn_cast<DynamicFunctionRefInst>(Op.get())) {
+    assert(areIdentical(*AV) &&
+           "The function_refs need to have the same value");
+    SILInstruction *User = Op.getUser();
+    auto *NewFR = cast<DynamicFunctionRefInst>(FR->clone(User));
+    Op.set(NewFR);
+    return;
   } else if (auto *IL = dyn_cast<IntegerLiteralInst>(Op.get()))
     if (areIdentical(*AV)) {
       // Some llvm intrinsics don't like phi nodes as their constant inputs (e.g
@@ -199,7 +213,7 @@ SILValue SILSSAUpdater::GetValueInMiddleOfBlock(SILBasicBlock *BB) {
 
   // Return undef for blocks without predecessor.
   if (PredVals.empty())
-    return SILUndef::get(ValType, BB->getModule());
+    return SILUndef::get(ValType, *BB->getParent());
 
   if (SingularValue)
     return SingularValue;
@@ -291,7 +305,7 @@ public:
 
   static SILValue GetUndefVal(SILBasicBlock *BB,
                               SILSSAUpdater *Updater) {
-    return SILUndef::get(Updater->ValType, &BB->getModule());
+    return SILUndef::get(Updater->ValType, *BB->getParent());
   }
 
   /// Add an Argument to the basic block.
@@ -376,7 +390,7 @@ SILValue SILSSAUpdater::GetValueAtEndOfBlockInternal(SILBasicBlock *BB){
   return Impl.GetValue(BB);
 }
 
-/// \brief Construct a use wrapper. For branches we store information so that we
+/// Construct a use wrapper. For branches we store information so that we
 /// can reconstruct the use after the branch has been modified.
 ///
 /// When a branch is modified existing pointers to the operand

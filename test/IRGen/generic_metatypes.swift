@@ -1,17 +1,15 @@
 
-// RUN: %swift -module-name generic_metatypes -target x86_64-apple-macosx10.9  -emit-ir -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-64 -DINT=i64 %s
-// RUN: %swift -module-name generic_metatypes -target i386-apple-ios7.0        -emit-ir -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-32 -DINT=i32 %s
-// RUN: %swift -module-name generic_metatypes -target x86_64-apple-ios7.0      -emit-ir -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-64 -DINT=i64  %s
-// RUN: %swift -module-name generic_metatypes -target i386-apple-tvos9.0       -emit-ir -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-32 -DINT=i32  %s
-// RUN: %swift -module-name generic_metatypes -target x86_64-apple-tvos9.0     -emit-ir -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-64 -DINT=i64  %s
-// RUN: %swift -module-name generic_metatypes -target i386-apple-watchos2.0    -emit-ir -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-32 -DINT=i32  %s
-// RUN: %swift -module-name generic_metatypes -target x86_64-unknown-linux-gnu -disable-objc-interop -emit-ir -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-64 -DINT=i64 %s
+// RUN: %swift -module-name generic_metatypes -target x86_64-apple-macosx10.9  -emit-ir -disable-legacy-type-info -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-64 -DINT=i64 %s
+// RUN: %swift -module-name generic_metatypes -target i386-apple-ios7.0        -emit-ir -disable-legacy-type-info -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-32 -DINT=i32 %s
+// RUN: %swift -module-name generic_metatypes -target x86_64-apple-ios7.0      -emit-ir -disable-legacy-type-info -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-64 -DINT=i64  %s
+// RUN: %swift -module-name generic_metatypes -target x86_64-apple-tvos9.0     -emit-ir -disable-legacy-type-info -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-64 -DINT=i64  %s
+// RUN: %swift -module-name generic_metatypes -target i386-apple-watchos2.0    -emit-ir -disable-legacy-type-info -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-32 -DINT=i32  %s
+// RUN: %swift -module-name generic_metatypes -target x86_64-unknown-linux-gnu -disable-objc-interop -emit-ir -disable-legacy-type-info -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-64 -DINT=i64 %s
 
-// RUN: %swift -module-name generic_metatypes -target armv7-apple-ios7.0       -emit-ir -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-32 -DINT=i32 %s
-// RUN: %swift -module-name generic_metatypes -target arm64-apple-ios7.0       -emit-ir -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-64 -DINT=i64 %s
-// RUN: %swift -module-name generic_metatypes -target armv7-apple-tvos9.0      -emit-ir -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-32 -DINT=i32 %s
-// RUN: %swift -module-name generic_metatypes -target arm64-apple-tvos9.0      -emit-ir -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-64 -DINT=i64 %s
-// RUN: %swift -module-name generic_metatypes -target armv7k-apple-watchos2.0  -emit-ir -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-32 -DINT=i32 %s
+// RUN: %swift -module-name generic_metatypes -target armv7-apple-ios7.0       -emit-ir -disable-legacy-type-info -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-32 -DINT=i32 %s
+// RUN: %swift -module-name generic_metatypes -target arm64-apple-ios7.0       -emit-ir -disable-legacy-type-info -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-64 -DINT=i64 %s
+// RUN: %swift -module-name generic_metatypes -target arm64-apple-tvos9.0      -emit-ir -disable-legacy-type-info -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-64 -DINT=i64 %s
+// RUN: %swift -module-name generic_metatypes -target armv7k-apple-watchos2.0  -emit-ir -disable-legacy-type-info -parse-stdlib -primary-file %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-32 -DINT=i32 %s
 
 // REQUIRES: CODEGENERATOR=X86
 // REQUIRES: CODEGENERATOR=ARM

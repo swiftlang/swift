@@ -136,7 +136,7 @@ public func fooFuncNoreturn2() -> Never
  */
 public func fooFuncWithComment1()
 
-/*!
+/**
   Aaa.  fooFuncWithComment2.  Bbb.
  */
 public func fooFuncWithComment2()
@@ -1695,7 +1695,7 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     key.length: 19
   },
   {
-    key.kind: source.lang.swift.syntaxtype.comment,
+    key.kind: source.lang.swift.syntaxtype.doccomment,
     key.offset: 2680,
     key.length: 42
   },
@@ -3604,7 +3604,8 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
   {
     key.kind: source.lang.swift.ref.module,
     key.offset: 53,
-    key.length: 17
+    key.length: 17,
+    key.is_system: 1
   },
   {
     key.kind: source.lang.swift.ref.protocol,
@@ -5457,6 +5458,8 @@ public class FooOverlayClassDerived : Foo.FooOverlayClassBase {
     key.length: 26,
     key.nameoffset: 2735,
     key.namelength: 21,
+    key.docoffset: 2680,
+    key.doclength: 42,
     key.attributes: [
       {
         key.offset: 2723,

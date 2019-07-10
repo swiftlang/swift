@@ -230,7 +230,6 @@ public protocol FloatingPoint : SignedNumeric, Strideable, Hashable
   ///     the initializer has the same magnitude as `magnitudeOf`.
   init(signOf: Self, magnitudeOf: Self)
   
-  
   /// Creates a new value, rounded to the closest possible representation.
   ///
   /// If two representable values are equally close, the result is the value
@@ -366,18 +365,25 @@ public protocol FloatingPoint : SignedNumeric, Strideable, Hashable
   /// - `greatestFiniteMagnitude.ulp` is a finite number, even though the next
   ///   greater representable value is `infinity`.
   ///
-  /// This quantity, or a related quantity, is sometimes called *epsilon* or
-  /// *machine epsilon.* Avoid that name because it has different meanings in
-  /// different languages, which can lead to confusion, and because it
-  /// suggests that it is a good tolerance to use for comparisons, which it
-  /// almost never is.
+  /// See also the `ulpOfOne` static property.
   var ulp: Self { get }
 
   /// The unit in the last place of 1.0.
   ///
   /// The positive difference between 1.0 and the next greater representable
-  /// number. The `ulpOfOne` constant corresponds to the C macros
-  /// `FLT_EPSILON`, `DBL_EPSILON`, and others with a similar purpose.
+  /// number. `ulpOfOne` corresponds to the value represented by the C macros
+  /// `FLT_EPSILON`, `DBL_EPSILON`, etc, and is sometimes called *epsilon* or
+  /// *machine epsilon*. Swift deliberately avoids using the term "epsilon"
+  /// because:
+  ///
+  /// - Historically "epsilon" has been used to refer to several different
+  ///   concepts in different languages, leading to confusion and bugs.
+  ///
+  /// - The name "epsilon" suggests that this quantity is a good tolerance to
+  ///   choose for approximate comparisons, but it is almost always unsuitable
+  ///   for that purpose.
+  ///
+  /// See also the `ulp` member property.
   static var ulpOfOne: Self { get }
 
   /// The least positive normal number.
@@ -1204,7 +1210,7 @@ public protocol FloatingPoint : SignedNumeric, Strideable, Hashable
 }
 
 /// The sign of a floating-point value.
-@_frozen // FIXME(sil-serialize-all)
+@frozen
 public enum FloatingPointSign: Int {
   /// The sign for a positive value.
   case plus
@@ -1232,14 +1238,28 @@ public enum FloatingPointSign: Int {
     }
   }
 
+  @_transparent
   @inlinable
   public static func ==(a: FloatingPointSign, b: FloatingPointSign) -> Bool {
     return a.rawValue == b.rawValue
   }
+
+  @inlinable
+  public var hashValue: Int { return rawValue.hashValue }
+
+  @inlinable
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(rawValue)
+  }
+
+  @inlinable
+  public func _rawHashValue(seed: Int) -> Int {
+    return rawValue._rawHashValue(seed: seed)
+  }
 }
 
 /// The IEEE 754 floating-point classes.
-@_frozen // FIXME(sil-serialize-all)
+@frozen
 public enum FloatingPointClassification {
   /// A signaling NaN ("not a number").
   ///
@@ -1477,7 +1497,7 @@ public protocol BinaryFloatingPoint: FloatingPoint, ExpressibleByFloatLiteral {
   /// - Parameter value: A floating-point value to be converted.
   init(_ value: Double)
 
-#if !os(Windows) && (arch(i386) || arch(x86_64))
+#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
   /// Creates a new instance from the given value, rounded to the closest
   /// possible representation.
   ///
@@ -1721,9 +1741,12 @@ extension FloatingPoint {
   /// - If `x` is `leastNonzeroMagnitude`, then `x.nextDown` is `0.0`.
   /// - If `x` is zero, then `x.nextDown` is `-leastNonzeroMagnitude`.
   /// - If `x` is `-greatestFiniteMagnitude`, then `x.nextDown` is `-infinity`.
-  @_transparent
+  @inlinable // FIXME(inline-always)
   public var nextDown: Self {
-    return -(-self).nextUp
+    @inline(__always)
+    get {
+      return -(-self).nextUp
+    }
   }
 
   /// Returns the remainder of this value divided by the given value using
@@ -1757,7 +1780,8 @@ extension FloatingPoint {
   /// - Parameter other: The value to use when dividing this value.
   /// - Returns: The remainder of this value divided by `other` using
   ///   truncating division.
-  @_transparent
+  @inlinable // FIXME(inline-always)
+  @inline(__always)
   public func truncatingRemainder(dividingBy other: Self) -> Self {
     var lhs = self
     lhs.formTruncatingRemainder(dividingBy: other)
@@ -1796,7 +1820,8 @@ extension FloatingPoint {
   ///
   /// - Parameter other: The value to use when dividing this value.
   /// - Returns: The remainder of this value divided by `other`.
-  @_transparent
+  @inlinable // FIXME(inline-always)
+  @inline(__always)
   public func remainder(dividingBy other: Self) -> Self {
     var lhs = self
     lhs.formRemainder(dividingBy: other)
@@ -1871,12 +1896,8 @@ extension FloatingPoint {
   ///   - y: Another floating-point value.
   /// - Returns: The minimum of `x` and `y`, or whichever is a number if the
   ///   other is NaN.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public static func minimum(_ x: Self, _ y: Self) -> Self {
-    if x.isSignalingNaN || y.isSignalingNaN {
-      //  Produce a quiet NaN matching platform arithmetic behavior.
-      return x + y
-    }
     if x <= y || y.isNaN { return x }
     return y
   }
@@ -1908,12 +1929,8 @@ extension FloatingPoint {
   ///   - y: Another floating-point value.
   /// - Returns: The greater of `x` and `y`, or whichever is a number if the
   ///   other is NaN.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public static func maximum(_ x: Self, _ y: Self) -> Self {
-    if x.isSignalingNaN || y.isSignalingNaN {
-      //  Produce a quiet NaN matching platform arithmetic behavior.
-      return x + y
-    }
     if x > y || y.isNaN { return x }
     return y
   }
@@ -1947,12 +1964,8 @@ extension FloatingPoint {
   ///   - y: Another floating-point value.
   /// - Returns: Whichever of `x` or `y` has lesser magnitude, or whichever is
   ///   a number if the other is NaN.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public static func minimumMagnitude(_ x: Self, _ y: Self) -> Self {
-    if x.isSignalingNaN || y.isSignalingNaN {
-      //  Produce a quiet NaN matching platform arithmetic behavior.
-      return x + y
-    }
     if x.magnitude <= y.magnitude || y.isNaN { return x }
     return y
   }
@@ -1986,12 +1999,8 @@ extension FloatingPoint {
   ///   - y: Another floating-point value.
   /// - Returns: Whichever of `x` or `y` has greater magnitude, or whichever is
   ///   a number if the other is NaN.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public static func maximumMagnitude(_ x: Self, _ y: Self) -> Self {
-    if x.isSignalingNaN || y.isSignalingNaN {
-      //  Produce a quiet NaN matching platform arithmetic behavior.
-      return x + y
-    }
     if x.magnitude > y.magnitude || y.isNaN { return x }
     return y
   }
@@ -2002,7 +2011,7 @@ extension FloatingPoint {
   /// described by the [IEEE 754 specification][spec].
   ///
   /// [spec]: http://ieeexplore.ieee.org/servlet/opac?punumber=4610933
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public var floatingPointClass: FloatingPointClassification {
     if isSignalingNaN { return .signalingNaN }
     if isNaN { return .quietNaN }
@@ -2022,6 +2031,7 @@ extension BinaryFloatingPoint {
   /// following formula, where `**` is exponentiation:
   ///
   ///     let magnitude = x.significand * F.radix ** x.exponent
+  @inlinable @inline(__always)
   public static var radix: Int { return 2 }
 
   /// Creates a new floating-point value using the sign of one value and the
@@ -2043,14 +2053,14 @@ extension BinaryFloatingPoint {
   ///     initializer has the same sign as `signOf`.
   ///   - magnitudeOf: A value from which to use the magnitude. The result of
   ///     the initializer has the same magnitude as `magnitudeOf`.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public init(signOf: Self, magnitudeOf: Self) {
     self.init(sign: signOf.sign,
       exponentBitPattern: magnitudeOf.exponentBitPattern,
       significandBitPattern: magnitudeOf.significandBitPattern)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public // @testable
   static func _convert<Source : BinaryFloatingPoint>(
     from source: Source
@@ -2192,7 +2202,7 @@ extension BinaryFloatingPoint {
   /// with more trailing zeros in its significand bit pattern.
   ///
   /// - Parameter value: A floating-point value to be converted.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public init<Source : BinaryFloatingPoint>(_ value: Source) {
     self = Self._convert(from: value).value
   }
@@ -2204,7 +2214,7 @@ extension BinaryFloatingPoint {
   /// result is `nil`.
   ///
   /// - Parameter value: A floating-point value to be converted.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public init?<Source : BinaryFloatingPoint>(exactly value: Source) {
     let (value_, exact) = Self._convert(from: value)
     guard exact else { return nil }
@@ -2233,7 +2243,7 @@ extension BinaryFloatingPoint {
   /// - Parameter other: A floating-point value to compare to this value.
   /// - Returns: `true` if this value is ordered below or the same as `other`
   ///   in a total ordering of the floating-point type; otherwise, `false`.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func isTotallyOrdered(belowOrEqualTo other: Self) -> Bool {
     // Quick return when possible.
     if self < other { return true }
@@ -2324,7 +2334,7 @@ extension BinaryFloatingPoint where Self.RawSignificand : FixedWidthInteger {
   /// with more trailing zeros in its significand bit pattern.
   ///
   /// - Parameter value: The integer to convert to a floating-point value.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public init<Source : BinaryInteger>(_ value: Source) {
     self = Self._convert(from: value).value
   }
@@ -2334,7 +2344,7 @@ extension BinaryFloatingPoint where Self.RawSignificand : FixedWidthInteger {
   /// If the given integer cannot be represented exactly, the result is `nil`.
   ///
   /// - Parameter value: The integer to convert to a floating-point value.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public init?<Source : BinaryInteger>(exactly value: Source) {
     let (value_, exact) = Self._convert(from: value)
     guard exact else { return nil }

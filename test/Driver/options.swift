@@ -25,13 +25,17 @@
 // RUN: not %swiftc_driver -import-objc-header fake.h -import-underlying-module -c %s 2>&1 | %FileCheck -check-prefix=FRAMEWORK_BRIDGING_HEADER %s
 // FRAMEWORK_BRIDGING_HEADER: error: using bridging headers with framework targets is unsupported
 
+// RUN: not %swiftc_driver -import-objc-header fake.h -emit-parseable-module-interface %s 2>&1 | %FileCheck -check-prefix=BRIDGING_HEADER_SWIFTINTERFACE %s
+// RUN: not %swiftc_driver -import-objc-header fake.h -emit-parseable-module-interface-path fake.swiftinterface %s 2>&1 | %FileCheck -check-prefix=BRIDGING_HEADER_SWIFTINTERFACE %s
+// BRIDGING_HEADER_SWIFTINTERFACE: error: using bridging headers with module interfaces is unsupported
+
 // RUN: %swift_driver -### | %FileCheck -check-prefix=DEFAULT_REPL %s
 // DEFAULT_REPL: -repl
 // RUN: not %swiftc_driver 2>&1 | %FileCheck -check-prefix=DEFAULT_EXEC_ERR  %s
 // DEFAULT_EXEC_ERR: error: no input files
 // RUN: %swiftc_driver %s -### 2>&1 | %FileCheck -check-prefix=DEFAULT_EXEC  %s
 // DEFAULT_EXEC: -c
-// DEFAULT_EXEC: ld
+// DEFAULT_EXEC: {{ld|clang\+\+}}
 
 // RUN: %swift_driver -repl -### 2>&1 | %FileCheck -check-prefix=REPL %s
 // REPL: warning: unnecessary option '-repl'
@@ -79,11 +83,11 @@
 
 // RUN: %swiftc_driver -incremental %s -### 2>&1 | %FileCheck -check-prefix=INCREMENTAL_WITHOUT_OFM %s
 // INCREMENTAL_WITHOUT_OFM: warning: ignoring -incremental (currently requires an output file map)
-// INCREMENTAL_WITHOUT_OFM: swift -frontend
+// INCREMENTAL_WITHOUT_OFM: swift{{c?(\.EXE)?"?}} -frontend
 
 // RUN: %swiftc_driver -incremental -output-file-map %S/Inputs/empty-ofm.json %s -### 2>&1 | %FileCheck -check-prefix=INCREMENTAL_WITHOUT_OFM_ENTRY %s
 // INCREMENTAL_WITHOUT_OFM_ENTRY: ignoring -incremental; output file map has no master dependencies entry ("swift-dependencies" under "")
-// INCREMENTAL_WITHOUT_OFM_ENTRY: swift -frontend
+// INCREMENTAL_WITHOUT_OFM_ENTRY: swift{{c?(\.EXE)?"?}} -frontend
 
 // RUN: %swiftc_driver -driver-print-jobs -enforce-exclusivity=checked %s | %FileCheck -check-prefix=EXCLUSIVITY_CHECKED %s
 // EXCLUSIVITY_CHECKED: swift
@@ -119,3 +123,13 @@
 // RUN: not %swiftc_driver -gline-tables-only -debug-info-format=codeview %s 2>&1 | %FileCheck -check-prefix BAD_DEBUG_LEVEL_ERROR %s
 // RUN: not %swiftc_driver -gdwarf-types -debug-info-format=codeview %s 2>&1 | %FileCheck -check-prefix BAD_DEBUG_LEVEL_ERROR %s
 // BAD_DEBUG_LEVEL_ERROR: error: argument '-debug-info-format=codeview' is not allowed with '{{.*}}'
+
+// RUN: %swift_driver -F %t/test.framework %s 2>&1 | %FileCheck -check-prefix SEARCH_PATH_INCLUDES_FRAMEWORK_EXTENSION %s
+// RUN: %swiftc_driver -F %t/test.framework %s 2>&1 | %FileCheck -check-prefix SEARCH_PATH_INCLUDES_FRAMEWORK_EXTENSION %s
+// RUN: %swift_driver -Fsystem %t/test.framework %s 2>&1 | %FileCheck -check-prefix SEARCH_PATH_INCLUDES_FRAMEWORK_EXTENSION %s
+// RUN: %swiftc_driver -Fsystem %t/test.framework %s 2>&1 | %FileCheck -check-prefix SEARCH_PATH_INCLUDES_FRAMEWORK_EXTENSION %s
+// RUN: %swift_driver -F %t/test.framework/ %s 2>&1 | %FileCheck -check-prefix SEARCH_PATH_INCLUDES_FRAMEWORK_EXTENSION %s
+// RUN: %swiftc_driver -F %t/test.framework/ %s 2>&1 | %FileCheck -check-prefix SEARCH_PATH_INCLUDES_FRAMEWORK_EXTENSION %s
+// RUN: %swift_driver -Fsystem %t/test.framework/ %s 2>&1 | %FileCheck -check-prefix SEARCH_PATH_INCLUDES_FRAMEWORK_EXTENSION %s
+// RUN: %swiftc_driver -Fsystem %t/test.framework/ %s 2>&1 | %FileCheck -check-prefix SEARCH_PATH_INCLUDES_FRAMEWORK_EXTENSION %s
+// SEARCH_PATH_INCLUDES_FRAMEWORK_EXTENSION: warning: framework search path ends in ".framework"

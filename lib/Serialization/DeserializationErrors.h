@@ -38,6 +38,7 @@ class XRefTracePath {
       Extension,
       GenericParam,
       PrivateDiscriminator,
+      OpaqueReturnType,
       Unknown
     };
 
@@ -61,6 +62,7 @@ class XRefTracePath {
       case Kind::Value:
       case Kind::Operator:
       case Kind::PrivateDiscriminator:
+      case Kind::OpaqueReturnType:
         return getDataAs<DeclBaseName>();
       case Kind::Type:
       case Kind::OperatorFilter:
@@ -146,6 +148,9 @@ class XRefTracePath {
       case Kind::PrivateDiscriminator:
         os << "(in " << getDataAs<Identifier>() << ")";
         break;
+      case Kind::OpaqueReturnType:
+        os << "opaque return type of " << getDataAs<DeclBaseName>();
+        break;
       case Kind::Unknown:
         os << "unknown xref kind " << getDataAs<uintptr_t>();
         break;
@@ -195,6 +200,10 @@ public:
 
   void addUnknown(uintptr_t kind) {
     path.push_back({ PathPiece::Kind::Unknown, kind });
+  }
+  
+  void addOpaqueReturnType(Identifier name) {
+    path.push_back({ PathPiece::Kind::OpaqueReturnType, name });
   }
 
   DeclBaseName getLastName() const {
@@ -275,6 +284,26 @@ public:
   void log(raw_ostream &OS) const override {
     OS << message << "\n";
     path.print(OS);
+  }
+
+  std::error_code convertToErrorCode() const override {
+    return llvm::inconvertibleErrorCode();
+  }
+};
+
+class XRefNonLoadedModuleError :
+    public llvm::ErrorInfo<XRefNonLoadedModuleError, DeclDeserializationError> {
+  friend ErrorInfo;
+  static const char ID;
+  void anchor() override;
+
+public:
+  explicit XRefNonLoadedModuleError(Identifier name) {
+    this->name = name;
+  }
+
+  void log(raw_ostream &OS) const override {
+    OS << "module '" << name << "' was not loaded";
   }
 
   std::error_code convertToErrorCode() const override {

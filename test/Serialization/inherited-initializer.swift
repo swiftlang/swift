@@ -6,7 +6,7 @@ import InheritedInitializerBase
 
 class InheritsInit : Base {}
 
-// CHECK-LABEL: sil hidden @$s4main10testSimpleyyF
+// CHECK-LABEL: sil hidden [ossa] @$s4main10testSimpleyyF
 func testSimple() {
   // CHECK: [[DEFAULT:%.+]] = function_ref @$s24InheritedInitializerBase0C0CyACSicfcfA_
   // CHECK: [[ARG:%.+]] = apply [[DEFAULT]]()
@@ -14,8 +14,8 @@ func testSimple() {
   // CHECK: apply [[INIT]]([[ARG]], {{%.+}})
   _ = InheritsInit()
 
-  // CHECK: [[VALUE:%.+]] = integer_literal $Builtin.Int2048, 5
-  // CHECK: [[ARG:%.+]] = apply {{%.+}}([[VALUE]], {{%.+}}) : $@convention(method) (Builtin.Int2048, @thin Int.Type) -> Int
+  // CHECK: [[VALUE:%.+]] = integer_literal $Builtin.IntLiteral, 5
+  // CHECK: [[ARG:%.+]] = apply {{%.+}}([[VALUE]], {{%.+}}) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
   // CHECK: [[INIT:%.+]] = function_ref @$s4main12InheritsInitCyACSicfC
   // CHECK: apply [[INIT]]([[ARG]], {{%.+}})
   _ = InheritsInit(5)
@@ -29,7 +29,7 @@ class GenericSub<T: Initializable> : GenericBase<T> {}
 class ModifiedGenericSub<U> : GenericBase<Reinitializable<U>> {}
 class NonGenericSub : GenericBase<Reinitializable<Int>> {}
 
-// CHECK-LABEL: sil hidden @$s4main11testGenericyyF
+// CHECK-LABEL: sil hidden [ossa] @$s4main11testGenericyyF
 func testGeneric() {
   // CHECK: [[TYPE:%.+]] = metatype $@thick GenericSub<Reinitializable<Int8>>.Type
   // CHECK: [[DEFAULT:%.+]] = function_ref @$s24InheritedInitializerBase07GenericC0CyACyxGxcfcfA_

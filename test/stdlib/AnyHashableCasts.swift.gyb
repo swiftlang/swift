@@ -26,7 +26,9 @@ struct HashableStruct : Hashable {
   static func ==(lhs: HashableStruct, rhs: HashableStruct) -> Bool {
     return lhs.value == rhs.value
   }
-  var hashValue : Int { return value }
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(value)
+  }
 }
 
 class HashableClass : Hashable {
@@ -35,7 +37,9 @@ class HashableClass : Hashable {
   static func ==(lhs: HashableClass, rhs: HashableClass) -> Bool {
     return lhs.value == rhs.value
   }
-  var hashValue : Int { return value }
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(value)
+  }
 }
 
 enum HashableEnum : Hashable {
@@ -45,9 +49,10 @@ enum HashableEnum : Hashable {
     case (.value(let l), .value(let r)): return l == r
     }
   }
-  var hashValue : Int {
+  func hash(into hasher: inout Hasher) {
     switch self {
-    case .value(let v): return v
+    case .value(let v):
+      hasher.combine(v)
     }
   }
 }
@@ -79,9 +84,15 @@ testCases = [
   ("AnyHashable(5)", "Any", "Int", "5"),
   ("HashableStruct(value: 5)", "HashableStruct", "AnyHashable",
    "AnyHashable(HashableStruct(value: 5))"),
+  ("HashableStruct(value: 5)", "AnyHashable", "HashableStruct",
+   "AnyHashable(HashableStruct(value: 5))"),
   ("HashableClass(value: 5)", "HashableClass", "AnyHashable",
    "AnyHashable(HashableClass(value: 5))"),
+  ("HashableClass(value: 5)", "AnyHashable", "HashableClass",
+   "AnyHashable(HashableClass(value: 5))"),
   ("HashableEnum.value(5)", "HashableEnum", "AnyHashable",
+   "AnyHashable(HashableEnum.value(5))"),
+  ("HashableEnum.value(5)", "AnyHashable", "HashableEnum",
    "AnyHashable(HashableEnum.value(5))"),
 ]
 }%
@@ -117,6 +128,16 @@ AnyHashableCasts.test("${valueExpr} as ${coercedType} as? ${castType}") {
   }
 }
 % end
+
+AnyHashableCasts.test("Casting to AnyHashable doesn't leak") {
+  do {
+    let tracked = LifetimeTracked(42)
+    let anyHashable = AnyHashable(tracked)
+    let anyObject = anyHashable as AnyObject
+    _ = anyObject as? AnyHashable
+  }
+  expectEqual(LifetimeTracked.instances, 0)
+}
 
 #if _runtime(_ObjC)
 // A wrapper type around Int that bridges to NSNumber.

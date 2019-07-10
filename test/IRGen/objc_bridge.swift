@@ -88,7 +88,7 @@ import Foundation
 // CHECK:     { i8*, i8*, i8* } {
 // CHECK:       i8* getelementptr inbounds ([11 x i8], [11 x i8]* @"\01L_selector_data(acceptSet:)", i64 0, i64 0),
 // CHECK:       i8* getelementptr inbounds ([11 x i8], [11 x i8]* @{{[0-9]+}}, i64 0, i64 0),
-// CHECK:       i8* bitcast (void (%3*, i8*, %4*)* @"$s11objc_bridge3BasC9acceptSetyyShyACSo8NSObjectCSH10ObjectiveCg_GFTo" to i8*)
+// CHECK:       i8* bitcast (void (%3*, i8*, %4*)* @"$s11objc_bridge3BasC9acceptSetyyShyACGFTo" to i8*)
 // CHECK:     }
 // CHECK:     { i8*, i8*, i8* } { 
 // CHECK:       i8* getelementptr inbounds ([14 x i8], [14 x i8]* @"\01L_selector_data(.cxx_destruct)", i64 0, i64 0), 
@@ -100,7 +100,7 @@ import Foundation
 
 // CHECK: @_PROPERTIES__TtC11objc_bridge3Bas = private constant { i32, i32, [5 x { i8*, i8* }] } {
 
-// CHECK: [[OBJC_BLOCK_PROPERTY:@.*]] = private unnamed_addr constant [11 x i8] c"T@?,N,C,Vx\00"
+// CHECK: [[OBJC_BLOCK_PROPERTY:@.*]] = private unnamed_addr constant [8 x i8] c"T@?,N,C\00"
 // CHECK: @_PROPERTIES__TtC11objc_bridge21OptionalBlockProperty = private constant {{.*}} [[OBJC_BLOCK_PROPERTY]]
 
 func getDescription(_ o: NSObject) -> String {
@@ -191,7 +191,7 @@ class Bas : NSObject {
 
   deinit { var x = 10 }
 
-  override var hashValue: Int { return 0 }
+  override var hash: Int { return 0 }
 
   @objc func acceptSet(_ set: Set<Bas>) { }
 }

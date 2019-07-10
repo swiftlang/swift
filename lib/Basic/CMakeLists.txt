@@ -8,7 +8,7 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
   set(UUID_LIBRARIES "rpcrt4.lib")
 else()
   find_package(UUID REQUIRED)
-  set(UUID_INCLUDE "-I${UUID_INCLUDE_DIRS}")
+  set(UUID_INCLUDE "${UUID_INCLUDE_DIRS}")
 endif()
 
 # Figure out if we can track VC revisions.
@@ -64,7 +64,7 @@ generate_revision_inc(swift_revision_inc Swift "${SWIFT_SOURCE_DIR}")
 set(version_inc_files
   ${llvm_revision_inc} ${clang_revision_inc} ${swift_revision_inc})
 
-add_swift_library(swiftBasic STATIC
+add_swift_host_library(swiftBasic STATIC
   AnyValue.cpp
   Cache.cpp
   ClusteredBitVector.cpp
@@ -102,13 +102,16 @@ add_swift_library(swiftBasic STATIC
   # Platform-agnostic fallback TaskQueue implementation
   Default/TaskQueue.inc
 
-  UnicodeExtendedGraphemeClusters.cpp.gyb
+  GYB_SOURCES
+    UnicodeExtendedGraphemeClusters.cpp.gyb
 
-  C_COMPILE_FLAGS ${UUID_INCLUDE}
-  LINK_LIBRARIES
-    swiftDemangling
-    ${UUID_LIBRARIES}
-  LLVM_COMPONENT_DEPENDS support)
+  LLVM_LINK_COMPONENTS support)
+target_include_directories(swiftBasic PRIVATE
+  ${UUID_INCLUDE})
+
+target_link_libraries(swiftBasic PRIVATE
+  swiftDemangling
+  ${UUID_LIBRARIES})
 
 message(STATUS "Swift version: ${SWIFT_VERSION}")
 message(STATUS "Swift vendor: ${SWIFT_VENDOR}")

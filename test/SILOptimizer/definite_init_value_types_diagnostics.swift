@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -enable-sil-ownership %s -o /dev/null -verify
+// RUN: %target-swift-frontend -emit-sil %s -o /dev/null -verify
 
 struct EmptyStruct {}
 

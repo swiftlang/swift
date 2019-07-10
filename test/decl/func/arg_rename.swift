@@ -25,11 +25,38 @@ f1(a: 1, b: 2)
 func f2(class cls: Int) { }
 f2(class: 5)
 
+func f3(var a: Int) {} // expected-warning {{'var' in this position is interpreted as an argument label}} {{9-12=`var`}}
+f3(var: 5)
+
+func f4(let a: Int) {} // expected-warning {{'let' in this position is interpreted as an argument label}} {{9-12=`let`}}
+f4(let: 5)
+
+func f5(a var: Int) {}
+f5(a: 5)
+
+func f6(a let: Int) {}
+f6(a: 5)
+
+func f7(var let: Int) { // expected-warning {{'var' in this position is interpreted as an argument label}} {{9-12=`var`}}
+  let _ = `let`
+} 
+f7(var: 5)
+
+func f8(let var: Int) { // expected-warning {{'let' in this position is interpreted as an argument label}} {{9-12=`let`}}
+  let _ = `var`
+}
+f8(let: 5)
 
 
-func g2(a a: Int) { } // expected-warning{{extraneous duplicate parameter name; 'a' already has an argument label}}{{9-11=}}
+func g1(a a: Int) { } // expected-warning{{extraneous duplicate parameter name; 'a' already has an argument label}}{{9-11=}}
 
-func g5(_ a: Int) { }
+func g2(_ a: Int) { }
+
+func g3(var var: Int) {} // expected-warning {{'var' in this position is interpreted as an argument label}} {{9-12=`var`}}
+// expected-warning @-1 {{extraneous duplicate parameter name; 'var' already has an argument label}}{{9-13=}}
+
+func g4(let let: Int) {} // expected-warning {{'let' in this position is interpreted as an argument label}} {{9-12=`let`}}
+// expected-warning @-1 {{extraneous duplicate parameter name; 'let' already has an argument label}}{{9-13=}}
 
 class X {
   init(a a: Int) { } // expected-warning{{extraneous duplicate parameter name; 'a' already has an argument label}}{{8-10=}}

@@ -24,7 +24,7 @@
 namespace swift {
 class CaptureInfo;
 
-/// \brief A universal function reference -- can wrap all AST nodes that
+/// A universal function reference -- can wrap all AST nodes that
 /// represent functions and exposes a common interface to them.
 class AnyFunctionRef {
   PointerUnion<AbstractFunctionDecl *, AbstractClosureExpr *> TheFunction;
@@ -52,10 +52,18 @@ public:
     }
   }
 
-  CaptureInfo &getCaptureInfo() const {
+  const CaptureInfo &getCaptureInfo() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
       return AFD->getCaptureInfo();
     return TheFunction.get<AbstractClosureExpr *>()->getCaptureInfo();
+  }
+
+  void setCaptureInfo(const CaptureInfo &captures) const {
+    if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
+      AFD->setCaptureInfo(captures);
+      return;
+    }
+    TheFunction.get<AbstractClosureExpr *>()->setCaptureInfo(captures);
   }
 
   void getLocalCaptures(SmallVectorImpl<CapturedValue> &Result) const {
@@ -66,6 +74,18 @@ public:
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
       return AFD->hasInterfaceType();
     return !TheFunction.get<AbstractClosureExpr *>()->getType().isNull();
+  }
+
+  bool hasSingleExpressionBody() const {
+    if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
+      return AFD->hasSingleExpressionBody();
+    return TheFunction.get<AbstractClosureExpr *>()->hasSingleExpressionBody();
+  }
+
+  Expr *getSingleExpressionBody() const {
+    if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
+      return AFD->getSingleExpressionBody();
+    return TheFunction.get<AbstractClosureExpr *>()->getSingleExpressionBody();
   }
 
   Type getType() const {
@@ -114,6 +134,12 @@ public:
   
   AbstractClosureExpr *getAbstractClosureExpr() const {
     return TheFunction.dyn_cast<AbstractClosureExpr*>();
+  }
+
+  bool isDeferBody() const {
+    if (auto *fd = dyn_cast_or_null<FuncDecl>(getAbstractFunctionDecl()))
+      return fd->isDeferBody();
+    return false;
   }
 
   /// Return true if this closure is passed as an argument to a function and is

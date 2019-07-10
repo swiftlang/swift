@@ -24,6 +24,7 @@
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/Strings.h"
 using namespace swift;
 
 //===----------------------------------------------------------------------===//
@@ -144,9 +145,9 @@ void SILBasicBlock::cloneArgumentList(SILBasicBlock *Other) {
 SILFunctionArgument *SILBasicBlock::createFunctionArgument(SILType Ty,
                                                            const ValueDecl *D) {
   assert(isEntry() && "Function Arguments can only be in the entry block");
-  SILFunction *Parent = getParent();
+  const SILFunction *Parent = getParent();
   auto OwnershipKind = ValueOwnershipKind(
-      Parent->getModule(), Ty,
+      *Parent, Ty,
       Parent->getConventions().getSILArgumentConvention(getNumArguments()));
   return new (getModule()) SILFunctionArgument(this, Ty, OwnershipKind, D);
 }
@@ -162,9 +163,11 @@ SILFunctionArgument *SILBasicBlock::insertFunctionArgument(arg_iterator Iter,
 SILFunctionArgument *SILBasicBlock::replaceFunctionArgument(
     unsigned i, SILType Ty, ValueOwnershipKind Kind, const ValueDecl *D) {
   assert(isEntry() && "Function Arguments can only be in the entry block");
-  SILModule &M = getParent()->getModule();
-  if (Ty.isTrivial(M))
-    Kind = ValueOwnershipKind::Trivial;
+
+  SILFunction *F = getParent();
+  SILModule &M = F->getModule();
+  if (Ty.isTrivial(*F))
+    Kind = ValueOwnershipKind::Any;
 
   assert(ArgumentList[i]->use_empty() && "Expected no uses of the old arg!");
 
@@ -187,9 +190,10 @@ SILPhiArgument *SILBasicBlock::replacePhiArgument(unsigned i, SILType Ty,
                                                   ValueOwnershipKind Kind,
                                                   const ValueDecl *D) {
   assert(!isEntry() && "PHI Arguments can not be in the entry block");
-  SILModule &M = getParent()->getModule();
-  if (Ty.isTrivial(M))
-    Kind = ValueOwnershipKind::Trivial;
+  SILFunction *F = getParent();
+  SILModule &M = F->getModule();
+  if (Ty.isTrivial(*F))
+    Kind = ValueOwnershipKind::Any;
 
   assert(ArgumentList[i]->use_empty() && "Expected no uses of the old BB arg!");
 
@@ -206,14 +210,35 @@ SILPhiArgument *SILBasicBlock::replacePhiArgument(unsigned i, SILType Ty,
   return NewArg;
 }
 
+SILPhiArgument *SILBasicBlock::replacePhiArgumentAndReplaceAllUses(
+    unsigned i, SILType ty, ValueOwnershipKind kind, const ValueDecl *d) {
+  // Put in an undef placeholder before we do the replacement since
+  // replacePhiArgument() expects the replaced argument to not have
+  // any uses.
+  SmallVector<Operand *, 16> operands;
+  SILValue undef = SILUndef::get(ty, *getParent());
+  for (auto *use : getArgument(i)->getUses()) {
+    use->set(undef);
+    operands.push_back(use);
+  }
+
+  // Perform the replacement.
+  auto *newArg = replacePhiArgument(i, ty, kind, d);
+
+  // Wire back up the uses.
+  while (!operands.empty()) {
+    operands.pop_back_val()->set(newArg);
+  }
+
+  return newArg;
+}
+
 SILPhiArgument *SILBasicBlock::createPhiArgument(SILType Ty,
                                                  ValueOwnershipKind Kind,
                                                  const ValueDecl *D) {
   assert(!isEntry() && "PHI Arguments can not be in the entry block");
-  assert(!getParent()->hasQualifiedOwnership() ||
-         Kind != ValueOwnershipKind::Any);
-  if (Ty.isTrivial(getModule()))
-    Kind = ValueOwnershipKind::Trivial;
+  if (Ty.isTrivial(*getParent()))
+    Kind = ValueOwnershipKind::Any;
   return new (getModule()) SILPhiArgument(this, Ty, Kind, D);
 }
 
@@ -221,10 +246,8 @@ SILPhiArgument *SILBasicBlock::insertPhiArgument(arg_iterator Iter, SILType Ty,
                                                  ValueOwnershipKind Kind,
                                                  const ValueDecl *D) {
   assert(!isEntry() && "PHI Arguments can not be in the entry block");
-  assert(!getParent()->hasQualifiedOwnership() ||
-         Kind != ValueOwnershipKind::Any);
-  if (Ty.isTrivial(getModule()))
-    Kind = ValueOwnershipKind::Trivial;
+  if (Ty.isTrivial(*getParent()))
+    Kind = ValueOwnershipKind::Any;
   return new (getModule()) SILPhiArgument(this, Iter, Ty, Kind, D);
 }
 
@@ -236,7 +259,7 @@ void SILBasicBlock::eraseArgument(int Index) {
   ArgumentList.erase(ArgumentList.begin() + Index);
 }
 
-/// \brief Splits a basic block into two at the specified instruction.
+/// Splits a basic block into two at the specified instruction.
 ///
 /// Note that all the instructions BEFORE the specified iterator
 /// stay as part of the original basic block. The old basic block is left
@@ -250,7 +273,7 @@ SILBasicBlock *SILBasicBlock::split(iterator I) {
   return New;
 }
 
-/// \brief Move the basic block to after the specified basic block in the IR.
+/// Move the basic block to after the specified basic block in the IR.
 void SILBasicBlock::moveAfter(SILBasicBlock *After) {
   assert(getParent() && getParent() == After->getParent() &&
          "Blocks must be in the same function");
@@ -263,8 +286,7 @@ void SILBasicBlock::moveTo(SILBasicBlock::iterator To, SILInstruction *I) {
   assert(I->getParent() != this && "Must move from different basic block");
   InstList.splice(To, I->getParent()->InstList, I);
   ScopeCloner ScopeCloner(*Parent);
-  SILBuilder B(*Parent);
-  I->setDebugScope(B, ScopeCloner.getOrCreateClonedScope(I->getDebugScope()));
+  I->setDebugScope(ScopeCloner.getOrCreateClonedScope(I->getDebugScope()));
 }
 
 void
@@ -280,14 +302,12 @@ transferNodesFromList(llvm::ilist_traits<SILBasicBlock> &SrcTraits,
     return;
 
   ScopeCloner ScopeCloner(*Parent);
-  SILBuilder B(*Parent);
 
   // If splicing blocks not in the same function, update the parent pointers.
   for (; First != Last; ++First) {
     First->Parent = Parent;
     for (auto &II : *First)
-      II.setDebugScope(B,
-                       ScopeCloner.getOrCreateClonedScope(II.getDebugScope()));
+      II.setDebugScope(ScopeCloner.getOrCreateClonedScope(II.getDebugScope()));
   }
 }
 

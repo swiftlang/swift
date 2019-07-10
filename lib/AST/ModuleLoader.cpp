@@ -34,9 +34,8 @@ void
 DependencyTracker::addDependency(StringRef File, bool IsSystem) {
   // DependencyTracker exposes an interface that (intentionally) does not talk
   // about clang at all, nor about missing deps. It does expose an IsSystem
-  // dimension, though it is presently always false, we accept it and pass it
-  // along to the clang DependencyCollector in case Swift callers start setting
-  // it to true someday.
+  // dimension, which we accept and pass along to the clang DependencyCollector.
+  // along to the clang DependencyCollector.
   clangCollector->maybeAddDependency(File, /*FromModule=*/false,
                                      IsSystem, /*IsModuleFile=*/false,
                                      /*IsMissing=*/false);

@@ -5,7 +5,7 @@ sil_stage raw // expected-error {{sil_stage declared multiple times}}
 
 import Swift
 
-sil @block_errors : $() -> () {
+sil [ossa] @block_errors : $() -> () {
 bb0:
   %0 = tuple ()
   return %0 : $()
@@ -13,7 +13,7 @@ bb0:                      // expected-error {{redefinition of basic block 'bb0'}
   return %0 : $()
 }
 
-sil @local_value_errors : $() -> () {
+sil [ossa] @local_value_errors : $() -> () {
 bb0:
   %0 = tuple ()
   %0 = tuple ()           // expected-error {{redefinition of value '%0'}}
@@ -21,12 +21,12 @@ bb0:
   %2 = tuple (%199 : $())  // expected-error {{use of undefined value '%199'}}
 }
 
-sil @local_value_errors2 : $() -> () {
+sil [ossa] @local_value_errors2 : $() -> () {
 bb0:
   %0 = builtin "cmp_eq_Int1"(%0 : $() // expected-error @+1 {{expected ')' or ',' in SIL instruction}}
 } // expected-error {{extraneous '}' at top level}}
 
-sil @global_value_errors : $() -> () {
+sil [ossa] @global_value_errors : $() -> () {
 bb0:
   %0 = function_ref @global_value_errors : $ () -> ((), ()) // expected-error {{defined with mismatching type}}
   %1 = function_ref @not_defined : $ () -> () // expected-error {{use of undefined value 'not_defined'}}
@@ -34,20 +34,20 @@ bb0:
   return %2 : $()
 }
 
-sil @global_value_errors : $() -> () {  // expected-error {{redefinition of value 'global_value_errors'}}
+sil [ossa] @global_value_errors : $() -> () {  // expected-error {{redefinition of value 'global_value_errors'}}
 bb0:
   %1 = function_ref @wrong_type : $() -> ((), ())  // expected-note {{prior reference was here}}
 }
 
-sil @wrong_type : $() -> () {  // expected-error {{value 'wrong_type' defined with mismatching type '() -> ((), ())' (expected '@convention(thin) () -> ()')}}
+sil [ossa] @wrong_type : $() -> () {  // expected-error {{value 'wrong_type' defined with mismatching type '() -> ((), ())' (expected '@convention(thin) () -> ()')}}
 bb0:
   %1 = tuple ()
 }
 
 sil_stage nonsense // expected-error {{expected 'raw' or 'canonical' after 'sil_stage'}}
 
-sil @missing_type : $@convention(thin) (Int) -> () {
-bb0(%0 : @trivial $Int):
+sil [ossa] @missing_type : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
   br bb3(%0) // expected-error {{expected ':' before type in SIL value reference}}
   // FIXME: The next error is unexpected.
 } // expected-error {{extraneous '}' at top level}} {{1-3=}}

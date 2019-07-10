@@ -54,8 +54,12 @@ PASS(AADumper, "aa-dump",
      "Dump Alias Analysis over all Pairs")
 PASS(ABCOpt, "abcopts",
      "Array Bounds Check Optimization")
+PASS(AccessEnforcementDom, "access-enforcement-dom",
+     "Remove dominated access checks with no nested conflict")
 PASS(AccessEnforcementOpts, "access-enforcement-opts",
      "Access Enforcement Optimization")
+PASS(AccessEnforcementReleaseSinking, "access-enforcement-release",
+     "Access Enforcement Release Sinking")
 PASS(AccessEnforcementSelection, "access-enforcement-selection",
      "Access Enforcement Selection")
 PASS(AccessEnforcementWMO, "access-enforcement-wmo",
@@ -106,6 +110,8 @@ PASS(ComputeLoopInfo, "compute-loop-info",
      "Compute Loop Information for Testing")
 PASS(ConditionForwarding, "condition-forwarding",
      "Conditional Branch Forwarding to Fold SIL switch_enum")
+PASS(ConstantEvaluatorTester, "test-constant-evaluator",
+      "Test constant evaluator")
 PASS(CopyForwarding, "copy-forwarding",
      "Copy Forwarding to Remove Redundant Copies")
 PASS(CopyPropagation, "copy-propagation",
@@ -130,6 +136,8 @@ PASS(Devirtualizer, "devirtualizer",
      "Indirect Call Devirtualization")
 PASS(DiagnoseInfiniteRecursion, "diagnose-infinite-recursion",
      "Diagnose Infinitely-Recursive Code")
+PASS(DiagnoseInvalidEscapingCaptures, "diagnose-invalid-escaping-captures",
+     "Diagnose Invalid Escaping Captures")
 PASS(DiagnoseStaticExclusivity, "diagnose-static-exclusivity",
      "Static Enforcement of Law of Exclusivity")
 PASS(DiagnoseUnreachable, "diagnose-unreachable",
@@ -154,6 +162,8 @@ PASS(ARCSequenceOpts, "arc-sequence-opts",
      "ARC Sequence Optimization")
 PASS(ARCLoopOpts, "arc-loop-opts",
      "ARC Loop Optimization")
+PASS(EarlyRedundantLoadElimination, "early-redundant-load-elim",
+     "Early Redundant Load Elimination")
 PASS(RedundantLoadElimination, "redundant-load-elim",
      "Redundant Load Elimination")
 PASS(DeadStoreElimination, "dead-store-elim",
@@ -216,18 +226,25 @@ PASS(NoReturnFolding, "noreturn-folding",
      "Prune Control Flow at No-Return Calls Using SIL unreachable")
 PASS(ObjectOutliner, "object-outliner",
      "Outlining of Global Objects")
+PASS(OpaqueArchetypeSpecializer, "opaque-archetype-specializer",
+     "Opaque archetype specializer")
 PASS(Outliner, "outliner",
      "Function Outlining Optimization")
 PASS(OwnershipModelEliminator, "ownership-model-eliminator",
      "Eliminate Ownership Annotation of SIL")
+PASS(NonTransparentFunctionOwnershipModelEliminator,
+     "non-transparent-func-ownership-model-eliminator",
+     "Eliminate Ownership Annotations from non-transparent SIL Functions")
 PASS(RCIdentityDumper, "rc-id-dumper",
      "Print Reference Count Identities")
 PASS(PerfInliner, "inline",
      "Performance Function Inlining")
 PASS(PerformanceConstantPropagation, "performance-constant-propagation",
      "Constant Propagation for Performance without Diagnostics")
-PASS(PredictableMemoryOptimizations, "predictable-memopt",
-     "Predictable Memory Optimization for Diagnostics")
+PASS(PredictableMemoryAccessOptimizations, "predictable-memaccess-opts",
+     "Predictable Memory Access Optimizations for Diagnostics")
+PASS(PredictableDeadAllocationElimination, "predictable-deadalloc-elim",
+     "Eliminate dead temporary allocations after diagnostics")
 PASS(ReleaseDevirtualizer, "release-devirtualizer",
      "SIL release Devirtualization")
 PASS(RetainSinking, "retain-sinking",
@@ -250,6 +267,8 @@ PASS(SideEffectsDumper, "side-effects-dump",
      "Print Side-Effect Information for all Functions")
 PASS(IRGenPrepare, "irgen-prepare",
      "Cleanup SIL in preparation for IRGen")
+PASS(SILGenCleanup, "silgen-cleanup",
+     "Cleanup SIL in preparation for diagnostics")
 PASS(SILCombine, "sil-combine",
      "Combine SIL Instructions via Peephole Optimization")
 PASS(SILDebugInfoGenerator, "sil-debuginfo-gen",
@@ -278,8 +297,8 @@ PASS(UnsafeGuaranteedPeephole, "unsafe-guaranteed-peephole",
      "SIL retain/release Peephole Removal for Builtin.unsafeGuaranteed")
 PASS(UsePrespecialized, "use-prespecialized",
      "Use Pre-Specialized Functions")
-PASS(ValueOwnershipKindDumper, "value-ownership-kind-dumper",
-     "Print Value Ownership Kind for Testing")
+PASS(OwnershipDumper, "ownership-dumper",
+     "Print Ownership information for Testing")
 PASS(SemanticARCOpts, "semantic-arc-opts",
      "Semantic ARC Optimization")
 PASS(MarkUninitializedFixup, "mark-uninitialized-fixup",
@@ -288,6 +307,9 @@ PASS(SimplifyUnreachableContainingBlocks, "simplify-unreachable-containing-block
      "Utility pass. Removes all non-term insts from blocks with unreachable terms")
 PASS(SerializeSILPass, "serialize-sil",
      "Utility pass. Serializes the current SILModule")
+PASS(YieldOnceCheck, "yield-once-check",
+    "Check correct usage of yields in yield-once coroutines")
+PASS(OSLogOptimization, "os-log-optimization", "Optimize os log calls")
 PASS(BugReducerTester, "bug-reducer-tester",
      "sil-bug-reducer Tool Testing by Asserting on a Sentinel Function")
 PASS_RANGE(AllPasses, AADumper, BugReducerTester)

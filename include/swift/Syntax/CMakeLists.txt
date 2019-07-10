@@ -15,3 +15,5 @@ set(generated_include_sources
 
 add_gyb_target(swift-syntax-generated-headers
     "${generated_include_sources}")
+set_property(TARGET swift-syntax-generated-headers
+    PROPERTY FOLDER "Miscellaneous")

@@ -258,31 +258,14 @@ TypeRepr *CloneVisitor::visitSILBoxTypeRepr(SILBoxTypeRepr *type) {
                                 type->getArgumentRAngleLoc());
 }
 
+TypeRepr *CloneVisitor::visitOpaqueReturnTypeRepr(OpaqueReturnTypeRepr *type) {
+  return new (Ctx) OpaqueReturnTypeRepr(type->getOpaqueLoc(),
+                                        visit(type->getConstraint()));
+}
+
 TypeRepr *TypeRepr::clone(const ASTContext &ctx) const {
   CloneVisitor visitor(ctx);
   return visitor.visit(const_cast<TypeRepr *>(this));
-}
-
-void TypeRepr::visitTopLevelTypeReprs(
-       llvm::function_ref<void(IdentTypeRepr *)> visitor) {
-  TypeRepr *typeRepr = this;
-
-  // Look through attributed type representations.
-  while (auto attr = dyn_cast<AttributedTypeRepr>(typeRepr))
-    typeRepr = attr->getTypeRepr();
-
-  // Handle identifier type representations.
-  if (auto ident = dyn_cast<IdentTypeRepr>(typeRepr)) {
-    visitor(ident);
-    return;
-  }
-
-  // Recurse into protocol compositions.
-  if (auto composition = dyn_cast<CompositionTypeRepr>(typeRepr)) {
-    for (auto type: composition->getTypes())
-      type->visitTopLevelTypeReprs(visitor);
-    return;
-  }
 }
 
 void ErrorTypeRepr::printImpl(ASTPrinter &Printer,
@@ -380,7 +363,7 @@ void FunctionTypeRepr::printImpl(ASTPrinter &Printer,
   printTypeRepr(ArgsTy, Printer, Opts);
   if (throws()) {
     Printer << " ";
-    Printer.printKeyword("throws");
+    Printer.printKeyword("throws", Opts);
   }
   Printer << " -> ";
   Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
@@ -570,24 +553,28 @@ void ProtocolTypeRepr::printImpl(ASTPrinter &Printer,
   Printer << ".Protocol";
 }
 
+void OpaqueReturnTypeRepr::printImpl(ASTPrinter &Printer,
+                                     const PrintOptions &Opts) const {
+  Printer.printKeyword("some", Opts, /*Suffix=*/" ");
+  printTypeRepr(Constraint, Printer, Opts);
+}
 
 void SpecifierTypeRepr::printImpl(ASTPrinter &Printer,
                                   const PrintOptions &Opts) const {
   switch (getKind()) {
   case TypeReprKind::InOut:
-    Printer.printKeyword("inout");
+    Printer.printKeyword("inout", Opts, " ");
     break;
   case TypeReprKind::Shared:
-    Printer.printKeyword("__shared");
+    Printer.printKeyword("__shared", Opts, " ");
     break;
   case TypeReprKind::Owned:
-    Printer.printKeyword("__owned");
+    Printer.printKeyword("__owned", Opts, " ");
     break;
   default:
     llvm_unreachable("unknown specifier type repr");
     break;
   }
-  Printer << " ";
   printTypeRepr(Base, Printer, Opts);
 }
 
@@ -599,7 +586,7 @@ void FixedTypeRepr::printImpl(ASTPrinter &Printer,
 void SILBoxTypeRepr::printImpl(ASTPrinter &Printer,
                                const PrintOptions &Opts) const {
   // TODO
-  Printer.printKeyword("sil_box");
+  Printer.printKeyword("sil_box", Opts);
 }
 
 // See swift/Basic/Statistic.h for declaration: this enables tracing

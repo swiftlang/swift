@@ -70,6 +70,7 @@ bool file_types::isTextual(ID Id) {
   case file_types::TY_SIL:
   case file_types::TY_Dependencies:
   case file_types::TY_Assembly:
+  case file_types::TY_ASTDump:
   case file_types::TY_RawSIL:
   case file_types::TY_LLVM_IR:
   case file_types::TY_ObjCHeader:
@@ -78,7 +79,7 @@ bool file_types::isTextual(ID Id) {
   case file_types::TY_TBD:
   case file_types::TY_ModuleTrace:
   case file_types::TY_OptRecord:
-  case file_types::TY_SwiftModuleInterfaceFile:
+  case file_types::TY_SwiftParseableInterfaceFile:
     return true;
   case file_types::TY_Image:
   case file_types::TY_Object:
@@ -117,6 +118,7 @@ bool file_types::isAfterLLVM(ID Id) {
   case file_types::TY_TBD:
   case file_types::TY_SIL:
   case file_types::TY_Dependencies:
+  case file_types::TY_ASTDump:
   case file_types::TY_RawSIL:
   case file_types::TY_ObjCHeader:
   case file_types::TY_AutolinkFile:
@@ -134,7 +136,7 @@ bool file_types::isAfterLLVM(ID Id) {
   case file_types::TY_IndexData:
   case file_types::TY_ModuleTrace:
   case file_types::TY_OptRecord:
-  case file_types::TY_SwiftModuleInterfaceFile:
+  case file_types::TY_SwiftParseableInterfaceFile:
     return false;
   case file_types::TY_INVALID:
     llvm_unreachable("Invalid type ID.");
@@ -166,11 +168,12 @@ bool file_types::isPartOfSwiftCompilation(ID Id) {
   case file_types::TY_dSYM:
   case file_types::TY_SwiftModuleFile:
   case file_types::TY_SwiftModuleDocFile:
-  case file_types::TY_SwiftModuleInterfaceFile:
+  case file_types::TY_SwiftParseableInterfaceFile:
   case file_types::TY_SerializedDiagnostics:
   case file_types::TY_ClangModuleFile:
   case file_types::TY_SwiftDeps:
   case file_types::TY_Nothing:
+  case file_types::TY_ASTDump:
   case file_types::TY_Remapping:
   case file_types::TY_IndexData:
   case file_types::TY_ModuleTrace:

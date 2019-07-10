@@ -19,6 +19,7 @@ class KIND(object):
 UID_KEYS = [
     KEY('VersionMajor', 'key.version_major'),
     KEY('VersionMinor', 'key.version_minor'),
+    KEY('VersionPatch', 'key.version_patch'),
     KEY('Results', 'key.results'),
     KEY('Request', 'key.request'),
     KEY('Notification', 'key.notification'),
@@ -38,6 +39,7 @@ UID_KEYS = [
     KEY('Column', 'key.column'),
     KEY('ReceiverUSR', 'key.receiver_usr'),
     KEY('IsDynamic', 'key.is_dynamic'),
+    KEY('IsImplicit', 'key.is_implicit'),
     KEY('FilePath', 'key.filepath'),
     KEY('ModuleInterfaceName', 'key.module_interface_name'),
     KEY('Hash', 'key.hash'),
@@ -50,7 +52,7 @@ UID_KEYS = [
     KEY('SourceText', 'key.sourcetext'),
     KEY('EnableSyntaxMap', 'key.enablesyntaxmap'),
     KEY('SyntaxTreeTransferMode', 'key.syntaxtreetransfermode'),
-    KEY('SyntaxTreeSerializationFormat', 
+    KEY('SyntaxTreeSerializationFormat',
         'key.syntax_tree_serialization_format'),
     KEY('EnableStructure', 'key.enablesubstructure'),
     KEY('Description', 'key.description'),
@@ -59,6 +61,8 @@ UID_KEYS = [
     KEY('SelectorName', 'key.selector_name'),
     KEY('AnnotatedDecl', 'key.annotated_decl'),
     KEY('FullyAnnotatedDecl', 'key.fully_annotated_decl'),
+    KEY('FullyAnnotatedGenericSignature',
+        'key.fully_annotated_generic_signature'),
     KEY('DocBrief', 'key.doc.brief'),
     KEY('Context', 'key.context'),
     KEY('ModuleImportDepth', 'key.moduleimportdepth'),
@@ -157,11 +161,22 @@ UID_KEYS = [
     KEY('ActionUnavailableReason', 'key.actionunavailablereason'),
     KEY('CompileID', 'key.compileid'),
     KEY('CompilerArgsString', 'key.compilerargs-string'),
+    KEY('ImplicitMembers', 'key.implicitmembers'),
+    KEY('ExpectedTypes', 'key.expectedtypes'),
+    KEY('Members', 'key.members'),
+    KEY('TypeBuffer', 'key.printedtypebuffer'),
+    KEY('ExpressionTypeList', 'key.expression_type_list'),
+    KEY('ExpressionOffset', 'key.expression_offset'),
+    KEY('ExpressionLength', 'key.expression_length'),
+    KEY('ExpressionType', 'key.expression_type'),
+    KEY('CanonicalizeType', 'key.canonicalize_type'),
+    KEY('InternalDiagnostic', "key.internal_diagnostic"),
 ]
 
 
 UID_REQUESTS = [
     REQUEST('ProtocolVersion', 'source.request.protocol_version'),
+    REQUEST('CompilerVersion', 'source.request.compiler_version'),
     REQUEST('CrashWithExit', 'source.request.crash_exit'),
     REQUEST('Demangle', 'source.request.demangle'),
     REQUEST('MangleSimpleClass', 'source.request.mangle_simple_class'),
@@ -176,6 +191,8 @@ UID_REQUESTS = [
     REQUEST('CodeCompleteSetPopularAPI',
             'source.request.codecomplete.setpopularapi'),
     REQUEST('CodeCompleteSetCustom', 'source.request.codecomplete.setcustom'),
+    REQUEST('TypeContextInfo', 'source.request.typecontextinfo'),
+    REQUEST('ConformingMethodList', 'source.request.conformingmethods'),
     REQUEST('CursorInfo', 'source.request.cursorinfo'),
     REQUEST('RangeInfo', 'source.request.rangeinfo'),
     REQUEST('RelatedIdents', 'source.request.relatedidents'),
@@ -210,6 +227,7 @@ UID_REQUESTS = [
     REQUEST('EnableCompileNotifications',
             'source.request.enable-compile-notifications'),
     REQUEST('TestNotification', 'source.request.test_notification'),
+    REQUEST('CollectExpressionType', 'source.request.expression.type'),
 ]
 
 
@@ -306,6 +324,8 @@ UID_KINDS = [
     KIND('DeclExtensionProtocol', 'source.lang.swift.decl.extension.protocol'),
     KIND('DeclAssociatedType', 'source.lang.swift.decl.associatedtype'),
     KIND('RefAssociatedType', 'source.lang.swift.ref.associatedtype'),
+    KIND('DeclOpaqueType', 'source.lang.swift.decl.opaquetype'),
+    KIND('RefOpaqueType', 'source.lang.swift.ref.opaquetype'),
     KIND('DeclTypeAlias', 'source.lang.swift.decl.typealias'),
     KIND('RefTypeAlias', 'source.lang.swift.ref.typealias'),
     KIND('DeclGenericTypeParam', 'source.lang.swift.decl.generic_type_param'),
@@ -413,8 +433,8 @@ UID_KINDS = [
     KIND('SyntaxTreeOff', 'source.syntaxtree.transfer.off'),
     KIND('SyntaxTreeIncremental', 'source.syntaxtree.transfer.incremental'),
     KIND('SyntaxTreeFull', 'source.syntaxtree.transfer.full'),
-    KIND('SyntaxTreeSerializationJSON', 
+    KIND('SyntaxTreeSerializationJSON',
          'source.syntaxtree.serialization.format.json'),
-    KIND('SyntaxTreeSerializationByteTree', 
+    KIND('SyntaxTreeSerializationByteTree',
          'source.syntaxtree.serialization.format.bytetree'),
 ]

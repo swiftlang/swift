@@ -855,6 +855,18 @@ namespace {
       case clang::BuiltinType::OCLClkEvent:
       case clang::BuiltinType::OCLQueue:
       case clang::BuiltinType::OCLReserveID:
+      case clang::BuiltinType::OCLIntelSubgroupAVCMcePayload:
+      case clang::BuiltinType::OCLIntelSubgroupAVCImePayload:
+      case clang::BuiltinType::OCLIntelSubgroupAVCRefPayload:
+      case clang::BuiltinType::OCLIntelSubgroupAVCSicPayload:
+      case clang::BuiltinType::OCLIntelSubgroupAVCMceResult:
+      case clang::BuiltinType::OCLIntelSubgroupAVCImeResult:
+      case clang::BuiltinType::OCLIntelSubgroupAVCRefResult:
+      case clang::BuiltinType::OCLIntelSubgroupAVCSicResult:
+      case clang::BuiltinType::OCLIntelSubgroupAVCImeResultSingleRefStreamout:
+      case clang::BuiltinType::OCLIntelSubgroupAVCImeResultDualRefStreamout:
+      case clang::BuiltinType::OCLIntelSubgroupAVCImeSingleRefStreamin:
+      case clang::BuiltinType::OCLIntelSubgroupAVCImeDualRefStreamin:
         llvm_unreachable("OpenCL type in ABI lowering");
 
       // Handle all the integer types as opaque values.
@@ -1502,6 +1514,17 @@ void CallEmission::emitToUnmappedExplosion(Explosion &out) {
     result = emitObjCRetainAutoreleasedReturnValue(IGF, result);
   }
 
+  auto origFnType = getCallee().getOrigFunctionType();
+
+  // Specially handle noreturn c function which would return a 'Never' SIL result
+  // type.
+  if (origFnType->getLanguage() == SILFunctionLanguage::C &&
+      origFnType->isNoReturnFunction()) {
+    auto clangResultTy = result->getType();
+    extractScalarResults(IGF, clangResultTy, result, out);
+    return;
+  }
+
   // Get the natural IR type in the body of the function that makes
   // the call. This may be different than the IR type returned by the
   // call itself due to ABI type coercion.
@@ -1510,11 +1533,13 @@ void CallEmission::emitToUnmappedExplosion(Explosion &out) {
 
   // For ABI reasons the result type of the call might not actually match the
   // expected result type.
+  //
+  // This can happen when calling C functions, or class method dispatch thunks
+  // for methods that have covariant ABI-compatible overrides.
   auto expectedNativeResultType = nativeSchema.getExpandedType(IGF.IGM);
   if (result->getType() != expectedNativeResultType) {
-    // This should only be needed when we call C functions.
-    assert(getCallee().getOrigFunctionType()->getLanguage() ==
-           SILFunctionLanguage::C);
+    assert(origFnType->getLanguage() == SILFunctionLanguage::C ||
+           origFnType->getRepresentation() == SILFunctionTypeRepresentation::Method);
     result =
         IGF.coerceValue(result, expectedNativeResultType, IGF.IGM.DataLayout);
   }
@@ -1738,9 +1763,11 @@ void CallEmission::emitYieldsToExplosion(Explosion &out) {
     }
 
     // Otherwise, it's direct.  Remap.
-    auto temp = schema.getDirectSchema().mapFromNative(IGF.IGM, IGF,
-                                                       rawYieldComponents,
-                                                       schema.getSILType());
+    const auto &directSchema = schema.getDirectSchema();
+    Explosion eltValues;
+    rawYieldComponents.transferInto(eltValues, directSchema.size());
+    auto temp = directSchema.mapFromNative(IGF.IGM, IGF, eltValues,
+                                           schema.getSILType());
 
     auto &yieldTI = cast<LoadableTypeInfo>(schema.getTypeInfo());
     emitCastToSubstSchema(IGF, temp, yieldTI.getSchema(), out);
@@ -1766,9 +1793,23 @@ void CallEmission::emitToExplosion(Explosion &out, bool isOutlined) {
   auto &substResultTI =
     cast<LoadableTypeInfo>(IGF.getTypeInfo(substResultType));
 
+  auto origFnType = getCallee().getOrigFunctionType();
+  auto isNoReturnCFunction =
+      origFnType->getLanguage() == SILFunctionLanguage::C &&
+      origFnType->isNoReturnFunction();
+
   // If the call is naturally to memory, emit it that way and then
   // explode that temporary.
   if (LastArgWritten == 1) {
+    if (isNoReturnCFunction) {
+      auto fnType = getCallee().getFunctionPointer().getFunctionType();
+      assert(fnType->getNumParams() > 0);
+      auto resultTy = fnType->getParamType(0)->getPointerElementType();
+      auto temp = IGF.createAlloca(resultTy, Alignment(0), "indirect.result");
+      emitToMemory(temp, substResultTI, isOutlined);
+      return;
+    }
+
     StackAddress ctemp = substResultTI.allocateStack(IGF, substResultType,
                                                      "call.aggresult");
     Address temp = ctemp.getAddress();
@@ -1784,6 +1825,13 @@ void CallEmission::emitToExplosion(Explosion &out, bool isOutlined) {
   // Okay, we're naturally emitting to an explosion.
   Explosion temp;
   emitToUnmappedExplosion(temp);
+
+  // Specially handle noreturn c function which would return a 'Never' SIL result
+  // type: there is no need to cast the result.
+  if (isNoReturnCFunction) {
+    temp.transferInto(out, temp.size());
+    return;
+  }
 
   // We might need to bitcast the results.
   emitCastToSubstSchema(IGF, temp, substResultTI.getSchema(), out);
@@ -3105,7 +3153,6 @@ Explosion NativeConventionSchema::mapFromNative(IRGenModule &IGM,
   // Store the expanded type elements.
   auto coercionAddr = Builder.CreateElementBitCast(temporary, coercionTy);
   unsigned expandedMapIdx = 0;
-  SmallVector<llvm::Value *, 8> expandedElts(expandedTys.size(), nullptr);
 
   auto eltsArray = native.claimAll();
   SmallVector<llvm::Value *, 8> nativeElts(eltsArray.begin(), eltsArray.end());

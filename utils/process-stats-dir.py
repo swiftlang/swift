@@ -33,7 +33,7 @@ from jobstats import (list_stats_dir_profiles,
                       load_stats_dir, merge_all_jobstats)
 
 
-MODULE_PAT = re.compile('^(\w+)\.')
+MODULE_PAT = re.compile(r'^(\w+)\.')
 
 
 def module_name_of_stat(name):
@@ -439,7 +439,7 @@ def evaluate(args):
     vargs = vars_of_args(args)
     merged = merge_all_jobstats(load_stats_dir(d, **vargs), **vargs)
     env = {}
-    ident = re.compile('(\w+)$')
+    ident = re.compile(r'(\w+)$')
     for (k, v) in merged.stats.items():
         if k.startswith("time.") or '.time.' in k:
             continue
@@ -472,7 +472,7 @@ def evaluate_delta(args):
     new_stats = merge_all_jobstats(load_stats_dir(new, **vargs), **vargs)
 
     env = {}
-    ident = re.compile('(\w+)$')
+    ident = re.compile(r'(\w+)$')
     for r in compare_stats(args, old_stats.stats, new_stats.stats):
         if r.name.startswith("time.") or '.time.' in r.name:
             continue

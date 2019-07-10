@@ -56,6 +56,38 @@ struct X4 {
   }
 }
 
+struct X5 {
+  static var stored : Int = 1
+  
+  static subscript (i : Int) -> Int {
+    get {
+      return stored + i
+    }
+    set {
+      stored = newValue - i
+    }
+  }
+}
+
+class X6 {
+  static var stored : Int = 1
+  
+  class subscript (i : Int) -> Int {
+    get {
+      return stored + i
+    }
+    set {
+      stored = newValue - i
+    }
+  }
+}
+
+protocol XP1 {
+  subscript (i : Int) -> Int { get set }
+  static subscript (i : Int) -> Int { get set }
+}
+
+
 // Semantic errors
 struct Y1 {
   var x : X
@@ -80,6 +112,24 @@ struct Y2 {
 class Y3 {
   subscript(idx: Int) -> TypoType { // expected-error {{use of undeclared type 'TypoType'}}
     get { repeat {} while true }
+    set {}
+  }
+}
+
+class Y4 {
+  var x = X()
+  
+  static subscript(idx: Int) -> X {
+    get { return x } // expected-error {{instance member 'x' cannot be used on type 'Y4'}}
+    set {}
+  }
+}
+
+class Y5 {
+  static var x = X()
+  
+  subscript(idx: Int) -> X {
+    get { return x } // expected-error {{static member 'x' cannot be used on instance of type 'Y5'}}
     set {}
   }
 }
@@ -199,6 +249,27 @@ func test_subscript(_ x2: inout X2, i: Int, j: Int, value: inout Int, no: NoSubs
 
   value = ret[i]
   ret[i] = value
+  
+  X5[i] = value
+  value = X5[i]
+}
+
+func test_proto_static<XP1Type: XP1>(
+                                     i: Int, value: inout Int,
+                                     existential: inout XP1,
+                                     generic: inout XP1Type
+                                     ) {
+  existential[i] = value
+  value = existential[i]
+  
+  type(of: existential)[i] = value
+  value = type(of: existential)[i]
+
+  generic[i] = value
+  value = generic[i]
+  
+  XP1Type[i] = value
+  value = XP1Type[i]
 }
 
 func subscript_rvalue_materialize(_ i: inout Int) {
@@ -255,7 +326,7 @@ class ClassConformingToProtocol: Protocol {}
 class ClassConformingToRefinedProtocol: RefinedProtocol {}
 
 struct GenSubscriptFixitTest {
-  subscript<T>(_ arg: T) -> Bool { return true } // expected-note {{declared here}}
+  subscript<T>(_ arg: T) -> Bool { return true } // expected-note 3 {{declared here}}
 }
 
 func testGenSubscriptFixit(_ s0: GenSubscriptFixitTest) {
@@ -264,9 +335,20 @@ func testGenSubscriptFixit(_ s0: GenSubscriptFixitTest) {
   // expected-error@-1 {{value of type 'GenSubscriptFixitTest' has no property or method named 'subscript'; did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{27-28=]}}
 }
 
+func testUnresolvedMemberSubscriptFixit(_ s0: GenSubscriptFixitTest) {
+
+  _ = s0.subscript
+  // expected-error@-1 {{value of type 'GenSubscriptFixitTest' has no property or method named 'subscript'; did you mean to use the subscript operator?}} {{9-19=[<#index#>]}}
+
+  s0.subscript = true
+  // expected-error@-1 {{value of type 'GenSubscriptFixitTest' has no property or method named 'subscript'; did you mean to use the subscript operator?}} {{5-15=[<#index#>]}}
+}
+
 struct SubscriptTest1 {
-  subscript(keyword:String) -> Bool { return true }  // expected-note 2 {{found this candidate}}
-  subscript(keyword:String) -> String? {return nil }  // expected-note 2 {{found this candidate}}
+  subscript(keyword:String) -> Bool { return true }
+  // expected-note@-1 4 {{found this candidate}}
+  subscript(keyword:String) -> String? {return nil }
+  // expected-note@-1 4 {{found this candidate}}
 
   subscript(arg: SubClass) -> Bool { return true } // expected-note {{declared here}}
   subscript(arg: Protocol) -> Bool { return true } // expected-note 2 {{declared here}}
@@ -285,7 +367,7 @@ func testSubscript1(_ s1 : SubscriptTest1) {
   _ = s1.subscript((true, (5, baz: SubSubClass())), "hello")
   // expected-error@-1 {{value of type 'SubscriptTest1' has no property or method named 'subscript'; did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{60-61=]}}
   _ = s1.subscript((fo: true, (5, baz: SubClass())), "hello")
-  // expected-error@-1 {{value of type 'SubscriptTest1' has no property or method named 'subscript'; did you mean to use the subscript operator?}}
+  // expected-error@-1 {{cannot convert value of type '(fo: Bool, (Int, baz: SubClass))' to expected argument type '(foo: Bool, bar: (Int, baz: SubClass))'}}
   _ = s1.subscript(SubSubClass())
   // expected-error@-1 {{value of type 'SubscriptTest1' has no property or method named 'subscript'; did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{33-34=]}}
   _ = s1.subscript(ClassConformingToProtocol())
@@ -293,13 +375,15 @@ func testSubscript1(_ s1 : SubscriptTest1) {
   _ = s1.subscript(ClassConformingToRefinedProtocol())
   // expected-error@-1 {{value of type 'SubscriptTest1' has no property or method named 'subscript'; did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{54-55=]}}
   _ = s1.subscript(true)
-  // expected-error@-1 {{value of type 'SubscriptTest1' has no property or method named 'subscript'; did you mean to use the subscript operator?}}
+  // expected-error@-1 {{cannot invoke 'subscript' with an argument list of type '(Bool)'}}
+  // expected-note@-2 {{overloads for 'subscript' exist with these partially matching parameter lists: (Protocol), (String), (SubClass)}}
   _ = s1.subscript(SuperClass())
-  // expected-error@-1 {{value of type 'SubscriptTest1' has no property or method named 'subscript'; did you mean to use the subscript operator?}}
+  // expected-error@-1 {{cannot invoke 'subscript' with an argument list of type '(SuperClass)'}}
+  // expected-note@-2 {{overloads for 'subscript' exist with these partially matching parameter lists: (Protocol), (String), (SubClass)}}
   _ = s1.subscript("hello")
-  // expected-error@-1 {{value of type 'SubscriptTest1' has no property or method named 'subscript'; did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{27-28=]}}
+  // expected-error@-1 {{value of type 'SubscriptTest1' has no property or method named 'subscript'; did you mean to use the subscript operator?}}
   _ = s1.subscript("hello"
-  // expected-error@-1 {{value of type 'SubscriptTest1' has no property or method named 'subscript'; did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{27-27=]}}
+  // expected-error@-1 {{value of type 'SubscriptTest1' has no property or method named 'subscript'; did you mean to use the subscript operator?}}
   // expected-note@-2 {{to match this opening '('}}
 
   let _ = s1["hello"]
@@ -314,10 +398,10 @@ struct SubscriptTest2 {
 }
 
 func testSubscript1(_ s2 : SubscriptTest2) {
-  _ = s2["foo"] // expected-error {{cannot subscript a value of type 'SubscriptTest2' with an index of type 'String'}}
+  _ = s2["foo"] // expected-error {{cannot subscript a value of type 'SubscriptTest2' with an argument of type 'String'}}
   // expected-note @-1 {{overloads for 'subscript' exist with these partially matching parameter lists: (String, Int), (String, String)}}
 
-  let a = s2["foo", 1.0] // expected-error {{cannot subscript a value of type 'SubscriptTest2' with an index of type '(String, Double)'}}
+  let a = s2["foo", 1.0] // expected-error {{cannot subscript a value of type 'SubscriptTest2' with an argument of type '(String, Double)'}}
   // expected-note @-1 {{overloads for 'subscript' exist with these partially matching parameter lists: (String, Int), (String, String)}}
 
   _ = s2.subscript("hello", 6)
@@ -337,7 +421,7 @@ class Foo {
     }
     
     subscript(key: String) -> String { // expected-error {{invalid redeclaration of 'subscript(_:)'}}
-        get { a } // expected-error {{use of unresolved identifier 'a'}}
+        get { _ = 0; a } // expected-error {{use of unresolved identifier 'a'}}
         set { b } // expected-error {{use of unresolved identifier 'b'}}
     }
 }
@@ -346,18 +430,9 @@ class Foo {
 protocol r23952125 {
   associatedtype ItemType
   var count: Int { get }
-  subscript(index: Int) -> ItemType  // expected-error {{subscript in protocol must have explicit { get } or { get set } specifier}} {{36-36= { get set \}}}
-  
-  var c : Int // expected-error {{property in protocol must have explicit { get } or { get set } specifier}}
-}
+  subscript(index: Int) -> ItemType  // expected-error {{subscript in protocol must have explicit { get } or { get set } specifier}} {{36-36= { get <#set#> \}}}
 
-// <rdar://problem/16812341> QoI: Poor error message when providing a default value for a subscript parameter
-struct S4 {
-  subscript(subs: Int = 0) -> Int {  // expected-error {{default arguments are not allowed in subscripts}}
-    get {
-      return 1
-    }
-  }
+  var c : Int // expected-error {{property in protocol must have explicit { get } or { get set } specifier}} {{14-14= { get <#set#> \}}}
 }
 
 // SR-2575

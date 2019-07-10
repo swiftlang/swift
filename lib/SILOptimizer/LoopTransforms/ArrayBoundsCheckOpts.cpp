@@ -1288,6 +1288,9 @@ public:
 
     SILFunction *F = getFunction();
     assert(F);
+    // FIXME: Update for ownership.
+    if (F->hasOwnership())
+      return;
     SILLoopInfo *LI = LA->get(F);
     assert(LI);
     DominanceInfo *DT = DA->get(F);

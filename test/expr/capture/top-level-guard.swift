@@ -1,7 +1,7 @@
-// RUN: %target-swift-frontend -dump-ast %s 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -dump-ast %s | %FileCheck %s
 // RUN: %target-swift-frontend -emit-ir %s > /dev/null
 
-// RUN: %target-swift-frontend -dump-ast -DVAR %s 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -dump-ast -DVAR %s | %FileCheck %s
 // RUN: %target-swift-frontend -emit-ir -DVAR %s > /dev/null
 
 // CHECK: (top_level_code_decl

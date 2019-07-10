@@ -98,7 +98,7 @@ public:
     return LocalTypeDataKind(uintptr_t(protocol) | Kind_Decl);
   }
 
-  /// A reference to a protocol witness table for an archetype.
+  /// A reference to a protocol witness table for a concrete type.
   static LocalTypeDataKind
   forConcreteProtocolWitnessTable(ProtocolConformance *conformance) {
     assert(conformance && "conformance reference may not be null");
@@ -190,7 +190,8 @@ public:
 }
 }
 
-template <> struct llvm::DenseMapInfo<swift::irgen::LocalTypeDataKey> {
+namespace llvm {
+template <> struct DenseMapInfo<swift::irgen::LocalTypeDataKey> {
   using LocalTypeDataKey = swift::irgen::LocalTypeDataKey;
   using CanTypeInfo = DenseMapInfo<swift::CanType>;
   static inline LocalTypeDataKey getEmptyKey() {
@@ -209,5 +210,6 @@ template <> struct llvm::DenseMapInfo<swift::irgen::LocalTypeDataKey> {
     return a == b;
   }
 };
+}
 
 #endif

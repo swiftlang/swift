@@ -55,17 +55,9 @@ public func subclassgeneric_generic<T: P2>(_: T.Type) {
 // CHECK-NEXT:    [[CONDITIONAL_REQUIREMENTS:%.*]] = getelementptr inbounds [1 x i8**], [1 x i8**]* %conditional.requirement.buffer, i32 0, i32 0
 // CHECK-NEXT:    [[T_P2_PTR:%.*]] = getelementptr inbounds i8**, i8*** [[CONDITIONAL_REQUIREMENTS]], i32 0
 // CHECK-NEXT:    store i8** %T.P2, i8*** [[T_P2_PTR]], align 8
-// CHECK-NEXT:    [[Base_P1:%.*]] = call i8** @"$s32conditional_conformance_subclass4BaseCyxGAA2P1A2A2P2RzlWa"(%swift.type* [[SubclassGeneric_TYPE]], i8*** [[CONDITIONAL_REQUIREMENTS]])
+// CHECK-NEXT:    [[Base_P1:%.*]] = call i8** @swift_getWitnessTable
 // CHECK-NEXT:    call swiftcc void @"$s32conditional_conformance_subclass8takes_p1yyxmAA2P1RzlF"(%swift.type* [[SubclassGeneric_TYPE]], %swift.type* [[SubclassGeneric_TYPE]], i8** [[Base_P1]])
 // CHECK-NEXT:    ret void
-// CHECK-NEXT:  }
-
-// witness table accessor for Base : P1
-
-// CHECK-LABEL: define{{( dllexport| protected)?}} i8** @"$s32conditional_conformance_subclass4BaseCyxGAA2P1A2A2P2RzlWa"(%swift.type*, i8***)
-// CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[TABLE:%.*]] = call i8** @swift_getGenericWitnessTable(%swift.generic_witness_table_cache* @"$s32conditional_conformance_subclass4BaseCyxGAA2P1A2A2P2RzlWG", %swift.type* %0, i8*** %1)
-// CHECK-NEXT:    ret i8** [[TABLE]]
 // CHECK-NEXT:  }
 
 public func subclassgeneric_concrete() {
@@ -91,12 +83,14 @@ public func subclassgeneric_concrete() {
 // CHECK-NEXT:    br i1 [[IS_NULL]], label %cacheIsNull, label %cont
 
 // CHECK:       cacheIsNull:
-// CHECK-NEXT:    [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s32conditional_conformance_subclass15SubclassGenericCyAA4IsP2VGMa"(i64 0)
+// CHECK-NEXT:    [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s32conditional_conformance_subclass15SubclassGenericCyAA4IsP2VGMa"(i64 255)
 // CHECK-NEXT:    [[SubclassGeneric_TYPE:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
+// CHECK-NEXT:    extractvalue %swift.metadata_response [[T0]], 1
+
 // CHECK-NEXT:    [[CONDITIONAL_REQUIREMENTS:%.*]] = getelementptr inbounds [1 x i8**], [1 x i8**]* %conditional.requirement.buffer, i32 0, i32 0
 // CHECK-NEXT:    [[A_P2_PTR:%.*]] = getelementptr inbounds i8**, i8*** [[CONDITIONAL_REQUIREMENTS]], i32 0
 // CHECK-NEXT:    store i8** getelementptr inbounds ([1 x i8*], [1 x i8*]* @"$s32conditional_conformance_subclass4IsP2VAA0E0AAWP", i32 0, i32 0), i8*** [[A_P2_PTR]], align 8
-// CHECK-NEXT:    [[Base_P1:%.*]] = call i8** @"$s32conditional_conformance_subclass4BaseCyxGAA2P1A2A2P2RzlWa"(%swift.type* [[SubclassGeneric_TYPE]], i8*** [[CONDITIONAL_REQUIREMENTS]])
+// CHECK-NEXT:    [[Base_P1:%.*]] = call i8** @swift_getWitnessTable
 // CHECK-NEXT:    store atomic i8** [[Base_P1]], i8*** @"$s32conditional_conformance_subclass15SubclassGenericCyAA4IsP2VGAA4BaseCyxGAA2P1A2A0G0RzlWL" release, align 8
 // CHECK-NEXT:    br label %cont
 
@@ -126,12 +120,14 @@ public func subclassconcrete() {
 // CHECK-NEXT:    br i1 [[IS_NULL]], label %cacheIsNull, label %cont
 
 // CHECK:       cacheIsNull:
-// CHECK-NEXT:    [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s32conditional_conformance_subclass16SubclassConcreteCMa"(i64 0)
+// CHECK-NEXT:    [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s32conditional_conformance_subclass16SubclassConcreteCMa"(i64 255)
 // CHECK-NEXT:    [[SubclassConcrete_TYPE:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
+// CHECK-NEXT:    extractvalue %swift.metadata_response [[T0]], 1
+
 // CHECK-NEXT:    [[CONDITIONAL_REQUIREMENTS:%.*]] = getelementptr inbounds [1 x i8**], [1 x i8**]* %conditional.requirement.buffer, i32 0, i32 0
 // CHECK-NEXT:    [[A_P2_PTR:%.*]] = getelementptr inbounds i8**, i8*** [[CONDITIONAL_REQUIREMENTS]], i32 0
 // CHECK-NEXT:    store i8** getelementptr inbounds ([1 x i8*], [1 x i8*]* @"$s32conditional_conformance_subclass4IsP2VAA0E0AAWP", i32 0, i32 0), i8*** [[A_P2_PTR]], align 8
-// CHECK-NEXT:    [[Base_P1:%.*]] = call i8** @"$s32conditional_conformance_subclass4BaseCyxGAA2P1A2A2P2RzlWa"(%swift.type* [[SubclassGeneric_TYPE]], i8*** [[CONDITIONAL_REQUIREMENTS]])
+// CHECK-NEXT:    [[Base_P1:%.*]] = call i8** @swift_getWitnessTable
 // CHECK-NEXT:    store atomic i8** [[Base_P1]], i8*** @"$s32conditional_conformance_subclass16SubclassConcreteCAA4BaseCyxGAA2P1A2A2P2RzlWL" release, align 8
 // CHECK-NEXT:    br label %cont
 
@@ -161,12 +157,13 @@ public func subclassgenericconcrete() {
 // CHECK-NEXT:    br i1 [[IS_NULL]], label %cacheIsNull, label %cont
 
 // CHECK:       cacheIsNull:
-// CHECK-NEXT:    [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s32conditional_conformance_subclass23SubclassGenericConcreteCMa"(i64 0)
+// CHECK-NEXT:    [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s32conditional_conformance_subclass23SubclassGenericConcreteCMa"(i64 255)
 // CHECK-NEXT:    [[SubclassGenericConcrete_TYPE:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
+// CHECK-NEXT:    extractvalue %swift.metadata_response [[T0]], 1
 // CHECK-NEXT:    [[CONDITIONAL_REQUIREMENTS:%.*]] = getelementptr inbounds [1 x i8**], [1 x i8**]* %conditional.requirement.buffer, i32 0, i32 0
 // CHECK-NEXT:    [[A_P2_PTR:%.*]] = getelementptr inbounds i8**, i8*** [[CONDITIONAL_REQUIREMENTS]], i32 0
 // CHECK-NEXT:    store i8** getelementptr inbounds ([1 x i8*], [1 x i8*]* @"$s32conditional_conformance_subclass4IsP2VAA0E0AAWP", i32 0, i32 0), i8*** [[A_P2_PTR]], align 8
-// CHECK-NEXT:    [[Base_P1:%.*]] = call i8** @"$s32conditional_conformance_subclass4BaseCyxGAA2P1A2A2P2RzlWa"(%swift.type* [[SubclassGeneric_TYPE]], i8*** [[CONDITIONAL_REQUIREMENTS]])
+// CHECK-NEXT:    [[Base_P1:%.*]] = call i8** @swift_getWitnessTable
 // CHECK-NEXT:    store atomic i8** [[Base_P1]], i8*** @"$s32conditional_conformance_subclass23SubclassGenericConcreteCAA4BaseCyxGAA2P1A2A2P2RzlWL" release, align 8
 // CHECK-NEXT:    br label %cont
 
@@ -174,21 +171,3 @@ public func subclassgenericconcrete() {
 // CHECK-NEXT:    [[T0:%.*]] = phi i8** [ [[CACHE]], %entry ], [ [[Base_P1]], %cacheIsNull ]
 // CHECK-NEXT:    ret i8** [[T0]]
 // CHECK-NEXT:  }
-
-
-// witness tabel instantiation function for Base : P1
-
-// CHECK-LABEL: define internal void @"$s32conditional_conformance_subclass4BaseCyxGAA2P1A2A2P2RzlWI"(i8**, %swift.type* %"Base<A>", i8**)
-// CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[TABLES:%.*]] = bitcast i8** %1 to i8***
-
-// CHECK-NEXT:    [[A_P2_SRC:%.*]] = getelementptr inbounds i8**, i8*** [[TABLES]], i32 0
-// CHECK-NEXT:    [[A_P2_DEST:%.*]] = getelementptr inbounds i8*, i8** %0, i32 -1
-// CHECK-NEXT:    [[A_P2:%.*]] = load i8**, i8*** [[A_P2_SRC]], align 8
-// CHECK-NEXT:    [[CAST_A_P2_DEST:%.*]] = bitcast i8** [[A_P2_DEST]] to i8***
-// CHECK-NEXT:    store i8** [[A_P2]], i8*** [[CAST_A_P2_DEST]], align 8
-
-// CHECK-NEXT:    ret void
-// CHECK-NEXT:  }
-
-

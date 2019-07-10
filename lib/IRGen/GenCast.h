@@ -51,7 +51,7 @@ namespace irgen {
                              SILType valueType, SILType loweredTargetType,
                              CheckedCastMode mode, Explosion &out);
 
-  /// \brief Convert a class object to the given destination type,
+  /// Convert a class object to the given destination type,
   /// using a runtime-checked cast.
   ///
   /// FIXME: toType should be an AST CanType.
@@ -68,7 +68,7 @@ namespace irgen {
     llvm::Value *casted;
   };
 
-  /// \brief Convert the given value to the exact destination type.
+  /// Convert the given value to the exact destination type.
   FailableCastResult emitClassIdenticalCast(IRGenFunction &IGF,
                                                   llvm::Value *from,
                                                   SILType fromType,

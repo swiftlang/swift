@@ -28,6 +28,11 @@ flags:
 OS X benchmark driver binaries are placed in `bin` alongside `swiftc`.
 Additional platform binaries are placed in the `benchmark/bin` build directory.
 
+The required Swift standard library dylibs are placed in `lib`. The
+drivers dynamically link Swift standard library dylibs from a path
+relative to their run-time location (../lib/swift) so the standard
+library should be distributed alongside them.
+
 Building Independently
 ----------------------
 
@@ -43,15 +48,19 @@ The following build options are available:
 * `-DSWIFT_LIBRARY_PATH`
     * An absolute path to the Swift standard library to use during compilation
       (default: `swiftc_directory`/../lib/swift)
+* `-DSWIFT_DARWIN_XCRUN_TOOLCHAIN`
+    * The Xcode toolchain to use when invoking `xcrun` to find `clang`.
+      (default: XcodeDefault)
 * `-DONLY_PLATFORMS`
     * A list of platforms to build the benchmarks for
       (default: "macosx;iphoneos;appletvos;watchos")
 * `-DSWIFT_OPTIMIZATION_LEVELS`
     * A list of Swift optimization levels to build against
       (default: "O;Onone;Osize")
-* `-DSWIFT_BENCHMARK_EMIT_SIB`
-    * A boolean value indicating whether .sib files should be generated
-      alongside .o files (default: FALSE)
+* `-DSWIFT_BENCHMARK_USE_OS_LIBRARIES`
+    * Enable this option to link the benchmark binaries against the target
+      machine's Swift standard library and runtime installed with the OS.
+    (default: OFF)
 
 The following build targets are available:
 
@@ -66,13 +75,40 @@ Build steps (with example options):
 1. `$ cd benchmark`
 2. `$ mkdir build`
 3. `$ cd build`
-4. `$ cmake ..`
-5. `$ make -j8 swift-benchmark-macosx-x86_64`
+4. `$ cmake ../benchmark -G Ninja -DSWIFT_EXEC=[path to built swiftc]`
+5. `$ ninja swift-benchmark-macosx-x86_64`
 
-Benchmark driver binaries are placed in `build/bin` and the required Swift
-standard library dylibs are placed in `build/lib`. The drivers dynamically link
-Swift standard library dylibs from a path relative to their location
-(../lib/swift) so the standard library should be distributed alongside them.
+Benchmark binaries are placed in `bin`.
+
+The binaries dynamically link Swift standard library dylibs from a
+path determined by the configuration. If `SWIFT_LIBRARY_PATH` is set,
+they link against the absolute path provided, regardless of where the
+binaries are installed. Otherwise, the runtime library path is
+relative to the benchmark binary at the time it was executed
+(`@executable_path/../lib/swift/<platform>`).
+
+For example, to benchmark against a locally built `swiftc`, including
+any standard library changes in that build, you might configure using:
+
+    cmake ../benchmark -G Ninja -DSWIFT_EXEC=<src>/swift/build/swift-macosx-x86_64/bin/swiftc
+    ninja swift-benchmark-iphoneos-arm64
+
+To build against the installed Xcode, simply omit SWIFT_EXEC:
+
+    cmake ../benchmark -G Ninja
+    ninja swift-benchmark-iphoneos-arm64
+
+In both examples above, to run the benchmarks on a device, the dynamic
+libraries must then be copied onto the device into the library path
+relative to `swiftc`. To benchmark against the target machine's
+installed libraries instead, enable
+`SWIFT_BENCHMARK_USE_OS_LIBRARIES`.
+
+    cmake ../benchmark -G Ninja -DSWIFT_BENCHMARK_USE_OS_LIBRARIES=ON
+    ninja swift-benchmark-iphoneos-arm64
+
+This will reflect the performance of the Swift standard library
+installed on the device, not the one included in the Swift root.
 
 Using the Benchmark Driver
 --------------------------
@@ -132,12 +168,17 @@ Adding New Benchmarks
 
 The harness generator supports both single and multiple file tests.
 
-To add a new single file test:
+To add a new single file test, execute the following script with the new of the benchmark:
 
+```
+swift-source$ ./swift/benchmark/scripts/create_benchmark.py YourTestNameHere
+```
+
+The script will automatically:
 1.  Add a new Swift file (`YourTestNameHere.swift`), built according to
     the template below, to the `single-source` directory.
-2.  Add the filename of the new Swift file to CMakeLists.txt
-3.  Edit `main.swift`. Import and register your new Swift module.
+2.  Add the filename of the new Swift file to `CMakeLists.txt`.
+3.  Edit `main.swift` by importing and registering your new Swift module.
 
 To add a new multiple file test:
 
@@ -154,7 +195,7 @@ To add a new multiple file test:
     instance of BenchmarkInfo (specified in the template below).
 
 2.  In `CMakeLists.txt` add the new directory name to
-    `SWIFT_MULTISOURCE_SWIFT3_BENCHES`, and set `YourTestName_sources` to the
+    `SWIFT_MULTISOURCE_SWIFT_BENCHES`, and set `YourTestName_sources` to the
     list of source file paths.
 
 3.  Edit `main.swift`. Import and register your new Swift module.

@@ -1,4 +1,4 @@
-// RUN: not %target-swift-frontend -emit-sil %s -emit-fixits-path %t.remap -enable-resilience -enable-nonfrozen-enum-exhaustivity-diagnostics -diagnostics-editor-mode
+// RUN: not %target-swift-frontend -emit-sil %s -emit-fixits-path %t.remap -enable-library-evolution -enable-nonfrozen-enum-exhaustivity-diagnostics -diagnostics-editor-mode
 // RUN: c-arcmt-test %t.remap | arcmt-test -verify-transformed-files %s.result
 
 enum Runcible {
@@ -141,7 +141,7 @@ public enum NonExhaustivePayload {
   case a(Int), b(Bool)
 }
 
-@_frozen public enum TemporalProxy {
+@frozen public enum TemporalProxy {
   case seconds(Int)
   case milliseconds(Int)
   case microseconds(Int)

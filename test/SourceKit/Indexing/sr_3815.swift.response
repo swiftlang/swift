@@ -1,11 +1,9 @@
 {
-  key.hash: <hash>,
   key.dependencies: [
     {
       key.kind: source.lang.swift.import.module.swift,
       key.name: "Swift",
       key.filepath: Swift.swiftmodule,
-      key.hash: <hash>,
       key.is_system: 1
     }
   ],
@@ -100,7 +98,8 @@
           key.kind: source.lang.swift.decl.function.constructor,
           key.usr: "s:7sr_38151SVACycfc",
           key.line: 9,
-          key.column: 8
+          key.column: 8,
+          key.is_implicit: 1
         }
       ]
     }

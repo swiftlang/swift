@@ -14,7 +14,8 @@
 from __future__ import print_function
 
 import argparse
-import os.path
+import os
+import posixpath
 import subprocess
 import sys
 
@@ -28,7 +29,7 @@ class CommandRunner(object):
 
     @staticmethod
     def _dirnames(files):
-        return sorted(set(os.path.dirname(f) for f in files))
+        return sorted(set(posixpath.dirname(f) for f in files))
 
     def popen(self, command, **kwargs):
         if self.verbose:
@@ -93,7 +94,7 @@ class CommandRunner(object):
             sys.exit(sftp_proc.returncode)
 
 class RemoteCommandRunner(CommandRunner):
-    def __init__(self, host, identity_path, ssh_options):
+    def __init__(self, host, identity_path, ssh_options, config_file):
         if ':' in host:
             (self.remote_host, self.port) = host.rsplit(':', 1)
         else:
@@ -101,9 +102,11 @@ class RemoteCommandRunner(CommandRunner):
             self.port = None
         self.identity_path = identity_path
         self.ssh_options = ssh_options
+        self.config_file = config_file
 
     def common_options(self, port_flag):
         port_option = [port_flag, self.port] if self.port else []
+        config_option = ['-F', self.config_file] if self.config_file else []
         identity_option = (
             ['-i', self.identity_path] if self.identity_path else [])
         # Interleave '-o' with each custom option.
@@ -112,7 +115,7 @@ class RemoteCommandRunner(CommandRunner):
         # https://spapas.github.io/2016/04/27/python-nested-list-comprehensions/
         extra_options = [arg for option in self.ssh_options
                              for arg in ["-o", option]]
-        return port_option + identity_option + extra_options
+        return port_option + identity_option + config_option + extra_options
 
     def remote_invocation(self, command):
         return (['/usr/bin/ssh', '-n'] +
@@ -121,7 +124,7 @@ class RemoteCommandRunner(CommandRunner):
                 [quote(arg) for arg in command])
 
     def sftp_invocation(self):
-        return (['/usr/bin/sftp', '-b', '-', '-q'] +
+        return (['/usr/bin/sftp', '-b', '-', '-q', '-r'] +
                 self.common_options(port_flag='-P') +
                 [self.remote_host])
 
@@ -136,8 +139,8 @@ class LocalCommandRunner(CommandRunner):
         return ['/usr/bin/sftp', '-b', '-', '-q', '-D', self.sftp_server_path]
 
 def find_transfers(args, source_prefix, dest_prefix):
-    if source_prefix.endswith(os.path.sep):
-        source_prefix = source_prefix[:-len(os.path.sep)]
+    if source_prefix.endswith(posixpath.sep):
+        source_prefix = source_prefix[:-len(posixpath.sep)]
     return dict((arg, dest_prefix + arg[len(source_prefix):])
                 for arg in args if arg.startswith(source_prefix))
 
@@ -171,6 +174,8 @@ def main():
 
     parser.add_argument('-i', '--identity', dest='identity', metavar='FILE',
                         help='an SSH identity file (private key) to use')
+    parser.add_argument('-F', '--config-file', dest='config_file', metavar='FILE',
+                        help='an SSH configuration file')
     parser.add_argument('-o', '--ssh-option', action='append', default=[],
                         dest='ssh_options', metavar='OPTION',
                         help='extra SSH config options (man ssh_config)')
@@ -191,7 +196,10 @@ def main():
         args.command.insert(0, args.host)
         del args.host
     else:
-        runner = RemoteCommandRunner(args.host, args.identity, args.ssh_options)
+        runner = RemoteCommandRunner(args.host,
+                                     args.identity,
+                                     args.ssh_options,
+                                     args.config_file)
     runner.dry_run = args.dry_run
     runner.verbose = args.verbose or args.dry_run
 
@@ -202,14 +210,14 @@ def main():
     remote_test_specific_dir = None
     if args.input_prefix:
         assert not args.remote_input_prefix.startswith("..")
-        remote_dir = os.path.join(args.remote_dir, args.remote_input_prefix)
+        remote_dir = posixpath.join(args.remote_dir, args.remote_input_prefix)
         input_files = find_transfers(args.command, args.input_prefix, 
                                      remote_dir)
         assert not any(upload_files.has_key(f) for f in input_files)
         upload_files.update(input_files)
     if args.output_prefix:
         assert not args.remote_output_prefix.startswith("..")
-        remote_dir = os.path.join(args.remote_dir, args.remote_output_prefix)
+        remote_dir = posixpath.join(args.remote_dir, args.remote_output_prefix)
         test_files = find_transfers(args.command, args.output_prefix, 
                                     remote_dir)
         assert not any(upload_files.has_key(f) for f in test_files)

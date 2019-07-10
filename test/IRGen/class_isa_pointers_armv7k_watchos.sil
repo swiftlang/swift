@@ -58,7 +58,7 @@ entry(%0 : @unowned $Purebred):
   unreachable
 }
 sil private @$s33class_isa_pointers_armv7k_watchos7MongrelC7bellsOnACSgSi_tcfcTo : $@convention(objc_method) (Int, Purebred) -> () {
-entry(%0 : @trivial $Int, %1 : @unowned $Purebred):
+entry(%0 : $Int, %1 : @unowned $Purebred):
   unreachable
 }
 sil private @$s33class_isa_pointers_armv7k_watchos7MongrelCACycfcTo : $@convention(objc_method) (Purebred) -> () {

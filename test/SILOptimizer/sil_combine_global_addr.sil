@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enforce-exclusivity=none -enable-sil-verify-all %s -sil-combine -verify-skip-unreachable-must-be-last -devirtualizer | %FileCheck %s
+// RUN: %target-sil-opt -enforce-exclusivity=none -enable-sil-verify-all %s -sil-combine -verify-skip-unreachable-must-be-last -devirtualizer | %FileCheck %s
 
 // Test to see if concrete type can be propagated from
 // global_addr in sil_combiner.

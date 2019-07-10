@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir -enable-resilience -enable-source-import -I %S/../Inputs | %FileCheck %s
-// RUN: %target-swift-frontend %s -emit-ir -num-threads 8 -enable-resilience -enable-source-import -I %S/../Inputs | %FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -enable-library-evolution -enable-source-import -I %S/../Inputs | %FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir -num-threads 8 -enable-library-evolution -enable-source-import -I %S/../Inputs | %FileCheck %s
 
 import resilient_struct
 import resilient_protocol
@@ -8,22 +8,7 @@ public protocol Associate {
   associatedtype X
 }
 
-// Dependent conformance
-// CHECK-LABEL: @"$s28protocol_conformance_records9DependentVyxGAA9AssociateAAMc" ={{ dllexport | protected | }}constant
-// -- protocol descriptor
-// CHECK-SAME:           @"$s28protocol_conformance_records9AssociateMp"
-// -- nominal type descriptor
-// CHECK-SAME:           @"$s28protocol_conformance_records9DependentVMn"
-// -- witness table accessor
-// CHECK-SAME:           @"$s28protocol_conformance_records9DependentVyxGAA9AssociateAAWa"
-// -- flags
-// CHECK-SAME:           i32 1
-// CHECK-SAME:         }
 public struct Dependent<T> {}
-
-extension Dependent : Associate {
-  public typealias X = (T, T)
-}
 
 public protocol Runcible {
   func runce()
@@ -37,8 +22,7 @@ public protocol Runcible {
 // -- witness table
 // CHECK-SAME:           @"$s28protocol_conformance_records15NativeValueTypeVAA8RuncibleAAWP"
 // -- flags
-// CHECK-SAME:           i32 0
-// CHECK-SAME:         },
+// CHECK-SAME:           i32 0 },
 public struct NativeValueType: Runcible {
   public func runce() {}
 }
@@ -51,8 +35,7 @@ public struct NativeValueType: Runcible {
 // -- witness table
 // CHECK-SAME:           @"$s28protocol_conformance_records15NativeClassTypeCAA8RuncibleAAWP"
 // -- flags
-// CHECK-SAME:           i32 0
-// CHECK-SAME:         },
+// CHECK-SAME:           i32 0 },
 public class NativeClassType: Runcible {
   public func runce() {}
 }
@@ -65,8 +48,7 @@ public class NativeClassType: Runcible {
 // -- witness table
 // CHECK-SAME:           @"$s28protocol_conformance_records17NativeGenericTypeVyxGAA8RuncibleAAWP"
 // -- flags
-// CHECK-SAME:           i32 0
-// CHECK-SAME:         },
+// CHECK-SAME:           i32 0 },
 public struct NativeGenericType<T>: Runcible {
   public func runce() {}
 }
@@ -102,6 +84,30 @@ extension Size: Runcible {
   public func runce() {}
 }
 
+// A non-dependent type conforming to a protocol with associated conformances
+// does not require a generic witness table.
+public protocol Simple {}
+
+public protocol AssociateConformance {
+  associatedtype X : Simple
+}
+
+public struct Other : Simple {}
+
+public struct Concrete : AssociateConformance {
+  public typealias X = Other
+}
+
+// CHECK-LABEL: @"$s28protocol_conformance_records8ConcreteVAA20AssociateConformanceAAMc" ={{ dllexport | protected | }}constant
+// -- protocol descriptor
+// CHECK-SAME:           @"$s28protocol_conformance_records20AssociateConformanceMp"
+// -- nominal type descriptor
+// CHECK-SAME:           @"$s28protocol_conformance_records8ConcreteVMn"
+// -- witness table
+// CHECK-SAME:           @"$s28protocol_conformance_records8ConcreteVAA20AssociateConformanceAAWP"
+// -- no flags are set, and no generic witness table follows
+// CHECK-SAME:           i32 0 }
+
 // CHECK-LABEL: @"\01l_protocols"
 // CHECK-SAME: @"$s28protocol_conformance_records8RuncibleMp"
 // CHECK-SAME: @"$s28protocol_conformance_records5SpoonMp"
@@ -115,9 +121,9 @@ public protocol Spoon { }
 // -- nominal type descriptor
 // CHECK-SAME:           @"$s28protocol_conformance_records17NativeGenericTypeVMn"
 // -- witness table accessor
-// CHECK-SAME:           @"$s28protocol_conformance_records17NativeGenericTypeVyxGAA5SpoonA2aERzlWa
+// CHECK-SAME:           @"$s28protocol_conformance_records17NativeGenericTypeVyxGAA5Spoon
 // -- flags
-// CHECK-SAME:           i32 258
+// CHECK-SAME:           i32 131328
 // -- conditional requirement #1
 // CHECK-SAME:           i32 128,
 // CHECK-SAME:           i32 0,
@@ -133,19 +139,39 @@ extension NativeGenericType : Spoon where T: Spoon {
 // CHECK-SAME:           @"{{got.|__imp_}}$s18resilient_protocol22OtherResilientProtocolMp"
 // -- nominal type descriptor
 // CHECK-SAME:           @"{{got.|__imp_}}$sSiMn"
-// -- witness table accessor
-// CHECK-SAME:           @"$sSi18resilient_protocol22OtherResilientProtocol0B20_conformance_recordsWa"
+// -- witness table pattern
+// CHECK-SAME:           i32 0,
 // -- flags
-// CHECK-SAME:           i32 73,
+// CHECK-SAME:           i32 131144,
 // -- module context for retroactive conformance
 // CHECK-SAME:           @"$s28protocol_conformance_recordsMXM"
 // CHECK-SAME:         }
 extension Int : OtherResilientProtocol { }
+
+// Dependent conformance
+// CHECK-LABEL: @"$s28protocol_conformance_records9DependentVyxGAA9AssociateAAMc" ={{ dllexport | protected | }}constant
+// -- protocol descriptor
+// CHECK-SAME:           @"$s28protocol_conformance_records9AssociateMp"
+// -- nominal type descriptor
+// CHECK-SAME:           @"$s28protocol_conformance_records9DependentVMn"
+// -- witness table pattern
+// CHECK-SAME:           @"$s28protocol_conformance_records9DependentVyxGAA9AssociateAAWp"
+// -- flags
+// CHECK-SAME:           i32 131072,
+// -- number of words in witness table
+// CHECK-SAME:           i16 2,
+// -- number of private words in witness table + bit for "needs instantiation"
+// CHECK-SAME:           i16 1
+// CHECK-SAME:         }
+extension Dependent : Associate {
+  public typealias X = (T, T)
+}
 
 // CHECK-LABEL: @"\01l_protocol_conformances" = private constant
 // CHECK-SAME: @"$s28protocol_conformance_records15NativeValueTypeVAA8RuncibleAAMc"
 // CHECK-SAME: @"$s28protocol_conformance_records15NativeClassTypeCAA8RuncibleAAMc"
 // CHECK-SAME: @"$s28protocol_conformance_records17NativeGenericTypeVyxGAA8RuncibleAAMc"
 // CHECK-SAME: @"$s16resilient_struct4SizeV28protocol_conformance_records8RuncibleADMc"
+// CHECK-SAME: @"$s28protocol_conformance_records8ConcreteVAA20AssociateConformanceAAMc"
 // CHECK-SAME: @"$s28protocol_conformance_records17NativeGenericTypeVyxGAA5SpoonA2aERzlMc"
 // CHECK-SAME: @"$sSi18resilient_protocol22OtherResilientProtocol0B20_conformance_recordsMc"

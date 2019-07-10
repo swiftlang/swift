@@ -34,7 +34,8 @@ namespace serialization {
 
 using FilenamesTy = ArrayRef<std::string>;
 
-class Serializer {
+class SerializerBase {
+protected:
   SmallVector<char, 0> Buffer;
   llvm::BitstreamWriter Out{Buffer};
 
@@ -50,6 +51,25 @@ class Serializer {
   /// serialized. Any other decls will be cross-referenced instead.
   const SourceFile *SF = nullptr;
 
+  /// Record the name of a block.
+  void emitBlockID(unsigned ID, StringRef name,
+                   SmallVectorImpl<unsigned char> &nameBuffer);
+
+  /// Record the name of a record within a block.
+  void emitRecordID(unsigned ID, StringRef name,
+                    SmallVectorImpl<unsigned char> &nameBuffer);
+
+  void writeToStream(raw_ostream &os);
+
+public:
+  SerializerBase(ArrayRef<unsigned char> signature, ModuleOrSourceFile DC);
+};
+
+class Serializer : public SerializerBase {
+  class DeclSerializer;
+  friend class DeclSerializer;
+  class TypeSerializer;
+  friend class TypeSerializer;
 public:
   /// Stores a declaration or a type to be written to the AST file.
   ///
@@ -313,31 +333,13 @@ private:
   /// Writes the BLOCKINFO block for the serialized module file.
   void writeBlockInfoBlock();
 
-  /// Writes the BLOCKINFO block for the module documentation file.
-  void writeDocBlockInfoBlock();
-
   /// Writes the Swift module file header and name, plus metadata determining
   /// if the module can be loaded.
   void writeHeader(const SerializationOptions &options = {});
 
-  /// Writes the Swift doc module file header and name.
-  void writeDocHeader();
-
   /// Writes the dependencies used to build this module: its imported
   /// modules and its source files.
   void writeInputBlock(const SerializationOptions &options);
-
-  void writeParameterList(const ParameterList *PL);
-
-  /// Writes the given pattern, recursively.
-  void writePattern(const Pattern *pattern, DeclContext *owningDC);
-
-  /// Writes a generic parameter list.
-  bool writeGenericParams(const GenericParamList *genericParams);
-
-  /// Writes the body text of the provided funciton, if the function is
-  /// inlinable and has body text.
-  void writeInlinableBodyTextIfNeeded(const AbstractFunctionDecl *decl);
 
   /// Writes a list of protocol conformances.
   void writeConformances(ArrayRef<ProtocolConformanceRef> conformances,
@@ -347,20 +349,6 @@ private:
   void writeConformances(ArrayRef<ProtocolConformance*> conformances,
                          const std::array<unsigned, 256> &abbrCodes);
 
-  /// Writes an array of members for a decl context.
-  ///
-  /// \param parentID The DeclID of the context.
-  /// \param members The decls within the context.
-  /// \param isClass True if the context could be a class context (class,
-  ///        class extension, or protocol).
-  void writeMembers(DeclID parentID, DeclRange members, bool isClass);
-
-  /// Write a default witness table for a protocol.
-  ///
-  /// \param proto The protocol.
-  void writeDefaultWitnessTable(const ProtocolDecl *proto,
-                                const std::array<unsigned, 256> &abbrCodes);
-
   /// Check if a decl is cross-referenced.
   bool isDeclXRef(const Decl *D) const;
 
@@ -369,12 +357,6 @@ private:
 
   /// Writes a reference to a decl in another module.
   void writeCrossReference(const Decl *D);
-
-  /// Writes out a declaration attribute.
-  void writeDeclAttribute(const DeclAttribute *DA);
-
-  /// Writes out a foreign error convention.
-  void writeForeignErrorConvention(const ForeignErrorConvention &fec);
 
   /// Writes the given decl.
   void writeDecl(const Decl *D);
@@ -439,20 +421,14 @@ private:
   void writeAST(ModuleOrSourceFile DC,
                 bool enableNestedTypeLookupTable);
 
-  void writeToStream(raw_ostream &os);
-
-  template <size_t N>
-  Serializer(const unsigned char (&signature)[N], ModuleOrSourceFile DC);
+  using SerializerBase::SerializerBase;
+  using SerializerBase::writeToStream;
 
 public:
   /// Serialize a module to the given stream.
   static void writeToStream(raw_ostream &os, ModuleOrSourceFile DC,
                             const SILModule *M,
                             const SerializationOptions &options);
-
-  /// Serialize module documentation to the given stream.
-  static void writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC,
-                               StringRef GroupInfoPath, ASTContext &Ctx);
 
   /// Records the use of the given Type.
   ///
@@ -484,6 +460,13 @@ public:
   IdentifierID addUniquedStringRef(StringRef str) {
     return addUniquedString(str).second;
   }
+
+  /// Records the use of the given file name.
+  ///
+  /// The Identifier will be scheduled for serialization if necessary.
+  ///
+  /// \returns The ID for the given file name in this module.
+  IdentifierID addFilename(StringRef filename);
 
   /// Records the use of the given Decl.
   ///
@@ -529,13 +512,16 @@ public:
   /// Records the use of the given SILLayout.
   SILLayoutID addSILLayoutRef(SILLayout *layout);
 
-  /// Records the use of the given module.
+  /// Records the module containing \p DC.
   ///
-  /// The module's name will be scheduled for serialization if necessary.
+  /// The module's name will be scheduled for serialization if necessary. This
+  /// may not be exactly the same as the name of the module containing DC;
+  /// instead, it will match the containing file's "exported module name".
   ///
   /// \returns The ID for the identifier for the module's name, or one of the
   /// special module codes defined above.
-  IdentifierID addModuleRef(const ModuleDecl *M);
+  /// \see FileUnit::getExportedModuleName
+  IdentifierID addContainingModuleRef(const DeclContext *DC);
 
   /// Write a normal protocol conformance.
   void writeNormalConformance(const NormalProtocolConformance *conformance);
@@ -562,6 +548,10 @@ public:
   void writeGenericRequirements(ArrayRef<Requirement> requirements,
                                 const std::array<unsigned, 256> &abbrCodes);
 };
+
+/// Serialize module documentation to the given stream.
+void writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC,
+                      StringRef GroupInfoPath);
 } // end namespace serialization
 } // end namespace swift
 #endif

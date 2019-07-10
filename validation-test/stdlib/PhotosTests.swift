@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-swift-frontend -typecheck %s
 
 // REQUIRES: objc_interop
 // UNSUPPORTED: OS=watchos

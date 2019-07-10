@@ -50,9 +50,6 @@ public:
   /// Remove all runtime assertions during optimizations.
   bool RemoveRuntimeAsserts = false;
 
-  /// Enable existential specializer optimization.
-  bool ExistentialSpecializer = false;
-
   /// Controls whether the SIL ARC optimizations are run.
   bool EnableARCOptimizations = true;
 
@@ -69,6 +66,9 @@ public:
 
   /// Whether to dump verbose SIL with scope and location information.
   bool EmitVerboseSIL = false;
+
+  /// Whether to stop the optimization pipeline after serializing SIL.
+  bool StopOptimizationAfterSerialization = false;
 
   /// Optimization mode being used.
   OptimizationMode OptMode = OptimizationMode::NotSet;
@@ -109,10 +109,7 @@ public:
   std::string SILOutputFileNameForDebugging;
 
   /// If set to true, compile with the SIL Ownership Model enabled.
-  bool EnableSILOwnership = false;
-
-  /// When parsing SIL, assume unqualified ownership.
-  bool AssumeUnqualifiedOwnershipWhenParsing = false;
+  bool VerifySILOwnership = true;
 
   /// Assume that code will be executed in a single-threaded environment.
   bool AssumeSingleThreaded = false;
@@ -129,11 +126,22 @@ public:
   /// Emit extra exclusvity markers for memory access and verify coverage.
   bool VerifyExclusivity = false;
 
-  /// Enable the mandatory semantic arc optimizer.
-  bool EnableMandatorySemanticARCOpts = false;
+  /// Calls to the replaced method inside of the replacement method will call
+  /// the previous implementation.
+  ///
+  /// @_dynamicReplacement(for: original())
+  /// func replacement() {
+  ///   if (...)
+  ///     original() // calls original() implementation if true
+  /// }
+  bool EnableDynamicReplacementCanCallPreviousImplementation = true;
 
-  /// \brief Enable large loadable types IRGen pass.
+  /// Enable large loadable types IRGen pass.
   bool EnableLargeLoadableTypes = true;
+
+  /// Should the default pass pipelines strip ownership during the diagnostic
+  /// pipeline or after serialization.
+  bool StripOwnershipAfterSerialization = false;
 
   /// The name of the file to which the backend should save YAML optimization
   /// records.

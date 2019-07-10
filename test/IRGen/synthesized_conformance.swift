@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir %s -swift-version 4 | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir %s -swift-version 4 | %FileCheck %s
 
 struct Struct<T> {
     var x: T

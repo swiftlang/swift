@@ -65,6 +65,10 @@ public struct CustomPrintableValue
     return value.hashValue
   }
 
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(value)
+  }
+
   public typealias Stride = Int
 
   public func distance(to other: CustomPrintableValue) -> Stride {

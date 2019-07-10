@@ -168,6 +168,11 @@ struct SyntaxFactory {
                                           const Trivia &TrailingTrivia = {},
                                           RC<SyntaxArena> Arena = nullptr);
 
+  /// Whether a raw node kind `MemberKind` can serve as a member in a syntax
+  /// collection of the given syntax collection kind.
+  static bool canServeAsCollectionMemberRaw(SyntaxKind CollectionKind,
+                                            SyntaxKind MemberKind);
+
   /// Whether a raw node `Member` can serve as a member in a syntax collection
   /// of the given syntax collection kind.
   static bool canServeAsCollectionMemberRaw(SyntaxKind CollectionKind,

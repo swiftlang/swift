@@ -194,3 +194,31 @@ class SR7562_B : SR7562_A {}
 
 SR7562_A(input: 10) // okay
 SR7562_B(input: 10) // okay
+
+protocol FooProtocol {}
+
+extension FooProtocol {
+  @discardableResult
+  static func returnSomething() -> Bool? {
+    return true
+  }
+}
+
+class Foo {
+  var myOptionalFooProtocol: FooProtocol.Type?
+  
+  func doSomething() {
+    myOptionalFooProtocol?.returnSomething() // okay
+  }
+}
+
+class Discard {
+  @discardableResult func bar() -> Int {
+    return 0
+  }
+
+  func baz() {
+    self.bar // expected-error {{expression resolves to an unused function}}
+    bar // expected-error {{expression resolves to an unused function}}
+  }
+}

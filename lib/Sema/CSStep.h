@@ -126,7 +126,7 @@ public:
   ///          this step solved or failed.
   virtual StepResult take(bool prevFailed) = 0;
 
-  /// \brief Try to resume previously suspended step.
+  /// Try to resume previously suspended step.
   ///
   /// This happens after "follow-up" steps are done
   /// and all of the required information should be
@@ -144,7 +144,7 @@ public:
   virtual void print(llvm::raw_ostream &Out) = 0;
 
 protected:
-  /// \brief Transition this step into one of the available states.
+  /// Transition this step into one of the available states.
   ///
   /// This is primarily driven by execution of the step itself and
   /// the solver, while it executes the work list.
@@ -218,7 +218,7 @@ protected:
 
   void recordDisjunctionChoice(ConstraintLocator *disjunctionLocator,
                                unsigned index) const {
-    CS.DisjunctionChoices.push_back({disjunctionLocator, index});
+    CS.recordDisjunctionChoice(disjunctionLocator, index);
   }
 
   Score getCurrentScore() const { return CS.CurrentScore; }
@@ -227,7 +227,7 @@ protected:
 
   void filterSolutions(SmallVectorImpl<Solution> &solutions, bool minimize) {
     if (!CS.retainAllSolutions())
-      CS.filterSolutions(solutions, CS.solverState->ExprWeights, minimize);
+      CS.filterSolutions(solutions, minimize);
   }
 
   /// Check whether constraint solver is running in "debug" mode,
@@ -291,7 +291,7 @@ class ComponentStep final : public SolverStep {
     ConstraintSystem &CS;
     ConstraintSystem::SolverScope *SolverScope;
 
-    SmallVector<TypeVariableType *, 16> TypeVars;
+    std::vector<TypeVariableType *> TypeVars;
     ConstraintSystem::SolverScope *PrevPartialScope = nullptr;
 
     // The component this scope is associated with.
@@ -336,7 +336,7 @@ class ComponentStep final : public SolverStep {
   std::unique_ptr<Scope> ComponentScope = nullptr;
 
   /// Type variables and constraints "in scope" of this step.
-  SmallVector<TypeVariableType *, 16> TypeVars;
+  std::vector<TypeVariableType *> TypeVars;
   /// Constraints "in scope" of this step.
   ConstraintList *Constraints;
 
@@ -395,7 +395,7 @@ private:
 
     ComponentScope = llvm::make_unique<Scope>(*this);
     // If this component has oprhaned constraint attached,
-    // let's return it ot the graph.
+    // let's return it to the graph.
     CS.CG.setOrphanedConstraint(OrphanedConstraint);
   }
 };

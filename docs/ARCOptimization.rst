@@ -162,7 +162,7 @@ Contrasts with Alias Analysis
 
 A common question is what is the difference in between RC Identity analysis and
 alias analysis. While alias analysis is attempting to determine if two memory
-location are the same, RC identity analysis is attempting to determine if
+locations are the same, RC identity analysis is attempting to determine if
 reference counting operations on different values would result in the same
 reference count being read or written to.
 
@@ -373,7 +373,7 @@ Semantic Tags
 ARC takes advantage of certain semantic tags. This section documents these
 semantics and their meanings.
 
-arc.programtermination_point
+programtermination_point
 ----------------------------
 
 If this semantic tag is applied to a function, then we know that:
@@ -396,7 +396,7 @@ scope's lifetime may never end. This means that:
 
 1. While we can not ignore all such unreachable terminated blocks for ARC
 purposes for instance, if we sink a retain past a br into a non
-arc.programtermination_point block, we must sink the retain into the block.
+programtermination_point block, we must sink the retain into the block.
 
 2. If we are able to infer that an object's lifetime scope would never end due
 to the unreachable/no-return function, then we do not need to end the lifetime
@@ -439,8 +439,8 @@ In the following we assume that all loops are canonicalized such that:
 2. The loop has one backedge.
 3. All exiting edges have a unique exit block.
 
-Motiviation
------------
+Motivation
+----------
 
 Consider the following simple loop::
 
@@ -544,7 +544,7 @@ optimization? We must consider three areas of concern:
    retain/release counts in the loop? Consider a set of retains and a set of
    releases that we wish to hoist out of a loop. We can only hoist the retain,
    release sets out of the loop if all paths in the given loop region from the
-   entrance to the backedge.  have exactly one retain or release from this set.
+   entrance to the backedge have exactly one retain or release from this set.
 
 4. Any early exits that we must move a retain past or a release by must be
    compensated appropriately. This will be discussed in the next section.
@@ -555,7 +555,7 @@ hoist with safety.
 Compensating Early Exits for Lost Dynamic Reference Counts
 ----------------------------------------------------------
 
-Lets say that we have the following loop canonicalized SIL::
+Let's say that we have the following loop canonicalized SIL::
 
   bb0(%0 : $Builtin.NativeObject):
     br bb1
@@ -579,7 +579,7 @@ Lets say that we have the following loop canonicalized SIL::
   bb6:
     return ...
 
-Can we hoist the retain/release pair here? Lets assume the loop is 3 iterations
+Can we hoist the retain/release pair here? Let's assume the loop is 3 iterations
 and we completely unroll it. Then we have::
 
   bb0:
@@ -667,7 +667,7 @@ exit. Consider the following::
   bb6:
     return ...
 
-Lets unroll this loop::
+Let's unroll this loop::
 
   bb0(%0 : $Builtin.NativeObject):
     br bb1

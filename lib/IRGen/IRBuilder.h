@@ -82,7 +82,7 @@ public:
   bool hasPostTerminatorIP() const {
     return GetInsertBlock() != nullptr &&
            !GetInsertBlock()->empty() &&
-           isa<llvm::TerminatorInst>(GetInsertBlock()->back());
+           GetInsertBlock()->back().isTerminator();
   }
 
   void ClearInsertionPoint() {
@@ -107,67 +107,6 @@ public:
   void SetInsertPoint(llvm::Instruction *I) {
     ClearedIP = nullptr;
     IRBuilderBase::SetInsertPoint(I);
-  }
-
-  /// A stable insertion point in the function.  "Stable" means that
-  /// it will point to the same location in the function, even if
-  /// instructions are subsequently added to the current basic block.
-  class StableIP {
-    /// Either an instruction that we're inserting after or the basic
-    /// block that we're inserting at the beginning of.
-    using UnionTy = llvm::PointerUnion<llvm::Instruction *, llvm::BasicBlock *>;
-    UnionTy After;
-  public:
-    StableIP() = default;
-    explicit StableIP(const IRBuilder &Builder) {
-      if (!Builder.hasValidIP()) {
-        After = UnionTy();
-        assert(!isValid());
-        return;
-      }
-
-      llvm::BasicBlock *curBlock = Builder.GetInsertBlock();
-      assert(Builder.GetInsertPoint() == curBlock->end());
-      if (curBlock->empty())
-        After = curBlock;
-      else
-        After = &curBlock->back();
-    }
-
-    /// Does this stable IP point to a valid location?
-    bool isValid() const {
-      return !After.isNull();
-    }
-
-    /// Insert an unparented instruction at this insertion point.
-    /// Note that inserting multiple instructions at an IP will cause
-    /// them to end up in reverse order.
-    void insert(llvm::Instruction *I) {
-      assert(isValid() && "inserting at invalid location!");
-      assert(I->getParent() == nullptr);
-      if (auto *block = After.dyn_cast<llvm::BasicBlock*>()) {
-        block->getInstList().push_front(I);
-      } else {
-        llvm::Instruction *afterInsn = After.get<llvm::Instruction*>();
-        afterInsn->getParent()->getInstList().insertAfter(
-            afterInsn->getIterator(), I);
-      }
-    }
-
-    // Support for being placed in pointer unions.
-    void *getOpaqueValue() const { return After.getOpaqueValue(); }
-    static StableIP getFromOpaqueValue(void *p) {
-      StableIP result;
-      result.After = UnionTy::getFromOpaqueValue(p);
-      return result;
-    }
-    enum { NumLowBitsAvailable
-             = llvm::PointerLikeTypeTraits<UnionTy>::NumLowBitsAvailable };
-  };
-
-  /// Capture a stable reference to the current IP.
-  StableIP getStableIP() const {
-    return StableIP(*this);
   }
 
   /// Return the LLVM module we're inserting into.
@@ -396,24 +335,5 @@ public:
 
 } // end namespace irgen
 } // end namespace swift
-
-namespace llvm {
-  template <> struct PointerLikeTypeTraits<swift::irgen::IRBuilder::StableIP> {
-    using type = swift::irgen::IRBuilder::StableIP;
-
-  public:
-    static void *getAsVoidPointer(type IP) {
-      return IP.getOpaqueValue();
-    }
-    static type getFromVoidPointer(void *p) {
-      return type::getFromOpaqueValue(p);
-    }
-
-    // The number of bits available are the min of the two pointer types.
-    enum {
-      NumLowBitsAvailable = type::NumLowBitsAvailable
-    };
-  };
-}
 
 #endif

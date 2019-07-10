@@ -130,13 +130,6 @@ void getLocationInfoForClangNode(ClangNode ClangNode,
 
 Optional<std::pair<unsigned, unsigned>> parseLineCol(StringRef LineCol);
 
-Decl *getDeclFromUSR(ASTContext &context, StringRef USR, std::string &error);
-Decl *getDeclFromMangledSymbolName(ASTContext &context, StringRef mangledName,
-                                   std::string &error);
-
-Type getTypeFromMangledSymbolname(ASTContext &Ctx, StringRef mangledName,
-                                  std::string &error);
-
 class XMLEscapingPrinter : public StreamPrinter {
   public:
   XMLEscapingPrinter(raw_ostream &OS) : StreamPrinter(OS){};
@@ -238,7 +231,7 @@ private:
   bool tryResolve(ModuleEntity Mod, SourceLoc Loc);
   bool tryResolve(Stmt *St);
   bool visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
-                               Optional<AccessKind> AccKind,
+                               ReferenceMetaData Data,
                                bool IsOpenBracket) override;
 };
 
@@ -275,6 +268,10 @@ class NameMatcher: public ASTWalker {
   std::vector<UnresolvedLoc> LocsToResolve;
   std::vector<ResolvedLoc> ResolvedLocs;
   ArrayRef<Token> TokensToCheck;
+
+  /// The \c Expr argument of a parent \c CustomAttr (if one exists) and
+  /// the \c SourceLoc of the type name it applies to.
+  llvm::Optional<std::pair<SourceLoc, Expr *>> CustomAttrArg;
   unsigned InactiveConfigRegionNestings = 0;
   unsigned SelectorNestings = 0;
 
@@ -294,6 +291,7 @@ class NameMatcher: public ASTWalker {
                   bool checkParentForLabels = false);
   bool tryResolve(ASTWalker::ParentTy Node, SourceLoc NameLoc, LabelRangeType RangeType,
                   ArrayRef<CharSourceRange> LabelLocs);
+  bool handleCustomAttrs(Decl *D);
 
   std::pair<bool, Expr*> walkToExprPre(Expr *E) override;
   Expr* walkToExprPost(Expr *E) override;
@@ -598,6 +596,7 @@ enum class LabelRangeEndAt: int8_t {
 struct CallArgInfo {
   Expr *ArgExp;
   CharSourceRange LabelRange;
+  bool IsTrailingClosure;
   CharSourceRange getEntireCharRange(const SourceManager &SM) const;
 };
 
@@ -605,8 +604,20 @@ std::vector<CallArgInfo>
 getCallArgInfo(SourceManager &SM, Expr *Arg, LabelRangeEndAt EndKind);
 
 // Get the ranges of argument labels from an Arg, either tuple or paren.
+// This includes empty ranges for any unlabelled arguments, and excludes
+// trailing closures.
 std::vector<CharSourceRange>
 getCallArgLabelRanges(SourceManager &SM, Expr *Arg, LabelRangeEndAt EndKind);
+
+/// Whether a decl is defined from clang source.
+bool isFromClang(const Decl *D);
+
+/// Retrieve the effective Clang node for the given declaration, which
+/// copes with the odd case of imported Error enums.
+ClangNode getEffectiveClangNode(const Decl *decl);
+
+/// Retrieve the Clang node for the given extension, if it has one.
+ClangNode extensionGetClangNode(const ExtensionDecl *ext);
 
 } // namespace ide
 } // namespace swift

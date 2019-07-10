@@ -192,7 +192,7 @@ static bool hoistInstructions(SILLoop *Loop, DominanceInfo *DT,
   return Changed;
 }
 
-/// \brief Summary of may writes occurring in the loop tree rooted at \p
+/// Summary of may writes occurring in the loop tree rooted at \p
 /// Loop. This includes all writes of the sub loops and the loop itself.
 struct LoopNestSummary {
   SILLoop *Loop;
@@ -347,7 +347,7 @@ hoistSpecialInstruction(std::unique_ptr<LoopNestSummary> &LoopSummary,
           llvm_unreachable("LICM: Could not perform must-sink instruction");
         }
       }
-      LLVM_DEBUG(llvm::errs() << " Successfully hosited and sank pair\n");
+      LLVM_DEBUG(llvm::errs() << " Successfully hoisted and sank pair\n");
     } else {
       LLVM_DEBUG(llvm::dbgs() << "Hoisted RefElementAddr "
                               << *static_cast<RefElementAddrInst *>(Inst));
@@ -358,7 +358,7 @@ hoistSpecialInstruction(std::unique_ptr<LoopNestSummary> &LoopSummary,
   return Changed;
 }
 
-/// \brief Optimize the loop tree bottom up propagating loop's summaries up the
+/// Optimize the loop tree bottom up propagating loop's summaries up the
 /// loop tree.
 class LoopTreeOptimization {
   llvm::DenseMap<SILLoop *, std::unique_ptr<LoopNestSummary>>
@@ -401,17 +401,17 @@ public:
     }
   }
 
-  /// \brief Optimize this loop tree.
+  /// Optimize this loop tree.
   bool optimize();
 
 protected:
-  /// \brief Propagate the sub-loops' summaries up to the current loop.
+  /// Propagate the sub-loops' summaries up to the current loop.
   void propagateSummaries(std::unique_ptr<LoopNestSummary> &CurrSummary);
 
-  /// \brief Collect a set of instructions that can be hoisted
+  /// Collect a set of instructions that can be hoisted
   void analyzeCurrentLoop(std::unique_ptr<LoopNestSummary> &CurrSummary);
 
-  /// \brief Optimize the current loop nest.
+  /// Optimize the current loop nest.
   bool optimizeLoop(std::unique_ptr<LoopNestSummary> &CurrSummary);
 };
 } // end anonymous namespace
@@ -554,10 +554,6 @@ static bool analyzeBeginAccess(BeginAccessInst *BI,
                                WriteSet &MayWrites,
                                AccessedStorageAnalysis *ASA,
                                DominanceInfo *DT) {
-  if (BI->getEnforcement() != SILAccessEnforcement::Dynamic) {
-    return false;
-  }
-
   const AccessedStorage &storage =
       findAccessedStorageNonNested(BI->getSource());
   if (!storage) {

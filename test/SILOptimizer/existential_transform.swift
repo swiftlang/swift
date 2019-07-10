@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -sil-existential-specializer -Xllvm -sil-disable-pass=GenericSpecializer -Xllvm -sil-disable-pass=FunctionSignatureOpts -Xllvm -sil-disable-pass=SILCombine -emit-sil -sil-verify-all %s | %FileCheck %s
+// RUN: %target-swift-frontend -O -Xllvm -enable-existential-specializer -Xllvm -sil-disable-pass=GenericSpecializer -Xllvm -sil-disable-pass=FunctionSignatureOpts -Xllvm -sil-disable-pass=SILCombine -emit-sil -sil-verify-all %s | %FileCheck %s
 
 internal protocol SomeProtocol : class {
   func foo()  -> Int
@@ -243,20 +243,9 @@ internal class KKKClass : PPP {
  return a.foo()
 }
 
+// Cannot specialize an @inout argument.
 // CHECK-LABEL: sil hidden [noinline] @$s21existential_transform9inout_ncpyyF : $@convention(thin) () -> () {
-// CHECK: bb0:
-// CHECK: alloc_stack
-// CHECK: alloc_ref
-// CHECK: debug_value
-// CHECK: init_existential_addr
-// CHECK: store
-// CHECK: function_ref @$s21existential_transform14wrap_inout_ncp1aSiAA3PPP_pz_tFTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : PPP> (@inout τ_0_0) -> Int
-// CHECK: open_existential_addr
-// CHECK: apply
-// CHECK: destroy_addr 
-// CHECK: dealloc_stack
-// CHECK: tuple
-// CHECK: return
+// CHECK: function_ref @$s21existential_transform14wrap_inout_ncp1aSiAA3PPP_pz_tF : $@convention(thin) (@inout PPP) -> Int
 // CHECK-LABEL: } // end sil function '$s21existential_transform9inout_ncpyyF'
 @inline(never) func inout_ncp() {
 var magic6:PPP = KKKClass()
@@ -277,19 +266,9 @@ internal struct SSSS : PPPP {
  return a.foo()
 }
 
+// Cannot specialize an @inout argument.
 // CHECK-LABEL: sil hidden [noinline] @$s21existential_transform16struct_inout_ncpyyF : $@convention(thin) () -> () {
-// CHECK: bb0:
-// CHECK: alloc_stack
-// CHECK: struct
-// CHECK: init_existential_addr
-// CHECK: store
-// CHECK: function_ref @$s21existential_transform21wrap_struct_inout_ncp1aSiAA4PPPP_pz_tFTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : PPPP> (@inout τ_0_0) -> Int 
-// CHECK: open_existential_addr
-// CHECK: apply
-// CHECK: destroy_addr
-// CHECK: dealloc_stack
-// CHECK: tuple
-// CHECK: return
+// CHECK: function_ref @$s21existential_transform21wrap_struct_inout_ncp1aSiAA4PPPP_pz_tF : $@convention(thin) (@inout PPPP) -> Int
 // CHECK-LABEL: } // end sil function '$s21existential_transform16struct_inout_ncpyyF'
 @inline(never) func struct_inout_ncp() {
 var magic7:PPPP = SSSS()
@@ -322,8 +301,8 @@ func wrap_gcp<T:GP>(_ a:T,_ b:GP) -> Int {
 // CHECK: strong_retain 
 // CHECK: apply
 // CHECK: destroy_addr 
-// CHECK: dealloc_stack
 // CHECK: strong_release 
+// CHECK: dealloc_stack
 // CHECK: return 
 // CHECK: } // end sil function '$s21existential_transform3gcpySixAA2GPRzlF'
 @inline(never) func gcp<T:GP>(_ a:T) -> Int {
@@ -331,6 +310,141 @@ func wrap_gcp<T:GP>(_ a:T,_ b:GP) -> Int {
   return wrap_gcp(a, k)
 }
 
+func wrap_gcp_arch<T:GP>(_ a:T,_ b:GP, _ c:inout Array<T>) -> Int {
+  return a.foo() + b.foo() + c[0].foo()
+}
+// CHECK-LABEL: sil hidden [noinline] @$s21existential_transform8gcp_archySix_SayxGztAA2GPRzlF : $@convention(thin) <T where T : GP> (@in_guaranteed T, @inout Array<T>) -> Int {
+// CHECK: bb0(%0 : $*T, %1 : $*Array<T>):
+// CHECK: debug_value_addr
+// CHECK: debug_value_addr
+// CHECK: alloc_ref
+// CHECK: debug_value
+// CHECK: debug_value
+// CHECK: alloc_stack
+// CHECK: init_existential_addr
+// CHECK: store
+// CHECK: function_ref @$s21existential_transform13wrap_gcp_archySix_AA2GP_pSayxGztAaCRzlFTf4nen_n : $@convention(thin) <τ_0_0 where τ_0_0 : GP><τ_1_0 where τ_1_0 : GP> (@in_guaranteed τ_0_0, @in_guaranteed τ_1_0, @inout Array<τ_0_0>) -> Int
+// CHECK: open_existential_addr
+// CHECK: strong_retain
+// CHECK: apply
+// CHECK: destroy_addr
+// CHECK: strong_release
+// CHECK: dealloc_stack
+// CHECK: return
+// CHECK-LABEL: } // end sil function '$s21existential_transform8gcp_archySix_SayxGztAA2GPRzlF'
+@inline(never) func gcp_arch<T:GP>(_ a:T, _ b:inout Array<T>) -> Int {
+  let k:GC = GC()
+  return wrap_gcp_arch(a, k, &b)
+}
+
+protocol Foo {
+  var myName: String { get }
+}
+
+struct MyURL {
+}
+
+extension MyURL : Foo {
+  var myName : String { return "MyURL" }
+}
+
+struct MyStruct : Foo {
+  var myName : String { return "MyStruct" }
+}
+
+// CHECK-LABEL: sil shared [noinline] @$s21existential_transform7getNameySSAA3Foo_pFTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : Foo> (@in_guaranteed τ_0_0) -> @owned String {
+// CHECK: bb0(%0 : $*τ_0_0):
+// CHECK:   alloc_stack
+// CHECK:   init_existential_addr
+// CHECK:   copy_addr
+// CHECK:   debug_value_addr 
+// CHECK:   open_existential_addr
+// CHECK:   witness_method 
+// CHECK:   apply
+// CHECK:   dealloc_stack
+// CHECK:   return
+// CHECK-LABEL: } // end sil function '$s21existential_transform7getNameySSAA3Foo_pFTf4e_n'
+@inline(never) func getName(_ f: Foo) -> String {
+  return f.myName
+}
+
+@inline(never) func getName_wrapper() -> Int32{
+  let u = MyURL()
+  return getName(u) == "MyStruct" ? 0 : 1
+}
+
+protocol RP {
+  var val:Int32 {get set}
+}
+class RC: RP {
+  var val:Int32
+  init(val:Int32) { self.val = val }
+}
+
+// Note: The checks below must ensure that the function signature "@inline(never) func find(base:Int32, mult:Int32, Obj1: RP) -> Bool" has been turned into a protocol-constrained generic function via existential  specialization, i.e., "function_ref @$s21existential_transform4find4base4mult4Obj1Sbs5Int32V_AgA2RP_ptFTf4nne_n : $@convention(thin) <τ_0_0 where τ_0_0 : RP> (Int32, Int32, @in_guaranteed τ_0_0) -> Bool". Same is true for the recursive function call for "return find (base: base, mult: mult+1, Obj1: Obj1)". Please refer to existential_specializer_soletype.sil test for SIL level testing. This test makes sure that nothing else breaks when we run end-to-end.
+// CHECK-LABEL: sil shared [noinline] @$s21existential_transform4find4base4mult4Obj1Sbs5Int32V_AgA2RP_ptFTf4nne_n : $@convention(thin) <τ_0_0 where τ_0_0 : RP> (Int32, Int32, @in_guaranteed τ_0_0) -> Bool {
+// CHECK: bb0
+// CHECK:   alloc_stack $RP
+// CHECK:   init_existential_addr
+// CHECK:   copy_addr
+// CHECK:   debug_value
+// CHECK:   debug_value
+// CHECK:   debug_value_addr
+// CHECK:   struct_extract
+// CHECK:   struct_extract
+// CHECK:   integer_literal
+// CHECK:   builtin
+// CHECK:   tuple_extract
+// CHECK:   tuple_extract
+// CHECK:   cond_fail
+// CHECK:   open_existential_addr
+// CHECK:   witness_method
+// CHECK:   apply
+// CHECK:   struct_extract
+// CHECK:   builtin
+// CHECK:   cond_br
+// CHECK: bb1:
+// CHECK:   integer_literal
+// CHECK:   struct
+// CHECK:   br
+// CHECK: bb2:
+// CHECK:   open_existential_addr
+// CHECK:   witness_method
+// CHECK:   apply
+// CHECK:   struct_extract
+// CHECK:   builtin
+// CHECK:   cond_br
+// CHECK: bb3
+// CHECK:   dealloc_stack
+// CHECK:   return
+// CHECK: bb4:
+// CHECK:   struct
+// CHECK:   br
+// CHECK: bb5:
+// CHECK:   integer_literal
+// CHECK:   builtin
+// CHECK:   tuple_extract
+// CHECK:   tuple_extract
+// CHECK:   cond_fail
+// CHECK:   struct
+// CHECK:   function_ref @$s21existential_transform4find4base4mult4Obj1Sbs5Int32V_AgA2RP_ptFTf4nne_n : $@convention(thin) <τ_0_0 where τ_0_0 : RP> (Int32, Int32, @in_guaranteed τ_0_0) -> Bool
+// CHECK:   open_existential_addr
+// CHECK:   apply
+// CHECK:   br 
+// CHECK-LABEL: } // end sil function '$s21existential_transform4find4base4mult4Obj1Sbs5Int32V_AgA2RP_ptFTf4nne_n'
+@inline(never) func find(base:Int32, mult:Int32, Obj1: RP) -> Bool {
+  if base * mult > Obj1.val {
+    return false
+  } else if base * mult == Obj1.val {
+    return true
+  } else {
+    return find (base: base, mult: mult+1, Obj1: Obj1)
+  }
+}
+@inline(never) func find_wrapper() -> Bool {
+  let ab = RC(val: 100)
+  return find(base: 3, mult: 1, Obj1: ab) 
+}
 @_optimize(none) public func foo() -> Int {
 cp()
 ncp()
@@ -342,5 +456,9 @@ do_not_optimize_inout_cp()
 inout_ncp()
 struct_inout_ncp()
 let y:Int = gcp(GC())
-return x + y
+var a:Array<GC> = [GC()]
+let z:Int = gcp_arch(GC(), &a) 
+let zz:Int32 = getName_wrapper()
+let _ = find_wrapper()
+return x + y + z + Int(zz)
 }

@@ -5,6 +5,9 @@
 
 // REQUIRES: CPU=i386 || CPU=x86_64
 
+// Windows does not support FP80
+// XFAIL: OS=windows-msvc
+
 enum Empty {}
 
 enum Boolish {
@@ -143,7 +146,7 @@ enum RawTypeNotFirst : RawTypeNotFirstProtocol, Int { // expected-error {{raw ty
   case E
 }
 
-enum ExpressibleByRawTypeNotLiteral : Array<Int> { // expected-error {{raw type 'Array<Int>' is not expressible by any literal}}
+enum ExpressibleByRawTypeNotLiteral : Array<Int> { // expected-error {{raw type 'Array<Int>' is not expressible by a string, integer, or floating-point literal}}
   // expected-error@-1{{'ExpressibleByRawTypeNotLiteral' declares raw type 'Array<Int>', but does not conform to RawRepresentable and conformance could not be synthesized}}
   case Ladd, Elliott, Sixteenth, Harrison
 }
@@ -197,6 +200,7 @@ enum RawTypeWithCharacterValues_Correct : Character {
   case First = "😅" // ok
   case Second = "👩‍👩‍👧‍👦" // ok
   case Third = "👋🏽" // ok
+  case Fourth = "\u{1F3F4}\u{E0067}\u{E0062}\u{E0065}\u{E006E}\u{E0067}\u{E007F}" // ok
 }
 
 enum RawTypeWithCharacterValues_Error1 : Character { // expected-error {{'RawTypeWithCharacterValues_Error1' declares raw type 'Character', but does not conform to RawRepresentable and conformance could not be synthesized}}
@@ -469,7 +473,7 @@ enum SE0036 {
 
   func staticReferenceInInstanceMethod() {
     _ = A // expected-error {{enum case 'A' cannot be used as an instance member}} {{9-9=SE0036.}}
-    _ = self.A // expected-error {{enum case 'A' cannot be used as an instance member}} {{none}}
+    _ = self.A // expected-error {{enum case 'A' cannot be used as an instance member}} {{9-9=SE0036.}}
     _ = SE0036.A
   }
 
@@ -515,10 +519,10 @@ enum SE0036 {
 
   init() {
     self = .A
-    self = A // expected-error {{enum case 'A' cannot be used as an instance member}} {{12-12=.}}
+    self = A // expected-error {{enum case 'A' cannot be used as an instance member}} {{12-12=SE0036.}}
     self = SE0036.A
     self = .B(SE0036_Auxiliary())
-    self = B(SE0036_Auxiliary()) // expected-error {{enum case 'B' cannot be used as an instance member}} {{12-12=.}}
+    self = B(SE0036_Auxiliary()) // expected-error {{enum case 'B' cannot be used as an instance member}} {{12-12=SE0036.}}
     self = SE0036.B(SE0036_Auxiliary())
   }
 }
@@ -528,7 +532,7 @@ enum SE0036_Generic<T> {
 
   func foo() {
     switch self {
-    case A(_): break // expected-error {{enum case 'A' cannot be used as an instance member}} {{10-10=.}}
+    case A(_): break // expected-error {{enum case 'A' cannot be used as an instance member}} {{10-10=.}} expected-error {{missing argument label 'x:' in call}}
     }
 
     switch self {

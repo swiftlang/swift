@@ -294,13 +294,13 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
   auto loadedModuleTrace = getSupplementaryFilenamesFromArguments(
       options::OPT_emit_loaded_module_trace_path);
   auto TBD = getSupplementaryFilenamesFromArguments(options::OPT_emit_tbd_path);
-  auto moduleInterfaceOutput = getSupplementaryFilenamesFromArguments(
-      options::OPT_emit_interface_path);
+  auto parseableInterfaceOutput = getSupplementaryFilenamesFromArguments(
+      options::OPT_emit_module_interface_path);
 
   if (!objCHeaderOutput || !moduleOutput || !moduleDocOutput ||
       !dependenciesFile || !referenceDependenciesFile ||
       !serializedDiagnostics || !fixItsOutput || !loadedModuleTrace || !TBD ||
-      !moduleInterfaceOutput) {
+      !parseableInterfaceOutput) {
     return None;
   }
   std::vector<SupplementaryOutputPaths> result;
@@ -318,7 +318,7 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
     sop.FixItsOutputPath = (*fixItsOutput)[i];
     sop.LoadedModuleTracePath = (*loadedModuleTrace)[i];
     sop.TBDPath = (*TBD)[i];
-    sop.ModuleInterfaceOutputPath = (*moduleInterfaceOutput)[i];
+    sop.ParseableInterfaceOutputPath = (*parseableInterfaceOutput)[i];
 
     result.push_back(sop);
   }
@@ -395,12 +395,13 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
       defaultSupplementaryOutputPathExcludingExtension);
 
   // There is no non-path form of -emit-interface-path
-  auto moduleInterfaceOutputPath = pathsFromArguments.ModuleInterfaceOutputPath;
+  auto parseableInterfaceOutputPath =
+      pathsFromArguments.ParseableInterfaceOutputPath;
 
   ID emitModuleOption;
   std::string moduleExtension;
   std::string mainOutputIfUsableForModule;
-  deriveModulePathParameters(emitModuleOption, moduleExtension,
+  deriveModulePathParameters(outputFile, emitModuleOption, moduleExtension,
                              mainOutputIfUsableForModule);
 
   auto moduleOutputPath = determineSupplementaryOutputFilename(
@@ -418,7 +419,7 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
   sop.FixItsOutputPath = fixItsOutputPath;
   sop.LoadedModuleTracePath = loadedModuleTracePath;
   sop.TBDPath = tbdPath;
-  sop.ModuleInterfaceOutputPath = moduleInterfaceOutputPath;
+  sop.ParseableInterfaceOutputPath = parseableInterfaceOutputPath;
   return sop;
 }
 
@@ -457,7 +458,7 @@ SupplementaryOutputPathsComputer::determineSupplementaryOutputFilename(
 };
 
 void SupplementaryOutputPathsComputer::deriveModulePathParameters(
-    options::ID &emitOption, std::string &extension,
+    StringRef mainOutputFile, options::ID &emitOption, std::string &extension,
     std::string &mainOutputIfUsable) const {
 
   bool isSIB = RequestedAction == FrontendOptions::ActionType::EmitSIB ||
@@ -476,7 +477,7 @@ void SupplementaryOutputPathsComputer::deriveModulePathParameters(
       isSIB ? file_types::TY_SIB : file_types::TY_SwiftModuleFile);
 
   mainOutputIfUsable =
-      canUseMainOutputForModule && !OutputFiles.empty() ? OutputFiles[0] : "";
+      canUseMainOutputForModule && !OutputFiles.empty() ? mainOutputFile : "";
 }
 
 static SupplementaryOutputPaths
@@ -493,7 +494,8 @@ createFromTypeToPathMap(const TypeToPathMap *map) {
       {file_types::TY_SerializedDiagnostics, paths.SerializedDiagnosticsPath},
       {file_types::TY_ModuleTrace, paths.LoadedModuleTracePath},
       {file_types::TY_TBD, paths.TBDPath},
-      {file_types::TY_SwiftModuleInterfaceFile,paths.ModuleInterfaceOutputPath}
+      {file_types::TY_SwiftParseableInterfaceFile,
+       paths.ParseableInterfaceOutputPath}
   };
   for (const std::pair<file_types::ID, std::string &> &typeAndString :
        typesAndStrings) {
@@ -505,14 +507,16 @@ createFromTypeToPathMap(const TypeToPathMap *map) {
 
 Optional<std::vector<SupplementaryOutputPaths>>
 SupplementaryOutputPathsComputer::readSupplementaryOutputFileMap() const {
-  if (Arg *A = Args.getLastArg(options::OPT_emit_objc_header_path,
-                               options::OPT_emit_module_path,
-                               options::OPT_emit_module_doc_path,
-                               options::OPT_emit_dependencies_path,
-                               options::OPT_emit_reference_dependencies_path,
-                               options::OPT_serialize_diagnostics_path,
-                               options::OPT_emit_loaded_module_trace_path,
-                               options::OPT_emit_tbd_path)) {
+  if (Arg *A = Args.getLastArg(
+        options::OPT_emit_objc_header_path,
+        options::OPT_emit_module_path,
+        options::OPT_emit_module_doc_path,
+        options::OPT_emit_dependencies_path,
+        options::OPT_emit_reference_dependencies_path,
+        options::OPT_serialize_diagnostics_path,
+        options::OPT_emit_loaded_module_trace_path,
+        options::OPT_emit_module_interface_path,
+        options::OPT_emit_tbd_path)) {
     Diags.diagnose(SourceLoc(),
                    diag::error_cannot_have_supplementary_outputs,
                    A->getSpelling(), "-supplementary-output-file-map");

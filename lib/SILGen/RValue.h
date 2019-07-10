@@ -76,7 +76,7 @@ class RValue {
   CanType type;
   unsigned elementsToBeAdded;
   
-  /// \brief Flag value used to mark an rvalue as invalid.
+  /// Flag value used to mark an rvalue as invalid.
   ///
   /// The reasons why this can be true is:
   ///
@@ -308,42 +308,6 @@ public:
   /// be returned. Otherwise, an object will be returned. So this is a
   /// convenient way to determine if an RValue needs an address.
   SILType getLoweredImplodedTupleType(SILGenFunction &SGF) const &;
-
-  /// Rewrite the type of this r-value.
-  void rewriteType(CanType newType) & {
-#ifndef NDEBUG
-    static const auto areSimilarTypes = [](CanType l, CanType r) {
-      if (l == r) return true;
-
-      // Allow function types to disagree about 'noescape'.
-      if (auto lf = dyn_cast<FunctionType>(l)) {
-        if (auto rf = dyn_cast<FunctionType>(r)) {
-          auto lParams = lf.getParams();
-          auto rParams = rf.getParams();
-          return AnyFunctionType::equalParams(lParams, rParams) &&
-                 lf.getResult() == rf.getResult() &&
-                 lf->getExtInfo().withNoEscape(false) ==
-                     lf->getExtInfo().withNoEscape(false);
-        }
-      }
-      return false;
-    };
-
-    static const auto isSingleElementTuple = [](CanType type, CanType eltType) {
-      if (auto tupleType = dyn_cast<TupleType>(type)) {
-        return tupleType->getNumElements() == 1 &&
-               areSimilarTypes(tupleType.getElementType(0), eltType);
-      }
-      return false;
-    };
-
-    // We only allow a very modest set of changes to a type.
-    assert(areSimilarTypes(newType, type) ||
-           isSingleElementTuple(newType, type) ||
-           isSingleElementTuple(type, newType));
-#endif
-    type = newType;
-  }
   
   /// Emit an equivalent value with independent ownership.
   RValue copy(SILGenFunction &SGF, SILLocation loc) const &;

@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -Xllvm -sil-full-demangle -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-full-demangle %s | %FileCheck %s
 
 func markUsed<T>(_ t: T) {}
 
@@ -7,13 +7,13 @@ func trap() -> Never {
 }
 
 
-// CHECK-LABEL: sil @main
-// CHECK: bb0({{%.*}} : @trivial $Int32, {{%.*}} : @trivial $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
+// CHECK-LABEL: sil [ossa] @main
+// CHECK: bb0({{%.*}} : $Int32, {{%.*}} : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
 
 // -- initialize x
 // CHECK: alloc_global @$s8toplevel1xSiv
 // CHECK: [[X:%[0-9]+]] = global_addr @$s8toplevel1xSivp : $*Int
-// CHECK: integer_literal $Builtin.Int2048, 999
+// CHECK: integer_literal $Builtin.IntLiteral, 999
 // CHECK: store {{.*}} to [trivial] [[X]]
 
 var x = 999
@@ -23,7 +23,7 @@ func print_x() {
 }
 
 // -- assign x
-// CHECK: integer_literal $Builtin.Int2048, 0
+// CHECK: integer_literal $Builtin.IntLiteral, 0
 // CHECK: [[WRITE:%.*]] = begin_access [modify] [dynamic] [[X]] : $*Int
 // CHECK: assign {{.*}} to [[WRITE]]
 // CHECK: [[PRINT_X:%[0-9]+]] = function_ref @$s8toplevel7print_xyyF :
@@ -122,11 +122,11 @@ defer {
 
 
 
-// CHECK-LABEL: sil hidden @$s8toplevel7print_xyyF
+// CHECK-LABEL: sil hidden [ossa] @$s8toplevel7print_xyyF
 
-// CHECK-LABEL: sil hidden @$s8toplevel7print_yyyF
+// CHECK-LABEL: sil hidden [ossa] @$s8toplevel7print_yyyF
 
-// CHECK: sil hidden @$s8toplevel13testGlobalCSESiyF
+// CHECK: sil hidden [ossa] @$s8toplevel13testGlobalCSESiyF
 // CHECK-NOT: global_addr
 // CHECK: %0 = global_addr @$s8toplevel1xSivp : $*Int
 // CHECK-NOT: global_addr

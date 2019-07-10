@@ -363,6 +363,7 @@ public protocol RangeReplaceableCollection : Collection
     where shouldBeRemoved: (Element) throws -> Bool) rethrows
 
   // FIXME: Associated type inference requires these.
+  @_borrowed
   override subscript(bounds: Index) -> Element { get }
   override subscript(bounds: Range<Index>) -> SubSequence { get }
 }

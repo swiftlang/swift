@@ -77,6 +77,8 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
+#include "swift/IRGen/Linking.h"
+#include "clang/AST/ASTContext.h"
 #include "clang/CodeGen/CodeGenABITypes.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -105,8 +107,7 @@
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
 #include "IndirectTypeInfo.h"
-#include "NativeConventionSchema.h"
-#include "ScalarTypeInfo.h"
+#include "ScalarPairTypeInfo.h"
 #include "Signature.h"
 #include "IRGenMangler.h"
 
@@ -178,12 +179,13 @@ namespace {
   };
 
   /// The @thick function type-info class.
-  class FuncTypeInfo : public ScalarTypeInfo<FuncTypeInfo, ReferenceTypeInfo>,
-                       public FuncSignatureInfo {
+  class FuncTypeInfo :
+      public ScalarPairTypeInfo<FuncTypeInfo, ReferenceTypeInfo>,
+      public FuncSignatureInfo {
     FuncTypeInfo(CanSILFunctionType formalType, llvm::StructType *storageType,
                  Size size, Alignment align, SpareBitVector &&spareBits,
                  IsPOD_t pod)
-      : ScalarTypeInfo(storageType, size, std::move(spareBits), align, pod),
+      : ScalarPairTypeInfo(storageType, size, std::move(spareBits), align, pod),
         FuncSignatureInfo(formalType)
     {
     }
@@ -207,33 +209,60 @@ namespace {
     }
 #include "swift/AST/ReferenceStorage.def"
 
-    llvm::StructType *getStorageType() const {
-      return cast<llvm::StructType>(TypeInfo::getStorageType());
+    static Size getFirstElementSize(IRGenModule &IGM) {
+      return IGM.getPointerSize();
+    }
+    static StringRef getFirstElementLabel() {
+      return ".fn";
+    }
+    static bool isFirstElementTrivial() {
+      return true;
+    }
+    void emitRetainFirstElement(IRGenFunction &IGF, llvm::Value *fn,
+                                Optional<Atomicity> atomicity = None) const {}
+    void emitReleaseFirstElement(IRGenFunction &IGF, llvm::Value *fn,
+                                 Optional<Atomicity> atomicity = None) const {}
+    void emitAssignFirstElement(IRGenFunction &IGF, llvm::Value *fn,
+                                Address fnAddr) const {
+      IGF.Builder.CreateStore(fn, fnAddr);
     }
 
-    unsigned getExplosionSize() const override {
-      return 2;
+    static Size getSecondElementOffset(IRGenModule &IGM) {
+      return IGM.getPointerSize();
     }
-
-    void getSchema(ExplosionSchema &schema) const override {
-      llvm::StructType *structTy = getStorageType();
-      schema.add(ExplosionSchema::Element::forScalar(structTy->getElementType(0)));
-      schema.add(ExplosionSchema::Element::forScalar(structTy->getElementType(1)));
+    static Size getSecondElementSize(IRGenModule &IGM) {
+      return IGM.getPointerSize();
     }
-
-    void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
-                          Size offset) const override {
-      auto ptrSize = IGM.getPointerSize();
-      llvm::StructType *structTy = getStorageType();
-      addScalarToAggLowering(IGM, lowering, structTy->getElementType(0),
-                             offset, ptrSize);
-      addScalarToAggLowering(IGM, lowering, structTy->getElementType(1),
-                             offset + ptrSize, ptrSize);
+    static StringRef getSecondElementLabel() {
+      return ".data";
+    }
+    bool isSecondElementTrivial() const {
+      return isPOD(ResilienceExpansion::Maximal);
+    }
+    void emitRetainSecondElement(IRGenFunction &IGF, llvm::Value *data,
+                                 Optional<Atomicity> atomicity = None) const {
+      if (!isPOD(ResilienceExpansion::Maximal)) {
+        if (!atomicity) atomicity = IGF.getDefaultAtomicity();
+        IGF.emitNativeStrongRetain(data, *atomicity);
+      }
+    }
+    void emitReleaseSecondElement(IRGenFunction &IGF, llvm::Value *data,
+                                  Optional<Atomicity> atomicity = None) const {
+      if (!isPOD(ResilienceExpansion::Maximal)) {
+        if (!atomicity) atomicity = IGF.getDefaultAtomicity();
+        IGF.emitNativeStrongRelease(data, *atomicity);
+      }
+    }
+    void emitAssignSecondElement(IRGenFunction &IGF, llvm::Value *context,
+                                 Address dataAddr) const {
+      if (isPOD(ResilienceExpansion::Maximal))
+        IGF.Builder.CreateStore(context, dataAddr);
+      else
+        IGF.emitNativeStrongAssign(context, dataAddr);
     }
 
     Address projectFunction(IRGenFunction &IGF, Address address) const {
-      return IGF.Builder.CreateStructGEP(address, 0, Size(0),
-                                         address->getName() + ".fn");
+      return projectFirstElement(IGF, address);
     }
 
     Address projectData(IRGenFunction &IGF, Address address) const {
@@ -241,94 +270,16 @@ namespace {
                                          address->getName() + ".data");
     }
 
-    void loadAsCopy(IRGenFunction &IGF, Address address,
-                    Explosion &e) const override {
-      // Load the function.
-      Address fnAddr = projectFunction(IGF, address);
-      e.add(IGF.Builder.CreateLoad(fnAddr, fnAddr->getName()+".load"));
-
-      Address dataAddr = projectData(IGF, address);
-      auto data = IGF.Builder.CreateLoad(dataAddr);
-      if (!isPOD(ResilienceExpansion::Maximal))
-        IGF.emitNativeStrongRetain(data, IGF.getDefaultAtomicity());
-      e.add(data);
-    }
-
-    void loadAsTake(IRGenFunction &IGF, Address addr,
-                    Explosion &e) const override {
-      // Load the function.
-      Address fnAddr = projectFunction(IGF, addr);
-      e.add(IGF.Builder.CreateLoad(fnAddr));
-
-      Address dataAddr = projectData(IGF, addr);
-      e.add(IGF.Builder.CreateLoad(dataAddr));
-    }
-
-    void assign(IRGenFunction &IGF, Explosion &e, Address address,
-                bool isOutlined) const override {
-      // Store the function pointer.
-      Address fnAddr = projectFunction(IGF, address);
-      IGF.Builder.CreateStore(e.claimNext(), fnAddr);
-
-      Address dataAddr = projectData(IGF, address);
-      auto context = e.claimNext();
-      if (isPOD(ResilienceExpansion::Maximal))
-        IGF.Builder.CreateStore(context, dataAddr);
-      else
-        IGF.emitNativeStrongAssign(context, dataAddr);
-    }
-
-    void initialize(IRGenFunction &IGF, Explosion &e, Address address,
-                    bool isOutlined) const override {
-      // Store the function pointer.
-      Address fnAddr = projectFunction(IGF, address);
-      IGF.Builder.CreateStore(e.claimNext(), fnAddr);
-
-      // Store the data pointer, if any, transferring the +1.
-      Address dataAddr = projectData(IGF, address);
-      auto context = e.claimNext();
-      if (isPOD(ResilienceExpansion::Maximal))
-        IGF.Builder.CreateStore(context, dataAddr);
-      else
-        IGF.emitNativeStrongInit(context, dataAddr);
-    }
-
-    void copy(IRGenFunction &IGF, Explosion &src,
-              Explosion &dest, Atomicity atomicity) const override {
-      src.transferInto(dest, 1);
-      auto data = src.claimNext();
-      if (!isPOD(ResilienceExpansion::Maximal))
-        IGF.emitNativeStrongRetain(data, atomicity);
-      dest.add(data);
-    }
-
-    void consume(IRGenFunction &IGF, Explosion &src,
-                 Atomicity atomicity) const override {
-      src.claimNext();
-      auto context = src.claimNext();
-      if (!isPOD(ResilienceExpansion::Maximal))
-        IGF.emitNativeStrongRelease(context, atomicity);
-    }
-
-    void fixLifetime(IRGenFunction &IGF, Explosion &src) const override {
-      src.claimNext();      
-      IGF.emitFixLifetime(src.claimNext());
-    }
-
     void strongRetain(IRGenFunction &IGF, Explosion &e,
                       Atomicity atomicity) const override {
       e.claimNext();
-      auto context = e.claimNext();
-      if (!isPOD(ResilienceExpansion::Maximal))
-        IGF.emitNativeStrongRetain(context, atomicity);
+      emitRetainSecondElement(IGF, e.claimNext(), atomicity);
     }
 
     void strongRelease(IRGenFunction &IGF, Explosion &e,
                        Atomicity atomicity) const override {
       e.claimNext();
-      auto context = e.claimNext();
-      if (!isPOD(ResilienceExpansion::Maximal))
-        IGF.emitNativeStrongRelease(context, atomicity);
+      emitReleaseSecondElement(IGF, e.claimNext(), atomicity);
     }
 
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
@@ -370,32 +321,6 @@ namespace {
     NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, name, "...") \
     ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, name, "...")
 #include "swift/AST/ReferenceStorage.def"
-
-    void destroy(IRGenFunction &IGF, Address addr, SILType T,
-                 bool isOutlined) const override {
-      auto data = IGF.Builder.CreateLoad(projectData(IGF, addr));
-      if (!isPOD(ResilienceExpansion::Maximal))
-        IGF.emitNativeStrongRelease(data, IGF.getDefaultAtomicity());
-    }
-
-    void packIntoEnumPayload(IRGenFunction &IGF,
-                             EnumPayload &payload,
-                             Explosion &src,
-                             unsigned offset) const override {
-      payload.insertValue(IGF, src.claimNext(), offset);
-      payload.insertValue(IGF, src.claimNext(),
-                          offset + IGF.IGM.getPointerSize().getValueInBits());
-    }
-    
-    void unpackFromEnumPayload(IRGenFunction &IGF,
-                               const EnumPayload &payload,
-                               Explosion &dest,
-                               unsigned offset) const override {
-      auto storageTy = getStorageType();
-      dest.add(payload.extractValue(IGF, storageTy->getElementType(0), offset));
-      dest.add(payload.extractValue(IGF, storageTy->getElementType(1),
-                          offset + IGF.IGM.getPointerSize().getValueInBits()));
-    }
 
     bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
       return true;
@@ -718,11 +643,13 @@ static bool isABIIgnoredParameterWithoutStorage(IRGenModule &IGM,
                                                 CanSILFunctionType substType,
                                                 unsigned paramIdx) {
   auto param = substType->getParameters()[paramIdx];
+  if (param.isFormalIndirect())
+    return false;
+
   SILType argType = IGM.silConv.getSILType(param);
-  auto argLoweringTy = getArgumentLoweringType(argType.getASTType(), param);
-  auto &ti = IGF.getTypeInfoForLowered(argLoweringTy);
+  auto &ti = IGF.getTypeInfoForLowered(argType.getASTType());
   // Empty values don't matter.
-  return ti.getSchema().empty() && !param.isFormalIndirect();
+  return ti.getSchema().empty();
 }
 
 /// Find the parameter index for the one (assuming there was only one) partially
@@ -1317,7 +1244,8 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     // cast to the result type - it could be substituted.
     if (origConv.getSILResultType().hasTypeParameter()) {
       auto ResType = fwd->getReturnType();
-      callResult = subIGF.Builder.CreateBitCast(callResult, ResType);
+      if (ResType != callResult->getType())
+        callResult = subIGF.coerceValue(callResult, ResType, subIGF.IGM.DataLayout);
     }
     subIGF.Builder.CreateRet(callResult);
   }
@@ -1327,7 +1255,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
 
 /// Emit a partial application thunk for a function pointer applied to a partial
 /// set of argument values.
-void irgen::emitFunctionPartialApplication(
+Optional<StackAddress> irgen::emitFunctionPartialApplication(
     IRGenFunction &IGF, SILFunction &SILFn, const FunctionPointer &fn,
     llvm::Value *fnContext, Explosion &args, ArrayRef<SILParameterInfo> params,
     SubstitutionMap subs, CanSILFunctionType origType,
@@ -1342,8 +1270,6 @@ void irgen::emitFunctionPartialApplication(
   SmallVector<const TypeInfo *, 4> argTypeInfos;
   SmallVector<SILType, 4> argValTypes;
   SmallVector<ParameterConvention, 4> argConventions;
-
-  assert(!outType->isNoEscape());
 
   // Reserve space for polymorphic bindings.
   auto bindings = NecessaryBindings::forFunctionInvocations(IGF.IGM,
@@ -1471,7 +1397,7 @@ void irgen::emitFunctionPartialApplication(
     llvm::Value *ctx = args.claimNext();
     ctx = IGF.Builder.CreateBitCast(ctx, IGF.IGM.RefCountedPtrTy);
     out.add(ctx);
-    return;
+    return {};
   }
   
   Optional<FunctionPointer> staticFn;
@@ -1510,12 +1436,20 @@ void irgen::emitFunctionPartialApplication(
     llvm::Value *ctx = args.claimNext();
     if (isIndirectFormalParameter(*singleRefcountedConvention))
       ctx = IGF.Builder.CreateLoad(ctx, IGF.IGM.getPointerAlignment());
-    ctx = IGF.Builder.CreateBitCast(ctx, IGF.IGM.RefCountedPtrTy);
+
+    auto expectedClosureTy =
+        outType->isNoEscape() ? IGF.IGM.OpaquePtrTy : IGF.IGM.RefCountedPtrTy;
+
+    // We might get a struct containing a pointer e.g type <{ %AClass* }>
+    if (ctx->getType() != expectedClosureTy)
+      ctx = IGF.coerceValue(ctx, expectedClosureTy, IGF.IGM.DataLayout);
     out.add(ctx);
-    return;
+    if (outType->isNoEscape())
+      return StackAddress();
+    return {};
   }
 
-  // Store the context arguments on the heap.
+  // Store the context arguments on the heap/stack.
   assert(argValTypes.size() == argTypeInfos.size()
          && argTypeInfos.size() == argConventions.size()
          && "argument info lists out of sync");
@@ -1523,18 +1457,32 @@ void irgen::emitFunctionPartialApplication(
                     /*typeToFill*/ nullptr,
                     std::move(bindings));
 
-  auto descriptor = IGF.IGM.getAddrOfCaptureDescriptor(SILFn, origType,
+  llvm::Value *data;
+
+  Optional<StackAddress> stackAddr;
+
+  if (args.empty() && layout.isKnownEmpty()) {
+    if (outType->isNoEscape())
+      data = llvm::ConstantPointerNull::get(IGF.IGM.OpaquePtrTy);
+    else
+      data = IGF.IGM.RefCountedNull;
+  } else {
+
+    // Allocate a new object on the heap or stack.
+    HeapNonFixedOffsets offsets(IGF, layout);
+    if (outType->isNoEscape()) {
+      stackAddr = IGF.emitDynamicAlloca(
+          IGF.IGM.Int8Ty, layout.emitSize(IGF.IGM), Alignment(16));
+      stackAddr = stackAddr->withAddress(IGF.Builder.CreateBitCast(
+          stackAddr->getAddress(), IGF.IGM.OpaquePtrTy));
+      data = stackAddr->getAddress().getAddress();
+    } else {
+        auto descriptor = IGF.IGM.getAddrOfCaptureDescriptor(SILFn, origType,
                                                        substType, subs,
                                                        layout);
 
-  llvm::Value *data;
-  if (args.empty() && layout.isKnownEmpty()) {
-    data = IGF.IGM.RefCountedNull;
-  } else {
-    // Allocate a new object.
-    HeapNonFixedOffsets offsets(IGF, layout);
-
-    data = IGF.emitUnmanagedAlloc(layout, "closure", descriptor, &offsets);
+        data = IGF.emitUnmanagedAlloc(layout, "closure", descriptor, &offsets);
+    }
     Address dataAddr = layout.emitCastTo(IGF, data);
     
     unsigned i = 0;
@@ -1602,6 +1550,7 @@ void irgen::emitFunctionPartialApplication(
   forwarder = IGF.Builder.CreateBitCast(forwarder, IGF.IGM.Int8PtrTy);
   out.add(forwarder);
   out.add(data);
+  return stackAddr;
 }
 
 /// Emit the block copy helper for a block.
@@ -1693,9 +1642,8 @@ void irgen::emitBlockHeader(IRGenFunction &IGF,
   auto NSConcreteStackBlock =
       IGF.IGM.getModule()->getOrInsertGlobal("_NSConcreteStackBlock",
                                              IGF.IGM.ObjCClassStructTy);
-  if (IGF.IGM.useDllStorage())
-    cast<llvm::GlobalVariable>(NSConcreteStackBlock)
-        ->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);
+  ApplyIRLinkage(IRLinkage::ExternalImport)
+      .to(cast<llvm::GlobalVariable>(NSConcreteStackBlock));
 
   //
   // Set the flags.
@@ -1725,8 +1673,13 @@ void irgen::emitBlockHeader(IRGenFunction &IGF,
   // Build the block descriptor.
   ConstantInitBuilder builder(IGF.IGM);
   auto descriptorFields = builder.beginStruct();
-  descriptorFields.addInt(IGF.IGM.IntPtrTy, 0);
-  descriptorFields.addInt(IGF.IGM.IntPtrTy,
+
+  const clang::ASTContext &ASTContext = IGF.IGM.getClangASTContext();
+  llvm::IntegerType *UnsignedLongTy =
+      llvm::IntegerType::get(IGF.IGM.LLVMContext,
+                             ASTContext.getTypeSize(ASTContext.UnsignedLongTy));
+  descriptorFields.addInt(UnsignedLongTy, 0);
+  descriptorFields.addInt(UnsignedLongTy,
                           storageTL.getFixedSize().getValue());
   
   if (!isPOD) {

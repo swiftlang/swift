@@ -4,7 +4,7 @@
 enum List<T> {
   case Nil
   // rdar://21927124
-  // CHECK: <attr-builtin>indirect</attr-builtin> <kw>case</kw> Cons(T, List)
+  // CHECK: <attr-builtin>indirect</attr-builtin> <kw>case</kw> Cons(<type>T</type>, <type>List</type>)
   indirect case Cons(T, List)
 }
 
@@ -165,7 +165,7 @@ protocol Prot {
 infix operator *-* : FunnyPrecedence
 
 // CHECK: <kw>precedencegroup</kw> FunnyPrecedence
-// CHECK-NEXT: <kw>associativity</kw>: left{{$}}
+// CHECK-NEXT: <kw>associativity</kw>: <kw>left</kw>{{$}}
 // CHECK-NEXT: <kw>higherThan</kw>: MultiplicationPrecedence
 precedencegroup FunnyPrecedence {
   associativity: left
@@ -197,6 +197,25 @@ class SubCls : MyCls, Prot {}
 func genFn<T : Prot where T.Blarg : Prot2>(_: T) -> Int {}
 
 func f(x: Int) -> Int {
+
+  // CHECK: <str>#"This is a raw string"#</str>
+  #"This is a raw string"#
+
+  // CHECK: <str>##"This is also a raw string"##</str>
+  ##"This is also a raw string"##
+
+  // CHECK: <str>###"This is an unterminated raw string"</str>
+  ###"This is an unterminated raw string"
+
+  // CHECK: <str>#"""This is a multiline raw string"""#</str>
+  #"""This is a multiline raw string"""#
+
+  // CHECK: <str>#"This is an </str>\#<anchor>(</anchor>interpolated<anchor>)</anchor><str> raw string"#</str>
+  #"This is an \#(interpolated) raw string"#
+
+  // CHECK: <str>#"This is a raw string with an invalid \##() interpolation"#</str>
+  #"This is a raw string with an invalid \##() interpolation"#
+
   // CHECK: <str>"This is string </str>\<anchor>(</anchor>genFn({(a:<type>Int</type> -> <type>Int</type>) <kw>in</kw> a})<anchor>)</anchor><str> interpolation"</str>
   "This is string \(genFn({(a:Int -> Int) in a})) interpolation"
 
@@ -243,6 +262,9 @@ func bar(x: Int) -> (Int, Float) {
   foo(Float())
 }
 
+// CHECK: <object-literal>#colorLiteral(red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0)</object-literal>
+#colorLiteral(red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0)
+
 class GenC<T1,T2> {}
 
 func test() {
@@ -257,6 +279,9 @@ func test2(x: Int) {
   // CHECK: <str>"</str>\<anchor>(</anchor>x<anchor>)</anchor><str>"</str>
   "\(x)"
 }
+
+// CHECK: <kw>#colorLiteral</kw>
+#colorLiteral
 
 // CHECK: <kw>class</kw> Observers {
 class Observers {
@@ -377,6 +402,9 @@ func keywordInCaseAndLocalArgLabel(_ for: Int, for in: Int, class _: Int) {
   case (let x, let y):
 // CHECK: <kw>case</kw> (<kw>let</kw> x, <kw>let</kw> y):
     print(x, y)
+  @unknown default:
+// CHECK: <attr-id>@unknown</attr-id> <kw>default</kw>:
+    ()
   }
 }
 
@@ -395,3 +423,25 @@ let closure = { [weak x=bindtox, unowned y=bindtoy, unowned(unsafe) z=bindtoz] i
 protocol FakeClassRestrictedProtocol : `class` {}
 // CHECK: <kw>protocol</kw> FakeClassRestrictedProtocol : <type>`class`</type> {}
 // FIXME: rdar://42801404: OLD and NEW should be the same '<type>`class`</type>'.
+
+// CHECK: <kw>func</kw> foo() -> <kw>some</kw> <type>P</type> {}
+func foo() -> some P {}
+
+// CHECK: <kw>func</kw> foo() -> <kw>some</kw> <type>P</type> & <type>Q</type> {}
+func foo() -> some P & Q {}
+
+// CHECK: <kw>class</kw> PropertyDelgate {
+class PropertyDelgate {
+  // CHECK: @<type>MyDelegate</type>(<int>1</int>, receiveClosure {
+  @MyDelegate(1, receiveClosure {
+    // CHECK: <kw>var</kw> x = <int>1</int>; x
+    var x = 1; x
+  })
+  var something
+}
+
+// CHECK: <kw>func</kw> acceptBuilder<T>(
+func acceptBuilder<T>(
+  // CHECK: @<type>SomeBuilder</type><<type>Element</type>> label param: () -> <type>T</type>
+  @SomeBuilder<Element> label param: () -> T
+) {}

@@ -3,8 +3,6 @@
 .. title:: Lexicon
 .. default-role:: term
 
-.. @raise litre.TestsAreMissing
-
 This file defines several terms used by the Swift compiler and standard library
 source code, tests, and commit messages. See also the `LLVM lexicon`_.
 
@@ -96,6 +94,11 @@ source code, tests, and commit messages. See also the `LLVM lexicon`_.
     2. The type of a value or declaration from inside a potentially generic
        context. This type may contain `archetypes <archetype>` and cannot be
        used directly from outside the context. Compare with `interface type`.
+
+  customization point
+    Informal term for a protocol requirement that has a default implementation,
+    i.e. one that conforming types don't *have* to implement but have the option
+    to "customize".
 
   DI (definite initialization / definitive initialization)
     The feature that no uninitialized variables, constants, or properties will

@@ -17,19 +17,25 @@
 public protocol StringProtocol
   : BidirectionalCollection,
   TextOutputStream, TextOutputStreamable,
-  LosslessStringConvertible, ExpressibleByStringLiteral,
+  LosslessStringConvertible, ExpressibleByStringInterpolation,
   Hashable, Comparable
-  where Iterator.Element == Character, SubSequence : StringProtocol {
-
+  where Iterator.Element == Character,
+        Index == String.Index,
+        SubSequence : StringProtocol,
+        StringInterpolation == DefaultStringInterpolation
+{
   associatedtype UTF8View : /*Bidirectional*/Collection
-  where UTF8View.Element == UInt8 // Unicode.UTF8.CodeUnit
+  where UTF8View.Element == UInt8, // Unicode.UTF8.CodeUnit
+        UTF8View.Index == Index
 
   associatedtype UTF16View : BidirectionalCollection
-  where UTF16View.Element == UInt16 // Unicode.UTF16.CodeUnit
+  where UTF16View.Element == UInt16, // Unicode.UTF16.CodeUnit
+        UTF16View.Index == Index
 
   associatedtype UnicodeScalarView : BidirectionalCollection
-  where UnicodeScalarView.Element == Unicode.Scalar
-  
+  where UnicodeScalarView.Element == Unicode.Scalar,
+        UnicodeScalarView.Index == Index
+
   associatedtype SubSequence = Substring
 
   var utf8: UTF8View { get }
@@ -111,75 +117,154 @@ public protocol StringProtocol
     encodedAs targetEncoding: Encoding.Type,
     _ body: (UnsafePointer<Encoding.CodeUnit>) throws -> Result
   ) rethrows -> Result
-
-  /// The entire String onto whose slice this view is a projection.
-  var _wholeString : String { get }
-  /// The range of storage offsets of this view in `_wholeString`.
-  var _encodedOffsetRange : Range<Int> { get }
 }
 
 extension StringProtocol {
-  public var _wholeString: String {
-    return String(self)
-  }
-
-  public var _encodedOffsetRange: Range<Int> {
-    return 0 ..< numericCast(self.utf16.count)
-  }
-}
-
-/// A protocol that provides fast access to a known representation of String.
-///
-/// Can be used to specialize generic functions that would otherwise end up
-/// doing grapheme breaking to vend individual characters.
-@usableFromInline // FIXME(sil-serialize-all)
-internal protocol _SwiftStringView {
-  /// A `String`, having the same contents as `self`, that may be unsuitable for
-  /// long-term storage.
-  var _ephemeralContent : String { get }
-
-  /// A `String`, having the same contents as `self`, that is suitable for
-  /// long-term storage.
+  // TODO(String performance): Make a _SharedString for non-smol Substrings
   //
-  // FIXME: Remove once _StringGuts has append(contentsOf:).
-  var _persistentContent : String { get }
+  // TODO(String performance): Provide a closure-based call with stack-allocated
+  // _SharedString for non-smol Substrings
+  //
+  public // @SPI(NSStringAPI.swift)
+  var _ephemeralString: String {
+    @_specialize(where Self == String)
+    @_specialize(where Self == Substring)
+    get { return String(self) }
+  }
 
-  /// The entire String onto whose slice this view is a projection.
-  var _wholeString : String { get }
-  /// The range of storage offsets of this view in `_wholeString`.
-  var _encodedOffsetRange : Range<Int> { get }
-}
-
-extension _SwiftStringView {
-  @inlinable // FIXME(sil-serialize-all)
-  internal var _ephemeralContent : String { return _persistentContent }
-}
-
-extension StringProtocol {
-  @inlinable // FIXME(sil-serialize-all)
-  public // Used in the Foundation overlay
-  var _ephemeralString : String {
-    if _fastPath(self is _SwiftStringView) {
-      return (self as! _SwiftStringView)._ephemeralContent
+  internal var _gutsSlice: _StringGutsSlice {
+    @_specialize(where Self == String)
+    @_specialize(where Self == Substring)
+    @inline(__always) get {
+      if let str = self as? String {
+        return _StringGutsSlice(str._guts)
+      }
+      if let subStr = self as? Substring {
+        return _StringGutsSlice(subStr._wholeGuts, subStr._offsetRange)
+      }
+      return _StringGutsSlice(String(self)._guts)
     }
-    return String(self)
+  }
+
+  @inlinable
+  internal var _offsetRange: Range<Int> {
+    @inline(__always) get {
+      let start = startIndex
+      let end = endIndex
+      _internalInvariant(
+        start.transcodedOffset == 0 && end.transcodedOffset == 0)
+      return Range(uncheckedBounds: (start._encodedOffset, end._encodedOffset))
+    }
+  }
+
+  @inlinable
+  internal var _wholeGuts: _StringGuts {
+    @_specialize(where Self == String)
+    @_specialize(where Self == Substring)
+    @inline(__always) get {
+      if let str = self as? String {
+        return str._guts
+      }
+      if let subStr = self as? Substring {
+        return subStr._wholeGuts
+      }
+      return String(self)._guts
+    }
   }
 }
 
-extension String : _SwiftStringView {
-  @inlinable // FIXME(sil-serialize-all)
-  internal var _persistentContent : String {
-    return self
+// Contiguous UTF-8 strings
+extension String {
+  /// Returns whether this string is capable of providing access to
+  /// validly-encoded UTF-8 contents in contiguous memory in O(1) time.
+  ///
+  /// Contiguous strings always operate in O(1) time for withUTF8 and always
+  /// give a result for String.UTF8View.withContiguousStorageIfAvailable.
+  /// Contiguous strings also benefit from fast-paths and better optimizations.
+  ///
+  @_alwaysEmitIntoClient
+  public var isContiguousUTF8: Bool { return _guts.isFastUTF8 }
+
+  /// If this string is not contiguous, make it so. If this mutates the string,
+  /// it will invalidate any pre-existing indices.
+  ///
+  /// Complexity: O(n) if non-contiguous, O(1) if already contiguous
+  ///
+  @_alwaysEmitIntoClient
+  public mutating func makeContiguousUTF8() {
+    if _fastPath(isContiguousUTF8) { return }
+    self = String._copying(self)
   }
 
-  @inlinable // FIXME(sil-serialize-all)
-  public var _wholeString : String {
-    return self
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  public var _encodedOffsetRange : Range<Int> {
-    return 0..<_guts.count
+  /// Runs `body` over the content of this string in contiguous memory. If this
+  /// string is not contiguous, this will first make it contiguous, which will
+  /// also speed up subsequent access. If this mutates the string,
+  /// it will invalidate any pre-existing indices.
+  ///
+  /// Note that it is unsafe to escape the pointer provided to `body`. For
+  /// example, strings of up to 15 UTF-8 code units in length may be represented
+  /// in a small-string representation, and thus will be spilled into
+  /// temporary stack space which is invalid after `withUTF8` finishes
+  /// execution.
+  ///
+  /// Complexity: O(n) if non-contiguous, O(1) if already contiguous
+  ///
+  @_alwaysEmitIntoClient
+  public mutating func withUTF8<R>(
+    _ body: (UnsafeBufferPointer<UInt8>) throws -> R
+  ) rethrows -> R {
+    makeContiguousUTF8()
+    return try _guts.withFastUTF8(body)
   }
 }
 
+// Contiguous UTF-8 strings
+extension Substring {
+  /// Returns whether this string is capable of providing access to
+  /// validly-encoded UTF-8 contents in contiguous memory in O(1) time.
+  ///
+  /// Contiguous strings always operate in O(1) time for withUTF8 and always
+  /// give a result for String.UTF8View.withContiguousStorageIfAvailable.
+  /// Contiguous strings also benefit from fast-paths and better optimizations.
+  ///
+  @_alwaysEmitIntoClient
+  public var isContiguousUTF8: Bool { return self.base.isContiguousUTF8 }
+
+  /// If this string is not contiguous, make it so. If this mutates the
+  /// substring, it will invalidate any pre-existing indices.
+  ///
+  /// Complexity: O(n) if non-contiguous, O(1) if already contiguous
+  ///
+  @_alwaysEmitIntoClient
+  public mutating func makeContiguousUTF8() {
+    if _fastPath(isContiguousUTF8) { return }
+    self = String._copying(self)[...]
+  }
+
+  /// Runs `body` over the content of this substring in contiguous memory. If
+  /// this substring is not contiguous, this will first make it contiguous,
+  /// which will also speed up subsequent access. If this mutates the substring,
+  /// it will invalidate any pre-existing indices.
+  ///
+  /// Note that it is unsafe to escape the pointer provided to `body`. For
+  /// example, strings of up to 15 UTF-8 code units in length may be represented
+  /// in a small-string representation, and thus will be spilled into
+  /// temporary stack space which is invalid after `withUTF8` finishes
+  /// execution.
+  ///
+  /// Complexity: O(n) if non-contiguous, O(1) if already contiguous
+  ///
+  @_alwaysEmitIntoClient
+  public mutating func withUTF8<R>(
+    _ body: (UnsafeBufferPointer<UInt8>) throws -> R
+  ) rethrows -> R {
+    if _fastPath(isContiguousUTF8) {
+      return try _wholeGuts.withFastUTF8(range: self._offsetRange) {
+        return try body($0)
+      }
+    }
+
+    makeContiguousUTF8()
+    return try _wholeGuts.withFastUTF8(body)
+  }
+}

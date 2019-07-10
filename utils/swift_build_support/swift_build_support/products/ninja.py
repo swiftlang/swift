@@ -24,11 +24,29 @@ from .. import shell
 
 
 class Ninja(product.Product):
+    @classmethod
+    def is_build_script_impl_product(cls):
+        return False
+
+    @classmethod
+    def new_builder(cls, args, toolchain, workspace, host):
+        return NinjaBuilder(cls, args, toolchain, workspace)
+
+
+class NinjaBuilder(product.ProductBuilder):
+    def __init__(self, product_class, args, toolchain, workspace):
+        self.source_dir = workspace.source_dir(
+            product_class.product_source_name())
+        self.build_dir = workspace.build_dir('build',
+                                             product_class.product_name())
+        self.args = args
+        self.toolchain = toolchain
+
     @cache_util.reify
     def ninja_bin_path(self):
         return os.path.join(self.build_dir, 'ninja')
 
-    def do_build(self):
+    def build(self):
         if os.path.exists(self.ninja_bin_path):
             return
 

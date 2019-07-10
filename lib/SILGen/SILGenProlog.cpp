@@ -96,25 +96,43 @@ public:
   }
 
   ManagedValue visitType(CanType t, bool isInOut) {
-    auto argType = SGF.getLoweredType(t);
+    // The calling convention always uses minimal resilience expansion.
+    auto argType =
+        SGF.SGM.Types.getLoweredType(t, ResilienceExpansion::Minimal);
     if (isInOut)
       argType = SILType::getPrimitiveAddressType(argType.getASTType());
 
     // Pop the next parameter info.
     auto parameterInfo = parameters.front();
     parameters = parameters.slice(1);
-    assert(
-        argType
-            == parent->getParent()->mapTypeIntoContext(
-                   SGF.getSILType(parameterInfo))
-        && "argument does not have same type as specified by parameter info");
-    (void)parameterInfo;
 
+    auto paramType = SGF.F.mapTypeIntoContext(SGF.getSILType(parameterInfo));
     ManagedValue mv = SGF.B.createInputFunctionArgument(
-        argType, loc.getAsASTNode<ValueDecl>());
+        paramType, loc.getAsASTNode<ValueDecl>());
+
+    if (argType != paramType) {
+      // This is a hack to deal with the fact that Self.Type comes in as a
+      // static metatype, but we have to downcast it to a dynamic Self
+      // metatype to get the right semantics.
+      assert(
+        cast<DynamicSelfType>(
+          argType.castTo<MetatypeType>().getInstanceType())
+            .getSelfType()
+          == paramType.castTo<MetatypeType>().getInstanceType());
+      mv = SGF.B.createUncheckedBitCast(loc, mv, argType);
+    }
 
     if (isInOut)
       return mv;
+
+    // This can happen if the value is resilient in the calling convention
+    // but not resilient locally.
+    if (argType.isLoadable(SGF.F) && argType.isAddress()) {
+      if (mv.isPlusOne(SGF))
+        mv = SGF.B.createLoadTake(loc, mv);
+      else
+        mv = SGF.B.createLoadBorrow(loc, mv);
+    }
 
     // If the value is a (possibly optional) ObjC block passed into the entry
     // point of the function, then copy it so we can treat the value reliably
@@ -135,7 +153,7 @@ public:
   ManagedValue visitTupleType(CanTupleType t) {
     SmallVector<ManagedValue, 4> elements;
 
-    auto &tl = SGF.getTypeLowering(t);
+    auto &tl = SGF.SGM.Types.getTypeLowering(t, ResilienceExpansion::Minimal);
     bool canBeGuaranteed = tl.isLoadable();
 
     // Collect the exploded elements.
@@ -181,7 +199,7 @@ public:
         if (element.hasCleanup())
           element.forwardInto(SGF, loc, elementBuffer);
         else
-          element.copyInto(SGF, elementBuffer, loc);
+          element.copyInto(SGF, loc, elementBuffer);
       }
       return SGF.emitManagedRValueWithCleanup(buffer);
     }
@@ -216,7 +234,7 @@ struct ArgumentInitHelper {
     assert(ty && "no type?!");
 
     // Create an RValue by emitting destructured arguments into a basic block.
-    CanType canTy = ty->eraseDynamicSelfType()->getCanonicalType();
+    CanType canTy = ty->getCanonicalType();
     EmitBBArguments argEmitter(SGF, parent, l, parameters);
 
     // Note: inouts of tuples are not exploded, so we bypass visit().
@@ -235,17 +253,6 @@ struct ArgumentInitHelper {
 
     if (vd->isInOut()) {
       assert(argrv.getType().isAddress() && "expected inout to be address");
-    } else if (auto *metatypeTy = ty->getAs<MetatypeType>()) {
-      // This is a hack to deal with the fact that Self.Type comes in as a
-      // static metatype, but we have to downcast it to a dynamic Self
-      // metatype to get the right semantics.
-      if (metatypeTy->getInstanceType()->is<DynamicSelfType>()) {
-        auto loweredTy = SGF.getLoweredType(ty);
-        if (loweredTy != argrv.getType()) {
-          argrv = ManagedValue::forUnmanaged(
-            SGF.B.createUncheckedBitCast(loc, argrv.getValue(), loweredTy));
-        }
-      }
     } else {
       assert(vd->isImmutable() && "expected parameter to be immutable!");
       // If the variable is immutable, we can bind the value as is.
@@ -304,12 +311,13 @@ static void makeArgument(Type ty, ParamDecl *decl,
                          SmallVectorImpl<SILValue> &args, SILGenFunction &SGF) {
   assert(ty && "no type?!");
   
-  // Destructure tuple arguments.
-  if (TupleType *tupleTy = ty->getAs<TupleType>()) {
+  // Destructure tuple value arguments.
+  if (TupleType *tupleTy = decl->isInOut() ? nullptr : ty->getAs<TupleType>()) {
     for (auto fieldType : tupleTy->getElementTypes())
       makeArgument(fieldType, decl, args, SGF);
   } else {
-    auto loweredTy = SGF.getLoweredType(ty);
+    auto loweredTy = SGF.SGM.Types.getLoweredType(ty,
+                                                  ResilienceExpansion::Minimal);
     if (decl->isInOut())
       loweredTy = SILType::getPrimitiveAddressType(loweredTy.getASTType());
     auto arg = SGF.F.begin()->createFunctionArgument(loweredTy, decl);
@@ -320,10 +328,7 @@ static void makeArgument(Type ty, ParamDecl *decl,
 
 void SILGenFunction::bindParameterForForwarding(ParamDecl *param,
                                      SmallVectorImpl<SILValue> &parameters) {
-  Type type = (param->hasType()
-               ? param->getType()
-               : F.mapTypeIntoContext(param->getInterfaceType()));
-  makeArgument(type->eraseDynamicSelfType(), param, parameters, *this);
+  makeArgument(param->getType(), param, parameters, *this);
 }
 
 void SILGenFunction::bindParametersForForwarding(const ParameterList *params,
@@ -349,10 +354,8 @@ static void emitCaptureArguments(SILGenFunction &SGF,
       closure.getGenericEnvironment(), interfaceType);
   };
 
-  switch (SGF.SGM.Types.getDeclCaptureKind(capture)) {
-  case CaptureKind::None:
-    break;
-
+  auto expansion = SGF.F.getResilienceExpansion();
+  switch (SGF.SGM.Types.getDeclCaptureKind(capture, expansion)) {
   case CaptureKind::Constant: {
     auto type = getVarTypeInCaptureContext();
     auto &lowering = SGF.getTypeLowering(type);
@@ -369,7 +372,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     if (VD->isSettable(VD->getDeclContext())) {
       auto addr = SGF.emitTemporaryAllocation(VD, ty);
       // We have created a copy that needs to be destroyed.
-      val = SGF.B.createCopyValue(Loc, val);
+      val = SGF.B.emitCopyValueOperation(Loc, val);
       NeedToDestroyValueAtExit = true;
       lowering.emitStore(SGF.B, VD, val, addr, StoreOwnershipQualifier::Init);
       val = addr;
@@ -394,7 +397,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     // the captured value.
     auto type = getVarTypeInCaptureContext();
     auto boxTy = SGF.SGM.Types.getContextBoxTypeForCapture(VD,
-                               SGF.getLoweredType(type).getASTType(),
+                               SGF.SGM.Types.getLoweredRValueType(type),
                                SGF.F.getGenericEnvironment(), /*mutable*/ true);
     SILValue box = SGF.F.begin()->createFunctionArgument(
         SILType::getPrimitiveObjectType(boxTy), VD);
@@ -423,6 +426,19 @@ void SILGenFunction::emitProlog(AnyFunctionRef TheClosure,
                                 Type resultType, bool throws) {
   uint16_t ArgNo = emitProlog(paramList, selfParam, resultType,
                               TheClosure.getAsDeclContext(), throws);
+  
+  // Emit an unreachable instruction if a parameter type is
+  // uninhabited
+  if (paramList) {
+    for (auto *param : *paramList) {
+      if (param->getType()->isStructurallyUninhabited()) {
+        SILLocation unreachableLoc(param);
+        unreachableLoc.markAsPrologue();
+        B.createUnreachable(unreachableLoc);
+        break;
+      }
+    }
+  }
 
   // Emit the capture argument variables. These are placed last because they
   // become the first curry level of the SIL function.
@@ -435,7 +451,24 @@ void SILGenFunction::emitProlog(AnyFunctionRef TheClosure,
       SILValue val = F.begin()->createFunctionArgument(ty);
       (void) val;
 
-      return;
+      continue;
+    }
+
+    if (capture.isOpaqueValue()) {
+      OpaqueValueExpr *opaqueValue = capture.getOpaqueValue();
+      Type type = opaqueValue->getType()->mapTypeOutOfContext();
+      type = GenericEnvironment::mapTypeIntoContext(
+          TheClosure.getGenericEnvironment(), type);
+      auto &lowering = getTypeLowering(type);
+      SILType ty = lowering.getLoweredType();
+      SILValue val = F.begin()->createFunctionArgument(ty);
+      OpaqueValues[opaqueValue] = ManagedValue::forUnmanaged(val);
+
+      // Opaque values are always passed 'owned', so add a clean up if needed.
+      if (!lowering.isTrivial())
+        enterDestroyCleanup(val);
+
+      continue;
     }
 
     emitCaptureArguments(*this, TheClosure, capture, ++ArgNo);
@@ -454,8 +487,10 @@ static void emitIndirectResultParameters(SILGenFunction &SGF, Type resultType,
 
   // If the return type is address-only, emit the indirect return argument.
 
-  const TypeLowering &resultTI =
-      SGF.getTypeLowering(DC->mapTypeIntoContext(resultType));
+  // The calling convention always uses minimal resilience expansion.
+  auto &resultTI =
+    SGF.SGM.Types.getTypeLowering(DC->mapTypeIntoContext(resultType),
+                                  ResilienceExpansion::Minimal);
   if (!SILModuleConventions::isReturnedIndirectlyInSIL(
           resultTI.getLoweredType(), SGF.SGM.M)) {
     return;
@@ -504,7 +539,7 @@ uint16_t SILGenFunction::emitProlog(ParameterList *paramList,
     else if (auto *ACE = dyn_cast<AbstractClosureExpr>(DC))
       Loc = ACE->getLoc();
     auto NativeErrorTy = SILType::getExceptionType(getASTContext());
-    ManagedValue Undef = emitUndef(Loc, NativeErrorTy);
+    ManagedValue Undef = emitUndef(NativeErrorTy);
     SILDebugVariable DbgVar("$error", /*Constant*/ false, ++ArgNo);
     B.createDebugValue(Loc, Undef.getValue(), DbgVar);
   }

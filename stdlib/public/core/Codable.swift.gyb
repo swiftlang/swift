@@ -1202,7 +1202,7 @@ public enum DecodingError : Error {
   /// for debugging.
   case typeMismatch(Any.Type, Context)
 
-  /// An indication that a nonoptional value of the given type was expected,
+  /// An indication that a non-optional value of the given type was expected,
   /// but a null value was found.
   ///
   /// As associated values, this case contains the attempted type and context
@@ -1751,6 +1751,40 @@ extension Array : Encodable where Element : Encodable {
 
 extension Array : Decodable where Element : Decodable {
   /// Creates a new array by decoding from the given decoder.
+  ///
+  /// This initializer throws an error if reading from the decoder fails, or
+  /// if the data read is corrupted or otherwise invalid.
+  ///
+  /// - Parameter decoder: The decoder to read data from.
+  public init(from decoder: Decoder) throws {
+    self.init()
+
+    var container = try decoder.unkeyedContainer()
+    while !container.isAtEnd {
+      let element = try container.decode(Element.self)
+      self.append(element)
+    }
+  }
+}
+
+extension ContiguousArray : Encodable where Element : Encodable {
+  /// Encodes the elements of this contiguous array into the given encoder
+  /// in an unkeyed container.
+  ///
+  /// This function throws an error if any values are invalid for the given
+  /// encoder's format.
+  ///
+  /// - Parameter encoder: The encoder to write data to.
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.unkeyedContainer()
+    for element in self {
+      try container.encode(element)
+    }
+  }
+}
+
+extension ContiguousArray : Decodable where Element : Decodable {
+  /// Creates a new contiguous array by decoding from the given decoder.
   ///
   /// This initializer throws an error if reading from the decoder fails, or
   /// if the data read is corrupted or otherwise invalid.

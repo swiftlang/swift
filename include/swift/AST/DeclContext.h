@@ -24,11 +24,14 @@
 #include "swift/AST/ResilienceExpansion.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/LLVM.h"
-#include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/PointerEmbeddedInt.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/Support/raw_ostream.h"
+
+#include <type_traits>
 
 namespace llvm {
   class raw_ostream;
@@ -78,6 +81,7 @@ enum class DeclContextKind : unsigned {
   Initializer,
   TopLevelCodeDecl,
   SubscriptDecl,
+  EnumElementDecl,
   AbstractFunctionDecl,
   SerializedLocal,
   Last_LocalDeclContextKind = SerializedLocal,
@@ -145,6 +149,8 @@ enum class ConformanceLookupKind : unsigned {
   All,
   /// Only the explicit conformance.
   OnlyExplicit,
+  /// All conformances except for inherited ones.
+  NonInherited,
 };
 
 /// Describes a diagnostic for a conflict between two protocol
@@ -230,6 +236,7 @@ class alignas(1 << DeclContextAlignInBits) DeclContext {
     case DeclContextKind::TopLevelCodeDecl:
     case DeclContextKind::AbstractFunctionDecl:
     case DeclContextKind::SubscriptDecl:
+    case DeclContextKind::EnumElementDecl:
     case DeclContextKind::GenericTypeDecl:
     case DeclContextKind::ExtensionDecl:
       return ASTHierarchy::Decl;
@@ -277,10 +284,6 @@ public:
   LLVM_READONLY
   bool isTypeContext() const;
 
-  /// \brief Determine whether this is an extension context.
-  LLVM_READONLY
-  bool isExtensionContext() const; // see swift/AST/Decl.h
-
   /// If this DeclContext is a NominalType declaration or an
   /// extension thereof, return the NominalTypeDecl.
   LLVM_READONLY
@@ -310,7 +313,7 @@ public:
   LLVM_READONLY
   ProtocolDecl *getExtendedProtocolDecl() const;
 
-  /// \brief Retrieve the generic parameter 'Self' from a protocol or
+  /// Retrieve the generic parameter 'Self' from a protocol or
   /// protocol extension.
   ///
   /// Only valid if \c getSelfProtocolDecl().
@@ -340,17 +343,21 @@ public:
   /// - Everything else falls back on getDeclaredInterfaceType().
   Type getSelfInterfaceType() const;
 
-  /// \brief Retrieve the innermost generic parameters of this context or any
-  /// of its parents.
-  ///
-  /// FIXME: Remove this
-  GenericParamList *getGenericParamsOfContext() const;
+  /// Visit the generic parameter list of every outer context, innermost first.
+  void forEachGenericContext(
+    llvm::function_ref<void (GenericParamList *)> fn) const;
 
-  /// \brief Retrieve the innermost generic signature of this context or any
+  /// Returns the depth of this generic context, or in other words,
+  /// the number of nested generic contexts minus one.
+  ///
+  /// This is (unsigned)-1 if none of the outer contexts are generic.
+  unsigned getGenericContextDepth() const;
+
+  /// Retrieve the innermost generic signature of this context or any
   /// of its parents.
   GenericSignature *getGenericSignatureOfContext() const;
 
-  /// \brief Retrieve the innermost archetypes of this context or any
+  /// Retrieve the innermost archetypes of this context or any
   /// of its parents.
   GenericEnvironment *getGenericEnvironmentOfContext() const;
 
@@ -501,7 +508,7 @@ public:
   /// lookup.
   ///
   /// \returns true if anything was found.
-  bool lookupQualified(ArrayRef<TypeDecl *> types, DeclName member,
+  bool lookupQualified(ArrayRef<NominalTypeDecl *> types, DeclName member,
                        NLOptions options,
                        SmallVectorImpl<ValueDecl *> &decls) const;
 
@@ -536,17 +543,13 @@ public:
   ///
   /// \param diagnostics If non-null, will be populated with the set of
   /// diagnostics that should be emitted for this declaration context.
-  ///
-  /// \param sorted Whether to sort the results in a canonical order.
-  ///
   /// FIXME: This likely makes more sense on IterableDeclContext or
   /// something similar.
   SmallVector<ProtocolDecl *, 2>
   getLocalProtocols(ConformanceLookupKind lookupKind
                       = ConformanceLookupKind::All,
                     SmallVectorImpl<ConformanceDiagnostic> *diagnostics
-                      = nullptr,
-                    bool sorted = false) const;
+                      = nullptr) const;
 
   /// Retrieve the set of protocol conformances associated with this
   /// declaration context.
@@ -556,16 +559,13 @@ public:
   /// \param diagnostics If non-null, will be populated with the set of
   /// diagnostics that should be emitted for this declaration context.
   ///
-  /// \param sorted Whether to sort the results in a canonical order.
-  ///
   /// FIXME: This likely makes more sense on IterableDeclContext or
   /// something similar.
   SmallVector<ProtocolConformance *, 2>
   getLocalConformances(ConformanceLookupKind lookupKind
                          = ConformanceLookupKind::All,
                        SmallVectorImpl<ConformanceDiagnostic> *diagnostics
-                         = nullptr,
-                       bool sorted = false) const;
+                         = nullptr) const;
 
   /// Retrieve the syntactic depth of this declaration context, i.e.,
   /// the number of non-module-scoped contexts.
@@ -584,7 +584,8 @@ public:
   bool walkContext(ASTWalker &Walker);
 
   void dumpContext() const;
-  unsigned printContext(llvm::raw_ostream &OS, unsigned indent = 0) const;
+  unsigned printContext(llvm::raw_ostream &OS, unsigned indent = 0,
+                        bool onlyAPartialLine = false) const;
 
   // Only allow allocation of DeclContext using the allocator in ASTContext.
   void *operator new(size_t Bytes, ASTContext &C,
@@ -774,7 +775,18 @@ private:
   /// member is an invisible addition.
   void addMemberSilently(Decl *member, Decl *hint = nullptr) const;
 };
-  
+
+/// Define simple_display for DeclContexts but not for subclasses in order to
+/// avoid ambiguities with Decl* arguments.
+template <typename ParamT, typename = typename std::enable_if<
+                               std::is_same<ParamT, DeclContext>::value>::type>
+void simple_display(llvm::raw_ostream &out, const ParamT *dc) {
+  if (dc)
+    dc->printContext(out, 0, true);
+  else
+    out << "(null)";
+}
+
 } // end namespace swift
 
 namespace llvm {

@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -closure-specialize %s | %FileCheck %s -check-prefix=REMOVECLOSURES
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all -closure-specialize-eliminate-dead-closures=0 -closure-specialize %s | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -closure-specialize %s | %FileCheck %s -check-prefix=REMOVECLOSURES
+// RUN: %target-sil-opt -enable-sil-verify-all -closure-specialize-eliminate-dead-closures=0 -closure-specialize %s | %FileCheck %s
 
 import Builtin
 import Swift
@@ -16,12 +16,12 @@ protocol Q {
 }
 
 public class C {
-  @sil_stored var c: C? { get set }
+  @_hasStorage var c: C? { get set }
   init()
 }
 
 public struct S: Q {
-  @sil_stored var c: C? { get set }
+  @_hasStorage var c: C? { get set }
   init(c: C?)
   init()
 }

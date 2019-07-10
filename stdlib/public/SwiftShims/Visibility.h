@@ -26,6 +26,10 @@
 #define __has_attribute(x) 0
 #endif
 
+#if !defined(__has_builtin)
+#define __has_builtin(builtin) 0
+#endif
+
 #if __has_feature(nullability)
 // Provide macros to temporarily suppress warning about the use of
 // _Nullable and _Nonnull.
@@ -112,6 +116,19 @@
 #endif
 
 
+#ifndef SWIFT_GNUC_PREREQ
+# if defined(__GNUC__) && defined(__GNUC_MINOR__) && defined(__GNUC_PATCHLEVEL__)
+#  define SWIFT_GNUC_PREREQ(maj, min, patch) \
+    ((__GNUC__ << 20) + (__GNUC_MINOR__ << 10) + __GNUC_PATCHLEVEL__ >= \
+     ((maj) << 20) + ((min) << 10) + (patch))
+# elif defined(__GNUC__) && defined(__GNUC_MINOR__)
+#  define SWIFT_GNUC_PREREQ(maj, min, patch) \
+    ((__GNUC__ << 20) + (__GNUC_MINOR__ << 10) >= ((maj) << 20) + ((min) << 10))
+# else
+#  define SWIFT_GNUC_PREREQ(maj, min, patch) 0
+# endif
+#endif
+
 /// Attributes for runtime-stdlib interfaces.
 /// Use these for C implementations that are imported into Swift via SwiftShims
 /// and for C implementations of Swift @_silgen_name declarations
@@ -129,12 +146,31 @@
 ///
 /// SWIFT_RUNTIME_STDLIB_INTERNAL functions are called only by the stdlib.
 /// Such functions are internal and are not exported.
-/// FIXME(sil-serialize-all): _INTERNAL functions are also exported for now
-/// until the tide of @inlinable is rolled back.
-/// They really should be LLVM_LIBRARY_VISIBILITY, not SWIFT_RUNTIME_EXPORT.
 #define SWIFT_RUNTIME_STDLIB_API       SWIFT_RUNTIME_EXPORT
 #define SWIFT_RUNTIME_STDLIB_SPI       SWIFT_RUNTIME_EXPORT
-#define SWIFT_RUNTIME_STDLIB_INTERNAL  SWIFT_RUNTIME_EXPORT
+
+// Match the definition of LLVM_LIBRARY_VISIBILITY from LLVM's
+// Compiler.h. That header requires C++ and this needs to work in C.
+#if (__has_attribute(visibility) || SWIFT_GNUC_PREREQ(4, 0, 0)) &&              \
+    !defined(__MINGW32__) && !defined(__CYGWIN__) && !defined(_WIN32)
+#define SWIFT_LIBRARY_VISIBILITY __attribute__ ((visibility("hidden")))
+#else
+#define SWIFT_LIBRARY_VISIBILITY
+#endif
+
+#if defined(__cplusplus)
+#define SWIFT_RUNTIME_STDLIB_INTERNAL extern "C" SWIFT_LIBRARY_VISIBILITY
+#else
+#define SWIFT_RUNTIME_STDLIB_INTERNAL SWIFT_LIBRARY_VISIBILITY
+#endif
+
+#if __has_builtin(__builtin_expect)
+#define SWIFT_LIKELY(expression) (__builtin_expect(!!(expression), 1))
+#define SWIFT_UNLIKELY(expression) (__builtin_expect(!!(expression), 0))
+#else
+#define SWIFT_LIKELY(expression) ((expression))
+#define SWIFT_UNLIKELY(expression) ((expression))
+#endif
 
 // SWIFT_STDLIB_SHIMS_VISIBILITY_H
 #endif

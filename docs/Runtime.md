@@ -260,9 +260,7 @@ optimization.
 0000000000023a40 T _swift_assignExistentialWithCopy
 000000000001dbf0 T _swift_copyPOD
 000000000001c560 T _swift_getEnumCaseMultiPayload
-000000000001be60 T _swift_getEnumCaseSinglePayload
 000000000001c400 T _swift_storeEnumTagMultiPayload
-000000000001bf90 T _swift_storeEnumTagSinglePayload
 ```
 
 ## Type metadata lookup

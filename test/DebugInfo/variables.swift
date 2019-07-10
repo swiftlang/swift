@@ -4,6 +4,7 @@
 // RUN: %target-swift-frontend %s -g -S -o - | %FileCheck %s --check-prefix ASM-%target-object-format
 // ASM-macho: .section __DWARF,__debug_info
 // ASM-elf: .section .debug_info,"",{{[@%]}}progbits
+// ASM-coff: .section .debug_info,"dr"
 
 // Test variables-interpreter.swift runs this code with `swift -g -i`.
 // Test variables-repl.swift runs this code with `swift -g < variables.swift`.
@@ -40,7 +41,7 @@ print(", \(glob_b)", terminator: "")
 print(", \(glob_s)", terminator: "")
 var unused: Int32 = -1
 
-// CHECK-DAG: ![[RT:[0-9]+]] ={{.*}}"Swift.swiftmodule"
+// CHECK-DAG: ![[RT:[0-9]+]] ={{.*}}"{{.*}}Swift.swiftmodule{{(/.+[.]swiftmodule)?}}"
 
 
 // Stack variables.
@@ -113,4 +114,4 @@ func myprint(_ value: TriValue) {
 }
 myprint(unknown)
 
-// CHECK-DAG: !DIFile(filename: "variables.swift"
+// CHECK-DAG: !DIFile(filename: "{{.*}}variables.swift"

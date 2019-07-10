@@ -22,12 +22,12 @@ import gizmo
 // CHECK: @"\01L_selector_data(bar)" = private global [4 x i8] c"bar\00", section "__TEXT,__objc_methname,cstring_literals", align 1
 // CHECK: @"\01L_selector(bar)" = private externally_initialized global i8* getelementptr inbounds ([4 x i8], [4 x i8]* @"\01L_selector_data(bar)", i64 0, i64 0), section "__DATA,__objc_selrefs,literal_pointers,no_dead_strip", align 8
 
-// CHECK: @"$sSo4RectVMn" = linkonce_odr hidden constant
-// CHECK: @"$sSo4RectVN" = linkonce_odr hidden constant
-
 // CHECK: @"\01L_selector_data(acquiesce)"
 // CHECK-NOT: @"\01L_selector_data(disharmonize)"
 // CHECK: @"\01L_selector_data(eviscerate)"
+
+// CHECK: @"$sSo4RectVMn" = linkonce_odr hidden constant
+// CHECK: @"$sSo4RectVMf" = linkonce_odr hidden constant
 
 struct id {
   var data : AnyObject
@@ -48,7 +48,7 @@ class MyBlammo : Blammo {
 class Test2 : Gizmo {
   func foo() {}
 // CHECK:  define hidden swiftcc void @"$s4objc5Test2C3fooyyF"([[TEST2]]* swiftself) {{.*}} {
-// CHECK:    call {{.*}} @objc_release
+// CHECK:    call {{.*}} @llvm.objc.release
 // CHECK:    ret void
 
   @objc dynamic func bar() {}
@@ -130,7 +130,7 @@ func test10(_ g: Gizmo, r: Rect) {
 func test11_helper<T>(_ t: T) {}
 // NSRect's metadata needs to be uniqued at runtime using getForeignTypeMetadata.
 // CHECK-LABEL: define hidden swiftcc void @"$s4objc6test11yySo4RectVF"
-// CHECK:         call swiftcc %swift.metadata_response @swift_getForeignTypeMetadata(i64 %0, {{.*}} @"$sSo4RectVN"
+// CHECK:         call swiftcc %swift.metadata_response @swift_getForeignTypeMetadata(i64 %0, {{.*}} @"$sSo4RectVMf"
 func test11(_ r: Rect) { test11_helper(r) }
 
 class WeakObjC {
@@ -147,6 +147,7 @@ class WeakObjC {
 // CHECK:  i32 1, !"Objective-C Version", i32 2}
 // CHECK:  i32 1, !"Objective-C Image Info Version", i32 0}
 // CHECK:  i32 1, !"Objective-C Image Info Section", !"__DATA,__objc_imageinfo,regular,no_dead_strip"}
-//   1536 == (6 << 8).  6 is the Swift ABI version.
-// CHECK:  i32 4, !"Objective-C Garbage Collection", i32 1536}
-// CHECK:  i32 1, !"Swift Version", i32 6}
+//   83953408 == (5 << 24) | (1 << 16) | (7 << 8). 
+//     5 and 0 is the current major.minor version. 7 is the Swift ABI version.
+// CHECK:  i32 4, !"Objective-C Garbage Collection", i32 83953408}
+// CHECK:  i32 1, !"Swift Version", i32 7}

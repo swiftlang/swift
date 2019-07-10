@@ -21,20 +21,26 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/ASTDemangler.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "swift/IDE/SourceEntityWalker.h"
+#include "swift/Parse/Lexer.h"
 
 using namespace swift;
 
 static bool shouldPrintAsFavorable(const Decl *D, const PrintOptions &Options) {
   if (!Options.TransformContext ||
-      !D->getDeclContext()->isExtensionContext() ||
+      !isa<ExtensionDecl>(D->getDeclContext()) ||
       !Options.TransformContext->isPrintingSynthesizedExtension())
     return true;
   auto DC = Options.TransformContext->getDeclContext();
   auto BaseTy = Options.TransformContext->getBaseType();
   const auto *FD = dyn_cast<FuncDecl>(D);
   if (!FD)
+    return true;
+  // Don't check overload choices for accessor decls.
+  if (isa<AccessorDecl>(FD))
     return true;
   ResolvedMemberResult Result =
       resolveValueMember(*DC, BaseTy, FD->getEffectiveFullName());
@@ -60,8 +66,8 @@ PrintOptions PrintOptions::printTypeInterface(Type T) {
   result.PrintExtensionFromConformingProtocols = true;
   result.TransformContext = TypeTransformContext(T);
   result.printExtensionContentAsMembers = [T](const ExtensionDecl *ED) {
-    return isExtensionApplied(*T->getNominalOrBoundGenericNominal()->
-                              getDeclContext(), T, ED);
+    return isExtensionApplied(
+        T->getNominalOrBoundGenericNominal()->getDeclContext(), T, ED);
   };
   result.CurrentPrintabilityChecker.reset(new ModulePrinterPrintableChecker());
   return result;
@@ -264,8 +270,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
 
   unsigned countInherits(ExtensionDecl *ED) {
     SmallVector<TypeLoc, 4> Results;
-    getInheritedForPrinting(
-        ED, [&](const Decl *D) { return Options.shouldPrint(D); }, Results);
+    getInheritedForPrinting(ED, Options, Results);
     return Results.size();
   }
 
@@ -322,7 +327,8 @@ struct SynthesizedExtensionAnalyzer::Implementation {
           // conformance instead of subtyping
           if (!canPossiblyConvertTo(First, Second, *DC))
             return true;
-          else if (!isConvertibleTo(First, Second, *DC))
+          else if (!isConvertibleTo(First, Second, /*openArchetypes=*/false,
+                                    *DC))
             MergeInfo.addRequirement(GenericSig, First, Second, Kind);
           break;
 
@@ -441,8 +447,17 @@ struct SynthesizedExtensionAnalyzer::Implementation {
       }
     };
 
+    // We want to visit the protocols of any normal conformances we see, but
+    // we have to avoid doing this to self-conformances or we can end up with
+    // a cycle.  Otherwise this is cycle-proof on valid code.
+    auto addConformance = [&](ProtocolConformance *Conf) {
+      auto RootConf = Conf->getRootConformance();
+      if (isa<NormalProtocolConformance>(RootConf))
+        Unhandled.push_back(RootConf->getProtocol());
+    };
+
     for (auto *Conf : Target->getLocalConformances()) {
-      Unhandled.push_back(Conf->getProtocol());
+      addConformance(Conf);
     }
     if (auto *CD = dyn_cast<ClassDecl>(Target)) {
       if (auto Super = CD->getSuperclassDecl())
@@ -455,7 +470,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
         handleExtension(E, true, nullptr, nullptr);
       }
       for (auto *Conf : Back->getLocalConformances()) {
-        Unhandled.push_back(Conf->getProtocol());
+        addConformance(Conf);
       }
       if (auto *CD = dyn_cast<ClassDecl>(Back)) {
         if (auto Super = CD->getSuperclass())
@@ -467,8 +482,11 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     for (auto *EnablingE : Target->getExtensions()) {
       handleExtension(EnablingE, false, nullptr, nullptr);
       for (auto *Conf : EnablingE->getLocalConformances()) {
-        for (auto E : Conf->getProtocol()->getExtensions())
-          handleExtension(E, true, EnablingE, Conf->getRootNormalConformance());
+        auto NormalConf =
+          dyn_cast<NormalProtocolConformance>(Conf->getRootConformance());
+        if (!NormalConf) continue;
+        for (auto E : NormalConf->getProtocol()->getExtensions())
+          handleExtension(E, true, EnablingE, NormalConf);
       }
     }
 
@@ -563,4 +581,162 @@ collectDefaultImplementationForProtocolMembers(ProtocolDecl *PD,
   // protocols.
   for (auto *IP : PD->getInheritedProtocols())
     HandleMembers(IP->getMembers());
+}
+
+/// This walker will traverse the AST and report types for every expression.
+class ExpressionTypeCollector: public SourceEntityWalker {
+  ModuleDecl &Module;
+  SourceManager &SM;
+  unsigned int BufferId;
+  std::vector<ExpressionTypeInfo> &Results;
+
+  // This is to where we print all types.
+  llvm::raw_ostream &OS;
+
+  // Map from a printed type to the offset in OS where the type starts.
+  llvm::StringMap<uint32_t> TypeOffsets;
+
+  // This keeps track of whether we have a type reported for a given
+  // [offset, length].
+  llvm::DenseMap<unsigned, llvm::DenseSet<unsigned>> AllPrintedTypes;
+
+  // When non empty, we only print expression types that conform to any of
+  // these protocols.
+  llvm::MapVector<ProtocolDecl*, StringRef> &InterestedProtocols;
+
+  // Specified by the client whether we should canonicalize types before printing
+  const bool CanonicalType;
+
+  bool shouldReport(unsigned Offset, unsigned Length, Expr *E,
+                    std::vector<StringRef> &Conformances) {
+    assert(Conformances.empty());
+    // We shouldn't report null types.
+    if (E->getType().isNull())
+      return false;
+
+    // If we have already reported types for this source range, we shouldn't
+    // report again. This makes sure we always report the outtermost type of
+    // several overlapping expressions.
+    auto &Bucket = AllPrintedTypes[Offset];
+    if (Bucket.find(Length) != Bucket.end())
+      return false;
+
+    // We print every expression if the interested protocols are empty.
+    if (InterestedProtocols.empty())
+      return true;
+
+    // Collecting protocols conformed by this expressions that are in the list.
+    for (auto Proto: InterestedProtocols) {
+      if (Module.conformsToProtocol(E->getType(), Proto.first)) {
+        Conformances.push_back(Proto.second);
+      }
+    }
+
+    // We only print the type of the expression if it conforms to any of the
+    // interested protocols.
+    return !Conformances.empty();
+  }
+
+  // Find an existing offset in the type buffer otherwise print the type to
+  // the buffer.
+  std::pair<uint32_t, uint32_t> getTypeOffsets(StringRef PrintedType) {
+    auto It = TypeOffsets.find(PrintedType);
+    if (It == TypeOffsets.end()) {
+      TypeOffsets[PrintedType] = OS.tell();
+      OS << PrintedType << '\0';
+    }
+    return {TypeOffsets[PrintedType], PrintedType.size()};
+  }
+
+
+public:
+  ExpressionTypeCollector(SourceFile &SF,
+              llvm::MapVector<ProtocolDecl*, StringRef> &InterestedProtocols,
+                          std::vector<ExpressionTypeInfo> &Results,
+                          bool CanonicalType,
+                          llvm::raw_ostream &OS): Module(*SF.getParentModule()),
+                            SM(SF.getASTContext().SourceMgr),
+                            BufferId(*SF.getBufferID()),
+                            Results(Results), OS(OS),
+                            InterestedProtocols(InterestedProtocols),
+                            CanonicalType(CanonicalType) {}
+  bool walkToExprPre(Expr *E) override {
+    if (E->getSourceRange().isInvalid())
+      return true;
+    CharSourceRange Range =
+      Lexer::getCharSourceRangeFromSourceRange(SM, E->getSourceRange());
+    unsigned Offset = SM.getLocOffsetInBuffer(Range.getStart(), BufferId);
+    unsigned Length = Range.getByteLength();
+    std::vector<StringRef> Conformances;
+    if (!shouldReport(Offset, Length, E, Conformances))
+      return true;
+    // Print the type to a temporary buffer.
+    SmallString<64> Buffer;
+    {
+      llvm::raw_svector_ostream OS(Buffer);
+      auto Ty = E->getType()->getRValueType();
+      if (CanonicalType) {
+        Ty->getCanonicalType()->print(OS);
+      } else {
+        Ty->reconstituteSugar(true)->print(OS);
+      }
+    }
+    auto Ty = getTypeOffsets(Buffer.str());
+    // Add the type information to the result list.
+    Results.push_back({Offset, Length, Ty.first, Ty.second, {}});
+
+    // Adding all protocol names to the result.
+    for(auto Con: Conformances) {
+      auto Ty = getTypeOffsets(Con);
+      Results.back().protocols.push_back({Ty.first, Ty.second});
+    }
+
+    // Keep track of that we have a type reported for this range.
+    AllPrintedTypes[Offset].insert(Length);
+    return true;
+  }
+};
+
+bool swift::resolveProtocolNames(DeclContext *DC,
+                                 ArrayRef<const char *> names,
+                          llvm::MapVector<ProtocolDecl*, StringRef> &result) {
+  assert(result.empty());
+  auto &ctx = DC->getASTContext();
+  for (auto name : names) {
+    // First try to solve by usr
+    ProtocolDecl *pd = dyn_cast_or_null<ProtocolDecl>(Demangle::
+      getTypeDeclForUSR(ctx, name));
+    if (!pd) {
+      // Second try to solve by mangled symbol name
+      pd = dyn_cast_or_null<ProtocolDecl>(Demangle::getTypeDeclForMangling(ctx, name));
+    }
+    if (!pd) {
+      // Thirdly try to solve by mangled type name
+      if (auto ty = Demangle::getTypeForMangling(ctx, name)) {
+        pd = dyn_cast_or_null<ProtocolDecl>(ty->getAnyGeneric());
+      }
+    }
+    if (pd) {
+      result.insert({pd, name});
+    }
+  }
+  if (names.size() == result.size())
+    return false;
+  // If we resolved none but the given names are not empty, return true for failure.
+  return result.size() == 0;
+}
+
+ArrayRef<ExpressionTypeInfo>
+swift::collectExpressionType(SourceFile &SF,
+                             ArrayRef<const char *> ExpectedProtocols,
+                             std::vector<ExpressionTypeInfo> &Scratch,
+                             bool CanonicalType,
+                             llvm::raw_ostream &OS) {
+  llvm::MapVector<ProtocolDecl*, StringRef> InterestedProtocols;
+  if (resolveProtocolNames(&SF, ExpectedProtocols, InterestedProtocols))
+    return {};
+  ExpressionTypeCollector Walker(SF, InterestedProtocols, Scratch,
+    CanonicalType, OS);
+  Walker.walk(SF);
+  return Scratch;
 }

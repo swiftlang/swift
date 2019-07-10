@@ -17,6 +17,7 @@ from __future__ import print_function
 
 import os
 import pipes
+import platform
 import shutil
 import subprocess
 import sys
@@ -91,6 +92,21 @@ def call(command, stderr=None, env=None, dry_run=None, echo=True):
         diagnostics.fatal(
             "could not execute '" + quote_command(command) +
             "': " + e.strerror)
+
+
+def call_without_sleeping(command, env=None, dry_run=False, echo=False):
+    """
+    Execute a command during which system sleep is disabled.
+
+    By default, this ignores the state of the `shell.dry_run` flag.
+    """
+
+    # Disable system sleep, if possible.
+    if platform.system() == 'Darwin':
+        # Don't mutate the caller's copy of the arguments.
+        command = ["caffeinate"] + list(command)
+
+    call(command, env=env, dry_run=dry_run, echo=echo)
 
 
 def capture(command, stderr=None, env=None, dry_run=None, echo=True,
@@ -225,10 +241,10 @@ def run_parallel(fn, pool_args, n_processes=0):
     if n_processes == 0:
         n_processes = cpu_count() * 2
 
-    l = Lock()
+    lk = Lock()
     print("Running ``%s`` with up to %d processes." %
           (fn.__name__, n_processes))
-    pool = Pool(processes=n_processes, initializer=init, initargs=(l,))
+    pool = Pool(processes=n_processes, initializer=init, initargs=(lk,))
     results = pool.map_async(func=fn, iterable=pool_args).get(999999)
     pool.close()
     pool.join()

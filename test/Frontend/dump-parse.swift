@@ -1,17 +1,16 @@
 // RUN: not %target-swift-frontend -dump-parse %s 2>&1 | %FileCheck %s
-// RUN: not %target-swift-frontend -dump-ast %s 2>&1 | %FileCheck %s -check-prefix=CHECK-AST
+// RUN: not %target-swift-frontend -dump-ast %s | %FileCheck %s -check-prefix=CHECK-AST
 
 // CHECK-LABEL: (func_decl{{.*}}"foo(_:)"
 // CHECK-AST-LABEL: (func_decl{{.*}}"foo(_:)"
 func foo(_ n: Int) -> Int {
   // CHECK:   (brace_stmt
   // CHECK:     (return_stmt
-  // CHECK:       (integer_literal_expr type='<null>' value=42)))
+  // CHECK:       (integer_literal_expr type='<null>' value=42 {{.*}})))
   // CHECK-AST: (brace_stmt
   // CHECK-AST:   (return_stmt
-  // CHECK-AST:     (call_expr implicit type='Int'
-  // CHECK-AST:       (integer_literal_expr type='{{[^']+}}' {{.*}} value=42)
-  return 42
+  // CHECK-AST:     (integer_literal_expr type='{{[^']+}}' {{.*}} value=42 {{.*}})
+    return 42
 }
 
 // -dump-parse should print an AST even though this code is invalid.

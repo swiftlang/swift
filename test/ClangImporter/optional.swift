@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -module-name optional -I %S/Inputs/custom-modules -enable-sil-ownership -emit-silgen -o - %s | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -module-name optional -I %S/Inputs/custom-modules -emit-silgen -o - %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -12,7 +12,7 @@ class A {
   @objc func foo() -> String? {
     return ""
   }
-// CHECK-LABEL:    sil hidden [thunk] @$s8optional1AC3fooSSSgyFTo : $@convention(objc_method) (A) -> @autoreleased Optional<NSString>
+// CHECK-LABEL:    sil hidden [thunk] [ossa] @$s8optional1AC3fooSSSgyFTo : $@convention(objc_method) (A) -> @autoreleased Optional<NSString>
 // CHECK:    bb0([[SELF:%.*]] : @unowned $A):
 // CHECK:      [[SELF_COPY:%.*]] = copy_value [[SELF]]
 // CHECK:      [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
@@ -27,8 +27,8 @@ class A {
 // CHECK:      [[T0:%.*]] = function_ref @$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
 // CHECK-NEXT: [[BORROWED_STR:%.*]] = begin_borrow [[STR]]
 // CHECK-NEXT: [[T1:%.*]] = apply [[T0]]([[BORROWED_STR]])
-// CHECK-NEXT: enum $Optional<NSString>, #Optional.some!enumelt.1, [[T1]]
 // CHECK-NEXT: end_borrow [[BORROWED_STR:%.*]]
+// CHECK-NEXT: enum $Optional<NSString>, #Optional.some!enumelt.1, [[T1]]
 // CHECK-NEXT: destroy_value [[STR]]
 // CHECK-NEXT: br
 //   Nothing branch: inject nothing into result.
@@ -41,7 +41,7 @@ class A {
 // CHECK-NEXT: return [[T0]]
 
   @objc func bar(x x : String?) {}
-// CHECK-LABEL:    sil hidden [thunk] @$s8optional1AC3bar1xySSSg_tFTo : $@convention(objc_method) (Optional<NSString>, A) -> ()
+// CHECK-LABEL:    sil hidden [thunk] [ossa] @$s8optional1AC3bar1xySSSg_tFTo : $@convention(objc_method) (Optional<NSString>, A) -> ()
 // CHECK:    bb0([[ARG:%.*]] : @unowned $Optional<NSString>, [[SELF:%.*]] : @unowned $A):
 // CHECK:      [[ARG_COPY:%.*]] = copy_value [[ARG]]
 // CHECK:      [[SELF_COPY:%.*]] = copy_value [[SELF]]

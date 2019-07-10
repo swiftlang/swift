@@ -98,8 +98,8 @@ class CodeCompletionInClassMethods1 {
 // Positive tests.
 // IN_CLASS_STATIC_METHOD_1: Begin completions
 // IN_CLASS_STATIC_METHOD_1-DAG: Decl[LocalVar]/Local:             self[#CodeCompletionInClassMethods1.Type#]{{; name=.+$}}
-// IN_CLASS_STATIC_METHOD_1-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc0({#self: CodeCompletionInClassMethods1#})[#() -> Void#]{{; name=.+$}}
-// IN_CLASS_STATIC_METHOD_1-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc1({#self: CodeCompletionInClassMethods1#})[#(Int) -> Void#]{{; name=.+$}}
+// IN_CLASS_STATIC_METHOD_1-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc0({#(self): CodeCompletionInClassMethods1#})[#() -> Void#]{{; name=.+$}}
+// IN_CLASS_STATIC_METHOD_1-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc1({#(self): CodeCompletionInClassMethods1#})[#(Int) -> Void#]{{; name=.+$}}
 // IN_CLASS_STATIC_METHOD_1-DAG: Decl[Struct]/CurrNominal:         NestedStruct[#CodeCompletionInClassMethods1.NestedStruct#]{{; name=.+$}}
 // IN_CLASS_STATIC_METHOD_1-DAG: Decl[Class]/CurrNominal:          NestedClass[#CodeCompletionInClassMethods1.NestedClass#]{{; name=.+$}}
 // IN_CLASS_STATIC_METHOD_1-DAG: Decl[Enum]/CurrNominal:           NestedEnum[#CodeCompletionInClassMethods1.NestedEnum#]{{; name=.+$}}
@@ -199,8 +199,8 @@ struct CodeCompletionInStructMethods1 {
 // Positive tests.
 // IN_STRUCT_STATIC_METHOD_1: Begin completions
 // IN_STRUCT_STATIC_METHOD_1-DAG: Decl[LocalVar]/Local:             self[#CodeCompletionInStructMethods1.Type#]{{; name=.+$}}
-// IN_STRUCT_STATIC_METHOD_1-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc0({#self: &CodeCompletionInStructMethods1#})[#() -> Void#]{{; name=.+$}}
-// IN_STRUCT_STATIC_METHOD_1-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc1({#self: &CodeCompletionInStructMethods1#})[#(Int) -> Void#]{{; name=.+$}}
+// IN_STRUCT_STATIC_METHOD_1-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc0({#(self): &CodeCompletionInStructMethods1#})[#() -> Void#]{{; name=.+$}}
+// IN_STRUCT_STATIC_METHOD_1-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc1({#(self): &CodeCompletionInStructMethods1#})[#(Int) -> Void#]{{; name=.+$}}
 // IN_STRUCT_STATIC_METHOD_1-DAG: Decl[Struct]/CurrNominal:         NestedStruct[#CodeCompletionInStructMethods1.NestedStruct#]{{; name=.+$}}
 // IN_STRUCT_STATIC_METHOD_1-DAG: Decl[Class]/CurrNominal:          NestedClass[#CodeCompletionInStructMethods1.NestedClass#]{{; name=.+$}}
 // IN_STRUCT_STATIC_METHOD_1-DAG: Decl[Enum]/CurrNominal:           NestedEnum[#CodeCompletionInStructMethods1.NestedEnum#]{{; name=.+$}}
@@ -259,9 +259,9 @@ struct NestedOuter1 {
         #^NESTED_NOMINAL_DECL_A_2^#
 // NESTED_NOMINAL_DECL_A_2: Begin completions
 // NESTED_NOMINAL_DECL_A_2-DAG: Decl[LocalVar]/Local:             self[#NestedInnerA.Type#]{{; name=.+$}}
-// NESTED_NOMINAL_DECL_A_2-DAG: Decl[InstanceMethod]/CurrNominal: aTestInstanceFunc({#self: &NestedInnerA#})[#() -> Void#]{{; name=.+$}}
+// NESTED_NOMINAL_DECL_A_2-DAG: Decl[InstanceMethod]/CurrNominal: aTestInstanceFunc({#(self): &NestedInnerA#})[#() -> Void#]{{; name=.+$}}
 // NESTED_NOMINAL_DECL_A_2-DAG: Decl[StaticMethod]/CurrNominal:   aTestStaticFunc()[#Void#]{{; name=.+$}}
-// NESTED_NOMINAL_DECL_A_2-DAG: Decl[InstanceMethod]/CurrNominal: aInstanceFunc({#self: &NestedInnerA#})[#() -> Void#]{{; name=.+$}}
+// NESTED_NOMINAL_DECL_A_2-DAG: Decl[InstanceMethod]/CurrNominal: aInstanceFunc({#(self): &NestedInnerA#})[#() -> Void#]{{; name=.+$}}
 // NESTED_NOMINAL_DECL_A_2-DAG: Decl[StaticVar]/CurrNominal:      aStaticVar[#Int#]{{; name=.+$}}
 // NESTED_NOMINAL_DECL_A_2-DAG: Decl[StaticMethod]/CurrNominal:   aStaticFunc()[#Void#]{{; name=.+$}}
 // NESTED_NOMINAL_DECL_A_2-DAG: Decl[Struct]/CurrNominal:         NestedInnerAStruct[#NestedInnerA.NestedInnerAStruct#]{{; name=.+$}}
@@ -328,7 +328,7 @@ struct NestedOuter1 {
 // NESTED_NOMINAL_DECL_A_5-NEXT: Decl[InstanceMethod]/CurrNominal: .aTestInstanceFunc()[#Void#]{{; name=.+$}}
 // NESTED_NOMINAL_DECL_A_5-NEXT: Decl[InstanceVar]/CurrNominal:    .aInstanceVar[#Int#]{{; name=.+$}}
 // NESTED_NOMINAL_DECL_A_5-NEXT: Decl[InstanceMethod]/CurrNominal: .aInstanceFunc()[#Void#]{{; name=.+$}}
-// NESTED_NOMINAL_DECL_A_5-NEXT: Decl[Subscript]/CurrNominal:      [{#Int#}][#Double#]{{; name=.+$}}
+// NESTED_NOMINAL_DECL_A_5-NEXT: Decl[Subscript]/CurrNominal:      [{#(i): Int#}][#Double#]{{; name=.+$}}
 // NESTED_NOMINAL_DECL_A_5-NEXT: Keyword[self]/CurrNominal:        .self[#NestedInnerA#]; name=self
 // NESTED_NOMINAL_DECL_A_5-NEXT: End completions
   }
@@ -364,9 +364,9 @@ struct NestedOuter1 {
         #^NESTED_NOMINAL_DECL_B_2^#
 // NESTED_NOMINAL_DECL_B_2: Begin completions
 // NESTED_NOMINAL_DECL_B_2-DAG: Decl[LocalVar]/Local:             self[#NestedInnerB.Type#]{{; name=.+$}}
-// NESTED_NOMINAL_DECL_B_2-DAG: Decl[InstanceMethod]/CurrNominal: bTestInstanceFunc({#self: &NestedInnerB#})[#() -> Void#]{{; name=.+$}}
+// NESTED_NOMINAL_DECL_B_2-DAG: Decl[InstanceMethod]/CurrNominal: bTestInstanceFunc({#(self): &NestedInnerB#})[#() -> Void#]{{; name=.+$}}
 // NESTED_NOMINAL_DECL_B_2-DAG: Decl[StaticMethod]/CurrNominal:   bTestStaticFunc()[#Void#]{{; name=.+$}}
-// NESTED_NOMINAL_DECL_B_2-DAG: Decl[InstanceMethod]/CurrNominal: bInstanceFunc({#self: &NestedInnerB#})[#() -> Void#]{{; name=.+$}}
+// NESTED_NOMINAL_DECL_B_2-DAG: Decl[InstanceMethod]/CurrNominal: bInstanceFunc({#(self): &NestedInnerB#})[#() -> Void#]{{; name=.+$}}
 // NESTED_NOMINAL_DECL_B_2-DAG: Decl[StaticVar]/CurrNominal:      bStaticVar[#Int#]{{; name=.+$}}
 // NESTED_NOMINAL_DECL_B_2-DAG: Decl[StaticMethod]/CurrNominal:   bStaticFunc()[#Void#]{{; name=.+$}}
 // NESTED_NOMINAL_DECL_B_2-DAG: Decl[Struct]/CurrNominal:         NestedInnerBStruct[#NestedInnerB.NestedInnerBStruct#]{{; name=.+$}}
@@ -424,9 +424,9 @@ struct NestedOuter1 {
 // NESTED_NOMINAL_DECL_B_4: Begin completions
 // NESTED_NOMINAL_DECL_B_4-DAG: Decl[Struct]/Local:               NestedInnerB[#NestedInnerB#]{{; name=.+$}}
 // NESTED_NOMINAL_DECL_B_4-DAG: Decl[LocalVar]/Local:             self[#NestedOuter1.Type#]{{; name=.+$}}
-// NESTED_NOMINAL_DECL_B_4-DAG: Decl[InstanceMethod]/CurrNominal: testInstanceFunc({#self: &NestedOuter1#})[#() -> Void#]{{; name=.+$}}
+// NESTED_NOMINAL_DECL_B_4-DAG: Decl[InstanceMethod]/CurrNominal: testInstanceFunc({#(self): &NestedOuter1#})[#() -> Void#]{{; name=.+$}}
 // NESTED_NOMINAL_DECL_B_4-DAG: Decl[StaticMethod]/CurrNominal:   testStaticFunc()[#Void#]{{; name=.+$}}
-// NESTED_NOMINAL_DECL_B_4-DAG: Decl[InstanceMethod]/CurrNominal: outerInstanceFunc({#self: &NestedOuter1#})[#() -> Void#]{{; name=.+$}}
+// NESTED_NOMINAL_DECL_B_4-DAG: Decl[InstanceMethod]/CurrNominal: outerInstanceFunc({#(self): &NestedOuter1#})[#() -> Void#]{{; name=.+$}}
 // NESTED_NOMINAL_DECL_B_4-DAG: Decl[StaticVar]/CurrNominal:      outerStaticVar[#Int#]{{; name=.+$}}
 // NESTED_NOMINAL_DECL_B_4-DAG: Decl[StaticMethod]/CurrNominal:   outerStaticFunc()[#Void#]{{; name=.+$}}
 // NESTED_NOMINAL_DECL_B_4-DAG: Decl[TypeAlias]/CurrNominal:      OuterTypealias[#Int#]{{; name=.+$}}
@@ -438,7 +438,7 @@ struct NestedOuter1 {
 // NESTED_NOMINAL_DECL_B_5-DAG: Decl[InstanceMethod]/CurrNominal: .bTestInstanceFunc()[#Void#]{{; name=.+$}}
 // NESTED_NOMINAL_DECL_B_5-DAG: Decl[InstanceVar]/CurrNominal:    .bInstanceVar[#Int#]{{; name=.+$}}
 // NESTED_NOMINAL_DECL_B_5-DAG: Decl[InstanceMethod]/CurrNominal: .bInstanceFunc()[#Void#]{{; name=.+$}}
-// NESTED_NOMINAL_DECL_B_5-DAG: Decl[Subscript]/CurrNominal:      [{#Int#}][#Double#]{{; name=.+$}}
+// NESTED_NOMINAL_DECL_B_5-DAG: Decl[Subscript]/CurrNominal:      [{#(i): Int#}][#Double#]{{; name=.+$}}
 // NESTED_NOMINAL_DECL_B_5-DAG: Keyword[self]/CurrNominal:        .self[#NestedInnerB#]; name=self
 // NESTED_NOMINAL_DECL_B_5: End completions
   }
@@ -474,9 +474,9 @@ func testOuterC() {
       #^NESTED_NOMINAL_DECL_C_2^#
 // NESTED_NOMINAL_DECL_C_2: Begin completions
 // NESTED_NOMINAL_DECL_C_2-DAG: Decl[LocalVar]/Local:             self[#NestedInnerC.Type#]{{; name=.+$}}
-// NESTED_NOMINAL_DECL_C_2-DAG: Decl[InstanceMethod]/CurrNominal: cTestInstanceFunc({#self: &NestedInnerC#})[#() -> Void#]{{; name=.+$}}
+// NESTED_NOMINAL_DECL_C_2-DAG: Decl[InstanceMethod]/CurrNominal: cTestInstanceFunc({#(self): &NestedInnerC#})[#() -> Void#]{{; name=.+$}}
 // NESTED_NOMINAL_DECL_C_2-DAG: Decl[StaticMethod]/CurrNominal:   cTestStaticFunc()[#Void#]{{; name=.+$}}
-// NESTED_NOMINAL_DECL_C_2-DAG: Decl[InstanceMethod]/CurrNominal: cInstanceFunc({#self: &NestedInnerC#})[#() -> Void#]{{; name=.+$}}
+// NESTED_NOMINAL_DECL_C_2-DAG: Decl[InstanceMethod]/CurrNominal: cInstanceFunc({#(self): &NestedInnerC#})[#() -> Void#]{{; name=.+$}}
 // NESTED_NOMINAL_DECL_C_2-DAG: Decl[StaticVar]/CurrNominal:      cStaticVar[#Int#]{{; name=.+$}}
 // NESTED_NOMINAL_DECL_C_2-DAG: Decl[StaticMethod]/CurrNominal:   cStaticFunc()[#Void#]{{; name=.+$}}
 // NESTED_NOMINAL_DECL_C_2-DAG: Decl[Struct]/CurrNominal:         NestedInnerCStruct[#NestedInnerC.NestedInnerCStruct#]{{; name=.+$}}
@@ -530,7 +530,7 @@ func testOuterC() {
 // NESTED_NOMINAL_DECL_C_5-NEXT: Decl[InstanceMethod]/CurrNominal: .cTestInstanceFunc()[#Void#]{{; name=.+$}}
 // NESTED_NOMINAL_DECL_C_5-NEXT: Decl[InstanceVar]/CurrNominal:    .cInstanceVar[#Int#]{{; name=.+$}}
 // NESTED_NOMINAL_DECL_C_5-NEXT: Decl[InstanceMethod]/CurrNominal: .cInstanceFunc()[#Void#]{{; name=.+$}}
-// NESTED_NOMINAL_DECL_C_5-NEXT: Decl[Subscript]/CurrNominal:      [{#Int#}][#Double#]{{; name=.+$}}
+// NESTED_NOMINAL_DECL_C_5-NEXT: Decl[Subscript]/CurrNominal:      [{#(i): Int#}][#Double#]{{; name=.+$}}
 // NESTED_NOMINAL_DECL_C_5-NEXT: Keyword[self]/CurrNominal:        .self[#NestedInnerC#]; name=self
 // NESTED_NOMINAL_DECL_C_5-NEXT: End completions
 }

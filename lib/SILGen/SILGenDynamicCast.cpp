@@ -229,11 +229,16 @@ namespace {
           return;
         }
 
-        if (consumption == CastConsumptionKind::CopyOnSuccess) {
+        switch (consumption) {
+        case CastConsumptionKind::BorrowAlways:
+        case CastConsumptionKind::CopyOnSuccess:
           SGF.B.createGuaranteedPhiArgument(operandValue.getType());
           handleFalse(None);
-        } else {
+          break;
+        case CastConsumptionKind::TakeAlways:
+        case CastConsumptionKind::TakeOnSuccess:
           handleFalse(SGF.B.createOwnedPhiArgument(operandValue.getType()));
+          break;
         }
 
         assert(!SGF.B.hasValidInsertionPoint() && "handler did not end block");
@@ -583,7 +588,7 @@ SILValue Lowering::emitIsa(SILGenFunction &SGF, SILLocation loc,
       });
 
   auto contBB = scope.exit();
-  auto isa = contBB->createPhiArgument(i1Ty, ValueOwnershipKind::Trivial);
+  auto isa = contBB->createPhiArgument(i1Ty, ValueOwnershipKind::Any);
   return isa;
 }
 

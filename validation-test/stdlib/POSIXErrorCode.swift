@@ -1,20 +1,17 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 //
-// REQUIRES: OS=macosx
-// REQUIRES: OS=ios
-// REQUIRES: OS=tvos
-// REQUIRES: OS=watchos
-// REQUIRES: OS=linux-androideabi
-// REQUIRES: OS=linux-gnu
+// REQUIRES-ANY: OS=macosx, OS=ios, OS=tvos, OS=watchos, OS=linux-androideabi, OS=linux-android, OS=linux-gnu
 
 import Swift
 import StdlibUnittest
 
-#if os(Linux) || os(Android)
-  import Glibc
-#elseif os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
   import Darwin
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
+  import Glibc
+#else
+#error("Unsupported platform")
 #endif
 
 var POSIXErrorCodeTestSuite = TestSuite("POSIXErrorCode")
@@ -161,3 +158,5 @@ POSIXErrorCodeTestSuite.test("Linux POSIX error codes constants") {
 }
 
 #endif
+
+runAllTests()

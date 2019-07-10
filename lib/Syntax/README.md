@@ -280,7 +280,10 @@ new `Syntax` nodes:
    the next newline character.
 
 2. Looking backward in the text, a token owns all of the leading trivia
-   up to and including the first contiguous sequence of newlines characters.
+   up to and including the first newline character.
+   
+In other words, a contiguous stretch of trivia between two tokens is split on the
+leftmost newline.
 
 Let's take a look at how this shows up in practice with a small snippet of Swift
 code.

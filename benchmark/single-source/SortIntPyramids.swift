@@ -8,11 +8,13 @@ public let SortIntPyramids = [
   BenchmarkInfo(
     name: "SortIntPyramid",
     runFunction: run_SortIntPyramid,
-    tags: [.validation, .api, .algorithm]),
+    tags: [.validation, .api, .algorithm],
+    legacyFactor: 5),
   BenchmarkInfo(
     name: "SortAdjacentIntPyramids",
     runFunction: run_SortAdjacentIntPyramids,
-    tags: [.validation, .api, .algorithm]),
+    tags: [.validation, .api, .algorithm],
+    legacyFactor: 5),
 ]
 
 // let A - array sorted in ascending order,
@@ -51,7 +53,7 @@ let adjacentPyramidsTemplate: [Int] = (1...aPH) + (1...aPH).reversed()
 
 @inline(never)
 public func run_SortIntPyramid(_ N: Int) {
-  for _ in 1...25*N {
+  for _ in 1...5*N {
     var pyramid = pyramidTemplate
 
     // sort pyramid in place.
@@ -64,7 +66,7 @@ public func run_SortIntPyramid(_ N: Int) {
 
 @inline(never)
 public func run_SortAdjacentIntPyramids(_ N: Int) {
-  for _ in 1...25*N {
+  for _ in 1...5*N {
     var adjacentPyramids = adjacentPyramidsTemplate
     adjacentPyramids.sort()
     // Check whether pyramid is sorted.

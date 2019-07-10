@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift
 
-// RUN: %target-typecheck-verify-swift -typecheck -debug-generic-signatures %s > %t.dump 2>&1 
+// RUN: %target-typecheck-verify-swift -typecheck -debug-generic-signatures %s > %t.dump 2>&1
 // RUN: %FileCheck %s < %t.dump
 
 class A {
@@ -94,7 +94,7 @@ func superclassConformance3<T>(t: T) where T : C, T : P4, T : C2 {}
 
 protocol P5: A { }
 
-protocol P6: A, Other { } // expected-error {{protocol 'P6' cannot be a subclass of both 'Other' and 'A'}}
+protocol P6: A, Other { } // expected-error {{protocol 'P6' cannot require 'Self' to be a subclass of both 'Other' and 'A'}}
 // expected-error@-1{{multiple inheritance from classes 'A' and 'Other'}}
 // expected-note@-2 {{superclass constraint 'Self' : 'A' written here}}
 
@@ -105,9 +105,8 @@ func takeP5<T: P5>(_ t: T) {
 
 protocol P7 {
 	associatedtype Assoc: A, Other 
-	// FIXME: expected-error@-1{{multiple inheritance from classes 'A' and 'Other'}}
-	// expected-note@-2{{superclass constraint 'Self.Assoc' : 'A' written here}}
-	// expected-error@-3{{'Self.Assoc' cannot be a subclass of both 'Other' and 'A'}}
+	// expected-note@-1{{superclass constraint 'Self.Assoc' : 'A' written here}}
+	// expected-error@-2{{'Self.Assoc' cannot be a subclass of both 'Other' and 'A'}}
 }
 
 // CHECK: superclassConformance4
@@ -204,3 +203,13 @@ func g<T : Init & Derived>(_: T.Type) {
   _ = T(x: ())
   _ = T(y: ())
 }
+
+// Binding a class-constrained generic parameter to a subclass existential is
+// not sound.
+struct G<T : Base> {}
+// expected-note@-1 2 {{requirement specified as 'T' : 'Base' [with T = Base & P]}}
+
+_ = G<Base & P>() // expected-error {{'G' requires that 'Base & P' inherit from 'Base'}}
+
+func badClassConstrainedType(_: G<Base & P>) {}
+// expected-error@-1 {{'G' requires that 'Base & P' inherit from 'Base'}}

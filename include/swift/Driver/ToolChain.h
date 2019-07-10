@@ -158,7 +158,10 @@ protected:
   virtual InvocationInfo
   constructInvocation(const AutolinkExtractJobAction &job,
                       const JobContext &context) const;
-  virtual InvocationInfo constructInvocation(const LinkJobAction &job,
+  virtual InvocationInfo constructInvocation(const DynamicLinkJobAction &job,
+                                             const JobContext &context) const;
+
+  virtual InvocationInfo constructInvocation(const StaticLinkJobAction &job,
                                              const JobContext &context) const;
 
   /// Searches for the given executable in appropriate paths relative to the
@@ -191,23 +194,37 @@ protected:
                               file_types::ID InputType,
                               const char *PrefixArgument = nullptr) const;
 
-  /// Get the runtime library link path, which is platform-specific and found
+  /// Get the resource dir link path, which is platform-specific and found
   /// relative to the compiler.
-  void getRuntimeLibraryPath(SmallVectorImpl<char> &runtimeLibPath,
-                             const llvm::opt::ArgList &args, bool shared) const;
+  void getResourceDirPath(SmallVectorImpl<char> &runtimeLibPath,
+                          const llvm::opt::ArgList &args, bool shared) const;
+
+  /// Get the runtime library link paths, which typically include the resource
+  /// dir path and the SDK.
+  void getRuntimeLibraryPaths(SmallVectorImpl<std::string> &runtimeLibPaths,
+                              const llvm::opt::ArgList &args,
+                              StringRef SDKPath, bool shared) const;
 
   void addPathEnvironmentVariableIfNeeded(Job::EnvironmentVector &env,
                                           const char *name,
                                           const char *separator,
                                           options::ID optionID,
                                           const llvm::opt::ArgList &args,
-                                          StringRef extraEntry = "") const;
+                                          ArrayRef<std::string> extraEntries = {}) const;
 
   /// Specific toolchains should override this to provide additional conditions
   /// under which the compiler invocation should be written into debug info. For
   /// example, Darwin does this if the RC_DEBUG_OPTIONS environment variable is
   /// set to match the behavior of Clang.
   virtual bool shouldStoreInvocationInDebugInfo() const { return false; }
+
+  /// Gets the response file path and command line argument for an invocation
+  /// if the tool supports response files and if the command line length would
+  /// exceed system limits.
+  Optional<Job::ResponseFileInfo>
+  getResponseFileInfo(const Compilation &C, const char *executablePath,
+                      const InvocationInfo &invocationInfo,
+                      const JobContext &context) const;
 
 public:
   virtual ~ToolChain() = default;

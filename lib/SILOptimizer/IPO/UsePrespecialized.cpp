@@ -55,6 +55,8 @@ class UsePrespecialized: public SILModuleTransform {
   bool replaceByPrespecialized(SILFunction &F);
 };
 
+} // end anonymous namespace
+
 // Analyze the function and replace each apply of
 // a generic function by an apply of the corresponding
 // pre-specialized function, if such a pre-specialization exists.
@@ -66,7 +68,7 @@ bool UsePrespecialized::replaceByPrespecialized(SILFunction &F) {
   collectApplyInst(F, NewApplies);
 
   for (auto &AI : NewApplies) {
-    auto *ReferencedF = AI.getReferencedFunction();
+    auto *ReferencedF = AI.getReferencedFunctionOrNull();
     if (!ReferencedF)
       continue;
 
@@ -88,7 +90,7 @@ bool UsePrespecialized::replaceByPrespecialized(SILFunction &F) {
     if (Subs.hasArchetypes())
       continue;
 
-    ReabstractionInfo ReInfo(AI, ReferencedF, Subs);
+    ReabstractionInfo ReInfo(AI, ReferencedF, Subs, IsNotSerialized);
 
     if (!ReInfo.canBeSpecialized())
       continue;
@@ -143,12 +145,17 @@ bool UsePrespecialized::replaceByPrespecialized(SILFunction &F) {
                             << " : " << NewF->getName() << "\n");
 
     auto NewAI = replaceWithSpecializedFunction(AI, NewF, ReInfo);
-    if (auto oldApply = dyn_cast<ApplyInst>(AI)) {
-      oldApply->replaceAllUsesWith(cast<ApplyInst>(NewAI));
-    } else if (auto oldPApply = dyn_cast<PartialApplyInst>(AI)) {
-      oldPApply->replaceAllUsesWith(cast<PartialApplyInst>(NewAI));
-    } else {
-      assert(isa<TryApplyInst>(NewAI) || isa<BeginApplyInst>(NewAI));
+    switch (AI.getKind()) {
+    case ApplySiteKind::ApplyInst:
+      cast<ApplyInst>(AI)->replaceAllUsesWith(cast<ApplyInst>(NewAI));
+      break;
+    case ApplySiteKind::PartialApplyInst:
+      cast<PartialApplyInst>(AI)->replaceAllUsesWith(
+          cast<PartialApplyInst>(NewAI));
+      break;
+    case ApplySiteKind::TryApplyInst:
+    case ApplySiteKind::BeginApplyInst:
+      break;
     }
     recursivelyDeleteTriviallyDeadInstructions(AI.getInstruction(), true);
     Changed = true;
@@ -156,8 +163,6 @@ bool UsePrespecialized::replaceByPrespecialized(SILFunction &F) {
 
   return Changed;
 }
-
-} // end anonymous namespace
 
 
 SILTransform *swift::createUsePrespecialized() {

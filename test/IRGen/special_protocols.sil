@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -emit-ir -parse-stdlib -module-name Swift | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend %s -emit-ir -parse-stdlib -module-name Swift | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 public protocol Error {}
 // CHECK: [[ERROR_NAME:@.*]] = private constant [6 x i8] c"Error\00"

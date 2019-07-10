@@ -132,20 +132,20 @@ public:
     return const_cast<SILBasicBlock *>(this)->getTerminator();
   }
 
-  /// \brief Splits a basic block into two at the specified instruction.
+  /// Splits a basic block into two at the specified instruction.
   ///
   /// Note that all the instructions BEFORE the specified iterator
   /// stay as part of the original basic block. The old basic block is left
   /// without a terminator.
   SILBasicBlock *split(iterator I);
 
-  /// \brief Move the basic block to after the specified basic block in the IR.
+  /// Move the basic block to after the specified basic block in the IR.
   ///
   /// Assumes that the basic blocks must reside in the same function. In asserts
   /// builds, an assert verifies that this is true.
   void moveAfter(SILBasicBlock *After);
 
-  /// \brief Moves the instruction to the iterator in this basic block.
+  /// Moves the instruction to the iterator in this basic block.
   void moveTo(SILBasicBlock::iterator To, SILInstruction *I);
 
   //===--------------------------------------------------------------------===//
@@ -232,11 +232,20 @@ public:
                                                const ValueDecl *D = nullptr);
 
   /// Replace the \p{i}th BB arg with a new BBArg with SILType \p Ty and
-  /// ValueDecl
-  /// \p D.
-  SILPhiArgument *replacePhiArgument(unsigned i, SILType Ty,
-                                     ValueOwnershipKind Kind,
-                                     const ValueDecl *D = nullptr);
+  /// ValueDecl \p D.
+  ///
+  /// NOTE: This assumes that the current argument in position \p i has had its
+  /// uses eliminated. To replace/replace all uses with, use
+  /// replacePhiArgumentAndRAUW.
+  SILPhiArgument *replacePhiArgument(unsigned i, SILType type,
+                                     ValueOwnershipKind kind,
+                                     const ValueDecl *decl = nullptr);
+
+  /// Replace phi argument \p i and RAUW all uses.
+  SILPhiArgument *
+  replacePhiArgumentAndReplaceAllUses(unsigned i, SILType type,
+                                      ValueOwnershipKind kind,
+                                      const ValueDecl *decl = nullptr);
 
   /// Allocate a new argument of type \p Ty and append it to the argument
   /// list. Optionally you can pass in a value decl parameter.
@@ -257,7 +266,7 @@ public:
     return insertPhiArgument(Pos, Ty, Kind, D);
   }
 
-  /// \brief Remove all block arguments.
+  /// Remove all block arguments.
   void dropAllArguments() { ArgumentList.clear(); }
 
   //===--------------------------------------------------------------------===//
@@ -311,7 +320,7 @@ public:
     return getTerminator()->getSingleSuccessorBlock();
   }
 
-  /// \brief Returns true if \p BB is a successor of this block.
+  /// Returns true if \p BB is a successor of this block.
   bool isSuccessorBlock(SILBasicBlock *Block) const {
     return getTerminator()->isSuccessorBlock(Block);
   }
@@ -370,7 +379,7 @@ public:
   /// no-return apply or builtin.
   bool isNoReturn() const;
 
-  /// Returns true if this instruction only contains a branch instruction.
+  /// Returns true if this block only contains a branch instruction.
   bool isTrampoline() const;
 
   /// Returns true if it is legal to hoist instructions into this block.
@@ -403,7 +412,7 @@ public:
     return &SILBasicBlock::InstList;
   }
 
-  /// \brief Drops all uses that belong to this basic block.
+  /// Drops all uses that belong to this basic block.
   void dropAllReferences() {
     dropAllArguments();
     for (SILInstruction &I : *this)

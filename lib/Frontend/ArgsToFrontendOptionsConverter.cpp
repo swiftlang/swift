@@ -60,6 +60,9 @@ bool ArgsToFrontendOptionsConverter::convert(
   if (const Arg *A = Args.getLastArg(OPT_index_store_path)) {
     Opts.IndexStorePath = A->getValue();
   }
+  if (const Arg *A = Args.getLastArg(OPT_prebuilt_module_cache_path)) {
+    Opts.PrebuiltModuleCachePath = A->getValue();
+  }
 
   Opts.IndexSystemModules |= Args.hasArg(OPT_index_system_modules);
 
@@ -67,9 +70,21 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.EmitSortedSIL |= Args.hasArg(OPT_emit_sorted_sil);
 
   Opts.EnableTesting |= Args.hasArg(OPT_enable_testing);
-  Opts.EnableResilience |= Args.hasArg(OPT_enable_resilience);
+  Opts.EnablePrivateImports |= Args.hasArg(OPT_enable_private_imports);
+  Opts.EnableLibraryEvolution |= Args.hasArg(OPT_enable_library_evolution);
+
+  // FIXME: Remove this flag
+  Opts.EnableLibraryEvolution |= Args.hasArg(OPT_enable_resilience);
+
+  Opts.EnableImplicitDynamic |= Args.hasArg(OPT_enable_implicit_dynamic);
 
   Opts.TrackSystemDeps |= Args.hasArg(OPT_track_system_dependencies);
+
+  Opts.SerializeModuleInterfaceDependencyHashes |=
+    Args.hasArg(OPT_serialize_module_interface_dependency_hashes);
+
+  Opts.RemarkOnRebuildFromModuleInterface |=
+    Args.hasArg(OPT_Rmodule_interface_rebuild);
 
   computePrintStatsOptions();
   computeDebugTimeOptions();
@@ -83,6 +98,8 @@ bool ArgsToFrontendOptionsConverter::convert(
                              Opts.SolverExpressionTimeThreshold);
   setUnsignedIntegerArgument(OPT_switch_checking_invocation_threshold_EQ, 10,
                              Opts.SwitchCheckingInvocationThreshold);
+
+  Opts.CheckOnoneSupportCompleteness = Args.hasArg(OPT_check_onone_completeness);
 
   Opts.DebuggerTestingTransform = Args.hasArg(OPT_debugger_testing_transform);
 
@@ -103,11 +120,27 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   Optional<FrontendInputsAndOutputs> inputsAndOutputs =
       ArgsToFrontendInputsConverter(Diags, Args).convert(buffers);
+
+  // None here means error, not just "no inputs". Propagage unconditionally.
   if (!inputsAndOutputs)
     return true;
-  Opts.InputsAndOutputs = std::move(inputsAndOutputs).getValue();
 
-  Opts.RequestedAction = determineRequestedAction(Args);
+  // InputsAndOutputs can only get set up once; if it was set already when we
+  // entered this function, we should not set it again (and should assert this
+  // is not being done). Further, the computeMainAndSupplementaryOutputFilenames
+  // call below needs to only happen when there was a new InputsAndOutputs,
+  // since it clobbers the existing one rather than adding to it.
+  bool HaveNewInputsAndOutputs = false;
+  if (Opts.InputsAndOutputs.hasInputs()) {
+    assert(!inputsAndOutputs->hasInputs());
+  } else {
+    HaveNewInputsAndOutputs = true;
+    Opts.InputsAndOutputs = std::move(inputsAndOutputs).getValue();
+  }
+
+  if (Opts.RequestedAction == FrontendOptions::ActionType::NoneAction) {
+    Opts.RequestedAction = determineRequestedAction(Args);
+  }
 
   if (Opts.RequestedAction == FrontendOptions::ActionType::Immediate &&
       Opts.InputsAndOutputs.hasPrimaryInputs()) {
@@ -121,7 +154,8 @@ bool ArgsToFrontendOptionsConverter::convert(
   if (computeModuleName())
     return true;
 
-  if (computeMainAndSupplementaryOutputFilenames())
+  if (HaveNewInputsAndOutputs &&
+      computeMainAndSupplementaryOutputFilenames())
     return true;
 
   if (checkUnusedSupplementaryOutputPaths())
@@ -130,8 +164,12 @@ bool ArgsToFrontendOptionsConverter::convert(
   if (const Arg *A = Args.getLastArg(OPT_module_link_name))
     Opts.ModuleLinkName = A->getValue();
 
-  Opts.AlwaysSerializeDebuggingOptions |=
-      Args.hasArg(OPT_serialize_debugging_options);
+  if (const Arg *A = Args.getLastArg(OPT_serialize_debugging_options,
+                                     OPT_no_serialize_debugging_options)) {
+    Opts.SerializeOptionsForDebugging =
+        A->getOption().matches(OPT_serialize_debugging_options);
+  }
+
   Opts.EnableSourceImport |= Args.hasArg(OPT_enable_source_import);
   Opts.ImportUnderlyingModule |= Args.hasArg(OPT_import_underlying_module);
   Opts.EnableSerializationNestedTypeLookupTable &=
@@ -345,6 +383,8 @@ ArgsToFrontendOptionsConverter::determineRequestedAction(const ArgList &args) {
     return FrontendOptions::ActionType::REPL;
   if (Opt.matches(OPT_interpret))
     return FrontendOptions::ActionType::Immediate;
+  if (Opt.matches(OPT_compile_module_from_interface))
+    return FrontendOptions::ActionType::CompileModuleFromInterface;
 
   llvm_unreachable("Unhandled mode option");
 }
@@ -496,7 +536,7 @@ bool ArgsToFrontendOptionsConverter::checkUnusedSupplementaryOutputPaths()
     return true;
   }
   if (!FrontendOptions::canActionEmitInterface(Opts.RequestedAction) &&
-      Opts.InputsAndOutputs.hasModuleInterfaceOutputPath()) {
+      Opts.InputsAndOutputs.hasParseableInterfaceOutputPath()) {
     Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_interface);
     return true;
   }

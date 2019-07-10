@@ -14,8 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef _SWIFT_RUNTIME_DEBUG_HELPERS_
-#define _SWIFT_RUNTIME_DEBUG_HELPERS_
+#ifndef SWIFT_RUNTIME_DEBUG_HELPERS_H
+#define SWIFT_RUNTIME_DEBUG_HELPERS_H
 
 #include <cstdarg>
 #include <cstdio>
@@ -129,6 +129,14 @@ void swift_abortUnownedRetainOverflow();
 // Halt due to an overflow in incrementWeak().
 SWIFT_RUNTIME_ATTRIBUTE_NORETURN SWIFT_RUNTIME_ATTRIBUTE_NOINLINE
 void swift_abortWeakRetainOverflow();
+
+// Halt due to enabling an already enabled dynamic replacement().
+SWIFT_RUNTIME_ATTRIBUTE_NORETURN SWIFT_RUNTIME_ATTRIBUTE_NOINLINE
+void swift_abortDynamicReplacementEnabling();
+
+// Halt due to disabling an already disabled dynamic replacement().
+SWIFT_RUNTIME_ATTRIBUTE_NORETURN SWIFT_RUNTIME_ATTRIBUTE_NOINLINE
+void swift_abortDynamicReplacementDisabling();
 
 /// This function dumps one line of a stack trace. It is assumed that \p framePC
 /// is the address of the stack frame at index \p index. If \p shortOutput is
@@ -260,4 +268,4 @@ inline static int swift_asprintf(char **strp, const char *fmt, ...) {
 // namespace swift
 }
 
-#endif // _SWIFT_RUNTIME_DEBUG_HELPERS_
+#endif // SWIFT_RUNTIME_DEBUG_HELPERS_H

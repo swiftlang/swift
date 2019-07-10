@@ -51,6 +51,14 @@ class Sample(namedtuple('Sample', 'i num_iters runtime')):
         return 's({0.i!r}, {0.num_iters!r}, {0.runtime!r})'.format(self)
 
 
+class Yield(namedtuple('Yield', 'before_sample after')):
+    u"""Meta-measurement of when the Benchmark_X voluntarily yielded process.
+
+    `before_sample`: index of measurement taken just after returning from yield
+    `after`: time elapsed since the previous yield in microseconds (μs)
+    """
+
+
 class PerformanceTestSamples(object):
     """Collection of runtime samples from the benchmark execution.
 
@@ -69,7 +77,7 @@ class PerformanceTestSamples(object):
             self.add(sample)
 
     def __str__(self):
-        """Text summary of benchmark statisctics."""
+        """Text summary of benchmark statistics."""
         return (
             '{0.name!s} n={0.count!r} '
             'Min={0.min!r} Q1={0.q1!r} M={0.median!r} Q3={0.q3!r} '
@@ -211,31 +219,60 @@ class PerformanceTestResult(object):
     Reported by the test driver (Benchmark_O, Benchmark_Onone, Benchmark_Osize
     or Benchmark_Driver).
 
-    It depends on the log format emitted by the test driver in the form:
-    #,TEST,SAMPLES,MIN(μs),MAX(μs),MEAN(μs),SD(μs),MEDIAN(μs),MAX_RSS(B)
-
-    The last column, MAX_RSS, is emitted only for runs instrumented by the
-    Benchmark_Driver to measure rough memory use during the execution of the
-    benchmark.
+    It suppors 2 log formats emitted by the test driver. Legacy format with
+    statistics for normal distribution (MEAN, SD):
+        #,TEST,SAMPLES,MIN(μs),MAX(μs),MEAN(μs),SD(μs),MEDIAN(μs),MAX_RSS(B)
+    And new quantiles format with variable number of columns:
+        #,TEST,SAMPLES,MIN(μs),MEDIAN(μs),MAX(μs)
+        #,TEST,SAMPLES,MIN(μs),Q1(μs),Q2(μs),Q3(μs),MAX(μs),MAX_RSS(B)
+    The number of columns between MIN and MAX depends on the test driver's
+    `--quantile`parameter. In both cases, the last column, MAX_RSS is optional.
     """
 
-    def __init__(self, csv_row):
-        """Initialize from a row with 8 or 9 columns with benchmark summary.
+    def __init__(self, csv_row, quantiles=False, memory=False, delta=False):
+        """Initialize from a row of multiple columns with benchmark summary.
 
         The row is an iterable, such as a row provided by the CSV parser.
         """
-        self.test_num = csv_row[0]      # Ordinal number of the test
-        self.name = csv_row[1]          # Name of the performance test
-        self.num_samples = (            # Number of measurement samples taken
-            int(csv_row[2]))
-        self.min = int(csv_row[3])      # Minimum runtime (μs)
-        self.max = int(csv_row[4])      # Maximum runtime (μs)
-        self.mean = float(csv_row[5])   # Mean (average) runtime (μs)
-        self.sd = float(csv_row[6])     # Standard Deviation (μs)
-        self.median = int(csv_row[7])   # Median runtime (μs)
-        self.max_rss = (                # Maximum Resident Set Size (B)
-            int(csv_row[8]) if len(csv_row) > 8 else None)
-        self.samples = None
+        self.test_num = csv_row[0]          # Ordinal number of the test
+        self.name = csv_row[1]              # Name of the performance test
+        self.num_samples = int(csv_row[2])  # Number of measurements taken
+
+        if quantiles:  # Variable number of columns representing quantiles
+            runtimes = csv_row[3:-1] if memory else csv_row[3:]
+            if delta:
+                runtimes = [int(x) if x else 0 for x in runtimes]
+                runtimes = reduce(lambda l, x: l.append(l[-1] + x) or  # runnin
+                                  l if l else [x], runtimes, None)     # total
+            num_values = len(runtimes)
+            if self.num_samples < num_values:  # remove repeated samples
+                quantile = num_values - 1
+                qs = [float(i) / float(quantile) for i in range(0, num_values)]
+                indices = [max(0, int(ceil(self.num_samples * float(q))) - 1)
+                           for q in qs]
+                runtimes = [runtimes[indices.index(i)]
+                            for i in range(0, self.num_samples)]
+
+            self.samples = PerformanceTestSamples(
+                self.name,
+                [Sample(None, None, int(runtime)) for runtime in runtimes])
+            self.samples.exclude_outliers(top_only=True)
+            sams = self.samples
+            self.min, self.max, self.median, self.mean, self.sd = \
+                sams.min, sams.max, sams.median, sams.mean, sams.sd
+            self.max_rss = (                # Maximum Resident Set Size (B)
+                int(csv_row[-1]) if memory else None)
+        else:  # Legacy format with statistics for normal distribution.
+            self.min = int(csv_row[3])      # Minimum runtime (μs)
+            self.max = int(csv_row[4])      # Maximum runtime (μs)
+            self.mean = float(csv_row[5])   # Mean (average) runtime (μs)
+            self.sd = float(csv_row[6])     # Standard Deviation (μs)
+            self.median = int(csv_row[7])   # Median runtime (μs)
+            self.max_rss = (                # Maximum Resident Set Size (B)
+                int(csv_row[8]) if len(csv_row) > 8 else None)
+            self.samples = None
+        self.yields = None
+        self.setup = None
 
     def __repr__(self):
         """Short summary for debugging purposes."""
@@ -253,6 +290,7 @@ class PerformanceTestResult(object):
         The use case here is comparing test results parsed from concatenated
         log files from multiple runs of benchmark driver.
         """
+        # Statistics
         if self.samples and r.samples:
             map(self.samples.add, r.samples.samples)
             sams = self.samples
@@ -266,8 +304,14 @@ class PerformanceTestResult(object):
                 (self.mean * self.num_samples) + (r.mean * r.num_samples)
             ) / float(self.num_samples + r.num_samples)
             self.num_samples += r.num_samples
-            self.max_rss = min(self.max_rss, r.max_rss)
-            self.median, self.sd = 0, 0
+            self.median, self.sd = None, None
+
+        # Metadata
+        def minimum(a, b):  # work around None being less than everything
+            return (min(filter(lambda x: x is not None, [a, b])) if any([a, b])
+                    else None)
+        self.max_rss = minimum(self.max_rss, r.max_rss)
+        self.setup = minimum(self.setup, r.setup)
 
 
 class ResultComparison(object):
@@ -307,39 +351,47 @@ class LogParser(object):
     def __init__(self):
         """Create instance of `LogParser`."""
         self.results = []
+        self.quantiles, self.delta, self.memory = False, False, False
         self._reset()
 
     def _reset(self):
         """Reset parser to the default state for reading a new result."""
-        self.samples, self.num_iters = [], 1
-        self.max_rss, self.mem_pages = None, None
+        self.samples, self.yields, self.num_iters = [], [], 1
+        self.setup, self.max_rss, self.mem_pages = None, None, None
         self.voluntary_cs, self.involuntary_cs = None, None
 
     # Parse lines like this
     # #,TEST,SAMPLES,MIN(μs),MAX(μs),MEAN(μs),SD(μs),MEDIAN(μs)
-    results_re = re.compile(r'( *\d+[, \t]*[\w.]+[, \t]*' +
-                            r'[, \t]*'.join([r'[\d.]+'] * 6) +
-                            r'[, \t]*[\d.]*)')  # optional MAX_RSS(B)
+    results_re = re.compile(
+        r'( *\d+[, \t]+[\w.\-\?!]+[, \t]+' +  # #,TEST
+        r'[, \t]+'.join([r'\d+'] * 2) +       # at least 2...
+        r'(?:[, \t]+\d*)*)')                  # ...or more numeric columns
 
     def _append_result(self, result):
-        columns = result.split(',')
-        if len(columns) < 8:
-            columns = result.split()
-        r = PerformanceTestResult(columns)
-        if self.max_rss:
-            r.max_rss = self.max_rss
-            r.mem_pages = self.mem_pages
-            r.voluntary_cs = self.voluntary_cs
-            r.involuntary_cs = self.involuntary_cs
+        columns = result.split(',') if ',' in result else result.split()
+        r = PerformanceTestResult(
+            columns, quantiles=self.quantiles, memory=self.memory,
+            delta=self.delta)
+        r.setup = self.setup
+        r.max_rss = r.max_rss or self.max_rss
+        r.mem_pages = self.mem_pages
+        r.voluntary_cs = self.voluntary_cs
+        r.involuntary_cs = self.involuntary_cs
         if self.samples:
             r.samples = PerformanceTestSamples(r.name, self.samples)
             r.samples.exclude_outliers()
         self.results.append(r)
+        r.yields = self.yields or None
         self._reset()
 
     def _store_memory_stats(self, max_rss, mem_pages):
         self.max_rss = int(max_rss)
         self.mem_pages = int(mem_pages)
+
+    def _configure_format(self, header):
+        self.quantiles = 'MEAN' not in header
+        self.memory = 'MAX_RSS' in header
+        self.delta = '𝚫' in header
 
     # Regular expression and action to take when it matches the parsed line
     state_actions = {
@@ -354,6 +406,17 @@ class LogParser(object):
         (lambda self, i, runtime:
          self.samples.append(
              Sample(int(i), int(self.num_iters), int(runtime)))),
+
+        re.compile(r'\s+SetUp (\d+)'):
+        (lambda self, setup: setattr(self, 'setup', int(setup))),
+
+        re.compile(r'\s+Yielding after ~(\d+) μs'):
+        (lambda self, since_last_yield:
+            self.yields.append(
+                Yield(len(self.samples), int(since_last_yield)))),
+
+        re.compile(r'( *#[, \t]+TEST[, \t]+SAMPLES[, \t]+MIN.*)'):
+        _configure_format,
 
         # Environmental statistics: memory usage and context switches
         re.compile(r'\s+MAX_RSS \d+ - \d+ = (\d+) \((\d+) pages\)'):
@@ -477,23 +540,12 @@ class ReportFormatter(object):
     GitHub), `git` and `html`.
     """
 
-    def __init__(self, comparator, old_branch, new_branch, changes_only,
+    def __init__(self, comparator, changes_only,
                  single_table=False):
         """Initialize with `TestComparator` and names of branches."""
         self.comparator = comparator
-        self.old_branch = old_branch
-        self.new_branch = new_branch
         self.changes_only = changes_only
         self.single_table = single_table
-
-    MARKDOWN_DETAIL = """
-<details {3}>
-  <summary>{0} ({1})</summary>
-  {2}
-</details>
-"""
-    GIT_DETAIL = """
-{0} ({1}): {2}"""
 
     PERFORMANCE_TEST_RESULT_HEADER = ('TEST', 'MIN', 'MAX', 'MEAN', 'MAX_RSS')
     RESULT_COMPARISON_HEADER = ('TEST', 'OLD', 'NEW', 'DELTA', 'RATIO')
@@ -528,16 +580,26 @@ class ReportFormatter(object):
     def markdown(self):
         """Report results of benchmark comparisons in Markdown format."""
         return self._formatted_text(
-            ROW='{0} | {1} | {2} | {3} | {4} \n',
-            HEADER_SEPARATOR='---',
-            DETAIL=self.MARKDOWN_DETAIL)
+            label_formatter=lambda s: ('**' + s + '**'),
+            COLUMN_SEPARATOR=' | ',
+            DELIMITER_ROW=([':---'] + ['---:'] * 4),
+            SEPARATOR='&nbsp; | | | | \n',
+            SECTION="""
+<details {3}>
+  <summary>{0} ({1})</summary>
+  {2}
+</details>
+""")
 
     def git(self):
         """Report results of benchmark comparisons in 'git' format."""
         return self._formatted_text(
-            ROW='{0}   {1}   {2}   {3}   {4} \n',
-            HEADER_SEPARATOR='   ',
-            DETAIL=self.GIT_DETAIL)
+            label_formatter=lambda s: s.upper(),
+            COLUMN_SEPARATOR='   ',
+            DELIMITER_ROW=None,
+            SEPARATOR='\n',
+            SECTION="""
+{0} ({1}): \n{2}""")
 
     def _column_widths(self):
         changed = self.comparator.decreased + self.comparator.increased
@@ -553,54 +615,49 @@ class ReportFormatter(object):
         ]
 
         def max_widths(maximum, widths):
-            return tuple(map(max, zip(maximum, widths)))
+            return map(max, zip(maximum, widths))
 
-        return reduce(max_widths, widths, tuple([0] * 5))
+        return reduce(max_widths, widths, [0] * 5)
 
-    def _formatted_text(self, ROW, HEADER_SEPARATOR, DETAIL):
+    def _formatted_text(self, label_formatter, COLUMN_SEPARATOR,
+                        DELIMITER_ROW, SEPARATOR, SECTION):
         widths = self._column_widths()
         self.header_printed = False
 
         def justify_columns(contents):
-            return tuple([c.ljust(w) for w, c in zip(widths, contents)])
+            return [c.ljust(w) for w, c in zip(widths, contents)]
 
         def row(contents):
-            return ROW.format(*justify_columns(contents))
+            return ('' if not contents else
+                    COLUMN_SEPARATOR.join(justify_columns(contents)) + '\n')
 
-        def header(header):
-            return '\n' + row(header) + row(tuple([HEADER_SEPARATOR] * 5))
+        def header(title, column_labels):
+            labels = (column_labels if not self.single_table else
+                      map(label_formatter, (title, ) + column_labels[1:]))
+            h = (('' if not self.header_printed else SEPARATOR) +
+                 row(labels) +
+                 (row(DELIMITER_ROW) if not self.header_printed else ''))
+            if self.single_table and not self.header_printed:
+                self.header_printed = True
+            return h
 
-        def format_columns(r, strong):
-            return (r if not strong else
-                    r[:-1] + ('**{0}**'.format(r[-1]), ))
+        def format_columns(r, is_strong):
+            return (r if not is_strong else
+                    r[:-1] + ('**' + r[-1] + '**', ))
 
         def table(title, results, is_strong=False, is_open=False):
-            rows = [
-                row(format_columns(ReportFormatter.values(r), is_strong))
-                for r in results
-            ]
-            if not rows:
+            if not results:
                 return ''
+            rows = [row(format_columns(ReportFormatter.values(r), is_strong))
+                    for r in results]
+            table = (header(title if self.single_table else '',
+                            ReportFormatter.header_for(results[0])) +
+                     ''.join(rows))
+            return (table if self.single_table else
+                    SECTION.format(
+                        title, len(results), table, 'open' if is_open else ''))
 
-            if self.single_table:
-                t = ''
-                if not self.header_printed:
-                    t += header(ReportFormatter.header_for(results[0]))
-                    self.header_printed = True
-                t += row(('**' + title + '**', '', '', '', ''))
-                t += ''.join(rows)
-                return t
-
-            return DETAIL.format(
-                *[
-                    title, len(results),
-                    (header(ReportFormatter.header_for(results[0])) +
-                     ''.join(rows)),
-                    ('open' if is_open else '')
-                ])
-
-        return ''.join([
-            # FIXME print self.old_branch, self.new_branch
+        return '\n' + ''.join([
             table('Regression', self.comparator.decreased, True, True),
             table('Improvement', self.comparator.increased, True),
             ('' if self.changes_only else
@@ -675,7 +732,6 @@ class ReportFormatter(object):
 
         return self.HTML.format(
             ''.join([
-                # FIXME print self.old_branch, self.new_branch
                 table('Regression', self.comparator.decreased, 'red'),
                 table('Improvement', self.comparator.increased, 'green'),
                 ('' if self.changes_only else
@@ -705,31 +761,33 @@ def parse_args(args):
         '--single-table',
         help='Combine data in a single table in git and markdown formats',
         action='store_true')
-    parser.add_argument('--new-branch',
-                        help='Name of the new branch', default='NEW_MIN')
-    parser.add_argument('--old-branch',
-                        help='Name of the old branch', default='OLD_MIN')
     parser.add_argument('--delta-threshold',
                         help='Delta threshold. Default 0.05.',
                         type=float, default=0.05)
     return parser.parse_args(args)
 
 
-def main():
-    """Compare benchmarks for changes in a formatted report."""
-    args = parse_args(sys.argv[1:])
-    comparator = TestComparator(LogParser.results_from_file(args.old_file),
-                                LogParser.results_from_file(args.new_file),
-                                args.delta_threshold)
-    formatter = ReportFormatter(comparator, args.old_branch, args.new_branch,
-                                args.changes_only, args.single_table)
+def create_report(old_results, new_results, delta_threshold, format,
+                  changes_only=True, single_table=True):
+    comparator = TestComparator(old_results, new_results, delta_threshold)
+    formatter = ReportFormatter(comparator, changes_only, single_table)
     formats = {
         'markdown': formatter.markdown,
         'git': formatter.git,
         'html': formatter.html
     }
 
-    report = formats[args.format]()
+    report = formats[format]()
+    return report
+
+
+def main():
+    """Compare benchmarks for changes in a formatted report."""
+    args = parse_args(sys.argv[1:])
+    report = create_report(LogParser.results_from_file(args.old_file),
+                           LogParser.results_from_file(args.new_file),
+                           args.delta_threshold, args.format,
+                           args.changes_only, args.single_table)
     print(report)
 
     if args.output:

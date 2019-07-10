@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -sil-deadfuncelim %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-deadfuncelim %s | %FileCheck %s
 
 // Check that we don't crash on this.
 

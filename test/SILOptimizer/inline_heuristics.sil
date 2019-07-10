@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -inline -sil-inline-generics=true -sil-partial-specialization=false -debug-only=sil-inliner 2>%t/log | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -inline -sil-inline-generics=true -sil-partial-specialization=false -debug-only=sil-inliner 2>%t/log | %FileCheck %s
 // RUN: %FileCheck %s --check-prefix=CHECK-LOG <%t/log
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -inline -sil-inline-generics=true -sil-partial-specialization=true -generic-specializer -debug-only=sil-inliner 2>%t/log | %FileCheck %s --check-prefix=CHECK-PARTIAL-SPECIALIZATION
+// RUN: %target-sil-opt -enable-sil-verify-all %s -inline -sil-inline-generics=true -sil-partial-specialization=true -generic-specializer -debug-only=sil-inliner 2>%t/log | %FileCheck %s --check-prefix=CHECK-PARTIAL-SPECIALIZATION
 // REQUIRES: asserts
 
 // This test checks the inline heuristics based on the debug log output of
@@ -428,6 +428,42 @@ bb0(%0 : $*U):
   %13 = tuple ()
   return %13 : $()
 } // end sil function 'testSpecializationAfterGenericInlining'
+
+// Tests of exclusivity inlining.
+
+// CHECK-LABEL: sil @testExclusivity : $@convention(thin) () -> () {
+// CHECK-NOT: apply
+// CHECK: begin_access
+// CHECK: return
+// CHECK: end sil function 'testExclusivity' 
+
+struct X {
+  @_hasStorage var i: Int64 { get set }
+  init(i: Int64)
+  init()
+}
+
+var globalX: X
+
+sil_global hidden @globalX : $X
+
+sil @exclusivityCallee : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @globalX: $*X
+  %1 = begin_access [read] [dynamic] [no_nested_conflict] %0 : $*X
+  %2 = load %1 : $*X
+  end_access %1 : $*X
+  %4 = tuple ()
+  return %4 : $()
+}
+
+sil @testExclusivity : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @exclusivityCallee : $@convention(thin) () -> ()
+  %1 = apply %0() : $@convention(thin) () -> ()
+  %2 = tuple ()
+  return %2 : $()
+}
 
 // TODO:
 // Check that the inlining heuristic takes into account the possibility

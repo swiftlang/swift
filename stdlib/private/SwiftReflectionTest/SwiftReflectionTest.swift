@@ -31,9 +31,9 @@ let RequestStringLength = "l"
 let RequestDone = "d"
 let RequestPointerSize = "p"
 
-internal func debugLog(_ message: String) {
+internal func debugLog(_ message: @autoclosure () -> String) {
 #if DEBUG_LOG
-  fputs("Child: \(message)\n", stderr)
+  fputs("Child: \(message())\n", stderr)
   fflush(stderr)
 #endif
 }
@@ -271,7 +271,10 @@ internal func sendStringLength() {
   debugLog("BEGIN \(#function)"); defer { debugLog("END \(#function)") }
   let address = readUInt()
   let cString = UnsafePointer<CChar>(bitPattern: address)!
-  let count = String(validatingUTF8: cString)!.utf8.count
+  var count = 0
+  while cString[count] != CChar(0) {
+    count = count + 1
+  }
   sendValue(count)
 }
 

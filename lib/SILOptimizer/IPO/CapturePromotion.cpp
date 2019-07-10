@@ -64,7 +64,7 @@ typedef llvm::DenseMap<PartialApplyInst*, IndicesSet> PartialApplyIndicesMap;
 STATISTIC(NumCapturesPromoted, "Number of captures promoted");
 
 namespace {
-/// \brief Transient reference to a block set within ReachabilityInfo.
+/// Transient reference to a block set within ReachabilityInfo.
 ///
 /// This is a bitset that conveniently flattens into a matrix allowing bit-wise
 /// operations without masking.
@@ -78,7 +78,7 @@ public:
     return (NumBlocks + BITWORD_SIZE - 1) / BITWORD_SIZE;
   }
 
-  /// \brief Transient reference to a reaching block matrix.
+  /// Transient reference to a reaching block matrix.
   struct ReachingBlockMatrix {
     uint64_t *Bits;
     unsigned NumBitWords; // Words per row.
@@ -168,7 +168,7 @@ public:
   }
 };
 
-/// \brief Store the reachability matrix: ToBlock -> FromBlocks.
+/// Store the reachability matrix: ToBlock -> FromBlocks.
 class ReachabilityInfo {
   SILFunction *F;
   llvm::DenseMap<SILBasicBlock*, unsigned> BlockMap;
@@ -190,17 +190,16 @@ private:
 
 
 namespace {
-/// \brief A SILCloner subclass which clones a closure function while converting
+/// A SILCloner subclass which clones a closure function while converting
 /// one or more captures from 'inout' (by-reference) to by-value.
 class ClosureCloner : public SILClonerWithScopes<ClosureCloner> {
 public:
   friend class SILInstructionVisitor<ClosureCloner>;
   friend class SILCloner<ClosureCloner>;
 
-  ClosureCloner(SILOptFunctionBuilder &FuncBuilder,
-                SILFunction *Orig, IsSerialized_t Serialized,
-                StringRef ClonedName,
-                IndicesSet &PromotableIndices);
+  ClosureCloner(SILOptFunctionBuilder &FuncBuilder, SILFunction *Orig,
+                IsSerialized_t Serialized, StringRef ClonedName,
+                IndicesSet &PromotableIndices, ResilienceExpansion expansion);
 
   void populateCloned();
 
@@ -210,7 +209,8 @@ private:
   static SILFunction *initCloned(SILOptFunctionBuilder &FuncBuilder,
                                  SILFunction *Orig, IsSerialized_t Serialized,
                                  StringRef ClonedName,
-                                 IndicesSet &PromotableIndices);
+                                 IndicesSet &PromotableIndices,
+                                 ResilienceExpansion expansion);
 
   SILValue getProjectBoxMappedVal(SILValue Operand);
 
@@ -224,6 +224,7 @@ private:
   void visitBeginAccessInst(BeginAccessInst *Inst);
   void visitEndAccessInst(EndAccessInst *Inst);
 
+  ResilienceExpansion resilienceExpansion;
   SILFunction *Orig;
   IndicesSet &PromotableIndices;
   llvm::DenseMap<SILArgument *, SILValue> BoxArgumentMap;
@@ -231,7 +232,7 @@ private:
 };
 } // end anonymous namespace
 
-/// \brief Compute ReachabilityInfo so that it can answer queries about
+/// Compute ReachabilityInfo so that it can answer queries about
 /// whether a given basic block in a function is reachable from another basic
 /// block in the function.
 ///
@@ -294,7 +295,7 @@ void ReachabilityInfo::compute() {
   ReachingBlockSet::deallocateSet(NewSet);
 }
 
-/// \brief Return true if the To basic block is reachable from the From basic
+/// Return true if the To basic block is reachable from the From basic
 /// block. A block is considered reachable from itself only if its entry can be
 /// recursively reached from its own exit.
 bool
@@ -311,10 +312,12 @@ ReachabilityInfo::isReachable(SILBasicBlock *From, SILBasicBlock *To) {
 ClosureCloner::ClosureCloner(SILOptFunctionBuilder &FuncBuilder,
                              SILFunction *Orig, IsSerialized_t Serialized,
                              StringRef ClonedName,
-                             IndicesSet &PromotableIndices)
-  : SILClonerWithScopes<ClosureCloner>(
-      *initCloned(FuncBuilder, Orig, Serialized, ClonedName, PromotableIndices)),
-    Orig(Orig), PromotableIndices(PromotableIndices) {
+                             IndicesSet &PromotableIndices,
+                             ResilienceExpansion resilienceExpansion)
+    : SILClonerWithScopes<ClosureCloner>(
+          *initCloned(FuncBuilder, Orig, Serialized, ClonedName,
+                      PromotableIndices, resilienceExpansion)),
+      Orig(Orig), PromotableIndices(PromotableIndices) {
   assert(Orig->getDebugScope()->Parent != getCloned()->getDebugScope()->Parent);
 }
 
@@ -326,9 +329,9 @@ ClosureCloner::ClosureCloner(SILOptFunctionBuilder &FuncBuilder,
 /// 2. Replace container box value arguments for the cloned closure with the
 ///    transformed address or value argument.
 static void
-computeNewArgInterfaceTypes(SILFunction *F,
-                            IndicesSet &PromotableIndices,
-                            SmallVectorImpl<SILParameterInfo> &OutTys) {
+computeNewArgInterfaceTypes(SILFunction *F, IndicesSet &PromotableIndices,
+                            SmallVectorImpl<SILParameterInfo> &OutTys,
+                            ResilienceExpansion expansion) {
   auto fnConv = F->getConventions();
   auto Parameters = fnConv.funcTy->getParameters();
 
@@ -365,9 +368,9 @@ computeNewArgInterfaceTypes(SILFunction *F,
     assert(paramBoxTy->getLayout()->getFields().size() == 1
            && "promoting compound box not implemented yet");
     auto paramBoxedTy = paramBoxTy->getFieldType(F->getModule(), 0);
-    auto &paramTL = Types.getTypeLowering(paramBoxedTy);
+    auto &paramTL = Types.getTypeLowering(paramBoxedTy, expansion);
     ParameterConvention convention;
-    if (paramTL.isFormallyPassedIndirectly()) {
+    if (paramTL.isAddressOnly()) {
       convention = ParameterConvention::Indirect_In;
     } else if (paramTL.isTrivial()) {
       convention = ParameterConvention::Direct_Unowned;
@@ -396,7 +399,7 @@ static std::string getSpecializedName(SILFunction *F,
   return Mangler.mangle();
 }
 
-/// \brief Create the function corresponding to the clone of the original
+/// Create the function corresponding to the clone of the original
 /// closure with the signature modified to reflect promotable captures (which
 /// are given by PromotableIndices, such that each entry in the set is the
 /// index of the box containing the variable in the closure's argument list, and
@@ -405,16 +408,17 @@ static std::string getSpecializedName(SILFunction *F,
 ///
 /// *NOTE* PromotableIndices only contains the container value of the box, not
 /// the address value.
-SILFunction*
+SILFunction *
 ClosureCloner::initCloned(SILOptFunctionBuilder &FunctionBuilder,
                           SILFunction *Orig, IsSerialized_t Serialized,
-                          StringRef ClonedName,
-                          IndicesSet &PromotableIndices) {
+                          StringRef ClonedName, IndicesSet &PromotableIndices,
+                          ResilienceExpansion resilienceExpansion) {
   SILModule &M = Orig->getModule();
 
   // Compute the arguments for our new function.
   SmallVector<SILParameterInfo, 4> ClonedInterfaceArgTys;
-  computeNewArgInterfaceTypes(Orig, PromotableIndices, ClonedInterfaceArgTys);
+  computeNewArgInterfaceTypes(Orig, PromotableIndices, ClonedInterfaceArgTys,
+                              resilienceExpansion);
 
   SILFunctionType *OrigFTI = Orig->getLoweredFunctionType();
 
@@ -435,18 +439,18 @@ ClosureCloner::initCloned(SILOptFunctionBuilder &FunctionBuilder,
   auto *Fn = FunctionBuilder.createFunction(
       Orig->getLinkage(), ClonedName, ClonedTy, Orig->getGenericEnvironment(),
       Orig->getLocation(), Orig->isBare(), IsNotTransparent, Serialized,
-      Orig->getEntryCount(), Orig->isThunk(), Orig->getClassSubclassScope(),
-      Orig->getInlineStrategy(), Orig->getEffectsKind(), Orig,
-      Orig->getDebugScope());
+      IsNotDynamic, Orig->getEntryCount(), Orig->isThunk(),
+      Orig->getClassSubclassScope(), Orig->getInlineStrategy(),
+      Orig->getEffectsKind(), Orig, Orig->getDebugScope());
   for (auto &Attr : Orig->getSemanticsAttrs())
     Fn->addSemanticsAttr(Attr);
-  if (!Orig->hasQualifiedOwnership()) {
-    Fn->setUnqualifiedOwnership();
+  if (!Orig->hasOwnership()) {
+    Fn->setOwnershipEliminated();
   }
   return Fn;
 }
 
-/// \brief Populate the body of the cloned closure, modifying instructions as
+/// Populate the body of the cloned closure, modifying instructions as
 /// necessary to take into consideration the promoted capture(s)
 void
 ClosureCloner::populateCloned() {
@@ -457,14 +461,17 @@ ClosureCloner::populateCloned() {
   SILBasicBlock *ClonedEntryBB = Cloned->createBasicBlock();
   getBuilder().setInsertionPoint(ClonedEntryBB);
 
+  SmallVector<SILValue, 4> entryArgs;
+  entryArgs.reserve(OrigEntryBB->getArguments().size());
+
   unsigned ArgNo = 0;
   auto I = OrigEntryBB->args_begin(), E = OrigEntryBB->args_end();
   for (; I != E; ++ArgNo, ++I) {
     if (!PromotableIndices.count(ArgNo)) {
-      // Otherwise, create a new argument which copies the original argument
+      // Simply create a new argument which copies the original argument
       SILValue MappedValue = ClonedEntryBB->createFunctionArgument(
           (*I)->getType(), (*I)->getDecl());
-      ValueMap.insert(std::make_pair(*I, MappedValue));
+      entryArgs.push_back(MappedValue);
       continue;
     }
 
@@ -479,11 +486,13 @@ ClosureCloner::populateCloned() {
     // If SIL ownership is enabled, we need to perform a borrow here if we have
     // a non-trivial value. We know that our value is not written to and it does
     // not escape. The use of a borrow enforces this.
-    if (Cloned->hasQualifiedOwnership() &&
-        MappedValue.getOwnershipKind() != ValueOwnershipKind::Trivial) {
+    if (Cloned->hasOwnership() &&
+        MappedValue.getOwnershipKind() != ValueOwnershipKind::Any) {
       SILLocation Loc(const_cast<ValueDecl *>((*I)->getDecl()));
-      MappedValue = getBuilder().createBeginBorrow(Loc, MappedValue);
+      MappedValue = getBuilder().emitBeginBorrowOperation(Loc, MappedValue);
     }
+    entryArgs.push_back(MappedValue);
+
     BoxArgumentMap.insert(std::make_pair(*I, MappedValue));
 
     // Track the projections of the box.
@@ -493,17 +502,9 @@ ClosureCloner::populateCloned() {
       }
     }
   }
-
-  BBMap.insert(std::make_pair(OrigEntryBB, ClonedEntryBB));
-  // Recursively visit original BBs in depth-first preorder, starting with the
-  // entry block, cloning all instructions other than terminators.
-  visitSILBasicBlock(OrigEntryBB);
-
-  // Now iterate over the BBs and fix up the terminators.
-  for (auto BI = BBMap.begin(), BE = BBMap.end(); BI != BE; ++BI) {
-    getBuilder().setInsertionPoint(BI->second);
-    visit(BI->first->getTerminator());
-  }
+  // Visit original BBs in depth-first preorder, starting with the
+  // entry block, cloning all instructions and terminators.
+  cloneFunctionBody(Orig, ClonedEntryBB, entryArgs);
 }
 
 /// If this operand originates from a mapped ProjectBox, return the mapped
@@ -532,14 +533,14 @@ void ClosureCloner::visitDebugValueAddrInst(DebugValueAddrInst *Inst) {
   SILCloner<ClosureCloner>::visitDebugValueAddrInst(Inst);
 }
 
-/// \brief Handle a strong_release instruction during cloning of a closure; if
+/// Handle a strong_release instruction during cloning of a closure; if
 /// it is a strong release of a promoted box argument, then it is replaced with
 /// a ReleaseValue of the new object type argument, otherwise it is handled
 /// normally.
 void
 ClosureCloner::visitStrongReleaseInst(StrongReleaseInst *Inst) {
   assert(
-      !Inst->getFunction()->hasQualifiedOwnership() &&
+      !Inst->getFunction()->hasOwnership() &&
       "Should not see strong release in a function with qualified ownership");
   SILValue Operand = Inst->getOperand();
   if (auto *A = dyn_cast<SILArgument>(Operand)) {
@@ -547,8 +548,7 @@ ClosureCloner::visitStrongReleaseInst(StrongReleaseInst *Inst) {
     if (I != BoxArgumentMap.end()) {
       // Releases of the box arguments get replaced with ReleaseValue of the new
       // object type argument.
-      SILFunction &F = getBuilder().getFunction();
-      auto &typeLowering = F.getModule().getTypeLowering(I->second->getType());
+      auto &typeLowering = getBuilder().getTypeLowering(I->second->getType());
       SILBuilderWithPostProcess<ClosureCloner, 1> B(this, Inst);
       typeLowering.emitDestroyValue(B, Inst->getLoc(), I->second);
       return;
@@ -558,7 +558,7 @@ ClosureCloner::visitStrongReleaseInst(StrongReleaseInst *Inst) {
   SILCloner<ClosureCloner>::visitStrongReleaseInst(Inst);
 }
 
-/// \brief Handle a destroy_value instruction during cloning of a closure; if
+/// Handle a destroy_value instruction during cloning of a closure; if
 /// it is a strong release of a promoted box argument, then it is replaced with
 /// a destroy_value of the new object type argument, otherwise it is handled
 /// normally.
@@ -570,18 +570,18 @@ void ClosureCloner::visitDestroyValueInst(DestroyValueInst *Inst) {
       // Releases of the box arguments get replaced with an end_borrow,
       // destroy_value of the new object type argument.
       SILFunction &F = getBuilder().getFunction();
-      auto &typeLowering = F.getModule().getTypeLowering(I->second->getType());
+      auto &typeLowering = F.getTypeLowering(I->second->getType());
       SILBuilderWithPostProcess<ClosureCloner, 1> B(this, Inst);
 
       SILValue Value = I->second;
 
       // If ownership is enabled, then we must emit a begin_borrow for any
       // non-trivial value.
-      if (F.hasQualifiedOwnership() &&
-          Value.getOwnershipKind() != ValueOwnershipKind::Trivial) {
+      if (F.hasOwnership() &&
+          Value.getOwnershipKind() != ValueOwnershipKind::Any) {
         auto *BBI = cast<BeginBorrowInst>(Value);
         Value = BBI->getOperand();
-        B.createEndBorrow(Inst->getLoc(), BBI, Value);
+        B.emitEndBorrowOperation(Inst->getLoc(), BBI);
       }
 
       typeLowering.emitDestroyValue(B, Inst->getLoc(), Value);
@@ -632,21 +632,21 @@ void ClosureCloner::visitEndAccessInst(EndAccessInst *Inst) {
   SILCloner<ClosureCloner>::visitEndAccessInst(Inst);
 }
 
-/// \brief Handle a load_borrow instruction during cloning of a closure.
+/// Handle a load_borrow instruction during cloning of a closure.
 ///
 /// The two relevant cases are a direct load from a promoted address argument or
 /// a load of a struct_element_addr of a promoted address argument.
 void ClosureCloner::visitLoadBorrowInst(LoadBorrowInst *LI) {
-  assert(LI->getFunction()->hasQualifiedOwnership() &&
+  assert(LI->getFunction()->hasOwnership() &&
          "We should only see a load borrow in ownership qualified SIL");
   if (SILValue Val = getProjectBoxMappedVal(LI->getOperand())) {
     // Loads of the address argument get eliminated completely; the uses of
     // the loads get mapped to uses of the new object type argument.
     //
     // We assume that the value is already guaranteed.
-    assert(Val.getOwnershipKind().isTrivialOr(ValueOwnershipKind::Guaranteed) &&
+    assert(Val.getOwnershipKind().isCompatibleWith(ValueOwnershipKind::Guaranteed) &&
            "Expected argument value to be guaranteed");
-    ValueMap.insert(std::make_pair(LI, Val));
+    recordFoldedValue(LI, Val);
     return;
   }
 
@@ -654,7 +654,7 @@ void ClosureCloner::visitLoadBorrowInst(LoadBorrowInst *LI) {
   return;
 }
 
-/// \brief Handle a load instruction during cloning of a closure.
+/// Handle a load instruction during cloning of a closure.
 ///
 /// The two relevant cases are a direct load from a promoted address argument or
 /// a load of a struct_element_addr of a promoted address argument.
@@ -667,11 +667,11 @@ void ClosureCloner::visitLoadInst(LoadInst *LI) {
     // behaviors depending on the type of load. Specifically, if we have a
     // load [copy], then we need to add a copy_value here. If we have a take
     // or trivial, we just propagate the value through.
-    if (LI->getFunction()->hasQualifiedOwnership()
+    if (LI->getFunction()->hasOwnership()
         && LI->getOwnershipQualifier() == LoadOwnershipQualifier::Copy) {
       Val = getBuilder().createCopyValue(LI->getLoc(), Val);
     }
-    ValueMap.insert(std::make_pair(LI, Val));
+    recordFoldedValue(LI, Val);
     return;
   }
 
@@ -685,19 +685,19 @@ void ClosureCloner::visitLoadInst(LoadInst *LI) {
     // Loads of a struct_element_addr of an argument get replaced with a
     // struct_extract of the new passed in value. The value should be borrowed
     // already, so we can just extract the value.
-    assert(!getBuilder().getFunction().hasQualifiedOwnership() ||
-           Val.getOwnershipKind().isTrivialOr(ValueOwnershipKind::Guaranteed));
+    assert(!getBuilder().getFunction().hasOwnership() ||
+           Val.getOwnershipKind().isCompatibleWith(ValueOwnershipKind::Guaranteed));
     Val = getBuilder().emitStructExtract(LI->getLoc(), Val, SEAI->getField(),
                                          LI->getType());
 
     // If we were performing a load [copy], then we need to a perform a copy
     // here since when cloning, we do not eliminate the destroy on the copied
     // value.
-    if (LI->getFunction()->hasQualifiedOwnership()
+    if (LI->getFunction()->hasOwnership()
         && LI->getOwnershipQualifier() == LoadOwnershipQualifier::Copy) {
       Val = getBuilder().createCopyValue(LI->getLoc(), Val);
     }
-    ValueMap.insert(std::make_pair(LI, Val));
+    recordFoldedValue(LI, Val);
     return;
   }
   SILCloner<ClosureCloner>::visitLoadInst(LI);
@@ -716,7 +716,7 @@ static bool isNonMutatingLoad(SILInstruction *I) {
   return LI->getOwnershipQualifier() != LoadOwnershipQualifier::Take;
 }
 
-/// \brief Given a partial_apply instruction and the argument index into its
+/// Given a partial_apply instruction and the argument index into its
 /// callee's argument list of a box argument (which is followed by an argument
 /// for the address of the box's contents), return true if the closure is known
 /// not to mutate the captured variable.
@@ -944,7 +944,7 @@ struct EscapeMutationScanningState {
 
 } // end anonymous namespace
 
-/// \brief Given a use of an alloc_box instruction, return true if the use
+/// Given a use of an alloc_box instruction, return true if the use
 /// definitely does not allow the box to escape; also, if the use is an
 /// instruction which possibly mutates the contents of the box, then add it to
 /// the Mutations vector.
@@ -969,6 +969,7 @@ bool isPartialApplyNonEscapingUser(Operand *CurrentOp, PartialApplyInst *PAI,
   }
 
   SILModule &M = PAI->getModule();
+  SILFunction *F = PAI->getFunction();
   auto closureType = PAI->getType().castTo<SILFunctionType>();
   SILFunctionConventions closureConv(closureType, M);
 
@@ -977,8 +978,11 @@ bool isPartialApplyNonEscapingUser(Operand *CurrentOp, PartialApplyInst *PAI,
   // index so is not stored separately);
   unsigned Index = OpNo - 1 + closureConv.getNumSILArguments();
 
-  auto *Fn = PAI->getReferencedFunction();
-  if (!Fn || !Fn->isDefinition()) {
+  auto *Fn = PAI->getReferencedFunctionOrNull();
+
+  // It is not safe to look at the content of dynamically replaceable functions
+  // since this pass looks at the content of Fn.
+  if (!Fn || !Fn->isDefinition() || Fn->isDynamicallyReplaceable()) {
     LLVM_DEBUG(llvm::dbgs() << "        FAIL! Not a direct function definition "
                           "reference.\n");
     return false;
@@ -989,10 +993,11 @@ bool isPartialApplyNonEscapingUser(Operand *CurrentOp, PartialApplyInst *PAI,
   // For now, return false is the address argument is an address-only type,
   // since we currently handle loadable types only.
   // TODO: handle address-only types
+  // FIXME: Expansion
   auto BoxTy = BoxArg->getType().castTo<SILBoxType>();
   assert(BoxTy->getLayout()->getFields().size() == 1 &&
          "promoting compound box not implemented yet");
-  if (BoxTy->getFieldType(M, 0).isAddressOnly(M)) {
+  if (BoxTy->getFieldType(M, 0).isAddressOnly(*F)) {
     LLVM_DEBUG(llvm::dbgs() << "        FAIL! Box is an address only "
                                "argument!\n");
     return false;
@@ -1037,6 +1042,17 @@ static bool scanUsesForEscapesAndMutations(Operand *Op,
     return isPartialApplyNonEscapingUser(Op, PAI, State);
   }
 
+  // A mark_dependence user on a partial_apply is safe.
+  if (auto *MD = dyn_cast<MarkDependenceInst>(User)) {
+    if (MD->getBase() == Op->get()) {
+      auto parent = MD->getValue();
+      while ((MD = dyn_cast<MarkDependenceInst>(parent))) {
+        parent = MD->getValue();
+      }
+      return isa<PartialApplyInst>(parent);
+    }
+  }
+
   if (auto *PBI = dyn_cast<ProjectBoxInst>(User)) {
     // It is assumed in later code that we will only have 1 project_box. This
     // can be seen since there is no code for reasoning about multiple
@@ -1066,7 +1082,7 @@ static bool scanUsesForEscapesAndMutations(Operand *Op,
   return isNonEscapingUse(Op, State);
 }
 
-/// \brief Examine an alloc_box instruction, returning true if at least one
+/// Examine an alloc_box instruction, returning true if at least one
 /// capture of the boxed variable is promotable.  If so, then the pair of the
 /// partial_apply instruction and the index of the box argument in the closure's
 /// argument list is added to IM.
@@ -1135,11 +1151,12 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
 static SILFunction *
 constructClonedFunction(SILOptFunctionBuilder &FuncBuilder,
                         PartialApplyInst *PAI, FunctionRefInst *FRI,
-                        IndicesSet &PromotableIndices) {
+                        IndicesSet &PromotableIndices,
+                        ResilienceExpansion resilienceExpansion) {
   SILFunction *F = PAI->getFunction();
 
   // Create the Cloned Name for the function.
-  SILFunction *Orig = FRI->getReferencedFunction();
+  SILFunction *Orig = FRI->getReferencedFunctionOrNull();
 
   IsSerialized_t Serialized = IsNotSerialized;
   if (F->isSerialized() && Orig->isSerialized())
@@ -1154,7 +1171,8 @@ constructClonedFunction(SILOptFunctionBuilder &FuncBuilder,
   }
 
   // Otherwise, create a new clone.
-  ClosureCloner cloner(FuncBuilder, Orig, Serialized, ClonedName, PromotableIndices);
+  ClosureCloner cloner(FuncBuilder, Orig, Serialized, ClonedName,
+                       PromotableIndices, resilienceExpansion);
   cloner.populateCloned();
   return cloner.getCloned();
 }
@@ -1201,7 +1219,29 @@ static SILValue getOrCreateProjectBoxHelper(SILValue PartialOperand) {
   return B.createProjectBox(Box->getLoc(), Box, 0);
 }
 
-/// \brief Given a partial_apply instruction and a set of promotable indices,
+/// Change the base in mark_dependence.
+static void
+mapMarkDependenceArguments(SingleValueInstruction *root,
+                           llvm::DenseMap<SILValue, SILValue> &map,
+                           SmallVectorImpl<SILInstruction *> &Delete) {
+  SmallVector<Operand *, 16> Uses(root->getUses());
+  for (auto *Use : Uses) {
+    if (auto *MD = dyn_cast<MarkDependenceInst>(Use->getUser())) {
+      mapMarkDependenceArguments(MD, map, Delete);
+      auto iter = map.find(MD->getBase());
+      if (iter != map.end()) {
+        MD->setBase(iter->second);
+      }
+      // Remove mark_dependence on trivial values.
+      if (MD->getBase()->getType().isTrivial(*MD->getFunction())) {
+        MD->replaceAllUsesWith(MD->getValue());
+        Delete.push_back(MD);
+      }
+    }
+  }
+}
+
+/// Given a partial_apply instruction and a set of promotable indices,
 /// clone the closure with the promoted captures and replace the partial_apply
 /// with a partial_apply of the new closure, fixing up reference counting as
 /// necessary. Also, if the closure is cloned, the cloned function is added to
@@ -1210,12 +1250,14 @@ static SILFunction *
 processPartialApplyInst(SILOptFunctionBuilder &FuncBuilder,
                         PartialApplyInst *PAI, IndicesSet &PromotableIndices,
                         SmallVectorImpl<SILFunction*> &Worklist) {
+  SILFunction *F = PAI->getFunction();
   SILModule &M = PAI->getModule();
 
   auto *FRI = dyn_cast<FunctionRefInst>(PAI->getCallee());
 
   // Clone the closure with the given promoted captures.
-  SILFunction *ClonedFn = constructClonedFunction(FuncBuilder, PAI, FRI, PromotableIndices);
+  SILFunction *ClonedFn = constructClonedFunction(
+      FuncBuilder, PAI, FRI, PromotableIndices, F->getResilienceExpansion());
   Worklist.push_back(ClonedFn);
 
   // Initialize a SILBuilder and create a function_ref referencing the cloned
@@ -1239,6 +1281,8 @@ processPartialApplyInst(SILOptFunctionBuilder &FuncBuilder,
   unsigned OpCount = PAI->getNumOperands() - PAI->getNumTypeDependentOperands();
   SmallVector<SILValue, 16> Args;
   auto NumIndirectResults = calleeConv.getNumIndirectSILResults();
+  llvm::DenseMap<SILValue, SILValue> capturedMap;
+  llvm::SmallSet<SILValue, 16> newCaptures;
   for (; OpNo != OpCount; ++OpNo) {
     unsigned Index = OpNo - 1 + FirstIndex;
     if (!PromotableIndices.count(Index)) {
@@ -1252,9 +1296,19 @@ processPartialApplyInst(SILOptFunctionBuilder &FuncBuilder,
     SILValue Box = PAI->getOperand(OpNo);
     SILValue Addr = getOrCreateProjectBoxHelper(Box);
 
-    auto &typeLowering = M.getTypeLowering(Addr->getType());
-    Args.push_back(
-        typeLowering.emitLoadOfCopy(B, PAI->getLoc(), Addr, IsNotTake));
+    auto &typeLowering = F->getTypeLowering(Addr->getType());
+    auto newCaptured =
+        typeLowering.emitLoadOfCopy(B, PAI->getLoc(), Addr, IsNotTake);
+    Args.push_back(newCaptured);
+
+    capturedMap[Box] = newCaptured;
+    newCaptures.insert(newCaptured);
+
+    // A partial_apply [stack] does not own the captured argument but we must
+    // destroy the projected object. We will do so after having created the new
+    // partial_apply below.
+    if (PAI->isOnStack())
+      continue;
 
     // Cleanup the captured argument.
     //
@@ -1271,7 +1325,8 @@ processPartialApplyInst(SILOptFunctionBuilder &FuncBuilder,
   // Create a new partial apply with the new arguments.
   auto *NewPAI = B.createPartialApply(
       PAI->getLoc(), FnVal, PAI->getSubstitutionMap(), Args,
-      PAI->getType().getAs<SILFunctionType>()->getCalleeConvention());
+      PAI->getType().getAs<SILFunctionType>()->getCalleeConvention(),
+      PAI->isOnStack());
   PAI->replaceAllUsesWith(NewPAI);
   PAI->eraseFromParent();
   if (FRI->use_empty()) {
@@ -1279,6 +1334,24 @@ processPartialApplyInst(SILOptFunctionBuilder &FuncBuilder,
     // TODO: If this is the last use of the closure, and if it has internal
     // linkage, we should remove it from the SILModule now.
   }
+
+  if (NewPAI->isOnStack()) {
+    // Insert destroy's of new captured arguments.
+    for (auto *Use : NewPAI->getUses()) {
+      if (auto *DS = dyn_cast<DeallocStackInst>(Use->getUser())) {
+        B.setInsertionPoint(std::next(SILBasicBlock::iterator(DS)));
+        insertDestroyOfCapturedArguments(NewPAI, B, [&](SILValue arg) -> bool {
+          return newCaptures.count(arg);
+        });
+      }
+    }
+    // Map the mark dependence arguments.
+    SmallVector<SILInstruction *, 16> Delete;
+    mapMarkDependenceArguments(NewPAI, capturedMap, Delete);
+    for (auto *inst : Delete)
+      inst->eraseFromParent();
+  }
+
   return ClonedFn;
 }
 

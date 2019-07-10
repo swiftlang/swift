@@ -1,5 +1,5 @@
-// RUN: %target-swift-emit-silgen -enable-sil-ownership %s -o /dev/null -verify
-// RUN: %target-swift-emit-silgen -enable-sil-ownership -enforce-exclusivity=checked %s -o /dev/null -verify
+// RUN: %target-swift-emit-silgen %s -o /dev/null -verify
+// RUN: %target-swift-emit-silgen -enforce-exclusivity=checked %s -o /dev/null -verify
 
 func takeInOut<T>(_: inout T) {}
 

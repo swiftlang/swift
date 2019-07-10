@@ -7,5 +7,5 @@ class OtherObjCClass: NSObject {
 
   @objc internal func internalFunc() {}
 
-  private func privateFunc() {} // expected-note 2{{'privateFunc' declared here}}
+  private func privateFunc() {} // expected-note 2{{'privateFunc()' declared here}}
 }

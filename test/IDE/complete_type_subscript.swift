@@ -40,7 +40,7 @@ struct G0<T> {
   subscript(x: T) -> #^GEN_RETURN_0^# { return 0 }
 }
 // GEN_TOP_LEVEL_0: Keyword/None:                       Any[#Any#];
-// GEN_TOP_LEVEL_0: Decl[GenericTypeParam]/CurrNominal: T[#T#]; name=T
+// GEN_TOP_LEVEL_0: Decl[GenericTypeParam]/Local:       T[#T#]; name=T
 // GEN_TOP_LEVEL_0: Decl[Struct]/CurrModule:            S0[#S0#];
 // GEN_TOP_LEVEL_0: Decl[Struct]/OtherModule[Swift]:    Int[#Int#];
 
@@ -100,7 +100,7 @@ extension G6 {
   subscript(b x: T.#^GEN_EXT_PARAM_6^#) -> Int { return 0 }
   subscript(b x: Int) -> T.#^GEN_EXT_RETURN_6^# { return 0 }
 }
-// GEN_PARAM_6-DAG: Decl[AssociatedType]/Super:         Assoc;
+// GEN_PARAM_6-DAG: Decl[AssociatedType]/CurrNominal:   Assoc;
 // GEN_PARAM_6-DAG: Keyword/None:                       Type[#T.Type#];
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENPROTO_PARAM_1 | %FileCheck %s -check-prefix=GENPROTO_1
@@ -116,5 +116,5 @@ extension GP1 {
   subscript(b x: I.#^GENPROTO_EXT_PARAM_1^#) -> Int { return 1 }
   subscript(b x: Int) -> I.#^GENPROTO_EXT_RETURN_1^# { return 1 }
 }
-// GENPROTO_1-DAG: Decl[AssociatedType]/Super:         Assoc;
+// GENPROTO_1-DAG: Decl[AssociatedType]/CurrNominal:   Assoc;
 // GENPROTO_1-DAG: Keyword/None:                       Type[#Self.I.Type#];

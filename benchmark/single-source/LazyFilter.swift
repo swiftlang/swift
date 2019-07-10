@@ -15,21 +15,29 @@
 import TestsUtils
 
 public let LazyFilter = [
-  BenchmarkInfo(name: "LazilyFilteredArrays2", runFunction: run_LazilyFilteredArrays, tags: [.validation, .api, .Array],
-      setUpFunction: { blackHole(filteredRange) }),
-  BenchmarkInfo(name: "LazilyFilteredRange", runFunction: run_LazilyFilteredRange, tags: [.validation, .api, .Array]),
+  BenchmarkInfo(name: "LazilyFilteredArrays2",
+    runFunction: run_LazilyFilteredArrays,
+    tags: [.validation, .api, .Array],
+    setUpFunction: { blackHole(filteredRange) },
+    legacyFactor: 100),
+  BenchmarkInfo(name: "LazilyFilteredRange",
+    runFunction: run_LazilyFilteredRange,
+    tags: [.validation, .api, .Array],
+    legacyFactor: 10),
   BenchmarkInfo(
     name: "LazilyFilteredArrayContains",
     runFunction: run_LazilyFilteredArrayContains,
     tags: [.validation, .api, .Array],
-    setUpFunction: setup_LazilyFilteredArrayContains,
-    tearDownFunction: teardown_LazilyFilteredArrayContains),
+    setUpFunction: {
+      multiplesOfThree = Array(1..<500).lazy.filter { $0 % 3 == 0 } },
+    tearDownFunction: { multiplesOfThree = nil },
+    legacyFactor: 100),
 ]
 
 @inline(never)
 public func run_LazilyFilteredRange(_ N: Int) {
   var res = 123
-  let c = (1..<1_000_000).lazy.filter { $0 % 7 == 0 }
+  let c = (1..<100_000).lazy.filter { $0 % 7 == 0 }
   for _ in 1...N {
     res += Array(c).count
     res -= Array(c).count
@@ -37,7 +45,7 @@ public func run_LazilyFilteredRange(_ N: Int) {
   CheckResults(res == 123)
 }
 
-let filteredRange = (1..<100_000).map({[$0]}).lazy.filter { $0.first! % 7 == 0 }
+let filteredRange = (1..<1_000).map({[$0]}).lazy.filter { $0.first! % 7 == 0 }
 
 @inline(never)
 public func run_LazilyFilteredArrays(_ N: Int) {
@@ -52,22 +60,14 @@ public func run_LazilyFilteredArrays(_ N: Int) {
 
 fileprivate var multiplesOfThree: LazyFilterCollection<Array<Int>>?
 
-fileprivate func setup_LazilyFilteredArrayContains() {
-  multiplesOfThree = Array(1..<5_000).lazy.filter { $0 % 3 == 0 }
-}
-
-fileprivate func teardown_LazilyFilteredArrayContains() {
-  multiplesOfThree = nil
-}
-
 @inline(never)
 fileprivate func run_LazilyFilteredArrayContains(_ N: Int) {
   let xs = multiplesOfThree!
   for _ in 1...N {
     var filteredCount = 0
-    for candidate in 1..<5_000 {
+    for candidate in 1..<500 {
       filteredCount += xs.contains(candidate) ? 1 : 0
     }
-    CheckResults(filteredCount == 1666)
+    CheckResults(filteredCount == 166)
   }
 }

@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -enable-objc-interop -emit-ir %s | %FileCheck %s -DINT=i%target-ptrsize
-// RUN: %target-swift-frontend -Osize -assume-parsing-unqualified-ownership-sil -enable-objc-interop -emit-ir %s | %FileCheck %s --check-prefix=OSIZE -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend -enable-objc-interop -emit-ir %s | %FileCheck %s -DINT=i%target-ptrsize -check-prefix CHECK -check-prefix CHECK-%target-import-type
+// RUN: %target-swift-frontend -Osize -enable-objc-interop -emit-ir %s | %FileCheck %s --check-prefix=OSIZE -DINT=i%target-ptrsize
 
 // REQUIRES: CPU=x86_64
 
@@ -27,16 +27,27 @@ bb0:
 
 // CHECK-LABEL: define hidden swiftcc %swift.metadata_response @"$s12typemetadata1CCMa"
 // CHECK-SAME:    ([[INT]])
-// CHECK:      [[T0:%.*]] = load %swift.type*, %swift.type**  @"$s12typemetadata1CCML", align 8
+// CHECK-DIRECT:    [[T0:%.*]] = load %swift.type*, %swift.type** @"$s12typemetadata1CCML", align 8
+// CHECK-INDIRECT:  [[T0:%.*]] = load %swift.type*, %swift.type** getelementptr inbounds ({ %swift.type*, i8* }, { %swift.type*, i8* }* @"$s12typemetadata1CCMl", i32 0, i32 0), align 8
 // CHECK-NEXT: [[T1:%.*]] = icmp eq %swift.type* [[T0]], null
 // CHECK-NEXT: br i1 [[T1]]
-// CHECK:      [[T0:%.*]] = call %objc_class* @swift_getInitializedObjCClass({{.*}} @"$s12typemetadata1CCMf", {{.*}})
-// CHECK-NEXT: [[T1:%.*]] = bitcast %objc_class* [[T0]] to %swift.type*
-// CHECK:      store atomic %swift.type* [[T1]], %swift.type** @"$s12typemetadata1CCML" release, align 8
-// CHECK-NEXT: br label
+
+// CHECK-DIRECT:      [[T0:%.*]] = call %objc_class* @swift_getInitializedObjCClass({{.*}} @"$s12typemetadata1CCMf", {{.*}})
+// CHECK-DIRECT-NEXT: [[T1:%.*]] = bitcast %objc_class* [[T0]] to %swift.type*
+// CHECK-DIRECT:      store atomic %swift.type* [[T1]], %swift.type** @"$s12typemetadata1CCML" release, align 8
+// CHECK-DIRECT-NEXT: br label
+
+// CHECK-INDIRECT:      [[T0:%.*]] = call swiftcc %swift.metadata_response
+// @swift_getSingletonMetdata([[INT]] %0, %swift.type_descriptor* bitcast (<{ {{.*}} }>* @"$s12typemetadata1CCMn" to %swift.type_descriptor*))
+// CHECK-INDIRECT-NEXT: [[T1:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
+// CHECK-INDIRECT-NEXT: [[T2:%.*]] = extractvalue %swift.metadata_response [[T0]], 1
+// CHECK-INDIRECT-NEXT: br label
+
 // CHECK:      [[RES:%.*]] = phi
+// CHECK-INDIRECT:    [[T2:%.*]] = phi [[INT]]
 // CHECK-NEXT: [[T0:%.*]] = insertvalue %swift.metadata_response undef, %swift.type* [[RES]], 0
-// CHECK-NEXT: [[T1:%.*]] = insertvalue %swift.metadata_response [[T0]], i64 0, 1
+// CHECK-DIRECT-NEXT:   [[T1:%.*]] = insertvalue %swift.metadata_response [[T0]], i64 0, 1
+// CHECK-INDIRECT-NEXT: [[T1:%.*]] = insertvalue %swift.metadata_response [[T0]], i64 [[T2]], 1
 // CHECK-NEXT: ret %swift.metadata_response [[T1]]
 
 // CHECK-LABEL: define linkonce_odr hidden swiftcc %swift.metadata_response @"$s12typemetadata1SV_AA1CCtMa"

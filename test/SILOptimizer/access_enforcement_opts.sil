@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -access-enforcement-opts -I %S/Inputs/abi -assume-parsing-unqualified-ownership-sil %s | %FileCheck %s
+// RUN: %target-sil-opt -access-enforcement-opts -I %S/Inputs/abi %s | %FileCheck %s
 
 sil_stage canonical
 
@@ -9,7 +9,7 @@ import c_layout
 
 
 struct X {
-  @sil_stored var i: Int64 { get set }
+  @_hasStorage var i: Int64 { get set }
   init(i: Int64)
   init()
 }
@@ -382,7 +382,7 @@ bb0(%0 : $*Int64):
 // CHECK-LABEL: sil @testInoutReadEscapeRead : $@convention(thin) () -> () {
 // CHECK: [[BOX:%.*]] = alloc_box ${ var Int64 }, var, name "x"
 // CHECK: [[BOXADR:%.*]] = project_box [[BOX]] : ${ var Int64 }, 0
-// CHECK: begin_access [read] [static] [[BOXADR]] : $*Int64
+// CHECK: begin_access [read] [static] [no_nested_conflict] [[BOXADR]] : $*Int64
 // CHECK-NOT: begin_access
 // CHECK-LABEL: } // end sil function 'testInoutReadEscapeRead'
 sil @testInoutReadEscapeRead : $@convention(thin) () -> () {
@@ -506,14 +506,19 @@ bb0(%0 : ${ var Int64 }):
 // }
 // Preserve the scope of the outer inout access. Runtime trap expected.
 //
+// FIXME: The optimization should be able to merge these accesses, but
+// it must first prove that no other conflicting read accesses occur
+// within the existing read access scopes.
+//
 // CHECK-LABEL: sil @$s17enforce_with_opts24testInoutWriteEscapeReadyyF : $@convention(thin) () -> () {
 // CHECK: [[BOX:%.*]] = alloc_box ${ var Int64 }, var, name "x"
 // CHECK: [[BOXADR:%.*]] = project_box [[BOX]] : ${ var Int64 }, 0
 // CHECK: [[BEGIN:%.*]] = begin_access [modify] [dynamic] [[BOXADR]] : $*Int64
 // CHECK: apply
-// CHECK-NOT: begin_access
 // CHECK: end_access [[BEGIN]]
-// CHECK-NOT: begin_access
+// CHECK: [[BEGIN2:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[BOXADR]] : $*Int64
+// CHECK: load [[BEGIN2]]
+// CHECK: end_access [[BEGIN2]]
 // CHECK-LABEL: } // end sil function '$s17enforce_with_opts24testInoutWriteEscapeReadyyF'
 sil @$s17enforce_with_opts24testInoutWriteEscapeReadyyF : $@convention(thin) () -> () {
 bb0:
@@ -579,14 +584,19 @@ bb0(%0 : ${ var Int64 }):
 // }
 // Preserve the scope of the outer inout access. Runtime trap expected.
 //
+// FIXME: The optimization should be able to merge these accesses, but
+// it must first prove that no other conflicting read accesses occur
+// within the existing read access scopes.
+//
 // CHECK-LABEL: sil @$s17enforce_with_opts020testInoutWriteEscapeF0yyF : $@convention(thin) () -> () {
 // CHECK: [[BOX:%.*]] = alloc_box ${ var Int64 }, var, name "x"
 // CHECK: [[BOXADR:%.*]] = project_box [[BOX]] : ${ var Int64 }, 0
 // CHECK: [[BEGIN:%.*]] = begin_access [modify] [dynamic] [[BOXADR]] : $*Int64
 // CHECK: apply
-// CHECK-NOT: begin_access
 // CHECK: end_access [[BEGIN]]
-// CHECK-NOT: begin_access
+// CHECK: [[BEGIN2:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[BOXADR]] : $*Int64
+// CHECK: load [[BEGIN2]]
+// CHECK: end_access [[BEGIN2]]
 // CHECK-LABEL: } // end sil function '$s17enforce_with_opts020testInoutWriteEscapeF0yyF'
 sil @$s17enforce_with_opts020testInoutWriteEscapeF0yyF : $@convention(thin) () -> () {
 bb0:
@@ -941,7 +951,7 @@ bb0(%0 : $*Int64, %1 : $@callee_guaranteed () -> ()):
 //
 // CHECK-LABEL: sil @testOldToNewMapRead : $@convention(thin) () -> () {
 // CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
-// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [read] [dynamic] [[GLOBAL]] : $*X
+// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
 // CHECK-NEXT: load [[BEGIN]] : $*X
 // CHECK-NEXT: load [[BEGIN]] : $*X
 // CHECK-NEXT: load [[BEGIN]] : $*X
@@ -971,7 +981,7 @@ bb0:
 //
 // CHECK-LABEL: sil @testOldToNewMapReadMayRelease : $@convention(thin) () -> () {
 // CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
-// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [read] [dynamic] [[GLOBAL]] : $*X
+// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
 // CHECK-NEXT: load [[BEGIN]] : $*X
 // CHECK-NEXT: load [[BEGIN]] : $*X
 // CHECK-NEXT: end_access [[BEGIN]] : $*X
@@ -999,14 +1009,21 @@ bb0:
 // public func testOldToNewMapWrite) {
 // Checks merging of 3 scopes resulting in a larger modify scope
 //
+// FIXME: The optimization should be able to merge these accesses, but
+// it must first prove that no other conflicting read accesses occur
+// within the existing read access scopes.
+//
 // CHECK-LABEL: sil @testOldToNewMapWrite : $@convention(thin) () -> () {
 // CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
-// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [modify] [dynamic] [[GLOBAL]] : $*X
-// CHECK-NEXT: load [[BEGIN]] : $*X
-// CHECK: store {{.*}} to [[BEGIN]] : $*X
+// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
 // CHECK-NEXT: load [[BEGIN]] : $*X
 // CHECK-NEXT: end_access [[BEGIN]] : $*X
-// CHECK-NOT: begin_access
+// CHECK: [[BEGIN2:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
+// CHECK-NEXT: store {{.*}} to [[BEGIN2]] : $*X
+// CHECK-NEXT: end_access [[BEGIN2]] : $*X
+// CHECK: [[BEGIN3:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
+// CHECK-NEXT: load [[BEGIN3]] : $*X
+// CHECK-NEXT: end_access [[BEGIN3]] : $*X
 // CHECK-LABEL: } // end sil function 'testOldToNewMapWrite'
 sil @testOldToNewMapWrite : $@convention(thin) () -> () {
 bb0:
@@ -1031,15 +1048,20 @@ bb0:
 // public func testDataFlowAcrossBBs() {
 // Checks merging of scopes across basic blocks - propagating that information
 //
+// FIXME: The optimization should be able to merge these accesses, but
+// it must first prove that no other conflicting read accesses occur
+// within the existing read access scopes.
+//
 // CHECK-LABEL: sil @testDataFlowAcrossBBs : $@convention(thin) () -> () {
 // CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
-// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [modify] [dynamic] [[GLOBAL]] : $*X
+// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
 // CHECK-NEXT: load [[BEGIN]] : $*X
+// CHECK-NEXT: end_access [[BEGIN]] : $*X
 // CHECK-NEXT: br bb1
 // CHECK: br bb2
-// CHECK: load [[BEGIN]] : $*X
-// CHECK-NEXT: end_access [[BEGIN]] : $*X
-// CHECK-NOT: begin_access
+// CHECK: [[BEGIN2:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
+// CHECK-NEXT: load [[BEGIN2]] : $*X
+// CHECK-NEXT: end_access [[BEGIN2]] : $*X
 // CHECK-LABEL: } // end sil function 'testDataFlowAcrossBBs'
 sil @testDataFlowAcrossBBs : $@convention(thin) () -> () {
 bb0:
@@ -1063,15 +1085,20 @@ bb2:
 // public func testDataFlowAcrossInnerLoop() {
 // Checks merging of scopes across an inner loop
 //
+// FIXME: The optimization should be able to merge these accesses, but
+// it must first prove that no other conflicting read accesses occur
+// within the existing read access scopes.
+//
 // CHECK-LABEL: sil @testDataFlowAcrossInnerLoop : $@convention(thin) () -> () {
 // CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
-// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [modify] [dynamic] [[GLOBAL]] : $*X
+// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
 // CHECK-NEXT: load [[BEGIN]] : $*X
+// CHECK-NEXT: end_access [[BEGIN]] : $*X
 // CHECK-NEXT: br bb1
 // CHECK: cond_br {{.*}}, bb1, bb2
-// CHECK: load [[BEGIN]] : $*X
-// CHECK-NEXT: end_access [[BEGIN]] : $*X
-// CHECK-NOT: begin_access
+// CHECK: [[BEGIN2:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
+// CHECK-NEXT: load [[BEGIN2]] : $*X
+// CHECK-NEXT: end_access [[BEGIN2]] : $*X
 // CHECK-LABEL: } // end sil function 'testDataFlowAcrossInnerLoop'
 sil @testDataFlowAcrossInnerLoop : $@convention(thin) () -> () {
 bb0:
@@ -1248,13 +1275,19 @@ bb4:
 // Checks detection of irreducible control flow / bail + parts that we *can* merge
 // See disableCrossBlock in the algorithm: this detects this corner case
 //
+// FIXME: The optimization should be able to merge these accesses, but
+// it must first prove that no other conflicting read accesses occur
+// within the existing read access scopes.
+//
 // CHECK-LABEL: sil @testIrreducibleGraph2 : $@convention(thin) () -> () {
 // CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
-// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [modify] [dynamic] [[GLOBAL]] : $*X
+// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
 // CHECK-NEXT: load [[BEGIN]] : $*X
-// CHECK-NEXT: br bb1
-// CHECK: load [[BEGIN]] : $*X
 // CHECK-NEXT: end_access [[BEGIN]] : $*X
+// CHECK-NEXT: br bb1
+// CHECK: [[BEGIN1:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
+// CHECK-NEXT: load [[BEGIN1]] : $*X
+// CHECK-NEXT: end_access [[BEGIN1]] : $*X
 // CHECK: cond_br {{.*}}, bb2, bb3
 // CHECK: [[BEGIN2:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
 // CHECK-NEXT: load [[BEGIN2]] : $*X
@@ -1262,11 +1295,9 @@ bb4:
 // CHECK-NEXT: br bb3
 // CHECK: [[BEGIN3:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
 // CHECK-NEXT: load [[BEGIN3]] : $*X
-// CHECK-NEXT: end_access [[BEGIN3]] : $*X
 // CHECK: br bb4
-// CHECK: [[BEGIN4:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
-// CHECK-NEXT: load [[BEGIN4]] : $*X
-// CHECK-NEXT: end_access [[BEGIN4]] : $*X
+// CHECK: load [[BEGIN3]] : $*X
+// CHECK-NEXT: end_access [[BEGIN3]] : $*X
 // CHECK: cond_br {{.*}}, bb2, bb5
 // CHECK: [[BEGIN5:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
 // CHECK-NEXT: load [[BEGIN5]] : $*X
@@ -1321,20 +1352,18 @@ class RefElemClass {
   init()
 }
 
-// Checks that we don't crash when unable to create projection paths
-// we can't merge anything here because of that
+// Merge access overlapping scopes.
+//
 // CHECK-LABEL: sil @ref_elem_c : $@convention(thin) (RefElemClass) -> () {
 // CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
-// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
+// CHECK-NEXT: [[BEGIN:%.*]] =  begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
 // CHECK-NEXT: load [[BEGIN]] : $*X
 // CHECK-NEXT: end_access [[BEGIN]] : $*X
 // CHECK-NEXT: [[REFX:%.*]] = ref_element_addr %0 : $RefElemClass, #RefElemClass.x
 // CHECK-NEXT: [[REFY:%.*]] = ref_element_addr %0 : $RefElemClass, #RefElemClass.y
 // CHECK-NEXT: [[BEGINX:%.*]] = begin_access [modify] [dynamic] [[REFX]] : $*BitfieldOne
-// CHECK: end_access [[BEGINX]] : $*BitfieldOne
 // CHECK: [[BEGINY:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[REFY]] : $*Int32
-// CHECK: [[BEGINX2:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[REFX]] : $*BitfieldOne
-// CHECK-NEXT: end_access [[BEGINX2]] : $*BitfieldOne
+// CHECK: end_access [[BEGINX]] : $*BitfieldOne
 // CHECK-NEXT: end_access [[BEGINY]] : $*Int32
 // CHECK-LABEL: } // end sil function 'ref_elem_c'
 
@@ -1358,23 +1387,57 @@ bb0(%0 : $RefElemClass):
   return %10 : $()
 }
 
+class RefElemNoConflictClass {
+  var x : Int32
+  var y : Int32
+  init()
+}
+
+// Checks that we can detect not having a nested conflict in class when we are accessing
+// fields that do no alias
+// CHECK-LABEL: sil @ref_elem_no_alias : $@convention(thin) (RefElemNoConflictClass) -> () {
+// CHECK: [[REFX:%.*]] = ref_element_addr %0 : $RefElemNoConflictClass, #RefElemNoConflictClass.x
+// CHECK-NEXT: [[REFY:%.*]] = ref_element_addr %0 : $RefElemNoConflictClass, #RefElemNoConflictClass.y
+// CHECK: [[BEGINY:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[REFY]] : $*Int32
+// CHECK: [[BEGINX:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[REFX]] : $*Int32
+// CHECK-NEXT: end_access [[BEGINX]] : $*Int32
+// CHECK-NEXT: end_access [[BEGINY]] : $*Int32
+// CHECK-LABEL: } // end sil function 'ref_elem_no_alias'
+sil @ref_elem_no_alias : $@convention(thin) (RefElemNoConflictClass) -> () {
+bb0(%0 : $RefElemNoConflictClass):
+  %x = ref_element_addr %0 : $RefElemNoConflictClass, #RefElemNoConflictClass.x
+  %y = ref_element_addr %0 : $RefElemNoConflictClass, #RefElemNoConflictClass.y
+  %b2 = begin_access [modify] [dynamic] %y : $*Int32
+  %b3 = begin_access [modify] [dynamic] %x : $*Int32
+  end_access %b3 : $*Int32
+  end_access %b2 : $*Int32
+  %10 = tuple ()
+  return %10 : $()
+}
+
 // public func testStronglyConnectedComponent() {
 // During the merge optimization,
 // Check that we don't merge cross strongly component boundaries for now
 //
+// FIXME: The optimization should be able to merge these accesses, but
+// it must first prove that no other conflicting read accesses occur
+// within the existing read access scopes.
+//
 // CHECK-LABEL: sil @testStronglyConnectedComponent : $@convention(thin) () -> () {
 // CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
-// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [modify] [dynamic] [[GLOBAL]] : $*X
+// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
 // CHECK-NEXT: load [[BEGIN]] : $*X
-// CHECK-NEXT: br bb1
-// CHECK: load [[BEGIN]] : $*X
 // CHECK-NEXT: end_access [[BEGIN]] : $*X
+// CHECK-NEXT: br bb1
+// CHECK: [[BEGIN1:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
+// CHECK-NEXT: load [[BEGIN1]] : $*X
+// CHECK-NEXT: end_access [[BEGIN1]] : $*X
 // CHECK: cond_br {{.*}}, bb2, bb3
 // CHECK: [[BEGIN2:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
 // CHECK-NEXT: load [[BEGIN2]] : $*X
 // CHECK-NEXT: end_access [[BEGIN2]] : $*X
 // CHECK-NEXT: br bb3
-// CHECK: [[BEGIN3:%.*]] = begin_access [read] [dynamic] [[GLOBAL]] : $*X
+// CHECK: [[BEGIN3:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
 // CHECK-NEXT: load [[BEGIN3]] : $*X
 // CHECK: br bb4
 // CHECK: load [[BEGIN3]] : $*X
@@ -1487,4 +1550,190 @@ bb0:
   return %10 : $()
 }
 
+// public func testPhiArgs() {
+// Check that we can merge scopes with Phi args - avoiding a crash we've seen in the past
+//
+// CHECK-LABEL: sil @testPhiArgs : $@convention(thin) () -> () {
+// CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
+// CHECK: cond_br {{.*}}, bb1, bb2
+// CHECK: bb1
+// CHECK: br bb3([[GLOBAL]] : $*X)
+// CHECK: bb2
+// CHECK: br bb3([[GLOBAL]] : $*X)
+// CHECK: bb3([[GLOBALPHI:%.*]] : $*X):
+// CHECK: [[BEGIN:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBALPHI]] : $*X
+// CHECK-NEXT: load
+// CHECK-NEXT: load
+// CHECK-NEXT: end_access [[BEGIN]] : $*X
+// CHECK-NOT: begin_access
+// CHECK-LABEL: } // end sil function 'testPhiArgs'
+sil @testPhiArgs : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @globalX: $*X
+  %cond = integer_literal $Builtin.Int1, 1
+  cond_br %cond, bb1, bb2
+  
+bb1:
+  br bb3(%0 : $*X)
+  
+bb2:
+  br bb3(%0 : $*X)
+  
+bb3(%1 : $*X):
+  %2 = begin_access [read] [dynamic] %1 : $*X
+  %3 = load %2 : $*X
+  end_access %2 : $*X
+  %4 = begin_access [read] [dynamic] %0 : $*X
+  %5 = load %4 : $*X
+  end_access %4 : $*X
+  %10 = tuple ()
+  return %10 : $()
+}
 
+// --- rdar://48239213: Fatal access conflict detected.
+//
+// The read/modify pair of accesses in testReadModifyConflictPair
+// cannot be merged without introducing a false conflict.
+
+public class TestClass {
+  @_hasStorage @_hasInitialValue var flags: Int64 { get set }
+}
+
+// CHECK-LABEL: sil hidden [noinline] @readFlags : $@convention(method) (Int64, @guaranteed TestClass) -> Bool {
+// CHECK: bb0(%0 : $Int64, %1 : $TestClass):
+// CHECK:   [[ADR:%.*]] = ref_element_addr %1 : $TestClass, #TestClass.flags
+// CHECK:   begin_access [read] [dynamic] [no_nested_conflict] [[ADR]] : $*Int64
+// CHECK:   load %4 : $*Builtin.Int64
+// CHECK:   end_access
+// CHECK-LABEL: } // end sil function 'readFlags'
+sil hidden [noinline] @readFlags : $@convention(method) (Int64, @guaranteed TestClass) -> Bool {
+bb0(%0 : $Int64, %1 : $TestClass):
+  %2 = ref_element_addr %1 : $TestClass, #TestClass.flags
+  %3 = begin_access [read] [dynamic] [no_nested_conflict] %2 : $*Int64
+  %4 = struct_element_addr %3 : $*Int64, #Int64._value
+  %5 = load %4 : $*Builtin.Int64
+  end_access %3 : $*Int64
+  %7 = struct_extract %0 : $Int64, #Int64._value
+  %8 = builtin "cmp_eq_Int64"(%5 : $Builtin.Int64, %7 : $Builtin.Int64) : $Builtin.Int1
+  %9 = struct $Bool (%8 : $Builtin.Int1)
+  return %9 : $Bool
+}
+
+// CHECK-LABEL: sil @testReadModifyConflictPair : $@convention(method) (@guaranteed TestClass) -> () {
+// CHECK: bb0(%0 : $TestClass):
+// CHECK:   [[ADR:%.*]] = ref_element_addr %0 : $TestClass, #TestClass.flags
+// CHECK:   begin_access [read] [dynamic] [no_nested_conflict] [[ADR]] : $*Int64
+// CHECK:   load
+// CHECK:   end_access
+// CHECK:   apply {{.*}} : $@convention(method) (Int64, @guaranteed TestClass) -> Bool
+// CHECK:   begin_access [modify] [dynamic] [no_nested_conflict] [[ADR]] : $*Int64
+// CHECK:   store
+// CHECK:   end_access
+// CHECK-LABEL: } // end sil function 'testReadModifyConflictPair'
+sil @testReadModifyConflictPair : $@convention(method) (@guaranteed TestClass) -> () {
+bb0(%0 : $TestClass):
+  %1 = ref_element_addr %0 : $TestClass, #TestClass.flags
+  %2 = begin_access [read] [dynamic] %1 : $*Int64
+  %3 = load %2 : $*Int64
+  end_access %2 : $*Int64
+  %5 = function_ref @readFlags : $@convention(method) (Int64, @guaranteed TestClass) -> Bool
+  %6 = apply %5(%3, %0) : $@convention(method) (Int64, @guaranteed TestClass) -> Bool
+  %7 = integer_literal $Builtin.Int64, 3
+  %8 = struct $Int64 (%7 : $Builtin.Int64)
+  %9 = begin_access [modify] [dynamic] %1 : $*Int64
+  store %8 to %9 : $*Int64
+  end_access %9 : $*Int64
+  %12 = tuple ()
+  return %12 : $()
+}
+
+// public func testNestedReadMerging() {
+// Checks bailing on nested read scopes
+// We will create two scopes - nested conflict
+//
+// CHECK-LABEL: sil @testNestedReadMerging : $@convention(thin) () -> () {
+// CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
+// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
+// CHECK-NEXT: load [[BEGIN]] : $*X
+// CHECK-NEXT: load [[BEGIN]] : $*X
+// CHECK-NEXT: [[BEGIN2:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
+// CHECK-NEXT: load [[BEGIN2]] : $*X
+// CHECK-NEXT: end_access [[BEGIN2]] : $*X
+// CHECK-NEXT: end_access [[BEGIN]] : $*X
+// CHECK-NOT: begin_access
+// CHECK-LABEL: } // end sil function 'testNestedReadMerging'
+sil @testNestedReadMerging : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @globalX: $*X
+  %1 = begin_access [read] [dynamic] %0 : $*X
+  %2 = load %1 : $*X
+  end_access %1 : $*X
+  %4 = begin_access [read] [dynamic] %0 : $*X
+  %5 = load %4 : $*X
+  %7 = begin_access [read] [dynamic] %0 : $*X
+  %8 = load %7 : $*X
+  end_access %7 : $*X
+  end_access %4 : $*X
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// public func testNestedWriteBailout() {
+// Same as testNestedReadBailout but with modify
+// We will create two scopes - the nested conflict must be preserved.
+//
+// CHECK-LABEL: sil @testNestedWriteBailout : $@convention(thin) () -> () {
+// CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
+// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [modify] [dynamic] [[GLOBAL]] : $*X
+// CHECK-NEXT: load [[BEGIN]] : $*X
+// CHECK-NEXT: load [[BEGIN]] : $*X
+// CHECK-NEXT: [[BEGIN2:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
+// CHECK-NEXT: load [[BEGIN2]] : $*X
+// CHECK-NEXT: end_access [[BEGIN2]] : $*X
+// CHECK-NEXT: end_access [[BEGIN]] : $*X
+// CHECK-NOT: begin_access
+// CHECK-LABEL: } // end sil function 'testNestedWriteBailout'
+sil @testNestedWriteBailout : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @globalX: $*X
+  %1 = begin_access [modify] [dynamic] %0 : $*X
+  %2 = load %1 : $*X
+  end_access %1 : $*X
+  %4 = begin_access [modify] [dynamic] %0 : $*X
+  %5 = load %4 : $*X
+  %7 = begin_access [modify] [dynamic] %0 : $*X
+  %8 = load %7 : $*X
+  end_access %7 : $*X
+  end_access %4 : $*X
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// Test transformCalleeStorage when the callee storage is an Argument
+// and the caller storage is an Argument at a different position.
+//
+// CHECK-LABEL: sil @testTransformArgumentCaller : $@convention(thin) (Int64, @guaranteed { var Int64 }, @guaranteed { var Int64 }) -> Int64 {
+// CHECK: begin_access [read] [dynamic] [no_nested_conflict]
+// CHECK-LABEL: } // end sil function 'testTransformArgumentCaller'
+sil @testTransformArgumentCaller : $@convention(thin) (Int64, @guaranteed { var Int64 }, @guaranteed { var Int64 }) -> Int64 {
+bb0(%0 : $Int64, %1 : ${ var Int64 }, %2 : ${ var Int64 }):
+  %boxadr = project_box %1 : $ { var Int64 }, 0
+  %access = begin_access [read] [dynamic] [no_nested_conflict] %boxadr : $*Int64
+  %f = function_ref @testTransformArgumentCallee : $@convention(thin) (@guaranteed { var Int64 }) -> Int64
+  %call = apply %f(%2) : $@convention(thin) (@guaranteed { var Int64 }) -> Int64
+  store %0 to %access : $*Int64
+  end_access %access : $*Int64
+  return %call : $Int64
+}
+
+// CHECK-LABEL: sil @testTransformArgumentCallee : $@convention(thin) (@guaranteed { var Int64 }) -> Int64 {
+// CHECK: begin_access [read] [dynamic] [no_nested_conflict]
+// CHECK-LABEL: } // end sil function 'testTransformArgumentCallee'
+sil @testTransformArgumentCallee : $@convention(thin) (@guaranteed { var Int64 }) -> Int64 {
+bb0(%0 : ${ var Int64 }):
+  %boxadr = project_box %0 : $ { var Int64 }, 0
+  %access = begin_access [read] [dynamic] [no_nested_conflict] %boxadr : $*Int64
+  %val = load %access : $*Int64
+  end_access %access : $*Int64
+  return %val : $Int64
+}

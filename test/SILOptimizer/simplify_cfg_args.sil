@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -jumpthread-simplify-cfg | %FileCheck %s
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -late-codemotion -jumpthread-simplify-cfg | %FileCheck %s --check-prefix=CHECK_WITH_CODEMOTION
+// RUN: %target-sil-opt -enable-sil-verify-all %s -jumpthread-simplify-cfg | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -late-codemotion -jumpthread-simplify-cfg | %FileCheck %s --check-prefix=CHECK_WITH_CODEMOTION
 
 sil_stage raw
 

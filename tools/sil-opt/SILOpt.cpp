@@ -71,14 +71,15 @@ ModuleName("module-name", llvm::cl::desc("The name of the module if processing"
                                          "stdin."));
 
 static llvm::cl::opt<bool>
-EnableResilience("enable-resilience",
-                 llvm::cl::desc("Compile the module to export resilient "
-                                "interfaces for all public declarations by "
-                                "default"));
+EnableLibraryEvolution("enable-library-evolution",
+                       llvm::cl::desc("Compile the module to export resilient "
+                                      "interfaces for all public declarations by "
+                                      "default"));
 
-static llvm::cl::opt<bool>
-EnableSILOwnershipOpt("enable-sil-ownership",
-                 llvm::cl::desc("Compile the module with sil-ownership initially enabled for all functions"));
+static llvm::cl::opt<bool> DisableSILOwnershipVerifier(
+    "disable-sil-ownership-verifier",
+    llvm::cl::desc(
+        "Do not verify SIL ownership invariants during SIL verification"));
 
 static llvm::cl::opt<bool>
 EnableSILOpaqueValues("enable-sil-opaque-values",
@@ -204,15 +205,9 @@ static llvm::cl::opt<bool>
 PerformWMO("wmo", llvm::cl::desc("Enable whole-module optimizations"));
 
 static llvm::cl::opt<bool>
-AssumeUnqualifiedOwnershipWhenParsing(
-    "assume-parsing-unqualified-ownership-sil", llvm::cl::Hidden, llvm::cl::init(false),
-    llvm::cl::desc("Assume all parsed functions have unqualified ownership"));
-
-static llvm::cl::opt<bool> DisableGuaranteedNormalArguments(
-    "disable-guaranteed-normal-arguments", llvm::cl::Hidden,
-    llvm::cl::init(false),
-    llvm::cl::desc("Assume that the input module was compiled with "
-                   "-disable-guaranteed-normal-arguments enabled"));
+EnableExperimentalStaticAssert(
+    "enable-experimental-static-assert", llvm::cl::Hidden,
+    llvm::cl::init(false), llvm::cl::desc("Enable experimental #assert"));
 
 /// Regular expression corresponding to the value given in one of the
 /// -pass-remarks* command line flags. Passes whose name matches this regexp
@@ -258,8 +253,8 @@ static void runCommandLineSelectedPasses(SILModule *Module,
 #include "swift/SILOptimizer/PassManager/Passes.def"
   }
 
-  PM.executePassPipelinePlan(
-      SILPassPipelinePlan::getPassPipelineForKinds(Passes));
+  PM.executePassPipelinePlan(SILPassPipelinePlan::getPassPipelineForKinds(
+      Module->getOptions(), Passes));
 
   if (Module->getOptions().VerifyAll)
     Module->verify();
@@ -306,7 +301,8 @@ int main(int argc, char **argv) {
     Invocation.setTargetTriple(Target);
   if (!ResourceDir.empty())
     Invocation.setRuntimeResourcePath(ResourceDir);
-  Invocation.getFrontendOptions().EnableResilience = EnableResilience;
+  Invocation.getFrontendOptions().EnableLibraryEvolution
+    = EnableLibraryEvolution;
   // Set the module cache path. If not passed in we use the default swift module
   // cache.
   Invocation.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
@@ -325,6 +321,9 @@ int main(int argc, char **argv) {
   Invocation.getLangOptions().OptimizationRemarkMissedPattern =
       createOptRemarkRegex(PassRemarksMissed);
 
+  Invocation.getLangOptions().EnableExperimentalStaticAssert =
+      EnableExperimentalStaticAssert;
+
   // Setup the SIL Options.
   SILOptions &SILOpts = Invocation.getSILOptions();
   SILOpts.InlineThreshold = SILInlineThreshold;
@@ -333,9 +332,7 @@ int main(int argc, char **argv) {
   SILOpts.AssertConfig = AssertConfId;
   if (OptimizationGroup != OptGroup::Diagnostics)
     SILOpts.OptMode = OptimizationMode::ForSpeed;
-  SILOpts.EnableSILOwnership = EnableSILOwnershipOpt;
-  SILOpts.AssumeUnqualifiedOwnershipWhenParsing =
-    AssumeUnqualifiedOwnershipWhenParsing;
+  SILOpts.VerifySILOwnership = !DisableSILOwnershipVerifier;
 
   SILOpts.VerifyExclusivity = VerifyExclusivity;
   if (EnforceExclusivity.getNumOccurrences() != 0) {
@@ -420,10 +417,10 @@ int main(int argc, char **argv) {
       llvm::errs() << EC.message() << '\n';
       return 1;
     }
-    CI.getSILModule()->setOptRecordStream(
-        llvm::make_unique<llvm::yaml::Output>(*OptRecordFile,
-                                              &CI.getSourceMgr()),
-        std::move(OptRecordFile));
+    auto Stream = llvm::make_unique<llvm::yaml::Output>(*OptRecordFile,
+                                                        &CI.getSourceMgr());
+    CI.getSILModule()->setOptRecordStream(std::move(Stream),
+                                          std::move(OptRecordFile));
   }
 
   if (OptimizationGroup == OptGroup::Diagnostics) {

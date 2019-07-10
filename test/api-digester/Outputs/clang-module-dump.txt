@@ -5,6 +5,48 @@
   "children": [
     {
       "kind": "TypeDecl",
+      "name": "AnotherObjcProt",
+      "printedName": "AnotherObjcProt",
+      "children": [
+        {
+          "kind": "Function",
+          "name": "anotherFunctionFromProt",
+          "printedName": "anotherFunctionFromProt()",
+          "children": [
+            {
+              "kind": "TypeNameAlias",
+              "name": "Void",
+              "printedName": "Void",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Void",
+                  "printedName": "()"
+                }
+              ]
+            }
+          ],
+          "declKind": "Func",
+          "usr": "c:objc(pl)AnotherObjcProt(im)anotherFunctionFromProt",
+          "moduleName": "Foo",
+          "genericSig": "<Self where Self : AnotherObjcProt>",
+          "protocolReq": true,
+          "declAttributes": [
+            "ObjC"
+          ],
+          "reqNewWitnessTableEntry": true,
+          "funcSelfKind": "NonMutating"
+        }
+      ],
+      "declKind": "Protocol",
+      "usr": "c:objc(pl)AnotherObjcProt",
+      "moduleName": "Foo",
+      "declAttributes": [
+        "ObjC"
+      ]
+    },
+    {
+      "kind": "TypeDecl",
       "name": "ClangInterface",
       "printedName": "ClangInterface",
       "children": [
@@ -32,7 +74,8 @@
           "isOpen": true,
           "declAttributes": [
             "ObjC"
-          ]
+          ],
+          "funcSelfKind": "NonMutating"
         },
         {
           "kind": "Constructor",
@@ -68,9 +111,19 @@
       "superclassNames": [
         "NSObject"
       ],
-      "conformingProtocols": [
-        "ObjcProt",
-        "NSObjectProtocol"
+      "conformances": [
+        {
+          "kind": "Conformance",
+          "name": "ObjcProt",
+          "printedName": "ObjcProt",
+          "usr": "c:objc(pl)ObjcProt"
+        },
+        {
+          "kind": "Conformance",
+          "name": "NSObjectProtocol",
+          "printedName": "NSObjectProtocol",
+          "usr": "c:objc(pl)NSObject"
+        }
       ]
     },
     {
@@ -103,7 +156,9 @@
           "protocolReq": true,
           "declAttributes": [
             "ObjC"
-          ]
+          ],
+          "reqNewWitnessTableEntry": true,
+          "funcSelfKind": "NonMutating"
         }
       ],
       "declKind": "Protocol",

@@ -1,8 +1,13 @@
+function(swift_android_libcxx_include_paths var)
+  set(${var}
+        "${SWIFT_ANDROID_NDK_PATH}/sources/cxx-stl/llvm-libc++/include"
+        "${SWIFT_ANDROID_NDK_PATH}/sources/cxx-stl/llvm-libc++abi/include"
+      PARENT_SCOPE)
+endfunction()
+
 function(swift_android_include_for_arch arch var)
   set(paths)
   list(APPEND paths
-       "${SWIFT_ANDROID_NDK_PATH}/sources/cxx-stl/llvm-libc++/include"
-       "${SWIFT_ANDROID_NDK_PATH}/sources/cxx-stl/llvm-libc++abi/include"
        "${SWIFT_ANDROID_NDK_PATH}/sources/android/support/include"
        "${SWIFT_ANDROID_NDK_PATH}/sysroot/usr/include"
        "${SWIFT_ANDROID_NDK_PATH}/sysroot/usr/include/${SWIFT_SDK_ANDROID_ARCH_${arch}_NDK_TRIPLE}") 
@@ -17,6 +22,10 @@ function(swift_android_lib_for_arch arch var)
   if(arch STREQUAL armv7)
     list(APPEND paths "${_prebuilt}/${_host}/lib/armv7-a")
   elseif(arch STREQUAL aarch64)
+    list(APPEND paths "${_prebuilt}/${_host}/lib64")
+  elseif(arch STREQUAL i686)
+    list(APPEND paths "${_prebuilt}/${_host}/lib")
+  elseif(arch STREQUAL x86_64)
     list(APPEND paths "${_prebuilt}/${_host}/lib64")
   else()
     message(SEND_ERROR "unknown architecture (${arch}) for android")

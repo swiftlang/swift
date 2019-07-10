@@ -63,7 +63,7 @@ public class GenericObjCSubclass<T> : NSCoder {
 // CHECK-NEXT: [[KLASS:%.*]] = call %objc_class* @object_getClass(%objc_object* [[ADDR]])
 // CHECK-NEXT: [[ISA:%.*]] = bitcast %objc_class* [[KLASS]] to %swift.type*
 // CHECK-NEXT: [[ISA_ADDR:%.*]] = bitcast %swift.type* [[ISA]] to [[INT]]*
-// CHECK-NEXT: [[FIELD_OFFSET_ADDR:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[ISA_ADDR]], [[INT]] 16
+// CHECK-NEXT: [[FIELD_OFFSET_ADDR:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[ISA_ADDR]], [[INT]] 15
 // CHECK-NEXT: [[FIELD_OFFSET:%.*]] = load [[INT]], [[INT]]* [[FIELD_OFFSET_ADDR:%.*]]
 // CHECK-NEXT: [[OBJECT:%.*]] = bitcast %T28class_resilience_objc_armv7k19GenericObjCSubclassC* %0 to i8*
 // CHECK-NEXT: [[ADDR:%.*]] = getelementptr inbounds i8, i8* [[OBJECT]], [[INT]] [[FIELD_OFFSET]]

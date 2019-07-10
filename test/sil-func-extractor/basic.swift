@@ -1,16 +1,18 @@
 // Passing demangled name
 
-// RUN: %target-swift-frontend %s -g -module-name basic -emit-sib -o - | %target-sil-func-extractor -module-name basic -func="basic.foo" | %FileCheck %s -check-prefix=EXTRACT-FOO
-// RUN: %target-swift-frontend %s -g -module-name basic -emit-sib -o - | %target-sil-func-extractor -module-name basic -func="basic.X.test" | %FileCheck %s -check-prefix=EXTRACT-TEST
-// RUN: %target-swift-frontend %s -g -module-name basic -emit-sib -o - | %target-sil-func-extractor -module-name basic -func="basic.Vehicle.init" | %FileCheck %s -check-prefix=EXTRACT-INIT
-// RUN: %target-swift-frontend %s -g -module-name basic -emit-sib -o - | %target-sil-func-extractor -module-name basic -func="basic.Vehicle.now" | %FileCheck %s -check-prefix=EXTRACT-NOW
+// RUN: %empty-directory(%t)
+
+// RUN: %target-swift-frontend %s -g -module-name basic -emit-sib -o %t/demangle-ext-foo.sib; %target-sil-func-extractor -module-name basic -func="basic.foo" %t/demangle-ext-foo.sib | %FileCheck %s -check-prefix=EXTRACT-FOO
+// RUN: %target-swift-frontend %s -g -module-name basic -emit-sib -o %t/demangle-ext-test.sib; %target-sil-func-extractor -module-name basic -func="basic.X.test" %t/demangle-ext-test.sib | %FileCheck %s -check-prefix=EXTRACT-TEST
+// RUN: %target-swift-frontend %s -g -module-name basic -emit-sib -o %t/demangle-ext-init.sib; %target-sil-func-extractor -module-name basic -func="basic.Vehicle.init" %t/demangle-ext-init.sib | %FileCheck %s -check-prefix=EXTRACT-INIT
+// RUN: %target-swift-frontend %s -g -module-name basic -emit-sib -o %t/demangle-ext-now.sib; %target-sil-func-extractor -module-name basic -func="basic.Vehicle.now" %t/demangle-ext-now.sib | %FileCheck %s -check-prefix=EXTRACT-NOW
 
 // Passing mangled name
 
-// RUN: %target-swift-frontend %s -g -module-name basic -emit-sib -o - | %target-sil-func-extractor -module-name basic -func='$s5basic3fooSiyF' | %FileCheck %s -check-prefix=EXTRACT-FOO
-// RUN: %target-swift-frontend %s -g -module-name basic -emit-sib -o - | %target-sil-func-extractor -module-name basic -func='$s5basic1XV4testyyF' | %FileCheck %s -check-prefix=EXTRACT-TEST
-// RUN: %target-swift-frontend %s -g -module-name basic -emit-sib -o - | %target-sil-func-extractor -module-name basic -func='$s5basic7VehicleC1nACSi_tcfc' | %FileCheck %s -check-prefix=EXTRACT-INIT
-// RUN: %target-swift-frontend %s -g -module-name basic -emit-sib -o - | %target-sil-func-extractor -module-name basic -func='$s5basic7VehicleC3nowSiyF' | %FileCheck %s -check-prefix=EXTRACT-NOW
+// RUN: %target-swift-frontend %s -g -module-name basic -emit-sib -o %t/mangle-ext-foo.sib; %target-sil-func-extractor -module-name basic -func='$s5basic3fooSiyF' %t/mangle-ext-foo.sib | %FileCheck %s -check-prefix=EXTRACT-FOO
+// RUN: %target-swift-frontend %s -g -module-name basic -emit-sib -o %t/mangle-ext-test.sib; %target-sil-func-extractor -module-name basic -func='$s5basic1XV4testyyF' %t/mangle-ext-test.sib | %FileCheck %s -check-prefix=EXTRACT-TEST
+// RUN: %target-swift-frontend %s -g -module-name basic -emit-sib -o %t/mangle-ext-init.sib; %target-sil-func-extractor -module-name basic -func='$s5basic7VehicleC1nACSi_tcfc' %t/mangle-ext-init.sib | %FileCheck %s -check-prefix=EXTRACT-INIT
+// RUN: %target-swift-frontend %s -g -module-name basic -emit-sib -o %t/mangle-ext-now.sib; %target-sil-func-extractor -module-name basic -func='$s5basic7VehicleC3nowSiyF' %t/mangle-ext-now.sib | %FileCheck %s -check-prefix=EXTRACT-NOW
 
 
 // EXTRACT-FOO-NOT: sil hidden @$s5basic1XV4testyyF : $@convention(method) (X) -> () {

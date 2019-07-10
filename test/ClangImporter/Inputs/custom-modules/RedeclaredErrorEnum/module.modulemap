@@ -1,0 +1,8 @@
+module Base {
+  header "Base.h"
+}
+
+module Redeclared {
+  header "Redeclared.h"
+  export *
+}

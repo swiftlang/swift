@@ -1,10 +1,18 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -emit-ir -o - -primary-file %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %t -enable-library-evolution -enable-objc-interop -emit-ir -o - -primary-file %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize -DINT=i%target-ptrsize
 
 // XFAIL: CPU=armv7k
-
-// CHECK: %swift.type = type { [[INT:i32|i64]] }
+// XFAIL: CPU=powerpc64le
 
 import Foundation
+import resilient_struct
+
+// Note that these are all mutable to allow for the runtime to slide them.
+// CHECK: @"$s21class_resilience_objc27ClassWithEmptyThenResilientC9resilient0I7_struct0H3IntVvpWvd" = hidden global [[INT]] 0,
+// CHECK: @"$s21class_resilience_objc27ClassWithResilientThenEmptyC9resilient0I7_struct0F3IntVvpWvd" = hidden global [[INT]] 0,
+// CHECK: @"$s21class_resilience_objc27ClassWithEmptyThenResilientC5emptyAA0F0VvpWvd" = hidden global [[INT]] 0,
+// CHECK: @"$s21class_resilience_objc27ClassWithResilientThenEmptyC5emptyAA0H0VvpWvd" = hidden global [[INT]] 0,
 
 public class FixedLayoutObjCSubclass : NSObject {
   // This field could use constant direct access because NSObject has
@@ -71,9 +79,9 @@ public class GenericObjCSubclass<T> : NSCoder {
 
 // CHECK-NEXT:    [[ISA_ADDR:%.*]] = bitcast %swift.type* [[ISA]] to [[INT]]*
 
-// CHECK-32-NEXT: [[FIELD_OFFSET_ADDR:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[ISA_ADDR]], [[INT]] 16
+// CHECK-32-NEXT: [[FIELD_OFFSET_ADDR:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[ISA_ADDR]], [[INT]] 15
 
-// CHECK-64-NEXT: [[FIELD_OFFSET_ADDR:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[ISA_ADDR]], [[INT]] 13
+// CHECK-64-NEXT: [[FIELD_OFFSET_ADDR:%.*]] = getelementptr inbounds [[INT]], [[INT]]* [[ISA_ADDR]], [[INT]] 12
 
 // CHECK-NEXT: [[FIELD_OFFSET:%.*]] = load [[INT]], [[INT]]* [[FIELD_OFFSET_ADDR:%.*]]
 // CHECK-NEXT: [[OBJECT:%.*]] = bitcast %T21class_resilience_objc19GenericObjCSubclassC* %0 to i8*
@@ -88,4 +96,27 @@ func testConstantIndirectFieldAccess<T>(_ o: GenericObjCSubclass<T>) {
   // layout. Non-constant indirect is never needed for Objective-C classes
   // because the field offset vector only contains Swift field offsets.
   o.field = 10
+}
+
+@frozen
+public struct Empty {}
+
+public class ClassWithEmptyThenResilient : DummyClass {
+  public let empty: Empty
+  public let resilient: ResilientInt
+
+  public init(empty: Empty, resilient: ResilientInt) {
+    self.empty = empty
+    self.resilient = resilient
+  }
+}
+
+public class ClassWithResilientThenEmpty : DummyClass {
+  public let resilient: ResilientInt
+  public let empty: Empty
+
+  public init(empty: Empty, resilient: ResilientInt) {
+    self.empty = empty
+    self.resilient = resilient
+  }
 }

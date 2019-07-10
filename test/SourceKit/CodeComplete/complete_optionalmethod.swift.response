@@ -6,7 +6,7 @@
       key.sourcetext: "optionalMethod?()",
       key.description: "optionalMethod?()",
       key.typename: "Int",
-      key.context: source.codecompletion.context.superclass,
+      key.context: source.codecompletion.context.thisclass,
       key.num_bytes_to_erase: 0,
       key.associated_usrs: "c:@M@complete_optionalmethod@objc(pl)Proto(im)optionalMethod",
       key.modulename: "complete_optionalmethod"

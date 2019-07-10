@@ -1,9 +1,9 @@
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -enable-resilience -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
-// RUN: %target-swift-frontend -emit-module -enable-resilience -emit-module-path=%t/resilient_enum.swiftmodule -module-name=resilient_enum -I %t %S/../Inputs/resilient_enum.swift
-// RUN: %target-swift-frontend -module-name struct_resilience -I %t -emit-ir -enable-resilience %s | %FileCheck %s
-// RUN: %target-swift-frontend -module-name struct_resilience -I %t -emit-ir -enable-resilience -O %s
+// RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
+// RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_enum.swiftmodule -module-name=resilient_enum -I %t %S/../Inputs/resilient_enum.swift
+// RUN: %target-swift-frontend -module-name struct_resilience -I %t -emit-ir -enable-library-evolution %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name struct_resilience -I %t -emit-ir -enable-library-evolution -O %s
 
 import resilient_struct
 import resilient_enum
@@ -25,9 +25,9 @@ public func functionWithResilientTypesSize(_ s: __owned Size, f: (__owned Size) 
 // CHECK: [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[METADATA_ADDR]], [[INT]] -1
 // CHECK: [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
 
-// CHECK-NEXT: [[WITNESS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 8
-// CHECK: [[WITNESS:%.*]] = load i8*, i8** [[WITNESS_ADDR]]
-// CHECK: [[WITNESS_FOR_SIZE:%.*]] = ptrtoint i8* [[WITNESS]]
+// CHECK-NEXT: [[VWT_CAST:%.*]] = bitcast i8** [[VWT]] to %swift.vwtable*
+// CHECK-NEXT: [[WITNESS_ADDR:%.*]] = getelementptr inbounds %swift.vwtable, %swift.vwtable* [[VWT_CAST]], i32 0, i32 8
+// CHECK: [[WITNESS_FOR_SIZE:%.*]] = load [[INT]], [[INT]]* [[WITNESS_ADDR]]
 // CHECK: [[ALLOCA:%.*]] = alloca i8, {{.*}} [[WITNESS_FOR_SIZE]], align 16
 // CHECK: [[STRUCT_ADDR:%.*]] = bitcast i8* [[ALLOCA]] to %swift.opaque*
 
@@ -92,16 +92,39 @@ public struct MySize {
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s17struct_resilience32functionWithMyResilientTypesSize_1fAA0eH0VAEn_A2EnXEtF"(%T17struct_resilience6MySizeV* noalias nocapture sret, %T17struct_resilience6MySizeV* noalias nocapture dereferenceable({{8|(16)}}), i8*, %swift.opaque*)
 public func functionWithMyResilientTypesSize(_ s: __owned MySize, f: (__owned MySize) -> MySize) -> MySize {
-// CHECK: alloca
-// CHECK: [[TEMP:%.*]] = alloca %T17struct_resilience6MySizeV
-// CHECK: bitcast
-// CHECK: llvm.lifetime.start
-// CHECK: bitcast
-// CHECK: [[COPY:%.*]] = bitcast %T17struct_resilience6MySizeV* %5 to i8*
-// CHECK: [[ARG:%.*]] = bitcast %T17struct_resilience6MySizeV* %1 to i8*
-// CHECK: call void @llvm.memcpy{{.*}}(i8* align {{4|8}} [[COPY]], i8* align {{4|8}} [[ARG]], {{i32 8|i64 16}}, i1 false)
-// CHECK: [[FN:%.*]] = bitcast i8* %2
-// CHECK: call swiftcc void [[FN]](%T17struct_resilience6MySizeV* {{.*}} %0, {{.*}} [[TEMP]], %swift.refcounted* swiftself %{{.*}})
+
+// There's an alloca for debug info?
+// CHECK: {{%.*}} = alloca %T17struct_resilience6MySizeV
+
+// CHECK: [[DST:%.*]] = alloca %T17struct_resilience6MySizeV
+
+// CHECK: [[W_ADDR:%.*]] = getelementptr inbounds %T17struct_resilience6MySizeV, %T17struct_resilience6MySizeV* %1, i32 0, i32 0
+// CHECK: [[W_PTR:%.*]] = getelementptr inbounds %TSi, %TSi* [[W_ADDR]], i32 0, i32 0
+// CHECK: [[W:%.*]] = load [[INT]], [[INT]]* [[W_PTR]]
+
+// CHECK: [[H_ADDR:%.*]] = getelementptr inbounds %T17struct_resilience6MySizeV, %T17struct_resilience6MySizeV* %1, i32 0, i32 1
+// CHECK: [[H_PTR:%.*]] = getelementptr inbounds %TSi, %TSi* [[H_ADDR]], i32 0, i32 0
+// CHECK: [[H:%.*]] = load [[INT]], [[INT]]* [[H_PTR]]
+
+// CHECK: [[DST_ADDR:%.*]] = bitcast %T17struct_resilience6MySizeV* [[DST]] to i8*
+
+// CHECK: call void @llvm.lifetime.start.p0i8({{i32|i64}} {{8|16}}, i8* [[DST_ADDR]])
+
+// CHECK: [[W_ADDR:%.*]] = getelementptr inbounds %T17struct_resilience6MySizeV, %T17struct_resilience6MySizeV* [[DST]], i32 0, i32 0
+// CHECK: [[W_PTR:%.*]] = getelementptr inbounds %TSi, %TSi* [[W_ADDR]], i32 0, i32 0
+// CHECK: store [[INT]] [[W]], [[INT]]* [[W_PTR]]
+
+// CHECK: [[H_ADDR:%.*]] = getelementptr inbounds %T17struct_resilience6MySizeV, %T17struct_resilience6MySizeV* [[DST]], i32 0, i32 1
+// CHECK: [[H_PTR:%.*]] = getelementptr inbounds %TSi, %TSi* [[H_ADDR]], i32 0, i32 0
+// CHECK: store [[INT]] [[H]], [[INT]]* [[H_PTR]]
+
+// CHECK: [[FN:%.*]] = bitcast i8* %2 to void (%T17struct_resilience6MySizeV*, %T17struct_resilience6MySizeV*, %swift.refcounted*)*
+// CHECK: [[CONTEXT:%.*]] = bitcast %swift.opaque* %3 to %swift.refcounted*
+
+// CHECK: call swiftcc void [[FN]](%T17struct_resilience6MySizeV* noalias nocapture sret %0, %T17struct_resilience6MySizeV* noalias nocapture dereferenceable({{8|16}}) [[DST]], %swift.refcounted* swiftself [[CONTEXT]])
+// CHECK: [[DST_ADDR:%.*]] = bitcast %T17struct_resilience6MySizeV* [[DST]] to i8*
+// CHECK: call void @llvm.lifetime.end.p0i8({{i32|i64}} {{8|16}}, i8* [[DST_ADDR]])
+
 // CHECK: ret void
 
   return f(s)
@@ -122,8 +145,8 @@ public struct StructWithResilientStorage {
 // metadata when accessing stored properties.
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc {{i32|i64}} @"$s17struct_resilience26StructWithResilientStorageV1nSivg"(%T17struct_resilience26StructWithResilientStorageV* {{.*}})
-// CHECK: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s17struct_resilience26StructWithResilientStorageVMa"([[INT]] 0)
-// CHECK: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
+// CHECK:      [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s17struct_resilience26StructWithResilientStorageVMa"([[INT]] 0)
+// CHECK:      [[METADATA:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
 // CHECK-NEXT: [[METADATA_ADDR:%.*]] = bitcast %swift.type* [[METADATA]] to i32*
 // CHECK-NEXT: [[FIELD_OFFSET_VECTOR:%.*]] = getelementptr inbounds i32, i32* [[METADATA_ADDR]], [[INT]] [[IDX:2|4]]
 // CHECK-NEXT: [[FIELD_OFFSET_PTR:%.*]] = getelementptr inbounds i32, i32* [[FIELD_OFFSET_VECTOR]], i32 2
@@ -145,10 +168,10 @@ public struct StructWithIndirectResilientEnum {
 
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc {{i32|i64}} @"$s17struct_resilience31StructWithIndirectResilientEnumV1nSivg"(%T17struct_resilience31StructWithIndirectResilientEnumV* {{.*}})
-// CHECK: [[FIELD_PTR:%.*]] = getelementptr inbounds %T17struct_resilience31StructWithIndirectResilientEnumV, %T17struct_resilience31StructWithIndirectResilientEnumV* %0, i32 0, i32 1
+// CHECK:      [[FIELD_PTR:%.*]] = getelementptr inbounds %T17struct_resilience31StructWithIndirectResilientEnumV, %T17struct_resilience31StructWithIndirectResilientEnumV* %0, i32 0, i32 1
 // CHECK-NEXT: [[FIELD_PAYLOAD_PTR:%.*]] = getelementptr inbounds %TSi, %TSi* [[FIELD_PTR]], i32 0, i32 0
 // CHECK-NEXT: [[FIELD_PAYLOAD:%.*]] = load [[INT]], [[INT]]* [[FIELD_PAYLOAD_PTR]]
-// CHECK-NEXT: ret [[INT]] [[FIELD_PAYLOAD]]
+// CHECK:      ret [[INT]] [[FIELD_PAYLOAD]]
 
 
 // Partial application of methods on resilient value types
@@ -188,6 +211,87 @@ public func resilientAny(s : ResilientWeakRef) {
 // CHECK:  call swiftcc void @"$s17struct_resilience8wantsAnyyyypF"(%Any* noalias nocapture dereferenceable({{(32|16)}}) [[ANY]])
 // CHECK:  call void @__swift_destroy_boxed_opaque_existential_0(%Any* [[ANY]])
 // CHECK:  ret void
+
+// Make sure that MemoryLayout properties access resilient types' metadata
+// instead of hardcoding sizes based on compile-time layouts.
+
+// CHECK-LABEL: define{{.*}} swiftcc {{i32|i64}} @"$s17struct_resilience38memoryLayoutDotSizeWithResilientStructSiyF"()
+public func memoryLayoutDotSizeWithResilientStruct() -> Int {
+  // CHECK: entry:
+  // CHECK: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s16resilient_struct4SizeVMa"([[INT]] 0)
+  // CHECK: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
+  // CHECK: [[METADATA_ADDR:%.*]] = bitcast %swift.type* [[METADATA]] to i8***
+  // CHECK: [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[METADATA_ADDR]], [[INT]] -1
+  // CHECK: [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
+
+  // CHECK-NEXT: [[VWT_CAST:%.*]] = bitcast i8** [[VWT]] to %swift.vwtable*
+  // CHECK-NEXT: [[WITNESS_ADDR:%.*]] = getelementptr inbounds %swift.vwtable, %swift.vwtable* [[VWT_CAST]], i32 0, i32 8
+  // CHECK: [[WITNESS_FOR_SIZE:%.*]] = load [[INT]], [[INT]]* [[WITNESS_ADDR]]
+
+  // CHECK: ret [[INT]] [[WITNESS_FOR_SIZE]]
+  return MemoryLayout<Size>.size
+}
+
+// CHECK-LABEL: define{{.*}} swiftcc {{i32|i64}} @"$s17struct_resilience40memoryLayoutDotStrideWithResilientStructSiyF"()
+public func memoryLayoutDotStrideWithResilientStruct() -> Int {
+  // CHECK: entry:
+  // CHECK: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s16resilient_struct4SizeVMa"([[INT]] 0)
+  // CHECK: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
+  // CHECK: [[METADATA_ADDR:%.*]] = bitcast %swift.type* [[METADATA]] to i8***
+  // CHECK: [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[METADATA_ADDR]], [[INT]] -1
+  // CHECK: [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
+
+  // CHECK-NEXT: [[VWT_CAST:%.*]] = bitcast i8** [[VWT]] to %swift.vwtable*
+  // CHECK-NEXT: [[WITNESS_ADDR:%.*]] = getelementptr inbounds %swift.vwtable, %swift.vwtable* [[VWT_CAST]], i32 0, i32 9
+  // CHECK: [[WITNESS_FOR_STRIDE:%.*]] = load [[INT]], [[INT]]* [[WITNESS_ADDR]]
+
+  // CHECK: ret [[INT]] [[WITNESS_FOR_STRIDE]]
+  return MemoryLayout<Size>.stride
+}
+
+// CHECK-LABEL: define{{.*}} swiftcc {{i32|i64}} @"$s17struct_resilience43memoryLayoutDotAlignmentWithResilientStructSiyF"()
+public func memoryLayoutDotAlignmentWithResilientStruct() -> Int {
+  // CHECK: entry:
+  // CHECK: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s16resilient_struct4SizeVMa"([[INT]] 0)
+  // CHECK: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
+  // CHECK: [[METADATA_ADDR:%.*]] = bitcast %swift.type* [[METADATA]] to i8***
+  // CHECK: [[VWT_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[METADATA_ADDR]], [[INT]] -1
+  // CHECK: [[VWT:%.*]] = load i8**, i8*** [[VWT_ADDR]]
+
+  // CHECK-NEXT: [[VWT_CAST:%.*]] = bitcast i8** [[VWT]] to %swift.vwtable*
+  // CHECK-NEXT: [[WITNESS_ADDR:%.*]] = getelementptr inbounds %swift.vwtable, %swift.vwtable* [[VWT_CAST]], i32 0, i32 10
+  // CHECK: [[WITNESS_FOR_FLAGS:%.*]] = load i32, i32* [[WITNESS_ADDR]]
+
+  // Not checked because it only exists on 64-bit: [[EXTENDED_FLAGS:%.*]] = zext i32 [[WITNESS_FOR_FLAGS]] to [[INT]]
+
+  // CHECK: [[ALIGNMENT_MASK:%.*]] = and [[INT]] {{%.*}}, 255
+  // CHECK: [[ALIGNMENT:%.*]] = add [[INT]] [[ALIGNMENT_MASK]], 1
+
+  // CHECK: ret [[INT]] [[ALIGNMENT]]
+  return MemoryLayout<Size>.alignment
+}
+
+
+// Make sure that MemoryLayout.offset(of:) on a resilient type uses the accessor
+// in the key path instead of hardcoding offsets based on compile-time layouts.
+
+// CHECK-LABEL: define{{.*}} swiftcc { {{i32|i64}}, i8 } @"$s17struct_resilience42memoryLayoutDotOffsetOfWithResilientStructSiSgyF"()
+public func memoryLayoutDotOffsetOfWithResilientStruct() -> Int? {
+  // CHECK-NEXT: entry:
+  // CHECK: [[RAW_KEY_PATH:%.*]] = call %swift.refcounted* @swift_getKeyPath
+  // CHECK: [[WRITABLE_KEY_PATH:%.*]] = bitcast %swift.refcounted* [[RAW_KEY_PATH]] to %Ts15WritableKeyPathCy16resilient_struct4SizeVSiG*
+  // CHECK: [[PARTIAL_KEY_PATH:%.*]] = bitcast %Ts15WritableKeyPathCy16resilient_struct4SizeVSiG* [[WRITABLE_KEY_PATH]] to %Ts14PartialKeyPathCy16resilient_struct4SizeVG*
+  // CHECK: [[ANY_KEY_PATH:%.*]] = bitcast %Ts14PartialKeyPathCy16resilient_struct4SizeVG* [[PARTIAL_KEY_PATH]] to %Ts10AnyKeyPathC*
+
+  // CHECK: [[STORED_INLINE_OFFSET:%.*]] = call swiftcc { [[INT]], i8 } @"$ss10AnyKeyPathC19_storedInlineOffsetSiSgvgTj"(%Ts10AnyKeyPathC* swiftself [[ANY_KEY_PATH]])
+  // CHECK: [[VALUE:%.*]] = extractvalue { [[INT]], i8 } [[STORED_INLINE_OFFSET]], 0
+
+  // CHECK: [[RET_PARTIAL:%.*]] = insertvalue { [[INT]], i8 } undef, [[INT]] [[VALUE]], 0
+  // CHECK: [[RET:%.*]] = insertvalue { [[INT]], i8 } [[RET_PARTIAL]]
+  // CHECK: ret { [[INT]], i8 } [[RET]]
+  return MemoryLayout<Size>.offset(of: \Size.w)
+}
+
 
 // Public metadata accessor for our resilient struct
 

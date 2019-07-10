@@ -26,8 +26,6 @@ namespace swift {
   class Type;
   class SourceLoc;
 
-  std::string getTypeListString(Type type);
-  
   /// Rewrite any type variables & archetypes in the specified type with
   /// UnresolvedType.
   Type replaceTypeParametersWithUnresolved(Type ty);

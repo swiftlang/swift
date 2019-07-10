@@ -1,7 +1,9 @@
-// RUN: %target-build-swift %s -import-objc-header %S/Inputs/unions-and-bitfields.h -disable-bridging-pch -o %t
+// RUN: %target-build-swift %s -Xfrontend -enable-objc-interop -Xfrontend -disable-objc-attr-requires-foundation-module -import-objc-header %S/Inputs/unions-and-bitfields.h -disable-bridging-pch -o %t
 // RUN: %target-codesign %t
 // RUN: %target-run %t
+
 // REQUIRES: executable_test
+// REQUIRES: objc_interop
 
 // The -disable-bridging-pch above isn't actually relevant to the test; however,
 // precompiled headers don't play nice with the way we include the platform

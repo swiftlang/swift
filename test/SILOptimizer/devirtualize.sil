@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -devirtualizer -dce -save-optimization-record-path=%t.yaml | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %/s -devirtualizer -dce -save-optimization-record-path=%t.yaml | %FileCheck %s
 // RUN: %FileCheck -check-prefix=YAML -input-file=%t.yaml %s
 
 sil_stage canonical
@@ -57,7 +57,7 @@ sil_vtable Bar {
 }
 
 private class Node {
-  @sil_stored var index: Int { get set }
+  @_hasStorage var index: Int { get set }
   init(index: Int)
    deinit
 }

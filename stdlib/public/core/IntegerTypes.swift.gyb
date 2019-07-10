@@ -23,10 +23,6 @@ from itertools import chain
 # Number of bits in the Builtin.Word type
 word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 
-# Number of bits in integer literals.
-builtinIntLiteralBits = 2048
-IntLiteral = 'Int%s' % builtinIntLiteralBits
-
 class struct(object):
   def __init__(self, **kw):
     self.__dict__ = kw
@@ -62,19 +58,6 @@ maskingShifts = [
       llvmName=lambda _: 'shl'),
 ]
 
-IntMax = 'Int%s' % int_max_bits
-UIntMax = 'UInt%s' % int_max_bits
-}%
-
-// FIXME(integers): remove these two aliases
-/// The largest native signed integer type.
-@available(swift, obsoleted: 4.0, renamed: "${IntMax}")
-public typealias IntMax = ${IntMax}
-/// The largest native unsigned integer type.
-@available(swift, obsoleted: 4.0, renamed: "${UIntMax}")
-public typealias UIntMax = ${UIntMax}
-
-%{
 #===-----------------------------------------------------------------------===//
 #===--- Operator Documentation --------------------------------------------===//
 #===-----------------------------------------------------------------------===//
@@ -1102,7 +1085,7 @@ def unsafeOperationComment(operator):
 /// ${Article} ${bits}-bit ${'' if signed else 'un'}signed integer value
 /// type.
 %   end
-@_fixed_layout
+@frozen
 public struct ${Self}
   : FixedWidthInteger, ${Unsigned}Integer,
     _ExpressibleByBuiltinIntegerLiteral {
@@ -1112,8 +1095,8 @@ public struct ${Self}
 
 
   @_transparent
-  public init(_builtinIntegerLiteral x: _MaxBuiltinIntegerType) {
-    _value = Builtin.s_to_${u}_checked_trunc_${IntLiteral}_${BuiltinName}(x).0
+  public init(_builtinIntegerLiteral x: Builtin.IntLiteral) {
+    _value = Builtin.s_to_${u}_checked_trunc_IntLiteral_${BuiltinName}(x).0
   }
 
   /// Creates a new instance with the same memory representation as the given
@@ -1145,7 +1128,7 @@ public struct ${Self}
 %     (lower, upper) = getFtoIBounds(floatBits=FloatBits, intBits=int(bits), signed=signed)
 
 %     if FloatType == 'Float80':
-#if !os(Windows) && (arch(i386) || arch(x86_64))
+#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
 %     end
 
   /// Creates an integer from the given floating-point value, rounding toward
@@ -1400,31 +1383,31 @@ ${assignmentOperatorComment(x.operator, True)}
   }
 
   /// A type that represents the words of this integer.
-  @_fixed_layout // FIXME(sil-serialize-all)
+  @frozen
   public struct Words : RandomAccessCollection {
     public typealias Indices = Range<Int>
     public typealias SubSequence = Slice<${Self}.Words>
 
-    @usableFromInline // FIXME(sil-serialize-all)
+    @usableFromInline
     internal var _value: ${Self}
 
-    @inlinable // FIXME(sil-serialize-all)
+    @inlinable
     public init(_ value: ${Self}) {
       self._value = value
     }
 
-    @inlinable // FIXME(sil-serialize-all)
+    @inlinable
     public var count: Int {
       return (${bits} + ${word_bits} - 1) / ${word_bits}
     }
 
-    @inlinable // FIXME(sil-serialize-all)
+    @inlinable
     public var startIndex: Int { return 0 }
 
-    @inlinable // FIXME(sil-serialize-all)
+    @inlinable
     public var endIndex: Int { return count }
 
-    @inlinable // FIXME(sil-serialize-all)
+    @inlinable
     public var indices: Indices { return startIndex ..< endIndex }
 
     @_transparent
@@ -1433,13 +1416,13 @@ ${assignmentOperatorComment(x.operator, True)}
     @_transparent
     public func index(before i: Int) -> Int { return i - 1 }
 
-    @inlinable // FIXME(sil-serialize-all)
+    @inlinable
     public subscript(position: Int) -> UInt {
       get {
         _precondition(position >= 0, "Negative word index")
         _precondition(position < endIndex, "Word index out of range")
         let shift = UInt(position._value) &* ${word_bits}
-        _sanityCheck(shift < UInt(_value.bitWidth._value))
+        _internalInvariant(shift < UInt(_value.bitWidth._value))
         return (_value &>> ${Self}(_truncatingBits: shift))._lowWord
       }
     }
@@ -1502,6 +1485,7 @@ ${assignmentOperatorComment(x.operator, True)}
 % end
 
 %   dbits = bits*2
+%   if bits <= word_bits:
   /// Returns a tuple containing the high and low parts of the result of
   /// multiplying this value by the given value.
   ///
@@ -1530,15 +1514,10 @@ ${assignmentOperatorComment(x.operator, True)}
   /// - Parameter other: The value to multiply this value by.
   /// - Returns: A tuple containing the high and low parts of the result of
   ///   multiplying this value and `other`.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func multipliedFullWidth(by other: ${Self})
     -> (high: ${Self}, low: ${Self}.Magnitude) {
     // FIXME(integers): tests
-%   # 128 bit types are not provided by the 32-bit LLVM
-%   if word_bits == 32 and bits == 64:
-    // FIXME(integers): implement
-    fatalError("Operation is not supported")
-%   else:
     let lhs_ = Builtin.${z}ext_Int${bits}_Int${dbits}(self._value)
     let rhs_ = Builtin.${z}ext_Int${bits}_Int${dbits}(other._value)
 
@@ -1548,8 +1527,8 @@ ${assignmentOperatorComment(x.operator, True)}
     let shifted = Builtin.ashr_Int${dbits}(res, shift)
     let high = ${Self}(Builtin.truncOrBitCast_Int${dbits}_Int${bits}(shifted))
     return (high: high, low: low)
-%   end
   }
+%   end
 
   /// Returns a tuple containing the quotient and remainder of dividing the
   /// given value by this value.
@@ -1563,7 +1542,7 @@ ${assignmentOperatorComment(x.operator, True)}
   ///   sign, if the type is signed.
   /// - Returns: A tuple containing the quotient and remainder of `dividend`
   ///   divided by this value.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   public func dividingFullWidth(
     _ dividend: (high: ${Self}, low: ${Self}.Magnitude)
   ) -> (quotient: ${Self}, remainder: ${Self}) {
@@ -1632,26 +1611,12 @@ ${assignmentOperatorComment(x.operator, True)}
   }
 % end
 
-  @inlinable // FIXME(sil-serialize-all)
-  @available(swift, obsoleted: 4.0, message: "Use initializers instead")
-  public func to${U}IntMax() -> ${U}Int64 {
-    return numericCast(self)
-  }
-
-  @inlinable // FIXME(sil-serialize-all)
-  @available(swift, obsoleted: 4, message: "Use bitWidth instead.")
-  public static var _sizeInBits: ${Self} { return ${bits} }
-
-  @inlinable // FIXME(sil-serialize-all)
-  @available(swift, obsoleted: 4)
-  public static var _sizeInBytes: ${Self} { return ${bits}/8 }
-
   /// Returns `-1` if this value is negative and `1` if it's positive;
   /// otherwise, `0`.
   ///
   /// - Returns: The sign of this number, expressed as an integer of the same
   ///   type.
-  @inlinable // FIXME(sil-serialize-all)
+  @inlinable
   @inline(__always)
   public func signum() -> ${Self} {
     let isPositive = ${Self}(Builtin.zext_Int1_Int${bits}(
@@ -1694,37 +1659,6 @@ extension ${Self} : _HasCustomAnyHashableRepresentation {
   }
 }
 
-% for src_type in all_integer_types(word_bits):
-%   srcBits = src_type.bits
-%   srcSigned = src_type.is_signed
-%   Src = src_type.stdlib_name
-%   if should_define_truncating_bit_pattern_init(src_ty=src_type, dst_ty=self_type):
-extension ${Self} {
-  /// Creates a new instance with the same bitwise representation as the least
-  /// significant bits of the given value.
-  ///
-  /// This initializer performs no range or overflow checking. The resulting
-  /// instance may have a different numeric value from `source`.
-  ///
-  /// - Parameter source: An integer to use as the source of the new value's
-  ///   bit pattern.
-  @inlinable // FIXME(sil-serialize-all)
-  @available(swift, obsoleted: 4.0, renamed: "init(truncatingIfNeeded:)")
-  @_transparent
-  public init(truncatingBitPattern source: ${Src}) {
-    let src = source._value
-%     if self_type.bits == src_type.bits:
-    let dstNotWord = src
-%     else:
-    let dstNotWord = Builtin.trunc_Int${srcBits}_Int${bits}(src)
-%     end
-    self._value = dstNotWord
-  }
-}
-%   end
-% end
-
-
 // FIXME(integers): this section here is to help the typechecker,
 // as it seems to have problems with a pattern where the nonmutating operation
 // is defined on a protocol in terms of a mutating one that is itself defined
@@ -1739,34 +1673,6 @@ ${operatorComment(x.operator, True)}
     var lhs = lhs
     lhs ${x.operator}= rhs
     return lhs
-  }
-
-%   end
-
-%   for op in maskingShifts:
-
-${operatorComment(x.operator, True)}
-  @inlinable // FIXME(sil-serialize-all)
-  @available(swift, obsoleted: 4)
-  @_semantics("optimize.sil.specialize.generic.partial.never")
-  @_transparent
-  public static func ${op.nonMaskingOperator}(
-    lhs: ${Self}, rhs: ${Self}
-  ) -> ${Self} {
-    var lhs = lhs
-    ${op.helper}Generic(&lhs, rhs)
-    return lhs
-  }
-
-${assignmentOperatorComment(x.operator, True)}
-  @inlinable // FIXME(sil-serialize-all)
-  @available(swift, obsoleted: 4)
-  @_semantics("optimize.sil.specialize.generic.partial.never")
-  @_transparent
-  public static func ${op.nonMaskingOperator}=(
-    lhs: inout ${Self}, rhs: ${Self}
-  ) {
-    ${op.helper}Generic(&lhs, rhs)
   }
 
 %   end
@@ -1794,7 +1700,7 @@ ${assignmentOperatorComment(x.operator, True)}
 /// It has only an effect if the argument is a load or call.
 @_transparent
 public func _assumeNonNegative(_ x: ${Self}) -> ${Self} {
-  _sanityCheck(x >= (0 as ${Self}))
+  _internalInvariant(x >= (0 as ${Self}))
   return ${Self}(Builtin.assumeNonNegative_${BuiltinName}(x._value))
 }
 % end
@@ -1837,7 +1743,8 @@ extension Int {
 }
 
 // FIXME(integers): switch to using `FixedWidthInteger.unsafeAdding`
-@inlinable // FIXME(sil-serialize-all)
+@_transparent
+@inlinable
 internal func _unsafePlus(_ lhs: Int, _ rhs: Int) -> Int {
 #if INTERNAL_CHECKS_ENABLED
   return lhs + rhs
@@ -1847,7 +1754,8 @@ internal func _unsafePlus(_ lhs: Int, _ rhs: Int) -> Int {
 }
 
 // FIXME(integers): switch to using `FixedWidthInteger.unsafeSubtracting`
-@inlinable // FIXME(sil-serialize-all)
+@_transparent
+@inlinable
 internal func _unsafeMinus(_ lhs: Int, _ rhs: Int) -> Int {
 #if INTERNAL_CHECKS_ENABLED
   return lhs - rhs
@@ -1889,19 +1797,19 @@ internal struct _IntegerAnyHashableBox<
   }
 
   internal var _hashValue: Int {
-    _sanityCheck(Base.self == UInt64.self || Base.self == Int64.self,
+    _internalInvariant(Base.self == UInt64.self || Base.self == Int64.self,
       "self isn't canonical")
     return _value.hashValue
   }
 
   internal func _hash(into hasher: inout Hasher) {
-    _sanityCheck(Base.self == UInt64.self || Base.self == Int64.self,
+    _internalInvariant(Base.self == UInt64.self || Base.self == Int64.self,
       "self isn't canonical")
     _value.hash(into: &hasher)
   }
 
   internal func _rawHashValue(_seed: Int) -> Int {
-    _sanityCheck(Base.self == UInt64.self || Base.self == Int64.self,
+    _internalInvariant(Base.self == UInt64.self || Base.self == Int64.self,
       "self isn't canonical")
     return _value._rawHashValue(seed: _seed)
   }

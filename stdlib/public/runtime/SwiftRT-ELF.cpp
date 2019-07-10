@@ -32,6 +32,8 @@ DECLARE_SWIFT_SECTION(swift5_typeref)
 DECLARE_SWIFT_SECTION(swift5_reflstr)
 DECLARE_SWIFT_SECTION(swift5_fieldmd)
 DECLARE_SWIFT_SECTION(swift5_assocty)
+DECLARE_SWIFT_SECTION(swift5_replace)
+DECLARE_SWIFT_SECTION(swift5_replac2)
 }
 
 #undef DECLARE_SWIFT_SECTION
@@ -61,6 +63,8 @@ static void swift_image_constructor() {
       SWIFT_SECTION_RANGE(swift5_reflstr),
       SWIFT_SECTION_RANGE(swift5_fieldmd),
       SWIFT_SECTION_RANGE(swift5_assocty),
+      SWIFT_SECTION_RANGE(swift5_replace),
+      SWIFT_SECTION_RANGE(swift5_replac2),
   };
 
 #undef SWIFT_SECTION_RANGE

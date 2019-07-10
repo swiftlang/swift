@@ -1,9 +1,9 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -emit-module -primary-file %s %S/Inputs/sil-merge-partial-modules-other.swift -module-name test -enable-resilience -o %t/partial.a.swiftmodule
-// RUN: %target-swift-frontend -emit-module %s -primary-file %S/Inputs/sil-merge-partial-modules-other.swift -module-name test -enable-resilience -o %t/partial.b.swiftmodule
+// RUN: %target-swift-frontend -emit-module -primary-file %s %S/Inputs/sil-merge-partial-modules-other.swift -module-name test -enable-library-evolution -o %t/partial.a.swiftmodule
+// RUN: %target-swift-frontend -emit-module %s -primary-file %S/Inputs/sil-merge-partial-modules-other.swift -module-name test -enable-library-evolution -o %t/partial.b.swiftmodule
 
-// RUN: %target-swift-frontend -emit-module %t/partial.a.swiftmodule %t/partial.b.swiftmodule -module-name test -enable-resilience -sil-merge-partial-modules -disable-diagnostic-passes -disable-sil-perf-optzns -o %t/test.swiftmodule
+// RUN: %target-swift-frontend -emit-module %t/partial.a.swiftmodule %t/partial.b.swiftmodule -module-name test -enable-library-evolution -sil-merge-partial-modules -disable-diagnostic-passes -disable-sil-perf-optzns -o %t/test.swiftmodule
 
 // RUN: %target-sil-opt %t/test.swiftmodule -disable-sil-linking > %t/dump.sil
 // RUN: %FileCheck %s < %t/dump.sil
@@ -20,7 +20,7 @@ public func inlinableFunction() {
   fn()
 }
 
-@_fixed_layout
+@frozen
 public struct Rectangle : Shape {
   @inlinable
   public func draw() {

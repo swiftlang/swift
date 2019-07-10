@@ -26,11 +26,11 @@ reflect(object: obj)
 // CHECK-64: (class reflect_Int16.TestClass)
 
 // CHECK-64: Type info:
-// CHECK-64: (class_instance size=18 alignment=2 stride=18 num_extra_inhabitants=0
+// CHECK-64: (class_instance size=18 alignment=2 stride=18 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-64:   (field name=t offset=16
-// CHECK-64:     (struct size=2 alignment=2 stride=2 num_extra_inhabitants=0
+// CHECK-64:     (struct size=2 alignment=2 stride=2 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-64:       (field name=_value offset=0
-// CHECK-64:         (builtin size=2 alignment=2 stride=2 num_extra_inhabitants=0)))))
+// CHECK-64:         (builtin size=2 alignment=2 stride=2 num_extra_inhabitants=0 bitwise_takable=1)))))
 
 // CHECK-32: Reflecting an object.
 // CHECK-32: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
@@ -38,11 +38,11 @@ reflect(object: obj)
 // CHECK-32: (class reflect_Int16.TestClass)
 
 // CHECK-32: Type info:
-// CHECK-32: (class_instance size=10 alignment=2 stride=10 num_extra_inhabitants=0
+// CHECK-32: (class_instance size=10 alignment=2 stride=10 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-32:   (field name=t offset=8
-// CHECK-32:     (struct size=2 alignment=2 stride=2 num_extra_inhabitants=0
+// CHECK-32:     (struct size=2 alignment=2 stride=2 num_extra_inhabitants=0 bitwise_takable=1
 // CHECK-32:       (field name=_value offset=0
-// CHECK-32:         (builtin size=2 alignment=2 stride=2 num_extra_inhabitants=0)))))
+// CHECK-32:         (builtin size=2 alignment=2 stride=2 num_extra_inhabitants=0 bitwise_takable=1)))))
 
 doneReflecting()
 

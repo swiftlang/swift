@@ -172,8 +172,7 @@ namespace {
     llvm::Constant *getConstantFieldOffset(IRGenModule &IGM,
                                            VarDecl *field) const {
       auto &fieldInfo = getFieldInfo(field);
-      if (fieldInfo.getKind() == ElementLayout::Kind::Fixed
-          || fieldInfo.getKind() == ElementLayout::Kind::Empty) {
+      if (fieldInfo.hasFixedByteOffset()) {
         return llvm::ConstantInt::get(
             IGM.Int32Ty, fieldInfo.getFixedByteOffset().getValue());
       }
@@ -472,6 +471,67 @@ namespace {
       return StructNonFixedOffsets(T).getFieldAccessStrategy(IGM,
                                               field.getNonFixedElementIndex());
     }
+
+    llvm::Value *getEnumTagSinglePayload(IRGenFunction &IGF,
+                                         llvm::Value *numEmptyCases,
+                                         Address structAddr,
+                                         SILType structType,
+                                         bool isOutlined) const override {
+      // If we're not emitting the value witness table's implementation,
+      // just call that.
+      if (!isOutlined) {
+        return emitGetEnumTagSinglePayloadCall(IGF, structType, numEmptyCases,
+                                               structAddr);
+      }
+
+      return emitGetEnumTagSinglePayloadGenericCall(IGF, structType, *this,
+                                                    numEmptyCases, structAddr,
+        [this,structType](IRGenFunction &IGF, Address structAddr,
+                          llvm::Value *structNumXI) {
+          return withExtraInhabitantProvidingField(IGF, structAddr, structType,
+                                                   structNumXI, IGF.IGM.Int32Ty,
+            [&](const FieldImpl &field, llvm::Value *numXI) -> llvm::Value* {
+              Address fieldAddr = asImpl().projectFieldAddress(
+                                           IGF, structAddr, structType, field);
+              auto fieldTy = field.getType(IGF.IGM, structType);
+              return field.getTypeInfo()
+                          .getExtraInhabitantTagDynamic(IGF, fieldAddr, fieldTy,
+                                                     numXI, /*outlined*/ false);
+            });
+        });
+    }
+
+    void storeEnumTagSinglePayload(IRGenFunction &IGF,
+                                   llvm::Value *whichCase,
+                                   llvm::Value *numEmptyCases,
+                                   Address structAddr,
+                                   SILType structType,
+                                   bool isOutlined) const override {
+      // If we're not emitting the value witness table's implementation,
+      // just call that.
+      if (!isOutlined) {
+        return emitStoreEnumTagSinglePayloadCall(IGF, structType, whichCase,
+                                                 numEmptyCases, structAddr);
+      }
+
+      emitStoreEnumTagSinglePayloadGenericCall(IGF, structType, *this,
+                                               whichCase, numEmptyCases,
+                                               structAddr,
+        [this,structType](IRGenFunction &IGF, Address structAddr,
+                          llvm::Value *tag, llvm::Value *structNumXI) {
+          withExtraInhabitantProvidingField(IGF, structAddr, structType,
+                                            structNumXI, IGF.IGM.VoidTy,
+            [&](const FieldImpl &field, llvm::Value *numXI) -> llvm::Value* {
+              Address fieldAddr = asImpl().projectFieldAddress(
+                                           IGF, structAddr, structType, field);
+              auto fieldTy = field.getType(IGF.IGM, structType);
+              field.getTypeInfo()
+                   .storeExtraInhabitantTagDynamic(IGF, tag, fieldAddr, fieldTy,
+                                                   /*outlined*/ false);
+              return nullptr;
+            });
+        });
+    }
   };
 
   class StructTypeBuilder :
@@ -566,7 +626,6 @@ public:
       TotalStride(Size(ClangLayout.getSize().getQuantity())),
       TotalAlignment(IGM.getCappedAlignment(
                                        Alignment(ClangLayout.getAlignment()))) {
-    SpareBits.reserve(TotalStride.getValue() * 8);
   }
 
   void collectRecordFields() {
@@ -730,8 +789,7 @@ private:
     ElementLayout layout = ElementLayout::getIncomplete(fieldType);
     auto isEmpty = fieldType.isKnownEmpty(ResilienceExpansion::Maximal);
     if (isEmpty)
-      layout.completeEmpty(fieldType.isPOD(ResilienceExpansion::Maximal),
-                           NextOffset);
+      layout.completeEmpty(fieldType.isPOD(ResilienceExpansion::Maximal));
     else
       layout.completeFixed(fieldType.isPOD(ResilienceExpansion::Maximal),
                            NextOffset, LLVMFields.size());
@@ -812,16 +870,27 @@ Optional<unsigned> irgen::getPhysicalStructFieldIndex(IRGenModule &IGM,
 }
 
 void IRGenModule::emitStructDecl(StructDecl *st) {
-  if (!IRGen.tryEnableLazyTypeMetadata(st))
+  if (!IRGen.hasLazyMetadata(st)) {
     emitStructMetadata(*this, st);
+    emitFieldDescriptor(st);
+  }
 
   emitNestedTypeDecls(st->getMembers());
+}
 
-  if (shouldEmitOpaqueTypeMetadataRecord(st)) {
-    emitOpaqueTypeMetadataRecord(st);
-  } else {
-    emitFieldMetadataRecord(st);
-  }  
+void IRGenModule::maybeEmitOpaqueTypeDecl(OpaqueTypeDecl *opaque) {
+  if (IRGen.Opts.EnableAnonymousContextMangledNames) {
+    // If we're emitting anonymous context mangled names for debuggability,
+    // then emit all opaque type descriptors and make them runtime-discoverable
+    // so that remote ast/mirror can recover them.
+    addRuntimeResolvableType(opaque);
+    if (IRGen.hasLazyMetadata(opaque))
+      IRGen.noteUseOfOpaqueTypeDescriptor(opaque);
+    else
+      emitOpaqueTypeDecl(opaque);
+  } else if (!IRGen.hasLazyMetadata(opaque)) {
+    emitOpaqueTypeDecl(opaque);
+  }
 }
 
 namespace {
@@ -860,7 +929,7 @@ const TypeInfo *TypeConverter::convertStructType(TypeBase *key, CanType type,
   auto ty = IGM.createNominalType(type);
 
   // Register a forward declaration before we look at any of the child types.
-  addForwardDecl(key, ty);
+  addForwardDecl(key);
 
   // Use different rules for types imported from C.
   if (D->hasClangNode()) {

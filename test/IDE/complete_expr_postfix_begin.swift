@@ -1,7 +1,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_POSTFIX_BEGIN_1 | %FileCheck %s -check-prefix=COMMON
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_POSTFIX_BEGIN_2 | %FileCheck %s -check-prefix=COMMON
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_POSTFIX_BEGIN_3 | %FileCheck %s -check-prefix=COMMON
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_POSTFIX_BEGIN_4 | %FileCheck %s -check-prefix=COMMON
+// RUN-FIXME: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_POSTFIX_BEGIN_4 | %FileCheck %s -check-prefix=COMMON
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_POSTFIX_BEGIN_5 | %FileCheck %s -check-prefix=COMMON
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EXPR_POSTFIX_BEGIN_6 | %FileCheck %s -check-prefix=COMMON
 
@@ -62,15 +62,26 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FOR_EACH_3 | %FileCheck %s -check-prefix=IN_FOR_EACH_3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FOR_EACH_4 | %FileCheck %s -check-prefix=IN_FOR_EACH_3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FOR_EACH_5 | %FileCheck %s -check-prefix=IN_FOR_EACH_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FOR_EACH_6 | %FileCheck %s -check-prefix=IN_FOR_EACH_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FOR_EACH_6 | %FileCheck %s -check-prefix=IN_FOR_EACH_2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FOR_EACH_7 | %FileCheck %s -check-prefix=IN_FOR_EACH_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FOR_EACH_8 | %FileCheck %s -check-prefix=IN_FOR_EACH_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FOR_EACH_9 | %FileCheck %s -check-prefix=IN_FOR_EACH_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FOR_EACH_9 | %FileCheck %s -check-prefix=IN_FOR_EACH_4
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FOR_EACH_10 | %FileCheck %s -check-prefix=IN_FOR_EACH_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FOR_EACH_11 | %FileCheck %s -check-prefix=IN_FOR_EACH_1
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FOR_EACH_12 | %FileCheck %s -check-prefix=IN_FOR_EACH_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_FOR_EACH_12 | %FileCheck %s -check-prefix=IN_FOR_EACH_2
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DEPRECATED_1 | %FileCheck %s -check-prefix=DEPRECATED_1
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_TUPLE_1 | %FileCheck %s -check-prefix=IN_TUPLE_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_TUPLE_2 | %FileCheck %s -check-prefix=IN_TUPLE_2
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_INIT_1 | %FileCheck %s -check-prefix=OWN_INIT_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_INIT_2 | %FileCheck %s -check-prefix=OWN_INIT_2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_INIT_3 | %FileCheck %s -check-prefix=OWN_INIT_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_INIT_4 | %FileCheck %s -check-prefix=OWN_INIT_4
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_INIT_5 | %FileCheck %s -check-prefix=OWN_INIT_5
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_INIT_6 | %FileCheck %s -check-prefix=OWN_INIT_6
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OWN_INIT_7 | %FileCheck %s -check-prefix=OWN_INIT_7
 
 //
 // Test code completion at the beginning of expr-postfix.
@@ -117,10 +128,10 @@ typealias FooTypealias = Int
 // COMMON-DAG: Decl[Struct]/OtherModule[Swift]:    Int32[#Int32#]{{; name=.+$}}
 // COMMON-DAG: Decl[Struct]/OtherModule[Swift]:    Int64[#Int64#]{{; name=.+$}}
 // COMMON-DAG: Decl[Struct]/OtherModule[Swift]:      Bool[#Bool#]{{; name=.+$}}
-// COMMON-DAG: Keyword[#function]/None: #function[#String#]{{; name=.+$}}
-// COMMON-DAG: Keyword[#file]/None: #file[#String#]{{; name=.+$}}
-// COMMON-DAG: Keyword[#line]/None: #line[#Int#]{{; name=.+$}}
-// COMMON-DAG: Keyword[#column]/None: #column[#Int#]{{; name=.+$}}
+// COMMON-DAG: Keyword[#function]/None{{(/TypeRelation\[Identical\])?}}: #function[#String#]{{; name=.+$}}
+// COMMON-DAG: Keyword[#file]/None{{(/TypeRelation\[Identical\])?}}: #file[#String#]{{; name=.+$}}
+// COMMON-DAG: Keyword[#line]/None{{(/TypeRelation\[Identical\])?}}: #line[#Int#]{{; name=.+$}}
+// COMMON-DAG: Keyword[#column]/None{{(/TypeRelation\[Identical\])?}}: #column[#Int#]{{; name=.+$}}
 // COMMON: End completions
 
 // NO_SELF-NOT: {{[[:<:]][Ss]elf[[:>:]]}}
@@ -217,7 +228,7 @@ struct TestFindFuncParam5_6<T> {
   func testFindFuncParam5(a: Int, b: T) {
     #^FIND_FUNC_PARAM_5^#
 // FIND_FUNC_PARAM_5: Begin completions
-// FIND_FUNC_PARAM_5-DAG: Decl[GenericTypeParam]/CurrNominal: T[#T#]{{; name=.+$}}
+// FIND_FUNC_PARAM_5-DAG: Decl[GenericTypeParam]/Local: T[#T#]{{; name=.+$}}
 // FIND_FUNC_PARAM_5-DAG: Decl[LocalVar]/Local: self[#TestFindFuncParam5_6<T>#]{{; name=.+$}}
 // FIND_FUNC_PARAM_5-DAG: Decl[LocalVar]/Local: a[#Int#]{{; name=.+$}}
 // FIND_FUNC_PARAM_5-DAG: Decl[LocalVar]/Local: b[#T#]{{; name=.+$}}
@@ -227,7 +238,7 @@ struct TestFindFuncParam5_6<T> {
   func testFindFuncParam6<U>(a: Int, b: T, c: U) {
     #^FIND_FUNC_PARAM_6^#
 // FIND_FUNC_PARAM_6: Begin completions
-// FIND_FUNC_PARAM_6-DAG: Decl[GenericTypeParam]/CurrNominal: T[#T#]{{; name=.+$}}
+// FIND_FUNC_PARAM_6-DAG: Decl[GenericTypeParam]/Local:       T[#T#]{{; name=.+$}}
 // FIND_FUNC_PARAM_6-DAG: Decl[GenericTypeParam]/Local:       U[#U#]{{; name=.+$}}
 // FIND_FUNC_PARAM_6-DAG: Decl[LocalVar]/Local:               self[#TestFindFuncParam5_6<T>#]{{; name=.+$}}
 // FIND_FUNC_PARAM_6-DAG: Decl[LocalVar]/Local:               a[#Int#]{{; name=.+$}}
@@ -298,10 +309,10 @@ class TestFindConstructorParam4<T> {
   init(a: Int, b: T) {
     #^FIND_CONSTRUCTOR_PARAM_4^#
 // FIND_CONSTRUCTOR_PARAM_4: Begin completions
-// FIND_CONSTRUCTOR_PARAM_4-DAG: Decl[GenericTypeParam]/CurrNominal: T[#T#]{{; name=.+$}}
-// FIND_CONSTRUCTOR_PARAM_4-DAG: Decl[LocalVar]/Local:               self[#TestFindConstructorParam4<T>#]{{; name=.+$}}
-// FIND_CONSTRUCTOR_PARAM_4-DAG: Decl[LocalVar]/Local:               a[#Int#]{{; name=.+$}}
-// FIND_CONSTRUCTOR_PARAM_4-DAG: Decl[LocalVar]/Local:               b[#T#]{{; name=.+$}}
+// FIND_CONSTRUCTOR_PARAM_4-DAG: Decl[GenericTypeParam]/Local: T[#T#]{{; name=.+$}}
+// FIND_CONSTRUCTOR_PARAM_4-DAG: Decl[LocalVar]/Local:         self[#TestFindConstructorParam4<T>#]{{; name=.+$}}
+// FIND_CONSTRUCTOR_PARAM_4-DAG: Decl[LocalVar]/Local:         a[#Int#]{{; name=.+$}}
+// FIND_CONSTRUCTOR_PARAM_4-DAG: Decl[LocalVar]/Local:         b[#T#]{{; name=.+$}}
 // FIND_CONSTRUCTOR_PARAM_4: End completions
   }
 }
@@ -310,12 +321,12 @@ class TestFindConstructorParam5<T> {
   init<U>(a: Int, b: T, c: U) {
     #^FIND_CONSTRUCTOR_PARAM_5^#
 // FIND_CONSTRUCTOR_PARAM_5: Begin completions
-// FIND_CONSTRUCTOR_PARAM_5-DAG: Decl[GenericTypeParam]/CurrNominal: T[#T#]{{; name=.+$}}
-// FIND_CONSTRUCTOR_PARAM_5-DAG: Decl[GenericTypeParam]/Local:       U[#U#]{{; name=.+$}}
-// FIND_CONSTRUCTOR_PARAM_5-DAG: Decl[LocalVar]/Local:               self[#TestFindConstructorParam5<T>#]{{; name=.+$}}
-// FIND_CONSTRUCTOR_PARAM_5-DAG: Decl[LocalVar]/Local:               a[#Int#]{{; name=.+$}}
-// FIND_CONSTRUCTOR_PARAM_5-DAG: Decl[LocalVar]/Local:               b[#T#]{{; name=.+$}}
-// FIND_CONSTRUCTOR_PARAM_5-DAG: Decl[LocalVar]/Local:               c[#U#]{{; name=.+$}}
+// FIND_CONSTRUCTOR_PARAM_5-DAG: Decl[GenericTypeParam]/Local: T[#T#]{{; name=.+$}}
+// FIND_CONSTRUCTOR_PARAM_5-DAG: Decl[GenericTypeParam]/Local: U[#U#]{{; name=.+$}}
+// FIND_CONSTRUCTOR_PARAM_5-DAG: Decl[LocalVar]/Local:         self[#TestFindConstructorParam5<T>#]{{; name=.+$}}
+// FIND_CONSTRUCTOR_PARAM_5-DAG: Decl[LocalVar]/Local:         a[#Int#]{{; name=.+$}}
+// FIND_CONSTRUCTOR_PARAM_5-DAG: Decl[LocalVar]/Local:         b[#T#]{{; name=.+$}}
+// FIND_CONSTRUCTOR_PARAM_5-DAG: Decl[LocalVar]/Local:         c[#U#]{{; name=.+$}}
 // FIND_CONSTRUCTOR_PARAM_5: End completions
   }
 }
@@ -346,7 +357,7 @@ class TestFindDestructorParam2<T> {
   deinit {
     #^FIND_DESTRUCTOR_PARAM_2^#
 // FIND_DESTRUCTOR_PARAM_2: Begin completions
-// FIND_DESTRUCTOR_PARAM_2-DAG: Decl[GenericTypeParam]/CurrNominal: T[#T#]{{; name=.+$}}
+// FIND_DESTRUCTOR_PARAM_2-DAG: Decl[GenericTypeParam]/Local: T[#T#]{{; name=.+$}}
 // FIND_DESTRUCTOR_PARAM_2-DAG: Decl[LocalVar]/Local: self[#TestFindDestructorParam2<T>#]{{; name=.+$}}
 // FIND_DESTRUCTOR_PARAM_2: End completions
   }
@@ -432,8 +443,7 @@ func testInForEach1(arg: Int) {
   let after = 4
 // IN_FOR_EACH_1-NOT: Decl[LocalVar]
 // IN_FOR_EACH_1: Decl[LocalVar]/Local:               local[#Int#];
-// FIXME: shouldn't show 'after' here.
-// IN_FOR_EACH_1: Decl[LocalVar]/Local:               after[#Int#];
+// IN_FOR_EACH_1-NOT: after
 // IN_FOR_EACH_1: Decl[LocalVar]/Local:               arg[#Int#];
 // IN_FOR_EACH_1-NOT: Decl[LocalVar]
 }
@@ -445,8 +455,7 @@ func testInForEach2(arg: Int) {
   let after = 4
 // IN_FOR_EACH_2-NOT: Decl[LocalVar]
 // IN_FOR_EACH_2: Decl[LocalVar]/Local/TypeRelation[Identical]: local[#Int#];
-// FIXME: shouldn't show 'after' here.
-// IN_FOR_EACH_2: Decl[LocalVar]/Local/TypeRelation[Identical]: after[#Int#];
+// IN_FOR_EACH_2-NOT: after
 // IN_FOR_EACH_2: Decl[LocalVar]/Local/TypeRelation[Identical]: arg[#Int#];
 // IN_FOR_EACH_2-NOT: Decl[LocalVar]
 }
@@ -460,8 +469,7 @@ func testInForEach3(arg: Int) {
 // IN_FOR_EACH_3: Decl[LocalVar]/Local:               index[#Int#];
 // IN_FOR_EACH_3-NOT: Decl[LocalVar]
 // IN_FOR_EACH_3: Decl[LocalVar]/Local:               local[#Int#];
-// FIXME: shouldn't show 'after' here.
-// IN_FOR_EACH_3: Decl[LocalVar]/Local:               after[#Int#];
+// IN_FOR_EACH_3-NOT: after
 // IN_FOR_EACH_3: Decl[LocalVar]/Local:               arg[#Int#];
 // IN_FOR_EACH_3-NOT: Decl[LocalVar]
 }
@@ -497,6 +505,12 @@ func testInForEach9(arg: Int) {
   let local = 2
   for index in [#^IN_FOR_EACH_9^#:2] {}
   let after = 4
+// NOTE: [Convertible] to AnyHashable.
+// IN_FOR_EACH_4-NOT: Decl[LocalVar]
+// IN_FOR_EACH_4: Decl[LocalVar]/Local/TypeRelation[Convertible]: local[#Int#];
+// IN_FOR_EACH_4-NOT: after
+// IN_FOR_EACH_4: Decl[LocalVar]/Local/TypeRelation[Convertible]: arg[#Int#];
+// IN_FOR_EACH_4-NOT: Decl[LocalVar]
 }
 func testInForEach10(arg: Int) {
   let local = 2
@@ -530,3 +544,46 @@ struct Deprecated {
 // DEPRECATED_1-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended: testDeprecated()[#Void#];
 // DEPRECATED_1-DAG: Decl[Struct]/CurrModule/NotRecommended: Deprecated[#Deprecated#];
 // DEPRECATED_1: End completions
+
+func testTuple(localInt: Int) {
+  let localStr: String = "foo"
+  let _: (Int, String) = (1, #^IN_TUPLE_1^#)
+  let _: (Int, String) = (#^IN_TUPLE_2^#, "foo")
+}
+// IN_TUPLE_1: Begin completions
+// IN_TUPLE_1: Decl[LocalVar]/Local/TypeRelation[Identical]: localStr[#String#]; name=localStr
+// IN_TUPLE_1: Decl[LocalVar]/Local:               localInt[#Int#]; name=localInt
+// IN_TUPLE_1: End completions
+
+// IN_TUPLE_2: Begin completions
+// IN_TUPLE_2: Decl[LocalVar]/Local:               localStr[#String#]; name=localStr
+// IN_TUPLE_2: Decl[LocalVar]/Local/TypeRelation[Identical]: localInt[#Int#]; name=localInt
+// IN_TUPLE_2: End completions
+
+var ownInit1: Int = #^OWN_INIT_1^#
+// OWN_INIT_1: Begin completions
+// OWN_INIT_1-NOT: ownInit1
+var ownInit2: () -> Void = { #^OWN_INIT_2^# }
+// OWN_INIT_2: Begin completions
+// OWN_INIT_2-NOT: ownInit2
+struct OwnInitTester {
+  var ownInit3: Int = #^OWN_INIT_3^#
+  // OWN_INIT_3: Begin completions
+  // OWN_INIT_3-NOT: ownInit3
+  var ownInit4: () -> Void = { #^OWN_INIT_4^# }
+  // OWN_INIT_4: Begin completions
+  // OWN_INIT_4-NOT: ownInit4
+}
+func ownInitTesting() {
+  var ownInit5: Int = #^OWN_INIT_5^#
+  // OWN_INIT_5: Begin completions
+  // OWN_INIT_5-NOT: ownInit5
+  var ownInit6: () -> Void = { #^OWN_INIT_6^# }
+  // OWN_INIT_6: Begin completions
+  // OWN_INIT_6-NOT: ownInit6
+}
+func ownInitTestingShadow(ownInit7: Int) {
+  var ownInit7: Int = #^OWN_INIT_7^#
+  // OWN_INIT_7: Begin completions
+  // OWN_INIT_7: Decl[LocalVar]/Local/TypeRelation[Identical]: ownInit7[#Int#];
+}

@@ -289,6 +289,15 @@ public:
           isKeywordPossibleDeclStart(*TInfo.StartOfLineBeforeTarget) &&
           TInfo.StartOfLineBeforeTarget->isKeyword())
         return false;
+      // VStack {
+      //   ...
+      // }
+      // .onAppear { <---- No indentation here.
+      if (TInfo.StartOfLineTarget->getKind() == tok::period &&
+          TInfo.StartOfLineBeforeTarget->getKind() == tok::r_brace &&
+          TInfo.StartOfLineBeforeTarget + 1 == TInfo.StartOfLineTarget) {
+        return false;
+      }
     }
 
     // Handle switch / case, indent unless at a case label.
@@ -344,6 +353,20 @@ public:
         if (SM.getLineNumber(FD->getBody()->getLBraceLoc()) == Line)
           return false;
       }
+    }
+
+    // func foo(a: Int,
+    //          b: Int
+    // ) {} <- Avoid adding indentation here
+    SourceLoc SignatureEnd;
+    if (auto *AFD = dyn_cast_or_null<AbstractFunctionDecl>(Cursor->getAsDecl())) {
+      SignatureEnd = AFD->getSignatureSourceRange().End;
+    } else if (auto *SD = dyn_cast_or_null<SubscriptDecl>(Cursor->getAsDecl())) {
+      SignatureEnd = SD->getSignatureSourceRange().End;
+    }
+    if (SignatureEnd.isValid() && TInfo &&
+        TInfo.StartOfLineTarget->getLoc() == SignatureEnd) {
+      return false;
     }
 
     // If we're at the beginning of a brace on a separate line in the context
@@ -456,7 +479,9 @@ public:
     auto AtCursorExpr = Cursor->getAsExpr();
     if (AtExprEnd && AtCursorExpr && (isa<ParenExpr>(AtCursorExpr) ||
                                       isa<TupleExpr>(AtCursorExpr))) {
-      if (isa<CallExpr>(AtExprEnd)) {
+      if (isa<CallExpr>(AtExprEnd) ||
+          isa<ArrayExpr>(AtExprEnd) ||
+          isa<DictionaryExpr>(AtExprEnd)) {
         if (exprEndAtLine(AtExprEnd, Line) &&
             exprEndAtLine(AtCursorExpr, Line)) {
           return false;
@@ -478,6 +503,25 @@ public:
         }
       }
     }
+
+    // Chained trailing closures shouldn't require additional indentation.
+    // a.map {
+    //  ...
+    // }.filter { <--- No indentation here.
+    //  ...
+    // }.map { <--- No indentation here.
+    //  ...
+    // }
+    if (AtExprEnd && AtCursorExpr &&
+        (isa<CallExpr>(AtExprEnd) || isa<SubscriptExpr>(AtExprEnd))) {
+      if (auto *UDE = dyn_cast<UnresolvedDotExpr>(AtCursorExpr)) {
+        if (auto *Base = UDE->getBase()) {
+          if (exprEndAtLine(Base, Line))
+            return false;
+        }
+      }
+    }
+
 
     // Indent another level from the outer context by default.
     return true;
@@ -575,8 +619,12 @@ class FormatWalker : public SourceEntityWalker {
       };
 
       if (auto AE = dyn_cast_or_null<ApplyExpr>(Node.dyn_cast<Expr *>())) {
-        collect(AE->getArg());
-        return;
+        // PrefixUnaryExpr shouldn't be syntactically considered as a function call
+        // for sibling alignment.
+        if (!isa<PrefixUnaryExpr>(AE)) {
+          collect(AE->getArg());
+          return;
+        }
       }
 
       if (auto PE = dyn_cast_or_null<ParenExpr>(Node.dyn_cast<Expr *>())) {

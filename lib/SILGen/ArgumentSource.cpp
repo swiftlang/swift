@@ -27,33 +27,6 @@ RValue &ArgumentSource::peekRValue() & {
   return Storage.get<RValueStorage>(StoredKind).Value;
 }
 
-bool ArgumentSource::isShuffle() const {
-  switch (StoredKind) {
-  case Kind::Invalid:
-    llvm_unreachable("argument source is invalid");
-  case Kind::RValue:
-  case Kind::LValue:
-    return false;
-  case Kind::Expr:
-    // FIXME: TupleShuffleExprs come in two flavors:
-    //
-    // 1) as apply arguments, where they're used to insert default
-    // argument value and collect varargs
-    //
-    // 2) as tuple conversions, where they can introduce, eliminate
-    // and re-order fields
-    //
-    // Case 1) must be emitted by ArgEmitter, and Case 2) must be
-    // emitted by RValueEmitter.
-    //
-    // It would be good to split up TupleShuffleExpr into these two
-    // cases, and simplify ArgEmitter since it no longer has to deal
-    // with re-ordering.
-    return isa<TupleShuffleExpr>(asKnownExpr());
-  }
-  llvm_unreachable("bad kind");
-}
-
 RValue ArgumentSource::getAsRValue(SILGenFunction &SGF, SGFContext C) && {
   switch (StoredKind) {
   case Kind::Invalid:
@@ -189,8 +162,8 @@ ManagedValue ArgumentSource::materialize(SILGenFunction &SGF,
                                          SILType destType) && {
   auto substFormalType = getSubstRValueType();
   assert(!destType || destType.getObjectType() ==
-               SGF.SGM.Types.getLoweredType(origFormalType,
-                                            substFormalType).getObjectType());
+               SGF.getLoweredType(origFormalType,
+                                  substFormalType).getObjectType());
 
   // Fast path: if the types match exactly, no abstraction difference
   // is possible and we can just materialize as normal.
@@ -269,14 +242,24 @@ void ArgumentSource::dump(raw_ostream &out, unsigned indent) const {
   case Kind::Expr:
     out << "Expr\n";
     Storage.get<Expr*>(StoredKind)->dump(out); // FIXME: indent
+    out << "\n";
     return;
   }
   llvm_unreachable("bad kind");
 }
 
-void PreparedArguments::emplaceEmptyArgumentList(SILGenFunction &SGF) {
-  emplace({}, /*scalar*/ false);
-  assert(isValid());
+PreparedArguments::PreparedArguments(
+    ArrayRef<AnyFunctionType::Param> params,
+    Expr *arg) : PreparedArguments(params) {
+  if (auto *PE = dyn_cast<ParenExpr>(arg))
+    addArbitrary(PE->getSubExpr());
+  else if (auto *TE = dyn_cast<TupleExpr>(arg)) {
+    for (auto *elt : TE->getElements())
+      addArbitrary(elt);
+  } else {
+    // FIXME: All ApplyExprs should have a ParenExpr or TupleExpr as their argument
+    addArbitrary(arg);
+  }
 }
 
 PreparedArguments
@@ -284,7 +267,7 @@ PreparedArguments::copy(SILGenFunction &SGF, SILLocation loc) const {
   if (isNull()) return PreparedArguments();
 
   assert(isValid());
-  PreparedArguments result(getParams(), isScalar());
+  PreparedArguments result(getParams());
   for (auto &elt : Arguments) {
     assert(elt.isRValue());
     result.add(elt.getKnownRValueLocation(),
@@ -332,7 +315,7 @@ PreparedArguments PreparedArguments::copyForDiagnostics() const {
     return PreparedArguments();
 
   assert(isValid());
-  PreparedArguments result(getParams(), isScalar());
+  PreparedArguments result(getParams());
   for (auto &arg : Arguments) {
     result.Arguments.push_back(arg.copyForDiagnostics());
   }

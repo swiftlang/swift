@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -primary-file %s -emit-ir -parse-stdlib -disable-access-control | %FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -parse-stdlib -disable-access-control | %FileCheck %s
 
 // REQUIRES: CPU=x86_64
 
@@ -15,7 +15,7 @@ func TestStringLiteral() -> String {
 }
 
 // CHECK: define hidden [[stringLayout]] @"$s11expressions18TestStringLiteral2SSyF"() {{.*}} {
-// CHECK: call [[stringLayout]] @{{.*}}_builtinUTF16StringLiteral{{.*}}(i8* bitcast ([19 x i16]* @1 to i8*), i64 18)
+// CHECK: call [[stringLayout]] @{{.*}}_builtinStringLiteral{{.*}}(i8* getelementptr inbounds ([20 x i8], [20 x i8]* @1, i64 0, i64 0), i64 19, i1 false)
 func TestStringLiteral2() -> String {
   return "non-ASCII string \u{00B5}"
 }

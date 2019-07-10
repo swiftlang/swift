@@ -73,36 +73,31 @@
 #define COROUTINE_ACCESSOR(ID, KEYWORD) OPAQUE_ACCESSOR(ID, KEYWORD)
 #endif
 
-/// ANY_ADDRESSOR(ACCESSOR_ID, ADDRESSOR_ID, KEYWORD)
+/// ANY_ADDRESSOR(ID, KEYWORD)
 ///   The given keyword corresponds to an addressor of the given kind.
 ///
-///   Defaults to ACCESSOR_KEYWORD(KEYWORD) if that is defined; otherwise
-///   defaults to nothing.
+///   Defaults to SINGLETON_ACCESSOR(ID, KEYWORD).
 #ifndef ANY_ADDRESSOR
-#if defined(ACCESSOR_KEYWORD)
-#define ANY_ADDRESSOR(ACCESSOR_ID, ADDRESSOR_ID, KEYWORD) \
-  ACCESSOR_KEYWORD(KEYWORD)
-#else
-#define ANY_ADDRESSOR(ACCESSOR_ID, ADDRESSOR_ID, KEYWORD)
-#endif
+#define ANY_ADDRESSOR(ID, KEYWORD) \
+  SINGLETON_ACCESSOR(ID, KEYWORD)
 #endif
 
-/// IMMUTABLE_ADDRESSOR(ADDRESSOR_ID, KEYWORD)
+/// IMMUTABLE_ADDRESSOR(ID, KEYWORD)
 ///   The given keyword corresponds to an immutable addressor of the given kind.
 ///
-///   DEfaults to ANY_ADDRESSOR(Address, ADDRESSOR_ID, KEYWORD).
+///   DEfaults to ANY_ADDRESSOR(ID, KEYWORD).
 #ifndef IMMUTABLE_ADDRESSOR
-#define IMMUTABLE_ADDRESSOR(ADDRESSOR_ID, KEYWORD) \
-  ANY_ADDRESSOR(Address, ADDRESSOR_ID, KEYWORD)
+#define IMMUTABLE_ADDRESSOR(ID, KEYWORD) \
+  ANY_ADDRESSOR(ID, KEYWORD)
 #endif
 
-/// MUTABLE_ADDRESSOR(ADDRESSOR_ID, KEYWORD)
+/// MUTABLE_ADDRESSOR(ID, KEYWORD)
 ///   The given keyword corresponds to a mutable addressor of the given kind.
 ///
-///   DEfaults to ANY_ADDRESSOR(MutableAddress, ADDRESSOR_ID, KEYWORD).
+///   DEfaults to ANY_ADDRESSOR(ID, KEYWORD).
 #ifndef MUTABLE_ADDRESSOR
-#define MUTABLE_ADDRESSOR(ADDRESSOR_ID, KEYWORD) \
-  ANY_ADDRESSOR(MutableAddress, ADDRESSOR_ID, KEYWORD)
+#define MUTABLE_ADDRESSOR(ID, KEYWORD) \
+  ANY_ADDRESSOR(ID, KEYWORD)
 #endif
 
 // Suppress entries for accessors which can't be written in source code.
@@ -167,11 +162,7 @@ OBSERVING_ACCESSOR(DidSet, didSet)
 /// Addressors are a way of proving more efficient access to storage
 /// when it is already stored in memory (but not as a stored member
 /// of the type).
-ACCESSOR(Address)
-
-IMMUTABLE_ADDRESSOR(Unsafe, unsafeAddress)
-IMMUTABLE_ADDRESSOR(Owning, addressWithOwner)
-IMMUTABLE_ADDRESSOR(NativeOwning, addressWithNativeOwner)
+IMMUTABLE_ADDRESSOR(Address, unsafeAddress)
 
 /// This is a mutableAddress-family accessor: a function that is
 /// called when the storage is modified and which works by returning
@@ -181,11 +172,7 @@ IMMUTABLE_ADDRESSOR(NativeOwning, addressWithNativeOwner)
 /// Addressors are a way of proving more efficient access to storage
 /// when it is already stored in memory (but not as a stored member
 /// of the type).
-ACCESSOR(MutableAddress)
-
-MUTABLE_ADDRESSOR(Unsafe, unsafeMutableAddress)
-MUTABLE_ADDRESSOR(Owning, mutableAddressWithOwner)
-MUTABLE_ADDRESSOR(NativeOwning, mutableAddressWithNativeOwner)
+MUTABLE_ADDRESSOR(MutableAddress, unsafeMutableAddress)
 
 #ifdef LAST_ACCESSOR
 LAST_ACCESSOR(MutableAddress)

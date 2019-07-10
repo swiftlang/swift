@@ -31,7 +31,7 @@ class SILFunction;
 
 namespace OptRemark {
 
-/// \brief Used in the streaming interface as the general argument type.  It
+/// Used in the streaming interface as the general argument type.  It
 /// internally converts everything into a key-value pair.
 struct Argument {
   std::string Key;
@@ -50,7 +50,8 @@ struct Argument {
   Argument(StringRef Key, unsigned long long N);
 
   Argument(StringRef Key, SILFunction *F);
-  Argument(StringRef Key, SILType *Ty);
+  Argument(StringRef Key, SILType Ty);
+  Argument(StringRef Key, CanType Ty);
 };
 
 /// Shorthand to insert named-value pairs.
@@ -148,7 +149,7 @@ class Emitter {
 public:
   Emitter(StringRef PassName, SILModule &M);
 
-  /// \brief Take a lambda that returns a remark which will be emitted.  The
+  /// Take a lambda that returns a remark which will be emitted.  The
   /// lambda is not evaluated unless remarks are enabled.  Second argument is
   /// only used to restrict this to functions.
   template <typename T>

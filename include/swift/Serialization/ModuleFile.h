@@ -48,6 +48,8 @@ class ModuleFile
   : public LazyMemberLoader,
     public LazyConformanceLoader {
   friend class SerializedASTFile;
+  friend class DeclDeserializer;
+  friend class TypeDeserializer;
   friend class SILDeserializer;
   using Status = serialization::Status;
   using TypeID = serialization::TypeID;
@@ -55,8 +57,8 @@ class ModuleFile
   /// A reference back to the AST representation of the file.
   FileUnit *FileContext = nullptr;
 
-  /// The module shadowed by this module, if any.
-  ModuleDecl *ShadowedModule = nullptr;
+  /// The module that this module is an overlay of, if any.
+  ModuleDecl *UnderlyingModule = nullptr;
 
   /// The module file data.
   std::unique_ptr<llvm::MemoryBuffer> ModuleInputBuffer;
@@ -133,27 +135,48 @@ public:
     const StringRef RawPath;
 
   private:
-    unsigned IsExported : 1;
+    using ImportFilterKind = ModuleDecl::ImportFilterKind;
+    const unsigned RawImportControl : 2;
     const unsigned IsHeader : 1;
     const unsigned IsScoped : 1;
 
-    Dependency(StringRef path, bool isHeader, bool exported, bool isScoped)
-      : RawPath(path), IsExported(exported), IsHeader(isHeader),
-        IsScoped(isScoped) {}
+    static unsigned rawControlFromKind(ImportFilterKind importKind) {
+      return llvm::countTrailingZeros(static_cast<unsigned>(importKind));
+    }
+    ImportFilterKind getImportControl() const {
+      return static_cast<ImportFilterKind>(1 << RawImportControl);
+    }
+
+    Dependency(StringRef path, bool isHeader, ImportFilterKind importControl,
+               bool isScoped)
+      : RawPath(path), RawImportControl(rawControlFromKind(importControl)),
+        IsHeader(isHeader), IsScoped(isScoped) {
+      assert(llvm::countPopulation(static_cast<unsigned>(importControl)) == 1 &&
+             "must be a particular filter option, not a bitset");
+      assert(getImportControl() == importControl && "not enough bits");
+    }
 
   public:
-    Dependency(StringRef path, bool exported, bool isScoped)
-      : Dependency(path, false, exported, isScoped) {}
+    Dependency(StringRef path, ImportFilterKind importControl, bool isScoped)
+      : Dependency(path, false, importControl, isScoped) {}
 
     static Dependency forHeader(StringRef headerPath, bool exported) {
-      return Dependency(headerPath, true, exported, false);
+      auto importControl = exported ? ImportFilterKind::Public
+                                    : ImportFilterKind::Private;
+      return Dependency(headerPath, true, importControl, false);
     }
 
     bool isLoaded() const {
       return Import.second != nullptr;
     }
 
-    bool isExported() const { return IsExported; }
+    bool isExported() const {
+      return getImportControl() == ImportFilterKind::Public;
+    }
+    bool isImplementationOnly() const {
+      return getImportControl() == ImportFilterKind::ImplementationOnly;
+    }
+
     bool isHeader() const { return IsHeader; }
     bool isScoped() const { return IsScoped; }
 
@@ -365,6 +388,10 @@ private:
   class LocalDeclTableInfo;
   using SerializedLocalDeclTable =
       llvm::OnDiskIterableChainedHashTable<LocalDeclTableInfo>;
+      
+  using OpaqueReturnTypeDeclTableInfo = LocalDeclTableInfo;
+  using SerializedOpaqueReturnTypeDeclTable =
+      llvm::OnDiskIterableChainedHashTable<OpaqueReturnTypeDeclTableInfo>;
 
   class NestedTypeDeclsTableInfo;
   using SerializedNestedTypeDeclsTable =
@@ -385,6 +412,7 @@ private:
   std::unique_ptr<SerializedDeclTable> OperatorMethodDecls;
   std::unique_ptr<SerializedExtensionTable> ExtensionDecls;
   std::unique_ptr<SerializedLocalDeclTable> LocalTypeDecls;
+  std::unique_ptr<SerializedOpaqueReturnTypeDeclTable> OpaqueReturnTypeDecls;
   std::unique_ptr<SerializedNestedTypeDeclsTable> NestedTypeDecls;
   std::unique_ptr<SerializedDeclMemberNamesTable> DeclMemberNames;
 
@@ -526,10 +554,6 @@ private:
   std::unique_ptr<SerializedDeclMembersTable>
   readDeclMembersTable(ArrayRef<uint64_t> fields, StringRef blobData);
 
-  /// Main logic of getDeclChecked.
-  llvm::Expected<Decl *>
-  getDeclCheckedImpl(serialization::DeclID DID);
-
   /// Reads the index block, which contains global tables.
   ///
   /// Returns false if there was an error.
@@ -548,6 +572,11 @@ private:
   /// Returns false if there was an error.
   bool readCommentBlock(llvm::BitstreamCursor &cursor);
 
+  /// Loads data from #ModuleDocInputBuffer.
+  ///
+  /// Returns false if there was an error.
+  bool readModuleDocIfPresent();
+
   /// Recursively reads a pattern from \c DeclTypeCursor.
   llvm::Expected<Pattern *> readPattern(DeclContext *owningDC);
 
@@ -557,8 +586,7 @@ private:
   ///
   /// If the record at the cursor is not a generic param list, returns null
   /// without moving the cursor.
-  GenericParamList *maybeReadGenericParams(DeclContext *DC,
-                                     GenericParamList *outerParams = nullptr);
+  GenericParamList *maybeReadGenericParams(DeclContext *DC);
 
   /// Reads a set of requirements from \c DeclTypeCursor.
   void readGenericRequirements(SmallVectorImpl<Requirement> &requirements,
@@ -585,7 +613,8 @@ private:
   /// because it reads from the cursor, it is not possible to reset the cursor
   /// after reading. Nothing should ever follow an XREF record except
   /// XREF_PATH_PIECE records.
-  llvm::Expected<Decl *> resolveCrossReference(ModuleDecl *M, uint32_t pathLen);
+  llvm::Expected<Decl *> resolveCrossReference(serialization::ModuleID MID,
+                                               uint32_t pathLen);
 
   /// Populates TopLevelIDs for name lookup.
   void buildTopLevelDeclMap();
@@ -626,17 +655,35 @@ public:
     theModule.reset(new ModuleFile(std::move(moduleInputBuffer),
                                    std::move(moduleDocInputBuffer),
                                    isFramework, info, extInfo));
+    assert(info.status == Status::Valid ||
+           info.status == theModule->getStatus());
+    info.status = theModule->getStatus();
     return info;
   }
 
   // Out of line to avoid instantiation OnDiskChainedHashTable here.
   ~ModuleFile();
 
-  /// Associates this module file with an AST module.
+  /// Associates this module file with the AST node representing it.
   ///
-  /// Returns any error that occurred during association, including validation
-  /// that the module file is compatible with the module it's being loaded as.
-  Status associateWithFileContext(FileUnit *file, SourceLoc diagLoc);
+  /// Checks that the file is compatible with the AST module it's being loaded
+  /// into, loads any dependencies needed to understand the module, and updates
+  /// the ASTContext and ClangImporter with search paths and other information
+  /// from the module.
+  ///
+  /// \param file The FileUnit that represents this file's place in the AST.
+  /// \param diagLoc A location used for diagnostics that occur during loading.
+  /// This does not include diagnostics about \e this file failing to load,
+  /// but rather other things that might be imported as part of bringing the
+  /// file into the AST.
+  /// \param treatAsPartialModule If true, processes implementation-only
+  /// information instead of assuming the client won't need it and shouldn't
+  /// see it.
+  ///
+  /// \returns any error that occurred during association, such as being
+  /// compiled for a different OS.
+  Status associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
+                                  bool treatAsPartialModule);
 
   /// Checks whether this module can be used.
   Status getStatus() const {
@@ -655,14 +702,18 @@ public:
     return Dependencies;
   }
 
-  /// The module shadowed by this module, if any.
-  ModuleDecl *getShadowedModule() const { return ShadowedModule; }
+  /// The module that this module is an overlay for, if any.
+  ModuleDecl *getUnderlyingModule() const { return UnderlyingModule; }
 
   /// Searches the module's top-level decls for the given identifier.
   void lookupValue(DeclName name, SmallVectorImpl<ValueDecl*> &results);
 
   /// Searches the module's local type decls for the given mangled name.
   TypeDecl *lookupLocalType(StringRef MangledName);
+      
+  /// Search the module's opaque return type decls for the one corresponding to
+  /// the given mangled name.
+  OpaqueTypeDecl *lookupOpaqueResultType(StringRef MangledName);
 
   /// Searches the module's nested type decls table for the given member of
   /// the given type.
@@ -695,7 +746,7 @@ public:
   /// Note that this may cause other decls to load as well.
   void loadExtensions(NominalTypeDecl *nominal);
 
-  /// \brief Load the methods within the given class that produce
+  /// Load the methods within the given class that produce
   /// Objective-C class or instance methods with the given selector.
   ///
   /// \param classDecl The class in which we are searching for @objc methods.
@@ -738,8 +789,14 @@ public:
   /// Adds all top-level decls to the given vector.
   void getTopLevelDecls(SmallVectorImpl<Decl*> &Results);
 
+  /// Adds all precedence groups to the given vector.
+  void getPrecedenceGroups(SmallVectorImpl<PrecedenceGroupDecl*> &Results);
+
   /// Adds all local type decls to the given vector.
   void getLocalTypeDecls(SmallVectorImpl<TypeDecl*> &Results);
+      
+  /// Add all opaque return type decls in the module to the given vector.
+  void getOpaqueReturnTypeDecls(SmallVectorImpl<OpaqueTypeDecl*> &Results);
 
   /// Adds all top-level decls to the given vector.
   ///
@@ -770,14 +827,18 @@ public:
   loadAllConformances(const Decl *D, uint64_t contextData,
                     SmallVectorImpl<ProtocolConformance*> &Conforms) override;
 
-  virtual TypeLoc loadAssociatedTypeDefault(const AssociatedTypeDecl *ATD,
-                                            uint64_t contextData) override;
+  virtual Type loadAssociatedTypeDefault(const AssociatedTypeDecl *ATD,
+                                         uint64_t contextData) override;
 
   virtual void finishNormalConformance(NormalProtocolConformance *conformance,
                                        uint64_t contextData) override;
 
   GenericEnvironment *loadGenericEnvironment(const DeclContext *decl,
                                              uint64_t contextData) override;
+
+  void
+  loadRequirementSignature(const ProtocolDecl *proto, uint64_t contextData,
+                           SmallVectorImpl<Requirement> &requirements) override;
 
   Optional<StringRef> getGroupNameById(unsigned Id) const;
   Optional<StringRef> getSourceFileNameById(unsigned Id) const;
@@ -846,7 +907,7 @@ public:
   ///
   /// If the name matches the name of the current module, a shadowed module
   /// is loaded instead.
-  ModuleDecl *getModule(ArrayRef<Identifier> name);
+  ModuleDecl *getModule(ArrayRef<Identifier> name, bool allowLoading = false);
 
   /// Returns the generic signature for the given ID.
   GenericSignature *getGenericSignature(serialization::GenericSignatureID ID);
@@ -887,6 +948,9 @@ public:
 
   /// Reads inlinable body text from \c DeclTypeCursor, if present.
   Optional<StringRef> maybeReadInlinableBodyText();
+
+  /// Reads pattern initializer text from \c DeclTypeCursor, if present.
+  Optional<StringRef> maybeReadPatternInitializerText();
 };
 
 template <typename T, typename RawData>

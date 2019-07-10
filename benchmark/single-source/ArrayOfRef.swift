@@ -14,14 +14,15 @@
 // references. It is meant to be a baseline for comparison against
 // ArrayOfGenericRef.
 //
-// For comparison, we always create four arrays of 10,000 words.
+// For comparison, we always create four arrays of 1,000 words.
 
 import TestsUtils
 
 public let ArrayOfRef = BenchmarkInfo(
   name: "ArrayOfRef",
   runFunction: run_ArrayOfRef,
-  tags: [.validation, .api, .Array])
+  tags: [.validation, .api, .Array],
+  legacyFactor: 10)
 
 protocol Constructible {
   associatedtype Element
@@ -32,8 +33,8 @@ class ConstructibleArray<T:Constructible> {
 
   init(_ e:T.Element) {
     array = [T]()
-    array.reserveCapacity(10_000)
-    for _ in 0...10_000 {
+    array.reserveCapacity(1_000)
+    for _ in 0...1_000 {
       array.append(T(e:e) as T)
     }
   }
@@ -77,7 +78,7 @@ enum RefEnum {
 class RefArray<T> {
   var array : [T]
 
-  init(_ i:T, count:Int = 10_000) {
+  init(_ i:T, count:Int = 1_000) {
     array = [T](repeating: i, count: count)
   }
 }

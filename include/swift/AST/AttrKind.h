@@ -40,6 +40,9 @@ enum class Associativity : uint8_t {
   Right
 };
 
+/// Returns the in-source spelling of the given associativity.
+StringRef getAssociativitySpelling(Associativity value);
+
 /// The kind of unary operator, if any.
 enum class UnaryOperatorKind : uint8_t {
   None,

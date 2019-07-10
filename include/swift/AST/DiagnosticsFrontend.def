@@ -18,8 +18,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if !(defined(DIAG) || (defined(ERROR) && defined(WARNING) && defined(NOTE)))
-#  error Must define either DIAG or the set {ERROR,WARNING,NOTE}
+#if !(defined(DIAG) || (defined(ERROR) && defined(WARNING) && defined(NOTE) && \
+                        defined(REMARK)))
+#  error Must define either DIAG or the set {ERROR,WARNING,NOTE,REMARK}
 #endif
 
 #ifndef ERROR
@@ -35,6 +36,11 @@
 #ifndef NOTE
 #  define NOTE(ID,Options,Text,Signature) \
   DIAG(NOTE,ID,Options,Text,Signature)
+#endif
+
+#ifndef REMARK
+#  define REMARK(ID,Options,Text,Signature)   \
+DIAG(REMARK,ID,Options,Text,Signature)
 #endif
 
 WARNING(warning_no_such_sdk,none,
@@ -103,8 +109,6 @@ ERROR(error_no_source_location_scope_map,none,
       "-dump-scope-maps argument must be 'expanded' or a list of "
       "source locations", ())
 
-NOTE(note_swift_version_major, none,
-     "use major version, as in '-swift-version %0'", (unsigned))
 NOTE(note_valid_swift_versions, none,
      "valid arguments to '-swift-version' are %0", (StringRef))
 
@@ -121,7 +125,7 @@ ERROR(error_mode_cannot_emit_module,none,
 ERROR(error_mode_cannot_emit_module_doc,none,
       "this mode does not support emitting module documentation files", ())
 ERROR(error_mode_cannot_emit_interface,none,
-      "this mode does not support emitting textual interface files", ())
+      "this mode does not support emitting module interface files", ())
 
 WARNING(emit_reference_dependencies_without_primary_file,none,
   "ignoring -emit-reference-dependencies (requires -primary-file)", ())
@@ -250,6 +254,10 @@ WARNING(cannot_assign_value_to_conditional_compilation_flag,none,
         "conditional compilation flags do not have values in Swift; they are "
         "either present or absent (rather than '%0')", (StringRef))
 
+WARNING(framework_search_path_includes_framework_extension,none,
+        "framework search path ends in \".framework\"; add directory containing "
+        "framework instead: %0", (StringRef))
+
 ERROR(error_optimization_remark_pattern, none, "%0 in '%1'",
       (StringRef, StringRef))
 
@@ -260,14 +268,52 @@ ERROR(error_invalid_debug_prefix_map, none,
 ERROR(invalid_vfs_overlay_file,none,
       "invalid virtual overlay file '%0'", (StringRef))
 
-WARNING(textual_interface_scoped_import_unsupported,none,
-        "scoped imports are not yet supported in textual module interfaces",
+WARNING(module_interface_scoped_import_unsupported,none,
+        "scoped imports are not yet supported in module interfaces",
         ())
+WARNING(warn_unsupported_module_interface_swift_version,none,
+        "module interfaces are only supported with Swift language version 5 "
+        "or later (currently using -swift-version %0)",
+        (StringRef))
+WARNING(warn_unsupported_module_interface_library_evolution,none,
+        "module interfaces are only supported with -enable-library-evolution",
+        ())
+ERROR(error_extracting_version_from_module_interface,none,
+      "error extracting version from module interface", ())
+ERROR(unsupported_version_of_module_interface,none,
+      "unsupported version of module interface '%0': '%1'",
+      (StringRef, llvm::VersionTuple))
+ERROR(error_extracting_flags_from_module_interface,none,
+      "error extracting flags from module interface", ())
+REMARK(rebuilding_module_from_interface,none,
+       "rebuilding module '%0' from interface '%1'", (StringRef, StringRef))
+NOTE(out_of_date_module_here,none,
+     "%select{compiled|cached|forwarding|prebuilt}0 module is out of date: '%1'",
+     (unsigned, StringRef))
+NOTE(module_interface_dependency_out_of_date,none,
+     "dependency is out of date: '%0'",
+     (StringRef))
+NOTE(module_interface_dependency_missing,none,
+     "dependency is missing: '%0'",
+     (StringRef))
+NOTE(compiled_module_invalid,none,
+     "unable to load compiled module '%0'",
+     (StringRef))
+NOTE(compiled_module_invalid_reason,none,
+     "unable to load compiled module '%0': %1",
+     (StringRef, StringRef))
+ERROR(error_extracting_dependencies_from_cached_module,none,
+      "error extracting dependencies from cached module '%0'",
+      (StringRef))
+ERROR(unknown_forced_module_loading_mode,none,
+      "unknown value for SWIFT_FORCE_MODULE_LOADING variable: '%0'",
+      (StringRef))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG
 # endif
+# undef REMARK
 # undef NOTE
 # undef WARNING
 # undef ERROR

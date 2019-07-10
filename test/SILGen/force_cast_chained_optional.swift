@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name force_cast_chained_optional -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name force_cast_chained_optional %s | %FileCheck %s
 
 class Foo {
   var bar: Bar!
@@ -12,14 +12,11 @@ class Bar {
 class C {}
 class D: C {}
 
-// CHECK-LABEL: sil hidden @$s27force_cast_chained_optional4testyAA1DCAA3FooCF
+// CHECK-LABEL: sil hidden [ossa] @$s27force_cast_chained_optional4testyAA1DCAA3FooCF
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $Foo):
 // CHECK:   class_method [[ARG]] : $Foo, #Foo.bar!getter.1 : (Foo) -> () -> Bar?, $@convention(method) (@guaranteed Foo) ->
 // CHECK:   select_enum_addr {{%.*}}
 // CHECK:   cond_br {{%.*}}, [[SOME_BAR:bb[0-9]+]], [[NO_BAR:bb[0-9]+]]
-//
-// CHECK: [[NO_BAR]]:
-// CHECK:   br [[TRAP:bb[0-9]+]]
 //
 // CHECK: [[SOME_BAR]]:
 // CHECK:   [[PAYLOAD_ADDR:%.*]] = unchecked_take_enum_data_addr {{%.*}} : $*Optional<Bar>
@@ -30,7 +27,7 @@ class D: C {}
 // CHECK:   end_borrow [[BORROWED_BAR]]
 // CHECK:   unconditional_checked_cast {{%.*}} : $C to $D
 //
-// CHECK: [[TRAP]]:
+// CHECK: [[NO_BAR]]:
 // CHECK:   unreachable
 func test(_ x: Foo) -> D {
   return x.bar?.bas as! D

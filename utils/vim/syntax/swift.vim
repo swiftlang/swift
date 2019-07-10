@@ -10,10 +10,8 @@ endif
 syn keyword swiftKeyword
       \ associatedtype
       \ break
-      \ case
       \ catch
       \ continue
-      \ default
       \ defer
       \ do
       \ else
@@ -41,9 +39,11 @@ syn keyword swiftDefinitionModifier
       \ fileprivate
       \ final
       \ internal
+      \ lazy
       \ nonmutating
       \ open
       \ override
+      \ prefix
       \ private
       \ public
       \ required
@@ -82,6 +82,8 @@ syn keyword swiftTypeDefinition skipwhite skipempty nextgroup=swiftTypeName
       \ extension
       \ protocol
       \ struct
+
+syn keyword swiftTypeAliasDefinition skipwhite skipempty nextgroup=swiftTypeAliasName
       \ typealias
 
 syn match swiftMultiwordTypeDefinition skipwhite skipempty nextgroup=swiftTypeName
@@ -109,6 +111,8 @@ syn match swiftImportModule contained nextgroup=swiftImportComponent
 syn match swiftImportComponent contained nextgroup=swiftImportComponent
       \ /\.\<[A-Za-z_][A-Za-z_0-9]*\>/
 
+syn match swiftTypeAliasName contained skipwhite skipempty nextgroup=swiftTypeAliasValue
+      \ /\<[A-Za-z_][A-Za-z_0-9]*\>/
 syn match swiftTypeName contained skipwhite skipempty nextgroup=swiftTypeParameters
       \ /\<[A-Za-z_][A-Za-z_0-9\.]*\>/
 syn match swiftVarName contained skipwhite skipempty nextgroup=swiftTypeDeclaration
@@ -136,10 +140,19 @@ syn region swiftTypeParameters contained contains=swiftVarName,swiftConstraint
 syn keyword swiftConstraint contained
       \ where
 
+syn match swiftTypeAliasValue skipwhite skipempty nextgroup=swiftType
+      \ /=/
 syn match swiftTypeDeclaration skipwhite skipempty nextgroup=swiftType,swiftInOutKeyword
       \ /:/
 syn match swiftTypeDeclaration skipwhite skipempty nextgroup=swiftType
       \ /->/
+
+syn match swiftKeyword
+      \ /\<case\>/
+syn region swiftCaseLabelRegion
+      \ matchgroup=swiftKeyword start=/\<case\>/ matchgroup=Delimiter end=/:/ oneline contains=TOP
+syn region swiftDefaultLabelRegion
+      \ matchgroup=swiftKeyword start=/\<default\>/ matchgroup=Delimiter end=/:/ oneline
 
 syn region swiftParenthesisRegion matchgroup=NONE start=/(/ end=/)/ contains=TOP
 
@@ -167,7 +180,7 @@ syn match swiftPreproc /#\(\<file\>\|\<line\>\|\<function\>\)/
 syn match swiftPreproc /^\s*#\(\<if\>\|\<else\>\|\<elseif\>\|\<endif\>\|\<error\>\|\<warning\>\)/
 syn region swiftPreprocFalse start="^\s*#\<if\>\s\+\<false\>" end="^\s*#\(\<else\>\|\<elseif\>\|\<endif\>\)"
 
-syn match swiftAttribute /@\<\w\+\>/ skipwhite skipempty nextgroup=swiftType
+syn match swiftAttribute /@\<\w\+\>/ skipwhite skipempty nextgroup=swiftType,swiftTypeDefinition
 
 syn keyword swiftTodo MARK TODO FIXME contained
 
@@ -188,17 +201,20 @@ hi def link swiftTypeDefinition Define
 hi def link swiftMultiwordTypeDefinition Define
 hi def link swiftType Type
 hi def link swiftTypePair Type
+hi def link swiftTypeAliasName Identifier
 hi def link swiftTypeName Function
 hi def link swiftConstraint Special
 hi def link swiftFuncDefinition Define
-hi def link swiftDefinitionModifier Define
+hi def link swiftDefinitionModifier Operator
 hi def link swiftInOutKeyword Define
 hi def link swiftFuncKeyword Function
 hi def link swiftFuncKeywordGeneral Function
+hi def link swiftTypeAliasDefinition Define
 hi def link swiftVarDefinition Define
 hi def link swiftVarName Identifier
 hi def link swiftImplicitVarName Identifier
 hi def link swiftIdentifierKeyword Identifier
+hi def link swiftTypeAliasValue Delimiter
 hi def link swiftTypeDeclaration Delimiter
 hi def link swiftTypeParameters Delimiter
 hi def link swiftBoolean Boolean

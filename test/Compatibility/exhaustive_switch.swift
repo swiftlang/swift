@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 4 -enable-resilience
+// RUN: %target-typecheck-verify-swift -swift-version 4 -enable-library-evolution
 
 func foo(a: Int?, b: Int?) -> Int {
   switch (a, b) {
@@ -441,8 +441,8 @@ enum ContainsOverlyLargeEnum {
 }
 
 func quiteBigEnough() -> Bool {
-  switch (OverlyLargeSpaceEnum.case1, OverlyLargeSpaceEnum.case2) { // expected-error {{the compiler is unable to check that this switch is exhaustive in reasonable time}}
-  // expected-note@-1 {{do you want to add a default clause?}}
+  switch (OverlyLargeSpaceEnum.case1, OverlyLargeSpaceEnum.case2) { // expected-error {{switch must be exhaustive}}
+  // expected-note@-1 132 {{add missing case:}}
   case (.case0, .case0): return true
   case (.case1, .case1): return true
   case (.case2, .case2): return true
@@ -457,8 +457,8 @@ func quiteBigEnough() -> Bool {
   case (.case11, .case11): return true
   }
 
-  switch (OverlyLargeSpaceEnum.case1, OverlyLargeSpaceEnum.case2) { // expected-error {{the compiler is unable to check that this switch is exhaustive in reasonable time}}
-  // expected-note@-1 {{do you want to add a default clause?}}
+  switch (OverlyLargeSpaceEnum.case1, OverlyLargeSpaceEnum.case2) { // expected-error {{switch must be exhaustive}}
+  // expected-note@-1 {{add missing case: '(.case11, _)'}}
   case (.case0, _): return true
   case (.case1, _): return true
   case (.case2, _): return true
@@ -472,7 +472,8 @@ func quiteBigEnough() -> Bool {
   case (.case10, _): return true
   }
 
-  switch (OverlyLargeSpaceEnum.case1, OverlyLargeSpaceEnum.case2) { // expected-error {{the compiler is unable to check that this switch is exhaustive in reasonable time}}
+  switch (OverlyLargeSpaceEnum.case1, OverlyLargeSpaceEnum.case2) { // expected-warning {{switch must be exhaustive}}
+  // expected-note@-1 {{add missing case: '(.case11, _)'}}
   case (.case0, _): return true
   case (.case1, _): return true
   case (.case2, _): return true
@@ -484,7 +485,7 @@ func quiteBigEnough() -> Bool {
   case (.case8, _): return true
   case (.case9, _): return true
   case (.case10, _): return true
-  @unknown default: return false // expected-note {{remove '@unknown' to handle remaining values}} {{3-12=}}
+  @unknown default: return false
   }
 
 
@@ -826,7 +827,7 @@ public enum NonExhaustivePayload {
   case a(Int), b(Bool)
 }
 
-@_frozen public enum TemporalProxy {
+@frozen public enum TemporalProxy {
   case seconds(Int)
   case milliseconds(Int)
   case microseconds(Int)
@@ -1173,5 +1174,45 @@ extension Result where T == NoError {
     case .Ok(_):
       break // But it's okay to write one.
     }
+  }
+}
+
+enum SR10301<T,E> {
+  case value(T)
+  case error(E)
+}
+enum SR10301Error: Error {
+  case bad
+}
+
+func sr10301(_ foo: SR10301<String,(Int,Error)>) {
+  switch foo {
+  case .value: return
+  case .error((_, SR10301Error.bad)): return
+  case .error((_, let err)):
+    _ = err
+    return
+  }
+}
+
+func sr10301_is(_ foo: SR10301<String,(Int,Error)>) {
+  switch foo {
+  case .value: return
+  case .error((_, is SR10301Error)): return
+  case .error((_, let err)):
+    _ = err
+    return
+  }
+}
+
+func sr10301_as(_ foo: SR10301<String,(Int,Error)>) {
+  switch foo {
+  case .value: return
+  case .error((_, let err as SR10301Error)):
+    _ = err
+    return
+  case .error((_, let err)):
+    _ = err
+    return
   }
 }

@@ -12,10 +12,8 @@ public extension _ObjectiveCBridgeable {
   }
 }
 
-class Root : Hashable { 
-  var hashValue: Int {
-    return 0
-  }
+class Root : Hashable {
+  func hash(into hasher: inout Hasher) {}
 }
 
 func ==(x: Root, y: Root) -> Bool { return true }
@@ -44,9 +42,7 @@ struct BridgedToObjC : Hashable, _ObjectiveCBridgeable {
     return true
   }
 
-  var hashValue: Int {
-    return 0
-  }
+  func hash(into hasher: inout Hasher) {}
 }
 
 func ==(x: BridgedToObjC, y: BridgedToObjC) -> Bool { return true }
@@ -66,7 +62,7 @@ func testUpcastBridge() {
 
   // Failed upcast
   setD = setB // expected-error{{cannot assign value of type 'Set<BridgedToObjC>' to type 'Set<DerivesObjC>'}}
-  _ = setD
+  // expected-note@-1 {{arguments to generic parameter 'Element' ('BridgedToObjC' and 'DerivesObjC') are expected to be equal}}
 }
 
 func testForcedDowncastBridge() {

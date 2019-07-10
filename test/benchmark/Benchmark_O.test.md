@@ -1,6 +1,5 @@
 <!--
 REQUIRES: OS=macosx
-REQUIRES: asserts
 REQUIRES: benchmark
 REQUIRES: CMAKE_GENERATOR=Ninja
 -->
@@ -15,11 +14,12 @@ as a verification of this public API to prevent its accidental breakage.
 [BD]: https://github.com/apple/swift/blob/master/benchmark/scripts/Benchmark_Driver
 [Testing]: https://github.com/apple/swift/blob/master/docs/Testing.md
 
-Note: Following tests use *Ackermann* as an example of a benchmark that is
-excluded from the default "pre-commit" list because it is marked `unstable` and
-the default skip-tags (`unstable,skip`) will exclude it. It's also
-alphabetically the first benchmark in the test suite (used to verify running by
-index). If these assumptions change, the test must be adapted.
+Note: Following tests use *Existential.* as an example of a benchmarks that are
+excluded from the default "pre-commit" list because they are marked `skip` and
+the default skip-tags (`unstable,skip`) will exclude them.  The *Ackermann* and
+*AngryPhonebook* are alphabetically the first two benchmarks in the test suite
+(used to verify running by index). If these assumptions change, the test must be
+adapted.
 
 ## List Format
 ````
@@ -27,7 +27,7 @@ RUN: %Benchmark_O --list | %FileCheck %s \
 RUN:                      --check-prefix LISTPRECOMMIT \
 RUN:                      --check-prefix LISTTAGS
 LISTPRECOMMIT: #,Test,[Tags]
-LISTPRECOMMIT-NOT: Ackermann
+LISTPRECOMMIT-NOT: Existential.
 LISTPRECOMMIT: {{[0-9]+}},AngryPhonebook
 LISTTAGS-SAME: ,[
 LISTTAGS-NOT: TestsUtils.BenchmarkCategory.
@@ -35,14 +35,14 @@ LISTTAGS-SAME: String, api, validation
 LISTTAGS-SAME: ]
 ````
 
-Verify Ackermann is listed when skip-tags are explicitly empty and that it is
-marked unstable:
+Verify `Existential.` benchmarks are listed when skip-tags are explicitly empty
+and that they are marked `skip`:
 
 ````
 RUN: %Benchmark_O --list --skip-tags= | %FileCheck %s --check-prefix LISTALL
-LISTALL: Ackermann
-LISTALL-SAME: unstable
 LISTALL: AngryPhonebook
+LISTALL: Existential.
+LISTALL-SAME: skip
 ````
 
 ## Benchmark Selection
@@ -54,8 +54,9 @@ It provides us with ability to do a "dry run".
 Run benchmark by name (even if its tags match the skip-tags) or test number:
 
 ````
-RUN: %Benchmark_O Ackermann --list | %FileCheck %s --check-prefix NAMEDSKIP
-NAMEDSKIP: Ackermann
+RUN: %Benchmark_O Existential.Mutating.Ref1 --list \
+RUN:              | %FileCheck %s --check-prefix NAMEDSKIP
+NAMEDSKIP: Existential.Mutating.Ref1
 
 RUN: %Benchmark_O 1 --list | %FileCheck %s --check-prefix RUNBYNUMBER
 RUNBYNUMBER: Ackermann
@@ -110,7 +111,7 @@ RUN:                              --check-prefix LOGHEADER \
 RUN:                              --check-prefix LOGBENCH
 LOGHEADER-LABEL: #,TEST,SAMPLES,MIN(μs),MAX(μs),MEAN(μs),SD(μs),MEDIAN(μs)
 LOGBENCH: {{[0-9]+}},
-NUMITERS1: AngryPhonebook,1
+NUMITERS1: AngryPhonebook,{{[0-9]+}}
 NUMITERS1-NOT: 0,0,0,0,0
 LOGBENCH-SAME: ,{{[0-9]+}},{{[0-9]+}},{{[0-9]+}},{{[0-9]+}},{{[0-9]+}}
 ````
@@ -153,7 +154,8 @@ CONFIG: NumSamples: 2
 CONFIG: Tests Filter: ["1", "Ackermann", "1", "AngryPhonebook"]
 CONFIG: Tests to run: Ackermann, AngryPhonebook
 LOGFORMAT: #,TEST,SAMPLES,MIN(μs),𝚫MEDIAN,𝚫MAX,MAX_RSS(B)
-LOGVERBOSE-LABEL: Running Ackermann for 2 samples.
+LOGVERBOSE-LABEL: Running Ackermann
+LOGVERBOSE: Collecting 2 samples.
 LOGVERBOSE: Measuring with scale {{[0-9]+}}.
 LOGVERBOSE: Sample 0,{{[0-9]+}}
 LOGVERBOSE: Sample 1,{{[0-9]+}}
@@ -162,8 +164,9 @@ MEASUREENV: ICS {{[0-9]+}} - {{[0-9]+}} = {{[0-9]+}}
 MEASUREENV: VCS {{[0-9]+}} - {{[0-9]+}} = {{[0-9]+}}
 RUNJUSTONCE-LABEL: 1,Ackermann
 RUNJUSTONCE-NOT: 1,Ackermann
-LOGFORMAT: ,{{[0-9]+}},{{[0-9]+}},,{{[0-9]+}},{{[0-9]+}}
-LOGVERBOSE-LABEL: Running AngryPhonebook for 2 samples.
+LOGFORMAT: ,{{[0-9]+}},{{[0-9]+}},,{{[0-9]*}},{{[0-9]+}}
+LOGVERBOSE-LABEL: Running AngryPhonebook
+LOGVERBOSE: Collecting 2 samples.
 ````
 
 Verify the specified delimiter is used when logging to console. The non-verbose

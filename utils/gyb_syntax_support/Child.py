@@ -11,6 +11,7 @@ class Child(object):
     """
     def __init__(self, name, kind, description=None, is_optional=False,
                  token_choices=None, text_choices=None, node_choices=None,
+                 collection_element_name=None,
                  classification=None, force_classification=False):
         """
         If a classification is passed, it specifies the color identifiers in 
@@ -25,6 +26,7 @@ class Child(object):
         self.description = description
         self.swift_syntax_kind = lowercase_first_word(self.syntax_kind)
         self.type_name = kind_to_type(self.syntax_kind)
+        self.collection_element_name = collection_element_name
         self.classification = classification_by_name(classification)
         self.force_classification = force_classification
 

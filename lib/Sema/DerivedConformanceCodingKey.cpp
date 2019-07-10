@@ -29,7 +29,7 @@ using namespace swift;
 /// Sets the body of the given function to `return nil`.
 ///
 /// \param funcDecl The function whose body to set.
-static void deriveNilReturn(AbstractFunctionDecl *funcDecl) {
+static void deriveNilReturn(AbstractFunctionDecl *funcDecl, void *) {
   auto *parentDC = funcDecl->getDeclContext();
   auto &C = parentDC->getASTContext();
 
@@ -43,7 +43,7 @@ static void deriveNilReturn(AbstractFunctionDecl *funcDecl) {
 /// Sets the body of the given function to `return self.rawValue`.
 ///
 /// \param funcDecl The function whose body to set.
-static void deriveRawValueReturn(AbstractFunctionDecl *funcDecl) {
+static void deriveRawValueReturn(AbstractFunctionDecl *funcDecl, void *) {
   auto *parentDC = funcDecl->getDeclContext();
   auto &C = parentDC->getASTContext();
 
@@ -62,7 +62,7 @@ static void deriveRawValueReturn(AbstractFunctionDecl *funcDecl) {
 /// the parameter of the given constructor.
 ///
 /// \param initDecl The constructor whose body to set.
-static void deriveRawValueInit(AbstractFunctionDecl *initDecl) {
+static void deriveRawValueInit(AbstractFunctionDecl *initDecl, void *) {
   auto *parentDC = initDecl->getDeclContext();
   auto &C = parentDC->getASTContext();
 
@@ -172,8 +172,8 @@ static ValueDecl *deriveProperty(DerivedConformance &derived, Type type,
                                      /*isStatic=*/false, /*isFinal=*/false);
 
   // Define the getter.
-  auto *getterDecl =
-      derived.addGetterToReadOnlyDerivedProperty(derived.TC, propDecl, type);
+  auto *getterDecl = derived.addGetterToReadOnlyDerivedProperty(
+      propDecl, type);
 
   // Synthesize the body.
   synthesizer(getterDecl);
@@ -190,7 +190,7 @@ static ValueDecl *deriveProperty(DerivedConformance &derived, Type type,
 ///
 /// \param strValDecl The function whose body to set.
 static void
-deriveBodyCodingKey_enum_stringValue(AbstractFunctionDecl *strValDecl) {
+deriveBodyCodingKey_enum_stringValue(AbstractFunctionDecl *strValDecl, void *) {
   // enum SomeEnum {
   //   case A, B, C
   //   @derived var stringValue: String {
@@ -235,9 +235,9 @@ deriveBodyCodingKey_enum_stringValue(AbstractFunctionDecl *strValDecl) {
       auto *returnStmt = new (C) ReturnStmt(SourceLoc(), caseValue);
       auto *caseBody = BraceStmt::create(C, SourceLoc(), ASTNode(returnStmt),
                                          SourceLoc());
-      cases.push_back(CaseStmt::create(C, SourceLoc(), labelItem,
-                                       /*HasBoundDecls=*/false, SourceLoc(),
-                                       SourceLoc(), caseBody));
+      cases.push_back(CaseStmt::create(C, SourceLoc(), labelItem, SourceLoc(),
+                                       SourceLoc(), caseBody,
+                                       /*case body var decls*/ None));
     }
 
     auto *selfRef = DerivedConformance::createSelfDeclRef(strValDecl);
@@ -255,7 +255,7 @@ deriveBodyCodingKey_enum_stringValue(AbstractFunctionDecl *strValDecl) {
 ///
 /// \param initDecl The function whose body to set.
 static void
-deriveBodyCodingKey_init_stringValue(AbstractFunctionDecl *initDecl) {
+deriveBodyCodingKey_init_stringValue(AbstractFunctionDecl *initDecl, void *) {
   // enum SomeEnum {
   //   case A, B, C
   //   @derived init?(stringValue: String) {
@@ -279,7 +279,7 @@ deriveBodyCodingKey_init_stringValue(AbstractFunctionDecl *initDecl) {
 
   auto elements = enumDecl->getAllElements();
   if (elements.empty() /* empty enum */) {
-    deriveNilReturn(initDecl);
+    deriveNilReturn(initDecl, nullptr);
     return;
   }
 
@@ -303,9 +303,9 @@ deriveBodyCodingKey_init_stringValue(AbstractFunctionDecl *initDecl) {
 
     auto *body = BraceStmt::create(C, SourceLoc(), ASTNode(assignment),
                                    SourceLoc());
-    cases.push_back(CaseStmt::create(C, SourceLoc(), labelItem,
-                                     /*HasBoundDecls=*/false, SourceLoc(),
-                                     SourceLoc(), body));
+    cases.push_back(CaseStmt::create(C, SourceLoc(), labelItem, SourceLoc(),
+                                     SourceLoc(), body,
+                                     /*case body var decls*/ None));
   }
 
   auto *anyPat = new (C) AnyPattern(SourceLoc());
@@ -315,9 +315,9 @@ deriveBodyCodingKey_init_stringValue(AbstractFunctionDecl *initDecl) {
   auto *dfltReturnStmt = new (C) FailStmt(SourceLoc(), SourceLoc());
   auto *dfltBody = BraceStmt::create(C, SourceLoc(), ASTNode(dfltReturnStmt),
                                      SourceLoc());
-  cases.push_back(CaseStmt::create(C, SourceLoc(), dfltLabelItem,
-                                   /*HasBoundDecls=*/false, SourceLoc(),
-                                   SourceLoc(), dfltBody));
+  cases.push_back(CaseStmt::create(C, SourceLoc(), dfltLabelItem, SourceLoc(),
+                                   SourceLoc(), dfltBody,
+                                   /*case body var decls*/ None));
 
   auto *stringValueDecl = initDecl->getParameters()->get(0);
   auto *stringValueRef = new (C) DeclRefExpr(stringValueDecl, DeclNameLoc(),

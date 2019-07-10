@@ -8,6 +8,7 @@ set(sourcekitdAPI_sources
   Requests.cpp
   sourcekitdAPI-Common.cpp
   TokenAnnotationsArray.cpp
+  ExpressionTypeArray.cpp
 )
 
 set(sourcekitdAPI_Darwin_sources

@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -enable-resilience -emit-module-path=%t/resilient_protocol.swiftmodule -module-name=resilient_protocol %S/../Inputs/resilient_protocol.swift
-// RUN: %target-swift-frontend -I %t -emit-ir -enable-resilience %s | %FileCheck %s
-// RUN: %target-swift-frontend -I %t -emit-ir -enable-resilience -O %s
+// RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_protocol.swiftmodule -module-name=resilient_protocol %S/../Inputs/resilient_protocol.swift
+// RUN: %target-swift-frontend -I %t -emit-ir -enable-library-evolution %s | %FileCheck %s
+// RUN: %target-swift-frontend -I %t -emit-ir -enable-library-evolution -O %s
 
 // CHECK: %swift.type = type { [[INT:i32|i64]] }
 

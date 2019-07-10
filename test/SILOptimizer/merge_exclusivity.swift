@@ -9,26 +9,36 @@ func sum(_ x: UInt64, _ y: UInt64) -> UInt64 {
   return x &+ y
 }
 
+// FIXME: The optimization should be able to merge these accesses, but
+// it must first prove that no other conflicting read accesses occur
+// within the existing read access scopes.
+//
 // TESTSIL-LABEL: sil [noinline] @$s17merge_exclusivity10MergeTest1yySiF : $@convention(thin)
 // TESTSIL: bb0
 // TESTSIL: [[GLOBALVAR:%.*]] = global_addr @$s17merge_exclusivity5checks6UInt64Vvp
 // TESTSIL: [[B1:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBALVAR]]
 // TESTSIL: end_access [[B1]]
 // TESTSIL: bb5
-// TESTSIL: [[B2:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBALVAR]]
-// TESTSIL-NEXT: load [[B2]]
-// TESTSIL: store {{.*}} to [[B2]]
-// TESTSIL: end_access [[B2]]
+// TESTSIL: [[B2a:%.*]] = begin_access [read] [static] [no_nested_conflict] [[GLOBALVAR]]
+// TESTSIL-NEXT: load [[B2a]]
+// TESTSIL: end_access [[B2a]]
+// TESTSIL: [[B2b:%.*]] = begin_access [modify] [static] [no_nested_conflict] [[GLOBALVAR]]
+// TESTSIL: store {{.*}} to [[B2b]]
+// TESTSIL: end_access [[B2b]]
 // TESTSIL: bb6
-// TESTSIL: [[B3:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBALVAR]]
-// TESTSIL-NEXT: load [[B3]]
-// TESTSIL: store {{.*}} to [[B3]]
-// TESTSIL: end_access [[B3]]
+// TESTSIL: [[B3a:%.*]] = begin_access [read] [static] [no_nested_conflict] [[GLOBALVAR]]
+// TESTSIL-NEXT: load [[B3a]]
+// TESTSIL: end_access [[B3a]]
+// TESTSIL: [[B3b:%.*]] = begin_access [modify] [static] [no_nested_conflict] [[GLOBALVAR]]
+// TESTSIL: store {{.*}} to [[B3b]]
+// TESTSIL: end_access [[B3b]]
 // TESTSIL: bb7
-// TESTSIL: [[B4:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBALVAR]]
-// TESTSIL-NEXT: load [[B4]]
-// TESTSIL: store {{.*}} to [[B4]]
-// TESTSIL: end_access [[B4]]
+// TESTSIL: [[B4a:%.*]] = begin_access [read] [static] [no_nested_conflict] [[GLOBALVAR]]
+// TESTSIL-NEXT: load [[B4a]]
+// TESTSIL: end_access [[B4a]]
+// TESTSIL: [[B4b:%.*]] = begin_access [modify] [static] [no_nested_conflict] [[GLOBALVAR]]
+// TESTSIL: store {{.*}} to [[B4b]]
+// TESTSIL: end_access [[B4b]]
 // TESTSIL-NOT: begin_access
 // TESTSIL-LABEL: } // end sil function '$s17merge_exclusivity10MergeTest1yySiF'
 @inline(never)
@@ -48,21 +58,29 @@ public func MergeTest1(_ N: Int) {
   }
 }
 
+// FIXME: The optimization should be able to merge these accesses, but
+// it must first prove that no other conflicting read accesses occur
+// within the existing read access scopes.
+//
 // TESTSIL-LABEL: sil [noinline] @$s17merge_exclusivity10MergeTest2yySiF : $@convention(thin)
 // TESTSIL: bb0
 // TESTSIL: [[GLOBALVAR:%.*]] = global_addr @$s17merge_exclusivity5checks6UInt64Vvp
 // TESTSIL: [[B1:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBALVAR]]
 // TESTSIL: end_access [[B1]]
 // TESTSIL: bb6
-// TESTSIL: [[B2:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBALVAR]]
-// TESTSIL-NEXT: load [[B2]]
-// TESTSIL: store {{.*}} to [[B2]]
-// TESTSIL: end_access [[B2]]
+// TESTSIL: [[B2a:%.*]] = begin_access [read] [static] [no_nested_conflict] [[GLOBALVAR]]
+// TESTSIL-NEXT: load [[B2a]]
+// TESTSIL: end_access [[B2a]]
+// TESTSIL: [[B2b:%.*]] = begin_access [modify] [static] [no_nested_conflict] [[GLOBALVAR]]
+// TESTSIL: store {{.*}} to [[B2b]]
+// TESTSIL: end_access [[B2b]]
 // TESTSIL: bb7
-// TESTSIL: [[B3:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBALVAR]]
-// TESTSIL-NEXT: load [[B3]]
-// TESTSIL: store {{.*}} to [[B3]]
-// TESTSIL: end_access [[B3]]
+// TESTSIL: [[B3a:%.*]] = begin_access [read] [static] [no_nested_conflict] [[GLOBALVAR]]
+// TESTSIL-NEXT: load [[B3a]]
+// TESTSIL: end_access [[B3a]]
+// TESTSIL: [[B3b:%.*]] = begin_access [modify] [static] [no_nested_conflict] [[GLOBALVAR]]
+// TESTSIL: store {{.*}} to [[B3b]]
+// TESTSIL: end_access [[B3b]]
 // TESTSIL-NOT: begin_access
 // TESTSIL-LABEL: } // end sil function '$s17merge_exclusivity10MergeTest2yySiF'
 @inline(never)
@@ -81,13 +99,17 @@ public func MergeTest2(_ N: Int) {
   }
 }
 
-// TESTSIL-LABEL: sil [noinline] @$s17merge_exclusivity10MergeTest3yySiF : $@convention(thin)
-// TESTSIL: bb0
-// TESTSIL: [[GLOBALVAR:%.*]] = global_addr @$s17merge_exclusivity5checks6UInt64Vvp
-// TESTSIL: [[B1:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBALVAR]]
-// TESTSIL: end_access [[B1]]
-// TESTSIL-NOT: begin_access
-// TESTSIL-LABEL: } // end sil function '$s17merge_exclusivity10MergeTest3yySiF'
+// FIXME: The optimization should be able to merge these accesses, but
+// it must first prove that no other conflicting read accesses occur
+// within the existing read access scopes.
+//
+// FIXME_TESTSIL-LABEL: sil [noinline] @$s17merge_exclusivity10MergeTest3yySiF : $@convention(thin)
+// FIXME_TESTSIL: bb0
+// FIXME_TESTSIL: [[GLOBALVAR:%.*]] = global_addr @$s17merge_exclusivity5checks6UInt64Vvp
+// FIXME_TESTSIL: [[B1:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBALVAR]]
+// FIXME_TESTSIL: end_access [[B1]]
+// FIXME_TESTSIL-NOT: begin_access
+// FIXME_TESTSIL-LABEL: } // end sil function '$s17merge_exclusivity10MergeTest3yySiF'
 @inline(never)
 public func MergeTest3(_ N: Int) {
   let range = 0..<10000
@@ -99,23 +121,27 @@ public func MergeTest3(_ N: Int) {
   }
 }
 
-// TESTSIL-LABEL: sil [noinline] @$s17merge_exclusivity10MergeTest4yySiF : $@convention(thin)
-// TESTSIL: bb0
-// TESTSIL: [[GLOBALVAR:%.*]] = global_addr @$s17merge_exclusivity5checks6UInt64Vvp
-// TESTSIL: [[B1:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBALVAR]]
-// TESTSIL: end_access [[B1]]
-// TESTSIL: bb7
-// TESTSIL: [[B2:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBALVAR]]
-// TESTSIL-NEXT: load [[B2]]
-// TESTSIL: store {{.*}} to [[B2]]
-// TESTSIL: end_access [[B2]]
-// TESTSIL: bb8
-// TESTSIL: [[B3:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBALVAR]]
-// TESTSIL-NEXT: load [[B3]]
-// TESTSIL: store {{.*}} to [[B3]]
-// TESTSIL: end_access [[B3]]
-// TESTSIL-NOT: begin_access
-// TESTSIL-LABEL: } // end sil function '$s17merge_exclusivity10MergeTest4yySiF'
+// FIXME: The optimization should be able to merge these accesses, but
+// it must first prove that no other conflicting read accesses occur
+// within the existing read access scopes.
+//
+// FIXME_TESTSIL-LABEL: sil [noinline] @$s17merge_exclusivity10MergeTest4yySiF : $@convention(thin)
+// FIXME_TESTSIL: bb0
+// FIXME_TESTSIL: [[GLOBALVAR:%.*]] = global_addr @$s17merge_exclusivity5checks6UInt64Vvp
+// FIXME_TESTSIL: [[B1:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBALVAR]]
+// FIXME_TESTSIL: end_access [[B1]]
+// FIXME_TESTSIL: bb7
+// FIXME_TESTSIL: [[B2:%.*]] = begin_access [modify] [static] [no_nested_conflict] [[GLOBALVAR]]
+// FIXME_TESTSIL-NEXT: load [[B2]]
+// FIXME_TESTSIL: store {{.*}} to [[B2]]
+// FIXME_TESTSIL: end_access [[B2]]
+// FIXME_TESTSIL: bb8
+// FIXME_TESTSIL: [[B3:%.*]] = begin_access [modify] [static] [no_nested_conflict] [[GLOBALVAR]]
+// FIXME_TESTSIL-NEXT: load [[B3]]
+// FIXME_TESTSIL: store {{.*}} to [[B3]]
+// FIXME_TESTSIL: end_access [[B3]]
+// FIXME_TESTSIL-NOT: begin_access
+// FIXME_TESTSIL-LABEL: } // end sil function '$s17merge_exclusivity10MergeTest4yySiF'
 @inline(never)
 public func MergeTest4(_ N: Int) {
   let range = 0..<10000
@@ -130,28 +156,32 @@ public func MergeTest4(_ N: Int) {
   }
 }
 
-// TESTSIL-LABEL: sil [noinline] @$s17merge_exclusivity10MergeTest5yySiF : $@convention(thin)
-// TESTSIL: bb0
-// TESTSIL: [[GLOBALVAR:%.*]] = global_addr @$s17merge_exclusivity5checks6UInt64Vvp
-// TESTSIL: [[B1:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBALVAR]]
-// TESTSIL: end_access [[B1]]
-// TESTSIL: bb6
-// TESTSIL: [[B2:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBALVAR]]
-// TESTSIL-NEXT: load [[B2]]
-// TESTSIL: store {{.*}} to [[B2]]
-// TESTSIL: end_access [[B2]]
-// TESTSIL: bb7
-// TESTSIL: [[B3:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBALVAR]]
-// TESTSIL-NEXT: load [[B3]]
-// TESTSIL: store {{.*}} to [[B3]]
-// TESTSIL: end_access [[B3]]
-// TESTSIL: bb8
-// TESTSIL: [[B4:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBALVAR]]
-// TESTSIL-NEXT: load [[B4]]
-// TESTSIL: store {{.*}} to [[B4]]
-// TESTSIL: end_access [[B4]]
-// TESTSIL-NOT: begin_access
-// TESTSIL-LABEL: } // end sil function '$s17merge_exclusivity10MergeTest5yySiF'
+// FIXME: The optimization should be able to merge these accesses, but
+// it must first prove that no other conflicting read accesses occur
+// within the existing read access scopes.
+//
+// FIXME_TESTSIL-LABEL: sil [noinline] @$s17merge_exclusivity10MergeTest5yySiF : $@convention(thin)
+// FIXME_TESTSIL: bb0
+// FIXME_TESTSIL: [[GLOBALVAR:%.*]] = global_addr @$s17merge_exclusivity5checks6UInt64Vvp
+// FIXME_TESTSIL: [[B1:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBALVAR]]
+// FIXME_TESTSIL: end_access [[B1]]
+// FIXME_TESTSIL: bb6
+// FIXME_TESTSIL: [[B2:%.*]] = begin_access [modify] [static] [no_nested_conflict] [[GLOBALVAR]]
+// FIXME_TESTSIL-NEXT: load [[B2]]
+// FIXME_TESTSIL: store {{.*}} to [[B2]]
+// FIXME_TESTSIL: end_access [[B2]]
+// FIXME_TESTSIL: bb7
+// FIXME_TESTSIL: [[B3:%.*]] = begin_access [modify] [static] [no_nested_conflict] [[GLOBALVAR]]
+// FIXME_TESTSIL-NEXT: load [[B3]]
+// FIXME_TESTSIL: store {{.*}} to [[B3]]
+// FIXME_TESTSIL: end_access [[B3]]
+// FIXME_TESTSIL: bb8
+// FIXME_TESTSIL: [[B4:%.*]] = begin_access [modify] [static] [no_nested_conflict] [[GLOBALVAR]]
+// FIXME_TESTSIL-NEXT: load [[B4]]
+// FIXME_TESTSIL: store {{.*}} to [[B4]]
+// FIXME_TESTSIL: end_access [[B4]]
+// FIXME_TESTSIL-NOT: begin_access
+// FIXME_TESTSIL-LABEL: } // end sil function '$s17merge_exclusivity10MergeTest5yySiF'
 @inline(never)
 public func MergeTest5(_ N: Int) {
   let range = 0..<10000
@@ -169,13 +199,17 @@ public func MergeTest5(_ N: Int) {
   }
 }
 
-// TESTSIL-LABEL: sil [noinline] @$s17merge_exclusivity10MergeTest6yySiF : $@convention(thin)
-// TESTSIL: bb0
-// TESTSIL: [[GLOBALVAR:%.*]] = global_addr @$s17merge_exclusivity5checks6UInt64Vvp
-// TESTSIL: [[B1:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBALVAR]]
-// TESTSIL: end_access [[B1]]
-// TESTSIL-NOT: begin_access
-// TESTSIL-LABEL: } // end sil function '$s17merge_exclusivity10MergeTest6yySiF'
+// FIXME: The optimization should be able to merge these accesses, but
+// it must first prove that no other conflicting read accesses occur
+// within the existing read access scopes.
+//
+// FIXME_TESTSIL-LABEL: sil [noinline] @$s17merge_exclusivity10MergeTest6yySiF : $@convention(thin)
+// FIXME_TESTSIL: bb0
+// FIXME_TESTSIL: [[GLOBALVAR:%.*]] = global_addr @$s17merge_exclusivity5checks6UInt64Vvp
+// FIXME_TESTSIL: [[B1:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBALVAR]]
+// FIXME_TESTSIL: end_access [[B1]]
+// FIXME_TESTSIL-NOT: begin_access
+// FIXME_TESTSIL-LABEL: } // end sil function '$s17merge_exclusivity10MergeTest6yySiF'
 @inline(never)
 public func MergeTest6(_ N: Int) {
   let range = 0..<10000
@@ -195,13 +229,17 @@ public func MergeTest6(_ N: Int) {
 public func foo() {
 }
 
-// TESTSIL-LABEL: sil [noinline] @$s17merge_exclusivity10MergeTest7yySiF : $@convention(thin)
-// TESTSIL: bb0
-// TESTSIL: [[GLOBALVAR:%.*]] = global_addr @$s17merge_exclusivity5checks6UInt64Vvp
-// TESTSIL: [[B1:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBALVAR]]
-// TESTSIL: end_access [[B1]]
-// TESTSIL-NOT: begin_access
-// TESTSIL-LABEL: } // end sil function '$s17merge_exclusivity10MergeTest7yySiF'
+// FIXME: The optimization should be able to merge these accesses, but
+// it must first prove that no other conflicting read accesses occur
+// within the existing read access scopes.
+//
+// FIXME_TESTSIL-LABEL: sil [noinline] @$s17merge_exclusivity10MergeTest7yySiF : $@convention(thin)
+// FIXME_TESTSIL: bb0
+// FIXME_TESTSIL: [[GLOBALVAR:%.*]] = global_addr @$s17merge_exclusivity5checks6UInt64Vvp
+// FIXME_TESTSIL: [[B1:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBALVAR]]
+// FIXME_TESTSIL: end_access [[B1]]
+// FIXME_TESTSIL-NOT: begin_access
+// FIXME_TESTSIL-LABEL: } // end sil function '$s17merge_exclusivity10MergeTest7yySiF'
 @inline(never)
 public func MergeTest7(_ N: Int) {
   let range = 0..<10000
@@ -217,13 +255,17 @@ public func MergeTest7(_ N: Int) {
   }
 }
 
-// TESTSIL-LABEL: sil [noinline] @$s17merge_exclusivity10MergeTest8yySiF : $@convention(thin)
-// TESTSIL: bb0
-// TESTSIL: [[GLOBALVAR:%.*]] = global_addr @$s17merge_exclusivity5checks6UInt64Vvp
-// TESTSIL: [[B1:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBALVAR]]
-// TESTSIL: end_access [[B1]]
-// TESTSIL-NOT: begin_access
-// TESTSIL-LABEL: } // end sil function '$s17merge_exclusivity10MergeTest8yySiF'
+// FIXME: The optimization should be able to merge these accesses, but
+// it must first prove that no other conflicting read accesses occur
+// within the existing read access scopes.
+//
+// FIXME_TESTSIL-LABEL: sil [noinline] @$s17merge_exclusivity10MergeTest8yySiF : $@convention(thin)
+// FIXME_TESTSIL: bb0
+// FIXME_TESTSIL: [[GLOBALVAR:%.*]] = global_addr @$s17merge_exclusivity5checks6UInt64Vvp
+// FIXME_TESTSIL: [[B1:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBALVAR]]
+// FIXME_TESTSIL: end_access [[B1]]
+// FIXME_TESTSIL-NOT: begin_access
+// FIXME_TESTSIL-LABEL: } // end sil function '$s17merge_exclusivity10MergeTest8yySiF'
 @inline(never)
 public func MergeTest8(_ N: Int) {
   let range = 0..<10000

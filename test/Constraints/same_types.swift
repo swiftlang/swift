@@ -240,6 +240,7 @@ func structuralSameType3<T, U, V, W>(_: T, _: U, _: V, _: W)
   where X1<T, U> == X1<V, W> { }
 // expected-error@-1{{same-type requirement makes generic parameters 'T' and 'V' equivalent}}
 // expected-error@-2{{same-type requirement makes generic parameters 'U' and 'W' equivalent}}
+// expected-warning@-3{{neither type in same-type constraint ('X1<T, U>' or 'X1<V, W>') refers to a generic parameter or associated type}}
 
 protocol P2 {
   associatedtype Assoc1
@@ -285,6 +286,7 @@ func test9<T: P6, U: P6>(_ t: T, u: U)
 func testMetatypeSameType<T, U>(_ t: T, _ u: U)
   where T.Type == U.Type { }
 // expected-error@-1{{same-type requirement makes generic parameters 'T' and 'U' equivalent}}
+// expected-warning@-2{{neither type in same-type constraint ('T.Type' or 'U.Type') refers to a generic parameter or associated type}}
 
 func testSameTypeCommutativity1<U, T>(_ t: T, _ u: U)
   where T.Type == U { } // Equivalent to U == T.Type
@@ -301,9 +303,20 @@ func testSameTypeCommutativity4<U, T>(_ t: T, _ u: U)
 // expected-error@-1{{same-type requirement makes generic parameter 'T' non-generic}}
 
 func testSameTypeCommutativity5<U, T: P1>(_ t: T, _ u: U)
-  where P1 & P2 == T.Assoc { } // Ok, equivalent to T.Assoc == P1 & P2
+  where PPP & P3 == T.Assoc { } // Ok, equivalent to T.Assoc == PPP & P3
 
 // FIXME: Error emitted twice.
 func testSameTypeCommutativity6<U, T: P1>(_ t: T, _ u: U)
-  where U & P2 == T.Assoc { } // Equivalent to T.Assoc == U & P2
+  where U & P3 == T.Assoc { } // Equivalent to T.Assoc == U & P3
 // expected-error@-1 2 {{non-protocol, non-class type 'U' cannot be used within a protocol-constrained type}}
+
+// rdar;//problem/46848889
+struct Foo<A: P1, B: P1, C: P1> where A.Assoc == B.Assoc, A.Assoc == C.Assoc {}
+
+struct Bar<A: P1, B: P1> where A.Assoc == B.Assoc {
+  func f<C: P1>(with other: C) -> Foo<A, B, C> where A.Assoc == C.Assoc {
+    // expected-note@-1 {{previous same-type constraint 'B.Assoc' == 'C.Assoc' inferred from type here}}
+    // expected-warning@-2 {{redundant same-type constraint 'A.Assoc' == 'C.Assoc'}}
+    fatalError()
+  }
+}

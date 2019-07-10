@@ -53,6 +53,7 @@ namespace swift {
   class IRGenOptions;
   class LangOptions;
   class ModuleDecl;
+  typedef void *OpaqueSyntaxNode;
   class Parser;
   class PersistentParserState;
   class SerializationOptions;
@@ -61,6 +62,7 @@ namespace swift {
   class SILParserTUState;
   class SourceFile;
   class SourceManager;
+  class SyntaxParseActions;
   class SyntaxParsingCache;
   class Token;
   class TopLevelContext;
@@ -86,7 +88,7 @@ namespace swift {
   /// compilation.
   bool shouldVerify(const Decl *D, const ASTContext &Context);
 
-  /// \brief Check that the source file is well-formed, aborting and spewing
+  /// Check that the source file is well-formed, aborting and spewing
   /// errors if not.
   ///
   /// "Well-formed" here means following the invariants of the AST, not that the
@@ -96,7 +98,7 @@ namespace swift {
 
   /// @}
 
-  /// \brief Parse a single buffer into the given source file.
+  /// Parse a single buffer into the given source file.
   ///
   /// If the source file is the main file, stop parsing after the next
   /// stmt-brace-item with side-effects.
@@ -119,15 +121,25 @@ namespace swift {
   bool parseIntoSourceFile(SourceFile &SF, unsigned BufferID, bool *Done,
                            SILParserState *SIL = nullptr,
                            PersistentParserState *PersistentState = nullptr,
-                           DelayedParsingCallbacks *DelayedParseCB = nullptr);
+                           DelayedParsingCallbacks *DelayedParseCB = nullptr,
+                           bool DelayBodyParsing = true);
 
-  /// \brief Finish the parsing by going over the nodes that were delayed
+  /// Parse a single buffer into the given source file, until the full source
+  /// contents are parsed.
+  ///
+  /// \return true if the parser found code with side effects.
+  bool parseIntoSourceFileFull(SourceFile &SF, unsigned BufferID,
+                             PersistentParserState *PersistentState = nullptr,
+                             DelayedParsingCallbacks *DelayedParseCB = nullptr,
+                               bool DelayBodyParsing = true);
+
+  /// Finish the parsing by going over the nodes that were delayed
   /// during the first parsing pass.
   void performDelayedParsing(DeclContext *DC,
                              PersistentParserState &PersistentState,
                              CodeCompletionCallbacksFactory *Factory);
 
-  /// \brief Lex and return a vector of tokens for the given buffer.
+  /// Lex and return a vector of tokens for the given buffer.
   std::vector<Token> tokenize(const LangOptions &LangOpts,
                               const SourceManager &SM, unsigned BufferID,
                               unsigned Offset = 0, unsigned EndOffset = 0,
@@ -204,10 +216,18 @@ namespace swift {
   /// emitted.
   void performWholeModuleTypeChecking(SourceFile &SF);
 
+  /// Checks to see if any of the imports in \p M use `@_implementationOnly` in
+  /// one file and not in another.
+  ///
+  /// Like redeclaration checking, but for imports. This isn't part of
+  /// swift::performWholeModuleTypeChecking because it's linear in the number
+  /// of declarations in the module.
+  void checkInconsistentImplementationOnlyImports(ModuleDecl *M);
+
   /// Incrementally type-check only added external definitions.
   void typeCheckExternalDefinitions(SourceFile &SF);
 
-  /// \brief Recursively validate the specified type.
+  /// Recursively validate the specified type.
   ///
   /// This is used when dealing with partial source files (e.g. SIL parsing,
   /// code completion).
@@ -217,7 +237,7 @@ namespace swift {
                               DeclContext *DC,
                               bool ProduceDiagnostics = true);
 
-  /// \brief Recursively validate the specified type.
+  /// Recursively validate the specified type.
   ///
   /// This is used when dealing with partial source files (e.g. SIL parsing,
   /// code completion).
@@ -251,6 +271,18 @@ namespace swift {
   /// Serializes a module or single source file to the given output file.
   void serialize(ModuleOrSourceFile DC, const SerializationOptions &options,
                  const SILModule *M = nullptr);
+
+  /// Serializes a module or single source file to the given output file and
+  /// returns back the file's contents as a memory buffer.
+  ///
+  /// Use this if you intend to immediately load the serialized module, as that
+  /// will both avoid extra filesystem traffic and will ensure you read back
+  /// exactly what was written.
+  void serializeToBuffers(ModuleOrSourceFile DC,
+                          const SerializationOptions &opts,
+                          std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
+                          std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
+                          const SILModule *M = nullptr);
 
   /// Get the CPU, subtarget feature options, and triple to use when emitting code.
   std::tuple<llvm::TargetOptions, std::string, std::vector<std::string>,
@@ -327,12 +359,15 @@ namespace swift {
   public:
     ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
                const LangOptions &LangOpts, StringRef ModuleName,
+               std::shared_ptr<SyntaxParseActions> spActions = nullptr,
                SyntaxParsingCache *SyntaxCache = nullptr);
     ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID);
     ParserUnit(SourceManager &SM, SourceFileKind SFKind, unsigned BufferID,
                unsigned Offset, unsigned EndOffset);
 
     ~ParserUnit();
+
+    OpaqueSyntaxNode parse();
 
     Parser &getParser();
     SourceFile &getSourceFile();

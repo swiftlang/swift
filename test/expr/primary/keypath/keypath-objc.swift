@@ -143,3 +143,24 @@ func testParseErrors() {
 func testTypoCorrection() {
   let _: String = #keyPath(A.proString) // expected-error {{type 'A' has no member 'proString'}}
 }
+
+class SR_10146_1 {
+  @objc let b = 1
+}
+
+class SR_10146_2: SR_10146_1 {
+  let a = \AnyObject.b // expected-error {{the root type of a Swift key path cannot be 'AnyObject'}}
+}
+
+class SR_10146_3 {
+  @objc let abc: Int = 1
+  
+  func doNotCrash() {
+    let _: KeyPath<AnyObject, Int> = \.abc // expected-error {{the root type of a Swift key path cannot be 'AnyObject'}}
+  }
+
+  func doNotCrash_1(_ obj: AnyObject, _ kp: KeyPath<AnyObject, Int>) {
+    let _ = obj[keyPath: \.abc] // expected-error 2{{the root type of a Swift key path cannot be 'AnyObject'}}
+    let _ = obj[keyPath: kp] // expected-error {{the root type of a Swift key path cannot be 'AnyObject'}}
+  }
+}

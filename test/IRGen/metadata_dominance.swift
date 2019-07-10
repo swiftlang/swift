@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir -primary-file %s | %FileCheck %s -DINT=i%target-ptrsize
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -O -emit-ir -primary-file %s | %FileCheck %s --check-prefix=CHECK-OPT -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend -emit-ir -primary-file %s | %FileCheck %s -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend -O -emit-ir -primary-file %s | %FileCheck %s --check-prefix=CHECK-OPT -DINT=i%target-ptrsize
 
 func use_metadata<F>(_ f: F) {}
 

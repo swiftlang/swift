@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -enable-sil-ownership -verify %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -verify %s | %FileCheck %s
 
 // SR-3090:
 
@@ -11,7 +11,7 @@ class Box<T> {
     }
 }
 
-// CHECK: sil @$s4main7testBoxyyF : $@convention(thin) () -> () {
+// CHECK: sil [ossa] @$s4main7testBoxyyF : $@convention(thin) () -> () {
 // CHECK: bb0:
 // CHECK:   // function_ref closure #1 in testBox()
 // CHECK:   [[CLOSURE:%.*]] = function_ref @$s4main7testBoxyyFyycfU_ : $@convention(thin) () -> ()

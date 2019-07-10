@@ -1,6 +1,33 @@
 if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
    ("${SWIFT_HOST_VARIANT_ARCH}" STREQUAL "${SWIFT_PRIMARY_VARIANT_ARCH}"))
 
+  if("${CMAKE_C_COMPILER_ID}" MATCHES "Clang")
+    # Do nothing
+  elseif(SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER)
+    if(NOT "${CMAKE_C_COMPILER_ID}" MATCHES "Clang")
+      message(FATAL_ERROR "Building the swift runtime is not supported with ${CMAKE_C_COMPILER_ID}. Use the just-built clang instead.")
+    endif()
+  else()
+    message(WARNING "Building the swift runtime using the host compiler, and not the just-built clang.")
+
+    # If we use Clang-cl or MSVC, CMake provides default compiler and linker flags that are incompatible
+    # with the frontend of Clang or Clang++.
+    if(SWIFT_COMPILER_IS_MSVC_LIKE)
+      set(CMAKE_CXX_COMPILER "${SWIFT_NATIVE_LLVM_TOOLS_PATH}/clang-cl")
+      set(CMAKE_C_COMPILER "${SWIFT_NATIVE_LLVM_TOOLS_PATH}/clang-cl")
+    else()
+      set(CMAKE_CXX_COMPILER "${SWIFT_NATIVE_LLVM_TOOLS_PATH}/clang++")
+      set(CMAKE_C_COMPILER "${SWIFT_NATIVE_LLVM_TOOLS_PATH}/clang")
+    endif()
+
+    if(CMAKE_C_COMPILER_LAUNCHER MATCHES ".*distcc")
+      set(CMAKE_C_COMPILER_LAUNCHER "")
+    endif()
+    if(CMAKE_CXX_COMPILER_LAUNCHER MATCHES ".*distcc")
+      set(CMAKE_CXX_COMPILER_LAUNCHER "")
+    endif()
+  endif()
+
   set(swift_runtime_test_extra_libraries)
   if(SWIFT_BUILD_STATIC_STDLIB AND "${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX")
     list(APPEND swift_runtime_test_extra_libraries 
@@ -30,13 +57,14 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     list(APPEND PLATFORM_TARGET_LINK_LIBRARIES
       ${EXECINFO_LIBRARY}
       )
+  elseif(SWIFT_HOST_VARIANT STREQUAL windows)
+    list(APPEND PLATFORM_TARGET_LINK_LIBRARIES DbgHelp)
   endif()
 
   add_swift_unittest(SwiftRuntimeTests
     Array.cpp
     CompatibilityOverride.cpp
     Concurrent.cpp
-    Exclusivity.cpp
     Metadata.cpp
     Mutex.cpp
     Enum.cpp

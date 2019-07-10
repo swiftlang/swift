@@ -72,6 +72,13 @@ canDuplicateOrMoveToPreheader(SILLoop *L, SILBasicBlock *Preheader,
     else if (isa<FunctionRefInst>(Inst)) {
       Move.push_back(Inst);
       Invariant.insert(Inst);
+    } else if (isa<DynamicFunctionRefInst>(Inst)) {
+      Move.push_back(Inst);
+      Invariant.insert(Inst);
+    }
+    else if (isa<PreviousDynamicFunctionRefInst>(Inst)) {
+      Move.push_back(Inst);
+      Invariant.insert(Inst);
     } else if (isa<IntegerLiteralInst>(Inst)) {
       Move.push_back(Inst);
       Invariant.insert(Inst);
@@ -414,6 +421,10 @@ class LoopRotation : public SILFunctionTransform {
 
     SILFunction *F = getFunction();
     assert(F);
+    // FIXME: Add ownership support.
+    if (F->hasOwnership())
+      return;
+
     SILLoopInfo *LI = LA->get(F);
     assert(LI);
     DominanceInfo *DT = DA->get(F);

@@ -161,3 +161,25 @@ test()
 let mdaPerf = [[1], [2], [3], [4], [5], [6], [7], [8], [9], [10], [11], [12]]
 print(mdaPerf)
 // CHECK: {{\[}}[1], [2], [3], [4], [5], [6], [7], [8], [9], [10], [11], [12]]
+
+class Deinitable {
+  deinit {
+    print("deinit called")
+  }
+}
+
+enum E : Error {
+  case error
+}
+
+func throwingFunc() throws -> Deinitable {
+  throw E.error
+}
+
+do {
+  let array = try [Deinitable(), throwingFunc()]
+} catch {
+  // CHECK: deinit called
+  // CHECK: error thrown
+  print("error thrown")
+}

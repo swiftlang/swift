@@ -85,7 +85,7 @@ public:
   void write(llvm::raw_ostream &os, ArrayRef<StringRef> inputs) const;
 
 private:
-  /// \brief Parses the given \p Buffer and returns either an OutputFileMap or
+  /// Parses the given \p Buffer and returns either an OutputFileMap or
   /// error, taking ownership of \p Buffer in the process.
   static llvm::Expected<OutputFileMap>
   parse(std::unique_ptr<llvm::MemoryBuffer> Buffer, StringRef workingDirectory);

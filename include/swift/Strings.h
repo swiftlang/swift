@@ -54,8 +54,11 @@ constexpr static const char BUILTIN_TYPE_NAME_INT128[] = "Builtin.Int128";
 constexpr static const char BUILTIN_TYPE_NAME_INT256[] = "Builtin.Int256";
 /// The name of the Builtin type for Int512
 constexpr static const char BUILTIN_TYPE_NAME_INT512[] = "Builtin.Int512";
+/// The name of the Builtin type for IntLiteral
+constexpr static const char BUILTIN_TYPE_NAME_INTLITERAL[] =
+    "Builtin.IntLiteral";
 /// The name of the Builtin type for Float
-constexpr static const char BUILTIN_TYPE_NAME_FLOAT[] = "Builtin.Float";
+constexpr static const char BUILTIN_TYPE_NAME_FLOAT[] = "Builtin.FPIEEE";
 /// The name of the Builtin type for NativeObject
 constexpr static const char BUILTIN_TYPE_NAME_NATIVEOBJECT[] =
     "Builtin.NativeObject";
@@ -77,8 +80,8 @@ constexpr static const char BUILTIN_TYPE_NAME_VEC[] = "Builtin.Vec";
 constexpr static const char BUILTIN_TYPE_NAME_SILTOKEN[] = "Builtin.SILToken";
 /// The name of the Builtin type for Word
 constexpr static const char BUILTIN_TYPE_NAME_WORD[] = "Builtin.Word";
-constexpr static StringLiteral SEMANTICS_ARC_PROGRAMTERMINATION_POINT =
-    "arc.programtermination_point";
+constexpr static StringLiteral SEMANTICS_PROGRAMTERMINATION_POINT =
+    "programtermination_point";
 } // end namespace swift
 
 #endif // SWIFT_STRINGS_H

@@ -264,6 +264,8 @@ public:
 
   bool isSpecial() const { return getKind() != Kind::Normal; }
 
+  bool isSubscript() const { return getKind() == Kind::Subscript; }
+
   /// Return the identifier backing the name. Assumes that the name is not
   /// special.
   Identifier getIdentifier() const {
@@ -592,6 +594,12 @@ public:
                             "only for use within the debugger");
 };
 
+enum class ObjCSelectorFamily : unsigned {
+  None,
+#define OBJC_SELECTOR_FAMILY(LABEL, PREFIX) LABEL,
+#include "swift/AST/ObjCSelectorFamily.def"
+};
+
 /// Represents an Objective-C selector.
 class ObjCSelector {
   /// The storage for an Objective-C selector.
@@ -655,6 +663,8 @@ public:
   ///
   /// \param scratch Scratch space to use.
   StringRef getString(llvm::SmallVectorImpl<char> &scratch) const;
+
+  ObjCSelectorFamily getSelectorFamily() const;
 
   void *getOpaqueValue() const { return Storage.getOpaqueValue(); }
   static ObjCSelector getFromOpaqueValue(void *p) {

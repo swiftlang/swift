@@ -1,4 +1,4 @@
-// RUN: %target-swift-remoteast-test-with-sdk -I %S/../ClangImporter/Inputs/custom-modules -I %S/Inputs/custom-modules %s | %FileCheck %s
+// RUN: %target-swift-remoteast-test-with-sdk -I %S/../ClangImporter/Inputs/custom-modules -I %S/../Inputs/custom-modules %s | %FileCheck %s
 
 // REQUIRES: swift-remoteast-test
 // REQUIRES: objc_interop
@@ -9,6 +9,9 @@ import ErrorEnums
 
 @_silgen_name("printMetadataType")
 func printType(_: Any.Type)
+
+@_silgen_name("stopRemoteAST")
+func stopRemoteAST()
 
 printType(CCRefrigerator.self)
 // CHECK: found type: CCRefrigerator
@@ -25,8 +28,16 @@ printType(RenamedError.self)
 printType(RenamedError.Code.self)
 // CHECK: found type: RenamedError.Code{{$}}
 
+printType(Wrapper.MemberError.self)
+// CHECK: found type: Wrapper.MemberError{{$}}
+
+printType(Wrapper.MemberError.Code.self)
+// CHECK: found type: Wrapper.MemberError.Code{{$}}
+
 printType(Wrapper.MemberEnum.self)
 // CHECK: found type: Wrapper.MemberEnum{{$}}
 
 printType(WrapperByAttribute.self)
 // CHECK: found type: WrapperByAttribute{{$}}
+
+stopRemoteAST()

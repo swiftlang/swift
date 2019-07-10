@@ -71,6 +71,8 @@ SILInstruction *SILCombiner::visitUpcastInst(UpcastInst *UCI) {
 SILInstruction *
 SILCombiner::
 visitPointerToAddressInst(PointerToAddressInst *PTAI) {
+  auto *F = PTAI->getFunction();
+
   Builder.setCurrentDebugScope(PTAI->getDebugScope());
 
   // If we reach this point, we know that the types must be different since
@@ -127,8 +129,11 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
                                 m_ApplyInst(BuiltinValueKind::Strideof,
                                             m_MetatypeInst(Metatype))),
                     m_SILValue(Distance)))) {
+
         SILType InstanceType =
-            Metatype->getType().getMetatypeInstanceType(PTAI->getModule());
+            F->getLoweredType(Metatype->getType()
+                .castTo<MetatypeType>().getInstanceType());
+
         auto *Trunc = cast<BuiltinInst>(TruncOrBitCast);
 
         // Make sure that the type of the metatype matches the type that we are
@@ -168,8 +173,10 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
                                  m_ApplyInst(BuiltinValueKind::Strideof,
                                              m_MetatypeInst(Metatype)),
                                  m_ValueBase()))) {
+
       SILType InstanceType =
-        Metatype->getType().getMetatypeInstanceType(PTAI->getModule());
+          F->getLoweredType(Metatype->getType()
+              .castTo<MetatypeType>().getInstanceType());
 
       // Make sure that the type of the metatype matches the type that we are
       // casting to so we stride by the correct amount.
@@ -258,11 +265,11 @@ SILCombiner::visitBridgeObjectToRefInst(BridgeObjectToRefInst *BORI) {
 SILInstruction *
 SILCombiner::visitUncheckedRefCastAddrInst(UncheckedRefCastAddrInst *URCI) {
   SILType SrcTy = URCI->getSrc()->getType();
-  if (!SrcTy.isLoadable(URCI->getModule()))
+  if (!SrcTy.isLoadable(*URCI->getFunction()))
     return nullptr;
 
   SILType DestTy = URCI->getDest()->getType();
-  if (!DestTy.isLoadable(URCI->getModule()))
+  if (!DestTy.isLoadable(*URCI->getFunction()))
     return nullptr;
 
   // After promoting unchecked_ref_cast_addr to unchecked_ref_cast, the SIL
@@ -289,16 +296,19 @@ SILCombiner::visitUncheckedRefCastAddrInst(UncheckedRefCastAddrInst *URCI) {
 SILInstruction *
 SILCombiner::
 visitUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *UCCAI) {
-  CastOpt.optimizeUnconditionalCheckedCastAddrInst(UCCAI);
+  if (CastOpt.optimizeUnconditionalCheckedCastAddrInst(UCCAI))
+    MadeChange = true;
+
   return nullptr;
 }
 
 SILInstruction *
 SILCombiner::
 visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI) {
-  if (CastOpt.optimizeUnconditionalCheckedCastInst(UCCI))
+  if (CastOpt.optimizeUnconditionalCheckedCastInst(UCCI)) {
+    MadeChange = true;
     return nullptr;
-
+  }
   // FIXME: rename from RemoveCondFails to RemoveRuntimeAsserts.
   if (RemoveCondFails) {
     auto LoweredTargetType = UCCI->getType();
@@ -376,7 +386,7 @@ visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *UBCI) {
     return Builder.createUncheckedBitwiseCast(UBCI->getLoc(), Oper,
                                               UBCI->getType());
   }
-  if (UBCI->getType().isTrivial(UBCI->getModule()))
+  if (UBCI->getType().isTrivial(*UBCI->getFunction()))
     return Builder.createUncheckedTrivialBitCast(UBCI->getLoc(),
                                                  UBCI->getOperand(),
                                                  UBCI->getType());
@@ -384,32 +394,6 @@ visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *UBCI) {
   if (auto refCast = Builder.tryCreateUncheckedRefCast(
         UBCI->getLoc(), UBCI->getOperand(), UBCI->getType()))
     return refCast;
-
-  return nullptr;
-}
-
-/// Helper function for simplifying conversions between
-/// thick and objc metatypes.
-static SILInstruction *
-visitMetatypeConversionInst(SILBuilder &Builder, ConversionInst *MCI,
-                            MetatypeRepresentation Representation) {
-  SILValue Op = MCI->getOperand(0);
-  // Instruction has a proper target type already.
-  SILType Ty = MCI->getType();
-  auto MetatypeTy = Op->getType().getAs<AnyMetatypeType>();
-
-  if (MetatypeTy->getRepresentation() != Representation)
-    return nullptr;
-
-  if (isa<MetatypeInst>(Op))
-    return Builder.createMetatype(MCI->getLoc(), Ty);
-
-  if (auto *VMI = dyn_cast<ValueMetatypeInst>(Op))
-    return Builder.createValueMetatype(MCI->getLoc(), Ty, VMI->getOperand());
-
-  if (auto *EMI = dyn_cast<ExistentialMetatypeInst>(Op))
-    return Builder.createExistentialMetatype(MCI->getLoc(), Ty,
-                                             EMI->getOperand());
 
   return nullptr;
 }
@@ -425,8 +409,10 @@ SILCombiner::visitThickToObjCMetatypeInst(ThickToObjCMetatypeInst *TTOCMI) {
   //
   // (thick_to_objc_metatype (existential_metatype @thick)) ->
   // (existential_metatype @objc_metatype)
-  return visitMetatypeConversionInst(Builder, TTOCMI,
-                                     MetatypeRepresentation::Thick);
+  if (CastOpt.optimizeMetatypeConversion(TTOCMI, MetatypeRepresentation::Thick))
+    MadeChange = true;
+
+  return nullptr;
 }
 
 SILInstruction *
@@ -440,20 +426,26 @@ SILCombiner::visitObjCToThickMetatypeInst(ObjCToThickMetatypeInst *OCTTMI) {
   //
   // (objc_to_thick_metatype (existential_metatype @objc_metatype)) ->
   // (existential_metatype @thick)
-  return visitMetatypeConversionInst(Builder, OCTTMI,
-                                     MetatypeRepresentation::ObjC);
+  if (CastOpt.optimizeMetatypeConversion(OCTTMI, MetatypeRepresentation::ObjC))
+    MadeChange = true;
+
+  return nullptr;
 }
 
 SILInstruction *
 SILCombiner::visitCheckedCastBranchInst(CheckedCastBranchInst *CBI) {
-  CastOpt.optimizeCheckedCastBranchInst(CBI);
+  if (CastOpt.optimizeCheckedCastBranchInst(CBI))
+    MadeChange = true;
+
   return nullptr;
 }
 
 SILInstruction *
 SILCombiner::
 visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI) {
-  CastOpt.optimizeCheckedCastAddrBranchInst(CCABI);
+  if (CastOpt.optimizeCheckedCastAddrBranchInst(CCABI))
+    MadeChange = true;
+
   return nullptr;
 }
 

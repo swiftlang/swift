@@ -438,13 +438,13 @@ if resiliencyChecks.subscriptRangeOnOutOfBoundsRangesBehavior != .none {
 }
 
 //===----------------------------------------------------------------------===//
-// _withUnsafeMutableBufferPointerIfSupported()
+// withContiguousMutableStorageIfAvailable()
 //===----------------------------------------------------------------------===//
 
-self.test("\(testNamePrefix)._withUnsafeMutableBufferPointerIfSupported()/semantics") {
+self.test("\(testNamePrefix).withContiguousMutableStorageIfAvailable()/semantics") {
   for test in subscriptRangeTests {
     var c = makeWrappedCollection(test.collection)
-    var result = c._withUnsafeMutableBufferPointerIfSupported {
+    var result = c.withContiguousMutableStorageIfAvailable {
       (bufferPointer) -> OpaqueValue<Array<OpaqueValue<Int>>> in
       let value = OpaqueValue(bufferPointer.map(extractValue))
       return value

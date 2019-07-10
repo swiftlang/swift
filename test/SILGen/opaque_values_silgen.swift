@@ -378,8 +378,8 @@ func s150___________anyArg(_: Any) {}
 // CHECK-LABEL: sil hidden @$s20opaque_values_silgen21s160_______callAnyArgyyF : $@convention(thin) () -> () {
 // CHECK: bb0:
 // CHECK:   [[INT_TYPE:%.*]] = metatype $@thin Int.Type
-// CHECK:   [[INT_LIT:%.*]] = integer_literal $Builtin.Int2048, 42
-// CHECK:   [[INT_ARG:%.*]] = apply %{{.*}}([[INT_LIT]], [[INT_TYPE]]) : $@convention(method) (Builtin.Int2048, @thin Int.Type) -> Int
+// CHECK:   [[INT_LIT:%.*]] = integer_literal $Builtin.IntLiteral, 42
+// CHECK:   [[INT_ARG:%.*]] = apply %{{.*}}([[INT_LIT]], [[INT_TYPE]]) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
 // CHECK:   [[INIT_OPAQUE:%.*]] = init_existential_value [[INT_ARG]] : $Int, $Int, $Any
 // CHECK:   apply %{{.*}}([[INIT_OPAQUE]]) : $@convention(thin) (@in_guaranteed Any) -> ()
 // CHECK:   return %{{.*}} : $()
@@ -394,8 +394,8 @@ func s160_______callAnyArg() {
 // CHECK: bb0:
 // CHECK-NOT: alloc_stack
 // CHECK:   [[INT_TYPE:%.*]] = metatype $@thin Int.Type
-// CHECK:   [[INT_LIT:%.*]] = integer_literal $Builtin.Int2048, 42
-// CHECK:   [[INT_ARG:%.*]] = apply %{{.*}}([[INT_LIT]], [[INT_TYPE]]) : $@convention(method) (Builtin.Int2048, @thin Int.Type) -> Int
+// CHECK:   [[INT_LIT:%.*]] = integer_literal $Builtin.IntLiteral, 42
+// CHECK:   [[INT_ARG:%.*]] = apply %{{.*}}([[INT_LIT]], [[INT_TYPE]]) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
 // CHECK:   [[INT_CAST:%.*]] = unconditional_checked_cast_value [[INT_ARG]] : $Int to $T
 // CHECK:   [[CAST_BORROW:%.*]] = begin_borrow [[INT_CAST]] : $T
 // CHECK:   [[RETURN_VAL:%.*]] = copy_value [[CAST_BORROW]] : $T
@@ -412,8 +412,8 @@ func s170____force_convert<T>() -> T {
 // ---
 // CHECK-LABEL: sil hidden @$s20opaque_values_silgen21s180_______return_fooAA3Foo_pyF : $@convention(thin) () -> @out Foo {
 // CHECK: bb0:
-// CHECK:   [[INT_LIT:%.*]] = integer_literal $Builtin.Int2048, 42
-// CHECK:   [[INT_ARG:%.*]] = apply %{{.*}}([[INT_LIT]], [[INT_TYPE]]) : $@convention(method) (Builtin.Int2048, @thin Int.Type) -> Int
+// CHECK:   [[INT_LIT:%.*]] = integer_literal $Builtin.IntLiteral, 42
+// CHECK:   [[INT_ARG:%.*]] = apply %{{.*}}([[INT_LIT]], [[INT_TYPE]]) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
 // CHECK:   [[INT_CAST:%.*]] = unconditional_checked_cast_value [[INT_ARG]] : $Int to $Foo
 // CHECK:   return [[INT_CAST]] : $Foo
 // CHECK-LABEL: } // end sil function '$s20opaque_values_silgen21s180_______return_fooAA3Foo_pyF'
@@ -531,8 +531,8 @@ func s240_____propOfLValue(_ x: Error) -> String {
 // CHECK: bb0:
 // CHECK:   [[BOX_MTYPE:%.*]] = metatype $@thin Box<Int>.Type
 // CHECK:   [[MTYPE:%.*]] = metatype $@thin Int.Type
-// CHECK:   [[INTLIT:%.*]] = integer_literal $Builtin.Int2048, 42
-// CHECK:   [[AINT:%.*]] = apply {{.*}}([[INTLIT]], [[MTYPE]]) : $@convention(method) (Builtin.Int2048, @thin Int.Type) -> Int
+// CHECK:   [[INTLIT:%.*]] = integer_literal $Builtin.IntLiteral, 42
+// CHECK:   [[AINT:%.*]] = apply {{.*}}([[INTLIT]], [[MTYPE]]) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
 // CHECK:   apply {{.*}}<Int>([[AINT]], [[BOX_MTYPE]]) : $@convention(method) <τ_0_0> (@in τ_0_0, @thin Box<τ_0_0>.Type) -> @out Box<τ_0_0>
 // CHECK:   return %{{.*}} : $()
 // CHECK-LABEL: } // end sil function '$s20opaque_values_silgen21s250_________testBoxTyyF'

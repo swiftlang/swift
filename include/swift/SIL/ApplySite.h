@@ -102,6 +102,7 @@ public:
     case ApplySiteKind::PartialApplyInst:
       return ApplySite(cast<PartialApplyInst>(node));
     }
+    llvm_unreachable("covered switch");
   }
 
   ApplySiteKind getKind() const { return ApplySiteKind(Inst->getKind()); }
@@ -126,6 +127,7 @@ public:
     case ApplySiteKind::TryApplyInst:                                          \
       return cast<TryApplyInst>(Inst)->OPERATION;                              \
     }                                                                          \
+    llvm_unreachable("covered switch");                                        \
   } while (0)
 
   /// Return the callee operand.
@@ -143,8 +145,29 @@ public:
 
   /// Return the referenced function if the callee is a function_ref
   /// instruction.
-  SILFunction *getReferencedFunction() const {
-    FOREACH_IMPL_RETURN(getReferencedFunction());
+  SILFunction *getReferencedFunctionOrNull() const {
+    FOREACH_IMPL_RETURN(getReferencedFunctionOrNull());
+  }
+
+  /// Return the referenced function if the callee is a function_ref like
+  /// instruction.
+  ///
+  /// WARNING: This not necessarily the function that will be called at runtime.
+  /// If the callee is a (prev_)dynamic_function_ref the actual function called
+  /// might be different because it could be dynamically replaced at runtime.
+  ///
+  /// If the client of this API wants to look at the content of the returned SIL
+  /// function it should call getReferencedFunctionOrNull() instead.
+  SILFunction *getInitiallyReferencedFunction() const {
+    FOREACH_IMPL_RETURN(getInitiallyReferencedFunction());
+  }
+
+  /// Should we optimize this call.
+  /// Calls to (previous_)dynamic_function_ref have a dynamic target function so
+  /// we should not optimize them.
+  bool canOptimize() const {
+    return !DynamicFunctionRefInst::classof(getCallee()) &&
+      !PreviousDynamicFunctionRefInst::classof(getCallee());
   }
 
   /// Return the type.
@@ -169,6 +192,12 @@ public:
   /// Get the conventions of the callee with the applied substitutions.
   SILFunctionConventions getSubstCalleeConv() const {
     return SILFunctionConventions(getSubstCalleeType(), getModule());
+  }
+
+  /// Returns true if the callee function is annotated with
+  /// @_semantics("programtermination_point")
+  bool isCalleeKnownProgramTerminationPoint() const {
+    FOREACH_IMPL_RETURN(isCalleeKnownProgramTerminationPoint());
   }
 
   /// Check if this is a call of a never-returning function.
@@ -266,6 +295,7 @@ public:
       // apply pa2(a)
       return getSubstCalleeConv().getNumSILArguments() - getNumArguments();
     }
+    llvm_unreachable("covered switch");
   }
 
   /// Return the callee's function argument index corresponding to the given
@@ -298,6 +328,7 @@ public:
     case ApplySiteKind::PartialApplyInst:
       llvm_unreachable("unhandled case");
     }
+    llvm_unreachable("covered switch");
   }
 
   /// Return the applied 'self' argument value.
@@ -312,6 +343,7 @@ public:
     case ApplySiteKind::PartialApplyInst:
       llvm_unreachable("unhandled case");
     }
+    llvm_unreachable("covered switch");
   }
 
   /// Return the 'self' apply operand.
@@ -326,6 +358,7 @@ public:
     case ApplySiteKind::PartialApplyInst:
       llvm_unreachable("Unhandled cast");
     }
+    llvm_unreachable("covered switch");
   }
 
   /// Return a list of applied arguments without self.
@@ -340,6 +373,7 @@ public:
     case ApplySiteKind::PartialApplyInst:
       llvm_unreachable("Unhandled case");
     }
+    llvm_unreachable("covered switch");
   }
 
   /// Return whether the given apply is of a formally-throwing function
@@ -369,6 +403,8 @@ public:
   static bool classof(const SILInstruction *inst) {
     return bool(ApplySiteKind::fromNodeKind(inst->getKind()));
   }
+
+  void dump() const LLVM_ATTRIBUTE_USED { getInstruction()->dump(); }
 };
 
 //===----------------------------------------------------------------------===//
@@ -437,6 +473,7 @@ public:
     case FullApplySiteKind::TryApplyInst:
       return FullApplySite(cast<TryApplyInst>(node));
     }
+    llvm_unreachable("covered switch");
   }
 
   FullApplySiteKind getKind() const {

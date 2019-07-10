@@ -8,7 +8,7 @@
 //===----------------------------------------------------------------------===//
 ///
 /// \file
-/// \brief A generic and abstract interface representation for linkable objects.
+/// A generic and abstract interface representation for linkable objects.
 ///        This could be an MachO executable, bundle, dylib, or text-based stub
 ///        file.
 ///

@@ -36,9 +36,9 @@ func f(x: Int) -> Int {
 
 
 
-/* FIXME: blah*/
+/* FIXME: blah */
 
-// CHECK: <comment-block>/* <comment-marker>FIXME: blah*/</comment-marker></comment-block>
+// CHECK: <comment-block>/* <comment-marker>FIXME: blah</comment-marker> */</comment-block>
 
 /*
  * FIXME: blah
@@ -194,7 +194,7 @@ func emptyDocBlockComment3() {}
 func malformedBlockComment(f : () throws -> ()) rethrows {}
 // CHECK: <doc-comment-block>/**/</doc-comment-block>
 
-// CHECK: <kw>func</kw> malformedBlockComment(f : () <kw>throws</kw> -> ()) <attr-builtin>rethrows</attr-builtin> {}
+// CHECK: <kw>func</kw> malformedBlockComment(f : () <kw>throws</kw> -> ()) <kw>rethrows</kw> {}
 
 //: playground doc comment line
 func playgroundCommentLine(f : () throws -> ()) rethrows {}

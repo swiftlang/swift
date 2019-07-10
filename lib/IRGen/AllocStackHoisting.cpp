@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "alloc-stack-hoisting"
 
 #include "swift/IRGen/IRGenSILPasses.h"
+#include "swift/AST/Availability.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -55,6 +56,19 @@ static bool isHoistable(AllocStackInst *Inst, irgen::IRGenModule &Mod) {
   // Only hoist types that are dynamically sized (generics and resilient types).
   auto &TI = Mod.getTypeInfo(SILTy);
   if (TI.isFixedSize())
+    return false;
+
+  // Don't hoist weakly imported (weakly linked) types.
+  bool foundWeaklyImported =
+      SILTy.getASTType().findIf([&Mod](CanType type) -> bool {
+        if (auto nominal = type->getNominalOrBoundGenericNominal())
+          if (nominal->isWeakImported(Mod.getSwiftModule(),
+                                      Mod.getAvailabilityContext())) {
+            return true;
+          }
+        return false;
+      });
+  if (foundWeaklyImported)
     return false;
 
   // Don't hoist generics with opened archetypes. We would have to hoist the
@@ -338,7 +352,7 @@ bool indicatesDynamicAvailabilityCheckUse(SILInstruction *I) {
     return false;
   if (Apply->hasSemantics("availability.osversion"))
     return true;
-  auto *FunRef = Apply->getReferencedFunction();
+  auto *FunRef = Apply->getReferencedFunctionOrNull();
   if (!FunRef)
     return false;
   if (FunRef->getName().equals("_swift_stdlib_operatingSystemVersion"))

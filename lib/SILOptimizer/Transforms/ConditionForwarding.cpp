@@ -105,6 +105,11 @@ private:
     bool Changed = false;
 
     SILFunction *F = getFunction();
+
+    // FIXME: Add ownership support.
+    if (F->hasOwnership())
+      return;
+
     for (SILBasicBlock &BB : *F) {
       if (auto *SEI = dyn_cast<SwitchEnumInst>(BB.getTerminator())) {
         Changed |= tryOptimize(SEI);
@@ -254,7 +259,7 @@ bool ConditionForwarding::tryOptimize(SwitchEnumInst *SEI) {
     assert(ArgUser == SEI);
     // We delete the SEI later anyway. Just get rid of the Arg use.
     ArgUse->set(SILUndef::get(SEI->getOperand()->getType(),
-                              getFunction()->getModule()));
+                              *getFunction()));
   }
 
   // Redirect the predecessors of the condition's merging block to the

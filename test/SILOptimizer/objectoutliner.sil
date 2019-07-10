@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -object-outliner | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -object-outliner | %FileCheck %s
 //
 
 sil_stage canonical
@@ -7,7 +7,7 @@ import Builtin
 import Swift
 
 class Obj {
-  @sil_stored var value: Int64
+  @_hasStorage var value: Int64
   init()
 }
 

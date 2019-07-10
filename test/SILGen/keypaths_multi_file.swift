@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-build-swift -module-name keypaths_resilient -emit-module -Xfrontend -enable-key-path-resilience %S/Inputs/keypaths_multi_file_c.swift -emit-module-path %t/keypaths_resilient.swiftmodule
+// RUN: %target-build-swift -module-name keypaths_resilient -emit-module %S/Inputs/keypaths_multi_file_c.swift -emit-module-path %t/keypaths_resilient.swiftmodule
 
 // RUN: %target-swift-emit-silgen -module-name keypaths -primary-file %s %S/Inputs/keypaths_multi_file_b.swift -I %t | %FileCheck %s
 // RUN: %target-swift-emit-silgen -module-name keypaths %s -primary-file %S/Inputs/keypaths_multi_file_b.swift -I %t | %FileCheck --check-prefix=DEFINITION %s
@@ -19,11 +19,11 @@ func foo(x: Int) -> KeyPath<A, Int> {
 
 // A.x setter
 // CHECK-LABEL: sil hidden_external @$s8keypaths1AV1xSivs
-// DEFINITION-LABEL: sil hidden @$s8keypaths1AV1xSivs
+// DEFINITION-LABEL: sil hidden [ossa] @$s8keypaths1AV1xSivs
 
 // A.subscript setter
 // CHECK-LABEL: sil hidden_external @$s8keypaths1AVyS2icis
-// DEFINITION-LABEL: sil hidden @$s8keypaths1AVyS2icis
+// DEFINITION-LABEL: sil hidden [ossa] @$s8keypaths1AVyS2icis
 
 func bar<T>(_: T) {
   _ = \C<T>.b

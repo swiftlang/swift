@@ -30,7 +30,7 @@ public:
     return builder.createFunction(
         SILLinkage::Private, name, type.getAs<SILFunctionType>(), nullptr,
         loc, IsNotBare, IsNotTransparent,
-        IsNotSerialized, ProfileCounter(), IsNotThunk,
+        IsNotSerialized, IsNotDynamic, ProfileCounter(), IsNotThunk,
         SubclassScope::NotApplicable);
   }
 };

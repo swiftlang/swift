@@ -265,7 +265,7 @@ static OptionalTypeKind getResultOptionality(
   return OTK_ImplicitlyUnwrappedOptional;
 }
 
-/// \brief Determine whether the given name is reserved for Swift.
+/// Determine whether the given name is reserved for Swift.
 static bool isSwiftReservedName(StringRef name) {
   tok kind = Lexer::kindOfIdentifier(name, /*InSILMode=*/false);
   return (kind != tok::identifier);
@@ -1404,8 +1404,8 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
   case clang::DeclarationName::CXXOperatorName:
   case clang::DeclarationName::CXXUsingDirective:
   case clang::DeclarationName::CXXDeductionGuideName:
-    // Handling these is part of C++ interoperability.
-    llvm_unreachable("unhandled C++ interoperability");
+    // TODO: Handling these is part of C++ interoperability.
+    return ImportedName();
 
   case clang::DeclarationName::Identifier:
     // Map the identifier.

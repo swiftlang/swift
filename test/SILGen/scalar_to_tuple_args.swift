@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name scalar_to_tuple_args -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name scalar_to_tuple_args %s | %FileCheck %s
 
 func inoutWithDefaults(_ x: inout Int, y: Int = 0, z: Int = 0) {}
 func inoutWithCallerSideDefaults(_ x: inout Int, y: Int = #line) {}
@@ -7,7 +7,7 @@ func inoutWithCallerSideDefaults(_ x: inout Int, y: Int = #line) {}
 func scalarWithDefaults(_ x: Int, y: Int = 0, z: Int = 0) {}
 func scalarWithCallerSideDefaults(_ x: Int, y: Int = #line) {}
 
-func tupleWithDefaults(x x: (Int, Int), y: Int = 0, z: Int = 0) {}
+func tupleWithDefaults(x: (Int, Int), y: Int = 0, z: Int = 0) {}
 
 func variadicFirst(_ x: Int...) {}
 func variadicSecond(_ x: Int, _ y: Int...) {}
@@ -57,18 +57,15 @@ tupleWithDefaults(x: (x,x))
 // CHECK: ([[ARRAY:%.*]], [[MEMORY:%.*]]) = destructure_tuple [[ALLOC_ARRAY]]
 // CHECK: [[ADDR:%.*]] = pointer_to_address [[MEMORY]]
 // CHECK: [[READ:%.*]] = begin_access [read] [dynamic] [[X_ADDR]] : $*Int
-// CHECK: [[X:%.*]] = load [trivial] [[READ]]
-// CHECK: store [[X]] to [trivial] [[ADDR]]
-// CHECK: [[BORROWED_ARRAY:%.*]] = begin_borrow [[ARRAY]]
+// CHECK: copy_addr [[READ]] to [initialization] [[ADDR]]
 // CHECK: [[VARIADIC_FIRST:%.*]] = function_ref @$s20scalar_to_tuple_args13variadicFirstyySid_tF
-// CHECK: apply [[VARIADIC_FIRST]]([[BORROWED_ARRAY]])
+// CHECK: apply [[VARIADIC_FIRST]]([[ARRAY]])
 variadicFirst(x)
 
-// CHECK: [[ALLOC_ARRAY:%.*]] = apply {{.*}} -> (@owned Array<τ_0_0>, Builtin.RawPointer)
-// CHECK: ([[ARRAY:%.*]], [[MEMORY:%.*]]) = destructure_tuple [[ALLOC_ARRAY]]
 // CHECK: [[READ:%.*]] = begin_access [read] [dynamic] [[X_ADDR]] : $*Int
 // CHECK: [[X:%.*]] = load [trivial] [[READ]]
-// CHECK: [[BORROWED_ARRAY:%.*]] = begin_borrow [[ARRAY]]
+// CHECK: [[ALLOC_ARRAY:%.*]] = apply {{.*}} -> (@owned Array<τ_0_0>, Builtin.RawPointer)
+// CHECK: ([[ARRAY:%.*]], [[MEMORY:%.*]]) = destructure_tuple [[ALLOC_ARRAY]]
 // CHECK: [[VARIADIC_SECOND:%.*]] = function_ref @$s20scalar_to_tuple_args14variadicSecondyySi_SidtF
-// CHECK: apply [[VARIADIC_SECOND]]([[X]], [[BORROWED_ARRAY]])
+// CHECK: apply [[VARIADIC_SECOND]]([[X]], [[ARRAY]])
 variadicSecond(x)

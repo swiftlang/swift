@@ -1,4 +1,4 @@
-@_frozen public enum FrozenEnum {
+@frozen public enum FrozenEnum {
   case a, b, c
 }
 

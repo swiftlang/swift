@@ -1,10 +1,10 @@
 // RUN: %empty-directory(%t)
 
-// RUN: (cd %t && %target-build-swift %S/Inputs/dsohandle-first.swift -emit-library -emit-module -module-name first -Xlinker -install_name -Xlinker '@executable_path/libfirst.dylib')
-// RUN: (cd %t && %target-build-swift %S/Inputs/dsohandle-second.swift -emit-library -emit-module -module-name second -Xlinker -install_name -Xlinker '@executable_path/libsecond.dylib')
+// RUN: %target-build-swift-dylib(%t/%target-library-name(first)) %S/Inputs/dsohandle-first.swift -emit-module -module-name first
+// RUN: %target-build-swift-dylib(%t/%target-library-name(second)) %S/Inputs/dsohandle-second.swift -emit-module -module-name second
 // RUN: %target-build-swift -I %t -L %t -lfirst -lsecond %s -o %t/main
-// RUN: %target-codesign %t/main %t/libfirst.%target-dylib-extension %t/libsecond.%target-dylib-extension
-// RUN: %target-run %t/main %t/libfirst.%target-dylib-extension %t/libsecond.%target-dylib-extension
+// RUN: %target-codesign %t/main %t/%target-library-name(first) %t/%target-library-name(second)
+// RUN: %target-run %t/main %t/%target-library-name(first) %t/%target-library-name(second)
 
 // REQUIRES: executable_test
 

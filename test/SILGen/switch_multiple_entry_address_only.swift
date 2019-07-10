@@ -7,10 +7,10 @@ case b(Any)
 case c(Any)
 }
 
-// CHECK-LABEL: sil hidden @$s34switch_multiple_entry_address_only8takesAnyyyypF : $@convention(thin) (@in_guaranteed Any) -> ()
+// CHECK-LABEL: sil hidden [ossa] @$s34switch_multiple_entry_address_only8takesAnyyyypF : $@convention(thin) (@in_guaranteed Any) -> ()
 func takesAny(_ x: Any) {}
 
-// CHECK-LABEL: sil hidden @$s34switch_multiple_entry_address_only0B9LabelsLet1eyAA1EO_tF : $@convention(thin) (@in_guaranteed E) -> ()
+// CHECK-LABEL: sil hidden [ossa] @$s34switch_multiple_entry_address_only0B9LabelsLet1eyAA1EO_tF : $@convention(thin) (@in_guaranteed E) -> ()
 func multipleLabelsLet(e: E) {
   // CHECK:      bb0
   // CHECK:      [[X_PHI:%.*]] = alloc_stack $Any
@@ -42,17 +42,14 @@ func multipleLabelsLet(e: E) {
   // CHECK:      [[FN:%.*]] = function_ref @$s34switch_multiple_entry_address_only8takesAnyyyypF
   // CHECK-NEXT: apply [[FN]]([[X_PHI]]
   // CHECK-NEXT: destroy_addr [[X_PHI]]
-  // CHECK-NEXT: br bb6
+  // CHECK-NEXT: br bb5
 
   // CHECK:      bb4:
+  // CHECK-NEXT: destroy_addr [[E_COPY]]
+  // CHECK-NEXT: dealloc_stack [[E_COPY]]
   // CHECK-NEXT: br bb5
 
   // CHECK:      bb5:
-  // CHECK-NEXT: destroy_addr [[E_COPY]]
-  // CHECK-NEXT: dealloc_stack [[E_COPY]]
-  // CHECK-NEXT: br bb6
-
-  // CHECK:      bb6:
   // CHECK-NEXT: dealloc_stack [[X_PHI]]
   // CHECK-NEXT: tuple ()
   // CHECK-NEXT: return
@@ -65,7 +62,7 @@ func multipleLabelsLet(e: E) {
   }
 }
 
-// CHECK-LABEL: sil hidden @$s34switch_multiple_entry_address_only0B9LabelsVar1eyAA1EO_tF : $@convention(thin) (@in_guaranteed E) -> ()
+// CHECK-LABEL: sil hidden [ossa] @$s34switch_multiple_entry_address_only0B9LabelsVar1eyAA1EO_tF : $@convention(thin) (@in_guaranteed E) -> ()
 func multipleLabelsVar(e: E) {
   // CHECK:      bb0
   // CHECK:      [[X_PHI:%.*]] = alloc_stack $Any
@@ -106,17 +103,14 @@ func multipleLabelsVar(e: E) {
   // CHECK-NEXT: destroy_addr [[ANY_STACK]]
   // CHECK-NEXT: dealloc_stack [[ANY_STACK]]
   // CHECK-NEXT: destroy_value [[ANY_BOX]]
-  // CHECK-NEXT: br bb6
+  // CHECK-NEXT: br bb5
 
   // CHECK:      bb4:
+  // CHECK-NEXT: destroy_addr [[E_COPY]]
+  // CHECK-NEXT: dealloc_stack [[E_COPY]]
   // CHECK-NEXT: br bb5
 
   // CHECK:      bb5:
-  // CHECK-NEXT: destroy_addr [[E_COPY]]
-  // CHECK-NEXT: dealloc_stack [[E_COPY]]
-  // CHECK-NEXT: br bb6
-
-  // CHECK:      bb6:
   // CHECK-NEXT: dealloc_stack [[X_PHI]]
   // CHECK-NEXT: tuple ()
   // CHECK-NEXT: return
@@ -129,7 +123,7 @@ func multipleLabelsVar(e: E) {
   }
 }
 
-// CHECK-LABEL: sil hidden @$s34switch_multiple_entry_address_only20fallthroughWithValue1eyAA1EO_tF : $@convention(thin) (@in_guaranteed E) -> ()
+// CHECK-LABEL: sil hidden [ossa] @$s34switch_multiple_entry_address_only20fallthroughWithValue1eyAA1EO_tF : $@convention(thin) (@in_guaranteed E) -> ()
 func fallthroughWithValue(e: E) {
   // CHECK:      bb0
   // CHECK:      [[X_PHI:%.*]] = alloc_stack $Any
@@ -163,17 +157,14 @@ func fallthroughWithValue(e: E) {
   // CHECK:      [[FN2:%.*]] = function_ref @$s34switch_multiple_entry_address_only8takesAnyyyypF
   // CHECK-NEXT: apply [[FN2]]([[X_PHI]]
   // CHECK-NEXT: destroy_addr [[X_PHI]]
-  // CHECK-NEXT: br bb6
+  // CHECK-NEXT: br bb5
   
   // CHECK:      bb4:
+  // CHECK-NEXT: destroy_addr [[E_COPY]]
+  // CHECK-NEXT: dealloc_stack [[E_COPY]]
   // CHECK-NEXT: br bb5
   
   // CHECK:      bb5:
-  // CHECK-NEXT: destroy_addr [[E_COPY]]
-  // CHECK-NEXT: dealloc_stack [[E_COPY]]
-  // CHECK-NEXT: br bb6
-  
-  // CHECK:      bb6:
   // CHECK-NEXT: dealloc_stack [[X_PHI]]
   // CHECK-NEXT: tuple ()
   // CHECK-NEXT: return

@@ -23,7 +23,7 @@
 
 namespace swift {
 
-/// \brief Describes either a nominal type declaration or an extension
+/// Describes either a nominal type declaration or an extension
 /// declaration.
 struct TypeOrExtensionDecl {
   // (The definitions are in Decl.cpp.)
@@ -34,15 +34,15 @@ struct TypeOrExtensionDecl {
   TypeOrExtensionDecl(NominalTypeDecl *D);
   TypeOrExtensionDecl(ExtensionDecl *D);
 
-  /// \brief Return the contained *Decl as the Decl superclass.
+  /// Return the contained *Decl as the Decl superclass.
   class Decl *getAsDecl() const;
-  /// \brief Return the contained *Decl as the DeclContext superclass.
+  /// Return the contained *Decl as the DeclContext superclass.
   DeclContext *getAsDeclContext() const;
-  /// \brief Return the contained NominalTypeDecl or that of the extended type
+  /// Return the contained NominalTypeDecl or that of the extended type
   /// in the ExtensionDecl.
   NominalTypeDecl *getBaseNominal() const;
 
-  /// \brief Is the contained pointer null?
+  /// Is the contained pointer null?
   bool isNull() const;
   explicit operator bool() const { return !isNull(); }
 

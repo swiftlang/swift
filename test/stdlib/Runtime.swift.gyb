@@ -10,10 +10,15 @@ import Swift
 import StdlibUnittest
 import SwiftShims
 
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-import Darwin
-#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android)
-import Glibc
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+  import Darwin
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
+  import Glibc
+#elseif os(Windows)
+  import MSVCRT
+  import WinSDK
+#else
+#error("Unsupported platform")
 #endif
 
 @_silgen_name("swift_demangle")
@@ -39,7 +44,7 @@ func _stdlib_demangleName(_ mangledName: String) -> String {
 
     if let demangledNamePtr = demangledNamePtr {
       let demangledName = String(cString: demangledNamePtr)
-      _stdlib_free(demangledNamePtr)
+      _swift_stdlib_free(demangledNamePtr)
       return demangledName
     }
     return mangledName
@@ -370,6 +375,39 @@ Runtime.test("demangleName") {
   expectEqual("Foobar", _stdlib_demangleName("$s13__lldb_expr_46FoobarCD"))
 }
 
+if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
+  Runtime.test("demangleTruncate") {
+    // Swift.Int requires 10 bytes to be fully demangled.
+    let buffer = UnsafeMutableBufferPointer<Int8>.allocate(capacity: 10)
+
+    defer { buffer.deallocate() }
+
+    // Set last byte to a custom number, that way when we call swift_demangle
+    // the last byte should be unchanged rather than it being set to 0.
+    buffer[buffer.count - 1] = 16
+
+    // Only give 9 bytes though to exercise that swift_demangle doesn't write past
+    // the buffer.
+    var bufferSize = UInt(buffer.count - 1)
+
+    let mangled = "$sSi"
+
+    mangled.utf8CString.withUnsafeBufferPointer {
+      _ = _stdlib_demangleImpl(
+        mangledName: $0.baseAddress,
+        mangledNameLength: UInt($0.count - 1),
+        outputBuffer: buffer.baseAddress,
+        outputBufferSize: &bufferSize,
+        flags: 0
+      )
+    }
+
+    expectEqual(String(cString: buffer.baseAddress!), "Swift.In")
+    expectEqual(bufferSize, 10)
+    expectEqual(buffer[buffer.count - 1], 16)
+  }
+}
+
 % for optionality in ['', '?']:
 Runtime.test("_stdlib_atomicCompareExchangeStrongPtr") {
   typealias IntPtr = UnsafeMutablePointer<Int>
@@ -558,14 +596,35 @@ Runtime.test("SwiftError layout constants for LLDB") {
   let RTLD_DEFAULT = UnsafeMutableRawPointer(bitPattern: -2)
 #elseif os(Linux)
   let RTLD_DEFAULT = UnsafeMutableRawPointer(bitPattern: 0)
+#elseif os(Android)
+  #if arch(arm)
+    let RTLD_DEFAULT = UnsafeMutableRawPointer(bitPattern: 0xffffffff as UInt)
+  #elseif arch(arm64)
+    let RTLD_DEFAULT = UnsafeMutableRawPointer(bitPattern: 0)
+  #else
+    _UnimplementedError()
+  #endif
+#elseif os(Windows)
+  let hStdlibCore: HMODULE = GetModuleHandleA("swiftCore.dll")!
 #else
   _UnimplementedError()
 #endif
 
+#if os(Windows)
+  let offsetof_SwiftError_typeMetadata: UnsafeRawPointer =
+      unsafeBitCast(GetProcAddress(hStdlibCore,
+                                   "_swift_lldb_offsetof_SwiftError_typeMetadata")!,
+                    to: UnsafeRawPointer.self)
+  let sizeof_SwiftError: UnsafeRawPointer =
+      unsafeBitCast(GetProcAddress(hStdlibCore,
+                                   "_swift_lldb_sizeof_SwiftError")!,
+                    to: UnsafeRawPointer.self)
+#else
   let offsetof_SwiftError_typeMetadata =
     dlsym(RTLD_DEFAULT, "_swift_lldb_offsetof_SwiftError_typeMetadata")!
   let sizeof_SwiftError =
     dlsym(RTLD_DEFAULT, "_swift_lldb_sizeof_SwiftError")!
+#endif
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
 #if arch(i386) || arch(arm)
   expectEqual(20, offsetof_SwiftError_typeMetadata.load(as: UInt.self))
@@ -574,7 +633,7 @@ Runtime.test("SwiftError layout constants for LLDB") {
   expectEqual(40, offsetof_SwiftError_typeMetadata.load(as: UInt.self))
   expectEqual(72, sizeof_SwiftError.load(as: UInt.self))
 #endif
-#elseif os(Linux)
+#elseif os(Linux) || os(Android) || os(Windows)
   expectEqual(16, offsetof_SwiftError_typeMetadata.load(as: UInt.self))
   expectEqual(32, sizeof_SwiftError.load(as: UInt.self))
 #else
@@ -658,13 +717,25 @@ Reflection.test("ObjectIdentifier/CustomDebugStringConvertible") {
 
 }
 
+class C: Q1 & Codable { }
+
+Reflection.test("multiprotocolTypes") {
+  // [SR-8158]: Printing type(of: Codable & Protocol type ) EXC_BAD_ACCESS
+  // This use of String(reflecting:) exercises a previously incorrect cast in
+  // NonFixedExistentialMetatypeBox::Container::getNumWitnessTables.
+  let obj: Q1 & Codable = C()
+  let t = type(of: obj)
+  let x = String(reflecting: t)
+  expectEqual("a.C", x)
+}
+
 
 var BitTwiddlingTestSuite = TestSuite("BitTwiddling")
 
 BitTwiddlingTestSuite.test("_pointerSize") {
 #if arch(i386) || arch(arm)
   expectEqual(4, MemoryLayout<Optional<AnyObject>>.size)
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le)
+#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
   expectEqual(8, MemoryLayout<Optional<AnyObject>>.size)
 #else
   fatalError("implement")
@@ -713,9 +784,10 @@ var AvailabilityVersionsTestSuite = TestSuite("AvailabilityVersions")
 
 AvailabilityVersionsTestSuite.test("_stdlib_isOSVersionAtLeast") {
   func isAtLeastOS(_ major: Int, _ minor: Int, _ patch: Int) -> Bool {
-    return _getBool(_stdlib_isOSVersionAtLeast(major._builtinWordValue,
-                                               minor._builtinWordValue,
-                                               patch._builtinWordValue))
+    return Bool(_builtinBooleanLiteral: _stdlib_isOSVersionAtLeast(
+                                          major._builtinWordValue,
+                                          minor._builtinWordValue,
+                                          patch._builtinWordValue))
   }
 
 // _stdlib_isOSVersionAtLeast is broken for
@@ -727,6 +799,9 @@ AvailabilityVersionsTestSuite.test("_stdlib_isOSVersionAtLeast") {
   expectFalse(isAtLeastOS(1066, 0, 0))
   expectTrue(isAtLeastOS(0, 1066, 0))
   expectTrue(isAtLeastOS(0, 0, 1066))
+  
+  // 9999 is a special version that's always available
+  expectTrue(isAtLeastOS(9999, 0, 0))
 #endif
 }
 

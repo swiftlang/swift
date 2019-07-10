@@ -133,9 +133,9 @@ extension Struct1 {
 var g2: Int = 0
 
 class Class3 {
-  var m1 = g2 == 0
-             ? "false" // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
-             : "true"; // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
+  var m1 = g2 == 0     // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}2
+             ? "false" // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}2
+             : "true"; // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}2
 }
 
 // rdar://34244637: Wrong coverage for do/catch sequence
@@ -188,5 +188,21 @@ let _ = Class3()
 
 let _ = Struct1(field: 1)
 let _ = Struct1()
+
+struct Struct2 {
+  func visible() {
+    hidden()
+  }
+  private func hidden() {
+    var x: Int = 0 // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
+    func helper() {
+      x += 1 // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
+    }
+    helper() // CHECK-COV: {{ *}}[[@LINE]]|{{ *}}1
+  }
+}
+
+var s2 = Struct2()
+s2.visible()
 
 // CHECK-REPORT: TOTAL {{.*}} 100.00% {{.*}} 100.00%

@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -parse-as-library -enable-sil-ownership  %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -parse-as-library  %s | %FileCheck %s
 
 func use<T>(_: T) {}
 
@@ -8,7 +8,7 @@ protocol P {}
 class C: P {}
 struct S {}
 
-// CHECK-LABEL: sil hidden @$s26guaranteed_closure_context0A9_capturesyyF
+// CHECK-LABEL: sil hidden [ossa] @$s26guaranteed_closure_context0A9_capturesyyF
 func guaranteed_captures() {
   // CHECK: [[MUTABLE_TRIVIAL_BOX:%.*]] = alloc_box ${ var S }
   var mutableTrivial = S()
@@ -72,4 +72,4 @@ func guaranteed_captures() {
   escape(captureEverything)
 }
 
-// CHECK: sil private [[FN_NAME]] : $@convention(thin) (@guaranteed { var S }, @guaranteed { var C }, @guaranteed { var P }, S, @guaranteed C, @guaranteed { var P })
+// CHECK: sil private [ossa] [[FN_NAME]] : $@convention(thin) (@guaranteed { var S }, @guaranteed { var C }, @guaranteed { var P }, S, @guaranteed C, @guaranteed { var P })

@@ -1,4 +1,8 @@
+
+#if _runtime(_ObjC)
+
 import Swift
+import SwiftPrivate
 import Darwin
 import StdlibUnittest
 import Foundation
@@ -20,12 +24,7 @@ public func convertNSDictionaryToDictionary<
 
 func isNativeDictionary<KeyTy : Hashable, ValueTy>(
   _ d: Dictionary<KeyTy, ValueTy>) -> Bool {
-  switch d._variant {
-  case .native:
-    return true
-  case .cocoa:
-    return false
-  }
+  return d._variant.isNative
 }
 
 func isCocoaDictionary<KeyTy : Hashable, ValueTy>(
@@ -37,7 +36,7 @@ func isNativeNSDictionary(_ d: NSDictionary) -> Bool {
   let className: NSString = NSStringFromClass(type(of: d)) as NSString
   return [
     "_SwiftDeferredNSDictionary",
-    "_EmptyDictionarySingleton",
+    "__EmptyDictionarySingleton",
     "_DictionaryStorage"].contains {
     className.range(of: $0).length > 0
   }
@@ -239,6 +238,10 @@ var _bridgedKeyBridgeOperations = _stdlib_AtomicInt(0)
 
 struct TestBridgedKeyTy
   : Equatable, Hashable, CustomStringConvertible, _ObjectiveCBridgeable {
+  var value: Int
+  var _hashValue: Int
+  var serial: Int
+
   static var bridgeOperations: Int {
     get {
       return _bridgedKeyBridgeOperations.load()
@@ -261,6 +264,10 @@ struct TestBridgedKeyTy
 
   var hashValue: Int {
     return _hashValue
+  }
+
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(_hashValue)
   }
 
   func _bridgeToObjectiveC() -> TestObjCKeyTy {
@@ -290,10 +297,6 @@ struct TestBridgedKeyTy
     _forceBridgeFromObjectiveC(source!, result: &result)
     return result!
   }
-
-  var value: Int
-  var _hashValue: Int
-  var serial: Int
 }
 
 func == (lhs: TestBridgedKeyTy, rhs: TestBridgedKeyTy) -> Bool {
@@ -519,15 +522,17 @@ import SlurpFastEnumeration
 ) {
   var state = NSFastEnumerationState()
 
-  let stackBufLength = 3
-  let stackBuf = _HeapBuffer<(), AnyObject?>(
-    _HeapBufferStorage<(), AnyObject?>.self, (), stackBufLength)
+  let bufferSize = 3
+  let buffer =
+    UnsafeMutableBufferPointer<AnyObject?>.allocate(capacity: bufferSize)
+  defer { buffer.deallocate() }
 
   var itemsReturned = 0
   while true {
     let returnedCount = fe.countByEnumerating(
-      with: &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
-      count: stackBufLength)
+      with: &state,
+      objects: AutoreleasingUnsafeMutablePointer(buffer.baseAddress!),
+      count: buffer.count)
     expectNotEqual(0, state.state)
     expectNotNil(state.mutationsPtr)
     if returnedCount == 0 {
@@ -545,8 +550,9 @@ import SlurpFastEnumeration
 
   for _ in 0..<3 {
     let returnedCount = fe.countByEnumerating(
-      with: &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
-      count: stackBufLength)
+      with: &state,
+      objects: AutoreleasingUnsafeMutablePointer(buffer.baseAddress!),
+      count: buffer.count)
     expectNotEqual(0, state.state)
     expectNotNil(state.mutationsPtr)
     expectEqual(0, returnedCount)
@@ -561,15 +567,17 @@ typealias AnyObjectTuple2 = (AnyObject, AnyObject)
 ) {
   var state = NSFastEnumerationState()
 
-  let stackBufLength = 3
-  let stackBuf = _HeapBuffer<(), AnyObject?>(
-    _HeapBufferStorage<(), AnyObject?>.self, (), stackBufLength)
+  let bufferSize = 3
+  let buffer =
+    UnsafeMutableBufferPointer<AnyObject?>.allocate(capacity: bufferSize)
+  defer { buffer.deallocate() }
 
   var itemsReturned = 0
   while true {
     let returnedCount = fe.countByEnumerating(
-      with: &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
-      count: stackBufLength)
+      with: &state,
+      objects: AutoreleasingUnsafeMutablePointer(buffer.baseAddress!),
+      count: buffer.count)
     expectNotEqual(0, state.state)
     expectNotNil(state.mutationsPtr)
     if returnedCount == 0 {
@@ -589,8 +597,9 @@ typealias AnyObjectTuple2 = (AnyObject, AnyObject)
 
   for _ in 0..<3 {
     let returnedCount = fe.countByEnumerating(
-      with: &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
-      count: stackBufLength)
+      with: &state,
+      objects: AutoreleasingUnsafeMutablePointer(buffer.baseAddress!),
+      count: buffer.count)
     expectEqual(0, returnedCount)
   }
 }
@@ -771,15 +780,17 @@ typealias AnyObjectTuple2 = (AnyObject, AnyObject)
 ) {
   var state = NSFastEnumerationState()
 
-  let stackBufLength = 3
-  let stackBuf = _HeapBuffer<(), AnyObject?>(
-    _HeapBufferStorage<(), AnyObject?>.self, (), stackBufLength)
+  let bufferSize = 3
+  let buffer =
+    UnsafeMutableBufferPointer<AnyObject?>.allocate(capacity: bufferSize)
+  defer { buffer.deallocate() }
 
   var itemsReturned = 0
   while true {
     let returnedCount = fe.countByEnumerating(
-      with: &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
-      count: stackBufLength)
+      with: &state,
+      objects: AutoreleasingUnsafeMutablePointer(buffer.baseAddress!),
+      count: buffer.count)
     expectNotEqual(0, state.state)
     expectNotNil(state.mutationsPtr)
     if returnedCount == 0 {
@@ -797,8 +808,9 @@ typealias AnyObjectTuple2 = (AnyObject, AnyObject)
 
   for _ in 0..<3 {
     let returnedCount = fe.countByEnumerating(
-      with: &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
-      count: stackBufLength)
+      with: &state,
+      objects: AutoreleasingUnsafeMutablePointer(buffer.baseAddress!),
+      count: buffer.count)
     expectNotEqual(0, state.state)
     expectNotNil(state.mutationsPtr)
     expectEqual(0, returnedCount)
@@ -993,3 +1005,6 @@ func getBridgedNSArrayOfValueTypeCustomBridged(
 
   return bridged
 }
+
+#endif
+

@@ -88,7 +88,7 @@ func parseError6(_ a: unknown_type, b: ) {} // expected-error {{use of undeclare
 
 func parseError7(_ a: Int, goo b: unknown_type) {} // expected-error {{use of undeclared type 'unknown_type'}}
 
-public func foo(_ a: Bool = true) -> (b: Bar, c: Bar) {} // expected-error {{use of undeclared type 'Bar'}}
+public func foo(_ a: Bool = true) -> (b: Bar, c: Bar) {} // expected-error 2{{use of undeclared type 'Bar'}}
 
 func parenPatternInArg((a): Int) -> Int { // expected-error {{expected parameter name followed by ':'}}
   return a  // expected-error {{use of unresolved identifier 'a'}}
@@ -123,12 +123,13 @@ func testObjCMethodCurry(_ a : ClassWithObjCMethod) -> (Int) -> () {
 }
 
 // We used to crash on this.
-func rdar16786220(inout let c: Int) -> () { // expected-error {{parameter must not have multiple '__owned', 'inout', '__shared', 'var', or 'let' specifiers}} {{25-29=}}
+func rdar16786220(inout let c: Int) -> () { // expected-warning {{'let' in this position is interpreted as an argument label}} {{25-28=`let`}}
 // expected-error @-1 {{'inout' before a parameter name is not allowed, place it before the parameter type instead}}{{19-24=}}{{32-32=inout }}
 
   c = 42
 }
 
+func multipleSpecifiers(a: inout __owned Int) {} // expected-error {{parameter must not have multiple '__owned', 'inout', or '__shared' specifiers}} {{28-34=}}
 
 // <rdar://problem/17763388> ambiguous operator emits same candidate multiple times
 infix operator !!!
@@ -139,8 +140,8 @@ _ = [1] !!! [1]   // unambiguously picking the array overload.
 
 
 // <rdar://problem/16786168> Functions currently permit 'var inout' parameters
-func var_inout_error(inout var x : Int) {} // expected-error {{parameter must not have multiple '__owned', 'inout', '__shared', 'var', or 'let' specifiers}} {{28-32=}}
-// expected-error @-1 {{'inout' before a parameter name is not allowed, place it before the parameter type instead}} {{22-27=}}{{36-36=inout }}
+func inout_error(inout var x : Int) {} // expected-warning {{'var' in this position is interpreted as an argument label}} {{24-27=`var`}}
+// expected-error @-1 {{'inout' before a parameter name is not allowed, place it before the parameter type instead}} {{18-23=}}{{32-32=inout }}
 
 // Unnamed parameters require the name "_":
 func unnamed(Int) { } // expected-error{{unnamed parameters must be written with the empty name '_'}}{{14-14=_: }}
@@ -153,15 +154,15 @@ func bareTypeWithAttr(@convention(c) () -> Void) {} // expected-error{{attribute
 
 // Test fixits on curried functions.
 func testCurryFixits() {
-  func f1(_ x: Int)(y: Int) {} // expected-error{{curried function declaration syntax has been removed; use a single parameter list}} {{19-21=, }}
+  func f1(_ x: Int)(y: Int) {} // expected-error{{cannot have more than one parameter list}}
   func f1a(_ x: Int, y: Int) {}
-  func f2(_ x: Int)(y: Int)(z: Int) {} // expected-error{{curried function declaration syntax has been removed; use a single parameter list}} {{19-21=, }} {{27-29=, }}
+  func f2(_ x: Int)(y: Int)(z: Int) {} // expected-error{{cannot have more than one parameter list}}
   func f2a(_ x: Int, y: Int, z: Int) {}
-  func f3(_ x: Int)() {} // expected-error{{curried function declaration syntax has been removed; use a single parameter list}} {{19-21=}}
+  func f3(_ x: Int)() {} // expected-error{{cannot have more than one parameter list}}
   func f3a(_ x: Int) {}
-  func f4()(x: Int) {} // expected-error{{curried function declaration syntax has been removed; use a single parameter list}} {{11-13=}}
+  func f4()(x: Int) {} // expected-error{{cannot have more than one parameter list}}
   func f4a(_ x: Int) {}
-  func f5(_ x: Int)()(y: Int) {} // expected-error{{curried function declaration syntax has been removed; use a single parameter list}} {{19-21=}} {{21-23=, }}
+  func f5(_ x: Int)()(y: Int) {} // expected-error{{cannot have more than one parameter list}}
   func f5a(_ x: Int, y: Int) {}
 }
 

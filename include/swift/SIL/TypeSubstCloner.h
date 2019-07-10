@@ -30,7 +30,7 @@
 
 namespace swift {
 
-/// \brief A utility class for cloning code while remapping types.
+/// A utility class for cloning code while remapping types.
 ///
 /// \tparam FunctionBuilderTy Function builder type injected by
 /// subclasses. Used to break a circular dependency from SIL <=>
@@ -69,7 +69,7 @@ class TypeSubstCloner : public SILClonerWithScopes<ImplClass> {
 
       if (!Cloner.Inlining) {
         FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(AI.getCallee());
-        if (FRI && FRI->getReferencedFunction() == AI.getFunction() &&
+        if (FRI && FRI->getInitiallyReferencedFunction() == AI.getFunction() &&
             Subs == Cloner.SubsMap) {
           // Handle recursions by replacing the apply to the callee with an
           // apply to the newly specialized function, but only if substitutions
@@ -135,8 +135,8 @@ public:
   using SILClonerWithScopes<ImplClass>::getTypeInClonedContext;
   using SILClonerWithScopes<ImplClass>::getOpType;
   using SILClonerWithScopes<ImplClass>::getOpBasicBlock;
-  using SILClonerWithScopes<ImplClass>::doPostProcess;
-  using SILClonerWithScopes<ImplClass>::ValueMap;
+  using SILClonerWithScopes<ImplClass>::recordClonedInstruction;
+  using SILClonerWithScopes<ImplClass>::recordFoldedValue;
   using SILClonerWithScopes<ImplClass>::addBlockWithUnreachable;
   using SILClonerWithScopes<ImplClass>::OpenedArchetypesTracker;
 
@@ -193,7 +193,14 @@ protected:
                                  Helper.getArguments(), Inst->isNonThrowing(),
                                  GenericSpecializationInformation::create(
                                    Inst, getBuilder()));
-    doPostProcess(Inst, N);
+    // Specialization can return noreturn applies that were not identified as
+    // such before.
+    if (N->isCalleeNoReturn() &&
+        !isa<UnreachableInst>(*std::next(SILBasicBlock::iterator(Inst)))) {
+      noReturnApplies.push_back(N);
+    }
+
+    recordClonedInstruction(Inst, N);
   }
 
   void visitTryApplyInst(TryApplyInst *Inst) {
@@ -205,7 +212,7 @@ protected:
         getOpBasicBlock(Inst->getErrorBB()),
         GenericSpecializationInformation::create(
           Inst, getBuilder()));
-    doPostProcess(Inst, N);
+    recordClonedInstruction(Inst, N);
   }
 
   void visitPartialApplyInst(PartialApplyInst *Inst) {
@@ -215,9 +222,9 @@ protected:
     PartialApplyInst *N = getBuilder().createPartialApply(
         getOpLocation(Inst->getLoc()), Helper.getCallee(),
         Helper.getSubstitutions(), Helper.getArguments(), ParamConvention,
-        GenericSpecializationInformation::create(
-          Inst, getBuilder()));
-    doPostProcess(Inst, N);
+        Inst->isOnStack(),
+        GenericSpecializationInformation::create(Inst, getBuilder()));
+    recordClonedInstruction(Inst, N);
   }
 
   /// Attempt to simplify a conditional checked cast.
@@ -258,7 +265,7 @@ protected:
     // there is no need for an upcast and we can just use the operand.
     if (getOpType(Upcast->getType()) ==
         getOpValue(Upcast->getOperand())->getType()) {
-      ValueMap.insert({SILValue(Upcast), getOpValue(Upcast->getOperand())});
+      recordFoldedValue(SILValue(Upcast), getOpValue(Upcast->getOperand()));
       return;
     }
     super::visitUpcastInst(Upcast);
@@ -267,8 +274,8 @@ protected:
   void visitCopyValueInst(CopyValueInst *Copy) {
     // If the substituted type is trivial, ignore the copy.
     SILType copyTy = getOpType(Copy->getType());
-    if (copyTy.isTrivial(Copy->getModule())) {
-      ValueMap.insert({SILValue(Copy), getOpValue(Copy->getOperand())});
+    if (copyTy.isTrivial(*Copy->getFunction())) {
+      recordFoldedValue(SILValue(Copy), getOpValue(Copy->getOperand()));
       return;
     }
     super::visitCopyValueInst(Copy);
@@ -277,7 +284,7 @@ protected:
   void visitDestroyValueInst(DestroyValueInst *Destroy) {
     // If the substituted type is trivial, ignore the destroy.
     SILType destroyTy = getOpType(Destroy->getOperand()->getType());
-    if (destroyTy.isTrivial(Destroy->getModule())) {
+    if (destroyTy.isTrivial(*Destroy->getFunction())) {
       return;
     }
     super::visitDestroyValueInst(Destroy);
@@ -353,8 +360,9 @@ protected:
       ParentFunction = FuncBuilder.getOrCreateFunction(
           ParentFunction->getLocation(), MangledName, SILLinkage::Shared,
           ParentFunction->getLoweredFunctionType(), ParentFunction->isBare(),
-          ParentFunction->isTransparent(), ParentFunction->isSerialized(), 0,
-          ParentFunction->isThunk(), ParentFunction->getClassSubclassScope());
+          ParentFunction->isTransparent(), ParentFunction->isSerialized(),
+          IsNotDynamic, 0, ParentFunction->isThunk(),
+          ParentFunction->getClassSubclassScope());
       // Increment the ref count for the inlined function, so it doesn't
       // get deleted before we can emit abstract debug info for it.
       if (!ParentFunction->isZombie()) {
@@ -380,6 +388,9 @@ protected:
   SILFunction &Original;
   /// True, if used for inlining.
   bool Inlining;
+  // Generic specialization can create noreturn applications that where
+  // previously not identifiable as such.
+  SmallVector<ApplyInst *, 16> noReturnApplies;
 };
 
 } // end namespace swift

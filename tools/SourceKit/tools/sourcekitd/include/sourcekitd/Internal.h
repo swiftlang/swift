@@ -59,6 +59,7 @@ enum class CustomBufferKind {
   InheritedTypesArray,
   DocStructureElementArray,
   AttributesArray,
+  ExpressionTypeArray,
   RawData
 };
 
@@ -129,7 +130,7 @@ public:
   Optional<llvm::StringRef> getString(SourceKit::UIdent Key);
   Optional<RequestDict> getDictionary(SourceKit::UIdent Key);
 
-  /// \brief Populate the vector with an array of C strings.
+  /// Populate the vector with an array of C strings.
   /// \param isOptional true if the key is optional. If false and the key is
   /// missing, the function will return true to indicate an error.
   /// \returns true if there is an error, like the key is not of an array type or
@@ -159,9 +160,9 @@ void handleRequest(sourcekitd_object_t Request, ResponseReceiver Receiver);
 void printRequestObject(sourcekitd_object_t Obj, llvm::raw_ostream &OS);
 void printResponse(sourcekitd_response_t Resp, llvm::raw_ostream &OS);
 
-sourcekitd_response_t createErrorRequestInvalid(const char *Description);
-sourcekitd_response_t createErrorRequestFailed(const char *Description);
-sourcekitd_response_t createErrorRequestInterrupted(const char *Description);
+sourcekitd_response_t createErrorRequestInvalid(llvm::StringRef Description);
+sourcekitd_response_t createErrorRequestFailed(llvm::StringRef Description);
+sourcekitd_response_t createErrorRequestInterrupted(llvm::StringRef Descr);
 sourcekitd_response_t createErrorRequestCancelled();
 
 /// Send notification object.

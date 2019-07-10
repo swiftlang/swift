@@ -17,7 +17,8 @@ import TestsUtils
 public let SortLargeExistentials = BenchmarkInfo(
   name: "SortLargeExistentials",
   runFunction: run_SortLargeExistentials,
-  tags: [.validation, .api, .algorithm])
+  tags: [.validation, .api, .algorithm],
+  legacyFactor: 100)
 
 protocol LetterKind {
   var value: String { get }
@@ -74,7 +75,7 @@ let lettersTemplate : [LetterKind] = [
 
 @inline(never)
 public func run_SortLargeExistentials(_ N: Int) {
-  for _ in 1...100*N {
+  for _ in 1...N {
     var letters = lettersTemplate
 
     letters.sort {

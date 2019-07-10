@@ -1,6 +1,6 @@
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -enable-resilience -emit-module-path=%t/type_layout_dumper_other.swiftmodule -module-name=type_layout_dumper_other %S/Inputs/type_layout_dumper_other.swift
+// RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/type_layout_dumper_other.swiftmodule -module-name=type_layout_dumper_other %S/Inputs/type_layout_dumper_other.swift
 
 // RUN: %target-swift-frontend -dump-type-info -type-info-dump-filter=resilient -I %t %s | %FileCheck %s
 
@@ -19,7 +19,7 @@ import type_layout_dumper_other
 // CHECK-NEXT:   - Name:            24type_layout_dumper_other21ConcreteResilientEnumO
 // CHECK-NEXT:     Size:            9
 // CHECK-NEXT:     Alignment:       8
-// CHECK-NEXT:     ExtraInhabitants: 0
+// CHECK-NEXT:     ExtraInhabitants: 254
 // CHECK-NEXT:   - Name:            24type_layout_dumper_other22DependentResilientEnumO09NestedNonefG0O
 // CHECK-NEXT:     Size:            8
 // CHECK-NEXT:     Alignment:       8

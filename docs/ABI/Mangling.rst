@@ -1,6 +1,5 @@
 :orphan:
 
-.. @raise litre.TestsAreMissing
 .. _ABI:
 
 .. highlight:: none
@@ -9,9 +8,15 @@ Mangling
 --------
 ::
 
-  mangled-name ::= '$S' global
+  mangled-name ::= '$s' global  // Swift stable mangling
+  mangled-name ::= '_T0' global // Swift 4.0
+  mangled-name ::= '$S' global  // Swift 4.2
 
-All Swift-mangled names begin with this prefix.
+All Swift-mangled names begin with a common prefix. Since Swift 4.0, the
+compiler has used variations of the mangling described in this document, though
+pre-stable versions may not exactly conform to this description. By using
+distinct prefixes, tools can attempt to accommodate bugs and version variations
+in pre-stable versions of Swift.
 
 The basic mangling scheme is a list of 'operators' where the operators are
 structured in a post-fix order. For example the mangling may start with an
@@ -19,8 +24,6 @@ identifier but only later in the mangling a type-like operator defines how this
 identifier has to be interpreted::
 
   4Test3FooC   // The trailing 'C' says that 'Foo' is a class in module 'Test'
-
-
 
 Operators are either identifiers or a sequence of one or more characters,
 like ``C`` for class.
@@ -42,6 +45,67 @@ mangled name will start with the module name (after the ``_S``).
 In the following, productions which are only _part_ of an operator, are
 named with uppercase letters.
 
+Symbolic references
+~~~~~~~~~~~~~~~~~~~
+
+The Swift compiler emits mangled names into binary images to encode
+references to types for runtime instantiation and reflection. In a binary,
+these mangled names may embed pointers to runtime data
+structures in order to more efficiently represent locally-defined types.
+We call these pointers **symbolic references**.
+These references will be introduced by a control character in the range
+`\x01` ... `\x1F`, which indicates the kind of symbolic reference, followed by
+some number of arbitrary bytes *which may include null bytes*. Code that
+processes mangled names out of Swift binaries needs to be aware of symbolic
+references in order to properly terminate strings; a null terminator may be
+part of a symbolic reference.
+
+::
+
+  symbolic-reference ::= [\x01-\x17] .{4} // Relative symbolic reference
+   #if sizeof(void*) == 8
+     symbolic-reference ::= [\x18-\x1F] .{8} // Absolute symbolic reference
+   #elif sizeof(void*) == 4
+     symbolic-reference ::= [\x18-\x1F] .{4} // Absolute symbolic reference
+   #endif
+
+Symbolic references are only valid in compiler-emitted metadata structures
+and must only appear in read-only parts of a binary image. APIs and tools
+that interpret Swift mangled names from potentially uncontrolled inputs must
+refuse to interpret symbolic references.
+
+The following symbolic reference kinds are currently implemented:
+
+::
+
+   #if SWIFT_RUNTIME_VERSION < 5.1
+     {any-generic-type, protocol} ::= '\x01' .{4} // Reference points directly to context descriptor
+     {any-generic-type, protocol} ::= '\x02' .{4} // Reference points indirectly to context descriptor
+   #else
+     {any-generic-type, protocol, opaque-type-decl-name} ::= '\x01' .{4} // Reference points directly to context descriptor
+     {any-generic-type, protocol, opaque-type-decl-name} ::= '\x02' .{4} // Reference points indirectly to context descriptor
+   #endif
+   // The grammatical role of the symbolic reference is determined by the
+   // kind of context descriptor referenced
+
+   protocol-conformance-ref ::= '\x03' .{4}  // Reference points directly to protocol conformance descriptor (NOT IMPLEMENTED)
+   protocol-conformance-ref ::= '\x04' .{4}  // Reference points indirectly to protocol conformance descriptor (NOT IMPLEMENTED)
+
+   dependent-associated-conformance ::= '\x05' .{4}  // Reference points directly to associated conformance descriptor (NOT IMPLEMENTED)
+   dependent-associated-conformance ::= '\x06' .{4}  // Reference points indirectly to associated conformance descriptor (NOT IMPLEMENTED)
+
+   associated-conformance-access-function ::= '\x07' .{4}  // Reference points directly to associated conformance access function relative to the protocol
+   associated-conformance-access-function ::= '\x08' .{4}  // Reference points directly to associated conformance access function relative to the conforming type
+
+   // keypaths only in Swift 5.0, generalized in Swift 5.1
+   #if SWIFT_RUNTIME_VERSION >= 5.1
+     metadata-access-function ::= '\x09' .{4}  // Reference points directly to metadata access function that can be invoked to produce referenced object
+   #endif
+
+A mangled name may also include ``\xFF`` bytes, which are only used for
+alignment padding. They do not affect what the mangled name references and can
+be skipped over and ignored.
+
 Globals
 ~~~~~~~
 
@@ -59,12 +123,18 @@ Globals
   global ::= nominal-type 'Ml'           // in-place type initialization cache
   global ::= nominal-type 'Mm'           // class metaclass
   global ::= nominal-type 'Mn'           // nominal type descriptor
+  #if SWIFT_RUNTIME_VERSION >= 5.1
+    global ::= opaque-type-decl-name 'MQ'  // opaque type descriptor -- added in Swift 5.1
+  #endif
   global ::= nominal-type 'Mu'           // class method lookup function
+  global ::= nominal-type 'MU'           // ObjC metadata update callback function
+  global ::= nominal-type 'Ms'           // ObjC resilient class stub
+  global ::= nominal-type 'Mt'           // Full ObjC resilient class stub (private)
   global ::= module 'MXM'                // module descriptor
   global ::= context 'MXE'               // extension descriptor
   global ::= context 'MXX'               // anonymous context descriptor
   global ::= context identifier 'MXY'    // anonymous context descriptor
-  global ::= type assoc-type-list 'MXA'  // generic parameter ref
+  global ::= type assoc-type-list 'MXA'  // generic parameter ref (HISTORICAL)
   global ::= protocol 'Mp'               // protocol descriptor
 
   global ::= nominal-type 'Mo'           // class metadata immediate member base offset
@@ -80,18 +150,21 @@ Globals
 
   global ::= type 'w' VALUE-WITNESS-KIND // value witness
 
+  global ::= protocol 'MS'               // protocol self-conformance descriptor
+  global ::= protocol 'WS'               // protocol self-conformance witness table
   global ::= protocol-conformance 'Mc'   // protocol conformance descriptor
   global ::= protocol-conformance 'WP'   // protocol witness table
-  global ::= protocol-conformance 'Wa'   // protocol witness table accessor
+  global ::= protocol-conformance 'Wa'   // protocol witness table accessor (HISTORICAL)
 
-  global ::= protocol-conformance 'WG'   // generic protocol witness table
+  global ::= protocol-conformance 'WG'   // generic protocol witness table (HISTORICAL)
   global ::= protocol-conformance 'Wp'   // protocol witness table pattern
-  global ::= protocol-conformance 'Wr'   // resilient witness table
+  global ::= protocol-conformance 'Wr'   // resilient witness table (HISTORICAL)
   global ::= protocol-conformance 'WI'   // generic protocol witness table instantiation function
   global ::= type protocol-conformance 'WL'   // lazy protocol witness table cache variable
 
   global ::= protocol-conformance identifier 'Wt' // associated type metadata accessor (HISTORICAL)
-  global ::= protocol-conformance assoc-type-list nominal-type 'WT' // associated type witness table accessor
+  global ::= protocol-conformance assoc-type-list protocol 'WT' // associated type witness table accessor
+  global ::= protocol-conformance protocol 'Wb' // base protocol witness table accessor
   global ::= type protocol-conformance 'Wl' // lazy protocol witness table accessor
 
   global ::= type 'WV'                   // value witness table
@@ -114,6 +187,7 @@ field offsets are therefore required when accessing fields in generic
 types where the metadata itself has unknown layout.)
 
 ::
+
   global ::= global 'Tj'                 // resilient method dispatch thunk
   global ::= global 'Tq'                 // method descriptor
 
@@ -121,16 +195,21 @@ types where the metadata itself has unknown layout.)
   global ::= global 'To'                 // swift-as-ObjC thunk
   global ::= global 'TD'                 // dynamic dispatch thunk
   global ::= global 'Td'                 // direct method reference thunk
+  global ::= global 'TI'                 // implementation of a dynamic_replaceable function
+  global ::= global 'TX'                 // function pointer of a dynamic_replaceable function
   global ::= entity entity 'TV'          // vtable override thunk, derived followed by base
   global ::= type label-list? 'D'        // type mangling for the debugger with label list for function types.
   global ::= type 'TC'                   // continuation prototype (not actually used for real symbols)
   global ::= protocol-conformance entity 'TW' // protocol witness thunk
+  global ::= entity 'TS'                 // protocol self-conformance witness thunk
   global ::= context identifier identifier 'TB' // property behavior initializer thunk (not used currently)
   global ::= context identifier identifier 'Tb' // property behavior setter thunk (not used currently)
   global ::= global specialization       // function specialization
   global ::= global 'Tm'                 // merged function
   global ::= entity                      // some identifiable thing
-  global ::= type type generic-signature? 'T' REABSTRACT-THUNK-TYPE   // reabstraction thunk helper function
+  global ::= from-type to-type generic-signature? 'TR'  // reabstraction thunk
+  global ::= from-type to-type self-type generic-signature? 'Ty'  // reabstraction thunk with dynamic 'Self' capture
+  global ::= from-type to-type generic-signature? 'Tr'  // obsolete mangling for reabstraction thunk
   global ::= entity generic-signature? type type* 'TK' // key path getter
   global ::= entity generic-signature? type type* 'Tk' // key path setter
   global ::= type generic-signature 'TH' // key path equality
@@ -139,14 +218,15 @@ types where the metadata itself has unknown layout.)
   global ::= protocol 'TL'               // protocol requirements base descriptor
   global ::= assoc-type-name 'Tl'        // associated type descriptor
   global ::= assoc-type-name 'TM'        // default associated type witness accessor (HISTORICAL)
-  global ::= type assoc-type-path protocol 'Tn' // associated conformance descriptor
-  global ::= type assoc-type-path protocol 'TN' // default associated conformance witness accessor
+  global ::= type assoc-type-list protocol 'Tn' // associated conformance descriptor
+  global ::= type assoc-type-list protocol 'TN' // default associated conformance witness accessor
+  global ::= type protocol 'Tb'          // base conformance descriptor
 
-  REABSTRACT-THUNK-TYPE ::= 'R'          // reabstraction thunk helper function
-  REABSTRACT-THUNK-TYPE ::= 'r'          // reabstraction thunk
+  REABSTRACT-THUNK-TYPE ::= 'R'          // reabstraction thunk
+  REABSTRACT-THUNK-TYPE ::= 'r'          // reabstraction thunk (obsolete)
 
-The types in a reabstraction thunk helper function are always non-polymorphic
-``<impl-function-type>`` types.
+The `from-type` and `to-type` in a reabstraction thunk helper function
+are always non-polymorphic ``<impl-function-type>`` types.
 
 ::
 
@@ -237,8 +317,8 @@ Entities
   ACCESSOR ::= 'p'                           // pseudo accessor referring to the storage itself
 
   ADDRESSOR-KIND ::= 'u'                     // unsafe addressor (no owner)
-  ADDRESSOR-KIND ::= 'O'                     // owning addressor (non-native owner)
-  ADDRESSOR-KIND ::= 'o'                     // owning addressor (native owner)
+  ADDRESSOR-KIND ::= 'O'                     // owning addressor (non-native owner), not used anymore
+  ADDRESSOR-KIND ::= 'o'                     // owning addressor (native owner), not used anymore
   ADDRESSOR-KIND ::= 'p'                     // pinning addressor (native owner), not used anymore
 
   decl-name ::= identifier
@@ -336,7 +416,6 @@ Types
   any-generic-type ::= context decl-name 'V'     // nominal struct type
   any-generic-type ::= context decl-name 'XY'    // unknown nominal type
   any-generic-type ::= protocol 'P'              // nominal protocol type
-  any-generic-type ::= context decl-name 'a'     // typealias type (used in DWARF and USRs)
 
   any-generic-type ::= standard-substitutions
 
@@ -400,6 +479,7 @@ Types
   type ::= 'BB'                              // Builtin.UnsafeValueBuffer
   type ::= 'Bf' NATURAL '_'                  // Builtin.Float<n>
   type ::= 'Bi' NATURAL '_'                  // Builtin.Int<n>
+  type ::= 'BI'                              // Builtin.IntLiteral
   type ::= 'BO'                              // Builtin.UnknownObject
   type ::= 'Bo'                              // Builtin.NativeObject
   type ::= 'Bp'                              // Builtin.RawPointer
@@ -432,6 +512,7 @@ Types
   FUNCTION-KIND ::= 'U'                      // uncurried function type (currently not used)
   FUNCTION-KIND ::= 'K'                      // @auto_closure function type (noescape)
   FUNCTION-KIND ::= 'B'                      // objc block function type
+  FUNCTION-KIND ::= 'L'                      // objc block function type (escaping) (DWARF only; otherwise use 'B')
   FUNCTION-KIND ::= 'C'                      // C function pointer type
   FUNCTION-KIND ::= 'A'                      // @auto_closure function type (escaping)
   FUNCTION-KIND ::= 'E'                      // function type (noescape)
@@ -536,6 +617,20 @@ For the most part, manglings follow the structure of formal language
 types.  However, in some cases it is more useful to encode the exact
 implementation details of a function type.
 
+::
+
+  #if SWIFT_VERSION >= 5.1
+    type ::= 'Qr'                         // opaque result type (of current decl)
+    type ::= opaque-type-decl-name bound-generic-args 'Qo' INDEX // opaque type
+
+    opaque-type-decl-name ::= entity 'QO' // opaque result type of specified decl
+  #endif
+
+Opaque return types have a special short representation in the mangling of
+their defining entity. In structural position, opaque types are fully qualified
+by mangling the defining entity for the opaque declaration and the substitutions
+into the defining entity's generic environment.
+
 The ``type*`` list contains parameter and return types (including the error
 result), in that order.
 The number of parameters and results must match with the number of
@@ -543,12 +638,25 @@ The number of parameters and results must match with the number of
 ``<FUNC-REPRESENTATION>``.
 The ``<generic-signature>`` is used if the function is polymorphic.
 
+DWARF debug info and USRs also mangle sugared types, adding the following
+productions:
+
+::
+
+  any-generic-type ::= context decl-name 'a'     // typealias type
+  type ::= base-type "XSq"                       // sugared Optional type
+  type ::= base-type "XSa"                       // sugared Array type
+  type ::= key-type value-type "XSD"             // sugared Dictionary type
+  type ::= base-type "XSp"                       // sugared Paren type
+
 Generics
 ~~~~~~~~
 
 ::
 
-  protocol-conformance ::= type protocol module generic-signature?
+  protocol-conformance-context ::= protocol module generic-signature?
+
+  protocol-conformance ::= type protocol-conformance-context
 
 ``<protocol-conformance>`` refers to a type's conformance to a protocol. The
 named module is the one containing the extension or type declaration that
@@ -556,9 +664,62 @@ declared the conformance.
 
 ::
 
+  protocol-conformance ::= type protocol
+
+If ``type`` is a generic parameter or associated type of one, then no module
+is mangled, because the conformance must be resolved from the generic
+environment.
+
   protocol-conformance ::= context identifier protocol identifier generic-signature?  // Property behavior conformance
 
 Property behaviors are implemented using private protocol conformances.
+
+::
+
+  concrete-protocol-conformance ::= type protocol-conformance-ref any-protocol-conformance-list 'HC'
+  protocol-conformance-ref ::= protocol 'HP'   // same module as conforming type
+  protocol-conformance-ref ::= protocol 'Hp'   // same module as protocol
+  protocol-conformance-ref ::= protocol module // "retroactive"
+
+  any-protocol-conformance ::= concrete-protocol-conformance
+  any-protocol-conformance ::= dependent-protocol-conformance
+
+  any-protocol-conformance-list ::= any-protocol-conformance '_' any-protocol-conformance-list
+  any-protocol-conformance-list ::= empty-list
+
+  DEPENDENT-CONFORMANCE-INDEX ::= INDEX
+
+  dependent-protocol-conformance ::= type protocol 'HD' DEPENDENT-CONFORMANCE-INDEX
+  dependent-protocol-conformance ::= dependent-protocol-conformance protocol 'HI' DEPENDENT-CONFORMANCE-INDEX
+  dependent-protocol-conformance ::= dependent-protocol-conformance
+      dependent-associated-conformance 'HA' DEPENDENT-CONFORMANCE-INDEX
+
+  dependent-associated-conformance ::= type protocol
+  dependent-protocol-conformance ::= dependent-protocol-conformance opaque-type 'HO'
+
+A compact representation used to represent mangled protocol conformance witness
+arguments at runtime. The ``module`` is only specified for conformances that
+are "retroactive", meaning that the context in which the conformance is defined
+is in neither the protocol or type module. For a non-retroactive conformance
+where both the type *and* the protocol are in the same module, or for
+synthesized conformances that have no owning module, the "HP" operator is
+preferred. The concrete protocol conformances that follow are for the
+conditional conformance requirements.
+
+Dependent protocol conformances mangle the access path required to extract a
+protocol conformance from some conformance passed into the environment. The
+first case (operator "HD") is the leaf requirement, containing a dependent type
+and the protocol it conforms to. The remaining dependent protocol conformance
+manglings describe lookups performed on their child dependent protocol
+conformances. The "HI" operator retrieves the named inherited protocol from the
+witness table produced by the child. The "HA" operator refers to an associated
+conformance within the witness table, identified by the dependent type and
+protocol. In all cases, the DEPENDENT-CONFORMANCE-INDEX is an INDEX value
+indicating the position of the appropriate value within the generic environment
+(for "HD") or witness table (for "HI" and "HA") when it is known to be at a
+fixed position. An index of 1 ("0_") is used to indicate "unknown"; all other
+values are adjusted by 2. That these indexes are not 0-based is a bug that's
+now codified into the ABI; the index 0 is therefore reserved.
 
 ::
 
@@ -618,7 +779,7 @@ from any character in a ``<GENERIC-PARAM-COUNT>``.
 
 ::
 
-  retroactive-conformance ::= protocol-conformance 'g' INDEX
+  retroactive-conformance ::= any-protocol-conformance 'g' INDEX
 
 When a protocol conformance used to satisfy one of a bound generic type's
 generic requirements is retroactive (i.e., it is specified in a module other

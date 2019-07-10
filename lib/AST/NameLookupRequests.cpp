@@ -12,6 +12,7 @@
 
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/Subsystems.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Evaluator.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
@@ -74,6 +75,30 @@ void UnderlyingTypeDeclsReferencedRequest::noteCycleStep(
 //----------------------------------------------------------------------------//
 // Superclass declaration computation.
 //----------------------------------------------------------------------------//
+Optional<ClassDecl *> SuperclassDeclRequest::getCachedResult() const {
+  auto nominalDecl = std::get<0>(getStorage());
+
+  if (auto *classDecl = dyn_cast<ClassDecl>(nominalDecl))
+    if (classDecl->LazySemanticInfo.SuperclassDecl.getInt())
+      return classDecl->LazySemanticInfo.SuperclassDecl.getPointer();
+
+  if (auto *protocolDecl = dyn_cast<ProtocolDecl>(nominalDecl))
+    if (protocolDecl->LazySemanticInfo.SuperclassDecl.getInt())
+      return protocolDecl->LazySemanticInfo.SuperclassDecl.getPointer();
+
+  return None;
+}
+
+void SuperclassDeclRequest::cacheResult(ClassDecl *value) const {
+  auto nominalDecl = std::get<0>(getStorage());
+
+  if (auto *classDecl = dyn_cast<ClassDecl>(nominalDecl))
+    classDecl->LazySemanticInfo.SuperclassDecl.setPointerAndInt(value, true);
+
+  if (auto *protocolDecl = dyn_cast<ProtocolDecl>(nominalDecl))
+    protocolDecl->LazySemanticInfo.SuperclassDecl.setPointerAndInt(value, true);
+}
+
 void SuperclassDeclRequest::diagnoseCycle(DiagnosticEngine &diags) const {
   // FIXME: Improve this diagnostic.
   auto subjectDecl = std::get<0>(getStorage());
@@ -87,7 +112,7 @@ void SuperclassDeclRequest::noteCycleStep(DiagnosticEngine &diags) const {
 }
 
 //----------------------------------------------------------------------------//
-// Superclass declaration computation.
+// Extended nominal computation.
 //----------------------------------------------------------------------------//
 Optional<NominalTypeDecl *> ExtendedNominalRequest::getCachedResult() const {
   // Note: if we fail to compute any nominal declaration, it's considered
@@ -121,15 +146,21 @@ void ExtendedNominalRequest::noteCycleStep(DiagnosticEngine &diags) const {
 void SelfBoundsFromWhereClauseRequest::diagnoseCycle(
                                               DiagnosticEngine &diags) const {
   // FIXME: Improve this diagnostic.
-  auto ext = std::get<0>(getStorage());
-  diags.diagnose(ext, diag::circular_reference);
+  auto subject = std::get<0>(getStorage());
+  Decl *decl = subject.dyn_cast<TypeDecl *>();
+  if (decl == nullptr)
+    decl = subject.get<ExtensionDecl *>();
+  diags.diagnose(decl, diag::circular_reference);
 }
 
 void SelfBoundsFromWhereClauseRequest::noteCycleStep(
                                               DiagnosticEngine &diags) const {
-  auto ext = std::get<0>(getStorage());
   // FIXME: Customize this further.
-  diags.diagnose(ext, diag::circular_reference_through);
+  auto subject = std::get<0>(getStorage());
+  Decl *decl = subject.dyn_cast<TypeDecl *>();
+  if (decl == nullptr)
+    decl = subject.get<ExtensionDecl *>();
+  diags.diagnose(decl, diag::circular_reference_through);
 }
 
 void TypeDeclsFromWhereClauseRequest::diagnoseCycle(
@@ -144,6 +175,20 @@ void TypeDeclsFromWhereClauseRequest::noteCycleStep(
   auto ext = std::get<0>(getStorage());
   // FIXME: Customize this further.
   diags.diagnose(ext, diag::circular_reference_through);
+}
+
+void CustomAttrNominalRequest::diagnoseCycle(
+    DiagnosticEngine &diags) const {
+  auto attr = std::get<0>(getStorage());
+  ASTContext &ctx = std::get<1>(getStorage())->getASTContext();
+  ctx.Diags.diagnose(attr->getLocation(), diag::circular_reference);
+}
+
+void CustomAttrNominalRequest::noteCycleStep(
+    DiagnosticEngine &diags) const {
+  auto attr = std::get<0>(getStorage());
+  ASTContext &ctx = std::get<1>(getStorage())->getASTContext();
+  ctx.Diags.diagnose(attr->getLocation(), diag::circular_reference_through);
 }
 
 // Define request evaluation functions for each of the name lookup requests.

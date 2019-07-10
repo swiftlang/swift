@@ -55,13 +55,16 @@ Parser::parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
     // Note that we're parsing a declaration.
     StructureMarkerRAII ParsingDecl(*this, Tok.getLoc(),
                                     StructureMarkerKind::Declaration);
+    
+    if (ParsingDecl.isFailed()) {
+      return makeParserError();
+    }
 
     // Parse attributes.
     DeclAttributes attributes;
     if (Tok.hasComment())
       attributes.add(new (Context) RawDocCommentAttr(Tok.getCommentRange()));
-    bool foundCCTokenInAttr;
-    parseDeclAttributeList(attributes, foundCCTokenInAttr);
+    parseDeclAttributeList(attributes);
 
     // Parse the name of the parameter.
     Identifier Name;
@@ -225,12 +228,8 @@ Parser::diagnoseWhereClauseInGenericParamList(const GenericParamList *
   if (Tok.is(tok::kw_where))
     WhereClauseText << ',';
 
-  // For Swift 3, keep this warning. 
-  const auto Message = Context.isSwiftVersion3() 
-                             ? diag::swift3_where_inside_brackets 
-                             : diag::where_inside_brackets;
-
-  auto Diag = diagnose(WhereRangeInsideBrackets.Start, Message);
+  auto Diag = diagnose(WhereRangeInsideBrackets.Start,
+                       diag::where_inside_brackets);
 
   Diag.fixItRemoveChars(RemoveWhereRange.getStart(),
                         RemoveWhereRange.getEnd());
@@ -297,8 +296,8 @@ ParserStatus Parser::parseGenericWhereClause(
           getLayoutConstraint(Context.getIdentifier(Tok.getText()), Context)
               ->isKnownLayout()) {
         // Parse a layout constraint.
-        auto LayoutName = Context.getIdentifier(Tok.getText());
-        auto LayoutLoc = consumeToken();
+        Identifier LayoutName;
+        auto LayoutLoc = consumeIdentifier(&LayoutName);
         auto LayoutInfo = parseLayoutConstraint(LayoutName);
         if (!LayoutInfo->isKnownLayout()) {
           // There was a bug in the layout constraint.

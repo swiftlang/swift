@@ -29,9 +29,9 @@ extension Version: Hashable {
         return lhs.major == rhs.major &&
                lhs.buildMetadataIdentifiers == rhs.buildMetadataIdentifiers
     }
-    public var hashValue: Int {
-        var result: UInt64 = 0
-        return Int(truncatingIfNeeded: result)
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(major)
+        hasher.combine(buildMetadataIdentifiers)
     }
 }
 

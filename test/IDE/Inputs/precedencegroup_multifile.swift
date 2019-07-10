@@ -1,0 +1,3 @@
+precedencegroup PrecedenceGroupOtherFile {
+  associativity: left
+}

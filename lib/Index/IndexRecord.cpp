@@ -164,9 +164,7 @@ public:
     // FIXME: expose errors?
   }
 
-  bool recordHash(StringRef hash, bool isKnown) override { return true; }
-  bool startDependency(StringRef name, StringRef path, bool isClangModule,
-                       bool isSystem, StringRef hash) override {
+  bool startDependency(StringRef name, StringRef path, bool isClangModule, bool isSystem) override {
     return true;
   }
   bool finishDependency(bool isClangModule) override { return true; }
@@ -203,9 +201,7 @@ public:
     // FIXME: expose errors?
   }
 
-  bool recordHash(StringRef hash, bool isKnown) override { return true; }
-  bool startDependency(StringRef name, StringRef path, bool isClangModule,
-                       bool isSystem, StringRef hash) override {
+  bool startDependency(StringRef name, StringRef path, bool isClangModule, bool isSystem) override {
     return true;
   }
   bool finishDependency(bool isClangModule) override { return true; }
@@ -342,7 +338,7 @@ recordSourceFile(SourceFile *SF, StringRef indexStorePath,
   bool failed = false;
   auto consumer = makeRecordingConsumer(SF->getFilename(), indexStorePath,
                                         &diags, &recordFile, &failed);
-  indexSourceFile(SF, /*Hash=*/"", *consumer);
+  indexSourceFile(SF, *consumer);
 
   if (!failed && !recordFile.empty())
     callback(recordFile, SF->getFilename());
@@ -406,6 +402,7 @@ static void addModuleDependencies(ArrayRef<ModuleDecl::ImportedModule> imports,
       case FileUnitKind::Builtin:
         break;
       case FileUnitKind::SerializedAST:
+      case FileUnitKind::DWARFModule:
       case FileUnitKind::ClangModule: {
         auto *LFU = cast<LoadedFile>(FU);
         if (auto *F = fileMgr.getFile(LFU->getFilename())) {
@@ -481,7 +478,7 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
     bool failed = false;
     auto consumer = makeRecordingConsumer(filename, indexStorePath,
                                           &diags, &recordFile, &failed);
-    indexModule(module, /*Hash=*/"", *consumer);
+    indexModule(module, *consumer);
 
     if (failed)
       return true;
@@ -530,7 +527,7 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
       records.emplace_back(outRecordFile, moduleName.str());
       return true;
     });
-    indexModule(module, /*Hash=*/"", groupIndexConsumer);
+    indexModule(module, groupIndexConsumer);
     if (failed)
       return true;
   }
@@ -561,8 +558,11 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
     unitWriter.addRecordFile(recordFile, FE, isSystemModule, mod);
   }
 
+  ModuleDecl::ImportFilter importFilter;
+  importFilter |= ModuleDecl::ImportFilterKind::Public;
+  importFilter |= ModuleDecl::ImportFilterKind::Private;
   SmallVector<ModuleDecl::ImportedModule, 8> imports;
-  module->getImportedModules(imports, ModuleDecl::ImportFilter::All);
+  module->getImportedModules(imports, importFilter);
   StringScratchSpace moduleNameScratch;
   addModuleDependencies(imports, indexStorePath, indexSystemModules,
                         targetTriple, clangCI, diags, unitWriter, moduleNameScratch);
@@ -596,8 +596,12 @@ recordSourceFileUnit(SourceFile *primarySourceFile, StringRef indexUnitToken,
     targetTriple, sysrootPath, getModuleInfoFromOpaqueModule);
 
   // Module dependencies.
+  ModuleDecl::ImportFilter importFilter;
+  importFilter |= ModuleDecl::ImportFilterKind::Public;
+  importFilter |= ModuleDecl::ImportFilterKind::Private;
+  importFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
   SmallVector<ModuleDecl::ImportedModule, 8> imports;
-  primarySourceFile->getImportedModules(imports, ModuleDecl::ImportFilter::All);
+  primarySourceFile->getImportedModules(imports, importFilter);
   StringScratchSpace moduleNameScratch;
   addModuleDependencies(imports, indexStorePath, indexSystemModules,
                         targetTriple, clangCI, diags, unitWriter, moduleNameScratch);

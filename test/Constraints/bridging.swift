@@ -43,7 +43,7 @@ extension LazyFilterSequence.Iterator : _ObjectiveCBridgeable { // expected-erro
 
 
 struct BridgedStruct : Hashable, _ObjectiveCBridgeable {
-  var hashValue: Int { return 0 }
+  func hash(into hasher: inout Hasher) {}
 
   func _bridgeToObjectiveC() -> BridgedClass {
     return BridgedClass()
@@ -71,14 +71,14 @@ struct BridgedStruct : Hashable, _ObjectiveCBridgeable {
 
 func ==(x: BridgedStruct, y: BridgedStruct) -> Bool { return true }
 
-struct NotBridgedStruct : Hashable { 
-  var hashValue: Int { return 0 }
+struct NotBridgedStruct : Hashable {
+  func hash(into hasher: inout Hasher) {}
 }
 
 func ==(x: NotBridgedStruct, y: NotBridgedStruct) -> Bool { return true }
 
 class OtherClass : Hashable { 
-  var hashValue: Int { return 0 }
+  func hash(into hasher: inout Hasher) {}
 }
 func ==(x: OtherClass, y: OtherClass) -> Bool { return true }
 
@@ -223,7 +223,9 @@ func takesDictionary<K, V>(_ p: Dictionary<K, V>) {} // expected-note {{in call 
 func takesArray<T>(_ t: Array<T>) {} // expected-note {{in call to function 'takesArray'}}
 func rdar19695671() {
   takesSet(NSSet() as! Set) // expected-error{{generic parameter 'T' could not be inferred}}
-  takesDictionary(NSDictionary() as! Dictionary) // expected-error{{generic parameter 'K' could not be inferred}}
+  takesDictionary(NSDictionary() as! Dictionary)
+  // expected-error@-1 {{generic parameter 'K' could not be inferred}}
+  // expected-error@-2 {{generic parameter 'V' could not be inferred}}
   takesArray(NSArray() as! Array) // expected-error{{generic parameter 'T' could not be inferred}}
 }
 
@@ -269,7 +271,7 @@ func rdar19831698() {
   var v72 = true + true // expected-error{{binary operator '+' cannot be applied to two 'Bool' operands}}
   // expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists:}}
   var v73 = true + [] // expected-error{{binary operator '+' cannot be applied to operands of type 'Bool' and '[Any]'}}
-  // expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists: (Self, Other), (Other, Self)}}
+  // expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists: (Array<Element>, Array<Element>), (Other, Self), (Self, Other)}}
   var v75 = true + "str" // expected-error {{binary operator '+' cannot be applied to operands of type 'Bool' and 'String'}} expected-note {{expected an argument list of type '(String, String)'}}
 }
 
@@ -349,7 +351,7 @@ func forceUniversalBridgeToAnyObject<T, U: KnownClassProtocol>(a: T, b: U, c: An
 
   z = a // expected-error{{does not conform to 'AnyObject'}}
   z = b
-  z = c // expected-error{{does not conform to 'AnyObject'}}
+  z = c // expected-error{{does not conform to 'AnyObject'}} expected-note {{cast 'Any' to 'AnyObject'}} {{8-8= as AnyObject}}
   z = d // expected-error{{does not conform to 'AnyObject'}}
   z = e
   z = f

@@ -215,6 +215,24 @@ func shortFormMissingParen() { // expected-error {{expected ')' in 'available' a
 func shortFormMissingPlatform() {
 }
 
+@available(iOS 8.0, iDishwasherOS 22.0, *) // expected-warning {{unrecognized platform name 'iDishwasherOS'}}
+func shortFormWithUnrecognizedPlatform() {
+}
+
+@available(iOS 8.0, iDishwasherOS 22.0, iRefrigeratorOS 18.0, *)
+// expected-warning@-1 {{unrecognized platform name 'iDishwasherOS'}}
+// expected-warning@-2 {{unrecognized platform name 'iRefrigeratorOS'}}
+func shortFormWithTwoUnrecognizedPlatforms() {
+}
+
+// Make sure that even after the parser hits an unrecognized
+// platform it validates the availability.
+@available(iOS 8.0, iDishwasherOS 22.0, iOS 9.0, *)
+// expected-warning@-1 {{unrecognized platform name 'iDishwasherOS'}}
+// expected-error@-2 {{version for 'iOS' already specified}}
+func shortFormWithUnrecognizedPlatformContinueValidating() {
+}
+
 @available(iOS 8.0, *
 func shortFormMissingParenAfterWildcard() { // expected-error {{expected ')' in 'available' attribute}}
 }
@@ -1048,4 +1066,37 @@ enum SR8634_Enum: Int {
 struct SR8634_Struct: Equatable {
   @available(*, deprecated, message: "I must not be raised in synthesized code", renamed: "x")
   let a: Int
+}
+
+@available(*, deprecated, message: "This is a message", message: "This is another message")
+// expected-warning@-1 {{'message' argument has already been specified}}
+func rdar46348825_message() {}
+
+@available(*, deprecated, renamed: "rdar46348825_message", renamed: "unavailable_func_with_message")
+// expected-warning@-1 {{'renamed' argument has already been specified}}
+func rdar46348825_renamed() {}
+
+@available(swift, introduced: 4.0, introduced: 4.0)
+// expected-warning@-1 {{'introduced' argument has already been specified}}
+func rdar46348825_introduced() {}
+
+@available(swift, deprecated: 4.0, deprecated: 4.0)
+// expected-warning@-1 {{'deprecated' argument has already been specified}}
+func rdar46348825_deprecated() {}
+
+@available(swift, obsoleted: 4.0, obsoleted: 4.0)
+// expected-warning@-1 {{'obsoleted' argument has already been specified}}
+func rdar46348825_obsoleted() {}
+
+// Referencing unavailable types in signatures of unavailable functions should be accepted
+@available(*, unavailable)
+protocol UnavailableProto {
+}
+
+@available(*, unavailable)
+func unavailableFunc(_ arg: UnavailableProto) -> UnavailableProto {}
+
+@available(*, unavailable)
+struct S {
+  var a: UnavailableProto
 }

@@ -60,7 +60,7 @@
 /// bridged into Swift as `Bool`. The single `Bool` type in Swift guarantees
 /// that functions, methods, and properties imported from C and Objective-C
 /// have a consistent type interface.
-@_fixed_layout
+@frozen
 public struct Bool {
   @usableFromInline
   internal var _value: Builtin.Int1
@@ -170,15 +170,6 @@ extension Bool : _ExpressibleByBuiltinBooleanLiteral, ExpressibleByBooleanLitera
   }
 }
 
-extension Bool {
-  // This is a magic entry point known to the compiler.
-  @_transparent
-  public // COMPILER_INTRINSIC
-  func _getBuiltinLogicValue() -> Builtin.Int1 {
-    return _value
-  }
-}
-
 extension Bool : CustomStringConvertible {
   /// A textual representation of the Boolean value.
   @inlinable
@@ -186,11 +177,6 @@ extension Bool : CustomStringConvertible {
     return self ? "true" : "false"
   }
 }
-
-// This is a magic entry point known to the compiler.
-@_transparent
-public // COMPILER_INTRINSIC
-func _getBool(_ v: Builtin.Int1) -> Bool { return Bool(v) }
 
 extension Bool: Equatable {
   @_transparent
@@ -343,10 +329,10 @@ extension Bool {
   /// Use this method to toggle a Boolean value from `true` to `false` or from
   /// `false` to `true`.
   ///
-  ///    var bools = [true, false]
+  ///     var bools = [true, false]
   ///
-  ///    bools[0].toggle()
-  ///    // bools == [false, false]
+  ///     bools[0].toggle()
+  ///     // bools == [false, false]
   @inlinable
   public mutating func toggle() {
     self = !self

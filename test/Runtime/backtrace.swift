@@ -1,6 +1,10 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -o %t/a.out
-// RUN: not --crash %t/a.out 2>&1 | %utils/backtrace-check
+// RUN: %{python} %S/../Inputs/not.py "%target-run %t/a.out" 2>&1 | %{python} %utils/backtrace-check
+
+// NOTE: not.py is used above instead of "not --crash" because %target-run
+// doesn't pass through the crash, and `not` may not be available when running
+// on a remote host.
 
 // This is not supported on watchos, ios, or tvos
 // UNSUPPORTED: OS=watchos

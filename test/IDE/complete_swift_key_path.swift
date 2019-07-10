@@ -21,7 +21,9 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=EMPTY_2 | %FileCheck %s -check-prefix=INVALID
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONTEXT_BASEONLY | %FileCheck %s -check-prefix=PERSONTYPE-DOT
-// FIXME: RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONTEXT_EXPLICIT | %FileCheck %s -check-prefix=INVALID
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONTEXT_EXPLICIT | %FileCheck %s -check-prefix=PERSONTYPE-DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONTEXT_GENERIC_RESULT | %FileCheck %s -check-prefix=PERSONTYPE-DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONTEXT_GENERIC_RESULT_OPTIONAL | %FileCheck %s -check-prefix=PERSONTYPE-DOT
 
 class Person {
     var name: String
@@ -41,7 +43,7 @@ let _ = \Person#^TYPE_NODOT^#
 // PERSONTYPE-NODOT-NEXT: Decl[InstanceVar]/CurrNominal:      .friends[#[Person]#]; name=friends
 // PERSONTYPE-NODOT-NEXT: Decl[InstanceVar]/CurrNominal:      .bestFriend[#Person?#]; name=bestFriend
 // PERSONTYPE-NODOT-NEXT: Decl[InstanceVar]/CurrNominal:      .itself[#Person#]; name=itself
-// PERSONTYPE-NODOT-NEXT: Decl[Subscript]/CurrNominal:        .[{#Int#}][#Int#]; name=[Int]
+// PERSONTYPE-NODOT-NEXT: Decl[Subscript]/CurrNominal:        .[{#(index): Int#}][#Int#]; name=[index: Int]
 
 let _ = \Person.#^TYPE_DOT^#
 // PERSONTYPE-DOT: Begin completions, 5 items
@@ -49,20 +51,20 @@ let _ = \Person.#^TYPE_DOT^#
 // PERSONTYPE-DOT-NEXT: Decl[InstanceVar]/CurrNominal:      friends[#[Person]#]; name=friends
 // PERSONTYPE-DOT-NEXT: Decl[InstanceVar]/CurrNominal:      bestFriend[#Person?#]; name=bestFriend
 // PERSONTYPE-DOT-NEXT: Decl[InstanceVar]/CurrNominal:      itself[#Person#]; name=itself
-// PERSONTYPE-DOT-NEXT: Decl[Subscript]/CurrNominal:        [{#Int#}][#Int#]; name=[Int]
+// PERSONTYPE-DOT-NEXT: Decl[Subscript]/CurrNominal:        [{#(index): Int#}][#Int#]; name=[index: Int]
 
 let _ = \Person.friends#^ARRAY_NODOT^#
 // ARRAY-NODOT: Begin completions
-// ARRAY-NODOT-DAG: Decl[Subscript]/CurrNominal:        [{#Int#}][#Element#]; name=[Int]
+// ARRAY-NODOT-DAG: Decl[Subscript]/CurrNominal:        [{#(index): Int#}][#Person#]; name=[index: Int]
 // ARRAY-NODOT-DAG: Decl[InstanceVar]/CurrNominal:      .count[#Int#]; name=count
 // ARRAY-NODOT-DAG: Decl[InstanceVar]/Super:            .first[#Person?#]; name=first
 
 let _ = \Person.friends.#^ARRAY_DOT^#
 // ARRAY-DOT: Begin completions
-// ARRAY-DOT-NOT: Decl[Subscript]/CurrNominal:        [{#Int#}][#Element#]; name=[Int]
+// ARRAY-DOT-NOT: Decl[Subscript]/CurrNominal:        [{#(index): Int#}][#Element#]; name=[Int]
 // ARRAY-DOT-DAG: Decl[InstanceVar]/CurrNominal:      count[#Int#]; name=count
 // ARRAY-DOT-DAG: Decl[InstanceVar]/Super:            first[#Person?#]; name=first
-// ARRAY-DOT-NOT: Decl[Subscript]/CurrNominal:        [{#Int#}][#Element#]; name=[Int]
+// ARRAY-DOT-NOT: Decl[Subscript]/CurrNominal:        [{#(index): Int#}][#Element#]; name=[Int]
 
 let _ = \Person.friends[0]#^OBJ_NODOT^#
 // OBJ-NODOT: Begin completions, 5 items
@@ -70,7 +72,7 @@ let _ = \Person.friends[0]#^OBJ_NODOT^#
 // OBJ-NODOT-NEXT: Decl[InstanceVar]/CurrNominal:      .friends[#[Person]#]; name=friends
 // OBJ-NODOT-NEXT: Decl[InstanceVar]/CurrNominal:      .bestFriend[#Person?#]; name=bestFriend
 // OBJ-NODOT-NEXT: Decl[InstanceVar]/CurrNominal:      .itself[#Person#]; name=itself
-// OBJ-NODOT-NEXT: Decl[Subscript]/CurrNominal:        [{#Int#}][#Int#]; name=[Int]
+// OBJ-NODOT-NEXT: Decl[Subscript]/CurrNominal:        [{#(index): Int#}][#Int#]; name=[index: Int]
 
 let _ = \Person.friends[0].#^OBJ_DOT^#
 // OBJ-DOT: Begin completions, 4 items
@@ -85,7 +87,7 @@ let _ = \Person.bestFriend#^OPTIONAL_NODOT^#
 // OPTIONAL-NODOT-NEXT: Decl[InstanceVar]/CurrNominal:      ?.friends[#[Person]#]; name=friends
 // OPTIONAL-NODOT-NEXT: Decl[InstanceVar]/CurrNominal:      ?.bestFriend[#Person?#]; name=bestFriend
 // OPTIONAL-NODOT-NEXT: Decl[InstanceVar]/CurrNominal:      ?.itself[#Person#]; name=itself
-// OPTIONAL-NODOT-NEXT: Decl[Subscript]/CurrNominal:        ?[{#Int#}][#Int#]; name=[Int]
+// OPTIONAL-NODOT-NEXT: Decl[Subscript]/CurrNominal:        ?[{#(index): Int#}][#Int#]; name=[index: Int]
 // OPTIONAL-NODOT: Decl[InstanceVar]/CurrNominal:      .unsafelyUnwrapped[#Person#]; name=unsafelyUnwrapped
 
 let _ = \Person.bestFriend.#^OPTIONAL_DOT^#
@@ -110,13 +112,13 @@ let _ = \Person.bestFriend?.itself.#^CHAIN_DOT^#
 
 let _ = \[Person]#^ARRAYTYPE_NODOT^#
 // ARRAYTYPE-NODOT: Begin completions
-// ARRAYTYPE-NODOT-DAG: Decl[Subscript]/CurrNominal:        .[{#Int#}][#Element#]; name=[Int]
+// ARRAYTYPE-NODOT-DAG: Decl[Subscript]/CurrNominal:        .[{#(index): Int#}][#Person#]; name=[index: Int]
 // ARRAYTYPE-NODOT-DAG: Decl[InstanceVar]/CurrNominal:      .count[#Int#]; name=count
 // ARRAYTYPE-NODOT-DAG: Decl[InstanceVar]/Super:            .first[#Person?#]; name=first
 
 let _ = \[Person].#^ARRAYTYPE_DOT^#
 // ARRAYTYPE-DOT: Begin completions
-// ARRAYTYPE-DOT-DAG: Decl[Subscript]/CurrNominal:        [{#Int#}][#Element#]; name=[Int]
+// ARRAYTYPE-DOT-DAG: Decl[Subscript]/CurrNominal:        [{#(index): Int#}][#Person#]; name=[index: Int]
 // ARRAYTYPE-DOT-DAG: Decl[InstanceVar]/CurrNominal:      count[#Int#]; name=count
 // ARRAYTYPE-DOT-DAG: Decl[InstanceVar]/Super:            first[#Person?#]; name=first
 
@@ -131,9 +133,19 @@ let _ = \.#^EMPTY_1^#
 let _ = \.friends.#^EMPTY_2^#
 // INVALID-NOT: Begin completions
 
-let _: PartialKeyPath<Person> = \.#^CONTEXT_BASEONLY^#
-// Same as TYPE_DOT.
-
-let _: KeyPath<Person, String> = \.#^CONTEXT_EXPLICIT^#
-// FIXME: Currently, it's suggest nothing. Since we know the base type is
-// 'Person', we should suggest at least '.name'.
+func recvPartialKP(_ kp: PartialKeyPath<Person>) {
+  recvPartialKP(\.#^CONTEXT_BASEONLY^#)
+  // Same as TYPE_DOT.
+}
+func recvExplicitKP(_ kp: KeyPath<Person, String>) {
+  recvExplicitKP(\.#^CONTEXT_EXPLICIT^#)
+  // Same as TYPE_DOT.
+}
+func recvExplicitKPWithGenericResult<Result>(_ kp: KeyPath<Person, Result>) {
+  recvExplicitKPWithGenericResult(\.#^CONTEXT_GENERIC_RESULT^#)
+  // Same as TYPE_DOT.
+}
+func recvExplicitKPWithGenericResultOpt<Result>(_ kp: KeyPath<Person, Result>?) {
+  recvExplicitKPWithGenericResult(\.#^CONTEXT_GENERIC_RESULT_OPTIONAL^#
+  // Same as TYPE_DOT.
+}

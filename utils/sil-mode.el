@@ -95,6 +95,7 @@
                     "is_unique"
                     "is_escaping_closure"
                     "copy_block"
+                    "copy_block_without_escaping"
                     "is_unique")
                   'words) . font-lock-keyword-face)
    ;; Literals

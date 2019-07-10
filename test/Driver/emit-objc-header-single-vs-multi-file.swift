@@ -1,5 +1,6 @@
 // FIXME: BEGIN -enable-source-import hackaround
 // RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t %clang-importer-sdk-path/swift-modules/Darwin.swift
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t %clang-importer-sdk-path/swift-modules/Foundation.swift
 // FIXME: END -enable-source-import hackaround
 

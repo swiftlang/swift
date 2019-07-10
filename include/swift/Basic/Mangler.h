@@ -78,6 +78,14 @@ protected:
     }
   };
 
+  void addSubstWordsInIdent(const WordReplacement &repl) {
+    SubstWordsInIdent.push_back(repl);
+  }
+
+  void addWord(const SubstitutionWord &word) {
+    Words.push_back(word);
+  }
+
   /// Returns the buffer as a StringRef, needed by mangleIdentifier().
   StringRef getBufferStr() const {
     return StringRef(Storage.data(), Storage.size());
@@ -141,11 +149,6 @@ protected:
   void appendOperator(StringRef op) {
     size_t OldPos = Storage.size();
     Buffer << op;
-    recordOpStat(op, OldPos);
-  }
-  void appendOperator(StringRef op, int natural) {
-    size_t OldPos = Storage.size();
-    Buffer << op << natural << '_';
     recordOpStat(op, OldPos);
   }
   void appendOperator(StringRef op, Index index) {

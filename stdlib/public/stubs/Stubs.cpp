@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -155,8 +155,20 @@ static inline locale_t getCLocale() {
   // as C locale.
   return nullptr;
 }
-#elif defined(__CYGWIN__) || defined(_WIN32) || defined(__HAIKU__)
+#elif defined(__CYGWIN__) || defined(__HAIKU__)
 // In Cygwin, getCLocale() is not used.
+#elif defined(_WIN32)
+static _locale_t makeCLocale() {
+  _locale_t CLocale = _create_locale(LC_ALL, "C");
+  if (!CLocale) {
+    swift::crash("makeCLocale: _create_locale() returned a null pointer");
+  }
+  return CLocale;
+}
+
+static _locale_t getCLocale() {
+  return SWIFT_LAZY_CONSTANT(makeCLocale());
+}
 #else
 static locale_t makeCLocale() {
   locale_t CLocale = newlocale(LC_ALL_MASK, "C", nullptr);
@@ -276,11 +288,11 @@ uint64_t swift_float80ToString(char *Buffer, size_t BufferLength,
 
 /// \param[out] LinePtr Replaced with the pointer to the malloc()-allocated
 /// line.  Can be NULL if no characters were read. This buffer should be
-/// freed by the caller if this function returns a positive value.
+/// freed by the caller.
 ///
 /// \returns Size of character data returned in \c LinePtr, or -1
 /// if an error occurred, or EOF was reached.
-swift::__swift_ssize_t
+__swift_ssize_t
 swift::swift_stdlib_readLine_stdin(unsigned char **LinePtr) {
 #if defined(_WIN32)
   if (LinePtr == nullptr)
@@ -370,6 +382,62 @@ static const char *_swift_stdlib_strtoX_clocale_impl(
 
   return nptr + pos;
 }
+
+#if defined(_WIN32)
+template <>
+const char *
+_swift_stdlib_strtoX_clocale_impl<float>(const char *str, float *result) {
+  if (swift_stringIsSignalingNaN(str)) {
+    *result = std::numeric_limits<float>::signaling_NaN();
+    return str + std::strlen(str);
+  }
+
+  char *end;
+  _set_errno(0);
+  *result = _strtof_l(str, &end, getCLocale());
+  if (*result == HUGE_VALF || *result == -HUGE_VALF || *result == 0.0 || *result == -0.0) {
+    if (errno == ERANGE)
+        end = nullptr;
+  }
+  return end;
+}
+
+template <>
+const char *
+_swift_stdlib_strtoX_clocale_impl<double>(const char *str, double *result) {
+  if (swift_stringIsSignalingNaN(str)) {
+    *result = std::numeric_limits<double>::signaling_NaN();
+    return str + std::strlen(str);
+  }
+
+  char *end;
+  _set_errno(0);
+  *result = _strtod_l(str, &end, getCLocale());
+  if (*result == HUGE_VAL || *result == -HUGE_VAL || *result == 0.0 || *result == -0.0) {
+    if (errno == ERANGE)
+        end = nullptr;
+  }
+  return end;
+}
+
+template <>
+const char *
+_swift_stdlib_strtoX_clocale_impl<long double>(const char *str, long double *result) {
+  if (swift_stringIsSignalingNaN(str)) {
+    *result = std::numeric_limits<long double>::signaling_NaN();
+    return str + std::strlen(str);
+  }
+
+  char *end;
+  _set_errno(0);
+  *result = _strtod_l(str, &end, getCLocale());
+  if (*result == HUGE_VALL || *result == -HUGE_VALL || *result == 0.0 || *result == -0.0) {
+    if (errno == ERANGE)
+        end = nullptr;
+  }
+  return end;
+}
+#endif
 
 const char *swift::_swift_stdlib_strtold_clocale(
     const char *nptr, void *outResult) {

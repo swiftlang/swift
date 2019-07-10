@@ -300,7 +300,7 @@ class AbstractionPattern {
     TheKind = unsigned(kind);
     OrigType = origType;
     GenericSig = CanGenericSignature();
-    if (origType->hasTypeParameter())
+    if (OrigType->hasTypeParameter())
       GenericSig = signature;
   }
 
@@ -565,10 +565,12 @@ public:
     case Kind::Type:
     case Kind::Discard: {
       auto type = getType();
-      if (isa<ArchetypeType>(type) ||
-          isa<DependentMemberType>(type) ||
+      if (isa<DependentMemberType>(type) ||
           isa<GenericTypeParamType>(type)) {
         return true;
+      }
+      if (auto archetype = dyn_cast<ArchetypeType>(type)) {
+        return !isa<OpaqueTypeArchetypeType>(archetype->getRoot());
       }
       return false;
     }

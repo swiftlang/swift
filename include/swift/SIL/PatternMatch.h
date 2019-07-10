@@ -467,6 +467,34 @@ tupleextract_ty<LTy> m_TupleExtractInst(const LTy &Left, unsigned Index) {
   return tupleextract_ty<LTy>(Left, Index);
 }
 
+/// Match either a tuple_extract that the index field from a tuple or the
+/// indexth destructure_tuple result.
+template <typename LTy> struct tupleextractoperation_ty {
+  LTy L;
+  unsigned index;
+  tupleextractoperation_ty(const LTy &Left, unsigned i) : L(Left), index(i) {}
+
+  template <typename ITy> bool match(ITy *V) {
+    if (auto *TEI = dyn_cast<TupleExtractInst>(V)) {
+      return TEI->getFieldNo() == index &&
+             L.match((ValueBase *)TEI->getOperand());
+    }
+
+    if (auto *DTR = dyn_cast<DestructureTupleResult>(V)) {
+      return DTR->getIndex() == index &&
+             L.match((ValueBase *)DTR->getParent()->getOperand());
+    }
+
+    return false;
+  }
+};
+
+template <typename LTy>
+tupleextractoperation_ty<LTy> m_TupleExtractOperation(const LTy &Left,
+                                                      unsigned Index) {
+  return tupleextractoperation_ty<LTy>(Left, Index);
+}
+
 //===----------------------------------------------------------------------===//
 //              Function/Builtin/Intrinsic Application Matchers
 //===----------------------------------------------------------------------===//
@@ -490,7 +518,7 @@ struct Callee_match<SILFunction &> {
     if (!AI)
       return false;
 
-    return AI->getReferencedFunction() == &Fun;
+    return AI->getReferencedFunctionOrNull() == &Fun;
   }
 };
 
@@ -714,13 +742,6 @@ using BuiltinApplyTy = typename Apply_match<BuiltinValueKind, Tys...>::Ty;
 // Convenience compound builtin instructions matchers that succeed
 // if any of the sub-matchers succeed.
 //
-
-/// Matcher for any of the builtin checked conversions.
-template <typename T0>
-inline typename OneOf_match<BuiltinApplyTy<T0>, BuiltinApplyTy<T0>>::Ty
-m_CheckedConversion(const T0 &Op0) {
-  return m_USCheckedConversion(Op0) || m_SUCheckedConversion(Op0);
-}
 
 /// Matcher for any of the builtin ExtOrBitCast instructions.
 template <typename T0>

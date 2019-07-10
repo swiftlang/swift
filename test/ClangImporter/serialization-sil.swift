@@ -1,6 +1,5 @@
-
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module-path %t/Test.swiftmodule -emit-sil -o /dev/null -module-name Test %s -sdk "" -import-objc-header %S/Inputs/serialization-sil.h -enable-sil-ownership
+// RUN: %target-swift-frontend -emit-module-path %t/Test.swiftmodule -emit-sil -o /dev/null -module-name Test %s -sdk "" -import-objc-header %S/Inputs/serialization-sil.h
 // RUN: %target-sil-func-extractor %t/Test.swiftmodule -sil-print-debuginfo  -func='$s4Test16testPartialApplyyySoAA_pF' -o - | %FileCheck %s
 
 // REQUIRES: objc_interop

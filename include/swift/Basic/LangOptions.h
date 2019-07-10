@@ -19,7 +19,6 @@
 #define SWIFT_BASIC_LANGOPTIONS_H
 
 #include "swift/Config.h"
-#include "swift/Basic/CycleDiagnosticKind.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Version.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -65,12 +64,12 @@ namespace swift {
     Complete,
   };
 
-  /// \brief A collection of options that affect the language dialect and
+  /// A collection of options that affect the language dialect and
   /// provide compiler debugging facilities.
   class LangOptions {
   public:
 
-    /// \brief The target we are building for.
+    /// The target we are building for.
     ///
     /// This represents the minimum deployment target.
     llvm::Triple Target;
@@ -79,14 +78,18 @@ namespace swift {
     /// Language features
     ///
 
-    /// \brief User-overridable language version to compile for.
+    /// User-overridable language version to compile for.
     version::Version EffectiveLanguageVersion = version::Version::getCurrentLanguageVersion();
 
-    /// \brief Disable API availability checking.
+    /// PackageDescription version to compile for.
+    version::Version PackageDescriptionVersion;
+
+    /// Disable API availability checking.
     bool DisableAvailabilityChecking = false;
 
-    /// \brief Maximum number of typo corrections we are allowed to perform.
-    unsigned TypoCorrectionLimit = 10;
+    /// Maximum number of typo corrections we are allowed to perform.
+    /// This is disabled by default until we can get typo-correction working within acceptable performance bounds.
+    unsigned TypoCorrectionLimit = 0;
     
     /// Should access control be respected?
     bool EnableAccessControl = true;
@@ -94,24 +97,38 @@ namespace swift {
     /// Enable 'availability' restrictions for App Extensions.
     bool EnableAppExtensionRestrictions = false;
 
+    /// Require public declarations to declare an introduction OS version.
+    bool RequireExplicitAvailability = false;
+
+    /// Introduction platform and version to suggest as fix-it
+    /// when using RequireExplicitAvailability.
+    std::string RequireExplicitAvailabilityTarget;
+
     ///
     /// Support for alternate usage modes
     ///
 
-    /// \brief Enable features useful for running in the debugger.
+    /// Enable features useful for running in the debugger.
     bool DebuggerSupport = false;
 
+    /// Enable the MemoryBufferSerializedModuleImporter.
+    /// Only used by lldb-moduleimport-test.
+    bool EnableMemoryBufferImporter = false;
+
+    /// Enable the DWARFImporter. Only used by lldb-moduleimport-test.
+    bool EnableDWARFImporter = false;
+    
     /// Allows using identifiers with a leading dollar.
     bool EnableDollarIdentifiers = false;
 
-    /// \brief Allow throwing call expressions without annotation with 'try'.
+    /// Allow throwing call expressions without annotation with 'try'.
     bool EnableThrowWithoutTry = false;
 
-    /// \brief Enable features useful for running playgrounds.
+    /// Enable features useful for running playgrounds.
     // FIXME: This should probably be limited to the particular SourceFile.
     bool Playground = false;
 
-    /// \brief Keep comments during lexing and attach them to declarations.
+    /// Keep comments during lexing and attach them to declarations.
     bool AttachCommentsToDecls = false;
 
     /// Whether to include initializers when code-completing a postfix
@@ -122,9 +139,6 @@ namespace swift {
     /// completions.
     bool CodeCompleteCallPatternHeuristics = false;
 
-    /// Disable constraint system performance hacks.
-    bool DisableConstraintSolverPerformanceHacks = false;
-
     ///
     /// Flags for use by tests
     ///
@@ -133,9 +147,17 @@ namespace swift {
     /// configuration options.
     bool EnableObjCInterop = true;
 
+    /// Enable C++ interop code generation and build configuration
+    /// options. Disabled by default because there is no way to control the
+    /// language mode of clang on a per-header or even per-module basis. Also
+    /// disabled because it is not complete.
+    bool EnableCXXInterop = false;
+
     /// On Darwin platforms, use the pre-stable ABI's mark bit for Swift
-    /// classes instead of the stable ABI's bit.
-    bool UseDarwinPreStableABIBit = !bool(SWIFT_DARWIN_ENABLE_STABLE_ABI_BIT);
+    /// classes instead of the stable ABI's bit. This is needed when
+    /// targeting OSes prior to macOS 10.14.4 and iOS 12.2, where
+    /// libobjc does not support the stable ABI's marker bit.
+    bool UseDarwinPreStableABIBit = false;
 
     /// Enables checking that uses of @objc require importing
     /// the Foundation module.
@@ -151,17 +173,21 @@ namespace swift {
     /// Flags for developers
     ///
 
-    /// \brief Whether we are debugging the constraint solver.
+    /// Whether we are debugging the constraint solver.
     ///
     /// This option enables verbose debugging output from the constraint
     /// solver.
     bool DebugConstraintSolver = false;
 
-    /// \brief Specific solution attempt for which the constraint
+    /// Specific solution attempt for which the constraint
     /// solver should be debugged.
     unsigned DebugConstraintSolverAttempt = 0;
 
-    /// \brief Enable named lazy member loading.
+    /// Line numbers to activate the constraint solver debugger.
+    /// Should be stored sorted.
+    llvm::SmallVector<unsigned, 4> DebugConstraintSolverOnLines;
+
+    /// Enable named lazy member loading.
     bool NamedLazyMemberLoading = true;
 
     /// Debug the generic signatures computed by the generic signature builder.
@@ -172,41 +198,47 @@ namespace swift {
     /// This is for testing purposes.
     std::string DebugForbidTypecheckPrefix;
 
-    /// \brief How to diagnose cycles encountered
-    CycleDiagnosticKind EvaluatorCycleDiagnostics =
-        CycleDiagnosticKind::NoDiagnose;
+    /// Whether to dump debug info for request evaluator cycles.
+    bool DebugDumpCycles = false;
 
-    /// \brief The path to which we should emit GraphViz output for the complete
+    /// The path to which we should emit GraphViz output for the complete
     /// request-evaluator graph.
     std::string RequestEvaluatorGraphVizPath;
 
-    /// \brief The upper bound, in bytes, of temporary data that can be
+    /// The upper bound, in bytes, of temporary data that can be
     /// allocated by the constraint solver.
     unsigned SolverMemoryThreshold = 512 * 1024 * 1024;
 
     unsigned SolverBindingThreshold = 1024 * 1024;
 
-    /// \brief The upper bound to number of sub-expressions unsolved
+    /// The upper bound to number of sub-expressions unsolved
     /// before termination of the shrink phrase of the constraint solver.
     unsigned SolverShrinkUnsolvedThreshold = 10;
 
     /// Disable the shrink phase of the expression type checker.
     bool SolverDisableShrink = false;
 
+    /// Disable constraint system performance hacks.
+    bool DisableConstraintSolverPerformanceHacks = false;
+
+    /// Enable experimental operator designated types feature.
+    bool EnableOperatorDesignatedTypes = false;
+
+    /// Enable constraint solver support for experimental
+    ///        operator protocol designator feature.
+    bool SolverEnableOperatorDesignatedTypes = false;
+
     /// The maximum depth to which to test decl circularity.
     unsigned MaxCircularityDepth = 500;
 
-    /// \brief Perform all dynamic allocations using malloc/free instead of
+    /// Perform all dynamic allocations using malloc/free instead of
     /// optimized custom allocator, so that memory debugging tools can be used.
     bool UseMalloc = false;
 
-    /// \brief Enable experimental property behavior feature.
-    bool EnableExperimentalPropertyBehaviors = false;
+    /// Enable experimental #assert feature.
+    bool EnableExperimentalStaticAssert = false;
 
-    /// \brief Enable experimental operator protocol designator feature.
-    bool EnableOperatorDesignatedProtocols = false;
-
-    /// \brief Staging flag for treating inout parameters as Thread Sanitizer
+    /// Staging flag for treating inout parameters as Thread Sanitizer
     /// accesses.
     bool DisableTsanInoutInstrumentation = false;
 
@@ -221,7 +253,16 @@ namespace swift {
     bool EnableDeserializationRecovery = true;
 
     /// Should we use \c ASTScope-based resolution for unqualified name lookup?
+    /// Default is in \c ParseLangArgs
+    ///
+    /// This is a staging flag; eventually it will be removed.
     bool EnableASTScopeLookup = false;
+
+    /// Someday, ASTScopeLookup will supplant lookup in the parser
+    bool DisableParserLookup = false;
+
+    /// Sound we compare to ASTScope-based resolution for debugging?
+    bool CompareToASTScopeLookup = false;
 
     /// Whether to use the import as member inference system
     ///
@@ -234,9 +275,6 @@ namespace swift {
     /// This is for bootstrapping. It can't be in SILOptions because the
     /// TypeChecker uses it to set resolve the ParameterConvention.
     bool EnableSILOpaqueValues = false;
-    
-    /// Enables key path resilience.
-    bool EnableKeyPathResilience = true;
 
     /// If set to true, the diagnosis engine can assume the emitted diagnostics
     /// will be used in editor. This usually leads to more aggressive fixit.
@@ -267,12 +305,6 @@ namespace swift {
     std::shared_ptr<llvm::Regex> OptimizationRemarkPassedPattern;
     std::shared_ptr<llvm::Regex> OptimizationRemarkMissedPattern;
 
-    /// When a conversion from String to Substring fails, emit a fix-it to append
-    /// the void subscript '[]'.
-    /// FIXME: Remove this flag when void subscripts are implemented.
-    /// This is used to guard preemptive testing for the fix-it.
-    bool FixStringToSubstringConversions = false;
-
     /// Whether collect tokens during parsing for syntax coloring.
     bool CollectParsedToken = false;
 
@@ -283,6 +315,15 @@ namespace swift {
 
     /// Whether to verify the parsed syntax tree and emit related diagnostics.
     bool VerifySyntaxTree = false;
+
+    /// Scaffolding to permit experimentation with finer-grained dependencies
+    /// and faster rebuilds.
+    bool EnableExperimentalDependencies = false;
+    
+    /// To mimic existing system, set to false.
+    /// To experiment with including file-private and private dependency info,
+    /// set to true.
+    bool ExperimentalDependenciesIncludeIntrafileOnes = false;
 
     /// Sets the target we are building for and updates platform conditions
     /// to match.
@@ -350,11 +391,6 @@ namespace swift {
       return CustomConditionalCompilationFlags;
     }
 
-    /// Whether our effective Swift version is in the Swift 3 family
-    bool isSwiftVersion3() const {
-      return EffectiveLanguageVersion.isVersion3();
-    }
-
     /// Whether our effective Swift version is at least 'major'.
     ///
     /// This is usually the check you want; for example, when introducing
@@ -363,6 +399,33 @@ namespace swift {
     bool isSwiftVersionAtLeast(unsigned major, unsigned minor = 0) const {
       return EffectiveLanguageVersion.isVersionAtLeast(major, minor);
     }
+
+    // The following deployment targets ship an Objective-C runtime supporting
+    // the class metadata update callback mechanism:
+    //
+    // - macOS 10.14.4
+    // - iOS 12.2
+    // - tvOS 12.2
+    // - watchOS 5.2
+    bool doesTargetSupportObjCMetadataUpdateCallback() const;
+
+    // The following deployment targets ship an Objective-C runtime supporting
+    // the objc_getClass() hook:
+    //
+    // - macOS 10.14.4
+    // - iOS 12.2
+    // - tvOS 12.2
+    // - watchOS 5.2
+    bool doesTargetSupportObjCGetClassHook() const;
+
+    // The following deployment targets ship an Objective-C runtime supporting
+    // the objc_loadClassref() entry point:
+    //
+    // - macOS 10.15
+    // - iOS 13
+    // - tvOS 13
+    // - watchOS 6
+    bool doesTargetSupportObjCClassStubs() const;
 
     /// Returns true if the given platform condition argument represents
     /// a supported target operating system.

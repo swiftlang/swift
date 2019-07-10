@@ -34,6 +34,7 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/IRGen/Linking.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/TypeLowering.h"
 
@@ -161,15 +162,6 @@ void MetadataDependencyCollector::checkDependency(IRGenFunction &IGF,
 
   // Otherwise, we need to pull out the response state and compare it against
   // the request state.
-
-  // Lazily create the continuation block and phis.
-  if (!RequiredMetadata) {
-    auto contBB = IGF.createBasicBlock("metadata-dependencies.cont");
-    RequiredMetadata =
-      llvm::PHINode::Create(IGF.IGM.TypeMetadataPtrTy, 4, "", contBB);
-    RequiredState = llvm::PHINode::Create(IGF.IGM.SizeTy, 4, "", contBB);
-  }
-
   llvm::Value *requiredState = request.getRequiredState(IGF);
 
   // More advanced metadata states are lower numbers.
@@ -177,6 +169,42 @@ void MetadataDependencyCollector::checkDependency(IRGenFunction &IGF,
                 "relying on the ordering of MetadataState here");
   auto satisfied = IGF.Builder.CreateICmpULE(metadataState, requiredState);
 
+  emitCheckBranch(IGF, satisfied, metadata, requiredState);
+}
+
+void MetadataDependencyCollector::collect(IRGenFunction &IGF,
+                                          llvm::Value *dependency) {
+  // Having either both or neither of the PHIs is normal.
+  // Having just RequiredState means that we already finalized this collector
+  // and shouldn't be using it anymore.
+  assert((!RequiredMetadata || RequiredState) &&
+         "checking dependencies on a finished collector");
+
+  assert(dependency->getType() == IGF.IGM.TypeMetadataDependencyTy);
+
+  // Split the dependency.
+  auto metadata = IGF.Builder.CreateExtractValue(dependency, 0);
+  auto requiredState = IGF.Builder.CreateExtractValue(dependency, 1);
+
+  // We have a dependency if the metadata is non-null; otherwise we're
+  // satisfied and can continue.
+  auto satisfied = IGF.Builder.CreateIsNull(metadata);
+  emitCheckBranch(IGF, satisfied, metadata, requiredState);
+}
+
+void MetadataDependencyCollector::emitCheckBranch(IRGenFunction &IGF,
+                                                  llvm::Value *satisfied,
+                                                  llvm::Value *metadata,
+                                                  llvm::Value *requiredState) {
+  // Lazily create the final continuation block and phis.
+  if (!RequiredMetadata) {
+    auto contBB = IGF.createBasicBlock("metadata-dependencies.cont");
+    RequiredMetadata =
+      llvm::PHINode::Create(IGF.IGM.TypeMetadataPtrTy, 4, "", contBB);
+    RequiredState = llvm::PHINode::Create(IGF.IGM.SizeTy, 4, "", contBB);
+  }
+
+  // Conditionally branch to the final continuation block.
   auto satisfiedBB = IGF.createBasicBlock("dependency-satisfied");
   auto curBB = IGF.Builder.GetInsertBlock();
   RequiredMetadata->addIncoming(metadata, curBB);
@@ -184,6 +212,7 @@ void MetadataDependencyCollector::checkDependency(IRGenFunction &IGF,
   IGF.Builder.CreateCondBr(satisfied, satisfiedBB,
                            RequiredMetadata->getParent());
 
+  // Otherwise resume emitting code on the main path.
   IGF.Builder.emitBlock(satisfiedBB);
 }
 
@@ -216,6 +245,51 @@ MetadataDependency MetadataDependencyCollector::finish(IRGenFunction &IGF) {
   return result;
 }
 
+
+llvm::Constant *IRGenModule::getAddrOfStringForMetadataRef(
+    StringRef symbolName,
+    unsigned alignment,
+    bool shouldSetLowBit,
+    llvm::function_ref<ConstantInitFuture (ConstantInitBuilder &)> body) {
+  // Call this to form the return value.
+  auto returnValue = [&](llvm::Constant *addr) {
+    if (!shouldSetLowBit)
+      return addr;
+
+    auto bitConstant = llvm::ConstantInt::get(IntPtrTy, 1);
+    return llvm::ConstantExpr::getGetElementPtr(nullptr, addr, bitConstant);
+  };
+
+  // Check whether we already have an entry with this name.
+  auto &entry = StringsForTypeRef[symbolName];
+  if (entry.second) {
+    return returnValue(entry.second);
+  }
+
+  // Construct the initializer.
+  ConstantInitBuilder builder(*this);
+  auto finished = body(builder);
+
+  auto var = new llvm::GlobalVariable(Module, finished.getType(),
+                                      /*constant*/ true,
+                                      llvm::GlobalValue::LinkOnceODRLinkage,
+                                      nullptr,
+                                      symbolName);
+
+  ApplyIRLinkage(IRLinkage::InternalLinkOnceODR).to(var);
+  if (alignment)
+    var->setAlignment(alignment);
+  setTrueConstGlobal(var);
+  var->setSection(getReflectionTypeRefSectionName());
+
+  finished.installInGlobal(var);
+
+  // Drill down to the i8* at the beginning of the constant.
+  auto addr = llvm::ConstantExpr::getBitCast(var, Int8PtrTy);
+  StringsForTypeRef[symbolName] = { var, addr };
+
+  return returnValue(addr);
+}
 
 llvm::Constant *IRGenModule::getAddrOfStringForTypeRef(StringRef str,
                                                        MangledTypeRefRole role){
@@ -261,22 +335,46 @@ llvm::Constant *IRGenModule::getAddrOfStringForTypeRef(
       // Emit the preceding literal chunk.
       auto literalChunk = StringRef(mangling.String.data() + pos,
                                     symbolic.second - pos);
-      assert(literalChunk.back() == '\1' && "should be prefixed with \\1");
       auto literal = llvm::ConstantDataArray::getString(getLLVMContext(),
                                                         literalChunk,
                                                         /*null*/ false);
       S.add(literal);
     }
     
-    // The symbolic reference is to the type context descriptor of the
-    // referenced type.
-    // We currently only allow symbolic references to nominal type contexts.
-    auto nominal = cast<NominalTypeDecl>(symbolic.first);
-    S.addRelativeAddress(
-         getAddrOfTypeContextDescriptor(const_cast<NominalTypeDecl*>(nominal),
-                                        DontRequireMetadata));
+    ConstantReference ref;
+    unsigned char baseKind;
+    if (auto ctype = symbolic.first.dyn_cast<const NominalTypeDecl*>()) {
+      auto type = const_cast<NominalTypeDecl*>(ctype);
+      if (auto proto = dyn_cast<ProtocolDecl>(type)) {
+        // The symbolic reference is to the protocol descriptor of the
+        // referenced protocol.
+        ref = getAddrOfLLVMVariableOrGOTEquivalent(
+          LinkEntity::forProtocolDescriptor(proto));
+      } else {
+        // The symbolic reference is to the type context descriptor of the
+        // referenced type.
+        IRGen.noteUseOfTypeContextDescriptor(type, DontRequireMetadata);
+        ref = getAddrOfLLVMVariableOrGOTEquivalent(
+          LinkEntity::forNominalTypeDescriptor(type));
+      }
+      // \1 - direct reference, \2 - indirect reference
+      baseKind = 1;
+    } else if (auto copaque = symbolic.first.dyn_cast<const OpaqueTypeDecl*>()){
+      auto opaque = const_cast<OpaqueTypeDecl*>(copaque);
+      IRGen.noteUseOfOpaqueTypeDescriptor(opaque);
+      ref = getAddrOfLLVMVariableOrGOTEquivalent(
+                                   LinkEntity::forOpaqueTypeDescriptor(opaque));
+      baseKind = 1;
+    } else {
+      llvm_unreachable("unhandled symbolic referent");
+    }
     
-    pos = symbolic.second + 4;
+    // add kind byte. indirect kinds are the direct kind + 1
+    unsigned char kind = ref.isIndirect() ? baseKind + 1 : baseKind;
+    S.add(llvm::ConstantInt::get(Int8Ty, kind));
+    // add relative reference
+    S.addRelativeAddress(ref.getValue());
+    pos = symbolic.second + 5;
   }
   
   // Add the last literal bit, if any.
@@ -298,7 +396,7 @@ llvm::Constant *IRGenModule::getAddrOfStringForTypeRef(
                                       llvm::GlobalValue::LinkOnceODRLinkage,
                                       nullptr,
                                       symbolName);
-  var->setVisibility(llvm::GlobalValue::HiddenVisibility);
+  ApplyIRLinkage(IRLinkage::InternalLinkOnceODR).to(var);
   var->setAlignment(2);
   setTrueConstGlobal(var);
   var->setSection(getReflectionTypeRefSectionName());
@@ -416,22 +514,24 @@ irgen::getRuntimeReifiedType(IRGenModule &IGM, CanType type) {
 /// Attempts to return a constant heap metadata reference for a
 /// class type.  This is generally only valid for specific kinds of
 /// ObjC reference, like superclasses or category references.
-llvm::Constant *irgen::tryEmitConstantHeapMetadataRef(IRGenModule &IGM,
-                                                      CanType type,
-                                              bool allowDynamicUninitialized) {
+llvm::Constant *
+irgen::tryEmitConstantHeapMetadataRef(IRGenModule &IGM,
+                                      CanType type,
+                                      bool allowDynamicUninitialized) {
   auto theDecl = type->getClassOrBoundGenericClass();
   assert(theDecl && "emitting constant heap metadata ref for non-class type?");
 
-  // If the class metadata is initialized from a pattern, we don't even have
-  // an uninitialized metadata symbol we could return, so just fail.
-  if (doesClassMetadataRequireRelocation(IGM, theDecl))
-    return nullptr;
-
-  // If the class must not require dynamic initialization --- e.g. if it
-  // is a super reference --- then respect everything that might impose that.
-  if (!allowDynamicUninitialized) {
-    if (doesClassMetadataRequireInitialization(IGM, theDecl))
+  switch (IGM.getClassMetadataStrategy(theDecl)) {
+  case ClassMetadataStrategy::Resilient:
+  case ClassMetadataStrategy::Singleton:
+    if (!allowDynamicUninitialized)
       return nullptr;
+    break;
+
+  case ClassMetadataStrategy::Update:
+  case ClassMetadataStrategy::FixedOrUpdate:
+  case ClassMetadataStrategy::Fixed:
+    break;
   }
 
   // For imported classes, use the ObjC class symbol.
@@ -542,6 +642,11 @@ static MetadataResponse emitNominalMetadataRef(IRGenFunction &IGF,
 bool irgen::isTypeMetadataAccessTrivial(IRGenModule &IGM, CanType type) {
   assert(!type->hasArchetype());
 
+  // Support dynamically replacing opaque result types. Don't cache the
+  // accessor result.
+  if (!IGM.getOptions().shouldOptimize() && type->hasOpaqueArchetype())
+    return true;
+
   // Value type metadata only requires dynamic initialization on first
   // access if it contains a resilient type.
   if (isa<StructType>(type) || isa<EnumType>(type)) {
@@ -557,24 +662,6 @@ bool irgen::isTypeMetadataAccessTrivial(IRGenModule &IGM, CanType type) {
       return false;
 
     auto expansion = ResilienceExpansion::Maximal;
-
-    // Normally, if a value type is known to have a fixed layout to us, we will
-    // have emitted fully initialized metadata for it, including a payload size
-    // field for enum metadata for example, allowing the type metadata to be
-    // used in other resilience domains without initialization.
-    //
-    // However, when -enable-resilience-bypass is on, we might be using a value
-    // type from another module built with resilience enabled. In that case, the
-    // type looks like it has fixed size to us, since we're bypassing resilience,
-    // but the metadata still requires runtime initialization, so its incorrect
-    // to reference it directly.
-    //
-    // While unconditionally using minimal expansion is correct, it is not as
-    // efficient as it should be, so only do so if -enable-resilience-bypass is on.
-    //
-    // FIXME: All of this goes away once lldb supports resilience.
-    if (IGM.IRGen.Opts.EnableResilienceBypass)
-      expansion = ResilienceExpansion::Minimal;
 
     // Resiliently-sized metadata access always requires an accessor.
     return (IGM.getTypeInfoForUnlowered(type).isFixedSize(expansion));
@@ -824,31 +911,31 @@ namespace {
   public:
     EmitTypeMetadataRef(IRGenFunction &IGF) : IGF(IGF) {}
 
-#define TREAT_AS_OPAQUE(KIND)                                             \
-    MetadataResponse visit##KIND##Type(Can##KIND##Type type,              \
-                                       DynamicMetadataRequest request) {  \
-      return visitOpaqueType(type);                                       \
-    }
-    TREAT_AS_OPAQUE(BuiltinInteger)
-    TREAT_AS_OPAQUE(BuiltinFloat)
-    TREAT_AS_OPAQUE(BuiltinVector)
-    TREAT_AS_OPAQUE(BuiltinRawPointer)
-#undef TREAT_AS_OPAQUE
-
     MetadataResponse emitDirectMetadataRef(CanType type) {
       return MetadataResponse::forComplete(IGF.IGM.getAddrOfTypeMetadata(type));
     }
 
     /// The given type should use opaque type info.  We assume that
-    /// the runtime always provides an entry for such a type;  right
-    /// now, that mapping is as one of the power-of-two integer types.
-    MetadataResponse visitOpaqueType(CanType type) {
+    /// the runtime always provides an entry for such a type.
+    MetadataResponse visitBuiltinIntegerType(CanBuiltinIntegerType type,
+                                             DynamicMetadataRequest request) {
+      // If the size isn't a power up two, round up to the next power of two
+      // and use the corresponding integer type.
       auto &opaqueTI = cast<FixedTypeInfo>(IGF.IGM.getTypeInfoForLowered(type));
       unsigned numBits = opaqueTI.getFixedSize().getValueInBits();
-      if (!llvm::isPowerOf2_32(numBits))
+      if (!llvm::isPowerOf2_32(numBits)) {
         numBits = llvm::NextPowerOf2(numBits);
-      auto intTy = BuiltinIntegerType::get(numBits, IGF.IGM.Context);
-      return emitDirectMetadataRef(CanType(intTy));
+        type = CanBuiltinIntegerType(
+                 BuiltinIntegerType::get(numBits, IGF.IGM.Context));
+      }
+
+      return emitDirectMetadataRef(type);
+    }
+
+    MetadataResponse
+    visitBuiltinIntegerLiteralType(CanBuiltinIntegerLiteralType type,
+                                   DynamicMetadataRequest request) {
+      return emitDirectMetadataRef(type);
     }
 
     MetadataResponse
@@ -872,6 +959,24 @@ namespace {
     MetadataResponse
     visitBuiltinUnsafeValueBufferType(CanBuiltinUnsafeValueBufferType type,
                                       DynamicMetadataRequest request) {
+      return emitDirectMetadataRef(type);
+    }
+
+    MetadataResponse
+    visitBuiltinRawPointerType(CanBuiltinRawPointerType type,
+                               DynamicMetadataRequest request) {
+      return emitDirectMetadataRef(type);
+    }
+
+    MetadataResponse
+    visitBuiltinFloatType(CanBuiltinFloatType type,
+                          DynamicMetadataRequest request) {
+      return emitDirectMetadataRef(type);
+    }
+
+    MetadataResponse
+    visitBuiltinVectorType(CanBuiltinVectorType type,
+                           DynamicMetadataRequest request) {
       return emitDirectMetadataRef(type);
     }
 
@@ -924,9 +1029,18 @@ namespace {
       auto params = type.getParams();
       auto numParams = params.size();
 
+      // Retrieve the ABI parameter flags from the type-level parameter
+      // flags.
+      auto getABIParameterFlags = [](ParameterTypeFlags flags) {
+        return ParameterFlags()
+            .withValueOwnership(flags.getValueOwnership())
+            .withVariadic(flags.isVariadic())
+            .withAutoClosure(flags.isAutoClosure());
+      };
+
       bool hasFlags = false;
       for (auto param : params) {
-        if (!param.getParameterFlags().isNone()) {
+        if (!getABIParameterFlags(param.getParameterFlags()).isNone()) {
           hasFlags = true;
           break;
         }
@@ -969,11 +1083,7 @@ namespace {
               auto param = params[index];
               auto flags = param.getParameterFlags();
 
-              auto parameterFlags =
-                  ParameterFlags()
-                      .withValueOwnership(flags.getValueOwnership())
-                      .withVariadic(flags.isVariadic());
-
+              auto parameterFlags = getABIParameterFlags(flags);
               processor(index, getFunctionParameterRef(param), parameterFlags);
             }
           };
@@ -1840,9 +1950,6 @@ llvm::Function *irgen::getOrCreateTypeMetadataAccessFunction(IRGenModule &IGM,
 
   switch (getTypeMetadataAccessStrategy(type)) {
   case MetadataAccessStrategy::ForeignAccessor:
-    // Force the foreign candidate to exist.
-    (void) IGM.getAddrOfForeignTypeMetadataCandidate(type);
-    LLVM_FALLTHROUGH;
   case MetadataAccessStrategy::PublicUniqueAccessor:
   case MetadataAccessStrategy::HiddenUniqueAccessor:
   case MetadataAccessStrategy::PrivateAccessor:

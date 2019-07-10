@@ -989,10 +989,30 @@ void ConformanceLookupTable::lookupConformances(
                        return true;
 
                      // If we are to filter out this result, do so now.
-                     if (lookupKind == ConformanceLookupKind::OnlyExplicit &&
-                         entry->getKind() != ConformanceEntryKind::Explicit &&
-                         entry->getKind() != ConformanceEntryKind::Synthesized)
-                       return false;
+                     switch (lookupKind) {
+                     case ConformanceLookupKind::OnlyExplicit:
+                       switch (entry->getKind()) {
+                       case ConformanceEntryKind::Explicit:
+                       case ConformanceEntryKind::Synthesized:
+                         break;
+                       case ConformanceEntryKind::Implied:
+                       case ConformanceEntryKind::Inherited:
+                         return false;
+                       }
+                       break;
+                     case ConformanceLookupKind::NonInherited:
+                       switch (entry->getKind()) {
+                       case ConformanceEntryKind::Explicit:
+                       case ConformanceEntryKind::Synthesized:
+                       case ConformanceEntryKind::Implied:
+                         break;
+                       case ConformanceEntryKind::Inherited:
+                         return false;
+                       }
+                       break;
+                     case ConformanceLookupKind::All:
+                       break;
+                     }
 
                      // Record the protocol.
                      if (protocols)
@@ -1134,9 +1154,9 @@ ConformanceLookupTable::getSatisfiedProtocolRequirementsForMember(
       if (conf->isInvalid())
         continue;
 
-      conf->forEachTypeWitness(nullptr, [&](const AssociatedTypeDecl *assoc,
-                                            Type type,
-                                            TypeDecl *typeDecl) -> bool {
+      conf->forEachTypeWitness([&](const AssociatedTypeDecl *assoc,
+                                   Type type,
+                                   TypeDecl *typeDecl) -> bool {
         if (typeDecl == member)
           reqs.push_back(const_cast<AssociatedTypeDecl*>(assoc));
         return false;
@@ -1147,9 +1167,8 @@ ConformanceLookupTable::getSatisfiedProtocolRequirementsForMember(
       if (conf->isInvalid())
         continue;
 
-      auto normal = conf->getRootNormalConformance();
-      normal->forEachValueWitness(nullptr,
-                                  [&](ValueDecl *req, Witness witness) {
+      auto root = conf->getRootConformance();
+      root->forEachValueWitness([&](ValueDecl *req, Witness witness) {
         if (witness.getDecl() == member)
           reqs.push_back(req);
       });

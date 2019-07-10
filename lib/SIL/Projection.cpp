@@ -599,20 +599,7 @@ ProjectionPath::expandTypeIntoLeafProjectionPaths(SILType B, SILModule *Mod,
 
     LLVM_DEBUG(llvm::dbgs() << "Visiting type: " << Ty << "\n");
 
-    // Get the first level projection of the current type.
-    Projections.clear();
-    Projection::getFirstLevelProjections(Ty, *Mod, Projections);
-
-    // Reached the end of the projection tree, this field can not be expanded
-    // anymore.
-    if (Projections.empty()) {
-      LLVM_DEBUG(llvm::dbgs() << "    No projections. "
-                 "Finished projection list\n");
-      Paths.push_back(PP);
-      continue;
-    }
-
-    // If this is a class type, we also have reached the end of the type
+    // If this is a class type, we have reached the end of the type
     // tree for this type.
     //
     // We do not push its next level projection into the worklist,
@@ -635,6 +622,19 @@ ProjectionPath::expandTypeIntoLeafProjectionPaths(SILType B, SILModule *Mod,
       continue;
     }
 
+    // Get the first level projection of the current type.
+    Projections.clear();
+    Projection::getFirstLevelProjections(Ty, *Mod, Projections);
+
+    // Reached the end of the projection tree, this field can not be expanded
+    // anymore.
+    if (Projections.empty()) {
+      LLVM_DEBUG(llvm::dbgs() << "    No projections. "
+                 "Finished projection list\n");
+      Paths.push_back(PP);
+      continue;
+    }
+
     // Keep expanding the location.
     for (auto &P : Projections) {
       ProjectionPath X(B);
@@ -647,8 +647,10 @@ ProjectionPath::expandTypeIntoLeafProjectionPaths(SILType B, SILModule *Mod,
   } while (!Worklist.empty());
 }
 
-bool ProjectionPath::
-hasUncoveredNonTrivials(SILType B, SILModule *Mod, ProjectionPathSet &CPaths) {
+bool ProjectionPath::hasUncoveredNonTrivials(SILType B, const SILFunction &F,
+                                             ProjectionPathSet &CPaths) {
+  auto &Mod = F.getModule();
+
   llvm::SmallVector<ProjectionPath, 4> Worklist, Paths;
   // Push an empty projection path to get started.
   ProjectionPath P(B);
@@ -662,11 +664,11 @@ hasUncoveredNonTrivials(SILType B, SILModule *Mod, ProjectionPathSet &CPaths) {
       continue;
       
     // Get the current type to process.
-    SILType Ty = PP.getMostDerivedType(*Mod);
+    SILType Ty = PP.getMostDerivedType(Mod);
 
     // Get the first level projection of the current type.
     llvm::SmallVector<Projection, 4> Projections;
-    Projection::getFirstLevelProjections(Ty, *Mod, Projections);
+    Projection::getFirstLevelProjections(Ty, Mod, Projections);
 
     // Reached the end of the projection tree, this field can not be expanded
     // anymore.
@@ -686,7 +688,7 @@ hasUncoveredNonTrivials(SILType B, SILModule *Mod, ProjectionPathSet &CPaths) {
     for (auto &P : Projections) {
       ProjectionPath X(B);
       X.append(PP);
-      assert(PP.getMostDerivedType(*Mod) == X.getMostDerivedType(*Mod));
+      assert(PP.getMostDerivedType(Mod) == X.getMostDerivedType(Mod));
       X.append(P);
       Worklist.push_back(X);
     }
@@ -695,7 +697,7 @@ hasUncoveredNonTrivials(SILType B, SILModule *Mod, ProjectionPathSet &CPaths) {
 
   // Check whether any path leads to a non-trivial type.
   for (auto &X : Paths) {
-    if (!X.getMostDerivedType(*Mod).isTrivial(*Mod))
+    if (!X.getMostDerivedType(Mod).isTrivial(F))
        return true;
   }   
   return false;
@@ -1127,7 +1129,7 @@ public:
 ProjectionTree::ProjectionTree(
     SILModule &Mod, SILType BaseTy,
     llvm::SpecificBumpPtrAllocator<ProjectionTreeNode> &Allocator)
-    : Mod(Mod), Allocator(Allocator) {
+    : Mod(&Mod), Allocator(&Allocator) {
   LLVM_DEBUG(llvm::dbgs() << "Constructing Projection Tree For : " << BaseTy
                           << "\n");
 
@@ -1153,7 +1155,7 @@ ProjectionTree::computeExplodedArgumentValueInner(SILBuilder &Builder,
     if (Iter != LeafValues.end())
       return Iter->second;
     // Return undef for dead node.
-    return SILUndef::get(Node->getType(), Mod);
+    return SILUndef::get(Node->getType(), Builder.getFunction());
   }
 
   // This is an aggregate node, construct its value from its children

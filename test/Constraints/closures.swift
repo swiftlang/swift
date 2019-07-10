@@ -55,7 +55,7 @@ func inoutToSharedConversions() {
 // Autoclosure
 func f1(f: @autoclosure () -> Int) { }
 func f2() -> Int { }
-f1(f: f2) // expected-error{{function produces expected type 'Int'; did you mean to call it with '()'?}}{{9-9=()}}
+f1(f: f2) // expected-error{{add () to forward @autoclosure parameter}}{{9-9=()}}
 f1(f: 5)
 
 // Ternary in closure
@@ -187,7 +187,7 @@ func testMap() {
 }
 
 // <rdar://problem/22414757> "UnresolvedDot" "in wrong phase" assertion from verifier
-[].reduce { $0 + $1 }  // expected-error {{cannot invoke 'reduce' with an argument list of type '((_, _) -> _)'}}
+[].reduce { $0 + $1 }  // expected-error {{cannot invoke 'reduce' with an argument list of type '(@escaping (_, _) -> _)'}}
 
 
 
@@ -268,7 +268,7 @@ func someFunc(_ foo: ((String) -> String)?,
 
 func verify_NotAC_to_AC_failure(_ arg: () -> ()) {
   func takesAC(_ arg: @autoclosure () -> ()) {}
-  takesAC(arg) // expected-error {{function produces expected type '()'; did you mean to call it with '()'?}}
+  takesAC(arg) // expected-error {{add () to forward @autoclosure parameter}} {{14-14=()}}
 }
 
 // SR-1069 - Error diagnostic refers to wrong argument
@@ -356,7 +356,7 @@ func f19997471(_ x: Int) {}
 func someGeneric19997471<T>(_ x: T) {
   takeVoidVoidFn {
     f19997471(x) // expected-error {{cannot invoke 'f19997471' with an argument list of type '(T)'}}
-    // expected-note @-1 {{overloads for 'f19997471' exist with these partially matching parameter lists: (String), (Int)}}
+    // expected-note @-1 {{overloads for 'f19997471' exist with these partially matching parameter lists: (Int), (String)}}
   }
 }
 
@@ -416,11 +416,11 @@ func r20789423() {
   
 }
 
-// Make sure that behavior related to allowing trailing closures to match functions
-// with Any as a final parameter is the same after the changes made by SR-2505, namely:
-// that we continue to select function that does _not_ have Any as a final parameter in
-// presence of other possibilities.
-
+// In the example below, SR-2505 started preferring C_SR_2505.test(_:) over
+// test(it:). Prior to Swift 5.1, we emulated the old behavior. However,
+// that behavior is inconsistent with the typical approach of preferring
+// overloads from the concrete type over one from a protocol, so we removed
+// the hack.
 protocol SR_2505_Initable { init() }
 struct SR_2505_II : SR_2505_Initable {}
 
@@ -442,10 +442,9 @@ class C_SR_2505 : P_SR_2505 {
   }
 
   func call(_ c: C_SR_2505) -> Bool {
-    // Note: no diagnostic about capturing 'self', because this is a
-    // non-escaping closure -- that's how we know we have selected
-    // test(it:) and not test(_)
-    return c.test { o in test(o) }
+    // Note: the diagnostic about capturing 'self', indicates that we have
+    // selected test(_) rather than test(it:)
+    return c.test { o in test(o) } // expected-error{{call to method 'test' in closure requires explicit 'self.' to make capture semantics explicit}}
   }
 }
 
@@ -556,6 +555,7 @@ r32432145 { _,_ in
 // rdar://problem/30106822 - Swift ignores type error in closure and presents a bogus error about the caller
 [1, 2].first { $0.foo = 3 }
 // expected-error@-1 {{value of type 'Int' has no member 'foo'}}
+// expected-error@-2 {{cannot convert value of type '()' to closure result type 'Bool'}}
 
 // rdar://problem/32433193, SR-5030 - Higher-order function diagnostic mentions the wrong contextual type conversion problem
 protocol A_SR_5030 {
@@ -716,7 +716,7 @@ func rdar37790062() {
 }
 
 // <rdar://problem/39489003>
-typealias KeyedItem<K, T> = (key: K, value: T)
+typealias KeyedItem<K, T> = (key: K, value: T) // expected-note {{'T' declared as parameter to type 'KeyedItem'}}
 
 protocol Node {
   associatedtype T
@@ -730,8 +730,7 @@ extension Node {
   func getChild(for key:K)->(key: K, value: T) {
     return children.first(where: { (item:KeyedItem) -> Bool in
         return item.key == key
-        // expected-error@-1 {{binary operator '==' cannot be applied to operands of type '_' and 'Self.K'}}
-        // expected-note@-2 {{overloads for '==' exist with these partially matching parameter lists:}}
+        // expected-error@-1 {{generic parameter 'T' could not be inferred}}
       })!
   }
 }
@@ -747,7 +746,7 @@ takesTwoInOut { _ in } // expected-error {{contextual closure type '(Int, inout 
 func f20371273() {
   let x: [Int] = [1, 2, 3, 4]
   let y: UInt = 4
-  _ = x.filter { ($0 + y)  > 42 } // expected-error {{'+' is unavailable}}
+  _ = x.filter { ($0 + y)  > 42 } // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'UInt'}} expected-note {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (UInt, UInt)}}
 }
 
 // rdar://problem/42337247
@@ -797,3 +796,114 @@ func test<Instances : Collection>(
 ) { fatalError() }
 
 test([1]) { _, _ in fatalError(); () }
+
+// rdar://problem/40537960 - Misleading diagnostic when using closure with wrong type
+
+protocol P_40537960 {}
+func rdar_40537960() {
+  struct S {
+    var v: String
+  }
+
+  struct L : P_40537960 {
+    init(_: String) {}
+  }
+
+  struct R<T : P_40537960> {
+    init(_: P_40537960) {}
+  }
+
+  struct A<T: Collection, P: P_40537960> { // expected-note {{'P' declared as parameter to type 'A'}}
+    typealias Data = T.Element
+    init(_: T, fn: (Data) -> R<P>) {}
+  }
+
+  var arr: [S] = []
+  _ = A(arr, fn: { L($0.v) }) // expected-error {{cannot convert value of type 'L' to closure result type 'R<Any>'}}
+  // expected-error@-1 {{generic parameter 'P' could not be inferred}}
+  // expected-note@-2 {{explicitly specify the generic arguments to fix this issue}} {{8-8=<[S], <#P: P_40537960#>>}}
+}
+
+// rdar://problem/45659733
+func rdar_45659733() {
+  func foo<T : BinaryInteger>(_: AnyHashable, _: T) {}
+  func bar(_ a: Int, _ b: Int) {
+    _ = (a ..< b).map { i in foo(i, i) } // Ok
+  }
+
+  struct S<V> {
+    func map<T>(
+      get: @escaping (V) -> T,
+      set: @escaping (inout V, T) -> Void
+    ) -> S<T> {
+      fatalError()
+    }
+
+    subscript<T>(
+      keyPath: WritableKeyPath<V, T?>,
+      default defaultValue: T
+    ) -> S<T> {
+      return map(
+        get: { $0[keyPath: keyPath] ?? defaultValue },
+        set: { $0[keyPath: keyPath] = $1 }
+      ) // Ok, make sure that we deduce result to be S<T>
+    }
+  }
+}
+
+func rdar45771997() {
+  struct S {
+    mutating func foo() {}
+  }
+
+  let _: Int = { (s: inout S) in s.foo() }
+  // expected-error@-1 {{cannot convert value of type '(inout S) -> ()' to specified type 'Int'}}
+}
+
+struct rdar30347997 {
+  func withUnsafeMutableBufferPointer(body : (inout Int) -> ()) {}
+  func foo() {
+    withUnsafeMutableBufferPointer {
+      (b : Int) in // expected-error {{'Int' is not convertible to 'inout Int'}}
+    }
+  }
+}
+
+struct rdar43866352<Options> {
+  func foo() {
+    let callback: (inout Options) -> Void
+    callback = { (options: Options) in } // expected-error {{cannot assign value of type '(inout Options) -> ()' to type '(inout _) -> Void'}}
+  }
+}
+
+extension Hashable {
+  var self_: Self {
+    return self
+  }
+}
+
+do {
+  struct S<
+      C : Collection,
+      I : Hashable,
+      R : Numeric
+  > {
+    init(_ arr: C,
+         id: KeyPath<C.Element, I>,
+         content: @escaping (C.Element) -> R) {}
+  }
+
+  func foo(_ arr: [Int]) {
+    _ = S(arr, id: \.self_) {
+      // expected-error@-1 {{contextual type for closure argument list expects 1 argument, which cannot be implicitly ignored}} {{30-30=_ in }}
+      return 42
+    }
+  }
+}
+
+// Don't allow result type of a closure to end up as a noescape type
+
+// The funny error is because we infer the type of badResult as () -> ()
+// via the 'T -> U => T -> ()' implicit conversion.
+let badResult = { (fn: () -> ()) in fn }
+// expected-error@-1 {{expression resolves to an unused function}}

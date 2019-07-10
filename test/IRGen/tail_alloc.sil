@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -stack-promotion-limit 48 -Onone -emit-ir %s | %FileCheck %s -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend -stack-promotion-limit 48 -Onone -emit-ir %s | %FileCheck %s -DINT=i%target-ptrsize
 //
 // REQUIRES: CPU=x86_64
 
@@ -9,7 +9,7 @@ import Swift
 
 // sizeof(TestClass) = 16 bytes header + 1 byte = 17 bytes
 class TestClass {
-  @sil_stored var a : Int8
+  @_hasStorage var a : Int8
   init()
 }
 

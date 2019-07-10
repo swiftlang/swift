@@ -1,4 +1,4 @@
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -9,6 +9,7 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
+// REQUIRES: rdar49026133
 
 import Foundation
 import CoreGraphics
@@ -49,7 +50,8 @@ func debugDescription<T>(_ value: T) -> String {
     }
 }
 
-func expectRoundTripEquality<T : Codable>(of value: T, encode: (T) throws -> Data, decode: (Data) throws -> T, lineNumber: Int) where T : Equatable {
+func performEncodeAndDecode<T : Codable>(of value: T, encode: (T) throws -> Data, decode: (T.Type, Data) throws -> T, lineNumber: Int) -> T {
+
     let data: Data
     do {
         data = try encode(value)
@@ -57,12 +59,16 @@ func expectRoundTripEquality<T : Codable>(of value: T, encode: (T) throws -> Dat
         fatalError("\(#file):\(lineNumber): Unable to encode \(T.self) <\(debugDescription(value))>: \(error)")
     }
 
-    let decoded: T
     do {
-        decoded = try decode(data)
+        return try decode(T.self, data)
     } catch {
         fatalError("\(#file):\(lineNumber): Unable to decode \(T.self) <\(debugDescription(value))>: \(error)")
     }
+}
+
+func expectRoundTripEquality<T : Codable>(of value: T, encode: (T) throws -> Data, decode: (T.Type, Data) throws -> T, lineNumber: Int) where T : Equatable {
+
+    let decoded = performEncodeAndDecode(of: value, encode: encode, decode: decode, lineNumber: lineNumber)
 
     expectEqual(value, decoded, "\(#file):\(lineNumber): Decoded \(T.self) <\(debugDescription(decoded))> not equal to original <\(debugDescription(value))>")
 }
@@ -77,12 +83,12 @@ func expectRoundTripEqualityThroughJSON<T : Codable>(for value: T, lineNumber: I
         return try encoder.encode(value)
     }
 
-    let decode = { (_ data: Data) throws -> T in
+    let decode = { (_ type: T.Type, _ data: Data) throws -> T in
         let decoder = JSONDecoder()
         decoder.nonConformingFloatDecodingStrategy = .convertFromString(positiveInfinity: inf,
                                                                         negativeInfinity: negInf,
                                                                         nan: nan)
-        return try decoder.decode(T.self, from: data)
+        return try decoder.decode(type, from: data)
     }
 
     expectRoundTripEquality(of: value, encode: encode, decode: decode, lineNumber: lineNumber)
@@ -93,8 +99,8 @@ func expectRoundTripEqualityThroughPlist<T : Codable>(for value: T, lineNumber: 
         return try PropertyListEncoder().encode(value)
     }
 
-    let decode = { (_ data: Data) throws -> T in
-        return try PropertyListDecoder().decode(T.self, from: data)
+    let decode = { (_ type: T.Type,_ data: Data) throws -> T in
+        return try PropertyListDecoder().decode(type, from: data)
     }
 
     expectRoundTripEquality(of: value, encode: encode, decode: decode, lineNumber: lineNumber)
@@ -351,6 +357,41 @@ class TestCodable : TestCodableSuper {
         }
     }
 
+    // MARK: - ClosedRange
+    func test_ClosedRange_JSON() {
+        let value = 0...Int.max
+        let decoded = performEncodeAndDecode(of: value, encode: { try JSONEncoder().encode($0) }, decode: { try JSONDecoder().decode($0, from: $1)  }, lineNumber: #line)
+        expectEqual(value.upperBound, decoded.upperBound, "\(#file):\(#line): Decoded ClosedRange upperBound <\(debugDescription(decoded))> not equal to original <\(debugDescription(value))>")
+        expectEqual(value.lowerBound, decoded.lowerBound, "\(#file):\(#line): Decoded ClosedRange lowerBound <\(debugDescription(decoded))> not equal to original <\(debugDescription(value))>")
+    }
+
+    func test_ClosedRange_Plist() {
+        let value = 0...Int.max
+        let decoded = performEncodeAndDecode(of: value, encode: { try PropertyListEncoder().encode($0) }, decode: { try PropertyListDecoder().decode($0, from: $1)  }, lineNumber: #line)
+        expectEqual(value.upperBound, decoded.upperBound, "\(#file):\(#line): Decoded ClosedRange upperBound <\(debugDescription(decoded))> not equal to original <\(debugDescription(value))>")
+        expectEqual(value.lowerBound, decoded.lowerBound, "\(#file):\(#line): Decoded ClosedRange lowerBound <\(debugDescription(decoded))> not equal to original <\(debugDescription(value))>")
+    }
+
+    // MARK: - ContiguousArray
+    lazy var contiguousArrayValues: [Int : ContiguousArray<String>] = [
+        #line : [],
+        #line : ["foo"],
+        #line : ["foo", "bar"],
+        #line : ["foo", "bar", "baz"],
+    ]
+
+    func test_ContiguousArray_JSON() {
+        for (testLine, contiguousArray) in contiguousArrayValues {
+            expectRoundTripEqualityThroughJSON(for: contiguousArray, lineNumber: testLine)
+        }
+    }
+
+    func test_ContiguousArray_Plist() {
+        for (testLine, contiguousArray) in contiguousArrayValues {
+            expectRoundTripEqualityThroughPlist(for: contiguousArray, lineNumber: testLine)
+        }
+    }
+
     // MARK: - DateComponents
     lazy var dateComponents: Set<Calendar.Component> = [
         .era, .year, .month, .day, .hour, .minute, .second, .nanosecond,
@@ -442,6 +483,8 @@ class TestCodable : TestCodableSuper {
     lazy var indexSetValues: [Int : IndexSet] = [
         #line : IndexSet(),
         #line : IndexSet(integer: 42),
+    ]
+    lazy var indexSetMaxValues: [Int : IndexSet] = [
         #line : IndexSet(integersIn: 0 ..< Int.max)
     ]
 
@@ -449,10 +492,19 @@ class TestCodable : TestCodableSuper {
         for (testLine, indexSet) in indexSetValues {
             expectRoundTripEqualityThroughJSON(for: indexSet, lineNumber: testLine)
         }
+        if #available(macOS 10.10, iOS 8, *) {
+            // Mac OS X 10.9 and iOS 7 weren't able to round-trip Int.max in JSON.
+            for (testLine, indexSet) in indexSetMaxValues {
+                expectRoundTripEqualityThroughJSON(for: indexSet, lineNumber: testLine)
+            }
+        }
     }
 
     func test_IndexSet_Plist() {
         for (testLine, indexSet) in indexSetValues {
+            expectRoundTripEqualityThroughPlist(for: indexSet, lineNumber: testLine)
+        }
+        for (testLine, indexSet) in indexSetMaxValues {
             expectRoundTripEqualityThroughPlist(for: indexSet, lineNumber: testLine)
         }
     }
@@ -506,6 +558,9 @@ class TestCodable : TestCodableSuper {
     // MARK: - NSRange
     lazy var nsrangeValues: [Int : NSRange] = [
         #line : NSRange(),
+        #line : NSRange(location: 5, length: 20),
+    ]
+    lazy var nsrangeMaxValues: [Int : NSRange] = [
         #line : NSRange(location: 0, length: Int.max),
         #line : NSRange(location: NSNotFound, length: 0),
     ]
@@ -514,12 +569,60 @@ class TestCodable : TestCodableSuper {
         for (testLine, range) in nsrangeValues {
             expectRoundTripEqualityThroughJSON(for: range, lineNumber: testLine)
         }
+        if #available(macOS 10.10, iOS 8, *) {
+            // Mac OS X 10.9 and iOS 7 weren't able to round-trip Int.max in JSON.
+            for (testLine, range) in nsrangeMaxValues {
+                expectRoundTripEqualityThroughJSON(for: range, lineNumber: testLine)
+            }
+        }
     }
 
     func test_NSRange_Plist() {
         for (testLine, range) in nsrangeValues {
             expectRoundTripEqualityThroughPlist(for: range, lineNumber: testLine)
         }
+        for (testLine, range) in nsrangeMaxValues {
+            expectRoundTripEqualityThroughPlist(for: range, lineNumber: testLine)
+        }
+    }
+
+    // MARK: - PartialRangeFrom
+    func test_PartialRangeFrom_JSON() {
+        let value = 0...
+        let decoded = performEncodeAndDecode(of: value, encode: { try JSONEncoder().encode($0) }, decode: { try JSONDecoder().decode($0, from: $1)  }, lineNumber: #line)
+        expectEqual(value.lowerBound, decoded.lowerBound, "\(#file):\(#line): Decoded PartialRangeFrom <\(debugDescription(decoded))> not equal to original <\(debugDescription(value))>")
+    }
+
+    func test_PartialRangeFrom_Plist() {
+        let value = 0...
+        let decoded = performEncodeAndDecode(of: value, encode: { try PropertyListEncoder().encode($0) }, decode: { try PropertyListDecoder().decode($0, from: $1)  }, lineNumber: #line)
+        expectEqual(value.lowerBound, decoded.lowerBound, "\(#file):\(#line): Decoded PartialRangeFrom <\(debugDescription(decoded))> not equal to original <\(debugDescription(value))>")
+    }
+
+    // MARK: - PartialRangeThrough
+    func test_PartialRangeThrough_JSON() {
+        let value = ...Int.max
+        let decoded = performEncodeAndDecode(of: value, encode: { try JSONEncoder().encode($0) }, decode: { try JSONDecoder().decode($0, from: $1)  }, lineNumber: #line)
+        expectEqual(value.upperBound, decoded.upperBound, "\(#file):\(#line): Decoded PartialRangeThrough <\(debugDescription(decoded))> not equal to original <\(debugDescription(value))>")
+    }
+
+    func test_PartialRangeThrough_Plist() {
+        let value = ...Int.max
+        let decoded = performEncodeAndDecode(of: value, encode: { try PropertyListEncoder().encode($0) }, decode: { try PropertyListDecoder().decode($0, from: $1)  }, lineNumber: #line)
+        expectEqual(value.upperBound, decoded.upperBound, "\(#file):\(#line): Decoded PartialRangeThrough <\(debugDescription(decoded))> not equal to original <\(debugDescription(value))>")
+    }
+
+    // MARK: - PartialRangeUpTo
+    func test_PartialRangeUpTo_JSON() {
+        let value = ..<Int.max
+        let decoded = performEncodeAndDecode(of: value, encode: { try JSONEncoder().encode($0) }, decode: { try JSONDecoder().decode($0, from: $1)  }, lineNumber: #line)
+        expectEqual(value.upperBound, decoded.upperBound, "\(#file):\(#line): Decoded PartialRangeUpTo <\(debugDescription(decoded))> not equal to original <\(debugDescription(value))>")
+    }
+
+    func test_PartialRangeUpTo_Plist() {
+        let value = ..<Int.max
+        let decoded = performEncodeAndDecode(of: value, encode: { try PropertyListEncoder().encode($0) }, decode: { try PropertyListDecoder().decode($0, from: $1)  }, lineNumber: #line)
+        expectEqual(value.upperBound, decoded.upperBound, "\(#file):\(#line): Decoded PartialRangeUpTo <\(debugDescription(decoded))> not equal to original <\(debugDescription(value))>")
     }
 
     // MARK: - PersonNameComponents
@@ -542,6 +645,21 @@ class TestCodable : TestCodableSuper {
         for (testLine, components) in personNameComponentsValues {
             expectRoundTripEqualityThroughPlist(for: components, lineNumber: testLine)
         }
+    }
+
+    // MARK: - Range
+    func test_Range_JSON() {
+        let value = 0..<Int.max
+        let decoded = performEncodeAndDecode(of: value, encode: { try JSONEncoder().encode($0) }, decode: { try JSONDecoder().decode($0, from: $1)  }, lineNumber: #line)
+        expectEqual(value.upperBound, decoded.upperBound, "\(#file):\(#line): Decoded Range upperBound <\(debugDescription(decoded))> not equal to original <\(debugDescription(value))>")
+        expectEqual(value.lowerBound, decoded.lowerBound, "\(#file):\(#line): Decoded Range lowerBound<\(debugDescription(decoded))> not equal to original <\(debugDescription(value))>")
+    }
+
+    func test_Range_Plist() {
+        let value = 0..<Int.max
+        let decoded = performEncodeAndDecode(of: value, encode: { try PropertyListEncoder().encode($0) }, decode: { try PropertyListDecoder().decode($0, from: $1)  }, lineNumber: #line)
+        expectEqual(value.upperBound, decoded.upperBound, "\(#file):\(#line): Decoded Range upperBound<\(debugDescription(decoded))> not equal to original <\(debugDescription(value))>")
+        expectEqual(value.lowerBound, decoded.lowerBound, "\(#file):\(#line): Decoded Range lowerBound<\(debugDescription(decoded))> not equal to original <\(debugDescription(value))>")
     }
 
     // MARK: - TimeZone
@@ -754,6 +872,10 @@ var tests = [
     "test_CGRect_Plist" : TestCodable.test_CGRect_Plist,
     "test_CGVector_JSON" : TestCodable.test_CGVector_JSON,
     "test_CGVector_Plist" : TestCodable.test_CGVector_Plist,
+    "test_ClosedRange_JSON" : TestCodable.test_ClosedRange_JSON,
+    "test_ClosedRange_Plist" : TestCodable.test_ClosedRange_Plist,
+    "test_ContiguousArray_JSON" : TestCodable.test_ContiguousArray_JSON,
+    "test_ContiguousArray_Plist" : TestCodable.test_ContiguousArray_Plist,
     "test_DateComponents_JSON" : TestCodable.test_DateComponents_JSON,
     "test_DateComponents_Plist" : TestCodable.test_DateComponents_Plist,
     "test_Decimal_JSON" : TestCodable.test_Decimal_JSON,
@@ -766,6 +888,14 @@ var tests = [
     "test_Locale_Plist" : TestCodable.test_Locale_Plist,
     "test_NSRange_JSON" : TestCodable.test_NSRange_JSON,
     "test_NSRange_Plist" : TestCodable.test_NSRange_Plist,
+    "test_PartialRangeFrom_JSON" : TestCodable.test_PartialRangeFrom_JSON,
+    "test_PartialRangeFrom_Plist" : TestCodable.test_PartialRangeFrom_Plist,
+    "test_PartialRangeThrough_JSON" : TestCodable.test_PartialRangeThrough_JSON,
+    "test_PartialRangeThrough_Plist" : TestCodable.test_PartialRangeThrough_Plist,
+    "test_PartialRangeUpTo_JSON" : TestCodable.test_PartialRangeUpTo_JSON,
+    "test_PartialRangeUpTo_Plist" : TestCodable.test_PartialRangeUpTo_Plist,
+    "test_Range_JSON" : TestCodable.test_Range_JSON,
+    "test_Range_Plist" : TestCodable.test_Range_Plist,
     "test_TimeZone_JSON" : TestCodable.test_TimeZone_JSON,
     "test_TimeZone_Plist" : TestCodable.test_TimeZone_Plist,
     "test_URL_JSON" : TestCodable.test_URL_JSON,

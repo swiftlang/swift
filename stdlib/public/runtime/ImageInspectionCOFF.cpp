@@ -17,6 +17,11 @@
 
 #if defined(__CYGWIN__)
 #include <dlfcn.h>
+#elif defined(_WIN32)
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <Windows.h>
+#include <DbgHelp.h>
 #endif
 
 using namespace swift;
@@ -82,6 +87,9 @@ void swift::initializeTypeMetadataRecordLookup() {
   }
 }
 
+void swift::initializeDynamicReplacementLookup() {
+}
+
 SWIFT_RUNTIME_EXPORT
 void swift_addNewDSOImage(const void *addr) {
   const swift::MetadataSections *sections =
@@ -106,6 +114,18 @@ void swift_addNewDSOImage(const void *addr) {
   const void *metadata = reinterpret_cast<void *>(type_metadata.start);
   if (type_metadata.length)
     addImageTypeMetadataRecordBlockCallback(metadata, type_metadata.length);
+
+  const auto &dynamic_replacements = sections->swift5_repl;
+  const auto *replacements =
+      reinterpret_cast<void *>(dynamic_replacements.start);
+  if (dynamic_replacements.length) {
+    const auto &dynamic_replacements_some = sections->swift5_reps;
+    const auto *replacements_some =
+      reinterpret_cast<void *>(dynamic_replacements_some.start);
+    addImageDynamicReplacementBlockCallback(
+        replacements, dynamic_replacements.length, replacements_some,
+        dynamic_replacements_some.length);
+  }
 }
 
 int swift::lookupSymbol(const void *address, SymbolInfo *info) {
@@ -120,9 +140,37 @@ int swift::lookupSymbol(const void *address, SymbolInfo *info) {
   info->symbolName = dli_info.dli_sname;
   info->symbolAddress = dli_saddr;
   return 1;
+#elif defined(_WIN32)
+  static const constexpr size_t kSymbolMaxNameLen = 1024;
+  static bool bInitialized = false;
+
+  if (bInitialized == false) {
+    if (SymInitialize(GetCurrentProcess(), /*UserSearchPath=*/NULL,
+                      /*fInvadeProcess=*/TRUE) == FALSE)
+      return 0;
+    bInitialized = true;
+  }
+
+  char buffer[sizeof(SYMBOL_INFO) + kSymbolMaxNameLen];
+  PSYMBOL_INFO pSymbol = reinterpret_cast<PSYMBOL_INFO>(buffer);
+  pSymbol->SizeOfStruct = sizeof(SYMBOL_INFO);
+  pSymbol->MaxNameLen = kSymbolMaxNameLen;
+
+  DWORD64 dwDisplacement = 0;
+
+  if (SymFromAddr(GetCurrentProcess(), reinterpret_cast<const DWORD64>(address),
+                  &dwDisplacement, pSymbol) == FALSE)
+    return 0;
+
+  info->fileName = NULL;
+  info->baseAddress = reinterpret_cast<void *>(pSymbol->ModBase);
+  info->symbolName.reset(_strdup(pSymbol->Name));
+  info->symbolAddress = reinterpret_cast<void *>(pSymbol->Address);
+
+  return 1;
 #else
   return 0;
-#endif // __CYGWIN__
+#endif // defined(__CYGWIN__) || defined(_WIN32)
 }
 
 // This is only used for backward deployment hooks, which we currently only support for

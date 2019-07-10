@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-sil -O -Xllvm -sil-fso-enable-generics=false %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -O -Xllvm -sil-fso-enable-generics=false %s | %FileCheck %s
 
 sil_stage raw
 

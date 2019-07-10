@@ -1,3 +1,5 @@
+// Windows doesn't track/use read() and poll()
+// UNSUPPORTED: windows
 // RUN: %empty-directory(%t/manyfuncs)
 // RUN: %empty-directory(%t/stats)
 //

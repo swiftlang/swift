@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift-swift3
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
@@ -22,9 +22,10 @@ DataTestSuite.test("Data.Iterator semantics") {
   checkSequence(1...33, Data(bytes: Array(1...33)))
 
   // Large data
-  var data = Data(count: 65535)
+  let count = 65535
+  var data = Data(count: count)
   data.withUnsafeMutableBytes { (ptr: UnsafeMutablePointer<UInt8>) -> () in
-    for i in 0..<data.count {
+    for i in 0..<count {
       ptr[i] = UInt8(i % 23)
     }
   }

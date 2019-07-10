@@ -10,12 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/SILOptimizer/Utils/Existential.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/SILOptimizer/Utils/Existential.h"
-#include "swift/SILOptimizer/Utils/CFG.h"
-#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/BasicBlockUtils.h"
+#include "swift/SIL/InstructionUtils.h"
+#include "swift/SILOptimizer/Utils/CFG.h"
+#include "swift/SILOptimizer/Utils/Local.h"
 #include "llvm/ADT/SmallPtrSet.h"
 
 using namespace swift;
@@ -32,8 +33,8 @@ using namespace swift;
 /// apply pattern shown above) and that a valid init_existential_addr 
 /// value is returned only if it can prove that the value it 
 /// initializes is the same value at the use point.
-static SILValue findInitExistentialFromGlobalAddr(GlobalAddrInst *GAI,
-                                                  SILInstruction *Insn) {
+static InitExistentialAddrInst *
+findInitExistentialFromGlobalAddr(GlobalAddrInst *GAI, SILInstruction *Insn) {
   /// Check for a single InitExistential usage for GAI and
   /// a simple dominance check: both InitExistential and Insn are in
   /// the same basic block and only one InitExistential
@@ -48,85 +49,39 @@ static SILValue findInitExistentialFromGlobalAddr(GlobalAddrInst *GAI,
 
   /// No InitExistential found in the basic block.
   if (IEUses.empty())
-    return SILValue();
+    return nullptr;
 
   /// Walk backwards from Insn instruction till the begining of the basic block
   /// looking for an InitExistential.
-  SILValue SingleIE;
+  InitExistentialAddrInst *SingleIE = nullptr;
   for (auto II = Insn->getIterator().getReverse(),
             IE = Insn->getParent()->rend();
        II != IE; ++II) {
     if (!IEUses.count(&*II))
       continue;
     if (SingleIE)
-      return SILValue();
+      return nullptr;
 
     SingleIE = cast<InitExistentialAddrInst>(&*II);
   }
   return SingleIE;
 }
 
-/// Determine InitExistential from global_addr and copy_addr.
-/// %3 = global_addr @$P : $*SomeP
-/// %4 = init_existential_addr %3 : $*SomeP, $SomeC
-/// %5 = alloc_ref $SomeC
-/// store %5 to %4 : $*SomeC
-/// %8 = alloc_stack $SomeP
-/// copy_addr %3 to [initialization] %8 : $*SomeP
-SILValue
-swift::findInitExistentialFromGlobalAddrAndCopyAddr(GlobalAddrInst *GAI,
-                                                    CopyAddrInst *CAI) {
-  assert(CAI->getSrc() == SILValue(GAI) &&
-         "Broken Assumption! Global Addr is not the source of the passed in "
-         "copy_addr?!");
-  return findInitExistentialFromGlobalAddr(GAI, cast<SILInstruction>(CAI));
-}
-
-/// Determine InitExistential from global_addr and an apply argument.
-/// Pattern 1
-/// %3 = global_addr @$P : $*SomeP
-/// %4 = init_existential_addr %3 : $*SomeP, $SomeC
-/// %5 = alloc_ref $SomeC
-/// store %5 to %4 : $*SomeC
-/// %10 = apply %9(%3) : $@convention(thin) (@in_guaranteed SomeP)
-/// Pattern 2
-/// %3 = global_addr @$P : $*SomeP
-/// %9 = open_existential_addr mutable_access %3 : $*SomeP to $*@opened SomeP
-/// %15 = apply %11(%9) : $@convention(thin) (@in_guaranteed SomeP)
-SILValue swift::findInitExistentialFromGlobalAddrAndApply(GlobalAddrInst *GAI,
-                                                          ApplySite Apply,
-                                                          int ArgIdx) {
-  /// Code to ensure that we are calling only in two pattern matching scenarios.
-  bool isArg = false;
-  auto Arg = Apply.getArgument(ArgIdx);
-  if (auto *ApplyGAI = dyn_cast<GlobalAddrInst>(Arg)) {
-    if (ApplyGAI->isIdenticalTo(GAI)) {
-      isArg = true;
-    }
-  } else if (auto Open = dyn_cast<OpenExistentialAddrInst>(Arg)) {
-    auto Op = Open->getOperand();
-    if (auto *OpGAI = dyn_cast<GlobalAddrInst>(Op)) {
-      if (OpGAI->isIdenticalTo(GAI)) {
-        isArg = true;
-      }
-    }
-  }
-  assert(isArg && "Broken Assumption! Global Addr is not an argument to "
-                  "apply?!");
-  return findInitExistentialFromGlobalAddr(GAI, Apply.getInstruction());
-}
-
-/// Returns the address of an object with which the stack location \p ASI is
-/// initialized. This is either a init_existential_addr or the destination of a
-/// copy_addr. Returns a null value if the address does not dominate the
-/// alloc_stack user \p ASIUser.
-/// If the value is copied from another stack location, \p isCopied is set to
-/// true.
-SILValue swift::getAddressOfStackInit(AllocStackInst *ASI,
-                                      SILInstruction *ASIUser, bool &isCopied) {
+/// Returns the instruction that initializes the given stack address. This is
+/// currently either a init_existential_addr, unconditional_checked_cast_addr,
+/// or copy_addr (if the instruction initializing the source of the copy cannot
+/// be determined). Returns nullptr if the initializer does not dominate the
+/// alloc_stack user \p ASIUser.  If the value is copied from another stack
+/// location, \p isCopied is set to true.
+///
+/// allocStackAddr may either itself be an AllocStackInst or an
+/// InitEnumDataAddrInst that projects the value of an AllocStackInst.
+static SILInstruction *getStackInitInst(SILValue allocStackAddr,
+                                        SILInstruction *ASIUser,
+                                        bool &isCopied) {
   SILInstruction *SingleWrite = nullptr;
   // Check that this alloc_stack is initialized only once.
-  for (auto Use : ASI->getUses()) {
+  for (auto Use : allocStackAddr->getUses()) {
     auto *User = Use->getUser();
 
     // Ignore instructions which don't write to the stack location.
@@ -138,17 +93,27 @@ SILValue swift::getAddressOfStackInit(AllocStackInst *ASI,
       continue;
     }
     if (auto *CAI = dyn_cast<CopyAddrInst>(User)) {
-      if (CAI->getDest() == ASI) {
+      if (CAI->getDest() == allocStackAddr) {
         if (SingleWrite)
-          return SILValue();
+          return nullptr;
         SingleWrite = CAI;
+        isCopied = true;
+      }
+      continue;
+    }
+    // An unconditional_checked_cast_addr also copies a value into this addr.
+    if (auto *UCCAI = dyn_cast<UnconditionalCheckedCastAddrInst>(User)) {
+      if (UCCAI->getDest() == allocStackAddr) {
+        if (SingleWrite)
+          return nullptr;
+        SingleWrite = UCCAI;
         isCopied = true;
       }
       continue;
     }
     if (isa<InitExistentialAddrInst>(User)) {
       if (SingleWrite)
-        return SILValue();
+        return nullptr;
       SingleWrite = User;
       continue;
     }
@@ -157,125 +122,212 @@ SILValue swift::getAddressOfStackInit(AllocStackInst *ASI,
       auto Conv = FullApplySite(User).getArgumentConvention(*Use);
       if (Conv != SILArgumentConvention::Indirect_In &&
           Conv != SILArgumentConvention::Indirect_In_Guaranteed)
-        return SILValue();
+        return nullptr;
       continue;
     }
     // Bail if there is any unknown (and potentially writing) instruction.
-    return SILValue();
+    return nullptr;
   }
   if (!SingleWrite)
-    return SILValue();
+    return nullptr;
 
   // A very simple dominance check. As ASI is an operand of ASIUser,
-  // SingleWrite dominates ASIUser if it is in the same block as ASI or ASIUser.
+  // SingleWrite dominates ASIUser if it is in the same block as ASI or
+  // ASIUser. (SingleWrite can't occur after ASIUser because the address would
+  // be uninitialized on use).
+  //
+  // If allocStack holds an Optional, then ASI is an InitEnumDataAddrInst
+  // projection and not strictly an operand of ASIUser. We rely on the guarantee
+  // that this InitEnumDataAddrInst must occur before the InjectEnumAddrInst
+  // that was the source of the existential address.
   SILBasicBlock *BB = SingleWrite->getParent();
-  if (BB != ASI->getParent() && BB != ASIUser->getParent())
+  if (BB != allocStackAddr->getParentBlock() && BB != ASIUser->getParent())
+    return nullptr;
+
+  if (auto *IE = dyn_cast<InitExistentialAddrInst>(SingleWrite))
+    return IE;
+
+  if (auto *UCCA = dyn_cast<UnconditionalCheckedCastAddrInst>(SingleWrite)) {
+    assert(isCopied && "isCopied not set for a unconditional_checked_cast_addr");
+    return UCCA;
+  }
+  auto *CAI = cast<CopyAddrInst>(SingleWrite);
+  assert(isCopied && "isCopied not set for a copy_addr");
+  // Attempt to recurse to find a concrete type.
+  if (auto *ASI = dyn_cast<AllocStackInst>(CAI->getSrc()))
+    return getStackInitInst(ASI, CAI, isCopied);
+
+  // Peek through a stack location holding an Enum.
+  //   %stack_adr = alloc_stack
+  //   %data_adr  = init_enum_data_addr %stk_adr
+  //   %enum_adr  = inject_enum_addr %stack_adr
+  //   %copy_src  = unchecked_take_enum_data_addr %enum_adr
+  // Replace %copy_src with %data_adr and recurse.
+  //
+  // TODO: a general Optional elimination sil-combine could
+  // supersede this check.
+  if (auto *UTEDAI = dyn_cast<UncheckedTakeEnumDataAddrInst>(CAI->getSrc())) {
+    if (InitEnumDataAddrInst *IEDAI = findInitAddressForTrivialEnum(UTEDAI))
+      return getStackInitInst(IEDAI, CAI, isCopied);
+  }
+
+  // Check if the CAISrc is a global_addr.
+  if (auto *GAI = dyn_cast<GlobalAddrInst>(CAI->getSrc()))
+    return findInitExistentialFromGlobalAddr(GAI, CAI);
+
+  // If the source of the copy cannot be determined, return the copy itself
+  // because the caller may have special handling for the source address.
+  return CAI;
+}
+
+/// Return the address of the value used to initialize the given stack location.
+/// If the value originates from init_existential_addr, then it will be a
+/// different type than \p allocStackAddr.
+static SILValue getAddressOfStackInit(SILValue allocStackAddr,
+                                      SILInstruction *ASIUser, bool &isCopied) {
+  SILInstruction *initI = getStackInitInst(allocStackAddr, ASIUser, isCopied);
+  if (!initI)
     return SILValue();
 
-  if (auto *CAI = dyn_cast<CopyAddrInst>(SingleWrite)) {
-    // Try to derive the type from the copy_addr that was used to
-    // initialize the alloc_stack.
-    assert(isCopied && "isCopied not set for a copy_addr");
-    SILValue CAISrc = CAI->getSrc();
-    if (auto *ASI = dyn_cast<AllocStackInst>(CAISrc))
-      return getAddressOfStackInit(ASI, CAI, isCopied);
-    // Check if the CAISrc is a global_addr.
-    if (auto *GAI = dyn_cast<GlobalAddrInst>(CAISrc)) {
-      return findInitExistentialFromGlobalAddrAndCopyAddr(GAI, CAI);
-    }
-    return CAISrc;
-  }
-  return cast<InitExistentialAddrInst>(SingleWrite);
+  if (auto *IEA = dyn_cast<InitExistentialAddrInst>(initI))
+    return IEA;
+
+  if (auto *CAI = dyn_cast<CopyAddrInst>(initI))
+    return CAI->getSrc();
+
+  return SILValue();
 }
 
-/// Find the init_existential, which could be used to determine a concrete
-/// type of the \p Self.
-/// If the value is copied from another stack location, \p isCopied is set to
-/// true.
-SILInstruction *swift::findInitExistential(Operand &openedUse,
-                                           ArchetypeType *&OpenedArchetype,
-                                           SILValue &OpenedArchetypeDef,
-                                           bool &isCopied) {
-  SILValue Self = openedUse.get();
-  SILInstruction *User = openedUse.getUser();
-  isCopied = false;
-  if (auto *Instance = dyn_cast<AllocStackInst>(Self)) {
-    // In case the Self operand is an alloc_stack where a copy_addr copies the
-    // result of an open_existential_addr to this stack location.
-    if (SILValue Src = getAddressOfStackInit(Instance, User, isCopied))
-      Self = Src;
+/// Check if the given operand originates from a recognized OpenArchetype
+/// instruction. If so, return the Opened, otherwise return nullptr.
+OpenedArchetypeInfo::OpenedArchetypeInfo(Operand &use) {
+  SILValue openedVal = use.get();
+  SILInstruction *user = use.getUser();
+  if (auto *instance = dyn_cast<AllocStackInst>(openedVal)) {
+    // Handle:
+    //   %opened = open_existential_addr
+    //   %instance = alloc $opened
+    //   copy_addr %opened to %stack
+    //   <opened_use> %instance
+    if (auto stackInitVal =
+            getAddressOfStackInit(instance, user, isOpenedValueCopied)) {
+      openedVal = stackInitVal;
+    }
   }
-
-  if (auto *Open = dyn_cast<OpenExistentialAddrInst>(Self)) {
-    auto Op = Open->getOperand();
-    auto *ASI = dyn_cast<AllocStackInst>(Op);
-    if (!ASI)
-      return nullptr;
-
-    SILValue StackWrite = getAddressOfStackInit(ASI, Open, isCopied);
-    if (!StackWrite)
-      return nullptr;
-
-    auto *IE = dyn_cast<InitExistentialAddrInst>(StackWrite);
-    if (!IE)
-      return nullptr;
-
+  if (auto *Open = dyn_cast<OpenExistentialAddrInst>(openedVal)) {
     OpenedArchetype = Open->getType().castTo<ArchetypeType>();
-    OpenedArchetypeDef = Open;
-    return IE;
+    OpenedArchetypeValue = Open;
+    ExistentialValue = Open->getOperand();
+    return;
   }
-
-  if (auto *Open = dyn_cast<OpenExistentialRefInst>(Self)) {
-    if (auto *IE = dyn_cast<InitExistentialRefInst>(Open->getOperand())) {
-      OpenedArchetype = Open->getType().castTo<ArchetypeType>();
-      OpenedArchetypeDef = Open;
-      return IE;
-    }
-    return nullptr;
+  if (auto *Open = dyn_cast<OpenExistentialRefInst>(openedVal)) {
+    OpenedArchetype = Open->getType().castTo<ArchetypeType>();
+    OpenedArchetypeValue = Open;
+    ExistentialValue = Open->getOperand();
+    return;
   }
-
-  if (auto *Open = dyn_cast<OpenExistentialMetatypeInst>(Self)) {
-    if (auto *IE = dyn_cast<InitExistentialMetatypeInst>(Open->getOperand())) {
-      auto Ty = Open->getType().getASTType();
-      while (auto Metatype = dyn_cast<MetatypeType>(Ty))
-        Ty = Metatype.getInstanceType();
-      OpenedArchetype = cast<ArchetypeType>(Ty);
-      OpenedArchetypeDef = Open;
-      return IE;
-    }
-    return nullptr;
+  if (auto *Open = dyn_cast<OpenExistentialMetatypeInst>(openedVal)) {
+    auto Ty = Open->getType().getASTType();
+    while (auto Metatype = dyn_cast<MetatypeType>(Ty))
+      Ty = Metatype.getInstanceType();
+    OpenedArchetype = cast<ArchetypeType>(Ty);
+    OpenedArchetypeValue = Open;
+    ExistentialValue = Open->getOperand();
   }
-  return nullptr;
 }
 
-/// Derive a concrete type of self and conformance from the init_existential
-/// instruction.
-/// If successful, initializes a valid ConformanceAndConcreteType.
-ConcreteExistentialInfo::ConcreteExistentialInfo(Operand &openedUse) {
-  // Try to find the init_existential, which could be used to
-  // determine a concrete type of the self.
-  // Returns: InitExistential, OpenedArchetype, OpenedArchetypeDef, isCopied.
-  InitExistential = findInitExistential(openedUse, OpenedArchetype,
-                                        OpenedArchetypeDef, isCopied);
-  if (!InitExistential)
+/// Initialize ExistentialSubs from the given conformance list, using the
+/// already initialized ExistentialType and ConcreteType.
+void ConcreteExistentialInfo::initializeSubstitutionMap(
+    ArrayRef<ProtocolConformanceRef> ExistentialConformances, SILModule *M) {
+
+  // Construct a single-generic-parameter substitution map directly to the
+  // ConcreteType with this existential's full list of conformances.
+  CanGenericSignature ExistentialSig =
+      M->getASTContext().getExistentialSignature(ExistentialType,
+                                                 M->getSwiftModule());
+  ExistentialSubs = SubstitutionMap::get(ExistentialSig, {ConcreteType},
+                                         ExistentialConformances);
+  assert(isValid());
+}
+
+/// If the ConcreteType is an opened existential, also initialize
+/// ConcreteTypeDef to the definition of that type.
+void ConcreteExistentialInfo::initializeConcreteTypeDef(
+    SILInstruction *typeConversionInst) {
+  if (!ConcreteType->isOpenedExistential())
     return;
 
-  ArrayRef<ProtocolConformanceRef> ExistentialConformances;
+  assert(isValid());
 
-  if (auto IE = dyn_cast<InitExistentialAddrInst>(InitExistential)) {
-    ExistentialType = IE->getOperand()->getType().getASTType();
-    ExistentialConformances = IE->getConformances();
-    ConcreteType = IE->getFormalConcreteType();
-    ConcreteValue = IE;
-  } else if (auto IER = dyn_cast<InitExistentialRefInst>(InitExistential)) {
+  // If the concrete type is another existential, we're "forwarding" an
+  // opened existential type, so we must keep track of the original
+  // defining instruction.
+  if (!typeConversionInst->getTypeDependentOperands().empty()) {
+    ConcreteTypeDef = cast<SingleValueInstruction>(
+        typeConversionInst->getTypeDependentOperands()[0].get());
+    return;
+  }
+
+  auto typeOperand =
+      cast<InitExistentialMetatypeInst>(typeConversionInst)->getOperand();
+  assert(typeOperand->getType().hasOpenedExistential()
+         && "init_existential is supposed to have a typedef operand");
+  ConcreteTypeDef = cast<SingleValueInstruction>(typeOperand);
+}
+
+/// Construct this ConcreteExistentialInfo based on the given existential use.
+///
+/// Finds the init_existential, or an address with concrete type used to
+/// initialize the given \p openedUse. If the value is copied
+/// from another stack location, \p isCopied is set to true.
+///
+/// If successful, ConcreteExistentialInfo will be valid upon return, with the
+/// following fields assigned:
+/// - ExistentialType
+/// - isCopied
+/// - ConcreteType
+/// - ConcreteValue
+/// - ConcreteTypeDef
+/// - ExistentialSubs
+ConcreteExistentialInfo::ConcreteExistentialInfo(SILValue existential,
+                                                 SILInstruction *user) {
+  if (existential->getType().isAddress()) {
+    auto *ASI = dyn_cast<AllocStackInst>(existential);
+    if (!ASI)
+      return;
+
+    SILInstruction *stackInit =
+        getStackInitInst(ASI, user, isConcreteValueCopied);
+    if (!stackInit)
+      return;
+
+    if (auto *IE = dyn_cast<InitExistentialAddrInst>(stackInit)) {
+      ExistentialType = IE->getOperand()->getType().getASTType();
+      ConcreteType = IE->getFormalConcreteType();
+      ConcreteValue = IE;
+      initializeSubstitutionMap(IE->getConformances(), &IE->getModule());
+      initializeConcreteTypeDef(IE);
+      return;
+    }
+    // TODO: Once we have a way to introduce more constrained archetypes, handle
+    // any unconditional_checked_cast that wasn't already statically eliminated.
+    //
+    // Unexpected stack write.
+    return;
+  }
+
+  if (auto *IER = dyn_cast<InitExistentialRefInst>(existential)) {
     ExistentialType = IER->getType().getASTType();
-    ExistentialConformances = IER->getConformances();
     ConcreteType = IER->getFormalConcreteType();
     ConcreteValue = IER->getOperand();
-  } else if (auto IEM =
-                 dyn_cast<InitExistentialMetatypeInst>(InitExistential)) {
+    initializeSubstitutionMap(IER->getConformances(), &IER->getModule());
+    initializeConcreteTypeDef(IER);
+    return;
+  }
+
+  if (auto *IEM = dyn_cast<InitExistentialMetatypeInst>(existential)) {
     ExistentialType = IEM->getType().getASTType();
-    ExistentialConformances = IEM->getConformances();
     ConcreteValue = IEM->getOperand();
     ConcreteType = ConcreteValue->getType().getASTType();
     while (auto InstanceType =
@@ -283,85 +335,33 @@ ConcreteExistentialInfo::ConcreteExistentialInfo(Operand &openedUse) {
       ExistentialType = InstanceType.getInstanceType();
       ConcreteType = cast<MetatypeType>(ConcreteType).getInstanceType();
     }
-  } else {
-    assert(!isValid());
+    initializeSubstitutionMap(IEM->getConformances(), &IEM->getModule());
+    initializeConcreteTypeDef(IEM);
     return;
   }
-  // Construct a single-generic-parameter substitution map directly to the
-  // ConcreteType with this existential's full list of conformances.
-  SILModule &M = InitExistential->getModule();
-  CanGenericSignature ExistentialSig =
-      M.getASTContext().getExistentialSignature(ExistentialType,
-                                                M.getSwiftModule());
-  ExistentialSubs = SubstitutionMap::get(ExistentialSig, {ConcreteType},
-                                         ExistentialConformances);
-  // If the concrete type is another existential, we're "forwarding" an
-  // opened existential type, so we must keep track of the original
-  // defining instruction.
-  if (ConcreteType->isOpenedExistential()) {
-    if (InitExistential->getTypeDependentOperands().empty()) {
-      auto op = InitExistential->getOperand(0);
-      assert(op->getType().hasOpenedExistential()
-             && "init_existential is supposed to have a typedef operand");
-      ConcreteTypeDef = cast<SingleValueInstruction>(op);
-    } else {
-      ConcreteTypeDef = cast<SingleValueInstruction>(
-          InitExistential->getTypeDependentOperands()[0].get());
-    }
-  }
-  assert(isValid());
+  // Unrecognized opened existential producer.
+  return;
 }
 
-/// Initialize a ConcreteExistentialInfo based on the already computed concrete
-/// type and protocol declaration. It determines the OpenedArchetypeDef
-/// and SubstituionMap for the ArgOperand argument.
-/// We need the OpenedArchetypeDef to be able to cast it to the concrete type.
-/// findInitExistential helps us determine this OpenedArchetypeDef. For cases
-/// where OpenedArchetypeDef can not be found from findInitExistential (because
-/// there was no InitExistential), then we do
-/// extra effort in trying to find an OpenedArchetypeDef for AllocStackInst
-/// using getAddressOfStackInit.
-ConcreteExistentialInfo::ConcreteExistentialInfo(Operand &ArgOperand,
-                                                 CanType ConcreteTy,
-                                                 ProtocolDecl *Protocol)
-    : ConcreteExistentialInfo(ArgOperand) {
-
-  // If we found an InitExistential, assert that ConcreteType we determined is
-  // same as ConcreteTy argument.
-  if (InitExistential) {
-    assert(ConcreteType == ConcreteTy);
-    assert(isValid());
-    return;
-  }
-
-  ConcreteType = ConcreteTy;
-  OpenedArchetypeDef = ArgOperand.get();
-
-  // If findInitExistential call from the other constructor did not update the
-  // OpenedArchetypeDef (because it did not find an InitExistential) and that
-  // the original Arg is an alloc_stack instruction, then we determine the
-  // OpenedArchetypeDef using getAddressOfStackInit. Please keep in mind that an
-  // alloc_stack can be an argument to apply (which could have no associated
-  // InitExistential), thus we need to determine the OpenedArchetypeDef for it.
-  // This is the extra effort.
-  SILInstruction *User = ArgOperand.getUser();
-  SILModule &M = User->getModule();
-  if (auto *ASI = dyn_cast<AllocStackInst>(OpenedArchetypeDef)) {
-    bool copied = false;
-    if (SILValue Src = getAddressOfStackInit(ASI, User, copied)) {
-      OpenedArchetypeDef = Src;
-    }
-    isCopied = copied;
-  }
-
-  // Bail, if we did not find an opened existential.
-  if (!(isa<OpenExistentialRefInst>(OpenedArchetypeDef) ||
-        isa<OpenExistentialAddrInst>(OpenedArchetypeDef)))
-    return;
+/// Initialize a ConcreteExistentialInfo based on a concrete type and protocol
+/// declaration that has already been computed via whole module type
+/// inference. A cast instruction will be introduced to produce the concrete
+/// value from the opened value.
+///
+/// The simpler constructor taking only the existential value is preferred
+/// because it generates simpler SIL and does not require an extra
+/// cast. However, if that constructor fails to produce a valid
+/// ConcreteExistentialInfo, this constructor may succeed because it doesn't
+/// needs to rediscover the whole-module inferred ConcreteTypeCandidate.
+ConcreteExistentialInfo::ConcreteExistentialInfo(SILValue existential,
+                                                 SILInstruction *user,
+                                                 CanType ConcreteTypeCandidate,
+                                                 ProtocolDecl *Protocol) {
+  SILModule *M = existential->getModule();
 
   // We have the open_existential; we still need the conformance.
   auto ConformanceRef =
-      M.getSwiftModule()->lookupConformance(ConcreteType, Protocol);
+      M->getSwiftModule()->conformsToProtocol(ConcreteTypeCandidate, Protocol);
   if (!ConformanceRef)
     return;
 
@@ -369,18 +369,40 @@ ConcreteExistentialInfo::ConcreteExistentialInfo(Operand &ArgOperand,
   auto *ConcreteConformance = ConformanceRef.getValue().getConcrete();
   assert(ConcreteConformance->isComplete());
 
+  ConcreteType = ConcreteTypeCandidate;
+  // There is no ConcreteValue in this case.
+
   /// Determine the ExistentialConformances and SubstitutionMap.
   ExistentialType = Protocol->getDeclaredType()->getCanonicalType();
-  auto ExistentialSig = M.getASTContext().getExistentialSignature(
-      ExistentialType, M.getSwiftModule());
-  ExistentialSubs = SubstitutionMap::get(
-      ExistentialSig, {ConcreteType},
-      llvm::makeArrayRef(ProtocolConformanceRef(ConcreteConformance)));
+  initializeSubstitutionMap(ProtocolConformanceRef(ConcreteConformance), M);
 
-  /// Determine the OpenedArchetype.
-  OpenedArchetype =
-      OpenedArchetypeDef->getType().castTo<ArchetypeType>();
-
-  /// Check validity.
   assert(isValid());
+}
+
+ConcreteOpenedExistentialInfo::ConcreteOpenedExistentialInfo(Operand &use)
+    : OAI(use) {
+  if (!OAI.isValid())
+    return;
+
+  CEI.emplace(OAI.ExistentialValue, OAI.OpenedArchetypeValue);
+  if (!CEI->isValid()) {
+    CEI.reset();
+    return;
+  }
+  CEI->isConcreteValueCopied |= OAI.isOpenedValueCopied;
+}
+
+ConcreteOpenedExistentialInfo::ConcreteOpenedExistentialInfo(
+    Operand &use, CanType concreteType, ProtocolDecl *protocol)
+    : OAI(use) {
+  if (!OAI.isValid())
+    return;
+
+  CEI.emplace(OAI.ExistentialValue, OAI.OpenedArchetypeValue, concreteType,
+              protocol);
+  if (!CEI->isValid()) {
+    CEI.reset();
+    return;
+  }
+  CEI->isConcreteValueCopied |= OAI.isOpenedValueCopied;
 }

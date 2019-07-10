@@ -50,11 +50,12 @@ namespace irgen {
   createVariable(IRGenModule &IGM, LinkInfo &linkInfo, llvm::Type *objectType,
                  Alignment alignment, DebugTypeInfo DebugType = DebugTypeInfo(),
                  Optional<SILLocation> DebugLoc = None,
-                 StringRef DebugName = StringRef(), bool heapAllocated = false,
-                 bool indirectForDebugInfo = false);
+                 StringRef DebugName = StringRef(), bool heapAllocated = false);
 
   void disableAddressSanitizer(IRGenModule &IGM, llvm::GlobalVariable *var);
 }
 }
+
+extern llvm::cl::opt<bool> UseBasicDynamicReplacement;
 
 #endif

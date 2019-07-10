@@ -5,7 +5,7 @@ sil_stage canonical
 import Swift
 
 class A {
-   @sil_stored final var x: Int { get set }
+   @_hasStorage final var x: Int { get set }
    init(x: Int)
 }
 sil_vtable A {}
@@ -14,7 +14,7 @@ sil public_external @changeInt : $@convention(thin) (@inout Int) -> ()
 
 // CHECK-LABEL: define {{.*}} @test1(
 sil @test1 : $@convention(thin) (@owned A) -> Int {
-bb0(%0 : @owned $A):
+bb0(%0 : $A):
   // CHECK: [[SCRATCH0:%.*]] = alloca [[BUFFER_T:\[.* x i8\]]],
   // CHECK: [[SCRATCH1:%.*]] = alloca [[BUFFER_T:\[.* x i8\]]],
 
@@ -25,11 +25,11 @@ bb0(%0 : @owned $A):
   // CHECK: call void @llvm.lifetime.start.p0i8(i64 -1, i8* [[T0]])
   // CHECK: [[T0:%.*]] = bitcast [[INT:%TSi]]* [[PROP]] to i8*
   // CHECK: call void @swift_beginAccess(i8* [[T0]], [[BUFFER_T]]* [[SCRATCH0]], [[SIZE_T:i32|i64]] 32, i8* null)
-    %4 = begin_access [read] [dynamic] %3 : $*Int
+  %4 = begin_access [read] [dynamic] %3 : $*Int
 
   // CHECK: [[T0:%.*]] = getelementptr inbounds [[INT]], [[INT]]* %1, i32 0, i32 0
   // CHECK: load {{.*}}* [[T0]]
-  %5 = load [trivial] %4 : $*Int
+  %5 = load %4 : $*Int
 
   // CHECK: call void @swift_endAccess([[BUFFER_T]]* [[SCRATCH0]])
   // CHECK: [[T0:%.*]] = bitcast [[BUFFER_T]]* [[SCRATCH0]] to i8*
@@ -54,6 +54,6 @@ bb0(%0 : @owned $A):
   // CHECK: [[T0:%.*]] = bitcast [[BUFFER_T]]* [[SCRATCH1]] to i8*
   // CHECK: call void @llvm.lifetime.end.p0i8(i64 -1, i8* [[T0]])
   end_access %12 : $*Int
-  destroy_value %0 : $A
+  strong_release %0 : $A
   return %5 : $Int
 }

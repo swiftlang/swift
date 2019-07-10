@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -wmo -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -inline -sil-combine -generic-specializer  -allocbox-to-stack -copy-forwarding -lower-aggregate-instrs -mem2reg -devirtualizer -late-inline -dead-arg-signature-opt -dce | %FileCheck %s
+// RUN: %target-sil-opt -wmo -enable-sil-verify-all %s -inline -sil-combine -generic-specializer  -allocbox-to-stack -copy-forwarding -lower-aggregate-instrs -mem2reg -devirtualizer -late-inline -dead-arg-signature-opt -dce | %FileCheck %s
 import Builtin
 import Swift
 import SwiftShims
@@ -178,7 +178,7 @@ bb0(%0 : $*SomeNoClass):
 sil hidden [signature_optimized_thunk] [always_inline] @$s21existential_transform12wrap_foo_ncp1as5Int32VAA19SomeNoClassProtocol_p_tF : $@convention(thin) (@in_guaranteed SomeNoClassProtocol) -> Int32 {
 bb0(%0 : $*SomeNoClassProtocol):
   %1 = function_ref @$s21existential_transform12wrap_foo_ncp1as5Int32VAA19SomeNoClassProtocol_p_tFTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : SomeNoClassProtocol> (@in_guaranteed τ_0_0) -> Int32 
-  %2 = open_existential_addr mutable_access %0 : $*SomeNoClassProtocol to $*@opened("CC97FCD6-AC7C-11E8-B742-D0817AD4059B") SomeNoClassProtocol 
+  %2 = open_existential_addr immutable_access %0 : $*SomeNoClassProtocol to $*@opened("CC97FCD6-AC7C-11E8-B742-D0817AD4059B") SomeNoClassProtocol 
   %3 = apply %1<@opened("CC97FCD6-AC7C-11E8-B742-D0817AD4059B") SomeNoClassProtocol>(%2) : $@convention(thin) <τ_0_0 where τ_0_0 : SomeNoClassProtocol> (@in_guaranteed τ_0_0) -> Int32 
   return %3 : $Int32                              
 } // end sil function '$s21existential_transform12wrap_foo_ncp1as5Int32VAA19SomeNoClassProtocol_p_tF'
@@ -302,7 +302,7 @@ bb0(%0 : $*SomeNoClassComp):
 sil hidden [signature_optimized_thunk] [always_inline] @$s21existential_transform25wrap_no_foo_bar_comp_ncpc1as5Int32VAA23SomeNoClassProtocolComp_AA0j5OtherklmN0p_tF : $@convention(thin) (@in_guaranteed SomeNoClassProtocolComp & SomeOtherNoClassProtocolComp) -> Int32 {
 bb0(%0 : $*SomeNoClassProtocolComp & SomeOtherNoClassProtocolComp):
   %1 = function_ref @$s21existential_transform25wrap_no_foo_bar_comp_ncpc1as5Int32VAA23SomeNoClassProtocolComp_AA0j5OtherklmN0p_tFTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : SomeNoClassProtocolComp, τ_0_0 : SomeOtherNoClassProtocolComp> (@in_guaranteed τ_0_0) -> Int32 
-  %2 = open_existential_addr mutable_access %0 : $*SomeNoClassProtocolComp & SomeOtherNoClassProtocolComp to $*@opened("CC983642-AC7C-11E8-B742-D0817AD4059B") SomeNoClassProtocolComp & SomeOtherNoClassProtocolComp 
+  %2 = open_existential_addr immutable_access %0 : $*SomeNoClassProtocolComp & SomeOtherNoClassProtocolComp to $*@opened("CC983642-AC7C-11E8-B742-D0817AD4059B") SomeNoClassProtocolComp & SomeOtherNoClassProtocolComp 
   %3 = apply %1<@opened("CC983642-AC7C-11E8-B742-D0817AD4059B") SomeNoClassProtocolComp & SomeOtherNoClassProtocolComp>(%2) : $@convention(thin) <τ_0_0 where τ_0_0 : SomeNoClassProtocolComp, τ_0_0 : SomeOtherNoClassProtocolComp> (@in_guaranteed τ_0_0) -> Int32 
   return %3 : $Int32                              
 } // end sil function '$s21existential_transform25wrap_no_foo_bar_comp_ncpc1as5Int32VAA23SomeNoClassProtocolComp_AA0j5OtherklmN0p_tF'
@@ -445,19 +445,16 @@ bb0(%0 : $*PPP):
   return %3 : $Int32                              
 } // end sil function '$s21existential_transform14wrap_inout_ncp1as5Int32VAA3PPP_pz_tF'
 
+// Cannot substitute a concrete address for an @inout existential argument. The wrong value would be modified.
+//
 // CHECK-LABEL: sil hidden [noinline] @$s21existential_transform9inout_ncpyyF : $@convention(thin) () -> () {
 // CHECK: bb0:
-// CHECK:  %0 = alloc_stack $KKK, var, name "magic6"       
-// CHECK:  %1 = alloc_ref $KKK                             
-// CHECK:  debug_value %1 : $KKK, let, name "self", argno 1 
-// CHECK:  store %1 to %0 : $*KKK                          
-// CHECK:  %4 = function_ref @$s21existential_transform14wrap_inout_ncp1as5Int32VAA3PPP_pz_tFTf4e_n4main3KKKC_Tg5 : $@convention(thin) (@inout KKK) -> Int32 
-// CHECK:  %5 = apply %4(%0) : $@convention(thin) (@inout KKK) -> Int32
-// CHECK:  %6 = load %0 : $*KKK                            
-// CHECK:  strong_release %6 : $KKK                        
-// CHECK:  dealloc_stack %0 : $*KKK                        
-// CHECK:  %9 = tuple ()                                   
-// CHECK:  return %9 : $()                                 
+// CHECK:  [[ALLOC:%.*]] = alloc_stack $PPP, var, name "magic6"
+// CHECK:  alloc_ref $KKK
+// CHECK:  [[F:%.*]] = function_ref @$s21existential_transform14wrap_inout_ncp1as5Int32VAA3PPP_pz_tFTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : PPP> (@inout τ_0_0) -> Int32
+// CHECK:  [[ADR:%.*]] = open_existential_addr mutable_access [[ALLOC]] : $*PPP to $*@opened("{{.*}}") PPP
+// CHECK:  apply [[F]]<@opened("{{.*}}") PPP>([[ADR]]) : $@convention(thin) <τ_0_0 where τ_0_0 : PPP> (@inout τ_0_0) -> Int32
+// CHECK:  dealloc_stack %0 : $*PPP
 // CHECK-LABEL: } // end sil function '$s21existential_transform9inout_ncpyyF'
 sil hidden [noinline] @$s21existential_transform9inout_ncpyyF : $@convention(thin) () -> () {
 bb0:
@@ -497,27 +494,26 @@ bb0(%0 : $*PPPP):
   return %3 : $Int32                              
 } // end sil function '$s21existential_transform21wrap_struct_inout_ncp1as5Int32VAA4PPPP_pz_tF'
 
-
+// Cannot substitute a concrete value's address for an @inout existential argument. The wrong value would be modified.
+//
 // CHECK-LABEL: sil hidden [noinline] @$s21existential_transform16struct_inout_ncpyyF : $@convention(thin) () -> () {
 // CHECK: bb0:
-// CHECK:   %0 = alloc_stack $SSSS, var, name "magic7"      
-// CHECK:   %1 = struct $SSSS ()                            
-// CHECK:   store %1 to %0 : $*SSSS                         
-// CHECK:   %3 = function_ref @$s21existential_transform21wrap_struct_inout_ncp1as5Int32VAA4PPPP_pz_tFTf4e_n4main4SSSSV_Tg5 : $@convention(thin) (@inout SSSS) -> Int32 
-// CHECK:   %4 = apply %3(%0) : $@convention(thin) (@inout SSSS) -> Int32
-// CHECK:   dealloc_stack %0 : $*SSSS                       
-// CHECK:   %6 = tuple ()                                   
-// CHECK:   return %6 : $()                                 
+// CHECK:   [[ALLOC:%.*]] = alloc_stack $PPPP, var, name "magic7"      
+// CHECK:   struct $SSSS ()                            
+// CHECK:   [[F:%.*]] = function_ref @$s21existential_transform21wrap_struct_inout_ncp1as5Int32VAA4PPPP_pz_tFTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : PPPP> (@inout τ_0_0) -> Int32 
+// CHECK:   [[ADR:%.*]] = open_existential_addr mutable_access %0 : $*PPPP to $*@opened("{{.*}}") PPPP 
+// CHECK:   apply [[F]]<@opened("{{.*}}") PPPP>(%5) : $@convention(thin) <τ_0_0 where τ_0_0 : PPPP> (@inout τ_0_0) -> Int32 
+// CHECK:   dealloc_stack [[ALLOC]] : $*PPPP
 // CHECK-LABEL: } // end sil function '$s21existential_transform16struct_inout_ncpyyF'
 sil hidden [noinline] @$s21existential_transform16struct_inout_ncpyyF : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack $PPPP, var, name "magic7"      
-  %1 = struct $SSSS ()                            
+  %1 = struct $SSSS ()
   %2 = init_existential_addr %0 : $*PPPP, $SSSS   
   store %1 to %2 : $*SSSS                         
-  %4 = function_ref @$s21existential_transform21wrap_struct_inout_ncp1as5Int32VAA4PPPP_pz_tFTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : PPPP> (@inout τ_0_0) -> Int32 
-  %5 = open_existential_addr mutable_access %0 : $*PPPP to $*@opened("CC98A5E6-AC7C-11E8-B742-D0817AD4059B") PPPP 
-  %6 = apply %4<@opened("CC98A5E6-AC7C-11E8-B742-D0817AD4059B") PPPP>(%5) : $@convention(thin) <τ_0_0 where τ_0_0 : PPPP> (@inout τ_0_0) -> Int32 
+  %4 = function_ref @$s21existential_transform21wrap_struct_inout_ncp1as5Int32VAA4PPPP_pz_tFTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : PPPP> (@inout τ_0_0) -> Int32
+  %5 = open_existential_addr mutable_access %0 : $*PPPP to $*@opened("CC98A5E6-AC7C-11E8-B742-D0817AD4059B") PPPP
+  %6 = apply %4<@opened("CC98A5E6-AC7C-11E8-B742-D0817AD4059B") PPPP>(%5) : $@convention(thin) <τ_0_0 where τ_0_0 : PPPP> (@inout τ_0_0) -> Int32
   destroy_addr %0 : $*PPPP                        
   dealloc_stack %0 : $*PPPP                       
   %9 = tuple ()                                   
@@ -610,12 +606,10 @@ bb0(%0 : $*τ_0_0):
   return %12 : $Int32                             
 } // end sil function '$s21existential_transform25wrap_no_foo_bar_comp_ncpc1as5Int32VAA23SomeNoClassProtocolComp_AA0j5OtherklmN0p_tFTf4e_n'
 
-// CHECK-LABEL: sil shared [noinline] @$s21existential_transform14wrap_inout_ncp1as5Int32VAA3PPP_pz_tFTf4e_n4main3KKKC_Tg5 : $@convention(thin) (@inout KKK) -> Int32 {
-// CHECK: bb0(%0 : $*KKK):
-// CHECK:   %1 = integer_literal $Builtin.Int32, 10         
-// CHECK:   %2 = struct $Int32 (%1 : $Builtin.Int32)        
-// CHECK:   return %2 : $Int32                              
-// CHECK-LABEL: } // end sil function '$s21existential_transform14wrap_inout_ncp1as5Int32VAA3PPP_pz_tFTf4e_n4main3KKKC_Tg5'
+// Cannot substitute a concrete value for a mutable existential, so specialization will be blocked.
+//
+// CHECK-LABEL: sil shared [noinline] @$s21existential_transform14wrap_inout_ncp1as5Int32VAA3PPP_pz_tFTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : PPP> (@inout τ_0_0) -> Int32 {
+// CHECK-LABEL: } // end sil function '$s21existential_transform14wrap_inout_ncp1as5Int32VAA3PPP_pz_tFTf4e_n'
 sil shared [noinline] @$s21existential_transform14wrap_inout_ncp1as5Int32VAA3PPP_pz_tFTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : PPP> (@inout τ_0_0) -> Int32 {
 bb0(%0 : $*τ_0_0):
   %1 = alloc_stack $τ_0_0                        
@@ -626,12 +620,10 @@ bb0(%0 : $*τ_0_0):
   return %4 : $Int32                              
 } // end sil function '$s21existential_transform14wrap_inout_ncp1as5Int32VAA3PPP_pz_tFTf4e_n'
 
-// CHECK-LABEL: sil shared [noinline] @$s21existential_transform21wrap_struct_inout_ncp1as5Int32VAA4PPPP_pz_tFTf4e_n4main4SSSSV_Tg5 : $@convention(thin) (@inout SSSS) -> Int32 {
-// CHECK: bb0(%0 : $*SSSS):
-// CHECK:   %1 = integer_literal $Builtin.Int32, 10         
-// CHECK:   %2 = struct $Int32 (%1 : $Builtin.Int32)        
-// CHECK:   return %2 : $Int32                              
-// CHECK-LABEL: } // end sil function '$s21existential_transform21wrap_struct_inout_ncp1as5Int32VAA4PPPP_pz_tFTf4e_n4main4SSSSV_Tg5'
+// Cannot substitute a concrete value for a mutable existential, so specialization will be blocked.
+//
+// CHECK-LABEL: sil shared [noinline] @$s21existential_transform21wrap_struct_inout_ncp1as5Int32VAA4PPPP_pz_tFTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : PPPP> (@inout τ_0_0) -> Int32 {
+// CHECK-LABEL: } // end sil function '$s21existential_transform21wrap_struct_inout_ncp1as5Int32VAA4PPPP_pz_tFTf4e_n'
 sil shared [noinline] @$s21existential_transform21wrap_struct_inout_ncp1as5Int32VAA4PPPP_pz_tFTf4e_n : $@convention(thin) <τ_0_0 where τ_0_0 : PPPP> (@inout τ_0_0) -> Int32 {
 bb0(%0 : $*τ_0_0):
   %1 = alloc_stack $τ_0_0                        

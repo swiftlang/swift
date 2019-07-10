@@ -324,7 +324,7 @@ are a few common reasons for this:
   save the overhead of a cross-library function call and allow further
   optimization of callers.
 
-- The function accesses a fixed-contents struct with non-public members; this
+- The function accesses a frozen struct with non-public members; this
   allows the library author to preserve invariants while still allowing
   efficient access to the struct.
 
@@ -345,11 +345,12 @@ Clients are not required to inline a function marked ``@inlinable``.
     understanding that it will not affect existing clients. This is the
     standard example of a `binary-compatible source-breaking change`.
 
-Any local functions or closures within an inlinable function are themselves
-treated as ``@inlinable``, and a client that inlines the containing function
-must emit its own copy of the local functions or closures. This is important in
-case it is necessary to change the inlinable function later; existing clients
-should not be depending on internal details of the previous implementation.
+Any local functions or closures within an inlinable function are treated as
+``@_alwaysEmitIntoClient`` (see below). A client that inlines the containing
+function must emit its own copy of the local functions or closures. This is
+important in case it is necessary to change the inlinable function later;
+existing clients should not be depending on internal details of the previous
+implementation.
 
 Removing the ``@inlinable`` attribute completely---say, to reference private
 implementation details that should not be `versioned <versioned entity>`---is a
@@ -395,7 +396,7 @@ polar representation::
 and the ``x`` and ``y`` properties have now disappeared. To avoid this, the
 bodies of inlinable functions have the following restrictions:
 
-- They may not define any local types (other than typealiases).
+- They may not define any local types.
 
 - They must not reference any ``private`` or ``fileprivate`` entities.
 
@@ -408,19 +409,35 @@ bodies of inlinable functions have the following restrictions:
   guards.
 
 
+Always Emit Into Client
+-----------------------
+
+A function, computed property or subscript annotated as ``@_alwaysEmitIntoClient``
+is similar to an ``@inlinable`` declaration, except the declaration is
+not part of the module's ABI, meaning that the client must always emit
+their own copy.
+
+As a result, removing a declaration annotated as ``@_alwaysEmitIntoClient``
+is a binary-compatible source-breaking change.
+
+.. admonition:: TODO
+
+    The implementation of ``@_alwaysEmitIntoClient`` is incomplete and
+    should probably graduate to having its own evolution proposal.
+
 Default Argument Expressions
 ----------------------------
 
 Default argument expressions for functions that are public, versioned, or
-inlinable are implemented very similar to inlinable functions and thus are
-subject to similar restrictions:
+inlinable are implicitly ``@_alwaysEmitIntoClient``. They are subject to
+similar restrictions:
 
-- They may not define any local types (other than typealiases).
+- They may not define any local types.
 
 - They must not reference any non-``public`` entities.
 
 - They must not reference any entities from the current module introduced
-  after the function was made inlinable, except under appropriate availability
+  after the default argument was added, except under appropriate availability
   guards.
 
 A default argument implicitly has the same availability as the function it is
@@ -438,6 +455,8 @@ changes are permitted:
 - Adding or removing a non-public, non-versioned setter.
 - Changing from a stored variable to a computed variable, or vice versa, as
   long as a previously versioned setter is not removed.
+- As a special case of the above, adding or removing ``lazy`` from a stored
+  property.
 - Changing the body of an accessor.
 - Adding or removing an observing accessor (``willSet`` or ``didSet``) to/from
   an existing variable. This is effectively the same as modifying the body of a
@@ -482,6 +501,7 @@ amount:
 - Adding or removing a non-public, non-versioned setter is still permitted.
 - Changing from stored to computed or vice versa is forbidden, because it would
   break existing clients.
+- Similarly, adding or removing ``lazy`` is forbidden.
 - Changing the body of an accessor is a `binary-compatible source-breaking
   change`.
 - Adding/removing observing accessors is likewise a `binary-compatible
@@ -530,6 +550,8 @@ the following changes are permitted:
 - Reordering any existing members, including stored properties.
 - Adding any new members, including stored properties.
 - Changing existing properties from stored to computed or vice versa.
+- As a special case of the above, adding or removing ``lazy`` from a stored
+  property.
 - Changing the body of any methods, initializers, or accessors.
 - Adding or removing an observing accessor (``willSet`` or ``didSet``) to/from
   an existing property. This is effectively the same as modifying the body of a
@@ -637,22 +659,28 @@ extension; unlike access control, entities within the extension may freely
 declare themselves to be either more or less available than what the extension
 provides.
 
+We could also implement a ``@_alwaysEmitIntoClient``  attribute for conformances.
+This introduces its own challenges with runtime uniquing of witness tables now
+necessary for conformances.
 
-Fixed-Contents Structs
-----------------------
 
-To opt out of this flexibility, a struct may be marked ``@fixedContents``.
+Frozen Structs
+--------------
+
+To opt out of this flexibility, a struct may be marked ``@frozen``.
 This promises that no stored properties will be added to or removed from the
 struct, even non-public ones. Additionally, all versioned instance stored
-properties in a ``@fixedContents`` struct are implicitly declared
+properties in a ``@frozen`` struct are implicitly declared
 ``@inlinable`` (as described above for top-level variables). In effect:
 
 - Reordering stored instance properties (public or non-public) is not permitted.
   Reordering all other members is still permitted.
 - Adding new stored instance properties (public or non-public) is not permitted.
   Adding any other new members is still permitted.
-- Existing instance properties may not be changed from stored to computed or
-  vice versa.
+- Changing existing instance properties from stored to computed or
+  vice versa is not permitted.
+- Similarly, adding or removing ``lazy`` from a stored property is not
+  permitted.
 - Changing the body of any *existing* methods, initializers, computed property
   accessors, or non-instance stored property accessors is permitted. Changing
   the body of a stored instance property observing accessor is permitted if the
@@ -672,8 +700,9 @@ generic parameters and members of tuples.
 
 .. note::
 
-    The name ``@fixedContents`` is intentionally awful to encourage us to come
-    up with a better one.
+    The above restrictions do not apply to ``static`` properties of
+    ``@frozen`` structs. Static members effectively behave as top-level
+    functions and variables.
 
 While adding or removing stored properties is forbidden, existing properties may
 still be modified in limited ways:
@@ -685,13 +714,13 @@ still be modified in limited ways:
 - A versioned ``internal`` property may be made ``public`` (without changing
   its version).
 
-An initializer of a fixed-contents struct may be declared ``@inlinable`` even
+An initializer of a frozen struct may be declared ``@inlinable`` even
 if it does not delegate to another initializer, as long as the ``@inlinable``
 attribute, or the initializer itself, is not introduced earlier than the
-``@fixedContents`` attribute and the struct has no non-versioned stored
+``@frozen`` attribute and the struct has no non-versioned stored
 properties.
 
-A ``@fixedContents`` struct is *not* guaranteed to use the same layout as a C
+A ``@frozen`` struct is *not* guaranteed to use the same layout as a C
 struct with a similar "shape". If such a struct is necessary, it should be
 defined in a C header and imported into Swift.
 
@@ -704,7 +733,7 @@ defined in a C header and imported into Swift.
 
 .. note::
 
-    Hypothetically, we could use a different model where a ``@fixedContents``
+    Hypothetically, we could use a different model where a ``@frozen``
     struct only guarantees the "shape" of the struct, so to speak, while
     leaving all property accesses to go through function calls. This would
     allow stored properties to change their accessors, or (with the Behaviors
@@ -713,17 +742,17 @@ defined in a C header and imported into Swift.
     a simple C-like struct that groups together simple values, with only public
     stored properties and no observing accessors, and having to opt into direct
     access to those properties seems unnecessarily burdensome. The struct is
-    being declared ``@fixedContents`` for a reason, after all: it's been
+    being declared ``@frozen`` for a reason, after all: it's been
     discovered that its use is causing performance issues.
 
     Consequently, as a first pass we may just require all stored properties in
-    a ``@fixedContents`` struct, public or non-public, to have trivial
+    a ``@frozen`` struct, public or non-public, to have trivial
     accessors, i.e. no observing accessors and no behaviors.
 
-``@fixedContents`` is a `versioned attribute`. This is so that clients can
+``@frozen`` is a `versioned attribute`. This is so that clients can
 deploy against older versions of the library, which may have a different layout
 for the struct. (In this case the client must manipulate the struct as if the
-``@fixedContents`` attribute were absent.)
+``@frozen`` attribute were absent.)
 
 
 Enums
@@ -787,9 +816,8 @@ clients that the enum cases are exhaustive. In particular:
 
 - Adding new cases is not permitted.
 - Reordering existing cases is not permitted.
-- Adding a raw type to an enum that does not have one is not permitted -- it's
-  used for optimization.
 - Removing a non-public case is not applicable.
+- Adding a raw type is still permitted.
 - Adding any other members is still permitted.
 - Removing any non-public, non-versioned members is still permitted.
 - Adding a new protocol conformance is still permitted.
@@ -825,11 +853,7 @@ Protocols
 
 There are very few safe changes to make to protocols and their members:
 
-- A new non-type requirement may be added to a protocol, as long as it has an
-  unconstrained default implementation.
 - A default may be added to an associated type.
-- Removing a default from an associated type is a `binary-compatible
-  source-breaking change`.
 - A new optional requirement may be added to an ``@objc`` protocol.
 - All members may be reordered, including associated types.
 - Changing *internal* parameter names of function and subscript requirements
@@ -840,30 +864,32 @@ There are very few safe changes to make to protocols and their members:
   be added to a function requirement without any additional versioning
   information.
 
+New requirements can be added to a protocol. However, restrictions around
+existential types mean that adding new associated types or non-type requirements
+involving ``Self`` can break source compatibility. For this reason, the following
+are `binary-compatible source-breaking changes <binary-compatible source-breaking change>`:
+
+- A new non-type requirement may be added to a protocol, as long as it has an
+  unconstrained default implementation in a protocol extension of the
+  protocol itself or some other protocol it refines.
+- A new associated type requirement may be added as long as it has a
+  default.
+
 All other changes to the protocol itself are forbidden, including:
 
-- Adding a new associated type.
+- Adding or removing refined protocols.
 - Removing any existing requirements (type or non-type).
+- Removing the default type of an associated type.
 - Making an existing requirement optional.
 - Making a non-``@objc`` protocol ``@objc`` or vice versa.
-- Adding or removing constraints from an associated type, including inherited
-  associated types.
+- Adding or removing protocols and superclasses from the inheritance
+  clause of an associated type.
+- Adding or removing constraints from the ``where`` clause of
+  the protocol or an associated type.
 
 Protocol extensions may be more freely modified; `see below`__.
 
 __ #protocol-extensions
-
-.. note::
-
-    A protocol's associated types are used in computing the "generic signature"
-    that uniquely identifies a generic function. Adding an associated type
-    could perturb the generic signature and thus change the identity of a
-    function, breaking binary compatibility.
-    
-    It may be possible to allow adding associated types as long as they have
-    proper availability annotations, but this is not in scope for the initial
-    version of Swift ABI stability.
-
 
 Classes
 ~~~~~~~
@@ -874,6 +900,8 @@ support all of the following changes:
 
 - Reordering any existing members, including stored properties.
 - Changing existing properties from stored to computed or vice versa.
+- As a special case of the above, adding or removing ``lazy`` from a stored
+  property.
 - Changing the body of any methods, initializers, or accessors.
 - Adding or removing an observing accessor (``willSet`` or ``didSet``) to/from
   an existing property. This is effectively the same as modifying the body of a
@@ -1078,7 +1106,7 @@ Possible Restrictions on Classes
 --------------------------------
 
 In addition to ``final``, it may be useful to restrict the stored properties of
-a class instance, like `Fixed-Contents Structs`_. However, there are open
+a class instance, like `Frozen Structs`_. However, there are open
 questions about how this would actually work, and the compiler still wouldn't
 be able to make much use of the information, because classes from other
 libraries must almost always be allocated on the heap.
@@ -1090,13 +1118,20 @@ additive feature, it can be added to the model at any time.
 Extensions
 ~~~~~~~~~~
 
-Non-protocol extensions largely follow the same rules as the types they extend.
+Extensions largely follow the same rules as the types they extend.
 The following changes are permitted:
 
 - Adding new extensions and removing empty extensions (that is, extensions that
   declare neither members nor protocol conformances).
 - Moving a member from one extension to another within the same module, as long
   as both extensions have the exact same constraints.
+- Adding any new member.
+- Reordering members.
+- Removing any non-public, non-versioned member.
+- Changing the body of any methods, initializers, or accessors.
+
+Additionally, non-protocol extensions allow a few additional changes:
+
 - Moving a member from an unconstrained extension to the declaration of the
   base type, provided that the declaration is in the same module. The reverse
   is permitted for all members except stored properties, although note that
@@ -1104,24 +1139,6 @@ The following changes are permitted:
   implicitly synthesized.
 - Adding a new protocol conformance (with proper availability annotations).
 - Removing conformances to non-public protocols.
-
-Adding, removing, reordering, and modifying members follow the same rules as
-the base type; see the sections on structs, enums, and classes above.
-
-
-Protocol Extensions
--------------------
-
-Protocol extensions follow slightly different rules from other extensions; the
-following changes are permitted:
-
-- Adding new extensions and removing empty extensions.
-- Moving a member from one extension to another within the same module, as long
-  as both extensions have the exact same constraints.
-- Adding any new member.
-- Reordering members.
-- Removing any non-public, non-versioned member.
-- Changing the body of any methods, initializers, or accessors.
 
 .. note::
 
@@ -1134,7 +1151,7 @@ Operators and Precedence Groups
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Operator and precedence group declarations are entirely compile-time
-constructs, so changing them does not have any affect on binary compatibility.
+constructs, so changing them does not have any effect on binary compatibility.
 However, they do affect *source* compatibility, so it is recommended that
 existing operators are not changed at all except for the following:
 
@@ -1170,18 +1187,13 @@ A Unifying Theme
 ~~~~~~~~~~~~~~~~
 
 So far this document has talked about ways to give up flexibility for several
-different kinds of declarations: ``@inlinable`` for functions,
-``@fixedContents`` for structs, etc. Each of these has a different set of
+different kinds of declarations: namely ``@inlinable`` for functions, and
+``@frozen`` for enums and structs. Each of these has a different set of
 constraints it enforces on the library author and promises it makes to clients.
-However, they all follow a common theme of giving up the flexibility of future
+However, they follow a common theme of giving up the flexibility of future
 changes in exchange for improved performance and perhaps some semantic
-guarantees. Therefore, all of these attributes are informally referred to as
+guarantees. Therefore, these attributes are informally referred to as
 "fragility attributes".
-
-Given that these attributes share several characteristics, we could consider
-converging on a single common attribute, say ``@fixed``, ``@inline``, or
-``@fragile``. However, this may be problematic if the same declaration has
-multiple kinds of flexibility.
 
 
 Versioning Internal Declarations
@@ -1232,7 +1244,7 @@ at run time if the source code is reorganized, which is unacceptable.
     keep things simple we'll stick with the basics.
 
 We could do away with the entire feature if we restricted inlinable functions
-and fixed-contents structs to only refer to public entities. However, this
+and frozen structs to only refer to public entities. However, this
 removes one of the primary reasons to make something inlinable: to allow
 efficient access to a type while still protecting its invariants.
 
@@ -1243,7 +1255,7 @@ efficient access to a type while still protecting its invariants.
 *Backdating* refers to releasing a new version of a library that contains
 changes, but pretending those changes were made in a previous version of the
 library. For example, you might want to release version 1.2 of the "Magician"
-library, but pretend that the "SpellIncantation" struct was fixed-contents
+library, but pretend that the "SpellIncantation" struct was frozen
 since its introduction in version 1.0.
 
 **This is not safe.**
@@ -1252,9 +1264,8 @@ Backdating the availability a versioned entity that was previously non-public
 is clearly not safe: older versions of the library will not expose the entity
 as part of their ABI. What may be less obvious is that the fragility attributes
 likewise are not safe to backdate, even if you know the attributes could have
-been added in the past. To give one example, the presence of ``@closed`` or
-``@fixedContents`` may affect the layout and calling conventions for an enum
-or struct.
+been added in the past. To give one example, the presence of ``@frozen`` may
+affect the layout and calling conventions for an enum or struct.
 
 .. note::
 
@@ -1469,7 +1480,7 @@ for verification. Important cases include but are not limited to:
 - Unsafe `backdating <#backdating>`_.
 
 - Unsafe modifications to entities marked with fragility attributes, such as
-  adding a stored property to a ``@fixedContents`` struct.
+  adding a stored property to a ``@frozen`` struct.
 
 Wherever possible, this tool should also check for `binary-compatible
 source-breaking changes <binary-compatible source-breaking change>`, such as
@@ -1626,12 +1637,13 @@ The following proposals (some currently in the process, some planned) will
 affect the model described in this document, or concern the parts of this
 document that affect language semantics:
 
+- Non-exhaustive enums (`SE-0192 <SE0192>`_)
+- Inlineable functions (`SE-0193 <SE0193>`_)
+- Frozen structs and enums (`SE-0260 <SE0260>`_)
 - (draft) `Overridable methods in extensions`_
 - (planned) Restricting retroactive modeling (protocol conformances for types you don't own)
 - (planned) `Generalized existentials (values of protocol type) <Generics>`_
-- (planned) Frozen enums (building on `SE-0192 <SE0192>`_)
 - (planned) Removing the "constant" guarantee for 'let' across module boundaries
-- (planned) Syntax for declaring fixed-contents structs
 - (future) Performance annotations for types
 - (future) Attributes for stored property accessors
 - (future) Stored properties in extensions
@@ -1639,6 +1651,8 @@ document that affect language semantics:
 .. _Overridable methods in extensions: https://github.com/jrose-apple/swift-evolution/blob/overridable-members-in-extensions/proposals/nnnn-overridable-members-in-extensions.md
 .. _Generics: https://github.com/apple/swift/blob/master/docs/GenericsManifesto.md#generalized-existentials
 .. _SE0192: https://github.com/apple/swift-evolution/blob/master/proposals/0192-non-exhaustive-enums.md
+.. _SE0193: https://github.com/apple/swift-evolution/blob/master/proposals/0193-cross-module-inlining-and-specialization.md
+.. _SE0260: https://github.com/apple/swift-evolution/blob/master/proposals/0260-library-evolution.md
 
 This does not mean all of these proposals need to be accepted, only that their
 acceptance or rejection will affect this document.

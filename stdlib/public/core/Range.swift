@@ -125,7 +125,7 @@ extension RangeExpression {
 /// `Stride` types, they cannot be used as the bounds of a countable range. If
 /// you need to iterate over consecutive floating-point values, see the
 /// `stride(from:to:by:)` function.
-@_fixed_layout
+@frozen
 public struct Range<Bound : Comparable> {
   /// The range's lower bound.
   ///
@@ -405,6 +405,29 @@ extension Range: Hashable where Bound: Hashable {
   }
 }
 
+extension Range: Decodable where Bound: Decodable {
+  public init(from decoder: Decoder) throws {
+    var container = try decoder.unkeyedContainer()
+    let lowerBound = try container.decode(Bound.self)
+    let upperBound = try container.decode(Bound.self)
+    guard lowerBound <= upperBound else {
+      throw DecodingError.dataCorrupted(
+        DecodingError.Context(
+          codingPath: decoder.codingPath,
+          debugDescription: "Cannot initialize \(Range.self) with a lowerBound (\(lowerBound)) greater than upperBound (\(upperBound))"))
+    }
+    self.init(uncheckedBounds: (lower: lowerBound, upper: upperBound))
+  }
+}
+
+extension Range: Encodable where Bound: Encodable {
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.unkeyedContainer()
+    try container.encode(self.lowerBound)
+    try container.encode(self.upperBound)
+  }
+}
+
 /// A partial half-open interval up to, but not including, an upper bound.
 ///
 /// You create `PartialRangeUpTo` instances by using the prefix half-open range
@@ -426,7 +449,7 @@ extension Range: Hashable where Bound: Hashable {
 ///     let numbers = [10, 20, 30, 40, 50, 60, 70]
 ///     print(numbers[..<3])
 ///     // Prints "[10, 20, 30]"
-@_fixed_layout
+@frozen
 public struct PartialRangeUpTo<Bound: Comparable> {
   public let upperBound: Bound
   
@@ -444,6 +467,20 @@ extension PartialRangeUpTo: RangeExpression {
   @_transparent
   public func contains(_ element: Bound) -> Bool {
     return element < upperBound
+  }
+}
+
+extension PartialRangeUpTo: Decodable where Bound: Decodable {
+  public init(from decoder: Decoder) throws {
+    var container = try decoder.unkeyedContainer()
+    try self.init(container.decode(Bound.self))
+  }
+}
+
+extension PartialRangeUpTo: Encodable where Bound: Encodable {
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.unkeyedContainer()
+    try container.encode(self.upperBound)
   }
 }
 
@@ -468,7 +505,7 @@ extension PartialRangeUpTo: RangeExpression {
 ///     let numbers = [10, 20, 30, 40, 50, 60, 70]
 ///     print(numbers[...3])
 ///     // Prints "[10, 20, 30, 40]"
-@_fixed_layout
+@frozen
 public struct PartialRangeThrough<Bound: Comparable> {  
   public let upperBound: Bound
   
@@ -485,6 +522,20 @@ extension PartialRangeThrough: RangeExpression {
   @_transparent
   public func contains(_ element: Bound) -> Bool {
     return element <= upperBound
+  }
+}
+
+extension PartialRangeThrough: Decodable where Bound: Decodable {
+  public init(from decoder: Decoder) throws {
+    var container = try decoder.unkeyedContainer()
+    try self.init(container.decode(Bound.self))
+  }
+}
+
+extension PartialRangeThrough: Encodable where Bound: Encodable {
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.unkeyedContainer()
+    try container.encode(self.upperBound)
   }
 }
 
@@ -569,7 +620,7 @@ extension PartialRangeThrough: RangeExpression {
 /// `Bound`. For example, iterating over an instance of
 /// `PartialRangeFrom<Int>` traps when the sequence's next value would be
 /// above `Int.max`.
-@_fixed_layout
+@frozen
 public struct PartialRangeFrom<Bound: Comparable> {
   public let lowerBound: Bound
 
@@ -596,7 +647,7 @@ extension PartialRangeFrom: Sequence
   public typealias Element = Bound
 
   /// The iterator for a `PartialRangeFrom` instance.
-  @_fixed_layout
+  @frozen
   public struct Iterator: IteratorProtocol {
     @usableFromInline
     internal var _current: Bound
@@ -621,6 +672,20 @@ extension PartialRangeFrom: Sequence
   @inlinable
   public __consuming func makeIterator() -> Iterator { 
     return Iterator(_current: lowerBound) 
+  }
+}
+
+extension PartialRangeFrom: Decodable where Bound: Decodable {
+  public init(from decoder: Decoder) throws {
+    var container = try decoder.unkeyedContainer()
+    try self.init(container.decode(Bound.self))
+  }
+}
+
+extension PartialRangeFrom: Encodable where Bound: Encodable {
+  public func encode(to encoder: Encoder) throws {
+    var container = encoder.unkeyedContainer()
+    try container.encode(self.lowerBound)
   }
 }
 
@@ -762,7 +827,7 @@ extension Comparable {
 ///     let word2 = "grisly"
 ///     let changes = countLetterChanges(word1[...], word2[...])
 ///     // changes == 2
-@_frozen // namespace
+@frozen // namespace
 public enum UnboundedRange_ {
   // FIXME: replace this with a computed var named `...` when the language makes
   // that possible.
@@ -772,7 +837,7 @@ public enum UnboundedRange_ {
   /// The unbounded range operator (`...`) is valid only within a collection's
   /// subscript.
   public static postfix func ... (_: UnboundedRange_) -> () {
-    fatalError("uncallable")
+    // This function is uncallable
   }
 }
 
@@ -878,14 +943,26 @@ extension Range {
   ///   common; otherwise, `false`.
   @inlinable
   public func overlaps(_ other: Range<Bound>) -> Bool {
-    return (!other.isEmpty && self.contains(other.lowerBound))
-        || (!self.isEmpty && other.contains(self.lowerBound))
+    // Disjoint iff the other range is completely before or after our range.
+    // Additionally either `Range` (unlike a `ClosedRange`) could be empty, in
+    // which case it is disjoint with everything as overlap is defined as having
+    // an element in common.
+    let isDisjoint = other.upperBound <= self.lowerBound
+      || self.upperBound <= other.lowerBound
+      || self.isEmpty || other.isEmpty
+    return !isDisjoint
   }
 
   @inlinable
   public func overlaps(_ other: ClosedRange<Bound>) -> Bool {
-    return self.contains(other.lowerBound)
-        || (!self.isEmpty && other.contains(self.lowerBound))
+    // Disjoint iff the other range is completely before or after our range.
+    // Additionally the `Range` (unlike the `ClosedRange`) could be empty, in
+    // which case it is disjoint with everything as overlap is defined as having
+    // an element in common.
+    let isDisjoint = other.upperBound < self.lowerBound
+      || self.upperBound <= other.lowerBound
+      || self.isEmpty
+    return !isDisjoint
   }
 }
 

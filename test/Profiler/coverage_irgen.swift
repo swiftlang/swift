@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -profile-generate -profile-coverage-mapping -emit-sil -o - -module-name=irgen | %FileCheck %s --check-prefix=SIL
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -profile-generate -profile-coverage-mapping -emit-ir -o - -module-name=irgen | %FileCheck %s --check-prefix=IR
+// RUN: %target-swift-frontend %s -profile-generate -profile-coverage-mapping -emit-sil -o - -module-name=irgen | %FileCheck %s --check-prefix=SIL
+// RUN: %target-swift-frontend %s -profile-generate -profile-coverage-mapping -emit-ir -o - -module-name=irgen | %FileCheck %s --check-prefix=IR
 
 // IR-NOT: __llvm_coverage_names
 // IR-NOT: __profn

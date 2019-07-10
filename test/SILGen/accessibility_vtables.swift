@@ -12,20 +12,16 @@ class Sub : Base {
   }
 }
 
-// CHECK-LABEL: sil hidden @$s21accessibility_vtables3SubCACycfc : $@convention(method) (@owned Sub) -> @owned Sub
-// CHECK:       bb0(%0 : @owned $Sub):
-// CHECK:         function_ref @$ss25_unimplementedInitializer9className04initD04file4line6columns5NeverOs12StaticStringV_A2JS2utF
-
 // CHECK-LABEL: sil_vtable Sub {
 // CHECK-NEXT:  #Base.internalMethod!1: {{.*}} : @$s28accessibility_vtables_helper4BaseC14internalMethodyyF [inherited]
 // CHECK-NEXT:  #Base.prop!getter.1: {{.*}} : @$s21accessibility_vtables3SubC4propSivg [override]  // accessibility_vtables.Sub.prop.getter : Swift.Int
 // CHECK-NEXT:  #Base.prop!setter.1: {{.*}} : @$s28accessibility_vtables_helper4BaseC4propSivs [inherited]  // accessibility_vtables_helper.Base.prop.setter : Swift.Int
 // CHECK-NEXT:  #Base.prop!modify.1: {{.*}} : @$s28accessibility_vtables_helper4BaseC4propSivM [inherited]  // accessibility_vtables_helper.Base.prop.modify : Swift.Int
-// CHECK-NEXT:  #Base.init!allocator.1: {{.*}} : @$s21accessibility_vtables3SubCACycfC [override]
-// CHECK-NEXT: #Sub.internalMethod!1: {{.*}} : @$s21accessibility_vtables3SubC14internalMethodyyF
-// CHECK-NEXT: #Sub.prop!setter.1: {{.*}} : @$s21accessibility_vtables3SubC4propSivs   // accessibility_vtables.Sub.prop.setter : Swift.Int
-// CHECK-NEXT: #Sub.prop!modify.1: {{.*}} : @$s21accessibility_vtables3SubC4propSivM  // accessibility_vtables.Sub.prop.modify : Swift.Int
-// CHECK-NEXT: #Sub.deinit
+// CHECK-NEXT:  #Base.init!allocator.1: (Base.Type) -> () -> Base : @$s28accessibility_vtables_helper4BaseCACycfC [inherited] // accessibility_vtables_helper.Base.__allocating_init() -> accessibility_vtables_helper.Base
+// CHECK-NEXT:  #Sub.internalMethod!1: {{.*}} : @$s21accessibility_vtables3SubC14internalMethodyyF
+// CHECK-NEXT:  #Sub.prop!setter.1: {{.*}} : @$s21accessibility_vtables3SubC4propSivs   // accessibility_vtables.Sub.prop.setter : Swift.Int
+// CHECK-NEXT:  #Sub.prop!modify.1: {{.*}} : @$s21accessibility_vtables3SubC4propSivM  // accessibility_vtables.Sub.prop.modify : Swift.Int
+// CHECK-NEXT:  #Sub.deinit
 // CHECK-NEXT: }
 
 class InternalSub : InternalBase {

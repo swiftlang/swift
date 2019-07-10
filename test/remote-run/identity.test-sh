@@ -1,4 +1,4 @@
-RUN: %utils/remote-run -n --remote-dir /xyz-REMOTE -i spiderman --output-prefix %t some_user@some_host:12345 cp %t/nested/input %t/nested/output 2>&1 >/dev/null | %FileCheck %s
+RUN: %remote-run -n --remote-dir /xyz-REMOTE -i spiderman --output-prefix %/t some_user@some_host:12345 cp %/t/nested/input %/t/nested/output 2>&1 >/dev/null | %FileCheck %s
 
 CHECK: /usr/bin/ssh -n
 CHECK-DAG: -p 12345
@@ -32,7 +32,7 @@ CHECK-DAG: -get '/xyz-REMOTE/output/nested/output' '{{.+}}/nested/output'
 CHECK-DAG: -get '/xyz-REMOTE/output/nested/input' '{{.+}}/nested/input'
 
 # Make sure things work without a port.
-RUN: %utils/remote-run -n --remote-dir /xyz-REMOTE -i spiderman --output-prefix %t some_user@some_host cp %t/nested/input %t/nested/output 2>&1 >/dev/null | %FileCheck -check-prefix CHECK-PORTLESS %s
+RUN: %remote-run -n --remote-dir /xyz-REMOTE -i spiderman --output-prefix %/t some_user@some_host cp %/t/nested/input %/t/nested/output 2>&1 >/dev/null | %FileCheck -check-prefix CHECK-PORTLESS %s
 
 CHECK-PORTLESS: /usr/bin/sftp
 CHECK-PORTLESS-SAME: -i spiderman

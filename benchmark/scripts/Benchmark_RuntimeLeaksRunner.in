@@ -151,9 +151,9 @@ def parse_args():
 
 if __name__ == "__main__":
     args = parse_args()
-    l = LeaksRunnerBenchmarkDriver(
+    driver = LeaksRunnerBenchmarkDriver(
         SWIFT_BIN_DIR, XFAIL_LIST, args.num_samples, args.num_iters)
-    if l.run(args.filter):
+    if driver.run(args.filter):
         sys.exit(0)
     else:
         sys.exit(-1)

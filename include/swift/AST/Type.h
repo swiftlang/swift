@@ -38,7 +38,6 @@ class ClassDecl;
 class CanType;
 class EnumDecl;
 class GenericSignature;
-class LazyResolver;
 class ModuleDecl;
 class NominalTypeDecl;
 class GenericTypeDecl;
@@ -53,8 +52,9 @@ class TypeBase;
 class Type;
 class TypeWalker;
 struct ExistentialLayout;
-
-/// \brief Type substitution mapping from substitutable types to their
+enum class ResilienceExpansion : unsigned;
+  
+/// Type substitution mapping from substitutable types to their
 /// replacements.
 typedef llvm::DenseMap<SubstitutableType *, Type> TypeSubstitutionMap;
 
@@ -147,6 +147,8 @@ enum class SubstFlags {
   AllowLoweredTypes = 0x02,
   /// Map member types to their desugared witness type.
   DesugarMemberTypes = 0x04,
+  /// Substitute types involving opaque type archetypes.
+  SubstituteOpaqueArchetypes = 0x08,
 };
 
 /// Options for performing substitutions into a type.
@@ -312,7 +314,7 @@ public:
 
   /// Replace references to substitutable types with error types.
   Type substDependentTypesWithErrorTypes() const;
-
+  
   bool isPrivateStdlibType(bool treatNonBuiltinProtocolsAsPublic = true) const;
 
   void dump() const;
@@ -647,7 +649,8 @@ namespace llvm {
   template<> struct DenseMapInfo<swift::CanType>
     : public DenseMapInfo<swift::Type> {
     static swift::CanType getEmptyKey() {
-      return swift::CanType(nullptr);
+      return swift::CanType(llvm::DenseMapInfo<swift::
+                              TypeBase*>::getEmptyKey());
     }
     static swift::CanType getTombstoneKey() {
       return swift::CanType(llvm::DenseMapInfo<swift::

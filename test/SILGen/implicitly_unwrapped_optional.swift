@@ -1,11 +1,11 @@
 
-// RUN: %target-swift-emit-silgen -module-name implicitly_unwrapped_optional -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name implicitly_unwrapped_optional %s | %FileCheck %s
 
 func foo(f f: (() -> ())!) {
   var f: (() -> ())! = f
   f?()
 }
-// CHECK: sil hidden @{{.*}}foo{{.*}} : $@convention(thin) (@guaranteed Optional<@callee_guaranteed () -> ()>) -> () {
+// CHECK: sil hidden [ossa] @{{.*}}foo{{.*}} : $@convention(thin) (@guaranteed Optional<@callee_guaranteed () -> ()>) -> () {
 // CHECK: bb0([[T0:%.*]] : @guaranteed $Optional<@callee_guaranteed () -> ()>):
 // CHECK:   [[F:%.*]] = alloc_box ${ var Optional<@callee_guaranteed () -> ()> }
 // CHECK:   [[PF:%.*]] = project_box [[F]]
@@ -13,30 +13,30 @@ func foo(f f: (() -> ())!) {
 // CHECK:   store [[T0_COPY]] to [init] [[PF]]
 // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PF]] : $*Optional<@callee_guaranteed () -> ()>
 // CHECK:   [[HASVALUE:%.*]] = select_enum_addr [[READ]]
-// CHECK:   cond_br [[HASVALUE]], bb2, bb1
+// CHECK:   cond_br [[HASVALUE]], bb1, bb3
 //
 //   If it does, project and load the value out of the implicitly unwrapped
 //   optional...
-// CHECK:    bb2:
+// CHECK:    bb1:
 // CHECK-NEXT: [[FN0_ADDR:%.*]] = unchecked_take_enum_data_addr [[READ]]
 // CHECK-NEXT: [[FN0:%.*]] = load [copy] [[FN0_ADDR]]
 //   .... then call it
 // CHECK:   [[B:%.*]] = begin_borrow [[FN0]]
 // CHECK:   apply [[B]]() : $@callee_guaranteed () -> ()
 // CHECK:   end_borrow [[B]]
-// CHECK:   br bb3
-// CHECK: bb3(
+// CHECK:   br bb2
+// CHECK: bb2(
 // CHECK:   destroy_value [[F]]
 // CHECK:   return
-// CHECK: bb4:
+// CHECK: bb3:
 // CHECK:   enum $Optional<()>, #Optional.none!enumelt
-// CHECK:   br bb3
+// CHECK:   br bb2
 //   The rest of this is tested in optional.swift
 // } // end sil function '{{.*}}foo{{.*}}'
 
 func wrap<T>(x x: T) -> T! { return x }
 
-// CHECK-LABEL: sil hidden @$s29implicitly_unwrapped_optional16wrap_then_unwrap{{[_0-9a-zA-Z]*}}F
+// CHECK-LABEL: sil hidden [ossa] @$s29implicitly_unwrapped_optional16wrap_then_unwrap{{[_0-9a-zA-Z]*}}F
 func wrap_then_unwrap<T>(x x: T) -> T {
   // CHECK:   switch_enum_addr {{%.*}}, case #Optional.some!enumelt.1: [[OK:bb[0-9]+]], case #Optional.none!enumelt: [[FAIL:bb[0-9]+]]
   // CHECK: [[FAIL]]:
@@ -45,7 +45,7 @@ func wrap_then_unwrap<T>(x x: T) -> T {
   return wrap(x: x)!
 }
 
-// CHECK-LABEL: sil hidden @$s29implicitly_unwrapped_optional10tuple_bind1xSSSgSi_SStSg_tF : $@convention(thin) (@guaranteed Optional<(Int, String)>) -> @owned Optional<String> {
+// CHECK-LABEL: sil hidden [ossa] @$s29implicitly_unwrapped_optional10tuple_bind1xSSSgSi_SStSg_tF : $@convention(thin) (@guaranteed Optional<(Int, String)>) -> @owned Optional<String> {
 func tuple_bind(x x: (Int, String)!) -> String? {
   return x?.1
   // CHECK:   switch_enum {{%.*}}, case #Optional.some!enumelt.1: [[NONNULL:bb[0-9]+]], case #Optional.none!enumelt: [[NULL:bb[0-9]+]]
@@ -54,7 +54,7 @@ func tuple_bind(x x: (Int, String)!) -> String? {
   // CHECK-NOT: destroy_value [[STRING]]
 }
 
-// CHECK-LABEL: sil hidden @$s29implicitly_unwrapped_optional011tuple_bind_a1_B01xSSSi_SStSg_tF
+// CHECK-LABEL: sil hidden [ossa] @$s29implicitly_unwrapped_optional011tuple_bind_a1_B01xSSSi_SStSg_tF
 func tuple_bind_implicitly_unwrapped(x x: (Int, String)!) -> String {
   return x.1
 }
@@ -64,7 +64,7 @@ func bind_any() {
   let object : AnyObject? = return_any()
 }
 
-// CHECK-LABEL: sil hidden @$s29implicitly_unwrapped_optional6sr3758yyF
+// CHECK-LABEL: sil hidden [ossa] @$s29implicitly_unwrapped_optional6sr3758yyF
 func sr3758() {
   // Verify that there are no additional reabstractions introduced.
   // CHECK: [[CLOSURE:%.+]] = function_ref @$s29implicitly_unwrapped_optional6sr3758yyFyypSgcfU_ : $@convention(thin) (@in_guaranteed Optional<Any>) -> ()

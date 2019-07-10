@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -typecheck -verify -swift-version 4 %s
 
+protocol P {}
+
 struct Foo {
   mutating func boom() {}
 }
@@ -20,3 +22,15 @@ func fromLocalContext2(x: inout Foo, y: Bool) -> () -> () {
   }
 }
 
+func bar() -> P.Type { fatalError() }
+func bar() -> Foo.Type { fatalError() }
+
+_ = bar().boom       // expected-warning{{partial application of 'mutating' method}}
+_ = bar().boom(&y)   // expected-error{{partial application of 'mutating' method}}
+_ = bar().boom(&y)() // ok
+
+func foo(_ foo: Foo.Type) {
+  _ = foo.boom       // expected-warning{{partial application of 'mutating' method}}
+  _ = foo.boom(&y)   // expected-error{{partial application of 'mutating' method}}
+  _ = foo.boom(&y)() // ok
+}

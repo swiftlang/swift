@@ -33,6 +33,7 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/Program.h"
+#include "llvm/Support/VersionTuple.h"
 
 using namespace swift;
 using namespace swift::driver;
@@ -71,12 +72,13 @@ toolchains::Darwin::constructInvocation(const InterpretJobAction &job,
                                         const JobContext &context) const {
   InvocationInfo II = ToolChain::constructInvocation(job, context);
 
-  SmallString<128> runtimeLibraryPath;
-  getRuntimeLibraryPath(runtimeLibraryPath, context.Args, /*Shared=*/true);
+  SmallVector<std::string, 4> runtimeLibraryPaths;
+  getRuntimeLibraryPaths(runtimeLibraryPaths, context.Args, context.OI.SDKPath,
+                         /*Shared=*/true);
 
   addPathEnvironmentVariableIfNeeded(II.ExtraEnvironment, "DYLD_LIBRARY_PATH",
                                      ":", options::OPT_L, context.Args,
-                                     runtimeLibraryPath);
+                                     runtimeLibraryPaths);
   addPathEnvironmentVariableIfNeeded(II.ExtraEnvironment, "DYLD_FRAMEWORK_PATH",
                                      ":", options::OPT_F, context.Args);
   // FIXME: Add options::OPT_Fsystem paths to DYLD_FRAMEWORK_PATH as well.
@@ -169,7 +171,9 @@ static bool findXcodeClangPath(llvm::SmallVectorImpl<char> &path) {
 
   auto xcrunPath = llvm::sys::findProgramByName("xcrun");
   if (!xcrunPath.getError()) {
-    const char *args[] = {"-f", "clang", nullptr};
+    // Explicitly ask for the default toolchain so that we don't find a Clang
+    // included with an open-source toolchain.
+    const char *args[] = {"-toolchain", "default", "-f", "clang", nullptr};
     sys::TaskQueue queue;
     queue.addTask(xcrunPath->c_str(), args, /*Env=*/llvm::None,
                   /*Context=*/nullptr,
@@ -220,7 +224,7 @@ static bool wantsObjCRuntime(const llvm::Triple &triple) {
 }
 
 ToolChain::InvocationInfo
-toolchains::Darwin::constructInvocation(const LinkJobAction &job,
+toolchains::Darwin::constructInvocation(const DynamicLinkJobAction &job,
                                         const JobContext &context) const {
   assert(context.Output.getPrimaryOutputType() == file_types::TY_Image &&
          "Invalid linker output type.");
@@ -282,6 +286,8 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
   case LinkKind::DynamicLibrary:
     Arguments.push_back("-dylib");
     break;
+  case LinkKind::StaticLibrary:
+    llvm_unreachable("the dynamic linker cannot build static libraries");
   }
 
   assert(Triple.isOSDarwin());
@@ -360,6 +366,9 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
   if (context.OI.SelectedSanitizers & SanitizerKind::Thread)
     addLinkSanitizerLibArgsForDarwin(context.Args, Arguments, "tsan", *this);
 
+  if (context.OI.SelectedSanitizers & SanitizerKind::Undefined)
+    addLinkSanitizerLibArgsForDarwin(context.Args, Arguments, "ubsan", *this);
+
   // Only link in libFuzzer for executables.
   if (job.getKind() == LinkKind::Executable &&
       (context.OI.SelectedSanitizers & SanitizerKind::Fuzzer))
@@ -382,28 +391,85 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
   Arguments.push_back("-arch");
   Arguments.push_back(context.Args.MakeArgString(getTriple().getArchName()));
 
+  // Link compatibility libraries, if we're deploying back to OSes that
+  // have an older Swift runtime.
+  SmallString<128> SharedResourceDirPath;
+  getResourceDirPath(SharedResourceDirPath, context.Args, /*Shared=*/true);
+  Optional<llvm::VersionTuple> runtimeCompatibilityVersion;
+  
+  if (context.Args.hasArg(options::OPT_runtime_compatibility_version)) {
+    auto value = context.Args.getLastArgValue(
+                                    options::OPT_runtime_compatibility_version);
+    if (value.equals("5.0")) {
+      runtimeCompatibilityVersion = llvm::VersionTuple(5, 0);
+    } else if (value.equals("none")) {
+      runtimeCompatibilityVersion = None;
+    } else {
+      // TODO: diagnose unknown runtime compatibility version?
+    }
+  } else if (job.getKind() == LinkKind::Executable) {
+    runtimeCompatibilityVersion
+                         = getSwiftRuntimeCompatibilityVersionForTarget(Triple);
+  }
+  
+  if (runtimeCompatibilityVersion) {
+    if (*runtimeCompatibilityVersion <= llvm::VersionTuple(5, 0)) {
+      // Swift 5.0 compatibility library
+      SmallString<128> BackDeployLib;
+      BackDeployLib.append(SharedResourceDirPath);
+      llvm::sys::path::append(BackDeployLib, "libswiftCompatibility50.a");
+      
+      if (llvm::sys::fs::exists(BackDeployLib)) {
+        Arguments.push_back("-force_load");
+        Arguments.push_back(context.Args.MakeArgString(BackDeployLib));
+      }
+    }
+  }
+    
+  if (job.getKind() == LinkKind::Executable) {
+    if (runtimeCompatibilityVersion)
+      if (*runtimeCompatibilityVersion <= llvm::VersionTuple(5, 0)) {
+        // Swift 5.0 dynamic replacement compatibility library.
+        SmallString<128> BackDeployLib;
+        BackDeployLib.append(SharedResourceDirPath);
+        llvm::sys::path::append(BackDeployLib,
+                                "libswiftCompatibilityDynamicReplacements.a");
+
+        if (llvm::sys::fs::exists(BackDeployLib)) {
+          Arguments.push_back("-force_load");
+          Arguments.push_back(context.Args.MakeArgString(BackDeployLib));
+        }
+      }
+  }
+
+  bool wantsStaticStdlib =
+      context.Args.hasFlag(options::OPT_static_stdlib,
+                           options::OPT_no_static_stdlib, false);
+
+  SmallVector<std::string, 4> RuntimeLibPaths;
+  getRuntimeLibraryPaths(RuntimeLibPaths, context.Args,
+                         context.OI.SDKPath, /*Shared=*/!wantsStaticStdlib);
+
   // Add the runtime library link path, which is platform-specific and found
   // relative to the compiler.
-  SmallString<128> RuntimeLibPath;
-  getRuntimeLibraryPath(RuntimeLibPath, context.Args, /*Shared=*/true);
+  for (auto path : RuntimeLibPaths) {
+    Arguments.push_back("-L");
+    Arguments.push_back(context.Args.MakeArgString(path));
+  }
 
   // Link the standard library.
-  Arguments.push_back("-L");
-  if (context.Args.hasFlag(options::OPT_static_stdlib,
-                           options::OPT_no_static_stdlib, false)) {
-    SmallString<128> StaticRuntimeLibPath;
-    getRuntimeLibraryPath(StaticRuntimeLibPath, context.Args, /*Shared=*/false);
-    Arguments.push_back(context.Args.MakeArgString(StaticRuntimeLibPath));
+  if (wantsStaticStdlib) {
     Arguments.push_back("-lc++");
     Arguments.push_back("-framework");
     Arguments.push_back("Foundation");
     Arguments.push_back("-force_load_swift_libs");
   } else {
-    Arguments.push_back(context.Args.MakeArgString(RuntimeLibPath));
     // FIXME: We probably shouldn't be adding an rpath here unless we know ahead
     // of time the standard library won't be copied. SR-1967
-    Arguments.push_back("-rpath");
-    Arguments.push_back(context.Args.MakeArgString(RuntimeLibPath));
+    for (auto path : RuntimeLibPaths) {
+      Arguments.push_back("-rpath");
+      Arguments.push_back(context.Args.MakeArgString(path));
+    }
   }
 
   if (context.Args.hasArg(options::OPT_profile_generate)) {
@@ -481,6 +547,41 @@ toolchains::Darwin::constructInvocation(const LinkJobAction &job,
 
   // This should be the last option, for convenience in checking output.
   Arguments.push_back("-o");
+  Arguments.push_back(
+      context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
+
+  return II;
+}
+
+
+ToolChain::InvocationInfo
+toolchains::Darwin::constructInvocation(const StaticLinkJobAction &job,
+                                        const JobContext &context) const {
+   assert(context.Output.getPrimaryOutputType() == file_types::TY_Image &&
+         "Invalid linker output type.");
+
+  // Configure the toolchain.
+  const char *LibTool = "libtool";
+
+  InvocationInfo II = {LibTool};
+  ArgStringList &Arguments = II.Arguments;
+
+  Arguments.push_back("-static");
+
+  if (context.shouldUseInputFileList()) {
+    Arguments.push_back("-filelist");
+    Arguments.push_back(context.getTemporaryFilePath("inputs", "LinkFileList"));
+    II.FilelistInfos.push_back({Arguments.back(), file_types::TY_Object,
+                                FilelistInfo::WhichFiles::Input});
+  } else {
+    addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
+                           file_types::TY_Object);
+  }
+
+  addInputsOfType(Arguments, context.InputActions, file_types::TY_Object);
+
+  Arguments.push_back("-o");
+
   Arguments.push_back(
       context.Args.MakeArgString(context.Output.getPrimaryOutputFilename()));
 

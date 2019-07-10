@@ -607,10 +607,44 @@ struct S {
   }
 }
 
-// TODO: A conflict should also be detected here. However, the
-// typechecker does not allow it. Enable the following test if we ever
-// remove this case from the typechecker test:
-// diag_invalid_inout_captures.swift.
-// public func nestedConflict(x: inout Int) {
-//   doit(x: &x, x == 0 ? { x = 1 } : { x = 2})
-// }
+func doit(x: inout Int, _ fn: () -> ()) {}
+
+func nestedConflict(x: inout Int) {
+  doit(x: &x, x == 0 ? { x = 1 } : { x = 2})
+  // expected-error@-1 2{{overlapping accesses to 'x', but modification requires exclusive access; consider copying to a local variable}}
+  // expected-note@-2 2{{conflicting access is here}}
+}
+
+// Avoid diagnosing a conflict on disjoint struct properies when one is a `let`.
+// This requires an address projection before loading the `let` property.
+//
+// <rdar://problem/35561050> [SR-10145][Exclusivity] SILGen loads entire struct when reading captured 'let' stored property
+struct DisjointLetMember {
+  var dummy: AnyObject // Make this a nontrivial struct because the SIL is more involved.
+  mutating func get(makeValue: ()->Int) -> Int {
+    return makeValue()
+  }
+}
+
+class IntWrapper {
+  var x = 0
+}
+
+struct DisjointLet {
+  let a = 2 // Using a `let` forces a full load.
+  let b: IntWrapper
+  var cache: DisjointLetMember
+
+  init(b: IntWrapper) {
+    self.b = b
+    self.cache = DisjointLetMember(dummy: b)
+  }
+
+  mutating func testDisjointLet() -> Int {
+    // Access to inout `self` for member .cache`.
+    return cache.get {
+      // Access to captured `self` for member .cache`.
+      a + b.x
+    }
+  }
+}

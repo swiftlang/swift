@@ -21,7 +21,7 @@ public extension P1 where T1 : P2 {
   public func ef2(t : T2) {}
 }
 
-public extension P1 where T1 == P2, T2 : P3 {
+public extension P1 where T1 == P3, T2 : P3 {
   public func ef3(t : T1) {}
   public func ef4(t : T1) {}
 }

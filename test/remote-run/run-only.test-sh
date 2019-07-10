@@ -1,3 +1,5 @@
+REQUIRES: shell
+
 RUN: %debug-remote-run echo hello | %FileCheck %s
 RUN: %debug-remote-run -v echo hello 2>&1 >/dev/null | %FileCheck -check-prefix VERBOSE %s
 

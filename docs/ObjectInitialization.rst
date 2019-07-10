@@ -117,7 +117,7 @@ Initialization proceeds in several steps:
 2. ``B``'s initializer initializes the stored property ``d`` to
    ``17.0``.
 3. ``B``'s initializer chains to ``A``'s initializer.
-4. ``A``'s initializer initialize's the stored properties ``i`` and
+4. ``A``'s initializer initializes the stored properties ``i`` and
    ``s``'.
 5. ``A``'s initializer calls ``completeInit()``, then returns.
 6. ``B``'s initializer calls ``completeInitForB()``, then returns.
@@ -191,7 +191,7 @@ Initialization proceeds as follows:
    ``d`` to ``17.0``.
 5. ``B``'s designated initializer chains to ``A``'s designated
    initializer.
-6. ``A``'s designated initializer initialize's the stored properties
+6. ``A``'s designated initializer initializes the stored properties
    ``i`` and ``s``'.
 7. ``A``'s designated initializer calls ``completeInit()``, then
    returns.

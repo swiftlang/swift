@@ -22,7 +22,7 @@ Typedefs:
 - Name:      MemberToMember_SameContainer_Typedef_Payload
   SwiftName: MemberToMember_SameContainer_Typedef_Container.PayloadFor4
 SwiftVersions:
-- Version: 3
+- Version: 4
   Classes:
   - Name:      GlobalToMember_Class_Payload
     SwiftName: GlobalToMember_Class_Payload

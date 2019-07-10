@@ -9,7 +9,7 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// XFAIL: linux
+
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -swift-version 4 -o %t/a.out %s
 // RUN: %target-run %t/a.out
@@ -17,7 +17,15 @@
 // REQUIRES: CPU=x86_64
 
 import StdlibUnittest
-import Darwin
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+  import Darwin
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
+  import Glibc
+#elseif os(Windows)
+  import MSVCRT
+#else
+#error("Unsupported platform")
+#endif
 
 extension FixedWidthInteger {
   /// Returns the high and low parts of a potentially overflowing addition.
@@ -85,7 +93,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
 
   /// A Boolean value indicating whether this instance is equal to zero.
   public var isZero: Bool {
-    return _data.count == 0
+    return _data.isEmpty
   }
 
   //===--- Numeric initializers -------------------------------------------===//
@@ -154,9 +162,9 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
   static func _randomWord() -> Word {
     // This handles up to a 64-bit word
     if Word.bitWidth > UInt32.bitWidth {
-      return Word(arc4random()) << 32 | Word(arc4random())
+      return Word(UInt32.random(in: 0...UInt32.max)) << 32 | Word(UInt32.random(in: 0...UInt32.max))
     } else {
-      return Word(truncatingIfNeeded: arc4random())
+      return Word(truncatingIfNeeded: UInt32.random(in: 0...UInt32.max))
     }
   }
 
@@ -202,7 +210,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
   /// - `_data` has no trailing zero elements
   /// - If `self == 0`, then `isNegative == false`
   func _checkInvariants(source: String = #function) {
-    if _data.count == 0 {
+    if _data.isEmpty {
       assert(isNegative == false,
         "\(source): isNegative with zero length _data")
     }
@@ -1064,17 +1072,9 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
 
   //===--- Hashable -------------------------------------------------------===//
 
-  public var hashValue: Int {
-#if arch(i386) || arch(arm)
-    let p: UInt = 16777619
-    let h: UInt = (2166136261 &* p) ^ (isNegative ? 1 : 0)
-#elseif arch(x86_64) || arch(arm64) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
-    let p: UInt = 1099511628211
-    let h: UInt = (14695981039346656037 &* p) ^ (isNegative ? 1 : 0)
-#else
-    fatalError("Unimplemented")
-#endif
-    return Int(bitPattern: _data.reduce(h, { ($0 &* p) ^ UInt($1) }))
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(isNegative)
+    hasher.combine(_data)
   }
 
   //===--- Bit shifting operators -----------------------------------------===//
@@ -1282,8 +1282,8 @@ struct Bit : FixedWidthInteger, UnsignedInteger {
 
   // Hashable, CustomStringConvertible
 
-  var hashValue: Int {
-    return Int(value)
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(value)
   }
 
   var description: String {
@@ -1458,7 +1458,7 @@ func testBinaryInit<T: BinaryInteger>(_ x: T) -> BigInt {
 }
 
 func randomBitLength() -> Int {
-  return Int(arc4random_uniform(1000) + 2)
+  return Int.random(in: 2...1000)
 }
 
 var BitTests = TestSuite("Bit")

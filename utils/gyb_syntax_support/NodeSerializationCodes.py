@@ -66,7 +66,6 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'ForcedValueExpr': 61,
     'PostfixUnaryExpr': 62,
     'SpecializeExpr': 63,
-    'StringInterpolationExpr': 64,
     'KeyPathExpr': 65,
     'KeyPathBaseExpr': 66,
     'ObjcKeyPathExpr': 67,
@@ -129,7 +128,7 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'AccessorBlock': 124,
     'PatternBinding': 125,
     'EnumCaseElement': 126,
-    'InfixOperatorGroup': 127,
+    'OperatorPrecedenceAndTypes': 127,
     'PrecedenceGroupRelation': 128,
     'PrecedenceGroupNameElement': 129,
     'PrecedenceGroupAssignment': 130,
@@ -170,7 +169,7 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'TupleElementList': 165,
     'ArrayElementList': 166,
     'DictionaryElementList': 167,
-    'StringInterpolationSegments': 168,
+    'StringLiteralSegments': 168,
     'DeclNameArgumentList': 169,
     'ExprList': 170,
     'ClosureCaptureItemList': 171,
@@ -227,6 +226,13 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'FunctionType': 222,
     'AttributedType': 223,
     'YieldStmt': 224,
+    'YieldList': 225,
+    'IdentifierList': 226,
+    'NamedAttributeStringArgument': 227,
+    'DeclName': 228,
+    'PoundAssertStmt': 229,
+    'SomeType': 230,
+    'CustomAttribute': 231,
 }
 
 
@@ -242,3 +248,7 @@ def verify_syntax_node_serialization_codes(nodes, serialization_codes):
         if serialization_code in used_codes:
             error("Serialization code %d used twice" % serialization_code)
         used_codes.add(serialization_code)
+
+
+def get_serialization_code(syntax_kind):
+    return SYNTAX_NODE_SERIALIZATION_CODES[syntax_kind]

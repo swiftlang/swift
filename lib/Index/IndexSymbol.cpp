@@ -28,12 +28,13 @@ static NominalTypeDecl *getNominalParent(const ValueDecl *D) {
 static bool isUnitTestCase(const ClassDecl *D) {
   if (!D)
     return false;
-  while (auto *SuperD = D->getSuperclassDecl()) {
-    if (SuperD->getNameStr() == "XCTestCase")
-      return true;
-    D = SuperD;
-  }
-  return false;
+
+  return D->walkSuperclasses([D](ClassDecl *SuperD) {
+    if (SuperD != D && // Do not treate XCTestCase itself as a test.
+        SuperD->getNameStr() == "XCTestCase")
+      return TypeWalker::Action::Stop; // Found test; stop and return true.
+    return TypeWalker::Action::Continue;
+  });
 }
 
 static bool isUnitTest(const ValueDecl *D) {
@@ -83,7 +84,8 @@ static bool isUnitTest(const ValueDecl *D) {
 static void setFuncSymbolInfo(const FuncDecl *FD, SymbolInfo &sym) {
   sym.Kind = SymbolKind::Function;
 
-  if (FD->getAttrs().hasAttribute<IBActionAttr>())
+  if (FD->getAttrs().hasAttribute<IBActionAttr>() ||
+      FD->getAttrs().hasAttribute<IBSegueActionAttr>())
     sym.Properties |= SymbolProperty::IBAnnotated;
 
   if (isUnitTest(FD))
@@ -158,9 +160,15 @@ SymbolInfo index::getSymbolInfoForDecl(const Decl *D) {
   SymbolInfo info{ SymbolKind::Unknown, SymbolSubKind::None,
                    SymbolLanguage::Swift, SymbolPropertySet() };
   switch (D->getKind()) {
-    case DeclKind::Enum:             info.Kind = SymbolKind::Enum; break;
-    case DeclKind::Struct:           info.Kind = SymbolKind::Struct; break;
-    case DeclKind::Protocol:         info.Kind = SymbolKind::Protocol; break;
+    case DeclKind::Enum:
+      info.Kind = SymbolKind::Enum;
+      break;
+    case DeclKind::Struct:
+      info.Kind = SymbolKind::Struct;
+      break;
+    case DeclKind::Protocol:
+      info.Kind = SymbolKind::Protocol;
+      break;
     case DeclKind::Class:
       info.Kind = SymbolKind::Class;
       if (isUnitTestCase(cast<ClassDecl>(D)))
@@ -233,6 +241,7 @@ SymbolInfo index::getSymbolInfoForDecl(const Decl *D) {
     case DeclKind::PoundDiagnostic:
     case DeclKind::MissingMember:
     case DeclKind::Module:
+    case DeclKind::OpaqueType:
       break;
   }
 

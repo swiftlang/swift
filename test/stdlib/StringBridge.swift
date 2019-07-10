@@ -75,5 +75,31 @@ StringBridgeTests.test("Tagged NSString") {
 #endif // not 32bit
 }
 
+func returnOne<T>(_ t: T) -> Int { return 1 }
+StringBridgeTests.test("Character from NSString") {
+  guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else { return }
+
+  // NOTE: Using hard-coded literals to directly construct NSStrings
+  let ns1 = "A" as NSString
+  let ns2 = "A\u{301}" as NSString
+  let ns3 = "𓁹͇͈͉͍͎͊͋͌ͧͨͩͪͫͬͭͮ͏̛͓͔͕͖͙͚̗̘̙̜̹̺̻̼͐͑͒͗͛ͣͤͥͦ̽̾̿̀́͂̓̈́͆ͧͨͩͪͫͬͭͮ͘̚͜͟͢͝͞͠͡ͅ" as NSString
+
+  let c1 = Character(ns1 as String)
+  let c2 = Character(ns2 as String)
+  let c3 = Character(ns3 as String)
+
+  expectEqual("A", String(c1))
+  expectNotNil(String(c1).utf8.withContiguousStorageIfAvailable(returnOne))
+
+  expectEqual("A\u{301}", String(c2))
+  expectNotNil(String(c2).utf8.withContiguousStorageIfAvailable(returnOne))
+  expectNil((ns2 as String).utf8.withContiguousStorageIfAvailable(returnOne))
+
+  expectEqual("𓁹͇͈͉͍͎͊͋͌ͧͨͩͪͫͬͭͮ͏̛͓͔͕͖͙͚̗̘̙̜̹̺̻̼͐͑͒͗͛ͣͤͥͦ̽̾̿̀́͂̓̈́͆ͧͨͩͪͫͬͭͮ͘̚͜͟͢͝͞͠͡ͅ", String(c3))
+  expectNotNil(String(c3).utf8.withContiguousStorageIfAvailable(returnOne))
+  expectNil((ns3 as String).utf8.withContiguousStorageIfAvailable(returnOne))
+}
+
+
 runAllTests()
 

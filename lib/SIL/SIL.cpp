@@ -30,14 +30,6 @@
 
 using namespace swift;
 
-SILUndef *SILUndef::get(SILType Ty, SILModule *M) {
-  // Unique these.
-  SILUndef *&Entry = M->UndefValues[Ty];
-  if (Entry == nullptr)
-    Entry = new (*M) SILUndef(Ty);
-  return Entry;
-}
-
 FormalLinkage swift::getDeclLinkage(const ValueDecl *D) {
   const DeclContext *fileContext = D->getDeclContext()->getModuleScopeContext();
 
@@ -81,12 +73,8 @@ SILLinkage swift::getSILLinkage(FormalLinkage linkage,
 }
 
 SILLinkage
-swift::getLinkageForProtocolConformance(const NormalProtocolConformance *C,
+swift::getLinkageForProtocolConformance(const RootProtocolConformance *C,
                                         ForDefinition_t definition) {
-  // Behavior conformances are always private.
-  if (C->isBehaviorConformance())
-    return (definition ? SILLinkage::Private : SILLinkage::PrivateExternal);
-
   // If the conformance was synthesized by the ClangImporter, give it
   // shared linkage.
   if (isa<ClangModuleUnit>(C->getDeclContext()->getModuleScopeContext()))
@@ -197,9 +185,10 @@ static bool isTypeMetadataForLayoutAccessible(SILModule &M, SILType type) {
 /// that are ABI-private to their defining module.  But if the type is not
 /// ABI-private, we can always at least fetch its metadata and use the
 /// value witness table stored there.
-bool SILModule::isTypeABIAccessible(SILType type) {
+bool SILModule::isTypeABIAccessible(SILType type,
+                                    ResilienceExpansion forExpansion) {
   // Fixed-ABI types can have value operations done without metadata.
-  if (Types.getTypeLowering(type).isFixedABI())
+  if (Types.getTypeLowering(type, forExpansion).isFixedABI())
     return true;
 
   assert(!type.is<ReferenceStorageType>() &&
@@ -231,6 +220,11 @@ bool AbstractStorageDecl::exportsPropertyDescriptor() const {
 
   // If the getter is mutating, we cannot form a keypath to it at all.
   if (isGetterMutating())
+    return false;
+
+  // If the storage is an ABI-compatible override of another declaration, we're
+  // not going to be emitting a property descriptor either.
+  if (!isValidKeyPathComponent())
     return false;
 
   // TODO: If previous versions of an ABI-stable binary needed the descriptor,

@@ -17,6 +17,7 @@
 
 // FIXME: this test runs forever on iOS arm64
 // REQUIRES: OS=macosx
+
 %{
 word_bits = int(WORD_BITS) / 2
 from SwiftIntTypes import all_integer_types
@@ -96,8 +97,8 @@ extension MockBinaryInteger : Comparable {
 }
 
 extension MockBinaryInteger : Hashable {
-  var hashValue: Int {
-    return _value.hashValue
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(_value)
   }
 }
 
@@ -914,18 +915,6 @@ tests.test("binaryLogarithm/generic") {
   expectEqual(
     (42 as MockBinaryInteger<UInt>)._binaryLogarithm(),
     (42 as UInt)._binaryLogarithm())
-// FIXME: DoubleWidth is no longer part of the standard library
-#if false
-  expectEqual(
-    (42 as MockBinaryInteger<DoubleWidth<Int>>)._binaryLogarithm(),
-    (42 as DoubleWidth<Int>)._binaryLogarithm())
-  expectEqual(
-    (42 as MockBinaryInteger<DoubleWidth<UInt>>)._binaryLogarithm(),
-    (42 as DoubleWidth<UInt>)._binaryLogarithm())
-  expectEqual(
-    (42 as MockBinaryInteger<DoubleWidth<DoubleWidth<Int>>>)._binaryLogarithm(),
-    (42 as DoubleWidth<DoubleWidth<Int>>)._binaryLogarithm())
-#endif
 }
 
 runAllTests()

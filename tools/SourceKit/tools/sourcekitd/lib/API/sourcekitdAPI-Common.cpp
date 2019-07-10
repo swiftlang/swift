@@ -35,7 +35,7 @@ using llvm::raw_ostream;
 #define KEY(NAME, CONTENT) UIdent sourcekitd::Key##NAME(CONTENT);
 #include "SourceKit/Core/ProtocolUIDs.def"
 
-/// \brief Order for the keys to use when emitting the debug description of
+/// Order for the keys to use when emitting the debug description of
 /// dictionaries.
 static UIdent *OrderedKeys[] = {
 #define KEY(NAME, CONTENT) &Key##NAME,

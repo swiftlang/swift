@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir -primary-file %s -disable-objc-attr-requires-foundation-module | %FileCheck %s
-// RUN: %target-swift-frontend -Osize -assume-parsing-unqualified-ownership-sil -emit-ir -primary-file %s -disable-objc-attr-requires-foundation-module | %FileCheck %s --check-prefix=OSIZE
+// RUN: %target-swift-frontend -emit-ir -primary-file %s -disable-objc-attr-requires-foundation-module | %FileCheck %s
+// RUN: %target-swift-frontend -Osize -emit-ir -primary-file %s -disable-objc-attr-requires-foundation-module | %FileCheck %s --check-prefix=OSIZE
 
 // Ensure that same-type constraints between generic arguments get reflected
 // correctly in the type context descriptor.

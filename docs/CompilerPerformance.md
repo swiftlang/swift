@@ -382,7 +382,7 @@ higher-resolution, more-detailed profile, in practice Instruments will often
 stall out and become unresponsive trying to process the additional detail.
 
 Similarly, be sure that as many applications as possible (especially those with
-debuginfo themselves!) are closed, so that Instruments has has little additional
+debuginfo themselves!) are closed, so that Instruments has little additional
 material to symbolicate as possible. It collects a _whole system profile_ at
 very high resolution, so you want to make its life easy by profiling on a quiet
 machine doing little beyond the task you're interested in.
@@ -645,7 +645,7 @@ compilers on hand while you're working.
     ```
 
   - `-Xfrontend -print-clang-stats`: prints counters associated with the clang
-    AST reader, which is operated as a subsystem fo the swift compiler when
+    AST reader, which is operated as a subsystem of the swift compiler when
     importing definitions from C/ObjC. Its output is added to the end of
     whatever output comes from `-print-stats`, and looks like this:
 
@@ -695,7 +695,7 @@ files in `<directory>`.
 
 This option also provides _some_ high-level counters that are "always available"
 regardless of whether you're using an assert or release build, though assert
-builds still get _more_ counters (all of those available thorugh
+builds still get _more_ counters (all of those available through
 `-print-stats`). If you are using a new-enough compiler, `-stats-output-dir`
 often simplifies analysis, since its output is machine-readable and aggregates
 all the jobs in a multi-job compilation, and there's a post-processing script
@@ -717,7 +717,6 @@ $ cat /tmp/stats/*.json
   "AST.NumSourceLinesPerSecond": 3,
   "AST.NumLinkLibraries": 0,
   "AST.NumLoadedModules": 4,
-  "AST.NumImportedExternalDefinitions": 0,
   "AST.NumTotalClangImportedEntities": 0,
   ...
   "time.swift.Parsing.wall": 5.038023e-03,
@@ -1322,7 +1321,7 @@ internals of the compiler, just time and patience.
 
   - Add Open Source projects to the
     [source-compatibility testsuite](https://swift.org/source-compatibility/).
-    Apple's internal CI infastructure is now tracking selected non-assert-build
+    Apple's internal CI infrastructure is now tracking selected non-assert-build
     `UnifiedStatsReporter` counters on those projects, and the team is far
     more likely to catch a regression if it's shown by a project in the testsuite.
 

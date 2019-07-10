@@ -296,7 +296,7 @@
 /// - Note: The `ContiguousArray` and `ArraySlice` types are not bridged;
 ///   instances of those types always have a contiguous block of memory as
 ///   their storage.
-@_fixed_layout
+@frozen
 public struct Array<Element>: _DestructorSafeContainer {
   #if _runtime(_ObjC)
   @usableFromInline
@@ -384,6 +384,7 @@ extension Array {
   }
 
   @_semantics("array.get_element")
+  @inlinable // FIXME(inline-always)
   @inline(__always)
   public // @testable
   func _getElement(
@@ -440,6 +441,7 @@ extension Array: _ArrayProtocol {
   @inlinable
   public // @testable
   var _owner: AnyObject? {
+    @inlinable // FIXME(inline-always)
     @inline(__always)
     get {
       return _buffer.owner      
@@ -800,7 +802,7 @@ extension Array: RangeReplaceableCollection {
   ///     print(emptyArray.isEmpty)
   ///     // Prints "true"
   @inlinable
-  @_semantics("array.init")
+  @_semantics("array.init.empty")
   public init() {
     _buffer = _Buffer()
   }
@@ -882,7 +884,7 @@ extension Array: RangeReplaceableCollection {
     return _Buffer(_buffer: newBuffer, shiftedToStartIndex: 0)
   }
 
-  /// Construct a Array of `count` uninitialized elements.
+  /// Construct an Array of `count` uninitialized elements.
   @inlinable
   internal init(_uninitializedCount count: Int) {
     _precondition(count >= 0, "Can't construct Array with count < 0")
@@ -901,7 +903,7 @@ extension Array: RangeReplaceableCollection {
   }
 
   /// Entry point for `Array` literal construction; builds and returns
-  /// a Array of `count` uninitialized elements.
+  /// an Array of `count` uninitialized elements.
   @inlinable
   @_semantics("array.uninitialized")
   internal static func _allocateUninitialized(
@@ -934,7 +936,7 @@ extension Array: RangeReplaceableCollection {
   }
 
   /// Entry point for aborting literal construction: deallocates
-  /// a Array containing only uninitialized elements.
+  /// an Array containing only uninitialized elements.
   @inlinable
   internal mutating func _deallocateUninitialized() {
     // Set the count to zero and just release as normal.
@@ -1027,7 +1029,7 @@ extension Array: RangeReplaceableCollection {
       _buffer = _Buffer(
         _buffer: newBuffer, shiftedToStartIndex: _buffer.startIndex)
     }
-    _sanityCheck(capacity >= minimumCapacity)
+    _internalInvariant(capacity >= minimumCapacity)
   }
 
   /// Copy the contents of the current buffer to a new unique mutable buffer.
@@ -1054,9 +1056,9 @@ extension Array: RangeReplaceableCollection {
   @_semantics("array.mutate_unknown")
   internal mutating func _reserveCapacityAssumingUniqueBuffer(oldCount: Int) {
     // This is a performance optimization. This code used to be in an ||
-    // statement in the _sanityCheck below.
+    // statement in the _internalInvariant below.
     //
-    //   _sanityCheck(_buffer.capacity == 0 ||
+    //   _internalInvariant(_buffer.capacity == 0 ||
     //                _buffer.isMutableAndUniquelyReferenced())
     //
     // SR-6437
@@ -1071,7 +1073,7 @@ extension Array: RangeReplaceableCollection {
     // This specific case is okay because we will make the buffer unique in this
     // function because we request a capacity > 0 and therefore _copyToNewBuffer
     // will be called creating a new buffer.
-    _sanityCheck(capacity ||
+    _internalInvariant(capacity ||
                  _buffer.isMutableAndUniquelyReferenced())
 
     if _slowPath(oldCount + 1 > _buffer.capacity) {
@@ -1085,8 +1087,8 @@ extension Array: RangeReplaceableCollection {
     _ oldCount: Int,
     newElement: __owned Element
   ) {
-    _sanityCheck(_buffer.isMutableAndUniquelyReferenced())
-    _sanityCheck(_buffer.capacity >= _buffer.count + 1)
+    _internalInvariant(_buffer.isMutableAndUniquelyReferenced())
+    _internalInvariant(_buffer.capacity >= _buffer.count + 1)
 
     _buffer.count = oldCount + 1
     (_buffer.firstElementAddress + oldCount).initialize(to: newElement)
@@ -1160,7 +1162,10 @@ extension Array: RangeReplaceableCollection {
       "newElements.underestimatedCount was an overestimate")
     // can't check for overflow as sequences can underestimate
 
-    _buffer.count += writtenCount
+    // This check prevents a data race writting to _swiftEmptyArrayStorage
+    if writtenCount > 0 {
+      _buffer.count += writtenCount
+    }
 
     if writtenUpTo == buf.endIndex {
       // there may be elements that didn't fit in the existing buffer,
@@ -1280,11 +1285,50 @@ extension Array: RangeReplaceableCollection {
   }
 
   @inlinable
-  public func _copyToContiguousArray() -> ContiguousArray<Element> {
+  public mutating func withContiguousMutableStorageIfAvailable<R>(
+    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return try withUnsafeMutableBufferPointer {
+      (bufferPointer) -> R in
+      return try body(&bufferPointer)
+    }
+  }
+
+  @inlinable
+  public func withContiguousStorageIfAvailable<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return try withUnsafeBufferPointer {
+      (bufferPointer) -> R in
+      return try body(bufferPointer)
+    }
+  }
+
+  @inlinable
+  public __consuming func _copyToContiguousArray() -> ContiguousArray<Element> {
     if let n = _buffer.requestNativeBuffer() {
       return ContiguousArray(_buffer: n)
     }
-    return _copyCollectionToContiguousArray(_buffer)
+    return _copyCollectionToContiguousArray(self)
+  }
+}
+
+// Implementations of + and += for same-type arrays. This combined
+// with the operator declarations for these operators designating this
+// type as a place to prefer this operator help the expression type
+// checker speed up cases where there is a large number of uses of the
+// operator in the same expression.
+extension Array {
+  @inlinable
+  public static func + (lhs: Array, rhs: Array) -> Array {
+    var lhs = lhs
+    lhs.append(contentsOf: rhs)
+    return lhs
+  }
+
+  @inlinable
+  public static func += (lhs: inout Array, rhs: Array) {
+    lhs.append(contentsOf: rhs)
   }
 }
 
@@ -1325,6 +1369,37 @@ extension Array {
 }
 
 extension Array {
+  /// Implementation for Array(unsafeUninitializedCapacity:initializingWith:)
+  /// and ContiguousArray(unsafeUninitializedCapacity:initializingWith:)
+  @inlinable
+  internal init(
+    _unsafeUninitializedCapacity: Int,
+    initializingWith initializer: (
+      _ buffer: inout UnsafeMutableBufferPointer<Element>,
+      _ initializedCount: inout Int) throws -> Void
+  ) rethrows {
+    var firstElementAddress: UnsafeMutablePointer<Element>
+    (self, firstElementAddress) =
+      Array._allocateUninitialized(_unsafeUninitializedCapacity)
+
+    var initializedCount = 0
+    var buffer = UnsafeMutableBufferPointer<Element>(
+      start: firstElementAddress, count: _unsafeUninitializedCapacity)
+    defer {
+      // Update self.count even if initializer throws an error.
+      _precondition(
+        initializedCount <= _unsafeUninitializedCapacity,
+        "Initialized count set to greater than specified capacity."
+      )
+      _precondition(
+        buffer.baseAddress == firstElementAddress,
+        "Can't reassign buffer in Array(unsafeUninitializedCapacity:initializingWith:)"
+      )
+      self._buffer.count = initializedCount
+    }
+    try initializer(&buffer, &initializedCount)
+  }
+
   /// Creates an array with the specified capacity, then calls the given
   /// closure with a buffer covering the array's uninitialized memory.
   ///
@@ -1332,14 +1407,15 @@ extension Array {
   /// elements that are initialized by the closure. The memory in the range
   /// `buffer[0..<initializedCount]` must be initialized at the end of the
   /// closure's execution, and the memory in the range
-  /// `buffer[initializedCount...]` must be uninitialized.
+  /// `buffer[initializedCount...]` must be uninitialized. This postcondition
+  /// must hold even if the `initializer` closure throws an error.
   ///
   /// - Note: While the resulting array may have a capacity larger than the
   ///   requested amount, the buffer passed to the closure will cover exactly
   ///   the requested number of elements.
   ///
   /// - Parameters:
-  ///   - _unsafeUninitializedCapacity: The number of elements to allocate
+  ///   - unsafeUninitializedCapacity: The number of elements to allocate
   ///     space for in the new array.
   ///   - initializer: A closure that initializes elements and sets the count
   ///     of the new array.
@@ -1349,31 +1425,18 @@ extension Array {
   ///       - initializedCount: The count of initialized elements in the array,
   ///         which begins as zero. Set `initializedCount` to the number of
   ///         elements you initialize.
-  @inlinable
+  @_alwaysEmitIntoClient @inlinable
   public init(
-    _unsafeUninitializedCapacity: Int,
+    unsafeUninitializedCapacity: Int,
     initializingWith initializer: (
       _ buffer: inout UnsafeMutableBufferPointer<Element>,
       _ initializedCount: inout Int) throws -> Void
   ) rethrows {
-    var firstElementAddress: UnsafeMutablePointer<Element>
-    (self, firstElementAddress) =
-      Array._allocateUninitialized(_unsafeUninitializedCapacity)
-    
-    var initializedCount = 0
-    defer {
-      // Update self.count even if initializer throws an error.
-      _precondition(
-        initializedCount <= _unsafeUninitializedCapacity,
-        "Initialized count set to greater than specified capacity."
-      )
-      self._buffer.count = initializedCount
-    }
-    var buffer = UnsafeMutableBufferPointer<Element>(
-      start: firstElementAddress, count: _unsafeUninitializedCapacity)
-    try initializer(&buffer, &initializedCount)
+    self = try Array(
+      _unsafeUninitializedCapacity: unsafeUninitializedCapacity,
+      initializingWith: initializer)
   }
-  
+
   /// Calls a closure with a pointer to the array's contiguous storage.
   ///
   /// Often, the optimizer can eliminate bounds checks within an array
@@ -1447,6 +1510,7 @@ extension Array {
   ///   method's execution.
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @_semantics("array.withUnsafeMutableBufferPointer")
+  @inlinable // FIXME(inline-always)
   @inline(__always) // Performance: This method should get inlined into the
   // caller such that we can combine the partial apply with the apply in this
   // function saving on allocating a closure context. This becomes unnecessary
@@ -1490,7 +1554,7 @@ extension Array {
   }
 
   @inlinable
-  public func _copyContents(
+  public __consuming func _copyContents(
     initializing buffer: UnsafeMutableBufferPointer<Element>
   ) -> (Iterator,UnsafeMutableBufferPointer<Element>.Index) {
 
@@ -1607,8 +1671,8 @@ extension Array: Equatable where Element: Equatable {
     }
 
 
-    _sanityCheck(lhs.startIndex == 0 && rhs.startIndex == 0)
-    _sanityCheck(lhs.endIndex == lhsCount && rhs.endIndex == lhsCount)
+    _internalInvariant(lhs.startIndex == 0 && rhs.startIndex == 0)
+    _internalInvariant(lhs.endIndex == lhsCount && rhs.endIndex == lhsCount)
 
     // We know that lhs.count == rhs.count, compare element wise.
     for idx in 0..<lhsCount {
@@ -1725,7 +1789,7 @@ extension Array {
 // to do the bridging in an ABI safe way. Even though this looks useless,
 // DO NOT DELETE!
 @usableFromInline internal
-func _bridgeCocoaArray<T>(_ _immutableCocoaArray: _NSArrayCore) -> Array<T> {
+func _bridgeCocoaArray<T>(_ _immutableCocoaArray: AnyObject) -> Array<T> {
   return Array(_buffer: _ArrayBuffer(nsArray: _immutableCocoaArray))
 }
 
@@ -1761,7 +1825,7 @@ extension Array {
   /// * `Element` is bridged verbatim to Objective-C (i.e.,
   ///   is a reference type).
   @inlinable
-  public init(_immutableCocoaArray: _NSArrayCore) {
+  public init(_immutableCocoaArray: AnyObject) {
     self = _bridgeCocoaArray(_immutableCocoaArray)
   }
 }

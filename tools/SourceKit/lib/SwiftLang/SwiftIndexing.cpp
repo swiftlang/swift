@@ -50,14 +50,9 @@ private:
     return Logger::isLoggingEnabledForLevel(Logger::Level::Warning);
   }
 
-  bool recordHash(StringRef hash, bool isKnown) override {
-    return impl.recordHash(hash, isKnown);
-  }
-
-  bool startDependency(StringRef name, StringRef path, bool isClangModule,
-                       bool isSystem, StringRef hash) override {
+  bool startDependency(StringRef name, StringRef path, bool isClangModule, bool isSystem) override {
     auto kindUID = getUIDForDependencyKind(isClangModule);
-    return impl.startDependency(kindUID, name, path, isSystem, hash);
+    return impl.startDependency(kindUID, name, path, isSystem);
   }
 
   bool finishDependency(bool isClangModule) override {
@@ -104,6 +99,21 @@ private:
     return impl.finishSourceEntity(UID);
   }
 
+  std::vector<UIdent> getDeclAttributeUIDs(const Decl *decl) {
+    std::vector<UIdent> uidAttrs =
+      SwiftLangSupport::UIDsFromDeclAttributes(decl->getAttrs());
+
+    // check if we should report an implicit @objc attribute
+    if (!decl->getAttrs().getAttribute(DeclAttrKind::DAK_ObjC)) {
+      if (auto *VD = dyn_cast<ValueDecl>(decl)) {
+        if (VD->isObjC()) {
+            uidAttrs.push_back(SwiftLangSupport::getUIDForObjCAttr());
+        }
+      }
+    }
+    return uidAttrs;
+  }
+
   template <typename F>
   bool withEntityInfo(const IndexSymbol &symbol, F func) {
     EntityInfo info;
@@ -118,11 +128,11 @@ private:
     info.Column = symbol.column;
     info.ReceiverUSR = symbol.getReceiverUSR();
     info.IsDynamic = symbol.roles & (unsigned)SymbolRole::Dynamic;
+    info.IsImplicit = symbol.roles & (unsigned)SymbolRole::Implicit;
     info.IsTestCandidate = symbol.symInfo.Properties & SymbolProperty::UnitTest;
     std::vector<UIdent> uidAttrs;
     if (!isRef) {
-      uidAttrs =
-        SwiftLangSupport::UIDsFromDeclAttributes(symbol.decl->getAttrs());
+      uidAttrs = getDeclAttributeUIDs(symbol.decl);
       info.Attrs = uidAttrs;
     }
     return func(info);
@@ -141,8 +151,7 @@ private:
     info.IsTestCandidate = relation.symInfo.Properties & SymbolProperty::UnitTest;
     std::vector<UIdent> uidAttrs;
     if (!isRef) {
-      uidAttrs =
-      SwiftLangSupport::UIDsFromDeclAttributes(relation.decl->getAttrs());
+      uidAttrs = getDeclAttributeUIDs(relation.decl);
       info.Attrs = uidAttrs;
     }
     return func(info);
@@ -154,7 +163,6 @@ private:
 
 static void indexModule(llvm::MemoryBuffer *Input,
                         StringRef ModuleName,
-                        StringRef Hash,
                         IndexingConsumer &IdxConsumer,
                         CompilerInstance &CI,
                         ArrayRef<const char *> Args) {
@@ -176,7 +184,9 @@ static void indexModule(llvm::MemoryBuffer *Input,
     // documentation file.
     // FIXME: refactor the frontend to provide an easy way to figure out the
     // correct filename here.
-    auto FUnit = Loader->loadAST(*Mod, None, std::move(Buf), nullptr);
+    auto FUnit = Loader->loadAST(*Mod, None, std::move(Buf), nullptr,
+                                 /*isFramework*/false,
+                                 /*treatAsPartialModule*/false);
 
     // FIXME: Not knowing what went wrong is pretty bad. loadModule() should be
     // more modular, rather than emitting diagnostics itself.
@@ -189,10 +199,10 @@ static void indexModule(llvm::MemoryBuffer *Input,
   }
 
   // Setup a typechecker for protocol conformance resolving.
-  OwnedResolver TypeResolver = createLazyResolver(Ctx);
+  (void)createTypeChecker(Ctx);
 
   SKIndexDataConsumer IdxDataConsumer(IdxConsumer);
-  index::indexModule(Mod, Hash, IdxDataConsumer);
+  index::indexModule(Mod, IdxDataConsumer);
 }
 
 
@@ -223,8 +233,7 @@ void trace::initTraceInfo(trace::SwiftInvocation &SwiftArgs,
 
 void SwiftLangSupport::indexSource(StringRef InputFile,
                                    IndexingConsumer &IdxConsumer,
-                                   ArrayRef<const char *> OrigArgs,
-                                   StringRef Hash) {
+                                   ArrayRef<const char *> OrigArgs) {
   std::string Error;
   auto InputBuf = ASTMgr->getMemoryBuffer(InputFile, Error);
   if (!InputBuf) {
@@ -272,7 +281,7 @@ void SwiftLangSupport::indexSource(StringRef InputFile,
     }
 
     indexModule(InputBuf.get(), llvm::sys::path::stem(Filename),
-                Hash, IdxConsumer, CI, Args);
+                IdxConsumer, CI, Args);
     return;
   }
 
@@ -301,8 +310,8 @@ void SwiftLangSupport::indexSource(StringRef InputFile,
   }
 
   // Setup a typechecker for protocol conformance resolving.
-  OwnedResolver TypeResolver = createLazyResolver(CI.getASTContext());
+  (void)createTypeChecker(CI.getASTContext());
 
   SKIndexDataConsumer IdxDataConsumer(IdxConsumer);
-  index::indexSourceFile(CI.getPrimarySourceFile(), Hash, IdxDataConsumer);
+  index::indexSourceFile(CI.getPrimarySourceFile(), IdxDataConsumer);
 }

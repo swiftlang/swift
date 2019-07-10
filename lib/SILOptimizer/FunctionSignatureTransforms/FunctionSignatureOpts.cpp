@@ -190,10 +190,7 @@ FunctionSignatureTransformDescriptor::createOptimizedSILFunctionName() {
     Mangler.setReturnValueOwnedToUnowned();
   }
 
-  auto MangledName = Mangler.mangle();
-  assert(!F->getModule().hasFunction(MangledName));
-
-  return MangledName;
+  return Mangler.mangle();
 }
 
 /// Collect all archetypes used by a function.
@@ -426,7 +423,7 @@ void FunctionSignatureTransformDescriptor::computeOptimizedArgInterface(
       SILType Ty = Node->getType();
       LLVM_DEBUG(llvm::dbgs() << "                " << Ty << "\n");
       // If Ty is trivial, just pass it directly.
-      if (Ty.isTrivial(AD.Arg->getModule())) {
+      if (Ty.isTrivial(*AD.Arg->getFunction())) {
         SILParameterInfo NewInfo(Ty.getASTType(),
                                  ParameterConvention::Direct_Unowned);
         Out.push_back(NewInfo);
@@ -483,6 +480,11 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
   SILFunction *F = TransformDescriptor.OriginalFunction;
   SILModule &M = F->getModule();
   std::string Name = TransformDescriptor.createOptimizedSILFunctionName();
+  // The transformed function must not already exist. This would indicate
+  // repeated application of FSO on the same function. That situation should be
+  // detected earlier by avoiding reoptimization of FSO thunks.
+  assert(!F->getModule().hasFunction(Name));
+
   SILLinkage linkage = getSpecializedLinkage(F, F->getLinkage());
 
   LLVM_DEBUG(llvm::dbgs() << "  -> create specialized function " << Name
@@ -501,12 +503,13 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
   // classSubclassScope.
   TransformDescriptor.OptimizedFunction = FunctionBuilder.createFunction(
       linkage, Name, NewFTy, NewFGenericEnv, F->getLocation(), F->isBare(),
-      F->isTransparent(), F->isSerialized(), F->getEntryCount(), F->isThunk(),
+      F->isTransparent(), F->isSerialized(), IsNotDynamic, F->getEntryCount(),
+      F->isThunk(),
       /*classSubclassScope=*/SubclassScope::NotApplicable,
       F->getInlineStrategy(), F->getEffectsKind(), nullptr, F->getDebugScope());
   SILFunction *NewF = TransformDescriptor.OptimizedFunction.get();
-  if (!F->hasQualifiedOwnership()) {
-    NewF->setUnqualifiedOwnership();
+  if (!F->hasOwnership()) {
+    NewF->setOwnershipEliminated();
   }
 
   if (F->isSpecialization()) {
@@ -531,7 +534,7 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
   for (auto Arg : NewF->begin()->getFunctionArguments()) {
     SILType MappedTy = Arg->getType();
     auto Ownershipkind =
-        ValueOwnershipKind(M, MappedTy, Arg->getArgumentConvention());
+        ValueOwnershipKind(*NewF, MappedTy, Arg->getArgumentConvention());
     Arg->setOwnershipKind(Ownershipkind);
   }
 
@@ -595,7 +598,7 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
     Builder.createThrow(Loc, ErrorArg);
     Builder.setInsertionPoint(NormalBlock);
   } else {
-    ReturnValue = Builder.createApply(Loc, FRI, Subs, ThunkArgs, false);
+    ReturnValue = Builder.createApply(Loc, FRI, Subs, ThunkArgs);
   }
 
   // Set up the return results.
@@ -616,7 +619,21 @@ bool FunctionSignatureTransform::run(bool hasCaller) {
   bool Changed = false;
   SILFunction *F = TransformDescriptor.OriginalFunction;
 
-  if (!hasCaller && canBeCalledIndirectly(F->getRepresentation())) {
+  // Never repeat the same function signature optimization on the same function.
+  // Multiple function signature optimizations are composed by successively
+  // optmizing the newly created functions. Each optimization creates a new
+  // level of thunk. Those should all be ultimately inlined away.
+  //
+  // This happens, for example, when a new reference to the original function is
+  // discovered during devirtualization. That will cause the original function
+  // (now and FSO thunk) to be pushed back on the function pass pipeline.
+  if (F->isThunk() == IsSignatureOptimizedThunk) {
+    LLVM_DEBUG(llvm::dbgs() << "  FSO already performed on this thunk\n");
+    return false;
+  }
+
+  if (!hasCaller && (F->getDynamicallyReplacedFunction() ||
+                     canBeCalledIndirectly(F->getRepresentation()))) {
     LLVM_DEBUG(llvm::dbgs() << "  function has no caller -> abort\n");
     return false;
   }
@@ -702,7 +719,7 @@ bool FunctionSignatureTransform::removeDeadArgs(int minPartialAppliedArgs) {
     // parameters (as a replacement for the removed partial_apply).
     //
     // TODO: Maybe we can skip this restriction when we have semantic ARC.
-    if (ArgumentDescList[Idx].Arg->getType().isTrivial(F->getModule()))
+    if (ArgumentDescList[Idx].Arg->getType().isTrivial(*F))
       continue;
     return false;
   }
@@ -740,6 +757,9 @@ public:
 
     // Don't optimize callees that should not be optimized.
     if (!F->shouldOptimize())
+      return;
+
+    if (F->isDynamicallyReplaceable())
       return;
 
     // This is the function to optimize.

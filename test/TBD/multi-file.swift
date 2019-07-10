@@ -20,20 +20,20 @@
 
 // -Onone, resilient
 
-// RUN: %target-build-swift -swift-version 4 -module-name multifile -emit-library -o %t/JustForTBDValidation %s %S/Inputs/multi-file2.swift -wmo -Xfrontend -enable-resilience -Xfrontend -validate-tbd-against-ir=all
-// RUN: %target-build-swift -swift-version 4 -module-name multifile -emit-library -o %t/JustForTBDValidation %s %S/Inputs/multi-file2.swift -Xfrontend -enable-resilience -Xfrontend -validate-tbd-against-ir=all
+// RUN: %target-build-swift -swift-version 4 -module-name multifile -emit-library -o %t/JustForTBDValidation %s %S/Inputs/multi-file2.swift -wmo -enable-library-evolution -Xfrontend -validate-tbd-against-ir=all
+// RUN: %target-build-swift -swift-version 4 -module-name multifile -emit-library -o %t/JustForTBDValidation %s %S/Inputs/multi-file2.swift -enable-library-evolution -Xfrontend -validate-tbd-against-ir=all
 
-// RUN: %target-build-swift -swift-version 4 -module-name multifile -emit-tbd-path %t/TBD-wmo.tbd -emit-module-path %t/multifile.swiftmodule %s %S/Inputs/multi-file2.swift -wmo -Xfrontend -enable-resilience
-// RUN: %target-build-swift -swift-version 4 -module-name multifile -emit-tbd-path %t/TBD-incremental.tbd -emit-module-path %t/multifile.swiftmodule %s %S/Inputs/multi-file2.swift -Xfrontend -enable-resilience
+// RUN: %target-build-swift -swift-version 4 -module-name multifile -emit-tbd-path %t/TBD-wmo.tbd -emit-module-path %t/multifile.swiftmodule %s %S/Inputs/multi-file2.swift -wmo -enable-library-evolution
+// RUN: %target-build-swift -swift-version 4 -module-name multifile -emit-tbd-path %t/TBD-incremental.tbd -emit-module-path %t/multifile.swiftmodule %s %S/Inputs/multi-file2.swift -enable-library-evolution
 // RUN: diff %t/TBD-wmo.tbd %t/TBD-incremental.tbd
 
 // -O, resilient
 
-// RUN: %target-build-swift -swift-version 4 -module-name multifile -emit-library -o %t/JustForTBDValidation %s %S/Inputs/multi-file2.swift -wmo -O -Xfrontend -enable-resilience -Xfrontend -validate-tbd-against-ir=all
-// RUN: %target-build-swift -swift-version 4 -module-name multifile -emit-library -o %t/JustForTBDValidation %s %S/Inputs/multi-file2.swift -O -Xfrontend -enable-resilience -Xfrontend -validate-tbd-against-ir=all
+// RUN: %target-build-swift -swift-version 4 -module-name multifile -emit-library -o %t/JustForTBDValidation %s %S/Inputs/multi-file2.swift -wmo -O -enable-library-evolution -Xfrontend -validate-tbd-against-ir=all
+// RUN: %target-build-swift -swift-version 4 -module-name multifile -emit-library -o %t/JustForTBDValidation %s %S/Inputs/multi-file2.swift -O -enable-library-evolution -Xfrontend -validate-tbd-against-ir=all
 
-// RUN: %target-build-swift -swift-version 4 -module-name multifile -emit-tbd-path %t/TBD-wmo.tbd -emit-module-path %t/multifile.swiftmodule %s %S/Inputs/multi-file2.swift -wmo -O -Xfrontend -enable-resilience
-// RUN: %target-build-swift -swift-version 4 -module-name multifile -emit-tbd-path %t/TBD-incremental.tbd -emit-module-path %t/multifile.swiftmodule %s %S/Inputs/multi-file2.swift -O -Xfrontend -enable-resilience
+// RUN: %target-build-swift -swift-version 4 -module-name multifile -emit-tbd-path %t/TBD-wmo.tbd -emit-module-path %t/multifile.swiftmodule %s %S/Inputs/multi-file2.swift -wmo -O -enable-library-evolution
+// RUN: %target-build-swift -swift-version 4 -module-name multifile -emit-tbd-path %t/TBD-incremental.tbd -emit-module-path %t/multifile.swiftmodule %s %S/Inputs/multi-file2.swift -O -enable-library-evolution
 // RUN: diff %t/TBD-wmo.tbd %t/TBD-incremental.tbd
 
 // REQUIRES: objc_interop

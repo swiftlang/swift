@@ -10,7 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Foundation
+#if os(Linux)
+import Glibc
+#elseif os(Windows)
+import MSVCRT
+#else
+import Darwin
+#endif
 
 enum ArgumentError: Error {
   case missingValue(String)
@@ -46,7 +52,7 @@ func checked<T>(
   if let t = try parse(value)  { return t }
   var type = "\(T.self)"
   if type.starts(with: "Optional<") {
-      let s = type.index(after: type.index(of:"<")!)
+      let s = type.index(after: type.firstIndex(of: "<")!)
       let e = type.index(before: type.endIndex) // ">"
       type = String(type[s ..< e]) // strip Optional< >
   }
@@ -66,7 +72,7 @@ class ArgumentParser<U> {
     private let programName: String = {
       // Strip full path from the program name.
       let r = CommandLine.arguments[0].reversed()
-      let ss = r[r.startIndex ..< (r.index(of:"/") ?? r.endIndex)]
+      let ss = r[r.startIndex ..< (r.firstIndex(of: "/") ?? r.endIndex)]
       return String(ss.reversed())
     }()
     private var positionalArgs = [String]()

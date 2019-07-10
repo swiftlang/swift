@@ -265,8 +265,11 @@ void SILDeserializer::setLocalValue(ValueBase *Value, ValueID Id) {
 
 SILValue SILDeserializer::getLocalValue(ValueID Id,
                                         SILType Type) {
+  // The first two IDs are special undefined values.
   if (Id == 0)
-    return SILUndef::get(Type, &SILMod);
+    return SILUndef::get(Type, SILMod, ValueOwnershipKind::Any);
+  else if (Id == 1)
+    return SILUndef::get(Type, SILMod, ValueOwnershipKind::Owned);
 
   // Check to see if this is already defined.
   ValueBase *Entry = LocalValues.lookup(Id);
@@ -463,17 +466,19 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
 
   DeclID clangNodeOwnerID;
   TypeID funcTyID;
+  IdentifierID replacedFunctionID;
   GenericEnvironmentID genericEnvID;
   unsigned rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
       optimizationMode, effect, numSpecAttrs, hasQualifiedOwnership,
-      isWeakLinked;
+      isWeakLinked, isDynamic;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
       scratch, rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
       optimizationMode, effect, numSpecAttrs, hasQualifiedOwnership,
-      isWeakLinked, funcTyID, genericEnvID, clangNodeOwnerID, SemanticsIDs);
+      isWeakLinked, isDynamic, funcTyID, replacedFunctionID, genericEnvID,
+      clangNodeOwnerID, SemanticsIDs);
 
   if (funcTyID == 0) {
     LLVM_DEBUG(llvm::dbgs() << "SILFunction typeID is 0.\n");
@@ -494,6 +499,17 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     LLVM_DEBUG(llvm::dbgs() << "not a function type for SILFunction\n");
     MF->error();
     return nullptr;
+  }
+
+  SILFunction *replacedFunction = nullptr;
+  Identifier replacedObjectiveCFunc;
+  if (replacedFunctionID &&
+      ty.getAs<SILFunctionType>()->getExtInfo().getRepresentation() !=
+          SILFunctionTypeRepresentation::ObjCMethod) {
+    replacedFunction =
+        getFuncForReference(MF->getIdentifier(replacedFunctionID).str());
+  } else if (replacedFunctionID) {
+    replacedObjectiveCFunc = MF->getIdentifier(replacedFunctionID);
   }
 
   auto linkage = fromStableSILLinkage(rawLinkage);
@@ -550,6 +566,11 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
         linkage == SILLinkage::PublicNonABI) {
       fn->setLinkage(SILLinkage::SharedExternal);
     }
+    if (fn->isDynamicallyReplaceable() != isDynamic) {
+      LLVM_DEBUG(llvm::dbgs() << "SILFunction type mismatch.\n");
+      MF->error();
+      return nullptr;
+    }
   } else {
     // Otherwise, create a new function.
     SILSerializationFunctionBuilder builder(SILMod);
@@ -564,6 +585,11 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     fn->setEffectsKind(EffectsKind(effect));
     fn->setOptimizationMode(OptimizationMode(optimizationMode));
     fn->setWeakLinked(isWeakLinked);
+    fn->setIsDynamic(IsDynamicallyReplaceable_t(isDynamic));
+    if (replacedFunction)
+      fn->setDynamicallyReplacedFunction(replacedFunction);
+    if (!replacedObjectiveCFunc.empty())
+      fn->setObjCReplacement(replacedObjectiveCFunc);
     if (clangNodeOwner)
       fn->setClangNodeOwner(clangNodeOwner);
     for (auto ID : SemanticsIDs) {
@@ -639,7 +665,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   }
 
   if (!hasQualifiedOwnership)
-    fn->setUnqualifiedOwnership();
+    fn->setOwnershipEliminated();
 
   NumDeserializedFunc++;
 
@@ -657,7 +683,9 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   BasicBlockID = 0;
   BlocksByID.clear();
   UndefinedBlocks.clear();
-  LastValueID = 0;
+
+  // The first two IDs are reserved for SILUndef.
+  LastValueID = 1;
   LocalValues.clear();
   ForwardLocalValues.clear();
 
@@ -789,6 +817,8 @@ static CastConsumptionKind getCastConsumptionKind(unsigned attr) {
     return CastConsumptionKind::TakeOnSuccess;
   case SIL_CAST_CONSUMPTION_COPY_ON_SUCCESS:
     return CastConsumptionKind::CopyOnSuccess;
+  case SIL_CAST_CONSUMPTION_BORROW_ALWAYS:
+    return CastConsumptionKind::BorrowAlways;
   default:
     llvm_unreachable("not a valid CastConsumptionKind for SIL");
   }
@@ -911,6 +941,9 @@ SILDeserializer::readKeyPathComponent(ArrayRef<uint64_t> ListOfValues,
   case KeyPathComponentKindEncoding::OptionalWrap:
     return KeyPathPatternComponent::forOptional(
         KeyPathPatternComponent::Kind::OptionalWrap, type);
+  case KeyPathComponentKindEncoding::TupleElement:
+    return KeyPathPatternComponent::forTupleElement(
+        ListOfValues[nextValue++], type);
   case KeyPathComponentKindEncoding::Trivial:
     llvm_unreachable("handled above");
   }
@@ -998,8 +1031,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     break;
   case SIL_INST_APPLY: {
     unsigned IsPartial;
-    SILInstApplyLayout::readRecord(scratch, IsPartial, NumSubs,
-                                   TyID, TyID2, ValID, ListOfValues);
+    SILInstApplyLayout::readRecord(scratch, IsPartial, NumSubs, TyID, TyID2,
+                                   ValID, ListOfValues);
     switch (IsPartial) {
     case SIL_APPLY:
       RawOpCode = (unsigned)SILInstructionKind::ApplyInst;
@@ -1155,12 +1188,11 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
            "Layout should be OneTypeOneOperand.");
     bool isLifetimeGuaranteed = Attr & 0x01;
-    bool isEscaped = Attr & 0x02;
     ResultVal = Builder.createConvertEscapeToNoEscape(
         Loc,
         getLocalValue(ValID, getSILType(MF->getType(TyID2),
                                         (SILValueCategory)TyCategory2)),
-        getSILType(MF->getType(TyID), (SILValueCategory)TyCategory), isEscaped,
+        getSILType(MF->getType(TyID), (SILValueCategory)TyCategory),
         isLifetimeGuaranteed);
     break;
   }
@@ -1392,11 +1424,13 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     for (unsigned I = 0, E = ListOfValues.size(); I < E; I++)
       Args.push_back(getLocalValue(
           ListOfValues[I], fnConv.getSILArgumentType(I + unappliedArgs)));
-
+    auto onStack = closureTy.castTo<SILFunctionType>()->isNoEscape()
+                       ? PartialApplyInst::OnStackKind::OnStack
+                       : PartialApplyInst::OnStackKind::NotOnStack;
     // FIXME: Why the arbitrary order difference in IRBuilder type argument?
     ResultVal = Builder.createPartialApply(
         Loc, FnVal, Substitutions, Args,
-        closureTy.castTo<SILFunctionType>()->getCalleeConvention());
+        closureTy.castTo<SILFunctionType>()->getCalleeConvention(), onStack);
     break;
   }
   case SILInstructionKind::BuiltinInst: {
@@ -1478,9 +1512,25 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   case SILInstructionKind::FunctionRefInst: {
     auto Ty = MF->getType(TyID);
     StringRef FuncName = MF->getIdentifierText(ValID);
-    ResultVal = Builder.createFunctionRef(Loc,
-        getFuncForReference(FuncName,
-                            getSILType(Ty, (SILValueCategory)TyCategory)));
+    ResultVal = Builder.createFunctionRef(
+        Loc, getFuncForReference(FuncName,
+                                 getSILType(Ty, (SILValueCategory)TyCategory)));
+    break;
+  }
+  case SILInstructionKind::DynamicFunctionRefInst: {
+    auto Ty = MF->getType(TyID);
+    StringRef FuncName = MF->getIdentifierText(ValID);
+    ResultVal = Builder.createDynamicFunctionRef(
+        Loc, getFuncForReference(FuncName,
+                                 getSILType(Ty, (SILValueCategory)TyCategory)));
+    break;
+  }
+  case SILInstructionKind::PreviousDynamicFunctionRefInst: {
+    auto Ty = MF->getType(TyID);
+    StringRef FuncName = MF->getIdentifierText(ValID);
+    ResultVal = Builder.createPreviousDynamicFunctionRef(
+        Loc, getFuncForReference(FuncName,
+                                 getSILType(Ty, (SILValueCategory)TyCategory)));
     break;
   }
   case SILInstructionKind::MarkDependenceInst: {
@@ -1533,10 +1583,11 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   }
   case SILInstructionKind::IntegerLiteralInst: {
     auto Ty = MF->getType(TyID);
-    auto intTy = Ty->castTo<BuiltinIntegerType>();
-    StringRef StringVal = MF->getIdentifierText(ValID);
-    // Build APInt from string.
-    APInt value(intTy->getGreatestWidth(), StringVal, 10);
+    auto intTy = Ty->castTo<AnyBuiltinIntegerType>();
+    StringRef text = MF->getIdentifierText(ValID);
+    bool negate = text[0] == '-';
+    if (negate) text = text.drop_front();
+    APInt value = intTy->getWidth().parse(text, 10, negate);
     ResultVal = Builder.createIntegerLiteral(Loc,
         getSILType(Ty, (SILValueCategory)TyCategory),
         value);
@@ -1793,12 +1844,16 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   case SILInstructionKind::AssignInst: {
     auto Ty = MF->getType(TyID);
     SILType addrType = getSILType(Ty, (SILValueCategory)TyCategory);
-    SILType ValType = addrType.getObjectType();
+    SILType valType = addrType.getObjectType();
+    auto qualifier = AssignOwnershipQualifier(Attr);
     ResultVal = Builder.createAssign(Loc,
-                    getLocalValue(ValID, ValType),
-                    getLocalValue(ValID2, addrType));
+                    getLocalValue(ValID, valType),
+                    getLocalValue(ValID2, addrType),
+                    qualifier);
     break;
   }
+  case SILInstructionKind::AssignByWrapperInst:
+    llvm_unreachable("not supported");
   case SILInstructionKind::BindMemoryInst: {
     assert(RecordKind == SIL_ONE_TYPE_VALUES &&
            "Layout should be OneTypeValues.");
@@ -2395,8 +2450,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     ResultVal = Builder.createKeyPath(Loc, pattern, subMap, operands, kpTy);
     break;
   }
-  case SILInstructionKind::MarkUninitializedBehaviorInst:
-    llvm_unreachable("todo");
   }
 
   for (auto result : ResultVal->getResults()) {
@@ -2472,17 +2525,19 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
   // linkage to avoid re-reading it from the bitcode each time?
   DeclID clangOwnerID;
   TypeID funcTyID;
+  IdentifierID replacedFunctionID;
   GenericEnvironmentID genericEnvID;
   unsigned rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
       optimizationMode, effect, numSpecAttrs, hasQualifiedOwnership,
-      isWeakLinked;
+      isWeakLinked, isDynamic;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
       scratch, rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
       optimizationMode, effect, numSpecAttrs, hasQualifiedOwnership,
-      isWeakLinked, funcTyID, genericEnvID, clangOwnerID, SemanticsIDs);
+      isWeakLinked, isDynamic, funcTyID, replacedFunctionID, genericEnvID,
+      clangOwnerID, SemanticsIDs);
   auto linkage = fromStableSILLinkage(rawLinkage);
   if (!linkage) {
     LLVM_DEBUG(llvm::dbgs() << "invalid linkage code " << rawLinkage
@@ -2678,17 +2733,8 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
            "Content of Vtable should be in SIL_VTABLE_ENTRY.");
     ArrayRef<uint64_t> ListOfValues;
     DeclID NameID;
-    unsigned RawLinkage;
     unsigned RawEntryKind;
-    VTableEntryLayout::readRecord(scratch, NameID, RawEntryKind, RawLinkage, ListOfValues);
-
-    auto Linkage = fromStableSILLinkage(RawLinkage);
-    if (!Linkage) {
-      LLVM_DEBUG(llvm::dbgs() << "invalid linkage code " << RawLinkage
-                              << " for VTable Entry\n");
-      MF->error();
-      return nullptr;
-    }
+    VTableEntryLayout::readRecord(scratch, NameID, RawEntryKind, ListOfValues);
 
     auto EntryKind = fromStableVTableEntryKind(RawEntryKind);
 
@@ -2696,7 +2742,7 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
     if (Func) {
       unsigned NextValueIndex = 0;
       vtableEntries.emplace_back(getSILDeclRef(MF, ListOfValues, NextValueIndex),
-                                 Func, EntryKind.getValue(), Linkage.getValue());
+                                 Func, EntryKind.getValue());
     }
 
     // Fetch the next record.
@@ -2724,10 +2770,10 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
   return vT;
 }
 
-SILVTable *SILDeserializer::lookupVTable(Identifier Name) {
+SILVTable *SILDeserializer::lookupVTable(StringRef MangledClassName) {
   if (!VTableList)
     return nullptr;
-  auto iter = VTableList->find(Name.str());
+  auto iter = VTableList->find(MangledClassName);
   if (iter == VTableList->end())
     return nullptr;
 
@@ -2900,13 +2946,12 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
   }
 
   // Deserialize Conformance.
-  auto theConformance = cast<NormalProtocolConformance>(
+  auto theConformance = cast<RootProtocolConformance>(
                           MF->readConformance(SILCursor).getConcrete());
 
-  PrettyStackTraceType trace(SILMod.getASTContext(),
-                             "deserializing SIL witness table for",
-                             theConformance->getType());
-  PrettyStackTraceDecl trace2("... to", theConformance->getProtocol());
+  PrettyStackTraceConformance trace(SILMod.getASTContext(),
+                                    "deserializing SIL witness table for",
+                                    theConformance);
 
   if (!existingWt)
     existingWt = SILMod.lookUpWitnessTable(theConformance, false);

@@ -1,23 +1,19 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir -O %s | %FileCheck %s -check-prefix CHECK -check-prefix CHECK-%target-os
+// RUN: %target-swift-frontend -emit-ir -O %s | %FileCheck %s -check-prefix CHECK -check-prefix CHECK-%target-os
 
-#if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
-import Darwin
-#elseif os(Android) || os(Cygwin) || os(FreeBSD) || os(Linux)
-import Glibc
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+  import Darwin
+#elseif os(Linux) || os(FreeBSD) || os(PS4) || os(Android) || os(Cygwin) || os(Haiku)
+  import Glibc
 #elseif os(Windows)
-import MSVCRT
+  import MSVCRT
+#else
+#error("Unsupported platform")
 #endif
 
 // Make sure we use an intrinsic for functions such as exp.
 
 // CHECK-LABEL: define {{.*}}test1
-// CHECK-ios: call float @llvm.exp.f32
-// CHECK-macosx: call float @llvm.exp.f32
-// CHECK-tvos: call float @llvm.exp.f32
-// CHECK-watchos: call float @llvm.exp.f32
-// CHECK-darwin: call float @llvm.exp.f32
-// CHECK-linux-gnu: call float @expf
-// CHECK-windows: call float @expf
+// CHECK: call float @llvm.exp.f32
 
 public func test1(f : Float) -> Float {
   return exp(f)
@@ -27,7 +23,7 @@ public func test1(f : Float) -> Float {
 // CHECK: call double @llvm.exp.f64
 
 public func test2(f : Double) -> Double {
-  return _exp(f)
+  return .exp(f)
 }
 
 // CHECK-LABEL: define {{.*}}test3

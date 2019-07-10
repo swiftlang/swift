@@ -16,6 +16,7 @@
 #include "swift/Serialization/ModuleFile.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/AST/ASTMangler.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
@@ -100,9 +101,12 @@ bool SerializedSILLoader::hasSILFunction(StringRef Name,
 }
 
 
-SILVTable *SerializedSILLoader::lookupVTable(Identifier Name) {
+SILVTable *SerializedSILLoader::lookupVTable(const ClassDecl *C) {
+  Mangle::ASTMangler mangler;
+  std::string mangledClassName = mangler.mangleNominalType(C);
+
   for (auto &Des : LoadedSILSections) {
-    if (auto VT = Des->lookupVTable(Name))
+    if (auto VT = Des->lookupVTable(mangledClassName))
       return VT;
   }
   return nullptr;

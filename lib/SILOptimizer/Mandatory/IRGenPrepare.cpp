@@ -16,7 +16,8 @@
 ///
 /// We perform the following canonicalizations:
 ///
-/// 1. We remove calls to Builtin.staticReport(), which are not needed post SIL.
+/// 1. We remove calls to Builtin.poundAssert() and Builtin.staticReport(),
+///    which are not needed post SIL.
 ///
 //===----------------------------------------------------------------------===//
 
@@ -41,14 +42,15 @@ static bool cleanFunction(SILFunction &fn) {
       SILInstruction *inst = &*i;
       ++i;
 
-      // Remove calls to Builtin.staticReport().
+      // Remove calls to Builtin.poundAssert() and Builtin.staticReport().
       auto *bi = dyn_cast<BuiltinInst>(inst);
       if (!bi) {
         continue;
       }
 
       const BuiltinInfo &bInfo = bi->getBuiltinInfo();
-      if (bInfo.ID != BuiltinValueKind::StaticReport) {
+      if (bInfo.ID != BuiltinValueKind::PoundAssert &&
+          bInfo.ID != BuiltinValueKind::StaticReport) {
         continue;
       }
 

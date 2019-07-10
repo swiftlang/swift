@@ -94,10 +94,15 @@ public class A_Sub2: A_Sub {
 // CHECK-NEXT: {{^}$}}
 
 // CHECK-RECOVERY-LABEL: class A_Sub : Base {
+// CHECK-RECOVERY-NEXT: func disappearingMethod()
+// CHECK-RECOVERY-NEXT: func nullabilityChangeMethod() -> Any?
+// CHECK-RECOVERY-NEXT: func typeChangeMethod() -> Any
+// CHECK-RECOVERY-NEXT: func disappearingMethodWithOverload()
 // CHECK-RECOVERY-NEXT: init()
 // CHECK-RECOVERY-NEXT: {{^}$}}
 
 // CHECK-RECOVERY-LABEL: class A_Sub2 : A_Sub {
+// CHECK-RECOVERY-NEXT: func disappearingMethod()
 // CHECK-RECOVERY-NEXT: init()
 // CHECK-RECOVERY-NEXT: {{^}$}}
 
@@ -119,6 +124,9 @@ public class B_GenericSub : GenericBase<Base> {
 // CHECK-NEXT: {{^}$}}
 
 // CHECK-RECOVERY-LABEL: class B_GenericSub : GenericBase<Base> {
+// CHECK-RECOVERY-NEXT: func disappearingMethod()
+// CHECK-RECOVERY-NEXT: func nullabilityChangeMethod() -> Base?
+// CHECK-RECOVERY-NEXT: func typeChangeMethod() -> Any
 // CHECK-RECOVERY-NEXT: init()
 // CHECK-RECOVERY-NEXT: {{^}$}}
 

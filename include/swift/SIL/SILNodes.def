@@ -23,6 +23,7 @@
 /// | ABSTRACT_VALUE     | Visit abstract single value insts as values             |
 /// | APPLYSITE_INST     | Visit full and partial apply site insts as apply sites. |
 /// | FULLAPPLYSITE_INST | Visit full apply site insts as apply sites.             |
+/// | DYNAMICCAST_INST   | Visit dynamic casts as dynamic casts.                   |
 ///
 /// We describe the triggering variables below:
 ///
@@ -49,7 +50,7 @@
 ///
 /// 4. APPLYSITE_INST(ID, PARENT)
 ///
-///   If defined this will cuase:
+///   If defined this will cause:
 ///
 ///         * APPLYSITE_SINGLE_VALUE_INST
 ///         * APPLYSITE_MULTIPLE_VALUE_INST
@@ -57,6 +58,17 @@
 ///
 ///   to expand to APPLYSITE_INST(ID, PARENT) instead of delegating to
 ///   SINGLE_VALUE_INST.
+///
+/// 5. DYNAMICCAST_INST(ID, PARENT)
+///
+///   If defined this will cause:
+///
+///         * DYNAMICCAST_SINGLE_VALUE_INST
+///         * DYNAMICCAST_TERMINATOR
+///         * DYNAMICCAST_NON_VALUE_INST
+///
+///   To expand to DYNAMICCAST_INST(ID, PARENT) instead of delegating to
+///   SINGLE_VALUE_INST, TERMINATOR, or NON_VALUE_INST
 ///
 //===----------------------------------------------------------------------===//
 
@@ -75,7 +87,7 @@
 #define NODE(ID, PARENT)
 #endif
 
-/// SINGLE_VALUE_INST(Id, Parent, TextualName, MemBehavior, MayRelease)
+/// SINGLE_VALUE_INST(ID, TEXTUALNAME, PARENT, MEMBEHAVIOR, MAYRELEASE)
 ///
 ///   A concrete subclass of SingleValueInstruction, which inherits from
 ///   both ValueBase and SILInstruction.  ID is a member of both ValueKind
@@ -90,6 +102,25 @@
 #endif
 #endif
 
+/// DYNAMICCAST_SINGLE_VALUE_INST(ID, TEXTUALNAME, PARENT, MEMBEHAVIOR, MAYRELEASE)
+///
+/// A SINGLE_VALUE_INST that is a cast instruction. ID is a member of
+/// SILDynamicCastKind.
+#ifndef DYNAMICCAST_SINGLE_VALUE_INST
+#ifdef DYNAMICCAST_INST
+#define DYNAMICCAST_SINGLE_VALUE_INST(ID, TEXTUALNAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
+  DYNAMICCAST_INST(ID, TEXTUALNAME)
+#else
+#define DYNAMICCAST_SINGLE_VALUE_INST(ID, TEXTUALNAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
+  SINGLE_VALUE_INST(ID, TEXTUALNAME, PARENT, MEMBEHAVIOR, MAYRELEASE)
+#endif
+#endif
+
+/// APPLYSITE_SINGLE_VALUE_INST(ID, TEXTUALNAME, PARENT, MEMBEHAVIOR,
+///                             MAYRELEASE)
+///
+///   A SINGLE_VALUE_INST that is a partial or full apply site. ID is a member
+///   of ApplySiteKind.
 #ifndef APPLYSITE_SINGLE_VALUE_INST
 #ifdef APPLYSITE_INST
 #define APPLYSITE_SINGLE_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
@@ -100,6 +131,11 @@
 #endif
 #endif
 
+/// FULLAPPLYSITE_SINGLE_VALUE_INST(ID, TEXTUALNAME, PARENT, MEMBEHAVIOR,
+///                                 MAYRELEASE)
+///
+///   A SINGLE_VALUE_INST that is a full apply site. ID is a member of
+///   FullApplySiteKind and ApplySiteKind.
 #ifndef FULLAPPLYSITE_SINGLE_VALUE_INST
 #ifdef FULLAPPLYSITE_INST
 #define FULLAPPLYSITE_SINGLE_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
@@ -120,6 +156,11 @@
   FULL_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE)
 #endif
 
+/// APPLYSITE_MULTIPLE_VALUE_INST(ID, TEXTUALNAME, PARENT, MEMBEHAVIOR,
+///                               MAYRELEASE)
+///
+///   A MULTIPLE_VALUE_INST that is additionally either a partial or full apply
+///   site. ID is a member of ApplySiteKind.
 #ifndef APPLYSITE_MULTIPLE_VALUE_INST
 #ifdef APPLYSITE_INST
 #define APPLYSITE_MULTIPLE_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
@@ -130,6 +171,11 @@
 #endif
 #endif
 
+/// FULLAPPLYSITE_MULTIPLE_VALUE_INST(ID, TEXTUALNAME, PARENT, MEMBEHAVIOR,
+///                                   MAYRELEASE)
+///
+///   A MULTIPLE_VALUE_INST that is additionally a full apply site. ID is a
+///   member of FullApplySiteKind and ApplySiteKind.
 #ifndef FULLAPPLYSITE_MULTIPLE_VALUE_INST
 #ifdef FULLAPPLYSITE_INST
 #define FULLAPPLYSITE_MULTIPLE_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
@@ -199,12 +245,35 @@
   FULL_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE)
 #endif
 
+#ifndef DYNAMICCAST_NON_VALUE_INST
+#ifdef DYNAMICCAST_INST
+#define DYNAMICCAST_NON_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
+  DYNAMICCAST_INST(ID, NAME)
+#else
+#define DYNAMICCAST_NON_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
+  NON_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE)
+#endif
+#endif
+
 /// TERMINATOR(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE)
 ///
 ///   ID is a member of TerminatorKind and the name of a subclass of TermInst.
 #ifndef TERMINATOR
 #define TERMINATOR(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
   NON_VALUE_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE)
+#endif
+
+/// DYNAMICCAST_TERMINATOR(ID, TEXTUAL_NAME, PARENT, MEMBEHAVIOR, MAYRELEASE)
+///
+///   A terminator that casts its inputs. ID is a member of SILDynamicCastKind.
+#ifndef DYNAMICCAST_TERMINATOR
+#ifdef DYNAMICCAST_INST
+#define DYNAMICCAST_TERMINATOR(ID, TEXTUAL_NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
+  DYNAMICCAST_INST(ID, TEXTUAL_NAME)
+#else
+#define DYNAMICCAST_TERMINATOR(ID, TEXTUAL_NAME, PARENT, MEMBEHAVIOR, MAYRELEASE) \
+  TERMINATOR(ID, TEXTUAL_NAME, PARENT, MEMBEHAVIOR, MAYRELEASE)
+#endif
 #endif
 
 /// APPLYSITE_TERMINATOR_INST(ID, NAME, PARENT, MEMBEHAVIOR, MAYRELEASE)
@@ -382,6 +451,10 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
   ABSTRACT_SINGLE_VALUE_INST(LiteralInst, SingleValueInstruction)
     SINGLE_VALUE_INST(FunctionRefInst, function_ref,
                       LiteralInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(DynamicFunctionRefInst, dynamic_function_ref,
+                      LiteralInst, None, DoesNotRelease)
+    SINGLE_VALUE_INST(PreviousDynamicFunctionRefInst, prev_dynamic_function_ref,
+                      LiteralInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(GlobalAddrInst, global_addr,
                       LiteralInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(GlobalValueInst, global_value,
@@ -460,7 +533,7 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                       ConversionInst, None, DoesNotRelease)
     // unconditional_checked_cast_value reads the source value and produces
     // a new value with a potentially different representation.
-    SINGLE_VALUE_INST(UnconditionalCheckedCastValueInst, unconditional_checked_cast_value,
+    DYNAMICCAST_SINGLE_VALUE_INST(UnconditionalCheckedCastValueInst, unconditional_checked_cast_value,
                       ConversionInst, MayRead, MayRelease)
     // unconditional_checked_cast_inst is only MayRead to prevent a subsequent
     // release of the cast's source from being hoisted above the cast:
@@ -473,7 +546,7 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
     // should never happen.  Since unconditional_checked_cast is a
     // scalar cast that doesn't affect the value's representation, its
     // side effect can then be modeled as None.
-    SINGLE_VALUE_INST(UnconditionalCheckedCastInst, unconditional_checked_cast,
+    DYNAMICCAST_SINGLE_VALUE_INST(UnconditionalCheckedCastInst, unconditional_checked_cast,
                       ConversionInst, MayRead, DoesNotRelease)
     SINGLE_VALUE_INST_RANGE(ConversionInst, UpcastInst, UnconditionalCheckedCastInst)
 
@@ -522,8 +595,6 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                     SingleValueInstruction, MayRead, DoesNotRelease)
 #include "swift/AST/ReferenceStorage.def"
   SINGLE_VALUE_INST(MarkUninitializedInst, mark_uninitialized,
-                    SingleValueInstruction, None, DoesNotRelease)
-  SINGLE_VALUE_INST(MarkUninitializedBehaviorInst, mark_uninitialized_behavior,
                     SingleValueInstruction, None, DoesNotRelease)
   SINGLE_VALUE_INST(ProjectValueBufferInst, project_value_buffer,
                     SingleValueInstruction, MayRead, DoesNotRelease)
@@ -650,11 +721,11 @@ ABSTRACT_INST(TermInst, SILInstruction)
              TermInst, MayRead, DoesNotRelease)
   TERMINATOR(DynamicMethodBranchInst, dynamic_method_br,
              TermInst, None, DoesNotRelease)
-  TERMINATOR(CheckedCastBranchInst, checked_cast_br,
+  DYNAMICCAST_TERMINATOR(CheckedCastBranchInst, checked_cast_br,
              TermInst, None, DoesNotRelease)
-  TERMINATOR(CheckedCastAddrBranchInst, checked_cast_addr_br,
+  DYNAMICCAST_TERMINATOR(CheckedCastAddrBranchInst, checked_cast_addr_br,
              TermInst, MayHaveSideEffects, MayRelease)
-  TERMINATOR(CheckedCastValueBranchInst, checked_cast_value_br,
+  DYNAMICCAST_TERMINATOR(CheckedCastValueBranchInst, checked_cast_value_br,
              TermInst, None, DoesNotRelease)
   INST_RANGE(TermInst, UnreachableInst, CheckedCastValueBranchInst)
 
@@ -734,6 +805,8 @@ NON_VALUE_INST(StoreInst, store,
                SILInstruction, MayWrite, DoesNotRelease)
 NON_VALUE_INST(AssignInst, assign,
                SILInstruction, MayWrite, DoesNotRelease)
+NON_VALUE_INST(AssignByWrapperInst, assign_by_wrapper,
+               SILInstruction, MayWrite, DoesNotRelease)
 NON_VALUE_INST(MarkFunctionEscapeInst, mark_function_escape,
                SILInstruction, None, DoesNotRelease)
 NON_VALUE_INST(DebugValueInst, debug_value,
@@ -756,7 +829,8 @@ NON_VALUE_INST(DeinitExistentialAddrInst, deinit_existential_addr,
                SILInstruction, MayHaveSideEffects, DoesNotRelease)
 NON_VALUE_INST(DeinitExistentialValueInst, deinit_existential_value,
                SILInstruction, MayHaveSideEffects, DoesNotRelease)
-NON_VALUE_INST(UnconditionalCheckedCastAddrInst, unconditional_checked_cast_addr,
+DYNAMICCAST_NON_VALUE_INST(
+               UnconditionalCheckedCastAddrInst, unconditional_checked_cast_addr,
                SILInstruction, MayHaveSideEffects, MayRelease)
 NON_VALUE_INST(UncheckedRefCastAddrInst, unchecked_ref_cast_addr,
                SILInstruction, MayHaveSideEffects, DoesNotRelease)
@@ -798,14 +872,18 @@ NODE_RANGE(SILNode, SILPhiArgument, DestructureTupleInst)
 #undef ABSTRACT_VALUE_AND_INST
 #undef FULLAPPLYSITE_TERMINATOR_INST
 #undef APPLYSITE_TERMINATOR_INST
+#undef DYNAMICCAST_TERMINATOR
 #undef TERMINATOR
 #undef NON_VALUE_INST
+#undef DYNAMICCAST_NON_VALUE_INST
 #undef MULTIPLE_VALUE_INST_RESULT
 #undef FULLAPPLYSITE_MULTIPLE_VALUE_INST
 #undef APPLYSITE_MULTIPLE_VALUE_INST
 #undef MULTIPLE_VALUE_INST
 #undef FULLAPPLYSITE_SINGLE_VALUE_INST
 #undef APPLYSITE_SINGLE_VALUE_INST
+#undef DYNAMICCAST_SINGLE_VALUE_INST
+#undef DYNAMICCAST_INST
 #undef SINGLE_VALUE_INST
 #undef FULL_INST
 #undef INST

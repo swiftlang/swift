@@ -120,16 +120,20 @@ public:
 
   void
   getImportedModules(SmallVectorImpl<ModuleDecl::ImportedModule> &Modules) const {
+    ModuleDecl::ImportFilter ImportFilter;
+    ImportFilter |= ModuleDecl::ImportFilterKind::Public;
+    ImportFilter |= ModuleDecl::ImportFilterKind::Private;
+    ImportFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
+
     if (auto *SF = SFOrMod.dyn_cast<SourceFile *>()) {
-      SF->getImportedModules(Modules, ModuleDecl::ImportFilter::All);
+      SF->getImportedModules(Modules, ImportFilter);
     } else {
-      SFOrMod.get<ModuleDecl *>()->getImportedModules(Modules,
-                                                  ModuleDecl::ImportFilter::All);
+      SFOrMod.get<ModuleDecl *>()->getImportedModules(Modules, ImportFilter);
     }
   }
 };
 
-struct ValueWitness {
+struct IndexedWitness {
   ValueDecl *Member;
   ValueDecl *Requirement;
 };
@@ -146,7 +150,7 @@ class IndexSwiftASTWalker : public SourceEntityWalker {
     Decl *D;
     SymbolInfo SymInfo;
     SymbolRoleSet Roles;
-    SmallVector<ValueWitness, 6> ExplicitValueWitnesses;
+    SmallVector<IndexedWitness, 6> ExplicitWitnesses;
     SmallVector<SourceLoc, 6> RefsToSuppress;
   };
   SmallVector<Entity, 6> EntitiesStack;
@@ -281,20 +285,23 @@ public:
     assert(Cancelled || ManuallyVisitedAccessorStack.empty());
   }
 
-  void visitModule(ModuleDecl &Mod, StringRef Hash);
+  void visitModule(ModuleDecl &Mod);
   void visitDeclContext(DeclContext *DC);
 
 private:
   bool visitImports(SourceFileOrModule Mod,
                     llvm::SmallPtrSetImpl<ModuleDecl *> &Visited);
 
-  bool handleSourceOrModuleFile(SourceFileOrModule SFOrMod, StringRef KnownHash,
-                                bool &HashIsKnown);
+  bool handleSourceOrModuleFile(SourceFileOrModule SFOrMod);
 
   bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
     // Do not handle unavailable decls.
     if (AvailableAttr::isUnavailable(D))
       return false;
+
+    if (!handleCustomAttrInitRefs(D))
+      return false;
+
     if (auto *AD = dyn_cast<AccessorDecl>(D)) {
       if (ManuallyVisitedAccessorStack.empty() ||
           ManuallyVisitedAccessorStack.back() != AD)
@@ -319,6 +326,36 @@ private:
     return true;
   }
 
+  /// Report calls to the initializers of property wrapper types on wrapped properties.
+  ///
+  /// These may be either explicit:
+  ///     `\@Wrapper(initialialValue: 42) var x: Int`
+  /// or implicit:
+  ///     `\@Wrapper var x = 10`
+  bool handleCustomAttrInitRefs(Decl * D) {
+    for (auto *customAttr : D->getAttrs().getAttributes<CustomAttr, true>()) {
+      if (customAttr->isImplicit())
+        continue;
+
+      auto &Loc = customAttr->getTypeLoc();
+      if (auto *semanticInit = dyn_cast_or_null<CallExpr>(customAttr->getSemanticInit())) {
+        if (auto *CD = semanticInit->getCalledValue()) {
+          if (!shouldIndex(CD, /*IsRef*/true))
+            continue;
+          IndexSymbol Info;
+          if (initIndexSymbol(CD, Loc.getLoc(), /*IsRef=*/true, Info))
+            continue;
+          Info.roles |= (unsigned)SymbolRole::Call;
+          if (semanticInit->isImplicit())
+            Info.roles |= (unsigned)SymbolRole::Implicit;
+          if (!startEntity(CD, Info, /*IsRef=*/true) || !finishCurrentEntity())
+            return false;
+        }
+      }
+    }
+    return true;
+  }
+
   void handleMemberwiseInitRefs(Expr *E) {
     if (!isa<ConstructorRefCallExpr>(E))
       return;
@@ -330,6 +367,7 @@ private:
     // get label locations
     auto *MemberwiseInit = DeclRef->getDecl();
     std::vector<SourceLoc> LabelLocs;
+    ArrayRef<Identifier> Labels;
     auto NameLoc = DeclRef->getNameLoc();
     if (NameLoc.isCompound()) {
       size_t LabelIndex = 0;
@@ -337,12 +375,16 @@ private:
       while ((ArgLoc = NameLoc.getArgumentLabelLoc(LabelIndex++)).isValid()) {
         LabelLocs.push_back(ArgLoc);
       }
+      Labels = MemberwiseInit->getFullName().getArgumentNames();
     } else if (auto *CallParent = dyn_cast_or_null<CallExpr>(getParentExpr())) {
       LabelLocs = CallParent->getArgumentLabelLocs();
+      Labels = CallParent->getArgumentLabels();
     }
 
     if (LabelLocs.empty())
       return;
+
+    assert(Labels.size() == LabelLocs.size());
 
     // match labels to properties
     auto *TypeContext =
@@ -350,14 +392,23 @@ private:
     if (!TypeContext || !shouldIndex(TypeContext, false))
       return;
 
-    auto LabelIt = LabelLocs.begin();
-    for (auto Prop : TypeContext->getStoredProperties()) {
-      if (Prop->getParentInitializer() && Prop->isLet())
+    unsigned CurLabel = 0;
+    for (auto Member : TypeContext->getMembers()) {
+      auto Prop = dyn_cast<VarDecl>(Member);
+      if (!Prop)
         continue;
 
-      assert(LabelIt != LabelLocs.end());
+      if (!Prop->isMemberwiseInitialized(/*preferDeclaredProperties=*/true))
+        continue;
+
+      if (CurLabel == LabelLocs.size())
+        break;
+
+      if (Labels[CurLabel] != Prop->getName())
+        continue;
+
       IndexSymbol Info;
-      if (initIndexSymbol(Prop, *LabelIt++, /*IsRef=*/true, Info))
+      if (initIndexSymbol(Prop, LabelLocs[CurLabel++], /*IsRef=*/true, Info))
         continue;
       if (startEntity(Prop, Info, /*IsRef=*/true))
         finishCurrentEntity();
@@ -390,11 +441,27 @@ private:
       return true;
 
     IndexSymbol Info;
+
+    if (Data.isImplicit)
+      Info.roles |= (unsigned)SymbolRole::Implicit;
+
     if (CtorTyRef)
       if (!reportRef(CtorTyRef, Loc, Info, Data.AccKind))
         return false;
     if (!reportRef(D, Loc, Info, Data.AccKind))
       return false;
+
+    // If this is a reference to a property wrapper backing property or
+    // projected value, report a reference to the wrapped property too (i.e.
+    // report an occurrence of `foo` in `_foo` and '$foo').
+    if (auto *VD = dyn_cast<VarDecl>(D)) {
+      if (auto *Wrapped = VD->getOriginalWrappedProperty()) {
+        assert(Range.getByteLength() > 1 &&
+               (Range.str().front() == '_' || Range.str().front() == '$'));
+        auto AfterDollar = Loc.getAdvancedLoc(1);
+        reportRef(Wrapped, AfterDollar, Info, None);
+      }
+    }
 
     return true;
   }
@@ -411,9 +478,8 @@ private:
     Info.symInfo = getSymbolInfoForModule(Mod);
     getModuleNameAndUSR(Mod, Info.name, Info.USR);
 
-    auto Parent = getParentDecl();
-    if (Parent && isa<AbstractFunctionDecl>(Parent))
-      addRelation(Info, (unsigned)SymbolRole::RelationContainedBy, Parent);
+    if (auto Container = getContainingDecl())
+      addRelation(Info, (unsigned)SymbolRole::RelationContainedBy, Container);
 
     if (!IdxConsumer.startSourceEntity(Info)) {
       Cancelled = true;
@@ -426,6 +492,16 @@ private:
   Decl *getParentDecl() const {
     if (!EntitiesStack.empty())
       return EntitiesStack.back().D;
+    return nullptr;
+  }
+
+  Decl *getContainingDecl() const {
+    for (const auto &Entity: EntitiesStack) {
+      if (isa<AbstractFunctionDecl>(Entity.D) &&
+          (Entity.Roles & (SymbolRoleSet)SymbolRole::Definition)) {
+        return Entity.D;
+      }
+    }
     return nullptr;
   }
 
@@ -462,8 +538,8 @@ private:
   bool reportExtension(ExtensionDecl *D);
   bool reportRef(ValueDecl *D, SourceLoc Loc, IndexSymbol &Info,
                  Optional<AccessKind> AccKind);
-  bool reportImplicitValueConformance(ValueDecl *witness, ValueDecl *requirement,
-                                      Decl *container);
+  bool reportImplicitConformance(ValueDecl *witness, ValueDecl *requirement,
+                                 Decl *container);
 
   bool startEntity(Decl *D, IndexSymbol &Info, bool IsRef);
   bool startEntityDecl(ValueDecl *D);
@@ -516,7 +592,17 @@ private:
   }
 
   bool shouldIndex(ValueDecl *D, bool IsRef) const {
+    if (D->isImplicit() && isa<VarDecl>(D) && IsRef) {
+      // Bypass the implicit VarDecls introduced in CaseStmt bodies by using the
+      // canonical VarDecl for these checks instead.
+      D = cast<VarDecl>(D)->getCanonicalVarDecl();
+    }
+
     if (D->isImplicit() && !isa<ConstructorDecl>(D))
+      return false;
+
+    // Do not handle non-public imported decls.
+    if (IsModuleFile && !D->isAccessibleFrom(nullptr))
       return false;
 
     if (!IdxConsumer.indexLocals() && isLocalSymbol(D))
@@ -535,12 +621,8 @@ private:
   /// members.
   ///
   /// \returns false if AST visitation should stop.
-  bool handleValueWitnesses(Decl *D, SmallVectorImpl<ValueWitness> &explicitValueWitnesses);
+  bool handleWitnesses(Decl *D, SmallVectorImpl<IndexedWitness> &explicitWitnesses);
 
-  void getModuleHash(SourceFileOrModule SFOrMod, llvm::raw_ostream &OS);
-  llvm::hash_code hashModule(llvm::hash_code code, SourceFileOrModule SFOrMod);
-  llvm::hash_code hashFileReference(llvm::hash_code code,
-                                    SourceFileOrModule SFOrMod);
   void getRecursiveModuleImports(ModuleDecl &Mod,
                                  SmallVectorImpl<ModuleDecl *> &Imports);
   void
@@ -573,7 +655,7 @@ void IndexSwiftASTWalker::visitDeclContext(DeclContext *Context) {
     ManuallyVisitedAccessorStack.pop_back();
 }
 
-void IndexSwiftASTWalker::visitModule(ModuleDecl &Mod, StringRef KnownHash) {
+void IndexSwiftASTWalker::visitModule(ModuleDecl &Mod) {
   SourceFile *SrcFile = nullptr;
   for (auto File : Mod.getFiles()) {
     if (auto SF = dyn_cast<SourceFile>(File)) {
@@ -585,41 +667,23 @@ void IndexSwiftASTWalker::visitModule(ModuleDecl &Mod, StringRef KnownHash) {
     }
   }
 
-  bool HashIsKnown;
   if (SrcFile != nullptr) {
     IsModuleFile = false;
-    if (!handleSourceOrModuleFile(*SrcFile, KnownHash, HashIsKnown))
+    if (!handleSourceOrModuleFile(*SrcFile))
       return;
-    if (HashIsKnown)
-      return; // No need to report symbols.
     walk(*SrcFile);
   } else {
     IsModuleFile = true;
     isSystemModule = Mod.isSystemModule();
-    if (!handleSourceOrModuleFile(Mod, KnownHash, HashIsKnown))
+    if (!handleSourceOrModuleFile(Mod))
       return;
-    if (HashIsKnown)
-      return; // No need to report symbols.
     walk(Mod);
   }
 }
 
-bool IndexSwiftASTWalker::handleSourceOrModuleFile(SourceFileOrModule SFOrMod,
-                                                   StringRef KnownHash,
-                                                   bool &HashIsKnown) {
+bool IndexSwiftASTWalker::handleSourceOrModuleFile(SourceFileOrModule SFOrMod) {
   // Common reporting for TU/module file.
 
-  SmallString<32> HashBuf;
-  {
-    llvm::raw_svector_ostream HashOS(HashBuf);
-    getModuleHash(SFOrMod, HashOS);
-    StringRef Hash = HashOS.str();
-    HashIsKnown = Hash == KnownHash;
-    if (!IdxConsumer.recordHash(Hash, HashIsKnown))
-      return false;
-  }
-
-  // We always report the dependencies, even if the hash is known.
   llvm::SmallPtrSet<ModuleDecl *, 16> Visited;
   return visitImports(SFOrMod, Visited);
 }
@@ -664,6 +728,7 @@ bool IndexSwiftASTWalker::visitImports(
         IsClangModuleOpt = false;
         break;
       case FileUnitKind::ClangModule:
+      case FileUnitKind::DWARFModule:
         assert(!IsClangModuleOpt.hasValue() &&
                "cannot handle multi-file modules");
         IsClangModuleOpt = true;
@@ -674,16 +739,8 @@ bool IndexSwiftASTWalker::visitImports(
       continue;
     bool IsClangModule = *IsClangModuleOpt;
 
-    StringRef Hash;
-    SmallString<32> HashBuf;
-    if (!IsClangModule) {
-      llvm::raw_svector_ostream HashOS(HashBuf);
-      getModuleHash(*Mod, HashOS);
-      Hash = HashOS.str();
-    }
-
     if (!IdxConsumer.startDependency(Mod->getName().str(), Path, IsClangModule,
-                                     Mod->isSystemModule(), Hash))
+                                     Mod->isSystemModule()))
       return false;
     if (!IsClangModule)
       if (!visitImports(*Mod, Visited))
@@ -695,7 +752,7 @@ bool IndexSwiftASTWalker::visitImports(
   return true;
 }
 
-bool IndexSwiftASTWalker::handleValueWitnesses(Decl *D, SmallVectorImpl<ValueWitness> &explicitValueWitnesses) {
+bool IndexSwiftASTWalker::handleWitnesses(Decl *D, SmallVectorImpl<IndexedWitness> &explicitWitnesses) {
   auto DC = dyn_cast<DeclContext>(D);
   if (!DC)
     return true;
@@ -704,9 +761,12 @@ bool IndexSwiftASTWalker::handleValueWitnesses(Decl *D, SmallVectorImpl<ValueWit
     if (conf->isInvalid())
       continue;
 
-    auto normal = conf->getRootNormalConformance();
-    normal->forEachValueWitness(nullptr,
-                                [&](ValueDecl *req, Witness witness) {
+    // Ignore self-conformances; they're not interesting to show to users.
+    auto normal = dyn_cast<NormalProtocolConformance>(conf->getRootConformance());
+    if (!normal)
+      continue;
+
+    normal->forEachValueWitness([&](ValueDecl *req, Witness witness) {
       if (Cancelled)
         return;
 
@@ -715,11 +775,26 @@ bool IndexSwiftASTWalker::handleValueWitnesses(Decl *D, SmallVectorImpl<ValueWit
         return;
 
       if (decl->getDeclContext() == DC) {
-        explicitValueWitnesses.push_back(ValueWitness{decl, req});
+        explicitWitnesses.push_back({decl, req});
+      } else {
+        reportImplicitConformance(decl, req, D);
+      }
+    });
+
+    normal->forEachTypeWitness(
+                [&](AssociatedTypeDecl *assoc, Type type, TypeDecl *typeDecl) {
+      if (Cancelled)
+        return true;
+      if (typeDecl == nullptr)
+        return false;
+
+      if (typeDecl->getDeclContext() == DC) {
+        explicitWitnesses.push_back({typeDecl, assoc});
       } else {
         // Report the implicit conformance.
-        reportImplicitValueConformance(decl, req, D);
+        reportImplicitConformance(typeDecl, assoc, D);
       }
+      return false;
     });
   }
 
@@ -737,12 +812,12 @@ bool IndexSwiftASTWalker::startEntity(Decl *D, IndexSymbol &Info, bool IsRef) {
     case swift::index::IndexDataConsumer::Skip:
       return false;
     case swift::index::IndexDataConsumer::Continue: {
-      SmallVector<ValueWitness, 6> explicitValueWitnesses;
+      SmallVector<IndexedWitness, 6> explicitWitnesses;
       if (!IsRef) {
-        if (!handleValueWitnesses(D, explicitValueWitnesses))
+        if (!handleWitnesses(D, explicitWitnesses))
           return false;
       }
-      EntitiesStack.push_back({D, Info.symInfo, Info.roles, std::move(explicitValueWitnesses), {}});
+      EntitiesStack.push_back({D, Info.symInfo, Info.roles, std::move(explicitWitnesses), {}});
       return true;
     }
   }
@@ -777,7 +852,7 @@ bool IndexSwiftASTWalker::startEntityDecl(ValueDecl *D) {
   }
 
   if (auto Parent = getParentDecl()) {
-    for (const ValueWitness &witness : EntitiesStack.back().ExplicitValueWitnesses) {
+    for (const IndexedWitness &witness : EntitiesStack.back().ExplicitWitnesses) {
       if (witness.Member == D)
         addRelation(Info, (SymbolRoleSet) SymbolRole::RelationOverrideOf, witness.Requirement);
     }
@@ -897,8 +972,7 @@ bool IndexSwiftASTWalker::reportPseudoAccessor(AbstractStorageDecl *D,
     Info.symInfo.Kind = SymbolKind::Function;
     if (D->getDeclContext()->isTypeContext()) {
       if (D->isStatic()) {
-        if (isa<VarDecl>(D) &&
-            cast<VarDecl>(D)->getCorrectStaticSpelling() == StaticSpellingKind::KeywordClass)
+        if (D->getCorrectStaticSpelling() == StaticSpellingKind::KeywordClass)
           Info.symInfo.Kind = SymbolKind::ClassMethod;
         else
           Info.symInfo.Kind = SymbolKind::StaticMethod;
@@ -1100,8 +1174,8 @@ bool IndexSwiftASTWalker::reportRef(ValueDecl *D, SourceLoc Loc,
   return finishCurrentEntity();
 }
 
-bool IndexSwiftASTWalker::reportImplicitValueConformance(ValueDecl *witness, ValueDecl *requirement,
-                                                         Decl *container) {
+bool IndexSwiftASTWalker::reportImplicitConformance(ValueDecl *witness, ValueDecl *requirement,
+                                                    Decl *container) {
   if (!shouldIndex(witness, /*IsRef=*/true))
     return true; // keep walking
 
@@ -1131,6 +1205,11 @@ bool IndexSwiftASTWalker::reportImplicitValueConformance(ValueDecl *witness, Val
 bool IndexSwiftASTWalker::initIndexSymbol(ValueDecl *D, SourceLoc Loc,
                                           bool IsRef, IndexSymbol &Info) {
   assert(D);
+  if (auto *VD = dyn_cast<VarDecl>(D)) {
+    // Always base the symbol information on the canonical VarDecl
+    D = VD->getCanonicalVarDecl();
+  }
+
   Info.decl = D;
   Info.symInfo = getSymbolInfoForDecl(D);
   if (Info.symInfo.Kind == SymbolKind::Unknown)
@@ -1140,9 +1219,8 @@ bool IndexSwiftASTWalker::initIndexSymbol(ValueDecl *D, SourceLoc Loc,
 
   if (IsRef) {
     Info.roles |= (unsigned)SymbolRole::Reference;
-    auto Parent = getParentDecl();
-    if (Parent && isa<AbstractFunctionDecl>(Parent))
-      addRelation(Info, (unsigned)SymbolRole::RelationContainedBy, Parent);
+    if (auto Container = getContainingDecl())
+      addRelation(Info, (unsigned)SymbolRole::RelationContainedBy, Container);
   } else {
     Info.roles |= (unsigned)SymbolRole::Definition;
     if (D->isImplicit())
@@ -1192,17 +1270,24 @@ bool IndexSwiftASTWalker::initFuncDeclIndexSymbol(FuncDecl *D,
     Info.roles |= (SymbolRoleSet)SymbolRole::Dynamic;
   }
 
-  if (D->getAttrs().hasAttribute<IBActionAttr>()) {
-    // Relate with type of the first parameter using RelationIBTypeOf.
-    if (D->hasImplicitSelfDecl()) {
-      auto paramList = D->getParameters();
-      if (!paramList->getArray().empty()) {
-        auto param = paramList->get(0);
-        if (auto nominal = param->getType()->getAnyNominal()) {
-          addRelation(Info, (SymbolRoleSet) SymbolRole::RelationIBTypeOf, nominal);
-        }
-      }
+  if (D->hasImplicitSelfDecl()) {
+    // If this is an @IBAction or @IBSegueAction method, find the sender
+    // parameter (if present) and relate the method to its type.
+    ParamDecl *senderParam = nullptr;
+
+    auto paramList = D->getParameters();
+    if (D->getAttrs().hasAttribute<IBActionAttr>()) {
+      if (paramList->size() > 0)
+        senderParam = paramList->get(0);
+    } else if (D->getAttrs().hasAttribute<IBSegueActionAttr>()) {
+      if (paramList->size() > 1)
+        senderParam = paramList->get(1);
     }
+
+    if (senderParam)
+      if (auto nominal = senderParam->getType()->getAnyNominal())
+        addRelation(Info, (SymbolRoleSet) SymbolRole::RelationIBTypeOf,
+                    nominal);
   }
 
   if (auto Group = D->getGroupName())
@@ -1346,9 +1431,9 @@ bool IndexSwiftASTWalker::indexComment(const Decl *D) {
 
   swift::markup::MarkupContext MC;
   auto DC = getSingleDocComment(MC, D);
-  if (!DC.hasValue())
+  if (!DC)
     return true;
-  for (StringRef tagName : DC.getValue()->getTags()) {
+  for (StringRef tagName : DC->getTags()) {
     tagName = tagName.trim();
     if (tagName.empty())
       continue;
@@ -1380,43 +1465,6 @@ bool IndexSwiftASTWalker::indexComment(const Decl *D) {
     }
   }
   return !Cancelled;
-}
-
-llvm::hash_code
-IndexSwiftASTWalker::hashFileReference(llvm::hash_code code,
-                                       SourceFileOrModule SFOrMod) {
-  StringRef Filename = SFOrMod.getFilename();
-  if (Filename.empty())
-    return code;
-
-  // FIXME: FileManager for swift ?
-
-  llvm::sys::fs::file_status Status;
-  if (std::error_code Ret = llvm::sys::fs::status(Filename, Status)) {
-    // Failure to read the file, just use filename to recover.
-    warn([&](llvm::raw_ostream &OS) {
-      OS << "failed to stat file: " << Filename << " (" << Ret.message() << ')';
-    });
-    return hash_combine(code, Filename);
-  }
-
-  // Don't use inode because it can easily change when you update the repository
-  // even though the file is supposed to be the same (same size/time).
-  code = hash_combine(code, Filename);
-  auto mtime = Status.getLastModificationTime().time_since_epoch().count();
-  return hash_combine(code, Status.getSize(), mtime);
-}
-
-llvm::hash_code IndexSwiftASTWalker::hashModule(llvm::hash_code code,
-                                                SourceFileOrModule SFOrMod) {
-  code = hashFileReference(code, SFOrMod);
-
-  SmallVector<ModuleDecl *, 16> Imports;
-  getRecursiveModuleImports(SFOrMod.getModule(), Imports);
-  for (auto Import : Imports)
-    code = hashFileReference(code, *Import);
-
-  return code;
 }
 
 void IndexSwiftASTWalker::getRecursiveModuleImports(
@@ -1458,6 +1506,7 @@ void IndexSwiftASTWalker::getRecursiveModuleImports(
             Info += "\"";
             break;
           case FileUnitKind::ClangModule:
+          case FileUnitKind::DWARFModule:
             Info += "clang module, file=\"";
             Info += cast<LoadedFile>(FU)->getFilename();
             Info += "\"";
@@ -1494,7 +1543,8 @@ void IndexSwiftASTWalker::collectRecursiveModuleImports(
   // need to hash the clang module.
   // FIXME: This is a bit of a hack.
   if (TopMod.getFiles().size() == 1)
-    if (TopMod.getFiles().front()->getKind() == FileUnitKind::ClangModule)
+    if (TopMod.getFiles().front()->getKind() == FileUnitKind::ClangModule ||
+        TopMod.getFiles().front()->getKind() == FileUnitKind::DWARFModule)
       return;
 
   auto It = ImportsMap.find(&TopMod);
@@ -1503,19 +1553,15 @@ void IndexSwiftASTWalker::collectRecursiveModuleImports(
     return;
   }
 
+  ModuleDecl::ImportFilter ImportFilter;
+  ImportFilter |= ModuleDecl::ImportFilterKind::Public;
+  ImportFilter |= ModuleDecl::ImportFilterKind::Private;
   SmallVector<ModuleDecl::ImportedModule, 8> Imports;
-  TopMod.getImportedModules(Imports, ModuleDecl::ImportFilter::All);
+  TopMod.getImportedModules(Imports);
 
   for (auto Import : Imports) {
     collectRecursiveModuleImports(*Import.second, Visited);
   }
-}
-
-void IndexSwiftASTWalker::getModuleHash(SourceFileOrModule Mod,
-                                        llvm::raw_ostream &OS) {
-  // FIXME: Use a longer hash string to minimize possibility for conflicts.
-  llvm::hash_code code = hashModule(0, Mod);
-  OS << llvm::APInt(64, code).toString(36, /*Signed=*/false);
 }
 
 static Type getContextFreeInterfaceType(ValueDecl *VD) {
@@ -1597,19 +1643,17 @@ void index::indexDeclContext(DeclContext *DC, IndexDataConsumer &consumer) {
   consumer.finish();
 }
 
-void index::indexSourceFile(SourceFile *SF, StringRef hash,
-                            IndexDataConsumer &consumer) {
+void index::indexSourceFile(SourceFile *SF, IndexDataConsumer &consumer) {
   assert(SF);
   unsigned bufferID = SF->getBufferID().getValue();
   IndexSwiftASTWalker walker(consumer, SF->getASTContext(), bufferID);
-  walker.visitModule(*SF->getParentModule(), hash);
+  walker.visitModule(*SF->getParentModule());
   consumer.finish();
 }
 
-void index::indexModule(ModuleDecl *module, StringRef hash,
-                        IndexDataConsumer &consumer) {
+void index::indexModule(ModuleDecl *module, IndexDataConsumer &consumer) {
   assert(module);
   IndexSwiftASTWalker walker(consumer, module->getASTContext());
-  walker.visitModule(*module, hash);
+  walker.visitModule(*module);
   consumer.finish();
 }

@@ -70,47 +70,64 @@ void OwnedFormalAccess::finishImpl(SILGenFunction &SGF) {
 
 FormalEvaluationScope::FormalEvaluationScope(SILGenFunction &SGF)
     : SGF(SGF), savedDepth(SGF.FormalEvalContext.stable_begin()),
-      wasInFormalEvaluationScope(SGF.InFormalEvaluationScope),
+      previous(SGF.FormalEvalContext.innermostScope),
       wasInInOutConversionScope(SGF.InInOutConversionScope) {
   if (wasInInOutConversionScope) {
     savedDepth.reset();
+    assert(isPopped());
     return;
   }
-  SGF.InFormalEvaluationScope = true;
+  SGF.FormalEvalContext.innermostScope = this;
 }
 
 FormalEvaluationScope::FormalEvaluationScope(FormalEvaluationScope &&o)
-    : SGF(o.SGF), savedDepth(o.savedDepth),
-      wasInFormalEvaluationScope(o.wasInFormalEvaluationScope),
+    : SGF(o.SGF), savedDepth(o.savedDepth), previous(o.previous),
       wasInInOutConversionScope(o.wasInInOutConversionScope) {
+
+  // Replace the scope in the active-scope chain if it's present.
+  if (!o.isPopped()) {
+    for (auto c = &SGF.FormalEvalContext.innermostScope; ; c = &(*c)->previous){
+      if (*c == &o) {
+        *c = this;
+        break;
+      }
+    }
+  }
+
   o.savedDepth.reset();
   assert(o.isPopped());
 }
 
 void FormalEvaluationScope::popImpl() {
-  // Pop the SGF.InFormalEvaluationScope bit.
-  SGF.InFormalEvaluationScope = wasInFormalEvaluationScope;
+  auto &context = SGF.FormalEvalContext;
+
+  // Remove the innermost scope from the chain.
+  assert(context.innermostScope == this &&
+         "popping formal-evaluation scopes out of order");
+  context.innermostScope = previous;
+
+  auto endDepth = *savedDepth;
 
   // Check to see if there is anything going on here.
-
-  auto &context = SGF.FormalEvalContext;
-  using iterator = FormalEvaluationContext::iterator;
-  using stable_iterator = FormalEvaluationContext::stable_iterator;
-
-  iterator unwrappedSavedDepth = context.find(savedDepth.getValue());
-  iterator iter = context.begin();
-  if (iter == unwrappedSavedDepth)
+  if (endDepth == context.stable_begin())
     return;
+
+#ifndef NDEBUG
+  // Verify that all the accesses are valid.
+  for (auto i = context.begin(), e = context.find(endDepth); i != e; ++i) {
+    i->verify(SGF);
+  }
+#endif
 
   // Save our start point to make sure that we are not adding any new cleanups
   // to the front of the stack.
-  stable_iterator originalBegin = context.stable_begin();
-  (void)originalBegin;
+  auto originalBegin = context.stable_begin();
 
   // Then working down the stack until we visit unwrappedSavedDepth...
-  for (; iter != unwrappedSavedDepth; ++iter) {
-    // Grab the next evaluation...
-    FormalAccess &access = *iter;
+  auto i = originalBegin;
+  do {
+    // Grab the next evaluation.
+    FormalAccess &access = context.findAndAdvance(i);
 
     // If this access was already finished, continue. This can happen if an
     // owned formal access was forwarded.
@@ -125,18 +142,19 @@ void FormalEvaluationScope::popImpl() {
     assert(!access.isFinished() && "Can not finish a formal access cleanup "
                                    "twice");
 
-    // and deactivate the cleanup. This will set the isFinished bit for owned
-    // FormalAccess.
+    // Set the finished bit to appease various invariants.
+    access.setFinished();
+
+    // Deactivate the cleanup.
     SGF.Cleanups.setCleanupState(access.getCleanup(), CleanupState::Dead);
 
     // Attempt to diagnose problems where obvious aliasing introduces illegal
     // code. We do a simple N^2 comparison here to detect this because it is
     // extremely unlikely more than a few writebacks are active at once.
     if (access.getKind() == FormalAccess::Exclusive) {
-      iterator j = iter;
-      ++j;
-
-      for (; j != unwrappedSavedDepth; ++j) {
+      // Note that we already advanced 'iter' above, so we can just start
+      // iterating from there.  Also, this doesn't invalidate the iterators.
+      for (auto j = context.find(i), je = context.find(endDepth); j != je; ++j){
         FormalAccess &other = *j;
         if (other.getKind() != FormalAccess::Exclusive)
           continue;
@@ -151,33 +169,25 @@ void FormalEvaluationScope::popImpl() {
     //
     // This evaluates arbitrary code, so it's best to be paranoid
     // about iterators on the context.
-    access.finish(SGF);
-  }
+    DiverseValueBuffer<FormalAccess> copiedAccess(access);
+    copiedAccess.getCopy().finish(SGF);
+
+  } while (i != endDepth);
 
   // Then check that we did not add any additional cleanups to the beginning of
   // the stack...
   assert(originalBegin == context.stable_begin() &&
-         "more formal eval cleanups placed onto context during formal eval scope pop?!");
+         "pushed more formal evaluations while popping formal evaluations?!");
 
   // And then pop off all stack elements until we reach the savedDepth.
-  context.pop(savedDepth.getValue());
+  context.pop(endDepth);
 }
 
 void FormalEvaluationScope::verify() const {
-  // Check to see if there is anything going on here.
+  // Walk up the stack to the saved depth.
   auto &context = SGF.FormalEvalContext;
-  using iterator = FormalEvaluationContext::iterator;
-
-  iterator unwrappedSavedDepth = context.find(savedDepth.getValue());
-  iterator iter = context.begin();
-  if (iter == unwrappedSavedDepth)
-    return;
-
-  // Then working down the stack until we visit unwrappedSavedDepth...
-  for (; iter != unwrappedSavedDepth; ++iter) {
-    // Grab the next evaluation verify that we can successfully access this
-    // formal access.
-    (*iter).verify(SGF);
+  for (auto i = context.begin(), e = context.find(*savedDepth); i != e; ++i) {
+    i->verify(SGF);
   }
 }
 

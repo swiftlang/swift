@@ -128,7 +128,8 @@ extension _ArrayBufferProtocol where Indices == Range<Int>{
 
   // Make sure the compiler does not inline _copyBuffer to reduce code size.
   @inline(never)
-  @usableFromInline
+  @inlinable // This code should be specializable such that copying an array is
+             // fast and does not end up in an unspecialized entry point.
   internal init(copying buffer: Self) {
     let newBuffer = _ContiguousArrayBuffer<Element>(
       _uninitializedCount: buffer.count, minimumCapacity: buffer.count)
@@ -144,7 +145,7 @@ extension _ArrayBufferProtocol where Indices == Range<Int>{
     with newCount: Int,
     elementsOf newValues: __owned C
   ) where C : Collection, C.Element == Element {
-    _sanityCheck(startIndex == 0, "_SliceBuffer should override this function.")
+    _internalInvariant(startIndex == 0, "_SliceBuffer should override this function.")
     let oldCount = self.count
     let eraseCount = subrange.count
 

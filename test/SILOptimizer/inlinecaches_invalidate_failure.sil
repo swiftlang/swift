@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -inline -specdevirt -code-sinking  -sil-verify-without-invalidation
+// RUN: %target-sil-opt -enable-sil-verify-all %s -inline -specdevirt -code-sinking  -sil-verify-without-invalidation
 
 sil_stage canonical
 

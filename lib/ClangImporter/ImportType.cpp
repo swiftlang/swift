@@ -23,6 +23,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
@@ -70,10 +71,8 @@ namespace {
       /// The source type is 'void'.
       Void,
 
-      /// The source type is 'BOOL'.
-      BOOL,
-
-      /// The source type is 'Boolean'.
+      /// The source type is 'BOOL' or 'Boolean' -- a type mapped to Swift's
+      /// 'Bool'.
       Boolean,
 
       /// The source type is an Objective-C class type bridged to a Swift
@@ -128,7 +127,6 @@ namespace {
     // See also ClangImporter.cpp's canImportAsOptional.
     switch (hint) {
     case ImportHint::None:
-    case ImportHint::BOOL:
     case ImportHint::Boolean:
     case ImportHint::NSUInteger:
     case ImportHint::Void:
@@ -198,7 +196,7 @@ namespace {
 #define TYPE(Class, Base)
 #include "clang/AST/TypeNodes.def"
     
-    // Given a loaded type like CInt, look through the name alias sugar that the
+    // Given a loaded type like CInt, look through the type alias sugar that the
     // stdlib uses to show the underlying type.  We want to import the signature
     // of the exit(3) libc function as "func exit(Int32)", not as
     // "func exit(CInt)".
@@ -206,7 +204,7 @@ namespace {
       // Handle missing or invalid stdlib declarations
       if (!T || T->hasError())
         return Type();
-      if (auto *NAT = dyn_cast<NameAliasType>(T.getPointer()))
+      if (auto *NAT = dyn_cast<TypeAliasType>(T.getPointer()))
         return NAT->getSinglyDesugaredType();
       return T;
     }
@@ -314,6 +312,18 @@ namespace {
       case clang::BuiltinType::OCLClkEvent:
       case clang::BuiltinType::OCLQueue:
       case clang::BuiltinType::OCLReserveID:
+      case clang::BuiltinType::OCLIntelSubgroupAVCMcePayload:
+      case clang::BuiltinType::OCLIntelSubgroupAVCImePayload:
+      case clang::BuiltinType::OCLIntelSubgroupAVCRefPayload:
+      case clang::BuiltinType::OCLIntelSubgroupAVCSicPayload:
+      case clang::BuiltinType::OCLIntelSubgroupAVCMceResult:
+      case clang::BuiltinType::OCLIntelSubgroupAVCImeResult:
+      case clang::BuiltinType::OCLIntelSubgroupAVCRefResult:
+      case clang::BuiltinType::OCLIntelSubgroupAVCSicResult:
+      case clang::BuiltinType::OCLIntelSubgroupAVCImeResultSingleRefStreamout:
+      case clang::BuiltinType::OCLIntelSubgroupAVCImeResultDualRefStreamout:
+      case clang::BuiltinType::OCLIntelSubgroupAVCImeSingleRefStreamin:
+      case clang::BuiltinType::OCLIntelSubgroupAVCImeDualRefStreamin:
         return Type();
 
       // OpenMP types that don't have Swift equivalents.
@@ -480,46 +490,54 @@ namespace {
           Bridgeability::None);
       if (!elementType)
         return Type();
+
+      auto size = type->getSize().getZExtValue();
+      // An array of size N is imported as an N-element tuple which
+      // takes very long to compile. We chose 4096 as the upper limit because
+      // we don't want to break arrays of size PATH_MAX. 
+      if (size > 4096)
+        return Type();
       
       TupleTypeElt elt(elementType);
       SmallVector<TupleTypeElt, 8> elts;
-      for (size_t i = 0, size = type->getSize().getZExtValue(); i < size; ++i)
+      for (size_t i = 0; i < size; ++i)
         elts.push_back(elt);
       
       return TupleType::get(elts, elementType->getASTContext());
     }
 
     ImportResult VisitVectorType(const clang::VectorType *type) {
-      auto *SIMD = Impl.tryLoadSIMDModule();
-      if (!SIMD)
-        return Type();
-      
-      // Map the element type and count to a Swift name, such as
-      // float x 3 => Float3.
-      SmallString<16> name;
-      {
-        llvm::raw_svector_ostream names(name);
-        
-        if (auto builtinTy
-              = dyn_cast<clang::BuiltinType>(type->getElementType())){
-          switch (builtinTy->getKind()) {
-#define MAP_SIMD_TYPE(TYPE_NAME, __, BUILTIN_KIND)   \
-          case clang::BuiltinType::BUILTIN_KIND: \
-            names << #TYPE_NAME;                 \
-            break;
-#include "swift/ClangImporter/SIMDMappedTypes.def"
-          default:
-            // A vector type we don't know how to map.
-            return Type();
+      // Get the imported element type and count.
+      Type element = Impl.importTypeIgnoreIUO(
+        type->getElementType(), ImportTypeKind::Abstract,
+        false /* No NSUIntegerAsInt */, Bridgeability::None,
+        OptionalTypeKind::OTK_None);
+      if (!element) { return Type(); }
+      unsigned count = type->getNumElements();
+      // Import vector-of-one as the element type.
+      if (count == 1) { return element; }
+      // Imported element type needs to conform to SIMDScalar.
+      auto nominal = element->getAnyNominal();
+      auto simdscalar = Impl.SwiftContext.getProtocol(KnownProtocolKind::SIMDScalar);
+      SmallVector<ProtocolConformance *, 2> conformances;
+      if (simdscalar && nominal->lookupConformance(nominal->getParentModule(),
+                                                   simdscalar, conformances)) {
+        // Element type conforms to SIMDScalar. Get the SIMDn generic type
+        // if it exists.
+        SmallString<8> name("SIMD");
+        name.append(std::to_string(count));
+        if (auto vector = Impl.getNamedSwiftType(Impl.getStdlibModule(), name)) {
+          if (auto unbound = vector->getAs<UnboundGenericType>()) {
+            // All checks passed: the imported element type is SIMDScalar,
+            // and a generic SIMDn type exists with n == count. Construct the
+            // bound generic type and return that.
+            return BoundGenericType::get(
+              cast<NominalTypeDecl>(unbound->getDecl()), Type(), { element }
+            );
           }
-        } else {
-          return Type();
         }
-        
-        names << type->getNumElements();
       }
-      
-      return Impl.getNamedSwiftType(SIMD, name);
+      return Type();
     }
 
     ImportResult VisitFunctionProtoType(const clang::FunctionProtoType *type) {
@@ -646,24 +664,40 @@ namespace {
       if (!decl) return Visit(type->desugar());
 
       Type mappedType = getAdjustedTypeDeclReferenceType(decl);
-      ImportHint hint = ImportHint::None;
 
       if (getSwiftNewtypeAttr(type->getDecl(), Impl.CurrentVersion)) {
         if (isCFTypeDecl(type->getDecl())) {
-          hint = ImportHint::SwiftNewtypeFromCFPointer;
-        } else {
-          // If the underlying type was bridged, the wrapper type is
-          // only useful in bridged cases.
-          auto underlying = Visit(type->getDecl()->getUnderlyingType());
-          if (underlying.Hint == ImportHint::ObjCBridged) {
-            return { underlying.AbstractType,
-                     ImportHint(ImportHint::ObjCBridged, mappedType) };
-          }
-          hint = underlying.Hint;
+          return {mappedType, ImportHint::SwiftNewtypeFromCFPointer};
         }
 
+        auto underlying = Visit(type->getDecl()->getUnderlyingType());
+        switch (underlying.Hint) {
+        case ImportHint::None:
+        case ImportHint::Void:
+        case ImportHint::Block:
+        case ImportHint::CFPointer:
+        case ImportHint::ObjCPointer:
+        case ImportHint::CFunctionPointer:
+        case ImportHint::OtherPointer:
+        case ImportHint::SwiftNewtypeFromCFPointer:
+          return {mappedType, underlying.Hint};
+
+        case ImportHint::Boolean:
+        case ImportHint::NSUInteger:
+          // Toss out the special rules for these types; we still want to
+          // import as a wrapper.
+          return {mappedType, ImportHint::None};
+
+        case ImportHint::ObjCBridged:
+          // If the underlying type was bridged, the wrapper type is
+          // only useful in bridged cases. Exit early.
+          return { underlying.AbstractType,
+                   ImportHint(ImportHint::ObjCBridged, mappedType) };
+        }
+      }
+
       // For certain special typedefs, we don't want to use the imported type.
-      } else if (auto specialKind = Impl.getSpecialTypedefKind(type->getDecl())) {
+      if (auto specialKind = Impl.getSpecialTypedefKind(type->getDecl())) {
         switch (specialKind.getValue()) {
         case MappedTypeNameKind::DoNothing:
         case MappedTypeNameKind::DefineAndUse:
@@ -675,8 +709,9 @@ namespace {
           break;
         }
 
+        ImportHint hint = ImportHint::None;
         if (type->getDecl()->getName() == "BOOL") {
-          hint = ImportHint::BOOL;
+          hint = ImportHint::Boolean;
         } else if (type->getDecl()->getName() == "Boolean") {
           // FIXME: Darwin only?
           hint = ImportHint::Boolean;
@@ -690,64 +725,62 @@ namespace {
           hint = ImportHint::OtherPointer;
         }
         // Any other interesting mapped types should be hinted here.
+        return { mappedType, hint };
+      }
 
       // Otherwise, recurse on the underlying type.  We need to recompute
       // the hint, and if the typedef uses different bridgeability than the
       // context then we may also need to bypass the typedef.
-      } else {
-        auto underlyingType = type->desugar();
+      auto underlyingType = type->desugar();
 
-        // Figure out the bridgeability we would normally use for this typedef.
-        auto typedefBridgeability =
+      // Figure out the bridgeability we would normally use for this typedef.
+      auto typedefBridgeability =
           getTypedefBridgeability(type->getDecl(), underlyingType);
 
-        // Figure out the typedef we should actually use.
-        auto underlyingBridgeability = Bridging;
-        SwiftTypeConverter innerConverter(Impl, AllowNSUIntegerAsInt,
-                                          underlyingBridgeability);
-        auto underlyingResult = innerConverter.Visit(underlyingType);
+      // Figure out the typedef we should actually use.
+      auto underlyingBridgeability = Bridging;
+      SwiftTypeConverter innerConverter(Impl, AllowNSUIntegerAsInt,
+                                        underlyingBridgeability);
+      auto underlyingResult = innerConverter.Visit(underlyingType);
 
-        // If we used different bridgeability than this typedef normally
-        // would because we're in a non-bridgeable context, and therefore
-        // the underlying type is different from the mapping of the typedef,
-        // use the underlying type.
-        if (underlyingBridgeability != typedefBridgeability &&
-            !underlyingResult.AbstractType->isEqual(mappedType)) {
-          return underlyingResult;
-        }
-
-#ifndef NDEBUG
-        switch (underlyingResult.Hint) {
-        case ImportHint::Block:
-        case ImportHint::ObjCBridged:
-          // Bridging is fine for Objective-C and blocks.
-          break;
-        case ImportHint::NSUInteger:
-          // NSUInteger might be imported as Int rather than UInt depending
-          // on where the import lives.
-          if (underlyingResult.AbstractType->getAnyNominal() ==
-              Impl.SwiftContext.getIntDecl())
-            break;
-          LLVM_FALLTHROUGH;
-        default:
-          if (!underlyingResult.AbstractType->isEqual(mappedType)) {
-            underlyingResult.AbstractType->dump();
-            mappedType->dump();
-          }
-          assert(underlyingResult.AbstractType->isEqual(mappedType) &&
-                 "typedef without special typedef kind was mapped "
-                 "differently from its underlying type?");
-        }
-#endif
-        hint = underlyingResult.Hint;
-
-        // If the imported typealias is unavailable, return the
-        // underlying type.
-        if (decl->getAttrs().isUnavailable(Impl.SwiftContext))
-          mappedType = underlyingResult.AbstractType;
+      // If we used different bridgeability than this typedef normally
+      // would because we're in a non-bridgeable context, and therefore
+      // the underlying type is different from the mapping of the typedef,
+      // use the underlying type.
+      if (underlyingBridgeability != typedefBridgeability &&
+          !underlyingResult.AbstractType->isEqual(mappedType)) {
+        return underlyingResult;
       }
 
-      return { mappedType, hint };
+#ifndef NDEBUG
+      switch (underlyingResult.Hint) {
+      case ImportHint::Block:
+      case ImportHint::ObjCBridged:
+        // Bridging is fine for Objective-C and blocks.
+        break;
+      case ImportHint::NSUInteger:
+        // NSUInteger might be imported as Int rather than UInt depending
+        // on where the import lives.
+        if (underlyingResult.AbstractType->getAnyNominal() ==
+            Impl.SwiftContext.getIntDecl())
+          break;
+        LLVM_FALLTHROUGH;
+      default:
+        if (!underlyingResult.AbstractType->isEqual(mappedType)) {
+          underlyingResult.AbstractType->dump();
+          mappedType->dump();
+        }
+        assert(underlyingResult.AbstractType->isEqual(mappedType) &&
+               "typedef without special typedef kind was mapped "
+               "differently from its underlying type?");
+      }
+#endif
+
+      // If the imported typealias is unavailable, return the underlying type.
+      if (decl->getAttrs().isUnavailable(Impl.SwiftContext))
+        return underlyingResult;
+
+      return { mappedType, underlyingResult.Hint };
     }
 
 #define SUGAR_TYPE(KIND)                                            \
@@ -1344,8 +1377,8 @@ static ImportedType adjustTypeForConcreteImport(
 
   // Turn BOOL and DarwinBoolean into Bool in contexts that can bridge types
   // losslessly.
-  if ((hint == ImportHint::BOOL || hint == ImportHint::Boolean) &&
-      bridging == Bridgeability::Full && canBridgeTypes(importKind)) {
+  if (hint == ImportHint::Boolean && bridging == Bridgeability::Full &&
+      canBridgeTypes(importKind)) {
     return {impl.SwiftContext.getBoolDecl()->getDeclaredType(), false};
   }
 
@@ -1445,7 +1478,7 @@ ImportedType ClangImporter::Implementation::importType(
   // This bans some trickery that the redefinition types enable, but is a more
   // sane model overall.
   auto &clangContext = getClangASTContext();
-  if (clangContext.getLangOpts().ObjC1) {
+  if (clangContext.getLangOpts().ObjC) {
     if (clangContext.hasSameUnqualifiedType(
           type, clangContext.getObjCIdRedefinitionType()) &&
         !clangContext.hasSameUnqualifiedType(
@@ -2306,11 +2339,6 @@ ModuleDecl *ClangImporter::Implementation::tryLoadFoundationModule() {
                        ImportForwardDeclarations, checkedModules);
 }
 
-ModuleDecl *ClangImporter::Implementation::tryLoadSIMDModule() {
-  return tryLoadModule(SwiftContext, SwiftContext.Id_simd,
-                       ImportForwardDeclarations, checkedModules);
-}
-
 Type ClangImporter::Implementation::getNamedSwiftType(ModuleDecl *module,
                                                       StringRef name) {
   if (!module)
@@ -2326,7 +2354,7 @@ Type ClangImporter::Implementation::getNamedSwiftType(ModuleDecl *module,
     if (auto clangUnit = dyn_cast<ClangModuleUnit>(file)) {
       // If we have an overlay, look in the overlay. Otherwise, skip
       // the lookup to avoid infinite recursion.
-      if (auto module = clangUnit->getAdapterModule())
+      if (auto module = clangUnit->getOverlayModule())
         module->lookupValue({ }, identifier,
                           NLKind::UnqualifiedLookup, results);
     } else {
@@ -2435,13 +2463,21 @@ bool ClangImporter::Implementation::matchesHashableBound(Type type) {
   // Match generic parameters against their bounds.
   if (auto *genericTy = type->getAs<GenericTypeParamType>()) {
     if (auto *generic = genericTy->getDecl()) {
-      type = generic->getSuperclass();
-      if (!type)
-        return false;
+      auto genericSig =
+        generic->getDeclContext()->getGenericSignatureOfContext();
+      if (genericSig && genericSig->getConformsTo(type).empty()) {
+        type = genericSig->getSuperclassBound(type);
+        if (!type)
+          return false;
+      }
     }
   }
 
-  // Class type or existential that inherits from NSObject.
+  // Existentials cannot match the Hashable bound.
+  if (type->isAnyExistentialType())
+    return false;
+
+  // Class type that inherits from NSObject.
   if (NSObjectType->isExactSuperclassOf(type))
     return true;
 
@@ -2496,7 +2532,7 @@ Type ClangImporter::Implementation::getSugaredTypeReference(TypeDecl *type) {
         parentType = nominal->getDeclaredInterfaceType();
     }
 
-    return NameAliasType::get(typealias, parentType, SubstitutionMap(),
+    return TypeAliasType::get(typealias, parentType, SubstitutionMap(),
                               typealias->getUnderlyingTypeLoc().getType());
   }
 

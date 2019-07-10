@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-module %S/Inputs/local_types_helper.swift -o %t
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -enable-objc-interop -emit-ir -parse-as-library %s -I %t | %FileCheck -check-prefix CHECK -check-prefix NEGATIVE %s
+// RUN: %target-swift-frontend -emit-module %S/Inputs/local_types_helper.swift -o %t
+// RUN: %target-swift-frontend -enable-objc-interop -emit-ir -parse-as-library %s -I %t | %FileCheck -check-prefix CHECK -check-prefix NEGATIVE %s
 
 import local_types_helper
 

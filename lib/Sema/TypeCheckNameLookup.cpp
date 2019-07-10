@@ -90,7 +90,7 @@ namespace {
                         bool isMemberLookup)
       : Result(result), DC(dc), Options(options),
         IsMemberLookup(isMemberLookup) {
-      if (!dc->getASTContext().LangOpts.EnableAccessControl)
+      if (dc->getASTContext().isAccessControlDisabled())
         Options |= NameLookupFlags::IgnoreAccessControl;
     }
 
@@ -231,11 +231,9 @@ namespace {
 
       // Dig out the protocol conformance.
       auto *foundProto = cast<ProtocolDecl>(foundDC);
-      auto resolver = DC->getASTContext().getLazyResolver();
-      assert(resolver && "Need an active resolver");
-      auto &tc = *static_cast<TypeChecker *>(resolver);
-      auto conformance = tc.conformsToProtocol(conformingType, foundProto, DC,
-                                               conformanceOptions);
+      auto conformance = TypeChecker::conformsToProtocol(conformingType,
+                                                         foundProto, DC,
+                                                         conformanceOptions);
       if (!conformance) {
         // If there's no conformance, we have an existential
         // and we found a member from one of the protocols, and
@@ -257,10 +255,10 @@ namespace {
       ValueDecl *witness = nullptr;
       auto concrete = conformance->getConcrete();
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(found)) {
-        witness = concrete->getTypeWitnessAndDecl(assocType, nullptr)
+        witness = concrete->getTypeWitnessAndDecl(assocType)
           .second;
       } else if (found->isProtocolRequirement()) {
-        witness = concrete->getWitnessDecl(found, nullptr);
+        witness = concrete->getWitnessDecl(found);
 
         // It is possible that a requirement is visible to us, but
         // not the witness. In this case, just return the requirement;
@@ -553,11 +551,12 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
           ProtocolConformanceState::CheckingTypeWitnesses)
         continue;
 
-      auto lazyResolver = dc->getASTContext().getLazyResolver();
       auto typeDecl =
-        concrete->getTypeWitnessAndDecl(assocType, lazyResolver).second;
+        concrete->getTypeWitnessAndDecl(assocType).second;
 
-      assert(typeDecl && "Missing type witness?");
+      // Circularity.
+      if (!typeDecl)
+        continue;
 
       auto memberType =
           substMemberTypeWithBase(dc->getParentModule(), typeDecl, type);
@@ -574,18 +573,9 @@ LookupResult TypeChecker::lookupConstructors(DeclContext *dc, Type type,
   return lookupMember(dc, type, DeclBaseName::createConstructor(), options);
 }
 
-enum : unsigned {
-  /// Never consider a candidate that's this distance away or worse.
-  UnreasonableCallEditDistance = 8,
-
-  /// Don't consider candidates that score worse than the given distance
-  /// from the best candidate.
-  MaxCallEditDistanceFromBestCandidate = 1
-};
-
-static unsigned getCallEditDistance(DeclName writtenName,
-                                    DeclName correctedName,
-                                    unsigned maxEditDistance) {
+unsigned TypeChecker::getCallEditDistance(DeclName writtenName,
+                                          DeclName correctedName,
+                                          unsigned maxEditDistance) {
   // TODO: consider arguments.
   // TODO: maybe ignore certain kinds of missing / present labels for the
   //   first argument label?
@@ -601,6 +591,12 @@ static unsigned getCallEditDistance(DeclName writtenName,
 
   StringRef writtenBase = writtenName.getBaseName().userFacingName();
   StringRef correctedBase = correctedName.getBaseName().userFacingName();
+
+  // Don't typo-correct to a name with a leading underscore unless the typed
+  // name also begins with an underscore.
+  if (correctedBase.startswith("_") && !writtenBase.startswith("_")) {
+    return UnreasonableCallEditDistance;
+  }
 
   unsigned distance = writtenBase.edit_distance(correctedBase, maxEditDistance);
 
@@ -631,15 +627,6 @@ static bool isPlausibleTypo(DeclRefKind refKind, DeclName typedName,
   return true;
 }
 
-static bool isLocInVarInit(TypeChecker &TC, VarDecl *var, SourceLoc loc) {
-  auto binding = var->getParentPatternBinding();
-  if (!binding || binding->isImplicit())
-    return false;
-
-  auto initRange = binding->getSourceRange();
-  return TC.Context.SourceMgr.rangeContainsTokenLoc(initRange, loc);
-}
-
 void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
                                         Type baseTypeOrNull,
                                         NameLookupOptions lookupOptions,
@@ -663,12 +650,6 @@ void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
     // not a plausible typo.
     if (!isPlausibleTypo(refKind, corrections.WrittenName, decl))
       return;
-
-    // Don't suggest a variable within its own initializer.
-    if (auto var = dyn_cast<VarDecl>(decl)) {
-      if (isLocInVarInit(*this, var, corrections.Loc.getBaseNameLoc()))
-        return;
-    }
 
     auto candidateName = decl->getFullName();
 

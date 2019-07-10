@@ -1,17 +1,17 @@
 
-// RUN: %target-swift-emit-silgen -module-name reabstract_lvalue -enable-sil-ownership %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name reabstract_lvalue %s | %FileCheck %s
 
 struct MyMetatypeIsThin {}
 
-// CHECK-LABEL: sil hidden @$s17reabstract_lvalue19consumeGenericInOut{{[_0-9a-zA-Z]*}}F : $@convention(thin) <T> (@inout T) -> ()
+// CHECK-LABEL: sil hidden [ossa] @$s17reabstract_lvalue19consumeGenericInOut{{[_0-9a-zA-Z]*}}F : $@convention(thin) <T> (@inout T) -> ()
 func consumeGenericInOut<T>(_ x: inout T) {}
 
-// CHECK-LABEL: sil hidden @$s17reabstract_lvalue9transformySdSiF : $@convention(thin) (Int) -> Double
+// CHECK-LABEL: sil hidden [ossa] @$s17reabstract_lvalue9transformySdSiF : $@convention(thin) (Int) -> Double
 func transform(_ i: Int) -> Double {
   return Double(i)
 }
 
-// CHECK-LABEL: sil hidden @$s17reabstract_lvalue0A13FunctionInOutyyF : $@convention(thin) () -> ()
+// CHECK-LABEL: sil hidden [ossa] @$s17reabstract_lvalue0A13FunctionInOutyyF : $@convention(thin) () -> ()
 func reabstractFunctionInOut() {
   // CHECK: [[BOX:%.*]] = alloc_box ${ var @callee_guaranteed (Int) -> Double }
   // CHECK: [[PB:%.*]] = project_box [[BOX]]
@@ -33,10 +33,10 @@ func reabstractFunctionInOut() {
   consumeGenericInOut(&minimallyAbstracted)
 }
 
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$sSiSdIegyd_SiSdIegnr_TR : $@convention(thin) (@in_guaranteed Int, @guaranteed @callee_guaranteed (Int) -> Double) -> @out Double
-// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] @$sSiSdIegnr_SiSdIegyd_TR : $@convention(thin) (Int, @guaranteed @callee_guaranteed (@in_guaranteed Int) -> @out Double) -> Double
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$sSiSdIegyd_SiSdIegnr_TR : $@convention(thin) (@in_guaranteed Int, @guaranteed @callee_guaranteed (Int) -> Double) -> @out Double
+// CHECK-LABEL: sil shared [transparent] [serializable] [reabstraction_thunk] [ossa] @$sSiSdIegnr_SiSdIegyd_TR : $@convention(thin) (Int, @guaranteed @callee_guaranteed (@in_guaranteed Int) -> @out Double) -> Double
 
-// CHECK-LABEL: sil hidden @$s17reabstract_lvalue0A13MetatypeInOutyyF : $@convention(thin) () -> ()
+// CHECK-LABEL: sil hidden [ossa] @$s17reabstract_lvalue0A13MetatypeInOutyyF : $@convention(thin) () -> ()
 func reabstractMetatypeInOut() {
   var thinMetatype = MyMetatypeIsThin.self
   // CHECK: [[BOX:%.*]] = alloc_stack $@thick MyMetatypeIsThin.Type

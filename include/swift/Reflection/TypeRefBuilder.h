@@ -29,8 +29,6 @@
 #include <vector>
 #include <unordered_map>
 
-class NodePointer;
-
 namespace swift {
 namespace reflection {
 
@@ -84,36 +82,36 @@ using GenericSection = ReflectionSection<const void *>;
 struct ReflectionInfo {
   struct {
     FieldSection Metadata;
-    uintptr_t SectionOffset;
+    uint64_t SectionOffset;
   } Field;
 
   struct {
     AssociatedTypeSection Metadata;
-    uintptr_t SectionOffset;
+    uint64_t SectionOffset;
   } AssociatedType;
 
   struct {
     BuiltinTypeSection Metadata;
-    uintptr_t SectionOffset;
+    uint64_t SectionOffset;
   } Builtin;
 
   struct {
     CaptureSection Metadata;
-    uintptr_t SectionOffset;
+    uint64_t SectionOffset;
   } Capture;
 
   struct {
     GenericSection Metadata;
-    uintptr_t SectionOffset;
+    uint64_t SectionOffset;
   } TypeReference;
 
   struct {
     GenericSection Metadata;
-    uintptr_t SectionOffset;
+    uint64_t SectionOffset;
   } ReflectionString;
 
-  uintptr_t LocalStartAddress;
-  uintptr_t RemoteStartAddress;
+  uint64_t LocalStartAddress;
+  uint64_t RemoteStartAddress;
 };
 
 struct ClosureContextInfo {
@@ -159,8 +157,8 @@ class TypeRefBuilder {
 
 public:
   using BuiltType = const TypeRef *;
-  using BuiltNominalTypeDecl = Optional<std::string>;
-  using BuiltProtocolDecl = Optional<std::string>;
+  using BuiltTypeDecl = Optional<std::string>;
+  using BuiltProtocolDecl = Optional<std::pair<std::string, bool /*isObjC*/>>;
 
   TypeRefBuilder();
 
@@ -170,6 +168,9 @@ public:
 private:
   Demangle::Demangler Dem;
 
+  std::function<const TypeRef* (const void*, unsigned)>
+    OpaqueUnderlyingTypeReader;
+  
   /// Makes sure dynamically allocated TypeRefs stick around for the life of
   /// this TypeRefBuilder and are automatically released.
   std::vector<std::unique_ptr<const TypeRef>> TypeRefPool;
@@ -205,21 +206,28 @@ public:
   /// Factory methods for all TypeRef kinds
   ///
 
-  const BuiltinTypeRef *createBuiltinType(const std::string &mangledName) {
+  const BuiltinTypeRef *createBuiltinType(const std::string &builtinName,
+                                          const std::string &mangledName) {
     return BuiltinTypeRef::create(*this, mangledName);
   }
 
   Optional<std::string>
-  createNominalTypeDecl(const Demangle::NodePointer &node) {
+  createTypeDecl(Node *node, bool &typeAlias) {
     return Demangle::mangleNode(node);
   }
 
-  Optional<std::string>
-  createProtocolDecl(const Demangle::NodePointer &node) {
-    return Demangle::mangleNode(node);
+  BuiltProtocolDecl
+  createProtocolDecl(Node *node) {
+    return std::make_pair(Demangle::mangleNode(node), false);
   }
 
-  Optional<std::string> createNominalTypeDecl(std::string &&mangledName) {
+  BuiltProtocolDecl
+  createObjCProtocolDecl(std::string &&name) {
+    return std::make_pair(name, true);
+  }
+
+  Optional<std::string> createTypeDecl(std::string &&mangledName,
+                                       bool &typeAlias) {
     return std::move(mangledName);
   }
   
@@ -234,6 +242,33 @@ public:
     return NominalTypeRef::create(*this, *mangledName, parent);
   }
 
+  const TypeRef *createTypeAliasType(
+                                    const Optional<std::string> &mangledName,
+                                    const TypeRef *parent) {
+    // TypeRefs don't contain sugared types
+    return nullptr;
+  }
+
+  const TypeRef *createOptionalType(const TypeRef *base) {
+    // TypeRefs don't contain sugared types
+    return nullptr;
+  }
+
+  const TypeRef *createArrayType(const TypeRef *base) {
+    // TypeRefs don't contain sugared types
+    return nullptr;
+  }
+
+  const TypeRef *createDictionaryType(const TypeRef *key, const TypeRef *value) {
+    // TypeRefs don't contain sugared types
+    return nullptr;
+  }
+
+  const TypeRef *createParenType(const TypeRef *base) {
+    // TypeRefs don't contain sugared types
+    return nullptr;
+  }
+
   const BoundGenericTypeRef *
   createBoundGenericType(const Optional<std::string> &mangledName,
                          const std::vector<const TypeRef *> &args) {
@@ -242,13 +277,45 @@ public:
 
   const BoundGenericTypeRef *
   createBoundGenericType(const Optional<std::string> &mangledName,
-                         const std::vector<const TypeRef *> &args,
+                         ArrayRef<const TypeRef *> args,
                          const TypeRef *parent) {
     return BoundGenericTypeRef::create(*this, *mangledName, args, parent);
   }
+  
+  const TypeRef *
+  resolveOpaqueType(NodePointer opaqueDescriptor,
+                    ArrayRef<ArrayRef<const TypeRef *>> genericArgs,
+                    unsigned ordinal) {
+    // TODO: Produce a type ref for the opaque type if the underlying type isn't
+    // available.
+    
+    // Try to resolve to the underlying type, if we can.
+    if (opaqueDescriptor->getKind() ==
+                            Node::Kind::OpaqueTypeDescriptorSymbolicReference) {
+      if (!OpaqueUnderlyingTypeReader)
+        return nullptr;
+      
+      auto underlyingTy = OpaqueUnderlyingTypeReader(
+                           (const void *)opaqueDescriptor->getIndex(), ordinal);
+      
+      if (!underlyingTy)
+        return nullptr;
+      
+      GenericArgumentMap subs;
+      for (unsigned d = 0, de = genericArgs.size(); d < de; ++d) {
+        auto argsForDepth = genericArgs[d];
+        for (unsigned i = 0, ie = argsForDepth.size(); i < ie; ++i) {
+          subs.insert({{d, i}, argsForDepth[i]});
+        }
+      }
+      
+      return underlyingTy->subst(*this, subs);
+    }
+    return nullptr;
+  }
 
   const TupleTypeRef *
-  createTupleType(const std::vector<const TypeRef *> &elements,
+  createTupleType(ArrayRef<const TypeRef *> elements,
                   std::string &&labels, bool isVariadic) {
     // FIXME: Add uniqueness checks in TupleTypeRef::Profile and
     // unittests/Reflection/TypeRef.cpp if using labels for identity.
@@ -256,18 +323,57 @@ public:
   }
 
   const FunctionTypeRef *createFunctionType(
-      const std::vector<remote::FunctionParam<const TypeRef *>> &params,
+      ArrayRef<remote::FunctionParam<const TypeRef *>> params,
       const TypeRef *result, FunctionTypeFlags flags) {
     return FunctionTypeRef::create(*this, params, result, flags);
+  }
+
+  const FunctionTypeRef *createImplFunctionType(
+    Demangle::ImplParameterConvention calleeConvention,
+    ArrayRef<Demangle::ImplFunctionParam<const TypeRef *>> params,
+    ArrayRef<Demangle::ImplFunctionResult<const TypeRef *>> results,
+    Optional<Demangle::ImplFunctionResult<const TypeRef *>> errorResult,
+    ImplFunctionTypeFlags flags) {
+    // Minimal support for lowered function types. These come up in
+    // reflection as capture types. For the reflection library's
+    // purposes, the only part that matters is the convention.
+    FunctionTypeFlags funcFlags;
+    switch (flags.getRepresentation()) {
+    case Demangle::ImplFunctionRepresentation::Thick:
+    case Demangle::ImplFunctionRepresentation::Closure:
+      funcFlags = funcFlags.withConvention(FunctionMetadataConvention::Swift);
+      break;
+    case Demangle::ImplFunctionRepresentation::Thin:
+    case Demangle::ImplFunctionRepresentation::Method:
+    case Demangle::ImplFunctionRepresentation::ObjCMethod:
+    case Demangle::ImplFunctionRepresentation::WitnessMethod:
+      funcFlags = funcFlags.withConvention(FunctionMetadataConvention::Thin);
+      break;
+    case Demangle::ImplFunctionRepresentation::CFunctionPointer:
+      funcFlags = funcFlags.withConvention(FunctionMetadataConvention::CFunctionPointer);
+      break;
+    case Demangle::ImplFunctionRepresentation::Block:
+      funcFlags = funcFlags.withConvention(FunctionMetadataConvention::Block);
+      break;
+    }
+
+    auto result = createTupleType({}, "", false);
+    return FunctionTypeRef::create(*this, {}, result, funcFlags);
   }
 
   const ProtocolCompositionTypeRef *
   createProtocolCompositionType(ArrayRef<BuiltProtocolDecl> protocols,
                                 BuiltType superclass,
                                 bool isClassBound) {
-    std::vector<const NominalTypeRef *> protocolRefs;
+    std::vector<const TypeRef *> protocolRefs;
     for (const auto &protocol : protocols) {
-      protocolRefs.push_back(createNominalType(protocol));
+      if (!protocol)
+        continue;
+
+      if (protocol->second)
+        protocolRefs.push_back(createObjCProtocolType(protocol->first));
+      else
+        protocolRefs.push_back(createNominalType(protocol->first));
     }
 
     return ProtocolCompositionTypeRef::create(*this, protocolRefs, superclass,
@@ -275,12 +381,14 @@ public:
   }
 
   const ExistentialMetatypeTypeRef *
-  createExistentialMetatypeType(const TypeRef *instance) {
+  createExistentialMetatypeType(const TypeRef *instance,
+                    Optional<Demangle::ImplMetatypeRepresentation> repr=None) {
     return ExistentialMetatypeTypeRef::create(*this, instance);
   }
 
   const MetatypeTypeRef *createMetatypeType(const TypeRef *instance,
-                                            bool WasAbstract = false) {
+                    Optional<Demangle::ImplMetatypeRepresentation> repr=None) {
+    bool WasAbstract = (repr && *repr != ImplMetatypeRepresentation::Thin);
     return MetatypeTypeRef::create(*this, instance, WasAbstract);
   }
 
@@ -291,9 +399,20 @@ public:
 
   const DependentMemberTypeRef *
   createDependentMemberType(const std::string &member,
+                            const TypeRef *base) {
+    // Should not have unresolved dependent member types here.
+    return nullptr;
+  }
+
+  const DependentMemberTypeRef *
+  createDependentMemberType(const std::string &member,
                             const TypeRef *base,
-                            Optional<std::string> protocol) {
-    return DependentMemberTypeRef::create(*this, member, base, *protocol);
+                            BuiltProtocolDecl protocol) {
+    // Objective-C protocols don't have dependent types.
+    if (protocol->second)
+      return nullptr;
+    return DependentMemberTypeRef::create(*this, member, base,
+                                          protocol->first);
   }
 
 #define REF_STORAGE(Name, ...) \
@@ -306,13 +425,31 @@ public:
     return SILBoxTypeRef::create(*this, base);
   }
 
-  const ObjCClassTypeRef *
-  createObjCClassType(const std::string &mangledName) {
-    return ObjCClassTypeRef::create(*this, mangledName);
+  const TypeRef *createDynamicSelfType(const TypeRef *selfType) {
+    // TypeRefs should not contain DynamicSelfType.
+    return nullptr;
   }
 
   const ObjCClassTypeRef *getUnnamedObjCClassType() {
     return createObjCClassType("");
+  }
+
+  const ObjCClassTypeRef *
+  createObjCClassType(const std::string &name) {
+    return ObjCClassTypeRef::create(*this, name);
+  }
+
+  const ObjCClassTypeRef *
+  createBoundGenericObjCClassType(const std::string &name,
+                                  ArrayRef<const TypeRef *> args) {
+    // Remote reflection just ignores generic arguments for Objective-C
+    // lightweight generic types, since they don't affect layout.
+    return createObjCClassType(name);
+  }
+
+  const ObjCProtocolTypeRef *
+  createObjCProtocolType(const std::string &name) {
+    return ObjCProtocolTypeRef::create(*this, name);
   }
 
   const ForeignClassTypeRef *
@@ -354,15 +491,53 @@ public:
     // demangling out of the referenced context descriptors in the target
     // process.
     Dem.setSymbolicReferenceResolver(
-      [this, &reader](int32_t offset, const void *base) -> Demangle::NodePointer {
-        // Resolve the reference to a remote address.
-        auto remoteAddress = getRemoteAddrOfTypeRefPointer(base);
-        if (remoteAddress == 0)
+    [this, &reader](SymbolicReferenceKind kind,
+                    Directness directness,
+                    int32_t offset, const void *base) -> Demangle::Node * {
+      // Resolve the reference to a remote address.
+      auto remoteAddress = getRemoteAddrOfTypeRefPointer(base);
+      if (remoteAddress == 0)
+        return nullptr;
+      
+      auto address = remoteAddress + offset;
+      if (directness == Directness::Indirect) {
+        if (auto indirectAddress = reader.readPointerValue(address)) {
+          address = *indirectAddress;
+        } else {
           return nullptr;
-        
-        return reader.readDemanglingForContextDescriptor(remoteAddress + offset,
-                                                         Dem);
-      });
+        }
+      }
+      
+      switch (kind) {
+      case Demangle::SymbolicReferenceKind::Context: {
+        auto context = reader.readContextDescriptor(address);
+        if (!context)
+          return nullptr;
+        // Try to preserve a reference to an OpaqueTypeDescriptor symbolically,
+        // since we'd like to read out and resolve the type ref to the
+        // underlying type if available.
+        if (context->getKind() == ContextDescriptorKind::OpaqueType) {
+          return Dem.createNode(
+                              Node::Kind::OpaqueTypeDescriptorSymbolicReference,
+                              (uintptr_t)context.getAddress());
+        }
+          
+        return reader.buildContextMangling(context, Dem);
+      }
+      case Demangle::SymbolicReferenceKind::AccessorFunctionReference:
+        // The symbolic reference points at a resolver function, but we can't
+        // execute code in the target process to resolve it from here.
+        return nullptr;
+      }
+      
+      return nullptr;
+    });
+    
+    OpaqueUnderlyingTypeReader =
+    [&reader](const void *descriptor, unsigned ordinal) -> const TypeRef* {
+      auto context = (typename Runtime::StoredPointer)descriptor;
+      return reader.readUnderlyingTypeForOpaqueTypeDescriptor(context, ordinal);
+    };
   }
 
   TypeConverter &getTypeConverter() { return TC; }
@@ -389,11 +564,11 @@ public:
 
   /// Get the raw capture descriptor for a remote capture descriptor
   /// address.
-  const CaptureDescriptor *getCaptureDescriptor(uintptr_t RemoteAddress);
+  const CaptureDescriptor *getCaptureDescriptor(uint64_t RemoteAddress);
 
   /// Get the unsubstituted capture types for a closure context.
   ClosureContextInfo getClosureContextInfo(const CaptureDescriptor &CD,
-                                           uintptr_t Offset);
+                                           uint64_t Offset);
 
   ///
   /// Dumping typerefs, field declarations, associated types

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-ir -assume-parsing-unqualified-ownership-sil | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend %s -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 // REQUIRES: CPU=x86_64
 
@@ -10,6 +10,9 @@ sil_vtable SwiftClass {}
 sil @$s13partial_apply10SwiftClassCfD : $@convention(method) (SwiftClass) -> ()
 
 sil @partially_applyable_to_class : $@convention(thin) (@owned SwiftClass) -> ()
+sil @partially_applyable_to_two_classes : $@convention(thin) (@owned SwiftClass, @owned SwiftClass) -> ()
+
+sil @use_closure : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
 
 // CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc { i8*, %swift.refcounted* } @partial_apply_class(%T13partial_apply10SwiftClassC*) {{.*}} {
 // CHECK: entry:
@@ -24,6 +27,53 @@ entry(%c : $SwiftClass):
   return %g : $@callee_owned () -> ()
 }
 
+// CHECK: define{{.*}} swiftcc void @partial_apply_class_on_stack(%T13partial_apply10SwiftClassC*)
+// CHECK: entry:
+// CHECK:   [[CTX:%.*]] = bitcast %T13partial_apply10SwiftClassC* %0 to %swift.opaque*
+// CHECK:   call swiftcc void @use_closure(i8* bitcast (void (%swift.refcounted*)* @"$s28partially_applyable_to_classTA.1" to i8*), %swift.opaque* [[CTX]])
+// CHECK:   call void bitcast (void (%swift.refcounted*)* @swift_release to void (%T13partial_apply10SwiftClassC*)*)(%T13partial_apply10SwiftClassC* %0)
+// CHECK:   ret void
+// CHECK: }
+
+sil @partial_apply_class_on_stack : $@convention(thin) (@owned SwiftClass) -> () {
+entry(%a : $SwiftClass):
+  %f = function_ref @partially_applyable_to_class : $@convention(thin) (@owned SwiftClass) -> ()
+  %c = partial_apply [callee_guaranteed] [on_stack] %f(%a) : $@convention(thin) (@owned SwiftClass) -> ()
+  %use = function_ref @use_closure : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  apply %use(%c) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  dealloc_stack %c : $@noescape @callee_guaranteed () ->()
+  strong_release %a : $SwiftClass
+  %t = tuple()
+  return %t : $()
+}
+
+// CHECK: define{{.*}} swiftcc void @partial_apply_two_classes_on_stack(%T13partial_apply10SwiftClassC*, %T13partial_apply10SwiftClassC*)
+// CHECK: entry:
+// CHECK:   [[CTX:%.*]] = alloca i8, i64 32, align 16
+// CHECK:   [[CTX2:%.*]] = bitcast i8* [[CTX]] to %swift.opaque*
+// CHECK:   [[LAYOUT:%.*]] = bitcast %swift.opaque* [[CTX2]] to <{ %swift.refcounted, %T13partial_apply10SwiftClassC*, %T13partial_apply10SwiftClassC* }>*
+// CHECK:   [[CAPTURE1:%.*]] = getelementptr inbounds <{ %swift.refcounted, %T13partial_apply10SwiftClassC*, %T13partial_apply10SwiftClassC* }>, <{ %swift.refcounted, %T13partial_apply10SwiftClassC*, %T13partial_apply10SwiftClassC* }>* [[LAYOUT]], i32 0, i32 1
+// CHECK:   store %T13partial_apply10SwiftClassC* %0, %T13partial_apply10SwiftClassC** [[CAPTURE1]], align 8
+// CHECK:   [[CAPTURE2:%.*]] = getelementptr inbounds <{ %swift.refcounted, %T13partial_apply10SwiftClassC*, %T13partial_apply10SwiftClassC* }>, <{ %swift.refcounted, %T13partial_apply10SwiftClassC*, %T13partial_apply10SwiftClassC* }>* [[LAYOUT]], i32 0, i32 2
+// CHECK:   store %T13partial_apply10SwiftClassC* %1, %T13partial_apply10SwiftClassC** [[CAPTURE2]], align 8
+// CHECK:   call swiftcc void @use_closure(i8* bitcast (void (%swift.refcounted*)* @"$s34partially_applyable_to_two_classesTA" to i8*), %swift.opaque* [[CTX2]])
+// CHECK:   call void bitcast (void (%swift.refcounted*)* @swift_release to void (%T13partial_apply10SwiftClassC*)*)(%T13partial_apply10SwiftClassC* %0)
+// CHECK:   call void bitcast (void (%swift.refcounted*)* @swift_release to void (%T13partial_apply10SwiftClassC*)*)(%T13partial_apply10SwiftClassC* %1)
+// CHECK:   ret void
+// CHECK: }
+
+sil @partial_apply_two_classes_on_stack : $@convention(thin) (@owned SwiftClass, @owned SwiftClass) -> () {
+entry(%a : $SwiftClass, %b: $SwiftClass):
+  %f = function_ref @partially_applyable_to_two_classes : $@convention(thin) (@owned SwiftClass, @owned SwiftClass) -> ()
+  %c = partial_apply [callee_guaranteed] [on_stack] %f(%a, %b) : $@convention(thin) (@owned SwiftClass, @owned SwiftClass) -> ()
+  %use = function_ref @use_closure : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  apply %use(%c) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  dealloc_stack %c : $@noescape @callee_guaranteed () ->()
+  strong_release %a : $SwiftClass
+  strong_release %b : $SwiftClass
+  %t = tuple()
+  return %t : $()
+}
 //
 // Check that partially applied generic parameters are correctly substituted
 // in the forwarder.
@@ -233,10 +283,14 @@ sil public_external @captured_fixed_and_dependent_params : $@convention(thin) <A
 // CHECK:         [[T_METADATA_BASE:%.*]] = bitcast %swift.type* %T to i8***
 // CHECK:         [[T_VWTABLE_ADDR:%.*]] = getelementptr {{.*}} [[T_METADATA_BASE]], [[WORD:i[0-9]+]] -1
 // CHECK:         [[T_VWTABLE:%.*]] = load {{.*}} [[T_VWTABLE_ADDR]]
-// CHECK:         [[T_FLAGS_ADDR:%.*]] = getelementptr {{.*}} [[T_VWTABLE]], i32 9
-// CHECK:         [[T_FLAGS_PTR:%.*]] = load {{.*}} [[T_FLAGS_ADDR]]
-// CHECK:         [[T_FLAGS:%.*]] = ptrtoint {{.*}} [[T_FLAGS_PTR]] to [[WORD]]
-// CHECK:         [[T_ALIGN_MASK:%.*]] = and [[WORD]] [[T_FLAGS]], 255
+// CHECK:         [[T_VWTABLE_CAST:%.*]] = bitcast i8** [[T_VWTABLE]] to %swift.vwtable*
+// CHECK:         [[T_FLAGS_ADDR:%.*]] = getelementptr inbounds %swift.vwtable, %swift.vwtable* [[T_VWTABLE_CAST]], i32 0, i32 10
+// CHECK:         [[T_FLAGS:%.*]] = load i32, i32* [[T_FLAGS_ADDR]]
+// CHECK-64:      [[T0:%.*]] = zext i32 [[T_FLAGS]] to i64
+// CHECK-64:      [[T_ALIGN_MASK:%.*]] = and i64 [[T0]], 255
+// CHECK-32:      [[T_ALIGN_MASK:%.*]] = and i32 [[T_FLAGS]], 255
+// CHECK-16:      [[T0:%.*]] = trunc i32 [[T_FLAGS]] to i16
+// CHECK-16:      [[T_ALIGN_MASK:%.*]] = and i16 [[T0]], 255
 // CHECK:         [[T_ALIGN_MASK_NOT:%.*]] = xor [[WORD]] [[T_ALIGN_MASK]], -1
 // -- 32 is 64-bit offset of 'T' field, 16 for obj header + 8 for T metadata + 8 for SwiftClass field
 // CHECK-64:      [[T_UP_TO_ALIGN_1:%.*]] = add i64 32, [[T_ALIGN_MASK]]
@@ -245,9 +299,9 @@ sil public_external @captured_fixed_and_dependent_params : $@convention(thin) <A
 // CHECK:         [[T_OFFSET:%.*]] = and [[WORD]] [[T_UP_TO_ALIGN_1]], [[T_ALIGN_MASK_NOT]]
 
 // -- Add the size of T to start the Int field.
-// CHECK:         [[T_SIZE_ADDR:%.*]] = getelementptr {{.*}} [[T_VWTABLE]], i32 8
-// CHECK:         [[T_SIZE_PTR:%.*]] = load {{.*}} [[T_SIZE_ADDR]]
-// CHECK:         [[T_SIZE:%.*]] = ptrtoint {{.*}} [[T_SIZE_PTR]] to [[WORD]]
+// CHECK:         [[T_VWTABLE_CAST:%.*]] = bitcast i8** [[T_VWTABLE]] to %swift.vwtable*
+// CHECK:         [[T_SIZE_ADDR:%.*]] = getelementptr inbounds %swift.vwtable, %swift.vwtable* [[T_VWTABLE_CAST]], i32 0, i32 8
+// CHECK:         [[T_SIZE:%.*]] = load [[WORD]], [[WORD]]* [[T_SIZE_ADDR]]
 // CHECK:         [[T_END:%.*]] = add [[WORD]] [[T_OFFSET]], [[T_SIZE]]
 
 // -- Accumulate total alignment.
@@ -524,3 +578,51 @@ bb2(%r : $()):
 bb3(%v : $()):
   return %v : $()
 }
+
+struct A1 {
+    let b: () -> ()
+}
+
+struct A2<T>  {
+    let a: T
+}
+
+class  A3 {}
+
+sil @amethod : $@convention(method) (@in_guaranteed A2<A3>) -> (@owned A1, @error Error)
+
+sil @repo : $@convention(thin) (@in_guaranteed A2<A3>) -> @owned @callee_guaranteed () -> (@owned A1, @error Error) {
+bb0(%0 : $*A2<A3>):
+  %1 = load %0 : $*A2<A3>
+  %2 = alloc_stack $A2<A3>
+  store %1 to %2 : $*A2<A3>
+  %4 = function_ref @amethod : $@convention(method) (@in_guaranteed A2<A3>) -> (@owned A1, @error Error)
+  %5 = partial_apply [callee_guaranteed] %4(%2) : $@convention(method) (@in_guaranteed A2<A3>) -> (@owned A1, @error Error)
+  dealloc_stack %2 : $*A2<A3>
+  return %5 : $@callee_guaranteed () -> (@owned A1, @error Error)
+}
+
+sil @capture_class : $@convention(thin) (@guaranteed A3) -> ()
+
+// CHECK-LABEL: define{{.*}} swiftcc i8* @partial_apply_stack_in_coroutine(i8* {{.*}}, %T13partial_apply2A3C*)
+// CHECK: entry:
+// CHECK:   [[CLOSURE_CONTEXT:%.*]] = bitcast %T13partial_apply2A3C* %1 to %swift.opaque*
+// CHECK:   [[CONTEXT:%.*]] = bitcast %swift.opaque* [[CLOSURE_CONTEXT]] to %swift.refcounted*
+// CHECK:   call swiftcc void @"$s13capture_classTA"(%swift.refcounted* swiftself [[CONTEXT]])
+sil @partial_apply_stack_in_coroutine : $@yield_once (@owned A3) -> () {
+entry(%0: $A3):
+  %f = function_ref @capture_class : $@convention(thin) (@guaranteed A3) -> ()
+  %p = partial_apply [callee_guaranteed] [on_stack] %f(%0) : $@convention(thin) (@guaranteed A3) -> ()
+  apply %p() : $@noescape @callee_guaranteed () -> ()
+  dealloc_stack %p : $@noescape @callee_guaranteed () -> ()
+  %1000 = integer_literal $Builtin.Int32, 1000
+  yield (), resume resume, unwind unwind
+
+resume:
+  %ret = tuple ()
+  return %ret : $()
+
+unwind:
+  unwind
+}
+sil_vtable A3 {}

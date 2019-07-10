@@ -68,9 +68,9 @@
 ///           return result
 ///         }
 ///       }
-///       private var nextElement: ResultElement? // The next result of next().
-///       private var base: Base                  // The underlying iterator.
-///       private let nextPartialResult: (ResultElement, Base.Element) -> ResultElement
+///       var nextElement: ResultElement? // The next result of next().
+///       var base: Base                  // The underlying iterator.
+///       let nextPartialResult: (ResultElement, Base.Element) -> ResultElement
 ///     }
 ///     
 ///     struct LazyScanSequence<Base: Sequence, ResultElement>
@@ -78,11 +78,12 @@
 ///     {
 ///       func makeIterator() -> LazyScanIterator<Base.Iterator, ResultElement> {
 ///         return LazyScanIterator(
-///           nextElement: initial, base: base.makeIterator(), nextPartialResult)
+///           nextElement: initial, base: base.makeIterator(),
+///           nextPartialResult: nextPartialResult)
 ///       }
-///       private let initial: ResultElement
-///       private let base: Base
-///       private let nextPartialResult:
+///       let initial: ResultElement
+///       let base: Base
+///       let nextPartialResult:
 ///         (ResultElement, Base.Element) -> ResultElement
 ///     }
 ///
@@ -101,14 +102,14 @@
 ///       /// - Complexity: O(1)
 ///       func scan<ResultElement>(
 ///         _ initial: ResultElement,
-///         _ nextPartialResult: (ResultElement, Element) -> ResultElement
+///         _ nextPartialResult: @escaping (ResultElement, Element) -> ResultElement
 ///       ) -> LazyScanSequence<Self, ResultElement> {
 ///         return LazyScanSequence(
-///           initial: initial, base: self, nextPartialResult)
+///           initial: initial, base: self, nextPartialResult: nextPartialResult)
 ///       }
 ///     }
 ///
-/// - See also: `LazySequence`, `LazyCollectionProtocol`, `LazyCollection`
+/// - See also: `LazySequence`
 ///
 /// - Note: The explicit permission to implement further operations
 ///   lazily applies only in contexts where the sequence is statically
@@ -176,9 +177,10 @@ extension LazySequenceProtocol where Elements: LazySequenceProtocol {
 /// implemented lazily.
 ///
 /// - See also: `LazySequenceProtocol`
-@_fixed_layout // lazy-performance
-public struct LazySequence<Base : Sequence>: _SequenceWrapper {
-  public var _base: Base
+@frozen // lazy-performance
+public struct LazySequence<Base : Sequence> {
+  @usableFromInline
+  internal var _base: Base
 
   /// Creates a sequence that has the same elements as `base`, but on
   /// which some operations such as `map` and `filter` are implemented
@@ -186,6 +188,39 @@ public struct LazySequence<Base : Sequence>: _SequenceWrapper {
   @inlinable // lazy-performance
   internal init(_base: Base) {
     self._base = _base
+  }
+}
+
+extension LazySequence: Sequence {
+  public typealias Element = Base.Element
+  public typealias Iterator = Base.Iterator
+
+  @inlinable
+  public __consuming func makeIterator() -> Iterator {
+    return _base.makeIterator()
+  }
+  
+  @inlinable // lazy-performance
+  public var underestimatedCount: Int {
+    return _base.underestimatedCount
+  }
+
+  @inlinable // lazy-performance
+  @discardableResult
+  public __consuming func _copyContents(
+    initializing buf: UnsafeMutableBufferPointer<Element>
+  ) -> (Iterator, UnsafeMutableBufferPointer<Element>.Index) {
+    return _base._copyContents(initializing: buf)
+  }
+
+  @inlinable // lazy-performance
+  public func _customContainsEquatableElement(_ element: Element) -> Bool? { 
+    return _base._customContainsEquatableElement(element)
+  }
+  
+  @inlinable // generic-performance
+  public __consuming func _copyToContiguousArray() -> ContiguousArray<Element> {
+    return _base._copyToContiguousArray()
   }
 }
 

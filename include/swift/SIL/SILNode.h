@@ -96,6 +96,7 @@ public:
   enum { NumVOKindBits = 3 };
   enum { NumStoreOwnershipQualifierBits = 2 };
   enum { NumLoadOwnershipQualifierBits = 2 };
+  enum { NumAssignOwnershipQualifierBits = 2 };
   enum { NumSILAccessKindBits = 2 };
   enum { NumSILAccessEnforcementBits = 2 };
 
@@ -280,6 +281,14 @@ protected:
                         NumLoadOwnershipQualifierBits,
     OwnershipQualifier : NumLoadOwnershipQualifierBits
   );
+  SWIFT_INLINE_BITFIELD(AssignInst, NonValueInstruction,
+                        NumAssignOwnershipQualifierBits,
+    OwnershipQualifier : NumAssignOwnershipQualifierBits
+  );
+  SWIFT_INLINE_BITFIELD(AssignByWrapperInst, NonValueInstruction,
+                        NumAssignOwnershipQualifierBits,
+    OwnershipQualifier : NumAssignOwnershipQualifierBits
+  );
 
   SWIFT_INLINE_BITFIELD(UncheckedOwnershipConversionInst,SingleValueInstruction,
                         NumVOKindBits,
@@ -294,6 +303,10 @@ protected:
     : NumPadBits,
     FieldNo : 32
   );
+
+  SWIFT_INLINE_BITFIELD_FULL(FieldIndexCacheBase, SingleValueInstruction, 32,
+                             : NumPadBits,
+                             FieldIndex : 32);
 
   SWIFT_INLINE_BITFIELD_EMPTY(MethodInst, SingleValueInstruction);
   // Ensure that WitnessMethodInst bitfield does not overflow.

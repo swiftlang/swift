@@ -10,48 +10,56 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A wrapper around _RawSetStorage that provides most of the
+/// A wrapper around __RawSetStorage that provides most of the
 /// implementation of Set.
 @usableFromInline
-@_fixed_layout
+@frozen
 internal struct _NativeSet<Element: Hashable> {
-  /// See the comments on _RawSetStorage and its subclasses to understand why we
+  /// See the comments on __RawSetStorage and its subclasses to understand why we
   /// store an untyped storage here.
   @usableFromInline
-  internal var _storage: _RawSetStorage
+  internal var _storage: __RawSetStorage
 
   /// Constructs an instance from the empty singleton.
   @inlinable
   @inline(__always)
   internal init() {
-    self._storage = _RawSetStorage.empty
+    self._storage = __RawSetStorage.empty
   }
 
   /// Constructs a native set adopting the given storage.
   @inlinable
   @inline(__always)
-  internal init(_ storage: __owned _RawSetStorage) {
+  internal init(_ storage: __owned __RawSetStorage) {
     self._storage = storage
   }
 
   @inlinable
   internal init(capacity: Int) {
-    self._storage = _SetStorage<Element>.allocate(capacity: capacity)
+    if capacity == 0 {
+      self._storage = __RawSetStorage.empty
+    } else {
+      self._storage = _SetStorage<Element>.allocate(capacity: capacity)
+    }
   }
 
 #if _runtime(_ObjC)
   @inlinable
-  internal init(_ cocoa: __owned _CocoaSet) {
+  internal init(_ cocoa: __owned __CocoaSet) {
     self.init(cocoa, capacity: cocoa.count)
   }
 
   @inlinable
-  internal init(_ cocoa: __owned _CocoaSet, capacity: Int) {
-    _sanityCheck(cocoa.count <= capacity)
-    self._storage = _SetStorage<Element>.convert(cocoa, capacity: capacity)
-    for element in cocoa {
-      let nativeElement = _forceBridgeFromObjectiveC(element, Element.self)
-      insertNew(nativeElement, isUnique: true)
+  internal init(_ cocoa: __owned __CocoaSet, capacity: Int) {
+    if capacity == 0 {
+      self._storage = __RawSetStorage.empty
+    } else {
+      _internalInvariant(cocoa.count <= capacity)
+      self._storage = _SetStorage<Element>.convert(cocoa, capacity: capacity)
+      for element in cocoa {
+        let nativeElement = _forceBridgeFromObjectiveC(element, Element.self)
+        insertNew(nativeElement, isUnique: true)
+      }
     }
   }
 #endif
@@ -101,7 +109,7 @@ extension _NativeSet { // Low-level unchecked operations
   @inline(__always)
   internal func uncheckedElement(at bucket: Bucket) -> Element {
     defer { _fixLifetime(self) }
-    _sanityCheck(hashTable.isOccupied(bucket))
+    _internalInvariant(hashTable.isOccupied(bucket))
     return _elements[bucket.offset]
   }
 
@@ -109,9 +117,20 @@ extension _NativeSet { // Low-level unchecked operations
   @inline(__always)
   internal func uncheckedInitialize(
     at bucket: Bucket,
-    to element: __owned Element) {
-    _sanityCheck(hashTable.isValid(bucket))
+    to element: __owned Element
+  ) {
+    _internalInvariant(hashTable.isValid(bucket))
     (_elements + bucket.offset).initialize(to: element)
+  }
+
+  @_alwaysEmitIntoClient @inlinable // Introduced in 5.1
+  @inline(__always)
+  internal func uncheckedAssign(
+    at bucket: Bucket,
+    to element: __owned Element
+  ) {
+    _internalInvariant(hashTable.isOccupied(bucket))
+    (_elements + bucket.offset).pointee = element
   }
 }
 
@@ -189,9 +208,9 @@ extension _NativeSet { // ensureUnique
   @inlinable
   internal mutating func copy() {
     let newStorage = _SetStorage<Element>.copy(original: _storage)
-    _sanityCheck(newStorage._scale == _storage._scale)
-    _sanityCheck(newStorage._age == _storage._age)
-    _sanityCheck(newStorage._seed == _storage._seed)
+    _internalInvariant(newStorage._scale == _storage._scale)
+    _internalInvariant(newStorage._age == _storage._age)
+    _internalInvariant(newStorage._seed == _storage._seed)
     let result = _NativeSet(newStorage)
     if count > 0 {
       result.hashTable.copyContents(of: hashTable)
@@ -241,12 +260,10 @@ extension _NativeSet {
   @inlinable
   @inline(__always)
   func validatedBucket(for index: Set<Element>.Index) -> Bucket {
-    switch index._variant {
-    case .native(let native):
-      return validatedBucket(for: native)
 #if _runtime(_ObjC)
-    case .cocoa(let cocoa):
+    guard index._isNative else {
       index._cocoaPath()
+      let cocoa = index._asCocoa
       // Accept Cocoa indices as long as they contain an element that exists in
       // this set, and the address of their Cocoa object generates the same age.
       if cocoa.age == self.age {
@@ -258,8 +275,9 @@ extension _NativeSet {
       }
       _preconditionFailure(
         "Attempting to access Set elements using an invalid index")
-#endif
     }
+#endif
+    return validatedBucket(for: index._asNative)
   }
 }
 
@@ -344,7 +362,7 @@ extension _NativeSet { // Insertions
   /// The `element` must not be already present in the Set.
   @inlinable
   internal func _unsafeInsertNew(_ element: __owned Element) {
-    _sanityCheck(count + 1 <= capacity)
+    _internalInvariant(count + 1 <= capacity)
     let hashValue = self.hashValue(for: element)
     if _isDebugAssertConfiguration() {
       // In debug builds, perform a full lookup and trap if we detect duplicate
@@ -361,7 +379,7 @@ extension _NativeSet { // Insertions
       let bucket = hashTable.insertNew(hashValue: hashValue)
       uncheckedInitialize(at: bucket, to: element)
     }
-    _storage._count += 1
+    _storage._count &+= 1
   }
 
   /// Insert a new element into uniquely held storage.
@@ -386,7 +404,7 @@ extension _NativeSet { // Insertions
     at bucket: Bucket,
     isUnique: Bool
   ) {
-    _sanityCheck(!hashTable.isOccupied(bucket))
+    _internalInvariant(!hashTable.isOccupied(bucket))
     var bucket = bucket
     let rehashed = ensureUnique(isUnique: isUnique, capacity: count + 1)
     if rehashed {
@@ -423,6 +441,50 @@ extension _NativeSet { // Insertions
     _unsafeInsertNew(element, at: bucket)
     return nil
   }
+
+  /// Insert an element into uniquely held storage, replacing an existing value
+  /// (if any).  Storage must be uniquely referenced with adequate capacity.
+  @_alwaysEmitIntoClient @inlinable // Introduced in 5.1
+  internal mutating func _unsafeUpdate(
+    with element: __owned Element
+  ) {
+    let (bucket, found) = find(element)
+    if found {
+      uncheckedAssign(at: bucket, to: element)
+    } else {
+      _precondition(count < capacity)
+      _unsafeInsertNew(element, at: bucket)
+    }
+  }
+}
+
+extension _NativeSet {
+  @inlinable
+  @inline(__always)
+  func isEqual(to other: _NativeSet) -> Bool {
+    if self._storage === other._storage { return true }
+    if self.count != other.count { return false }
+
+    for member in self {
+      guard other.find(member).found else { return false }
+    }
+    return true
+  }
+
+#if _runtime(_ObjC)
+  @inlinable
+  func isEqual(to other: __CocoaSet) -> Bool {
+    if self.count != other.count { return false }
+
+    defer { _fixLifetime(self) }
+    for bucket in self.hashTable {
+      let key = self.uncheckedElement(at: bucket)
+      let bridgedKey = _bridgeAnythingToObjectiveC(key)
+      guard other.contains(bridgedKey) else { return false }
+    }
+    return true
+  }
+#endif
 }
 
 extension _NativeSet: _HashTableDelegate {
@@ -446,7 +508,7 @@ extension _NativeSet { // Deletion
   internal mutating func _delete(at bucket: Bucket) {
     hashTable.delete(at: bucket, with: self)
     _storage._count -= 1
-    _sanityCheck(_storage._count >= 0)
+    _internalInvariant(_storage._count >= 0)
     invalidateIndices()
   }
 
@@ -455,9 +517,9 @@ extension _NativeSet { // Deletion
   internal mutating func uncheckedRemove(
     at bucket: Bucket,
     isUnique: Bool) -> Element {
-    _sanityCheck(hashTable.isOccupied(bucket))
+    _internalInvariant(hashTable.isOccupied(bucket))
     let rehashed = ensureUnique(isUnique: isUnique, capacity: capacity)
-    _sanityCheck(!rehashed)
+    _internalInvariant(!rehashed)
     let old = (_elements + bucket.offset).move()
     _delete(at: bucket)
     return old
@@ -484,7 +546,7 @@ extension _NativeSet { // Deletion
 
 extension _NativeSet: Sequence {
   @usableFromInline
-  @_fixed_layout
+  @frozen
   internal struct Iterator {
     // The iterator is iterating over a frozen view of the collection state, so
     // it keeps its own reference to the set.

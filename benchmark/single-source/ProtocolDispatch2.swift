@@ -15,12 +15,11 @@
 
 
 import TestsUtils
-import Foundation
 
 public let ProtocolDispatch2 = BenchmarkInfo(
   name: "ProtocolDispatch2",
   runFunction: run_ProtocolDispatch2,
-  tags: [.validation, .abstraction, .unstable])
+  tags: [.validation, .abstraction])
 
 protocol Pingable { func ping() -> Int;  func pong() -> Int}
 
@@ -58,7 +57,7 @@ public func run_ProtocolDispatch2(_ N: Int) {
   var c = 0
   let g1 = Game()
   let g2 = Game()
-  for _ in 1...N {
+  for _ in 1...10*N {
     c = 0
     for i in 1...5000 {
       c += wrapper(i, g1, g2)
@@ -66,4 +65,3 @@ public func run_ProtocolDispatch2(_ N: Int) {
   }
   CheckResults(c == 75000)
 }
-

@@ -32,6 +32,8 @@
 
 #include <iostream>
 
+using namespace swift::Demangle;
+
 static llvm::cl::opt<bool>
 ExpandMode("expand",
                llvm::cl::desc("Expand mode (show node structure of the demangling)"));
@@ -43,6 +45,10 @@ CompactMode("compact",
 static llvm::cl::opt<bool>
 TreeOnly("tree-only",
            llvm::cl::desc("Tree-only mode (do not show the demangled string)"));
+
+static llvm::cl::opt<bool>
+StripSpecialization("strip-specialization",
+           llvm::cl::desc("Remangle the origin of a specialized function"));
 
 static llvm::cl::opt<bool>
 RemangleMode("test-remangle",
@@ -80,6 +86,22 @@ static llvm::StringRef substrBefore(llvm::StringRef whole,
 static llvm::StringRef substrAfter(llvm::StringRef whole,
                                    llvm::StringRef part) {
   return whole.substr((part.data() - whole.data()) + part.size());
+}
+
+static void stripSpecialization(NodePointer Node) {
+  if (Node->getKind() != Node::Kind::Global)
+    return;
+  switch (Node->getFirstChild()->getKind()) {
+    case Node::Kind::FunctionSignatureSpecialization:
+    case Node::Kind::GenericSpecialization:
+    case Node::Kind::GenericSpecializationNotReAbstracted:
+    case Node::Kind::GenericPartialSpecialization:
+    case Node::Kind::GenericPartialSpecializationNotReAbstracted:
+      Node->removeChildAt(0);
+      break;
+    default:
+      break;
+  }
 }
 
 static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
@@ -138,6 +160,12 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
         llvm::errs() << "Can't de-mangle " << name << '\n';
         exit(1);
       }
+      std::string remangled = swift::Demangle::mangleNode(pointer);
+      llvm::outs() << remangled;
+      return;
+    }
+    if (StripSpecialization) {
+      stripSpecialization(pointer);
       std::string remangled = swift::Demangle::mangleNode(pointer);
       llvm::outs() << remangled;
       return;
@@ -212,7 +240,7 @@ int main(int argc, char **argv) {
   } else {
     swift::Demangle::Context DCtx;
     for (llvm::StringRef name : InputNames) {
-      if (name.startswith("S")) {
+      if (name.startswith("S") || name.startswith("s") ) {
         std::string correctedName = std::string("$") + name.str();
         demangle(llvm::outs(), correctedName, DCtx, options);
       } else {

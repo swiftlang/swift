@@ -40,14 +40,14 @@ protected:
   /// method.
   struct FuncImpl {
     FuncImpl(SILFunction *F, ClassDecl *Cl) : F(F), Impl(Cl) {}
-    FuncImpl(SILFunction *F, ProtocolConformance *C) : F(F), Impl(C) {}
+    FuncImpl(SILFunction *F, RootProtocolConformance *C) : F(F), Impl(C) {}
 
     /// The implementing function.
     SILFunction *F;
 
     /// This is a class decl if we are tracking a class_method (i.e. a vtable
     /// method) and a protocol conformance if we are tracking a witness_method.
-    PointerUnion<ClassDecl *, ProtocolConformance *> Impl;
+    PointerUnion<ClassDecl *, RootProtocolConformance*> Impl;
   };
 
   /// Stores which functions implement a vtable or witness table method.
@@ -75,7 +75,7 @@ protected:
     }
 
     /// Adds an implementation of the method in a specific conformance.
-    void addWitnessFunction(SILFunction *F, ProtocolConformance *Conf) {
+    void addWitnessFunction(SILFunction *F, RootProtocolConformance *Conf) {
       assert(isWitnessMethod);
       implementingFunctions.push_back(FuncImpl(F, Conf));
     }
@@ -95,6 +95,12 @@ protected:
 
     // Functions that may be used externally cannot be removed.
     if (F->isPossiblyUsedExternally())
+      return true;
+
+    if (F->getDynamicallyReplacedFunction())
+      return true;
+
+    if (F->isDynamicallyReplaceable())
       return true;
 
     // ObjC functions are called through the runtime and are therefore alive
@@ -235,6 +241,7 @@ protected:
     case KeyPathPatternComponent::Kind::OptionalChain:
     case KeyPathPatternComponent::Kind::OptionalForce:
     case KeyPathPatternComponent::Kind::OptionalWrap:
+    case KeyPathPatternComponent::Kind::TupleElement:
       break;
     }
   }
@@ -254,18 +261,6 @@ protected:
     makeAlive(WT);
   }
 
-  /// Returns true if \a Derived is the same as \p Base or derived from it.
-  static bool isDerivedOrEqual(ClassDecl *Derived, ClassDecl *Base) {
-    for (;;) {
-      if (Derived == Base)
-        return true;
-      if (!Derived->hasSuperclass())
-        break;
-      Derived = Derived->getSuperclassDecl();
-    }
-    return false;
-  }
-
   /// Returns true if the implementation of method \p FD in class \p ImplCl
   /// may be called when the type of the class_method's operand is \p MethodCl.
   /// Both, \p MethodCl and \p ImplCl, may by null if not known or if it's a
@@ -276,7 +271,7 @@ protected:
       return true;
 
     // All implementations of derived classes may be called.
-    if (isDerivedOrEqual(ImplCl, MethodCl))
+    if (MethodCl->isSuperclassOf(ImplCl))
       return true;
 
     // Check if the method implementation is the same in a super class, i.e.
@@ -317,7 +312,7 @@ protected:
       return;
     mi->methodIsCalled = true;
     for (FuncImpl &FImpl : mi->implementingFunctions) {
-      if (auto *Conf = FImpl.Impl.dyn_cast<ProtocolConformance *>()) {
+      if (auto Conf = FImpl.Impl.dyn_cast<RootProtocolConformance *>()) {
         SILWitnessTable *WT =
             Module->lookUpWitnessTable(Conf,
                                        /*deserializeLazily*/ false);
@@ -361,7 +356,11 @@ protected:
           MethodInfo *mi = getMethodInfo(funcDecl, /*isWitnessTable*/ false);
           ensureAliveClassMethod(mi, dyn_cast<FuncDecl>(funcDecl), MethodCl);
         } else if (auto *FRI = dyn_cast<FunctionRefInst>(&I)) {
-          ensureAlive(FRI->getReferencedFunction());
+          ensureAlive(FRI->getInitiallyReferencedFunction());
+        } else if (auto *FRI = dyn_cast<DynamicFunctionRefInst>(&I)) {
+          ensureAlive(FRI->getInitiallyReferencedFunction());
+        } else if (auto *FRI = dyn_cast<PreviousDynamicFunctionRefInst>(&I)) {
+          ensureAlive(FRI->getInitiallyReferencedFunction());
         } else if (auto *KPI = dyn_cast<KeyPathInst>(&I)) {
           for (auto &component : KPI->getPattern()->getComponents())
             ensureKeyPathComponentIsAlive(component);
@@ -483,7 +482,7 @@ class DeadFunctionElimination : FunctionLivenessComputation {
 
     // Collect witness method implementations.
     for (SILWitnessTable &WT : Module->getWitnessTableList()) {
-      ProtocolConformance *Conf = WT.getConformance();
+      auto Conf = WT.getConformance();
       for (const SILWitnessTable::Entry &entry : WT.getEntries()) {
         if (entry.getKind() != SILWitnessTable::Method)
           continue;
@@ -536,13 +535,10 @@ class DeadFunctionElimination : FunctionLivenessComputation {
         SILFunction *F = entry.Implementation;
         auto *fd = getBase(cast<AbstractFunctionDecl>(entry.Method.getDecl()));
 
-        if (// A conservative approach: if any of the overridden functions is
-            // visible externally, we mark the whole method as alive.
-            isPossiblyUsedExternally(entry.Linkage, Module->isWholeModule())
-            // We also have to check the method declaration's access level.
+        if (// We also have to check the method declaration's access level.
             // Needed if it's a public base method declared in another
             // compilation unit (for this we have no SILFunction).
-            || isVisibleExternally(fd)
+            isVisibleExternally(fd)
             // Declarations are always accessible externally, so they are alive.
             || !F->isDefinition()) {
           MethodInfo *mi = getMethodInfo(fd, /*isWitnessTable*/ false);
@@ -749,5 +745,5 @@ void swift::performSILDeadFunctionElimination(SILModule *M) {
   SILPassManager PM(M);
   llvm::SmallVector<PassKind, 1> Pass = {PassKind::DeadFunctionElimination};
   PM.executePassPipelinePlan(
-      SILPassPipelinePlan::getPassPipelineForKinds(Pass));
+      SILPassPipelinePlan::getPassPipelineForKinds(M->getOptions(), Pass));
 }

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -33,6 +33,13 @@ namespace llvm {
 namespace swift {
 namespace Demangle {
 
+enum class SymbolicReferenceKind : uint8_t;
+
+/// A simple default implementation that assigns letters to type parameters in
+/// alphabetic order.
+std::string genericParameterName(uint64_t depth, uint64_t index);
+
+/// Display style options for the demangler.
 struct DemangleOptions {
   bool SynthesizeSugarOnTypes = false;
   bool DisplayDebuggerGeneratedModule = true;
@@ -50,6 +57,8 @@ struct DemangleOptions {
   bool ShortenArchetype = false;
   bool ShowPrivateDiscriminators = true;
   bool ShowFunctionArgumentTypes = true;
+  std::function<std::string(uint64_t, uint64_t)> GenericParameterName =
+      genericParameterName;
 
   DemangleOptions() {}
 
@@ -140,32 +149,38 @@ public:
   friend class NodeFactory;
   
 private:
+
+  struct NodeVector {
+    NodePointer *Nodes;
+    uint32_t Number = 0;
+    uint32_t Capacity = 0;
+  };
+
+  union {
+    llvm::StringRef Text;
+    IndexType Index;
+    NodePointer InlineChildren[2];
+    NodeVector Children;
+  };
+
+
   Kind NodeKind;
 
   enum class PayloadKind : uint8_t {
-    None, Text, Index
+    None, Text, Index, OneChild, TwoChildren, ManyChildren
   };
   PayloadKind NodePayloadKind;
-
-  union {
-    llvm::StringRef TextPayload;
-    IndexType IndexPayload;
-  };
-
-  NodePointer *Children = nullptr;
-  size_t NumChildren = 0;
-  size_t ReservedChildren = 0;
 
   Node(Kind k)
       : NodeKind(k), NodePayloadKind(PayloadKind::None) {
   }
   Node(Kind k, llvm::StringRef t)
       : NodeKind(k), NodePayloadKind(PayloadKind::Text) {
-    TextPayload = t;
+    Text = t;
   }
   Node(Kind k, IndexType index)
       : NodeKind(k), NodePayloadKind(PayloadKind::Index) {
-    IndexPayload = index;
+    Index = index;
   }
   Node(const Node &) = delete;
   Node &operator=(const Node &) = delete;
@@ -176,41 +191,37 @@ public:
   bool hasText() const { return NodePayloadKind == PayloadKind::Text; }
   llvm::StringRef getText() const {
     assert(hasText());
-    return TextPayload;
+    return Text;
   }
 
   bool hasIndex() const { return NodePayloadKind == PayloadKind::Index; }
   uint64_t getIndex() const {
     assert(hasIndex());
-    return IndexPayload;
+    return Index;
   }
 
-  using iterator = NodePointer *;
-  using const_iterator = const NodePointer *;
-  using size_type = size_t;
+  using iterator = const NodePointer *;
 
-  bool hasChildren() const { return NumChildren != 0; }
-  size_t getNumChildren() const { return NumChildren; }
-  iterator begin() { return Children; }
-  iterator end() { return Children + NumChildren; }
-  const_iterator begin() const { return Children; }
-  const_iterator end() const { return Children + NumChildren; }
+  size_t getNumChildren() const;
+
+  bool hasChildren() const { return getNumChildren() != 0; }
+
+  iterator begin() const;
+
+  iterator end() const;
 
   NodePointer getFirstChild() const {
-    assert(NumChildren >= 1);
-    return Children[0];
+    return getChild(0);
   }
   NodePointer getChild(size_t index) const {
-    assert(NumChildren > index);
-    return Children[index];
+    assert(getNumChildren() > index);
+    return begin()[index];
   }
-
-//  inline void addChild(NodePointer Child, Context &Ctx);
 
   // Only to be used by the demangler parsers.
   void addChild(NodePointer Child, NodeFactory &Factory);
   // Only to be used by the demangler parsers.
-  void removeChildAt(unsigned Pos, NodeFactory &factory);
+  void removeChildAt(unsigned Pos);
 
   // Reverses the order of children.
   void reverseChildren(size_t StartingAt = 0);
@@ -342,8 +353,9 @@ public:
   /// prefix: _T, _T0, $S, _$S.
   ///
   /// \returns The demangled string.
-  std::string demangleSymbolAsString(llvm::StringRef MangledName,
-                            const DemangleOptions &Options = DemangleOptions());
+  std::string demangleSymbolAsString(
+      llvm::StringRef MangledName,
+      const DemangleOptions &Options = DemangleOptions());
 
   /// Demangle the given type and return the readable name.
   ///
@@ -351,13 +363,14 @@ public:
   /// a mangling prefix.
   ///
   /// \returns The demangled string.
-  std::string demangleTypeAsString(llvm::StringRef MangledName,
-                            const DemangleOptions &Options = DemangleOptions());
+  std::string
+  demangleTypeAsString(llvm::StringRef MangledName,
+                       const DemangleOptions &Options = DemangleOptions());
 
   /// Returns true if the mangledName refers to a thunk function.
   ///
   /// Thunk functions are either (ObjC) partial apply forwarder, swift-as-ObjC
-  /// or ObjC-as-swift thunks.
+  /// or ObjC-as-swift thunks or allocating init functions.
   bool isThunkSymbol(llvm::StringRef MangledName);
 
   /// Returns the mangled name of the target of a thunk.
@@ -374,6 +387,14 @@ public:
   /// The return value is unspecified if the \p MangledName does not refer to a
   /// function symbol.
   bool hasSwiftCallingConvention(llvm::StringRef MangledName);
+
+  /// Demangle the given symbol and return the module name of the symbol.
+  ///
+  /// \param mangledName The mangled symbol string, which start a mangling
+  /// prefix: _T, _T0, $S, _$S.
+  ///
+  /// \returns The module name.
+  std::string getModuleName(llvm::StringRef mangledName);
 
   /// Deallocates all nodes.
   ///
@@ -463,31 +484,44 @@ enum class OperatorKind {
   Infix,
 };
 
-/// \brief Mangle an identifier using Swift's mangling rules.
-void mangleIdentifier(const char *data, size_t length,
-                      OperatorKind operatorKind, std::string &out,
-                      bool usePunycode = true);
+/// Remangle a demangled parse tree.
+std::string mangleNode(NodePointer root);
 
-/// \brief Remangle a demangled parse tree.
-///
-/// This should always round-trip perfectly with demangleSymbolAsNode.
-std::string mangleNode(const NodePointer &root);
+using SymbolicResolver =
+  llvm::function_ref<Demangle::NodePointer (SymbolicReferenceKind,
+                                            const void *)>;
 
-using SymbolicResolver = llvm::function_ref<Demangle::NodePointer (const void *)>;
+/// Remangle a demangled parse tree, using a callback to resolve
+/// symbolic references.
+std::string mangleNode(NodePointer root, SymbolicResolver resolver);
 
-/// \brief Remangle a demangled parse tree, using a callback to resolve
+/// Remangle a demangled parse tree, using a callback to resolve
 /// symbolic references.
 ///
-/// This should always round-trip perfectly with demangleSymbolAsNode.
-std::string mangleNode(const NodePointer &root, SymbolicResolver resolver);
+/// The returned string is owned by \p Factory. This means \p Factory must stay
+/// alive as long as the returned string is used.
+llvm::StringRef mangleNode(NodePointer root, SymbolicResolver resolver,
+                           NodeFactory &Factory);
 
 /// Remangle in the old mangling scheme.
 ///
-/// This is only used for objc-runtime names and should be removed as soon as
-/// we switch to the new mangling for those names as well.
-std::string mangleNodeOld(const NodePointer &root);
+/// This is only used for objc-runtime names.
+std::string mangleNodeOld(NodePointer root);
 
-/// \brief Transform the node structure to a string.
+/// Remangle in the old mangling scheme.
+///
+/// This is only used for objc-runtime names.
+/// The returned string is owned by \p Factory. This means \p Factory must stay
+/// alive as long as the returned string is used.
+llvm::StringRef mangleNodeOld(NodePointer node, NodeFactory &Factory);
+
+/// Remangle in the old mangling scheme and embed the name in "_Tt<name>_".
+///
+/// The returned string is null terminated and owned by \p Factory. This means
+/// \p Factory must stay alive as long as the returned string is used.
+const char *mangleNodeAsObjcCString(NodePointer node, NodeFactory &Factory);
+
+/// Transform the node structure to a string.
 ///
 /// Typical usage:
 /// \code
@@ -537,6 +571,8 @@ public:
     return std::move(*this << std::forward<T>(x));
   }
   
+  DemanglerPrinter &writeHex(unsigned long long n) &;
+ 
   std::string &&str() && { return std::move(Stream); }
 
   llvm::StringRef getStringRef() const { return Stream; }
@@ -558,9 +594,19 @@ const char *getNodeKindString(swift::Demangle::Node::Kind k);
 /// Useful for debugging.
 std::string getNodeTreeAsString(NodePointer Root);
 
+bool nodeConsumesGenericArgs(Node *node);
+
 bool isSpecialized(Node *node);
+
 NodePointer getUnspecialized(Node *node, NodeFactory &Factory);
-std::string archetypeName(Node::IndexType index, Node::IndexType depth);
+
+/// Returns true if the node \p kind refers to a context node, e.g. a nominal
+/// type or a function.
+bool isContext(Node::Kind kind);
+
+/// Returns true if the node \p kind refers to a node which is placed before a
+/// function node, e.g. a specialization attribute.
+bool isFunctionAttr(Node::Kind kind);
 
 /// Form a StringRef around the mangled name starting at base, if the name may
 /// contain symbolic references.

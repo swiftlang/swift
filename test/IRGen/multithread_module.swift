@@ -1,10 +1,10 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %S/Inputs/multithread_module/main.swift -emit-ir -o %t/main.ll %s -o %t/mt_module.ll -num-threads 2 -O -g -module-name test
+// RUN: %target-swift-frontend %S/Inputs/multithread_module/main.swift -emit-ir -o %t/main.ll %/s -o %t/mt_module.ll -num-threads 2 -O -g -module-name test
 // RUN: %FileCheck --check-prefix=CHECK-MAINLL %s <%t/main.ll
 // RUN: %FileCheck --check-prefix=CHECK-MODULELL %s <%t/mt_module.ll
 
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -c %S/Inputs/multithread_module/main.swift -o %t/main.o %s -o %t/mt_module.o -num-threads 2 -O -g -module-name test
+// RUN: %target-swift-frontend -c %S/Inputs/multithread_module/main.swift -o %t/main.o %s -o %t/mt_module.o -num-threads 2 -O -g -module-name test
 // RUN: %target-build-swift %t/main.o %t/mt_module.o -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
@@ -62,8 +62,8 @@ func callproto(_ p: MyProto) {
 
 // Check if the DI filename is correct and not "<unknown>".
 
-// CHECK-MAINLL: DICompileUnit(language: DW_LANG_Swift, file: [[F:![0-9]+]]
-// CHECK-MAINLL: [[F]] = !DIFile(filename: "{{.*}}IRGen/Inputs/multithread_module/main.swift", directory: "{{.*}}")
+// CHECK-MAINLL: [[F:![0-9]+]] = !DIFile(filename: "{{.*}}IRGen/Inputs/multithread_module/main.swift", directory: "{{.*}}")
+// CHECK-MAINLL: DICompileUnit(language: DW_LANG_Swift, file: [[F]],
 
-// CHECK-MODULELL: DICompileUnit(language: DW_LANG_Swift, file: [[F:![0-9]+]]
-// CHECK-MODULELL: [[F]] = !DIFile(filename: "{{.*}}IRGen/multithread_module.swift", directory: "{{.*}}")
+// CHECK-MODULELL: [[F:![0-9]]] = !DIFile(filename: "{{.*}}IRGen/multithread_module.swift", directory: "{{.*}}")
+// CHECK-MODULELL: DICompileUnit(language: DW_LANG_Swift, file: [[F]],

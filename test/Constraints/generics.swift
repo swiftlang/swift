@@ -52,7 +52,7 @@ func generic_metatypes<T : SomeProtocol>(_ x: T)
 }
 
 // Inferring a variable's type from a call to a generic.
-struct Pair<T, U> { } // expected-note 4 {{'T' declared as parameter to type 'Pair'}} expected-note {{'U' declared as parameter to type 'Pair'}}
+struct Pair<T, U> { } // expected-note 3 {{'T' declared as parameter to type 'Pair'}} expected-note 3 {{'U' declared as parameter to type 'Pair'}}
 
 func pair<T, U>(_ x: T, _ y: U) -> Pair<T, U> { }
 
@@ -219,8 +219,7 @@ protocol P19215114 {}
 func body9215114<T: P19215114, U: Q19215114>(_ t: T) -> (_ u: U) -> () {}
 
 func test9215114<T: P19215114, U: Q19215114>(_ t: T) -> (U) -> () {
-  //Should complain about not being able to infer type of U.
-  let f = body9215114(t)  // expected-error {{generic parameter 'T' could not be inferred}}
+  let f = body9215114(t)  // expected-error {{generic parameter 'U' could not be inferred}}
   return f
 }
 
@@ -231,7 +230,7 @@ class Whatever<A: Numeric, B: Numeric> {  // expected-note 2 {{'A' declared as p
   static func bar() {}
 
 }
-Whatever.foo(a: 23) // expected-error {{generic parameter 'A' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{9-9=<<#A: Numeric#>, <#B: Numeric#>>}}
+Whatever.foo(a: 23) // expected-error {{generic parameter 'A' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{9-9=<<#A: Numeric#>, Int>}}
 
 // <rdar://problem/21718955> Swift useless error: cannot invoke 'foo' with no arguments
 Whatever.bar()  // expected-error {{generic parameter 'A' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{9-9=<<#A: Numeric#>, <#B: Numeric#>>}}
@@ -262,7 +261,7 @@ protocol SubProto: BaseProto {}
   func copy() -> Any
 }
 
-struct FullyGeneric<Foo> {} // expected-note 11 {{'Foo' declared as parameter to type 'FullyGeneric'}} expected-note 1 {{generic type 'FullyGeneric' declared here}}
+struct FullyGeneric<Foo> {} // expected-note 13 {{'Foo' declared as parameter to type 'FullyGeneric'}} expected-note 1 {{generic type 'FullyGeneric' declared here}}
 
 struct AnyClassBound<Foo: AnyObject> {} // expected-note {{'Foo' declared as parameter to type 'AnyClassBound'}} expected-note {{generic type 'AnyClassBound' declared here}}
 // expected-note@-1{{requirement specified as 'Foo' : 'AnyObject'}}
@@ -340,7 +339,10 @@ func testFixIts() {
   // expected-error@-1 {{referencing initializer 'init()' on 'ClassAndProtosBound2' requires that 'X' conform to 'NSCopyish'}}
   // expected-error@-2 {{referencing initializer 'init()' on 'ClassAndProtosBound2' requires that 'X' conform to 'SubProto'}}
 
-  _ = Pair() // expected-error {{generic parameter 'T' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{11-11=<Any, Any>}}
+  _ = Pair()
+  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+  // expected-error@-2 {{generic parameter 'U' could not be inferred}}
+  // expected-note@-3 {{explicitly specify the generic arguments to fix this issue}} {{11-11=<Any, Any>}}
   _ = Pair(first: S()) // expected-error {{generic parameter 'U' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{11-11=<S, Any>}}
   _ = Pair(second: S()) // expected-error {{generic parameter 'T' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{11-11=<Any, S>}}
 }
@@ -359,13 +361,13 @@ func testFixItClassBound() {
 }
 
 func testFixItCasting(x: Any) {
-  _ = x as! FullyGeneric // expected-error {{generic parameter 'Foo' could not be inferred in cast to 'FullyGeneric<_>'}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{25-25=<Any>}}
+  _ = x as! FullyGeneric // expected-error {{generic parameter 'Foo' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{25-25=<Any>}}
 }
 
 func testFixItContextualKnowledge() {
   // FIXME: These could propagate backwards.
-  let _: Int = Pair().first // expected-error {{generic parameter 'T' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{20-20=<Any, Any>}}
-  let _: Int = Pair().second // expected-error {{generic parameter 'T' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{20-20=<Any, Any>}}
+  let _: Int = Pair().first // expected-error {{generic parameter 'U' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{20-20=<Int, Any>}}
+  let _: Int = Pair().second // expected-error {{generic parameter 'T' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{20-20=<Any, Int>}}
 }
 
 func testFixItTypePosition() {
@@ -382,32 +384,47 @@ func testFixItNested() {
   _ = [FullyGeneric]() // expected-error {{generic parameter 'Foo' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{20-20=<Any>}}
 
   _ = FullyGeneric<FullyGeneric>() // expected-error {{generic parameter 'Foo' could not be inferred}}
+  // expected-note@-1 {{explicitly specify the generic arguments to fix this issue}} {{32-32=<Any>}}
 
-  _ = Pair< // expected-error {{generic parameter 'Foo' could not be inferred}}
+  _ = Pair<
     FullyGeneric,
-    // expected-note@-1 {{explicitly specify the generic arguments to fix this issue}} {{17-17=<Any>}}
-    FullyGeneric // FIXME: We could diagnose both of these, but we don't.
+    // expected-error@-1 {{generic parameter 'Foo' could not be inferred}}
+    // expected-note@-2 {{explicitly specify the generic arguments to fix this issue}} {{17-17=<Any>}}
+    FullyGeneric
+    // expected-error@-1 {{generic parameter 'Foo' could not be inferred}}
+    // expected-note@-2 {{explicitly specify the generic arguments to fix this issue}} {{17-17=<Any>}}
   >()
-  _ = Pair< // expected-error {{generic parameter 'Foo' could not be inferred}}
+  _ = Pair<
     FullyGeneric<Any>,
     FullyGeneric
+    // expected-error@-1 {{generic parameter 'Foo' could not be inferred}}
+    // expected-note@-2 {{explicitly specify the generic arguments to fix this issue}} {{17-17=<Any>}}
   >()
-  _ = Pair< // expected-error {{generic parameter 'Foo' could not be inferred}}
+  _ = Pair<
     FullyGeneric,
-    // expected-note@-1 {{explicitly specify the generic arguments to fix this issue}} {{17-17=<Any>}}
+    // expected-error@-1 {{generic parameter 'Foo' could not be inferred}}
+    // expected-note@-2 {{explicitly specify the generic arguments to fix this issue}} {{17-17=<Any>}}
     FullyGeneric<Any>
   >()
 
-  _ = pair( // expected-error {{generic parameter 'Foo' could not be inferred}} {{none}}
-    FullyGeneric(), // expected-note {{explicitly specify the generic arguments to fix this issue}}
+  _ = pair(
+    FullyGeneric(),
+    // expected-error@-1 {{generic parameter 'Foo' could not be inferred}}
+    // expected-note@-2 {{explicitly specify the generic arguments to fix this issue}} {{17-17=<Any>}}
     FullyGeneric()
+    // expected-error@-1 {{generic parameter 'Foo' could not be inferred}}
+    // expected-note@-2 {{explicitly specify the generic arguments to fix this issue}} {{17-17=<Any>}}
   )
-  _ = pair( // expected-error {{generic parameter 'Foo' could not be inferred}} {{none}}
+  _ = pair(
     FullyGeneric<Any>(),
-    FullyGeneric() // expected-note {{explicitly specify the generic arguments to fix this issue}}
+    FullyGeneric()
+    // expected-error@-1 {{generic parameter 'Foo' could not be inferred}}
+    // expected-note@-2 {{explicitly specify the generic arguments to fix this issue}} {{17-17=<Any>}}
   )
-  _ = pair( // expected-error {{generic parameter 'Foo' could not be inferred}} {{none}}
-    FullyGeneric(), // expected-note {{explicitly specify the generic arguments to fix this issue}}
+  _ = pair(
+    FullyGeneric(),
+    // expected-error@-1 {{generic parameter 'Foo' could not be inferred}}
+    // expected-note@-2 {{explicitly specify the generic arguments to fix this issue}} {{17-17=<Any>}}
     FullyGeneric<Any>()
   )
 }
@@ -435,7 +452,6 @@ class GenericClass<A> {}
 func genericFunc<T>(t: T) {
   _ = [T: GenericClass] // expected-error {{generic parameter 'A' could not be inferred}}
   // expected-note@-1 {{explicitly specify the generic arguments to fix this issue}}
-  // expected-error@-2 3 {{type 'T' does not conform to protocol 'Hashable'}}
 }
 
 struct SR_3525<T> {}
@@ -563,7 +579,7 @@ do {
 }
 
 func rdar35890334(_ arr: inout [Int]) {
-  _ = arr.popFirst() // expected-error {{value of type '[Int]' has no member 'popFirst'}}
+  _ = arr.popFirst() // expected-error {{referencing instance method 'popFirst()' on 'Collection' requires the types '[Int]' and 'ArraySlice<Int>' be equivalent}}
 }
 
 // rdar://problem/39616039
@@ -618,6 +634,162 @@ func rdar40537858() {
   }
 
   var s = S(id: S.Id())
-  let _: E = .foo(s)   // expected-error {{generic enum 'E' requires that 'S' conform to 'P'}}
-  let _: E = .bar([s]) // expected-error {{generic enum 'E' requires that 'S' conform to 'P'}}
+  let _: E = .foo(s)   // expected-error {{enum case 'foo' requires that 'S' conform to 'P'}}
+  let _: E = .bar([s]) // expected-error {{enum case 'bar' requires that 'S' conform to 'P'}}
+}
+
+// https://bugs.swift.org/browse/SR-8934
+struct BottleLayout {
+    let count : Int
+}
+let arr = [BottleLayout]()
+let layout = BottleLayout(count:1)
+let ix = arr.firstIndex(of:layout) // expected-error {{argument type 'BottleLayout' does not conform to expected type 'Equatable'}}
+
+let _: () -> UInt8 = { .init("a" as Unicode.Scalar) } // expected-error {{initializer 'init(_:)' requires that 'Unicode.Scalar' conform to 'BinaryInteger'}}
+
+// https://bugs.swift.org/browse/SR-9068
+func compare<C: Collection, Key: Hashable, Value: Equatable>(c: C)
+  -> Bool where C.Element == (key: Key, value: Value)
+{
+  _ = Dictionary(uniqueKeysWithValues: Array(c))
+}
+
+// https://bugs.swift.org/browse/SR-7984
+struct SR_7984<Bar> {
+  func doSomething() {}
+}
+
+extension SR_7984 where Bar: String {} // expected-error {{type 'Bar' constrained to non-protocol, non-class type 'String'}} expected-note {{use 'Bar == String' to require 'Bar' to be 'String'}} {{28-29= ==}}
+
+protocol SR_7984_Proto {
+  associatedtype Bar
+}
+
+extension SR_7984_Proto where Bar: String {} // expected-error {{type 'Self.Bar' constrained to non-protocol, non-class type 'String'}} expected-note {{use 'Bar == String' to require 'Bar' to be 'String'}} {{34-35= ==}}
+
+protocol SR_7984_HasFoo {
+  associatedtype Foo
+}
+protocol SR_7984_HasAssoc {
+  associatedtype Assoc: SR_7984_HasFoo
+}
+
+struct SR_7984_X<T: SR_7984_HasAssoc> {}
+extension SR_7984_X where T.Assoc.Foo: String {} // expected-error {{type 'T.Assoc.Foo' constrained to non-protocol, non-class type 'String'}} expected-note {{use 'T.Assoc.Foo == String' to require 'T.Assoc.Foo' to be 'String'}} {{38-39= ==}}
+
+struct SR_7984_S<T: Sequence> where T.Element: String {} // expected-error {{type 'T.Element' constrained to non-protocol, non-class type 'String'}} expected-note {{use 'T.Element == String' to require 'T.Element' to be 'String'}} {{46-47= ==}}
+func SR_7984_F<T: Sequence>(foo: T) where T.Element: String {} // expected-error {{type 'T.Element' constrained to non-protocol, non-class type 'String'}} expected-note {{use 'T.Element == String' to require 'T.Element' to be 'String'}} {{52-53= ==}}
+
+protocol SR_7984_P {
+  func S<T : Sequence>(bar: T) where T.Element: String // expected-error {{type 'T.Element' constrained to non-protocol, non-class type 'String'}} expected-note {{use 'T.Element == String' to require 'T.Element' to be 'String'}} {{47-48= ==}}
+}
+
+struct A<T: String> {} // expected-error {{type 'T' constrained to non-protocol, non-class type 'String'}}
+struct B<T> where T: String {} // expected-error {{type 'T' constrained to non-protocol, non-class type 'String'}}
+protocol C {
+  associatedtype Foo: String // expected-error {{type 'Self.Foo' constrained to non-protocol, non-class type 'String'}}
+}
+protocol D {
+  associatedtype Foo where Foo: String // expected-error {{type 'Self.Foo' constrained to non-protocol, non-class type 'String'}}
+}
+
+func member_ref_with_explicit_init() {
+  struct S<T: P> { // expected-note {{where 'T' = 'Int'}}
+    init(_: T) {}
+    init(_: T, _ other: Int = 42) {}
+  }
+
+  _ = S.init(42)
+  // expected-error@-1 {{generic struct 'S' requires that 'Int' conform to 'P'}}
+}
+
+protocol Q {
+  init<T : P>(_ x: T) // expected-note 2{{where 'T' = 'T'}}
+}
+
+struct SR10694 {
+  init<T : P>(_ x: T) {} // expected-note 2{{where 'T' = 'T'}}
+  func bar<T>(_ x: T, _ s: SR10694, _ q: Q) {
+    SR10694.self(x) // expected-error {{initializer 'init(_:)' requires that 'T' conform to 'P'}}
+
+    type(of: s)(x)  // expected-error {{initializer 'init(_:)' requires that 'T' conform to 'P'}}
+    // expected-error@-1 {{initializing from a metatype value must reference 'init' explicitly}}
+
+    Q.self(x) // expected-error {{initializer 'init(_:)' requires that 'T' conform to 'P'}}
+    // expected-error@-1 {{protocol type 'Q' cannot be instantiated}}
+
+    type(of: q)(x)  // expected-error {{initializer 'init(_:)' requires that 'T' conform to 'P'}}
+    // expected-error@-1 {{initializing from a metatype value must reference 'init' explicitly}}
+  }
+}
+
+// SR-7003 (rdar://problem/51203824) - Poor diagnostics when attempting to access members on unfulfilled generic type
+func sr_7003() {
+  struct E<T> { // expected-note 4 {{'T' declared as parameter to type 'E'}}
+    static var foo: String { return "" }
+    var bar: String { return "" }
+    static func baz() -> String { return "" }
+    func qux() -> String { return "" }
+  }
+
+  let _: Any = E.foo
+  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+  // expected-note@-2 {{explicitly specify the generic arguments to fix this issue}} {{17-17=<Any>}}
+  let _: Any = E().bar
+  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+  // expected-note@-2 {{explicitly specify the generic arguments to fix this issue}} {{17-17=<Any>}}
+  let _: Any = E.baz()
+  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+  // expected-note@-2 {{explicitly specify the generic arguments to fix this issue}} {{17-17=<Any>}}
+  let _: Any = E().qux()
+  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+  // expected-note@-2 {{explicitly specify the generic arguments to fix this issue}} {{17-17=<Any>}}
+}
+
+func test_generic_subscript_with_missing_arg() {
+  struct S<T> {
+    subscript<U>(_: T) -> S<U> { fatalError() }
+    // expected-note@-1 {{in call to 'subscript(_:)'}}
+  }
+
+  func test(_ s: S<Int>) {
+    _ = s[0] // expected-error {{generic parameter 'U' could not be inferred}}
+  }
+}
+
+func rdar_50007727() {
+  struct A<T> { // expected-note {{'T' declared as parameter to type 'A'}}
+    struct B<U> : ExpressibleByStringLiteral {
+      init(stringLiteral value: String) {}
+    }
+  }
+
+  struct S {}
+  let _ = A.B<S>("hello")
+  // expected-error@-1 {{generic parameter 'T' could not be inferred in cast to 'A.B'}}
+  // expected-note@-2 {{explicitly specify the generic arguments to fix this issue}} {{12-12=<Any>}}
+}
+
+// rdar://problem/51413254
+
+infix operator ==>
+
+struct Key {
+  init(_ key: String) {}
+}
+
+func ==> (lhs: Any, rhs: Key) throws -> Any {
+  return 0
+}
+
+func ==> <A>(lhs: Any, rhs: Key) throws -> A {
+  fatalError()
+}
+
+struct R_51413254 {
+  var str: String = ""
+  mutating func test(_ anyDict: Any) throws {
+    self.str = try anyDict ==> Key("a") // Ok
+  }
 }

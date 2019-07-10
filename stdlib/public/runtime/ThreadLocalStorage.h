@@ -53,9 +53,14 @@ extern "C" int pthread_key_init_np(int key, void (*destructor)(void *));
 # ifndef __PTK_FRAMEWORK_SWIFT_KEY1
 #  define __PTK_FRAMEWORK_SWIFT_KEY1 101
 # endif
+# ifndef __PTK_FRAMEWORK_SWIFT_KEY2
+#  define __PTK_FRAMEWORK_SWIFT_KEY2 102
+# endif
 
-# define SWIFT_EXCLUSIVITY_TLS_KEY __PTK_FRAMEWORK_SWIFT_KEY0
+
+# define SWIFT_RUNTIME_TLS_KEY __PTK_FRAMEWORK_SWIFT_KEY0
 # define SWIFT_STDLIB_TLS_KEY __PTK_FRAMEWORK_SWIFT_KEY1
+# define SWIFT_COMPATIBILITY_50_TLS_KEY __PTK_FRAMEWORK_SWIFT_KEY2
 
 #endif
 
@@ -90,7 +95,7 @@ static_assert(std::is_same<__swift_thread_key_t, DWORD>::value,
 
 #  define SWIFT_THREAD_KEY_CREATE _stdlib_thread_key_create
 #  define SWIFT_THREAD_GETSPECIFIC FlsGetValue
-#  define SWIFT_THREAD_SETSPECIFIC(key, value) (FlsSetValue(key, value) == TRUE)
+#  define SWIFT_THREAD_SETSPECIFIC(key, value) (FlsSetValue(key, value) == FALSE)
 
 # else
 // Otherwise use the pthread API.

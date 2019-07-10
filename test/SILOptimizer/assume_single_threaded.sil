@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -emit-sil -assume-parsing-unqualified-ownership-sil %s -assume-single-threaded | %FileCheck %s
-// RUN: %target-swift-frontend -emit-sil -assume-parsing-unqualified-ownership-sil %s -O -assume-single-threaded | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil %s -assume-single-threaded | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil %s -O -assume-single-threaded | %FileCheck %s
 
 // Check that all reference counting instructions are converted to [nonatomic]
 // if -assume-single-threaded is used.

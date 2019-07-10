@@ -52,6 +52,8 @@ struct MetadataSections {
   Range swift5_reflstr;
   Range swift5_fieldmd;
   Range swift5_assocty;
+  Range swift5_replace;
+  Range swift5_replac2;
 };
 } // namespace swift
 

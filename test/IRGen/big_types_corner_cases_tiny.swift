@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -enable-large-loadable-types -primary-file %s %S/big_types_corner_cases.swift -emit-ir | %FileCheck %s --check-prefix=CHECK
+// RUN: %target-swift-frontend -enable-large-loadable-types -primary-file %s %S/big_types_corner_cases.swift -emit-ir | %FileCheck %s --check-prefix=CHECK
 // REQUIRES: optimized_stdlib
 
 // DO NOT ADD ANY MORE CODE TO THIS FILE!

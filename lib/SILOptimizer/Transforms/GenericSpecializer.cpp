@@ -37,6 +37,11 @@ class GenericSpecializer : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() override {
     SILFunction &F = *getFunction();
+
+    // TODO: We should be able to handle ownership.
+    if (F.hasOwnership())
+      return;
+
     LLVM_DEBUG(llvm::dbgs() << "***** GenericSpecializer on function:"
                             << F.getName() << " *****\n");
 
@@ -70,7 +75,7 @@ bool GenericSpecializer::specializeAppliesInFunction(SILFunction &F) {
       if (!Apply || !Apply.hasSubstitutions())
         continue;
 
-      auto *Callee = Apply.getReferencedFunction();
+      auto *Callee = Apply.getReferencedFunctionOrNull();
       if (!Callee)
         continue;
       if (!Callee->isDefinition()) {
@@ -94,10 +99,10 @@ bool GenericSpecializer::specializeAppliesInFunction(SILFunction &F) {
       auto *I = Applies.pop_back_val();
       auto Apply = ApplySite::isa(I);
       assert(Apply && "Expected an apply!");
-      SILFunction *Callee = Apply.getReferencedFunction();
+      SILFunction *Callee = Apply.getReferencedFunctionOrNull();
       assert(Callee && "Expected to have a known callee");
 
-      if (!Callee->shouldOptimize())
+      if (!Apply.canOptimize() || !Callee->shouldOptimize())
         continue;
 
       // We have a call that can potentially be specialized, so

@@ -29,7 +29,7 @@ enum class ObjCSelectorContext {
   SetterSelector
 };
 
-/// \brief Parser's interface to code completion.
+/// Parser's interface to code completion.
 class CodeCompletionCallbacks {
 protected:
   Parser &P;
@@ -115,90 +115,96 @@ public:
     }
   };
 
-  /// \brief Complete the whole expression.  This is a fallback that should
+  /// Set target decl for attribute if the CC token is in attribute of the decl.
+  virtual void setAttrTargetDeclKind(Optional<DeclKind> DK) {}
+
+  /// Complete the whole expression.  This is a fallback that should
   /// produce results when more specific completion methods failed.
-  virtual void completeExpr() = 0;
+  virtual void completeExpr() {};
 
-  /// \brief Complete expr-dot after we have consumed the dot.
-  virtual void completeDotExpr(Expr *E, SourceLoc DotLoc) = 0;
+  /// Complete expr-dot after we have consumed the dot.
+  virtual void completeDotExpr(Expr *E, SourceLoc DotLoc) {};
 
-  /// \brief Complete the beginning of a statement or expression.
-  virtual void completeStmtOrExpr() = 0;
+  /// Complete the beginning of a statement or expression.
+  virtual void completeStmtOrExpr(CodeCompletionExpr *E) {};
 
-  /// \brief Complete the beginning of expr-postfix -- no tokens provided
+  /// Complete the beginning of expr-postfix -- no tokens provided
   /// by user.
-  virtual void completePostfixExprBeginning(CodeCompletionExpr *E) = 0;
+  virtual void completePostfixExprBeginning(CodeCompletionExpr *E) {};
 
-  /// \brief Complete the beginning of expr-postfix in a for-each loop sequqence
+  /// Complete the beginning of expr-postfix in a for-each loop sequqence
   /// -- no tokens provided by user.
-  virtual void completeForEachSequenceBeginning(CodeCompletionExpr *E) = 0;
+  virtual void completeForEachSequenceBeginning(CodeCompletionExpr *E) {};
 
-  /// \brief Complete a given expr-postfix.
-  virtual void completePostfixExpr(Expr *E, bool hasSpace) = 0;
+  /// Complete a given expr-postfix.
+  virtual void completePostfixExpr(Expr *E, bool hasSpace) {};
 
-  /// \brief Complete a given expr-postfix, given that there is a following
+  /// Complete a given expr-postfix, given that there is a following
   /// left parenthesis.
-  virtual void completePostfixExprParen(Expr *E, Expr *CodeCompletionE) = 0;
+  virtual void completePostfixExprParen(Expr *E, Expr *CodeCompletionE) {};
 
-  /// \brief Complete expr-super after we have consumed the 'super' keyword.
-  virtual void completeExprSuper(SuperRefExpr *SRE) = 0;
-
-  /// \brief Complete expr-super after we have consumed the 'super' keyword and
-  /// a dot.
-  virtual void completeExprSuperDot(SuperRefExpr *SRE) = 0;
-
-  /// \brief Complete the argument to an Objective-C #keyPath
+  /// Complete the argument to an Objective-C #keyPath
   /// expression.
   ///
   /// \param KPE A partial #keyPath expression that can be used to
   /// provide context. This will be \c NULL if no components of the
   /// #keyPath argument have been parsed yet.
-  virtual void completeExprKeyPath(KeyPathExpr *KPE, SourceLoc DotLoc) = 0;
+  virtual void completeExprKeyPath(KeyPathExpr *KPE, SourceLoc DotLoc) {};
 
-  /// \brief Complete the beginning of type-simple -- no tokens provided
+  /// Complete the beginning of the type of result of func/var/let/subscript.
+  virtual void completeTypeDeclResultBeginning() {};
+
+  /// Complete the beginning of type-simple -- no tokens provided
   /// by user.
-  virtual void completeTypeSimpleBeginning() = 0;
+  virtual void completeTypeSimpleBeginning() {};
 
-  /// \brief Complete a given type-identifier after we have consumed the dot.
-  virtual void completeTypeIdentifierWithDot(IdentTypeRepr *ITR) = 0;
+  /// Complete a given type-identifier after we have consumed the dot.
+  virtual void completeTypeIdentifierWithDot(IdentTypeRepr *ITR) {};
 
-  /// \brief Complete a given type-identifier when there is no trailing dot.
-  virtual void completeTypeIdentifierWithoutDot(IdentTypeRepr *ITR) = 0;
+  /// Complete a given type-identifier when there is no trailing dot.
+  virtual void completeTypeIdentifierWithoutDot(IdentTypeRepr *ITR) {};
 
-  /// \brief Complete at the beginning of a case stmt pattern.
-  virtual void completeCaseStmtBeginning() = 0;
+  /// Complete the beginning of a case statement at the top of switch stmt.
+  virtual void completeCaseStmtKeyword() {};
 
-  /// \brief Complete a case stmt pattern that starts with a dot.
-  virtual void completeCaseStmtDotPrefix() = 0;
+  /// Complete at the beginning of a case stmt pattern.
+  virtual void completeCaseStmtBeginning(CodeCompletionExpr *E) {};
 
   /// Complete at the beginning of member of a nominal decl member -- no tokens
   /// provided by user.
   virtual void completeNominalMemberBeginning(
-      SmallVectorImpl<StringRef> &Keywords) = 0;
+      SmallVectorImpl<StringRef> &Keywords, SourceLoc introducerLoc) {};
+
+  /// Complete at the beginning of accessor in a accessor block.
+  virtual void completeAccessorBeginning(CodeCompletionExpr *E) {};
 
   /// Complete the keyword in attribute, for instance, @available.
-  virtual void completeDeclAttrKeyword(Decl *D, bool Sil, bool Param) = 0;
+  virtual void completeDeclAttrBeginning(bool Sil, bool isIndependent) {};
 
   /// Complete the parameters in attribute, for instance, version specifier for
   /// @available.
-  virtual void completeDeclAttrParam(DeclAttrKind DK, int Index) = 0;
+  virtual void completeDeclAttrParam(DeclAttrKind DK, int Index) {};
+
+  /// Complete within a precedence group decl or after a colon in an
+  /// operator decl.
+  virtual void completeInPrecedenceGroup(SyntaxKind SK) {};
 
   /// Complete the platform names inside #available statements.
-  virtual void completePoundAvailablePlatform() = 0;
+  virtual void completePoundAvailablePlatform() {};
 
   /// Complete the import decl with importable modules.
   virtual void
-  completeImportDecl(std::vector<std::pair<Identifier, SourceLoc>> &Path) = 0;
+  completeImportDecl(std::vector<std::pair<Identifier, SourceLoc>> &Path) {};
 
   /// Complete unresolved members after dot.
   virtual void completeUnresolvedMember(CodeCompletionExpr *E,
-                                        SourceLoc DotLoc) = 0;
+                                        SourceLoc DotLoc) {};
 
-  virtual void completeAssignmentRHS(AssignExpr *E) = 0;
+  virtual void completeAssignmentRHS(AssignExpr *E) {};
 
-  virtual void completeCallArg(CallExpr *E) = 0;
+  virtual void completeCallArg(CodeCompletionExpr *E, bool isFirst) {};
 
-  virtual void completeReturnStmt(CodeCompletionExpr *E) = 0;
+  virtual void completeReturnStmt(CodeCompletionExpr *E) {};
 
   /// Complete a yield statement.  A missing yield index means that the
   /// completion immediately follows the 'yield' keyword; it may be either
@@ -206,30 +212,30 @@ public:
   /// index means that the completion is within the parentheses and is
   /// for a specific yield value.
   virtual void completeYieldStmt(CodeCompletionExpr *E,
-                                 Optional<unsigned> yieldIndex) = 0;
+                                 Optional<unsigned> yieldIndex) {};
 
   virtual void completeAfterPoundExpr(CodeCompletionExpr *E,
-                                      Optional<StmtKind> ParentKind) = 0;
+                                      Optional<StmtKind> ParentKind) {};
 
-  virtual void completeAfterPoundDirective() = 0;
+  virtual void completeAfterPoundDirective() {};
 
-  virtual void completePlatformCondition() = 0;
+  virtual void completePlatformCondition() {};
 
-  virtual void completeAfterIfStmt(bool hasElse) = 0;
+  virtual void completeAfterIfStmt(bool hasElse) {};
 
-  virtual void completeGenericParams(TypeLoc TL) = 0;
+  virtual void completeGenericParams(TypeLoc TL) {};
 
-  /// \brief Signals that the AST for the all the delayed-parsed code was
+  /// Signals that the AST for the all the delayed-parsed code was
   /// constructed.  No \c complete*() callbacks will be done after this.
   virtual void doneParsing() = 0;
 };
 
-/// \brief A factory to create instances of \c CodeCompletionCallbacks.
+/// A factory to create instances of \c CodeCompletionCallbacks.
 class CodeCompletionCallbacksFactory {
 public:
   virtual ~CodeCompletionCallbacksFactory() {}
 
-  /// \brief Create an instance of \c CodeCompletionCallbacks.  The result
+  /// Create an instance of \c CodeCompletionCallbacks.  The result
   /// should be deallocated with 'delete'.
   virtual CodeCompletionCallbacks *createCodeCompletionCallbacks(Parser &P) = 0;
 };

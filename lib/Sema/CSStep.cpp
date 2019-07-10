@@ -99,8 +99,8 @@ void SplitterStep::computeFollowupSteps(
   // FIXME: We're seeding typeVars with TypeVariables so that the
   // connected-components algorithm only considers those type variables within
   // our component. There are clearly better ways to do this.
-  SmallVector<TypeVariableType *, 16> typeVars(CS.TypeVariables);
-  SmallVector<unsigned, 16> components;
+  std::vector<TypeVariableType *> typeVars(CS.TypeVariables);
+  std::vector<unsigned> components;
   unsigned numComponents = CG.computeConnectedComponents(typeVars, components);
   if (numComponents < 2) {
     componentSteps.push_back(llvm::make_unique<ComponentStep>(
@@ -117,7 +117,7 @@ void SplitterStep::computeFollowupSteps(
         CS, i, /*single=*/false, &Components[i], PartialSolutions[i]));
   }
 
-  if (numComponents > 1 && isDebugMode()) {
+  if (isDebugMode()) {
     auto &log = getDebugLogger();
     // Verify that the constraint graph is valid.
     CG.verify();
@@ -275,8 +275,58 @@ StepResult ComponentStep::take(bool prevFailed) {
   // If there are no disjunctions or type variables to bind
   // we can't solve this system unless we have free type variables
   // allowed in the solution.
-  if (!CS.solverState->allowsFreeTypeVariables() && CS.hasFreeTypeVariables())
-    return done(/*isSuccess=*/false);
+  if (!CS.solverState->allowsFreeTypeVariables() && CS.hasFreeTypeVariables()) {
+    if (!CS.shouldAttemptFixes())
+      return done(/*isSuccess=*/false);
+
+    // Let's see if all of the free type variables are associated with
+    // generic parameters and if so, let's default them to `Any` and continue
+    // solving so we can properly diagnose the problem later by suggesting
+    // to explictly specify them.
+
+    llvm::SmallDenseMap<ConstraintLocator *,
+                        llvm::SmallVector<GenericTypeParamType *, 4>>
+        defaultableGenericParams;
+
+    for (auto *typeVar : CS.getTypeVariables()) {
+      if (typeVar->getImpl().hasRepresentativeOrFixed())
+        continue;
+
+      // If this free type variable is not a generic parameter
+      // we are done.
+      auto *locator = typeVar->getImpl().getLocator();
+
+      auto *anchor = locator->getAnchor();
+      if (!(anchor && locator->isForGenericParameter()))
+        return done(/*isSuccess=*/false);
+
+      // Increment the score for every missing generic argument
+      // to make ranking of the solutions with different number
+      // of generic arguments easier.
+      CS.increaseScore(ScoreKind::SK_Fix);
+      // Default argument to `Any`.
+      CS.assignFixedType(typeVar, CS.getASTContext().TheAnyType);
+      // Note that this generic argument has been given a default value.
+      CS.DefaultedConstraints.push_back(locator);
+
+      auto path = locator->getPath();
+      // Let's drop `generic parameter '...'` part of the locator to
+      // group all of the missing generic parameters related to the
+      // same path together.
+      defaultableGenericParams[CS.getConstraintLocator(anchor,
+                                                       path.drop_back())]
+          .push_back(locator->getGenericParameter());
+    }
+
+    for (const auto &missing : defaultableGenericParams) {
+      auto *locator = missing.first;
+      auto &missingParams = missing.second;
+      auto *fix =
+          ExplicitlySpecifyGenericArguments::create(CS, missingParams, locator);
+      if (CS.recordFix(fix))
+        return done(/*isSuccess=*/false);
+    }
+  }
 
   // If this solution is worse than the best solution we've seen so far,
   // skip it.
@@ -430,7 +480,9 @@ StepResult DisjunctionStep::resume(bool prevFailed) {
 bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
   auto &ctx = CS.getASTContext();
 
-  if (choice.isDisabled()) {
+  bool attemptFixes = CS.shouldAttemptFixes();
+  // Enable "fixed" overload choices in "diagnostic" mode.
+  if (!(attemptFixes && choice.hasFix()) && choice.isDisabled()) {
     if (isDebugMode()) {
       auto &log = getDebugLogger();
       log << "(skipping ";
@@ -442,7 +494,7 @@ bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
   }
 
   // Skip unavailable overloads unless solver is in the "diagnostic" mode.
-  if (!CS.shouldAttemptFixes() && choice.isUnavailable())
+  if (!attemptFixes && choice.isUnavailable())
     return true;
 
   if (ctx.LangOpts.DisableConstraintSolverPerformanceHacks)
@@ -490,11 +542,30 @@ bool DisjunctionStep::shouldStopAt(const DisjunctionChoice &choice) const {
           shortCircuitDisjunctionAt(choice, lastChoice));
 }
 
+bool swift::isSIMDOperator(ValueDecl *value) {
+  if (!value)
+    return false;
+
+  auto func = dyn_cast<FuncDecl>(value);
+  if (!func)
+    return false;
+
+  if (!func->isOperator())
+    return false;
+
+  auto nominal = func->getDeclContext()->getSelfNominalTypeDecl();
+  if (!nominal)
+    return false;
+
+  if (nominal->getName().empty())
+    return false;
+
+  return nominal->getName().str().startswith_lower("simd");
+}
+
 bool DisjunctionStep::shortCircuitDisjunctionAt(
     Constraint *currentChoice, Constraint *lastSuccessfulChoice) const {
   auto &ctx = CS.getASTContext();
-  if (ctx.LangOpts.DisableConstraintSolverPerformanceHacks)
-    return false;
 
   // If the successfully applied constraint is favored, we'll consider that to
   // be the "best".
@@ -515,6 +586,9 @@ bool DisjunctionStep::shortCircuitDisjunctionAt(
   if (currentChoice->getFix() && !lastSuccessfulChoice->getFix())
     return true;
 
+  if (ctx.LangOpts.DisableConstraintSolverPerformanceHacks)
+    return false;
+
   if (auto restriction = currentChoice->getRestriction()) {
     // Non-optional conversions are better than optional-to-optional
     // conversions.
@@ -533,6 +607,16 @@ bool DisjunctionStep::shortCircuitDisjunctionAt(
   // Implicit conversions are better than checked casts.
   if (currentChoice->getKind() == ConstraintKind::CheckedCast)
     return true;
+
+  // If we have a SIMD operator, and the prior choice was not a SIMD
+  // Operator, we're done.
+  if (currentChoice->getKind() == ConstraintKind::BindOverload &&
+      isSIMDOperator(currentChoice->getOverloadChoice().getDecl()) &&
+      lastSuccessfulChoice->getKind() == ConstraintKind::BindOverload &&
+      !isSIMDOperator(lastSuccessfulChoice->getOverloadChoice().getDecl()) &&
+      !ctx.LangOpts.SolverEnableOperatorDesignatedTypes) {
+    return true;
+  }
 
   return false;
 }

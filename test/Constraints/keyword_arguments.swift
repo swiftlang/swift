@@ -317,7 +317,7 @@ func testClosures() {
 
 func acceptAutoclosure(f: @autoclosure () -> Int) { }
 func produceInt() -> Int { }
-acceptAutoclosure(f: produceInt) // expected-error{{function produces expected type 'Int'; did you mean to call it with '()'?}} {{32-32=()}}
+acceptAutoclosure(f: produceInt) // expected-error{{add () to forward @autoclosure parameter}} {{32-32=()}}
 
 // -------------------------------------------
 // Trailing closures
@@ -347,7 +347,9 @@ func trailingClosure5<T>(_ file: String = #file, line: UInt = #line, expression:
 func trailingClosure6<T>(value: Int, expression: () -> T?) { }
 
 trailingClosure5(file: "hello", line: 17) { return Optional.Some(5) } // expected-error{{extraneous argument label 'file:' in call}}{{18-24=}}
+// expected-error@-1 {{enum type 'Optional<Any>' has no case 'Some'; did you mean 'some'}} {{61-65=some}}
 trailingClosure6(5) { return Optional.Some(5) } // expected-error{{missing argument label 'value:' in call}}{{18-18=value: }}
+// expected-error@-1 {{enum type 'Optional<Any>' has no case 'Some'; did you mean 'some'}} {{39-43=some}}
 
 class MismatchOverloaded1 {
   func method1(_ x: Int!, arg: ((Int) -> Int)!) { }

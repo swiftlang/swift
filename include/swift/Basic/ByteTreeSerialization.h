@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 //
 /// \file
-/// \brief Provides an interface for serializing an object tree to a custom
+/// Provides an interface for serializing an object tree to a custom
 /// binary format called ByteTree.
 ///
 //===----------------------------------------------------------------------===//
@@ -155,7 +155,7 @@ private:
   llvm::BinaryStreamWriter &StreamWriter;
 
   /// The underlying stream of the StreamWriter. We need this reference so that
-  /// we can call \c ExponentialGrowthAppendingBinaryByteStream.writeRaw
+  /// we can call \c ExponentialGrowthAppendingBinaryByteStream.writeInteger
   /// which is more efficient than the generic \c writeBytes of
   /// \c llvm::BinaryStreamWriter since it avoids the arbitrary size memcopy.
   ExponentialGrowthAppendingBinaryByteStream &Stream;
@@ -179,13 +179,10 @@ private:
                  llvm::BinaryStreamWriter &StreamWriter, UserInfoMap &UserInfo)
       : StreamWriter(StreamWriter), Stream(Stream), UserInfo(UserInfo) {}
 
-  /// Write the given value to the ByteTree in the same form in which it is
-  /// represented on the serializing machine.
+  /// Write the given value to the ByteTree in little-endian byte order.
   template <typename T>
-  llvm::Error writeRaw(T Value) {
-    // FIXME: We implicitly inherit the endianess of the serializing machine.
-    // Since we're currently only supporting macOS that's not a problem for now.
-    auto Error = Stream.writeRaw(StreamWriter.getOffset(), Value);
+  llvm::Error writeInteger(T Value) {
+    auto Error = Stream.writeInteger(StreamWriter.getOffset(), Value);
     StreamWriter.setOffset(StreamWriter.getOffset() + sizeof(T));
     return Error;
   }
@@ -205,7 +202,7 @@ private:
     // Set the most significant bit to indicate that the next construct is an
     // object and not a scalar.
     uint32_t ToWrite = NumFields | (1 << 31);
-    auto Error = writeRaw(ToWrite);
+    auto Error = writeInteger(ToWrite);
     (void)Error;
     assert(!Error);
 
@@ -241,7 +238,7 @@ public:
     llvm::BinaryStreamWriter StreamWriter(Stream);
     ByteTreeWriter Writer(Stream, StreamWriter, UserInfo);
 
-    auto Error = Writer.writeRaw(ProtocolVersion);
+    auto Error = Writer.writeInteger(ProtocolVersion);
     (void)Error;
     assert(!Error);
 
@@ -272,7 +269,7 @@ public:
     // bitflag that indicates if the next construct in the tree is an object
     // or a scalar.
     assert((ValueSize & ((uint32_t)1 << 31)) == 0 && "Value size too large");
-    auto SizeError = writeRaw(ValueSize);
+    auto SizeError = writeInteger(ValueSize);
     (void)SizeError;
     assert(!SizeError);
 
@@ -292,11 +289,11 @@ public:
     validateAndIncreaseFieldIndex(Index);
 
     uint32_t ValueSize = sizeof(T);
-    auto SizeError = writeRaw(ValueSize);
+    auto SizeError = writeInteger(ValueSize);
     (void)SizeError;
     assert(!SizeError);
 
-    auto ContentError = writeRaw(Value);
+    auto ContentError = writeInteger(Value);
     (void)ContentError;
     assert(!ContentError);
   }

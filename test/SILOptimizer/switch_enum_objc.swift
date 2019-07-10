@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -emit-sil -O -primary-file %s -import-objc-header %S/Inputs/switch_enum_objc.h | %FileCheck %s
-// RUN: %target-swift-frontend -emit-sil -Osize -primary-file %s -import-objc-header %S/Inputs/switch_enum_objc.h | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -O -primary-file %s -enable-objc-interop -disable-objc-attr-requires-foundation-module -import-objc-header %S/Inputs/switch_enum_objc.h | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -Osize -primary-file %s -enable-objc-interop -disable-objc-attr-requires-foundation-module -import-objc-header %S/Inputs/switch_enum_objc.h | %FileCheck %s
 
 @inline(never)
 func action0() {}
@@ -184,11 +184,11 @@ func testFunctionalDefaultMulti(_ letter: Alpha) -> Int {
 
 // CHECK-LABEL: sil hidden @$s16switch_enum_objc19testImperativeHeadsyySo4CoinVF
 func testImperativeHeads(_ coin: Coin) {
-  // CHECK: switch_enum %0 : $Coin, case #Coin.heads!enumelt: bb2, default bb1
+  // CHECK: switch_enum %0 : $Coin, case #Coin.heads!enumelt: bb1, default bb2
   // CHECK: bb1:
-  // CHECK: function_ref @$s16switch_enum_objc7action1
-  // CHECK: bb2:
   // CHECK: function_ref @$s16switch_enum_objc7action0
+  // CHECK: bb2:
+  // CHECK: function_ref @$s16switch_enum_objc7action1
   if case .heads = coin {
     action0()
   } else {
@@ -198,11 +198,11 @@ func testImperativeHeads(_ coin: Coin) {
 
 // CHECK-LABEL: sil hidden @$s16switch_enum_objc19testImperativeTailsyySo4CoinVF
 func testImperativeTails(_ coin: Coin) {
-  // CHECK: switch_enum %0 : $Coin, case #Coin.tails!enumelt: bb2, default bb1
+  // CHECK: switch_enum %0 : $Coin, case #Coin.tails!enumelt: bb1, default bb2
   // CHECK: bb1:
-  // CHECK: function_ref @$s16switch_enum_objc7action1
-  // CHECK: bb2:
   // CHECK: function_ref @$s16switch_enum_objc7action0
+  // CHECK: bb2:
+  // CHECK: function_ref @$s16switch_enum_objc7action1
   if case .tails = coin {
     action0()
   } else {

@@ -1,5 +1,5 @@
 // RUN: rm -rf %t
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -use-jit -playground -parse-stdlib %s -emit-ir -disable-objc-attr-requires-foundation-module | %FileCheck %s
+// RUN: %target-swift-frontend -use-jit -playground -parse-stdlib %s -emit-ir -disable-objc-attr-requires-foundation-module | %FileCheck %s
 
 // REQUIRES: OS=macosx
 // REQUIRES: CPU=x86_64
@@ -8,6 +8,12 @@
 import Swift
 
 @objc class C { }
+
+private func __builtin_log_scope_entry(_ startLine: Int, _ startColumn: Int,
+  _ endLine: Int, _ endColumn: Int, _ moduleID: Int, _ fileID: Int) { }
+private func __builtin_log_scope_exit(_ startLine: Int, _ startColumn: Int,
+  _ endLine: Int, _ endColumn: Int, _ moduleID: Int, _ fileID: Int) { }
+private func __builtin_send_data<T>(_ object: T) { }
 
 public func anchor() {}
 

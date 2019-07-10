@@ -2,24 +2,24 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module-path %t/default_arguments_other.swiftmodule -emit-module -swift-version 4 -primary-file %S/Inputs/default_arguments_other.swift
 
-// RUN: %target-swift-emit-silgen -module-name default_arguments_serialized -Xllvm -sil-full-demangle -enable-sil-ownership -swift-version 4 -I %t %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -module-name default_arguments_serialized -Xllvm -sil-full-demangle -swift-version 4 -I %t %s | %FileCheck %s
 
-// RUN: %target-swift-emit-sil -module-name default_arguments_serialized -Xllvm -sil-full-demangle -enable-sil-ownership -O -swift-version 4 -I %t %s | %FileCheck %s --check-prefix=OPT
+// RUN: %target-swift-emit-sil -module-name default_arguments_serialized -Xllvm -sil-full-demangle -O -swift-version 4 -I %t %s | %FileCheck %s --check-prefix=OPT
 
 // Check that default arguments are serialized in Swift 4 mode.
 
 import default_arguments_other
 
-// CHECK-LABEL: sil @$s28default_arguments_serialized0A6StringSSyF : $@convention(thin) () -> @owned String
+// CHECK-LABEL: sil [ossa] @$s28default_arguments_serialized0A6StringSSyF : $@convention(thin) () -> @owned String
 public func defaultString() -> String { return "hi" }
 
-// CHECK-LABEL: sil non_abi [serialized] @$s28default_arguments_serialized19hasDefaultArguments1x1yySi_SStFfA_ : $@convention(thin) () -> Int
+// CHECK-LABEL: sil non_abi [serialized] [ossa] @$s28default_arguments_serialized19hasDefaultArguments1x1yySi_SStFfA_ : $@convention(thin) () -> Int
 
-// CHECK-LABEL: sil non_abi [serialized] @$s28default_arguments_serialized19hasDefaultArguments1x1yySi_SStFfA0_ : $@convention(thin) () -> @owned String
+// CHECK-LABEL: sil non_abi [serialized] [ossa] @$s28default_arguments_serialized19hasDefaultArguments1x1yySi_SStFfA0_ : $@convention(thin) () -> @owned String
 
 public func hasDefaultArguments(x: Int = 0, y: String = defaultString()) {}
 
-// CHECK-LABEL: sil @$s28default_arguments_serialized21callsDefaultArgumentsyyF : $@convention(thin) () -> ()
+// CHECK-LABEL: sil [ossa] @$s28default_arguments_serialized21callsDefaultArgumentsyyF : $@convention(thin) () -> ()
 // CHECK: function_ref @$s28default_arguments_serialized19hasDefaultArguments1x1yySi_SStFfA_ : $@convention(thin) () -> Int
 // CHECK: function_ref @$s28default_arguments_serialized19hasDefaultArguments1x1yySi_SStFfA0_ : $@convention(thin) () -> @owned String
 // CHECK: function_ref @$s28default_arguments_serialized19hasDefaultArguments1x1yySi_SStF : $@convention(thin) (Int, @guaranteed String) -> ()
@@ -33,7 +33,7 @@ public func callsDefaultArguments() {
 // that was built in Swift 4 mode, we should always treat it as serialized,
 // even if *this* module is built in Swift 3 mode.
 
-// CHECK-LABEL: sil @$s28default_arguments_serialized26callsOtherDefaultArgumentsyyF : $@convention(thin) () -> ()
+// CHECK-LABEL: sil [ossa] @$s28default_arguments_serialized26callsOtherDefaultArgumentsyyF : $@convention(thin) () -> ()
 // CHECK: function_ref @$s23default_arguments_other0C16DefaultArguments1xySi_tFfA_ : $@convention(thin) () -> Int
 // CHECK: function_ref @$s23default_arguments_other0C16DefaultArguments1xySi_tF : $@convention(thin) (Int) -> ()
 // CHECK: apply

@@ -39,7 +39,7 @@ static bool canDeriveConformance(NominalTypeDecl *type) {
 }
 
 /// Derive the implementation of allCases for a "simple" no-payload enum.
-void deriveCaseIterable_enum_getter(AbstractFunctionDecl *funcDecl) {
+void deriveCaseIterable_enum_getter(AbstractFunctionDecl *funcDecl, void *) {
   auto *parentDC = funcDecl->getDeclContext();
   auto *parentEnum = parentDC->getSelfEnumDecl();
   auto enumTy = parentDC->getDeclaredTypeInContext();
@@ -86,13 +86,14 @@ ValueDecl *DerivedConformance::deriveCaseIterable(ValueDecl *requirement) {
   if (!canDeriveConformance(Nominal))
     return nullptr;
 
+  ASTContext &C = TC.Context;
+
   // Build the necessary decl.
-  if (requirement->getBaseName() != TC.Context.Id_allCases) {
-    TC.diagnose(requirement->getLoc(), diag::broken_case_iterable_requirement);
+  if (requirement->getBaseName() != C.Id_allCases) {
+    requirement->diagnose(diag::broken_case_iterable_requirement);
     return nullptr;
   }
 
-  ASTContext &C = TC.Context;
 
   // Define the property.
   auto *returnTy = computeAllCasesType(Nominal);
@@ -104,7 +105,7 @@ ValueDecl *DerivedConformance::deriveCaseIterable(ValueDecl *requirement) {
                              /*isStatic=*/true, /*isFinal=*/true);
 
   // Define the getter.
-  auto *getterDecl = addGetterToReadOnlyDerivedProperty(TC, propDecl, returnTy);
+  auto *getterDecl = addGetterToReadOnlyDerivedProperty(propDecl, returnTy);
 
   getterDecl->setBodySynthesizer(&deriveCaseIterable_enum_getter);
 

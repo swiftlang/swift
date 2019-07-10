@@ -127,3 +127,11 @@ enum MyEnum {
 enum MySecondEnum {
   case One = 1
 }
+
+func someFunc(input :Int?, completion: () throws -> Void) rethrows {}
+
+class OneMore {
+  @IBSegueAction func testAction(coder: AnyObject, _ ident: String) -> AnyObject {
+    fatalError()
+  }
+}

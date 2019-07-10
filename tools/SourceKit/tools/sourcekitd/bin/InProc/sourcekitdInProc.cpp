@@ -15,6 +15,7 @@
 #include "SourceKit/Support/Concurrency.h"
 #include "SourceKit/Support/UIdent.h"
 
+#include "llvm/ADT/SmallString.h"
 #include "llvm/Support/Mutex.h"
 #include "llvm/Support/Path.h"
 
@@ -82,6 +83,7 @@ UIdent sourcekitd::UIdentFromSKDUID(sourcekitd_uid_t uid) {
 std::string sourcekitd::getRuntimeLibPath() {
 #if defined(_WIN32)
   MEMORY_BASIC_INFORMATION mbi;
+  llvm::SmallString<128> libPath;
   char path[MAX_PATH + 1];
   if (!VirtualQuery(static_cast<void *>(sourcekitd_initialize), &mbi,
                     sizeof(mbi)))
@@ -89,7 +91,9 @@ std::string sourcekitd::getRuntimeLibPath() {
   if (!GetModuleFileNameA(static_cast<HINSTANCE>(mbi.AllocationBase), path,
                           MAX_PATH))
     llvm_unreachable("call to GetModuleFileNameA failed");
-  return llvm::sys::path::parent_path(path);
+  libPath = llvm::sys::path::parent_path(llvm::sys::path::parent_path(path));
+  llvm::sys::path::append(libPath, "lib");
+  return libPath.str();
 #else
   // This silly cast below avoids a C++ warning.
   Dl_info info;

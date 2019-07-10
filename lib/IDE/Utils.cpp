@@ -104,16 +104,9 @@ ide::isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf,
   SourceManager SM;
   auto BufferID = SM.addNewSourceBuffer(std::move(MemBuf));
   ParserUnit Parse(SM, SFKind, BufferID);
-  Parser &P = Parse.getParser();
-
-  bool Done;
-  do {
-    P.parseTopLevel();
-    Done = P.Tok.is(tok::eof);
-  } while (!Done);
-
+  Parse.parse();
   SourceCompleteResult SCR;
-  SCR.IsComplete = !P.isInputIncomplete();
+  SCR.IsComplete = !Parse.getParser().isInputIncomplete();
 
   // Use the same code that was in the REPL code to track the indent level
   // for now. In the future we should get this from the Parser if possible.
@@ -226,7 +219,8 @@ static std::string adjustClangTriple(StringRef TripleStr) {
     }
     break;
   }
-  OS << '-' << Triple.getVendorName() << '-' << Triple.getOSName();
+  OS << '-' << Triple.getVendorName() << '-' <<
+      Triple.getOSAndEnvironmentName();
   OS.flush();
   return Result;
 }
@@ -949,4 +943,50 @@ accept(SourceManager &SM, RegionType RegionType,
   for (const auto &Replacement : Replacements) {
     Impl.accept(SM, Replacement.Range, Replacement.Text);
   }
+}
+
+bool swift::ide::isFromClang(const Decl *D) {
+  if (getEffectiveClangNode(D))
+    return true;
+  if (auto *Ext = dyn_cast<ExtensionDecl>(D))
+    return static_cast<bool>(extensionGetClangNode(Ext));
+  return false;
+}
+
+ClangNode swift::ide::getEffectiveClangNode(const Decl *decl) {
+  // Directly...
+  if (auto clangNode = decl->getClangNode())
+    return clangNode;
+
+  // Or via the nested "Code" enum.
+  if (auto nominal =
+      const_cast<NominalTypeDecl *>(dyn_cast<NominalTypeDecl>(decl))) {
+    auto &ctx = nominal->getASTContext();
+    auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
+    flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
+    for (auto code : nominal->lookupDirect(ctx.Id_Code, flags)) {
+      if (auto clangDecl = code->getClangDecl())
+        return clangDecl;
+    }
+  }
+
+  return ClangNode();
+}
+
+/// Retrieve the Clang node for the given extension, if it has one.
+ClangNode swift::ide::extensionGetClangNode(const ExtensionDecl *ext) {
+  // If it has a Clang node (directly),
+  if (ext->hasClangNode()) return ext->getClangNode();
+
+  // Check whether it was syntheszed into a module-scope context.
+  if (!isa<ClangModuleUnit>(ext->getModuleScopeContext()))
+    return ClangNode();
+
+  // It may have a global imported as a member.
+  for (auto member : ext->getMembers()) {
+    if (auto clangNode = getEffectiveClangNode(member))
+      return clangNode;
+  }
+
+  return ClangNode();
 }

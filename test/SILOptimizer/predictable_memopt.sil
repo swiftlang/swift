@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -assume-parsing-unqualified-ownership-sil -enable-sil-verify-all %s -predictable-memopt  | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -predictable-memaccess-opts -predictable-deadalloc-elim  | %FileCheck %s
 
 import Builtin
 import Swift
@@ -42,6 +42,63 @@ bb0(%0 : $Int):
   strong_release %1 : $<τ_0_0> { var τ_0_0 } <(Int, Int)>
   return %d : $Int
 }
+
+// In this example we create two boxes. The first box is initialized and then
+// taken from to initialize the second box. This means that the first box must
+// be dealloc_boxed (since its underlying memory is considered invalid). In
+// contrast, the 2nd box must be released so that we destroy the underlying
+// input object.
+//
+// CHECK-LABEL: sil @simple_reg_promotion_nontrivial_memory : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK: strong_release
+// CHECK-NOT: dealloc_box
+// CHECK: } // end sil function 'simple_reg_promotion_nontrivial_memory'
+sil @simple_reg_promotion_nontrivial_memory : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>
+  %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>, 0
+  store %0 to %1a : $*Builtin.NativeObject
+
+  %3 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>
+  %3a = project_box %3 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>, 0
+  %4 = load %1a : $*Builtin.NativeObject
+  store %4 to %3a : $*Builtin.NativeObject
+  strong_release %3 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>
+  dealloc_box %1 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>
+
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Same as the last test but with release_value to be defensive in the cast that
+// someone passes us such SIL.
+//
+// CHECK-LABEL: sil @simple_reg_promotion_nontrivial_memory_release_value : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// The retain value is on the dealloc_box.
+// CHECK-NOT: retain_value
+// CHECK: release_value
+// CHECK-NOT: dealloc_box
+// CHECK: } // end sil function 'simple_reg_promotion_nontrivial_memory_release_value'
+sil @simple_reg_promotion_nontrivial_memory_release_value : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject):
+  %1 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>
+  %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>, 0
+  store %0 to %1a : $*Builtin.NativeObject
+
+  // Also verify that we skip a retain_value on the dealloc_box.
+  retain_value %1 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>
+
+  %3 = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>
+  %3a = project_box %3 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>, 0
+  %4 = load %1a : $*Builtin.NativeObject
+  store %4 to %3a : $*Builtin.NativeObject
+  release_value %3 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>
+  dealloc_box %1 : $<τ_0_0> { var τ_0_0 } <Builtin.NativeObject>
+
+  %9999 = tuple()
+  return %9999 : $()
+}
+
 
 sil @takes_Int_inout : $@convention(thin) (@inout Int) -> ()
 sil @takes_NativeObject_inout : $@convention(thin) (@inout Builtin.NativeObject) -> ()

@@ -1,5 +1,5 @@
-// RUN: %target-swift-emit-silgen -enable-sil-ownership -verify %s
-// RUN: %target-swift-emit-sil -enable-sil-ownership %s | %FileCheck --check-prefix=AFTER-MANDATORY-PASSES %s
+// RUN: %target-swift-emit-silgen -verify %s
+// RUN: %target-swift-emit-sil %s | %FileCheck --check-prefix=AFTER-MANDATORY-PASSES %s
 
 // ensure escape analysis killed the box allocations used for delayed Self
 // return buffers

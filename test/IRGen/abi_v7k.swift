@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -emit-ir -primary-file %s -module-name test_v7k | %FileCheck %s
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil -S -primary-file %s -module-name test_v7k | %FileCheck -check-prefix=V7K %s
+// RUN: %target-swift-frontend -emit-ir -primary-file %s -module-name test_v7k | %FileCheck %s
+// RUN: %target-swift-frontend -S -primary-file %s -module-name test_v7k | %FileCheck -check-prefix=V7K %s
 
 // REQUIRES: CPU=armv7k
 // REQUIRES: OS=watchos
@@ -142,7 +142,7 @@ func testClike8(t: Int, x: CLike8) -> Int {
 // assigned values in the data area of the enum in declaration order
 // CHECK-LABEL: define hidden swiftcc double @"$s8test_v7k0A7SingleP{{.*}}"(i32, i32, i8)
 // CHECK: br i1
-// CHECK: switch i32 [[ID:%[0-9]+]]
+// CHECK: switch i64 [[ID:%[0-9]+]]
 // CHECK: [[FIRST:%[0-9]+]] = zext i32 %0 to i64
 // CHECK: [[SECOND:%[0-9]+]] = zext i32 %1 to i64
 // CHECK: [[TEMP:%[0-9]+]] = shl i64 [[SECOND]], 32
@@ -178,7 +178,7 @@ func testSingleP(x: SinglePayload) -> Double {
 // V7K-LABEL: _$s8test_v7k0A6MultiP
 // V7K:        vldr     d16, [sp{{.*}}]
 // V7K:        vmov.f64 d0, d16
-// V7K:        pop     {{{.*}}}
+// V7K:        bx lr
 // Backend will assign r0, r1 and r2 for input parameters and d0 for return values.
 class Bignum {}
 enum MultiPayload {

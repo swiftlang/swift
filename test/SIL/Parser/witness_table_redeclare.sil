@@ -1,0 +1,12 @@
+// RUN: %target-sil-opt %s -module-name=witness_table_redeclare | %target-sil-opt -module-name=witness_table_redeclare | %FileCheck %s
+
+protocol P {}
+
+struct S : P {}
+
+sil_witness_table S: P module witness_table_redeclare
+
+sil_witness_table S: P module witness_table_redeclare {}
+
+// CHECK-LABEL: sil_witness_table S: P module witness_table_redeclare {
+// CHECK-NEXT: }

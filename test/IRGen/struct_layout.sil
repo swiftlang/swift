@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -assume-parsing-unqualified-ownership-sil %s -module-name main -emit-ir -o - | %FileCheck -check-prefix=%target-ptrsize %s
+// RUN: %target-swift-frontend %s -module-name main -emit-ir -o - | %FileCheck -check-prefix=%target-ptrsize %s
 
 import Builtin
 import Swift
@@ -9,9 +9,9 @@ import Swift
 // 64: %T4main14Rdar15410780_CV = type <{ %TSSSg }>
 // 64: %TSSSg = type <{ [16 x i8] }>
 
-// 64: @"$s4main14Rdar15410780_AVWV" = internal constant {{.*}} (i64 257
-// 64: @"$s4main14Rdar15410780_BVWV" = internal constant {{.*}} (i64 258
-// 64: @"$s4main14Rdar15410780_CVWV" = internal constant {{.*}} (i64 16
+// 64: @"$s4main14Rdar15410780_AVWV" = internal constant {{.*}} i64 257
+// 64: @"$s4main14Rdar15410780_BVWV" = internal constant {{.*}} i64 258
+// 64: @"$s4main14Rdar15410780_CVWV" = internal constant {{.*}} i64 16
 
 
 // 32: %T4main14Rdar15410780_AV = type <{ i2048, %Ts4Int8V }>
@@ -20,9 +20,9 @@ import Swift
 // 32: %T4main14Rdar15410780_CV = type <{ %TSSSg }>
 // 32: %TSSSg = type <{ [12 x i8] }>
 
-// 32: @"$s4main14Rdar15410780_AVWV" = internal constant {{.*}} (i32 257
-// 32: @"$s4main14Rdar15410780_BVWV" = internal constant {{.*}} (i32 258
-// 32: @"$s4main14Rdar15410780_CVWV" = internal constant {{.*}} (i32 12
+// 32: @"$s4main14Rdar15410780_AVWV" = internal constant {{.*}} i32 257
+// 32: @"$s4main14Rdar15410780_BVWV" = internal constant {{.*}} i32 258
+// 32: @"$s4main14Rdar15410780_CVWV" = internal constant {{.*}} i32 12
 
 
 // <rdar://problem/15410780>

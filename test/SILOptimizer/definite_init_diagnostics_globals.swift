@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -enable-sil-ownership -primary-file %s -o /dev/null -verify
+// RUN: %target-swift-frontend -emit-sil -primary-file %s -o /dev/null -verify
 
 import Swift
 
@@ -21,7 +21,7 @@ defer { print(y) } // expected-error {{constant 'y' used in defer before being i
 // Test top-level functions.
 
 func testFunc() {       // expected-error {{variable 'x' used by function definition before being initialized}}
-  defer { print(x) }    // expected-warning {{'defer' statement before end of scope always executes immediately}}{{3-8=do}}
+  defer { print(x) }    // expected-warning {{'defer' statement at end of scope always executes immediately}}{{3-8=do}}
 }
 
 // Test top-level closures.
@@ -60,9 +60,8 @@ var w: String  // expected-note {{variable defined here}}
                // expected-note@-1 {{variable defined here}}
                // expected-note@-2 {{variable defined here}}
 
-// FIXME: the error should blame the class definition: <rdar://41490541>.
-class TestClass1 { // expected-error {{variable 'w' used by function definition before being initialized}}
-  let fld = w
+class TestClass1 {
+  let fld = w // expected-error {{variable 'w' used by function definition before being initialized}}
 }
 
 class TestClass2 {

@@ -1,11 +1,12 @@
-add_swift_library(swiftSerialization STATIC
+add_swift_host_library(swiftSerialization STATIC
   Deserialization.cpp
   DeserializeSIL.cpp
   ModuleFile.cpp
   Serialization.cpp
   SerializedModuleLoader.cpp
   SerializedSILLoader.cpp
-  SerializeSIL.cpp
-  LINK_LIBRARIES
-    swiftClangImporter)
+  SerializeDoc.cpp
+  SerializeSIL.cpp)
+target_link_libraries(swiftSerialization PRIVATE
+  swiftClangImporter)
 

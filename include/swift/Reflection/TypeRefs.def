@@ -28,6 +28,7 @@ TYPEREF(GenericTypeParameter, TypeRef)
 TYPEREF(DependentMember, TypeRef)
 TYPEREF(ForeignClass, TypeRef)
 TYPEREF(ObjCClass, TypeRef)
+TYPEREF(ObjCProtocol, TypeRef)
 TYPEREF(Opaque, TypeRef)
 #define REF_STORAGE(Name, ...) \
   TYPEREF(Name##Storage, TypeRef)

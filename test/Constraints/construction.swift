@@ -94,10 +94,10 @@ _ = b as! Derived
 Int(i) // expected-warning{{unused}}
 _ = i as Int
 Z(z) // expected-error{{cannot invoke initializer for type 'Z' with an argument list of type '(Z)'}}
-// expected-note @-1 {{overloads for 'Z' exist with these partially matching parameter lists: (UnicodeScalar), (String)}}
+// expected-note @-1 {{overloads for 'Z' exist with these partially matching parameter lists: (String), (UnicodeScalar)}}
 
 Z.init(z)  // expected-error {{cannot invoke 'Z.Type.init' with an argument list of type '(Z)'}}
-// expected-note @-1 {{overloads for 'Z.Type.init' exist with these partially matching parameter lists: (UnicodeScalar), (String)}}
+// expected-note @-1 {{overloads for 'Z.Type.init' exist with these partially matching parameter lists: (String), (UnicodeScalar)}}
 
 
 _ = z as Z
@@ -172,3 +172,86 @@ SR_5245(s: SR_5245.S(f: [.e1, .e2]))
 
 // rdar://problem/34670592 - Compiler crash on heterogeneous collection literal
 _ = Array([1, "hello"]) // Ok
+
+func init_via_non_const_metatype(_ s1: S1.Type) {
+  _ = s1(i: 42) // expected-error {{initializing from a metatype value must reference 'init' explicitly}} {{9-9=.init}}
+  _ = s1.init(i: 42) // ok
+}
+
+// rdar://problem/45535925 - diagnostic is attached to invalid source location
+func rdar_45535925() {
+  struct S {
+    var addr: String
+    var port: Int
+
+    private init(addr: String, port: Int?) {
+      // expected-note@-1 {{'init(addr:port:)' declared here}}
+      self.addr = addr
+      self.port = port ?? 31337
+    }
+
+    private init(port: Int) {
+      self.addr = "localhost"
+      self.port = port
+    }
+
+    private func foo(_: Int) {}  // expected-note {{'foo' declared here}}
+    private static func bar() {} // expected-note {{'bar()' declared here}}
+  }
+
+  _ = S(addr: "localhost", port: nil)
+  // expected-error@-1 {{'S' initializer is inaccessible due to 'private' protection level}}
+
+  func baz(_ s: S) {
+    s.foo(42)
+    // expected-error@-1 {{'foo' is inaccessible due to 'private' protection level}}
+    S.bar()
+    // expected-error@-1 {{'bar' is inaccessible due to 'private' protection level}}
+  }
+}
+
+// rdar://problem/50668864
+func rdar_50668864() {
+  struct Foo {
+    init(anchors: [Int]) {
+      // TODO: This would be improved when argument conversions are diagnosed via new diagnostic framework,
+      // actual problem here is that `[Int]` cannot be converted to function type represented by a closure.
+      self = .init { _ in [] } // expected-error {{type of expression is ambiguous without more context}}
+    }
+  }
+}
+
+// SR-10837 (rdar://problem/51442825) - init partial application regression
+func sr_10837() {
+  struct S {
+    let value: Int
+
+    static func foo(_ v: Int?) {
+      _ = v.flatMap(self.init(value:)) // Ok
+      _ = v.flatMap(S.init(value:))    // Ok
+      _ = v.flatMap { S.init(value:)($0) }    // Ok
+      _ = v.flatMap { self.init(value:)($0) } // Ok
+    }
+  }
+
+  class A {
+    init(bar: Int) {}
+  }
+
+  class B : A {
+    init(value: Int) {}
+    convenience init(foo: Int = 42) {
+      self.init(value:)(foo) // Ok
+      self.init(value:)
+      // expected-error@-1 {{partial application of 'self.init' initializer delegation is not allowed}}
+    }
+  }
+
+  class C : A {
+    override init(bar: Int) {
+      super.init(bar:)(bar) // Ok
+      super.init(bar:)
+      // expected-error@-1 {{partial application of 'super.init' initializer chain is not allowed}}
+    }
+  }
+}

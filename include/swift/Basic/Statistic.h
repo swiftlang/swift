@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -21,7 +21,9 @@
 #include <thread>
 #include <tuple>
 
-#define SWIFT_FUNC_STAT                                                 \
+#define SWIFT_FUNC_STAT SWIFT_FUNC_STAT_NAMED(DEBUG_TYPE)
+
+#define SWIFT_FUNC_STAT_NAMED(DEBUG_TYPE)                               \
   do {                                                                  \
     static llvm::Statistic FStat =                                      \
       {DEBUG_TYPE, __func__, __func__, {0}, {false}};                   \
@@ -138,6 +140,7 @@ public:
 private:
   bool currentProcessExitStatusSet;
   int currentProcessExitStatus;
+  long maxChildRSS = 0;
   SmallString<128> StatsFilename;
   SmallString<128> TraceFilename;
   SmallString<128> ProfileDirname;
@@ -190,6 +193,8 @@ public:
   void flushTracesAndProfiles();
   void noteCurrentProcessExitStatus(int);
   void saveAnyFrontendStatsEvents(FrontendStatsTracer const &T, bool IsEntry);
+  void recordJobMaxRSS(long rss);
+  int64_t getChildrenMaxResidentSetSize();
 };
 
 // This is a non-nested type just to make it less work to write at call sites.

@@ -52,10 +52,9 @@ namespace {
     InFlightDiagnostic diagnose(ArgTypes &&...Args) {
       return Context.Diags.diagnose(std::forward<ArgTypes>(Args)...);
     }
-    
-    void addImport(
-        SmallVectorImpl<std::pair<ImportedModule, ImportOptions>> &imports,
-        ImportDecl *ID);
+
+    void addImport(SmallVectorImpl<SourceFile::ImportedModuleDesc> &imports,
+                   ImportDecl *ID);
 
     /// Load a module referenced by an import statement.
     ///
@@ -168,8 +167,7 @@ static bool shouldImportSelfImportClang(const ImportDecl *ID,
 }
 
 void NameBinder::addImport(
-    SmallVectorImpl<std::pair<ImportedModule, ImportOptions>> &imports,
-    ImportDecl *ID) {
+    SmallVectorImpl<SourceFile::ImportedModuleDesc> &imports, ImportDecl *ID) {
   if (ID->getModulePath().front().first == SF.getParentModule()->getName() &&
       ID->getModulePath().size() == 1 && !shouldImportSelfImportClang(ID, SF)) {
     // If the imported module name is the same as the current module,
@@ -227,10 +225,33 @@ void NameBinder::addImport(
 
   auto *testableAttr = ID->getAttrs().getAttribute<TestableAttr>();
   if (testableAttr && !topLevelModule->isTestingEnabled() &&
+      !topLevelModule->isNonSwiftModule() &&
       Context.LangOpts.EnableTestableAttrRequiresTestableModule) {
     diagnose(ID->getModulePath().front().second, diag::module_not_testable,
              topLevelModule->getName());
     testableAttr->setInvalid();
+  }
+
+  auto *privateImportAttr = ID->getAttrs().getAttribute<PrivateImportAttr>();
+  StringRef privateImportFileName;
+  if (privateImportAttr) {
+    if (!topLevelModule->arePrivateImportsEnabled()) {
+      diagnose(ID->getModulePath().front().second,
+               diag::module_not_compiled_for_private_import,
+               topLevelModule->getName());
+      privateImportAttr->setInvalid();
+    } else {
+      privateImportFileName = privateImportAttr->getSourceFile();
+    }
+  }
+
+  if (SF.getParentModule()->isResilient() &&
+      !topLevelModule->isResilient() &&
+      !topLevelModule->isNonSwiftModule() &&
+      !ID->getAttrs().hasAttribute<ImplementationOnlyAttr>()) {
+    diagnose(ID->getModulePath().front().second,
+             diag::module_not_compiled_with_library_evolution,
+             topLevelModule->getName(), SF.getParentModule()->getName());
   }
 
   ImportOptions options;
@@ -238,10 +259,27 @@ void NameBinder::addImport(
     options |= SourceFile::ImportFlags::Exported;
   if (testableAttr)
     options |= SourceFile::ImportFlags::Testable;
-  imports.push_back({ { ID->getDeclPath(), M }, options });
+  if (privateImportAttr)
+    options |= SourceFile::ImportFlags::PrivateImport;
+
+  auto *implementationOnlyAttr =
+      ID->getAttrs().getAttribute<ImplementationOnlyAttr>();
+  if (implementationOnlyAttr) {
+    if (options.contains(SourceFile::ImportFlags::Exported)) {
+      diagnose(ID, diag::import_implementation_cannot_be_exported,
+               topLevelModule->getName())
+        .fixItRemove(implementationOnlyAttr->getRangeWithAt());
+    } else {
+      options |= SourceFile::ImportFlags::ImplementationOnly;
+    }
+  }
+
+  imports.push_back(SourceFile::ImportedModuleDesc(
+      {ID->getDeclPath(), M}, options, privateImportFileName));
 
   if (topLevelModule != M)
-    imports.push_back({ { ID->getDeclPath(), topLevelModule }, options });
+    imports.push_back(SourceFile::ImportedModuleDesc(
+        {ID->getDeclPath(), topLevelModule}, options, privateImportFileName));
 
   if (ID->getImportKind() != ImportKind::Module) {
     // If we're importing a specific decl, validate the import kind.
@@ -288,7 +326,7 @@ void NameBinder::addImport(
         emittedDiag.emplace(diagnose(ID,
             diag::imported_decl_is_wrong_kind_typealias,
             typealias->getDescriptiveKind(),
-            NameAliasType::get(typealias, Type(), SubstitutionMap(),
+            TypeAliasType::get(typealias, Type(), SubstitutionMap(),
                                 typealias->getUnderlyingTypeLoc().getType()),
             getImportKindString(ID->getImportKind())));
       } else {
@@ -367,7 +405,7 @@ void swift::performNameBinding(SourceFile &SF, unsigned StartElem) {
 
   NameBinder Binder(SF);
 
-  SmallVector<std::pair<ImportedModule, ImportOptions>, 8> ImportedModules;
+  SmallVector<SourceFile::ImportedModuleDesc, 8> ImportedModules;
 
   // Do a prepass over the declarations to find and load the imported modules
   // and map operator decls.

@@ -17,6 +17,7 @@
 
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/Compiler.h"
+#include "llvm/Support/Path.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalVariable.h"
@@ -1076,7 +1077,7 @@ RESULT IRGenFunction::emit##KIND(TYPE1 val1, ReferenceCounting style) {        \
   llvm_unreachable("bad refcounting style");                                   \
 }
 
-#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
+#define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   DEFINE_BINARY_OPERATION(Name##CopyInit, void, Address, Address) \
   DEFINE_BINARY_OPERATION(Name##TakeInit, void, Address, Address) \
   DEFINE_BINARY_OPERATION(Name##CopyAssign, void, Address, Address) \
@@ -1086,8 +1087,6 @@ RESULT IRGenFunction::emit##KIND(TYPE1 val1, ReferenceCounting style) {        \
   DEFINE_BINARY_OPERATION(Name##LoadStrong, llvm::Value *, Address,llvm::Type*)\
   DEFINE_BINARY_OPERATION(Name##TakeStrong, llvm::Value *, Address,llvm::Type*)\
   DEFINE_UNARY_OPERATION(Name##Destroy, void, Address)
-#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-  NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, "...")
 #include "swift/AST/ReferenceStorage.def"
 
 
@@ -1332,7 +1331,12 @@ llvm::Value *IRGenFunction::emitIsEscapingClosureCall(
   auto loc = SILLocation::decode(sourceLoc, IGM.Context.SourceMgr);
   auto line = llvm::ConstantInt::get(IGM.Int32Ty, loc.Line);
   auto col = llvm::ConstantInt::get(IGM.Int32Ty, loc.Column);
-  auto filename = IGM.getAddrOfGlobalString(loc.Filename);
+
+  // Only output the filepath in debug mode. It is going to leak into the
+  // executable. This is the same behavior as asserts.
+  auto filename = IGM.IRGen.Opts.shouldOptimize()
+                      ? IGM.getAddrOfGlobalString("")
+                      : IGM.getAddrOfGlobalString(loc.Filename);
   auto filenameLength =
       llvm::ConstantInt::get(IGM.Int32Ty, loc.Filename.size());
   auto type = llvm::ConstantInt::get(IGM.Int32Ty, verificationType);
@@ -1680,17 +1684,46 @@ void IRGenFunction::emit##ID(llvm::Value *value, Address src) {       \
 
 llvm::Value *IRGenFunction::getLocalSelfMetadata() {
   assert(LocalSelf && "no local self metadata");
+
+  // If we already have a metatype, just return it.
+  if (SelfKind == SwiftMetatype)
+    return LocalSelf;
+
+  // We need to materialize a metatype. Emit the code for that once at the
+  // top of the function and cache the result.
+
+  // This is a slight optimization in the case of repeated access, but also
+  // needed for correctness; when an @objc convenience initializer replaces
+  // the 'self' value, we don't keep track of what the new 'self' value is
+  // in IRGen, so we can't just grab the first function argument and assume
+  // it's a valid 'self' at the point where DynamicSelfType metadata is needed.
+
+  // Note that if DynamicSelfType was modeled properly as an opened archetype,
+  // none of this would be an issue since it would be always be associated
+  // with the correct value.
+
+  llvm::IRBuilderBase::InsertPointGuard guard(Builder);
+  auto insertPt = isa<llvm::Instruction>(LocalSelf)
+                      ? std::next(llvm::BasicBlock::iterator(
+                            cast<llvm::Instruction>(LocalSelf)))
+                      : CurFn->getEntryBlock().begin();
+  Builder.SetInsertPoint(&CurFn->getEntryBlock(), insertPt);
+
   switch (SelfKind) {
   case SwiftMetatype:
-    return LocalSelf;
+    llvm_unreachable("Already handled");
   case ObjCMetatype:
-    return emitObjCMetadataRefForMetadata(*this, LocalSelf);
+    LocalSelf = emitObjCMetadataRefForMetadata(*this, LocalSelf);
+    SelfKind = SwiftMetatype;
+    break;
   case ObjectReference:
-    return emitDynamicTypeOfOpaqueHeapObject(*this, LocalSelf,
+    LocalSelf = emitDynamicTypeOfOpaqueHeapObject(*this, LocalSelf,
                                              MetatypeRepresentation::Thick);
+    SelfKind = SwiftMetatype;
+    break;
   }
 
-  llvm_unreachable("Not a valid LocalSelfKind.");
+  return LocalSelf;
 }
 
 /// Given a non-tagged object pointer, load a pointer to its class object.
@@ -1879,14 +1912,6 @@ llvm::Value *irgen::emitDynamicTypeOfHeapObject(IRGenFunction &IGF,
   llvm_unreachable("unhandled ISA encoding");
 }
 
-static ClassDecl *getRootClass(ClassDecl *theClass) {
-  while (theClass->hasSuperclass()) {
-    theClass = theClass->getSuperclassDecl();
-    assert(theClass && "base type of class not a class?");
-  }
-  return theClass;
-}
-
 /// What isa encoding mechanism does a type have?
 IsaEncoding irgen::getIsaEncodingForType(IRGenModule &IGM,
                                          CanType type) {
@@ -1896,7 +1921,7 @@ IsaEncoding irgen::getIsaEncodingForType(IRGenModule &IGM,
 
   if (auto theClass = type->getClassOrBoundGenericClass()) {
     // We can access the isas of pure Swift classes directly.
-    if (getRootClass(theClass)->hasKnownSwiftImplementation())
+    if (!theClass->checkAncestry(AncestryFlags::ClangImported))
       return IsaEncoding::Pointer;
     // For ObjC or mixed classes, we need to use object_getClass.
     return IsaEncoding::ObjC;
@@ -1904,7 +1929,7 @@ IsaEncoding irgen::getIsaEncodingForType(IRGenModule &IGM,
   
   // Existentials use the encoding of the enclosed dynamic type.
   if (type->isAnyExistentialType()) {
-    return getIsaEncodingForType(IGM, ArchetypeType::getOpened(type));
+    return getIsaEncodingForType(IGM, OpenedArchetypeType::getAny(type));
   }
 
   if (auto archetype = dyn_cast<ArchetypeType>(type)) {

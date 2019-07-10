@@ -29,7 +29,6 @@ enum class ArrayCallKind {
   kGetCount,
   kGetCapacity,
   kGetElement,
-  kGetArrayOwner,
   kGetElementAddress,
   kMakeMutable,
   kMutateUnknown,
@@ -152,7 +151,7 @@ public:
 
   /// Replace a call to append(contentsOf: ) with a series of
   /// append(element: ) calls.
-  bool replaceByAppendingValues(SILModule &M, SILFunction *AppendFn,
+  bool replaceByAppendingValues(SILFunction *AppendFn,
                                 SILFunction *ReserveFn,
                                 const llvm::SmallVectorImpl<SILValue> &Vals,
                                 SubstitutionMap Subs);

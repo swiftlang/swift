@@ -11,9 +11,13 @@
 //===----------------------------------------------------------------------===//
 #include "TypeChecker.h"
 #include "TypeCheckType.h"
+#include "swift/AST/PropertyWrappers.h"
+#include "swift/AST/Attr.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/GenericSignature.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/Types.h"
 #include "swift/Subsystems.h"
@@ -81,6 +85,15 @@ SuperclassTypeRequest::evaluate(Evaluator &evaluator,
                                 TypeResolutionStage stage) const {
   assert(isa<ClassDecl>(nominalDecl) || isa<ProtocolDecl>(nominalDecl));
 
+  // If this is a protocol that came from a serialized module, compute the
+  // superclass via its generic signature.
+  if (auto *proto = dyn_cast<ProtocolDecl>(nominalDecl)) {
+    if (proto->wasDeserialized()) {
+      return proto->getGenericSignature()
+          ->getSuperclassBound(proto->getSelfInterfaceType());
+    }
+  }
+
   for (unsigned int idx : indices(nominalDecl->getInherited())) {
     auto result = evaluator(InheritedTypeRequest{nominalDecl, idx, stage});
 
@@ -143,6 +156,80 @@ EnumRawTypeRequest::evaluate(Evaluator &evaluator, EnumDecl *enumDecl,
 
   // No raw type.
   return Type();
+}
+
+llvm::Expected<CustomAttr *>
+AttachedFunctionBuilderRequest::evaluate(Evaluator &evaluator,
+                                         ValueDecl *decl) const {
+  ASTContext &ctx = decl->getASTContext();
+  auto dc = decl->getDeclContext();
+  for (auto attr : decl->getAttrs().getAttributes<CustomAttr>()) {
+    auto mutableAttr = const_cast<CustomAttr *>(attr);
+    // Figure out which nominal declaration this custom attribute refers to.
+    auto nominal = evaluateOrDefault(ctx.evaluator,
+                                     CustomAttrNominalRequest{mutableAttr, dc},
+                                     nullptr);
+
+    // Ignore unresolvable custom attributes.
+    if (!nominal)
+      continue;
+
+    // Return the first custom attribute that is a function builder type.
+    if (nominal->getAttrs().hasAttribute<FunctionBuilderAttr>())
+      return mutableAttr;
+  }
+
+  return nullptr;
+}
+
+llvm::Expected<Type>
+FunctionBuilderTypeRequest::evaluate(Evaluator &evaluator,
+                                     ValueDecl *decl) const {
+  // Look for a function-builder custom attribute.
+  auto attr = decl->getAttachedFunctionBuilder();
+  if (!attr) return Type();
+
+  // Resolve a type for the attribute.
+  auto mutableAttr = const_cast<CustomAttr*>(attr);
+  auto dc = decl->getDeclContext();
+  auto &ctx = dc->getASTContext();
+  Type type = resolveCustomAttrType(mutableAttr, dc,
+                                    CustomAttrTypeKind::NonGeneric);
+  if (!type) return Type();
+
+  auto nominal = type->getAnyNominal();
+  if (!nominal) {
+    assert(ctx.Diags.hadAnyError());
+    return Type();
+  }
+
+  // Do some additional checking on parameters.
+  if (auto param = dyn_cast<ParamDecl>(decl)) {
+    // The parameter had better already have an interface type.
+    Type paramType = param->getInterfaceType();
+    assert(paramType);
+    auto paramFnType = paramType->getAs<FunctionType>();
+
+    // Require the parameter to be an interface type.
+    if (!paramFnType) {
+      ctx.Diags.diagnose(attr->getLocation(),
+                         diag::function_builder_parameter_not_of_function_type,
+                         nominal->getFullName());
+      mutableAttr->setInvalid();
+      return Type();
+    }
+
+    // Forbid the parameter to be an autoclosure.
+    if (param->isAutoClosure()) {
+      ctx.Diags.diagnose(attr->getLocation(),
+                         diag::function_builder_parameter_autoclosure,
+                         nominal->getFullName());
+      mutableAttr->setInvalid();
+      return Type();
+    }
+  }
+
+  return type->mapTypeOutOfContext();
 }
 
 // Define request evaluation functions for each of the type checker requests.
