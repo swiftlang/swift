@@ -6171,25 +6171,32 @@ public:
   /// Performs tangent synthesis on the empty differential function. Returns true if
   /// any error occurs.
   bool run() {
-    auto &original = getOriginal();
     auto &differential = getDifferential();
-    auto diffLoc = getDifferential().getLocation();
-    LLVM_DEBUG(getADDebugStream() << "Running DifferentialEmitter on\n"
-               << original);
+
+    // Create empty body of differential.
+    auto diffConv = jvpEmitter.differential->getConventions();
+    auto *entry = jvpEmitter.differential->createBasicBlock();
+    createEntryArguments(&differential);
+
+    SILBuilder builder(entry);
+    auto loc = differential.getLocation();
+    builder.createReturn(loc,
+        SILUndef::get(differential.mapTypeIntoContext(
+            diffConv.getSILResultType()), differential));
   }
 
   void visit(SILInstruction *inst) {
     if (errorOccurred)
       return;
 
-    LLVM_DEBUG(getADDebugStream() << "PullbackEmitter visited:\n[ORIG]"
+    LLVM_DEBUG(getADDebugStream() << "DifferentialEmitter visited:\n[ORIG]"
                << *inst);
 #ifndef NDEBUG
     auto beforeInsertion = std::prev(builder.getInsertionPoint());
 #endif
     SILInstructionVisitor::visit(inst);
     LLVM_DEBUG({
-      auto &s = llvm::dbgs() << "[ADJ] Emitted:\n";
+      auto &s = llvm::dbgs() << "[DIFF] Emitted:\n";
       auto afterInsertion = builder.getInsertionPoint();
       for (auto it = ++beforeInsertion; it != afterInsertion; ++it)
         s << *it;
@@ -6198,7 +6205,7 @@ public:
 
   void visitSILInstruction(SILInstruction *inst) {
     LLVM_DEBUG(getADDebugStream()
-               << "Unhandled instruction in adjoint emitter: " << *inst);
+               << "Unhandled instruction in DifferentialEmitter: " << *inst);
     getContext().emitNondifferentiabilityError(inst, getInvoker(),
         diag::autodiff_expression_not_differentiable_note);
     errorOccurred = true;
@@ -6921,18 +6928,6 @@ bool JVPEmitter::run() {
     // If errors occurred, back out.
     if (errorOccurred)
       return true;
-
-    // Create empty body of differential.
-        auto diffConv = differential->getConventions();
-        auto *entry = differential->createBasicBlock();
-        createEntryArguments(differential);
-        // Return undef.
-        SILBuilder builder(entry);
-        auto loc = differential->getLocation();
-        builder.createReturn(loc, SILUndef::get(
-                                      differential->mapTypeIntoContext(
-                                          diffConv.getSILResultType()),
-                                      *differential));
 
     // Generate differential code.
     DifferentialEmitter DifferentialEmitter(*this);
