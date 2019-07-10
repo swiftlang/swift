@@ -3450,10 +3450,6 @@ private:
   /// The differentiation invoker.
   DifferentiationInvoker invoker;
 
-  /// Caches basic blocks whose phi arguments have been remapped (adding a
-  /// predecessor enum argument).
-  SmallPtrSet<SILBasicBlock *, 4> remappedBasicBlocks;
-
   /// Temporary boolean for determine whether we should be generating the body of the JVP.
   /// If true, then skip the JVP generation process since we cannot generate JVPs for the
   /// primitive VJPs defined on addition for Float for example.
@@ -3504,20 +3500,18 @@ public:
 
     // Add differential result for the seed.
     auto origResInfo = origTy->getResults()[indices.source];
-    diffResults.push_back(SILResultInfo(
-                              origResInfo.getType()
-                                  ->getAutoDiffAssociatedTangentSpace(
-                                        lookupConformance)
-                                  ->getCanonicalType(),
-                              origResInfo.getConvention()));
+    diffResults.push_back(
+        SILResultInfo(origResInfo.getType()
+            ->getAutoDiffAssociatedTangentSpace(lookupConformance)
+            ->getCanonicalType(), origResInfo.getConvention()));
 
     // Add pullback results for the requested wrt parameters.
     for (auto i : indices.parameters->getIndices()) {
       auto origParam = origParams[i];
-      diffParams.push_back(SILParameterInfo(
-          origParam.getType()
-          ->getAutoDiffAssociatedTangentSpace(lookupConformance)
-          ->getCanonicalType(), origParam.getConvention()));
+      diffParams.push_back(
+          SILParameterInfo(origParam.getType()
+              ->getAutoDiffAssociatedTangentSpace(lookupConformance)
+              ->getCanonicalType(), origParam.getConvention()));
     }
 
     auto diffName = original->getASTContext()
@@ -3553,9 +3547,8 @@ public:
     SILBuilder builder(entry);
     auto loc = differential->getLocation();
     builder.createReturn(loc, SILUndef::get(
-                                  differential->mapTypeIntoContext(
-                                      diffConv.getSILResultType()),
-                                  *differential));
+        differential->mapTypeIntoContext(diffConv.getSILResultType()),
+        *differential));
     return differential;
   }
 
@@ -3566,12 +3559,6 @@ public:
     if (errorOccurred)
       return;
     SILClonerWithScopes::postProcess(orig, cloned);
-  }
-
-  /// Remap original basic blocks, adding predecessor enum arguments.
-  SILBasicBlock *remapBasicBlock(SILBasicBlock *bb) {
-    auto *jvpBB = BBMap[bb];
-    return jvpBB;
   }
 
   /// General visitor for all instructions. If any error is emitted by previous
@@ -6085,9 +6072,8 @@ bool JVPEmitter::run() {
     SILBuilder builder(entry);
     auto loc = jvp->getLocation();
     builder.createReturn(loc, SILUndef::get(
-                                  jvp->mapTypeIntoContext(
-                                      diffConv.getSILResultType()),
-                              *jvp));
+        jvp->mapTypeIntoContext(diffConv.getSILResultType()),
+        *jvp));
   }
 
   LLVM_DEBUG(getADDebugStream() << "Generated JVP for "
