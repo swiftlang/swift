@@ -2533,7 +2533,7 @@ for host in "${ALL_HOSTS[@]}"; do
                   if [[ "$(uname -s)" == "Darwin" ]] ; then
                     cmake_cache="Apple-lldb-macOS.cmake"
                   else
-                    cmake_cache="Apple-lldb-linux.cmake"
+                    cmake_cache="Apple-lldb-Linux.cmake"
                   fi
 
                   cmake_options=(
