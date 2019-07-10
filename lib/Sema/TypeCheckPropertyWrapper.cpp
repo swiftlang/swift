@@ -513,13 +513,7 @@ AttachedPropertyWrapperTypeRequest::evaluate(Evaluator &evaluator,
   if (tc.validateType(customAttr->getTypeLoc(), resolution, options))
     return ErrorType::get(ctx);
 
-  Type customAttrType = customAttr->getTypeLoc().getType();
-  if (!customAttrType->getAnyNominal()) {
-    assert(ctx.Diags.hadAnyError());
-    return ErrorType::get(ctx);
-  }
-
-  return customAttrType;
+  return customAttr->getTypeLoc().getType();
 }
 
 llvm::Expected<Type>
@@ -531,7 +525,7 @@ PropertyWrapperBackingPropertyTypeRequest::evaluate(
     return rawTypeResult;
 
   Type rawType = *rawTypeResult;
-  if (!rawType)
+  if (!rawType || rawType->hasError())
     return Type();
 
   if (!rawType->hasUnboundGenericType())
@@ -578,7 +572,7 @@ PropertyWrapperBackingPropertyTypeRequest::evaluate(
     if (!rawWrapperType)
       return Type();
     
-    // Open the
+    // Open the type.
     Type openedWrapperType =
       cs.openUnboundGenericType(rawWrapperType, emptyLocator);
     if (!outermostOpenedWrapperType)

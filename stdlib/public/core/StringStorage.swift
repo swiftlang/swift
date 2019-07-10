@@ -398,6 +398,34 @@ extension __StringStorage {
     return __StringStorage.create(
       realCodeUnitCapacity: realCapacity, countAndFlags: countAndFlags)
   }
+  
+  // The caller is expected to check UTF8 validity and ASCII-ness and update
+  // the resulting StringStorage accordingly
+  internal static func create(
+    uninitializedCapacity capacity: Int,
+    initializingUncheckedUTF8With initializer: (
+      _ buffer: UnsafeMutableBufferPointer<UInt8>
+    ) throws -> Int
+  ) rethrows -> __StringStorage {
+    let storage = __StringStorage.create(
+      capacity: capacity,
+      countAndFlags: CountAndFlags(mortalCount: 0, isASCII: false)
+    )
+    let buffer = UnsafeMutableBufferPointer(start: storage.mutableStart,
+                                            count: capacity)
+    let count = try initializer(buffer)
+    
+    let countAndFlags = CountAndFlags(mortalCount: count, isASCII: false)
+    #if arch(i386) || arch(arm)
+    storage._count = countAndFlags.count
+    storage._flags = countAndFlags.flags
+    #else
+    storage._countAndFlags = countAndFlags
+    #endif
+    
+    storage.terminator.pointee = 0 // nul-terminated
+    return storage
+  }
 
   @_effects(releasenone)
   internal static func create(
@@ -453,7 +481,7 @@ extension __StringStorage {
   }
 
   @inline(__always)
-  private var codeUnits: UnsafeBufferPointer<UInt8> {
+  internal var codeUnits: UnsafeBufferPointer<UInt8> {
     return UnsafeBufferPointer(start: start, count: count)
   }
 
@@ -518,7 +546,7 @@ extension __StringStorage {
 extension __StringStorage {
   // Perform common post-RRC adjustments and invariant enforcement.
   @_effects(releasenone)
-  private func _postRRCAdjust(newCount: Int, newIsASCII: Bool) {
+  internal func _updateCountAndFlags(newCount: Int, newIsASCII: Bool) {
     let countAndFlags = CountAndFlags(
       mortalCount: newCount, isASCII: newIsASCII)
 #if arch(i386) || arch(arm)
@@ -540,7 +568,7 @@ extension __StringStorage {
     appendedCount: Int, appendedIsASCII isASCII: Bool
   ) {
     let oldTerminator = self.terminator
-    _postRRCAdjust(
+    _updateCountAndFlags(
       newCount: self.count + appendedCount, newIsASCII: self.isASCII && isASCII)
     _internalInvariant(oldTerminator + appendedCount == self.terminator)
   }
@@ -570,7 +598,7 @@ extension __StringStorage {
   }
 
   internal func clear() {
-    _postRRCAdjust(newCount: 0, newIsASCII: true)
+    _updateCountAndFlags(newCount: 0, newIsASCII: true)
   }
 }
 
@@ -585,7 +613,7 @@ extension __StringStorage {
     let tailCount = mutableEnd - upperPtr
     lowerPtr.moveInitialize(from: upperPtr, count: tailCount)
 
-    _postRRCAdjust(
+    _updateCountAndFlags(
       newCount: self.count &- (upper &- lower), newIsASCII: self.isASCII)
   }
 
@@ -622,7 +650,7 @@ extension __StringStorage {
       count: replCount)
 
     let isASCII = self.isASCII && _allASCII(replacement)
-    _postRRCAdjust(newCount: lower + replCount + tailCount, newIsASCII: isASCII)
+    _updateCountAndFlags(newCount: lower + replCount + tailCount, newIsASCII: isASCII)
   }
 
 
@@ -651,7 +679,7 @@ extension __StringStorage {
     }
     _internalInvariant(srcCount == replCount)
 
-    _postRRCAdjust(
+    _updateCountAndFlags(
       newCount: lower + replCount + tailCount, newIsASCII: isASCII)
   }
 }

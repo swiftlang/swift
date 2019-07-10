@@ -886,6 +886,17 @@ struct SomeA<T> {
 	}
 }
 
+// rdar://problem/51989272 - crash when the property wrapper is a generic type
+// alias
+typealias Alias<T> = WrapperWithInitialValue<T>
+
+struct TestAlias {
+  @Alias var foo = 17
+}
+
+
+
+// 
 // ---------------------------------------------------------------------------
 // Property wrapper composition
 // ---------------------------------------------------------------------------
