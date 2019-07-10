@@ -32,9 +32,8 @@ class ValueDecl;
 /// Request the AccessLevel of the given ValueDecl.
 class AccessLevelRequest :
     public SimpleRequest<AccessLevelRequest,
-                         CacheKind::SeparatelyCached,
-                         AccessLevel,
-                         ValueDecl *> {
+                         AccessLevel(ValueDecl *),
+                         CacheKind::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -61,9 +60,8 @@ public:
 /// the accessibility of mutating accessors.
 class SetterAccessLevelRequest :
     public SimpleRequest<SetterAccessLevelRequest,
-                         CacheKind::SeparatelyCached,
-                         AccessLevel,
-                         AbstractStorageDecl *> {
+                         AccessLevel(AbstractStorageDecl *),
+                         CacheKind::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -88,9 +86,8 @@ public:
 /// Request the Default and Max AccessLevels of the given ExtensionDecl.
 class DefaultAndMaxAccessLevelRequest :
     public SimpleRequest<DefaultAndMaxAccessLevelRequest,
-                         CacheKind::SeparatelyCached,
-                         std::pair<AccessLevel, AccessLevel>,
-                         ExtensionDecl *> {
+                         std::pair<AccessLevel, AccessLevel>(ExtensionDecl *),
+                         CacheKind::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
   using DefaultAndMax = std::pair<AccessLevel, AccessLevel>;
