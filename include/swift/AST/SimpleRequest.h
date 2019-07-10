@@ -66,15 +66,6 @@ enum class CacheKind {
 ///   void noteCycleStep(DiagnosticEngine &diags) const;
 /// \endcode
 ///
-/// Or the \c Derived class can provide a "diagnostic location" operation and
-/// diagnostic values for the main cycle diagnostic and a "note" describing a
-/// step within the chain of diagnostics:
-/// \code
-///   T getCycleDiagnosticLoc(Inputs...) const;
-///   static constexpr Diag<Inputs...> cycleDiagnostic = ...;
-///   static constexpr Diag<Inputs...> cycleStepDiagnostic = ...;
-/// \endcode
-///
 /// Value caching is determined by the \c Caching parameter. When
 /// \c Caching == CacheKind::SeparatelyCached, the \c Derived class is
 /// responsible for implementing the two operations responsible to managing
@@ -106,14 +97,6 @@ class SimpleRequest<Derived, Output(Inputs...), Caching> {
     return asDerived().evaluate(evaluator, std::get<Indices>(storage)...);
   }
 
-  template<size_t ...Indices>
-  void diagnoseImpl(DiagnosticEngine &diags, Diag<Inputs...> diag,
-                    llvm::index_sequence<Indices...>) const {
-    diags.diagnose(
-      asDerived().getCycleDiagnosticLoc(std::get<Indices>(storage)...),
-      diag, std::get<Indices>(storage)...);
-  }
-
 protected:
   /// Retrieve the storage value directly.
   const std::tuple<Inputs...> &getStorage() const { return storage; }
@@ -132,16 +115,6 @@ public:
   evaluateRequest(const Derived &request, Evaluator &evaluator) {
     return request.callDerived(evaluator,
                                llvm::index_sequence_for<Inputs...>());
-  }
-
-  void diagnoseCycle(DiagnosticEngine &diags) const {
-    diagnoseImpl(diags, Derived::cycleDiagnostic,
-                 llvm::index_sequence_for<Inputs...>());
-  }
-
-  void noteCycleStep(DiagnosticEngine &diags) const {
-    diagnoseImpl(diags, Derived::cycleStepDiagnostic,
-                 llvm::index_sequence_for<Inputs...>());
   }
 
   friend bool operator==(const SimpleRequest &lhs, const SimpleRequest &rhs) {
