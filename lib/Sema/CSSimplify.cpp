@@ -5528,12 +5528,17 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
       choices[locator->getPath()[0].getValue()] = resolvedItem->Choice;
     }
   }
-  
+
   keyPathTy = getFixedTypeRecursive(keyPathTy, /*want rvalue*/ true);
+  bool definitelyFunctionType = false;
+  bool definitelyKeyPathType = false;
+
   auto tryMatchRootAndValueFromKeyPathType =
     [&](BoundGenericType *bgt, bool allowPartial) -> SolutionKind {
       Type boundRoot, boundValue;
-      
+
+      definitelyKeyPathType = true;
+
       // We can get root and value from a concrete key path type.
       if (bgt->getDecl() == getASTContext().getKeyPathDecl()
           || bgt->getDecl() == getASTContext().getWritableKeyPathDecl()
@@ -5564,6 +5569,26 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
       return SolutionKind::Solved;
     };
 
+  auto tryMatchRootAndValueFromFunctionType =
+      [&](FunctionType *fnTy) -> SolutionKind {
+    if (fnTy->getParams().size() != 1)
+      return SolutionKind::Error;
+
+    Type boundRoot = fnTy->getParams()[0].getPlainType();
+    Type boundValue = fnTy->getResult();
+
+    if (matchTypes(boundRoot, rootTy, ConstraintKind::Bind, subflags, locator)
+            .isFailure())
+      return SolutionKind::Error;
+
+    if (matchTypes(boundValue, valueTy, ConstraintKind::Bind, subflags, locator)
+            .isFailure())
+      return SolutionKind::Error;
+
+    definitelyFunctionType = true;
+    return SolutionKind::Solved;
+  };
+
   // If we're fixed to a bound generic type, trying harvesting context from it.
   // However, we don't want a solution that fixes the expression type to
   // PartialKeyPath; we'd rather that be represented using an upcast conversion.
@@ -5571,6 +5596,11 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
   if (keyPathBGT) {
     if (tryMatchRootAndValueFromKeyPathType(keyPathBGT, /*allowPartial*/false)
           == SolutionKind::Error)
+      return SolutionKind::Error;
+  }
+  // If we're bound to a (Root) -> Value function type, use that for context.
+  if (auto fnTy = keyPathTy->getAs<FunctionType>()) {
+    if (tryMatchRootAndValueFromFunctionType(fnTy) == SolutionKind::Error)
       return SolutionKind::Error;
   }
 
@@ -5582,24 +5612,28 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
             == SolutionKind::Error)
         return SolutionKind::Error;
     }
+    if (auto contextualBGT = contextualTy->getAs<FunctionType>()) {
+      if (tryMatchRootAndValueFromFunctionType(contextualBGT) ==
+          SolutionKind::Error)
+        return SolutionKind::Error;
+    }
   }
 
-  // If we're bound to a (Root) -> Value function type, use that for context.
-  if (auto fnTy = keyPathTy->getAs<FunctionType>()) {
-    if (fnTy->getParams().size() == 1) {
-      Type boundRoot = fnTy->getParams()[0].getPlainType();
-      Type boundValue = fnTy->getResult();
-
-      if (matchTypes(boundRoot, rootTy, ConstraintKind::Bind, subflags, locator)
-              .isFailure())
-        return SolutionKind::Error;
-
-      if (matchTypes(boundValue, valueTy, ConstraintKind::Bind, subflags,
-                     locator)
-              .isFailure())
-        return SolutionKind::Error;
-
-      return SolutionKind::Solved;
+  // If we have nothing else, and there's another constraint on our keyPathTy
+  // type variable that's some sort of conversion to a function type, use that
+  // constraint's second type.
+  if (keyPathTy->isTypeVariableOrMember()) {
+    for (auto constraint : getActiveConstraints()) {
+      if (constraint.getKind() > ConstraintKind::OperatorArgumentConversion)
+        continue;
+      if (constraint.getFirstType().getPointer() == keyPathTy.getPointer()) {
+        auto otherType = constraint.getSecondType();
+        if (auto otherFT = otherType->getAs<FunctionType>()) {
+          if (tryMatchRootAndValueFromFunctionType(otherFT) ==
+              SolutionKind::Error)
+            return SolutionKind::Error;
+        }
+      }
     }
   }
 
@@ -5609,6 +5643,8 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
     Writable,
     ReferenceWritable
   } capability = Writable;
+
+  bool anyComponentsUnresolved = false;
 
   for (unsigned i : indices(keyPath->getComponents())) {
     auto &component = keyPath->getComponents()[i];
@@ -5622,18 +5658,19 @@ ConstraintSystem::simplifyKeyPathConstraint(Type keyPathTy,
     case KeyPathExpr::Component::Kind::Subscript:
     case KeyPathExpr::Component::Kind::UnresolvedProperty:
     case KeyPathExpr::Component::Kind::UnresolvedSubscript: {
-      // If no choice was made, leave the constraint unsolved.
-      if (choices[i].isInvalid()) {
+      // If no choice was made, leave the constraint unsolved. But when
+      // generating constraints, we may already have enough information
+      // to determine whether the result will be a function type vs BGT KeyPath
+      // type, so continue through components to create new constraint at the
+      // end.
+      if (choices[i].isInvalid() || anyComponentsUnresolved) {
         if (flags.contains(TMF_GenerateConstraints)) {
-          addUnsolvedConstraint(Constraint::create(*this,
-                                                   ConstraintKind::KeyPath,
-                                                   keyPathTy, rootTy, valueTy,
-                                                   locator.getBaseLocator()));
-          return SolutionKind::Solved;
+          anyComponentsUnresolved = true;
+          continue;
         }
         return SolutionKind::Unsolved;
       }
-      
+
       // tuple elements do not change the capability of the key path
       if (choices[i].getKind() == OverloadChoiceKind::TupleIndex) {
         continue;
@@ -5728,17 +5765,23 @@ done:
       kpDecl = getASTContext().getWritableKeyPathDecl();
   }
   
-  auto resolvedKPTy = BoundGenericType::get(kpDecl, nullptr,
-                                            {rootTy, valueTy});
-  Type fnType = FunctionType::get({AnyFunctionType::Param(rootTy)}, valueTy,
-                                  AnyFunctionType::ExtInfo().withThrows(false));
-  llvm::SmallVector<Constraint *, 2> constraints;
   auto loc = locator.getBaseLocator();
-  constraints.push_back(Constraint::create(*this, ConstraintKind::Bind,
-                                           keyPathTy, resolvedKPTy, loc));
-  constraints.push_back(
-      Constraint::create(*this, ConstraintKind::Bind, keyPathTy, fnType, loc));
-  addDisjunctionConstraint(constraints, locator);
+  if (definitelyFunctionType) {
+    Type fnType =
+        FunctionType::get({AnyFunctionType::Param(rootTy)}, valueTy,
+                          AnyFunctionType::ExtInfo().withThrows(false));
+    return matchTypes(keyPathTy, fnType, ConstraintKind::Bind, subflags, loc);
+  } else if (!anyComponentsUnresolved ||
+             (definitelyKeyPathType && capability == ReadOnly)) {
+    auto resolvedKPTy =
+        BoundGenericType::get(kpDecl, nullptr, {rootTy, valueTy});
+    return matchTypes(keyPathTy, resolvedKPTy, ConstraintKind::Bind, subflags,
+                      loc);
+  } else {
+    addUnsolvedConstraint(Constraint::create(*this, ConstraintKind::KeyPath,
+                                             keyPathTy, rootTy, valueTy,
+                                             locator.getBaseLocator()));
+  }
   return SolutionKind::Solved;
 }
 

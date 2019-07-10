@@ -1105,17 +1105,6 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
       continue;
     }
 
-    // If one is a function type and the other is a key path, prefer the other.
-    if (type1->is<FunctionType>() != type2->is<FunctionType>()) {
-      auto anyKeyPathTy =
-          cs.DC->getASTContext().getAnyKeyPathDecl()->getDeclaredType();
-
-      if (tc.isSubtypeOf(type1, anyKeyPathTy, cs.DC))
-        ++score1;
-      else if (tc.isSubtypeOf(type2, anyKeyPathTy, cs.DC))
-        ++score2;
-    }
-    
     // FIXME:
     // This terrible hack is in place to support equality comparisons of non-
     // equatable option types to 'nil'. Until we have a way to constrain a type

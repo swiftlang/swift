@@ -40,7 +40,10 @@ let some = Some(keyPath: \Demo.here)
 func testFunc() {
   let _: (S) -> Int = \.i
   _ = ([S]()).map(\.i)
+
+  // FIXME: A terrible error, but the same as the pre-existing key path
+  // error in the similar situation: 'let _ = \S.init'.
   _ = ([S]()).map(\.init)
-  // expected-error@-1 {{static member 'init' cannot be used on instance of type 'S'}}
+  // expected-error@-1 {{type of expression is ambiguous without more context}}
 }
 >>>>>>> Add typechecking tests
