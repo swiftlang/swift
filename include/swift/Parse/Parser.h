@@ -867,6 +867,7 @@ public:
   }
 
   ParserResult<Decl> parseDecl(ParseDeclOptions Flags,
+                               bool IsAtStartOfLineOrPreviousHadSemi,
                                llvm::function_ref<void(Decl*)> Handler);
 
   void parseDeclDelayed();
@@ -992,7 +993,8 @@ public:
                SmallVectorImpl<Decl *> &Decls,
                SourceLoc StaticLoc,
                StaticSpellingKind StaticSpelling,
-               SourceLoc TryLoc);
+               SourceLoc TryLoc,
+               bool HasLetOrVarKeyword = true);
 
   void consumeGetSetBody(AbstractFunctionDecl *AFD, SourceLoc LBLoc);
 
@@ -1020,7 +1022,8 @@ public:
   ParserResult<FuncDecl> parseDeclFunc(SourceLoc StaticLoc,
                                        StaticSpellingKind StaticSpelling,
                                        ParseDeclOptions Flags,
-                                       DeclAttributes &Attributes);
+                                       DeclAttributes &Attributes,
+                                       bool HasFuncKeyword = true);
   void parseAbstractFunctionBody(AbstractFunctionDecl *AFD);
   bool parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD);
   ParserResult<ProtocolDecl> parseDeclProtocol(ParseDeclOptions Flags,

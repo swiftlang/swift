@@ -16,11 +16,11 @@ class InvalidFuncDecls {
   func parensAdded<<ADD_FUNC_PARENS<|||()>>> {
   }
 
-  func openingBraceAdded() <<ADD_OPENING_BRACE|||{>>>
+  func openingBraceAdded() <<ADD_OPENING_BRACE<|||{>>>
 
   func closingBraceAdded() {
 
-  <<ADD_ClOSING_BRACE|||}>>>
+  <<ADD_ClOSING_BRACE<|||}>>>
 
   <<REMOVE_FUNC_KEYWORD<func|||>>> funcKeywordRemoved() {
 
