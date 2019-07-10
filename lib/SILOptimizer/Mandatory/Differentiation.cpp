@@ -3451,17 +3451,13 @@ private:
   /// The differentiation invoker.
   DifferentiationInvoker invoker;
 
+
   /// Info from activity analysis on the original function.
   const DifferentiableActivityInfo &activityInfo;
 
   /// Caches basic blocks whose phi arguments have been remapped (adding a
   /// predecessor enum argument).
   SmallPtrSet<SILBasicBlock *, 4> remappedBasicBlocks;
-
-  /// Temporary boolean for determine whether we should be generating the body of the JVP.
-  /// If true, then skip the JVP generation process since we cannot generate JVPs for the
-  /// primitive VJPs defined on addition for Float for example.
-  bool vjpGenerated;
 
   bool errorOccurred = false;
 
@@ -3495,12 +3491,11 @@ private:
 public:
   explicit JVPEmitter(ADContext &context, SILFunction *original,
                       SILDifferentiableAttr *attr, SILFunction *jvp,
-                      DifferentiationInvoker invoker, bool vjpGenerated)
+                      DifferentiationInvoker invoker)
       : TypeSubstCloner(*jvp, *original, getSubstitutionMap(original, jvp)),
         context(context), original(original), attr(attr), jvp(jvp),
-        invoker(invoker), activityInfo(getActivityInfo(
-                              context, original, attr->getIndices(), jvp)),
-        vjpGenerated(vjpGenerated) {
+        invoker(invoker) {
+
     // Create empty differential function.
     differential = createEmptyDifferential();
     context.getGeneratedFunctions().push_back(differential);
@@ -3524,20 +3519,18 @@ public:
 
     // Add differential result for the seed.
     auto origResInfo = origTy->getResults()[indices.source];
-    diffResults.push_back(SILResultInfo(
-                              origResInfo.getType()
-                                  ->getAutoDiffAssociatedTangentSpace(
-                                        lookupConformance)
-                                  ->getCanonicalType(),
-                              origResInfo.getConvention()));
+    diffResults.push_back(
+        SILResultInfo(origResInfo.getType()
+            ->getAutoDiffAssociatedTangentSpace(lookupConformance)
+            ->getCanonicalType(), origResInfo.getConvention()));
 
     // Add pullback results for the requested wrt parameters.
     for (auto i : indices.parameters->getIndices()) {
       auto origParam = origParams[i];
-      diffParams.push_back(SILParameterInfo(
-          origParam.getType()
-          ->getAutoDiffAssociatedTangentSpace(lookupConformance)
-          ->getCanonicalType(), origParam.getConvention()));
+      diffParams.push_back(
+          SILParameterInfo(origParam.getType()
+              ->getAutoDiffAssociatedTangentSpace(lookupConformance)
+              ->getCanonicalType(), origParam.getConvention()));
     }
 
     auto diffName = original->getASTContext()
@@ -3562,9 +3555,8 @@ public:
         original->isBare(), IsNotTransparent, original->isSerialized(),
         original->isDynamicallyReplaceable());
     differential->setOwnershipEliminated();
-    differential->setDebugScope(new (module)
-                                    SILDebugScope(original->getLocation(),
-                                                  differential));
+    differential->setDebugScope(
+        new (module) SILDebugScope(original->getLocation(), differential));
     return differential;
   }
 
@@ -3628,12 +3620,11 @@ public:
     auto jvpResultArray = jvp->getLoweredFunctionType()->getResults();
     auto funcType = jvpResultArray.back().getType();
     auto silFuncCanType = funcType->castTo<SILFunctionType>()
-                              ->getCanonicalType();
+        ->getCanonicalType();
 
     directResults.push_back(
-        SILUndef::get(jvp->mapTypeIntoContext(SILType::getPrimitiveObjectType(
-                                                  silFuncCanType)),
-                      *jvp));
+        SILUndef::get(jvp->mapTypeIntoContext(
+            SILType::getPrimitiveObjectType(silFuncCanType)), *jvp));
     builder.createReturn(
         ri->getLoc(), joinElements(directResults, builder, loc));
   }
@@ -4370,7 +4361,7 @@ private:
       assert(tanFieldLookup.size() == 1);
       auto *tanField = cast<VarDecl>(tanFieldLookup.front());
       return builder.createStructElementAddr(
-         seai->getLoc(), adjSource.getValue(), tanField);
+          seai->getLoc(), adjSource.getValue(), tanField);
     }
     // Handle `tuple_element_addr`.
     if (auto *teai = dyn_cast<TupleElementAddrInst>(originalProjection)) {
@@ -5015,50 +5006,45 @@ public:
     errorOccurred = true;
   }
 
-  AllocStackInst *emitDifferentiableViewSubscript(
-      ApplyInst *ai, SILType elType, SILValue adjointArray, SILValue fnRef,
-      CanGenericSignature genericSig, int index) {
+  AllocStackInst *
+  emitDifferentiableViewSubscript(ApplyInst *ai, SILType elType,
+                                  SILValue adjointArray, SILValue fnRef,
+                                  CanGenericSignature genericSig, int index) {
     auto &ctx = builder.getASTContext();
     auto astType = elType.getASTType();
     auto literal = builder.createIntegerLiteral(
         ai->getLoc(), SILType::getBuiltinIntegerType(64, ctx), index);
     auto intType = SILType::getPrimitiveObjectType(
         ctx.getIntDecl()->getDeclaredType()->getCanonicalType());
-    auto intStruct = builder.createStruct(
-        ai->getLoc(), intType, {literal});
-    AllocStackInst *subscriptBuffer = builder.createAllocStack(
-        ai->getLoc(), elType);
+    auto intStruct = builder.createStruct(ai->getLoc(), intType, {literal});
+    AllocStackInst *subscriptBuffer =
+        builder.createAllocStack(ai->getLoc(), elType);
     auto swiftModule = getModule().getSwiftModule();
-    auto diffProto =  ctx.getProtocol(KnownProtocolKind::Differentiable);
-    auto diffConf = swiftModule->lookupConformance(
-        astType, diffProto);
+    auto diffProto = ctx.getProtocol(KnownProtocolKind::Differentiable);
+    auto diffConf = swiftModule->lookupConformance(astType, diffProto);
     assert(diffConf.hasValue() && "Missing conformance to `Differentiable`");
     auto addArithProto = ctx.getProtocol(KnownProtocolKind::AdditiveArithmetic);
-    auto addArithConf = swiftModule->lookupConformance(
-        astType, addArithProto);
+    auto addArithConf = swiftModule->lookupConformance(astType, addArithProto);
     assert(addArithConf.hasValue() &&
            "Missing conformance to `AdditiveArithmetic`");
-    auto subMap = SubstitutionMap::get(
-        genericSig, {astType},
-        {*addArithConf, *diffConf});
-    auto subscriptApply = builder.createApply(
-        ai->getLoc(), fnRef, subMap,
-        {subscriptBuffer, intStruct, adjointArray});
+    auto subMap =
+        SubstitutionMap::get(genericSig, {astType}, {*addArithConf, *diffConf});
+    builder.createApply(ai->getLoc(), fnRef, subMap,
+                        {subscriptBuffer, intStruct, adjointArray});
     return subscriptBuffer;
   }
 
-  void accumulateDifferentiableViewSubscriptDirect(
-      ApplyInst *ai, SILType elType, StoreInst *si,
-      AllocStackInst *subscriptBuffer) {
+  void
+  accumulateDifferentiableViewSubscriptDirect(ApplyInst *ai, SILType elType,
+                                              StoreInst *si,
+                                              AllocStackInst *subscriptBuffer) {
     auto astType = elType.getASTType();
-    auto newAdjValue = builder.createLoad(
-        ai->getLoc(), subscriptBuffer, getBufferLOQ(astType, getPullback()));
-    addAdjointValue(
-        si->getParent(), si->getSrc(),
-        makeConcreteAdjointValue(ValueWithCleanup(
-                newAdjValue, makeCleanup(newAdjValue, emitCleanup))));
-    builder.createDeallocStack(
-        ai->getLoc(), subscriptBuffer);
+    auto newAdjValue = builder.createLoad(ai->getLoc(), subscriptBuffer,
+                                          getBufferLOQ(astType, getPullback()));
+    addAdjointValue(si->getParent(), si->getSrc(),
+                    makeConcreteAdjointValue(ValueWithCleanup(
+                        newAdjValue, makeCleanup(newAdjValue, emitCleanup))));
+    builder.createDeallocStack(ai->getLoc(), subscriptBuffer);
   }
 
   void accumulateDifferentiableViewSubscriptIndirect(
@@ -5067,10 +5053,9 @@ public:
         ai->getLoc(), subscriptBuffer, SILAccessKind::Read,
         SILAccessEnforcement::Static, /*noNestedConflict*/ true,
         /*fromBuiltin*/ false);
-    addToAdjointBuffer(
-        cai->getParent(), cai->getSrc(), subscriptBufferAccess);
-    builder.createEndAccess(
-        ai->getLoc(), subscriptBufferAccess, /*aborted*/ false);
+    addToAdjointBuffer(cai->getParent(), cai->getSrc(), subscriptBufferAccess);
+    builder.createEndAccess(ai->getLoc(), subscriptBufferAccess,
+                            /*aborted*/ false);
     builder.createDeallocStack(ai->getLoc(), subscriptBuffer);
   }
 
@@ -5078,8 +5063,6 @@ public:
     SILValue adjointArray;
     SILValue fnRef;
     CanGenericSignature genericSig;
-    auto lookupConformance = LookUpConformanceInModule(
-        getModule().getSwiftModule());
     for (auto use : ai->getUses()) {
       auto tei = dyn_cast<TupleExtractInst>(use->getUser()->getResult(0));
       if (!tei || tei->getFieldNo() != 0) continue;
@@ -5531,9 +5514,9 @@ public:
     }
   }
 
-  // Handle `load` instruction.
-  //   Original: y = load x
-  //    Adjoint: adj[x] += adj[y]
+  /// Handle `load` instruction.
+  ///   Original: y = load x
+  ///    Adjoint: adj[x] += adj[y]
   void visitLoadInst(LoadInst *li) {
     auto *bb = li->getParent();
     auto adjVal = materializeAdjointDirect(getAdjointValue(bb, li), li->getLoc());
@@ -5565,9 +5548,9 @@ public:
     builder.createDeallocStack(li->getLoc(), localBuf);
   }
 
-  // Handle `store` instruction.
-  //   Original: store x to y
-  //    Adjoint: adj[x] += load adj[y]; adj[y] = 0
+  /// Handle `store` instruction.
+  ///   Original: store x to y
+  ///    Adjoint: adj[x] += load adj[y]; adj[y] = 0
   void visitStoreInst(StoreInst *si) {
     auto *bb = si->getParent();
     auto &adjBuf = getAdjointBuffer(bb, si->getDest());
@@ -5588,9 +5571,9 @@ public:
     emitZeroIndirect(bufType.getASTType(), adjBuf, si->getLoc());
   }
 
-  // Handle `copy_addr` instruction.
-  //   Original: copy_addr x to y
-  //    Adjoint: adj[x] += adj[y]; adj[y] = 0
+  /// Handle `copy_addr` instruction.
+  ///   Original: copy_addr x to y
+  ///    Adjoint: adj[x] += adj[y]; adj[y] = 0
   void visitCopyAddrInst(CopyAddrInst *cai) {
     auto *bb = cai->getParent();
     auto &adjDest = getAdjointBuffer(bb, cai->getDest());
@@ -5616,9 +5599,9 @@ public:
     adjDest.setCleanup(cleanup);
   }
 
-  // Handle `begin_access` instruction.
-  //   Original: y = begin_access x
-  //    Adjoint: nothing
+  /// Handle `begin_access` instruction.
+  ///   Original: y = begin_access x
+  ///    Adjoint: nothing (differentiability checks, cleanup propagation)
   void visitBeginAccessInst(BeginAccessInst *bai) {
     // Check for non-differentiable writes.
     if (bai->getAccessKind() == SILAccessKind::Modify) {
@@ -5657,7 +5640,7 @@ public:
 #define NOT_DIFFERENTIABLE(INST, DIAG) \
   void visit##INST##Inst(INST##Inst *inst) { \
     getContext().emitNondifferentiabilityError( \
-        inst, getDifferentiationTask(), DIAG); \
+        inst, getInvoker(), DIAG); \
     errorOccurred = true; \
     return; \
   }
@@ -6917,36 +6900,12 @@ bool JVPEmitter::run() {
   // Create entry BB and arguments.
   auto *entry = jvp->createBasicBlock();
   createEntryArguments(jvp);
-
-  if (vjpGenerated) {
-    // Clone. Since the VJP was generated, the SIL code was verified for being
-    // differentiable, thus creating the original body of the JVP should also
-    // be possible.
-    SmallVector<SILValue, 4> entryArgs(entry->getArguments().begin(),
-                                       entry->getArguments().end());
-    cloneFunctionBody(original, entry, entryArgs);
-    // If errors occurred, back out.
-    if (errorOccurred)
-      return true;
-
-    // Generate differential code.
-    DifferentialEmitter DifferentialEmitter(*this);
-    if (DifferentialEmitter.run()) {
-      errorOccurred = true;
-      return true;
-    }
-  } else {
-    // Create empty body of JVP if the user defined their own custom VJP.
-    // Return undef.
-    auto diffConv = jvp->getConventions();
-    SILBuilder builder(entry);
-    auto loc = jvp->getLocation();
-    builder.createReturn(loc, SILUndef::get(
-                                  jvp->mapTypeIntoContext(
-                                      diffConv.getSILResultType()),
-                              *jvp));
-  }
-
+  SmallVector<SILValue, 4> entryArgs(entry->getArguments().begin(),
+                                     entry->getArguments().end());
+  cloneFunctionBody(original, entry, entryArgs);
+  // If errors occurred, back out.
+  if (errorOccurred)
+    return true;
 
   LLVM_DEBUG(getADDebugStream() << "Generated JVP for "
              << original->getName() << ":\n" << *jvp);
@@ -7160,11 +7119,30 @@ bool ADContext::processDifferentiableAttribute(
     if (vjpGenerated && (diagnoseNoReturn(*this, original, invoker) ||
         diagnoseUnsupportedControlFlow(*this, original, invoker)))
       return true;
-    
+
     jvp = createEmptyJVP(*this, original, attr, isAssocFnExported);
     getGeneratedFunctions().push_back(jvp);
-    JVPEmitter emitter(*this, original, attr, jvp, invoker, vjpGenerated);
-    return emitter.run();
+
+    if (vjpGenerated) {
+      JVPEmitter emitter(*this, original, attr, jvp, invoker);
+      return emitter.run();
+    } else {
+      LLVM_DEBUG(getADDebugStream()
+                 << "Generating empty JVP for original @"
+                 << original->getName() << '\n');
+      // Create empty body of JVP if the user defined their own custom VJP.
+      // Return undef.
+      auto *entry = jvp->createBasicBlock();
+      createEntryArguments(jvp);
+      auto diffConv = jvp->getConventions();
+      SILBuilder builder(entry);
+      auto loc = jvp->getLocation();
+      builder.createReturn(loc, SILUndef::get(
+          jvp->mapTypeIntoContext(diffConv.getSILResultType()),
+          *jvp));
+      LLVM_DEBUG(getADDebugStream() << "Generated empty JVP for "
+                 << original->getName() << ":\n" << *jvp);
+    }
   }
 
   return false;

@@ -588,17 +588,6 @@ extension FloatingPoint {
   }
 }
 
-protocol MethodDiffReq {
-  @differentiable(wrt: self, vjp: vjpFoo where Self : Differentiable)
-  func foo() -> Self
-}
-
-extension MethodDiffReq where Self : Differentiable {
-  func vjpFoo(x: Self) -> (Self, (Self.TangentVector) -> Self.TangentVector) {
-    return (self, { $0 })
-  }
-}
-
 // expected-error @+1 {{'vjpNonvariadic' does not have expected type '(Float, Int32...) -> (Float, (Float.TangentVector) -> Float.TangentVector)' (aka '(Float, Int32...) -> (Float, (Float) -> Float)')}}
 @differentiable(wrt: x, vjp: vjpNonvariadic)
 func variadic(_ x: Float, indices: Int32...) -> Float {
@@ -647,10 +636,6 @@ protocol DifferentiableAttrRequirements : Differentiable {
   // expected-note @+2 {{protocol requires function 'f2'}}
   @differentiable(wrt: (self, x, y))
   func f2(_ x: Float, _ y: Float) -> Float
-
-  // expected-note @+2 {{protocol requires function 'generic'}}
-  @differentiable(where T : Differentiable)
-  func generic<T>(_ x: T) -> T
 }
 
 // expected-error @+1 {{does not conform to protocol 'DifferentiableAttrRequirements'}}
@@ -695,11 +680,6 @@ struct DiffAttrConformanceErrors : DifferentiableAttrRequirements {
   @differentiable(wrt: (self, x))
   func f2(_ x: Float, _ y: Float) -> Float {
     return x + y
-  }
-
-  // expected-note @+1 {{candidate is missing attribute '@differentiable(where T : Differentiable)'}}
-  func generic<T>(_ x: T) -> T {
-    return x
   }
 }
 
@@ -864,4 +844,44 @@ func inout1(x: Float, y: inout Float) -> Void {
 @differentiable(wrt: y) // expected-error {{'inout' parameters ('inout Float') cannot be differentiated with respect to}}
 func inout2(x: Float, y: inout Float) -> Float {
   let _ = x + y
+}
+
+
+// Missing `@differentiable` attribute, without printing the 'wrt' arguments.
+
+protocol DifferentiableWhereClause: Differentiable {
+  associatedtype Scalar
+
+  @differentiable(where Scalar: Differentiable) // expected-error {{'where' clauses cannot be used in a '@differentiable' attribute on a protocol requirement}}
+  func test(value: Scalar) -> Float
+}
+
+// Missing a `@differentiable` attribute.
+
+public protocol Distribution {
+  associatedtype Value
+  func logProbability(of value: Value) -> Float
+}
+
+public protocol DifferentiableDistribution: Differentiable, Distribution {
+  @differentiable(wrt: self)
+  func logProbability(of value: Value) -> Float
+}
+
+public protocol MissingDifferentiableDistribution: DifferentiableDistribution
+  where Value: Differentiable {
+  func logProbability(of value: Value) -> Float // expected-note {{candidate is missing attribute '@differentiable(wrt: self)'}}
+}
+
+// Missing `@differentiable` attribute, without printing the 'wrt' arguments.
+
+protocol Example: Differentiable {
+  associatedtype Scalar: Differentiable
+
+  @differentiable
+  func test(value: Scalar) -> Float
+}
+
+protocol MissingDifferentiableTest: Example {
+  func test(value: Scalar) -> Float // expected-note {{candidate is missing attribute '@differentiable'}}
 }

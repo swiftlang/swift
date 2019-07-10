@@ -1994,6 +1994,12 @@ extension Array.DifferentiableView : Equatable where Element : Equatable {
   }
 }
 
+extension Array.DifferentiableView : ExpressibleByArrayLiteral {
+  public init(arrayLiteral elements: Element...) {
+    self.init(elements)
+  }
+}
+
 extension Array.DifferentiableView : CustomStringConvertible {
   public var description: String {
     return base.description

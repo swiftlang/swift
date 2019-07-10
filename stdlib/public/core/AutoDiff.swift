@@ -100,7 +100,7 @@ public extension VectorProtocol {
   }
 }
 
-/* Note: These default-implemented opreators will slow down type-checking
+/* Note: These default-implemented operators will slow down type-checking
    performance and break existing code.
 
 public extension VectorProtocol {
@@ -883,5 +883,78 @@ public struct AnyDerivative : Differentiable & AdditiveArithmetic {
       return
     }
     _box._move(along: direction._box)
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Differentiable higher order functions for collections
+//===----------------------------------------------------------------------===//
+
+public extension Array where Element: Differentiable {
+  @differentiable(wrt: (self, initialResult), vjp: _vjpDifferentiableReduce)
+  func differentiableReduce<Result: Differentiable>(
+    _ initialResult: Result,
+    _ nextPartialResult: @differentiable (Result, Element) -> Result
+  ) -> Result {
+    reduce(initialResult, nextPartialResult)
+  }
+
+  @usableFromInline
+  internal func _vjpDifferentiableReduce<Result: Differentiable>(
+    _ initialResult: Result,
+    _ nextPartialResult: @differentiable (Result, Element) -> Result
+  ) -> (value: Result,
+        pullback: (Result.TangentVector)
+          -> (Array.TangentVector, Result.TangentVector)) {
+    var pullbacks:
+      [(Result.TangentVector) -> (Result.TangentVector, Element.TangentVector)]
+        = []
+    let count = self.count
+    pullbacks.reserveCapacity(count)
+    var result = initialResult
+    for element in self {
+      let (y, pb) =
+        Swift.valueWithPullback(at: result, element, in: nextPartialResult)
+      result = y
+      pullbacks.append(pb)
+    }
+    return (value: result, pullback: { tangent in
+      var resultTangent = tangent
+      var elementTangents = TangentVector([])
+      elementTangents.base.reserveCapacity(count)
+      for pullback in pullbacks.reversed() {
+        let (newResultTangent, elementTangent) = pullback(resultTangent)
+        resultTangent = newResultTangent
+        elementTangents.base.append(elementTangent)
+      }
+      return (TangentVector(elementTangents.base.reversed()), resultTangent)
+    })
+  }
+}
+
+public extension Array where Element: Differentiable {
+  @differentiable(wrt: self, vjp: _vjpDifferentiableMap)
+  func differentiableMap<Result: Differentiable>(
+    _ body: @differentiable (Element) -> Result
+  ) -> [Result] {
+    map(body)
+  }
+
+  @usableFromInline
+  internal func _vjpDifferentiableMap<Result: Differentiable>(
+    _ body: @differentiable (Element) -> Result
+  ) -> (value: [Result],
+        pullback: (Array<Result>.TangentVector) -> Array.TangentVector) {
+    var values: [Result] = []
+    var pullbacks: [(Result.TangentVector) -> Element.TangentVector] = []
+    for x in self {
+      let (y, pb) = Swift.valueWithPullback(at: x, in: body)
+      values.append(y)
+      pullbacks.append(pb)
+    }
+    func pullback(_ tans: Array<Result>.TangentVector) -> Array.TangentVector {
+      .init(zip(tans.base, pullbacks).map { tan, pb in pb(tan) })
+    }
+    return (value: values, pullback: pullback)
   }
 }
