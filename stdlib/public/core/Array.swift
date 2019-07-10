@@ -1917,19 +1917,17 @@ extension Array where Element : Differentiable {
   /// The view of an array as the differentiable product manifold of `Element`
   /// multiplied with itself `count` times.
   @frozen
-  public struct DifferentiableView : Differentiable {
-    private var _base: [Element]
+  public struct DifferentiableView
+    : Differentiable, MutableCollection, RandomAccessCollection,
+      RangeReplaceableCollection {
+    @usableFromInline
+    internal var _base: [Element]
 
-    /// The viewed array.
-    // I'm implementing this as a computed property instead of directly
-    // exposing `_base` because the `@differentiable` annotation does not make
-    // the stored property actually differentiable. I think this is a bug.
-    // Maybe it's related to `@frozen`?
-    // TODO: Determine if that is a bug, and fix.
+    @inlinable
     public var base: [Element] {
-      @differentiable(wrt: self, vjp: _vjpBase)
-      get { return _base }
-      _modify { yield &_base }
+      @differentiable(vjp: _vjpBase)
+      get { _base }
+      set { _base = newValue }
     }
 
     @usableFromInline
@@ -1957,16 +1955,14 @@ extension Array where Element : Differentiable {
 
     public var allDifferentiableVariables: AllDifferentiableVariables {
       get {
-        return AllDifferentiableVariables(
-          base.map { $0.allDifferentiableVariables })
+        AllDifferentiableVariables(base.map { $0.allDifferentiableVariables })
       }
       set {
         precondition(
-          base.count == newValue.base.count,
-          "cannot set Array.DifferentiableView.AllDifferentiableVariables " +
-            "with count \(base.count) to " +
-            "Array.DifferentiableView.AllDifferentiableVariables with " +
-            "different count \(newValue.base.count)")
+          base.count == newValue.base.count, """
+            Count mismatch: \(base.count) ('self') and \(newValue.base.count) \
+            ('newValue')
+            """)
         for i in base.indices {
           base[i].allDifferentiableVariables = newValue.base[i]
         }
@@ -1975,12 +1971,39 @@ extension Array where Element : Differentiable {
 
     public mutating func move(along direction: TangentVector) {
       precondition(
-        base.count == direction.base.count,
-        "cannot move Array.DifferentiableView with count \(base.count) along " +
-          "direction with different count \(direction.base.count)")
+        base.count == direction.base.count, """
+          Count mismatch: \(base.count) ('self') and \(direction.base.count) \
+          ('direction')
+          """)
       for i in base.indices {
         base[i].move(along: direction.base[i])
       }
+    }
+
+    // MARK: - Collection conformance.
+    public typealias Index = Array.Index
+    public typealias Indices = Array.Indices
+    public typealias SubSequence = Array.SubSequence
+
+    @inlinable
+    public subscript(position: Int) -> Element {
+      get { _base[position] }
+      set { _base[position] = newValue }
+    }
+
+    @inlinable
+    public var startIndex: Int {
+      _base.startIndex
+    }
+
+    @inlinable
+    public var endIndex: Int {
+      _base.endIndex
+    }
+
+    @inlinable
+    public init() {
+      self.init(.init())
     }
   }
 }
@@ -2021,17 +2044,15 @@ extension Array.DifferentiableView : AdditiveArithmetic
     lhs: Array.DifferentiableView,
     rhs: Array.DifferentiableView
   ) -> Array.DifferentiableView {
-    precondition(
-      lhs.base.count == 0 || rhs.base.count == 0 ||
-        lhs.base.count == rhs.base.count,
-      "cannot add Array.DifferentiableViews with different counts: " +
-        "\(lhs.base.count) and \(rhs.base.count)")
     if lhs.base.count == 0 {
       return rhs
     }
     if rhs.base.count == 0 {
       return lhs
     }
+    precondition(
+      lhs.base.count == rhs.base.count,
+      "Count mismatch: \(lhs.base.count) and \(rhs.base.count)")
     return Array.DifferentiableView(zip(lhs.base, rhs.base).map(+))
   }
 
@@ -2039,32 +2060,21 @@ extension Array.DifferentiableView : AdditiveArithmetic
     lhs: Array.DifferentiableView,
     rhs: Array.DifferentiableView
   ) -> Array.DifferentiableView {
-    precondition(
-      lhs.base.count == 0 || rhs.base.count == 0 ||
-        lhs.base.count == rhs.base.count,
-      "cannot subtract Array.DifferentiableViews with different counts: " +
-        "\(lhs.base.count) and \(rhs.base.count)")
     if lhs.base.count == 0 {
       return rhs
     }
     if rhs.base.count == 0 {
       return lhs
     }
+    precondition(
+      lhs.base.count == rhs.base.count,
+      "Count mismatch: \(lhs.base.count) and \(rhs.base.count)")
     return Array.DifferentiableView(zip(lhs.base, rhs.base).map(-))
-  }
-
-  @inlinable
-  public subscript(_ index: Int) -> Element {
-    if index < base.count {
-      return base[index]
-    } else {
-      return Element.zero
-    }
   }
 }
 
-/// Makes `Array` differentiable as the product manifold of `Element`
-/// multiplied with itself `count` times.
+// Makes `Array` differentiable as the product manifold of `Element`
+// multiplied with itself `count` times.
 extension Array : Differentiable where Element : Differentiable {
   // In an ideal world, `TangentVector`, `TangentVector`, and
   // `AllDifferentiableVariables` would all be `Array`s. Unfortunately, we
@@ -2097,33 +2107,29 @@ extension Array : Differentiable where Element : Differentiable {
 
 extension Array where Element : Differentiable {
   public func _vjpSubscript(index: Int) ->
-    (Element, (Element.TangentVector) -> TangentVector)
-  {
-    func pullback(_ gradientIn: Element.TangentVector) -> TangentVector {
-      var gradientOut = Array<Element.TangentVector>(
+    (Element, (Element.TangentVector) -> TangentVector) {
+    func pullback(_ v: Element.TangentVector) -> TangentVector {
+      var grad = Array<Element.TangentVector>(
         repeating: .zero,
         count: count)
-      gradientOut[index] = gradientIn
-      return TangentVector(gradientOut)
+      grad[index] = v
+      return TangentVector(grad)
     }
     return (self[index], pullback)
   }
 
   public static func _vjpPlus(_ lhs: [Element], _ rhs: [Element]) ->
     ([Element], (TangentVector) -> (TangentVector, TangentVector)) {
-      func pullback(_ gradientIn: TangentVector) ->
-        (TangentVector, TangentVector) {
-        precondition(
-          gradientIn.base.count == lhs.count + rhs.count,
-          "+ should receive gradient with count equal to sum of operand " +
-            "counts, but counts are: gradient \(gradientIn.base.count), " +
-            "lhs \(lhs.count), rhs \(rhs.count)")
-        return (
-          TangentVector(Array<Element.TangentVector>(
-            gradientIn.base[0..<lhs.count])),
-          TangentVector(Array<Element.TangentVector>(
-            gradientIn.base[lhs.count...])))
-      }
-      return (lhs + rhs, pullback)
+    func pullback(_ v: TangentVector) -> (TangentVector, TangentVector) {
+      precondition(
+        v.base.count == lhs.count + rhs.count, """
+          Tangent vector with invalid count; expected to equal the sum of \
+          operand counts \(lhs.count) and \(rhs.count)
+          """)
+      return (
+        .init(.init(v.base[0..<lhs.endIndex])),
+        .init(.init(v.base[lhs.endIndex...])))
+    }
+    return (lhs + rhs, pullback)
   }
 }
