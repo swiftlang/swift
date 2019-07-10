@@ -683,8 +683,8 @@ void swift::simple_display(
   else
     out << "null";
   out << ", ";
-  if (propertyWrapper.initialValueInit)
-    out << propertyWrapper.initialValueInit->printRef();
+  if (propertyWrapper.wrappedValueInit)
+    out << propertyWrapper.wrappedValueInit->printRef();
   else
     out << "null";
   out << " }";
