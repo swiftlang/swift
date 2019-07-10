@@ -499,7 +499,16 @@ static void printDifferentiableAttrArguments(
     stream << "vjp: " << vjp->Name;
   }
   // Print 'where' clause, if any.
-  if (!attr->getRequirements().empty()) {
+  // First, filter out requirements satisfied by the original function's
+  // generic signature. They should not be printed.
+  auto requirementsToPrint =
+      makeFilterRange(attr->getRequirements(), [&](Requirement req) {
+        if (auto *originalGenSig = original->getGenericSignature())
+          if (originalGenSig->isRequirementSatisfied(req))
+            return false;
+        return true;
+      });
+  if (!requirementsToPrint.empty()) {
     if (!isLeadingClause)
       stream << ' ';
     stream << "where ";
@@ -515,15 +524,6 @@ static void printDifferentiableAttrArguments(
         return genericEnv->getSugaredType(Ty);
       };
     }
-    // Filter out requirements satisfied by original function's generic
-    // signature. They should not be printed.
-    auto requirementsToPrint =
-        makeFilterRange(attr->getRequirements(), [&](Requirement req) {
-          if (auto *originalGenSig = original->getGenericSignature())
-            if (originalGenSig->isRequirementSatisfied(req))
-              return false;
-          return true;
-        });
     interleave(requirementsToPrint, [&](Requirement req) {
       if (auto *originalGenSig = original->getGenericSignature())
         if (originalGenSig->isRequirementSatisfied(req))

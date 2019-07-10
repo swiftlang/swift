@@ -591,6 +591,92 @@ static bool parameterTypesMatch(const ValueDecl *derivedDecl,
   return true;
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+static bool overridesDifferentiableAttribute(ValueDecl *derivedDecl,
+                                             ValueDecl *baseDecl) {
+  ASTContext &ctx = derivedDecl->getASTContext();
+  auto &diags = ctx.Diags;
+
+  auto *derivedAFD = dyn_cast<AbstractFunctionDecl>(derivedDecl);
+  auto *baseAFD = dyn_cast<AbstractFunctionDecl>(baseDecl);
+
+  if (!derivedAFD || !baseAFD)
+    return false;
+
+  auto derivedDAs = derivedAFD->getAttrs().getAttributes<DifferentiableAttr>();
+  auto baseDAs = baseAFD->getAttrs().getAttributes<DifferentiableAttr>();
+
+  // Make sure all the differentiable attributes in `baseDecl` are
+  // also declared in `derivedDecl`.
+  for (auto baseDA : baseDAs) {
+    auto baseParameters = baseDA->getParameterIndices();
+    auto defined = false;
+    for (auto derivedDA : derivedDAs) {
+      auto derivedParameters = derivedDA->getParameterIndices();
+      if (derivedParameters &&
+          baseParameters &&
+          AutoDiffIndexSubset::get(
+              ctx, baseParameters->parameters)
+              ->isSubsetOf(AutoDiffIndexSubset::get(
+                  ctx, derivedParameters->parameters))) {
+        defined = true;
+        break;
+      }
+    }
+    if (!defined) {
+      // Omit printing wrt clause if attribute differentiation parameters match
+      // inferred differentiation parameters.
+      auto *inferredParameters = TypeChecker::inferDifferentiableParameters(
+          derivedAFD, nullptr);
+      bool omitWrtClause = !baseParameters ||
+          baseParameters->parameters.count() ==
+          inferredParameters->parameters.count();
+      // Get `@differentiable` attribute description.
+      std::string baseDAString;
+      llvm::raw_string_ostream stream(baseDAString);
+      baseDA->print(stream, derivedDecl, omitWrtClause);
+      diags.diagnose(
+          derivedDecl,
+          diag::protocol_witness_missing_differentiable_attr,
+          StringRef(stream.str()).trim());
+      return false;
+    }
+  }
+
+  // If there is no differentiable attribute in `derivedDecl`, then
+  // overriding is not allowed.
+  if (derivedDAs.empty())
+    return false;
+
+  // Finally, go through all differentiable attributes in
+  // `derivedDecl` and check if they subsume any of the
+  // differentiable attributes in `baseDecl`.
+  for (auto derivedDA : derivedDAs) {
+    auto derivedParameters = derivedDA->getParameterIndices();
+    auto overrides = true;
+    for (auto baseDA : baseDAs) {
+      auto baseParameters = baseDA->getParameterIndices();
+      // If the differentiable indices of `derivedDA` are a
+      // subset of those of `baseDA`, then `baseDA` subsumes
+      // `derivedDA` and the function is marked as overridden.
+      if (derivedParameters &&
+            baseParameters &&
+            AutoDiffIndexSubset::get(
+                ctx, derivedParameters->parameters)
+              ->isSubsetOf(AutoDiffIndexSubset::get(
+                  ctx, baseParameters->parameters))) {
+        overrides = false;
+        break;
+      }
+    }
+    if (overrides)
+      return true;
+  }
+
+  return false;
+}
+// SWIFT_ENABLE_TENSORFLOW END
+
 /// Returns true if the given declaration is for the `NSObject.hashValue`
 /// property.
 static bool isNSObjectHashValue(ValueDecl *baseDecl) {
@@ -745,6 +831,12 @@ SmallVector<OverrideMatch, 2> OverrideMatcher::match(
     // declarations do not have an overriding relationship.
     if (!areOverrideCompatibleSimple(decl, parentDecl))
       continue;
+
+    // SWIFT_ENABLE_TENSORFLOW
+    // Check whether the differentiable attribute allows overriding.
+    if (overridesDifferentiableAttribute(decl, parentDecl))
+      continue;
+    // SWIFT_ENABLE_TENSORFLOW END
 
     auto parentMethod = dyn_cast<AbstractFunctionDecl>(parentDecl);
     auto parentStorage = dyn_cast<AbstractStorageDecl>(parentDecl);

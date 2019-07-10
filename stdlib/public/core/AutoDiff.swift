@@ -100,7 +100,7 @@ public extension VectorProtocol {
   }
 }
 
-/* Note: These default-implemented opreators will slow down type-checking
+/* Note: These default-implemented operators will slow down type-checking
    performance and break existing code.
 
 public extension VectorProtocol {
