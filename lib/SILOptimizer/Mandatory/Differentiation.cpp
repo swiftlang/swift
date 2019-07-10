@@ -3475,14 +3475,14 @@ private:
 
   static const DifferentiableActivityInfo &getActivityInfo(
        ADContext &context, SILFunction *original,
-       const SILAutoDiffIndices &indices, SILFunction *vjp) {
+       const SILAutoDiffIndices &indices, SILFunction *jvp) {
     // Get activity info of the original function.
     auto &passManager = context.getPassManager();
     auto *activityAnalysis =
     passManager.getAnalysis<DifferentiableActivityAnalysis>();
     auto &activityCollection = *activityAnalysis->get(original);
     auto &activityInfo = activityCollection.getActivityInfo(
-        vjp->getLoweredFunctionType()->getGenericSignature());
+        jvp->getLoweredFunctionType()->getGenericSignature());
     LLVM_DEBUG(dumpActivityInfo(*original, indices, activityInfo,
                                 getADDebugStream()));
     return activityInfo;
@@ -3494,7 +3494,8 @@ public:
                       DifferentiationInvoker invoker)
       : TypeSubstCloner(*jvp, *original, getSubstitutionMap(original, jvp)),
         context(context), original(original), attr(attr), jvp(jvp),
-        invoker(invoker) {
+      invoker(invoker), activityInfo(getActivityInfo(
+                            context, original, attr->getIndices(), jvp)) {
 
     // Create empty differential function.
     differential = createEmptyDifferential();
@@ -4251,7 +4252,7 @@ private:
   }
 
   /// Substitutes all replacement types of the given substitution map using the
-  /// differential function's substitution map.
+  /// adjoint function's substitution map.
   SubstitutionMap remapSubstitutionMap(SubstitutionMap substMap) {
     return substMap.subst(getPullback().getForwardingSubstitutionMap());
   }
@@ -4431,7 +4432,7 @@ private:
     }
 
     // Set insertion point for local allocation builder: before the last local
-    // allocation, or at the start of the differential function's entry if no local
+    // allocation, or at the start of the adjoint function's entry if no local
     // allocations exist yet.
     localAllocBuilder.setInsertionPoint(
         getPullback().getEntryBlock(),
@@ -4625,7 +4626,7 @@ public:
       auto pbStructLoweredType =
           remapType(getPullbackInfo().getPullbackStructLoweredType(origBB));
       // If the BB is the original exit, then the adjoint block that we just
-      // created must be the differential function's entry. For the adjoint entry,
+      // created must be the pullback function's entry. For the adjoint entry,
       // create entry arguments and continue to the next block.
       if (origBB == origExit) {
         assert(adjointBB->isEntry());
@@ -6168,31 +6169,31 @@ public:
             diffConv.getSILResultType()), differential));
   }
 
-  void visit(SILInstruction *inst) {
-    if (errorOccurred)
-      return;
+//  void visit(SILInstruction *inst) {
+//    if (errorOccurred)
+//      return;
+//
+//    LLVM_DEBUG(getADDebugStream() << "DifferentialEmitter visited:\n[ORIG]"
+//               << *inst);
+//#ifndef NDEBUG
+//    auto beforeInsertion = std::prev(builder.getInsertionPoint());
+//#endif
+//    SILInstructionVisitor::visit(inst);
+//    LLVM_DEBUG({
+//      auto &s = llvm::dbgs() << "[DIFF] Emitted:\n";
+//      auto afterInsertion = builder.getInsertionPoint();
+//      for (auto it = ++beforeInsertion; it != afterInsertion; ++it)
+//        s << *it;
+//    });
+//  }
 
-    LLVM_DEBUG(getADDebugStream() << "DifferentialEmitter visited:\n[ORIG]"
-               << *inst);
-#ifndef NDEBUG
-    auto beforeInsertion = std::prev(builder.getInsertionPoint());
-#endif
-    SILInstructionVisitor::visit(inst);
-    LLVM_DEBUG({
-      auto &s = llvm::dbgs() << "[DIFF] Emitted:\n";
-      auto afterInsertion = builder.getInsertionPoint();
-      for (auto it = ++beforeInsertion; it != afterInsertion; ++it)
-        s << *it;
-    });
-  }
-
-  void visitSILInstruction(SILInstruction *inst) {
-    LLVM_DEBUG(getADDebugStream()
-               << "Unhandled instruction in DifferentialEmitter: " << *inst);
-    getContext().emitNondifferentiabilityError(inst, getInvoker(),
-        diag::autodiff_expression_not_differentiable_note);
-    errorOccurred = true;
-  }
+//  void visitSILInstruction(SILInstruction *inst) {
+//    LLVM_DEBUG(getADDebugStream()
+//               << "Unhandled instruction in DifferentialEmitter: " << *inst);
+//    getContext().emitNondifferentiabilityError(inst, getInvoker(),
+//        diag::autodiff_expression_not_differentiable_note);
+//    errorOccurred = true;
+//  }
 
   AllocStackInst *emitDifferentiableViewSubscript(
       ApplyInst *ai, SILType elType, SILValue adjointArray, SILValue fnRef,
@@ -6253,13 +6254,13 @@ public:
     builder.createDeallocStack(ai->getLoc(), subscriptBuffer);
   }
 
-  void visitArrayInitialization(ApplyInst *ai) {
+//  void visitArrayInitialization(ApplyInst *ai) {
+//
+//  }
 
-  }
-
-  void visitApplyInst(ApplyInst *ai) {
-
-  }
+//  void visitApplyInst(ApplyInst *ai) {
+//
+//  }
 
   /// Handle `struct` instruction.
   ///   Original: y = struct (x0, x1, x2, ...)
@@ -6267,26 +6268,26 @@ public:
   ///             adj[x1] += struct_extract adj[y], #x1
   ///             adj[x2] += struct_extract adj[y], #x2
   ///             ...
-  void visitStructInst(StructInst *si) {
-
-  }
+//  void visitStructInst(StructInst *si) {
+//
+//  }
 
   /// Handle `struct_extract` instruction.
   ///   Original: y = struct_extract x, #field
   ///    Adjoint: adj[x] += struct (0, ..., #field': adj[y], ..., 0)
   ///                                       ^~~~~~~
   ///                     field in tangent space corresponding to #field
-  void visitStructExtractInst(StructExtractInst *sei) {
-
-  }
+//  void visitStructExtractInst(StructExtractInst *sei) {
+//
+//  }
 
   /// Handle `tuple` instruction.
   ///   Original: y = tuple (x0, x1, x2, ...)
   ///    Adjoint: adj[x0] += tuple_extract adj[y], 0
   ///             ...
-  void visitTupleInst(TupleInst *ti) {
-
-  }
+//  void visitTupleInst(TupleInst *ti) {
+//
+//  }
 
   /// Handle `tuple_extract` instruction.
   ///   Original: y = tuple_extract x, <n>
@@ -6294,37 +6295,37 @@ public:
   ///                                         ^~~~~~
   ///                            n'-th element, where n' is tuple tangent space
   ///                            index corresponding to n
-  void visitTupleExtractInst(TupleExtractInst *tei) {
-
-  }
+//  void visitTupleExtractInst(TupleExtractInst *tei) {
+//
+//  }
 
   // Handle `load` instruction.
   //   Original: y = load x
   //    Adjoint: adj[x] += adj[y]
-  void visitLoadInst(LoadInst *li) {
-
-  }
+//  void visitLoadInst(LoadInst *li) {
+//
+//  }
 
   // Handle `store` instruction.
   //   Original: store x to y
   //    Adjoint: adj[x] += load adj[y]; adj[y] = 0
-  void visitStoreInst(StoreInst *si) {
-
-  }
+//  void visitStoreInst(StoreInst *si) {
+//
+//  }
 
   // Handle `copy_addr` instruction.
   //   Original: copy_addr x to y
   //    Adjoint: adj[x] += adj[y]; adj[y] = 0
-  void visitCopyAddrInst(CopyAddrInst *cai) {
-
-  }
+//  void visitCopyAddrInst(CopyAddrInst *cai) {
+//
+//  }
 
   // Handle `begin_access` instruction.
   //   Original: y = begin_access x
   //    Adjoint: nothing
-  void visitBeginAccessInst(BeginAccessInst *bai) {
-
-  }
+//  void visitBeginAccessInst(BeginAccessInst *bai) {
+//
+//  }
 
 #define DIFFERENTIAL_PROPAGATE_BUFFER_CLEANUP(INST) \
   void visit##INST##Inst(INST##Inst *inst) { \
