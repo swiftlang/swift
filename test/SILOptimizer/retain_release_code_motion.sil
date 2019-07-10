@@ -723,7 +723,7 @@ bb2:
 // CHECK: bb0(%0 : $AnyObject):
 // CHECK-NOT:  retain
 // CHECK:      [[A:%.*]] = alloc_stack $Int64
-// CHECK-NEXT  dealloc_stack [[A]] : $*Int64
+// CHECK-NEXT:  dealloc_stack [[A]] : $*Int64
 // CHECK-NOT:  release
 // CHECK-LABEL: } // end sil function 'testReleaseHoistDeallocStack'
 sil @testReleaseHoistDeallocStack : $@convention(thin) (AnyObject)->() {
