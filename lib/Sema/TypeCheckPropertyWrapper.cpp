@@ -29,8 +29,7 @@ using namespace swift;
 /// Find the named property in a property wrapper to which access will
 /// be delegated.
 static VarDecl *findValueProperty(ASTContext &ctx, NominalTypeDecl *nominal,
-                                  Identifier name, bool allowMissing,
-                                  bool *diagnosed = nullptr) {
+                                  Identifier name, bool allowMissing) {
   SmallVector<VarDecl *, 2> vars;
   {
     SmallVector<ValueDecl *, 2> decls;
@@ -51,8 +50,6 @@ static VarDecl *findValueProperty(ASTContext &ctx, NominalTypeDecl *nominal,
     if (!allowMissing) {
       nominal->diagnose(diag::property_wrapper_no_value_property,
                         nominal->getDeclaredType(), name);
-      if (diagnosed)
-        *diagnosed = true;
     }
     return nullptr;
 
@@ -66,8 +63,6 @@ static VarDecl *findValueProperty(ASTContext &ctx, NominalTypeDecl *nominal,
       var->diagnose(diag::kind_declname_declared_here,
                     var->getDescriptiveKind(), var->getFullName());
     }
-    if (diagnosed)
-      *diagnosed = true;
     return nullptr;
   }
 
@@ -78,8 +73,6 @@ static VarDecl *findValueProperty(ASTContext &ctx, NominalTypeDecl *nominal,
                   var->getFormalAccess(), var->getDescriptiveKind(),
                   var->getFullName(), nominal->getDeclaredType(),
                   nominal->getFormalAccess());
-    if (diagnosed)
-      *diagnosed = true;
     return nullptr;
   }
 
@@ -302,32 +295,11 @@ PropertyWrapperTypeInfoRequest::evaluate(
   // Look for a non-static property named "wrappedValue" in the property
   // wrapper type.
   ASTContext &ctx = nominal->getASTContext();
-  bool diagnosed = false;
   auto valueVar =
       findValueProperty(ctx, nominal, ctx.Id_wrappedValue,
-                        /*allowMissing=*/true, &diagnosed);
-  if (!valueVar) {
-    if (!diagnosed) {
-      // Look for a non-static property named "value". This is the old name,
-      // but accept it with a warning.
-      valueVar = findValueProperty(ctx, nominal, ctx.Id_value,
-                                   /*allowMissing=*/true, &diagnosed);
-    }
-
-    if (!valueVar) {
-      if (!diagnosed) {
-        valueVar = findValueProperty(ctx, nominal, ctx.Id_wrappedValue,
-                                     /*allowMissing=*/false);
-      }
-
-      return PropertyWrapperTypeInfo();
-    }
-
-    if (valueVar->getLoc().isValid()) {
-      valueVar->diagnose(diag::property_wrapper_value)
-        .fixItReplace(valueVar->getNameLoc(), "wrappedValue");
-    }
-  }
+                        /*allowMissing=*/false);
+  if (!valueVar)
+    return PropertyWrapperTypeInfo();
 
   if (!valueVar->hasInterfaceType())
     static_cast<TypeChecker &>(*ctx.getLazyResolver()).validateDecl(valueVar);
@@ -362,29 +334,17 @@ PropertyWrapperTypeInfoRequest::evaluate(
   result.enclosingInstanceProjectedSubscript =
     findEnclosingSelfSubscript(ctx, nominal, ctx.Id_projected);
 
-  // If there was no projectedValue property, but there is a delegateValue
-  // or wrapperValue, property, use that and warn.
+  // If there was no projectedValue property, but there is a wrapperValue,
+  // property, use that and warn.
   if (!result.projectedValueVar) {
     result.projectedValueVar =
       findValueProperty(ctx, nominal, ctx.Id_wrapperValue,
                         /*allowMissing=*/true);
-    if (result.projectedValueVar) {
-      if (result.projectedValueVar->getLoc().isValid()) {
-        result.projectedValueVar->diagnose(diag::property_wrapper_wrapperValue)
-          .fixItReplace(result.projectedValueVar->getNameLoc(),
-                        "projectedValue");
-      }
-    } else {
-      result.projectedValueVar =
-          findValueProperty(ctx, nominal, ctx.Id_delegateValue,
-                            /*allowMissing=*/true);
-      if (result.projectedValueVar &&
-          result.projectedValueVar->getLoc().isValid()) {
-        result.projectedValueVar->diagnose(
-            diag::property_wrapper_delegateValue)
-          .fixItReplace(result.projectedValueVar->getNameLoc(),
-                        "projectedValue");
-      }
+    if (result.projectedValueVar &&
+        result.projectedValueVar->getLoc().isValid()) {
+      result.projectedValueVar->diagnose(diag::property_wrapper_wrapperValue)
+        .fixItReplace(result.projectedValueVar->getNameLoc(),
+                      "projectedValue");
     }
   }
 
