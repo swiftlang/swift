@@ -3530,9 +3530,8 @@ public:
         original->isBare(), IsNotTransparent, original->isSerialized(),
         original->isDynamicallyReplaceable());
     differential->setOwnershipEliminated();
-    differential->setDebugScope(new (module)
-                                    SILDebugScope(original->getLocation(),
-                                                  differential));
+    differential->setDebugScope(
+        new (module) SILDebugScope(original->getLocation(), differential));
     // Create empty body of differential.
     auto diffConv = differential->getConventions();
     auto *entry = differential->createBasicBlock();
@@ -3600,12 +3599,11 @@ public:
     auto jvpResultArray = jvp->getLoweredFunctionType()->getResults();
     auto funcType = jvpResultArray.back().getType();
     auto silFuncCanType = funcType->castTo<SILFunctionType>()
-                              ->getCanonicalType();
+        ->getCanonicalType();
 
     directResults.push_back(
-        SILUndef::get(jvp->mapTypeIntoContext(SILType::getPrimitiveObjectType(
-                                                  silFuncCanType)),
-                      *jvp));
+        SILUndef::get(jvp->mapTypeIntoContext(
+            SILType::getPrimitiveObjectType(silFuncCanType)), *jvp));
     builder.createReturn(
         ri->getLoc(), joinElements(directResults, builder, loc));
   }
