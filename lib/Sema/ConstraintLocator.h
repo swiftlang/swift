@@ -184,8 +184,10 @@ public:
 
     case TypeParameterRequirement:
     case ConditionalRequirement:
-    case ApplyArgToParam:
       return 2;
+
+    case ApplyArgToParam:
+      return 3;
     }
 
     llvm_unreachable("Unhandled PathElementKind in switch.");
@@ -282,12 +284,12 @@ public:
     uint64_t storedKind : 3;
 
     /// Encode a path element kind and a value into the storage format.
-    static uint64_t encodeStorage(PathElementKind kind, unsigned value) {
-      return ((uint64_t)value << 8) | kind;
+    static uint64_t encodeStorage(PathElementKind kind, uint64_t value) {
+      return (value << 8) | kind;
     }
 
     /// Decode a storage value into path element kind and value.
-    static std::pair<PathElementKind, unsigned>
+    static std::pair<PathElementKind, uint64_t>
     decodeStorage(uint64_t storage) {
       return { (PathElementKind)((unsigned)storage & 0xFF), storage >> 8 };
     }
@@ -305,6 +307,15 @@ public:
     {
       assert(numNumericValuesInPathElement(kind) == 2 &&
              "Path element kind does not require 2 values");
+    }
+
+    PathElement(PathElementKind kind, unsigned value1, unsigned value2,
+                unsigned value3)
+        : storage(encodeStorage(kind, ((uint64_t)value1 << 32) | value2 << 16 |
+                                          value3)),
+          storedKind(StoredKindAndValue) {
+      assert(numNumericValuesInPathElement(kind) == 3 &&
+             "Path element kind does not require three values");
     }
 
     PathElement(GenericSignature *sig)
@@ -358,8 +369,10 @@ public:
 
     /// Retrieve a path element for an argument/parameter comparison in a
     /// function application.
-    static PathElement getApplyArgToParam(unsigned argIdx, unsigned paramIdx) {
-      return PathElement(ApplyArgToParam, argIdx, paramIdx);
+    static PathElement getApplyArgToParam(unsigned argIdx, unsigned paramIdx,
+                                          ParameterTypeFlags flags) {
+      unsigned rawFlags = flags.toRaw();
+      return PathElement(ApplyArgToParam, argIdx, paramIdx, rawFlags);
     }
 
     /// Retrieve a path element for a generic argument referred to by
@@ -432,24 +445,25 @@ public:
     unsigned getValue() const {
       unsigned numValues = numNumericValuesInPathElement(getKind());
       assert(numValues > 0 && "No value in path element!");
-
-      auto value = decodeStorage(storage).second;
-      if (numValues == 1) {
-        return value;
-      }
-
-      return value >> 16;
+      auto extraValues = numValues - 1;
+      return decodeStorage(storage).second >> (extraValues * 16);
     }
 
     /// Retrieve the second value associated with this path element,
     /// if it has one.
     unsigned getValue2() const {
       unsigned numValues = numNumericValuesInPathElement(getKind());
-      (void)numValues;
-      assert(numValues == 2 && "No second value in path element!");
-
-      auto value = decodeStorage(storage).second;
+      assert(numValues >= 2 && "No second value in path element!");
+      auto extraValues = numValues - 2;
+      auto value = decodeStorage(storage).second >> (extraValues * 16);
       return value & 0x00FFFF;
+    }
+
+    ParameterTypeFlags getParameterFlags() const {
+      assert(getKind() == ApplyArgToParam && "Is not a param application");
+      auto value = decodeStorage(storage).second;
+      uint8_t rawFlags = value & 0xFF;
+      return ParameterTypeFlags::fromRaw(rawFlags);
     }
 
     /// Retrieve the declaration for a witness path element.

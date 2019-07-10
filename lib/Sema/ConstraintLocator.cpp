@@ -49,6 +49,12 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
       id.AddPointer(elt.getKeyPath());
       break;
 
+    case ApplyArgToParam:
+      id.AddInteger(elt.getValue());
+      id.AddInteger(elt.getValue2());
+      id.AddInteger(elt.getParameterFlags().toRaw());
+      break;
+
     case ApplyArgument:
     case ApplyFunction:
     case FunctionArgument:
@@ -70,7 +76,6 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
     case GenericArgument:
     case NamedTupleElement:
     case TupleElement:
-    case ApplyArgToParam:
     case OpenedGeneric:
     case KeyPathComponent:
     case ConditionalRequirement:

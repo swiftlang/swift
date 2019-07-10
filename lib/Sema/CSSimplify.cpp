@@ -963,9 +963,8 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
 
     // Compare each of the bound arguments for this parameter.
     for (auto argIdx : parameterBindings[paramIdx]) {
-      auto loc = locator.withPathElement(LocatorPathElt::
-                                            getApplyArgToParam(argIdx,
-                                                               paramIdx));
+      auto loc = locator.withPathElement(LocatorPathElt::getApplyArgToParam(
+          argIdx, paramIdx, param.getParameterFlags()));
       auto argTy = argsWithLabels[argIdx].getOldType();
 
       bool matchingAutoClosureResult = param.isAutoClosure();
@@ -2280,10 +2279,11 @@ bool ConstraintSystem::repairFailures(
             rhs)) {
       conversionsOrFixes.push_back(fix);
     }
-    
+
     auto elementTy = lhs->getArrayElementType();
-    if (elementTy && true) {
-      conversionsOrFixes.push_back(ExpandArrayIntoVarargs::create(*this, lhs, rhs, getConstraintLocator(locator)));
+    if (elementTy && elt.getParameterFlags().isVariadic()) {
+      conversionsOrFixes.push_back(ExpandArrayIntoVarargs::create(
+          *this, lhs, rhs, getConstraintLocator(locator)));
       return true;
     }
 
@@ -6960,14 +6960,14 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::UseWrappedValue: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
-      
+
   case FixKind::ExpandArrayIntoVarargs: {
-    auto result = matchTypes(type1, ArraySliceType::get(type2),
-                             matchKind, subflags, locator);
+    auto result = matchTypes(type1, ArraySliceType::get(type2), matchKind,
+                             subflags, locator);
     if (result == SolutionKind::Solved)
       if (recordFix(fix))
         return SolutionKind::Error;
-    
+
     return result;
   }
 

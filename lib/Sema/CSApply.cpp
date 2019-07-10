@@ -5318,10 +5318,11 @@ Expr *ExprRewriter::coerceCallArguments(
   auto params = funcType->getParams();
 
   // Local function to produce a locator to refer to the given parameter.
-  auto getArgLocator = [&](unsigned argIdx, unsigned paramIdx)
-                         -> ConstraintLocatorBuilder {
+  auto getArgLocator =
+      [&](unsigned argIdx, unsigned paramIdx,
+          ParameterTypeFlags flags) -> ConstraintLocatorBuilder {
     return locator.withPathElement(
-             LocatorPathElt::getApplyArgToParam(argIdx, paramIdx));
+        LocatorPathElt::getApplyArgToParam(argIdx, paramIdx, flags));
   };
 
   bool matchCanFail =
@@ -5449,8 +5450,9 @@ Expr *ExprRewriter::coerceCallArguments(
           convertedArg =
               buildCollectionUpcastExpr(arg, paramType, false, locator);
         } else {
-          convertedArg =
-              coerceToType(arg, paramType, getArgLocator(argIdx, paramIdx));
+          convertedArg = coerceToType(
+              arg, paramType,
+              getArgLocator(argIdx, paramIdx, param.getParameterFlags()));
         }
 
         if (!convertedArg)
@@ -5573,8 +5575,9 @@ Expr *ExprRewriter::coerceCallArguments(
       convertedArg = cs.TC.buildAutoClosureExpr(dc, arg, closureType);
       cs.cacheExprTypes(convertedArg);
     } else {
-      convertedArg =
-          coerceToType(arg, paramType, getArgLocator(argIdx, paramIdx));
+      convertedArg = coerceToType(
+          arg, paramType,
+          getArgLocator(argIdx, paramIdx, param.getParameterFlags()));
     }
 
     if (!convertedArg)

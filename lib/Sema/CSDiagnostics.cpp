@@ -3498,19 +3498,21 @@ bool MutatingMemberRefOnImmutableBase::diagnoseAsError() {
 
 bool ExpandArrayIntoVarargsFailure::diagnoseAsError() {
   if (auto anchor = getAnchor()) {
-    emitDiagnostic(anchor->getLoc(), diag::cannot_convert_array_to_variadic, getFromType(), getToType());
+    emitDiagnostic(anchor->getLoc(), diag::cannot_convert_array_to_variadic,
+                   getFromType(), getToType());
     // Offer to pass the array elements using #variadic
     auto range = anchor->getSourceRange();
-    emitDiagnostic(anchor->getLoc(), diag::suggest_pass_elements_using_pound_variadic)
-    .fixItInsert(range.Start, "#variadic(")
-    .fixItInsertAfter(range.End, ")");
+    emitDiagnostic(anchor->getLoc(),
+                   diag::suggest_pass_elements_using_pound_variadic)
+        .fixItInsert(range.Start, "#variadic(")
+        .fixItInsertAfter(range.End, ")");
     // If this is an array literal, offer to remove the brackets and pass the
     // elements directly as variadic arguments.
     if (auto *arrayExpr = dyn_cast<ArrayExpr>(anchor)) {
-      auto diag =
-      emitDiagnostic(arrayExpr->getLoc(), diag::suggest_pass_elements_directly);
+      auto diag = emitDiagnostic(arrayExpr->getLoc(),
+                                 diag::suggest_pass_elements_directly);
       diag.fixItRemove(arrayExpr->getLBracketLoc())
-      .fixItRemove(arrayExpr->getRBracketLoc());
+          .fixItRemove(arrayExpr->getRBracketLoc());
       // Handle the case where the array literal has a trailing comma.
       if (arrayExpr->getNumCommas() == arrayExpr->getNumElements())
         diag.fixItRemove(arrayExpr->getCommaLocs().back());

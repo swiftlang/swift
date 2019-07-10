@@ -1037,7 +1037,7 @@ public:
 
   /// Return T if this type is Optional<T>; otherwise, return the null type.
   Type getOptionalObjectType();
-  
+
   // Return T if this type is Array<T>; otherwise, return the null type.
   Type getArrayElementType();
 

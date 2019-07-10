@@ -1459,13 +1459,10 @@ public:
 
 class ExpandArrayIntoVarargsFailure final : public ContextualFailure {
 public:
-  ExpandArrayIntoVarargsFailure(Expr *root,
-                                ConstraintSystem &cs,
-                                Type lhs,
-                                Type rhs,
-                                ConstraintLocator *locator)
-  : ContextualFailure(root, cs, lhs, rhs, locator) { }
-  
+  ExpandArrayIntoVarargsFailure(Expr *root, ConstraintSystem &cs, Type lhs,
+                                Type rhs, ConstraintLocator *locator)
+      : ContextualFailure(root, cs, lhs, rhs, locator) {}
+
   bool diagnoseAsError() override;
 };
 

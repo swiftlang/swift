@@ -3440,7 +3440,7 @@ auto NominalTypeDecl::getStoredProperties(bool skipInaccessible) const
 bool NominalTypeDecl::isOptionalDecl() const {
   return this == getASTContext().getOptionalDecl();
 }
-      
+
 bool NominalTypeDecl::isArrayDecl() const {
   return this == getASTContext().getArrayDecl();
 }

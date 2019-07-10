@@ -3444,7 +3444,7 @@ public:
 
   /// Is this the decl for Optional<T>?
   bool isOptionalDecl() const;
-  
+
   /// Is this the decl for Array<T>?
   bool isArrayDecl() const;
 
