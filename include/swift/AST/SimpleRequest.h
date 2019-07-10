@@ -47,11 +47,10 @@ enum class CacheKind {
 /// the given type.
 ///
 /// \tparam Derived The final, derived class type for the request.
+/// \tparam Signature The signature of the request, described as a
+/// function type whose inputs (\c Inputs) are the parameter types and
+/// whose output (\c Output) is the result of evaluating this request.
 /// \tparam Caching Describes how the output value is cached, if at all.
-/// \tparam Output The type of the result produced by evaluating this request.
-/// \tparam Inputs The types of the inputs to this request, i.e., the values
-/// that comprise the request itself. These will determine the uniqueness of
-/// the request.
 ///
 /// The \c Derived class needs to implement several operations. The most
 /// important one takes an evaluator and the input values, then computes the
@@ -84,9 +83,12 @@ enum class CacheKind {
 ///   Optional<Output> getCachedResult() const;
 ///   void cacheResult(Output value) const;
 /// \endcode
+template<typename Derived, typename Signature, CacheKind Caching>
+class SimpleRequest;
+
 template<typename Derived, CacheKind Caching, typename Output,
          typename ...Inputs>
-class SimpleRequest {
+class SimpleRequest<Derived, Output(Inputs...), Caching> {
   std::tuple<Inputs...> storage;
 
   Derived &asDerived() {
