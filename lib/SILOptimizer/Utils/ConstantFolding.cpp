@@ -1201,9 +1201,8 @@ static SILValue constantFoldBuiltin(BuiltinInst *BI,
 #include "swift/AST/Builtins.def"
     return constantFoldBinaryWithOverflow(BI, Builtin.ID, ResultsInError);
 
-#define BUILTIN(id, name, Attrs)
-#define BUILTIN_BINARY_OPERATION(id, name, attrs, overload) \
-case BuiltinValueKind::id:
+#define BUILTIN(id, name, attrs)
+#define BUILTIN_BINARY_OPERATION(id, name, attrs) case BuiltinValueKind::id:
 #include "swift/AST/Builtins.def"
       return constantFoldBinary(BI, Builtin.ID, ResultsInError);
 
