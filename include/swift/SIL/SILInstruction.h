@@ -4824,11 +4824,10 @@ public:
 
     StructDecl *S = getStructDecl();
 
-    NominalTypeDecl::StoredPropertyRange Range = S->getStoredProperties();
-    unsigned Index = 0;
-    for (auto I = Range.begin(), E = Range.end(); I != E; ++I, ++Index)
-      if (V == *I)
-        return &getAllOperands()[Index];
+    auto Props = S->getStoredProperties();
+    for (unsigned I = 0, E = Props.size(); I < E; ++I)
+      if (V == Props[I])
+        return &getAllOperands()[I];
 
     // Did not find a matching VarDecl, return nullptr.
     return nullptr;

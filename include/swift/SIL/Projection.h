@@ -317,8 +317,6 @@ public:
     llvm_unreachable("Unhandled ProjectionKind in switch.");
   }
 
-  /// WARNING: This is not a constant time operation because it requests all
-  /// BaseType's stored properties.
   VarDecl *getVarDecl(SILType BaseType) const {
     assert(isValid());
     assert((getKind() == ProjectionKind::Struct ||
@@ -326,9 +324,7 @@ public:
     assert(BaseType.getNominalOrBoundGenericNominal() &&
            "This should only be called with a nominal type");
     auto *NDecl = BaseType.getNominalOrBoundGenericNominal();
-    auto Iter = NDecl->getStoredProperties().begin();
-    std::advance(Iter, getIndex());
-    return *Iter;
+    return NDecl->getStoredProperties()[getIndex()];
   }
 
   EnumElementDecl *getEnumElementDecl(SILType BaseType) const {

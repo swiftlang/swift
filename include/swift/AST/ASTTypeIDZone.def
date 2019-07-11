@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 SWIFT_TYPEID_NAMED(NominalTypeDecl *, NominalTypeDecl)
 SWIFT_TYPEID_NAMED(VarDecl *, VarDecl)
+SWIFT_TYPEID_NAMED(Decl *, Decl)
 SWIFT_TYPEID(Type)
 SWIFT_TYPEID(PropertyWrapperBackingPropertyInfo)
 SWIFT_TYPEID(PropertyWrapperTypeInfo)

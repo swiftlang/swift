@@ -946,6 +946,83 @@ static bool contextAllowsPatternBindingWithoutVariables(DeclContext *dc) {
   return true;
 }
 
+static VarDecl *getStoredPropertyFor(VarDecl *var) {
+  if (var->isStatic())
+    return nullptr;
+
+  if (var->isLazyStorageProperty())
+    return nullptr;
+
+  if (var->getOriginalWrappedProperty())
+    return nullptr;
+
+  if (var->getAttrs().hasAttribute<LazyAttr>()) {
+    if (auto *storage = var->getLazyStorageProperty()) {
+      assert(storage->hasStorage());
+      return storage;
+    }
+
+    return nullptr;
+  }
+
+  if (var->hasAttachedPropertyWrapper()) {
+    if (auto *storage = var->getPropertyWrapperBackingProperty()) {
+      assert(storage->hasStorage());
+      return storage;
+    }
+
+    return nullptr;
+  }
+
+  if (var->getAttrs().hasAttribute<NSManagedAttr>())
+    return nullptr;
+
+  if (!var->hasStorage())
+    return nullptr;
+
+  return var;
+}
+
+llvm::Expected<ArrayRef<VarDecl *>>
+StoredPropertiesRequest::evaluate(Evaluator &evaluator,
+                                  NominalTypeDecl *decl) const {
+  if (isa<EnumDecl>(decl) ||
+      isa<ProtocolDecl>(decl) ||
+      (isa<ClassDecl>(decl) && decl->hasClangNode()))
+    return ArrayRef<VarDecl *>();
+
+  SmallVector<VarDecl *, 4> results;
+  for (auto *member : decl->getMembers()) {
+    if (auto *var = dyn_cast<VarDecl>(member))
+      if (auto *storage = getStoredPropertyFor(var))
+        results.push_back(storage);
+  }
+
+  return decl->getASTContext().AllocateCopy(results);
+}
+
+llvm::Expected<ArrayRef<Decl *>>
+StoredPropertiesAndMissingMembersRequest::evaluate(Evaluator &evaluator,
+                                                   NominalTypeDecl *decl) const {
+  if (isa<EnumDecl>(decl) ||
+      isa<ProtocolDecl>(decl) ||
+      (isa<ClassDecl>(decl) && decl->hasClangNode()))
+    return ArrayRef<Decl *>();
+
+  SmallVector<Decl *, 4> results;
+  for (auto *member : decl->getMembers()) {
+    if (auto *var = dyn_cast<VarDecl>(member))
+      if (auto *storage = getStoredPropertyFor(var))
+        results.push_back(storage);
+
+    if (auto missing = dyn_cast<MissingMemberDecl>(member))
+      if (missing->getNumberOfFieldOffsetVectorEntries() > 0)
+        results.push_back(missing);
+  }
+
+  return decl->getASTContext().AllocateCopy(results);
+}
+
 /// Validate the \c entryNumber'th entry in \c binding.
 static void validatePatternBindingEntry(TypeChecker &tc,
                                         PatternBindingDecl *binding,

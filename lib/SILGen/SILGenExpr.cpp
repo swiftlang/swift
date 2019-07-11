@@ -3107,7 +3107,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
       branchScope.pop();
       
       auto isEqualI1 = subSGF.B.createStructExtract(loc, isEqual,
-        C.getBoolDecl()->getStoredProperties().front(), i1Ty);
+        C.getBoolDecl()->getStoredProperties()[0], i1Ty);
       
       auto isTrueBB = subSGF.createBasicBlock();
       // Each false condition needs its own block to avoid critical edges.
