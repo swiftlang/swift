@@ -7353,6 +7353,16 @@ inline SourceLoc extractNearestSourceLoc(const ExtensionDecl *ext) {
   return extractNearestSourceLoc(static_cast<const Decl *>(ext));
 }
 
+/// Extract the source location from the given declaration.
+inline SourceLoc extractNearestSourceLoc(const GenericTypeDecl *type) {
+  return extractNearestSourceLoc(static_cast<const Decl *>(type));
+}
+
+/// Extract the source location from the given declaration.
+inline SourceLoc extractNearestSourceLoc(const AbstractFunctionDecl *func) {
+  return extractNearestSourceLoc(static_cast<const Decl *>(func));
+}
+
 } // end namespace swift
 
 #endif

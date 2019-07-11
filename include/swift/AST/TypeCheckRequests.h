@@ -71,9 +71,8 @@ private:
            TypeResolutionStage stage) const;
 
 public:
-  // Cycle handling
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
+  // Source location
+  SourceLoc getNearestLoc() const;
 
   // Caching
   bool isCached() const;
@@ -100,7 +99,6 @@ private:
 public:
   // Cycle handling
   void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
 
   // Separate caching.
   bool isCached() const;
@@ -127,7 +125,6 @@ private:
 public:
   // Cycle handling
   void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
 
   // Separate caching.
   bool isCached() const;
@@ -152,10 +149,6 @@ private:
   evaluate(Evaluator &evaluator, ValueDecl *decl) const;
 
 public:
-  // Cycle handling
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
-
   // Separate caching.
   bool isCached() const { return true; }
   Optional<llvm::TinyPtrVector<ValueDecl *>> getCachedResult() const;
@@ -177,10 +170,6 @@ private:
   llvm::Expected<bool> evaluate(Evaluator &evaluator, ValueDecl *decl) const;
 
 public:
-  // Cycle handling
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
-
   // Separate caching.
   bool isCached() const { return true; }
   Optional<bool> getCachedResult() const;
@@ -202,10 +191,6 @@ private:
   llvm::Expected<bool> evaluate(Evaluator &evaluator, ValueDecl *decl) const;
 
 public:
-  // Cycle handling
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
-
   // Separate caching.
   bool isCached() const { return true; }
   Optional<bool> getCachedResult() const;
@@ -227,10 +212,6 @@ private:
   llvm::Expected<bool> evaluate(Evaluator &evaluator, ValueDecl *decl) const;
 
 public:
-  // Cycle handling
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
-
   // Separate caching.
   bool isCached() const { return true; }
   Optional<bool> getCachedResult() const;
@@ -252,10 +233,6 @@ private:
   llvm::Expected<ArrayRef<Requirement>> evaluate(Evaluator &evaluator, ProtocolDecl *proto) const;
 
 public:
-  // Cycle handling
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
-
   // Separate caching.
   bool isCached() const { return true; }
   Optional<ArrayRef<Requirement>> getCachedResult() const;
@@ -277,10 +254,6 @@ private:
   llvm::Expected<Type> evaluate(Evaluator &evaluator, AssociatedTypeDecl *decl) const;
 
 public:
-  // Cycle handling
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
-
   // Caching.
   bool isCached() const { return true; }
 };
@@ -357,9 +330,8 @@ private:
                                        TypeResolutionStage stage) const;
 
 public:
-  // Cycle handling
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
+  // Source location
+  SourceLoc getNearestLoc() const;
 
   // Separate caching.
   bool isCached() const;
@@ -383,10 +355,6 @@ private:
   llvm::Expected<std::string> evaluate(Evaluator &eval, const ValueDecl *d) const;
 
 public:
-  // Cycle handling
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
-
   // Caching
   bool isCached() const { return true; }
 };
@@ -407,10 +375,6 @@ private:
   llvm::Expected<std::string> evaluate(Evaluator &eval, const TypeDecl *d) const;
 
 public:
-  // Cycle handling
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
-
   // Caching
   bool isCached() const { return true; }
 };
@@ -434,10 +398,6 @@ private:
                                 const DeclContext *) const;
 
 public:
-  // Cycle handling
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
-
   // Caching
   bool isCached() const { return true; }
   Optional<Type> getCachedResult() const;
@@ -476,10 +436,6 @@ private:
 public:
   // Caching
   bool isCached() const;
-
-  // Cycle handling
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
 /// Request the nominal type declaration to which the given custom attribute
@@ -501,10 +457,6 @@ private:
 public:
   // Caching
   bool isCached() const;
-
-  // Cycle handling
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
 /// Request the raw (possibly unbound generic) type of the property wrapper
@@ -526,10 +478,6 @@ private:
 public:
   // Caching
   bool isCached() const;
-
-  // Cycle handling
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
 /// Request the nominal type declaration to which the given custom attribute
@@ -551,10 +499,6 @@ private:
 public:
   // Caching
   bool isCached() const;
-
-  // Cycle handling
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
 /// Request information about the backing property for properties that have
@@ -576,10 +520,6 @@ private:
 public:
   // Caching
   bool isCached() const;
-
-  // Cycle handling
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
 /// Retrieve the structural type of an alias type.
@@ -597,10 +537,6 @@ private:
   llvm::Expected<Type> evaluate(Evaluator &eval, TypeAliasDecl *d) const;
 
 public:
-  // Cycle handling.
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
-
   // Caching.
   bool isCached() const { return true; }
 };
@@ -624,10 +560,6 @@ private:
 public:
   // Caching
   bool isCached() const;
-
-  // Cycle handling
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
 /// Request the function builder type attached to the given declaration,
@@ -648,10 +580,6 @@ private:
 public:
   // Caching
   bool isCached() const { return true; }
-
-  // Cycle handling
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
 /// Request a function's self access kind.
@@ -670,10 +598,6 @@ private:
   evaluate(Evaluator &evaluator, FuncDecl *func) const;
 
 public:
-  // Cycle handling
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
-
   // Separate caching.
   bool isCached() const { return true; }
   Optional<SelfAccessKind> getCachedResult() const;
@@ -696,10 +620,6 @@ private:
   evaluate(Evaluator &evaluator, AbstractStorageDecl *func) const;
 
 public:
-  // Cycle handling
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
-
   // Separate caching.
   bool isCached() const { return true; }
   Optional<bool> getCachedResult() const;
@@ -722,10 +642,6 @@ private:
   evaluate(Evaluator &evaluator, AbstractStorageDecl *func) const;
 
 public:
-  // Cycle handling
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
-
   // Separate caching.
   bool isCached() const { return true; }
   Optional<bool> getCachedResult() const;
@@ -748,10 +664,6 @@ private:
   evaluate(Evaluator &evaluator, AbstractStorageDecl *storage) const;
 
 public:
-  // Cycle handling
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
-
   // Separate caching.
   bool isCached() const { return true; }
   Optional<OpaqueReadOwnership> getCachedResult() const;
@@ -774,10 +686,6 @@ private:
   evaluate(Evaluator &evaluator, VarDecl *lazyVar) const;
 
 public:
-  // Cycle handling
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
-
   bool isCached() const { return true; }
 };
 

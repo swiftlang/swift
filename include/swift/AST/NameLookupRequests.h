@@ -81,9 +81,8 @@ public:
   // Caching
   bool isCached() const { return true; }
 
-  // Cycle handling
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
+  // Source location information.
+  SourceLoc getNearestLoc() const;
 };
 
 /// Request the set of declarations directly referenced by the underlying
@@ -124,10 +123,6 @@ private:
 public:
   // Caching
   bool isCached() const { return true; }
-
-  // Cycle handling
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
 /// Request the superclass declaration for the given class.
@@ -150,10 +145,6 @@ public:
   bool isCached() const { return true; }
   Optional<ClassDecl *> getCachedResult() const;
   void cacheResult(ClassDecl *value) const;
-
-  // Cycle handling
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
 /// Request the nominal declaration extended by a given extension declaration.
@@ -199,12 +190,6 @@ private:
   // Evaluation.
   SelfBounds evaluate(Evaluator &evaluator,
                       llvm::PointerUnion<TypeDecl *, ExtensionDecl *>) const;
-
-public:
-  // Cycle handling
-  SelfBounds breakCycle() const { return { }; }
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
 
@@ -223,12 +208,6 @@ private:
   // Evaluation.
   DirectlyReferencedTypeDecls evaluate(Evaluator &evaluator,
                                        ExtensionDecl *ext) const;
-
-public:
-  // Cycle handling
-  DirectlyReferencedTypeDecls breakCycle() const { return { }; }
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
 /// Request the nominal type declaration to which the given custom attribute
@@ -250,10 +229,6 @@ private:
 public:
   // Caching
   bool isCached() const { return true; }
-
-  // Cycle handling
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
 /// The zone number for name-lookup requests.
