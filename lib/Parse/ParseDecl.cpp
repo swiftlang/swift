@@ -6393,7 +6393,7 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
     SignatureHasCodeCompletion |= whereStatus.hasCodeCompletion();
     if (whereStatus.hasCodeCompletion() && !CodeCompletion) {
       // Trigger delayed parsing, no need to continue.
-      Subscript->setEndLoc(getEndOfPreviousLoc());
+      Subscript->setEndLoc(getEndOfPreviousLoc().getAdvancedLoc(-1));
       return whereStatus;
     }
   }
@@ -6437,7 +6437,7 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
 
   accessors.record(*this, Subscript, (Invalid || !Status.isSuccess()), Decls);
 
-  Subscript->setEndLoc(getEndOfPreviousLoc());
+  Subscript->setEndLoc(getEndOfPreviousLoc().getAdvancedLoc(-1));
 
   // No need to setLocalDiscriminator because subscripts cannot
   // validly appear outside of type decls.
