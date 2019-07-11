@@ -25,6 +25,7 @@
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/STLExtras.h"
 #include <tuple>
+#include <type_traits>
 
 namespace swift {
 
@@ -41,6 +42,99 @@ enum class CacheKind {
   /// mechanism, such as a mutable data structure.
   SeparatelyCached,
 };
+
+/// -------------------------------------------------------------------------
+/// Extracting the source location "nearest" a request.
+/// -------------------------------------------------------------------------
+
+namespace detail {
+  /// Dummy extract function used to detect when we can call
+  /// extractNearestSourceLoc() safely.
+  inline void extractNearestSourceLoc(...) { }
+
+  /// Metaprogram to determine whether any input is true.
+  constexpr bool anyTrue() { return false; }
+
+  template<typename ...Rest>
+  constexpr bool anyTrue(bool current, Rest... rest) {
+    return current || anyTrue(rest...);
+  }
+}
+
+/// Determine whether we can extract a nearest source location from a value of
+/// the given type.
+template<typename T>
+constexpr bool canExtractNearestSourceLoc() {
+  using detail::extractNearestSourceLoc;
+  return !std::is_void<decltype(extractNearestSourceLoc(*(T*)nullptr))>::value;
+}
+
+/// Extract source locations when possible, or return an invalid source
+/// location if not possible.
+template<typename T,
+         typename = typename std::enable_if<
+             canExtractNearestSourceLoc<T>()>::type>
+SourceLoc maybeExtractNearestSourceLoc(const T& value) {
+  return extractNearestSourceLoc(value);
+}
+
+template<typename T,
+         typename = void,
+         typename = typename std::enable_if<
+             !canExtractNearestSourceLoc<T>()>::type>
+SourceLoc maybeExtractNearestSourceLoc(const T& value) {
+  return SourceLoc();
+}
+
+/// Extract the nearest source location from a pointer union.
+template<typename T, typename U,
+          typename = typename std::enable_if<
+            canExtractNearestSourceLoc<T>() &&
+            canExtractNearestSourceLoc<U>()>::type>
+SourceLoc extractNearestSourceLoc(const llvm::PointerUnion<T, U> &value) {
+  if (auto first = value.template dyn_cast<T>()) {
+    return extractNearestSourceLoc(first);
+  }
+  if (auto second = value.template dyn_cast<U>()) {
+    return extractNearestSourceLoc(second);
+  }
+  return SourceLoc();
+}
+
+namespace detail {
+  /// Basis case for extracting the nearest source location from a tuple.
+  template<unsigned Index, typename ...Types,
+           typename = void,
+           typename = typename std::enable_if<
+               (Index >= sizeof...(Types))>::type>
+  SourceLoc extractNearestSourceLocTuple(const std::tuple<Types...> &) {
+    return SourceLoc();
+  }
+
+  /// Extract the first, nearest source location from a tuple.
+  template<unsigned Index, typename ...Types,
+           typename = typename std::enable_if<Index < sizeof...(Types)>::type>
+  SourceLoc extractNearestSourceLocTuple(const std::tuple<Types...> &value) {
+    SourceLoc loc = maybeExtractNearestSourceLoc(std::get<Index>(value));
+    if (loc.isValid())
+      return loc;
+
+    return extractNearestSourceLocTuple<Index + 1>(value);
+  }
+}
+
+/// Extract the first, nearest source location from a tuple.
+template<typename First, typename ...Rest,
+         typename = typename std::enable_if<
+             detail::anyTrue(canExtractNearestSourceLoc<First>(),
+                             canExtractNearestSourceLoc<Rest>()...)>::type>
+SourceLoc extractNearestSourceLoc(const std::tuple<First, Rest...> &value) {
+  return detail::extractNearestSourceLocTuple<0>(value);
+}
+
+/// -------------------------------------------------------------------------
+/// Simple Requests
+/// -------------------------------------------------------------------------
 
 /// CRTP base class that describes a request operation that takes values
 /// with the given input types (\c Inputs...) and produces an output of
@@ -66,14 +160,14 @@ enum class CacheKind {
 ///   void noteCycleStep(DiagnosticEngine &diags) const;
 /// \endcode
 ///
-/// Or the \c Derived class can provide a "diagnostic location" operation and
-/// diagnostic values for the main cycle diagnostic and a "note" describing a
-/// step within the chain of diagnostics:
+/// Or the implementation will use the default "circular reference" diagnostics
+/// based on the "nearest" source location, which can be provided explicitly by
+/// implementing the following in the subclass:
 /// \code
-///   T getCycleDiagnosticLoc(Inputs...) const;
-///   static constexpr Diag<Inputs...> cycleDiagnostic = ...;
-///   static constexpr Diag<Inputs...> cycleStepDiagnostic = ...;
+///   SourceLoc getNearestLoc() const;
 /// \endcode
+/// If not provided, a default implementation for \c getNearestLoc() will pick
+/// the source location from the first input that provides one.
 ///
 /// Value caching is determined by the \c Caching parameter. When
 /// \c Caching == CacheKind::SeparatelyCached, the \c Derived class is
@@ -106,14 +200,6 @@ class SimpleRequest<Derived, Output(Inputs...), Caching> {
     return asDerived().evaluate(evaluator, std::get<Indices>(storage)...);
   }
 
-  template<size_t ...Indices>
-  void diagnoseImpl(DiagnosticEngine &diags, Diag<Inputs...> diag,
-                    llvm::index_sequence<Indices...>) const {
-    diags.diagnose(
-      asDerived().getCycleDiagnosticLoc(std::get<Indices>(storage)...),
-      diag, std::get<Indices>(storage)...);
-  }
-
 protected:
   /// Retrieve the storage value directly.
   const std::tuple<Inputs...> &getStorage() const { return storage; }
@@ -134,14 +220,18 @@ public:
                                llvm::index_sequence_for<Inputs...>());
   }
 
+  /// Retrieve the nearest source location to which this request applies.
+  SourceLoc getNearestLoc() const {
+    return extractNearestSourceLoc(storage);
+  }
+
   void diagnoseCycle(DiagnosticEngine &diags) const {
-    diagnoseImpl(diags, Derived::cycleDiagnostic,
-                 llvm::index_sequence_for<Inputs...>());
+    diags.diagnose(asDerived().getNearestLoc(), diag::circular_reference);
   }
 
   void noteCycleStep(DiagnosticEngine &diags) const {
-    diagnoseImpl(diags, Derived::cycleStepDiagnostic,
-                 llvm::index_sequence_for<Inputs...>());
+    diags.diagnose(asDerived().getNearestLoc(),
+                   diag::circular_reference_through);
   }
 
   friend bool operator==(const SimpleRequest &lhs, const SimpleRequest &rhs) {
