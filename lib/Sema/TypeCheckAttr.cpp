@@ -2163,6 +2163,9 @@ static FuncDecl *findReplacedAccessor(DeclName replacedVarName,
     Type replacementStorageType = getDynamicComparisonType(replacementStorage);
     results.erase(std::remove_if(results.begin(), results.end(),
         [&](ValueDecl *result) {
+          // Protocol requirements are not replaceable.
+          if (isa<ProtocolDecl>(result->getDeclContext()))
+            return true;
           // Check for static/instance mismatch.
           if (result->isStatic() != replacementStorage->isStatic())
             return true;
@@ -2244,9 +2247,13 @@ findReplacedFunction(DeclName replacedFunctionName,
   lookupReplacedDecl(replacedFunctionName, attr, replacement, results);
 
   for (auto *result : results) {
+    // Protocol requirements are not replaceable.
+    if (isa<ProtocolDecl>(result->getDeclContext()))
+      continue;
     // Check for static/instance mismatch.
     if (result->isStatic() != replacement->isStatic())
       continue;
+
     if (TC)
       TC->validateDecl(result);
     TypeMatchOptions matchMode = TypeMatchFlags::AllowABICompatible;
