@@ -697,7 +697,8 @@ static bool validateTypedPattern(TypeChecker &TC,
       auto opaqueTy = TC.getOrCreateOpaqueResultType(resolution,
                                                      named->getDecl(),
                                                      opaqueRepr);
-      TL.setType(opaqueTy);
+      TL.setType(named->getDecl()->getDeclContext()
+                                 ->mapTypeIntoContext(opaqueTy));
       hadError = opaqueTy->hasError();
     } else {
       TC.diagnose(TP->getLoc(), diag::opaque_type_unsupported_pattern);
