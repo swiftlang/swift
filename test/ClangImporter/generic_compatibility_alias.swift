@@ -1,6 +1,4 @@
-// RUN: %empty-directory(%t)
-// RUN: %build-clang-importer-objc-overlays
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -module-name generic_compat_alias -I %S/Inputs/custom-modules -typecheck -verify %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -module-name generic_compat_alias -I %S/Inputs/custom-modules -typecheck -verify %s
 
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx

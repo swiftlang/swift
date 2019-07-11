@@ -4,14 +4,8 @@
 
 // RUN: %empty-directory(%t)
 
-// FIXME: BEGIN -enable-source-import hackaround
-// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t %S/../Inputs/clang-importer-sdk/swift-modules/ObjectiveC.swift -disable-objc-attr-requires-foundation-module
-// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t  %S/../Inputs/clang-importer-sdk/swift-modules/CoreGraphics.swift
-// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t  %S/../Inputs/clang-importer-sdk/swift-modules/Foundation.swift
-// FIXME: END -enable-source-import hackaround
-
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -import-objc-header %S/Inputs/swift_name.h -emit-module -o %t %s
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -import-objc-header %S/Inputs/swift_name.h -parse-as-library %t/swift_name.swiftmodule -typecheck -emit-objc-header-path %t/swift_name.h
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -import-objc-header %S/Inputs/swift_name.h -emit-module -o %t %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -import-objc-header %S/Inputs/swift_name.h -parse-as-library %t/swift_name.swiftmodule -typecheck -emit-objc-header-path %t/swift_name.h
 
 // RUN: %FileCheck %s < %t/swift_name.h
 // RUN: %check-in-clang %t/swift_name.h

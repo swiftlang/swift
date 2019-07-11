@@ -1,17 +1,6 @@
-// RUN: %empty-directory(%t)
-
-// This file deliberately does not use %clang-importer-sdk for most RUN lines.
-// Instead, it generates custom overlay modules itself, and uses -I %t when it
-// wants to use them.
-
 // REQUIRES: OS=macosx
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-module -o %t %S/../Inputs/clang-importer-sdk/swift-modules/ObjectiveC.swift -disable-objc-attr-requires-foundation-module
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-module -o %t %S/../Inputs/clang-importer-sdk/swift-modules/CoreGraphics.swift
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-module -o %t %S/../Inputs/clang-importer-sdk/swift-modules/Foundation.swift
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-module -o %t %S/../Inputs/clang-importer-sdk/swift-modules/AppKit.swift
-
-// RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -print-module -source-filename %s -module-to-print=AppKit -function-definitions=false -prefer-type-repr=true > %t.printed.txt
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -print-module -source-filename %s -module-to-print=AppKit -function-definitions=false -prefer-type-repr=true > %t.printed.txt
 // RUN: %FileCheck %s -check-prefix=APPKIT -strict-whitespace < %t.printed.txt
 
 // APPKIT-LABEL: {{^}}extension NSString {{{$}}

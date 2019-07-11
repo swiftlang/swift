@@ -1,5 +1,5 @@
 // swift-interface-format-version: 1.0
-// swift-module-flags: -module-name ObjectiveC -enable-resilience -disable-objc-attr-requires-foundation-module
+// swift-module-flags: -module-name ObjectiveC -enable-library-evolution -disable-objc-attr-requires-foundation-module
 
 @_exported import ObjectiveC // Clang module
 

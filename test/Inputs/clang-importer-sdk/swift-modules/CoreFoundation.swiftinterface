@@ -1,6 +1,11 @@
 // swift-interface-format-version: 1.0
-// swift-module-flags: -module-name CoreFoundation -enable-resilience
+// swift-module-flags: -module-name CoreFoundation -enable-library-evolution
 
 @_exported import CoreFoundation
 
-protocol _CFObject {}
+public protocol _CFObject: class, Hashable {}
+extension _CFObject {
+  public var hashValue: Int { get }
+  public func hash(into hasher: inout Hasher)
+  public static func ==(left: Self, right: Self) -> Bool
+}

@@ -1,5 +1,5 @@
 // swift-interface-format-version: 1.0
-// swift-module-flags: -module-name Dispatch -enable-resilience
+// swift-module-flags: -module-name Dispatch -enable-library-evolution
 
 @_exported import Dispatch // Clang module
 

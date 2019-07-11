@@ -1,5 +1,5 @@
 // swift-interface-format-version: 1.0
-// swift-module-flags: -module-name simd -enable-resilience
+// swift-module-flags: -module-name simd -enable-library-evolution
 
 @_fixed_layout @_alignment(16) public struct float3 { public var x, y, z: Float }
 @_fixed_layout @_alignment(16) public struct float4 { public var x, y, z, w: Float }

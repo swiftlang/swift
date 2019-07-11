@@ -1,7 +1,4 @@
-// RUN: %empty-directory(%t)
-// RUN: %build-clang-importer-objc-overlays
-
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-sil -I %S/Inputs/custom-modules %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-sil -I %S/Inputs/custom-modules %s -verify
 
 // REQUIRES: objc_interop
 

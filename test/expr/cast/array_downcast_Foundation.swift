@@ -1,12 +1,7 @@
 // RUN: %empty-directory(%t)
 
-// FIXME: BEGIN -enable-source-import hackaround
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t %clang-importer-sdk-path/swift-modules/Darwin.swift
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t %clang-importer-sdk-path/swift-modules/Foundation.swift
-// FIXME: END -enable-source-import hackaround
-
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -typecheck %s -verify
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) %s -dump-ast -verify | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %s -dump-ast -verify | %FileCheck %s
 
 // REQUIRES: objc_interop
 

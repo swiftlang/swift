@@ -1,10 +1,7 @@
 // REQUIRES: objc_interop
 
-// RUN: %empty-directory(%t)
-// RUN: %build-clang-importer-objc-overlays
-
 // RUN: %sourcekitd-test -req=index %s -- %s -F %S/../Inputs/libIDE-mock-sdk \
-// RUN:         %mcp_opt -target %target-triple %clang-importer-sdk-nosource -I %t | %FileCheck %s
+// RUN:         %mcp_opt -target %target-triple %clang-importer-sdk | %FileCheck %s
 
 import Foo
 

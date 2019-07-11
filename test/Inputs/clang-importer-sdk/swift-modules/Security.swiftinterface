@@ -1,5 +1,5 @@
 // swift-interface-format-version: 1.0
-// swift-module-flags: -module-name Security -enable-resilience
+// swift-module-flags: -module-name Security -enable-library-evolution
 
 @_exported import Security // Clang module
 

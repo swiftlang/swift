@@ -2,21 +2,13 @@
 
 // RUN: %empty-directory(%t)
 
-// FIXME: BEGIN -enable-source-import hackaround
-// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t %S/../Inputs/clang-importer-sdk/swift-modules/ObjectiveC.swift -disable-objc-attr-requires-foundation-module
-// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t  %S/../Inputs/clang-importer-sdk/swift-modules/CoreGraphics.swift
-// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t  %S/../Inputs/clang-importer-sdk/swift-modules/Foundation.swift
-// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t  %S/../Inputs/clang-importer-sdk/swift-modules/AppKit.swift
-// FIXME: END -enable-source-import hackaround
-
-
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -I %S/Inputs/custom-modules -o %t %s -disable-objc-attr-requires-foundation-module -swift-version 4 -enable-swift3-objc-inference -warn-swift3-objc-inference-minimal
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -parse-as-library %t/swift3_deprecated_objc_inference.swiftmodule -typecheck -I %S/Inputs/custom-modules -emit-objc-header-path %t/swift3_deprecated_objc_inference.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module -swift-version 4 -enable-swift3-objc-inference -warn-swift3-objc-inference-minimal
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -I %S/Inputs/custom-modules -o %t %s -disable-objc-attr-requires-foundation-module -swift-version 4 -enable-swift3-objc-inference -warn-swift3-objc-inference-minimal
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse-as-library %t/swift3_deprecated_objc_inference.swiftmodule -typecheck -I %S/Inputs/custom-modules -emit-objc-header-path %t/swift3_deprecated_objc_inference.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module -swift-version 4 -enable-swift3-objc-inference -warn-swift3-objc-inference-minimal
 // RUN: %FileCheck %s < %t/swift3_deprecated_objc_inference.h
 // RUN: %check-in-clang -I %S/Inputs/custom-modules/ %t/swift3_deprecated_objc_inference.h
 
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -I %S/Inputs/custom-modules -o %t/swift3_deprecated_objc_inference_nowarn.swiftmodule %s -disable-objc-attr-requires-foundation-module -swift-version 4 -enable-swift3-objc-inference
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -parse-as-library %t/swift3_deprecated_objc_inference_nowarn.swiftmodule -typecheck -I %S/Inputs/custom-modules -emit-objc-header-path %t/swift3_deprecated_objc_inference_nowarn.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module -swift-version 4 -enable-swift3-objc-inference
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -I %S/Inputs/custom-modules -o %t/swift3_deprecated_objc_inference_nowarn.swiftmodule %s -disable-objc-attr-requires-foundation-module -swift-version 4 -enable-swift3-objc-inference
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse-as-library %t/swift3_deprecated_objc_inference_nowarn.swiftmodule -typecheck -I %S/Inputs/custom-modules -emit-objc-header-path %t/swift3_deprecated_objc_inference_nowarn.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module -swift-version 4 -enable-swift3-objc-inference
 // RUN: %FileCheck -check-prefix=CHECK-NOWARN %s < %t/swift3_deprecated_objc_inference_nowarn.h
 // RUN: %check-in-clang -I %S/Inputs/custom-modules/ %t/swift3_deprecated_objc_inference_nowarn.h
 

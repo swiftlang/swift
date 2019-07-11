@@ -3,25 +3,19 @@
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t.overlays)
 
-// FIXME: BEGIN -enable-source-import hackaround
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t.overlays %clang-importer-sdk-path/swift-modules/ObjectiveC.swift -disable-objc-attr-requires-foundation-module
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t.overlays %clang-importer-sdk-path/swift-modules/CoreGraphics.swift
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t.overlays %clang-importer-sdk-path/swift-modules/Foundation.swift
-// FIXME: END -enable-source-import hackaround
-
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t.overlays %S/Inputs/fixits_helper.swift -module-name Helper
 
 // Make sure we get the right diagnostics.
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t.overlays) -typecheck %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %t.overlays -typecheck %s -verify
 
 // Copy the source, apply the Fix-Its, and compile it again, making
 // sure that we've cleaned up all of the deprecation warnings.
 // RUN: %empty-directory(%t.sources)
 // RUN: %empty-directory(%t.remapping)
 // RUN: cp %s %t.sources/fixits.swift
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t.overlays) -typecheck %t.sources/fixits.swift -fixit-all -emit-fixits-path %t.remapping/fixits.remap
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %t.overlays -typecheck %t.sources/fixits.swift -fixit-all -emit-fixits-path %t.remapping/fixits.remap
 // RUN: %{python} %utils/apply-fixit-edits.py %t.remapping
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t.overlays) -typecheck %t.sources/fixits.swift 2> %t.result
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %t.overlays -typecheck %t.sources/fixits.swift 2> %t.result
 
 // RUN: %FileCheck %s < %t.result
 // RUN: grep -c "warning:" %t.result | grep 3

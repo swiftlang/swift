@@ -1,8 +1,4 @@
-// RUN: %empty-directory(%t)
-// RUN: %build-clang-importer-objc-overlays
-
-// RUN: %target-swift-frontend %clang-importer-sdk-nosource -I %t %s -emit-ir
-// REQUIRES: executable_test
+// RUN: %target-swift-frontend %clang-importer-sdk %s -emit-ir
 // REQUIRES: OS=macosx
 // REQUIRES: objc_interop
 

@@ -1,7 +1,4 @@
-
-// RUN: %empty-directory(%t)
-// RUN: %build-clang-importer-objc-overlays
-// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk-nosource -I %t) -module-name foreign_errors -parse-as-library %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) -module-name foreign_errors -parse-as-library %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 

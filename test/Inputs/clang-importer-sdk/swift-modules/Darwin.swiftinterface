@@ -1,5 +1,5 @@
 // swift-interface-format-version: 1.0
-// swift-module-flags: -module-name Darwin -enable-resilience
+// swift-module-flags: -module-name Darwin -enable-library-evolution
 
 @_exported import Darwin // Clang module
 

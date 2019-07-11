@@ -1,4 +1,4 @@
-// RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t -I %S/Inputs/custom-modules) -print-module -source-filename %s -module-to-print=ImportAsMember.C -always-argument-labels > %t.printed.C.txt
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -I %S/Inputs/custom-modules -print-module -source-filename %s -module-to-print=ImportAsMember.C -always-argument-labels > %t.printed.C.txt
 
 // REQUIRES: objc_interop
 
