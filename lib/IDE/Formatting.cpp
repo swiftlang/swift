@@ -350,7 +350,7 @@ public:
     //  }
     if (auto FD = dyn_cast_or_null<AccessorDecl>(Start.getAsDecl())) {
       if (FD->isGetter() && FD->getAccessorKeywordLoc().isInvalid()) {
-        if (SM.getLineNumber(FD->getBody()->getLBraceLoc()) == Line)
+        if (SM.getLineNumber(FD->getBodySourceRange().Start) == Line)
           return false;
       }
     }
