@@ -689,6 +689,28 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Request to type check the body of the given function.
+///
+/// Produces true if an error occurred, false otherwise.
+/// FIXME: it would be far better to return the type-checked body.
+class TypeCheckFunctionBodyRequest :
+    public SimpleRequest<TypeCheckFunctionBodyRequest,
+                         bool(AbstractFunctionDecl *),
+                         CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool>
+  evaluate(Evaluator &evaluator, AbstractFunctionDecl *func) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>
