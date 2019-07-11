@@ -250,12 +250,14 @@ void Evaluator::printDependenciesGraphviz(llvm::raw_ostream &out) const {
   out << "digraph Dependencies {\n";
 
   // Emit the edges.
+  llvm::DenseMap<AnyRequest, unsigned> inDegree;
   for (const auto &source : allRequests) {
     auto known = dependencies.find(source);
     assert(known != dependencies.end());
     for (const auto &target : known->second) {
       out << "  " << getNodeName(source) << " -> " << getNodeName(target)
           << ";\n";
+      ++inDegree[target];
     }
   }
 
@@ -308,6 +310,41 @@ void Evaluator::printDependenciesGraphviz(llvm::raw_ostream &out) const {
     }
 
     out << "];\n";
+  }
+
+  // Emit "fake" nodes for each of the source buffers we encountered, so
+  // we know which file we're working from.
+  // FIXME: This approximates a "top level" request for, e.g., type checking
+  // an entire source file.
+  std::vector<unsigned> sourceBufferIDs;
+  for (const auto &element : knownBuffers) {
+    sourceBufferIDs.push_back(element.first);
+  }
+  std::sort(sourceBufferIDs.begin(), sourceBufferIDs.end());
+  for (unsigned bufferID : sourceBufferIDs) {
+    out << "  buffer_" << bufferID << "[label=\"";
+    printEscapedString(diags.SourceMgr.getIdentifierForBuffer(bufferID), out);
+    out << "\"";
+
+    out << ", shape=\"box\"";
+    out << ", fillcolor=\""
+        << colorNames[knownBuffers[bufferID] % numColorNames] << "\"";
+    out << "];\n";
+  }
+
+  // Emit "false" dependencies from source buffer IDs to any requests that (1)
+  // have no other incomining edges and (2) can be associated with a source
+  // buffer.
+  for (const auto &request : allRequests) {
+    if (inDegree[request] > 0)
+      continue;
+
+    SourceLoc loc = request.getNearestLoc();
+    if (loc.isInvalid())
+      continue;
+
+    unsigned bufferID = diags.SourceMgr.findBufferContainingLoc(loc);
+    out << "  buffer_" << bufferID << " -> " << getNodeName(request) << ";\n";
   }
 
   // Done!
