@@ -162,8 +162,10 @@ static bool validateCodingKeysEnum(DerivedConformance &derived,
   // Here we'll hold on to properties by name -- when we've validated a property
   // against its CodingKey entry, it will get removed.
   llvm::SmallDenseMap<Identifier, VarDecl *, 8> properties;
-  for (auto *varDecl :
-       derived.Nominal->getStoredProperties(/*skipInaccessible=*/true)) {
+  for (auto *varDecl : derived.Nominal->getStoredProperties()) {
+    if (!varDecl->isUserAccessible())
+      continue;
+
     if (varDecl->getAttrs().hasAttribute<LazyAttr>())
       continue;
 
@@ -357,7 +359,10 @@ static EnumDecl *synthesizeCodingKeysEnum(DerivedConformance &derived) {
   // Each of these vars needs a case in the enum. For each var decl, if the type
   // conforms to {En,De}codable, add it to the enum.
   bool allConform = true;
-  for (auto *varDecl : target->getStoredProperties(/*skipInaccessible=*/true)) {
+  for (auto *varDecl : target->getStoredProperties()) {
+    if (!varDecl->isUserAccessible())
+      continue;
+
     if (varDecl->getAttrs().hasAttribute<LazyAttr>())
       continue;
 

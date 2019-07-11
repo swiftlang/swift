@@ -3454,9 +3454,7 @@ public:
 private:
   /// Predicate used to filter StoredPropertyRange.
   struct ToStoredProperty {
-    ToStoredProperty(bool skipInaccessible = false) :
-        skipUserInaccessible(skipInaccessible) {}
-    bool skipUserInaccessible;
+    ToStoredProperty() {}
     Optional<VarDecl *> operator()(Decl *decl) const;
   };
   
@@ -3466,7 +3464,7 @@ public:
                                                      ToStoredProperty>;
 
   /// Return a collection of the stored member variables of this type.
-  StoredPropertyRange getStoredProperties(bool skipInaccessible = false) const;
+  StoredPropertyRange getStoredProperties() const;
 
 private:
   /// Predicate used to filter StoredPropertyRange.
@@ -7148,32 +7146,6 @@ inline bool ValueDecl::isSettable(const DeclContext *UseDC,
     return sd->isSettable();
   } else
     return false;
-}
-
-inline Optional<VarDecl *>
-NominalTypeDecl::ToStoredProperty::operator()(Decl *decl) const {
-  if (auto var = dyn_cast<VarDecl>(decl)) {
-    if (!var->isStatic() && var->hasStorage() &&
-        (!skipUserInaccessible || var->isUserAccessible()))
-      return var;
-  }
-
-  return None;
-}
-
-inline Optional<Decl *>
-NominalTypeDecl::ToStoredPropertyOrMissingMemberPlaceholder
-::operator()(Decl *decl) const {
-  if (auto var = dyn_cast<VarDecl>(decl)) {
-    if (!var->isStatic() && var->hasStorage())
-      return var;
-  }
-  if (auto missing = dyn_cast<MissingMemberDecl>(decl)) {
-    if (missing->getNumberOfFieldOffsetVectorEntries() > 0)
-      return missing;
-  }
-
-  return None;
 }
 
 inline void
