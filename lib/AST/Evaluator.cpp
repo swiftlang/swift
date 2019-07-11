@@ -15,7 +15,9 @@
 //
 //===----------------------------------------------------------------------===//
 #include "swift/AST/Evaluator.h"
+#include "swift/AST/DiagnosticEngine.h"
 #include "swift/Basic/Range.h"
+#include "swift/Basic/SourceManager.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/FileSystem.h"
@@ -259,6 +261,34 @@ void Evaluator::printDependenciesGraphviz(llvm::raw_ostream &out) const {
 
   out << "\n";
 
+  static const char *colorNames[] = {
+    "aquamarine",
+    "blueviolet",
+    "brown",
+    "burlywood",
+    "cadetblue",
+    "chartreuse",
+    "chocolate",
+    "coral",
+    "cornflowerblue",
+    "crimson"
+  };
+  const unsigned numColorNames = sizeof(colorNames) / sizeof(const char *);
+
+  llvm::DenseMap<unsigned, unsigned> knownBuffers;
+  auto getColor = [&](const AnyRequest &request) -> Optional<const char *> {
+    SourceLoc loc = request.getNearestLoc();
+    if (loc.isInvalid())
+      return None;
+
+    unsigned bufferID = diags.SourceMgr.findBufferContainingLoc(loc);
+    auto knownId = knownBuffers.find(bufferID);
+    if (knownId == knownBuffers.end()) {
+      knownId = knownBuffers.insert({bufferID, knownBuffers.size()}).first;
+    }
+    return colorNames[knownId->second % numColorNames];
+  };
+
   // Emit the nodes.
   for (unsigned i : indices(allRequests)) {
     const auto &request = allRequests[i];
@@ -271,7 +301,13 @@ void Evaluator::printDependenciesGraphviz(llvm::raw_ostream &out) const {
       out << " -> ";
       printEscapedString(cachedValue->second.getAsString(), out);
     }
-    out << "\"];\n";
+    out << "\"";
+
+    if (auto color = getColor(request)) {
+      out << ", fillcolor=\"" << *color << "\"";
+    }
+
+    out << "];\n";
   }
 
   // Done!
