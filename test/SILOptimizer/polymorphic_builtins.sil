@@ -1,0 +1,58 @@
+// RUN: %target-swift-frontend -sil-verify-all -parse-stdlib -Onone -emit-sil %s | %FileCheck %s
+
+sil_stage raw
+
+import Builtin
+
+// CHECK-LABEL: sil @concrete_type_test : $@convention(thin) (Builtin.Vec4xInt32, Builtin.Vec4xInt32) -> Builtin.Vec4xInt32 {
+// CHECK: builtin "add_Vec4xInt32"(
+// CHECK: return
+// CHECK: } // end sil function 'concrete_type_test'
+sil @concrete_type_test : $@convention(thin) (Builtin.Vec4xInt32, Builtin.Vec4xInt32) -> Builtin.Vec4xInt32 {
+bb0(%0 : $Builtin.Vec4xInt32, %1 : $Builtin.Vec4xInt32):
+  %2 = builtin "generic_add"(%0 : $Builtin.Vec4xInt32, %1 : $Builtin.Vec4xInt32) : $Builtin.Vec4xInt32
+  return %2 : $Builtin.Vec4xInt32
+}
+
+// CHECK-LABEL: sil @concrete_type_test_2 : $@convention(thin) (Builtin.Vec4xInt32, Builtin.Vec4xInt32) -> Builtin.Vec4xInt32 {
+// CHECK: builtin "add_Vec4xInt32"(
+// CHECK: return
+// CHECK: } // end sil function 'concrete_type_test_2'
+sil @concrete_type_test_2 : $@convention(thin) (Builtin.Vec4xInt32, Builtin.Vec4xInt32) -> Builtin.Vec4xInt32 {
+bb0(%0 : $Builtin.Vec4xInt32, %1 : $Builtin.Vec4xInt32):
+  %2 = builtin "generic_add"<Builtin.Vec4xInt32>(%0 : $Builtin.Vec4xInt32, %1 : $Builtin.Vec4xInt32) : $Builtin.Vec4xInt32
+  return %2 : $Builtin.Vec4xInt32
+}
+
+// Make sure that we handle this case correctly which can happen after mandatory
+// inlining. We should load/store the relevant values and transform the @out
+// parameter into a return value.
+//
+// CHECK-LABEL: sil @indirect_test : $@convention(thin) (@in Builtin.Vec4xInt32, @in Builtin.Vec4xInt32) -> @out Builtin.Vec4xInt32 {
+// CHECK: bb0([[OUT:%.*]] : $*Builtin.Vec4xInt32, [[ARG1:%.*]] : $*Builtin.Vec4xInt32, [[ARG2:%.*]] : $*Builtin.Vec4xInt32):
+// CHECK:   [[ARG1_LOAD:%.*]] = load [[ARG1]]
+// CHECK:   [[ARG2_LOAD:%.*]] = load [[ARG2]]
+// CHECK:   [[BUILTIN_RESULT:%.*]] = builtin "add_Vec4xInt32"([[ARG1_LOAD]] : $Builtin.Vec4xInt32, [[ARG2_LOAD]] : $Builtin.Vec4xInt32) : $Builtin.Vec4xInt32
+// CHECK:   store [[BUILTIN_RESULT]] to [[OUT]]
+// CHECK:   } // end sil function 'indirect_test'
+sil @indirect_test : $@convention(thin) (@in Builtin.Vec4xInt32, @in Builtin.Vec4xInt32) -> @out Builtin.Vec4xInt32 {
+bb0(%0 : $*Builtin.Vec4xInt32, %1 : $*Builtin.Vec4xInt32, %2 : $*Builtin.Vec4xInt32):
+  %3 = builtin "generic_add"<Builtin.Vec4xInt32>(%0 : $*Builtin.Vec4xInt32, %1 : $*Builtin.Vec4xInt32, %2 : $*Builtin.Vec4xInt32) : $()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @indirect_test_ossa : $@convention(thin) (@in Builtin.Vec4xInt32, @in Builtin.Vec4xInt32) -> @out Builtin.Vec4xInt32 {
+// CHECK: bb0([[OUT:%.*]] : $*Builtin.Vec4xInt32, [[ARG1:%.*]] : $*Builtin.Vec4xInt32, [[ARG2:%.*]] : $*Builtin.Vec4xInt32):
+// CHECK:   [[ARG1_LOAD:%.*]] = load [[ARG1]]
+// CHECK:   [[ARG2_LOAD:%.*]] = load [[ARG2]]
+// CHECK:   [[BUILTIN_RESULT:%.*]] = builtin "add_Vec4xInt32"([[ARG1_LOAD]] : $Builtin.Vec4xInt32, [[ARG2_LOAD]] : $Builtin.Vec4xInt32) : $Builtin.Vec4xInt32
+// CHECK:   store [[BUILTIN_RESULT]] to [[OUT]]
+// CHECK:   } // end sil function 'indirect_test_ossa'
+sil [ossa] @indirect_test_ossa : $@convention(thin) (@in Builtin.Vec4xInt32, @in Builtin.Vec4xInt32) -> @out Builtin.Vec4xInt32 {
+bb0(%0 : $*Builtin.Vec4xInt32, %1 : $*Builtin.Vec4xInt32, %2 : $*Builtin.Vec4xInt32):
+  %3 = builtin "generic_add"<Builtin.Vec4xInt32>(%0 : $*Builtin.Vec4xInt32, %1 : $*Builtin.Vec4xInt32, %2 : $*Builtin.Vec4xInt32) : $()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
