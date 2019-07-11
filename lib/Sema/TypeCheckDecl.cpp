@@ -5653,8 +5653,8 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
   // Create an empty body for the default constructor.
   SmallVector<ASTNode, 1> stmts;
   stmts.push_back(new (Context) ReturnStmt(decl->getLoc(), nullptr));
-  ctor->setBody(BraceStmt::create(Context, SourceLoc(), stmts, SourceLoc()));
-  ctor->setBodyTypeCheckedIfPresent();
+  ctor->setBody(BraceStmt::create(Context, SourceLoc(), stmts, SourceLoc()),
+                AbstractFunctionDecl::BodyKind::TypeChecked);
 }
 
 static void validateAttributes(TypeChecker &TC, Decl *D) {

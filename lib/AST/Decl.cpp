@@ -6236,6 +6236,40 @@ bool AbstractFunctionDecl::argumentNameIsAPIByDefault() const {
   return false;
 }
 
+BraceStmt *AbstractFunctionDecl::getBody(bool canSynthesize) const {
+  switch (getBodyKind()) {
+  case BodyKind::Deserialized:
+  case BodyKind::MemberwiseInitializer:
+  case BodyKind::None:
+  case BodyKind::Skipped:
+    return nullptr;
+
+  case BodyKind::Parsed:
+  case BodyKind::TypeChecked:
+    return Body;
+
+  case BodyKind::Unparsed:
+    // FIXME: Go parse now!
+    return nullptr;
+
+  case BodyKind::Synthesize: {
+    if (!canSynthesize)
+      return nullptr;
+
+    const_cast<AbstractFunctionDecl *>(this)->setBodyKind(BodyKind::None);
+    BraceStmt *body;
+    bool isTypeChecked;
+
+    auto mutableThis = const_cast<AbstractFunctionDecl *>(this);
+    std::tie(body, isTypeChecked) = (Synthesizer.Fn)(
+        mutableThis, Synthesizer.Context);
+    mutableThis->setBody(
+        body, isTypeChecked ? BodyKind::TypeChecked : BodyKind::Parsed);
+    return body;
+  }
+  }
+}
+
 SourceRange AbstractFunctionDecl::getBodySourceRange() const {
   switch (getBodyKind()) {
   case BodyKind::None:
