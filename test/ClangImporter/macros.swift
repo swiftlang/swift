@@ -179,5 +179,5 @@ func testNulls() {
 
 func testHeaderGuard() {
   _ = IS_HEADER_GUARD // expected-error {{use of unresolved identifier 'IS_HEADER_GUARD'}}
-  _ = LOOKS_LIKE_HEADER_GUARD_BUT_IS_USEFUL_CONSTANT // expected-error {{use of unresolved identifier 'LOOKS_LIKE_HEADER_GUARD_BUT_IS_USEFUL_CONSTANT'}}
+  _ = LOOKS_LIKE_HEADER_GUARD_BUT_IS_USEFUL_CONSTANT
 }
