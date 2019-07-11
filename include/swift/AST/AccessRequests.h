@@ -45,10 +45,6 @@ private:
                                        ValueDecl *decl) const;
 
 public:
-  // Cycle handling
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
-
   // Separate caching.
   bool isCached() const { return true; }
   Optional<AccessLevel> getCachedResult() const;
@@ -73,10 +69,6 @@ private:
   evaluate(Evaluator &evaluator, AbstractStorageDecl *decl) const;
 
 public:
-  // Cycle handling
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
-
   // Separate caching.
   bool isCached() const { return true; }
   Optional<AccessLevel> getCachedResult() const;
@@ -99,10 +91,6 @@ private:
   evaluate(Evaluator &evaluator, ExtensionDecl *decl) const;
 
 public:
-  // Cycle handling
-  void diagnoseCycle(DiagnosticEngine &diags) const;
-  void noteCycleStep(DiagnosticEngine &diags) const;
-
   // Separate caching.
   bool isCached() const { return true; }
   Optional<DefaultAndMax> getCachedResult() const;

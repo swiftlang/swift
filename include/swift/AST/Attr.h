@@ -1680,6 +1680,10 @@ public:
 
 void simple_display(llvm::raw_ostream &out, const DeclAttribute *attr);
 
+inline SourceLoc extractNearestSourceLoc(const DeclAttribute *attr) {
+  return attr->getLocation();
+}
+
 } // end namespace swift
 
 #endif
