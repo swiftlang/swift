@@ -364,7 +364,7 @@ static GuardStmt *returnIfNotEqualGuard(ASTContext &C,
   return new (C) GuardStmt(SourceLoc(), C.AllocateCopy(conditions), body);
 }
 
-static void
+static std::pair<BraceStmt *, bool>
 deriveBodyEquatable_enum_uninhabited_eq(AbstractFunctionDecl *eqDecl, void *) {
   auto parentDC = eqDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
@@ -389,13 +389,13 @@ deriveBodyEquatable_enum_uninhabited_eq(AbstractFunctionDecl *eqDecl, void *) {
   statements.push_back(switchStmt);
 
   auto body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
-  eqDecl->setBody(body);
+  return { body, /*isTypeChecked=*/false };
 }
 
 /// Derive the body for an '==' operator for an enum that has no associated
 /// values. This generates code that converts each value to its integer ordinal
 /// and compares them, which produces an optimal single icmp instruction.
-static void
+static std::pair<BraceStmt *, bool>
 deriveBodyEquatable_enum_noAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
                                                void *) {
   auto parentDC = eqDecl->getDeclContext();
@@ -446,12 +446,12 @@ deriveBodyEquatable_enum_noAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
   statements.push_back(new (C) ReturnStmt(SourceLoc(), cmpExpr));
 
   BraceStmt *body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
-  eqDecl->setBody(body);
+  return { body, /*isTypeChecked=*/false };
 }
 
 /// Derive the body for an '==' operator for an enum where at least one of the
 /// cases has associated values.
-static void
+static std::pair<BraceStmt *, bool>
 deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
                                                 void *) {
   auto parentDC = eqDecl->getDeclContext();
@@ -579,12 +579,12 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
   statements.push_back(switchStmt);
 
   auto body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
-  eqDecl->setBody(body);
+  return { body, /*isTypeChecked=*/false };
 }
 
 /// Derive the body for an '==' operator for a struct.
-static void deriveBodyEquatable_struct_eq(AbstractFunctionDecl *eqDecl,
-                                          void *) {
+static std::pair<BraceStmt *, bool>
+deriveBodyEquatable_struct_eq(AbstractFunctionDecl *eqDecl, void *) {
   auto parentDC = eqDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
 
@@ -629,13 +629,15 @@ static void deriveBodyEquatable_struct_eq(AbstractFunctionDecl *eqDecl,
   statements.push_back(returnStmt);
 
   auto body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
-  eqDecl->setBody(body);
+  return { body, /*isTypeChecked=*/false };
 }
 
 /// Derive an '==' operator implementation for an enum or a struct.
 static ValueDecl *
-deriveEquatable_eq(DerivedConformance &derived,
-                   void (*bodySynthesizer)(AbstractFunctionDecl *, void *)) {
+deriveEquatable_eq(
+    DerivedConformance &derived,
+    std::pair<BraceStmt *, bool> (*bodySynthesizer)(AbstractFunctionDecl *,
+                                                    void *)) {
   // enum SomeEnum<T...> {
   //   case A, B(Int), C(String, Int)
   //
@@ -817,9 +819,10 @@ static CallExpr *createHasherCombineCall(ASTContext &C,
 }
 
 static FuncDecl *
-deriveHashable_hashInto(DerivedConformance &derived,
-                        void (*bodySynthesizer)(AbstractFunctionDecl *,
-                                                void *)) {
+deriveHashable_hashInto(
+    DerivedConformance &derived,
+    std::pair<BraceStmt *, bool> (*bodySynthesizer)(AbstractFunctionDecl *,
+                                                    void *)) {
   // @derived func hash(into hasher: inout Hasher)
 
   ASTContext &C = derived.TC.Context;
@@ -879,7 +882,7 @@ deriveHashable_hashInto(DerivedConformance &derived,
 
 /// Derive the body for the hash(into:) method when hashValue has a
 /// user-supplied implementation.
-static void
+static std::pair<BraceStmt *, bool>
 deriveBodyHashable_compat_hashInto(AbstractFunctionDecl *hashIntoDecl, void *) {
   // func hash(into hasher: inout Hasher) {
   //   hasher.combine(self.hashValue)
@@ -898,12 +901,12 @@ deriveBodyHashable_compat_hashInto(AbstractFunctionDecl *hashIntoDecl, void *) {
 
   auto body = BraceStmt::create(C, SourceLoc(), {ASTNode(hasherExpr)},
                                 SourceLoc(), /*implicit*/ true);
-  hashIntoDecl->setBody(body);
+  return { body, /*isTypeChecked=*/false };
 }
 
 /// Derive the body for the 'hash(into:)' method for an enum by using its raw
 /// value.
-static void
+static std::pair<BraceStmt *, bool>
 deriveBodyHashable_enum_rawValue_hashInto(
   AbstractFunctionDecl *hashIntoDecl, void *) {
   // enum SomeEnum: Int {
@@ -926,12 +929,12 @@ deriveBodyHashable_enum_rawValue_hashInto(
 
   auto body = BraceStmt::create(C, SourceLoc(), combineStmt, SourceLoc(),
                                 /*implicit*/ true);
-  hashIntoDecl->setBody(body);
+  return { body, /*isTypeChecked=*/false };
 }
 
 /// Derive the body for the 'hash(into:)' method for an enum without associated
 /// values.
-static void
+static std::pair<BraceStmt *, bool>
 deriveBodyHashable_enum_noAssociatedValues_hashInto(
   AbstractFunctionDecl *hashIntoDecl, void *) {
   // enum SomeEnum {
@@ -967,12 +970,12 @@ deriveBodyHashable_enum_noAssociatedValues_hashInto(
 
   auto body = BraceStmt::create(C, SourceLoc(), stmts, SourceLoc(),
                                 /*implicit*/ true);
-  hashIntoDecl->setBody(body);
+  return { body, /*isTypeChecked=*/false };
 }
 
 /// Derive the body for the 'hash(into:)' method for an enum with associated
 /// values.
-static void
+static std::pair<BraceStmt *, bool>
 deriveBodyHashable_enum_hasAssociatedValues_hashInto(
   AbstractFunctionDecl *hashIntoDecl, void *) {
   // enum SomeEnumWithAssociatedValues {
@@ -1072,11 +1075,11 @@ deriveBodyHashable_enum_hasAssociatedValues_hashInto(
 
   auto body = BraceStmt::create(C, SourceLoc(), {ASTNode(switchStmt)},
                                 SourceLoc());
-  hashIntoDecl->setBody(body);
+  return { body, /*isTypeChecked=*/false };
 }
 
 /// Derive the body for the 'hash(into:)' method for a struct.
-static void
+static std::pair<BraceStmt *, bool>
 deriveBodyHashable_struct_hashInto(AbstractFunctionDecl *hashIntoDecl, void *) {
   // struct SomeStruct {
   //   var x: Int
@@ -1114,11 +1117,11 @@ deriveBodyHashable_struct_hashInto(AbstractFunctionDecl *hashIntoDecl, void *) {
 
   auto body = BraceStmt::create(C, SourceLoc(), statements,
                                 SourceLoc(), /*implicit*/ true);
-  hashIntoDecl->setBody(body);
+  return { body, /*isTypeChecked=*/false };
 }
 
 /// Derive the body for the 'hashValue' getter.
-static void
+static std::pair<BraceStmt *, bool>
 deriveBodyHashable_hashValue(AbstractFunctionDecl *hashValueDecl, void *) {
   auto parentDC = hashValueDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
@@ -1136,7 +1139,7 @@ deriveBodyHashable_hashValue(AbstractFunctionDecl *hashValueDecl, void *) {
 
   auto body = BraceStmt::create(C, SourceLoc(), {returnStmt}, SourceLoc(),
                                 /*implicit*/ true);
-  hashValueDecl->setBody(body);
+  return { body, /*isTypeChecked=*/false };
 }
 
 /// Derive a 'hashValue' implementation.
@@ -1309,7 +1312,8 @@ ValueDecl *DerivedConformance::deriveHashable(ValueDecl *requirement) {
         return nullptr;
 
       if (auto ED = dyn_cast<EnumDecl>(Nominal)) {
-        void (*bodySynthesizer)(AbstractFunctionDecl *, void *);
+        std::pair<BraceStmt *, bool> (*bodySynthesizer)(
+            AbstractFunctionDecl *, void *);
         if (ED->isObjC())
           bodySynthesizer = deriveBodyHashable_enum_rawValue_hashInto;
         else if (ED->hasOnlyCasesWithoutAssociatedValues())

@@ -536,8 +536,7 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
   auto body = BraceStmt::create(C, SourceLoc(), {assign, ret}, SourceLoc(),
                                 /*implicit*/ true);
   
-  ctorDecl->setBody(body);
-  ctorDecl->setBodyTypeCheckedIfPresent();
+  ctorDecl->setBody(body, AbstractFunctionDecl::BodyKind::TypeChecked);
 
   return ctorDecl;
 }
@@ -612,8 +611,7 @@ static AccessorDecl *makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
   auto body = BraceStmt::create(C, SourceLoc(), ASTNode(ret), SourceLoc(),
                                 /*implicit*/ true);
   
-  getterDecl->setBody(body);
-  getterDecl->setBodyTypeCheckedIfPresent();
+  getterDecl->setBody(body, AbstractFunctionDecl::BodyKind::TypeChecked);
 
   return getterDecl;
 }
@@ -689,8 +687,7 @@ static AccessorDecl *makeStructRawValueGetter(
   auto body = BraceStmt::create(C, SourceLoc(), ASTNode(ret), SourceLoc(),
                                 /*implicit*/ true);
   
-  getterDecl->setBody(body);
-  getterDecl->setBodyTypeCheckedIfPresent();
+  getterDecl->setBody(body, AbstractFunctionDecl::BodyKind::TypeChecked);
 
   return getterDecl;
 }
@@ -848,8 +845,7 @@ makeIndirectFieldAccessors(ClangImporter::Implementation &Impl,
     auto ret = new (C) ReturnStmt(SourceLoc(), expr);
     auto body = BraceStmt::create(C, SourceLoc(), ASTNode(ret), SourceLoc(),
                                   /*implicit*/ true);
-    getterDecl->setBody(body);
-    getterDecl->setBodyTypeCheckedIfPresent();
+    getterDecl->setBody(body, AbstractFunctionDecl::BodyKind::TypeChecked);
     getterDecl->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
   }
 
@@ -879,8 +875,7 @@ makeIndirectFieldAccessors(ClangImporter::Implementation &Impl,
 
     auto body = BraceStmt::create(C, SourceLoc(), { assign }, SourceLoc(),
                                   /*implicit*/ true);
-    setterDecl->setBody(body);
-    setterDecl->setBodyTypeCheckedIfPresent();
+    setterDecl->setBody(body, AbstractFunctionDecl::BodyKind::TypeChecked);
     setterDecl->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
   }
 
@@ -956,8 +951,7 @@ makeUnionFieldAccessors(ClangImporter::Implementation &Impl,
     auto ret = new (C) ReturnStmt(SourceLoc(), reinterpreted);
     auto body = BraceStmt::create(C, SourceLoc(), ASTNode(ret), SourceLoc(),
                                   /*implicit*/ true);
-    getterDecl->setBody(body);
-    getterDecl->setBodyTypeCheckedIfPresent();
+    getterDecl->setBody(body, AbstractFunctionDecl::BodyKind::TypeChecked);
     getterDecl->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
   }
 
@@ -1017,8 +1011,7 @@ makeUnionFieldAccessors(ClangImporter::Implementation &Impl,
 
     auto body = BraceStmt::create(C, SourceLoc(), { initialize }, SourceLoc(),
                                   /*implicit*/ true);
-    setterDecl->setBody(body);
-    setterDecl->setBodyTypeCheckedIfPresent();
+    setterDecl->setBody(body, AbstractFunctionDecl::BodyKind::TypeChecked);
     setterDecl->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
   }
 
@@ -1282,8 +1275,7 @@ createDefaultConstructor(ClangImporter::Implementation &Impl,
   // Create the function body.
   auto body = BraceStmt::create(context, SourceLoc(), {assign, ret},
                                 SourceLoc());
-  constructor->setBody(body);
-  constructor->setBodyTypeCheckedIfPresent();
+  constructor->setBody(body, AbstractFunctionDecl::BodyKind::TypeChecked);
 
   // We're done.
   return constructor;
@@ -1401,8 +1393,7 @@ createValueConstructor(ClangImporter::Implementation &Impl,
 
     // Create the function body.
     auto body = BraceStmt::create(context, SourceLoc(), stmts, SourceLoc());
-    constructor->setBody(body);
-    constructor->setBodyTypeCheckedIfPresent();
+    constructor->setBody(body, AbstractFunctionDecl::BodyKind::TypeChecked);
   }
 
   // We're done.
@@ -1552,8 +1543,7 @@ static ConstructorDecl *createRawValueBridgingConstructor(
     auto ret = new (ctx) ReturnStmt(SourceLoc(), result, /*Implicit=*/true);
 
     auto body = BraceStmt::create(ctx, SourceLoc(), {assign, ret}, SourceLoc());
-    init->setBody(body);
-    init->setBodyTypeCheckedIfPresent();
+    init->setBody(body, AbstractFunctionDecl::BodyKind::TypeChecked);
   }
 
   return init;
@@ -1911,8 +1901,8 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
 
   auto ret = new (C) ReturnStmt(SourceLoc(), domainDeclRef);
   getterDecl->setBody(
-      BraceStmt::create(C, SourceLoc(), {ret}, SourceLoc(), isImplicit));
-  getterDecl->setBodyTypeCheckedIfPresent();
+      BraceStmt::create(C, SourceLoc(), {ret}, SourceLoc(), isImplicit),
+      AbstractFunctionDecl::BodyKind::TypeChecked);
 
   return true;
 }
@@ -8268,8 +8258,8 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
     // Finally, set the body.
     func->setBody(BraceStmt::create(C, SourceLoc(),
                                     ASTNode(ret),
-                                    SourceLoc()));
-    func->setBodyTypeCheckedIfPresent();
+                                    SourceLoc()),
+                  AbstractFunctionDecl::BodyKind::TypeChecked);
   }
 
   // Mark the function transparent so that we inline it away completely.

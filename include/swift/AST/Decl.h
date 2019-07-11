@@ -5615,7 +5615,7 @@ public:
   }
 
   struct BodySynthesizer {
-    void (* Fn)(AbstractFunctionDecl *, void *);
+    std::pair<BraceStmt *, bool> (* Fn)(AbstractFunctionDecl *, void *);
     void *Context;
   };
 
@@ -5748,18 +5748,8 @@ public:
   /// have a body for this function.
   ///
   /// \sa hasBody()
-  BraceStmt *getBody(bool canSynthesize = true) const {
-    if (canSynthesize && getBodyKind() == BodyKind::Synthesize) {
-      const_cast<AbstractFunctionDecl *>(this)->setBodyKind(BodyKind::None);
-      (Synthesizer.Fn)(const_cast<AbstractFunctionDecl *>(this),
-                       Synthesizer.Context);
-    }
-    if (getBodyKind() == BodyKind::Parsed ||
-        getBodyKind() == BodyKind::TypeChecked) {
-      return Body;
-    }
-    return nullptr;
-  }
+  BraceStmt *getBody(bool canSynthesize = true) const;
+
   void setBody(BraceStmt *S, BodyKind NewBodyKind = BodyKind::Parsed) {
     assert(getBodyKind() != BodyKind::Skipped &&
            "cannot set a body if it was skipped");
@@ -5784,8 +5774,12 @@ public:
   }
 
   /// Note that parsing for the body was delayed.
-  void setBodySynthesizer(void (* fn)(AbstractFunctionDecl *, void *),
-                         void *context = nullptr) {
+  ///
+  /// The function should return the body statement and a flag indicating
+  /// whether that body is already type-checked.
+  void setBodySynthesizer(
+      std::pair<BraceStmt *, bool> (* fn)(AbstractFunctionDecl *, void *),
+      void *context = nullptr) {
     assert(getBodyKind() == BodyKind::None);
     Synthesizer = {fn, context};
     setBodyKind(BodyKind::Synthesize);
