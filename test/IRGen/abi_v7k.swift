@@ -6,7 +6,7 @@
 
 // CHECK-LABEL: define hidden swiftcc float @"$s8test_v7k9addFloats{{.*}}"(float, float)
 // CHECK: fadd float %0, %1
-// CHECK ret float
+// CHECK: ret float
 // V7K-LABEL: _$s8test_v7k9addFloats{{.*}}
 // V7K: vadd.f32 s0, s0, s1
 func addFloats(x: Float, y : Float) -> Float {

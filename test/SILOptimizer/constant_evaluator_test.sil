@@ -495,7 +495,7 @@ bb3:
 
 // Test stack allocation and memory access.
 
-// CHECK-LABEL @interpretLoadStore
+// CHECK-LABEL: @interpretLoadStore
 sil hidden @interpretLoadStore : $@convention(thin) () -> Builtin.Int64 {
 bb0:
   %0 = alloc_stack $Builtin.Int64, var, name "i"
@@ -506,7 +506,7 @@ bb0:
   return %3 : $Builtin.Int64
 } // CHECK: Returns int: 11
 
-// CHECK-LABEL @interpretBeginEndAccess
+// CHECK-LABEL: @interpretBeginEndAccess
 sil hidden @interpretBeginEndAccess : $@convention(thin) () -> Builtin.Int64 {
 bb0:
   %0 = alloc_stack $Builtin.Int64, var, name "i"

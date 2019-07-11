@@ -38,7 +38,7 @@ func foo() {
   //       are contiguous.
   // CHECK: call {{.*}} @"$ss18_fatalErrorMessage__4file4line5flagss5NeverOs12StaticStringV_A2HSus6UInt32VtF"{{.*}}, !dbg ![[DIV:[0-9]+]]
   // CHECK-NEXT: unreachable, !dbg ![[DIV]]
-  // CHECK sdiv i64 %0, %1, !dbg ![[DIV]]
+  // CHECK: sdiv i64 %0, %1, !dbg ![[DIV]]
   // CHECK: call void @llvm.trap(), !dbg ![[INLINEDADD:[0-9]+]]
   // CHECK-NEXT: unreachable, !dbg ![[INLINEDADD]]
 
