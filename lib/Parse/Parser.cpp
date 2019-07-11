@@ -26,11 +26,15 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/DelayedParsingCallbacks.h"
+#include "swift/Parse/ParsedSyntaxNodes.h"
+#include "swift/Parse/ParsedSyntaxRecorder.h"
 #include "swift/Parse/ParseSILSupport.h"
 #include "swift/Parse/SyntaxParseActions.h"
 #include "swift/Parse/SyntaxParsingContext.h"
+#include "swift/Parse/HiddenLibSyntaxAction.h"
 #include "swift/Syntax/RawSyntax.h"
 #include "swift/Syntax/TokenSyntax.h"
+#include "swift/SyntaxParse/SyntaxTreeCreator.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
@@ -141,7 +145,7 @@ private:
     unsigned BufferID = SourceMgr.findBufferContainingLoc(AFD->getLoc());
     Parser TheParser(BufferID, SF, nullptr, &ParserState, nullptr,
                      /*DelayBodyParsing=*/false);
-    TheParser.SyntaxContext->disable();
+    TheParser.SyntaxContext->setDiscard();
     std::unique_ptr<CodeCompletionCallbacks> CodeCompletion;
     if (CodeCompletionFactory) {
       CodeCompletion.reset(
@@ -168,10 +172,7 @@ static void parseDelayedDecl(
     SourceMgr.findBufferContainingLoc(ParserState.getDelayedDeclLoc());
   Parser TheParser(BufferID, SF, nullptr, &ParserState, nullptr,
                    /*DelayBodyParsing=*/false);
-
-  // Disable libSyntax creation in the delayed parsing.
-  TheParser.SyntaxContext->disable();
-
+  TheParser.SyntaxContext->setDiscard();
   std::unique_ptr<CodeCompletionCallbacks> CodeCompletion;
   if (CodeCompletionFactory) {
     CodeCompletion.reset(
@@ -518,9 +519,16 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
     TokReceiver(SF.shouldCollectToken() ?
                 new TokenRecorder(SF) :
                 new ConsumeTokenReceiver()),
-    SyntaxContext(new SyntaxParsingContext(SyntaxContext, SF,
-                                           L->getBufferID(),
-                                           std::move(SPActions))) {
+    SyntaxContext(new SyntaxParsingContext(
+                    SyntaxContext, SF, L->getBufferID(),
+                    std::make_shared<HiddenLibSyntaxAction>(
+                        SPActions,
+                        std::make_shared<SyntaxTreeCreator>(
+                            SF.getASTContext().SourceMgr,
+                            L->getBufferID(),
+                            SF.SyntaxParsingCache,
+                            SF.getASTContext().getSyntaxArena())))),
+    Generator(SF.getASTContext()) {
   State = PersistentState;
   if (!State) {
     OwnedState.reset(new PersistentParserState(Context));
@@ -573,6 +581,19 @@ SourceLoc Parser::consumeToken() {
   TokReceiver->receive(Tok);
   SyntaxContext->addToken(Tok, LeadingTrivia, TrailingTrivia);
   return consumeTokenWithoutFeedingReceiver();
+}
+
+ParsedTokenSyntax Parser::consumeTokenSyntax() {
+  TokReceiver->receive(Tok);
+  ParsedTokenSyntax ParsedToken = ParsedSyntaxRecorder::makeToken(
+      Tok, LeadingTrivia, TrailingTrivia, *SyntaxContext);
+
+  // todo [gsoc]: remove when possible
+  // todo [gsoc]: handle backtracking properly
+  Generator.pushLoc(Tok.getLoc());
+
+  consumeTokenWithoutFeedingReceiver();
+  return ParsedToken;
 }
 
 SourceLoc Parser::getEndOfPreviousLoc() {
