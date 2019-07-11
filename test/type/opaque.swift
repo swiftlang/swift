@@ -427,3 +427,48 @@ struct Foo {
   var instanceVar: some P = 17
   let instanceLet: some P = 38
 }
+
+protocol P_52528543 {
+  init()
+
+  associatedtype A: Q_52528543
+
+  var a: A { get }
+}
+
+protocol Q_52528543 {
+  associatedtype B // expected-note 2 {{associated type 'B'}}
+
+  var b: B { get }
+}
+
+extension P_52528543 {
+  func frob(a_b: A.B) -> some P_52528543 { return self }
+}
+
+func foo<T: P_52528543>(x: T) -> some P_52528543 {
+  return x
+    .frob(a_b: x.a.b)
+    .frob(a_b: x.a.b) // expected-error {{cannot convert}}
+}
+
+struct GenericFoo<T: P_52528543, U: P_52528543> {
+  let x: some P_52528543 = T()
+  let y: some P_52528543 = U()
+
+  mutating func bump() {
+    var xab = f_52528543(x: x)
+    xab = f_52528543(x: y) // expected-error{{cannot assign}}
+  }
+}
+
+func f_52528543<T: P_52528543>(x: T) -> T.A.B { return x.a.b }
+
+func opaque_52528543<T: P_52528543>(x: T) -> some P_52528543 { return x }
+
+func invoke_52528543<T: P_52528543, U: P_52528543>(x: T, y: U) {
+  let x2 = opaque_52528543(x: x)
+  let y2 = opaque_52528543(x: y)
+  var xab = f_52528543(x: x2)
+  xab = f_52528543(x: y2) // expected-error{{cannot assign}}
+}
