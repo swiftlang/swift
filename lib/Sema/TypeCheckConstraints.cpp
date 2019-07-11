@@ -180,6 +180,12 @@ bool constraints::computeTupleShuffle(ArrayRef<TupleTypeElt> fromTuple,
 Expr *ConstraintLocatorBuilder::trySimplifyToExpr() const {
   SmallVector<LocatorPathElt, 4> pathBuffer;
   Expr *anchor = getLocatorParts(pathBuffer);
+  // Locators are not guaranteed to have an anchor
+  // if constraint system is used to verify generic
+  // requirements.
+  if (!anchor)
+    return nullptr;
+
   ArrayRef<LocatorPathElt> path = pathBuffer;
 
   SourceRange range;
