@@ -45,5 +45,10 @@ func testFunc() {
   // error in the similar situation: 'let _ = \S.init'.
   _ = ([S]()).map(\.init)
   // expected-error@-1 {{type of expression is ambiguous without more context}}
+
+  let kp = \S.i
+  let _: KeyPath<S, Int> = kp // works, because type defaults to KeyPath nominal
+  let f = \S.i
+  let _: (S) -> Int = f // expected-error {{cannot convert value of type 'KeyPath<S, Int>' to specified type '(S) -> Int'}}
 }
 >>>>>>> Add typechecking tests
