@@ -991,7 +991,7 @@ ParserResult<Stmt> Parser::parseStmtDefer() {
     tempDecl->setBody(Body.get());
   }
   
-  SourceLoc loc = tempDecl->getBody()->getStartLoc();
+  SourceLoc loc = tempDecl->getBodySourceRange().Start;
 
   // Form the call, which will be emitted on any path that needs to run the
   // code.
