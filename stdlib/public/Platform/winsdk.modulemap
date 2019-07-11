@@ -15,6 +15,8 @@ module WinSDK [system] [extern_c] {
     header "WinSock2.h"
     header "WS2tcpip.h"
     export *
+
+    link "WS2_32.lib"
   }
 
   module core {
@@ -58,9 +60,12 @@ module WinSDK [system] [extern_c] {
       export *
     }
 
+    // iphlpapi.dll
     module iphlp {
       header "iphlpapi.h"
       export *
+
+      link "iphlpapi.lib"
     }
 
     // api-ms-win-core-libloader-l1-1-0.dll
@@ -120,6 +125,8 @@ module WinSDK [system] [extern_c] {
   module DbgHelp {
     header "DbgHelp.h"
     export *
+
+    link "DbgHelp.lib"
   }
 
   module Shell {
@@ -130,6 +137,8 @@ module WinSDK [system] [extern_c] {
   module ShellAPI {
     header "Shlwapi.h"
     export *
+
+    link "ShLwApi.lib"
   }
 
   module User {
@@ -140,6 +149,8 @@ module WinSDK [system] [extern_c] {
   module WinCrypt {
     header "wincrypt.h"
     export *
+
+    link "Crypt32.lib"
   }
 }
 
