@@ -83,6 +83,11 @@ enum class BuiltinValueKind {
 #include "swift/AST/Builtins.def"
 };
 
+/// Returns true if this is a polymorphic builtin that is only valid
+/// in raw sil and thus must be resolved to have concrete types by the
+/// time we are in canonical SIL.
+bool isPolymorphicBuiltin(BuiltinValueKind Id);
+
 /// Decode the type list of a builtin (e.g. mul_Int32) and return the base
 /// name (e.g. "mul").
 StringRef getBuiltinBaseName(ASTContext &C, StringRef Name,

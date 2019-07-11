@@ -89,8 +89,7 @@ static bool isBarrier(SILInstruction *inst) {
 #define BUILTIN_CAST_OPERATION(Id, Name, Attrs) BUILTIN_NO_BARRIER(Id)
 #define BUILTIN_CAST_OR_BITCAST_OPERATION(Id, Name, Attrs)                     \
   BUILTIN_NO_BARRIER(Id)
-#define BUILTIN_BINARY_OPERATION(Id, Name, Attrs, Overload)                    \
-  BUILTIN_NO_BARRIER(Id)
+#define BUILTIN_BINARY_OPERATION(Id, Name, Attrs) BUILTIN_NO_BARRIER(Id)
 #define BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(Id, Name, UncheckedID, Attrs,   \
                                                Overload)                       \
   BUILTIN_NO_BARRIER(Id)

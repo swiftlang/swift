@@ -874,6 +874,12 @@ using all_true =
 template <class... Ts>
 using are_all_compound = all_true<std::is_compound<Ts>::value...>;
 
+/// Overload for producing optionals of type T where c++ type inference does not
+/// let you consider optional a subtype of T.
+template <typename T> Optional<T> make_optional(const T &t) {
+  return Optional<T>(t);
+}
+
 } // end namespace swift
 
 #endif // SWIFT_BASIC_INTERLEAVE_H
