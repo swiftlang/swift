@@ -631,7 +631,8 @@ private:
   TypeChecker(ASTContext &Ctx);
   friend class ASTContext;
   friend class constraints::ConstraintSystem;
-
+  friend class TypeCheckFunctionBodyRequest;
+  
 public:
   /// Create a new type checker instance for the given ASTContext, if it
   /// doesn't already have one.
