@@ -4406,9 +4406,9 @@ ERROR(property_wrapper_ambiguous_value_property, none,
   "property wrapper type %0 has multiple non-static properties "
   "named %1", (Type, Identifier))
 ERROR(property_wrapper_wrong_initial_value_init, none,
-      "'init(initialValue:)' parameter type (%0) must be the same as its "
-      "'wrappedValue' property type (%1) or an @autoclosure thereof",
-      (Type, Type))
+      "%0 parameter type (%1) must be the same as its "
+      "'wrappedValue' property type (%2) or an @autoclosure thereof",
+      (DeclName, Type, Type))
 ERROR(property_wrapper_failable_init, none,
       "%0 cannot be failable", (DeclName))
 ERROR(property_wrapper_ambiguous_initial_value_init, none,
@@ -4477,15 +4477,13 @@ ERROR(property_wrapper_type_not_usable_from_inline,none,
       "%select{%select{variable|constant}0|property}1 "
       "must be '@usableFromInline' or public",
       (bool, bool))
-WARNING(property_wrapper_delegateValue,none,
-        "property wrapper's `delegateValue` property should be renamed to "
-        "'projectedValue'; use of 'delegateValue' is deprecated", ())
 WARNING(property_wrapper_wrapperValue,none,
         "property wrapper's `wrapperValue` property should be renamed to "
         "'projectedValue'; use of 'wrapperValue' is deprecated", ())
-WARNING(property_wrapper_value,none,
-        "property wrapper's `value` property should be renamed to "
-        "'wrappedValue'; use of 'value' is deprecated", ())
+WARNING(property_wrapper_init_initialValue,none,
+        "property wrapper's `init(initialValue:)` should be renamed "
+        "to 'init(wrappedValue:)'; use of 'init(initialValue:)' is deprecated",
+        ())
 ERROR(property_wrapper_projection_value_missing,none,
       "could not find projection value property %0", (Identifier))
 

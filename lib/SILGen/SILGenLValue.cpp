@@ -1296,9 +1296,9 @@ namespace {
         if (VD->getAttachedPropertyWrappers().size() == 1) {
           auto wrapperInfo = VD->getAttachedPropertyWrapperTypeInfo(0);
           
-          // If there is no init(initialValue:), we cannot rewrite an
+          // If there is no init(wrapperValue:), we cannot rewrite an
           // assignment into an initialization.
-          if (!wrapperInfo.initialValueInit)
+          if (!wrapperInfo.wrappedValueInit)
             return false;
 
           // If we have a nonmutating setter on a value type, the call
@@ -1404,7 +1404,7 @@ namespace {
         // FIXME: Composition.
         assert(field->getAttachedPropertyWrappers().size() == 1);
         auto wrapperInfo = field->getAttachedPropertyWrapperTypeInfo(0);
-        auto ctor = wrapperInfo.initialValueInit;
+        auto ctor = wrapperInfo.wrappedValueInit;
         SubstitutionMap subs = backingVar->getType()->getMemberSubstitutionMap(
                         SGF.getModule().getSwiftModule(), ctor);
 
