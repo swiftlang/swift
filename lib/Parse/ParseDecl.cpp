@@ -3256,6 +3256,8 @@ void Parser::parseDeclDelayed() {
       } else if (auto *ED = dyn_cast<ExtensionDecl>(parent)) {
         ED->addMember(D);
       } else if (auto *SF = dyn_cast<SourceFile>(parent)) {
+        // FIXME: unify notification to ASTSourceFileScope with addMember
+        // mechanism used above
         SF->Decls.push_back(D);
       }
     }
@@ -4118,8 +4120,8 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
     if (EqualLoc.isInvalid()) {
       diagnose(Tok, diag::expected_equal_in_typealias);
       Status.setIsParseError();
+      return Status;
     }
-    return Status;
   }
 
   // Exit the scope introduced for the generic parameters.
@@ -6391,6 +6393,7 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
     SignatureHasCodeCompletion |= whereStatus.hasCodeCompletion();
     if (whereStatus.hasCodeCompletion() && !CodeCompletion) {
       // Trigger delayed parsing, no need to continue.
+      Subscript->setEndLoc(getEndOfPreviousLoc());
       return whereStatus;
     }
   }
@@ -6433,6 +6436,8 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
   }
 
   accessors.record(*this, Subscript, (Invalid || !Status.isSuccess()), Decls);
+
+  Subscript->setEndLoc(getEndOfPreviousLoc());
 
   // No need to setLocalDiscriminator because subscripts cannot
   // validly appear outside of type decls.

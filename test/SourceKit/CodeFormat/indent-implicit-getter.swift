@@ -63,7 +63,7 @@ class var foo: Int {
 // CHECK: key.sourcetext: "    subscript(a: Int) -> Int {"
 // CHECK: key.sourcetext: "        let x = 3"
 // CHECK: key.sourcetext: "        return x"
-// CHECK: key.sourcetext: "    }"
+// CHECK: key.sourcetext: "        }"
 // CHECK: key.sourcetext: "}"
 // CHECK: key.sourcetext: "    var foo: Int {"
 // CHECK: key.sourcetext: "    class var foo: Int {"
