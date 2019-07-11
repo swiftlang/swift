@@ -29,6 +29,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
@@ -1920,35 +1921,47 @@ bool TypeChecker::typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
 }
 
 bool TypeChecker::typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD) {
-  // HACK: don't type-check the same function body twice.  This is
-  // supposed to be handled by just not enqueuing things twice,
-  // but that gets tricky with synthesized function bodies.
-  validateDecl(AFD);
-  (void) AFD->getBody();
+  return evaluateOrDefault(Context.evaluator,
+                           TypeCheckFunctionBodyRequest{AFD},
+                           true);
+}
 
-  if (AFD->isBodyTypeChecked())
+llvm::Expected<bool>
+TypeCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
+                                       AbstractFunctionDecl *func) const {
+  ASTContext &ctx = func->getASTContext();
+  if (!func->hasInterfaceType()) {
+    TypeChecker &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
+    tc.validateDecl(func);
+  }
+
+  // HACK: don't type-check the same function body twice. This will eventually
+  // be handled by the request-evaluator's caching mechanism.
+  (void)func->getBody();
+  if (func->isBodyTypeChecked())
     return false;
 
-  FrontendStatsTracer StatsTracer(Context.Stats, "typecheck-fn", AFD);
-  PrettyStackTraceDecl StackEntry("type-checking", AFD);
+  FrontendStatsTracer StatsTracer(ctx.Stats, "typecheck-fn", func);
+  PrettyStackTraceDecl StackEntry("type-checking", func);
 
-  if (Context.Stats)
-    Context.Stats->getFrontendCounters().NumFunctionsTypechecked++;
+  if (ctx.Stats)
+    ctx.Stats->getFrontendCounters().NumFunctionsTypechecked++;
 
   Optional<FunctionBodyTimer> timer;
-  if (DebugTimeFunctionBodies || WarnLongFunctionBodies)
-    timer.emplace(AFD, DebugTimeFunctionBodies, WarnLongFunctionBodies);
+  TypeChecker &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
+  if (tc.DebugTimeFunctionBodies || tc.WarnLongFunctionBodies)
+    timer.emplace(func, tc.DebugTimeFunctionBodies, tc.WarnLongFunctionBodies);
 
-  requestRequiredNominalTypeLayoutForParameters(AFD->getParameters());
+  tc.requestRequiredNominalTypeLayoutForParameters(func->getParameters());
 
-  bool error = typeCheckAbstractFunctionBodyUntil(AFD, SourceLoc());
-  AFD->setBodyTypeCheckedIfPresent();
+  bool error = tc.typeCheckAbstractFunctionBodyUntil(func, SourceLoc());
+  func->setBodyTypeCheckedIfPresent();
 
   if (error)
     return true;
 
-  if (AFD->getBody())
-    performAbstractFuncDeclDiagnostics(*this, AFD);
+  if (func->getBody())
+    performAbstractFuncDeclDiagnostics(tc, func);
 
   return false;
 }

@@ -540,10 +540,12 @@ namespace swift {
   /// Class responsible for formatting diagnostics and presenting them
   /// to the user.
   class DiagnosticEngine {
+  public:
     /// The source manager used to interpret source locations and
     /// display diagnostics.
     SourceManager &SourceMgr;
 
+  private:
     /// The diagnostic consumer(s) that will be responsible for actually
     /// emitting diagnostics.
     SmallVector<DiagnosticConsumer *, 2> Consumers;
