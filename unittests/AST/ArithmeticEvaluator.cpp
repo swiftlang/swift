@@ -117,8 +117,7 @@ struct EvaluationRule
     }
   }
 
-  void diagnoseCycle(DiagnosticEngine &diags) const { }
-  void noteCycleStep(DiagnosticEngine &diags) const { }
+  SourceLoc getNearestLoc() const { return SourceLoc(); }
 };
 
 struct InternallyCachedEvaluationRule :
