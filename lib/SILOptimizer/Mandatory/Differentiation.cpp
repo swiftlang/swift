@@ -3905,6 +3905,9 @@ public:
                                                  getBuilder(),
                                                  jvpCall->getLoc());
 
+    // Store the original result to the value map.
+    mapValue(ai, originalDirectResult);
+    
     // Some instructions that produce the callee may have been cloned.
     // If the original callee did not have any users beyond this `apply`,
     // recursively kill the cloned callee.
