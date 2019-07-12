@@ -626,6 +626,43 @@ static AccessorDecl *makeEnumRawValueGetter(ClangImporter::Implementation &Impl,
   return getterDecl;
 }
 
+/// Synthesizer for the rawValue getter for an imported struct.
+static std::pair<BraceStmt *, bool>
+synthesizeStructRawValueGetterBody(AbstractFunctionDecl *afd, void *context) {
+  auto getterDecl = cast<AccessorDecl>(afd);
+  VarDecl *storedVar = static_cast<VarDecl *>(context);
+
+  ASTContext &ctx = getterDecl->getASTContext();
+  auto *selfDecl = getterDecl->getImplicitSelfDecl();
+  auto selfRef = new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(),
+                                       /*implicit*/true);
+  selfRef->setType(selfDecl->getType());
+
+  auto storedType = storedVar->getInterfaceType();
+  auto storedRef = new (ctx) MemberRefExpr(selfRef, SourceLoc(), storedVar,
+                                           DeclNameLoc(), /*Implicit=*/true,
+                                           AccessSemantics::DirectToStorage);
+  storedRef->setType(storedType);
+
+  Expr *result = storedRef;
+
+  Type computedType = getterDecl->getResultInterfaceType();
+  if (!computedType->isEqual(storedType)) {
+    auto bridge = new (ctx) BridgeFromObjCExpr(storedRef, computedType);
+    bridge->setType(computedType);
+
+    auto coerce = new (ctx) CoerceExpr(bridge, {}, {nullptr, computedType});
+    coerce->setType(computedType);
+
+    result = coerce;
+  }
+
+  auto ret = new (ctx) ReturnStmt(SourceLoc(), result);
+  auto body = BraceStmt::create(ctx, SourceLoc(), ASTNode(ret), SourceLoc(),
+                                /*implicit*/ true);
+  return { body, /*isTypeChecked=*/true };
+}
+
 // Build the rawValue getter for a struct type.
 //
 //   struct SomeType: RawRepresentable {
@@ -646,7 +683,6 @@ static AccessorDecl *makeStructRawValueGetter(
   auto *params = ParameterList::createEmpty(C);
 
   auto computedType = computedVar->getInterfaceType();
-  auto storedType = storedVar->getInterfaceType();
 
   auto getterDecl = AccessorDecl::create(C,
                      /*FuncLoc=*/SourceLoc(),
@@ -667,38 +703,7 @@ static AccessorDecl *makeStructRawValueGetter(
   getterDecl->setValidationToChecked();
 
   getterDecl->setAccess(AccessLevel::Public);
-
-  // Don't bother synthesizing the body if we've already finished type-checking.
-  if (Impl.hasFinishedTypeChecking())
-    return getterDecl;
-
-  auto *selfDecl = getterDecl->getImplicitSelfDecl();
-  auto selfRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(), /*implicit*/true);
-  selfRef->setType(selfDecl->getType());
-
-  auto storedRef = new (C) MemberRefExpr(selfRef, SourceLoc(), storedVar,
-                                         DeclNameLoc(), /*Implicit=*/true,
-                                         AccessSemantics::DirectToStorage);
-  storedRef->setType(storedType);
-
-  Expr *result = storedRef;
-
-  if (!computedType->isEqual(storedType)) {
-    auto bridge = new (C) BridgeFromObjCExpr(storedRef, computedType);
-    bridge->setType(computedType);
-
-    auto coerce = new (C) CoerceExpr(bridge, {}, {nullptr, computedType});
-    coerce->setType(computedType);
-
-    result = coerce;
-  }
-
-  auto ret = new (C) ReturnStmt(SourceLoc(), result);
-  auto body = BraceStmt::create(C, SourceLoc(), ASTNode(ret), SourceLoc(),
-                                /*implicit*/ true);
-  
-  getterDecl->setBody(body, AbstractFunctionDecl::BodyKind::TypeChecked);
-
+  getterDecl->setBodySynthesizer(synthesizeStructRawValueGetterBody, storedVar);
   return getterDecl;
 }
 
