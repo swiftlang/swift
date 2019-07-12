@@ -14,16 +14,16 @@ func test() {
   local(a: SLocal(x: S1()))
 }
 
-guard let <base>top</base> = Optional.some("top") else {
+guard let top = Optional.some("top") else {
   fatalError()
 }
-print(<base>top</base>)
+print(top)
 
 protocol P1 {}
 struct Test {
   var test: P1 {
-    struct SP1: P1 {}
-    return SP1()
+    struct new_SP1: P1 {}
+    return new_SP1()
   }
 }
 
