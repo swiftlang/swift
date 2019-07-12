@@ -3445,6 +3445,8 @@ private:
   /// The differential function.
   SILFunction *differential;
 
+  SILBasicBlock *dfBasicBlock;
+
   /// The differentiation invoker.
   DifferentiationInvoker invoker;
 
@@ -3566,15 +3568,8 @@ public:
         new (module) SILDebugScope(original->getLocation(), differential));
 
     // Create empty body of differential.
-    auto diffConv = differential->getConventions();
-    auto *entry = differential->createBasicBlock();
+    dfBasicBlock = differential->createBasicBlock();
     createEntryArguments(differential);
-
-    SILBuilder builder(entry);
-    auto loc = differential->getLocation();
-    builder.createReturn(loc,
-                         SILUndef::get(differential->mapTypeIntoContext(
-                             diffConv.getSILResultType()), *differential));
     return differential;
   }
 
@@ -3692,6 +3687,20 @@ public:
     directResults.push_back(differentialPartialApply);
     builder.createReturn(
         ri->getLoc(), joinElements(directResults, builder, loc));
+
+    // In the differential, return just the tangent of the original result
+    auto differentialBuilder = SILBuilder(dfBasicBlock);
+//    SmallVector<SILValue, 8> diffResults;
+//    extractAllElements(origResult, builder, diffResults);
+//    differentialBuilder.createReturn(differential->getLocation(), origResult);
+//    differentialBuilder.createReturn(differential->getLocation(),
+//                         joinElements(diffResults, differentialBuilder,
+//                                      differential->getLocation()));
+    auto diffConv = differential->getConventions();
+    auto diffLoc = differential->getLocation();
+    differentialBuilder.createReturn(diffLoc,
+                         SILUndef::get(differential->mapTypeIntoContext(
+                             diffConv.getSILResultType()), *differential));
   }
 
   // If an `apply` has active results or active inout parameters, replace it
@@ -3895,9 +3904,6 @@ public:
     SILValue originalDirectResult = joinElements(originalDirectResults,
                                                  getBuilder(),
                                                  jvpCall->getLoc());
-
-    // Store the original result to the value map.
-    mapValue(ai, originalDirectResult);
 
     // Some instructions that produce the callee may have been cloned.
     // If the original callee did not have any users beyond this `apply`,
