@@ -5613,7 +5613,7 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
   if (auto *classDecl = dyn_cast<ClassDecl>(decl)) {
     // If the class has a superclass, we should have either inherited it's
     // designated initializers or diagnosed the absence of our own.
-    if (classDecl->getSuperclass())
+    if (classDecl->hasSuperclass())
       return;
   }
 
