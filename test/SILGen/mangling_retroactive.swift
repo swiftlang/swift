@@ -87,3 +87,15 @@ extension ConditionallyP2: P where T: Q, T: NonRetroactive {}
 
 func useConditionallyP2(_: RequiresP<ConditionallyP2<Y>>) {}
 // CHECK: sil hidden [ossa] @$s20mangling_retroactive18useConditionallyP2yyAA9RequiresPVyAA0dE0Vy12RetroactiveB1YVGAJ0G1A1PHPAiK1QAAyHC_AiA03NonG0HpyHCHCg_GF
+
+// SR-10926
+protocol OurBaseProtocol: P {
+  associatedtype Assoc: P
+}
+protocol OurDerivedProtocol: OurBaseProtocol {}
+extension AnotherExternalGeneric: P where Argument: P {}
+enum OurType<Value: P> {
+  case value(Value)
+}
+func useDependentConformances<T: OurDerivedProtocol>(_: T.Type) -> OurType<AnotherExternalGeneric<T.Assoc>> {}
+// CHECK: sil hidden [ossa] @$s20mangling_retroactive24useDependentConformancesyAA7OurTypeOy12RetroactiveB22AnotherExternalGenericVy5AssocQzGAJ0H1A1PAAxAA0F15DerivedProtocolHD1_AA0f4BaseN0HI1_AikLHA2__HCg_GxmAaMRzlF

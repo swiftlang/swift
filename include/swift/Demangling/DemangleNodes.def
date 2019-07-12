@@ -212,6 +212,7 @@ NODE(TypeMetadataInstantiationFunction)
 NODE(TypeMetadataSingletonInitializationCache)
 NODE(TypeMetadataLazyCache)
 NODE(UncurriedFunctionType)
+NODE(UnknownIndex)
 #define REF_STORAGE(Name, ...) NODE(Name)
 #include "swift/AST/ReferenceStorage.def"
 CONTEXT_NODE(UnsafeAddressor)
