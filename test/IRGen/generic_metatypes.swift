@@ -204,7 +204,7 @@ func makeGenericMetatypes() {
 // CHECK-NOT: call void @llvm.lifetime.end
 // CHECK:   ret %swift.metadata_response
 
-// CHECK: attributes [[NOUNWIND_READNONE_OPT]] = { nounwind readnone "no-frame-pointer-elim"="true" "no-frame-pointer-elim-non-leaf" "target-cpu"
-// CHECK: attributes [[NOUNWIND_OPT]] = { nounwind "no-frame-pointer-elim"="true" "no-frame-pointer-elim-non-leaf" "target-cpu"
+// CHECK: attributes [[NOUNWIND_READNONE_OPT]] = { nounwind readnone "frame-pointer"="all" "target-cpu"
+// CHECK: attributes [[NOUNWIND_OPT]] = { nounwind "frame-pointer"="all" "target-cpu"
 // CHECK: attributes [[NOUNWIND_READNONE]] = { nounwind readnone }
 // CHECK: attributes [[NOUNWIND_ARGMEM]] = { inaccessiblemem_or_argmemonly nounwind }
