@@ -637,8 +637,7 @@ static bool overridesDifferentiableAttribute(ValueDecl *derivedDecl,
       baseDA->print(stream, derivedDecl, omitWrtClause,
                     /*omitAssociatedFunctions*/ true);
       diags.diagnose(
-          derivedDecl,
-          diag::protocol_witness_missing_differentiable_attr,
+          derivedDecl, diag::overriding_decl_missing_differentiable_attr,
           StringRef(stream.str()).trim());
       return false;
     }
