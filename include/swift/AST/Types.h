@@ -1038,9 +1038,6 @@ public:
   /// Return T if this type is Optional<T>; otherwise, return the null type.
   Type getOptionalObjectType();
 
-  // Return T if this type is Array<T>; otherwise, return the null type.
-  Type getArrayElementType();
-
   // Return type underlying type of a swift_newtype annotated imported struct;
   // otherwise, return the null type.
   Type getSwiftNewtypeUnderlyingType();

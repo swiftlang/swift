@@ -3441,10 +3441,6 @@ bool NominalTypeDecl::isOptionalDecl() const {
   return this == getASTContext().getOptionalDecl();
 }
 
-bool NominalTypeDecl::isArrayDecl() const {
-  return this == getASTContext().getArrayDecl();
-}
-
 Optional<KeyPathTypeKind> NominalTypeDecl::getKeyPathTypeKind() const {
   auto &ctx = getASTContext();
 #define CASE(NAME) if (this == ctx.get##NAME##Decl()) return KPTK_##NAME;

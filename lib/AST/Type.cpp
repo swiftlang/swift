@@ -584,13 +584,6 @@ Type TypeBase::getOptionalObjectType() {
   return Type();
 }
 
-Type TypeBase::getArrayElementType() {
-  if (auto genericTy = getAs<BoundGenericType>())
-    if (genericTy->getDecl()->isArrayDecl())
-      return genericTy->getGenericArgs().front();
-  return Type();
-}
-
 CanType CanType::getOptionalObjectTypeImpl(CanType type) {
   if (auto boundTy = dyn_cast<BoundGenericEnumType>(type))
     if (boundTy->getDecl()->isOptionalDecl())

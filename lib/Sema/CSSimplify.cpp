@@ -2280,11 +2280,9 @@ bool ConstraintSystem::repairFailures(
       conversionsOrFixes.push_back(fix);
     }
 
-    auto elementTy = lhs->getArrayElementType();
-    if (elt.getKind() == ConstraintLocator::ApplyArgToParam &&
-        elementTy && elt.getParameterFlags().isVariadic()) {
+    if (isArrayType(lhs) && elt.getParameterFlags().isVariadic()) {
       conversionsOrFixes.push_back(ExpandArrayIntoVarargs::create(
-          *this, lhs, rhs, getConstraintLocator(locator)));
+          *this, lhs, rhs, loc));
       return true;
     }
 

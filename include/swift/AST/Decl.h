@@ -3445,9 +3445,6 @@ public:
   /// Is this the decl for Optional<T>?
   bool isOptionalDecl() const;
 
-  /// Is this the decl for Array<T>?
-  bool isArrayDecl() const;
-
   /// Is this a key path type?
   Optional<KeyPathTypeKind> getKeyPathTypeKind() const;
 

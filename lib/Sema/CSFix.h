@@ -184,7 +184,6 @@ enum class FixKind : uint8_t {
   /// when base is an r-value type.
   AllowMutatingMemberOnRValueBase,
   
-
   /// If an array was passed to a variadic argument, offer to wrap it in
   /// #variadic, or drop the brackets if it's a literal
   ExpandArrayIntoVarargs,
