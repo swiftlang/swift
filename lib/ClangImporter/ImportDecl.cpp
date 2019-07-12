@@ -774,6 +774,91 @@ static AccessorDecl *makeFieldSetterDecl(ClangImporter::Implementation &Impl,
   return setterDecl;
 }
 
+/// Find the anonymous inner field declaration for the given anonymous field.
+static VarDecl *findAnonymousInnerFieldDecl(VarDecl *importedFieldDecl,
+                                            VarDecl *anonymousFieldDecl) {
+  auto anonymousFieldType = anonymousFieldDecl->getInterfaceType();
+  auto anonymousFieldTypeDecl
+      = anonymousFieldType->getStructOrBoundGenericStruct();
+
+  auto lookupFlags = NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
+  for (auto decl : anonymousFieldTypeDecl->lookupDirect(
+                       importedFieldDecl->getName(), lookupFlags)) {
+    if (isa<VarDecl>(decl)) {
+      return cast<VarDecl>(decl);
+    }
+  }
+
+  llvm_unreachable("couldn't find anonymous inner field decl");
+}
+
+/// Synthesize the getter body for an indirect field.
+static std::pair<BraceStmt *, bool>
+synthesizeIndirectFieldGetterBody(AbstractFunctionDecl *afd, void *context) {
+  auto getterDecl = cast<AccessorDecl>(afd);
+  auto anonymousFieldDecl = static_cast<VarDecl *>(context);
+
+  ASTContext &ctx = getterDecl->getASTContext();
+  auto selfDecl = getterDecl->getImplicitSelfDecl();
+  Expr *expr = new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(),
+                                     /*implicit*/true);
+  expr->setType(selfDecl->getInterfaceType());
+
+  expr = new (ctx) MemberRefExpr(expr, SourceLoc(), anonymousFieldDecl,
+                                 DeclNameLoc(), /*implicit*/true);
+  expr->setType(anonymousFieldDecl->getInterfaceType());
+
+  auto importedFieldDecl = cast<VarDecl>(getterDecl->getStorage());
+  auto anonymousInnerFieldDecl =
+      findAnonymousInnerFieldDecl(importedFieldDecl, anonymousFieldDecl);
+  expr = new (ctx) MemberRefExpr(expr, SourceLoc(), anonymousInnerFieldDecl,
+                                 DeclNameLoc(), /*implicit*/true);
+  expr->setType(anonymousInnerFieldDecl->getInterfaceType());
+
+  auto ret = new (ctx) ReturnStmt(SourceLoc(), expr);
+  auto body = BraceStmt::create(ctx, SourceLoc(), ASTNode(ret), SourceLoc(),
+                                /*implicit*/ true);
+  return { body, /*isTypeChecked=*/true };
+}
+
+/// Synthesize the setter body for an indirect field.
+static std::pair<BraceStmt *, bool>
+synthesizeIndirectFieldSetterBody(AbstractFunctionDecl *afd, void *context) {
+  auto setterDecl = cast<AccessorDecl>(afd);
+  auto anonymousFieldDecl = static_cast<VarDecl *>(context);
+
+  ASTContext &ctx = setterDecl->getASTContext();
+  auto selfDecl = setterDecl->getImplicitSelfDecl();
+  Expr *lhs = new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(),
+                                   /*implicit*/true);
+  lhs->setType(LValueType::get(selfDecl->getInterfaceType()));
+
+  lhs = new (ctx) MemberRefExpr(lhs, SourceLoc(), anonymousFieldDecl,
+                                DeclNameLoc(), /*implicit*/true);
+  lhs->setType(LValueType::get(anonymousFieldDecl->getInterfaceType()));
+
+  auto importedFieldDecl = cast<VarDecl>(setterDecl->getStorage());
+  auto anonymousInnerFieldDecl =
+      findAnonymousInnerFieldDecl(importedFieldDecl, anonymousFieldDecl);
+
+  lhs = new (ctx) MemberRefExpr(lhs, SourceLoc(), anonymousInnerFieldDecl,
+                                DeclNameLoc(), /*implicit*/true);
+  lhs->setType(LValueType::get(anonymousInnerFieldDecl->getInterfaceType()));
+
+  auto newValueDecl = setterDecl->getParameters()->get(0);
+
+  auto rhs = new (ctx) DeclRefExpr(newValueDecl, DeclNameLoc(),
+                                  /*implicit*/ true);
+  rhs->setType(newValueDecl->getInterfaceType());
+
+  auto assign = new (ctx) AssignExpr(lhs, SourceLoc(), rhs, /*implicit*/true);
+  assign->setType(TupleType::getEmpty(ctx));
+
+  auto body = BraceStmt::create(ctx, SourceLoc(), { assign }, SourceLoc(),
+                                /*implicit*/ true);
+  return { body, /*isTypeChecked=*/true };
+}
+
 /// Build the indirect field getter and setter.
 ///
 /// \code
@@ -805,10 +890,12 @@ makeIndirectFieldAccessors(ClangImporter::Implementation &Impl,
   auto getterDecl = makeFieldGetterDecl(Impl,
                                         importedStructDecl,
                                         importedFieldDecl);
+  getterDecl->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
 
   auto setterDecl = makeFieldSetterDecl(Impl,
                                         importedStructDecl,
                                         importedFieldDecl);
+  setterDecl->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
 
   makeComputed(importedFieldDecl, getterDecl, setterDecl);
 
@@ -825,74 +912,10 @@ makeIndirectFieldAccessors(ClangImporter::Implementation &Impl,
     }
   }
   assert (anonymousFieldDecl && "anonymous field not generated");
-
-  auto anonymousFieldType = anonymousFieldDecl->getInterfaceType();
-  auto anonymousFieldTypeDecl = anonymousFieldType->getStructOrBoundGenericStruct();
-
-  VarDecl *anonymousInnerFieldDecl = nullptr;
-  for (auto decl : anonymousFieldTypeDecl->lookupDirect(importedFieldDecl->getName())) {
-    if (isa<VarDecl>(decl)) {
-      anonymousInnerFieldDecl = cast<VarDecl>(decl);
-      break;
-    }
-  }
-  assert (anonymousInnerFieldDecl && "cannot find field in anonymous generated structure");
-
-  // Don't bother synthesizing the body if we've already finished type-checking.
-  if (Impl.hasFinishedTypeChecking())
-    return { getterDecl, setterDecl };
-
-  // Synthesize the getter body
-  {
-    auto selfDecl = getterDecl->getImplicitSelfDecl();
-    Expr *expr = new (C) DeclRefExpr(selfDecl, DeclNameLoc(),
-                                     /*implicit*/true);
-    expr->setType(selfDecl->getInterfaceType());
-
-    expr = new (C) MemberRefExpr(expr, SourceLoc(), anonymousFieldDecl,
-                                 DeclNameLoc(), /*implicit*/true);
-    expr->setType(anonymousFieldDecl->getInterfaceType());
-
-    expr = new (C) MemberRefExpr(expr, SourceLoc(), anonymousInnerFieldDecl,
-                                 DeclNameLoc(), /*implicit*/true);
-    expr->setType(anonymousInnerFieldDecl->getInterfaceType());
-
-    auto ret = new (C) ReturnStmt(SourceLoc(), expr);
-    auto body = BraceStmt::create(C, SourceLoc(), ASTNode(ret), SourceLoc(),
-                                  /*implicit*/ true);
-    getterDecl->setBody(body, AbstractFunctionDecl::BodyKind::TypeChecked);
-    getterDecl->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
-  }
-
-  // Synthesize the setter body
-  {
-    auto selfDecl = setterDecl->getImplicitSelfDecl();
-    Expr *lhs = new (C) DeclRefExpr(selfDecl, DeclNameLoc(),
-                                     /*implicit*/true);
-    lhs->setType(LValueType::get(selfDecl->getInterfaceType()));
-
-    lhs = new (C) MemberRefExpr(lhs, SourceLoc(), anonymousFieldDecl,
-                                DeclNameLoc(), /*implicit*/true);
-    lhs->setType(LValueType::get(anonymousFieldDecl->getInterfaceType()));
-
-    lhs = new (C) MemberRefExpr(lhs, SourceLoc(), anonymousInnerFieldDecl,
-                                DeclNameLoc(), /*implicit*/true);
-    lhs->setType(LValueType::get(anonymousInnerFieldDecl->getInterfaceType()));
-
-    auto newValueDecl = setterDecl->getParameters()->get(0);
-
-    auto rhs = new (C) DeclRefExpr(newValueDecl, DeclNameLoc(),
-                                   /*implicit*/ true);
-    rhs->setType(newValueDecl->getInterfaceType());
-
-    auto assign = new (C) AssignExpr(lhs, SourceLoc(), rhs, /*implicit*/true);
-    assign->setType(TupleType::getEmpty(C));
-
-    auto body = BraceStmt::create(C, SourceLoc(), { assign }, SourceLoc(),
-                                  /*implicit*/ true);
-    setterDecl->setBody(body, AbstractFunctionDecl::BodyKind::TypeChecked);
-    setterDecl->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
-  }
+  getterDecl->setBodySynthesizer(synthesizeIndirectFieldGetterBody,
+                                 anonymousFieldDecl);
+  setterDecl->setBodySynthesizer(synthesizeIndirectFieldSetterBody,
+                                 anonymousFieldDecl);
 
   return { getterDecl, setterDecl };
 }
