@@ -1915,6 +1915,26 @@ static void inferProtocolMemberAvailability(ClangImporter::Implementation &impl,
   applyAvailableAttribute(valueDecl, requiredRange, C);
 }
 
+/// Synthesizer callback for the error domain property getter.
+static std::pair<BraceStmt *, bool>
+synthesizeErrorDomainGetterBody(AbstractFunctionDecl *afd, void *context) {
+  auto getterDecl = cast<AccessorDecl>(afd);
+  ASTContext &ctx = getterDecl->getASTContext();
+
+  auto contextData =
+      llvm::PointerIntPair<ValueDecl *, 1, bool>::getFromOpaqueValue(context);
+  auto swiftValueDecl = contextData.getPointer();
+  bool isImplicit = contextData.getInt();
+  DeclRefExpr *domainDeclRef = new (ctx)
+      DeclRefExpr(ConcreteDeclRef(swiftValueDecl), {}, isImplicit);
+  domainDeclRef->setType(
+    getterDecl->mapTypeIntoContext(swiftValueDecl->getInterfaceType()));
+
+  auto ret = new (ctx) ReturnStmt(SourceLoc(), domainDeclRef);
+  return { BraceStmt::create(ctx, SourceLoc(), {ret}, SourceLoc(), isImplicit),
+           /*isTypeChecked=*/true };
+}
+
 /// Add a domain error member, as required by conformance to
 /// _BridgedStoredNSError.
 /// \returns true on success, false on failure
@@ -1941,10 +1961,6 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
   errorDomainPropertyDecl->setInterfaceType(stringTy);
   errorDomainPropertyDecl->setValidationToChecked();
   errorDomainPropertyDecl->setAccess(AccessLevel::Public);
-
-  DeclRefExpr *domainDeclRef = new (C)
-      DeclRefExpr(ConcreteDeclRef(swiftValueDecl), {}, isImplicit);
-  domainDeclRef->setType(swiftValueDecl->getInterfaceType());
 
   auto *params = ParameterList::createEmpty(C);
 
@@ -1974,10 +1990,10 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
   getterDecl->setStatic(isStatic);
   getterDecl->setAccess(AccessLevel::Public);
 
-  auto ret = new (C) ReturnStmt(SourceLoc(), domainDeclRef);
-  getterDecl->setBody(
-      BraceStmt::create(C, SourceLoc(), {ret}, SourceLoc(), isImplicit),
-      AbstractFunctionDecl::BodyKind::TypeChecked);
+  llvm::PointerIntPair<ValueDecl *, 1, bool> contextData(swiftValueDecl,
+                                                         isImplicit);
+  getterDecl->setBodySynthesizer(synthesizeErrorDomainGetterBody,
+                                 contextData.getOpaqueValue());
 
   return true;
 }
