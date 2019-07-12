@@ -9,18 +9,18 @@ extension Int: P {
 
 }
 
-@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
 func bar(_ x: Int) -> some P {
   return x
 }
 
 struct Container {
-  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+  @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
   func bar(_ x: Int) -> some P {
     return x
   }
 
-  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+  @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
   var computedProperty : some P {
     get {
       return 2
@@ -30,7 +30,7 @@ struct Container {
     }
   }
 
-  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+  @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
   subscript(_ x: Int) -> some P {
     get {
       return 2
@@ -49,12 +49,12 @@ extension Int : Q {}
 
 public protocol Assoc {
   associatedtype A = Int
-  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+  @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
   func act() -> A
 }
 
 struct Test : Assoc {
-  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+  @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
   func act() -> some Q {
     return 1
   }

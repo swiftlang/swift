@@ -101,19 +101,19 @@ class InternalType {}
 
 extension InternalType {}
 
-@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
 public extension PSuper {
   func futureFoo() {}
 }
 
 public class FutureContainer {
-  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+  @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
   public func futureFoo() {}
-  @available(macOS 9999, *)
+  @available(macOS 10.15, *)
   public func NotfutureFoo() {}
 }
 
-@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
 extension FutureContainer: P1 {}
 
 extension FutureContainer: P2 {}
