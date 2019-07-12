@@ -257,11 +257,6 @@ ValueDecl *DerivedConformance::getDerivableRequirement(TypeChecker &tc,
       return getRequirement(KnownProtocolKind::AdditiveArithmetic);
 
     // SWIFT_ENABLE_TENSORFLOW
-    // PointwiseMultiplicative.one
-    if (name.isSimpleName(ctx.Id_one))
-      return getRequirement(KnownProtocolKind::PointwiseMultiplicative);
-
-    // SWIFT_ENABLE_TENSORFLOW
     // PointwiseMultiplicative.reciprocal
     if (name.isSimpleName(ctx.Id_reciprocal))
       return getRequirement(KnownProtocolKind::PointwiseMultiplicative);

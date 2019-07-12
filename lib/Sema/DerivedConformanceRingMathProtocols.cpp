@@ -341,17 +341,6 @@ static void deriveBodyAdditiveArithmetic_zero(AbstractFunctionDecl *funcDecl,
   deriveBodyRingPropertyGetter(funcDecl, addArithProto, zeroReq);
 }
 
-// Synthesize body for the `PointwiseMultiplicative.one` computed property
-// getter.
-static void deriveBodyPointwiseMultiplicative_one(
-    AbstractFunctionDecl *funcDecl, void *) {
-  auto &C = funcDecl->getASTContext();
-  auto *pointMulProto =
-      C.getProtocol(KnownProtocolKind::PointwiseMultiplicative);
-  auto *oneReq = getProtocolRequirement(pointMulProto, C.Id_one);
-  deriveBodyRingPropertyGetter(funcDecl, pointMulProto, oneReq);
-}
-
 // Synthesize body for the `PointwiseMultiplicative.reciprocal` computed
 // property getter.
 static void
@@ -401,15 +390,6 @@ static ValueDecl *deriveAdditiveArithmetic_zero(DerivedConformance &derived) {
                             {deriveBodyAdditiveArithmetic_zero, nullptr});
 }
 
-// Synthesize the static property declaration for
-// `PointwiseMultiplicative.one`.
-static ValueDecl *
-derivePointwiseMultiplicative_one(DerivedConformance &derived) {
-  auto &C = derived.TC.Context;
-  return deriveRingProperty(derived, C.Id_one, /*isStatic*/ true,
-                            {deriveBodyPointwiseMultiplicative_one, nullptr});
-}
-
 // Synthesize the instance property declaration for
 // `PointwiseMultiplicative.reciprocal`.
 static ValueDecl *
@@ -447,8 +427,6 @@ DerivedConformance::derivePointwiseMultiplicative(ValueDecl *requirement) {
   getOrCreateEffectiveMemberwiseInitializer(TC, Nominal);
   if (requirement->getBaseName() == TC.Context.getIdentifier(".*"))
     return deriveMathOperator(*this, Multiply);
-  if (requirement->getBaseName() == TC.Context.Id_one)
-    return derivePointwiseMultiplicative_one(*this);
   if (requirement->getBaseName() == TC.Context.Id_reciprocal)
     return derivePointwiseMultiplicative_reciprocal(*this);
   TC.diagnose(requirement->getLoc(),

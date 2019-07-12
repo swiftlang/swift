@@ -2,12 +2,12 @@
 
 struct Base : PointwiseMultiplicative {}
 
-// expected-note @+1 3 {{type declared here}}
+// expected-note @+1 2 {{type declared here}}
 struct OtherFileNonconforming : Equatable, AdditiveArithmetic {
   var base: Base
 }
 
-// expected-note @+1 3 {{type declared here}}
+// expected-note @+1 2 {{type declared here}}
 struct GenericOtherFileNonconforming<
   T : PointwiseMultiplicative
 > : Equatable, AdditiveArithmetic {

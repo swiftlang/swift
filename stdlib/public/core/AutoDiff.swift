@@ -26,16 +26,7 @@ infix operator .*= : AssignmentPrecedence
 /// A type with values that support pointwise multiplication.
 // TODO: Add API documentation.
 public protocol PointwiseMultiplicative : AdditiveArithmetic {
-  /// The one value.
-  ///
-  /// One is the identity element for multiplication. For any value,
-  /// `x .* .one == x` and `.one .* x == x`.
-  static var one: Self { get }
-
   /// The multiplicative inverse of self.
-  ///
-  /// For any value, `x .* x.reciprocal == .one` and
-  /// `x.reciprocal .* x == .one`.
   var reciprocal: Self { get }
 
   /// Multiplies two values and produces their product.
@@ -56,12 +47,6 @@ public protocol PointwiseMultiplicative : AdditiveArithmetic {
 public extension PointwiseMultiplicative {
   static func .*=(lhs: inout Self, rhs: Self) {
     lhs = lhs .* rhs
-  }
-}
-
-public extension PointwiseMultiplicative where Self : ExpressibleByIntegerLiteral {
-  static var one: Self {
-    return 1
   }
 }
 
@@ -100,7 +85,7 @@ public extension VectorProtocol {
   }
 }
 
-/* Note: These default-implemented opreators will slow down type-checking
+/* Note: These default-implemented operators will slow down type-checking
    performance and break existing code.
 
 public extension VectorProtocol {

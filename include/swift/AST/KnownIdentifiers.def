@@ -141,7 +141,6 @@ IDENTIFIER_(tensorHandleCount)
 IDENTIFIER_(typeList)
 // AdditiveArithmetic, PointwiseMultiplicative, VectorProtocol
 IDENTIFIER(zero)
-IDENTIFIER(one)
 IDENTIFIER(reciprocal)
 IDENTIFIER(VectorSpaceScalar)
 IDENTIFIER(adding)

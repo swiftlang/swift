@@ -4,9 +4,8 @@
 func testPointwiseMultiplicative<T : PointwiseMultiplicative>(
   _ x: inout T
 ) {
-  // Test `PointwiseMultiplicative` requirements: `one`, `.*`.
-  let one = T.one
-  x .*= x .* one
+  // Test `PointwiseMultiplicative` requirements: `reciprocal`, `.*`.
+  x .*= x .* x.reciprocal
 }
 
 struct Empty : PointwiseMultiplicative {}
@@ -21,7 +20,7 @@ struct Vector2<T : PointwiseMultiplicative>: PointwiseMultiplicative {
   var y: T
 }
 func testVector2() {
-  var vec2 = Vector2<Empty>(x: Empty(), y: Empty.one)
+  var vec2 = Vector2<Empty>(x: Empty(), y: Empty())
   testPointwiseMultiplicative(&vec2)
 }
 
@@ -87,8 +86,8 @@ extension NoMemberwiseInitializerExtended: Equatable, AdditiveArithmetic, Pointw
 
 // Test derived conformances in disallowed contexts.
 
-// expected-error @+1 3 {{implementation of 'PointwiseMultiplicative' cannot be automatically synthesized in an extension in a different file to the type}}
+// expected-error @+1 2 {{implementation of 'PointwiseMultiplicative' cannot be automatically synthesized in an extension in a different file to the type}}
 extension OtherFileNonconforming : PointwiseMultiplicative {}
 
-// expected-error @+1 3 {{implementation of 'PointwiseMultiplicative' cannot be automatically synthesized in an extension in a different file to the type}}
+// expected-error @+1 2 {{implementation of 'PointwiseMultiplicative' cannot be automatically synthesized in an extension in a different file to the type}}
 extension GenericOtherFileNonconforming : PointwiseMultiplicative {}
