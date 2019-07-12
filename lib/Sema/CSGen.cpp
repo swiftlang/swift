@@ -3299,8 +3299,6 @@ namespace {
         // Remove any semantic expression injected by typechecking.
         if (auto ISLE = dyn_cast<InterpolatedStringLiteralExpr>(expr)) {
           ISLE->setSemanticExpr(nullptr);
-        } else if (auto OLE = dyn_cast<ObjectLiteralExpr>(expr)) {
-          OLE->setSemanticExpr(nullptr);
         } else if (auto EPE = dyn_cast<EditorPlaceholderExpr>(expr)) {
           EPE->setSemanticExpr(nullptr);
         }

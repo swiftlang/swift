@@ -1131,7 +1131,6 @@ public:
 
 private:
   Expr *Arg;
-  Expr *SemanticExpr;
   SourceLoc PoundLoc;
   ConcreteDeclRef Initializer;
 
@@ -1180,9 +1179,6 @@ public:
   bool hasTrailingClosure() const {
     return Bits.ObjectLiteralExpr.HasTrailingClosure;
   }
-
-  Expr *getSemanticExpr() const { return SemanticExpr; }
-  void setSemanticExpr(Expr *expr) { SemanticExpr = expr; }
 
   SourceLoc getSourceLoc() const { return PoundLoc; }
   SourceRange getSourceRange() const { 

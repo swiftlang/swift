@@ -484,8 +484,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   Expr *visitObjectLiteralExpr(ObjectLiteralExpr *E) {
-    HANDLE_SEMANTIC_EXPR(E);
-
     if (Expr *arg = E->getArg()) {
       if (Expr *arg2 = doIt(arg)) {
         E->setArg(arg2);
