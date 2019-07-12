@@ -622,6 +622,15 @@ SILInstruction *SILCombiner::visitBuiltinInst(BuiltinInst *I) {
     }
     break;
   }
+  case BuiltinValueKind::CondFail:
+    if (auto *SLI = dyn_cast<StringLiteralInst>(I->getOperand(1))) {
+      if (SLI->getEncoding() == StringLiteralInst::Encoding::UTF8) {
+        Builder.createCondFail(I->getLoc(), I->getOperand(0), SLI->getValue());
+        eraseInstFromFunction(*I);
+        return nullptr;
+      }
+    }
+    break;
   default:
     break;
   }

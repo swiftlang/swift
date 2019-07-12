@@ -4851,7 +4851,7 @@ RValue RValueEmitter::emitForceValue(ForceValueExpr *loc, Expr *E,
         failureBuilder.setTrackingList(SGF.getBuilder().getTrackingList());
         auto boolTy = SILType::getBuiltinIntegerType(1, SGF.getASTContext());
         auto trueV = failureBuilder.createIntegerLiteral(loc, boolTy, 1);
-        failureBuilder.createCondFail(loc, trueV);
+        failureBuilder.createCondFail(loc, trueV, "force unwrapped a nil value");
         failureBuilder.createUnreachable(loc);
       }
     }
@@ -4990,7 +4990,7 @@ RValue RValueEmitter::visitMakeTemporarilyEscapableExpr(
   auto isEscaping = SGF.B.createIsEscapingClosure(
       loc, borrowedClosure.getValue(),
       IsEscapingClosureInst::WithoutActuallyEscaping);
-  SGF.B.createCondFail(loc, isEscaping);
+  SGF.B.createCondFail(loc, isEscaping, "non-escaping closure has escaped");
   return rvalue;
 }
 
