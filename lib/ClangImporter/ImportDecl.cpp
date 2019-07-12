@@ -1487,7 +1487,6 @@ static void makeStructRawValued(
 
   addSynthesizedTypealias(structDecl, ctx.Id_RawValue, underlyingType);
   Impl.RawTypes[structDecl] = underlyingType;
-  Impl.RawInits[structDecl] = initRawValue;
 }
 
 /// Create a rawValue-ed constructor that bridges to its underlying storage.
@@ -1630,7 +1629,6 @@ static void makeStructRawValuedWithBridge(
 
   addSynthesizedTypealias(structDecl, ctx.Id_RawValue, bridgedType);
   Impl.RawTypes[structDecl] = bridgedType;
-  Impl.RawInits[structDecl] = init;
 }
 
 /// Build a declaration for an Objective-C subscript getter.
@@ -2833,7 +2831,6 @@ namespace {
 
         addSynthesizedTypealias(enumDecl, C.Id_RawValue, underlyingType);
         Impl.RawTypes[enumDecl] = underlyingType;
-        Impl.RawInits[enumDecl] = rawValueConstructor;
 
         // If we have an error wrapper, finish it up now that its
         // nested enum has been constructed.
@@ -8151,6 +8148,86 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   return createConstant(name, dc, type, expr, convertKind, isStatic, ClangN);
 }
 
+namespace {
+  using ConstantGetterBodyContextData =
+      llvm::PointerIntPair<Expr *, 2, ConstantConvertKind>;
+}
+
+/// Synthesizer callback to synthesize the getter for a constant value.
+static std::pair<BraceStmt *, bool>
+synthesizeConstantGetterBody(AbstractFunctionDecl *afd, void *voidContext) {
+  ASTContext &ctx = afd->getASTContext();
+  auto func = cast<AccessorDecl>(afd);
+  VarDecl *constantVar = cast<VarDecl>(func->getStorage());
+  Type type = func->mapTypeIntoContext(constantVar->getValueInterfaceType());
+
+  auto contextData = ConstantGetterBodyContextData::getFromOpaqueValue(
+      voidContext);
+  Expr *expr = contextData.getPointer();
+  ConstantConvertKind convertKind = contextData.getInt();
+
+  // If we need a conversion, add one now.
+  switch (convertKind) {
+  case ConstantConvertKind::None:
+    break;
+
+  case ConstantConvertKind::Construction:
+  case ConstantConvertKind::ConstructionWithUnwrap: {
+    auto typeRef = TypeExpr::createImplicit(type, ctx);
+
+    // Reference init(rawValue: T)
+    ConstructorDecl *init = nullptr;
+    DeclName initName = DeclName(ctx, DeclBaseName::createConstructor(),
+                                 { ctx.Id_rawValue });
+    auto nominal = type->getAnyNominal();
+    auto lookupFlags = NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
+    for (auto found : nominal->lookupDirect(initName, lookupFlags)) {
+      init = dyn_cast<ConstructorDecl>(found);
+      if (init && init->getDeclContext() == nominal)
+        break;
+    }
+    assert(init && "did not find init(rawValue:)");
+
+    auto initTy = init->getInterfaceType()->removeArgumentLabels(1);
+    auto declRef =
+        new (ctx) DeclRefExpr(init, DeclNameLoc(), /*Implicit=*/true,
+                              AccessSemantics::Ordinary, initTy);
+
+    // (Self) -> ...
+    initTy = initTy->castTo<FunctionType>()->getResult();
+    auto initRef = new (ctx) DotSyntaxCallExpr(declRef, SourceLoc(),
+                                               typeRef, initTy);
+    initRef->setThrows(false);
+
+    // (rawValue: T) -> ...
+    initTy = initTy->castTo<FunctionType>()->getResult();
+
+    auto initCall = CallExpr::createImplicit(ctx, initRef, { expr },
+                                             { ctx.Id_rawValue });
+    initCall->setType(initTy);
+    initCall->setThrows(false);
+
+    expr = initCall;
+
+    // Force unwrap if our init(rawValue:) is failable, which is currently
+    // the case with enums.
+    if (convertKind == ConstantConvertKind::ConstructionWithUnwrap) {
+      initTy = initTy->getOptionalObjectType();
+      expr = new (ctx) ForceValueExpr(expr, SourceLoc());
+      expr->setType(initTy);
+    }
+
+    assert(initTy->isEqual(type));
+    break;
+  }
+  }
+
+  // Create the return statement.
+  auto ret = new (ctx) ReturnStmt(SourceLoc(), expr);
+
+  return { BraceStmt::create(ctx, SourceLoc(), ASTNode(ret), SourceLoc()),
+           /*isTypeChecked=*/true };
+}
 
 ValueDecl *
 ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
@@ -8200,67 +8277,9 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
   func->setIsObjC(false);
   func->setIsDynamic(false);
 
-  // If we're not done type checking, build the getter body.
-  if (!hasFinishedTypeChecking()) {
-    auto expr = valueExpr;
-
-    // If we need a conversion, add one now.
-    switch (convertKind) {
-    case ConstantConvertKind::None:
-      break;
-
-    case ConstantConvertKind::Construction:
-    case ConstantConvertKind::ConstructionWithUnwrap: {
-      auto typeRef = TypeExpr::createImplicit(type, C);
-
-      // Reference init(rawValue: T)
-      auto found = RawInits.find(type->getAnyNominal());
-      assert(found != RawInits.end());
-
-      auto *init = found->second;
-      auto initTy = init->getInterfaceType()->removeArgumentLabels(1);
-      auto declRef =
-          new (C) DeclRefExpr(init, DeclNameLoc(), /*Implicit=*/true,
-                              AccessSemantics::Ordinary, initTy);
-
-      // (Self) -> ...
-      initTy = initTy->castTo<FunctionType>()->getResult();
-      auto initRef = new (C) DotSyntaxCallExpr(declRef, SourceLoc(),
-                                               typeRef, initTy);
-      initRef->setThrows(false);
-
-      // (rawValue: T) -> ...
-      initTy = initTy->castTo<FunctionType>()->getResult();
-
-      auto initCall = CallExpr::createImplicit(C, initRef, { expr },
-                                               { C.Id_rawValue });
-      initCall->setType(initTy);
-      initCall->setThrows(false);
-
-      expr = initCall;
-
-      // Force unwrap if our init(rawValue:) is failable, which is currently
-      // the case with enums.
-      if (convertKind == ConstantConvertKind::ConstructionWithUnwrap) {
-        initTy = initTy->getOptionalObjectType();
-        expr = new (C) ForceValueExpr(expr, SourceLoc());
-        expr->setType(initTy);
-      }
-
-      assert(initTy->isEqual(type));
-      break;
-    }
-    }
-
-    // Create the return statement.
-    auto ret = new (C) ReturnStmt(SourceLoc(), expr);
-
-    // Finally, set the body.
-    func->setBody(BraceStmt::create(C, SourceLoc(),
-                                    ASTNode(ret),
-                                    SourceLoc()),
-                  AbstractFunctionDecl::BodyKind::TypeChecked);
-  }
+  func->setBodySynthesizer(synthesizeConstantGetterBody,
+                           ConstantGetterBodyContextData(valueExpr, convertKind)
+                               .getOpaqueValue());
 
   // Mark the function transparent so that we inline it away completely.
   func->getAttrs().add(new (C) TransparentAttr(/*implicit*/ true));
