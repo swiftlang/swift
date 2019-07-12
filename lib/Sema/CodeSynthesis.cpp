@@ -2056,9 +2056,6 @@ static void finishProtocolStorageImplInfo(AbstractStorageDecl *storage) {
 }
 
 static void finishLazyVariableImplInfo(VarDecl *var) {
-  // FIXME: Remove this once getStoredProperties() is a request
-  (void) var->getLazyStorageProperty();
-
   // If there are already accessors, something is invalid; bail out.
   if (!var->getImplInfo().isSimpleStored())
     return;
@@ -2074,6 +2071,9 @@ static bool allPropertyWrapperValueSettersAreAccessible(VarDecl *var) {
   for (unsigned i : indices(wrapperAttrs)) {
     auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo(i);
     auto valueVar = wrapperInfo.valueVar;
+    // Only nullptr with invalid code.
+    if (!valueVar)
+      return false;
     if (!valueVar->isSettable(nullptr) ||
         !valueVar->isSetterAccessibleFrom(innermostDC))
       return false;
@@ -2083,10 +2083,6 @@ static bool allPropertyWrapperValueSettersAreAccessible(VarDecl *var) {
 }
 
 static void finishPropertyWrapperImplInfo(VarDecl *var) {
-  auto backingVar = var->getPropertyWrapperBackingProperty();
-  if (!backingVar || backingVar->isInvalid())
-    return;
-
   auto parentSF = var->getDeclContext()->getParentSourceFile();
   bool wrapperSetterIsUsable =
     var->getSetter() ||

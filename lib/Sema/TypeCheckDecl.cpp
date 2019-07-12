@@ -2875,6 +2875,9 @@ public:
 
     TC.addImplicitConstructors(SD);
 
+    // Force lowering of stored properties.
+    (void) SD->getStoredProperties();
+
     for (Decl *Member : SD->getMembers())
       visit(Member);
 
@@ -3001,6 +3004,9 @@ public:
       checkCircularity(TC, CD, diag::circular_class_inheritance,
                        DescriptiveDeclKind::Class, path);
     }
+
+    // Force lowering of stored properties.
+    (void) CD->getStoredProperties();
 
     for (Decl *Member : CD->getMembers()) {
       visit(Member);
@@ -4522,31 +4528,16 @@ static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
     CD->addImplicitDestructor();
   }
 
+  // Force lowering of stored properties.
+  (void) nominal->getStoredProperties();
+
   for (auto *D : nominal->getMembers()) {
     auto VD = dyn_cast<ValueDecl>(D);
     if (!VD)
       continue;
 
-    if (!shouldValidateMemberDuringFinalization(nominal, VD))
-      continue;
-
-    TC.DeclsToFinalize.insert(VD);
-
-    // The only thing left to do is synthesize storage for lazy variables
-    // and property wrappers.
-    auto *prop = dyn_cast<VarDecl>(D);
-    if (!prop)
-      continue;
-
-    if (prop->getAttrs().hasAttribute<LazyAttr>() && !prop->isStatic() &&
-        (!prop->getGetter() || !prop->getGetter()->hasBody())) {
-      (void) prop->getLazyStorageProperty();
-    }
-
-    // Ensure that we create the backing variable for a wrapped property.
-    if (prop->hasAttachedPropertyWrapper()) {
-      (void) prop->getPropertyWrapperBackingProperty();
-    }
+    if (shouldValidateMemberDuringFinalization(nominal, VD))
+      TC.DeclsToFinalize.insert(VD);
   }
 
   if (auto *CD = dyn_cast<ClassDecl>(nominal)) {
