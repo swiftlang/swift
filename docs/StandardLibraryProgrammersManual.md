@@ -7,46 +7,9 @@ TODO: Should this subsume or link to [StdlibRationales.rst](https://github.com/a
 TODO: Should this subsume or link to [AccessControlInStdlib.rst](https://github.com/apple/swift/blob/master/docs/AccessControlInStdlib.rst)
 
 
-## (Meta): List of wants and TODOs for this guide
-
-1. Library Organization
-    1. What files are where
-        1. Brief about CMakeLists
-        1. Brief about GroupInfo.json
-    1. What tests are where
-        1. Furthermore, should there be a split between whitebox tests and blackbox tests?
-    1. What benchmarks are where
-        1. Furthermore, should there be benchmarks, microbenchmarks, and nanobenchmarks (aka whitebox microbenchmarks)?
-    1. What SPIs exist, where, and who uses them
-    1. Explain test/Prototypes, and how to use that for rapid (relatively speaking) prototyping
-1. Library Concepts
-    1. Protocol hierarchy
-        1. Customization hooks
-    1. Use of classes, COW implementation, buffers, etc
-    1. Compatibility, `@available`, etc.
-    1. Resilience, ABI stability, `@inlinable`, `@usableFromInline`, etc
-    1. Strings and ICU
-    1. Lifetimes
-        1. withExtendedLifetime, withUnsafe...,
-    1. Shims and stubs
-1. Coding Standards
-    1. High level concerns
-    1. Best practices
-    1. Formatting
-1. Internals
-    1. `@inline(__always)` and `@inline(never)`
-    1. `@semantics(...)`
-    1. Builtins
-        1. Builtin.addressof, _isUnique, etc
-1. Dirty hacks
-    1. Why all the underscores and extra protocols?
-    1. How does the `...` ranges work?
-1. Frequently Encountered Issues
-
-
 ## Coding style
 
-- The stdlib currently has a hard line length limit of 80 characters. 
+- The stdlib currently has a hard line length limit of 80 characters.
 
    To break long lines, please closely follow the indentation conventions you see in the existing codebase. (FIXME: Describe.)
   
@@ -54,9 +17,27 @@ TODO: Should this subsume or link to [AccessControlInStdlib.rst](https://github.
 
     The underscored component need not be the last. For example, `Swift.Dictionary._worble()` is a good name for an internal helper method, but so is `Swift._NativeDictionary.worble()` -- the `_NativeDictionary` type already has the underscore.
     
-    Initializers don't have a dedicated name we can put the underscore on; instead, we add the underscore on the first argument label: `init(_value: Int)`. If the initializer doesn't have any parameters, then we add a dummy parameter of type Void with an underscored label: for example, `UnsafeBufferPointer.init(_empty: ())`.
+    Initializers don't have a dedicated name on which we can put the underscore; instead, we add the underscore on the first argument label, adding one if necessary: e.g., `init(_ value: Int)` may become `init(_value: Int)`. If the initializer doesn't have any parameters, then we add a dummy parameter of type Void with an underscored label: for example, `UnsafeBufferPointer.init(_empty: ())`.
 
     This rule ensures we don't accidentally clutter the public namespace with `@usableFromInline` things (which could prevent us from choosing the best names for new public API), and it also makes it easy to see at a glance if a piece of stdlib code uses any non-public entities.
+    
+- We prefer to explicitly spell out all access modifiers in the stdlib codebase. (I.e., we type `internal` even if it's the implicit default.) Additionally, we put the access level on each individual entry point rather than inheriting them from the extension they are in:
+
+    ```swift
+    public extension String {
+      // 😢👎
+      func blanch() { ... }
+      func roast() { ... }
+    }
+    
+    extension String {
+      // 😊👍
+      public func roast() { ... }
+      public func roast() { ... }
+    }    
+    ```
+    
+    This makes it trivial to identify the access level of every definition without having to scan the context it appears in.
 
 ## Internals
 
@@ -261,3 +242,41 @@ Clicking around a little bit, we can find `lib/swift/iphonesimulator/i386/libswi
 Going further, for various reasons the standard library has lots of warnings. This is actively being addressed, but fixing all of them may require language features, etc. In the mean time, let’s suppress warnings in our build so that we just see the errors. `ninja -nv lib/swift/iphonesimulator/i386/libswiftCore.dylib` will show us the actual commands ninja will issue to build the i386 stdlib. (You’ll notice that an incremental build here is merely 3 commands as opposed to ~150 for `swift-stdlib-iphonesimulator-i386`).
 
 Copy the invocation that has  ` -o <build-path>/swift-macosx-x86_64/stdlib/public/core/iphonesimulator/i386/Swift.o`, so that we can perform the actual call to swiftc ourselves. Tack on `-suppress-warnings` at the end, and now we have the command to just build `Swift.o` for i386 while only displaying the actual errors.
+
+## (Meta): List of wants and TODOs for this guide
+
+1. Library Organization
+    1. What files are where
+        1. Brief about CMakeLists
+        1. Brief about GroupInfo.json
+    1. What tests are where
+        1. Furthermore, should there be a split between whitebox tests and blackbox tests?
+    1. What benchmarks are where
+        1. Furthermore, should there be benchmarks, microbenchmarks, and nanobenchmarks (aka whitebox microbenchmarks)?
+    1. What SPIs exist, where, and who uses them
+    1. Explain test/Prototypes, and how to use that for rapid (relatively speaking) prototyping
+1. Library Concepts
+    1. Protocol hierarchy
+        1. Customization hooks
+    1. Use of classes, COW implementation, buffers, etc
+    1. Compatibility, `@available`, etc.
+    1. Resilience, ABI stability, `@inlinable`, `@usableFromInline`, etc
+    1. Strings and ICU
+    1. Lifetimes
+        1. withExtendedLifetime, withUnsafe...,
+    1. Shims and stubs
+1. Coding Standards
+    1. High level concerns
+    1. Best practices
+    1. Formatting
+1. Internals
+    1. `@inline(__always)` and `@inline(never)`
+    1. `@semantics(...)`
+    1. Builtins
+        1. Builtin.addressof, _isUnique, etc
+1. Dirty hacks
+    1. Why all the underscores and extra protocols?
+    1. How does the `...` ranges work?
+1. Frequently Encountered Issues
+
+
