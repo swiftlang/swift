@@ -724,7 +724,7 @@ void ModuleFile::readGenericRequirements(
 
     scratch.clear();
     unsigned recordID = fatalIfUnexpected(
-        DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
+        Cursor.readRecord(entry.ID, scratch, &blobData));
     switch (recordID) {
     case GENERIC_REQUIREMENT: {
       uint8_t rawKind;
