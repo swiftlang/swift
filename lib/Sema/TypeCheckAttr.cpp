@@ -3267,6 +3267,12 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   // Start type-checking the arguments of the @differentiable attribute. This
   // covers 'wrt:', 'jvp:', 'vjp:', and 'where', all of which are optional.
 
+  // `@differentiable` attributes on protocol requirements do not support
+  // JVP/VJP or 'where' clauses.
+  bool isOriginalProtocolRequirement =
+      isa<ProtocolDecl>(original->getDeclContext()) &&
+      original->isProtocolRequirement();
+
   // Handle 'where' clause, if it exists.
   // - Resolve attribute where clause requirements and store in the attribute
   //   for serialization.
@@ -3276,12 +3282,11 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   GenericSignature *whereClauseGenSig = nullptr;
   GenericEnvironment *whereClauseGenEnv = nullptr;
   if (auto whereClause = attr->getWhereClause()) {
-    // 'where' clauses in '@differentiable' attributes of protocol
-    // requirements are not supported.
-    if (isa<ProtocolDecl>(original->getDeclContext()) &&
-        original->isProtocolRequirement()) {
+    // `@differentiable` attributes on protocol requirements do not support
+    // 'where' clauses.
+    if (isOriginalProtocolRequirement) {
       TC.diagnose(attr->getLocation(),
-                  diag::differentiable_attr_protocol_where_clause);
+                  diag::differentiable_attr_protocol_req_where_clause);
       attr->setInvalid();
       return;
     }
@@ -3394,6 +3399,15 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     TC.diagnose(attr->getLocation(),
                 diag::differentiable_attr_result_not_differentiable,
                 originalResultTy);
+    attr->setInvalid();
+    return;
+  }
+
+  // `@differentiable` attributes on protocol requirements do not support
+  // JVP/VJP.
+  if (isOriginalProtocolRequirement && (attr->getJVP() || attr->getVJP())) {
+    TC.diagnose(attr->getLocation(),
+                diag::differentiable_attr_protocol_req_assoc_func);
     attr->setInvalid();
     return;
   }
