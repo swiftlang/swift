@@ -639,7 +639,7 @@ protocol ProtocolRequirements : Differentiable {
 }
 
 protocol ProtocolRequirementsRefined : ProtocolRequirements {
-  // expected-note @+1 {{candidate is missing attribute '@differentiable'}}
+  // expected-error @+1 {{overriding declaration is missing attribute '@differentiable'}}
   func f1(_ x: Float) -> Float
 }
 
@@ -890,7 +890,7 @@ public protocol DifferentiableDistribution: Differentiable, Distribution {
 
 public protocol MissingDifferentiableDistribution: DifferentiableDistribution
   where Value: Differentiable {
-  // expected-note @+1 {{candidate is missing attribute '@differentiable(wrt: self)'}}
+  // expected-error @+1 {{overriding declaration is missing attribute '@differentiable(wrt: self)'}}
   func logProbability(of value: Value) -> Float
 }
 

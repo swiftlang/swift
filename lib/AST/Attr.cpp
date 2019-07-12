@@ -20,6 +20,8 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
+// SWIFT_ENABLE_TENSORFLOW
+#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Types.h"
 // SWIFT_ENABLE_TENSORFLOW
@@ -454,7 +456,8 @@ static std::string getTransposingParametersClauseString(
 // Print the arguments of the given `@differentiable` attribute.
 static void printDifferentiableAttrArguments(
     const DifferentiableAttr *attr, ASTPrinter &printer, PrintOptions Options,
-    const Decl *D, bool omitWrtClause = false) {
+    const Decl *D, bool omitWrtClause = false,
+    bool omitAssociatedFunctions = false) {
   // Create a temporary string for the attribute argument text.
   std::string attrArgText;
   llvm::raw_string_ostream stream(attrArgText);
@@ -1470,11 +1473,34 @@ void DifferentiableAttr::setVJPFunction(FuncDecl *decl) {
     VJP = {decl->getFullName(), DeclNameLoc(decl->getNameLoc())};
 }
 
+GenericEnvironment *DifferentiableAttr::computeDerivativeGenericEnvironment(
+    AbstractFunctionDecl *original) const {
+  // If `@differentiable` attribute has no requirements, return original
+  // function's generic environment.
+  if (getRequirements().empty())
+    return original->getGenericEnvironment();
+  // Otherwise, build derivative generic sigunature.
+  GenericSignatureBuilder builder(original->getASTContext());
+  // Add original function's generic signature.
+  builder.addGenericSignature(original->getGenericSignature());
+  using FloatingRequirementSource =
+      GenericSignatureBuilder::FloatingRequirementSource;
+  // Add `@differentiable` attribute requirements.
+  for (auto req : getRequirements())
+    builder.addRequirement(req, FloatingRequirementSource::forAbstract(),
+                           original->getModuleContext());
+  auto *derivativeGenSig = std::move(builder).computeGenericSignature(
+      getLocation(), /*allowConcreteGenericParams=*/true);
+  return derivativeGenSig->createGenericEnvironment();
+}
+
 void DifferentiableAttr::print(llvm::raw_ostream &OS, const Decl *D,
-                               bool omitWrtClause) const {
+                               bool omitWrtClause,
+                               bool omitAssociatedFunctions) const {
   StreamPrinter P(OS);
   P << "@" << getAttrName();
-  printDifferentiableAttrArguments(this, P, PrintOptions(), D, omitWrtClause);
+  printDifferentiableAttrArguments(this, P, PrintOptions(), D, omitWrtClause,
+                                   omitAssociatedFunctions);
 }
 
 // SWIFT_ENABLE_TENSORFLOW

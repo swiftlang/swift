@@ -634,10 +634,10 @@ static bool overridesDifferentiableAttribute(ValueDecl *derivedDecl,
       // Get `@differentiable` attribute description.
       std::string baseDAString;
       llvm::raw_string_ostream stream(baseDAString);
-      baseDA->print(stream, derivedDecl, omitWrtClause);
+      baseDA->print(stream, derivedDecl, omitWrtClause,
+                    /*omitAssociatedFunctions*/ true);
       diags.diagnose(
-          derivedDecl,
-          diag::protocol_witness_missing_differentiable_attr,
+          derivedDecl, diag::overriding_decl_missing_differentiable_attr,
           StringRef(stream.str()).trim());
       return false;
     }
@@ -833,7 +833,7 @@ SmallVector<OverrideMatch, 2> OverrideMatcher::match(
       continue;
 
     // SWIFT_ENABLE_TENSORFLOW
-    // Check whether the differentiable attribute allows overriding.
+    // Check whether the `@differentiable` attribute allows overriding.
     if (overridesDifferentiableAttribute(decl, parentDecl))
       continue;
     // SWIFT_ENABLE_TENSORFLOW END
