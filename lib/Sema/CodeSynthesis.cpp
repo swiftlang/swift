@@ -1404,6 +1404,10 @@ void TypeChecker::synthesizeWitnessAccessorsForStorage(
                                              AbstractStorageDecl *storage) {
   bool addedAccessor = false;
 
+  // Make sure the protocol requirement itself has the right accessors.
+  // FIXME: This should be a request kicked off by SILGen.
+  DeclsToFinalize.insert(requirement);
+
   requirement->visitExpectedOpaqueAccessors([&](AccessorKind kind) {
     // If the accessor already exists, we have nothing to do.
     if (storage->getAccessor(kind))
@@ -1708,6 +1712,10 @@ LazyStoragePropertyRequest::evaluate(Evaluator &evaluator,
   NameBuf += "$__lazy_storage_$_";
   NameBuf += VD->getName().str();
   auto StorageName = Context.getIdentifier(NameBuf);
+
+  if (!VD->hasInterfaceType())
+    Context.getLazyResolver()->resolveDeclSignature(VD);
+
   auto StorageTy = OptionalType::get(VD->getType());
   auto StorageInterfaceTy = OptionalType::get(VD->getInterfaceType());
 

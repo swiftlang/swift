@@ -2153,35 +2153,6 @@ OpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
           : OpaqueReadOwnership::Owned);
 }
 
-static void validateAbstractStorageDecl(TypeChecker &TC,
-                                        AbstractStorageDecl *storage) {
-  if (storage->getOpaqueResultTypeDecl()) {
-    if (auto sf = storage->getInnermostDeclContext()->getParentSourceFile()) {
-      sf->markDeclWithOpaqueResultTypeAsValidated(storage);
-    }
-  }
-
-  // Everything else about the accessors can wait until finalization.
-  // This will validate all the accessors.
-  TC.DeclsToFinalize.insert(storage);
-}
-
-static void finalizeAbstractStorageDecl(TypeChecker &TC,
-                                        AbstractStorageDecl *storage) {
-  TC.validateDecl(storage);
-
-  // Add any mandatory accessors now.
-  maybeAddAccessorsToStorage(storage);
-
-  for (auto accessor : storage->getAllAccessors()) {
-    // Are there accessors we can safely ignore here, like maybe observers?
-    TC.validateDecl(accessor);
-
-    // Finalize the accessors as well.
-    TC.DeclsToFinalize.insert(accessor);
-  }
-}
-
 /// Check the requirements in the where clause of the given \c source
 /// to ensure that they don't introduce additional 'Self' requirements.
 static void checkProtocolSelfRequirements(ProtocolDecl *proto,
@@ -2254,6 +2225,18 @@ public:
 
     if (auto VD = dyn_cast<ValueDecl>(decl)) {
       checkRedeclaration(TC, VD);
+
+      // Force some requests, which can produce diagnostics.
+
+      // Compute access level.
+      (void) VD->getFormalAccess();
+
+      // Compute overrides.
+      (void) VD->getOverriddenDecls();
+
+      // Check whether the member is @objc or dynamic.
+      (void) VD->isObjC();
+      (void) VD->isDynamic();
 
       // Make sure we finalize this declaration.
       TC.DeclsToFinalize.insert(VD);
@@ -2973,6 +2956,24 @@ public:
 
     TC.addImplicitConstructors(CD);
     CD->addImplicitDestructor();
+
+    // Compute @objc for each superclass member, to catch selector
+    // conflicts resulting from unintended overrides.
+    //
+    // FIXME: This should be a request so we can measure how much work
+    // we're doing here.
+    CD->walkSuperclasses(
+      [&](ClassDecl *superclass) {
+        for (auto *member : superclass->getMembers()) {
+          if (auto *vd = dyn_cast<ValueDecl>(member)) {
+            if (vd->isPotentiallyOverridable()) {
+              (void) vd->isObjC();
+            }
+          }
+        }
+
+        return TypeWalker::Action::Continue;
+      });
 
     if (auto superclassTy = CD->getSuperclass()) {
       ClassDecl *Super = superclassTy->getClassOrBoundGenericClass();
@@ -3961,8 +3962,11 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     checkDeclAttributesEarly(VD);
     validateAttributes(*this, VD);
 
-    // Perform accessor-related validation.
-    validateAbstractStorageDecl(*this, VD);
+    if (VD->getOpaqueResultTypeDecl()) {
+      if (auto SF = VD->getInnermostDeclContext()->getParentSourceFile()) {
+        SF->markDeclWithOpaqueResultTypeAsValidated(VD);
+      }
+    }
 
     break;
   }
@@ -4240,7 +4244,11 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     }
 
     // Perform accessor-related validation.
-    validateAbstractStorageDecl(*this, SD);
+    if (SD->getOpaqueResultTypeDecl()) {
+      if (auto SF = SD->getInnermostDeclContext()->getParentSourceFile()) {
+        SF->markDeclWithOpaqueResultTypeAsValidated(SD);
+      }
+    }
 
     break;
   }
@@ -4423,29 +4431,9 @@ void TypeChecker::requestMemberLayout(ValueDecl *member) {
   if (auto *protocolDecl = dyn_cast<ProtocolDecl>(dc))
     requestNominalLayout(protocolDecl);
 
-  if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
-    if (ext->getSelfClassDecl()) {
-      // Finalize members of class extensions, to ensure we compute their
-      // @objc and dynamic state.
-      DeclsToFinalize.insert(member);
-    }
-  }
-
   // If this represents (abstract) storage, form the appropriate accessors.
-  if (auto storage = dyn_cast<AbstractStorageDecl>(member)) {
-    validateAbstractStorageDecl(*this, storage);
-
-    // Request layout of the accessors for an @objc declaration.
-    // We can't delay validation of getters and setters on @objc properties,
-    // because if they never get validated at all then conformance checkers
-    // will complain about selector mismatches.
-    if (storage->isObjC()) {
-      maybeAddAccessorsToStorage(storage);
-      for (auto accessor : storage->getAllAccessors()) {
-        requestMemberLayout(accessor);
-      }
-    }
-  }
+  if (auto storage = dyn_cast<AbstractStorageDecl>(member))
+    DeclsToFinalize.insert(storage);
 }
 
 void TypeChecker::requestNominalLayout(NominalTypeDecl *nominalDecl) {
@@ -4485,20 +4473,19 @@ static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
 
     TC.DeclsToFinalize.insert(VD);
 
-    // The only thing left to do is synthesize storage for lazy variables.
+    // The only thing left to do is synthesize storage for lazy variables
+    // and property wrappers.
     auto *prop = dyn_cast<VarDecl>(D);
     if (!prop)
       continue;
 
     if (prop->getAttrs().hasAttribute<LazyAttr>() && !prop->isStatic() &&
         (!prop->getGetter() || !prop->getGetter()->hasBody())) {
-      finalizeAbstractStorageDecl(TC, prop);
       (void) prop->getLazyStorageProperty();
     }
 
     // Ensure that we create the backing variable for a wrapped property.
     if (prop->hasAttachedPropertyWrapper()) {
-      finalizeAbstractStorageDecl(TC, prop);
       (void) prop->getPropertyWrapperBackingProperty();
     }
   }
@@ -4530,12 +4517,9 @@ static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
     forceConformance(TC.Context.getProtocol(KnownProtocolKind::Hashable));
   }
 
-  // validateDeclForNameLookup will not trigger an immediate full
-  // validation of protocols, but clients will assume that things
-  // like the requirement signature have been set.
   if (auto PD = dyn_cast<ProtocolDecl>(nominal)) {
-    (void)PD->getInheritedProtocols();
-    TC.validateDecl(PD);
+    for (auto *inherited : PD->getInheritedProtocols())
+      TC.requestNominalLayout(inherited);
   }
 }
 
@@ -4548,18 +4532,8 @@ void TypeChecker::finalizeDecl(ValueDecl *decl) {
   if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
     finalizeType(*this, nominal);
   } else if (auto storage = dyn_cast<AbstractStorageDecl>(decl)) {
-    finalizeAbstractStorageDecl(*this, storage);
+    maybeAddAccessorsToStorage(storage);
   }
-
-  // Compute access level.
-  (void)decl->getFormalAccess();
-
-  // Compute overrides.
-  (void)decl->getOverriddenDecls();
-
-  // Check whether the member is @objc or dynamic.
-  (void)decl->isObjC();
-  (void)decl->isDynamic();
 }
 
 /// Determine whether this is a "pass-through" typealias, which has the
