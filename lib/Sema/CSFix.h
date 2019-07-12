@@ -40,6 +40,7 @@ namespace constraints {
 class OverloadChoice;
 class ConstraintSystem;
 class ConstraintLocator;
+class ConstraintLocatorBuilder;
 class Solution;
 
 /// Describes the kind of fix to apply to the given constraint before
@@ -183,6 +184,10 @@ enum class FixKind : uint8_t {
   /// Allow invalid reference to a member declared as `mutating`
   /// when base is an r-value type.
   AllowMutatingMemberOnRValueBase,
+
+  /// Allow a single tuple parameter to be matched with N arguments
+  /// by forming all of the given arguments into a single tuple.
+  AllowTupleSplatForSingleParameter,
 };
 
 class ConstraintFix {
@@ -1179,6 +1184,30 @@ public:
   static SkipUnhandledConstructInFunctionBuilder *
   create(ConstraintSystem &cs, UnhandledNode unhandledNode,
          NominalTypeDecl *builder, ConstraintLocator *locator);
+};
+
+class AllowTupleSplatForSingleParameter final : public ConstraintFix {
+  using Param = AnyFunctionType::Param;
+
+  Type ParamType;
+
+  AllowTupleSplatForSingleParameter(ConstraintSystem &cs, Type paramTy,
+                                    ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowTupleSplatForSingleParameter, locator),
+        ParamType(paramTy) {}
+
+public:
+  std::string getName() const override {
+    return "allow single parameter tuple splat";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static AllowTupleSplatForSingleParameter *
+  attempt(ConstraintSystem &cs, SmallVectorImpl<Param> &args,
+          ArrayRef<Param> params,
+          SmallVectorImpl<SmallVector<unsigned, 1>> &bindings,
+          ConstraintLocatorBuilder locator);
 };
 
 } // end namespace constraints

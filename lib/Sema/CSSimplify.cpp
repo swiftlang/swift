@@ -949,8 +949,16 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
                                       paramInfo,
                                       hasTrailingClosure,
                                       cs.shouldAttemptFixes(), listener,
-                                      parameterBindings))
-    return cs.getTypeMatchFailure(locator);
+                                      parameterBindings)) {
+    if (!cs.shouldAttemptFixes())
+      return cs.getTypeMatchFailure(locator);
+
+    auto *fix = AllowTupleSplatForSingleParameter::attempt(
+        cs, argsWithLabels, params, parameterBindings, locator);
+
+    if (!fix || cs.recordFix(fix))
+      return cs.getTypeMatchFailure(locator);
+  }
 
   // If this application is part of an operator, then we allow an implicit
   // lvalue to be compatible with inout arguments.  This is used by
@@ -6984,6 +6992,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::ExplicitlySpecifyGenericArguments:
   case FixKind::GenericArgumentsMismatch:
   case FixKind::AllowMutatingMemberOnRValueBase:
+  case FixKind::AllowTupleSplatForSingleParameter:
     llvm_unreachable("handled elsewhere");
   }
 
