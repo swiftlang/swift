@@ -31,7 +31,7 @@ private func test<T: NSObject & NSCoding>(type: T.Type) {
 // Test all the classes listed in SwiftNativeNSXXXBase.mm.gyb except for
 // NSEnumerator (which doesn't conform to NSCoding).
 
-if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
+if #available(iOS 13, macOS 10.15, tvOS 13, watchOS 6, *) {
   testSuite.test("NSArray") {
     test(type: NSArray.self)
   }
