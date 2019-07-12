@@ -36,7 +36,7 @@ func foo() {
   //       between other instructions for the division. We want to make sure
   //       all instructions from the division have the same debug location and
   //       are contiguous.
-  // CHECK: call {{.*}} @"$ss18_fatalErrorMessage__4file4line5flagss5NeverOs12StaticStringV_A2HSus6UInt32VtF"{{.*}}, !dbg ![[DIV:[0-9]+]]
+  // CHECK: call {{.*}} @"$ss17_assertionFailure__4file4line5flagss5NeverOs12StaticStringV_A2HSus6UInt32VtF"{{.*}}, !dbg ![[DIV:[0-9]+]]
   // CHECK-NEXT: unreachable, !dbg ![[DIV]]
   // CHECK: sdiv i64 %0, %1, !dbg ![[DIV]]
   // CHECK: call void @llvm.trap(), !dbg ![[INLINEDADD:[0-9]+]]

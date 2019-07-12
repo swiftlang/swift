@@ -1,5 +1,5 @@
-// RUN: %target-swift-emit-silgen -parse-stdlib %s -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s
-// RUN: %target-swift-emit-sil -Onone -parse-stdlib %s -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck -check-prefix=CANONICAL %s
+// RUN: %target-swift-emit-silgen -parse-stdlib %s -disable-access-control -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s
+// RUN: %target-swift-emit-sil -Onone -parse-stdlib %s -disable-access-control -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck -check-prefix=CANONICAL %s
 
 import Swift
 
@@ -396,8 +396,8 @@ func performInstantaneousReadAccess<T1>(address: Builtin.RawPointer, scratch: Bu
 
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins8condfail{{[_0-9a-zA-Z]*}}F
 func condfail(_ i: Builtin.Int1) {
-  Builtin.condfail(i)
-  // CHECK: cond_fail {{%.*}} : $Builtin.Int1
+  Builtin.condfail(i, StaticString("message").unsafeRawPointer)
+  // CHECK: builtin "condfail"({{%.*}} : $Builtin.Int1, {{%.*}} : $Builtin.RawPointer) : $()
 }
 
 struct S {}
