@@ -4098,6 +4098,7 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
     }
 
     UnderlyingTy = parseType(diag::expected_type_in_typealias);
+    TAD->setEndLoc(getEndOfPreviousLoc());
     Status |= UnderlyingTy;
   }
 
