@@ -1183,11 +1183,10 @@
           "usr": "s:4cake6PSuperPAAE9futureFooyyF",
           "moduleName": "cake",
           "genericSig": "<τ_0_0 where τ_0_0 : PSuper>",
-          "isABIPlaceholder": true,
-          "intro_Macosx": "9999",
-          "intro_iOS": "9999",
-          "intro_tvOS": "9999",
-          "intro_watchOS": "9999",
+          "intro_Macosx": "10.15",
+          "intro_iOS": "13",
+          "intro_tvOS": "13",
+          "intro_watchOS": "6",
           "funcSelfKind": "NonMutating"
         }
       ],
@@ -1334,11 +1333,10 @@
           "declKind": "Func",
           "usr": "s:4cake15FutureContainerC9futureFooyyF",
           "moduleName": "cake",
-          "isABIPlaceholder": true,
-          "intro_Macosx": "9999",
-          "intro_iOS": "9999",
-          "intro_tvOS": "9999",
-          "intro_watchOS": "9999",
+          "intro_Macosx": "10.15",
+          "intro_iOS": "13",
+          "intro_tvOS": "13",
+          "intro_watchOS": "6",
           "declAttributes": [
             "Available",
             "Available",
@@ -1361,7 +1359,7 @@
           "declKind": "Func",
           "usr": "s:4cake15FutureContainerC12NotfutureFooyyF",
           "moduleName": "cake",
-          "intro_Macosx": "9999",
+          "intro_Macosx": "10.15",
           "declAttributes": [
             "Available"
           ],
@@ -1376,8 +1374,7 @@
           "kind": "Conformance",
           "name": "P1",
           "printedName": "P1",
-          "usr": "s:4cake2P1P",
-          "isABIPlaceholder": true
+          "usr": "s:4cake2P1P"
         },
         {
           "kind": "Conformance",
