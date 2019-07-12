@@ -193,8 +193,27 @@ extension Range where Bound == String.Index {
   }
 
   public init?(_ range: NSRange, in string: __shared String) {
-    self.init(range, _genericIn: string)
+    if #available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *) {
+      // When building for an OS that has the new stuff that supports
+      // the generic version available, we just use that.
+      self.init(range, _genericIn: string)
+    } else {
+      // Need to have the old version available to support testing a just-
+      // built standard library on 10.14. We may want to figure out a more
+      // principled way to handle this in the future, but this should keep
+      // local and PR testing working.
+      let u = string.utf16
+      guard range.location != NSNotFound,
+        let start = u.index(u.startIndex, offsetBy: range.location, limitedBy: u.endIndex),
+        let end = u.index(u.startIndex, offsetBy: range.location + range.length, limitedBy: u.endIndex),
+        let lowerBound = String.Index(start, within: string),
+        let upperBound = String.Index(end, within: string)
+      else { return nil }
+      
+      self = lowerBound..<upperBound
+    }
   }
+  
   @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
   public init?<S: StringProtocol>(_ range: NSRange, in string: __shared S) {
     self.init(range, _genericIn: string)
