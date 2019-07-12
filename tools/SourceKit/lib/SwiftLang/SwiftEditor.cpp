@@ -1022,8 +1022,7 @@ void SwiftDocumentSemanticInfo::processLatestSnapshotAsync(
     EditableTextBufferRef EditableBuffer) {
 
   SwiftInvocationRef Invok = InvokRef;
-  if (!Invok)
-    return;
+  if (Invok){
 
   RefPtr<SwiftDocumentSemanticInfo> SemaInfoRef = this;
   auto Consumer = std::make_shared<AnnotAndDiagASTConsumer>(EditableBuffer,
@@ -1035,6 +1034,7 @@ void SwiftDocumentSemanticInfo::processLatestSnapshotAsync(
   const void *OncePerASTToken = SemaInfoRef.get();
   if (auto ASTMgr = this->ASTMgr.lock()) {
     ASTMgr->processASTAsync(Invok, std::move(Consumer), OncePerASTToken);
+   }
   }
 }
 
@@ -1522,12 +1522,14 @@ private:
           // Unresolved member can have argument too.
           Arg = UME->getArgument();
         }
-        if (!Arg)
-          return false;
+        if (Arg){
+       
         if (EnclosingCallAndArg.first)
           OuterExpr = EnclosingCallAndArg.first;
         EnclosingCallAndArg = {E, Arg};
         return true;
+        }
+          return false;
       }
 
       bool walkToExprPre(Expr *E) override {
