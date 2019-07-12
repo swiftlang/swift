@@ -5599,6 +5599,16 @@ void TypeChecker::synthesizeMemberForLookup(NominalTypeDecl *target,
   }
 }
 
+/// Synthesizer callback for a function body consisting of "return".
+static std::pair<BraceStmt *, bool>
+synthesizeSingleReturnFunctionBody(AbstractFunctionDecl *afd, void *) {
+  ASTContext &ctx = afd->getASTContext();
+  SmallVector<ASTNode, 1> stmts;
+  stmts.push_back(new (ctx) ReturnStmt(afd->getLoc(), nullptr));
+  return { BraceStmt::create(ctx, afd->getLoc(), stmts, afd->getLoc(), true),
+           /*isTypeChecked=*/true };
+}
+
 void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
   FrontendStatsTracer StatsTracer(Context.Stats, "define-default-ctor", decl);
   PrettyStackTraceDecl stackTrace("defining default constructor for",
@@ -5624,11 +5634,8 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
   // Add the constructor.
   decl->addMember(ctor);
 
-  // Create an empty body for the default constructor.
-  SmallVector<ASTNode, 1> stmts;
-  stmts.push_back(new (Context) ReturnStmt(decl->getLoc(), nullptr));
-  ctor->setBody(BraceStmt::create(Context, SourceLoc(), stmts, SourceLoc()),
-                AbstractFunctionDecl::BodyKind::TypeChecked);
+  // Lazily synthesize an empty body for the default constructor.
+  ctor->setBodySynthesizer(synthesizeSingleReturnFunctionBody);
 }
 
 static void validateAttributes(TypeChecker &TC, Decl *D) {
