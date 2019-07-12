@@ -204,7 +204,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
 
   // Emit non-mergeable traps only.
   if (IGF.Builder.isTrapIntrinsic(IID)) {
-    IGF.Builder.CreateNonMergeableTrap(IGF.IGM);
+    IGF.Builder.CreateNonMergeableTrap(IGF.IGM, StringRef());
     return;
   }
 
@@ -359,7 +359,8 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     // string literal. If we ever get to the point of executing this builtin
     // at run time, it implies an incorrect use of the builtin and must result
     // in a trap.
-    IGF.emitTrap(/*Unreachable=*/false);
+    IGF.emitTrap("invalid use of globalStringTablePointer",
+                 /*Unreachable=*/false);
     auto returnValue = llvm::UndefValue::get(IGF.IGM.Int8PtrTy);
     // Consume the arguments of the builtin.
     (void)args.claimAll();
