@@ -459,6 +459,55 @@ static bool isNSDictionaryMethod(const clang::ObjCMethodDecl *MD,
   return true;
 }
 
+/// Synthesize the body of \c init?(rawValue:RawType) for an imported enum.
+static std::pair<BraceStmt *, bool>
+synthesizeEnumRawValueConstructorBody(AbstractFunctionDecl *afd,
+                                      void *context) {
+  ASTContext &ctx = afd->getASTContext();
+  auto ctorDecl = cast<ConstructorDecl>(afd);
+  auto enumDecl = static_cast<EnumDecl *>(context);
+  auto selfDecl = ctorDecl->getImplicitSelfDecl();
+  auto selfRef = new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(),
+  /*implicit*/true);
+  selfRef->setType(LValueType::get(selfDecl->getType()));
+
+  auto param = ctorDecl->getParameters()->get(0);
+  auto paramRef = new (ctx) DeclRefExpr(param, DeclNameLoc(),
+                                        /*implicit*/ true);
+  paramRef->setType(param->getType());
+
+  auto reinterpretCast
+    = cast<FuncDecl>(
+        getBuiltinValueDecl(ctx, ctx.getIdentifier("reinterpretCast")));
+  auto rawTy = enumDecl->getRawType();
+  auto enumTy = enumDecl->getDeclaredInterfaceType();
+  SubstitutionMap subMap =
+    SubstitutionMap::get(reinterpretCast->getGenericSignature(),
+                         { rawTy, enumTy }, { });
+  ConcreteDeclRef concreteDeclRef(reinterpretCast, subMap);
+  auto reinterpretCastRef
+    = new (ctx) DeclRefExpr(concreteDeclRef, DeclNameLoc(), /*implicit*/ true);
+  reinterpretCastRef->setType(FunctionType::get({FunctionType::Param(rawTy)},
+                                                enumTy));
+
+  auto reinterpreted = CallExpr::createImplicit(ctx, reinterpretCastRef,
+                                                { paramRef }, { Identifier() });
+  reinterpreted->setType(enumTy);
+  reinterpreted->setThrows(false);
+
+  auto assign = new (ctx) AssignExpr(selfRef, SourceLoc(), reinterpreted,
+                                     /*implicit*/ true);
+  assign->setType(TupleType::getEmpty(ctx));
+
+  auto result = TupleExpr::createEmpty(ctx, SourceLoc(), SourceLoc(),
+                                       /*Implicit=*/true);
+  auto ret = new (ctx) ReturnStmt(SourceLoc(), result, /*Implicit=*/true);
+
+  auto body = BraceStmt::create(ctx, SourceLoc(), {assign, ret}, SourceLoc(),
+                                /*implicit*/ true);
+  return { body, /*isTypeChecked=*/true };
+}
+
 // Build the init(rawValue:) initializer for an imported NS_ENUM.
 //   enum NSSomeEnum: RawType {
 //     init?(rawValue: RawType) {
@@ -472,8 +521,7 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
                             EnumDecl *enumDecl) {
   ASTContext &C = Impl.SwiftContext;
   auto rawTy = enumDecl->getRawType();
-  auto enumTy = enumDecl->getDeclaredInterfaceType();
-  
+
   auto param = new (C) ParamDecl(VarDecl::Specifier::Default, SourceLoc(),
                                  SourceLoc(), C.Id_rawValue,
                                  SourceLoc(), C.Id_rawValue,
@@ -495,49 +543,7 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
 
   ctorDecl->computeType();
   ctorDecl->setValidationToChecked();
-
-  // Don't bother synthesizing the body if we've already finished type-checking.
-  if (Impl.hasFinishedTypeChecking())
-    return ctorDecl;
-
-  auto selfDecl = ctorDecl->getImplicitSelfDecl();
-  auto selfRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(), /*implicit*/true);
-  selfRef->setType(LValueType::get(selfDecl->getType()));
-
-  auto paramRef = new (C) DeclRefExpr(param, DeclNameLoc(),
-                                      /*implicit*/ true);
-  paramRef->setType(param->getType());
-
-  auto reinterpretCast
-    = cast<FuncDecl>(
-        getBuiltinValueDecl(C, C.getIdentifier("reinterpretCast")));
-  SubstitutionMap subMap =
-    SubstitutionMap::get(reinterpretCast->getGenericSignature(),
-                         { rawTy, enumTy }, { });
-  ConcreteDeclRef concreteDeclRef(reinterpretCast, subMap);
-  auto reinterpretCastRef
-    = new (C) DeclRefExpr(concreteDeclRef, DeclNameLoc(), /*implicit*/ true);
-  reinterpretCastRef->setType(FunctionType::get({FunctionType::Param(rawTy)},
-                                                enumTy));
-
-  auto reinterpreted = CallExpr::createImplicit(C, reinterpretCastRef,
-                                                { paramRef }, { Identifier() });
-  reinterpreted->setType(enumTy);
-  reinterpreted->setThrows(false);
-
-  auto assign = new (C) AssignExpr(selfRef, SourceLoc(), reinterpreted,
-                                   /*implicit*/ true);
-  assign->setType(TupleType::getEmpty(C));
-
-  auto result = TupleExpr::createEmpty(C, SourceLoc(), SourceLoc(),
-                                       /*Implicit=*/true);
-  auto ret = new (C) ReturnStmt(SourceLoc(), result, /*Implicit=*/true);
-
-  auto body = BraceStmt::create(C, SourceLoc(), {assign, ret}, SourceLoc(),
-                                /*implicit*/ true);
-  
-  ctorDecl->setBody(body, AbstractFunctionDecl::BodyKind::TypeChecked);
-
+  ctorDecl->setBodySynthesizer(synthesizeEnumRawValueConstructorBody, enumDecl);
   return ctorDecl;
 }
 
