@@ -839,7 +839,6 @@ shallowCloneImpl(const ObjectLiteralExpr *E, ASTContext &Ctx,
   auto res =
       ObjectLiteralExpr::create(Ctx, E->getStartLoc(), E->getLiteralKind(),
                                 E->getArg(), E->isImplicit(), getType);
-  res->setSemanticExpr(E->getSemanticExpr());
   return res;
 }
 
@@ -1196,7 +1195,7 @@ ObjectLiteralExpr::ObjectLiteralExpr(SourceLoc PoundLoc, LiteralKind LitKind,
                                      bool hasTrailingClosure,
                                      bool implicit)
     : LiteralExpr(ExprKind::ObjectLiteral, implicit), 
-      Arg(Arg), SemanticExpr(nullptr), PoundLoc(PoundLoc) {
+      Arg(Arg), PoundLoc(PoundLoc) {
   Bits.ObjectLiteralExpr.LitKind = static_cast<unsigned>(LitKind);
   assert(getLiteralKind() == LitKind);
   Bits.ObjectLiteralExpr.NumArgLabels = argLabels.size();
