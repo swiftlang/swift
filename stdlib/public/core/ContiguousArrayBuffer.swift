@@ -40,11 +40,6 @@ internal final class __EmptyArrayStorage
     return try body(UnsafeBufferPointer(start: nil, count: 0))
   }
 
-  @nonobjc
-  override internal func _getNonVerbatimBridgedCount() -> Int {
-    return 0
-  }
-
   override internal func _getNonVerbatimBridgingBuffer() -> _BridgingBuffer {
     return _BridgingBuffer(0)
   }
@@ -109,17 +104,6 @@ internal final class _ContiguousArrayStorage<
       defer { _fixLifetime(self) }
       try body(UnsafeBufferPointer(start: elements, count: count))
     }
-  }
-
-  /// Returns the number of elements in the array.
-  ///
-  /// - Precondition: `Element` is bridged non-verbatim.
-  @nonobjc
-  override internal func _getNonVerbatimBridgedCount() -> Int {
-    _internalInvariant(
-      !_isBridgedVerbatimToObjectiveC(Element.self),
-      "Verbatim bridging should be handled separately")
-    return countAndCapacity.count
   }
 
   /// Bridge array elements and return a new buffer that owns them.
