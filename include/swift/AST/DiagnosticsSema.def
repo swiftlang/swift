@@ -2342,8 +2342,8 @@ WARNING(override_swift3_objc_inference,none,
         (DescriptiveDeclKind, DeclName, Identifier))
 ERROR(override_method_different_generic_sig,none,
       "overridden method %0 has generic signature %1 which is incompatible with "
-      "base method's generic signature %2",
-      (DeclBaseName, StringRef, StringRef))
+      "base method's generic signature %2; expected generic signature to be %3",
+      (DeclBaseName, StringRef, StringRef, StringRef))
 
 // Inheritance
 ERROR(duplicate_inheritance,none,

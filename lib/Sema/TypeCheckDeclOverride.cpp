@@ -1055,7 +1055,8 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
               decl, diag::override_method_different_generic_sig,
               decl->getBaseName(),
               derivedGenericCtx->getGenericSignature()->getAsString(),
-              baseGenericCtx->getGenericSignature()->getAsString());
+              baseGenericCtx->getGenericSignature()->getAsString(),
+              newSig->getAsString());
           diags.diagnose(baseDecl, diag::overridden_here);
           emittedMatchError = true;
         }
