@@ -1251,6 +1251,54 @@ makeBitFieldAccessors(ClangImporter::Implementation &Impl,
   return { getterDecl, setterDecl };
 }
 
+/// Synthesize the body for an struct default initializer.
+static std::pair<BraceStmt *, bool>
+synthesizeStructDefaultConstructorBody(AbstractFunctionDecl *afd,
+                                       void *context) {
+  auto constructor = cast<ConstructorDecl>(afd);
+  ASTContext &ctx = constructor->getASTContext();
+  auto structDecl = static_cast<StructDecl *>(context);
+
+  // Use a builtin to produce a zero initializer, and assign it to self.
+
+  // Construct the left-hand reference to self.
+  auto *selfDecl = constructor->getImplicitSelfDecl();
+  Expr *lhs = new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(), /*Implicit=*/true);
+  auto selfType = structDecl->getDeclaredInterfaceType();
+  lhs->setType(LValueType::get(selfType));
+
+  auto emptyTuple = TupleType::getEmpty(ctx);
+
+  // Construct the right-hand call to Builtin.zeroInitializer.
+  Identifier zeroInitID = ctx.getIdentifier("zeroInitializer");
+  auto zeroInitializerFunc =
+    cast<FuncDecl>(getBuiltinValueDecl(ctx, zeroInitID));
+  SubstitutionMap subMap =
+    SubstitutionMap::get(zeroInitializerFunc->getGenericSignature(),
+                         llvm::makeArrayRef(selfType), { });
+  ConcreteDeclRef concreteDeclRef(zeroInitializerFunc, subMap);
+  auto zeroInitializerRef =
+    new (ctx) DeclRefExpr(concreteDeclRef, DeclNameLoc(), /*implicit*/ true);
+  zeroInitializerRef->setType(FunctionType::get({}, selfType));
+
+  auto call = CallExpr::createImplicit(ctx, zeroInitializerRef, {}, {});
+  call->setType(selfType);
+  call->setThrows(false);
+
+  auto assign = new (ctx) AssignExpr(lhs, SourceLoc(), call, /*implicit*/ true);
+  assign->setType(emptyTuple);
+
+  auto result = TupleExpr::createEmpty(ctx, SourceLoc(), SourceLoc(),
+                                       /*Implicit=*/true);
+  result->setType(emptyTuple);
+
+  auto ret = new (ctx) ReturnStmt(SourceLoc(), result, /*Implicit=*/true);
+
+  // Create the function body.
+  auto body = BraceStmt::create(ctx, SourceLoc(), {assign, ret}, SourceLoc());
+  return { body, /*isTypeChecked=*/true };
+}
+
 /// Create a default constructor that initializes a struct to zero.
 static ConstructorDecl *
 createDefaultConstructor(ClangImporter::Implementation &Impl,
@@ -1275,51 +1323,8 @@ createDefaultConstructor(ClangImporter::Implementation &Impl,
   // Mark the constructor transparent so that we inline it away completely.
   constructor->getAttrs().add(new (context) TransparentAttr(/*implicit*/ true));
 
-  if (Impl.hasFinishedTypeChecking())
-    return constructor;
-
-  // Use a builtin to produce a zero initializer, and assign it to self.
-
-  // Construct the left-hand reference to self.
-  auto *selfDecl = constructor->getImplicitSelfDecl();
-  Expr *lhs = new (context) DeclRefExpr(selfDecl,
-                                        DeclNameLoc(), /*Implicit=*/true);
-  auto selfType = structDecl->getDeclaredInterfaceType();
-  lhs->setType(LValueType::get(selfType));
-
-  auto emptyTuple = TupleType::getEmpty(context);
-
-  // Construct the right-hand call to Builtin.zeroInitializer.
-  Identifier zeroInitID = context.getIdentifier("zeroInitializer");
-  auto zeroInitializerFunc =
-    cast<FuncDecl>(getBuiltinValueDecl(context, zeroInitID));
-  SubstitutionMap subMap =
-    SubstitutionMap::get(zeroInitializerFunc->getGenericSignature(),
-                         llvm::makeArrayRef(selfType), { });
-  ConcreteDeclRef concreteDeclRef(zeroInitializerFunc, subMap);
-  auto zeroInitializerRef =
-    new (context) DeclRefExpr(concreteDeclRef, DeclNameLoc(),
-                              /*implicit*/ true);
-  zeroInitializerRef->setType(FunctionType::get({}, selfType));
-
-  auto call = CallExpr::createImplicit(context, zeroInitializerRef, {}, {});
-  call->setType(selfType);
-  call->setThrows(false);
-
-  auto assign = new (context) AssignExpr(lhs, SourceLoc(), call,
-                                         /*implicit*/ true);
-  assign->setType(emptyTuple);
-
-  auto result = TupleExpr::createEmpty(context, SourceLoc(), SourceLoc(),
-                                       /*Implicit=*/true);
-  result->setType(emptyTuple);
-
-  auto ret = new (context) ReturnStmt(SourceLoc(), result, /*Implicit=*/true);
-
-  // Create the function body.
-  auto body = BraceStmt::create(context, SourceLoc(), {assign, ret},
-                                SourceLoc());
-  constructor->setBody(body, AbstractFunctionDecl::BodyKind::TypeChecked);
+  constructor->setBodySynthesizer(synthesizeStructDefaultConstructorBody,
+                                  structDecl);
 
   // We're done.
   return constructor;
