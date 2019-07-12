@@ -175,7 +175,7 @@ static VarDecl *deriveRawRepresentable_raw(DerivedConformance &derived) {
 
   // Define the getter.
   auto getterDecl = DerivedConformance::addGetterToReadOnlyDerivedProperty(
-      derived.TC, propDecl, rawType);
+      propDecl, rawType);
   getterDecl->setBodySynthesizer(&deriveBodyRawRepresentable_raw);
 
   // If the containing module is not resilient, make sure clients can get at

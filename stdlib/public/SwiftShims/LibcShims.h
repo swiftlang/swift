@@ -23,6 +23,10 @@
 #include "SwiftStddef.h"
 #include "Visibility.h"
 
+#if defined(__ANDROID__)
+#include <android/api-level.h>
+#endif
+
 #if __has_feature(nullability)
 #pragma clang assume_nonnull begin
 #endif

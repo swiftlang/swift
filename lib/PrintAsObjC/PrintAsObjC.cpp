@@ -571,7 +571,7 @@ private:
     // Constructors and methods returning DynamicSelf return
     // instancetype.
     if (isa<ConstructorDecl>(AFD) ||
-        (isa<FuncDecl>(AFD) && cast<FuncDecl>(AFD)->hasDynamicSelf())) {
+        (isa<FuncDecl>(AFD) && cast<FuncDecl>(AFD)->hasDynamicSelfResult())) {
       if (errorConvention && errorConvention->stripsResultOptionality()) {
         printNullability(OTK_Optional, NullabilityPrintKind::ContextSensitive);
       } else if (auto ctor = dyn_cast<ConstructorDecl>(AFD)) {
@@ -1928,6 +1928,14 @@ private:
              "constrained extensions or custom generic parameters?");
       type = extendedClass->getGenericEnvironment()->getSugaredType(type);
       decl = type->getDecl();
+    }
+
+    if (auto *proto = dyn_cast<ProtocolDecl>(decl->getDeclContext())) {
+      if (type->isEqual(proto->getSelfInterfaceType())) {
+        printNullability(optionalKind, NullabilityPrintKind::ContextSensitive);
+        os << "instancetype";
+        return;
+      }
     }
 
     assert(decl->getClangDecl() && "can only handle imported ObjC generics");

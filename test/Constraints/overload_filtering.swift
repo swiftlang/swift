@@ -26,8 +26,7 @@ struct X {
 }
 
 func testSubscript(x: X, i: Int) {
-  // CHECK: disabled disjunction term {{.*}} bound to key path application
-  // CHECK-NEXT: disabled disjunction term {{.*}}X.subscript(_:)
+  // CHECK: disabled disjunction term {{.*}}X.subscript(_:)
   // CHECK-NEXT: disabled disjunction term {{.*}}X.subscript(_:_:_:)
   // CHECK-NEXT: introducing single enabled disjunction term {{.*}} bound to decl overload_filtering.(file).X.subscript(_:_:)
   _ = x[i, i]

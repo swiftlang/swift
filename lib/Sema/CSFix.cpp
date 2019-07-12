@@ -278,19 +278,36 @@ InsertExplicitCall *InsertExplicitCall::create(ConstraintSystem &cs,
   return new (cs.getAllocator()) InsertExplicitCall(cs, locator);
 }
 
-bool InsertPropertyWrapperUnwrap::diagnose(Expr *root, bool asNote) const {
+bool UsePropertyWrapper::diagnose(Expr *root, bool asNote) const {
+  auto &cs = getConstraintSystem();
+  auto failure = ExtraneousPropertyWrapperUnwrapFailure(
+      root, cs, Wrapped, UsingStorageWrapper, Base, Wrapper, getLocator());
+  return failure.diagnose(asNote);
+}
+
+UsePropertyWrapper *UsePropertyWrapper::create(ConstraintSystem &cs,
+                                               VarDecl *wrapped,
+                                               bool usingStorageWrapper,
+                                               Type base, Type wrapper,
+                                               ConstraintLocator *locator) {
+  return new (cs.getAllocator()) UsePropertyWrapper(
+      cs, wrapped, usingStorageWrapper, base, wrapper, locator);
+}
+
+bool UseWrappedValue::diagnose(Expr *root, bool asNote) const {
+  auto &cs = getConstraintSystem();
   auto failure = MissingPropertyWrapperUnwrapFailure(
-      root, getConstraintSystem(), getPropertyName(), getBase(), getWrapper(),
+      root, cs, PropertyWrapper, usingStorageWrapper(), Base, Wrapper,
       getLocator());
   return failure.diagnose(asNote);
 }
 
-InsertPropertyWrapperUnwrap *
-InsertPropertyWrapperUnwrap::create(ConstraintSystem &cs, DeclName propertyName,
-                                    Type base, Type wrapper,
-                                    ConstraintLocator *locator) {
+UseWrappedValue *UseWrappedValue::create(ConstraintSystem &cs,
+                                         VarDecl *propertyWrapper, Type base,
+                                         Type wrapper,
+                                         ConstraintLocator *locator) {
   return new (cs.getAllocator())
-      InsertPropertyWrapperUnwrap(cs, propertyName, base, wrapper, locator);
+      UseWrappedValue(cs, propertyWrapper, base, wrapper, locator);
 }
 
 bool UseSubscriptOperator::diagnose(Expr *root, bool asNote) const {
@@ -325,14 +342,16 @@ AllowMemberRefOnExistential::create(ConstraintSystem &cs, Type baseType,
 }
 
 bool AllowMemberRefOnExistential::diagnose(Expr *root, bool asNote) const {
-  auto failure = InvalidMemberRefOnExistential(root, getConstraintSystem(),
-                                               BaseType, Name, getLocator());
+  auto failure =
+      InvalidMemberRefOnExistential(root, getConstraintSystem(), getBaseType(),
+                                    getMemberName(), getLocator());
   return failure.diagnose(asNote);
 }
 
 bool AllowTypeOrInstanceMember::diagnose(Expr *root, bool asNote) const {
   auto failure = AllowTypeOrInstanceMemberFailure(
-      root, getConstraintSystem(), BaseType, Member, UsedName, getLocator());
+      root, getConstraintSystem(), getBaseType(), getMember(), getMemberName(),
+      getLocator());
   return failure.diagnose(asNote);
 }
 
@@ -455,15 +474,17 @@ MoveOutOfOrderArgument *MoveOutOfOrderArgument::create(
 }
 
 bool AllowInaccessibleMember::diagnose(Expr *root, bool asNote) const {
-  InaccessibleMemberFailure failure(root, getConstraintSystem(), Member,
+  InaccessibleMemberFailure failure(root, getConstraintSystem(), getMember(),
                                     getLocator());
   return failure.diagnose(asNote);
 }
 
 AllowInaccessibleMember *
-AllowInaccessibleMember::create(ConstraintSystem &cs, ValueDecl *member,
+AllowInaccessibleMember::create(ConstraintSystem &cs, Type baseType,
+                                ValueDecl *member, DeclName name,
                                 ConstraintLocator *locator) {
-  return new (cs.getAllocator()) AllowInaccessibleMember(cs, member, locator);
+  return new (cs.getAllocator())
+      AllowInaccessibleMember(cs, baseType, member, name, locator);
 }
 
 bool AllowAnyObjectKeyPathRoot::diagnose(Expr *root, bool asNote) const {
@@ -621,4 +642,18 @@ bool SkipUnhandledConstructInFunctionBuilder::diagnose(Expr *root,
   SkipUnhandledConstructInFunctionBuilderFailure failure(
       root, getConstraintSystem(), unhandled, builder, getLocator());
   return failure.diagnose(asNote);
+}
+
+bool AllowMutatingMemberOnRValueBase::diagnose(Expr *root, bool asNote) const {
+  auto &cs = getConstraintSystem();
+  MutatingMemberRefOnImmutableBase failure(root, cs, getMember(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowMutatingMemberOnRValueBase *
+AllowMutatingMemberOnRValueBase::create(ConstraintSystem &cs, Type baseType,
+                                        ValueDecl *member, DeclName name,
+                                        ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowMutatingMemberOnRValueBase(cs, baseType, member, name, locator);
 }

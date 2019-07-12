@@ -1177,7 +1177,40 @@
       key.nameoffset: 1796,
       key.namelength: 1,
       key.bodyoffset: 1799,
-      key.bodylength: 109
+      key.bodylength: 109,
+      key.substructure: [
+        {
+          key.kind: source.lang.swift.decl.function.method.instance,
+          key.accessibility: source.lang.swift.accessibility.internal,
+          key.name: "init(x:y:)",
+          key.offset: 1882,
+          key.length: 25,
+          key.nameoffset: 1882,
+          key.namelength: 22,
+          key.bodyoffset: 1906,
+          key.bodylength: 0,
+          key.substructure: [
+            {
+              key.kind: source.lang.swift.decl.var.parameter,
+              key.name: "x",
+              key.offset: 1889,
+              key.length: 6,
+              key.typename: "Int",
+              key.nameoffset: 1889,
+              key.namelength: 1
+            },
+            {
+              key.kind: source.lang.swift.decl.var.parameter,
+              key.name: "y",
+              key.offset: 1897,
+              key.length: 6,
+              key.typename: "Int",
+              key.nameoffset: 1897,
+              key.namelength: 1
+            }
+          ]
+        }
+      ]
     },
     {
       key.kind: source.lang.swift.decl.var.global,
@@ -1420,15 +1453,13 @@
       key.column: 1,
       key.filepath: "-foobar",
       key.severity: source.diagnostic.severity.error,
-      key.description: "expected declaration",
+      key.description: "expected 'func' keyword in instance method declaration",
       key.diagnostic_stage: source.diagnostic.stage.swift.parse,
-      key.diagnostics: [
+      key.fixits: [
         {
-          key.line: 114,
-          key.column: 7,
-          key.filepath: "-foobar",
-          key.severity: source.diagnostic.severity.note,
-          key.description: "in declaration of 'C'"
+          key.offset: 1882,
+          key.length: 0,
+          key.sourcetext: "func "
         }
       ]
     }

@@ -29,7 +29,7 @@ typedef __SIZE_TYPE__ __swift_size_t;
 #endif
 
 // This selects the signed equivalent of the unsigned type chosen for size_t.
-#if __STDC_VERSION__-0 >= 201112l
+#if __STDC_VERSION__-0 >= 201112l || defined(__swift__)
 typedef __typeof__(_Generic((__swift_size_t)0,                                 \
                             unsigned long long int : (long long int)0,         \
                             unsigned long int : (long int)0,                   \

@@ -299,6 +299,9 @@ struct PrintOptions {
   /// Empty means allow all.
   std::vector<AnyAttrKind> ExclusiveAttrList;
 
+  /// List of decls that should be printed even if they are implicit and \c SkipImplicit is set to true.
+  std::vector<const Decl*> TreatAsExplicitDeclList;
+
   /// Whether to print function @convention attribute on function types.
   bool PrintFunctionRepresentationAttrs = true;
 

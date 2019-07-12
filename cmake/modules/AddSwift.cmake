@@ -288,6 +288,21 @@ function(_add_variant_c_compile_flags)
     endif()
   endif()
 
+  if(${CFLAGS_SDK} STREQUAL ANDROID)
+    if(${CFLAGS_ARCH} STREQUAL x86_64)
+      # NOTE(compnerd) Android NDK 21 or lower will generate library calls to
+      # `__sync_val_compare_and_swap_16` rather than lowering to the CPU's
+      # `cmpxchg16b` instruction as the `cx16` feature is disabled due to a bug
+      # in Clang.  This is being fixed in the current master Clang and will
+      # hopefully make it into Clang 9.0.  In the mean time, workaround this in
+      # the build.
+      if(CMAKE_C_COMPILER_ID MATCHES Clang AND CMAKE_C_COMPILER_VERSION
+          VERSION_LESS 9.0.0)
+        list(APPEND result -mcx16)
+      endif()
+    endif()
+  endif()
+
   if(CFLAGS_ENABLE_ASSERTIONS)
     list(APPEND result "-UNDEBUG")
   else()
@@ -309,10 +324,11 @@ function(_add_variant_c_compile_flags)
   endif()
 
   if("${CFLAGS_SDK}" STREQUAL "ANDROID")
+    list(APPEND result -nostdinc++)
     swift_android_libcxx_include_paths(CFLAGS_CXX_INCLUDES)
     swift_android_include_for_arch("${CFLAGS_ARCH}" "${CFLAGS_ARCH}_INCLUDE")
     foreach(path IN LISTS CFLAGS_CXX_INCLUDES ${CFLAGS_ARCH}_INCLUDE)
-      list(APPEND result "\"${CMAKE_INCLUDE_FLAG_C}${path}\"")
+      list(APPEND result -isystem;${path})
     endforeach()
     list(APPEND result "-D__ANDROID_API__=${SWIFT_ANDROID_API_LEVEL}")
   elseif(CFLAGS_SDK STREQUAL WINDOWS)
@@ -1923,7 +1939,7 @@ function(add_swift_target_library name)
     if(SWIFTLIB_SHARED)
       if(sdk IN_LIST SWIFT_APPLE_PLATFORMS)
         list(APPEND swiftlib_link_flags_all "-dynamiclib -Wl,-headerpad_max_install_names")
-      elseif(sdk STREQUAL ANDROID)
+      elseif(${sdk} STREQUAL ANDROID)
         list(APPEND swiftlib_link_flags_all "-shared")
         # TODO: Instead of `lib${name}.so` find variable or target property which already have this value.
         list(APPEND swiftlib_link_flags_all "-Wl,-soname,lib${name}.so")

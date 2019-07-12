@@ -68,9 +68,9 @@
 ///           return result
 ///         }
 ///       }
-///       private var nextElement: ResultElement? // The next result of next().
-///       private var base: Base                  // The underlying iterator.
-///       private let nextPartialResult: (ResultElement, Base.Element) -> ResultElement
+///       var nextElement: ResultElement? // The next result of next().
+///       var base: Base                  // The underlying iterator.
+///       let nextPartialResult: (ResultElement, Base.Element) -> ResultElement
 ///     }
 ///     
 ///     struct LazyScanSequence<Base: Sequence, ResultElement>
@@ -78,11 +78,12 @@
 ///     {
 ///       func makeIterator() -> LazyScanIterator<Base.Iterator, ResultElement> {
 ///         return LazyScanIterator(
-///           nextElement: initial, base: base.makeIterator(), nextPartialResult)
+///           nextElement: initial, base: base.makeIterator(),
+///           nextPartialResult: nextPartialResult)
 ///       }
-///       private let initial: ResultElement
-///       private let base: Base
-///       private let nextPartialResult:
+///       let initial: ResultElement
+///       let base: Base
+///       let nextPartialResult:
 ///         (ResultElement, Base.Element) -> ResultElement
 ///     }
 ///
@@ -101,10 +102,10 @@
 ///       /// - Complexity: O(1)
 ///       func scan<ResultElement>(
 ///         _ initial: ResultElement,
-///         _ nextPartialResult: (ResultElement, Element) -> ResultElement
+///         _ nextPartialResult: @escaping (ResultElement, Element) -> ResultElement
 ///       ) -> LazyScanSequence<Self, ResultElement> {
 ///         return LazyScanSequence(
-///           initial: initial, base: self, nextPartialResult)
+///           initial: initial, base: self, nextPartialResult: nextPartialResult)
 ///       }
 ///     }
 ///

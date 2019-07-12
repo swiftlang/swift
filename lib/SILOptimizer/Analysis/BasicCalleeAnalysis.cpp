@@ -168,7 +168,7 @@ void CalleeCache::computeWitnessMethodCalleesForWitnessTable(
         LLVM_FALLTHROUGH;
       case AccessLevel::FilePrivate:
       case AccessLevel::Private: {
-        auto Witness = Conf->getWitness(Requirement.getDecl(), nullptr);
+        auto Witness = Conf->getWitness(Requirement.getDecl());
         auto DeclRef = SILDeclRef(Witness.getDecl());
         canCallUnknown = !calleesAreStaticallyKnowable(M, DeclRef);
       }

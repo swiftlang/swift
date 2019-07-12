@@ -84,9 +84,10 @@ void simple_display(llvm::raw_ostream &out, ArithmeticExpr *expr) {
 /// Rule to evaluate the value of the expression.
 template<typename Derived, CacheKind Caching>
 struct EvaluationRule
-  : public SimpleRequest<Derived, Caching, double, ArithmeticExpr *>
+  : public SimpleRequest<Derived, double(ArithmeticExpr *), Caching>
 {
-  using SimpleRequest<Derived, Caching, double, ArithmeticExpr *>::SimpleRequest;
+  using SimpleRequest<Derived, double(ArithmeticExpr *), Caching>
+      ::SimpleRequest;
 
   llvm::Expected<double>
   evaluate(Evaluator &evaluator, ArithmeticExpr *expr) const {

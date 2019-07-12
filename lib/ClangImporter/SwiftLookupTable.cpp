@@ -83,8 +83,7 @@ public:
   void populateTable(SwiftLookupTable &table, NameImporter &);
 
   void populateTableWithDecl(SwiftLookupTable &table,
-                             NameImporter &nameImporter,
-                             clang::Decl* decl);
+                             NameImporter &nameImporter, clang::Decl *decl);
 };
 
 /// Module file extension reader for the Swift lookup tables.
@@ -1799,14 +1798,14 @@ void importer::finalizeLookupTable(SwiftLookupTable &table,
 
 void SwiftLookupTableWriter::populateTableWithDecl(SwiftLookupTable &table,
                                                    NameImporter &nameImporter,
-                                                   clang::Decl* decl) {
+                                                   clang::Decl *decl) {
   // Skip anything from an AST file.
   if (decl->isFromASTFile())
     return;
 
   // Iterate into extern "C" {} type declarations.
   if (auto linkageDecl = dyn_cast<clang::LinkageSpecDecl>(decl)) {
-    for (auto* decl : linkageDecl->noload_decls()) {
+    for (auto *decl : linkageDecl->noload_decls()) {
       populateTableWithDecl(table, nameImporter, decl);
     }
     return;

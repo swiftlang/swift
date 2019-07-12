@@ -2603,6 +2603,9 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
 
         for (unsigned i : indices(wrappedVar->getAttachedPropertyWrappers())) {
           auto wrapperInfo = wrappedVar->getAttachedPropertyWrapperTypeInfo(i);
+          if (!wrapperInfo)
+            break;
+
           Type memberType =
               cs->createTypeVariable(emptyLocator, TVO_CanBindToLValue);
           cs->addValueMemberConstraint(
@@ -2649,8 +2652,11 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
         initType = patternType;
 
         // Add a conversion constraint between the types.
-        cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
-                         patternType, Locator, /*isFavored*/true);
+        if (!cs.Options.contains(
+                   ConstraintSystemFlags::UnderlyingTypeForOpaqueReturnType)) {
+          cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
+                           patternType, Locator, /*isFavored*/true);
+        }
       }
 
       // The expression has been pre-checked; save it in case we fail later.
@@ -2710,7 +2716,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
       auto &ctx = singleVar->getASTContext();
       auto outermostWrapperAttr = wrapperAttrs.front();
       if (initializer) {
-        // Form init(initialValue:) call(s).
+        // Form init(wrappedValue:) call(s).
         Expr *wrappedInitializer =
             buildPropertyWrapperInitialValueCall(
                 singleVar, Type(), initializer, /*ignoreAttributeArgs=*/false);
@@ -2762,6 +2768,13 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
     // If we already had an error, don't repeat the problem.
     if (contextualType.getType()->hasError())
       return true;
+    
+    // Allow the initializer expression to establish the underlying type of an
+    // opaque type.
+    if (auto opaqueType = pattern->getType()->getAs<OpaqueTypeArchetypeType>()){
+      flags |= TypeCheckExprFlags::ConvertTypeIsOpaqueReturnType;
+      flags -= TypeCheckExprFlags::ConvertTypeIsOnlyAHint;
+    }
 
     // Only provide a TypeLoc if it makes sense to allow diagnostics.
     if (auto *typedPattern = dyn_cast<TypedPattern>(pattern)) {
@@ -2846,10 +2859,35 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
   PBD->setPattern(patternNumber, pattern, initContext);
   PBD->setInit(patternNumber, init);
 
+  // Bind a property with an opaque return type to the underlying type
+  // given by the initializer.
+  if (auto var = pattern->getSingleVar()) {
+    if (auto opaque = var->getOpaqueResultTypeDecl()) {
+      if (auto convertedInit = dyn_cast<UnderlyingToOpaqueExpr>(init)) {
+        auto underlyingType = convertedInit->getSubExpr()->getType()
+            ->mapTypeOutOfContext();
+        auto underlyingSubs = SubstitutionMap::get(
+          opaque->getOpaqueInterfaceGenericSignature(),
+          [&](SubstitutableType *t) -> Type {
+            if (t->isEqual(opaque->getUnderlyingInterfaceType())) {
+              return underlyingType;
+            }
+            return Type(t);
+          },
+          LookUpConformanceInModule(opaque->getModuleContext()));
+        
+        opaque->setUnderlyingTypeSubstitutions(underlyingSubs);
+      } else {
+        diagnose(var->getLoc(), diag::opaque_type_var_no_underlying_type);
+      }
+    }
+  }
+  
   if (hadError)
     PBD->setInvalid();
 
   PBD->setInitializerChecked(patternNumber);
+  
   return hadError;
 }
 
@@ -2921,9 +2959,9 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
       SequenceType = solution.simplifyType(SequenceType);
 
       // Perform any necessary conversions of the sequence (e.g. [T]! -> [T]).
-      if (tc.convertToType(expr, SequenceType, cs.DC)) {
-        return nullptr;
-      }
+      expr = solution.coerceToType(expr, SequenceType, cs.getConstraintLocator(expr));
+      
+      if (!expr) return nullptr;
 
       cs.cacheExprTypes(expr);
 
@@ -3376,6 +3414,11 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc,
   // TODO: need to add kind arg?
   // Construct a constraint system from this expression.
   ConstraintSystem cs(*this, dc, ConstraintSystemFlags::AllowFixes);
+    
+  // Cache the expression type on the system to ensure it is available
+  // on diagnostics if the convertion fails.
+  cs.cacheExprTypes(expr);
+
   // If there is a type that we're expected to convert to, add the conversion
   // constraint.
   cs.addConstraint(ConstraintKind::Conversion, expr->getType(), type,

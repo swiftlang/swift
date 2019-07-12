@@ -75,3 +75,7 @@ module _SwiftNetworkOverlayShims {
 module _SwiftClockKitOverlayShims {
     header "ClockKitOverlayShims.h"
 }
+
+module _SwiftCoreMediaOverlayShims {
+  header "CoreMediaOverlayShims.h"
+}

@@ -172,8 +172,8 @@ static ValueDecl *deriveProperty(DerivedConformance &derived, Type type,
                                      /*isStatic=*/false, /*isFinal=*/false);
 
   // Define the getter.
-  auto *getterDecl =
-      derived.addGetterToReadOnlyDerivedProperty(derived.TC, propDecl, type);
+  auto *getterDecl = derived.addGetterToReadOnlyDerivedProperty(
+      propDecl, type);
 
   // Synthesize the body.
   synthesizer(getterDecl);

@@ -149,6 +149,11 @@ bool ASTScopeImpl::verifyThatThisNodeComeAfterItsPriorSibling() const {
   print(out);
   out << "\n***Parent node***\n";
   getParent().get()->print(out);
+  llvm::errs() << "\n\nsource:\n"
+               << getSourceManager()
+                      .getRangeForBuffer(
+                          getSourceFile()->getBufferID().getValue())
+                      .str();
   abort();
 }
 

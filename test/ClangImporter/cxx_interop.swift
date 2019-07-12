@@ -1,13 +1,11 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -typecheck %s -I %S/Inputs/custom-modules -module-cache-path %t -enable-cxx-interop
-// UNSUPPORTED: macosx
 
 import CXXInterop
 
 // Basic structs
 do {
-  var tmp: ns_Basic = makeA()
+  var tmp: Basic = makeA()
   tmp.a = 3
+  tmp.b = nil
 }
-
-var tmp: NestedStruct = MakeNestedStruct()

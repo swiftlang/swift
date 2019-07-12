@@ -227,9 +227,22 @@
               "kind": "TypeNominal",
               "name": "WeakStorage",
               "printedName": "Optional<C1>"
-            },
+            }
+          ],
+          "declKind": "Var",
+          "usr": "s:4cake2C1C3InsACSgvp",
+          "moduleName": "cake",
+          "declAttributes": [
+            "HasInitialValue",
+            "ReferenceOwnership",
+            "HasStorage"
+          ],
+          "fixedbinaryorder": 0,
+          "ownership": 1,
+          "hasStorage": true,
+          "accessors": [
             {
-              "kind": "Getter",
+              "kind": "Accessor",
               "name": "Get",
               "printedName": "Get()",
               "children": [
@@ -254,10 +267,11 @@
               "implicit": true,
               "declAttributes": [
                 "Transparent"
-              ]
+              ],
+              "accessorKind": "get"
             },
             {
-              "kind": "Setter",
+              "kind": "Accessor",
               "name": "Set",
               "printedName": "Set()",
               "children": [
@@ -287,20 +301,30 @@
               "implicit": true,
               "declAttributes": [
                 "Transparent"
-              ]
+              ],
+              "accessorKind": "set"
+            },
+            {
+              "kind": "Accessor",
+              "name": "Modify",
+              "printedName": "Modify()",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Void",
+                  "printedName": "()"
+                }
+              ],
+              "declKind": "Accessor",
+              "usr": "s:4cake2C1C3InsACSgvM",
+              "moduleName": "cake",
+              "implicit": true,
+              "declAttributes": [
+                "Transparent"
+              ],
+              "accessorKind": "_modify"
             }
-          ],
-          "declKind": "Var",
-          "usr": "s:4cake2C1C3InsACSgvp",
-          "moduleName": "cake",
-          "declAttributes": [
-            "HasInitialValue",
-            "ReferenceOwnership",
-            "HasStorage"
-          ],
-          "fixedbinaryorder": 0,
-          "ownership": 1,
-          "hasStorage": true
+          ]
         },
         {
           "kind": "Var",
@@ -311,9 +335,22 @@
               "kind": "TypeNominal",
               "name": "UnownedStorage",
               "printedName": "C1"
-            },
+            }
+          ],
+          "declKind": "Var",
+          "usr": "s:4cake2C1C4Ins2ACvp",
+          "moduleName": "cake",
+          "declAttributes": [
+            "HasInitialValue",
+            "ReferenceOwnership",
+            "HasStorage"
+          ],
+          "fixedbinaryorder": 1,
+          "ownership": 2,
+          "hasStorage": true,
+          "accessors": [
             {
-              "kind": "Getter",
+              "kind": "Accessor",
               "name": "Get",
               "printedName": "Get()",
               "children": [
@@ -330,10 +367,11 @@
               "implicit": true,
               "declAttributes": [
                 "Transparent"
-              ]
+              ],
+              "accessorKind": "get"
             },
             {
-              "kind": "Setter",
+              "kind": "Accessor",
               "name": "Set",
               "printedName": "Set()",
               "children": [
@@ -355,20 +393,30 @@
               "implicit": true,
               "declAttributes": [
                 "Transparent"
-              ]
+              ],
+              "accessorKind": "set"
+            },
+            {
+              "kind": "Accessor",
+              "name": "Modify",
+              "printedName": "Modify()",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Void",
+                  "printedName": "()"
+                }
+              ],
+              "declKind": "Accessor",
+              "usr": "s:4cake2C1C4Ins2ACvM",
+              "moduleName": "cake",
+              "implicit": true,
+              "declAttributes": [
+                "Transparent"
+              ],
+              "accessorKind": "_modify"
             }
-          ],
-          "declKind": "Var",
-          "usr": "s:4cake2C1C4Ins2ACvp",
-          "moduleName": "cake",
-          "declAttributes": [
-            "HasInitialValue",
-            "ReferenceOwnership",
-            "HasStorage"
-          ],
-          "fixedbinaryorder": 1,
-          "ownership": 2,
-          "hasStorage": true
+          ]
         }
       ],
       "declKind": "Class",
@@ -523,9 +571,15 @@
               "name": "Int",
               "printedName": "Int",
               "usr": "s:Si"
-            },
+            }
+          ],
+          "declKind": "Var",
+          "usr": "s:4cake6NumberO8rawValueSivp",
+          "moduleName": "cake",
+          "implicit": true,
+          "accessors": [
             {
-              "kind": "Getter",
+              "kind": "Accessor",
               "name": "Get",
               "printedName": "Get()",
               "children": [
@@ -542,13 +596,10 @@
               "implicit": true,
               "declAttributes": [
                 "Inlinable"
-              ]
+              ],
+              "accessorKind": "get"
             }
-          ],
-          "declKind": "Var",
-          "usr": "s:4cake6NumberO8rawValueSivp",
-          "moduleName": "cake",
-          "implicit": true
+          ]
         }
       ],
       "declKind": "Enum",
@@ -642,9 +693,20 @@
               "name": "Int",
               "printedName": "Int",
               "usr": "s:Si"
-            },
+            }
+          ],
+          "declKind": "Var",
+          "usr": "s:4cake17fixedLayoutStructV1aSivp",
+          "moduleName": "cake",
+          "declAttributes": [
+            "HasInitialValue",
+            "HasStorage"
+          ],
+          "fixedbinaryorder": 0,
+          "hasStorage": true,
+          "accessors": [
             {
-              "kind": "Getter",
+              "kind": "Accessor",
               "name": "Get",
               "printedName": "Get()",
               "children": [
@@ -661,10 +723,11 @@
               "implicit": true,
               "declAttributes": [
                 "Transparent"
-              ]
+              ],
+              "accessorKind": "get"
             },
             {
-              "kind": "Setter",
+              "kind": "Accessor",
               "name": "Set",
               "printedName": "Set()",
               "children": [
@@ -686,18 +749,30 @@
               "implicit": true,
               "declAttributes": [
                 "Transparent"
-              ]
+              ],
+              "accessorKind": "set"
+            },
+            {
+              "kind": "Accessor",
+              "name": "Modify",
+              "printedName": "Modify()",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Void",
+                  "printedName": "()"
+                }
+              ],
+              "declKind": "Accessor",
+              "usr": "s:4cake17fixedLayoutStructV1aSivM",
+              "moduleName": "cake",
+              "implicit": true,
+              "declAttributes": [
+                "Transparent"
+              ],
+              "accessorKind": "_modify"
             }
-          ],
-          "declKind": "Var",
-          "usr": "s:4cake17fixedLayoutStructV1aSivp",
-          "moduleName": "cake",
-          "declAttributes": [
-            "HasInitialValue",
-            "HasStorage"
-          ],
-          "fixedbinaryorder": 0,
-          "hasStorage": true
+          ]
         },
         {
           "kind": "Var",
@@ -709,27 +784,6 @@
               "name": "Int",
               "printedName": "Int",
               "usr": "s:Si"
-            },
-            {
-              "kind": "Getter",
-              "name": "Get",
-              "printedName": "Get()",
-              "children": [
-                {
-                  "kind": "TypeNominal",
-                  "name": "Int",
-                  "printedName": "Int",
-                  "usr": "s:Si"
-                }
-              ],
-              "declKind": "Accessor",
-              "usr": "s:4cake17fixedLayoutStructV1b33_3D8926C30F7417F2EF9A277D0C73FBDBLLSivg",
-              "moduleName": "cake",
-              "implicit": true,
-              "isInternal": true,
-              "declAttributes": [
-                "Transparent"
-              ]
             }
           ],
           "declKind": "Var",
@@ -741,9 +795,7 @@
             "HasStorage"
           ],
           "fixedbinaryorder": 1,
-          "hasStorage": true,
-          "hasDidset": true,
-          "hasWillset": true
+          "hasStorage": true
         },
         {
           "kind": "Var",
@@ -755,27 +807,6 @@
               "name": "Int",
               "printedName": "Int",
               "usr": "s:Si"
-            },
-            {
-              "kind": "Getter",
-              "name": "Get",
-              "printedName": "Get()",
-              "children": [
-                {
-                  "kind": "TypeNominal",
-                  "name": "Int",
-                  "printedName": "Int",
-                  "usr": "s:Si"
-                }
-              ],
-              "declKind": "Accessor",
-              "usr": "s:4cake17fixedLayoutStructV1cSivg",
-              "moduleName": "cake",
-              "implicit": true,
-              "isInternal": true,
-              "declAttributes": [
-                "Transparent"
-              ]
             }
           ],
           "declKind": "Var",
@@ -799,9 +830,22 @@
               "name": "Int",
               "printedName": "Int",
               "usr": "s:Si"
-            },
+            }
+          ],
+          "declKind": "Var",
+          "usr": "s:4cake17fixedLayoutStructV19unavailablePropertySivp",
+          "moduleName": "cake",
+          "declAttributes": [
+            "HasInitialValue",
+            "Available",
+            "HasStorage"
+          ],
+          "fixedbinaryorder": 3,
+          "isLet": true,
+          "hasStorage": true,
+          "accessors": [
             {
-              "kind": "Getter",
+              "kind": "Accessor",
               "name": "Get",
               "printedName": "Get()",
               "children": [
@@ -818,20 +862,10 @@
               "implicit": true,
               "declAttributes": [
                 "Transparent"
-              ]
+              ],
+              "accessorKind": "get"
             }
-          ],
-          "declKind": "Var",
-          "usr": "s:4cake17fixedLayoutStructV19unavailablePropertySivp",
-          "moduleName": "cake",
-          "declAttributes": [
-            "HasInitialValue",
-            "Available",
-            "HasStorage"
-          ],
-          "fixedbinaryorder": 3,
-          "isLet": true,
-          "hasStorage": true
+          ]
         }
       ],
       "declKind": "Struct",
@@ -899,9 +933,14 @@
               "name": "Int",
               "printedName": "Int",
               "usr": "s:Si"
-            },
+            }
+          ],
+          "declKind": "Var",
+          "usr": "s:4cake21ProWithAssociatedTypePAAE9NonReqVarSivp",
+          "moduleName": "cake",
+          "accessors": [
             {
-              "kind": "Getter",
+              "kind": "Accessor",
               "name": "Get",
               "printedName": "Get()",
               "children": [
@@ -915,12 +954,10 @@
               "declKind": "Accessor",
               "usr": "s:4cake21ProWithAssociatedTypePAAE9NonReqVarSivg",
               "moduleName": "cake",
-              "genericSig": "<τ_0_0 where τ_0_0 : ProWithAssociatedType>"
+              "genericSig": "<τ_0_0 where τ_0_0 : ProWithAssociatedType>",
+              "accessorKind": "get"
             }
-          ],
-          "declKind": "Var",
-          "usr": "s:4cake21ProWithAssociatedTypePAAE9NonReqVarSivp",
-          "moduleName": "cake"
+          ]
         }
       ],
       "declKind": "Protocol",
@@ -954,7 +991,35 @@
           "usr": "s:4cake13SubsContainerP6getterS2i_tcip",
           "moduleName": "cake",
           "genericSig": "<τ_0_0 where τ_0_0 : SubsContainer>",
-          "protocolReq": true
+          "protocolReq": true,
+          "accessors": [
+            {
+              "kind": "Accessor",
+              "name": "Get",
+              "printedName": "Get()",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int",
+                  "printedName": "Int",
+                  "usr": "s:Si"
+                },
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int",
+                  "printedName": "Int",
+                  "usr": "s:Si"
+                }
+              ],
+              "declKind": "Accessor",
+              "usr": "s:4cake13SubsContainerP6getterS2i_tcig",
+              "moduleName": "cake",
+              "genericSig": "<τ_0_0 where τ_0_0 : SubsContainer>",
+              "protocolReq": true,
+              "reqNewWitnessTableEntry": true,
+              "accessorKind": "get"
+            }
+          ]
         },
         {
           "kind": "Subscript",
@@ -979,7 +1044,91 @@
           "moduleName": "cake",
           "genericSig": "<τ_0_0 where τ_0_0 : SubsContainer>",
           "protocolReq": true,
-          "hasSetter": true
+          "accessors": [
+            {
+              "kind": "Accessor",
+              "name": "Get",
+              "printedName": "Get()",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int",
+                  "printedName": "Int",
+                  "usr": "s:Si"
+                },
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int",
+                  "printedName": "Int",
+                  "usr": "s:Si"
+                }
+              ],
+              "declKind": "Accessor",
+              "usr": "s:4cake13SubsContainerP6setterS2i_tcig",
+              "moduleName": "cake",
+              "genericSig": "<τ_0_0 where τ_0_0 : SubsContainer>",
+              "protocolReq": true,
+              "reqNewWitnessTableEntry": true,
+              "accessorKind": "get"
+            },
+            {
+              "kind": "Accessor",
+              "name": "Set",
+              "printedName": "Set()",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Void",
+                  "printedName": "()"
+                },
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int",
+                  "printedName": "Int",
+                  "usr": "s:Si"
+                },
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int",
+                  "printedName": "Int",
+                  "usr": "s:Si"
+                }
+              ],
+              "declKind": "Accessor",
+              "usr": "s:4cake13SubsContainerP6setterS2i_tcis",
+              "moduleName": "cake",
+              "genericSig": "<τ_0_0 where τ_0_0 : SubsContainer>",
+              "protocolReq": true,
+              "reqNewWitnessTableEntry": true,
+              "accessorKind": "set"
+            },
+            {
+              "kind": "Accessor",
+              "name": "Modify",
+              "printedName": "Modify()",
+              "children": [
+                {
+                  "kind": "TypeNominal",
+                  "name": "Void",
+                  "printedName": "()"
+                },
+                {
+                  "kind": "TypeNominal",
+                  "name": "Int",
+                  "printedName": "Int",
+                  "usr": "s:Si"
+                }
+              ],
+              "declKind": "Accessor",
+              "usr": "s:4cake13SubsContainerP6setterS2i_tciM",
+              "moduleName": "cake",
+              "genericSig": "<τ_0_0 where τ_0_0 : SubsContainer>",
+              "protocolReq": true,
+              "implicit": true,
+              "reqNewWitnessTableEntry": true,
+              "accessorKind": "_modify"
+            }
+          ]
         }
       ],
       "declKind": "Protocol",
@@ -1144,27 +1293,6 @@
               "name": "Int",
               "printedName": "Int",
               "usr": "s:Si"
-            },
-            {
-              "kind": "Getter",
-              "name": "Get",
-              "printedName": "Get()",
-              "children": [
-                {
-                  "kind": "TypeNominal",
-                  "name": "Int",
-                  "printedName": "Int",
-                  "usr": "s:Si"
-                }
-              ],
-              "declKind": "Accessor",
-              "usr": "s:4cake21UsableFromInlineClassC4Prop33_3D8926C30F7417F2EF9A277D0C73FBDBLLSivg",
-              "moduleName": "cake",
-              "implicit": true,
-              "isInternal": true,
-              "declAttributes": [
-                "Transparent"
-              ]
             }
           ],
           "declKind": "Var",

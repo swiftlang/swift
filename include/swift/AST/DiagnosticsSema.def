@@ -997,10 +997,6 @@ ERROR(missing_address_of,none,
 ERROR(missing_address_of_yield,none,
       "yielding mutable value of type %0 requires explicit '&'",
       (Type))
-ERROR(extraneous_property_wrapper_unwrap,none,
-      "property %0 will be unwrapped to value of type %1, use '$' to refer to "
-      "wrapper type %2",
-      (DeclName, Type, Type))
 ERROR(extraneous_address_of,none,
       "use of extraneous '&'",
       ())
@@ -1014,6 +1010,14 @@ ERROR(cannot_pass_inout_arg_to_subscript,none,
       "cannot pass an inout argument to a subscript; use "
       "'withUnsafeMutablePointer' to explicitly convert argument "
       "to a pointer", ())
+
+ERROR(incorrect_property_wrapper_reference,none,
+      "cannot convert value %0 of type %1 to expected type %2, "
+      "use %select{wrapper|wrapped value}3 instead",
+      (Identifier, Type, Type, bool))
+ERROR(incorrect_property_wrapper_reference_member,none,
+      "referencing %0 %1 requires %select{wrapper|wrapped value of type}2 %3",
+      (DescriptiveDeclKind, DeclName, bool, Type))
 
 ERROR(missing_init_on_metatype_initialization,none,
       "initializing from a metatype value must reference 'init' explicitly",
@@ -2611,9 +2615,23 @@ NOTE(missing_member_type_conformance_prevents_synthesis, none,
 ERROR(dynamic_self_non_method,none,
       "%select{global|local}0 function cannot return 'Self'", (bool))
 
-ERROR(self_in_nominal,none,
-      "'Self' is only available in a protocol or as the result of a "
-      "method in a class; did you mean '%0'?", (StringRef))
+ERROR(dynamic_self_invalid,none,
+      "covariant 'Self' can only appear as the type of a property, subscript or method result; "
+      "did you mean '%0'?", (StringRef))
+ERROR(dynamic_self_in_mutable_property,none,
+      "mutable property cannot have covariant 'Self' type", ())
+ERROR(dynamic_self_in_stored_property,none,
+      "stored property cannot have covariant 'Self' type", ())
+ERROR(dynamic_self_in_mutable_subscript,none,
+      "mutable subscript cannot have covariant 'Self' type", ())
+ERROR(dynamic_self_invalid_property,none,
+      "covariant 'Self' can only appear at the top level of property type", ())
+ERROR(dynamic_self_invalid_subscript,none,
+      "covariant 'Self' can only appear at the top level of subscript element type", ())
+ERROR(dynamic_self_invalid_method,none,
+      "covariant 'Self' can only appear at the top level of method result type", ())
+ERROR(dynamic_self_stored_property_init,none,
+      "covariant 'Self' type cannot be referenced from a stored property initializer", ())
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Attributes
@@ -3175,14 +3193,6 @@ ERROR(method_call_in_closure_without_explicit_self,none,
 ERROR(implicit_use_of_self_in_closure,none,
       "implicit use of 'self' in closure; use 'self.' to make"
       " capture semantics explicit", ())
-ERROR(capture_before_declaration,none,
-      "cannot capture %0 before it is declared", (Identifier))
-ERROR(transitive_capture_before_declaration,none,
-      "cannot capture %0, which would use %1 before it is declared",
-      (Identifier, Identifier))
-NOTE(transitive_capture_through_here,none,
-     "%0, declared here, captures %1",
-     (Identifier, Identifier))
 
 WARNING(recursive_accessor_reference,none,
         "attempting to %select{access|modify}1 %0 within its own "
@@ -3498,6 +3508,9 @@ ERROR(trailing_closure_requires_parens,none,
       "trailing closure requires parentheses for disambiguation in this"
       " context", ())
 
+ERROR(opaque_type_var_no_init,none,
+      "property declares an opaque return type, but has no initializer "
+      "expression from which to infer an underlying type", ())
 ERROR(opaque_type_no_underlying_type_candidates,none,
       "function declares an opaque return type, but has no return statements "
       "in its body from which to infer an underlying type", ())
@@ -3509,6 +3522,9 @@ NOTE(opaque_type_underlying_type_candidate_here,none,
 ERROR(opaque_type_self_referential_underlying_type,none,
       "function opaque return type was inferred as %0, which defines the "
       "opaque type in terms of itself", (Type))
+ERROR(opaque_type_var_no_underlying_type,none,
+      "property declares an opaque return type, but cannot infer the "
+      "underlying type from its initializer expression", ())
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Patterns
@@ -4612,9 +4628,9 @@ ERROR(property_wrapper_ambiguous_value_property, none,
   "property wrapper type %0 has multiple non-static properties "
   "named %1", (Type, Identifier))
 ERROR(property_wrapper_wrong_initial_value_init, none,
-      "'init(initialValue:)' parameter type (%0) must be the same as its "
-      "'wrappedValue' property type (%1) or an @autoclosure thereof",
-      (Type, Type))
+      "%0 parameter type (%1) must be the same as its "
+      "'wrappedValue' property type (%2) or an @autoclosure thereof",
+      (DeclName, Type, Type))
 ERROR(property_wrapper_failable_init, none,
       "%0 cannot be failable", (DeclName))
 ERROR(property_wrapper_ambiguous_initial_value_init, none,
@@ -4626,6 +4642,9 @@ ERROR(property_wrapper_type_requirement_not_accessible,none,
       "more restrictive access than its enclosing property wrapper type %3 "
       "(which is %select{private|fileprivate|internal|public|open}4)",
       (AccessLevel, DescriptiveDeclKind, DeclName, Type, AccessLevel))
+ERROR(property_wrapper_ambiguous_enclosing_self_subscript, none,
+      "property wrapper type %0 has multiple enclosing-self subscripts %1",
+      (Type, DeclName))
 
 ERROR(property_wrapper_attribute_not_on_property, none,
       "property wrapper attribute %0 can only be applied to a property",
@@ -4635,6 +4654,8 @@ NOTE(property_wrapper_declared_here,none,
 
 ERROR(property_wrapper_local,none,
       "property wrappers are not yet supported on local properties", ())
+ERROR(property_wrapper_top_level,none,
+      "property wrappers are not yet supported in top-level code", ())
 ERROR(property_wrapper_let, none,
       "property wrapper can only be applied to a 'var'",
       ())
@@ -4678,12 +4699,15 @@ ERROR(property_wrapper_type_not_usable_from_inline,none,
       "%select{%select{variable|constant}0|property}1 "
       "must be '@usableFromInline' or public",
       (bool, bool))
-WARNING(property_wrapper_delegateValue,none,
-        "property wrapper's `delegateValue` property should be renamed to "
-        "'wrapperValue'; use of 'delegateValue' is deprecated", ())
-WARNING(property_wrapper_value,none,
-        "property wrapper's `value` property should be renamed to "
-        "'wrappedValue'; use of 'value' is deprecated", ())
+WARNING(property_wrapper_wrapperValue,none,
+        "property wrapper's `wrapperValue` property should be renamed to "
+        "'projectedValue'; use of 'wrapperValue' is deprecated", ())
+WARNING(property_wrapper_init_initialValue,none,
+        "property wrapper's `init(initialValue:)` should be renamed "
+        "to 'init(wrappedValue:)'; use of 'init(initialValue:)' is deprecated",
+        ())
+ERROR(property_wrapper_projection_value_missing,none,
+      "could not find projection value property %0", (Identifier))
 
 //------------------------------------------------------------------------------
 // MARK: function builder diagnostics

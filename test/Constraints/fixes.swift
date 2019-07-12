@@ -261,6 +261,8 @@ struct FooStruct {
   }
 
   let e: BarStruct? = BarStruct()
+
+  func f() -> Optional<Optional<Int>> { return 29 }
 }
 
 struct BarStruct {
@@ -288,6 +290,9 @@ let _: Int = thing?.e?.a() // expected-error {{value of optional type 'Int?' mus
 // expected-note@-1{{coalesce}}
 // expected-note@-2{{force-unwrap}}
 let _: Int? = thing?.e?.b // expected-error {{value of optional type 'Int??' must be unwrapped to a value of type 'Int?'}}
+// expected-note@-1{{coalesce}}
+// expected-note@-2{{force-unwrap}}
+let _: Int? = thing?.f() // expected-error {{value of optional type 'Int??' must be unwrapped to a value of type 'Int?'}}
 // expected-note@-1{{coalesce}}
 // expected-note@-2{{force-unwrap}}
 

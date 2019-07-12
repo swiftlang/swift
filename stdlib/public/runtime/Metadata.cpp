@@ -3934,6 +3934,10 @@ StringRef swift::getStringForMetadataKind(MetadataKind kind) {
   }
 }
 
+/***************************************************************************/
+/*** Debugging dump methods ************************************************/
+/***************************************************************************/
+
 #ifndef NDEBUG
 template <>
 LLVM_ATTRIBUTE_USED
@@ -3941,9 +3945,49 @@ void Metadata::dump() const {
   printf("TargetMetadata.\n");
   printf("Kind: %s.\n", getStringForMetadataKind(getKind()).data());
   printf("Value Witnesses: %p.\n", getValueWitnesses());
-  printf("Class Object: %p.\n", getClassObject());
-  printf("Type Context Description: %p.\n", getTypeContextDescriptor());
+
+  auto *contextDescriptor = getTypeContextDescriptor();
+  printf("Name: %s.\n", contextDescriptor->Name.get());
+  printf("Type Context Description: %p.\n", contextDescriptor);
   printf("Generic Args: %p.\n", getGenericArgs());
+
+#if SWIFT_OBJC_INTEROP
+  if (auto *classObject = getClassObject()) {
+    printf("ObjC Name: %s.\n", class_getName(
+        reinterpret_cast<Class>(const_cast<ClassMetadata *>(classObject))));
+    printf("Class Object: %p.\n", classObject);
+  }
+#endif
+}
+
+template <>
+LLVM_ATTRIBUTE_USED
+void ContextDescriptor::dump() const {
+  printf("TargetTypeContextDescriptor.\n");
+  printf("Flags: 0x%x.\n", this->Flags.getIntValue());
+  printf("Parent: %p.\n", this->Parent.get());
+  if (auto *typeDescriptor = dyn_cast<TypeContextDescriptor>(this)) {
+    printf("Name: %s.\n", typeDescriptor->Name.get());
+    printf("Fields: %p.\n", typeDescriptor->Fields.get());
+    printf("Access function: %p.\n",
+           static_cast<void *>(typeDescriptor->getAccessFunction()));
+  }
+}
+
+template<>
+LLVM_ATTRIBUTE_USED
+void EnumDescriptor::dump() const {
+  printf("TargetEnumDescriptor.\n");
+  printf("Flags: 0x%x.\n", this->Flags.getIntValue());
+  printf("Parent: %p.\n", this->Parent.get());
+  printf("Name: %s.\n", Name.get());
+  printf("Access function: %p.\n", static_cast<void *>(getAccessFunction()));
+  printf("Fields: %p.\n", Fields.get());
+  printf("NumPayloadCasesAndPayloadSizeOffset: 0x%08x "
+         "(payload cases: %u - payload size offset: %zu).\n",
+         NumPayloadCasesAndPayloadSizeOffset,
+         getNumPayloadCases(), getPayloadSizeOffset());
+  printf("NumEmptyCases: %u\n", NumEmptyCases);
 }
 #endif
 
@@ -5137,3 +5181,14 @@ const HeapObject *swift_getKeyPathImpl(const void *pattern,
 #define OVERRIDE_KEYPATH COMPATIBILITY_OVERRIDE
 #define OVERRIDE_WITNESSTABLE COMPATIBILITY_OVERRIDE
 #include "CompatibilityOverride.def"
+
+#if defined(_WIN32) && defined(_M_ARM64)
+namespace std {
+template <>
+inline void _Atomic_storage<::PoolRange, 16>::_Unlock() const noexcept {
+  __dmb(0x8);
+  __iso_volatile_store32(&reinterpret_cast<volatile int &>(_Spinlock), 0);
+  __dmb(0x8);
+}
+}
+#endif

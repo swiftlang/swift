@@ -653,7 +653,7 @@ ManagedValue SILGenFunction::emitExistentialErasure(
       if (storedNSErrorConformance->isConcrete()) {
         if (auto normal = dyn_cast<NormalProtocolConformance>(
                                     storedNSErrorConformance->getConcrete())) {
-          if (auto witnessVar = normal->getWitness(nsErrorVar, nullptr)) {
+          if (auto witnessVar = normal->getWitness(nsErrorVar)) {
             nsErrorVar = cast<VarDecl>(witnessVar.getDecl());
             nsErrorVarSubstitutions = witnessVar.getSubstitutions();
           }

@@ -129,10 +129,12 @@ public protocol AdditiveArithmetic : Equatable {
 }
 
 public extension AdditiveArithmetic {
+  @_alwaysEmitIntoClient
   static func +=(lhs: inout Self, rhs: Self) {
     lhs = lhs + rhs
   }
 
+  @_alwaysEmitIntoClient
   static func -=(lhs: inout Self, rhs: Self) {
     lhs = lhs - rhs
   }
@@ -143,6 +145,7 @@ public extension AdditiveArithmetic where Self : ExpressibleByIntegerLiteral {
   ///
   /// Zero is the identity element for addition. For any value,
   /// `x + .zero == x` and `.zero + x == x`.
+  @inlinable @inline(__always)
   static var zero: Self {
     return 0
   }

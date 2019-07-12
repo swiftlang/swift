@@ -145,6 +145,7 @@ public:
 
   virtual void failed(StringRef ErrDescription) = 0;
 
+  virtual void setCompletionKind(UIdent kind) {};
   virtual bool handleResult(const CodeCompletionInfo &Info) = 0;
 };
 
@@ -787,6 +788,7 @@ public:
   virtual void collectExpressionTypes(StringRef FileName,
                                       ArrayRef<const char *> Args,
                                       ArrayRef<const char *> ExpectedProtocols,
+                                      bool CanonicalType,
                                       std::function<void(const
                                           RequestResult<ExpressionTypesInFile> &)> Receiver) = 0;
 

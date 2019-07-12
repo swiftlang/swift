@@ -469,13 +469,6 @@ private:
                                     CalleeCandidateInfo &calleeInfo,
                                     SourceLoc applyLoc);
 
-  /// Produce diagnostic for failures related to attributes associated with
-  /// candidate functions/methods e.g. mutability.
-  bool diagnoseMethodAttributeFailures(ApplyExpr *expr,
-                                       ArrayRef<Identifier> argLabels,
-                                       bool hasTrailingClosure,
-                                       CalleeCandidateInfo &candidates);
-
   /// Produce diagnostic for failures related to unfulfilled requirements
   /// of the generic parameters used as arguments.
   bool diagnoseArgumentGenericRequirements(TypeChecker &TC, Expr *callExpr,
@@ -777,14 +770,8 @@ void FailureDiagnosis::diagnoseUnviableLookupResults(
     }
     case MemberLookupResult::UR_MutatingMemberOnRValue:
     case MemberLookupResult::UR_MutatingGetterOnRValue: {
-      auto diagIDsubelt = diag::cannot_pass_rvalue_mutating_subelement;
-      auto diagIDmember = diag::cannot_pass_rvalue_mutating;
-      if (firstProblem == MemberLookupResult::UR_MutatingGetterOnRValue) {
-        diagIDsubelt = diag::cannot_pass_rvalue_mutating_getter_subelement;
-        diagIDmember = diag::cannot_pass_rvalue_mutating_getter;
-      }
-      assert(baseExpr && "Cannot have a mutation failure without a base");
-      AssignmentFailure failure(baseExpr, CS, loc, diagIDsubelt, diagIDmember);
+      MutatingMemberRefOnImmutableBase failure(E, CS, choice->getDecl(),
+                                               CS.getConstraintLocator(E));
       (void)failure.diagnose();
       return;
     }
@@ -3057,117 +3044,6 @@ bool FailureDiagnosis::diagnoseImplicitSelfErrors(
   return false;
 }
 
-// It is a somewhat common error to try to access an instance method as a
-// curried member on the type, instead of using an instance, e.g. the user
-// wrote:
-//
-//   Foo.doThing(42, b: 19)
-//
-// instead of:
-//
-//   myFoo.doThing(42, b: 19)
-//
-// Check for this situation and handle it gracefully.
-static bool
-diagnoseInstanceMethodAsCurriedMemberOnType(CalleeCandidateInfo &CCI,
-                                            Expr *fnExpr, Expr *argExpr) {
-  for (auto &candidate : CCI.candidates) {
-    if (!candidate.hasParameters())
-      return false;
-
-    auto *decl = candidate.getDecl();
-    if (!decl)
-      return false;
-
-    // If this is an exact match at the level 1 of the parameters, but
-    // there is still something wrong with the expression nevertheless
-    // it might be worth while to check if it's instance method as curried
-    // member of type problem.
-    if (CCI.closeness == CC_ExactMatch &&
-        (decl->isInstanceMember() && candidate.skipCurriedSelf))
-      continue;
-
-    auto params = candidate.getParameters();
-    // If one of the candidates is an instance method with a single parameter
-    // at the level 0, this might be viable situation for calling instance
-    // method as curried member of type problem.
-    if (params.size() != 1 || !decl->isInstanceMember() ||
-        candidate.skipCurriedSelf)
-      return false;
-  }
-
-  auto &TC = CCI.CS.TC;
-
-  if (auto UDE = dyn_cast<UnresolvedDotExpr>(fnExpr)) {
-    auto baseExpr = UDE->getBase();
-    auto baseType = CCI.CS.getType(baseExpr);
-    if (auto *MT = baseType->getAs<MetatypeType>()) {
-      auto DC = CCI.CS.DC;
-      auto instanceType = MT->getInstanceType();
-
-      // If the base is an implicit self type reference, and we're in a
-      // an initializer, then the user wrote something like:
-      //
-      //   class Foo { let val = initFn() }
-      // or
-      //   class Bar { func something(x: Int = initFn()) }
-      //
-      // which runs in type context, not instance context.  Produce a tailored
-      // diagnostic since this comes up and is otherwise non-obvious what is
-      // going on.
-      if (baseExpr->isImplicit() && isa<Initializer>(DC)) {
-        auto *TypeDC = DC->getParent();
-        bool propertyInitializer = true;
-        // If the parent context is not a type context, we expect it
-        // to be a defaulted parameter in a function declaration.
-        if (!TypeDC->isTypeContext()) {
-          assert(TypeDC->getContextKind() ==
-                     DeclContextKind::AbstractFunctionDecl &&
-                 "Expected function decl context for initializer!");
-          TypeDC = TypeDC->getParent();
-          propertyInitializer = false;
-        }
-        assert(TypeDC->isTypeContext() && "Expected type decl context!");
-
-        if (TypeDC->getSelfNominalTypeDecl() == instanceType->getAnyNominal()) {
-          if (propertyInitializer)
-            TC.diagnose(UDE->getLoc(), diag::instance_member_in_initializer,
-                        UDE->getName());
-          else
-            TC.diagnose(UDE->getLoc(),
-                        diag::instance_member_in_default_parameter,
-                        UDE->getName());
-          return true;
-        }
-      }
-
-      // If this is a situation like this `self.foo(A())()` and self != A
-      // let's say that `self` is not convertible to A.
-      if (auto nominalType = CCI.CS.getType(argExpr)->getAs<NominalType>()) {
-        if (!instanceType->isEqual(nominalType)) {
-          TC.diagnose(argExpr->getStartLoc(), diag::types_not_convertible,
-                      false, nominalType, instanceType);
-          return true;
-        }
-      }
-
-      // Otherwise, complain about use of instance value on type.
-      if (isa<TypeExpr>(baseExpr)) {
-        TC.diagnose(UDE->getLoc(), diag::instance_member_use_on_type,
-                    instanceType, UDE->getName())
-          .highlight(baseExpr->getSourceRange());
-      } else {
-        TC.diagnose(UDE->getLoc(), diag::could_not_use_instance_member_on_type,
-                    instanceType, UDE->getName(), instanceType, false)
-        .highlight(baseExpr->getSourceRange());
-      }
-      return true;
-    }
-  }
-
-  return false;
-}
-
 static bool diagnoseTupleParameterMismatch(CalleeCandidateInfo &CCI,
                                            ArrayRef<AnyFunctionType::Param> params,
                                            ArrayRef<AnyFunctionType::Param> args,
@@ -3786,9 +3662,6 @@ bool FailureDiagnosis::diagnoseParameterErrors(CalleeCandidateInfo &CCI,
   if (diagnoseImplicitSelfErrors(fnExpr, argExpr, CCI, argLabels))
     return true;
 
-  if (diagnoseInstanceMethodAsCurriedMemberOnType(CCI, fnExpr, argExpr))
-    return true;
-
   // Do all the stuff that we only have implemented when there is a single
   // candidate.
   if (diagnoseSingleCandidateFailures(CCI, fnExpr, argExpr, argLabels))
@@ -4091,86 +3964,6 @@ bool FailureDiagnosis::diagnoseNilLiteralComparison(
   }
 
   return true;
-}
-
-bool FailureDiagnosis::diagnoseMethodAttributeFailures(
-    swift::ApplyExpr *callExpr, ArrayRef<Identifier> argLabels,
-    bool hasTrailingClosure, CalleeCandidateInfo &candidates) {
-  auto UDE = dyn_cast<UnresolvedDotExpr>(callExpr->getFn());
-  if (!UDE)
-    return false;
-
-  auto argExpr = callExpr->getArg();
-  auto argType = CS.getType(argExpr);
-
-  // If type of the argument hasn't been established yet, we can't diagnose.
-  if (!argType || isUnresolvedOrTypeVarType(argType))
-    return false;
-
-  // Let's filter our candidate list based on that type.
-  candidates.filterListArgs(decomposeArgType(argType, argLabels));
-
-  if (candidates.closeness == CC_ExactMatch)
-    return false;
-
-  // And if filtering didn't give an exact match, such means that problem
-  // might be related to function attributes which is best diagnosed by
-  // unviable member candidates, if any.
-  auto base = UDE->getBase();
-  auto baseType = CS.getType(base);
-
-  // This handles following situation:
-  // struct S {
-  //   mutating func f(_ i: Int) {}
-  //   func f(_ f: Float) {}
-  // }
-  //
-  // Given struct has an overloaded method "f" with a single argument of
-  // multiple different types, one of the overloads is marked as
-  // "mutating", which means it can only be applied on LValue base type.
-  // So when struct is used like this:
-  //
-  // let answer: Int = 42
-  // S().f(answer)
-  //
-  // Constraint system generator is going to pick `f(_ f: Float)` as
-  // only possible overload candidate because "base" of the call is immutable
-  // and contextual information about argument type is not available yet.
-  // Such leads to incorrect contextual conversion failure diagnostic because
-  // type of the argument is going to resolved as (Int) no matter what.
-  // To workaround that fact and improve diagnostic of such cases we are going
-  // to try and collect all unviable candidates for a given call and check if
-  // at least one of them matches established argument type before even trying
-  // to re-check argument expression.
-  auto results = CS.performMemberLookup(
-      ConstraintKind::ValueMember, UDE->getName(), baseType,
-      UDE->getFunctionRefKind(), CS.getConstraintLocator(UDE),
-      /*includeInaccessibleMembers=*/false);
-
-  if (results.UnviableCandidates.empty())
-    return false;
-
-  SmallVector<OverloadChoice, 2> choices;
-  for (auto &unviable : results.UnviableCandidates)
-    choices.push_back(OverloadChoice(baseType, unviable.getDecl(),
-                                     UDE->getFunctionRefKind()));
-
-  CalleeCandidateInfo unviableCandidates(baseType, choices, hasTrailingClosure,
-                                         CS);
-
-  // Filter list of the unviable candidates based on the
-  // already established type of the argument expression.
-  unviableCandidates.filterListArgs(decomposeArgType(argType, argLabels));
-
-  // If one of the unviable candidates matches arguments exactly,
-  // that means that actual problem is related to function attributes.
-  if (unviableCandidates.closeness == CC_ExactMatch) {
-    diagnoseUnviableLookupResults(results, UDE, baseType, base, UDE->getName(),
-                                  UDE->getNameLoc(), UDE->getLoc());
-    return true;
-  }
-
-  return false;
 }
 
 bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
@@ -4937,14 +4730,6 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
                               callExpr->getArg(), argLabels))
     return true;
 
-  // There might be a candidate with correct argument types but it's not
-  // used by constraint solver because it doesn't have correct attributes,
-  // let's try to diagnose such situation there right before type checking
-  // argument expression, because that would overwrite original argument types.
-  if (diagnoseMethodAttributeFailures(callExpr, argLabels, hasTrailingClosure,
-                                      calleeInfo))
-    return true;
-
   Type argType;  // argument list, if known.
   if (auto FTy = fnType->getAs<AnyFunctionType>()) {
     argType = FunctionType::composeInput(CS.getASTContext(), FTy->getParams(),
@@ -5274,39 +5059,7 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     }
   }
   
-  // If we have an argument list (i.e., a scalar, or a non-zero-element tuple)
-  // then diagnose with some specificity about the arguments.
   bool isInitializer = isa<TypeExpr>(fnExpr);
-  if (!fnType->is<AnyMetatypeType>() &&
-      ((isa<TupleExpr>(argExpr) &&
-        cast<TupleExpr>(argExpr)->getNumElements() == 1) ||
-       (isa<ParenExpr>(argExpr) &&
-        !isa<LoadExpr>(cast<ParenExpr>(argExpr)->getSubExpr())))) {
-    if (auto ctorRef = dyn_cast<UnresolvedDotExpr>(fnExpr)) {
-      if (ctorRef->getName().isSimpleName(DeclBaseName::createConstructor())) {
-        // Diagnose 'super.init', which can only appear inside another
-        // initializer, specially.
-        if (isa<SuperRefExpr>(ctorRef->getBase())) {
-          diagnose(fnExpr->getLoc(),
-                   diag::super_initializer_not_in_initializer);
-          calleeInfo.suggestPotentialOverloads(fnExpr->getLoc());
-          return true;
-        }
-
-        // Suggest inserting a call to 'type(of:)' to construct another object
-        // of the same dynamic type.
-        SourceRange fixItRng = ctorRef->getNameLoc().getSourceRange();
-
-        // Surround the caller in `type(of:)`.
-        diagnose(fnExpr->getLoc(), diag::init_not_instance_member)
-            .fixItInsert(fixItRng.Start, "type(of: ")
-            .fixItInsertAfter(fixItRng.End, ")");
-        calleeInfo.suggestPotentialOverloads(fnExpr->getLoc());
-        return true;
-      }
-    }
-  }
-
   if (isa<TupleExpr>(argExpr) &&
       cast<TupleExpr>(argExpr)->getNumElements() == 0) {
     // Emit diagnostics that say "no arguments".
@@ -6845,10 +6598,10 @@ bool FailureDiagnosis::diagnoseMemberFailures(
       }
 
       if (!optionalResult.ViableCandidates.empty()) {
-        if (diagnoseBaseUnwrapForMemberAccess(baseExpr, baseObjTy, memberName,
-                                              /* additionalOptional= */ false,
-                                              memberRange))
-          return true;
+        MemberAccessOnOptionalBaseFailure failure(
+            expr, CS, CS.getConstraintLocator(baseExpr), memberName,
+            /*resultOptional=*/false);
+        return failure.diagnoseAsError();
       }
     }
 
@@ -7487,32 +7240,4 @@ ValueDecl *ConstraintSystem::findResolvedMemberRef(ConstraintLocator *locator) {
   }
   
   return nullptr;
-}
-
-bool swift::diagnoseBaseUnwrapForMemberAccess(Expr *baseExpr, Type baseType,
-                                              DeclName memberName,
-                                              bool resultOptional,
-                                              SourceRange memberRange) {
-  auto unwrappedBaseType = baseType->getOptionalObjectType();
-  if (!unwrappedBaseType)
-    return false;
-
-  ASTContext &ctx = baseType->getASTContext();
-  DiagnosticEngine &diags = ctx.Diags;
-  diags.diagnose(baseExpr->getLoc(), diag::optional_base_not_unwrapped,
-                 baseType, memberName, unwrappedBaseType);
-
-  // FIXME: It would be nice to immediately offer "base?.member ?? defaultValue"
-  // for non-optional results where that would be appropriate. For the moment
-  // always offering "?" means that if the user chooses chaining, we'll end up
-  // in MissingOptionalUnwrapFailure:diagnose() to offer a default value during
-  // the next compile.
-  diags.diagnose(baseExpr->getLoc(), diag::optional_base_chain, memberName)
-    .fixItInsertAfter(baseExpr->getEndLoc(), "?");
-
-  if (!resultOptional) {
-    diags.diagnose(baseExpr->getLoc(), diag::unwrap_with_force_value)
-        .fixItInsertAfter(baseExpr->getEndLoc(), "!");
-  }
-  return true;
 }

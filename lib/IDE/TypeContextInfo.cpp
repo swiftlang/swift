@@ -37,7 +37,7 @@ public:
 
   void completePostfixExprBeginning(CodeCompletionExpr *E) override;
   void completeForEachSequenceBeginning(CodeCompletionExpr *E) override;
-  void completeCaseStmtBeginning() override;
+  void completeCaseStmtBeginning(CodeCompletionExpr *E) override;
 
   void completeCallArg(CodeCompletionExpr *E, bool isFirst) override;
   void completeReturnStmt(CodeCompletionExpr *E) override;
@@ -46,7 +46,6 @@ public:
 
   void completeUnresolvedMember(CodeCompletionExpr *E,
                                 SourceLoc DotLoc) override;
-  void completeCaseStmtDotPrefix() override;
 
   void doneParsing() override;
 };
@@ -81,10 +80,7 @@ void ContextInfoCallbacks::completeUnresolvedMember(CodeCompletionExpr *E,
   ParsedExpr = E;
 }
 
-void ContextInfoCallbacks::completeCaseStmtBeginning() {
-  // TODO: Implement?
-}
-void ContextInfoCallbacks::completeCaseStmtDotPrefix() {
+void ContextInfoCallbacks::completeCaseStmtBeginning(CodeCompletionExpr *E) {
   // TODO: Implement?
 }
 
@@ -157,7 +153,8 @@ void ContextInfoCallbacks::getImplicitMembers(
       // Static properties which is convertible to 'Self'.
       if (isa<VarDecl>(VD) && VD->isStatic()) {
         auto declTy = T->getTypeOfMember(CurModule, VD);
-        if (declTy->isEqual(T) || swift::isConvertibleTo(declTy, T, *DC))
+        if (declTy->isEqual(T) ||
+            swift::isConvertibleTo(declTy, T, /*openArchetypes=*/true, *DC))
           return true;
       }
 

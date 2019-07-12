@@ -547,3 +547,13 @@ struct MultipleMemberAccesses {
     y2.x2.init() // expected-error {{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{5-5=type(of: }} {{10-10=)}}
   }
 }
+
+func sr10670() {
+  struct S {
+    init(_ x: inout String) {}
+    init(_ x: inout [Int]) {}
+  }
+  var a = 0
+  S.init(&a) // expected-error {{cannot invoke 'S.Type.init' with an argument list of type '(inout Int)'}}
+  // expected-note@-1 {{overloads for 'S.Type.init' exist with these partially matching parameter lists: (inout String), (inout [Int])}}
+}
