@@ -15,7 +15,7 @@ import Foundation
 @_exported import Compression
 
 /// Compression algorithms, wraps the C API constants.
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, *)
 public enum Algorithm: CaseIterable, RawRepresentable {
 
   /// LZFSE
@@ -51,7 +51,7 @@ public enum Algorithm: CaseIterable, RawRepresentable {
 }
 
 /// Compression filter direction of operation, compress/decompress
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, *)
 public enum FilterOperation: RawRepresentable {
 
   /// Compress raw data to a compressed payload
@@ -77,7 +77,7 @@ public enum FilterOperation: RawRepresentable {
 }
 
 /// Compression errors
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, *)
 public enum FilterError: Error {
 
   /// Filter failed to initialize,
@@ -90,7 +90,7 @@ public enum FilterError: Error {
   case invalidData
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, *)
 extension compression_stream {
 
   /// Initialize a compression_stream struct
@@ -112,7 +112,7 @@ extension compression_stream {
   }
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, *)
 public class OutputFilter {
   private var _stream: compression_stream
   private var _buf: UnsafeMutablePointer<UInt8>
@@ -226,7 +226,7 @@ public class OutputFilter {
 
 }
 
-@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, *)
 public class InputFilter<D: DataProtocol> {
 
   // Internal buffer to read bytes from a DataProtocol implementation
