@@ -1557,60 +1557,72 @@ static void makeStructRawValued(
   Impl.RawTypes[structDecl] = underlyingType;
 }
 
+/// Synthesizer callback for a raw value bridging constructor body.
+static std::pair<BraceStmt *, bool>
+synthesizeRawValueBridgingConstructorBody(AbstractFunctionDecl *afd,
+                                          void *context) {
+  auto init = cast<ConstructorDecl>(afd);
+  VarDecl *storedRawValue = static_cast<VarDecl *>(context);
+
+  ASTContext &ctx = init->getASTContext();
+
+  auto selfDecl = init->getImplicitSelfDecl();
+  auto storedType = storedRawValue->getInterfaceType();
+
+  // Construct left-hand side.
+  Expr *lhs = new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(),
+                                    /*Implicit=*/true);
+  lhs->setType(LValueType::get(selfDecl->getType()));
+
+  lhs = new (ctx) MemberRefExpr(lhs, SourceLoc(), storedRawValue,
+                                DeclNameLoc(), /*Implicit=*/true,
+                                AccessSemantics::DirectToStorage);
+  lhs->setType(LValueType::get(storedType));
+
+  // Construct right-hand side.
+  // FIXME: get the parameter from the init, and plug it in here.
+  auto *paramDecl = init->getParameters()->get(0);
+  auto *paramRef = new (ctx) DeclRefExpr(
+      paramDecl, DeclNameLoc(), /*Implicit=*/true);
+  paramRef->setType(paramDecl->getType());
+
+  Expr *rhs = paramRef;
+  if (!storedRawValue->getInterfaceType()->isEqual(paramDecl->getType())) {
+    auto bridge = new (ctx) BridgeToObjCExpr(paramRef, storedType);
+    bridge->setType(storedType);
+
+    auto coerce = new (ctx) CoerceExpr(bridge, SourceLoc(),
+                                       {nullptr, storedType});
+    coerce->setType(storedType);
+
+    rhs = coerce;
+  }
+
+  // Add assignment.
+  auto assign = new (ctx) AssignExpr(lhs, SourceLoc(), rhs,
+                                     /*Implicit=*/true);
+  assign->setType(TupleType::getEmpty(ctx));
+
+  auto result = TupleExpr::createEmpty(ctx, SourceLoc(), SourceLoc(),
+                                       /*Implicit=*/true);
+  auto ret = new (ctx) ReturnStmt(SourceLoc(), result, /*Implicit=*/true);
+
+  auto body = BraceStmt::create(ctx, SourceLoc(), {assign, ret}, SourceLoc());
+  return { body, /*isTypeChecked=*/true };
+}
+
 /// Create a rawValue-ed constructor that bridges to its underlying storage.
 static ConstructorDecl *createRawValueBridgingConstructor(
     ClangImporter::Implementation &Impl, StructDecl *structDecl,
     VarDecl *computedRawValue, VarDecl *storedRawValue, bool wantLabel,
     bool wantBody) {
-  auto &ctx = Impl.SwiftContext;
   auto init = createValueConstructor(Impl, structDecl, computedRawValue,
                                      /*wantCtorParamNames=*/wantLabel,
                                      /*wantBody=*/false);
   // Insert our custom init body
   if (wantBody) {
-    auto selfDecl = init->getImplicitSelfDecl();
-    auto storedType = storedRawValue->getInterfaceType();
-
-    // Construct left-hand side.
-    Expr *lhs = new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(),
-                                      /*Implicit=*/true);
-    lhs->setType(LValueType::get(selfDecl->getType()));
-
-    lhs = new (ctx) MemberRefExpr(lhs, SourceLoc(), storedRawValue,
-                                  DeclNameLoc(), /*Implicit=*/true,
-                                  AccessSemantics::DirectToStorage);
-    lhs->setType(LValueType::get(storedType));
-
-    // Construct right-hand side.
-    // FIXME: get the parameter from the init, and plug it in here.
-    auto *paramDecl = init->getParameters()->get(0);
-    auto *paramRef = new (ctx) DeclRefExpr(
-        paramDecl, DeclNameLoc(), /*Implicit=*/true);
-    paramRef->setType(paramDecl->getType());
-
-    Expr *rhs = paramRef;
-    if (!storedRawValue->getInterfaceType()->isEqual(paramDecl->getType())) {
-      auto bridge = new (ctx) BridgeToObjCExpr(paramRef, storedType);
-      bridge->setType(storedType);
-
-      auto coerce = new (ctx) CoerceExpr(bridge, SourceLoc(),
-                                         {nullptr, storedType});
-      coerce->setType(storedType);
-
-      rhs = coerce;
-    }
-
-    // Add assignment.
-    auto assign = new (ctx) AssignExpr(lhs, SourceLoc(), rhs,
-                                       /*Implicit=*/true);
-    assign->setType(TupleType::getEmpty(ctx));
-
-    auto result = TupleExpr::createEmpty(ctx, SourceLoc(), SourceLoc(),
-                                         /*Implicit=*/true);
-    auto ret = new (ctx) ReturnStmt(SourceLoc(), result, /*Implicit=*/true);
-
-    auto body = BraceStmt::create(ctx, SourceLoc(), {assign, ret}, SourceLoc());
-    init->setBody(body, AbstractFunctionDecl::BodyKind::TypeChecked);
+    init->setBodySynthesizer(synthesizeRawValueBridgingConstructorBody,
+                             storedRawValue);
   }
 
   return init;
@@ -1681,7 +1693,7 @@ static void makeStructRawValuedWithBridge(
   if (makeUnlabeledValueInit)
     unlabeledCtor = createRawValueBridgingConstructor(
         Impl, structDecl, computedVar, storedVar,
-        /*wantLabel*/ false, /*wantBody*/!Impl.hasFinishedTypeChecking());
+        /*wantLabel*/ false, /*wantBody*/true);
 
   if (unlabeledCtor)
     structDecl->addMember(unlabeledCtor);

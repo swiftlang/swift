@@ -1168,10 +1168,6 @@ public:
            "already have a type resolver");
     typeResolver.setPointerAndInt(newResolver, true);
   }
-  bool hasBegunTypeChecking() const { return typeResolver.getInt(); }
-  bool hasFinishedTypeChecking() const {
-    return hasBegunTypeChecking() && !getTypeResolver();
-  }
 
   /// Allocate a new delayed conformance ID with the given set of
   /// conformances.
