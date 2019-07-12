@@ -92,24 +92,25 @@
 // RUN: %swiftc_driver -driver-print-actions -gnone -emit-executable -emit-module %s 2>&1 | %FileCheck %s -check-prefix=EXEC-AND-MODULE
 // RUN: %swiftc_driver -driver-print-actions -g -gnone -emit-executable -emit-module %s 2>&1 | %FileCheck %s -check-prefix=EXEC-AND-MODULE
 
-// RUN: %swiftc_driver -driver-print-actions %S/Inputs/main.swift %S/../Inputs/empty.swift %s -module-name actions 2>&1 | %FileCheck %s -check-prefix=MULTI
-// MULTI: 0: input, "{{.*}}Inputs/main.swift", swift
-// MULTI: 1: compile, {0}, object
-// MULTI: 2: input, "{{.*}}Inputs/empty.swift", swift
-// MULTI: 3: compile, {2}, object
-// MULTI: 4: input, "{{.*}}actions.swift", swift
-// MULTI: 5: compile, {4}, object
-// MULTI: 6: link, {1, 3, 5}, image
+// RUN: %swiftc_driver -driver-print-actions %S/Inputs/main.swift %S/../Inputs/empty.swift %s -module-name actions 2>&1 | %FileCheck %s -check-prefix=MULTI -check-prefix MULTI-%target-object-format
+// MULTI: 0: load-module, {}
+// MULTI: 1: input, "{{.*}}Inputs/main.swift", swift
+// MULTI: 2: compile, {1, 0}, object
+// MULTI: 3: input, "{{.*}}Inputs/empty.swift", swift
+// MULTI: 4: compile, {3, 0}, object
+// MULTI: 5: input, "{{.*}}actions.swift", swift
+// MULTI: 6: compile, {5, 0}, object
+// MULTI: 7: link, {2, 4, 6}, image
 
-// RUN: %swiftc_driver -driver-print-actions -g %S/Inputs/main.swift %S/../Inputs/empty.swift %s -module-name actions 2>&1 | %FileCheck %s -check-prefix=DEBUG-MULTI
-// DEBUG-MULTI: 0: input, "{{.*}}Inputs/main.swift", swift
-// DEBUG-MULTI: 1: compile, {0}, object
-// DEBUG-MULTI: 2: input, "{{.*}}Inputs/empty.swift", swift
-// DEBUG-MULTI: 3: compile, {2}, object
-// DEBUG-MULTI: 4: input, "{{.*}}actions.swift", swift
-// DEBUG-MULTI: 5: compile, {4}, object
-// DEBUG-MULTI: 6: merge-module, {1, 3, 5}, swiftmodule
-// DEBUG-MULTI: 7: link, {1, 3, 5, 6}, image
+// RUN: %swiftc_driver -driver-print-actions -g %S/Inputs/main.swift %S/../Inputs/empty.swift %s -module-name actions 2>&1 | %FileCheck %s -check-prefix=DEBUG-MULTI -check-prefix DEBUG-MULTI-%target-object-format
+// DEBUG-MULTI: 1: input, "{{.*}}Inputs/main.swift", swift
+// DEBUG-MULTI: 2: compile, {1, 0}, object
+// DEBUG-MULTI: 3: input, "{{.*}}Inputs/empty.swift", swift
+// DEBUG-MULTI: 4: compile, {3, 0}, object
+// DEBUG-MULTI: 5: input, "{{.*}}actions.swift", swift
+// DEBUG-MULTI: 6: compile, {5, 0}, object
+// DEBUG-MULTI: 7: merge-module, {2, 4, 6}, swiftmodule
+// DEBUG-MULTI: 8: link, {2, 4, 6, 7}, image
 
 
 // RUN: touch %t/a.o %t/b.o

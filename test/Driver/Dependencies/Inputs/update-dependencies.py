@@ -35,6 +35,11 @@ import sys
 
 assert sys.argv[1] == '-frontend'
 
+# If we're handling a frontend action that doesn't produce output
+# (e.g. a -typecheck action), then don't do anything.
+if '-o' not in sys.argv:
+    sys.exit(0)
+
 # NB: The bitcode options automatically specify a -primary-file, even in cases
 #     where we do not wish to use a dependencies file in the test.
 if '-primary-file' in sys.argv \

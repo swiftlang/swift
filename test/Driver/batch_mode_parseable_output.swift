@@ -8,6 +8,39 @@
 // CHECK: {{[1-9][0-9]*}}
 // CHECK-NEXT: {
 // CHECK-NEXT:   "kind": "began",
+// CHECK-NEXT:   "name": "load-module",
+// CHECK-NEXT:   "command": "{{.*[\\/]}}swift{{c?(\.EXE)?(\\")?}} -frontend -typecheck -import-module Swift {{.*}}tmp{{.*}}.swift",
+// CHECK-NEXT:   "command_executable": "{{.*[\\/]}}swift{{c?(\.EXE)?(\\")?}}",
+// CHECK-NEXT:   "command_arguments": [
+// CHECK-NEXT:     "-frontend",
+// CHECK-NEXT:     "-typecheck",
+// CHECK-NEXT:     "-import-module",
+// CHECK-NEXT:     "Swift",
+// CHECK:          "{{.*}}tmp{{.*}}.swift"
+// CHECK-NEXT:   ],
+// CHECK-NEXT:   "inputs": [],
+// CHECK-NEXT:   "outputs": [],
+// CHECK-NEXT:   "pid": {{[1-9][0-9]*}},
+// CHECK-NEXT:   "process": {
+// CHECK-NEXT:     "real_pid": {{[1-9][0-9]*}}
+// CHECK-NEXT:   }
+// CHECK-NEXT: }
+
+// CHECK: {{[1-9][0-9]*}}
+// CHECK-NEXT: {
+// CHECK-NEXT:   "kind": "finished",
+// CHECK-NEXT:   "name": "load-module",
+// CHECK-NEXT:   "pid": {{[1-9][0-9]*}},
+// CHECK-NEXT:   "output": "Output placeholder\n",
+// CHECK-NEXT:   "process": {
+// CHECK-NEXT:     "real_pid": {{[1-9][0-9]*}}
+// CHECK-NEXT:   },
+// CHECK-NEXT:   "exit-status": 0
+// CHECK-NEXT: }
+
+// CHECK: {{[1-9][0-9]*}}
+// CHECK-NEXT: {
+// CHECK-NEXT:   "kind": "began",
 // CHECK-NEXT:   "name": "compile",
 // CHECK-NEXT:   "command": "{{.*[\\/]}}swift{{c?(\.EXE)?(\\")?}} -frontend -c -primary-file {{.*}}/file-01.swift{{(\\")?}} {{.*}}file-02.swift{{(\\")?}} {{.*}}file-03.swift{{(\\")?}} {{.*}}main.swift{{(\\")?}} -emit-module-path {{.*}}file-01-[[MODULE01:[a-z0-9]+]].swiftmodule{{(\\")?}} -emit-module-doc-path {{.*}}file-01-[[SWIFTDOC01:[a-z0-9]+]].swiftdoc{{(\\")?}} {{.*}} -module-name main -o {{.*}}file-01-[[OBJ01:[a-z0-9]+]].o{{(\\")?}}",
 // CHECK-NEXT:   "command_executable": "{{.*[\\/]}}swift{{c?(\.EXE)?}}",
@@ -29,7 +62,8 @@
 // CHECK-NEXT:     "{{.*[\\/]}}file-01-[[OBJ01:[a-z0-9]+]].o"
 // CHECK-NEXT:   ],
 // CHECK-NEXT:   "inputs": [
-// CHECK-NEXT:     "{{.*[\\/]}}file-01.swift"
+// CHECK-NEXT:     "{{.*[\\/]}}file-01.swift",
+// CHECK-NEXT:     ""
 // CHECK-NEXT:   ],
 // CHECK-NEXT:   "outputs": [
 // CHECK-NEXT:     {
@@ -74,7 +108,8 @@
 // CHECK-NEXT:     "{{.*[\\/]}}file-02-[[OBJ02:[a-z0-9]+]].o"
 // CHECK-NEXT:   ],
 // CHECK-NEXT:   "inputs": [
-// CHECK-NEXT:     "{{.*[\\/]}}file-02.swift"
+// CHECK-NEXT:     "{{.*[\\/]}}file-02.swift",
+// CHECK-NEXT:     ""
 // CHECK-NEXT:   ],
 // CHECK-NEXT:   "outputs": [
 // CHECK-NEXT:     {
@@ -119,7 +154,8 @@
 // CHECK-NEXT:     "{{.*[\\/]}}file-03-[[OBJ03:[a-z0-9]+]].o"
 // CHECK-NEXT:   ],
 // CHECK-NEXT:   "inputs": [
-// CHECK-NEXT:     "{{.*[\\/]}}file-03.swift"
+// CHECK-NEXT:     "{{.*[\\/]}}file-03.swift",
+// CHECK-NEXT:     ""
 // CHECK-NEXT:   ],
 // CHECK-NEXT:   "outputs": [
 // CHECK-NEXT:     {
@@ -164,7 +200,8 @@
 // CHECK-NEXT:     "{{.*[\\/]}}main-[[OBJMAIN:[a-z0-9]+]].o"
 // CHECK-NEXT:   ],
 // CHECK-NEXT:   "inputs": [
-// CHECK-NEXT:     "{{.*[\\/]}}main.swift"
+// CHECK-NEXT:     "{{.*[\\/]}}main.swift",
+// CHECK-NEXT:     ""
 // CHECK-NEXT:   ],
 // CHECK-NEXT:   "outputs": [
 // CHECK-NEXT:     {

@@ -26,6 +26,11 @@ import sys
 
 assert sys.argv[1] == '-frontend'
 
+# If we don't have a -primary-file, for example if this is a -typecheck job,
+# then don't do anything with this script.
+if '-primary-file' not in sys.argv:
+    sys.exit(0)
+
 primaryFile = sys.argv[sys.argv.index('-primary-file') + 1]
 
 if (os.path.basename(primaryFile) == 'bad.swift' or

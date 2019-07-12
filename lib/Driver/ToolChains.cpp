@@ -1056,6 +1056,40 @@ ToolChain::constructInvocation(const StaticLinkJobAction &job,
    llvm_unreachable("archiving not implemented for this toolchain");
 }
 
+ToolChain::InvocationInfo
+ToolChain::constructInvocation(const LoadModuleJobAction &job,
+                               const JobContext &context) const {
+
+  // Invoke the frontend, passing `-import-module ModuleName` for whatever
+  // module the job is supposed to load.
+
+  InvocationInfo II{SWIFT_EXECUTABLE_NAME};
+  ArgStringList &Arguments = II.Arguments;
+  II.allowsResponseFiles = true;
+
+  for (auto &s : getDriver().getSwiftProgramArgs())
+    Arguments.push_back(s.c_str());
+
+  Arguments.push_back("-frontend");
+  Arguments.push_back("-typecheck");
+
+  // Force importing the module that this job specifies.
+
+  Arguments.push_back("-import-module");
+  Arguments.push_back(context.Args.MakeArgString(job.getModuleName()));
+
+  // Pass along the relevant arguments to the frontend invocation.
+
+  addCommonFrontendArgs(*this, context.OI, context.Output, context.Args,
+                        Arguments);
+
+  // Create an empty temporary file to typecheck.
+  auto tempFile = context.getTemporaryFilePath("tmp", "swift");
+  Arguments.push_back(context.Args.MakeArgString(tempFile));
+
+  return II;
+}
+
 void ToolChain::addPathEnvironmentVariableIfNeeded(
     Job::EnvironmentVector &env, const char *name, const char *separator,
     options::ID optionID, const ArgList &args,

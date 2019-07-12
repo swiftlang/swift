@@ -1694,6 +1694,25 @@ Driver::computeCompilerMode(const DerivedArgList &Args,
   return OutputInfo::Mode::SingleCompile;
 }
 
+/// Determines whether the given set of inputs has multiple .swift, .sil, or
+/// .sib inputs, which will require loading the standard library.
+static bool hasMultipleSourceFileInputs(ArrayRef<InputPair> inputs) {
+  bool hasFoundOneSourceFileAlready = false;
+  for (const InputPair &input : inputs) {
+    switch (input.first) {
+    case file_types::TY_Swift:
+    case file_types::TY_SIL:
+    case file_types::TY_SIB:
+      if (hasFoundOneSourceFileAlready)
+        return true;
+      hasFoundOneSourceFileAlready = true;
+      break;
+    default: break;
+    }
+  }
+  return false;
+}
+
 void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
                           const ToolChain &TC, const OutputInfo &OI,
                           const InputInfoMap *OutOfDateMap,
@@ -1711,6 +1730,18 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
 
   switch (OI.CompilerMode) {
   case OutputInfo::Mode::StandardCompile: {
+
+    // If we're not compiling the standard library, and we're going to schedule
+    // multiple parallel compile jobs, add an action before any others that
+    // will quickly load the standard library module.
+    // This will ensure that, if we need to build the standard library from
+    // a module interface, it happens once, rather than once per parallel
+    // invocation.
+    LoadModuleJobAction *preLoadStdlib = nullptr;
+    if (!Args.hasArg(options::OPT_parse_stdlib) &&
+        hasMultipleSourceFileInputs(Inputs)) {
+      preLoadStdlib = C.createAction<LoadModuleJobAction>(STDLIB_NAME);
+    }
 
     // If the user is importing a textual (.h) bridging header and we're in
     // standard-compile (non-WMO) mode, we take the opportunity to precompile
@@ -1735,6 +1766,15 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       }
     }
 
+    // Adds the implicit dependencies for this job action, either generating
+    // a PCH, or pre-loading the standard library, or both.
+    auto addImplicitDeps = [&](Action *action) {
+      if (PCH)
+        cast<JobAction>(action)->addInput(PCH);
+      if (preLoadStdlib)
+        cast<JobAction>(action)->addInput(preLoadStdlib);
+    };
+
     for (const InputPair &Input : Inputs) {
       file_types::ID InputType = Input.first;
       const Arg *InputArg = Input.second;
@@ -1756,8 +1796,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
         if (Args.hasArg(options::OPT_embed_bitcode)) {
           Current = C.createAction<CompileJobAction>(
               Current, file_types::TY_LLVM_BC, previousBuildState);
-          if (PCH)
-            cast<JobAction>(Current)->addInput(PCH);
+          addImplicitDeps(Current);
           AllModuleInputs.push_back(Current);
           Current = C.createAction<BackendJobAction>(Current,
                                                      OI.CompilerOutputType, 0);
@@ -1765,8 +1804,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
           Current = C.createAction<CompileJobAction>(Current,
                                                      OI.CompilerOutputType,
                                                      previousBuildState);
-          if (PCH)
-            cast<JobAction>(Current)->addInput(PCH);
+          addImplicitDeps(Current);
           AllModuleInputs.push_back(Current);
         }
         AllLinkerInputs.push_back(Current);

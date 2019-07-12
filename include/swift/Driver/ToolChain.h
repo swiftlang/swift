@@ -164,6 +164,9 @@ protected:
   virtual InvocationInfo constructInvocation(const StaticLinkJobAction &job,
                                              const JobContext &context) const;
 
+  virtual InvocationInfo constructInvocation(const LoadModuleJobAction &job,
+                                             const JobContext &context) const;
+
   /// Searches for the given executable in appropriate paths relative to the
   /// Swift binary.
   ///

@@ -58,7 +58,7 @@
 // PERSISTENT-YESPCHJOB-DIAG2: {{.*}}swift{{c?(\.EXE)?"?}} -frontend {{.*}} -serialize-diagnostics-path {{.*}}/pch-out-dir{{/|\\\\}}bridging-header-{{.*}}.dia{{"?}} {{.*}} -emit-pch -pch-output-dir {{.*}}/pch-out-dir
 
 // RUN: %target-build-swift -typecheck -import-objc-header %S/Inputs/bridging-header.h -pch-output-dir %t/pch -parseable-output -driver-skip-execution %s 2>&1 | %FileCheck %s -check-prefix=PERSISTENT-OUTPUT
-// PERSISTENT-OUTPUT-NOT: "outputs": [
+// PERSISTENT-OUTPUT-NOT: "outputs": [{{$}}
 
 // RUN: %target-build-swift -typecheck -driver-print-jobs -import-objc-header %S/Inputs/bridging-header.h -pch-output-dir %t/pch -whole-module-optimization %s 2>&1 | %FileCheck %s -check-prefix=PERSISTENT-WMO-YESPCHJOB --implicit-check-not pch-disable-validation
 // PERSISTENT-WMO-YESPCHJOB: {{.*}}swift{{c?(\.EXE)?"?}} -frontend {{.*}} -import-objc-header {{.*}}bridging-header.h{{"?}} -pch-output-dir {{.*}}/pch
