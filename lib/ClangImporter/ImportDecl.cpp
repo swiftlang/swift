@@ -1159,10 +1159,6 @@ makeBitFieldAccessors(ClangImporter::Implementation &Impl,
 
   makeComputed(importedFieldDecl, getterDecl, setterDecl);
 
-  // Don't bother synthesizing the body if we've already finished type-checking.
-  if (Impl.hasFinishedTypeChecking())
-    return { getterDecl, setterDecl };
-  
   // Synthesize the getter body
   {
     auto cGetterSelfId = nullptr;
