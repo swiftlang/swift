@@ -5,21 +5,21 @@
 // RUN: cd %t && %swiftc_driver -c -module-name main -driver-print-bindings ./main.swift ./other.swift ./yet-another.swift -incremental -output-file-map %t/output.json 2>&1 | %FileCheck %s -check-prefix=MUST-EXEC-INITIAL
 
 // MUST-EXEC-INITIAL-NOT: warning
-// MUST-EXEC-INITIAL: inputs: ["./main.swift"], output: {{[{].*[}]}}, condition: run-without-cascading
-// MUST-EXEC-INITIAL: inputs: ["./other.swift"], output: {{[{].*[}]}}, condition: run-without-cascading
-// MUST-EXEC-INITIAL: inputs: ["./yet-another.swift"], output: {{[{].*[}]}}, condition: run-without-cascading
+// MUST-EXEC-INITIAL: inputs: ["./main.swift", ""], output: {{[{].*[}]}}, condition: run-without-cascading
+// MUST-EXEC-INITIAL: inputs: ["./other.swift", ""], output: {{[{].*[}]}}, condition: run-without-cascading
+// MUST-EXEC-INITIAL: inputs: ["./yet-another.swift", ""], output: {{[{].*[}]}}, condition: run-without-cascading
 
 // MUST-EXEC-ALL-NOT: warning
-// MUST-EXEC-ALL: inputs: ["./main.swift"], output: {{[{].*[}]$}}
-// MUST-EXEC-ALL: inputs: ["./other.swift"], output: {{[{].*[}]$}}
-// MUST-EXEC-ALL: inputs: ["./yet-another.swift"], output: {{[{].*[}]$}}
+// MUST-EXEC-ALL: inputs: ["./main.swift", ""], output: {{[{].*[}]$}}
+// MUST-EXEC-ALL: inputs: ["./other.swift", ""], output: {{[{].*[}]$}}
+// MUST-EXEC-ALL: inputs: ["./yet-another.swift", ""], output: {{[{].*[}]$}}
 
 // RUN: cd %t && %swiftc_driver -c -module-name main -driver-use-frontend-path "%{python};%S/Inputs/update-dependencies.py" ./main.swift ./other.swift ./yet-another.swift -incremental -output-file-map %t/output.json
 // RUN: cd %t && %swiftc_driver -c -module-name main -driver-print-bindings ./main.swift ./other.swift ./yet-another.swift -incremental -output-file-map %t/output.json 2>&1 | %FileCheck %s -check-prefix=NO-EXEC
 
-// NO-EXEC: inputs: ["./main.swift"], output: {{[{].*[}]}}, condition: check-dependencies
-// NO-EXEC: inputs: ["./other.swift"], output: {{[{].*[}]}}, condition: check-dependencies
-// NO-EXEC: inputs: ["./yet-another.swift"], output: {{[{].*[}]}}, condition: check-dependencies
+// NO-EXEC: inputs: ["./main.swift", ""], output: {{[{].*[}]}}, condition: check-dependencies
+// NO-EXEC: inputs: ["./other.swift", ""], output: {{[{].*[}]}}, condition: check-dependencies
+// NO-EXEC: inputs: ["./yet-another.swift", ""], output: {{[{].*[}]}}, condition: check-dependencies
 
 
 // RUN: cd %t && %swiftc_driver -c -module-name main -driver-print-bindings -serialize-diagnostics ./main.swift ./other.swift ./yet-another.swift -incremental -output-file-map %t/output.json 2>&1 | %FileCheck %s -check-prefix=NO-EXEC

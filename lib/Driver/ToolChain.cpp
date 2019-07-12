@@ -106,6 +106,7 @@ std::unique_ptr<Job> ToolChain::constructJob(
       CASE(GeneratePCHJob)
       CASE(AutolinkExtractJob)
       CASE(REPLJob)
+      CASE(LoadModuleJob)
 #undef CASE
     case Action::Kind::Input:
       llvm_unreachable("not a JobAction");
