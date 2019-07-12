@@ -1,4 +1,4 @@
-// RUN: %swiftc_driver %s -g -debug-info-format=codeview -emit-ir -o - | %FileCheck %s
+// RUN: %swiftc_driver %s -g -debug-info-format=codeview -Xllvm -enable-trap-debug-info -emit-ir -o - | %FileCheck %s
 func markUsed<T>(_ t: T) {}
 func arithmetic(_ a: Int64, _ b: Int64) {
   markUsed(a + b)             // line 4
@@ -78,7 +78,9 @@ func foo() {
 // CHECK-DAG: ![[DIV]] = !DILocation(line: 5, scope:
 // FIXME: The location of ``@llvm.trap`` should be in Integers.swift.gyb
 //        instead of being artificial.
-// CHECK-DAG: ![[INLINEDADD]] = !DILocation(line: 0, scope: !{{[0-9]+}}, inlinedAt: ![[ADD]]
+// CHECK: ![[INLINEDADD]] = !DILocation(line: 0, scope: ![[FAILURE_FUNC:[0-9]+]], inlinedAt: ![[INLINELOC:[0-9]+]]
+// CHECK-DAG: !{{.*}} = distinct !DISubprogram(linkageName: "Swift runtime failure: arithmetic overflow", scope: {{.*}}, flags: DIFlagArtificial, spFlags: DISPFlagDefinition, {{.*}})
+// CHECK-DAG: ![[INLINELOC]] = !DILocation(line: 0, scope: !{{[0-9]+}}, inlinedAt: ![[ADD]]
 
 // NOTE: These prologue instructions are given artificial line locations for
 //       LLDB, but for CodeView they should have the location of the function
