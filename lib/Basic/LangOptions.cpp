@@ -66,12 +66,8 @@ static const StringRef SupportedConditionalCompilationTargetEnvironments[] = {
 };
 
 static const PlatformConditionKind AllPlatformConditionKinds[] = {
-  PlatformConditionKind::OS,
-  PlatformConditionKind::Arch,
-  PlatformConditionKind::Endianness,
-  PlatformConditionKind::Runtime,
-  PlatformConditionKind::CanImport,
-  PlatformConditionKind::TargetEnvironment
+#define PLATFORM_CONDITION(LABEL, IDENTIFIER) PlatformConditionKind::LABEL,
+#include "swift/AST/PlatformConditionKinds.def"
 };
 
 template <size_t N>

@@ -38,30 +38,18 @@ namespace {
 static
 Optional<PlatformConditionKind> getPlatformConditionKind(StringRef Name) {
   return llvm::StringSwitch<Optional<PlatformConditionKind>>(Name)
-    .Case("os", PlatformConditionKind::OS)
-    .Case("arch", PlatformConditionKind::Arch)
-    .Case("_endian", PlatformConditionKind::Endianness)
-    .Case("_runtime", PlatformConditionKind::Runtime)
-    .Case("canImport", PlatformConditionKind::CanImport)
-    .Case("targetEnvironment", PlatformConditionKind::TargetEnvironment)
+#define PLATFORM_CONDITION(LABEL, IDENTIFIER) \
+    .Case(IDENTIFIER, PlatformConditionKind::LABEL)
+#include "swift/AST/PlatformConditionKinds.def"
     .Default(None);
 }
 
 /// Get platform condition name from PlatformConditionKind.
 static StringRef getPlatformConditionName(PlatformConditionKind Kind) {
   switch (Kind) {
-  case PlatformConditionKind::OS:
-    return "os";
-  case PlatformConditionKind::Arch:
-    return "arch";
-  case PlatformConditionKind::Endianness:
-    return "_endian";
-  case PlatformConditionKind::Runtime:
-    return "_runtime";
-  case PlatformConditionKind::CanImport:
-    return "canImport";
-  case PlatformConditionKind::TargetEnvironment:
-    return "targetEnvironment";
+#define PLATFORM_CONDITION(LABEL, IDENTIFIER) \
+  case PlatformConditionKind::LABEL: return IDENTIFIER;
+#include "swift/AST/PlatformConditionKinds.def"
   }
 }
 

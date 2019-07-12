@@ -37,18 +37,8 @@ namespace swift {
 
   /// Kind of implicit platform conditions.
   enum class PlatformConditionKind {
-    /// The active os target (OSX, iOS, Linux, etc.)
-    OS,
-    /// The active arch target (x86_64, i386, arm, arm64, etc.)
-    Arch,
-    /// The active endianness target (big or little)
-    Endianness,
-    /// Runtime support (_ObjC or _Native)
-    Runtime,
-    /// Conditional import of module
-    CanImport,
-    /// Target Environment (currently just 'simulator' or absent)
-    TargetEnvironment,
+#define PLATFORM_CONDITION(LABEL, IDENTIFIER) LABEL,
+#include "swift/AST/PlatformConditionKinds.def"
   };
 
   /// Describes which Swift 3 Objective-C inference warnings should be
