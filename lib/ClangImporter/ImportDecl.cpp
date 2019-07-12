@@ -1330,6 +1330,77 @@ createDefaultConstructor(ClangImporter::Implementation &Impl,
   return constructor;
 }
 
+/// Synthesizer callback for the body of a struct value constructor.
+static std::pair<BraceStmt *, bool>
+synthesizeValueConstructorBody(AbstractFunctionDecl *afd, void *context) {
+  auto constructor = cast<ConstructorDecl>(afd);
+  ArrayRef<VarDecl *> members(static_cast<VarDecl **>(context) + 1,
+                              static_cast<uintptr_t*>(context)[0]);
+
+  ASTContext &ctx = constructor->getASTContext();
+
+  // Assign all of the member variables appropriately.
+  SmallVector<ASTNode, 4> stmts;
+
+  auto *selfDecl = constructor->getImplicitSelfDecl();
+
+  // To keep DI happy, initialize stored properties before computed.
+  auto parameters = constructor->getParameters();
+  for (unsigned pass = 0; pass < 2; pass++) {
+    unsigned paramPos = 0;
+
+    for (unsigned i = 0, e = members.size(); i < e; i++) {
+      auto var = members[i];
+
+      if (var->hasClangNode() &&
+          isa<clang::IndirectFieldDecl>(var->getClangDecl()))
+        continue;
+
+      if (var->hasStorage() == (pass != 0)) {
+        paramPos++;
+        continue;
+      }
+
+      // Construct left-hand side.
+      Expr *lhs = new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(),
+                                        /*Implicit=*/true);
+      lhs->setType(LValueType::get(selfDecl->getType()));
+
+      auto semantics = (var->hasStorage()
+                        ? AccessSemantics::DirectToStorage
+                        : AccessSemantics::Ordinary);
+
+      lhs = new (ctx) MemberRefExpr(lhs, SourceLoc(), var, DeclNameLoc(),
+                                    /*Implicit=*/true, semantics);
+      lhs->setType(LValueType::get(var->getType()));
+
+      // Construct right-hand side.
+      auto rhs = new (ctx) DeclRefExpr(parameters->get(paramPos),
+                                       DeclNameLoc(), /*Implicit=*/true);
+      rhs->setType(parameters->get(paramPos)->getType());
+
+      // Add assignment.
+      auto assign = new (ctx) AssignExpr(lhs, SourceLoc(), rhs,
+                                         /*Implicit=*/true);
+      assign->setType(TupleType::getEmpty(ctx));
+
+      stmts.push_back(assign);
+      paramPos++;
+    }
+  }
+
+  auto result = TupleExpr::createEmpty(ctx, SourceLoc(), SourceLoc(),
+                                       /*Implicit=*/true);
+  result->setType(TupleType::getEmpty(ctx));
+
+  auto ret = new (ctx) ReturnStmt(SourceLoc(), result, /*Implicit=*/true);
+  stmts.push_back(ret);
+
+  // Create the function body.
+  auto body = BraceStmt::create(ctx, SourceLoc(), stmts, SourceLoc());
+  return { body, /*isTypeChecked=*/true };
+}
+
 /// Create a constructor that initializes a struct from its members.
 static ConstructorDecl *
 createValueConstructor(ClangImporter::Implementation &Impl,
@@ -1383,66 +1454,14 @@ createValueConstructor(ClangImporter::Implementation &Impl,
   constructor->getAttrs().add(new (context) TransparentAttr(/*implicit*/ true));
 
   if (wantBody) {
-    // Assign all of the member variables appropriately.
-    SmallVector<ASTNode, 4> stmts;
-
-    auto *selfDecl = constructor->getImplicitSelfDecl();
-
-    // To keep DI happy, initialize stored properties before computed.
-    for (unsigned pass = 0; pass < 2; pass++) {
-      unsigned paramPos = 0;
-
-      for (unsigned i = 0, e = members.size(); i < e; i++) {
-        auto var = members[i];
-
-        if (var->hasClangNode() && isa<clang::IndirectFieldDecl>(var->getClangDecl()))
-          continue;
-
-        if (var->hasStorage() == (pass != 0)) {
-          paramPos++;
-          continue;
-        }
-
-        // Construct left-hand side.
-        Expr *lhs = new (context) DeclRefExpr(selfDecl, DeclNameLoc(),
-                                              /*Implicit=*/true);
-        lhs->setType(LValueType::get(selfDecl->getType()));
-
-        auto semantics = (var->hasStorage()
-                          ? AccessSemantics::DirectToStorage
-                          : AccessSemantics::Ordinary);
-
-        lhs = new (context) MemberRefExpr(lhs, SourceLoc(), var, DeclNameLoc(),
-                                          /*Implicit=*/true,
-                                          semantics);
-        lhs->setType(LValueType::get(var->getType()));
-
-        // Construct right-hand side.
-        auto rhs = new (context) DeclRefExpr(valueParameters[paramPos],
-                                             DeclNameLoc(),
-                                             /*Implicit=*/true);
-        rhs->setType(valueParameters[paramPos]->getType());
-
-        // Add assignment.
-        auto assign = new (context) AssignExpr(lhs, SourceLoc(), rhs,
-                                               /*Implicit=*/true);
-        assign->setType(TupleType::getEmpty(context));
-
-        stmts.push_back(assign);
-        paramPos++;
-      }
+    auto memberMemory =
+        context.AllocateUninitialized<uintptr_t>(members.size() + 1);
+    memberMemory[0] = members.size();
+    for (unsigned i : indices(members)) {
+      memberMemory[i+1] = reinterpret_cast<uintptr_t>(members[i]);
     }
-
-    auto result = TupleExpr::createEmpty(context, SourceLoc(), SourceLoc(),
-                                         /*Implicit=*/true);
-    result->setType(TupleType::getEmpty(context));
-
-    auto ret = new (context) ReturnStmt(SourceLoc(), result, /*Implicit=*/true);
-    stmts.push_back(ret);
-
-    // Create the function body.
-    auto body = BraceStmt::create(context, SourceLoc(), stmts, SourceLoc());
-    constructor->setBody(body, AbstractFunctionDecl::BodyKind::TypeChecked);
+    constructor->setBodySynthesizer(synthesizeValueConstructorBody,
+                                    memberMemory.data());
   }
 
   // We're done.
@@ -1523,12 +1542,12 @@ static void makeStructRawValued(
     structDecl->addMember(
         createValueConstructor(Impl, structDecl, var,
                                /*wantCtorParamNames=*/false,
-                               /*wantBody=*/!Impl.hasFinishedTypeChecking()));
+                               /*wantBody=*/true));
 
   auto *initRawValue =
       createValueConstructor(Impl, structDecl, var,
                              /*wantCtorParamNames=*/true,
-                             /*wantBody=*/!Impl.hasFinishedTypeChecking());
+                             /*wantBody=*/true);
   structDecl->addMember(initRawValue);
   structDecl->addMember(patternBinding);
   structDecl->addMember(var);
@@ -1653,19 +1672,16 @@ static void makeStructRawValuedWithBridge(
       ctx, StaticSpellingKind::None, computedVarPattern, /*InitExpr*/ nullptr,
       structDecl);
 
-  // Don't bother synthesizing the body if we've already finished
-  // type-checking.
-  bool wantBody = !Impl.hasFinishedTypeChecking();
-
   auto init = createRawValueBridgingConstructor(Impl, structDecl, computedVar,
                                                 storedVar,
-                                                /*wantLabel*/ true, wantBody);
+                                                /*wantLabel*/ true,
+                                                /*wantBody*/ true);
 
   ConstructorDecl *unlabeledCtor = nullptr;
   if (makeUnlabeledValueInit)
     unlabeledCtor = createRawValueBridgingConstructor(
         Impl, structDecl, computedVar, storedVar,
-        /*wantLabel*/ false, wantBody);
+        /*wantLabel*/ false, /*wantBody*/!Impl.hasFinishedTypeChecking());
 
   if (unlabeledCtor)
     structDecl->addMember(unlabeledCtor);
@@ -3299,7 +3315,7 @@ namespace {
           auto valueCtor =
               createValueConstructor(Impl, result, VD,
                                      /*want param names*/true,
-                                     /*wantBody=*/!Impl.hasFinishedTypeChecking());
+                                     /*wantBody=*/true);
           ctors.push_back(valueCtor);
         }
       }
@@ -3318,11 +3334,10 @@ namespace {
         //
         // If we can completely represent the struct in SIL, leave the body
         // implicit, otherwise synthesize one to call property setters.
-        bool wantBody = (hasUnreferenceableStorage &&
-                         !Impl.hasFinishedTypeChecking());
-        auto valueCtor = createValueConstructor(Impl, result, members,
-                                                /*want param names*/true,
-                                                /*want body*/wantBody);
+        auto valueCtor = createValueConstructor(
+            Impl, result, members,
+            /*want param names*/true,
+            /*want body*/hasUnreferenceableStorage);
         if (!hasUnreferenceableStorage)
           valueCtor->setIsMemberwiseInitializer();
 
