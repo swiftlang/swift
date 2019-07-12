@@ -5773,6 +5773,11 @@ public:
     setBodyKind(BodyKind::Unparsed);
   }
 
+  /// Provide the parsed body for the function.
+  void setBodyParsed(BraceStmt *S) {
+    setBody(S, BodyKind::Parsed);
+  }
+
   /// Note that parsing for the body was delayed.
   ///
   /// The function should return the body statement and a flag indicating
