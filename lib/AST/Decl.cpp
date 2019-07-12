@@ -3775,6 +3775,14 @@ DestructorDecl *ClassDecl::getDestructor() {
   return cast<DestructorDecl>(results.front());
 }
 
+/// Synthesizer callback for an empty implicit function body.
+static std::pair<BraceStmt *, bool>
+synthesizeEmplyFunctionBody(AbstractFunctionDecl *afd, void *context) {
+  ASTContext &ctx = afd->getASTContext();
+  return { BraceStmt::create(ctx, afd->getLoc(), { }, afd->getLoc(), true),
+           /*isTypeChecked=*/true };
+}
+
 void ClassDecl::addImplicitDestructor() {
   if (hasDestructor() || isInvalid())
     return;
@@ -3785,8 +3793,8 @@ void ClassDecl::addImplicitDestructor() {
   DD->setImplicit();
   DD->setValidationToChecked();
 
-  // Create an empty body for the destructor.
-  DD->setBody(BraceStmt::create(ctx, getLoc(), { }, getLoc(), true));
+  // Synthesize an empty body for the destructor as needed.
+  DD->setBodySynthesizer(synthesizeEmplyFunctionBody);
   addMember(DD);
 
   // Propagate access control and versioned-ness.
