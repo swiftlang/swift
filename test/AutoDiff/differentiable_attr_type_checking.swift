@@ -612,7 +612,7 @@ func invalidRequirementLayout<Scalar>(x: Scalar) -> Scalar {
   return x
 }
 
-protocol DifferentiableAttrRequirements : Differentiable {
+protocol ProtocolRequirements : Differentiable {
   // expected-note @+2 {{protocol requires initializer 'init(x:y:)' with type '(x: Float, y: Float)'}}
   @differentiable
   init(x: Float, y: Float)
@@ -638,8 +638,13 @@ protocol DifferentiableAttrRequirements : Differentiable {
   func f2(_ x: Float, _ y: Float) -> Float
 }
 
-// expected-error @+1 {{does not conform to protocol 'DifferentiableAttrRequirements'}}
-struct DiffAttrConformanceErrors : DifferentiableAttrRequirements {
+protocol ProtocolRequirementsRefined : ProtocolRequirements {
+  // expected-note @+1 {{candidate is missing attribute '@differentiable'}}
+  func f1(_ x: Float) -> Float
+}
+
+// expected-error @+1 {{does not conform to protocol 'ProtocolRequirements'}}
+struct DiffAttrConformanceErrors : ProtocolRequirements {
   var x: Float
   var y: Float
 
@@ -681,6 +686,31 @@ struct DiffAttrConformanceErrors : DifferentiableAttrRequirements {
   func f2(_ x: Float, _ y: Float) -> Float {
     return x + y
   }
+}
+
+protocol ProtocolRequirementsWithDefault_NoConformingTypes {
+  @differentiable
+  func f1(_ x: Float) -> Float
+}
+extension ProtocolRequirementsWithDefault_NoConformingTypes {
+  // TODO(TF-650): It would be nice to diagnose protocol default implementation
+  // with missing `@differentiable` attribute.
+  func f1(_ x: Float) -> Float { x }
+}
+
+protocol ProtocolRequirementsWithDefault {
+  // expected-note @+2 {{protocol requires function 'f1'}}
+  @differentiable
+  func f1(_ x: Float) -> Float
+}
+extension ProtocolRequirementsWithDefault {
+  // expected-note @+1 {{candidate is missing attribute '@differentiable'}}
+  func f1(_ x: Float) -> Float { x }
+}
+// expected-error @+1 {{type 'DiffAttrConformanceErrors2' does not conform to protocol 'ProtocolRequirementsWithDefault'}}
+struct DiffAttrConformanceErrors2 : ProtocolRequirementsWithDefault {
+  // expected-note @+1 {{candidate is missing attribute '@differentiable'}}
+  func f1(_ x: Float) -> Float { x }
 }
 
 protocol NotRefiningDiffable {
@@ -846,17 +876,7 @@ func inout2(x: Float, y: inout Float) -> Float {
   let _ = x + y
 }
 
-
-// Missing `@differentiable` attribute, without printing the 'wrt' arguments.
-
-protocol DifferentiableWhereClause: Differentiable {
-  associatedtype Scalar
-
-  @differentiable(where Scalar: Differentiable) // expected-error {{'where' clauses cannot be used in a '@differentiable' attribute on a protocol requirement}}
-  func test(value: Scalar) -> Float
-}
-
-// Missing a `@differentiable` attribute.
+// Test refining protocol requirements with `@differentiable` attribute.
 
 public protocol Distribution {
   associatedtype Value
@@ -870,18 +890,25 @@ public protocol DifferentiableDistribution: Differentiable, Distribution {
 
 public protocol MissingDifferentiableDistribution: DifferentiableDistribution
   where Value: Differentiable {
-  func logProbability(of value: Value) -> Float // expected-note {{candidate is missing attribute '@differentiable(wrt: self)'}}
+  // expected-note @+1 {{candidate is missing attribute '@differentiable(wrt: self)'}}
+  func logProbability(of value: Value) -> Float
 }
 
-// Missing `@differentiable` attribute, without printing the 'wrt' arguments.
+// Test protocol requirement `@differentiable` attribute unsupported features.
 
-protocol Example: Differentiable {
-  associatedtype Scalar: Differentiable
+protocol ProtocolRequirementUnsupported : Differentiable {
+  associatedtype Scalar
 
-  @differentiable
-  func test(value: Scalar) -> Float
+  // expected-error @+1 {{'@differentiable' attribute on protocol requirement cannot specify 'where' clause}}
+  @differentiable(where Scalar: Differentiable)
+  func unsupportedWhereClause(value: Scalar) -> Float
+
+  // expected-error @+1 {{'@differentiable' attribute on protocol requirement cannot specify 'jvp:' or 'vjp:'}}
+  @differentiable(wrt: x, jvp: dfoo, vjp: dfoo)
+  func unsupportedDerivatives(_ x: Float) -> Float
 }
-
-protocol MissingDifferentiableTest: Example {
-  func test(value: Scalar) -> Float // expected-note {{candidate is missing attribute '@differentiable'}}
+extension ProtocolRequirementUnsupported {
+  func dfoo(_ x: Float) -> (Float, (Float) -> Float) {
+    (x, { $0 })
+  }
 }
