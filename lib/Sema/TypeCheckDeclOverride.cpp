@@ -968,25 +968,29 @@ static GenericSignature *getOverrideGenericSignature(ValueDecl *base,
   if (baseGenericCtx->getGenericSignature() == nullptr) {
     return nullptr;
   }
-  unsigned depth = 0;
+  unsigned derivedDepth = 0;
 
-  if (auto *genericSig = derivedClass->getGenericSignature())
-    depth = genericSig->getGenericParams().back()->getDepth() + 1;
+  if (auto *derivedSig = derivedClass->getGenericSignature())
+    derivedDepth = derivedSig->getGenericParams().back()->getDepth() + 1;
 
   GenericSignatureBuilder builder(ctx);
   builder.addGenericSignature(derivedClass->getGenericSignature());
 
-  for (auto param : *baseGenericCtx->getGenericParams()) {
-    builder.addGenericParameter(param);
+  if (auto derivedGenericCtx = derived->getAsGenericContext()) {
+    if (derivedGenericCtx->isGeneric()) {
+      for (auto param : *derivedGenericCtx->getGenericParams()) {
+        builder.addGenericParameter(param);
+      }
+    }
   }
 
   auto source =
       GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
 
-  unsigned superclassDepth = 0;
+  unsigned baseDepth = 0;
 
   if (baseClassSig) {
-    superclassDepth = baseClassSig->getGenericParams().back()->getDepth() + 1;
+    baseDepth = baseClassSig->getGenericParams().back()->getDepth() + 1;
   }
 
   auto substFn = [&](SubstitutableType *type) -> Type {
@@ -997,7 +1001,7 @@ static GenericSignature *getOverrideGenericSignature(ValueDecl *base,
     }
 
     return CanGenericTypeParamType::get(
-        gp->getDepth() - superclassDepth + depth, gp->getIndex(), ctx);
+        gp->getDepth() - baseDepth + derivedDepth, gp->getIndex(), ctx);
   };
 
   auto lookupConformanceFn =
