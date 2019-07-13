@@ -33,7 +33,6 @@ const char *Action::getClassName(Kind AC) {
   case Kind::GenerateDSYMJob:  return "generate-dSYM";
   case Kind::VerifyDebugInfoJob:  return "verify-debug-info";
   case Kind::GeneratePCHJob:  return "generate-pch";
-  case Kind::LoadModuleJob:  return "load-module";
   }
 
   llvm_unreachable("invalid class");
@@ -66,5 +65,3 @@ void GenerateDSYMJobAction::anchor() {}
 void VerifyDebugInfoJobAction::anchor() {}
 
 void GeneratePCHJobAction::anchor() {}
-
-void LoadModuleJobAction::anchor() {}

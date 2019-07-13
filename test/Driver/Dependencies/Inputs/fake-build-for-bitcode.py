@@ -23,11 +23,6 @@ import sys
 
 assert sys.argv[1] == '-frontend'
 
-# If we're handling a frontend action that doesn't produce output or have a
-# primary-file, (e.g. a -typecheck action), then don't do anything.
-if '-primary-file' not in sys.argv or '-o' not in sys.argv:
-    sys.exit(0)
-
 primaryFile = sys.argv[sys.argv.index('-primary-file') + 1]
 outputFile = sys.argv[sys.argv.index('-o') + 1]
 
