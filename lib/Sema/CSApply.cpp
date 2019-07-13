@@ -5444,17 +5444,15 @@ Expr *ExprRewriter::coerceCallArguments(
           continue;
         }
 
-        // Explicit vararg expansion expressions always wrap a CoerceExpr, so
-        // the argument type will exactly match. Implicit vararg expansions
-        // inserted by the compiler will likewise match the argument type
-        // exactly
-        assert(!isVarargExpansion &&
-               "Vararg expansions should aready be handled");
-
         // Convert the argument.
-        auto convertedArg = coerceToType(
-            arg, paramType,
-            getArgLocator(argIdx, paramIdx, param.getParameterFlags()));
+        Expr *convertedArg;
+        if (isVarargExpansion) {
+          convertedArg = buildCollectionUpcastExpr(arg, paramType, false, locator);
+        } else {
+          convertedArg = coerceToType(
+                                      arg, paramType,
+                                      getArgLocator(argIdx, paramIdx, param.getParameterFlags()));
+        }
 
         if (!convertedArg)
           return nullptr;
