@@ -1145,7 +1145,7 @@ namespace {
       // can't be later applied to AST and would result in the crash in some
       // cases. Such expressions are only allowed in argument positions
       // of function/operator calls.
-      if (isa<InOutExpr>(expr) || isa<VarargExpansionExpr>(expr)) {
+      if (isa<InOutExpr>(expr) /* || isa<VarargExpansionExpr>(expr)*/) {
         auto diag = isa<InOutExpr>(expr)
                         ? diag::extraneous_address_of
                         : diag::pound_variadic_outside_arg_position;

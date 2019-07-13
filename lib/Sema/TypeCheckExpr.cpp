@@ -375,7 +375,13 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS,
     // Resolve the 'as' or 'is' expression.
     assert(!as->isFolded() && "already folded 'as' expr in sequence?!");
     assert(RHS == as && "'as' with non-type RHS?!");
-    as->setSubExpr(LHS);    
+    as->setSubExpr(LHS);
+    auto coercion = dyn_cast<CoerceExpr>(as);
+    if (coercion && coercion->includesVaragExpansion()) {
+      auto expansionExpr =
+          new (TC.Context) VarargExpansionExpr(coercion, false);
+      return makeResultExpr(expansionExpr);
+    }
     return makeResultExpr(as);
   }
 

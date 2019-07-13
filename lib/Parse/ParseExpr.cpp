@@ -118,7 +118,15 @@ ParserResult<Expr> Parser::parseExprAs() {
   } else if (exclaimLoc.isValid()) {
     parsed = new (Context) ForcedCheckedCastExpr(asLoc, exclaimLoc, type.get());
   } else {
-    parsed = new (Context) CoerceExpr(asLoc, type.get());
+    bool includesVarargExpansion = false;
+    auto typeRepr = type.get();
+    if (Tok.is(tok::oper_postfix) && Tok.getRawText() == "...") {
+      consumeToken();
+      includesVarargExpansion = true;
+      typeRepr =
+          new (Context) ArrayTypeRepr(typeRepr, typeRepr->getSourceRange());
+    }
+    parsed = new (Context) CoerceExpr(asLoc, typeRepr, includesVarargExpansion);
   }
   return makeParserResult(parsed);
 }

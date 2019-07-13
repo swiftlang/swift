@@ -61,14 +61,15 @@ namespace swift {
   class EnumElementDecl;
   class CallExpr;
   class KeyPathExpr;
+  class CoerceExpr;
 
-enum class ExprKind : uint8_t {
+  enum class ExprKind : uint8_t {
 #define EXPR(Id, Parent) Id,
 #define LAST_EXPR(Id) Last_Expr = Id,
 #define EXPR_RANGE(Id, FirstId, LastId) \
   First_##Id##Expr = FirstId, Last_##Id##Expr = LastId,
 #include "swift/AST/ExprNodes.def"
-};
+  };
 enum : unsigned { NumExprKindBits =
   countBitsUsed(static_cast<unsigned>(ExprKind::Last_Expr)) };
   
@@ -3357,24 +3358,19 @@ public:
         KeywordLoc(keywordLoc), LParenLoc(lParenLoc), RParenLoc(rParenLoc) {}
 
   VarargExpansionExpr(Expr *subExpr, bool implicit, Type type = Type())
-      : Expr(ExprKind::VarargExpansion, implicit, type), SubExpr(subExpr) {}
-
-  SourceLoc getStartLoc() const {
-    return isImplicit() ? SubExpr->getStartLoc() : KeywordLoc;
+      : Expr(ExprKind::VarargExpansion, implicit, type), SubExpr(subExpr) {
+    assert(implicit ||
+           isa<CoerceExpr>(subExpr) &&
+               "SubExpr of explicit VarargExpansionExpr must be a CoerceExpr");
   }
 
-  SourceLoc getEndLoc() const {
-    return isImplicit() ? SubExpr->getEndLoc() : RParenLoc;
-  }
+  SourceLoc getStartLoc() const { return SubExpr->getStartLoc(); }
 
-  SourceLoc getLoc() const {
-    return isImplicit() ? SubExpr->getLoc() : KeywordLoc;
-  }
+  SourceLoc getEndLoc() const { return SubExpr->getEndLoc(); }
 
-  SourceRange getSourceRange() const {
-    return isImplicit() ? SubExpr->getSourceRange()
-                        : SourceRange(KeywordLoc, RParenLoc);
-  }
+  SourceLoc getLoc() const { return SubExpr->getLoc(); }
+
+  SourceRange getSourceRange() const { return SubExpr->getSourceRange(); }
 
   Expr *getSubExpr() const { return SubExpr; }
   void setSubExpr(Expr *subExpr) { SubExpr = subExpr; }
@@ -4437,15 +4433,17 @@ class CoerceExpr : public ExplicitCastExpr {
   /// we use it to store `start` of the initializer
   /// call source range to save some storage.
   SourceLoc InitRangeEnd;
+  bool IncludesVarargExpansion;
 
 public:
-  CoerceExpr(Expr *sub, SourceLoc asLoc, TypeLoc type)
-    : ExplicitCastExpr(ExprKind::Coerce, sub, asLoc, type, type.getType())
-  { }
+  CoerceExpr(Expr *sub, SourceLoc asLoc, TypeLoc type,
+             bool includesVarargExpansion = false)
+      : ExplicitCastExpr(ExprKind::Coerce, sub, asLoc, type, type.getType()),
+        IncludesVarargExpansion(includesVarargExpansion) {}
 
-  CoerceExpr(SourceLoc asLoc, TypeLoc type)
-    : CoerceExpr(nullptr, asLoc, type)
-  { }
+  CoerceExpr(SourceLoc asLoc, TypeLoc type,
+             bool includesVarargExpansion = false)
+      : CoerceExpr(nullptr, asLoc, type, includesVarargExpansion) {}
 
 private:
   CoerceExpr(SourceRange initRange, Expr *literal, TypeLoc type)
@@ -4463,6 +4461,8 @@ public:
   }
 
   bool isLiteralInit() const { return InitRangeEnd.isValid(); }
+
+  bool includesVaragExpansion() const { return IncludesVarargExpansion; }
 
   SourceRange getSourceRange() const {
     return isLiteralInit()
