@@ -970,18 +970,14 @@ static GenericSignature *getOverrideGenericSignature(ValueDecl *base,
   }
   unsigned depth = 0;
 
-  if (auto *genericSig = baseClass->getGenericSignature())
+  if (auto *genericSig = derivedClass->getGenericSignature())
     depth = genericSig->getGenericParams().back()->getDepth() + 1;
 
   GenericSignatureBuilder builder(ctx);
   builder.addGenericSignature(derivedClass->getGenericSignature());
 
-  if (auto derivedGenericCtx = derived->getAsGenericContext()) {
-    if (derivedGenericCtx->isGeneric()) {
-      for (auto param : *derivedGenericCtx->getGenericParams()) {
-        builder.addGenericParameter(param);
-      }
-    }
+  for (auto param : *baseGenericCtx->getGenericParams()) {
+    builder.addGenericParameter(param);
   }
 
   auto source =
