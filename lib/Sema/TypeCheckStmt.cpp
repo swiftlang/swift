@@ -524,6 +524,14 @@ public:
       if (func->hasSingleExpressionBody()) {
         ctp = CTP_ReturnSingleExpr;
       }
+
+      // If we are performing code-completion inside a function builder body,
+      // suppress diagnostics to workaround typechecking performance problems.
+      if (func->getFunctionBuilderType() &&
+          TC.Context.SourceMgr.rangeContainsCodeCompletionLoc(
+              func->getBody()->getSourceRange())) {
+        options |= TypeCheckExprFlags::SuppressDiagnostics;
+      }
     }
 
     auto exprTy = TC.typeCheckExpression(E, DC, TypeLoc::withoutLoc(ResultTy),
@@ -2166,9 +2174,9 @@ bool TypeChecker::typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
 
   if (auto *func = dyn_cast<FuncDecl>(AFD)) {
     if (Type builderType = getFunctionBuilderType(func)) {
-      // FIXME: this should be a transform on the body, not a separate type
-      // checking operation.
-      return typeCheckFunctionBuilderFuncBody(func, builderType);
+      body = applyFunctionBuilderBodyTransform(func, body, builderType);
+      if (!body)
+        return true;
     } else if (func->hasSingleExpressionBody()) {
       auto resultTypeLoc = func->getBodyResultTypeLoc();
       auto expr = func->getSingleExpressionBody();

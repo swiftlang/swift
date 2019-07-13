@@ -981,7 +981,9 @@ public:
                                           SourceLoc EndTypeCheckLoc);
   bool typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD);
 
-  bool typeCheckFunctionBuilderFuncBody(FuncDecl *FD, Type builderType);
+  BraceStmt *applyFunctionBuilderBodyTransform(FuncDecl *FD,
+                                               BraceStmt *body,
+                                               Type builderType);
   bool typeCheckClosureBody(ClosureExpr *closure);
 
   bool typeCheckTapBody(TapExpr *expr, DeclContext *DC);
