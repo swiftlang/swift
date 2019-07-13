@@ -8,7 +8,7 @@
 // CHECK-FIRST: Queuing (initial): {compile: main.o <= main.swift}
 
 // RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path "%{python};%S/Inputs/update-dependencies.py" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./main.swift ./other.swift -module-name main -j1 -v -driver-show-incremental 2>&1 | %FileCheck -check-prefix=CHECK-SECOND %s
-// CHECK-SECOND-NOT: Queuing
+// CHECK-SECOND-NOT: Queuing (initial): {compile
 
 // RUN: touch -t 201401240006 %t/other.swift
 // RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path "%{python};%S/Inputs/update-dependencies.py" -output-file-map %t/output.json -incremental -driver-always-rebuild-dependents ./main.swift ./other.swift -module-name main -j1 -v -driver-show-incremental 2>&1 | %FileCheck -check-prefix=CHECK-THIRD %s
