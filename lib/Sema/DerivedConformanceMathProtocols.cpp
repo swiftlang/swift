@@ -1,4 +1,4 @@
-//===--- DerivedConformanceRingMathProtocols.cpp --------------------------===//
+//===--- DerivedConformanceMathProtocols.cpp ------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file implements explicit derivation of mathematical ring protocols for
-// struct types: AdditiveArithmetic and PointwiseMultiplicative.
+// This file implements explicit derivation of mathematical protocols for struct
+// types: AdditiveArithmetic and PointwiseMultiplicative.
 //
 //===----------------------------------------------------------------------===//
 
@@ -97,7 +97,7 @@ static bool hasLetStoredPropertyWithInitialValue(NominalTypeDecl *nominal) {
   });
 }
 
-static bool canDeriveRingProtocol(KnownProtocolKind knownProtoKind,
+static bool canDeriveMathProtocol(KnownProtocolKind knownProtoKind,
                                   NominalTypeDecl *nominal, DeclContext *DC) {
   // Nominal type must be a struct. (No stored properties is okay.)
   auto *structDecl = dyn_cast<StructDecl>(nominal);
@@ -124,17 +124,17 @@ static bool canDeriveRingProtocol(KnownProtocolKind knownProtoKind,
 
 bool DerivedConformance::canDeriveAdditiveArithmetic(NominalTypeDecl *nominal,
                                                      DeclContext *DC) {
-  return canDeriveRingProtocol(KnownProtocolKind::AdditiveArithmetic,
+  return canDeriveMathProtocol(KnownProtocolKind::AdditiveArithmetic,
                                nominal, DC);
 }
 
 bool DerivedConformance::canDerivePointwiseMultiplicative(NominalTypeDecl *nominal,
                                                           DeclContext *DC) {
-  return canDeriveRingProtocol(KnownProtocolKind::PointwiseMultiplicative,
+  return canDeriveMathProtocol(KnownProtocolKind::PointwiseMultiplicative,
                                nominal, DC);
 }
 
-// Synthesize body for ring math operator.
+// Synthesize body for math operator.
 static void deriveBodyMathOperator(AbstractFunctionDecl *funcDecl,
                                    MathOperator op) {
   auto *parentDC = funcDecl->getParent();
@@ -265,8 +265,8 @@ static ValueDecl *deriveMathOperator(DerivedConformance &derived,
   return operatorDecl;
 }
 
-// Synthesize body for a ring property computed property getter.
-static void deriveBodyRingPropertyGetter(
+// Synthesize body for a computed property getter.
+static void deriveBodyMathPropertyGetter(
     AbstractFunctionDecl *funcDecl, ProtocolDecl *proto, ValueDecl *reqDecl) {
   auto *parentDC = funcDecl->getParent();
   auto *nominal = parentDC->getSelfNominalTypeDecl();
@@ -282,7 +282,7 @@ static void deriveBodyRingPropertyGetter(
                                                   funcDecl, /*Implicit*/ true);
   auto *initExpr = new (C) ConstructorRefCallExpr(initDRE, nominalTypeExpr);
 
-  auto createMemberRingPropertyExpr = [&](VarDecl *member) -> Expr * {
+  auto createMemberMathPropertyExpr = [&](VarDecl *member) -> Expr * {
     auto memberType =
         parentDC->mapTypeIntoContext(member->getValueInterfaceType());
     Expr *memberExpr = nullptr;
@@ -302,9 +302,9 @@ static void deriveBodyRingPropertyGetter(
     }
     auto module = nominal->getModuleContext();
     auto confRef = module->lookupConformance(memberType, proto);
-    assert(confRef && "Member does not conform to ring protocol");
+    assert(confRef && "Member does not conform to math protocol");
     // If conformance reference is not concrete, then concrete witness
-    // declaration for ring property cannot be resolved. Return reference to
+    // declaration for property cannot be resolved. Return reference to
     // protocol requirement: this will be dynamically dispatched.
     if (!confRef->isConcrete()) {
       return new (C) MemberRefExpr(memberExpr, SourceLoc(), reqDecl,
@@ -317,14 +317,14 @@ static void deriveBodyRingPropertyGetter(
                                  DeclNameLoc(), /*Implicit*/ true);
   };
 
-  // Create array of `member.<ring property>` expressions.
+  // Create array of `member.<property>` expressions.
   llvm::SmallVector<Expr *, 2> memberPropExprs;
   llvm::SmallVector<Identifier, 2> memberNames;
   for (auto member : nominal->getStoredProperties()) {
-    memberPropExprs.push_back(createMemberRingPropertyExpr(member));
+    memberPropExprs.push_back(createMemberMathPropertyExpr(member));
     memberNames.push_back(member->getName());
   }
-  // Call memberwise initializer with member ring property expressions.
+  // Call memberwise initializer with member property expressions.
   auto *callExpr =
       CallExpr::createImplicit(C, initExpr, memberPropExprs, memberNames);
   ASTNode returnStmt = new (C) ReturnStmt(SourceLoc(), callExpr, true);
@@ -338,7 +338,7 @@ static void deriveBodyAdditiveArithmetic_zero(AbstractFunctionDecl *funcDecl,
   auto &C = funcDecl->getASTContext();
   auto *addArithProto = C.getProtocol(KnownProtocolKind::AdditiveArithmetic);
   auto *zeroReq = getProtocolRequirement(addArithProto, C.Id_zero);
-  deriveBodyRingPropertyGetter(funcDecl, addArithProto, zeroReq);
+  deriveBodyMathPropertyGetter(funcDecl, addArithProto, zeroReq);
 }
 
 // Synthesize body for the `PointwiseMultiplicative.reciprocal` computed
@@ -350,12 +350,12 @@ deriveBodyPointwiseMultiplicative_reciprocal(AbstractFunctionDecl *funcDecl,
   auto *pointMulProto =
       C.getProtocol(KnownProtocolKind::PointwiseMultiplicative);
   auto *reciprocalReq = getProtocolRequirement(pointMulProto, C.Id_reciprocal);
-  deriveBodyRingPropertyGetter(funcDecl, pointMulProto, reciprocalReq);
+  deriveBodyMathPropertyGetter(funcDecl, pointMulProto, reciprocalReq);
 }
 
-// Synthesize a ring protocol property declaration.
+// Synthesize a protocol property declaration.
 static ValueDecl *
-deriveRingProperty(DerivedConformance &derived, Identifier propertyName,
+deriveMathProperty(DerivedConformance &derived, Identifier propertyName,
                    bool isStatic,
                    AbstractFunctionDecl::BodySynthesizer bodySynthesizer) {
   auto *nominal = derived.Nominal;
@@ -365,14 +365,14 @@ deriveRingProperty(DerivedConformance &derived, Identifier propertyName,
   auto returnInterfaceTy = nominal->getDeclaredInterfaceType();
   auto returnTy = parentDC->mapTypeIntoContext(returnInterfaceTy);
 
-  // Create ring property declaration.
+  // Create property declaration.
   VarDecl *propDecl;
   PatternBindingDecl *pbDecl;
   std::tie(propDecl, pbDecl) = derived.declareDerivedProperty(
       propertyName, returnInterfaceTy, returnTy, /*isStatic*/ isStatic,
       /*isFinal*/ true);
 
-  // Create ring property getter.
+  // Create property getter.
   auto *getterDecl =
       derived.declareDerivedPropertyGetter(TC, propDecl, returnTy);
   getterDecl->setBodySynthesizer(bodySynthesizer.Fn, bodySynthesizer.Context);
@@ -386,7 +386,7 @@ deriveRingProperty(DerivedConformance &derived, Identifier propertyName,
 // Synthesize the static property declaration for `AdditiveArithmetic.zero`.
 static ValueDecl *deriveAdditiveArithmetic_zero(DerivedConformance &derived) {
   auto &C = derived.TC.Context;
-  return deriveRingProperty(derived, C.Id_zero, /*isStatic*/ true,
+  return deriveMathProperty(derived, C.Id_zero, /*isStatic*/ true,
                             {deriveBodyAdditiveArithmetic_zero, nullptr});
 }
 
@@ -395,7 +395,7 @@ static ValueDecl *deriveAdditiveArithmetic_zero(DerivedConformance &derived) {
 static ValueDecl *
 derivePointwiseMultiplicative_reciprocal(DerivedConformance &derived) {
   auto &C = derived.TC.Context;
-  return deriveRingProperty(
+  return deriveMathProperty(
       derived, C.Id_reciprocal, /*isStatic*/ false,
       {deriveBodyPointwiseMultiplicative_reciprocal, nullptr});
 }
