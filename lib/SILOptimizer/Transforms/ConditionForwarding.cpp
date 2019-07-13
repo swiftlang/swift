@@ -134,7 +134,7 @@ static bool hasNoRelevantSideEffects(SILBasicBlock *BB) {
       // Even if we move the whole block across other code, it's still
       // guaranteed that the cond_fail is executed before the result of the
       // builtin is used.
-      auto *TEI = dyn_cast<TupleExtractInst>(CF->getOperand());
+      auto *TEI = dyn_cast<TupleExtractInst>(CF->getCondition());
       if (!TEI)
         return false;
       auto *BI = dyn_cast<BuiltinInst>(TEI->getOperand());

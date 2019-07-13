@@ -6715,14 +6715,57 @@ class ProjectExistentialBoxInst
 //===----------------------------------------------------------------------===//
 
 /// Trigger a runtime failure if the given Int1 value is true.
-class CondFailInst
-    : public UnaryInstructionBase<SILInstructionKind::CondFailInst,
+class CondFailInst final
+    : public InstructionBaseWithTrailingOperands<
+                                  SILInstructionKind::CondFailInst,
+                                  CondFailInst,
                                   NonValueInstruction>
 {
   friend SILBuilder;
-
-  CondFailInst(SILDebugLocation DebugLoc, SILValue Operand)
-      : UnaryInstructionBase(DebugLoc, Operand) {}
+  
+  static SmallVector<SILValue, 8>
+  makeOperandsArray(SILValue Condition, SILValue Message,
+                    ArrayRef<SILValue> MessageArguments) {
+    SmallVector<SILValue, 8> result;
+    result.push_back(Condition);
+    if (Message)
+      result.push_back(Message);
+    assert(Message || MessageArguments.empty()
+           && "can only have message arguments with a message");
+    result.append(MessageArguments.begin(), MessageArguments.end());
+    return result;
+  }
+  
+  CondFailInst(SILDebugLocation DebugLoc, SILValue Condition,
+               SILValue Message = SILValue(),
+               ArrayRef<SILValue> MessageArguments = {})
+    : InstructionBaseWithTrailingOperands(
+                        makeOperandsArray(Condition, Message, MessageArguments),
+                        DebugLoc) {}
+  
+  enum { Condition, Message, FirstMessageArgument };
+  
+  static CondFailInst *create(SILModule &M,
+                              SILDebugLocation DebugLoc, SILValue Condition,
+                              SILValue Message = SILValue(),
+                              ArrayRef<SILValue> MessageArguments = {});
+  
+public:
+  SILValue getCondition() const { return getAllOperands()[Condition].get(); }
+  
+  SILValue getMessage() const {
+    if (getAllOperands().size() > Message) {
+      return getAllOperands()[Message].get();
+    }
+    return SILValue();
+  }
+  
+  OperandValueArrayRef getMessageArguments() const {
+    if (getAllOperands().size() > FirstMessageArgument) {
+      return OperandValueArrayRef(getAllOperands().slice(FirstMessageArgument));
+    }
+    return {};
+  }
 };
 
 //===----------------------------------------------------------------------===//

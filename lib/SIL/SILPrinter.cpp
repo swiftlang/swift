@@ -1866,7 +1866,23 @@ public:
   }
 
   void visitCondFailInst(CondFailInst *FI) {
-    *this << getIDAndType(FI->getOperand());
+    *this << getIDAndType(FI->getCondition());
+    
+    if (auto message = FI->getMessage()) {
+      *this << ", " << getIDAndType(message);
+      
+      if (!FI->getMessageArguments().empty()) {
+        *this << '(';
+        interleave(FI->getMessageArguments().begin(),
+                   FI->getMessageArguments().end(),
+                   [&](SILValue v) {
+                     *this << getIDAndType(v);
+                   }, [&]{
+                     *this << ", ";
+                   });
+        *this << ')';
+      }
+    }
   }
   
   void visitIndexAddrInst(IndexAddrInst *IAI) {

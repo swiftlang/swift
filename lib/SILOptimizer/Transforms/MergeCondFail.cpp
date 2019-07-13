@@ -26,7 +26,7 @@ using namespace swift;
 /// Return true if the operand of the cond_fail instruction looks like
 /// the overflow bit of an arithmetic instruction.
 static bool hasOverflowConditionOperand(CondFailInst *CFI) {
-  if (auto *TEI = dyn_cast<TupleExtractInst>(CFI->getOperand()))
+  if (auto *TEI = dyn_cast<TupleExtractInst>(CFI->getCondition()))
     if (isa<BuiltinInst>(TEI->getOperand()))
       return true;
   return false;
@@ -101,7 +101,7 @@ public:
 
     // Merge conditions and remove the merged cond_fail instructions.
     for (unsigned I = 0, E = CondFailToMerge.size(); I != E; ++I) {
-      auto CurCond = CondFailToMerge[I]->getOperand();
+      auto CurCond = CondFailToMerge[I]->getCondition();
       if (MergedCond) {
         CurCond = Builder.createBuiltinBinaryFunction(Loc, "or",
                                                       CurCond->getType(),

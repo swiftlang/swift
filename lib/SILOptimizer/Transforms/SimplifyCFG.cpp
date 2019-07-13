@@ -1384,14 +1384,14 @@ static CondFailInst *getUnConditionalFail(SILBasicBlock *BB, SILValue Cond,
     return nullptr;
   
   // The simple case: check if it is a "cond_fail 1".
-  auto *IL = dyn_cast<IntegerLiteralInst>(CondFail->getOperand());
+  auto *IL = dyn_cast<IntegerLiteralInst>(CondFail->getCondition());
   if (IL && IL->getValue() != 0)
     return CondFail;
 
   // Check if the cond_fail has the same condition as the cond_br in the
   // predecessor block.
   Cond = skipInvert(Cond, Inverted, false);
-  SILValue CondFailCond = skipInvert(CondFail->getOperand(), Inverted, false);
+  SILValue CondFailCond = skipInvert(CondFail->getCondition(), Inverted, false);
   if (Cond == CondFailCond && !Inverted)
     return CondFail;
   return nullptr;
@@ -2455,7 +2455,7 @@ static bool tryMoveCondFailToPreds(SILBasicBlock *BB) {
   // want to the optimization if the condition gets dead after moving the
   // cond_fail.
   bool inverted = false;
-  SILValue cond = skipInvert(CFI->getOperand(), inverted, true);
+  SILValue cond = skipInvert(CFI->getCondition(), inverted, true);
   if (!cond)
     return false;
   

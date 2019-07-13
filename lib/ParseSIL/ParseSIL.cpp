@@ -2887,7 +2887,6 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     UNARY_INSTRUCTION(DestroyAddr)
     UNARY_INSTRUCTION(CopyValue)
     UNARY_INSTRUCTION(DestroyValue)
-    UNARY_INSTRUCTION(CondFail)
     UNARY_INSTRUCTION(EndBorrow)
     UNARY_INSTRUCTION(DestructureStruct)
     UNARY_INSTRUCTION(DestructureTuple)
@@ -2911,6 +2910,39 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
 #undef UNARY_INSTRUCTION
 #undef REFCOUNTING_INSTRUCTION
 
+  case SILInstructionKind::CondFailInst: {
+    SILValue condition;
+    if (parseTypedValueRef(condition, B))
+      return true;
+    SILValue message;
+    SmallVector<SILValue, 4> messageArgs;
+    if (P.consumeIf(tok::comma)) {
+      if (parseTypedValueRef(message, B))
+        return true;
+      
+      if (P.consumeIf(tok::l_paren)) {
+        while (true) {
+          SILValue arg;
+          if (parseTypedValueRef(arg, B))
+            return true;
+          messageArgs.push_back(arg);
+          if (!P.consumeIf(tok::comma))
+            break;
+        }
+        if (!P.consumeIf(tok::r_paren))
+          return true;
+      }
+    }
+    
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
+    
+    ResultVal = B.createCondFail(InstLoc, condition, /*inverted*/ false,
+                                 message, messageArgs);
+    
+    break;
+  }
+      
   case SILInstructionKind::IsEscapingClosureInst: {
     bool IsObjcVerifcationType = false;
     if (parseSILOptional(IsObjcVerifcationType, *this, "objc"))

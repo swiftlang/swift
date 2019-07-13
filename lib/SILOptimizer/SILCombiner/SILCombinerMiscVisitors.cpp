@@ -749,7 +749,7 @@ SILInstruction *SILCombiner::visitCondFailInst(CondFailInst *CFI) {
   if (RemoveCondFails)
     return eraseInstFromFunction(*CFI);
 
-  auto *I = dyn_cast<IntegerLiteralInst>(CFI->getOperand());
+  auto *I = dyn_cast<IntegerLiteralInst>(CFI->getCondition());
   if (!I)
     return nullptr;
 

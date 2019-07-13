@@ -1230,7 +1230,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, "...") \
   ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, "...")
 #include "swift/AST/ReferenceStorage.def"
-  case SILInstructionKind::CondFailInst:
   case SILInstructionKind::RetainValueInst:
   case SILInstructionKind::DestructureStructInst:
   case SILInstructionKind::DestructureTupleInst:
@@ -1284,6 +1283,35 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       Attr = IEC->getVerificationType();
     }
     writeOneOperandLayout(SI.getKind(), Attr, SI.getOperand(0));
+    break;
+  }
+  case SILInstructionKind::CondFailInst: {
+    auto CFI = dyn_cast<CondFailInst>(&SI);
+    SmallVector<ValueID, 4> values;
+
+    auto conditionValue = addValueRef(CFI->getCondition());
+    values.push_back(conditionValue);
+    
+    auto messageValue = addValueRef(CFI->getMessage());
+    values.push_back(messageValue);
+    TypeID messageType = 0;
+    unsigned messageCategory = 0;
+    if (auto message = CFI->getMessage()) {
+      messageType = S.addTypeRef(message->getType().getASTType());
+      messageCategory = (unsigned)message->getType().getCategory();
+    }
+    
+    for (auto arg : CFI->getMessageArguments()) {
+      values.push_back(addValueRef(arg));
+      values.push_back(S.addTypeRef(arg->getType().getASTType()));
+      values.push_back((unsigned)arg->getType().getCategory());
+    }
+    
+    SILOneTypeValuesLayout::emitRecord(Out, ScratchRecord,
+                                       SILAbbrCodes[SILOneTypeValuesLayout::Code],
+                                       (unsigned)CFI->SILInstruction::getKind(),
+                                       messageType, messageCategory,
+                                       values);
     break;
   }
   case SILInstructionKind::MarkUninitializedInst: {

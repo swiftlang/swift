@@ -486,7 +486,7 @@ static bool isSignedLessEqual(SILValue Start, SILValue End, SILBasicBlock &BB) {
   for (auto &Inst : BB)
     if (auto CF = dyn_cast<CondFailInst>(&Inst)) {
       // Try to match a cond_fail on "XOR , (SLE Start, End), 1".
-      if (match(CF->getOperand(),
+      if (match(CF->getCondition(),
                 m_ApplyInst(BuiltinValueKind::Xor,
                             m_ApplyInst(BuiltinValueKind::ICMP_SLE,
                                         m_Specific(Start),
@@ -496,14 +496,14 @@ static bool isSignedLessEqual(SILValue Start, SILValue End, SILBasicBlock &BB) {
       // Inclusive ranges will have a check on the upper value (before adding
       // one).
       if (PreInclusiveEnd) {
-        if (match(CF->getOperand(),
+        if (match(CF->getCondition(),
                   m_ApplyInst(BuiltinValueKind::Xor,
                               m_ApplyInst(BuiltinValueKind::ICMP_SLE,
                                           m_Specific(Start),
                                           m_Specific(PreInclusiveEnd)),
                               m_One())))
           IsPreInclusiveEndLEQ = true;
-        if (match(CF->getOperand(),
+        if (match(CF->getCondition(),
                   m_ApplyInst(BuiltinValueKind::Xor,
                               m_ApplyInst(BuiltinValueKind::ICMP_SGT,
                                           m_Specific(End),

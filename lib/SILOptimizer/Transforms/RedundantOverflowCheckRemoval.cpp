@@ -499,7 +499,7 @@ public:
 
   bool tryToRemoveCondFail(CondFailInst *CFI) {
     // Extract the arithmetic operation from the condfail.
-    auto *TEI = dyn_cast<TupleExtractInst>(CFI->getOperand());
+    auto *TEI = dyn_cast<TupleExtractInst>(CFI->getCondition());
     if (!TEI) return false;
     auto *BI = dyn_cast<BuiltinInst>(TEI->getOperand());
     if (!BI) return false;
@@ -623,7 +623,7 @@ public:
 
   void registerCondFailFormula(CondFailInst *CFI) {
     // Extract the arithmetic operation from the condfail.
-    if (auto *TEI = dyn_cast<TupleExtractInst>(CFI->getOperand())) {
+    if (auto *TEI = dyn_cast<TupleExtractInst>(CFI->getCondition())) {
       auto *BI = dyn_cast<BuiltinInst>(TEI->getOperand());
       if (!BI)
         return;
@@ -655,7 +655,7 @@ public:
     //  We can figure out that x - y will not underflow because of x >= y
     //  %usub_underflow = tuple_extract %usub_result : $(Builtin.Int64, Builtin.Int1), 1
     //  cond_fail %usub_underflow : $Builtin.Int1
-    if (auto *CMP = dyn_cast<BuiltinInst>(CFI->getOperand())) {
+    if (auto *CMP = dyn_cast<BuiltinInst>(CFI->getCondition())) {
       SILBasicBlock *TrueBB = nullptr;
       SILBasicBlock *FalseBB = CMP->getParent();
       addComparisonRelation(CMP, TrueBB, FalseBB);

@@ -114,7 +114,7 @@ swift::isInstructionTriviallyDead(SILInstruction *I) {
 
   // condfail instructions that obviously can't fail are dead.
   if (auto *CFI = dyn_cast<CondFailInst>(I))
-    if (auto *ILI = dyn_cast<IntegerLiteralInst>(CFI->getOperand()))
+    if (auto *ILI = dyn_cast<IntegerLiteralInst>(CFI->getCondition()))
       if (!ILI->getValue())
         return true;
 

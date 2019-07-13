@@ -194,7 +194,7 @@ public:
   }
 
   hash_code visitCondFailInst(CondFailInst *X) {
-    return llvm::hash_combine(X->getKind(), X->getOperand());
+    return llvm::hash_combine(X->getKind(), X->getCondition());
   }
 
   hash_code visitClassMethodInst(ClassMethodInst *X) {

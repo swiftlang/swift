@@ -5426,7 +5426,7 @@ void IRGenSILFunction::visitDestroyAddrInst(swift::DestroyAddrInst *i) {
 }
 
 void IRGenSILFunction::visitCondFailInst(swift::CondFailInst *i) {
-  Explosion e = getLoweredExplosion(i->getOperand());
+  Explosion e = getLoweredExplosion(i->getCondition());
   llvm::Value *cond = e.claimNext();
 
   // Emit individual fail blocks so that we can map the failure back to a source

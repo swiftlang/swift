@@ -1774,16 +1774,21 @@ public:
   // Runtime failure
   //===--------------------------------------------------------------------===//
 
-  CondFailInst *createCondFail(SILLocation Loc, SILValue Operand,
-                               bool Inverted = false) {
+  CondFailInst *createCondFail(SILLocation Loc,
+                               SILValue Condition,
+                               bool Inverted = false,
+                               SILValue Message = SILValue(),
+                               ArrayRef<SILValue> MessageArguments = {}) {
     if (Inverted) {
-      SILType Ty = Operand->getType();
+      SILType Ty = Condition->getType();
       SILValue True(createIntegerLiteral(Loc, Ty, 1));
-      Operand =
-          createBuiltinBinaryFunction(Loc, "xor", Ty, Ty, {Operand, True});
+      Condition =
+          createBuiltinBinaryFunction(Loc, "xor", Ty, Ty, {Condition, True});
     }
-    return insert(new (getModule())
-                      CondFailInst(getSILDebugLocation(Loc), Operand));
+    
+    return insert(CondFailInst::create(getModule(),
+                                       getSILDebugLocation(Loc), Condition,
+                                       Message, MessageArguments));
   }
 
   BuiltinInst *createBuiltinTrap(SILLocation Loc) {

@@ -220,7 +220,7 @@ static SILInstruction *getProducer(CondFailInst *CFI) {
   //   %1 = builtin "some_operation_with_overflow"
   //   %2 = tuple_extract %1
   //   %3 = cond_fail %2
-  SILValue FailCond = CFI->getOperand();
+  SILValue FailCond = CFI->getCondition();
   if (auto *TEI = dyn_cast<TupleExtractInst>(FailCond)) {
     if (auto *BI = dyn_cast<BuiltinInst>(TEI->getOperand())) {
       return BI;

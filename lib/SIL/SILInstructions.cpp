@@ -371,6 +371,18 @@ BuiltinInst::BuiltinInst(SILDebugLocation Loc, Identifier Name,
       Substitutions(Subs) {
 }
 
+CondFailInst *CondFailInst::create(SILModule &M,
+                                   SILDebugLocation DebugLoc,
+                                   SILValue Condition,
+                                   SILValue Message,
+                                   ArrayRef<SILValue> MessageArguments) {
+  auto Size = totalSizeToAlloc<swift::Operand>(1 + (Message ? 1 : 0)
+                                               + MessageArguments.size());
+  auto Buffer = M.allocateInst(Size, alignof(CondFailInst));
+  return ::new (Buffer) CondFailInst(
+                               DebugLoc, Condition, Message, MessageArguments);
+}
+
 InitBlockStorageHeaderInst *
 InitBlockStorageHeaderInst::create(SILFunction &F,
                                SILDebugLocation DebugLoc, SILValue BlockStorage,

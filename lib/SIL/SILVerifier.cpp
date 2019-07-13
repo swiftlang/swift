@@ -3861,9 +3861,11 @@ public:
   }
 
   void checkCondFailInst(CondFailInst *CFI) {
-    require(CFI->getOperand()->getType()
+    require(CFI->getCondition()->getType()
               == SILType::getBuiltinIntegerType(1, F.getASTContext()),
             "cond_fail operand must be a Builtin.Int1");
+    
+#warning "todo: message validation"
   }
 
   void checkReturnInst(ReturnInst *RI) {

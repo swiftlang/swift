@@ -1664,7 +1664,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   REFCOUNTING_INSTRUCTION(StrongRetain##Name) \
   UNARY_INSTRUCTION(Copy##Name##Value)
 #include "swift/AST/ReferenceStorage.def"
-  UNARY_INSTRUCTION(CondFail)
   REFCOUNTING_INSTRUCTION(RetainValue)
   REFCOUNTING_INSTRUCTION(RetainValueAddr)
   REFCOUNTING_INSTRUCTION(UnmanagedRetainValue)
@@ -1697,6 +1696,30 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
 #undef UNARY_INSTRUCTION
 #undef REFCOUNTING_INSTRUCTION
 
+  case SILInstructionKind::CondFailInst: {
+    assert(RecordKind == SIL_ONE_TYPE_VALUES
+           && "Layout should be OneTypeValues.");
+    assert((ListOfValues.size() - 2) % 3 == 0 && "wrong number of values");
+    
+    SILValue condition = getLocalValue(ListOfValues[0],
+                     SILType::getBuiltinIntegerType(1, SILMod.getASTContext()));
+    SILValue message;
+    SmallVector<SILValue, 4> messageArgs;
+    if (auto messageID = ListOfValues[1]) {
+      message = getLocalValue(messageID,
+                     getSILType(MF->getType(TyID), (SILValueCategory)TyCategory));
+      for (unsigned i = 2; i < ListOfValues.size(); i += 3) {
+        SILValue arg = getLocalValue(ListOfValues[i],
+                                 getSILType(MF->getType(ListOfValues[i+1]),
+                                            (SILValueCategory)ListOfValues[i+2]));
+        messageArgs.push_back(arg);
+      }
+    }
+    
+    ResultVal = Builder.createCondFail(Loc, condition, /*invert*/ false,
+                                       message, messageArgs);
+    break;
+  }
   case SILInstructionKind::IsEscapingClosureInst: {
     assert(RecordKind == SIL_ONE_OPERAND && "Layout should be OneOperand.");
     unsigned verificationType = Attr;

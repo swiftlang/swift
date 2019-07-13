@@ -23,6 +23,21 @@ bb0(%0 : @owned $Builtin.NativeObject):
   return undef : $()
 }
 
+// CHECK-LABEL: sil [serialized] @test_cond_fail
+sil [serialized] @test_cond_fail : $(Builtin.Int1) -> () {
+entry(%z : $Builtin.Int1):
+  %m = string_literal utf8 "this is the way the world ends"
+  %a = integer_literal $Builtin.Word, 1738
+  // CHECK: cond_fail [[COND:%.*]] : $Builtin.Int1
+  cond_fail %z : $Builtin.Int1
+  // CHECK: cond_fail [[COND]] : $Builtin.Int1, [[MESSAGE:%.*]] : $Builtin.RawPointer
+  cond_fail %z : $Builtin.Int1, %m : $Builtin.RawPointer
+  // CHECK: cond_fail [[COND]] : $Builtin.Int1, [[MESSAGE]] : $Builtin.RawPointer([[ARG:%.*]] : $Builtin.Word)
+  cond_fail %z : $Builtin.Int1, %m : $Builtin.RawPointer(%a : $Builtin.Word)
+  return undef : $()
+}
+
+
 class TestArrayStorage {
   @_hasStorage var count: Int32
   init()
