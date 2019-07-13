@@ -1,9 +1,9 @@
 protocol P {
-  func myValue() -> Int
+  func myValue() -> Int64
 }
 
-extension Int: P {
-  public func myValue() -> Int {
+extension Int64: P {
+  public func myValue() -> Int64 {
     return self
   }
 
@@ -23,7 +23,7 @@ struct Container {
   @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
   var computedProperty : some P {
     get {
-      return 2
+      return Int64(2)
     }
     set {
       print("original \(newValue)")
@@ -33,7 +33,7 @@ struct Container {
   @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
   subscript(_ x: Int) -> some P {
     get {
-      return 2
+      return Int64(2)
     }
     set {
       print("original \(newValue)")
@@ -45,7 +45,7 @@ protocol Q {}
 
 struct NewType : Q {}
 
-extension Int : Q {}
+extension Int64 : Q {}
 
 public protocol Assoc {
   associatedtype A = Int
@@ -56,6 +56,6 @@ public protocol Assoc {
 struct Test : Assoc {
   @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
   func act() -> some Q {
-    return 1
+    return Int64(1)
   }
 }
