@@ -5798,14 +5798,6 @@ public:
     setBodyKind(BodyKind::MemberwiseInitializer);
   }
 
-  /// If a body has been loaded, flag that it's been type-checked.
-  /// This is kindof a hacky operation, but it avoids some unnecessary
-  /// duplication of work.
-  void setBodyTypeCheckedIfPresent() {
-    if (getBodyKind() == BodyKind::Parsed)
-      setBodyKind(BodyKind::TypeChecked);
-  }
-
   /// Gets the body of this function, stripping the unused portions of #if
   /// configs inside the body. If this function was not deserialized from a
   /// .swiftmodule, this body is reconstructed from the original

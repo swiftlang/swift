@@ -1925,49 +1925,7 @@ static Type getFunctionBuilderType(FuncDecl *FD) {
 }
 
 bool TypeChecker::typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD) {
-  return evaluateOrDefault(Context.evaluator,
-                           TypeCheckFunctionBodyRequest{AFD},
-                           true);
-}
-
-llvm::Expected<bool>
-TypeCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
-                                       AbstractFunctionDecl *func) const {
-  ASTContext &ctx = func->getASTContext();
-  if (!func->hasInterfaceType()) {
-    TypeChecker &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
-    tc.validateDecl(func);
-  }
-
-  // HACK: don't type-check the same function body twice. This will eventually
-  // be handled by the request-evaluator's caching mechanism.
-  (void)func->getBody();
-  if (func->isBodyTypeChecked())
-    return false;
-
-  FrontendStatsTracer StatsTracer(ctx.Stats, "typecheck-fn", func);
-  PrettyStackTraceDecl StackEntry("type-checking", func);
-
-  if (ctx.Stats)
-    ctx.Stats->getFrontendCounters().NumFunctionsTypechecked++;
-
-  Optional<FunctionBodyTimer> timer;
-  TypeChecker &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
-  if (tc.DebugTimeFunctionBodies || tc.WarnLongFunctionBodies)
-    timer.emplace(func, tc.DebugTimeFunctionBodies, tc.WarnLongFunctionBodies);
-
-  tc.requestRequiredNominalTypeLayoutForParameters(func->getParameters());
-
-  bool error = tc.typeCheckAbstractFunctionBodyUntil(func, SourceLoc());
-  func->setBodyTypeCheckedIfPresent();
-
-  if (error)
-    return true;
-
-  if (func->getBody())
-    performAbstractFuncDeclDiagnostics(tc, func);
-
-  return false;
+  return typeCheckAbstractFunctionBodyUntil(AFD, SourceLoc());
 }
 
 static Expr* constructCallToSuperInit(ConstructorDecl *ctor,
@@ -2163,10 +2121,29 @@ static void checkClassConstructorBody(ClassDecl *classDecl,
   }
 }
 
-bool TypeChecker::typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
-                                                     SourceLoc EndTypeCheckLoc) {
-  validateDecl(AFD);
-  checkDefaultArguments(AFD->getParameters(), AFD);
+llvm::Expected<bool>
+TypeCheckFunctionBodyUntilRequest::evaluate(Evaluator &evaluator,
+                                            AbstractFunctionDecl *AFD,
+                                            SourceLoc endTypeCheckLoc) const {
+  ASTContext &ctx = AFD->getASTContext();
+
+  // Accounting for type checking of function bodies.
+  // FIXME: We could probably take this away, given that the request-evaluator
+  // does much of it for us.
+  FrontendStatsTracer StatsTracer(ctx.Stats, "typecheck-fn", AFD);
+  PrettyStackTraceDecl StackEntry("type-checking", AFD);
+
+  if (ctx.Stats)
+    ctx.Stats->getFrontendCounters().NumFunctionsTypechecked++;
+
+  Optional<FunctionBodyTimer> timer;
+  TypeChecker &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
+  if (tc.DebugTimeFunctionBodies || tc.WarnLongFunctionBodies)
+    timer.emplace(AFD, tc.DebugTimeFunctionBodies, tc.WarnLongFunctionBodies);
+
+  tc.validateDecl(AFD);
+  tc.requestRequiredNominalTypeLayoutForParameters(AFD->getParameters());
+  tc.checkDefaultArguments(AFD->getParameters(), AFD);
 
   BraceStmt *body = AFD->getBody();
   if (!body || AFD->isBodyTypeChecked())
@@ -2174,7 +2151,7 @@ bool TypeChecker::typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
 
   if (auto *func = dyn_cast<FuncDecl>(AFD)) {
     if (Type builderType = getFunctionBuilderType(func)) {
-      body = applyFunctionBuilderBodyTransform(func, body, builderType);
+      body = tc.applyFunctionBuilderBodyTransform(func, body, builderType);
       if (!body)
         return true;
     } else if (func->hasSingleExpressionBody()) {
@@ -2195,15 +2172,15 @@ bool TypeChecker::typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
     // simplifies SILGen.
     SmallVector<ASTNode, 8> Elts(body->getElements().begin(),
                                  body->getElements().end());
-    Elts.push_back(new (Context) ReturnStmt(body->getRBraceLoc(),
-                                            /*value*/nullptr,
-                                            /*implicit*/true));
-    body = BraceStmt::create(Context, body->getLBraceLoc(), Elts,
+    Elts.push_back(new (ctx) ReturnStmt(body->getRBraceLoc(),
+                                        /*value*/nullptr,
+                                        /*implicit*/true));
+    body = BraceStmt::create(ctx, body->getLBraceLoc(), Elts,
                              body->getRBraceLoc(), body->isImplicit());
   }
 
-  StmtChecker SC(*this, AFD);
-  SC.EndTypeCheckLoc = EndTypeCheckLoc;
+  StmtChecker SC(tc, AFD);
+  SC.EndTypeCheckLoc = endTypeCheckLoc;
   bool hadError = SC.typeCheckBody(body);
 
   // If this was a function with a single expression body, let's see
@@ -2222,14 +2199,28 @@ bool TypeChecker::typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
     }
   }
 
+  // Class constructor checking.
   if (auto *ctor = dyn_cast<ConstructorDecl>(AFD)) {
     if (auto classDecl = ctor->getDeclContext()->getSelfClassDecl()) {
       checkClassConstructorBody(classDecl, ctor, body);
     }
   }
 
+  // If nothing went wrong yet, perform extra checking.
+  if (!hadError && endTypeCheckLoc.isInvalid())
+    performAbstractFuncDeclDiagnostics(tc, AFD, body);
+
+  // Wire up the function body now.
   AFD->setBody(body, AbstractFunctionDecl::BodyKind::TypeChecked);
   return hadError;
+}
+
+bool TypeChecker::typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
+                                                     SourceLoc EndTypeCheckLoc) {
+  return evaluateOrDefault(
+             Context.evaluator,
+             TypeCheckFunctionBodyUntilRequest{AFD, EndTypeCheckLoc},
+             true);
 }
 
 bool TypeChecker::typeCheckClosureBody(ClosureExpr *closure) {

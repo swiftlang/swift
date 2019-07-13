@@ -689,13 +689,14 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Request to type check the body of the given function.
+/// Request to type check the body of the given function up to the given
+/// source location.
 ///
 /// Produces true if an error occurred, false otherwise.
 /// FIXME: it would be far better to return the type-checked body.
-class TypeCheckFunctionBodyRequest :
-    public SimpleRequest<TypeCheckFunctionBodyRequest,
-                         bool(AbstractFunctionDecl *),
+class TypeCheckFunctionBodyUntilRequest :
+    public SimpleRequest<TypeCheckFunctionBodyUntilRequest,
+                         bool(AbstractFunctionDecl *, SourceLoc),
                          CacheKind::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -705,7 +706,8 @@ private:
 
   // Evaluation.
   llvm::Expected<bool>
-  evaluate(Evaluator &evaluator, AbstractFunctionDecl *func) const;
+  evaluate(Evaluator &evaluator, AbstractFunctionDecl *func,
+           SourceLoc endTypeCheckLoc) const;
 
 public:
   bool isCached() const { return true; }
