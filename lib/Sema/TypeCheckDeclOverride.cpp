@@ -996,7 +996,7 @@ static GenericSignature *getOverrideGenericSignature(ValueDecl *base,
   auto substFn = [&](SubstitutableType *type) -> Type {
     auto *gp = cast<GenericTypeParamType>(type);
 
-    if (gp->getDepth() < superclassDepth) {
+    if (gp->getDepth() < baseDepth) {
       return Type(gp).subst(subMap);
     }
 
