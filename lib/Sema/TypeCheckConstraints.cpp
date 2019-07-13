@@ -1145,10 +1145,10 @@ namespace {
       // can't be later applied to AST and would result in the crash in some
       // cases. Such expressions are only allowed in argument positions
       // of function/operator calls.
-      if (isa<InOutExpr>(expr) /* || isa<VarargExpansionExpr>(expr)*/) {
+      if (isa<InOutExpr>(expr) || isa<VarargExpansionExpr>(expr)) {
         auto diag = isa<InOutExpr>(expr)
                         ? diag::extraneous_address_of
-                        : diag::pound_variadic_outside_arg_position;
+                        : diag::array_to_vararg_coercion_outside_arg_position;
         // If this is an implicit `inout` or expansion expression we assume that
         // compiler knowns what it's doing.
         if (expr->isImplicit())
@@ -1159,11 +1159,18 @@ namespace {
           return finish(true, expr);
 
         auto parents = ParentExpr->getParentMap();
-
-        auto result = parents.find(expr);
-        if (result != parents.end()) {
-          auto *parent = result->getSecond();
-
+        Expr *parent = nullptr;
+        if (isa<InOutExpr>(expr)) {
+          auto result = parents.find(expr);
+          if (result != parents.end()) {
+            parent = result->getSecond();
+          }
+        } else if (isa<VarargExpansionExpr>(expr) && !ExprStack.empty()) {
+          // Use ExprStack to find the first parent. This accounts for the case
+          // where expressions were folded after ParentExpr was set
+          parent = ExprStack.back();
+        }
+        if (parent) {
           if (isa<SequenceExpr>(parent))
             return finish(true, expr);
 
@@ -1179,7 +1186,8 @@ namespace {
                 TC.diagnose(expr->getStartLoc(),
                             diag::cannot_pass_inout_arg_to_subscript);
                 return finish(false, nullptr);
-              }
+              } else if (isa<SubscriptExpr>(call->getSecond()))
+                return finish(true, expr);
             }
           }
         }

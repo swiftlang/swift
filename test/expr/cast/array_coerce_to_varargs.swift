@@ -55,8 +55,10 @@ takesA([S2()] as A...) // expected-error {{cannot convert value of type 'S2' to 
 takesP([S(), S(), S()] as P...)
 takesP([S2()] as P...) // expected-error {{argument type '[S2]' does not conform to expected type 'P'}}
 
-f(([1,2,3] as Int...) as Int...) // expected-error {{#variadic can only be used in an argument position}}
-let y = [1,2,3] as Int... // expected-error {{#variadic can only be used in an argument position}}
+f(([1,2,3] as Int...) as Int...) // expected-error {{coercion to variadic arguments is only allowed in an argument position}}
+let y = [1,2,3] as Int... // expected-error {{coercion to variadic arguments is only allowed in an argument position}}
+x as Int... // expected-error {{coercion to variadic arguments is only allowed in an argument position}}
+(x as Int...) + x // expected-error {{coercion to variadic arguments is only allowed in an argument position}}
 
 func takesArray(_ x: [Int]) {}
 takesArray([1,2,3] as Int...) // expected-error {{cannot invoke 'takesArray' with an argument list of type '(Int...)'}}

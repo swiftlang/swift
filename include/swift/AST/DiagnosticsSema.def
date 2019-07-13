@@ -363,8 +363,8 @@ ERROR(cannot_convert_array_to_variadic,none,
 ERROR(pound_variadic_must_appear_alone,none,
       "#variadic cannot be used alongside additional variadic arguments",
       ())
-ERROR(pound_variadic_outside_arg_position,none,
-      "#variadic can only be used in an argument position",
+ERROR(array_to_vararg_coercion_outside_arg_position,none,
+      "coercion to variadic arguments is only allowed in an argument position",
       ())
 
 NOTE(suggest_pass_elements_directly,none,
