@@ -146,27 +146,13 @@ public:
     });
   }
 
-  /// Subclasses can override this to determine if they should print empty
-  /// arrays for `inputs` and `output`, or if they can omit them.
-  virtual bool requireInputsAndOutputs() {
-    return false;
-  }
-
   void provideMapping(swift::json::Output &out) override {
     Message::provideMapping(out);
     out.mapRequired("command", CommandLine); // Deprecated, do not document
     out.mapRequired("command_executable", Executable);
     out.mapRequired("command_arguments", Arguments);
-
-    // Some commands can choose to print empty arrays if their inputs and
-    // outputs are empty.
-    if (requireInputsAndOutputs()) {
-      out.mapRequired("inputs", Inputs);
-      out.mapRequired("outputs", Outputs);
-    } else {
-      out.mapOptional("inputs", Inputs);
-      out.mapOptional("outputs", Outputs);
-    }
+    out.mapOptional("inputs", Inputs);
+    out.mapOptional("outputs", Outputs);
   }
 };
 
@@ -190,12 +176,6 @@ public:
   BeganMessage(const Job &Cmd, int64_t Pid, TaskProcessInformation ProcInfo)
       : DetailedCommandBasedMessage("began", Cmd), Pid(Pid),
         ProcInfo(ProcInfo) {}
-
-  bool requireInputsAndOutputs() override {
-    /// `began` messages should always print inputs and outputs, even if they
-    /// are empty.
-    return true;
-  }
 
   void provideMapping(swift::json::Output &out) override {
     DetailedCommandBasedMessage::provideMapping(out);

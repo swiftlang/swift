@@ -52,10 +52,9 @@ public:
     GenerateDSYMJob,
     VerifyDebugInfoJob,
     GeneratePCHJob,
-    LoadModuleJob,
 
     JobFirst = CompileJob,
-    JobLast = LoadModuleJob
+    JobLast = GeneratePCHJob
   };
 
   static const char *getClassName(Kind AC);
@@ -336,24 +335,6 @@ public:
 
   static bool classof(const Action *A) {
     return A->getKind() == Action::Kind::StaticLinkJob;
-  }
-};
-
-/// An action that will attempt to load a specific module before any other
-/// actions.
-class LoadModuleJobAction : public JobAction {
-  virtual void anchor();
-  std::string moduleName;
-
-  public:
-  LoadModuleJobAction(StringRef moduleName)
-    : JobAction(Action::Kind::LoadModuleJob, {}, file_types::TY_Nothing),
-      moduleName(moduleName) {}
-
-  StringRef getModuleName() const { return moduleName; }
-
-  static bool classof(const Action *A) {
-    return A->getKind() == Action::Kind::LoadModuleJob;
   }
 };
 

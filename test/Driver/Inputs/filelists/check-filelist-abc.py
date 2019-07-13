@@ -26,11 +26,6 @@ else:
 if primaryFile and primaryFile.endswith(".bc"):
     sys.exit()
 
-# If we're handling a frontend action that doesn't produce have a
-# filelist, (e.g. a -typecheck action), then don't do anything.
-if '-filelist' not in sys.argv:
-    sys.exit(0)
-
 filelistFile = sys.argv[sys.argv.index('-filelist') + 1]
 
 with open(filelistFile, 'r') as f:

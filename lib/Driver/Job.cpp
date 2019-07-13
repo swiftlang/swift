@@ -383,14 +383,9 @@ void Job::printSummary(raw_ostream &os) const {
     if (const auto *IA = dyn_cast<InputAction>(A))
       Inputs.push_back(IA->getInputArg().getValue());
 
-  for (const Job *J : getInputs()) {
-    // Some jobs might produce no output, so don't include them in the
-    // list of inputs.
-    if (J->getOutput().getPrimaryOutputType() == file_types::TY_Nothing)
-      continue;
+  for (const Job *J : getInputs())
     for (StringRef f : J->getOutput().getPrimaryOutputFilenames())
       Inputs.push_back(f);
-  }
 
   size_t limit = 3;
   size_t actual_in = Inputs.size();
