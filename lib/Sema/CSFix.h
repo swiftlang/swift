@@ -183,9 +183,9 @@ enum class FixKind : uint8_t {
   /// Allow invalid reference to a member declared as `mutating`
   /// when base is an r-value type.
   AllowMutatingMemberOnRValueBase,
-  
-  /// If an array was passed to a variadic argument, offer to wrap it in
-  /// #variadic, or drop the brackets if it's a literal
+
+  /// If an array was passed to a variadic argument, offer to coerce it to
+  /// varargs, or drop the brackets if it's a literal
   ExpandArrayIntoVarargs,
 };
 
@@ -1200,7 +1200,7 @@ class ExpandArrayIntoVarargs final : public ContextualMismatch {
 
 public:
   std::string getName() const override {
-    return "require #variadic when passing Array elements as variadic "
+    return "require explicit coercion when passing Array elements as variadic "
            "arguments";
   }
 

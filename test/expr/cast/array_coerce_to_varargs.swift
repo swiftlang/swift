@@ -30,16 +30,13 @@ func overloaded(x: [Int]) {}
 func overloaded(x: Int...) {}
 overloaded(x: x as Int...)
 
-f([1,2,3] as Int..., 3, 4) // expected-error {{#variadic cannot be used alongside additional variadic arguments}}
-f(1, 2, [1,2,3] as Int...) // expected-error {{#variadic cannot be used alongside additional variadic arguments}}
-f(1, 2, [1,2,3] as Int..., 3, 4) // expected-error {{#variadic cannot be used alongside additional variadic arguments}}
-f([1,2,3] as Int..., 3, 4, [1,2,3] as Int...) // expected-error {{#variadic cannot be used alongside additional variadic arguments}}
-f([1,2,3] as Int..., [1,2,3] as Int...) // expected-error {{#variadic cannot be used alongside additional variadic arguments}}
+f([1,2,3] as Int..., 3, 4) // expected-error {{array elements coerced to variadic arguments cannot be used alongside additional variadic arguments}}
+f(1, 2, [1,2,3] as Int...) // expected-error {{array elements coerced to variadic arguments cannot be used alongside additional variadic arguments}}
+f(1, 2, [1,2,3] as Int..., 3, 4) // expected-error {{array elements coerced to variadic arguments cannot be used alongside additional variadic arguments}}
+f([1,2,3] as Int..., 3, 4, [1,2,3] as Int...) // expected-error {{array elements coerced to variadic arguments cannot be used alongside additional variadic arguments}}
+f([1,2,3] as Int..., [1,2,3] as Int...) // expected-error {{array elements coerced to variadic arguments cannot be used alongside additional variadic arguments}}
 
 f(1 as Int...) // expected-error {{expression type '[_]' is ambiguous without more context}}
-
-f([1,2,3])
-f(x)
 
 class A {}
 class B: A {}

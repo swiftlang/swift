@@ -3498,12 +3498,31 @@ bool ExpandArrayIntoVarargsFailure::diagnoseAsError() {
   if (auto anchor = getAnchor()) {
     emitDiagnostic(anchor->getLoc(), diag::cannot_convert_array_to_variadic,
                    getFromType(), getToType());
+
     // Offer to pass the array elements using 'as T...'
-    auto range = anchor->getSourceRange();
+    auto *DC = getDC();
+    auto &TC = getTypeChecker();
+    auto asPG = getTypeChecker().lookupPrecedenceGroup(
+        DC, DC->getASTContext().Id_CastingPrecedence, SourceLoc());
+    // Parens are never needed on the outside because 'as T...' is only allowed
+    // as an argument
+    bool needsParensInside =
+        !asPG || exprNeedsParensInsideFollowingOperator(TC, DC, anchor, asPG);
+
+    llvm::SmallString<2> insertBefore;
+    llvm::SmallString<32> insertAfter;
+    if (needsParensInside) {
+      insertBefore += "(";
+      insertAfter += ")";
+    }
+    insertAfter += " as ";
+    insertAfter += getToType()->getWithoutParens()->getString();
+    insertAfter += "...";
     emitDiagnostic(anchor->getLoc(),
                    diag::suggest_pass_elements_using_pound_variadic)
-        .fixItInsert(range.Start, "#variadic(")
-        .fixItInsertAfter(range.End, ")");
+        .fixItInsert(anchor->getStartLoc(), insertBefore)
+        .fixItInsertAfter(anchor->getEndLoc(), insertAfter);
+
     // If this is an array literal, offer to remove the brackets and pass the
     // elements directly as variadic arguments.
     if (auto *arrayExpr = dyn_cast<ArrayExpr>(anchor)) {
