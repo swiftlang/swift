@@ -121,6 +121,12 @@ toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
 
   ArgStringList Arguments;
 
+  std::string Target = getTargetForLinker();
+  if (!Target.empty()) {
+    Arguments.push_back("-target");
+    Arguments.push_back(context.Args.MakeArgString(Target));
+  }
+
   switch (job.getKind()) {
   case LinkKind::None:
     llvm_unreachable("invalid link kind");
@@ -171,12 +177,6 @@ toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
   if (getTriple().getOS() == llvm::Triple::Linux &&
       job.getKind() == LinkKind::Executable) {
     Arguments.push_back("-pie");
-  }
-
-  std::string Target = getTargetForLinker();
-  if (!Target.empty()) {
-    Arguments.push_back("-target");
-    Arguments.push_back(context.Args.MakeArgString(Target));
   }
 
   bool staticExecutable = false;
