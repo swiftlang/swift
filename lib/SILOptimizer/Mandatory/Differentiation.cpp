@@ -2789,8 +2789,12 @@ private:
   static SubstitutionMap getSubstitutionMap(SILFunction *original,
                                             SILFunction *vjp) {
     auto substMap = original->getForwardingSubstitutionMap();
-    if (auto *vjpGenEnv = vjp->getGenericEnvironment())
-      substMap = substMap.subst(vjpGenEnv->getForwardingSubstitutionMap());
+    if (auto *vjpGenEnv = vjp->getGenericEnvironment()) {
+      auto vjpSubstMap = vjpGenEnv->getForwardingSubstitutionMap();
+      substMap = SubstitutionMap::get(
+          vjpGenEnv->getGenericSignature(), QuerySubstitutionMap{vjpSubstMap},
+          LookUpConformanceInSubstitutionMap(vjpSubstMap));
+    }
     return substMap;
   }
 
@@ -3026,7 +3030,7 @@ private:
     auto enumLoweredTy = getNominalDeclLoweredType(succEnum);
     auto *enumEltDecl =
         pullbackInfo.lookUpPredecessorEnumElement(predBB, succBB);
-    auto enumEltType = remapType(
+    auto enumEltType = getOpType(
         enumLoweredTy.getEnumElementType(enumEltDecl, getModule()));
     // If the enum element type does not have a box type (i.e. the enum case is
     // not indirect), then directly create an enum.
@@ -3459,8 +3463,12 @@ private:
   static SubstitutionMap getSubstitutionMap(SILFunction *original,
                                             SILFunction *jvp) {
     auto substMap = original->getForwardingSubstitutionMap();
-    if (auto *jvpGenEnv = jvp->getGenericEnvironment())
-      substMap = substMap.subst(jvpGenEnv->getForwardingSubstitutionMap());
+    if (auto *jvpGenEnv = jvp->getGenericEnvironment()) {
+      auto jvpSubstMap = jvpGenEnv->getForwardingSubstitutionMap();
+      substMap = SubstitutionMap::get(
+          jvpGenEnv->getGenericSignature(), QuerySubstitutionMap{jvpSubstMap},
+          LookUpConformanceInSubstitutionMap(jvpSubstMap));
+    }
     return substMap;
   }
 
