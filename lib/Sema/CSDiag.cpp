@@ -2760,7 +2760,10 @@ typeCheckArgumentChildIndependently(Expr *argExpr, Type argType,
     
     resultElts.push_back(elExpr);
     auto resFlags =
-        ParameterTypeFlags().withInOut(elExpr->isSemanticallyInOutExpr());
+        ParameterTypeFlags()
+            .withInOut(elExpr->isSemanticallyInOutExpr())
+            .withVariadic(elExpr->getSemanticsProvidingExpr()->getKind() ==
+                          ExprKind::VarargExpansion);
     resultEltTys.push_back({CS.getType(elExpr)->getInOutObjectType(),
                             TE->getElementName(i), resFlags});
   }

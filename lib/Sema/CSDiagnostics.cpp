@@ -3498,7 +3498,7 @@ bool ExpandArrayIntoVarargsFailure::diagnoseAsError() {
   if (auto anchor = getAnchor()) {
     emitDiagnostic(anchor->getLoc(), diag::cannot_convert_array_to_variadic,
                    getFromType(), getToType());
-    // Offer to pass the array elements using #variadic
+    // Offer to pass the array elements using 'as T...'
     auto range = anchor->getSourceRange();
     emitDiagnostic(anchor->getLoc(),
                    diag::suggest_pass_elements_using_pound_variadic)

@@ -3343,8 +3343,9 @@ public:
   }
 };
 
-/// The #variadic varargs expansion operator,
-/// which expands an array into a sequence of variadic arguments.
+/// The  varargs expansion operator, which expands an array into a sequence of
+/// variadic arguments. Is written in source as part of a coercion operation,
+/// e.g. 'as T...'
 class VarargExpansionExpr : public Expr {
   Expr *SubExpr;
 

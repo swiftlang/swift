@@ -38,6 +38,9 @@ f([1,2,3] as Int..., [1,2,3] as Int...) // expected-error {{#variadic cannot be 
 
 f(1 as Int...) // expected-error {{expression type '[_]' is ambiguous without more context}}
 
+f([1,2,3])
+f(x)
+
 class A {}
 class B: A {}
 protocol P {}
@@ -47,10 +50,17 @@ func takesA(_ x: A...) {}
 func takesP(_ x: P...) {}
 takesA([A(), A()] as A...)
 takesA([B(), B()] as A...)
-//takesA([B(), B()] as B...)
+takesA([B(), B()] as B...)
 takesA([S2()] as A...) // expected-error {{cannot convert value of type 'S2' to expected element type 'A'}}
 takesP([S(), S(), S()] as P...)
 takesP([S2()] as P...) // expected-error {{argument type '[S2]' does not conform to expected type 'P'}}
 
 f(([1,2,3] as Int...) as Int...) // expected-error {{#variadic can only be used in an argument position}}
 let y = [1,2,3] as Int... // expected-error {{#variadic can only be used in an argument position}}
+
+func takesArray(_ x: [Int]) {}
+takesArray([1,2,3] as Int...) // expected-error {{cannot invoke 'takesArray' with an argument list of type '(Int...)'}}
+// expected-note@-1 {{expected an argument list of type '([Int])'}}
+takesArray(x as Int...) // expected-error {{cannot invoke 'takesArray' with an argument list of type '(Int...)'}}
+// expected-note@-1 {{expected an argument list of type '([Int])'}}
+takesArray(1 as Int...)
