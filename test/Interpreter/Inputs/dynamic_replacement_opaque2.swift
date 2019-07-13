@@ -1,23 +1,23 @@
 @_private(sourceFile: "TestOpaque1.swift") import TestOpaque1
 
 struct Pair : P {
-  var x = 0
-  var y = 1
-  func myValue() -> Int{
+  var x = Int64(0)
+  var y = Int64(1)
+  func myValue() -> Int64 {
     return y
   }
 }
 
 @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
 @_dynamicReplacement(for:bar(_:))
-func _replacement_bar(y x: Int) -> some P {
+func _replacement_bar(y x: Int64) -> some P {
   return Pair()
 }
 
 extension Container {
   @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
   @_dynamicReplacement(for:bar(_:))
-  func _replacement_bar(y x: Int) -> some P {
+  func _replacement_bar(y x: Int64) -> some P {
     return Pair()
   }
 
