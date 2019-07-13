@@ -3347,16 +3347,8 @@ public:
 /// which expands an array into a sequence of variadic arguments.
 class VarargExpansionExpr : public Expr {
   Expr *SubExpr;
-  SourceLoc KeywordLoc;
-  SourceLoc LParenLoc;
-  SourceLoc RParenLoc;
 
 public:
-  VarargExpansionExpr(Expr *subExpr, SourceLoc keywordLoc, SourceLoc lParenLoc,
-                      SourceLoc rParenLoc, Type type = Type())
-      : Expr(ExprKind::VarargExpansion, false, type), SubExpr(subExpr),
-        KeywordLoc(keywordLoc), LParenLoc(lParenLoc), RParenLoc(rParenLoc) {}
-
   VarargExpansionExpr(Expr *subExpr, bool implicit, Type type = Type())
       : Expr(ExprKind::VarargExpansion, implicit, type), SubExpr(subExpr) {
     assert(implicit ||

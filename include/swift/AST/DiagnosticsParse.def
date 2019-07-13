@@ -1263,14 +1263,6 @@ ERROR(expr_selector_expected_property_expr,PointsToFirstBadToken,
 ERROR(expr_selector_expected_rparen,PointsToFirstBadToken,
       "expected ')' to complete '#selector' expression", ())
 
-// Varargs Expansion Expressions
-ERROR(expr_varargs_expansion_expected_lparen,PointsToFirstBadToken,
-      "expected '(' following '#variadic'", ())
-ERROR(expr_varargs_expansion_expected_expr,PointsToFirstBadToken,
-      "expected expression within '#variadic(...)'", ())
-ERROR(expr_varargs_expansion_expected_rparen,PointsToFirstBadToken,
-      "expected ')' to complete '#variadic' expression", ())
-
 // Type-of expressions.
 ERROR(expr_typeof_expected_label_of,PointsToFirstBadToken,
       "expected argument label 'of:' within 'type(...)'", ())
