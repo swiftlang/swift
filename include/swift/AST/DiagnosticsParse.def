@@ -848,6 +848,8 @@ ERROR(expected_parameter_name,PointsToFirstBadToken,
       "expected parameter name followed by ':'", ())
 ERROR(expected_parameter_colon,PointsToFirstBadToken,
       "expected ':' following argument label and parameter name", ())
+ERROR(expected_assignment_instead_of_comparison_operator,none,
+      "expected '=' instead of '==' to assign default value for parameter", ())
 ERROR(missing_parameter_type,PointsToFirstBadToken,
       "parameter requires an explicit type", ())
 ERROR(multiple_parameter_ellipsis,none,

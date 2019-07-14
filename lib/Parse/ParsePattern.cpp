@@ -366,7 +366,13 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
       } else {
         // Otherwise, we're not sure what is going on, but this doesn't smell
         // like a parameter.
-        diagnose(Tok, diag::expected_parameter_name);
+        if (Tok.isBinaryOperator() && Tok.getText() == "==") {
+          diagnose(Tok,
+                   diag::expected_assignment_instead_of_comparison_operator)
+              .fixItReplace(Tok.getLoc(), "=");
+        } else {
+          diagnose(Tok, diag::expected_parameter_name);
+        }
         param.isInvalid = true;
         param.FirstNameLoc = Tok.getLoc();
         TokReceiver->registerTokenKindChange(param.FirstNameLoc,
