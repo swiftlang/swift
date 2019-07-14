@@ -11,9 +11,11 @@ struct HasVariadicSubscript {
 let closure: ((Int...) -> Void) = {
   (args: Int...) in
 }
+let x: [Int] = [1,2,3] + [4]
 
 f([1,2,3] as Int ...) // expected-error {{expected expression after operator}}
-
+f(x as! Int...) // expected-error {{coercion to variadic arguments using 'as!' is not allowed; did you mean to use 'as'?}}
+f(x as? Int...) // expected-error {{coercion to variadic arguments using 'as?' is not allowed; did you mean to use 'as'?}}
 
 _ = 0 as Int...5
 _ = 0 as Int ... 5
@@ -21,7 +23,6 @@ _ = 0 as Int ... 5
 f(1,2,3)
 f([1,2,3] as Int...)
 closure([1,2,3] as Int...)
-let x: [Int] = [1,2,3] + [4]
 f(x as Int...)
 f((x.map { $0 + 1 }) as Int...)
 f([] as Int...)

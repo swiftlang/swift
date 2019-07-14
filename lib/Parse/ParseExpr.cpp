@@ -111,24 +111,38 @@ ParserResult<Expr> Parser::parseExprAs() {
   if (type.isNull())
     return nullptr;
 
+  bool includesVarargExpansion = false;
+  SourceLoc ellipsisLoc;
+  auto typeRepr = type.get();
+  if (Tok.is(tok::oper_postfix) && Tok.isEllipsis()) {
+    ellipsisLoc = consumeToken();
+    includesVarargExpansion = true;
+    typeRepr =
+        new (Context) ArrayTypeRepr(typeRepr, typeRepr->getSourceRange());
+  }
+  ParserStatus status;
   Expr *parsed;
   if (questionLoc.isValid()) {
-    parsed = new (Context) ConditionalCheckedCastExpr(asLoc, questionLoc,
-                                                      type.get());
-  } else if (exclaimLoc.isValid()) {
-    parsed = new (Context) ForcedCheckedCastExpr(asLoc, exclaimLoc, type.get());
-  } else {
-    bool includesVarargExpansion = false;
-    auto typeRepr = type.get();
-    if (Tok.is(tok::oper_postfix) && Tok.isEllipsis()) {
-      consumeToken();
-      includesVarargExpansion = true;
-      typeRepr =
-          new (Context) ArrayTypeRepr(typeRepr, typeRepr->getSourceRange());
+    if (includesVarargExpansion) {
+      diagnose(asLoc, diag::invalid_ellipsis_after_as_type, "as?")
+          .fixItRemove(questionLoc);
+      status.setIsParseError();
     }
+    parsed =
+        new (Context) ConditionalCheckedCastExpr(asLoc, questionLoc, typeRepr);
+  } else if (exclaimLoc.isValid()) {
+    if (includesVarargExpansion) {
+      diagnose(asLoc, diag::invalid_ellipsis_after_as_type, "as!")
+          .fixItRemove(exclaimLoc);
+      status.setIsParseError();
+    }
+    parsed = new (Context) ForcedCheckedCastExpr(asLoc, exclaimLoc, typeRepr);
+  } else {
     parsed = new (Context) CoerceExpr(asLoc, typeRepr, includesVarargExpansion);
   }
-  return makeParserResult(parsed);
+  return status.isError() ? makeParserErrorResult(
+                                new (Context) ErrorExpr({asLoc, ellipsisLoc}))
+                          : makeParserResult(parsed);
 }
 
 /// parseExprArrow

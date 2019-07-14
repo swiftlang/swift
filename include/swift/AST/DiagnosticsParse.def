@@ -1228,6 +1228,9 @@ ERROR(expected_type_after_is,none,
       "expected type after 'is'", ())
 ERROR(expected_type_after_as,none,
       "expected type after 'as'", ())
+ERROR(invalid_ellipsis_after_as_type,none,
+      "coercion to variadic arguments using '%0' is not allowed; did you mean"
+      " to use 'as'?", (StringRef))
 
 // Extra tokens in string interpolation like in " >> \( $0 } ) << "
 ERROR(string_interpolation_extra,none,
