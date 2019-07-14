@@ -3357,13 +3357,7 @@ public:
                "SubExpr of explicit VarargExpansionExpr must be a CoerceExpr");
   }
 
-  SourceLoc getStartLoc() const { return SubExpr->getStartLoc(); }
-
-  SourceLoc getEndLoc() const { return SubExpr->getEndLoc(); }
-
-  SourceLoc getLoc() const { return SubExpr->getLoc(); }
-
-  SourceRange getSourceRange() const { return SubExpr->getSourceRange(); }
+  SWIFT_FORWARD_SOURCE_LOCS_TO(SubExpr)
 
   Expr *getSubExpr() const { return SubExpr; }
   void setSubExpr(Expr *subExpr) { SubExpr = subExpr; }
