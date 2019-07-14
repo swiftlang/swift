@@ -504,7 +504,7 @@ public:
       // Note that we don't assume cachePath is the same as the Clang
       // module cache path at this point.
       if (!moduleCachePath.empty())
-        (void)llvm::sys::fs::create_directory(moduleCachePath);
+        (void)llvm::sys::fs::create_directories(moduleCachePath);
 
       configureSubInvocationInputsAndOutputs(OutPath);
 
@@ -1266,6 +1266,10 @@ class ParseableInterfaceModuleLoaderImpl {
           addDependency(getFullDependencyPath(dep, SDKRelativeBuffer));
       depsAdjustedToMTime.push_back(adjustedDep);
     }
+
+    // Create the module cache if we haven't created it yet.
+    StringRef parentDir = path::parent_path(outputPath);
+    (void)llvm::sys::fs::create_directories(parentDir);
 
     auto hadError = withOutputFile(diags, outputPath,
       [&](llvm::raw_pwrite_stream &out) {
