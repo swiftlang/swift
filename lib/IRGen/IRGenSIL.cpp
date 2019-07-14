@@ -35,6 +35,7 @@
 #include "swift/Basic/Range.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ParameterList.h"
@@ -5435,12 +5436,28 @@ void IRGenSILFunction::visitCondFailInst(swift::CondFailInst *i) {
   llvm::BasicBlock *contBB = llvm::BasicBlock::Create(IGM.getLLVMContext());
   Builder.CreateCondBr(cond, failBB, contBB);
   Builder.emitBlock(failBB);
-  if (IGM.DebugInfo)
-    // If we are emitting DWARF, this does nothing. Otherwise the ``llvm.trap``
-    // instruction emitted from ``Builtin.condfail`` should have an inlined
-    // debug location. This is because zero is not an artificial line location
-    // in CodeView.
-    IGM.DebugInfo->setInlinedTrapLocation(Builder, i->getDebugScope());
+  if (IGM.DebugInfo) {
+    // Give the ``Builtin.condfail`` an inlined debug location.
+    
+    // If the failure has a literal string message associated, use it as the
+    // function name for the inlined location, so that backtraces show the
+    // message.
+    // TODO: Also lower the message arguments as frame variables in the inline
+    // scope.
+    SmallString<128> message;
+    if (auto messageValue = i->getMessage()) {
+      if (auto messageLiteral = dyn_cast<StringLiteralInst>(messageValue)) {
+        message = messageLiteral->getValue();
+      } else {
+        IGM.Context.Diags.diagnose(i->getLoc().getSourceLoc(),
+                                   diag::irgen_condfail_non_literal_message);
+      }
+    }
+    
+    IGM.DebugInfo->setInlinedTrapLocation(Builder, i->getDebugScope(),
+                                          i->getLoc(), message);
+  }
+  
   emitTrap(/*EmitUnreachable=*/true);
   Builder.emitBlock(contBB);
   FailBBs.push_back(failBB);

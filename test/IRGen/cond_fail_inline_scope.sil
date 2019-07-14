@@ -1,0 +1,27 @@
+// RUN: %target-swift-frontend -emit-ir -gline-tables-only %s | %FileCheck %s
+
+import Builtin
+
+sil @after_trap : $() -> ()
+
+// CHECK-LABEL: define {{.*}}@cond_fail_message(i1)
+sil @cond_fail_message : $(Builtin.Int1) -> () {
+entry(%z : $Builtin.Int1):
+  %m = string_literal utf8 "this is the way the world ends"
+  // CHECK:   br i1 {{.*}}, label %[[TRAP:.*]], label %[[CONT:.*]], !dbg [[COND_FAIL_LOC:!.*]]
+  cond_fail %z : $Builtin.Int1, %m : $Builtin.RawPointer
+  // CHECK: ; <label>:[[CONT]]:
+  // CHECK:   call {{.*}} @after_trap(), !dbg [[APPLY_LOC:!.*]]
+  %f = function_ref @after_trap : $@convention(thin) () -> ()
+  %a = apply %f() : $@convention(thin) () -> ()
+  // CHECK:   ret void, !dbg [[RET_LOC:!.*]]
+  return undef : $()
+
+  // CHECK: ; <label>:[[TRAP]]:
+  // CHECK:   call void @llvm.trap(), !dbg [[TRAP_LOC:!.*]]
+}
+
+// CHECK-DAG: [[TRAP_LOC]] = !DILocation(line: 12, column: 3, scope: [[TRAP_SCOPE:!.*]], inlinedAt: [[TRAP_INLINED_LOC:!.*]])
+// CHECK-DAG: [[TRAP_SCOPE]] = distinct !DISubprogram(name: "this is the way the world ends"
+// CHECK-DAG: [[TRAP_INLINED_LOC]] = !DILocation(line: 12, column: 3, scope: [[FUNCTION_SCOPE:!.*]])
+// CHECK-DAG: [[FUNCTION_SCOPE]] = distinct !DISubprogram(name: "cond_fail_message"

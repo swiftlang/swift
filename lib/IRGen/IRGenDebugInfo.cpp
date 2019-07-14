@@ -151,7 +151,9 @@ public:
   void clearLoc(IRBuilder &Builder);
   void pushLoc();
   void popLoc();
-  void setInlinedTrapLocation(IRBuilder &Builder, const SILDebugScope *Scope);
+  void setInlinedTrapLocation(IRBuilder &Builder, const SILDebugScope *Scope,
+                              SILLocation loc,
+                              StringRef message);
   void setEntryPointLoc(IRBuilder &Builder);
   llvm::DIScope *getEntryPointFn();
   llvm::DIScope *getOrCreateScope(const SILDebugScope *DS);
@@ -1848,29 +1850,58 @@ void IRGenDebugInfoImpl::popLoc() {
   std::tie(LastDebugLoc, LastScope) = LocationStack.pop_back_val();
 }
 
-/// This is done for WinDbg to avoid having two non-contiguous sets of
-/// instructions because the ``@llvm.trap`` instruction gets placed at the end
-/// of the function.
 void IRGenDebugInfoImpl::setInlinedTrapLocation(IRBuilder &Builder,
-                                                const SILDebugScope *Scope) {
-  if (Opts.DebugInfoFormat != IRGenDebugInfoFormat::CodeView)
-    return;
-
-  // The @llvm.trap could be inlined into a chunk of code that was also inlined.
-  // If this is the case then simply using the LastScope's location would
-  // generate debug info that claimed Function A owned Block X and Block X
-  // thought it was owned by Function B. Therefore, we need to find the last
-  // inlined scope to point to.
-  const SILDebugScope *TheLastScope = LastScope;
-  while (TheLastScope->InlinedCallSite &&
-         TheLastScope->InlinedCallSite != TheLastScope) {
-    TheLastScope = TheLastScope->InlinedCallSite;
+                                                const SILDebugScope *Scope,
+                                                SILLocation loc,
+                                                StringRef message) {
+  llvm::DebugLoc DL;
+  // If the trap came with a message, create an artificial inline scope inside
+  // the scope with the message.
+  if (!message.empty()) {
+    auto realScope = getOrCreateScope(LastScope);
+    auto trapScope = llvm::DISubprogram::getDistinct(IGM.LLVMContext,
+                               realScope->getFile(),
+                               message, "",
+                               realScope->getFile(),
+                               LastDebugLoc.Line,
+                               /*type*/ nullptr,
+                               LastDebugLoc.Line,
+                               /*containingType*/ llvm::DITypeRef(),
+                               /*virtualIndex*/0,
+                               /*thisAdjustment*/0,
+                               llvm::DINode::DIFlags(),
+                               llvm::DISubprogram::DISPFlags::SPFlagDefinition,
+                               TheCU);
+    DL = llvm::DebugLoc::get(LastDebugLoc.Line,
+                             LastDebugLoc.Column,
+                             trapScope,
+                             llvm::DebugLoc::get(LastDebugLoc.Line,
+                                                 LastDebugLoc.Column,
+                                                 getOrCreateScope(LastScope)));
+  } else if (Opts.DebugInfoFormat == IRGenDebugInfoFormat::CodeView) {
+    // This is done for WinDbg to avoid having two non-contiguous sets of
+    // instructions because the ``@llvm.trap`` instruction gets placed at the end
+    // of the function.
+    //
+    // The @llvm.trap could be inlined into a chunk of code that was also inlined.
+    // If this is the case then simply using the LastScope's location would
+    // generate debug info that claimed Function A owned Block X and Block X
+    // thought it was owned by Function B. Therefore, we need to find the last
+    // inlined scope to point to.
+    const SILDebugScope *TheLastScope = LastScope;
+    while (TheLastScope->InlinedCallSite &&
+           TheLastScope->InlinedCallSite != TheLastScope) {
+      TheLastScope = TheLastScope->InlinedCallSite;
+    }
+    auto LastLocation = llvm::DebugLoc::get(
+        LastDebugLoc.Line, LastDebugLoc.Column, getOrCreateScope(TheLastScope));
+    // FIXME: This location should point to stdlib instead of being artificial.
+    DL = llvm::DebugLoc::get(0, 0, getOrCreateScope(Scope), LastLocation);
   }
-  auto LastLocation = llvm::DebugLoc::get(
-      LastDebugLoc.Line, LastDebugLoc.Column, getOrCreateScope(TheLastScope));
-  // FIXME: This location should point to stdlib instead of being artificial.
-  auto DL = llvm::DebugLoc::get(0, 0, getOrCreateScope(Scope), LastLocation);
-  Builder.SetCurrentDebugLocation(DL);
+  
+  if (DL) {
+    Builder.SetCurrentDebugLocation(DL);
+  }
 }
 
 void IRGenDebugInfoImpl::setEntryPointLoc(IRBuilder &Builder) {
@@ -2333,9 +2364,13 @@ void IRGenDebugInfo::popLoc() {
 }
 
 void IRGenDebugInfo::setInlinedTrapLocation(IRBuilder &Builder,
-                                            const SILDebugScope *Scope) {
+                                            const SILDebugScope *Scope,
+                                            SILLocation loc,
+                                            StringRef message) {
   static_cast<IRGenDebugInfoImpl *>(this)->setInlinedTrapLocation(Builder,
-                                                                  Scope);
+                                                                  Scope,
+                                                                  loc,
+                                                                  message);
 }
 
 void IRGenDebugInfo::setEntryPointLoc(IRBuilder &Builder) {

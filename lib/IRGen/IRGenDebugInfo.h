@@ -73,7 +73,9 @@ public:
   /// In CodeView, since zero is not an artificial location, we emit the
   /// location of the unified trap block at the end of the fuction as an
   /// artificial inline location pointing to the user's instruction.
-  void setInlinedTrapLocation(IRBuilder &Builder, const SILDebugScope *Scope);
+  void setInlinedTrapLocation(IRBuilder &Builder, const SILDebugScope *Scope,
+                              SILLocation loc,
+                              StringRef message);
 
   /// Set the location for SWIFT_ENTRY_POINT_FUNCTION.
   void setEntryPointLoc(IRBuilder &Builder);
