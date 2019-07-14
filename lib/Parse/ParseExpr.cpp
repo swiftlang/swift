@@ -88,7 +88,7 @@ ParserResult<Expr> Parser::parseExprIs() {
 
 /// parseExprAs
 ///   expr-as:
-///     'as' type
+///     'as' type '...'?
 ///     'as?' type
 ///     'as!' type
 ParserResult<Expr> Parser::parseExprAs() {
@@ -120,7 +120,7 @@ ParserResult<Expr> Parser::parseExprAs() {
   } else {
     bool includesVarargExpansion = false;
     auto typeRepr = type.get();
-    if (Tok.isEllipsis()) {
+    if (Tok.is(tok::oper_postfix) && Tok.isEllipsis()) {
       consumeToken();
       includesVarargExpansion = true;
       typeRepr =

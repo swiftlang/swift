@@ -12,6 +12,12 @@ let closure: ((Int...) -> Void) = {
   (args: Int...) in
 }
 
+f([1,2,3] as Int ...) // expected-error {{expected expression after operator}}
+
+
+_ = 0 as Int...5
+_ = 0 as Int ... 5
+
 f(1,2,3)
 f([1,2,3] as Int...)
 closure([1,2,3] as Int...)
