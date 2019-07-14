@@ -37,9 +37,10 @@ let x = [1,2,3].map { $0 + 1 }
 f(x as Int...) // CHECK: 2,3,4
 f([x, x] as [Int]...) // CHECK: [2, 3, 4],[2, 3, 4]
 
-func overloaded(x: [Int]) { print("incorrect") }
-func overloaded(x: Int...) { print("correct") }
-overloaded(x: x as Int...) // CHECK: correct
+func overloaded(x: [Int]) { print("array") }
+func overloaded(x: Int...) { print("varargs") }
+overloaded(x: x as Int...) // CHECK: varargs
+overloaded(x: x) // CHECK: array
 
 struct HasVariadicSubscript {
   subscript(bar: Int...) -> Int {

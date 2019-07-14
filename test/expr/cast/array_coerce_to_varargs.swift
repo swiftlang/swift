@@ -12,6 +12,7 @@ let closure: ((Int...) -> Void) = {
   (args: Int...) in
 }
 let x: [Int] = [1,2,3] + [4]
+let y: [Int]! = [1,2,3]
 
 f([1,2,3] as Int ...) // expected-error {{expected expression after operator}}
 f(x as! Int...) // expected-error {{coercion to variadic arguments using 'as!' is not allowed; did you mean to use 'as'?}}
@@ -26,6 +27,7 @@ closure([1,2,3] as Int...)
 f(x as Int...)
 f((x.map { $0 + 1 }) as Int...)
 f([] as Int...)
+f(y as Int...)
 
 f2(x: "Hello,", y: 1,2,3, z: "world!")
 f2(x: "Hello again,", y: [1,2,3] as Int..., z: "world!")
@@ -36,6 +38,7 @@ f3(["\(1)", "\(2)"] as String...)
 func overloaded(x: [Int]) {}
 func overloaded(x: Int...) {}
 overloaded(x: x as Int...)
+overloaded(x: x)
 
 f([1,2,3] as Int..., 3, 4) // expected-error {{array elements coerced to variadic arguments cannot be used alongside additional variadic arguments}}
 f(1, 2, [1,2,3] as Int...) // expected-error {{array elements coerced to variadic arguments cannot be used alongside additional variadic arguments}}
