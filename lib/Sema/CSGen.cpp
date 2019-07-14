@@ -46,6 +46,26 @@ static bool isArithmeticOperatorDecl(ValueDecl *vd) {
    vd->getBaseName() == "%");
 }
 
+static bool hasBinOpOverloadWithSameArgTypesDifferingResult(
+    OverloadedDeclRefExpr *overloads) {
+  for (auto decl : overloads->getDecls()) {
+    auto metaFuncType = decl->getInterfaceType()->getAs<AnyFunctionType>();
+    auto funcType = metaFuncType->getResult()->getAs<FunctionType>();
+    if (!funcType)
+      continue;
+
+    auto params = funcType->getParams();
+    if (params.size() != 2)
+      continue;
+
+    if (params[0].getPlainType().getPointer() != params[1].getPlainType().getPointer())
+      continue;
+    if (funcType->getResult().getPointer() != params[0].getPlainType().getPointer())
+      return true;
+  }
+  return false;
+}
+
 static bool mergeRepresentativeEquivalenceClasses(ConstraintSystem &CS,
                                                   TypeVariableType* tyvar1,
                                                   TypeVariableType* tyvar2) {
@@ -338,6 +358,9 @@ namespace {
 
             if (ODR1->getDecls()[0]->getBaseName() !=
                 ODR2->getDecls()[0]->getBaseName())
+              return;
+
+            if (hasBinOpOverloadWithSameArgTypesDifferingResult(ODR1))
               return;
 
             // All things equal, we can merge the tyvars for the function
