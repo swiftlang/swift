@@ -4455,7 +4455,7 @@ public:
 
   bool isLiteralInit() const { return InitRangeEnd.isValid(); }
 
-  bool includesVaragExpansion() const { return IncludesVarargExpansion; }
+  bool includesVarargExpansion() const { return IncludesVarargExpansion; }
 
   SourceRange getSourceRange() const {
     return isLiteralInit()

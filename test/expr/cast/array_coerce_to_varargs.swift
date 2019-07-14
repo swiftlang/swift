@@ -36,7 +36,7 @@ f(1, 2, [1,2,3] as Int..., 3, 4) // expected-error {{array elements coerced to v
 f([1,2,3] as Int..., 3, 4, [1,2,3] as Int...) // expected-error {{array elements coerced to variadic arguments cannot be used alongside additional variadic arguments}}
 f([1,2,3] as Int..., [1,2,3] as Int...) // expected-error {{array elements coerced to variadic arguments cannot be used alongside additional variadic arguments}}
 
-f(1 as Int...) // expected-error {{expression type '[_]' is ambiguous without more context}}
+f(1 as Int...) // expected-error {{cannot convert value of type 'Int' to type '[Int]' in coercion}}
 
 class A {}
 class B: A {}
@@ -50,7 +50,7 @@ takesA([B(), B()] as A...)
 takesA([B(), B()] as B...)
 takesA([S2()] as A...) // expected-error {{cannot convert value of type 'S2' to expected element type 'A'}}
 takesP([S(), S(), S()] as P...)
-takesP([S2()] as P...) // expected-error {{argument type '[S2]' does not conform to expected type 'P'}}
+takesP([S2()] as P...) // expected-error {{'[S2]' is not convertible to '[P]'; did you mean to use 'as!' to force downcast?}} {{8-8=(}} {{14-14= as! [P])}}
 
 f(([1,2,3] as Int...) as Int...) // expected-error {{coercion to variadic arguments is only allowed in an argument position}}
 let y = [1,2,3] as Int... // expected-error {{coercion to variadic arguments is only allowed in an argument position}}
@@ -62,4 +62,3 @@ takesArray([1,2,3] as Int...) // expected-error {{cannot invoke 'takesArray' wit
 // expected-note@-1 {{expected an argument list of type '([Int])'}}
 takesArray(x as Int...) // expected-error {{cannot invoke 'takesArray' with an argument list of type '(Int...)'}}
 // expected-note@-1 {{expected an argument list of type '([Int])'}}
-takesArray(1 as Int...)

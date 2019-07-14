@@ -813,10 +813,19 @@ bool MissingForcedDowncastFailure::diagnoseAsError() {
   case CheckedCastKind::DictionaryDowncast:
   case CheckedCastKind::SetDowncast:
   case CheckedCastKind::ValueCast:
-    emitDiagnostic(coerceExpr->getLoc(), diag::missing_forced_downcast,
-                   fromType, toType)
-        .highlight(coerceExpr->getSourceRange())
-        .fixItReplace(coerceExpr->getLoc(), "as!");
+    auto diag = emitDiagnostic(coerceExpr->getLoc(),
+                               diag::missing_forced_downcast, fromType, toType);
+    diag.highlight(coerceExpr->getSourceRange());
+    if (coerceExpr->includesVarargExpansion()) {
+      diag.fixItInsert(coerceExpr->getStartLoc(), "(");
+      llvm::SmallString<32> insertAfter;
+      insertAfter += " as! ";
+      insertAfter += toType->getWithoutParens()->getString();
+      insertAfter += ")";
+      diag.fixItInsertAfter(subExpr->getEndLoc(), insertAfter);
+    } else {
+      diag.fixItReplace(coerceExpr->getLoc(), "as!");
+    }
     return true;
   }
   llvm_unreachable("unhandled cast kind");

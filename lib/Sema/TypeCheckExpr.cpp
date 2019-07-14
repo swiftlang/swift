@@ -377,7 +377,7 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS,
     assert(RHS == as && "'as' with non-type RHS?!");
     as->setSubExpr(LHS);
     auto coercion = dyn_cast<CoerceExpr>(as);
-    if (coercion && coercion->includesVaragExpansion()) {
+    if (coercion && coercion->includesVarargExpansion()) {
       auto expansionExpr =
           new (TC.Context) VarargExpansionExpr(coercion, false);
       return makeResultExpr(expansionExpr);
