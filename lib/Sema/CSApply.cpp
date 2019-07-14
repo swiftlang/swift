@@ -5446,12 +5446,13 @@ Expr *ExprRewriter::coerceCallArguments(
 
         // Convert the argument.
         Expr *convertedArg;
+        auto argLocator = getArgLocator(argIdx, paramIdx,
+                                        param.getParameterFlags());
         if (isVarargExpansion) {
-          convertedArg = buildCollectionUpcastExpr(arg, paramType, false, locator);
+          convertedArg = buildCollectionUpcastExpr(arg, paramType, false,
+                                                   argLocator);
         } else {
-          convertedArg = coerceToType(
-                                      arg, paramType,
-                                      getArgLocator(argIdx, paramIdx, param.getParameterFlags()));
+          convertedArg = coerceToType(arg, paramType, argLocator);
         }
 
         if (!convertedArg)

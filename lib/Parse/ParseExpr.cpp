@@ -120,7 +120,7 @@ ParserResult<Expr> Parser::parseExprAs() {
   } else {
     bool includesVarargExpansion = false;
     auto typeRepr = type.get();
-    if (Tok.is(tok::oper_postfix) && Tok.getRawText() == "...") {
+    if (Tok.isEllipsis()) {
       consumeToken();
       includesVarargExpansion = true;
       typeRepr =
