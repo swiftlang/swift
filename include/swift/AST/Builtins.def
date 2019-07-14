@@ -318,6 +318,11 @@ BUILTIN_SIL_OPERATION(EndUnpairedAccess, "endUnpairedAccess", Special)
 /// Triggers a runtime failure if the condition is true.
 BUILTIN_SIL_OPERATION(CondFail, "condfail", Special)
 
+/// condfail(Int1, RawPointer) -> ()
+/// Triggers a runtime failure if the condition is true, with a
+/// reason message to encode in debug info
+BUILTIN_SIL_OPERATION(CondFailMessage, "condfail_message", Special)
+
 /// fixLifetime(T) -> ()
 /// Fixes the lifetime of any heap references in a value.
 BUILTIN_SIL_OPERATION(FixLifetime, "fixLifetime", Special)

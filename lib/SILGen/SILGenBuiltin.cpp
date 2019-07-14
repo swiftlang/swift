@@ -630,6 +630,19 @@ static ManagedValue emitBuiltinCondFail(SILGenFunction &SGF,
   return ManagedValue::forUnmanaged(SGF.emitEmptyTuple(loc));
 }
 
+/// Specialized emitter for Builtin.condfail_message.
+static ManagedValue emitBuiltinCondFailMessage(SILGenFunction &SGF,
+                                        SILLocation loc,
+                                        SubstitutionMap substitutions,
+                                        ArrayRef<ManagedValue> args,
+                                        SGFContext C) {
+  assert(args.size() == 2 && "condfail should be given one argument");
+  
+  SGF.B.createCondFail(loc, args[0].getUnmanagedValue(), /*invert*/ false,
+                       args[1].getUnmanagedValue());
+  return ManagedValue::forUnmanaged(SGF.emitEmptyTuple(loc));
+}
+
 /// Specialized emitter for Builtin.castReference.
 static ManagedValue
 emitBuiltinCastReference(SILGenFunction &SGF,

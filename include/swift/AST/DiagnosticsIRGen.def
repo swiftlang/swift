@@ -67,6 +67,9 @@ ERROR(alignment_more_than_maximum,none,
       "@_alignment cannot increase alignment above maximum alignment of %0",
       (unsigned))
 
+WARNING(irgen_condfail_non_literal_message,none,
+        "condfail message did not evaluate to a literal string", ())
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG

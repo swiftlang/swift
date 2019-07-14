@@ -1035,10 +1035,18 @@ static ValueDecl *getCanBeObjCClassOperation(ASTContext &Context,
 }
 
 static ValueDecl *getCondFailOperation(ASTContext &C, Identifier Id) {
-  // Int1 -> ()
+  // (Int1) -> ()
   auto CondTy = BuiltinIntegerType::get(1, C);
   auto VoidTy = TupleType::getEmpty(C);
   return getBuiltinFunction(Id, {CondTy}, VoidTy);
+}
+
+static ValueDecl *getCondFailMessageOperation(ASTContext &C, Identifier Id) {
+  // (Int1, RawPointer) -> ()
+  auto CondTy = BuiltinIntegerType::get(1, C);
+  auto MsgTy = C.TheRawPointerType;
+  auto VoidTy = TupleType::getEmpty(C);
+  return getBuiltinFunction(Id, {CondTy, MsgTy}, VoidTy);
 }
 
 static ValueDecl *getAssertConfOperation(ASTContext &C, Identifier Id) {
@@ -1894,6 +1902,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::CondFail:
     return getCondFailOperation(Context, Id);
+
+  case BuiltinValueKind::CondFailMessage:
+    return getCondFailMessageOperation(Context, Id);
 
   case BuiltinValueKind::AssertConf:
     return getAssertConfOperation(Context, Id);
