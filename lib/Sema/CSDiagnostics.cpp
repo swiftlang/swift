@@ -3528,7 +3528,7 @@ bool ExpandArrayIntoVarargsFailure::diagnoseAsError() {
     insertAfter += getToType()->getWithoutParens()->getString();
     insertAfter += "...";
     emitDiagnostic(anchor->getLoc(),
-                   diag::suggest_pass_elements_using_pound_variadic)
+                   diag::suggest_pass_elements_using_vararg_expansion)
         .fixItInsert(anchor->getStartLoc(), insertBefore)
         .fixItInsertAfter(anchor->getEndLoc(), insertAfter);
 

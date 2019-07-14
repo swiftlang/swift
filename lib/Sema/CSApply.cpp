@@ -5429,7 +5429,7 @@ Expr *ExprRewriter::coerceCallArguments(
         auto argType = cs.getType(arg);
 
         if (isa<VarargExpansionExpr>(arg) && varargIndices.size() > 1) {
-          tc.diagnose(arg->getLoc(), diag::pound_variadic_must_appear_alone);
+          tc.diagnose(arg->getLoc(), diag::vararg_expansion_must_appear_alone);
           return nullptr;
         } else if (isa<VarargExpansionExpr>(arg)) {
           isVarargExpansion = true;
