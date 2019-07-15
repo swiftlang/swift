@@ -248,7 +248,23 @@ extension _StringGuts {
   ) -> Int? {
     #if _runtime(_ObjC)
     // Currently, foreign  means NSString
-    return _cocoaStringCopyUTF8(_object.cocoaObject, into: mbp)
+    if let res = _cocoaStringCopyUTF8(_object.cocoaObject, into: mbp) {
+      return res
+    }
+    
+    // If the NSString contains invalid UTF8 (e.g. unpaired surrogates), we
+    // can get nil from cocoaStringCopyUTF8 in situations where a character by
+    // character loop would get something more useful like repaired contents
+    var ptr = mbp.baseAddress._unsafelyUnwrappedUnchecked
+    var numWritten = 0
+    for cu in String(self).utf8 {
+      guard numWritten < mbp.count else { return nil }
+      ptr.initialize(to: cu)
+      ptr += 1
+      numWritten += 1
+    }
+    
+    return numWritten
     #else
     fatalError("No foreign strings on Linux in this version of Swift")
     #endif
