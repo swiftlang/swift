@@ -5773,6 +5773,11 @@ public:
     setBodyKind(BodyKind::Unparsed);
   }
 
+  /// Provide the parsed body for the function.
+  void setBodyParsed(BraceStmt *S) {
+    setBody(S, BodyKind::Parsed);
+  }
+
   /// Note that parsing for the body was delayed.
   ///
   /// The function should return the body statement and a flag indicating
@@ -5791,14 +5796,6 @@ public:
     assert(getBodyKind() == BodyKind::None);
     assert(isa<ConstructorDecl>(this));
     setBodyKind(BodyKind::MemberwiseInitializer);
-  }
-
-  /// If a body has been loaded, flag that it's been type-checked.
-  /// This is kindof a hacky operation, but it avoids some unnecessary
-  /// duplication of work.
-  void setBodyTypeCheckedIfPresent() {
-    if (getBodyKind() == BodyKind::Parsed)
-      setBodyKind(BodyKind::TypeChecked);
   }
 
   /// Gets the body of this function, stripping the unused portions of #if

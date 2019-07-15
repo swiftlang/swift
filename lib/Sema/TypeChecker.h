@@ -623,15 +623,10 @@ private:
   /// Closure expressions that have already been prechecked.
   llvm::SmallPtrSet<ClosureExpr *, 2> precheckedClosures;
 
-  /// A helper to construct and typecheck call to super.init().
-  ///
-  /// \returns NULL if the constructed expression does not typecheck.
-  Expr* constructCallToSuperInit(ConstructorDecl *ctor, ClassDecl *ClDecl);
-
   TypeChecker(ASTContext &Ctx);
   friend class ASTContext;
   friend class constraints::ConstraintSystem;
-  friend class TypeCheckFunctionBodyRequest;
+  friend class TypeCheckFunctionBodyUntilRequest;
   
 public:
   /// Create a new type checker instance for the given ASTContext, if it
@@ -985,13 +980,10 @@ public:
   bool typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
                                           SourceLoc EndTypeCheckLoc);
   bool typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD);
-  bool typeCheckFunctionBodyUntil(FuncDecl *FD, SourceLoc EndTypeCheckLoc);
-  bool typeCheckConstructorBodyUntil(ConstructorDecl *CD,
-                                     SourceLoc EndTypeCheckLoc);
-  bool typeCheckDestructorBodyUntil(DestructorDecl *DD,
-                                    SourceLoc EndTypeCheckLoc);
 
-  bool typeCheckFunctionBuilderFuncBody(FuncDecl *FD, Type builderType);
+  BraceStmt *applyFunctionBuilderBodyTransform(FuncDecl *FD,
+                                               BraceStmt *body,
+                                               Type builderType);
   bool typeCheckClosureBody(ClosureExpr *closure);
 
   bool typeCheckTapBody(TapExpr *expr, DeclContext *DC);
@@ -1841,7 +1833,7 @@ public:
   /// declarations are permitted.
   ///
   /// \see FragileFunctionKind
-  std::pair<FragileFunctionKind, bool>
+  static std::pair<FragileFunctionKind, bool>
   getFragileFunctionKind(const DeclContext *DC);
 
   /// \name Availability checking
