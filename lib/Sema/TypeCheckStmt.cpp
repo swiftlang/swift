@@ -763,9 +763,8 @@ public:
         return nullptr;
       S->setSequenceConformance(conformance);
 
-      iteratorTy = TC.getWitnessType(sequenceType, sequenceProto, *conformance,
-                                     TC.Context.Id_Iterator,
-                                     diag::sequence_protocol_broken);
+      iteratorTy = conformance->getTypeWitnessByName(sequenceType,
+                                                     TC.Context.Id_Iterator);
       if (!iteratorTy)
         return nullptr;
 
@@ -796,7 +795,7 @@ public:
       // be around.
       auto nextResultType =
           OptionalType::get(conformance->getTypeWitnessByName(
-                                sequenceType, DC->getASTContext().Id_Element))
+                                sequenceType, TC.Context.Id_Element))
               ->getCanonicalType();
       auto *genBinding = PatternBindingDecl::createImplicit(
           TC.Context, StaticSpellingKind::None, genPat,
@@ -829,9 +828,8 @@ public:
     if (!genConformance)
       return nullptr;
 
-    Type elementTy = TC.getWitnessType(iteratorTy, iteratorProto,
-                                       *genConformance, TC.Context.Id_Element,
-                                       diag::iterator_protocol_broken);
+    Type elementTy = genConformance->getTypeWitnessByName(iteratorTy,
+                                                        TC.Context.Id_Element);
     if (!elementTy)
       return nullptr;
 
