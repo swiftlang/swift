@@ -5336,18 +5336,10 @@ private:
   /// The JVP function.
   SILFunction *const jvp;
 
-  /// The differential function.
-  SILFunction *differential;
-
-  SILBasicBlock *dfBasicBlock;
-
   llvm::BumpPtrAllocator allocator;
 
   /// The differentiation invoker.
   DifferentiationInvoker invoker;
-
-  /// Info from activity analysis on the original function.
-  const DifferentiableActivityInfo &activityInfo;
 
   bool errorOccurred = false;
 
@@ -5357,11 +5349,19 @@ private:
 
   /// Mapping from original basic blocks and original values to corresponding
   /// adjoint values.
-  DenseMap<SILValue, AdjointValue> valueMap;
+  DenseMap<SILValue, AdjointValue> tangentValueMap;
+
+  /// The builder for the differential function.
+  SILBuilder differentialAndBuilder;
+
+  /// Info from activity analysis on the original function.
+  const DifferentiableActivityInfo &activityInfo;
 
   ASTContext &getASTContext() const { return jvp->getASTContext(); }
   SILModule &getModule() const { return jvp->getModule(); }
   const SILAutoDiffIndices &getIndices() const { return attr->getIndices(); }
+  SILFunction &getDifferential() { return differentialAndBuilder.getFunction(); }
+  SILBuilder &getDifferentialBuilder() { return differentialAndBuilder; }
 
   static SubstitutionMap getSubstitutionMap(SILFunction *original,
                                             SILFunction *jvp) {
@@ -5386,25 +5386,33 @@ private:
     return activityInfo;
   }
 
+  static SILBuilder initializeDifferentialAndBuilder(
+      ADContext &context, SILFunction *original, SILDifferentiableAttr *attr) {
+    auto *differential = createEmptyDifferential(context, original, attr);
+    return SILBuilder(*differential);
+  }
+
 public:
   explicit JVPEmitter(ADContext &context, SILFunction *original,
                       SILDifferentiableAttr *attr, SILFunction *jvp,
                       DifferentiationInvoker invoker)
-  : TypeSubstCloner(*jvp, *original, getSubstitutionMap(original, jvp)),
-  context(context), original(original), attr(attr), jvp(jvp),
-  invoker(invoker), activityInfo(getActivityInfo(
-      context, original, attr->getIndices(), jvp)) {
+      : TypeSubstCloner(*jvp, *original, getSubstitutionMap(original, jvp)),
+        context(context), original(original), attr(attr), jvp(jvp),
+        invoker(invoker),
+        differentialAndBuilder(
+            initializeDifferentialAndBuilder(context, original, attr)),
+        activityInfo(
+            getActivityInfo(context, original, attr->getIndices(), jvp)) {
     // Get JVP generic signature.
     CanGenericSignature jvpGenSig = nullptr;
     if (auto *jvpGenEnv = jvp->getGenericEnvironment())
       jvpGenSig = jvpGenEnv->getGenericSignature()->getCanonicalSignature();
-
     // Create empty differential function.
-    differential = createEmptyDifferential();
-    context.getGeneratedFunctions().push_back(differential);
+    context.getGeneratedFunctions().push_back(&getDifferential());
   }
 
-  SILFunction *createEmptyDifferential() {
+  static SILFunction *createEmptyDifferential(
+      ADContext &context, SILFunction *original, SILDifferentiableAttr *attr) {
     auto &module = context.getModule();
     auto origTy = original->getLoweredFunctionType();
     auto lookupConformance = LookUpConformanceInModule(module.getSwiftModule());
@@ -5468,8 +5476,10 @@ public:
         new (module) SILDebugScope(original->getLocation(), differential));
 
     // Create empty body of differential.
-    dfBasicBlock = differential->createBasicBlock();
+    // TODO(bartchr): remove.
+    differential->createBasicBlock();
     createEntryArguments(differential);
+
     return differential;
   }
 
@@ -5517,14 +5527,14 @@ private:
   }
 
   //--------------------------------------------------------------------------//
-  // Managed value mapping
+  // Managed tangent value mapping
   //--------------------------------------------------------------------------//
 
   /// Returns true if the original value has a corresponding adjoint value.
   bool hasAdjointValue(SILBasicBlock *origBB, SILValue originalValue) const {
     assert(origBB->getParent() == original);
     assert(originalValue->getType().isObject());
-    return valueMap.count(originalValue);
+    return tangentValueMap.count(originalValue);
   }
 
   /// Assuming the given type conforms to `Differentiable` after remapping,
@@ -5546,7 +5556,7 @@ private:
     assert(adjointValue.getType() ==
            getRemappedTangentType(originalValue->getType()));
     auto insertion =
-        valueMap.try_emplace(originalValue, adjointValue);
+        tangentValueMap.try_emplace(originalValue, adjointValue);
     assert(insertion.second && "Adjoint value inserted before");
   }
 
@@ -5558,7 +5568,7 @@ private:
   AdjointValue getAdjointValue(SILValue originalValue) {
     assert(originalValue->getType().isObject());
     assert(originalValue->getFunction() == original);
-    auto insertion = valueMap.try_emplace(
+    auto insertion = tangentValueMap.try_emplace(
         originalValue, makeZeroAdjointValue(
             getRemappedTangentType(originalValue->getType())));
     auto it = insertion.first;
@@ -5576,7 +5586,7 @@ private:
     assert(newAdjointValue.getType() ==
            getRemappedTangentType(originalValue->getType()));
     auto insertion =
-    valueMap.try_emplace(originalValue, newAdjointValue);
+    tangentValueMap.try_emplace(originalValue, newAdjointValue);
     auto inserted = insertion.second;
     if (inserted)
       return;
@@ -5584,7 +5594,7 @@ private:
     // adjoint.
     auto it = insertion.first;
     auto &&existingValue = it->getSecond();
-    valueMap.erase(it);
+    tangentValueMap.erase(it);
     auto adjVal = newAdjointValue; //    auto adjVal = accumulateAdjointsDirect(existingValue, newAdjointValue);
     initializeAdjointValue(originalValue, adjVal);
   }
@@ -5662,7 +5672,7 @@ public:
     auto jvpSubstMap = jvpGenericEnv
     ? jvpGenericEnv->getForwardingSubstitutionMap()
     : jvp->getForwardingSubstitutionMap();
-    auto *differentialRef = builder.createFunctionRef(loc, differential);
+    auto *differentialRef = getDifferentialBuilder().createFunctionRef(loc, &getDifferential());
     auto *differentialPartialApply = builder.createPartialApply(
                                                                 loc, differentialRef, jvpSubstMap, {},
                                                                 ParameterConvention::Direct_Guaranteed);
@@ -5675,18 +5685,18 @@ public:
                          ri->getLoc(), joinElements(directResults, builder, loc));
 
     // In the differential, return just the tangent of the original result
-    auto differentialBuilder = SILBuilder(dfBasicBlock);
     //    SmallVector<SILValue, 8> diffResults;
     //    extractAllElements(origResult, builder, diffResults);
     //    differentialBuilder.createReturn(differential->getLocation(), origResult);
     //    differentialBuilder.createReturn(differential->getLocation(),
     //                         joinElements(diffResults, differentialBuilder,
     //                                      differential->getLocation()));
-    auto diffConv = differential->getConventions();
-    auto diffLoc = differential->getLocation();
-    differentialBuilder.createReturn(diffLoc,
-                                     SILUndef::get(differential->mapTypeIntoContext(
-                                                                                    diffConv.getSILResultType()), *differential));
+    auto diffConv = getDifferential().getConventions();
+    auto diffLoc = getDifferential().getLocation();
+    getDifferentialBuilder().createReturn(
+        diffLoc, SILUndef::get(getDifferential().mapTypeIntoContext(
+                                   diffConv.getSILResultType()),
+                               getDifferential()));
   }
 
   // If an `apply` has active results or active inout parameters, replace it
