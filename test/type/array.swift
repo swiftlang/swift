@@ -114,3 +114,9 @@ func passAssocType<T : HasAssocType>(_ t: T) {
   takesAssocType(t, [T.A](), [T.A?]())
 }
 
+// SR-11134
+
+let sr_11134_1 = [["a"][0]] // Ok
+let sr_11134_2 = [["a"][1]] // expected-warning {{index '1' in subscript expression is out of bounds}}
+
+let sr_11134_3 = [[1, 1, 1], [], [4, 5, 6, 7], [0], [], [] [42]] // expected-warning {{index '42' in subscript expression is out of bounds}}

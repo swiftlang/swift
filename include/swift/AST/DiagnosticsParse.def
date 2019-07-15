@@ -762,6 +762,8 @@ ERROR(extra_rbracket,PointsToFirstBadToken,
       "unexpected ']' in type; did you mean to write an array type?", ())
 ERROR(extra_colon,PointsToFirstBadToken,
       "unexpected ':' in type; did you mean to write a dictionary type?", ())
+WARNING(subscript_collection_element_invalid_index, none,
+       "index '%0' in subscript expression is out of bounds", (StringRef))
 
 // Tuple Types
 ERROR(expected_rparen_tuple_type_list,none,
