@@ -1203,11 +1203,13 @@ public:
 
   bool diagnose(Expr *root, bool asNote = false) const override;
 
-  static AllowTupleSplatForSingleParameter *
-  attempt(ConstraintSystem &cs, SmallVectorImpl<Param> &args,
-          ArrayRef<Param> params,
-          SmallVectorImpl<SmallVector<unsigned, 1>> &bindings,
-          ConstraintLocatorBuilder locator);
+  /// Apply this fix to given arguments/parameters and return `true`
+  /// this fix is not applicable and solver can't continue, `false`
+  /// otherwise.
+  static bool attempt(ConstraintSystem &cs, SmallVectorImpl<Param> &args,
+                      ArrayRef<Param> params,
+                      SmallVectorImpl<SmallVector<unsigned, 1>> &bindings,
+                      ConstraintLocatorBuilder locator);
 };
 
 } // end namespace constraints

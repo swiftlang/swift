@@ -662,18 +662,18 @@ bool AllowTupleSplatForSingleParameter::diagnose(Expr *root, bool asNote) const 
   return false;
 }
 
-AllowTupleSplatForSingleParameter *AllowTupleSplatForSingleParameter::attempt(
+bool AllowTupleSplatForSingleParameter::attempt(
     ConstraintSystem &cs, SmallVectorImpl<Param> &args, ArrayRef<Param> params,
     SmallVectorImpl<SmallVector<unsigned, 1>> &bindings,
     ConstraintLocatorBuilder locator) {
   if (params.size() != 1 || args.size() <= 1)
-    return nullptr;
+    return true;
 
   const auto &param = params.front();
 
   auto *paramTy = param.getOldType()->getAs<TupleType>();
   if (!paramTy || paramTy->getNumElements() != args.size())
-    return nullptr;
+    return true;
 
   SmallVector<TupleTypeElt, 4> argElts;
   for (const auto &arg : args) {
@@ -689,6 +689,8 @@ AllowTupleSplatForSingleParameter *AllowTupleSplatForSingleParameter::attempt(
   args.clear();
   args.push_back(AnyFunctionType::Param(newArgType, param.getLabel()));
 
-  return new (cs.getAllocator()) AllowTupleSplatForSingleParameter(
+  auto *fix = new (cs.getAllocator()) AllowTupleSplatForSingleParameter(
       cs, paramTy, cs.getConstraintLocator(locator));
+
+  return cs.recordFix(fix);
 }

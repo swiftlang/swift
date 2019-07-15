@@ -953,10 +953,8 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
     if (!cs.shouldAttemptFixes())
       return cs.getTypeMatchFailure(locator);
 
-    auto *fix = AllowTupleSplatForSingleParameter::attempt(
-        cs, argsWithLabels, params, parameterBindings, locator);
-
-    if (!fix || cs.recordFix(fix))
+    if (AllowTupleSplatForSingleParameter::attempt(cs, argsWithLabels, params,
+                                                   parameterBindings, locator))
       return cs.getTypeMatchFailure(locator);
   }
 
