@@ -307,7 +307,7 @@ public:
   /// Call the trap intrinsic. If optimizations are enabled, an inline asm
   /// gadget is emitted before the trap. The gadget inhibits transforms which
   /// merge trap calls together, which makes debugging crashes easier.
-  llvm::CallInst *CreateNonMergeableTrap(IRGenModule &IGM, StringRef failureMsg);
+  llvm::CallInst *CreateNonMergeableTrap(IRGenModule &IGM);
 
   /// Split a first-class aggregate value into its component pieces.
   template <unsigned N>

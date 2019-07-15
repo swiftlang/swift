@@ -69,9 +69,7 @@ public:
 
         // Do not process arithmetic overflow checks. We typically generate more
         // efficient code with separate jump-on-overflow.
-        if (CFI && !hasOverflowConditionOperand(CFI) &&
-            (CondFailToMerge.empty() ||
-             CFI->getMessage() == CondFailToMerge.front()->getMessage()))
+        if (CFI && !hasOverflowConditionOperand(CFI))
           CondFailToMerge.push_back(CFI);
 
       }
@@ -111,15 +109,12 @@ public:
                                                       {MergedCond, CurCond});
       }
 
+      CondFailToMerge[I]->eraseFromParent();
       MergedCond = CurCond;
     }
 
     // Create a new cond_fail using the merged condition.
-    Builder.createCondFail(Loc, MergedCond, LastCFI->getMessage());
-
-    for (CondFailInst *CFI : CondFailToMerge) {
-      CFI->eraseFromParent();
-    }
+    Builder.createCondFail(Loc, MergedCond);
     return true;
   }
 };

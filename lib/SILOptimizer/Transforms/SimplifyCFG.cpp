@@ -1399,9 +1399,9 @@ static CondFailInst *getUnConditionalFail(SILBasicBlock *BB, SILValue Cond,
 
 /// Creates a new cond_fail instruction, optionally with an xor inverted
 /// condition.
-static void createCondFail(CondFailInst *Orig, SILValue Cond, StringRef Message,
-                           bool inverted, SILBuilder &Builder) {
-  Builder.createCondFail(Orig->getLoc(), Cond, Message, inverted);
+static void createCondFail(CondFailInst *Orig, SILValue Cond, bool inverted,
+                           SILBuilder &Builder) {
+  Builder.createCondFail(Orig->getLoc(), Cond, inverted);
 }
 
 /// Inverts the expected value of 'PotentialExpect' (if it is an expect
@@ -1643,7 +1643,7 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
   if (auto *TrueCFI = getUnConditionalFail(TrueSide, CFCondition, false)) {
     LLVM_DEBUG(llvm::dbgs() << "replace with cond_fail:" << *BI);
     SILBuilderWithScope Builder(BI);
-    createCondFail(TrueCFI, CFCondition, TrueCFI->getMessage(), false, Builder);
+    createCondFail(TrueCFI, CFCondition, false, Builder);
     SILBuilderWithScope(BI).createBranch(BI->getLoc(), FalseSide, FalseArgs);
 
     BI->eraseFromParent();
@@ -1655,7 +1655,7 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
   if (auto *FalseCFI = getUnConditionalFail(FalseSide, CFCondition, true)) {
     LLVM_DEBUG(llvm::dbgs() << "replace with inverted cond_fail:" << *BI);
     SILBuilderWithScope Builder(BI);
-    createCondFail(FalseCFI, CFCondition, FalseCFI->getMessage(), true, Builder);
+    createCondFail(FalseCFI, CFCondition, true, Builder);
     SILBuilderWithScope(BI).createBranch(BI->getLoc(), TrueSide, TrueArgs);
     
     BI->eraseFromParent();
@@ -2497,7 +2497,7 @@ static bool tryMoveCondFailToPreds(SILBasicBlock *BB) {
     SILValue incoming = condArg->getIncomingPhiValue(Pred);
     SILBuilderWithScope Builder(Pred->getTerminator());
     
-    createCondFail(CFI, incoming, CFI->getMessage(), inverted, Builder);
+    createCondFail(CFI, incoming, inverted, Builder);
   }
   CFI->eraseFromParent();
   return true;

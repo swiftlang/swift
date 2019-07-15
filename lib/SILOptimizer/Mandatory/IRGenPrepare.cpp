@@ -48,23 +48,16 @@ static bool cleanFunction(SILFunction &fn) {
         continue;
       }
 
-      switch (bi->getBuiltinInfo().ID) {
-        case BuiltinValueKind::CondFail: {
-          SILBuilderWithScope Builder(bi);
-          Builder.createCondFail(bi->getLoc(), bi->getOperand(0),
-            "unknown program error");
-          LLVM_FALLTHROUGH;
-        }
-        case BuiltinValueKind::PoundAssert:
-        case BuiltinValueKind::StaticReport:
-          // The call to the builtin should get removed before we reach
-          // IRGen.
-          recursivelyDeleteTriviallyDeadInstructions(bi, /* Force */ true);
-          madeChange = true;
-          break;
-        default:
-          break;
+      const BuiltinInfo &bInfo = bi->getBuiltinInfo();
+      if (bInfo.ID != BuiltinValueKind::PoundAssert &&
+          bInfo.ID != BuiltinValueKind::StaticReport) {
+        continue;
       }
+
+      // The call to the builtin should get removed before we reach
+      // IRGen.
+      recursivelyDeleteTriviallyDeadInstructions(bi, /* Force */ true);
+      madeChange = true;
     }
   }
 

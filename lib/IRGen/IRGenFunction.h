@@ -287,7 +287,7 @@ public:
   void setDereferenceableLoad(llvm::LoadInst *load, unsigned size);
 
   /// Emit a non-mergeable trap call, optionally followed by a terminator.
-  void emitTrap(StringRef failureMessage, bool EmitUnreachable);
+  void emitTrap(bool EmitUnreachable);
 
 private:
   llvm::Instruction *AllocaIP;

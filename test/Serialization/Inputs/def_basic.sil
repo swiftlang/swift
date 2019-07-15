@@ -1036,8 +1036,8 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
 // CHECK: sil public_external [transparent] [serialized] @cond_fail_test : $@convention(thin) (Builtin.Int1) -> () {
 sil [transparent] [serialized] @cond_fail_test : $@convention(thin) (Builtin.Int1) -> () {
 entry(%0 : $Builtin.Int1):
-  // CHECK: cond_fail %0 : $Builtin.Int1, "message"
-  cond_fail %0 : $Builtin.Int1, "message"
+  // CHECK: cond_fail %0 : $Builtin.Int1
+  cond_fail %0 : $Builtin.Int1
   %1 = tuple ()
   return %1 : $()
 }

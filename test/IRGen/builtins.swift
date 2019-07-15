@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name builtins -parse-stdlib  -disable-access-control -primary-file %s -emit-ir -o - -disable-objc-attr-requires-foundation-module | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
+// RUN: %target-swift-frontend -module-name builtins -parse-stdlib -primary-file %s -emit-ir -o - -disable-objc-attr-requires-foundation-module | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
 
 // REQUIRES: CPU=x86_64
 
@@ -315,10 +315,10 @@ func testStaticReport(_ b: Bool, ptr: Builtin.RawPointer) -> () {
 // CHECK-LABEL: define hidden {{.*}}void @"$s8builtins12testCondFail{{[_0-9a-zA-Z]*}}F"(i1, i1)
 func testCondFail(_ b: Bool, c: Bool) {
   // CHECK: br i1 %0, label %[[FAIL:.*]], label %[[CONT:.*]]
-  Builtin.condfail(b, StaticString("message").unsafeRawPointer)
+  Builtin.condfail(b)
   // CHECK: <label>:[[CONT]]
   // CHECK: br i1 %1, label %[[FAIL2:.*]], label %[[CONT:.*]]
-  Builtin.condfail(c, StaticString("message").unsafeRawPointer)
+  Builtin.condfail(c)
   // CHECK: <label>:[[CONT]]
   // CHECK: ret void
 

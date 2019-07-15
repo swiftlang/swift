@@ -2447,8 +2447,7 @@ SILCloner<ImplClass>::visitCondFailInst(CondFailInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(
       Inst, getBuilder().createCondFail(getOpLocation(Inst->getLoc()),
-                                        getOpValue(Inst->getOperand()),
-                                        Inst->getMessage()));
+                                        getOpValue(Inst->getOperand())));
 }
 
 template<typename ImplClass>

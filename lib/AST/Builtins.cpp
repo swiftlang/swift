@@ -1037,9 +1037,8 @@ static ValueDecl *getCanBeObjCClassOperation(ASTContext &Context,
 static ValueDecl *getCondFailOperation(ASTContext &C, Identifier Id) {
   // Int1 -> ()
   auto CondTy = BuiltinIntegerType::get(1, C);
-  auto MsgTy = C.TheRawPointerType;
   auto VoidTy = TupleType::getEmpty(C);
-  return getBuiltinFunction(Id, {CondTy, MsgTy}, VoidTy);
+  return getBuiltinFunction(Id, {CondTy}, VoidTy);
 }
 
 static ValueDecl *getAssertConfOperation(ASTContext &C, Identifier Id) {

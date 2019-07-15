@@ -6715,28 +6715,14 @@ class ProjectExistentialBoxInst
 //===----------------------------------------------------------------------===//
 
 /// Trigger a runtime failure if the given Int1 value is true.
-///
-/// Optionally cond_fail has a static failure message, which is displayed in the debugger in case the failure
-/// is triggered.
-class CondFailInst final
+class CondFailInst
     : public UnaryInstructionBase<SILInstructionKind::CondFailInst,
-                                  NonValueInstruction>,
-      private llvm::TrailingObjects<CondFailInst, char>
+                                  NonValueInstruction>
 {
-  friend TrailingObjects;
   friend SILBuilder;
 
-  unsigned MessageSize;
-
-  CondFailInst(SILDebugLocation DebugLoc, SILValue Operand, StringRef Message);
-
-  static CondFailInst *create(SILDebugLocation DebugLoc, SILValue Operand,
-                              StringRef Message, SILModule &M);
-
-public:
-  StringRef getMessage() const {
-    return {getTrailingObjects<char>(), MessageSize};
-  }
+  CondFailInst(SILDebugLocation DebugLoc, SILValue Operand)
+      : UnaryInstructionBase(DebugLoc, Operand) {}
 };
 
 //===----------------------------------------------------------------------===//
