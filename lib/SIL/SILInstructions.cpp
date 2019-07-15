@@ -773,21 +773,6 @@ StringLiteralInst *StringLiteralInst::create(SILDebugLocation Loc,
   return ::new (buf) StringLiteralInst(Loc, text, encoding, Ty);
 }
 
-CondFailInst::CondFailInst(SILDebugLocation DebugLoc, SILValue Operand,
-                           StringRef Message)
-      : UnaryInstructionBase(DebugLoc, Operand),
-        MessageSize(Message.size()) {
-  memcpy(getTrailingObjects<char>(), Message.data(), Message.size());
-}
-
-CondFailInst *CondFailInst::create(SILDebugLocation DebugLoc, SILValue Operand,
-                                   StringRef Message, SILModule &M) {
-
-  auto Size = totalSizeToAlloc<char>(Message.size());
-  auto Buffer = M.allocateInst(Size, alignof(CondFailInst));
-  return ::new (Buffer) CondFailInst(DebugLoc, Operand, Message);
-}
-
 uint64_t StringLiteralInst::getCodeUnitCount() {
   auto E = unsigned(Encoding::UTF16);
   if (SILInstruction::Bits.StringLiteralInst.TheEncoding == E)
