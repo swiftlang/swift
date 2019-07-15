@@ -454,9 +454,6 @@ public:
   // Mapping from imported types to their raw value types.
   llvm::DenseMap<const NominalTypeDecl *, Type> RawTypes;
 
-  // Mapping from imported types to their init(rawValue:) initializers.
-  llvm::DenseMap<const NominalTypeDecl *, ConstructorDecl *> RawInits;
-
   clang::CompilerInstance *getClangInstance() {
     return Instance.get();
   }
@@ -1170,10 +1167,6 @@ public:
     assert((!typeResolver.getPointer() || !newResolver) &&
            "already have a type resolver");
     typeResolver.setPointerAndInt(newResolver, true);
-  }
-  bool hasBegunTypeChecking() const { return typeResolver.getInt(); }
-  bool hasFinishedTypeChecking() const {
-    return hasBegunTypeChecking() && !getTypeResolver();
   }
 
   /// Allocate a new delayed conformance ID with the given set of

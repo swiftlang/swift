@@ -6685,26 +6685,9 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
                                           DeclName builtinLiteralFuncName,
                                           Diag<> brokenProtocolDiag,
                                           Diag<> brokenBuiltinProtocolDiag) {
-  auto &tc = cs.getTypeChecker();
-
-  auto getType = [&](const Expr *E) -> Type {
-    return cs.getType(E);
-  };
-
-  auto setType = [&](Expr *E, Type Ty) {
-    cs.setType(E, Ty);
-  };
-
   // If coercing a literal to an unresolved type, we don't try to look up the
   // witness members, just do it.
   if (type->is<UnresolvedType>()) {
-    // Instead of updating the literal expr in place, allocate a new node.  This
-    // avoids issues where Builtin types end up on expr nodes and pollute
-    // diagnostics.
-    literal = cast<LiteralExpr>(literal)->shallowClone(tc.Context, setType,
-                                                       getType);
-
-    // The literal expression has this type.
     cs.setType(literal, type);
     return literal;
   }
@@ -6753,9 +6736,8 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
   // Dig out the literal type and perform a builtin literal conversion to it.
   if (!literalType.empty()) {
     // Extract the literal type.
-    Type builtinLiteralType = tc.getWitnessType(type, protocol, *conformance,
-                                                literalType,
-                                                brokenProtocolDiag);
+    Type builtinLiteralType =
+        conformance->getTypeWitnessByName(type, literalType);
     if (!builtinLiteralType)
       return nullptr;
 

@@ -113,7 +113,7 @@ namespace detail {
 
   /// Extract the first, nearest source location from a tuple.
   template<unsigned Index, typename ...Types,
-           typename = typename std::enable_if<Index < sizeof...(Types)>::type>
+           typename = typename std::enable_if<(Index < sizeof...(Types))>::type>
   SourceLoc extractNearestSourceLocTuple(const std::tuple<Types...> &value) {
     SourceLoc loc = maybeExtractNearestSourceLoc(std::get<Index>(value));
     if (loc.isValid())

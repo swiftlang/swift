@@ -172,14 +172,14 @@ extension _StringGuts {
 
     _internalInvariant(isOnUnicodeScalarBoundary(result),
       "Alignment bit is set for non-aligned index")
-    _internalInvariant(result._isScalarAligned)
+    _internalInvariant_5_1(result._isScalarAligned)
     return result
   }
 
   @inline(never) // slow-path
   @_alwaysEmitIntoClient // Swift 5.1
   internal func scalarAlignSlow(_ idx: Index) -> Index {
-    _internalInvariant(!idx._isScalarAligned)
+    _internalInvariant_5_1(!idx._isScalarAligned)
 
     if _slowPath(idx.transcodedOffset != 0 || idx._encodedOffset == 0) {
       // Transcoded index offsets are already scalar aligned
@@ -187,7 +187,7 @@ extension _StringGuts {
     }
     if _slowPath(self.isForeign) {
       let foreignIdx = foreignScalarAlign(idx)
-      _internalInvariant(foreignIdx._isScalarAligned)
+      _internalInvariant_5_1(foreignIdx._isScalarAligned)
       return foreignIdx
     }
 

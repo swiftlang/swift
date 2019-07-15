@@ -1496,6 +1496,7 @@ _Static_assert(_Alignof(InlineRefCounts) == _Alignof(__swift_uintptr_t),
 #endif
 
 #if defined(_WIN32) && defined(_M_ARM64)
+#if defined(__cplusplus)
 namespace std {
 template <>
 inline void _Atomic_storage<swift::SideTableRefCountBits, 16>::_Unlock() const noexcept {
@@ -1504,6 +1505,7 @@ inline void _Atomic_storage<swift::SideTableRefCountBits, 16>::_Unlock() const n
   __dmb(0x8);
 }
 }
+#endif
 #endif
 
 #endif

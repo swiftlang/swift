@@ -5473,15 +5473,3 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
         req.getFirstType()->getCanonicalType(), requirementProto, *conformance);
   }
 }
-
-Type TypeChecker::getWitnessType(Type type, ProtocolDecl *protocol,
-                                 ProtocolConformanceRef conformance,
-                                 Identifier name,
-                                 Diag<> brokenProtocolDiag) {
-  Type ty = conformance.getTypeWitnessByName(type, name);
-  if (!ty &&
-      !(conformance.isConcrete() && conformance.getConcrete()->isInvalid()))
-    diagnose(protocol->getLoc(), brokenProtocolDiag);
-
-  return (!ty || ty->hasError()) ? Type() : ty;
-}

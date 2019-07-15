@@ -1333,15 +1333,13 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
       DiffItem->RightComment, /*From String*/false,
       /*No expression to wrap*/nullptr);
 
-    if (auto *BD = AFD->getBody()) {
-      auto BL = BD->getLBraceLoc();
-      if (BL.isValid()) {
-        // Insert the local variable declaration after the opening brace.
-        Editor.insertAfterToken(BL,
-          (llvm::Twine("\n// Local variable inserted by Swift 4.2 migrator.") +
-           "\nlet " + VariableName + " = " + Info.getFuncName() + "(" +
-           VariableName + ")\n").str());
-      }
+    auto BL = AFD->getBodySourceRange().Start;
+    if (BL.isValid()) {
+      // Insert the local variable declaration after the opening brace.
+      Editor.insertAfterToken(BL,
+        (llvm::Twine("\n// Local variable inserted by Swift 4.2 migrator.") +
+         "\nlet " + VariableName + " = " + Info.getFuncName() + "(" +
+         VariableName + ")\n").str());
     }
   }
 

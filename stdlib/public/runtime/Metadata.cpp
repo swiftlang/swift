@@ -31,6 +31,7 @@
 #include "llvm/Support/PointerLikeTypeTraits.h"
 #include <algorithm>
 #include <cctype>
+#include <cinttypes>
 #include <condition_variable>
 #include <new>
 #include <unordered_set>
@@ -3897,10 +3898,15 @@ void _swift_debug_verifyTypeLayoutAttribute(Metadata *type,
                                             size_t size,
                                             const char *description) {
   auto presentValue = [&](const void *value) {
-    if (size < sizeof(long long)) {
-      long long intValue = 0;
-      memcpy(&intValue, value, size);
-      fprintf(stderr, "%lld (%#llx)\n                  ", intValue, intValue);
+    if (size <= sizeof(uint64_t)) {
+      uint64_t intValue = 0;
+      auto ptr = reinterpret_cast<uint8_t *>(&intValue);
+#if defined(__BIG_ENDIAN__)
+      ptr += sizeof(uint64_t) - size;
+#endif
+      memcpy(ptr, value, size);
+      fprintf(stderr, "%" PRIu64 " (%#" PRIx64 ")\n", intValue, intValue);
+      fprintf(stderr, "                  ");
     }
     auto bytes = reinterpret_cast<const uint8_t *>(value);
     for (unsigned i = 0; i < size; ++i) {
