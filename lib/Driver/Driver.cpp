@@ -258,6 +258,17 @@ static void validateAutolinkingArgs(DiagnosticEngine &diags,
                  forceLoadArg->getSpelling(), incrementalArg->getSpelling());
 }
 
+static void validateUnsupportedDarwinStaticStdlib(DiagnosticEngine &diags, const ArgList &args) {
+    if (const Arg *A = args.getLastArg(options::OPT_target)) {
+        auto TargetTriple = llvm::Triple::normalize(A->getValue());
+        const llvm::Triple target(TargetTriple);
+        
+        if (target.getOS() == llvm::Triple::Darwin && args.hasArg(options::OPT_static_stdlib)) {
+            diags.diagnose(SourceLoc(), diag::error_darwin_static_stdlib_not_supported);
+        }
+    }
+}
+
 /// Perform miscellaneous early validation of arguments.
 static void validateArgs(DiagnosticEngine &diags, const ArgList &args) {
   validateBridgingHeaderArgs(diags, args);
@@ -268,6 +279,7 @@ static void validateArgs(DiagnosticEngine &diags, const ArgList &args) {
   validateCompilationConditionArgs(diags, args);
   validateSearchPathArgs(diags, args);
   validateAutolinkingArgs(diags, args);
+  validateUnsupportedDarwinStaticStdlib(diags, args);
 }
 
 std::unique_ptr<ToolChain>
