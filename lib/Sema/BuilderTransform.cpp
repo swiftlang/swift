@@ -476,47 +476,25 @@ static bool hasReturnStmt(Stmt *stmt) {
   return finder.hasReturnStmt;
 }
 
-bool TypeChecker::typeCheckFunctionBuilderFuncBody(FuncDecl *FD,
-                                                   Type builderType) {
+BraceStmt *
+TypeChecker::applyFunctionBuilderBodyTransform(FuncDecl *FD,
+                                               BraceStmt *body,
+                                               Type builderType) {
   // Try to build a single result expression.
   BuilderClosureVisitor visitor(Context, nullptr,
                                 /*wantExpr=*/true, builderType);
-  Expr *returnExpr = visitor.visit(FD->getBody());
+  Expr *returnExpr = visitor.visit(body);
   if (!returnExpr)
-    return true;
+    return nullptr;
 
   // Make sure we have a usable result type for the body.
   Type returnType = AnyFunctionRef(FD).getBodyResultType();
   if (!returnType || returnType->hasError())
-    return true;
-
-  TypeCheckExprOptions options = {};
-  if (auto opaque = returnType->getAs<OpaqueTypeArchetypeType>()) {
-    if (opaque->getDecl()->isOpaqueReturnTypeOfFunction(FD))
-      options |= TypeCheckExprFlags::ConvertTypeIsOpaqueReturnType;
-  }
-
-  // If we are performing code-completion inside the functions body, supress
-  // diagnostics to workaround typechecking performance problems.
-  if (Context.SourceMgr.rangeContainsCodeCompletionLoc(
-          FD->getBody()->getSourceRange()))
-    options |= TypeCheckExprFlags::SuppressDiagnostics;
-
-  // Type-check the single result expression.
-  Type returnExprType = typeCheckExpression(returnExpr, FD,
-                                            TypeLoc::withoutLoc(returnType),
-                                            CTP_ReturnStmt, options);
-  if (!returnExprType)
-    return true;
-  assert(returnExprType->isEqual(returnType));
+    return nullptr;
 
   auto returnStmt = new (Context) ReturnStmt(SourceLoc(), returnExpr);
-  auto origBody = FD->getBody();
-  auto fakeBody = BraceStmt::create(Context, origBody->getLBraceLoc(),
-                                    { returnStmt },
-                                    origBody->getRBraceLoc());
-  FD->setBody(fakeBody);
-  return false;
+  return BraceStmt::create(Context, body->getLBraceLoc(), { returnStmt },
+                           body->getRBraceLoc());
 }
 
 ConstraintSystem::TypeMatchResult ConstraintSystem::applyFunctionBuilder(
