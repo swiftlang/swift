@@ -25,6 +25,11 @@ module WinSDK [system] [extern_c] {
       export *
     }
 
+    module compress {
+      header "compressapi.h"
+      export *
+    }
+
     module console {
       header "consoleapi.h"
       export *
@@ -111,6 +116,13 @@ module WinSDK [system] [extern_c] {
     }
   }
 
+  module AuthZ {
+    header "AuthZ.h"
+    export *
+
+    link "authz.lib"
+  }
+
   module CommCtrl {
     header "CommCtrl.h"
     export *
@@ -122,11 +134,26 @@ module WinSDK [system] [extern_c] {
     export *
   }
 
+  module DFS {
+    header "LMDFS.h"
+    header "LM.h"
+    export *
+
+    link "NetAPi32.lib"
+  }
+
   module DbgHelp {
     header "DbgHelp.h"
     export *
 
     link "DbgHelp.lib"
+  }
+
+  module FCI {
+    header "fci.h"
+    export *
+
+    link "cabinet.lib"
   }
 
   module Shell {
@@ -141,6 +168,13 @@ module WinSDK [system] [extern_c] {
     link "ShLwApi.lib"
   }
 
+  module OLE32 {
+    header "oaidl.h"
+    export *
+
+    link "OleAut32.lib"
+  }
+
   module User {
     header "WinUser.h"
     export *
@@ -151,6 +185,20 @@ module WinSDK [system] [extern_c] {
     export *
 
     link "Crypt32.lib"
+  }
+
+  module WinDNS {
+    header "WinDNS.h"
+    export *
+
+    link "Dnsapi.lib"
+  }
+
+  module WinReg {
+    header "winreg.h"
+    export *
+
+    link "Advapi32.lib"
   }
 }
 
