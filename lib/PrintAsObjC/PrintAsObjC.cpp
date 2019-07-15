@@ -1494,6 +1494,7 @@ private:
 
       MAP(CChar, "char", false);
       MAP(CWideChar, "wchar_t", false);
+      MAP(CChar8, "char8_t", false);
       MAP(CChar16, "char16_t", false);
       MAP(CChar32, "char32_t", false);
 
@@ -2579,6 +2580,7 @@ public:
            "# if __has_include(<uchar.h>)\n"
            "#  include <uchar.h>\n"
            "# elif !defined(__cplusplus)\n"
+           "typedef unsigned char char8_t;\n"
            "typedef uint_least16_t char16_t;\n"
            "typedef uint_least32_t char32_t;\n"
            "# endif\n"

@@ -34,6 +34,7 @@ PrintTests.test("CustomStringConvertible") {
   hasDescription(CLong(42))
   hasDescription(CLongLong(42))
   hasDescription(CWideChar(42)!)
+  hasDescription(CChar8(42))
   hasDescription(CChar16(42))
   hasDescription(CChar32(42)!)
 }
@@ -51,6 +52,7 @@ PrintTests.test("Printable") {
   expectPrinted("42", CLong(42))
   expectPrinted("42", CLongLong(42))
   expectPrinted("*", CWideChar(42)!)
+  expectPrinted("42", CChar8(42))
   expectPrinted("42", CChar16(42))
   expectPrinted("*", CChar32(42)!)
 
@@ -142,6 +144,7 @@ PrintTests.test("Printable") {
   expectPrinted("42", CLongLong(42))
 
   expectPrinted("*", CWideChar(42)!)
+  expectPrinted("42", CChar8(42))
   expectPrinted("42", CChar16(42))
   expectPrinted("*", CChar32(42)!)
 }

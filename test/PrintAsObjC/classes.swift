@@ -198,7 +198,7 @@ class NotObjC {}
 // CHECK-NEXT: - (void)testSelector:(SEL _Nonnull)sel boolean:(BOOL)b;
 // CHECK-NEXT: - (void)testCSignedTypes:(signed char)a b:(short)b c:(int)c d:(long)d e:(long long)e;
 // CHECK-NEXT: - (void)testCUnsignedTypes:(unsigned char)a b:(unsigned short)b c:(unsigned int)c d:(unsigned long)d e:(unsigned long long)e;
-// CHECK-NEXT: - (void)testCChars:(char)basic wchar:(wchar_t)wide char16:(char16_t)char16 char32:(char32_t)char32;
+// CHECK-NEXT: - (void)testCChars:(char)basic wchar:(wchar_t)wide char8:(char8_t)char8 char16:(char16_t)char16 char32:(char32_t)char32;
 // CHECK-NEXT: - (void)testCFloats:(float)a b:(double)b;
 // CHECK-NEXT: - (void)testCBool:(bool)a;
 // CHECK-NEXT: - (void)testSizedSignedTypes:(int8_t)a b:(int16_t)b c:(int32_t)c d:(int64_t)d;
@@ -244,7 +244,7 @@ class NotObjC {}
 
   @objc func testCSignedTypes(_ a: CSignedChar, b: CShort, c: CInt, d: CLong, e: CLongLong) {}
   @objc func testCUnsignedTypes(_ a: CUnsignedChar, b: CUnsignedShort, c: CUnsignedInt, d: CUnsignedLong, e: CUnsignedLongLong) {}
-  @objc func testCChars(_ basic: CChar, wchar wide: CWideChar, char16: CChar16, char32: CChar32) {}
+  @objc func testCChars(_ basic: CChar, wchar wide: CWideChar, char8: CChar8, char16: CChar16, char32: CChar32) {}
   @objc func testCFloats(_ a: CFloat, b: CDouble) {}
   @objc func testCBool(_ a: CBool) {}
 

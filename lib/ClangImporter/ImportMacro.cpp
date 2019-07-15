@@ -258,6 +258,8 @@ static Optional<clang::QualType> builtinTypeForToken(const clang::Token &tok,
     return clang::QualType(context.WCharTy);
   case clang::tok::kw_bool:
     return clang::QualType(context.BoolTy);
+  case clang::tok::kw_char8_t:
+    return clang::QualType(context.Char8Ty);
   case clang::tok::kw_char16_t:
     return clang::QualType(context.Char16Ty);
   case clang::tok::kw_char32_t:
