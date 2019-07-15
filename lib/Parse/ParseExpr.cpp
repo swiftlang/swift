@@ -3509,6 +3509,12 @@ void Parser::validateCollectionElement(ParserResult<Expr> element) {
                          diag::subscript_collection_element_invalid_index,
                          indexExpr->getDigitsText());
     diag.highlight(subscriptExpr->getSourceRange());
+    diag.flush();
+
+    auto note = diagnose(subscriptExpr->getLoc(),
+                         diag::subscript_collection_element_fix_it);
+    note.fixItInsertAfter(baseExpr->getRBracketLoc(), ",");
+
     element.setIsParseError();
   }
 }
