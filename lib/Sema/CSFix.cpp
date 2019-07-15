@@ -659,7 +659,10 @@ AllowMutatingMemberOnRValueBase::create(ConstraintSystem &cs, Type baseType,
 }
 
 bool AllowTupleSplatForSingleParameter::diagnose(Expr *root, bool asNote) const {
-  return false;
+  auto &cs = getConstraintSystem();
+  InvalidTupleSplatWithSingleParameterFailure failure(root, cs, ParamType,
+                                                      getLocator());
+  return failure.diagnose(asNote);
 }
 
 bool AllowTupleSplatForSingleParameter::attempt(

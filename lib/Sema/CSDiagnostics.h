@@ -1457,6 +1457,25 @@ public:
   bool diagnoseAsNote() override;
 };
 
+/// Diagnose situation when a single "tuple" parameter is given N arguments e.g.
+///
+/// ```swift
+/// func foo<T>(_ x: (T, Bool)) {}
+/// foo(1, false) // foo exptects a single argument of tuple type `(1, false)`
+/// ```
+class InvalidTupleSplatWithSingleParameterFailure final
+    : public FailureDiagnostic {
+  Type ParamType;
+
+public:
+  InvalidTupleSplatWithSingleParameterFailure(Expr *root, ConstraintSystem &cs,
+                                              Type paramTy,
+                                              ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator), ParamType(paramTy) {}
+
+  bool diagnoseAsError() override;
+};
+
 /// Provides information about the application of a function argument to a
 /// parameter.
 class FunctionArgApplyInfo {

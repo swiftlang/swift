@@ -3493,3 +3493,42 @@ bool MutatingMemberRefOnImmutableBase::diagnoseAsError() {
                             diagIDmember);
   return failure.diagnoseAsError();
 }
+
+bool InvalidTupleSplatWithSingleParameterFailure::diagnoseAsError() {
+  auto *anchor = getRawAnchor();
+
+  auto selectedOverload = getChoiceFor(anchor);
+  if (!selectedOverload || !selectedOverload->choice.isDecl())
+    return false;
+
+  auto *choice = selectedOverload->choice.getDecl();
+
+  auto *argExpr = getArgumentExprFor(anchor);
+  if (!argExpr)
+    return false;
+
+  auto paramTy = ParamType.transform([&](Type type) -> Type {
+    if (auto *typeVar = type->getAs<TypeVariableType>()) {
+      auto *GP = typeVar->getImpl().getGenericParameter();
+      return GP ? GP : resolveType(typeVar);
+    }
+
+    return type;
+  });
+
+  DeclBaseName name = choice->getBaseName();
+
+  auto diagnostic =
+      name.isSpecial()
+          ? emitDiagnostic(argExpr->getLoc(),
+                           diag::single_tuple_parameter_mismatch_special,
+                           choice->getDescriptiveKind(), paramTy)
+          : emitDiagnostic(argExpr->getLoc(),
+                           diag::single_tuple_parameter_mismatch_normal,
+                           choice->getDescriptiveKind(), name, paramTy);
+
+  diagnostic.highlight(argExpr->getSourceRange())
+      .fixItInsertAfter(argExpr->getStartLoc(), "(")
+      .fixItInsert(argExpr->getEndLoc(), ")");
+  return true;
+}

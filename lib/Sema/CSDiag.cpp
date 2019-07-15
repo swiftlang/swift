@@ -3113,17 +3113,17 @@ static bool diagnoseTupleParameterMismatch(CalleeCandidateInfo &CCI,
   auto &TC = CCI.CS.TC;
   if (isTopLevel) {
     if (auto *decl = CCI[0].getDecl()) {
-      Identifier name;
-      auto kind = decl->getDescriptiveKind();
-      // Constructors/descructors and subscripts don't really have names.
-      if (!(isa<ConstructorDecl>(decl) || isa<DestructorDecl>(decl) ||
-            isa<SubscriptDecl>(decl))) {
-        name = decl->getBaseName().getIdentifier();
-      }
+      auto name = decl->getBaseName();
+      auto diagnostic =
+          name.isSpecial()
+              ? TC.diagnose(argExpr->getLoc(),
+                            diag::single_tuple_parameter_mismatch_special,
+                            decl->getDescriptiveKind(), paramType)
+              : TC.diagnose(argExpr->getLoc(),
+                            diag::single_tuple_parameter_mismatch_normal,
+                            decl->getDescriptiveKind(), name, paramType);
 
-      TC.diagnose(argExpr->getLoc(), diag::single_tuple_parameter_mismatch,
-                  kind, name, paramTupleTy, !name.empty())
-          .highlight(argExpr->getSourceRange())
+      diagnostic.highlight(argExpr->getSourceRange())
           .fixItInsertAfter(argExpr->getStartLoc(), "(")
           .fixItInsert(argExpr->getEndLoc(), ")");
     } else {
