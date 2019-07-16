@@ -590,11 +590,8 @@ void toolchains::Darwin::validateArguments(DiagnosticEngine &diags, const llvm::
     
     // Validating darwin unsupported -static-stdlib argument.
     if (const Arg *A = args.getLastArg(options::OPT_target)) {
-        auto TargetTriple = llvm::Triple::normalize(A->getValue());
-        const llvm::Triple target(TargetTriple);
-        
-        if (args.hasArg(options::OPT_static_stdlib)) {
-            diags.diagnose(SourceLoc(), diag::error_darwin_static_stdlib_not_supported);
-        }
+      if (args.hasArg(options::OPT_static_stdlib)) {
+        diags.diagnose(SourceLoc(), diag::error_darwin_static_stdlib_not_supported);
+      }
     }
 }

@@ -308,10 +308,11 @@ public:
                          StringRef LibName) const;
     
   /// Validates arguments passed to the toolchain.
+  /// 
   /// An override point for platform-specific subclasses to customize the
   /// validations that should be performed.
   virtual void validateArguments(DiagnosticEngine &diags,
-                                 const llvm::opt::ArgList &args) const {};
+                                 const llvm::opt::ArgList &args) const {}
 };
 } // end namespace driver
 } // end namespace swift
