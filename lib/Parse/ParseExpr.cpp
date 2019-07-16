@@ -3499,15 +3499,13 @@ void Parser::validateCollectionElement(ParserResult<Expr> element) {
   auto endLocOfArray = arrayExpr->getEndLoc();
 
   if (L->getLocForEndOfToken(SourceMgr, endLocOfArray) != startLocOfSubscript) {
-    auto diag =
-        diagnose(subscriptExpr->getLoc(), diag::subscript_array_element);
-    diag.highlight(subscriptExpr->getSourceRange());
-    diag.fixItInsertAfter(endLocOfArray, ",");
-    diag.flush();
-
-    auto note =
-        diagnose(subscriptExpr->getLoc(), diag::subscript_array_element_fix_it);
-    note.fixItRemoveChars(endLocOfArray.getAdvancedLoc(1), startLocOfSubscript);
+    auto subscriptLoc = subscriptExpr->getLoc();
+    diagnose(subscriptLoc, diag::subscript_array_element)
+        .highlight(subscriptExpr->getSourceRange());
+    diagnose(subscriptLoc, diag::subscript_array_element_fix_it_add_comma)
+        .fixItInsertAfter(endLocOfArray, ",");
+    diagnose(subscriptLoc, diag::subscript_array_element_fix_it_remove_space)
+        .fixItRemoveChars(endLocOfArray.getAdvancedLoc(1), startLocOfSubscript);
   }
 }
 
