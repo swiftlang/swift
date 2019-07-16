@@ -46,26 +46,6 @@ static bool isArithmeticOperatorDecl(ValueDecl *vd) {
    vd->getBaseName() == "%");
 }
 
-static bool hasBinOpOverloadWithSameArgTypesDifferingResult(
-    OverloadedDeclRefExpr *overloads) {
-  for (auto decl : overloads->getDecls()) {
-    auto metaFuncType = decl->getInterfaceType()->getAs<AnyFunctionType>();
-    auto funcType = metaFuncType->getResult()->getAs<FunctionType>();
-    if (!funcType)
-      continue;
-
-    auto params = funcType->getParams();
-    if (params.size() != 2)
-      continue;
-
-    if (params[0].getPlainType().getPointer() != params[1].getPlainType().getPointer())
-      continue;
-    if (funcType->getResult().getPointer() != params[0].getPlainType().getPointer())
-      return true;
-  }
-  return false;
-}
-
 static bool mergeRepresentativeEquivalenceClasses(ConstraintSystem &CS,
                                                   TypeVariableType* tyvar1,
                                                   TypeVariableType* tyvar2) {
@@ -323,75 +303,6 @@ namespace {
       // solver can still make progress.
       auto favoredTy = (*lti.collectedTypes.begin())->getWithoutSpecifierType();
       CS.setFavoredType(expr, favoredTy.getPointer());
-
-      // If we have a chain of identical binop expressions with homogeneous
-      // argument types, we can directly simplify the associated constraint
-      // graph.
-      auto simplifyBinOpExprTyVars = [&]() {
-        // Don't attempt to do linking if there are
-        // literals intermingled with other inferred types.
-        if (lti.hasLiteral)
-          return;
-
-        for (auto binExp1 : lti.binaryExprs) {
-          for (auto binExp2 : lti.binaryExprs) {
-            if (binExp1 == binExp2)
-              continue;
-
-            auto fnTy1 = CS.getType(binExp1)->getAs<TypeVariableType>();
-            auto fnTy2 = CS.getType(binExp2)->getAs<TypeVariableType>();
-
-            if (!(fnTy1 && fnTy2))
-              return;
-
-            auto ODR1 = dyn_cast<OverloadedDeclRefExpr>(binExp1->getFn());
-            auto ODR2 = dyn_cast<OverloadedDeclRefExpr>(binExp2->getFn());
-
-            if (!(ODR1 && ODR2))
-              return;
-
-            // TODO: We currently limit this optimization to known arithmetic
-            // operators, but we should be able to broaden this out to
-            // logical operators as well.
-            if (!isArithmeticOperatorDecl(ODR1->getDecls()[0]))
-              return;
-
-            if (ODR1->getDecls()[0]->getBaseName() !=
-                ODR2->getDecls()[0]->getBaseName())
-              return;
-
-            if (hasBinOpOverloadWithSameArgTypesDifferingResult(ODR1))
-              return;
-
-            // All things equal, we can merge the tyvars for the function
-            // types.
-            auto rep1 = CS.getRepresentative(fnTy1);
-            auto rep2 = CS.getRepresentative(fnTy2);
-
-            if (rep1 != rep2) {
-              CS.mergeEquivalenceClasses(rep1, rep2,
-                                         /*updateWorkList*/ false);
-            }
-
-            auto odTy1 = CS.getType(ODR1)->getAs<TypeVariableType>();
-            auto odTy2 = CS.getType(ODR2)->getAs<TypeVariableType>();
-
-            if (odTy1 && odTy2) {
-              auto odRep1 = CS.getRepresentative(odTy1);
-              auto odRep2 = CS.getRepresentative(odTy2);
-
-              // Since we'll be choosing the same overload, we can merge
-              // the overload tyvar as well.
-              if (odRep1 != odRep2)
-                CS.mergeEquivalenceClasses(odRep1, odRep2,
-                                           /*updateWorkList*/ false);
-            }
-          }
-        }
-      };
-
-      simplifyBinOpExprTyVars();       
-
       return true;
     }
     

@@ -2013,9 +2013,47 @@ static Constraint *tryOptimizeGenericDisjunction(
   llvm_unreachable("covered switch");
 }
 
+// Performance hack: favor operator overloads with types we're already binding elsewhere in this expression.
+static void existingOperatorBindingsForDisjunction(ConstraintSystem &CS, ArrayRef<Constraint *> constraints, SmallVectorImpl<Constraint *> &found) {
+  auto *choice = constraints.front();
+  if (choice->getKind() != ConstraintKind::BindOverload)
+    return;
+
+  auto overload = choice->getOverloadChoice();
+  if (!overload.isDecl())
+    return;
+  auto decl = overload.getDecl();
+  if (!decl->isOperator())
+    return;
+
+  for (auto *resolved = CS.getResolvedOverloadSets(); resolved;
+       resolved = resolved->Previous) {
+    if (!resolved->Choice.isDecl())
+      continue;
+    auto representativeDecl = resolved->Choice.getDecl();
+
+    if (!representativeDecl->isOperator())
+      continue;
+
+    for (auto *constraint : constraints) {
+      if (constraint->isFavored())
+        continue;
+      auto choice = constraint->getOverloadChoice();
+      if (choice.getDecl()->getInterfaceType()->isEqual(representativeDecl->getInterfaceType()))
+        found.push_back(constraint);
+    }
+  }
+}
+
 void ConstraintSystem::partitionDisjunction(
     ArrayRef<Constraint *> Choices, SmallVectorImpl<unsigned> &Ordering,
     SmallVectorImpl<unsigned> &PartitionBeginning) {
+
+  SmallVector<Constraint *, 4> existing;
+  existingOperatorBindingsForDisjunction(*this, Choices, existing);
+  for (auto constraint : existing)
+    favorConstraint(constraint);
+
   // Apply a special-case rule for favoring one generic function over
   // another.
   if (auto favored = tryOptimizeGenericDisjunction(DC, Choices)) {
@@ -2134,12 +2172,30 @@ Constraint *ConstraintSystem::selectDisjunction() {
   if (auto *disjunction = selectBestBindingDisjunction(*this, disjunctions))
     return disjunction;
 
-  // Pick the disjunction with the smallest number of active choices.
+  // Pick the disjunction with the smallest number of favored, then active choices.
+  auto cs = this;
   auto minDisjunction =
       std::min_element(disjunctions.begin(), disjunctions.end(),
                        [&](Constraint *first, Constraint *second) -> bool {
-                         return first->countActiveNestedConstraints() <
-                                second->countActiveNestedConstraints();
+                         unsigned firstFavored = first->countFavoredNestedConstraints();
+                         unsigned secondFavored = second->countFavoredNestedConstraints();
+
+                         if (firstFavored == secondFavored) {
+                           // Look for additional choices to favor
+                           SmallVector<Constraint *, 4> firstExisting;
+                           SmallVector<Constraint *, 4> secondExisting;
+
+                           existingOperatorBindingsForDisjunction(*cs, first->getNestedConstraints(), firstExisting);
+                           firstFavored = firstExisting.size() ?: first->countActiveNestedConstraints();
+                           existingOperatorBindingsForDisjunction(*cs, second->getNestedConstraints(), secondExisting);
+                           secondFavored = secondExisting.size() ?: second->countActiveNestedConstraints();
+
+                           return firstFavored < secondFavored;
+                         } else {
+                           firstFavored = firstFavored ?: first->countActiveNestedConstraints();
+                           secondFavored = secondFavored ?: second->countActiveNestedConstraints();
+                           return firstFavored < secondFavored;
+                         }
                        });
 
   if (minDisjunction != disjunctions.end())
