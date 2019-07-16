@@ -817,6 +817,5 @@ func f() {
 
 
 // <rdar://problem/22478168> | SR-11006
-// expected-error@+2 {{expected '=' instead of '==' to assign default value for parameter}} {{21-23==}}
-// expected-error@+1 {{expected ',' separator}}
+// expected-error@+1 {{expected '=' instead of '==' to assign default value for parameter}} {{21-23==}}
 func SR11006(a: Int == 0) {}

@@ -67,10 +67,10 @@ void Parser::DefaultArgumentInfo::setFunctionContext(
 static ParserStatus parseDefaultArgument(
     Parser &P, Parser::DefaultArgumentInfo *defaultArgs, unsigned argIndex,
     Expr *&init, bool &hasInheritedDefaultArg,
-    Parser::ParameterContextKind paramContext) {
+    Parser::ParameterContextKind paramContext, tok assignmentTok) {
   SyntaxParsingContext DefaultArgContext(P.SyntaxContext,
                                          SyntaxKind::InitializerClause);
-  SourceLoc equalLoc = P.consumeToken(tok::equal);
+  SourceLoc equalLoc = P.consumeToken(assignmentTok);
 
   if (P.SF.Kind == SourceFileKind::Interface) {
     // Swift module interfaces don't synthesize inherited intializers and
@@ -366,13 +366,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
       } else {
         // Otherwise, we're not sure what is going on, but this doesn't smell
         // like a parameter.
-        if (Tok.isBinaryOperator() && Tok.getText() == "==") {
-          diagnose(Tok,
-                   diag::expected_assignment_instead_of_comparison_operator)
-              .fixItReplace(Tok.getLoc(), "=");
-        } else {
-          diagnose(Tok, diag::expected_parameter_name);
-        }
+        diagnose(Tok, diag::expected_parameter_name);
         param.isInvalid = true;
         param.FirstNameLoc = Tok.getLoc();
         TokReceiver->registerTokenKindChange(param.FirstNameLoc,
@@ -387,13 +381,20 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
       param.EllipsisLoc = consumeToken();
     }
 
-    // ('=' expr)?
-    if (Tok.is(tok::equal)) {
+    // ('=' expr) or ('==' expr)?
+    bool isEqualBinaryOperator =
+        Tok.isBinaryOperator() && Tok.getText() == "==";
+    if (Tok.is(tok::equal) || isEqualBinaryOperator) {
       SourceLoc EqualLoc = Tok.getLoc();
-      status |= parseDefaultArgument(*this, defaultArgs, defaultArgIndex,
-                                     param.DefaultArg,
-                                     param.hasInheritedDefaultArg,
-                                     paramContext);
+
+      if (isEqualBinaryOperator) {
+        diagnose(Tok, diag::expected_assignment_instead_of_comparison_operator)
+            .fixItReplace(EqualLoc, "=");
+      }
+
+      status |= parseDefaultArgument(
+          *this, defaultArgs, defaultArgIndex, param.DefaultArg,
+          param.hasInheritedDefaultArg, paramContext, Tok.getKind());
 
       if (param.EllipsisLoc.isValid() && param.DefaultArg) {
         // The range of the complete default argument.
