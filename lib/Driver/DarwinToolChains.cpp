@@ -585,12 +585,12 @@ bool toolchains::Darwin::shouldStoreInvocationInDebugInfo() const {
   return false;
 }
 
-void toolchains::Darwin::validateArguments(DiagnosticEngine &diags, const llvm::opt::ArgList &args) const {
+void 
+toolchains::Darwin::validateArguments(DiagnosticEngine &diags,
+                                      const llvm::opt::ArgList &args) const {
     
     // Validating darwin unsupported -static-stdlib argument.
-    if (const Arg *A = args.getLastArg(options::OPT_target)) {
-      if (args.hasArg(options::OPT_static_stdlib)) {
-        diags.diagnose(SourceLoc(), diag::error_darwin_static_stdlib_not_supported);
-      }
+    if (args.hasArg(options::OPT_static_stdlib)) {
+      diags.diagnose(SourceLoc(), diag::error_darwin_static_stdlib_not_supported);
     }
 }
