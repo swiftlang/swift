@@ -92,7 +92,8 @@ public:
 
   ImmutableTextSnapshotRef
   initializeText(llvm::MemoryBuffer *Buf, ArrayRef<const char *> Args,
-                 bool ProvideSemanticInfo);
+                 bool ProvideSemanticInfo,
+                 llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem);
   ImmutableTextSnapshotRef replaceText(unsigned Offset, unsigned Length,
                                        llvm::MemoryBuffer *Buf,
                                        bool ProvideSemanticInfo,

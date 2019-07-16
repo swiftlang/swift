@@ -1055,8 +1055,6 @@ struct SwiftEditorDocument::Implementation {
   const std::string FilePath;
   EditableTextBufferRef EditableBuffer;
 
-  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem;
-
   /// The list of syntax highlighted token offsets and ranges in the document
   SwiftSyntaxMap SyntaxMap;
   /// The minimal range of syntax highlighted tokens affected by the last edit
@@ -1084,7 +1082,7 @@ struct SwiftEditorDocument::Implementation {
                  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem)
       : ASTMgr(LangSupport.getASTManager()),
         NotificationCtr(LangSupport.getNotificationCenter()),
-        FilePath(FilePath), FormatOptions(options), fileSystem(fileSystem) {
+        FilePath(FilePath), FormatOptions(options) {
     assert(fileSystem);
     // This instance of semantic info is used if a document is opened with
     // `key.syntactic_only: 1`, but subsequently a semantic request such as
@@ -1720,7 +1718,8 @@ SwiftEditorDocument::~SwiftEditorDocument()
 
 ImmutableTextSnapshotRef SwiftEditorDocument::initializeText(
     llvm::MemoryBuffer *Buf, ArrayRef<const char *> Args,
-    bool ProvideSemanticInfo) {
+    bool ProvideSemanticInfo,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem) {
   llvm::sys::ScopedLock L(Impl.AccessMtx);
 
   Impl.Edited = false;
@@ -1735,7 +1734,7 @@ ImmutableTextSnapshotRef SwiftEditorDocument::initializeText(
   // or it's syntactic-only but with passed-in compiler arguments.
   if (ProvideSemanticInfo || !Args.empty()) {
     Impl.SemanticInfo = new SwiftDocumentSemanticInfo(
-        Impl.FilePath, Impl.ASTMgr, Impl.NotificationCtr, Impl.fileSystem);
+        Impl.FilePath, Impl.ASTMgr, Impl.NotificationCtr, fileSystem);
     Impl.SemanticInfo->setCompilerArgs(Args);
   }
   return Impl.EditableBuffer->getSnapshot();
@@ -2156,7 +2155,7 @@ void SwiftLangSupport::editorOpen(
   if (!EditorDoc) {
     EditorDoc = new SwiftEditorDocument(Name, *this, fileSystem);
     Snapshot = EditorDoc->initializeText(
-        Buf, Args, Consumer.needsSemanticInfo());
+        Buf, Args, Consumer.needsSemanticInfo(), fileSystem);
     EditorDoc->parse(Snapshot, *this, Consumer.syntaxTreeEnabled());
     if (EditorDocuments->getOrUpdate(Name, *this, EditorDoc)) {
       // Document already exists, re-initialize it. This should only happen
@@ -2170,7 +2169,7 @@ void SwiftLangSupport::editorOpen(
 
   if (!Snapshot) {
     Snapshot = EditorDoc->initializeText(
-        Buf, Args, Consumer.needsSemanticInfo());
+        Buf, Args, Consumer.needsSemanticInfo(), fileSystem);
     EditorDoc->parse(Snapshot, *this, Consumer.syntaxTreeEnabled());
   }
 
