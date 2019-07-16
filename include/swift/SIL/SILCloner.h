@@ -18,9 +18,10 @@
 #define SWIFT_SIL_SILCLONER_H
 
 #include "swift/AST/ProtocolConformance.h"
-#include "swift/SIL/SILOpenedArchetypesTracker.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILDebugScope.h"
+#include "swift/SIL/SILOpenedArchetypesTracker.h"
 #include "swift/SIL/SILVisitor.h"
 
 namespace swift {
@@ -866,13 +867,71 @@ SILCloner<ImplClass>::visitAllocValueBufferInst(AllocValueBufferInst *Inst) {
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitBuiltinInst(BuiltinInst *Inst) {
-  auto Args = getOpValueArray<8>(Inst->getArguments());
+  auto RawArgsStorage = getOpValueArray<8>(Inst->getArguments());
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  recordClonedInstruction(
-      Inst, getBuilder().createBuiltin(
-                getOpLocation(Inst->getLoc()), Inst->getName(),
-                getOpType(Inst->getType()),
-                getOpSubstitutionMap(Inst->getSubstitutions()), Args));
+
+  // First check if we have a polymorphic builtin that has indirect
+  // parameters. If we do not, just clone the builtin and return.
+  //
+  // NOTE: We cannot use the *PBSOI::init that takes a
+  // BuiltinInst. This is b/c our BuiltinInst is going to be generic
+  // and thus we will not try to specialize. Instead we have to infer
+  // the types that the builtin in *Op* land would have.
+  //
+  // *PBSOI == PolymorphicBuiltinSpecializedOverloadInfo.
+  auto Kind = Inst->getBuiltinKind();
+  PolymorphicBuiltinSpecializedOverloadInfo Info;
+  SmallVector<SILType, 8> RawOperandTypes;
+  transform(RawArgsStorage, std::back_inserter(RawOperandTypes),
+            [](SILValue v) -> SILType { return v->getType(); });
+  SILType RawResultType = getOpType(Inst->getType());
+  if (!Kind.hasValue() ||
+      !Info.init(Inst->getModule(), *Kind, RawOperandTypes, RawResultType)) {
+    return recordClonedInstruction(
+        Inst,
+        getBuilder().createBuiltin(
+            getOpLocation(Inst->getLoc()), Inst->getName(), RawResultType,
+            getOpSubstitutionMap(Inst->getSubstitutions()), RawArgsStorage));
+  }
+
+  // Otherwise, see if we can instead of inserting the polymorphic builtin,
+  // dispatch it to the relevant static builtin as we go. This will ensure that
+  // we specialize the generic calls to these polymorphic builtins before
+  // predictable memory access optimizations so we form SSA around this value at
+  // -Onone.
+  ArrayRef<SILValue> RawArgs(RawArgsStorage);
+  SILValue Result;
+  SILType ResultType = RawResultType;
+  if (Info.hasOutParam) {
+    Result = RawArgs.front();
+    ResultType = Result->getType().getObjectType();
+    RawArgs = RawArgs.drop_front();
+  }
+
+  SmallVector<SILValue, 8> PromotedArgs;
+  for (SILValue v : RawArgs) {
+    if (v->getType().isAddress()) {
+      PromotedArgs.push_back(getBuilder().emitLoadValueOperation(
+          getOpLocation(Inst->getLoc()), v, LoadOwnershipQualifier::Take));
+      continue;
+    }
+    PromotedArgs.push_back(v);
+  }
+
+  // If we specialize, our type no longer has any substitutions.
+  BuiltinInst *NewInst = getBuilder().createBuiltin(
+      getOpLocation(Inst->getLoc()), Info.staticOverloadIdentifier, ResultType,
+      {}, // If we specialize, the function no longer has any substitutions.
+      PromotedArgs);
+
+  if (Result) {
+    assert(Result->getType().isAddress());
+    getBuilder().emitStoreValueOperation(getOpLocation(Inst->getLoc()),
+                                         NewInst->getResult(0), Result,
+                                         StoreOwnershipQualifier::Init);
+  }
+
+  recordClonedInstruction(Inst, NewInst);
 }
 
 template<typename ImplClass>
