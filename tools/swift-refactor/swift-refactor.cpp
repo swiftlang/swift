@@ -260,7 +260,7 @@ int main(int argc, char *argv[]) {
   CI.addDiagnosticConsumer(&PrintDiags);
   if (CI.setup(Invocation))
     return 1;
-
+  registerIDERequestFunctions(CI.getASTContext().evaluator);
   switch (options::Action) {
     case RefactoringKind::GlobalRename:
     case RefactoringKind::FindGlobalRenameRanges:
