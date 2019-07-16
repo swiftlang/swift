@@ -277,6 +277,22 @@ FailureDiagnostic::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
                               fnInterfaceType, fnType, callee);
 }
 
+Type FailureDiagnostic::restoreGenericParameters(
+    Type type,
+    llvm::function_ref<void(GenericTypeParamType *, Type)> substitution) {
+  return type.transform([&](Type type) -> Type {
+    if (auto *typeVar = type->getAs<TypeVariableType>()) {
+      type = resolveType(typeVar);
+      if (auto *GP = typeVar->getImpl().getGenericParameter()) {
+        substitution(GP, type);
+        return GP;
+      }
+    }
+
+    return type;
+  });
+}
+
 Type RequirementFailure::getOwnerType() const {
   auto *anchor = getRawAnchor();
 
@@ -3508,19 +3524,12 @@ bool InvalidTupleSplatWithSingleParameterFailure::diagnoseAsError() {
     return false;
 
   using Substitution = std::pair<GenericTypeParamType *, Type>;
-  llvm::SetVector<Substitution> substitutions;
-  auto paramTy = ParamType.transform([&](Type type) -> Type {
-    if (auto *typeVar = type->getAs<TypeVariableType>()) {
-      type = resolveType(typeVar);
+  llvm::DenseMap<GenericParamKey, Substitution> substitutions;
 
-      if (auto *GP = typeVar->getImpl().getGenericParameter()) {
-        substitutions.insert(std::make_pair(GP, type));
-        return GP;
-      }
-    }
-
-    return type;
-  });
+  auto paramTy = restoreGenericParameters(
+      ParamType, [&](GenericTypeParamType *GP, Type resolvedType) {
+        substitutions[{GP}] = std::make_pair(GP, resolvedType);
+      });
 
   DeclBaseName name = choice->getBaseName();
 
@@ -3529,7 +3538,8 @@ bool InvalidTupleSplatWithSingleParameterFailure::diagnoseAsError() {
     subsStr += " [where ";
     interleave(
         substitutions,
-        [&subsStr](const Substitution &substitution) {
+        [&subsStr](const std::pair<GenericParamKey, Substitution> &e) {
+          const auto &substitution = e.second;
           subsStr += substitution.first->getString();
           subsStr += " = ";
           subsStr += substitution.second->getString();

@@ -185,6 +185,13 @@ protected:
   Optional<FunctionArgApplyInfo>
   getFunctionArgApplyInfo(ConstraintLocator *locator) const;
 
+  /// \returns A new type with all of the type variables associated with
+  /// generic parameters substituted back into being generic parameter type.
+  Type restoreGenericParameters(
+      Type type,
+      llvm::function_ref<void(GenericTypeParamType *, Type)> substitution =
+          [](GenericTypeParamType *, Type) {});
+
 private:
   /// Compute anchor expression associated with current diagnostic.
   std::pair<Expr *, bool> computeAnchor() const;
