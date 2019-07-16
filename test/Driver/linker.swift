@@ -4,7 +4,7 @@
 // RUN: %FileCheck %s < %t.simple.txt
 // RUN: %FileCheck -check-prefix SIMPLE %s < %t.simple.txt
 
-// RUN: not %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -static-stdlib %s 2>&1 > %t.simple.txt | %FileCheck -check-prefix=SIMPLE_STATIC %s
+// RUN: not %swiftc_driver -driver-print-jobs -target x86_64-apple-macosx10.9 -static-stdlib %s 2>&1 | %FileCheck -check-prefix=SIMPLE_STATIC %s
 
 // RUN: %swiftc_driver -driver-print-jobs -target x86_64-apple-ios7.1 %s 2>&1 > %t.simple.txt
 // RUN: %FileCheck -check-prefix IOS_SIMPLE %s < %t.simple.txt

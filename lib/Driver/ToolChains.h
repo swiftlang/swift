@@ -13,13 +13,14 @@
 #ifndef SWIFT_DRIVER_TOOLCHAINS_H
 #define SWIFT_DRIVER_TOOLCHAINS_H
 
-#include "swift/AST/DiagnosticEngine.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Driver/ToolChain.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Support/Compiler.h"
 
 namespace swift {
+class DiagnosticEngine;
+
 namespace driver {
 namespace toolchains {
 
