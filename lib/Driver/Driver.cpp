@@ -820,7 +820,11 @@ Driver::buildCompilation(const ToolChain &TC,
   std::unique_ptr<DerivedArgList> TranslatedArgList(
       translateInputAndPathArgs(*ArgList, workingDirectory));
 
+  // TODO: We should check which validations could be moved to toolchain specific classes.
   validateArgs(Diags, *TranslatedArgList);
+    
+  // Perform toolchain specific args validation.
+  TC.validateArguments(Diags, *TranslatedArgList);
 
   if (Diags.hadAnyError())
     return nullptr;

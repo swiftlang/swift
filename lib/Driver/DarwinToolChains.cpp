@@ -12,6 +12,7 @@
 
 #include "ToolChains.h"
 
+#include "swift/AST/DiagnosticsDriver.h"
 #include "swift/Basic/Dwarf.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Platform.h"
@@ -442,13 +443,9 @@ toolchains::Darwin::constructInvocation(const DynamicLinkJobAction &job,
       }
   }
 
-  bool wantsStaticStdlib =
-      context.Args.hasFlag(options::OPT_static_stdlib,
-                           options::OPT_no_static_stdlib, false);
-
   SmallVector<std::string, 4> RuntimeLibPaths;
   getRuntimeLibraryPaths(RuntimeLibPaths, context.Args,
-                         context.OI.SDKPath, /*Shared=*/!wantsStaticStdlib);
+                         context.OI.SDKPath, /*Shared=*/true);
 
   // Add the runtime library link path, which is platform-specific and found
   // relative to the compiler.
@@ -457,19 +454,11 @@ toolchains::Darwin::constructInvocation(const DynamicLinkJobAction &job,
     Arguments.push_back(context.Args.MakeArgString(path));
   }
 
-  // Link the standard library.
-  if (wantsStaticStdlib) {
-    Arguments.push_back("-lc++");
-    Arguments.push_back("-framework");
-    Arguments.push_back("Foundation");
-    Arguments.push_back("-force_load_swift_libs");
-  } else {
-    // FIXME: We probably shouldn't be adding an rpath here unless we know ahead
-    // of time the standard library won't be copied. SR-1967
-    for (auto path : RuntimeLibPaths) {
-      Arguments.push_back("-rpath");
-      Arguments.push_back(context.Args.MakeArgString(path));
-    }
+  // FIXME: We probably shouldn't be adding an rpath here unless we know ahead
+  // of time the standard library won't be copied. SR-1967
+  for (auto path : RuntimeLibPaths) {
+    Arguments.push_back("-rpath");
+    Arguments.push_back(context.Args.MakeArgString(path));
   }
 
   if (context.Args.hasArg(options::OPT_profile_generate)) {
@@ -594,4 +583,13 @@ bool toolchains::Darwin::shouldStoreInvocationInDebugInfo() const {
   if (const char *S = ::getenv("RC_DEBUG_OPTIONS"))
     return S[0] != '\0';
   return false;
+}
+
+void 
+toolchains::Darwin::validateArguments(DiagnosticEngine &diags,
+                                      const llvm::opt::ArgList &args) const {
+  // Validating darwin unsupported -static-stdlib argument.
+  if (args.hasArg(options::OPT_static_stdlib)) {
+    diags.diagnose(SourceLoc(), diag::error_darwin_static_stdlib_not_supported);
+  }
 }
