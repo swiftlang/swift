@@ -3508,6 +3508,8 @@ void Parser::validateCollectionElement(ParserResult<Expr> element) {
     auto note =
         diagnose(subscriptExpr->getLoc(), diag::subscript_array_element_fix_it);
     note.fixItRemoveChars(endLocOfArray.getAdvancedLoc(1), startLocOfSubscript);
+
+    element.setIsParseError();
   }
 }
 

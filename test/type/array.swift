@@ -117,4 +117,4 @@ func passAssocType<T : HasAssocType>(_ t: T) {
 // SR-11134
 
 let sr_11134_1 = [[1, 2, 3][0]] // ok
-let sr_11134_2 = [[1, 2, 3] [1]] // expected-warning {{unexpected subscript in array literal, did you mean to write two separate elements instead?}}{{28-28=,}} // expected-note {{Remove the space between the elements to silence this warning}} {{28-29=}}
+let sr_11134_2 = [[1, 2, 3] [1]] // expected-warning {{unexpected subscript in array literal; did you mean to write two separate elements instead?}}{{28-28=,}} // expected-note {{Remove the space between the elements to silence this warning}} {{28-29=}}
