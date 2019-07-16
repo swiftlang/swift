@@ -1069,10 +1069,6 @@ namespace {
     Expr *finishApply(ApplyExpr *apply, Type openedType,
                       ConstraintLocatorBuilder locator);
 
-    // Resolve @dynamicCallable applications.
-    Expr *finishApplyDynamicCallable(const Solution &solution, ApplyExpr *apply,
-                                     ConstraintLocatorBuilder locator);
-
   private:
     /// Simplify the given type by substituting all occurrences of
     /// type variables for their fixed types.

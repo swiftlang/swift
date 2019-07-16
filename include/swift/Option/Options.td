@@ -858,11 +858,6 @@ def enable_private_imports : Flag<["-"], "enable-private-imports">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
   HelpText<"Allows this module's internal and private API to be accessed">;
 
-def enable_cxx_interop :
-  Flag<["-"], "enable-cxx-interop">,
-  HelpText<"Enable C++ interop code generation and config directives">,
-  Flags<[FrontendOption]>;
-
 def sanitize_EQ : CommaJoined<["-"], "sanitize=">,
   Flags<[FrontendOption, NoInteractiveOption]>, MetaVarName<"<check>">,
   HelpText<"Turn on runtime checks for erroneous behavior.">;

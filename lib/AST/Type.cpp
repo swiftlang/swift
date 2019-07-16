@@ -4540,7 +4540,7 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
   // Unwrap curry levels. At most, two parameter lists are necessary, for
   // curried method types with a `(Self)` parameter list.
   SmallVector<AnyFunctionType *, 2> curryLevels;
-  auto *currentLevel = eraseDynamicSelfType()->castTo<AnyFunctionType>();
+  auto *currentLevel = castTo<AnyFunctionType>();
   for (unsigned i : range(2)) {
     (void)i;
     if (currentLevel == nullptr)

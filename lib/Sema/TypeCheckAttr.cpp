@@ -3545,7 +3545,7 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
   auto original = attr->getOriginal();
 
   auto *derivativeInterfaceType = derivative->getInterfaceType()
-      ->eraseDynamicSelfType()->castTo<AnyFunctionType>();
+      ->castTo<AnyFunctionType>();
 
   // Perform preliminary derivative checks.
 

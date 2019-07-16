@@ -137,7 +137,7 @@ static ValueDecl *deriveTensorGroup_typeList(DerivedConformance &derived) {
 
   // Create `_typeList` getter.
   auto *getterDecl = derived.declareDerivedPropertyGetter(
-      TC, typeListDecl, returnType);
+      typeListDecl, returnType);
   getterDecl->setBodySynthesizer(deriveBodyTensorGroup_typeList, nullptr);
   typeListDecl->setAccessors(StorageImplInfo::getImmutableComputed(),
                              SourceLoc(), {getterDecl}, SourceLoc());
@@ -221,8 +221,7 @@ static void deriveBodyTensorGroup_init(AbstractFunctionDecl *funcDecl, void *) {
     // If conformance reference is concrete, then use concrete witness
     // declaration for the constructor.
     if (confRef->isConcrete())
-      memberInitDecl = confRef->getConcrete()->getWitnessDecl(
-          initReq, C.getLazyResolver());
+      memberInitDecl = confRef->getConcrete()->getWitnessDecl(initReq);
     assert(memberInitDecl && "Member constructor declaration must exist");
     auto memberInitDRE = new (C) DeclRefExpr(
         memberInitDecl, DeclNameLoc(), /*implicit*/ true);
