@@ -67,10 +67,12 @@ void Parser::DefaultArgumentInfo::setFunctionContext(
 static ParserStatus parseDefaultArgument(
     Parser &P, Parser::DefaultArgumentInfo *defaultArgs, unsigned argIndex,
     Expr *&init, bool &hasInheritedDefaultArg,
-    Parser::ParameterContextKind paramContext, tok assignmentTok) {
+    Parser::ParameterContextKind paramContext) {
   SyntaxParsingContext DefaultArgContext(P.SyntaxContext,
                                          SyntaxKind::InitializerClause);
-  SourceLoc equalLoc = P.consumeToken(assignmentTok);
+  assert(P.Tok.is(tok::equal) ||
+       (P.Tok.isBinaryOperator() && P.Tok.getText() == "=="));
+  SourceLoc equalLoc = P.consumeToken();
 
   if (P.SF.Kind == SourceFileKind::Interface) {
     // Swift module interfaces don't synthesize inherited intializers and
@@ -394,7 +396,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
 
       status |= parseDefaultArgument(
           *this, defaultArgs, defaultArgIndex, param.DefaultArg,
-          param.hasInheritedDefaultArg, paramContext, Tok.getKind());
+          param.hasInheritedDefaultArg, paramContext);
 
       if (param.EllipsisLoc.isValid() && param.DefaultArg) {
         // The range of the complete default argument.
