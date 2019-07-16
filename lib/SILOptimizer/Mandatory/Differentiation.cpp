@@ -5857,6 +5857,109 @@ private:
     initializeTangentValue(origBB, originalValue, tanVal);
   }
 
+  //--------------------------------------------------------------------------//
+  // Differential Emitter helpers
+  //--------------------------------------------------------------------------//
+
+  void visitReturnInstDifferential(ReturnInst *ri) {
+    auto loc = ri->getOperand().getLoc();
+    auto diffBuilder = getDifferentialBuilder();
+    // This vector will contain all the materialized return elements.
+    SmallVector<SILValue, 8> retElts;
+    // This vector will contain all indirect parameter adjoint buffers.
+    // TODO: Handle indirect results.
+    auto tanParam =
+        materializeTangent(getTangentValue(ri->getOperand()), loc);
+    tanParam.getCleanup()->disable();
+    tanParam.getCleanup()->applyRecursively(diffBuilder, loc);
+    diffBuilder.createReturn(
+        ri->getLoc(), tanParam);
+  }
+
+  void visitApplyInstDifferential(ApplyInst *ai, SILAutoDiffIndices indices) {
+    auto *bb = ai->getParent();
+    auto loc = ai->getLoc();
+    auto diffBuilder = getDifferentialBuilder();
+
+    // Get the differential.
+    auto *field = linearMapInfo.lookUpLinearMapDecl(ai);
+    assert(field);
+    SILValue differential = diffBuilder.createStructExtract(
+        loc, getDifferentialStructArgument(ai->getParent()), field);
+
+    SmallVector<SILValue, 8> diffArgs;
+    SmallVector<Cleanup *, 8> diffArgCleanups;
+    for (auto origArg : ai->getArguments()) {
+      // Get the tangent value of the original parameter.
+      if (!activityInfo.isActive(origArg, getIndices()))
+        continue;
+      ValueWithCleanup tanParam;
+      if (origArg->getType().isObject()) {
+        // If original result is a `tuple_extract`, materialize tangent value of
+        // `ai` and extract the corresponding element tangent value.
+        if (auto *tupleExtract =
+            dyn_cast<TupleExtractInst>(origArg)) {
+          auto tangentTuple = materializeTangent(getTangentValue(ai), loc);
+          auto tanParamVal = diffBuilder.emitTupleExtract(
+              loc, tangentTuple, tupleExtract->getFieldNo());
+          tanParam =
+              ValueWithCleanup(tanParamVal, makeCleanup(tanParamVal, emitCleanup, {}));
+        }
+        // Otherwise, materialize adjoint value of `ai`.
+        else {
+          tanParam = materializeTangent(getTangentValue(origArg), loc);
+        }
+      } else {
+        tanParam = getTangentBuffer(ai->getParent(), origArg);
+        if (errorOccurred)
+          return;
+      }
+      diffArgs.push_back(tanParam);
+      diffArgCleanups.push_back(tanParam.getCleanup());
+    }
+
+    // TODO: Reabstract the differential.
+    // See code from "If pullback was reabstracted in VJP, reabstract pullback
+    // in adjoint.".
+
+    // Call the differential.
+    auto *differentialCall = diffBuilder.createApply(
+        loc, differential, SubstitutionMap(), diffArgs,
+        /*isNonThrowing*/ false);
+    assert(differentialCall->getNumResults() == 1 &&
+           "Expected differential to return one result");
+
+    // TODO: Generalize for indirect results, multiple results, etc
+    auto origResult = ai->getResult(indices.source);
+
+    // Extract all direct results from the differential.
+    SmallVector<SILValue, 8> differentialDirResults;
+    extractAllElements(differentialCall, diffBuilder, differentialDirResults);
+    // Get all differential results in type-defined order.
+    SmallVector<SILValue, 8> differentialAllResults;
+    collectAllActualResultsInTypeOrder(
+        differentialCall, differentialDirResults,
+        differentialCall->getIndirectSILResults(), differentialAllResults);
+    auto differentialResult = differentialAllResults[indices.source];
+
+    // Accumulate tangent for original result.
+    assert(indices.source == 0 && "Expect result index to be first.");
+    addTangentValue(bb, origResult, makeConcreteAdjointValue(
+        ValueWithCleanup(differentialResult,
+        // TODO: Consider if cleanup children are to be passed.
+        makeCleanup(differentialResult, emitCleanup, diffArgCleanups))));
+
+    // TODO: handle indirect
+    // Add the tangent value of the result of the apply instruction.
+    //    auto tanVal = makeConcreteAdjointValue(
+    //        ValueWithCleanup(originalDirectResult,
+    //        makeCleanup(originalDirectResult, emitCleanup, {})));
+    //    for (auto dirRes : ai->getResults())
+    //      addTangentValue(bb, originalDirectResult, tanVal);
+    //    for (auto indRes : ai->getIndirectSILResults())
+    //      ;
+  }
+
 public:
   explicit JVPEmitter(ADContext &context, SILFunction *original,
                       SILDifferentiableAttr *attr, SILFunction *jvp,
@@ -5954,7 +6057,112 @@ public:
   }
 
   /// Run JVP generation. Returns true on error.
-  bool run();
+  bool run() {
+    LLVM_DEBUG(getADDebugStream()
+               << "Cloning original @" << original->getName()
+               << " to jvp @" << jvp->getName() << '\n');
+    // Create JVP entry and arguments.
+    auto *entry = jvp->createBasicBlock();
+    createEntryArguments(jvp);
+
+    // Create differential blocks and arguments.
+    // TODO: Consider visiting original blocks in pre-order (dominance) order.
+    SmallVector<SILBasicBlock *, 8> preOrderDomOrder;
+    auto &differential = getDifferential();
+    auto *origEntry = original->getEntryBlock();
+    for (auto &origBB : *original) {
+      auto *diffBB = differential.createBasicBlock();
+      diffBBMap.insert({&origBB, diffBB});
+      auto diffStructLoweredType =
+      remapType(linearMapInfo.getLinearMapStructLoweredType(&origBB));
+      // If the BB is the original exit, then the differential block that we just
+      // created must be the differential function's entry. Create differential
+      // entry arguments and continue.
+      if (&origBB == origEntry) {
+        assert(diffBB->isEntry());
+        createEntryArguments(&differential);
+        auto *lastArg = diffBB->getArguments().back();
+        assert(lastArg->getType() == diffStructLoweredType);
+        differentialStructArguments[&origBB] = lastArg;
+      }
+    }
+    assert(diffBBMap.size() == 1
+           && "Can only currently handle single basic block functions");
+
+    // The differential function has type:
+    // (arg0', ..., argn', exit_diffs) -> result'.
+    auto &diffBuilder = getDifferentialBuilder();
+    auto diffParamArgs =
+        differential.getArgumentsWithoutIndirectResults().drop_back();
+    assert(diffParamArgs.size() == attr->getIndices().parameters->getCapacity());
+    auto origParamArgs = original->getArgumentsWithoutIndirectResults();
+
+    // Check if result is not varied.
+    SmallVector<SILValue, 8> origFormalResults;
+    collectAllFormalResultsInTypeOrder(*original, origFormalResults);
+    auto origResult = origFormalResults[getIndices().source];
+    // Emit warning if original result is not varied, because it will always
+    // have a zero derivative.
+    if (!activityInfo.isVaried(origResult, getIndices().parameters)) {
+      // Emit fixit if original result has a valid source location.
+      auto startLoc = origResult.getLoc().getStartSourceLoc();
+      auto endLoc = origResult.getLoc().getEndSourceLoc();
+      if (startLoc.isValid() && endLoc.isValid()) {
+        context
+        .diagnose(startLoc, diag::autodiff_nonvaried_result_fixit)
+        .fixItInsert(startLoc, "withoutDerivative(at:")
+        .fixItInsertAfter(endLoc, ")");
+      }
+    }
+
+    auto *diffEntry = getDifferential().getEntryBlock();
+    auto diffLoc = getDifferential().getLocation();
+    diffBuilder.setInsertionPoint(
+        diffEntry, getNextDifferentialLocalAllocationInsertionPoint());
+
+    for (auto index : *getIndices().parameters) {
+      auto diffParam = diffParamArgs[index];
+      auto origParam = origParamArgs[index];
+
+      if (diffParam->getType().isAddress()) {
+        // Create a local copy so that it can be written to by later adjoint
+        // zero'ing logic.
+        auto *diffBufCopy =
+            diffBuilder.createAllocStack(diffLoc, diffParam->getType());
+        diffBuilder.createCopyAddr(diffLoc, diffParam, diffBufCopy, IsNotTake,
+                                   IsInitialization);
+        if (diffParam->getType().isLoadable(diffBuilder.getFunction()))
+          diffBuilder.createRetainValueAddr(diffLoc, diffBufCopy,
+                                            diffBuilder.getDefaultAtomicity());
+        ValueWithCleanup diffBufferCopyWithCleanup(
+            diffBufCopy, makeCleanup(diffBufCopy, emitCleanup, {}));
+        setTangentBuffer(origEntry, origParam, diffBufferCopyWithCleanup);
+        differentialLocalAllocations.push_back(diffBufferCopyWithCleanup);
+      } else {
+        diffBuilder.createRetainValue(diffLoc, diffParam,
+                                      diffBuilder.getDefaultAtomicity());
+        initializeTangentValue(
+            origEntry, origParam,
+            makeConcreteAdjointValue(ValueWithCleanup(
+                diffParam, makeCleanup(diffParam, emitCleanup, {}))));
+      }
+      LLVM_DEBUG(getADDebugStream()
+                 << "Assigned parameter " << *diffParam
+                 << " as the adjoint of original result " << origParam);
+    }
+
+    // Clone
+    SmallVector<SILValue, 4> entryArgs(entry->getArguments().begin(),
+                                       entry->getArguments().end());
+    cloneFunctionBody(original, entry, entryArgs);
+    // If errors occurred, back out.
+    if (errorOccurred)
+      return true;
+
+    LLVM_DEBUG(getADDebugStream() << "Generated JVP for "
+               << original->getName() << ":\n" << *jvp);
+    return errorOccurred;
+  }
 
   void postProcess(SILInstruction *orig, SILInstruction *cloned) {
     if (errorOccurred)
@@ -5980,21 +6188,6 @@ public:
     context.emitNondifferentiabilityError(inst, invoker,
         diag::autodiff_expression_not_differentiable_note);
     errorOccurred = true;
-  }
-
-  void visitReturnInstDifferential(ReturnInst *ri) {
-    auto loc = ri->getOperand().getLoc();
-    auto diffBuilder = getDifferentialBuilder();
-    // This vector will contain all the materialized return elements.
-    SmallVector<SILValue, 8> retElts;
-    // This vector will contain all indirect parameter adjoint buffers.
-    // TODO: Handle indirect results.
-    auto tanParam =
-        materializeTangent(getTangentValue(ri->getOperand()), loc);
-    tanParam.getCleanup()->disable();
-    tanParam.getCleanup()->applyRecursively(diffBuilder, loc);
-    diffBuilder.createReturn(
-        ri->getLoc(), tanParam);
   }
 
   void visitReturnInst(ReturnInst *ri) {
@@ -6029,90 +6222,6 @@ public:
 
     // Differential emission.
     visitReturnInstDifferential(ri);
-  }
-
-  void visitApplyInstDifferential(ApplyInst *ai, SILAutoDiffIndices indices) {
-    auto *bb = ai->getParent();
-    auto loc = ai->getLoc();
-    auto diffBuilder = getDifferentialBuilder();
-
-    // Get the differential.
-    auto *field = linearMapInfo.lookUpLinearMapDecl(ai);
-    assert(field);
-    SILValue differential = diffBuilder.createStructExtract(
-        loc, getDifferentialStructArgument(ai->getParent()), field);
-
-    SmallVector<SILValue, 8> diffArgs;
-    SmallVector<Cleanup *, 8> diffArgCleanups;
-    for (auto origArg : ai->getArguments()) {
-      // Get the tangent value of the original parameter.
-      if (!activityInfo.isActive(origArg, getIndices()))
-        continue;
-      ValueWithCleanup tanParam;
-      if (origArg->getType().isObject()) {
-        // If original result is a `tuple_extract`, materialize tangent value of
-        // `ai` and extract the corresponding element tangent value.
-        if (auto *tupleExtract =
-            dyn_cast<TupleExtractInst>(origArg)) {
-          auto tangentTuple = materializeTangent(getTangentValue(ai), loc);
-          auto tanParamVal = diffBuilder.emitTupleExtract(
-              loc, tangentTuple, tupleExtract->getFieldNo());
-          tanParam =
-              ValueWithCleanup(tanParamVal, makeCleanup(tanParamVal, emitCleanup, {}));
-        }
-        // Otherwise, materialize adjoint value of `ai`.
-        else {
-          tanParam = materializeTangent(getTangentValue(origArg), loc);
-        }
-      } else {
-        tanParam = getTangentBuffer(ai->getParent(), origArg);
-        if (errorOccurred)
-          return;
-      }
-      diffArgs.push_back(tanParam);
-      diffArgCleanups.push_back(tanParam.getCleanup());
-    }
-
-    // TODO: Reabstract the differential.
-    // See code from "If pullback was reabstracted in VJP, reabstract pullback
-    // in adjoint.".
-
-    // Call the differential.
-    auto *differentialCall = diffBuilder.createApply(
-        loc, differential, SubstitutionMap(), diffArgs,
-        /*isNonThrowing*/ false);
-    assert(differentialCall->getNumResults() == 1 &&
-           "Expected differential to return one result");
-
-    // TODO: Generalize for indirect results, multiple results, etc
-    auto origResult = ai->getResult(indices.source);
-
-    // Extract all direct results from the differential.
-    SmallVector<SILValue, 8> differentialDirResults;
-    extractAllElements(differentialCall, diffBuilder, differentialDirResults);
-    // Get all differential results in type-defined order.
-    SmallVector<SILValue, 8> differentialAllResults;
-    collectAllActualResultsInTypeOrder(
-        differentialCall, differentialDirResults,
-        differentialCall->getIndirectSILResults(), differentialAllResults);
-    auto differentialResult = differentialAllResults[indices.source];
-
-    // Accumulate tangent for original result.
-    assert(indices.source == 0 && "Expect result index to be first.");
-    addTangentValue(bb, origResult, makeConcreteAdjointValue(
-        ValueWithCleanup(differentialResult,
-        // TODO: Consider if cleanup children are to be passed.
-        makeCleanup(differentialResult, emitCleanup, diffArgCleanups))));
-
-    // TODO: handle indirect
-    // Add the tangent value of the result of the apply instruction.
-//    auto tanVal = makeConcreteAdjointValue(
-//        ValueWithCleanup(originalDirectResult,
-//        makeCleanup(originalDirectResult, emitCleanup, {})));
-//    for (auto dirRes : ai->getResults())
-//      addTangentValue(bb, originalDirectResult, tanVal);
-//    for (auto indRes : ai->getIndirectSILResults())
-//      ;
   }
 
   // If an `apply` has active results or active inout parameters, replace it
@@ -6867,112 +6976,6 @@ bool VJPEmitter::run() {
   }
   LLVM_DEBUG(getADDebugStream() << "Generated VJP for "
                                 << original->getName() << ":\n" << *vjp);
-  return errorOccurred;
-}
-
-bool JVPEmitter::run() {
-  LLVM_DEBUG(getADDebugStream()
-             << "Cloning original @" << original->getName()
-             << " to jvp @" << jvp->getName() << '\n');
-  // Create JVP entry and arguments.
-  auto *entry = jvp->createBasicBlock();
-  createEntryArguments(jvp);
-
-  // Create differential blocks and arguments.
-  // TODO: Consider visiting original blocks in pre-order (dominance) order.
-  SmallVector<SILBasicBlock *, 8> preOrderDomOrder;
-  auto &differential = getDifferential();
-  auto *origEntry = original->getEntryBlock();
-  for (auto &origBB : *original) {
-    auto *diffBB = differential.createBasicBlock();
-    diffBBMap.insert({&origBB, diffBB});
-    auto diffStructLoweredType =
-        remapType(linearMapInfo.getLinearMapStructLoweredType(&origBB));
-    // If the BB is the original exit, then the differential block that we just
-    // created must be the differential function's entry. Create differential
-    // entry arguments and continue.
-    if (&origBB == origEntry) {
-      assert(diffBB->isEntry());
-      createEntryArguments(&differential);
-      auto *lastArg = diffBB->getArguments().back();
-      assert(lastArg->getType() == diffStructLoweredType);
-      differentialStructArguments[&origBB] = lastArg;
-    }
-  }
-  assert(diffBBMap.size() == 1
-         && "Can only currently handle single basic block functions");
-
-  // The differential function has type:
-  // (arg0', ..., argn', exit_diffs) -> result'.
-  auto &diffBuilder = getDifferentialBuilder();
-  auto diffParamArgs =
-      differential.getArgumentsWithoutIndirectResults().drop_back();
-  assert(diffParamArgs.size() == attr->getIndices().parameters->getCapacity());
-  auto origParamArgs = original->getArgumentsWithoutIndirectResults();
-
-  // Check if result is not varied.
-  SmallVector<SILValue, 8> origFormalResults;
-  collectAllFormalResultsInTypeOrder(*original, origFormalResults);
-  auto origResult = origFormalResults[getIndices().source];
-  // Emit warning if original result is not varied, because it will always
-  // have a zero derivative.
-  if (!activityInfo.isVaried(origResult, getIndices().parameters)) {
-    // Emit fixit if original result has a valid source location.
-    auto startLoc = origResult.getLoc().getStartSourceLoc();
-    auto endLoc = origResult.getLoc().getEndSourceLoc();
-    if (startLoc.isValid() && endLoc.isValid()) {
-      context
-      .diagnose(startLoc, diag::autodiff_nonvaried_result_fixit)
-      .fixItInsert(startLoc, "withoutDerivative(at:")
-      .fixItInsertAfter(endLoc, ")");
-    }
-  }
-
-  auto *diffEntry = getDifferential().getEntryBlock();
-  auto diffLoc = getDifferential().getLocation();
-  diffBuilder.setInsertionPoint(
-      diffEntry, getNextDifferentialLocalAllocationInsertionPoint());
-
-  for (auto index : *getIndices().parameters) {
-    auto diffParam = diffParamArgs[index];
-    auto origParam = origParamArgs[index];
-
-    if (diffParam->getType().isAddress()) {
-      // Create a local copy so that it can be written to by later adjoint
-      // zero'ing logic.
-      auto *diffBufCopy = diffBuilder.createAllocStack(diffLoc,
-                                                       diffParam->getType());
-      diffBuilder.createCopyAddr(diffLoc, diffParam, diffBufCopy, IsNotTake,
-                                 IsInitialization);
-      if (diffParam->getType().isLoadable(diffBuilder.getFunction()))
-        diffBuilder.createRetainValueAddr(diffLoc, diffBufCopy,
-                                          diffBuilder.getDefaultAtomicity());
-      ValueWithCleanup diffBufferCopyWithCleanup(
-          diffBufCopy, makeCleanup(diffBufCopy, emitCleanup, {}));
-      setTangentBuffer(origEntry, origParam, diffBufferCopyWithCleanup);
-      differentialLocalAllocations.push_back(diffBufferCopyWithCleanup);
-    } else {
-      diffBuilder.createRetainValue(diffLoc, diffParam,
-                                    diffBuilder.getDefaultAtomicity());
-      initializeTangentValue(origEntry, origParam, makeConcreteAdjointValue(
-          ValueWithCleanup(diffParam, makeCleanup(diffParam, emitCleanup,
-                                                  {}))));
-    }
-    LLVM_DEBUG(getADDebugStream()
-               << "Assigned parameter " << *diffParam
-               << " as the adjoint of original result " << origParam);
-  }
-
-  // Clone
-  SmallVector<SILValue, 4> entryArgs(entry->getArguments().begin(),
-                                     entry->getArguments().end());
-  cloneFunctionBody(original, entry, entryArgs);
-  // If errors occurred, back out.
-  if (errorOccurred)
-    return true;
-
-  LLVM_DEBUG(getADDebugStream() << "Generated JVP for "
-             << original->getName() << ":\n" << *jvp);
   return errorOccurred;
 }
 
