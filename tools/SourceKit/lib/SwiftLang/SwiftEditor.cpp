@@ -1824,8 +1824,9 @@ void SwiftEditorDocument::parse(ImmutableTextSnapshotRef Snapshot,
   // all tokens are visited and thus token collection is invalid
   CompInv.getLangOptions().CollectParsedToken = (SyntaxCache == nullptr);
   // Access to Impl.SyntaxInfo is guarded by Impl.AccessMtx
+  std::string ResolvedPath = SwiftLangSupport::resolvePathSymlinks(Impl.FilePath);
   Impl.SyntaxInfo.reset(
-    new SwiftDocumentSyntaxInfo(CompInv, Snapshot, Args, Impl.FilePath));
+    new SwiftDocumentSyntaxInfo(CompInv, Snapshot, Args, ResolvedPath));
 
   Impl.SyntaxInfo->parse();
 }
