@@ -26,6 +26,45 @@ CHANGELOG
 Swift Next
 ----------
 
+* [SR-4206][]:
+
+  Overriden methods are no longer allowed to have a different generic 
+  signature compared to the base method. For example:
+
+  ```
+  protocol P {}
+  
+  class Base {
+    func foo<T>(arg: T) {}
+  }
+  
+  class Derived: Base {
+    override func foo<T: P>(arg: T) {}
+  }
+  ```
+
+  will now be diagnosed as an error.
+
+* [SR-6118][]:
+
+  Subscripts can now declare default arguments:
+
+  ```swift
+  struct Subscriptable {
+    subscript(x: Int, y: Int = 0) {
+      ...
+    }
+  }
+
+  let s = Subscriptable()
+  print(s[0])
+  ```
+
+**Add new entries to the top of this section, not here!**
+
+Swift 5.1
+---------
+
 * [SR-8974][]:
 
   Duplicate tuple element labels are no longer allowed, because it leads
@@ -47,26 +86,6 @@ Swift Next
   func foo(bar x: Int, bar y: Int) {}
   subscript(a x: Int, a y: Int) -> Int {}
   ```
-
-* [SR-6118][]:
-
-  Subscripts can now declare default arguments:
-
-  ```swift
-  struct Subscriptable {
-    subscript(x: Int, y: Int = 0) {
-      ...
-    }
-  }
-
-  let s = Subscriptable()
-  print(s[0])
-  ```
-
-**Add new entries to the top of this section, not here!**
-
-Swift 5.1
----------
 
 * [SE-0244][]:
 
@@ -7708,6 +7727,7 @@ Swift 1.0
 [SR-2608]: <https://bugs.swift.org/browse/SR-2608>
 [SR-2672]: <https://bugs.swift.org/browse/SR-2672>
 [SR-2688]: <https://bugs.swift.org/browse/SR-2688>
+[SR-4206]: <https://bugs.swift.org/browse/SR-4206>
 [SR-4248]: <https://bugs.swift.org/browse/SR-4248>
 [SR-5581]: <https://bugs.swift.org/browse/SR-5581>
 [SR-5719]: <https://bugs.swift.org/browse/SR-5719>
