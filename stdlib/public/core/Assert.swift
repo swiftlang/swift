@@ -93,7 +93,7 @@ public func precondition(
     }
   } else if _isReleaseAssertConfiguration() {
     let error = !condition()
-    Builtin.condfail(error._value)
+    Builtin.condfail(error._value, StaticString("precondition failure").unsafeRawPointer)
   }
 }
 
@@ -171,7 +171,7 @@ public func preconditionFailure(
     _assertionFailure("Fatal error", message(), file: file, line: line,
       flags: _fatalErrorFlags())
   } else if _isReleaseAssertConfiguration() {
-    Builtin.int_trap()
+    Builtin.condfail(true._value, StaticString("precondition failure").unsafeRawPointer)
   }
   _conditionallyUnreachable()
 }
@@ -207,12 +207,12 @@ internal func _precondition(
   // Only check in debug and release mode. In release mode just trap.
   if _isDebugAssertConfiguration() {
     if !_fastPath(condition()) {
-      _fatalErrorMessage("Fatal error", message, file: file, line: line,
+      _assertionFailure("Fatal error", message, file: file, line: line,
         flags: _fatalErrorFlags())
     }
   } else if _isReleaseAssertConfiguration() {
     let error = !condition()
-    Builtin.condfail(error._value)
+    Builtin.condfail(error._value, message.unsafeRawPointer)
   }
 }
 
@@ -240,7 +240,7 @@ public func _overflowChecked<T>(
         file: file, line: line, flags: _fatalErrorFlags())
     }
   } else {
-    Builtin.condfail(error._value)
+    Builtin.condfail(error._value, StaticString("_overflowChecked failure").unsafeRawPointer)
   }
   return result
 }

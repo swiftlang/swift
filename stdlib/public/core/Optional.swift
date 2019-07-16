@@ -302,14 +302,21 @@ func _diagnoseUnexpectedNilOptional(_filenameStart: Builtin.RawPointer,
                                     _isImplicitUnwrap: Builtin.Int1) {
   // Cannot use _preconditionFailure as the file and line info would not be
   // printed.
-  preconditionFailure(
-    Bool(_isImplicitUnwrap)
-      ? "Unexpectedly found nil while implicitly unwrapping an Optional value"
-      : "Unexpectedly found nil while unwrapping an Optional value",
-    file: StaticString(_start: _filenameStart,
-                       utf8CodeUnitCount: _filenameLength,
-                       isASCII: _filenameIsASCII),
-    line: UInt(_line))
+  if Bool(_isImplicitUnwrap) {
+    _preconditionFailure(
+      "Unexpectedly found nil while implicitly unwrapping an Optional value",
+      file: StaticString(_start: _filenameStart,
+                         utf8CodeUnitCount: _filenameLength,
+                         isASCII: _filenameIsASCII),
+      line: UInt(_line))
+  } else {
+    _preconditionFailure(
+      "Unexpectedly found nil while unwrapping an Optional value",
+      file: StaticString(_start: _filenameStart,
+                         utf8CodeUnitCount: _filenameLength,
+                         isASCII: _filenameIsASCII),
+      line: UInt(_line))
+  }
 }
 
 extension Optional : Equatable where Wrapped : Equatable {
