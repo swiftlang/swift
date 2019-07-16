@@ -3507,10 +3507,16 @@ bool InvalidTupleSplatWithSingleParameterFailure::diagnoseAsError() {
   if (!argExpr)
     return false;
 
+  using Substitution = std::pair<GenericTypeParamType *, Type>;
+  llvm::SetVector<Substitution> substitutions;
   auto paramTy = ParamType.transform([&](Type type) -> Type {
     if (auto *typeVar = type->getAs<TypeVariableType>()) {
-      auto *GP = typeVar->getImpl().getGenericParameter();
-      return GP ? GP : resolveType(typeVar);
+      type = resolveType(typeVar);
+
+      if (auto *GP = typeVar->getImpl().getGenericParameter()) {
+        substitutions.insert(std::make_pair(GP, type));
+        return GP;
+      }
     }
 
     return type;
@@ -3518,14 +3524,28 @@ bool InvalidTupleSplatWithSingleParameterFailure::diagnoseAsError() {
 
   DeclBaseName name = choice->getBaseName();
 
+  std::string subsStr;
+  if (!substitutions.empty()) {
+    subsStr += " [where ";
+    interleave(
+        substitutions,
+        [&subsStr](const Substitution &substitution) {
+          subsStr += substitution.first->getString();
+          subsStr += " = ";
+          subsStr += substitution.second->getString();
+        },
+        [&subsStr] { subsStr += ", "; });
+    subsStr += ']';
+  }
+
   auto diagnostic =
       name.isSpecial()
           ? emitDiagnostic(argExpr->getLoc(),
                            diag::single_tuple_parameter_mismatch_special,
-                           choice->getDescriptiveKind(), paramTy)
-          : emitDiagnostic(argExpr->getLoc(),
-                           diag::single_tuple_parameter_mismatch_normal,
-                           choice->getDescriptiveKind(), name, paramTy);
+                           choice->getDescriptiveKind(), paramTy, subsStr)
+          : emitDiagnostic(
+                argExpr->getLoc(), diag::single_tuple_parameter_mismatch_normal,
+                choice->getDescriptiveKind(), name, paramTy, subsStr);
 
   diagnostic.highlight(argExpr->getSourceRange())
       .fixItInsertAfter(argExpr->getStartLoc(), "(")
