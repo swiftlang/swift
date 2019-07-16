@@ -5412,7 +5412,7 @@ private:
   const DifferentiableActivityInfo &activityInfo;
 
   ///
-  /// Differential-related fields
+  /// Differential-related fields.
   ///
 
   /// The builder for the differential function.
@@ -5422,7 +5422,7 @@ private:
   DenseMap<SILBasicBlock *, SILArgument *> differentialStructArguments;
 
   /// Mapping from original basic blocks and original values to corresponding
-  /// adjoint values.
+  /// tangent values.
   DenseMap<SILValue, AdjointValue> tangentValueMap;
 
   DenseMap<SILBasicBlock *, SILBasicBlock *> diffBBMap;
@@ -5435,11 +5435,15 @@ private:
   DenseMap<SILBasicBlock *, SmallVector<SILValue, 8>> differentialValues;
 
   /// Mapping from original basic blocks and original buffers to corresponding
-  /// adjoint buffers.
+  /// tangent buffers.
   DenseMap<std::pair<SILBasicBlock *, SILValue>, ValueWithCleanup> bufferMap;
 
   /// An auxiliary differential local allocation builder.
   SILBuilder diffLocalAllocBuilder;
+
+  //--------------------------------------------------------------------------//
+  // Private Getters
+  //--------------------------------------------------------------------------//
 
   ASTContext &getASTContext() const { return jvp->getASTContext(); }
   SILModule &getModule() const { return jvp->getModule(); }
@@ -5455,6 +5459,10 @@ private:
     return differentialStructArguments[origBB];
   }
 
+  //--------------------------------------------------------------------------//
+  // Misc. Class Helpers
+  //--------------------------------------------------------------------------//
+
   static SubstitutionMap getSubstitutionMap(SILFunction *original,
                                             SILFunction *jvp) {
     auto substMap = original->getForwardingSubstitutionMap();
@@ -5463,13 +5471,14 @@ private:
     return substMap;
   }
 
+  /// Returns the activity info about the SILValues in the original function.
   static const DifferentiableActivityInfo &getActivityInfo(
       ADContext &context, SILFunction *original,
       const SILAutoDiffIndices &indices, SILFunction *jvp) {
     // Get activity info of the original function.
     auto &passManager = context.getPassManager();
     auto *activityAnalysis =
-    passManager.getAnalysis<DifferentiableActivityAnalysis>();
+        passManager.getAnalysis<DifferentiableActivityAnalysis>();
     auto &activityCollection = *activityAnalysis->get(original);
     auto &activityInfo = activityCollection.getActivityInfo(
         jvp->getLoweredFunctionType()->getGenericSignature());
@@ -5477,10 +5486,6 @@ private:
                                 getADDebugStream()));
     return activityInfo;
   }
-
-  //--------------------------------------------------------------------------//
-  // Misc. Class Helpers
-  //--------------------------------------------------------------------------//
 
   static SILBuilder initializeDifferentialAndBuilder(
       ADContext &context, SILFunction *original, SILDifferentiableAttr *attr,
@@ -5491,7 +5496,7 @@ private:
   }
 
   SILBasicBlock::iterator getNextDifferentialLocalAllocationInsertionPoint() {
-    // If there are no local allocations, insert at the adjont entry beginning.
+    // If there are no local allocations, insert at the tangent entry beginning.
     if (differentialLocalAllocations.empty())
       return getDifferential().getEntryBlock()->begin();
     // Otherwise, insert before the last local allocation. Inserting before
@@ -5523,21 +5528,22 @@ private:
     return nomSILType;
   }
 
-  /// Build a pullback struct value for the original block corresponding to the
-  /// given terminator.
+  /// Build a differential struct value for the original block corresponding to
+  /// the given terminator.
   StructInst *buildDifferentialValueStructValue(TermInst *termInst) {
     assert(termInst->getFunction() == original);
     auto loc = termInst->getFunction()->getLocation();
     auto *origBB = termInst->getParent();
     auto *vjpBB = BBMap[origBB];
-    auto *pbStruct = linearMapInfo.getLinearMapStruct(origBB);
-    auto structLoweredTy = getNominalDeclLoweredType(pbStruct);
-    auto bbPullbackValues = differentialValues[origBB];
+    auto *diffStruct = linearMapInfo.getLinearMapStruct(origBB);
+    auto structLoweredTy = getNominalDeclLoweredType(diffStruct);
+    auto bbDifferentialValues = differentialValues[origBB];
     if (!origBB->isEntry()) {
-      auto *predEnumArg = vjpBB->getArguments().back();
-      bbPullbackValues.insert(bbPullbackValues.begin(), predEnumArg);
+      auto *enumArg = vjpBB->getArguments().back();
+      bbDifferentialValues.insert(bbDifferentialValues.begin(), enumArg);
     }
-    return getBuilder().createStruct(loc, structLoweredTy, bbPullbackValues);
+    return getBuilder().createStruct(loc, structLoweredTy,
+                                     bbDifferentialValues);
   }
 
   //--------------------------------------------------------------------------//
@@ -5575,18 +5581,20 @@ private:
     auto silType = getModule().Types.getLoweredLoadableType(
         type, ResilienceExpansion::Minimal);
     auto *buffer = builder.createAllocStack(loc, silType);
-    auto *initAccess = builder.createBeginAccess(loc, buffer, SILAccessKind::Init,
+    auto *initAccess = builder.createBeginAccess(loc, buffer,
+                                                 SILAccessKind::Init,
                                                  SILAccessEnforcement::Static,
                                                  /*noNestedConflict*/ true,
                                                  /*fromBuiltin*/ false);
     emitZeroIndirect(type, initAccess, loc);
     builder.createEndAccess(loc, initAccess, /*aborted*/ false);
-    auto readAccess = builder.createBeginAccess(loc, buffer, SILAccessKind::Read,
+    auto readAccess = builder.createBeginAccess(loc, buffer,
+                                                SILAccessKind::Read,
                                                 SILAccessEnforcement::Static,
                                                 /*noNestedConflict*/ true,
                                                 /*fromBuiltin*/ false);
-    auto *loaded = builder.createLoad(loc, readAccess,
-                                      getBufferLOQ(type, getDifferential()));
+    auto *loaded = builder.createLoad(
+        loc, readAccess, getBufferLOQ(type, getDifferential()));
     builder.createEndAccess(loc, readAccess, /*aborted*/ false);
     builder.createDeallocStack(loc, buffer);
     return loaded;
@@ -5787,6 +5795,240 @@ private:
   // Managed tangent value mapping
   //--------------------------------------------------------------------------//
 
+  template<typename EltRange>
+  AdjointValue makeAggregateTangentValue(SILType type, EltRange elements) {
+    return AdjointValue::createAggregate(allocator, remapType(type), elements);
+  }
+
+  void accumulateIndirect(
+      SILValue resultBufAccess, SILValue lhsBufAccess, SILValue rhsBufAccess) {
+    auto diffBuilder = getDifferentialBuilder();
+    // TODO: Optimize for the case when lhs == rhs.
+    assert(lhsBufAccess->getType() == rhsBufAccess->getType() &&
+           "Tangent values must have same type!");
+    assert(lhsBufAccess->getType().isAddress() &&
+           rhsBufAccess->getType().isAddress() &&
+           "Tangent values must both have address types!");
+    auto loc = resultBufAccess.getLoc();
+    auto tangentTy = lhsBufAccess->getType();
+    auto tangentASTTy = tangentTy.getASTType();
+    auto *swiftMod = getModule().getSwiftModule();
+    auto tangentSpace = tangentASTTy->getAutoDiffAssociatedTangentSpace(
+        LookUpConformanceInModule(swiftMod));
+    assert(tangentSpace && "No tangent space for this type");
+    switch (tangentSpace->getKind()) {
+    case VectorSpace::Kind::Vector: {
+      auto *proto = context.getAdditiveArithmeticProtocol();
+      auto *combinerFuncDecl = context.getPlusDecl();
+      // Call the combiner function and return.
+      auto tangentParentModule = tangentSpace->getNominal()
+          ? tangentSpace->getNominal()->getModuleContext()
+          : getModule().getSwiftModule();
+      auto confRef = tangentParentModule->lookupConformance(tangentASTTy,
+                                                            proto);
+      assert(confRef.hasValue()
+             && "Missing conformance to `AdditiveArithmetic`");
+      SILDeclRef declRef(combinerFuncDecl, SILDeclRef::Kind::Func);
+      auto silFnTy = context.getTypeConverter().getConstantType(declRef);
+      // %0 = witness_method @+
+      auto witnessMethod = diffBuilder.createWitnessMethod(loc, tangentASTTy,
+                                                           *confRef, declRef,
+                                                           silFnTy);
+      auto subMap = SubstitutionMap::getProtocolSubstitutions(
+          proto, tangentASTTy, *confRef);
+      // %1 = metatype $T.Type
+      auto metatypeType =
+          CanMetatypeType::get(tangentASTTy, MetatypeRepresentation::Thick);
+      auto metatypeSILType = SILType::getPrimitiveObjectType(metatypeType);
+      auto metatype = diffBuilder.createMetatype(loc, metatypeSILType);
+      // %2 = apply $0(%result, %new, %old, %1)
+      diffBuilder.createApply(loc, witnessMethod, subMap,
+                              {resultBufAccess, rhsBufAccess, lhsBufAccess,
+                               metatype},
+                              /*isNonThrowing*/ false);
+      return;
+    }
+    case VectorSpace::Kind::Tuple: {
+      auto tupleType = tangentSpace->getTuple();
+      for (unsigned i : range(tupleType->getNumElements())) {
+        auto *destAddr = diffBuilder.createTupleElementAddr(
+            loc, resultBufAccess, i);
+        auto *eltAddrLHS = diffBuilder.createTupleElementAddr(
+            loc, lhsBufAccess, i);
+        auto *eltAddrRHS = diffBuilder.createTupleElementAddr(
+            loc, rhsBufAccess, i);
+        accumulateIndirect(destAddr, eltAddrLHS, eltAddrRHS);
+      }
+      return;
+    }
+    case VectorSpace::Kind::Function: {
+      llvm_unreachable(
+          "Unimplemented: Emit thunks for abstracting tangent value "
+          "accumulation");
+    }
+    }
+  }
+
+  SILValue accumulateDirect(SILValue lhs, SILValue rhs) {
+    auto diffBuilder = getDifferentialBuilder();
+    // TODO: Optimize for the case when lhs == rhs.
+    LLVM_DEBUG(getADDebugStream() <<
+               "Emitting tangent accumulation for lhs: " << lhs << " and rhs: "
+               << rhs << "\n");
+    assert(lhs->getType() == rhs->getType()
+           && "Tangents must have equal types!");
+    assert(lhs->getType().isObject() && rhs->getType().isObject() &&
+           "Adjoint types must be both object types!");
+    auto tangentTy = lhs->getType();
+    auto tangentASTTy = tangentTy.getASTType();
+    auto loc = lhs.getLoc();
+    auto tangentSpace = getTangentSpace(tangentASTTy);
+    assert(tangentSpace && "No tangent space for this type");
+    switch (tangentSpace->getKind()) {
+      case VectorSpace::Kind::Vector: {
+        // Allocate buffers for inputs and output.
+        auto *resultBuf = diffBuilder.createAllocStack(loc, tangentTy);
+        auto *lhsBuf = diffBuilder.createAllocStack(loc, tangentTy);
+        auto *rhsBuf = diffBuilder.createAllocStack(loc, tangentTy);
+        // Initialize input buffers.
+        auto *lhsBufInitAccess = diffBuilder.createBeginAccess(
+            loc, lhsBuf, SILAccessKind::Init, SILAccessEnforcement::Static,
+            /*noNestedConflict*/ true, /*fromBuiltin*/ false);
+        auto *rhsBufInitAccess = diffBuilder.createBeginAccess(
+            loc, rhsBuf, SILAccessKind::Init, SILAccessEnforcement::Static,
+            /*noNestedConflict*/ true, /*fromBuiltin*/ false);
+        diffBuilder.createStore(loc, lhs, lhsBufInitAccess,
+                                getBufferSOQ(tangentASTTy, getDifferential()));
+        diffBuilder.createStore(loc, rhs, rhsBufInitAccess,
+                                getBufferSOQ(tangentASTTy, getDifferential()));
+        diffBuilder.createEndAccess(loc, lhsBufInitAccess, /*aborted*/ false);
+        diffBuilder.createEndAccess(loc, rhsBufInitAccess, /*aborted*/ false);
+        // Accumulate the tangents.
+        auto *resultBufAccess = diffBuilder.createBeginAccess(
+            loc, resultBuf, SILAccessKind::Init, SILAccessEnforcement::Static,
+            /*noNestedConflict*/ true, /*fromBuiltin*/ false);
+        auto *lhsBufReadAccess = diffBuilder.createBeginAccess(loc, lhsBuf,
+            SILAccessKind::Read, SILAccessEnforcement::Static,
+            /*noNestedConflict*/ true, /*fromBuiltin*/ false);
+        auto *rhsBufReadAccess = diffBuilder.createBeginAccess(loc, rhsBuf,
+            SILAccessKind::Read, SILAccessEnforcement::Static,
+            /*noNestedConflict*/ true, /*fromBuiltin*/ false);
+        accumulateIndirect(resultBufAccess, lhsBufReadAccess, rhsBufReadAccess);
+        diffBuilder.createEndAccess(loc, resultBufAccess, /*aborted*/ false);
+        diffBuilder.createEndAccess(loc, rhsBufReadAccess, /*aborted*/ false);
+        diffBuilder.createEndAccess(loc, lhsBufReadAccess, /*aborted*/ false);
+        // Deallocate input buffers.
+        diffBuilder.createDeallocStack(loc, rhsBuf);
+        diffBuilder.createDeallocStack(loc, lhsBuf);
+        // Load result.
+        resultBufAccess = diffBuilder.createBeginAccess(loc, resultBuf,
+            SILAccessKind::Read, SILAccessEnforcement::Static,
+            /*noNestedConflict*/ true, /*fromBuiltin*/ false);
+        auto val = diffBuilder.createLoad(loc, resultBufAccess,
+            getBufferLOQ(lhs->getType().getASTType(), getDifferential()));
+        diffBuilder.createEndAccess(loc, resultBufAccess, /*aborted*/ false);
+        // Deallocate result buffer.
+        diffBuilder.createDeallocStack(loc, resultBuf);
+        return val;
+      }
+      case VectorSpace::Kind::Tuple: {
+        auto tupleType = tangentSpace->getTuple();
+        SmallVector<SILValue, 8> adjElements;
+        for (unsigned i : range(tupleType->getNumElements())) {
+          auto *eltLHS = diffBuilder.createTupleExtract(loc, lhs, i);
+          auto *eltRHS = diffBuilder.createTupleExtract(loc, rhs, i);
+          adjElements.push_back(accumulateDirect(eltLHS, eltRHS));
+        }
+        return diffBuilder.createTuple(loc, tangentTy, adjElements);
+      }
+      case VectorSpace::Kind::Function: {
+        llvm_unreachable(
+            "Unimplemented: Emit thunks for abstracting adjoint accumulation");
+      }
+    }
+  }
+
+  AdjointValue accumulateTangentsDirect(AdjointValue lhs,
+                                        AdjointValue rhs) {
+    auto diffBuilder = getDifferentialBuilder();
+    LLVM_DEBUG(getADDebugStream()
+               << "Materializing tangent directly.\nLHS: " << lhs
+               << "\nRHS: " << rhs << '\n');
+
+    switch (lhs.getKind()) {
+    // x
+    case AdjointValueKind::Concrete: {
+      auto lhsVal = lhs.getConcreteValue();
+      switch (rhs.getKind()) {
+      // x + y
+      case AdjointValueKind::Concrete: {
+        auto rhsVal = rhs.getConcreteValue();
+        auto sum = accumulateDirect(lhsVal, rhsVal);
+        return makeConcreteAdjointValue(ValueWithCleanup(
+            sum, makeCleanup(sum, emitCleanup, {lhsVal.getCleanup(),
+                                                rhsVal.getCleanup()})));
+      }
+      // x + 0 => x
+      case AdjointValueKind::Zero:
+        return lhs;
+      // x + (y, z) => (x.0 + y, x.1 + z)
+      case AdjointValueKind::Aggregate:
+        SmallVector<AdjointValue, 8> newElements;
+        auto lhsTy = lhsVal.getValue()->getType().getASTType();
+        if (auto *tupTy = lhsTy->getAs<TupleType>()) {
+          for (auto idx : range(rhs.getNumAggregateElements())) {
+            auto lhsElt = diffBuilder.createTupleExtract(
+                lhsVal.getLoc(), lhsVal, idx);
+            auto rhsElt = rhs.getAggregateElement(idx);
+            newElements.push_back(accumulateTangentsDirect(
+                makeConcreteAdjointValue(
+                    ValueWithCleanup(lhsElt, lhsVal.getCleanup())),
+                rhsElt));
+          }
+        } else if (auto *structDecl = lhsTy->getStructOrBoundGenericStruct()) {
+          auto fieldIt = structDecl->getStoredProperties().begin();
+          for (unsigned i = 0;
+               fieldIt != structDecl->getStoredProperties().end();
+               ++fieldIt, ++i) {
+            auto lhsElt = diffBuilder.createStructExtract(
+                lhsVal.getLoc(), lhsVal, *fieldIt);
+            auto rhsElt = rhs.getAggregateElement(i);
+            newElements.push_back(accumulateTangentsDirect(
+                makeConcreteAdjointValue(
+                    ValueWithCleanup(lhsElt, lhsVal.getCleanup())),
+                rhsElt));
+          }
+        } else {
+          llvm_unreachable("Not an aggregate type");
+        }
+        return makeAggregateTangentValue(lhsVal.getType(), newElements);
+      }
+    }
+    // 0
+    case AdjointValueKind::Zero:
+      // 0 + x => x
+      return rhs;
+    // (x, y)
+    case AdjointValueKind::Aggregate:
+      switch (rhs.getKind()) {
+      // (x, y) + z => (x + z.0, y + z.1)
+      case AdjointValueKind::Concrete:
+      // x + 0 => x
+      case AdjointValueKind::Zero:
+        return lhs;
+      // (x, y) + (z, w) => (x + z, y + w)
+      case AdjointValueKind::Aggregate: {
+        SmallVector<AdjointValue, 8> newElements;
+        for (auto i : range(lhs.getNumAggregateElements()))
+          newElements.push_back(
+              accumulateTangentsDirect(lhs.getAggregateElement(i),
+                                       rhs.getAggregateElement(i)));
+        return makeAggregateTangentValue(lhs.getType(), newElements);
+      }
+      }
+    }
+  }
+
   AdjointValue makeZeroTangentValue(SILType type) {
     return AdjointValue::createZero(allocator, remapType(type));
   }
@@ -5806,7 +6048,7 @@ private:
     assert(originalValue->getType().isObject());
     assert(tangentValue.getType().isObject());
     assert(originalValue->getFunction() == original);
-    // The adjoint value must be in the tangent space.
+    // The tangent value must be in the tangent space.
     assert(tangentValue.getType() ==
            getRemappedTangentType(originalValue->getType()));
     auto insertion =
@@ -5814,11 +6056,11 @@ private:
     assert(insertion.second && "Tangent value inserted before");
   }
 
-  /// Get the adjoint for an original value. The given value must be in the
+  /// Get the tangent for an original value. The given value must be in the
   /// original function.
   ///
-  /// This method first tries to find an entry in `adjointMap`. If an adjoint
-  /// doesn't exist, create a zero adjoint.
+  /// This method first tries to find an entry in `tangentValueMap`. If a tangent
+  /// doesn't exist, create a zero tangent.
   AdjointValue getTangentValue(SILValue originalValue) {
     assert(originalValue->getType().isObject());
     assert(originalValue->getFunction() == original);
@@ -5831,7 +6073,7 @@ private:
 
   /// Add a tangent value for the given original value.
   void addTangentValue(SILBasicBlock *origBB, SILValue originalValue,
-  AdjointValue newTangentValue) {
+                       AdjointValue newTangentValue) {
     assert(originalValue->getType().isObject());
     assert(newTangentValue.getType().isObject());
     assert(originalValue->getFunction() == original);
@@ -5840,7 +6082,7 @@ private:
     assert(newTangentValue.getType() ==
            getRemappedTangentType(originalValue->getType()));
     auto insertion =
-    tangentValueMap.try_emplace(originalValue, newTangentValue);
+        tangentValueMap.try_emplace(originalValue, newTangentValue);
     auto inserted = insertion.second;
     if (inserted)
       return;
@@ -5849,9 +6091,7 @@ private:
     auto it = insertion.first;
     auto &&existingValue = it->getSecond();
     tangentValueMap.erase(it);
-    // TODO: do an accumulation.
-    //    auto adjVal = accumulateAdjointsDirect(existingValue, newAdjointValue);
-    auto tanVal = newTangentValue;
+    auto tanVal = accumulateTangentsDirect(existingValue, newTangentValue);
     initializeTangentValue(origBB, originalValue, tanVal);
   }
 
