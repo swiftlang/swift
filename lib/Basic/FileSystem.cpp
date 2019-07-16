@@ -197,16 +197,16 @@ std::error_code swift::moveFileIfDifferent(const llvm::Twine &source,
       same = true;
     } else {
       std::error_code sourceRegionErr;
-      fs::mapped_file_region sourceRegion(sourceFile.fd,
-                                          fs::mapped_file_region::readonly,
-                                          size, 0, sourceRegionErr);
+      fs::mapped_file_region sourceRegion(
+          fs::convertFDToNativeFile(sourceFile.fd),
+          fs::mapped_file_region::readonly, size, 0, sourceRegionErr);
       if (sourceRegionErr)
         return sourceRegionErr;
 
       std::error_code destRegionErr;
-      fs::mapped_file_region destRegion(destFile.fd,
-                                        fs::mapped_file_region::readonly,
-                                        size, 0, destRegionErr);
+      fs::mapped_file_region destRegion(fs::convertFDToNativeFile(destFile.fd),
+                                        fs::mapped_file_region::readonly, size,
+                                        0, destRegionErr);
 
       if (!destRegionErr) {
         same = (0 == memcmp(sourceRegion.const_data(), destRegion.const_data(),
