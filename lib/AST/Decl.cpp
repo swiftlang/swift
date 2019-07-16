@@ -1029,6 +1029,31 @@ ImportDecl::findBestImportKind(ArrayRef<ValueDecl *> Decls) {
   return FirstKind;
 }
 
+Optional<VarDecl *>
+NominalTypeDecl::ToStoredProperty::operator()(Decl *decl) const {
+  if (auto var = dyn_cast<VarDecl>(decl)) {
+    if (!var->isStatic() && var->hasStorage())
+      return var;
+  }
+
+  return None;
+}
+
+Optional<Decl *>
+NominalTypeDecl::ToStoredPropertyOrMissingMemberPlaceholder
+::operator()(Decl *decl) const {
+  if (auto var = dyn_cast<VarDecl>(decl)) {
+    if (!var->isStatic() && var->hasStorage())
+      return var;
+  }
+  if (auto missing = dyn_cast<MissingMemberDecl>(decl)) {
+    if (missing->getNumberOfFieldOffsetVectorEntries() > 0)
+      return missing;
+  }
+
+  return None;
+}
+
 void NominalTypeDecl::setConformanceLoader(LazyMemberLoader *lazyLoader,
                                            uint64_t contextData) {
   assert(!Bits.NominalTypeDecl.HasLazyConformances &&
@@ -1534,7 +1559,7 @@ bool VarDecl::isInitExposedToClients() const {
 
 /// Check whether the given type representation will be
 /// default-initializable.
-static bool isDefaultInitializable(const TypeRepr *typeRepr) {
+static bool isDefaultInitializable(const TypeRepr *typeRepr, ASTContext &ctx) {
   // Look through most attributes.
   if (const auto attributed = dyn_cast<AttributedTypeRepr>(typeRepr)) {
     // Ownership kinds have optionalness requirements.
@@ -1542,13 +1567,27 @@ static bool isDefaultInitializable(const TypeRepr *typeRepr) {
         ReferenceOwnershipOptionality::Required)
       return true;
 
-    return isDefaultInitializable(attributed->getTypeRepr());
+    return isDefaultInitializable(attributed->getTypeRepr(), ctx);
   }
 
   // Optional types are default-initializable.
   if (isa<OptionalTypeRepr>(typeRepr) ||
       isa<ImplicitlyUnwrappedOptionalTypeRepr>(typeRepr))
     return true;
+
+  // Also support the desugared 'Optional<T>' spelling.
+  if (!ctx.isSwiftVersionAtLeast(5)) {
+    if (auto *identRepr = dyn_cast<SimpleIdentTypeRepr>(typeRepr)) {
+      if (identRepr->getIdentifier() == ctx.Id_Void)
+        return true;
+    }
+
+    if (auto *identRepr = dyn_cast<GenericIdentTypeRepr>(typeRepr)) {
+      if (identRepr->getIdentifier() == ctx.Id_Optional &&
+          identRepr->getNumGenericArgs() == 1)
+        return true;
+    }
+  }
 
   // Tuple types are default-initializable if all of their element
   // types are.
@@ -1558,7 +1597,7 @@ static bool isDefaultInitializable(const TypeRepr *typeRepr) {
       return false;
 
     for (const auto elt : tuple->getElements()) {
-      if (!isDefaultInitializable(elt.Type))
+      if (!isDefaultInitializable(elt.Type, ctx))
         return false;
     }
 
@@ -1610,11 +1649,13 @@ bool PatternBindingDecl::isDefaultInitializable(unsigned i) const {
   if (entry.getPattern()->isNeverDefaultInitializable())
     return false;
 
+  auto &ctx = getASTContext();
+
   // If the pattern is typed as optional (or tuples thereof), it is
   // default initializable.
   if (const auto typedPattern = dyn_cast<TypedPattern>(entry.getPattern())) {
     if (const auto typeRepr = typedPattern->getTypeLoc().getTypeRepr()) {
-      if (::isDefaultInitializable(typeRepr))
+      if (::isDefaultInitializable(typeRepr, ctx))
         return true;
     } else if (typedPattern->isImplicit()) {
       // Lazy vars have implicit storage assigned to back them. Because the
@@ -3419,7 +3460,7 @@ void NominalTypeDecl::addExtension(ExtensionDecl *extension) {
   addedExtension(extension);
 }
 
-auto NominalTypeDecl::getStoredProperties(bool skipInaccessible) const
+auto NominalTypeDecl::getStoredProperties() const
     -> StoredPropertyRange {
   // This should be called at most once per SIL instruction that accesses a
   // VarDecl.
@@ -3432,10 +3473,9 @@ auto NominalTypeDecl::getStoredProperties(bool skipInaccessible) const
   // Clang-imported classes never have stored properties.
   if (hasClangNode() && isa<ClassDecl>(this))
     return StoredPropertyRange(DeclRange(nullptr, nullptr),
-                               ToStoredProperty(skipInaccessible));
+                               ToStoredProperty());
 
-  return StoredPropertyRange(getMembers(),
-                             ToStoredProperty(skipInaccessible));
+  return StoredPropertyRange(getMembers(), ToStoredProperty());
 }
 
 bool NominalTypeDecl::isOptionalDecl() const {
@@ -6467,7 +6507,9 @@ bool AbstractFunctionDecl::isObjCInstanceMethod() const {
 }
 
 static bool requiresNewVTableEntry(const AbstractFunctionDecl *decl) {
-  if (!isa<ClassDecl>(decl->getDeclContext()))
+  auto *dc = decl->getDeclContext();
+
+  if (!isa<ClassDecl>(dc))
     return true;
 
   assert(isa<FuncDecl>(decl) || isa<ConstructorDecl>(decl));
@@ -6476,7 +6518,16 @@ static bool requiresNewVTableEntry(const AbstractFunctionDecl *decl) {
   // Dynamic methods are always accessed by objc_msgSend().
   if (decl->isFinal() || decl->isObjCDynamic() || decl->hasClangNode())
     return false;
-  
+
+  auto &ctx = dc->getASTContext();
+
+  // FIXME: Remove this once getInterfaceType(), isDesignatedInit() and
+  // anything else that is used below has been request-ified.
+  if (!decl->hasInterfaceType()) {
+    ctx.getLazyResolver()->resolveDeclSignature(
+      const_cast<AbstractFunctionDecl *>(decl));
+  }
+
   // Initializers are not normally inherited, but required initializers can
   // be overridden for invocation from dynamic types, and convenience initializers
   // are conditionally inherited when all designated initializers are available,
@@ -6500,7 +6551,14 @@ static bool requiresNewVTableEntry(const AbstractFunctionDecl *decl) {
 
   if (!base || base->hasClangNode() || base->isObjCDynamic())
     return true;
-  
+
+  // FIXME: Remove this once getInterfaceType(), isDesignatedInit() and
+  // anything else that is used below has been request-ified.
+  if (!base->hasInterfaceType()) {
+    ctx.getLazyResolver()->resolveDeclSignature(
+      const_cast<AbstractFunctionDecl *>(base));
+  }
+
   // As above, convenience initializers are not formally overridable in Swift
   // vtables, although same-named initializers are modeled as overriding for
   // various QoI and objc interop reasons. Even if we "override" a non-required

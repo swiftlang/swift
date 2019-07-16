@@ -1341,32 +1341,6 @@ static void addExpectedOpaqueAccessorsToStorage(AbstractStorageDecl *storage,
   });
 }
 
-/// Add trivial accessors to a Stored or Addressed property.
-static void addTrivialAccessorsToStorage(AbstractStorageDecl *storage,
-                                         ASTContext &ctx) {
-  assert(!isSynthesizedComputedProperty(storage));
-  addExpectedOpaqueAccessorsToStorage(storage, ctx);
-}
-
-static StorageImplInfo getProtocolStorageImpl(AbstractStorageDecl *storage) {
-  auto protocol = cast<ProtocolDecl>(storage->getDeclContext());
-  if (protocol->isObjC()) {
-    return StorageImplInfo::getComputed(storage->supportsMutation());
-  } else {
-    return StorageImplInfo::getOpaque(storage->supportsMutation(),
-                                      storage->getOpaqueReadOwnership());
-  }
-}
-
-/// Given a storage declaration in a protocol, set it up with the right
-/// StorageImpl and add the right set of opaque accessors.
-static void setProtocolStorageImpl(AbstractStorageDecl *storage,
-                                   ASTContext &ctx) {
-  addExpectedOpaqueAccessorsToStorage(storage, ctx);
-
-  storage->overwriteImplInfo(getProtocolStorageImpl(storage));
-}
-
 /// Synthesize the body of a setter which just delegates to a mutable
 /// addressor.
 static std::pair<BraceStmt *, bool>
@@ -1385,15 +1359,6 @@ synthesizeModifyCoroutineSetterBody(AccessorDecl *setter, ASTContext &ctx) {
   return synthesizeTrivialSetterBodyWithStorage(setter,
                                                 TargetImpl::Implementation,
                                                 setter->getStorage(), ctx);
-}
-
-static void convertNSManagedStoredVarToComputed(VarDecl *VD, ASTContext &ctx) {
-  // If it's not still stored, just bail out.
-  if (!VD->getImplInfo().isSimpleStored())
-    return;
-
-  VD->overwriteImplInfo(StorageImplInfo::getMutableComputed());
-  addExpectedOpaqueAccessorsToStorage(VD, ctx);
 }
 
 std::pair<BraceStmt *, bool>
@@ -2060,108 +2025,23 @@ void swift::triggerAccessorSynthesis(TypeChecker &TC,
   });
 }
 
-static void maybeAddAccessorsToLazyVariable(VarDecl *var, ASTContext &ctx) {
-  // If there are already accessors, something is invalid; bail out.
-  if (!var->getImplInfo().isSimpleStored())
-    return;
-
-  var->overwriteImplInfo(StorageImplInfo::getMutableComputed());
-  addExpectedOpaqueAccessorsToStorage(var, ctx);
-}
-
-/// Determine whether all of the wrapped-value setters for the property wrappers attached to this
-/// variable are available and accessible.
-static bool allPropertyWrapperValueSettersAreAccessible(VarDecl *var) {
-  auto wrapperAttrs = var->getAttachedPropertyWrappers();
-  auto innermostDC = var->getInnermostDeclContext();
-  for (unsigned i : indices(wrapperAttrs)) {
-    auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo(i);
-    auto valueVar = wrapperInfo.valueVar;
-    if (!valueVar->isSettable(nullptr) ||
-        !valueVar->isSetterAccessibleFrom(innermostDC))
-      return false;
+static StorageImplInfo getProtocolStorageImpl(AbstractStorageDecl *storage) {
+  auto protocol = cast<ProtocolDecl>(storage->getDeclContext());
+  if (protocol->isObjC()) {
+    return StorageImplInfo::getComputed(storage->supportsMutation());
+  } else {
+    return StorageImplInfo::getOpaque(storage->supportsMutation(),
+                                      storage->getOpaqueReadOwnership());
   }
-  
-  return true;
 }
 
-static void maybeAddAccessorsForPropertyWrapper(VarDecl *var,
-                                                ASTContext &ctx) {
-  auto backingVar = var->getPropertyWrapperBackingProperty();
-  if (!backingVar || backingVar->isInvalid())
-    return;
-
-  auto parentSF = var->getDeclContext()->getParentSourceFile();
-  bool wrapperSetterIsUsable =
-    var->getSetter() ||
-    (parentSF &&
-     parentSF->Kind != SourceFileKind::Interface &&
-     !var->isLet() &&
-     allPropertyWrapperValueSettersAreAccessible(var));
-
-  if (wrapperSetterIsUsable)
-    var->overwriteImplInfo(StorageImplInfo::getMutableComputed());
-  else
-    var->overwriteImplInfo(StorageImplInfo::getImmutableComputed());
-
-  addExpectedOpaqueAccessorsToStorage(var, ctx);
-}
-
-/// Try to add the appropriate accessors required a storage declaration.
-/// This needs to be idempotent.
-///
-/// Note that the parser synthesizes accessors in some cases:
-///   - it synthesizes a getter and setter for an observing property
-///   - it synthesizes a setter for get+mutableAddress
-void swift::maybeAddAccessorsToStorage(AbstractStorageDecl *storage) {
-  auto &ctx = storage->getASTContext();
-
-  if (auto var = dyn_cast<VarDecl>(storage)) {
-    // Lazy properties require special handling.
-    if (var->getAttrs().hasAttribute<LazyAttr>()) {
-      // FIXME: Remove this once getStoredProperties() is a request
-      (void) var->getLazyStorageProperty();
-
-      maybeAddAccessorsToLazyVariable(var, ctx);
-      return;
-    }
-
-    // Property wrappers require backing storage.
-    if (var->hasAttachedPropertyWrapper()) {
-      maybeAddAccessorsForPropertyWrapper(var, ctx);
-      return;
-    }
-  }
-
-  auto *dc = storage->getDeclContext();
-
-  // Local stored variables don't otherwise get accessors.
-  if (dc->isLocalContext() && storage->getImplInfo().isSimpleStored())
-    return;
-
-  // Implicit properties don't get accessors.
-  if (storage->isImplicit() &&
-      !(isa<VarDecl>(storage) &&
-        cast<VarDecl>(storage)->getOriginalWrappedProperty()))
-    return;
-
-  if (!dc->isTypeContext()) {
-    // dynamic globals need accessors.
-    if (dc->isModuleScopeContext() && storage->isNativeDynamic()) {
-      addTrivialAccessorsToStorage(storage, ctx);
-      return;
-    }
-    // Fixed-layout global variables don't get accessors.
-    if (!storage->isResilient() && storage->getImplInfo().isSimpleStored())
-      return;
-
-  // In a protocol context, variables written as just "var x : Int" or
-  // "let x : Int" are errors and recovered by building a computed property
-  // with just a getter. Diagnose this and create the getter decl now.
-  } else if (isa<ProtocolDecl>(dc)) {
-    if (storage->hasStorage()) {
-      auto var = cast<VarDecl>(storage);
-
+/// Given a storage declaration in a protocol, set it up with the right
+/// StorageImpl and add the right set of opaque accessors.
+static void finishProtocolStorageImplInfo(AbstractStorageDecl *storage) {
+  if (auto *var = dyn_cast<VarDecl>(storage)) {
+    if (var->hasStorage()) {
+      auto &ctx = var->getASTContext();
+      // Protocols cannot have stored properties.
       if (var->isLet()) {
         ctx.Diags.diagnose(var->getLoc(),
                            diag::protocol_property_must_be_computed_var)
@@ -2178,36 +2058,126 @@ void swift::maybeAddAccessorsToStorage(AbstractStorageDecl *storage) {
           diag.fixItInsertAfter(var->getTypeLoc().getLoc(), " { get <#set#> }");
       }
     }
-
-    setProtocolStorageImpl(storage, ctx);
-    return;
-
-  // NSManaged properties on classes require special handling.
-  } else if (dc->getSelfClassDecl()) {
-    auto var = dyn_cast<VarDecl>(storage);
-    if (var && var->getAttrs().hasAttribute<NSManagedAttr>()) {
-      convertNSManagedStoredVarToComputed(var, ctx);
-      return;
-    }
-
-  // Stored properties imported from Clang don't get accessors.
-  } else if (auto *structDecl = dyn_cast<StructDecl>(dc)) {
-    if (structDecl->hasClangNode())
-      return;
   }
 
-  // Stored properties in SIL mode don't get accessors.
-  // But we might need to create opaque accessors for them.
-  if (auto sourceFile = dc->getParentSourceFile())
-    if (sourceFile->Kind == SourceFileKind::SIL) {
-      if (storage->getGetter()) {
-        addExpectedOpaqueAccessorsToStorage(storage, ctx);
-      }
+  storage->overwriteImplInfo(getProtocolStorageImpl(storage));
+}
+
+static void finishLazyVariableImplInfo(VarDecl *var) {
+  // FIXME: Remove this once getStoredProperties() is a request
+  (void) var->getLazyStorageProperty();
+
+  // If there are already accessors, something is invalid; bail out.
+  if (!var->getImplInfo().isSimpleStored())
+    return;
+
+  var->overwriteImplInfo(StorageImplInfo::getMutableComputed());
+}
+
+/// Determine whether all of the wrapped-value setters for the property
+/// wrappers attached to this variable are available and accessible.
+static bool allPropertyWrapperValueSettersAreAccessible(VarDecl *var) {
+  auto wrapperAttrs = var->getAttachedPropertyWrappers();
+  auto innermostDC = var->getInnermostDeclContext();
+  for (unsigned i : indices(wrapperAttrs)) {
+    auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo(i);
+    auto valueVar = wrapperInfo.valueVar;
+    if (!valueVar->isSettable(nullptr) ||
+        !valueVar->isSetterAccessibleFrom(innermostDC))
+      return false;
+  }
+  
+  return true;
+}
+
+static void finishPropertyWrapperImplInfo(VarDecl *var) {
+  auto backingVar = var->getPropertyWrapperBackingProperty();
+  if (!backingVar || backingVar->isInvalid())
+    return;
+
+  auto parentSF = var->getDeclContext()->getParentSourceFile();
+  bool wrapperSetterIsUsable =
+    var->getSetter() ||
+    (parentSF &&
+     parentSF->Kind != SourceFileKind::Interface &&
+     !var->isLet() &&
+     allPropertyWrapperValueSettersAreAccessible(var));
+
+  if (wrapperSetterIsUsable)
+    var->overwriteImplInfo(StorageImplInfo::getMutableComputed());
+  else
+    var->overwriteImplInfo(StorageImplInfo::getImmutableComputed());
+}
+
+static void finishNSManagedImplInfo(VarDecl *VD) {
+  // If it's not still stored, just bail out.
+  if (!VD->getImplInfo().isSimpleStored())
+    return;
+
+  VD->overwriteImplInfo(StorageImplInfo::getMutableComputed());
+}
+
+static void finishStorageImplInfo(AbstractStorageDecl *storage) {
+  if (isa<ProtocolDecl>(storage->getDeclContext())) {
+    finishProtocolStorageImplInfo(storage);
+    return;
+  }
+
+  auto var = dyn_cast<VarDecl>(storage);
+  if (var == nullptr)
+    return;
+
+  if (var->getAttrs().hasAttribute<LazyAttr>()) {
+    finishLazyVariableImplInfo(var);
+  } else if (var->getAttrs().hasAttribute<NSManagedAttr>()) {
+    finishNSManagedImplInfo(var);
+  } else if (var->hasAttachedPropertyWrapper()) {
+    finishPropertyWrapperImplInfo(var);
+  }
+}
+
+/// Try to add the appropriate accessors required a storage declaration.
+/// This needs to be idempotent.
+void swift::maybeAddAccessorsToStorage(AbstractStorageDecl *storage) {
+  finishStorageImplInfo(storage);
+
+  // Implicit properties don't get accessors.
+  if (storage->isImplicit() &&
+      !(isa<VarDecl>(storage) &&
+        cast<VarDecl>(storage)->getOriginalWrappedProperty()))
+    return;
+
+  if (storage->getImplInfo().isSimpleStored()) {
+    auto *dc = storage->getDeclContext();
+
+    // Local stored variables don't otherwise get accessors.
+    if (dc->isLocalContext()) {
       return;
+
+    } else if (dc->isModuleScopeContext()) {
+      // Fixed-layout global variables don't get accessors.
+      if (!storage->isResilient() && !storage->isNativeDynamic())
+        return;
+
+    // Stored properties imported from Clang don't get accessors.
+    } else if (auto *structDecl = dyn_cast<StructDecl>(dc)) {
+      if (structDecl->hasClangNode())
+        return;
     }
 
+    // Stored properties in SIL mode don't get accessors.
+    // But we might need to create opaque accessors for them.
+    if (auto sourceFile = dc->getParentSourceFile()) {
+      if (sourceFile->Kind == SourceFileKind::SIL) {
+        if (!storage->getGetter())
+          return;
+      }
+    }
+  }
+
   // Everything else gets mandatory accessors.
-  addTrivialAccessorsToStorage(storage, ctx);
+  auto &ctx = storage->getASTContext();
+  addExpectedOpaqueAccessorsToStorage(storage, ctx);
 }
 
 static std::pair<BraceStmt *, bool>

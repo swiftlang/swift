@@ -551,9 +551,6 @@ public:
   /// from the \c DeclsToFinalize set.
   unsigned NextDeclToFinalize = 0;
 
-  /// The list of types whose circularity checks were delayed.
-  SmallVector<NominalTypeDecl*, 8> DelayedCircularityChecks;
-
   // Caches whether a given declaration is "as specialized" as another.
   llvm::DenseMap<std::tuple<ValueDecl *, ValueDecl *,
                             /*isDynamicOverloadComparison*/ unsigned>,

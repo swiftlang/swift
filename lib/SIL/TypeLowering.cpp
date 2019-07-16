@@ -1267,10 +1267,20 @@ namespace {
       if (handleResilience(structType, D, properties))
         return handleAddressOnly(structType, properties);
 
+      auto subMap = structType->getContextSubstitutionMap(
+          M.getSwiftModule(), D);
+
       // Classify the type according to its stored properties.
       for (auto field : D->getStoredProperties()) {
+        // FIXME: Remove this once getInterfaceType() is a request.
+        if (!field->hasInterfaceType())
+          M.getASTContext().getLazyResolver()->resolveDeclSignature(field);
+
         auto substFieldType =
-          structType->getTypeOfMember(D->getModuleContext(), field, nullptr);
+          field->getInterfaceType()
+            .subst(subMap, SubstFlags::UseErrorType)
+            ->getCanonicalType();
+
         properties.addSubobject(classifyType(substFieldType->getCanonicalType(),
                                              M, Sig, Expansion));
       }
@@ -1297,6 +1307,9 @@ namespace {
                                                             Expansion);
       }
 
+      auto subMap = enumType->getContextSubstitutionMap(
+          M.getSwiftModule(), D);
+
       // Accumulate the properties of all direct payloads.
       for (auto elt : D->getAllElements()) {
         // No-payload elements do not affect any recursive properties.
@@ -1308,11 +1321,15 @@ namespace {
           properties.setNonTrivial();
           continue;
         }
-        
-        auto substEltType = enumType->getTypeOfMember(
-                              D->getModuleContext(), elt,
-                              elt->getArgumentInterfaceType())
-          ->getCanonicalType();
+
+        // FIXME: Remove this once getInterfaceType() is a request.
+        if (!elt->hasInterfaceType())
+          M.getASTContext().getLazyResolver()->resolveDeclSignature(elt);
+
+        auto substEltType =
+          elt->getArgumentInterfaceType()
+            .subst(subMap, SubstFlags::UseErrorType)
+            ->getCanonicalType();
         
         properties.addSubobject(classifyType(substEltType, M, Sig, Expansion));
       }
@@ -2591,6 +2608,10 @@ CanSILBoxType TypeConverter::getBoxTypeForEnumElement(SILType enumType,
 
   auto &C = M.getASTContext();
 
+  // FIXME: Remove this once getInterfaceType() is a request.
+  if (!elt->hasInterfaceType())
+    C.getLazyResolver()->resolveDeclSignature(elt);
+
   auto boxSignature = getEffectiveGenericSignature(enumDecl);
 
   if (boxSignature == CanGenericSignature()) {
@@ -2655,12 +2676,15 @@ static void countNumberOfInnerFields(unsigned &fieldsCount, SILModule &Module,
     unsigned fieldsCountBefore = fieldsCount;
     unsigned maxEnumCount = 0;
     for (auto elt : enumDecl->getAllElements()) {
-      if (!elt->getArgumentInterfaceType()) {
+      if (!elt->hasAssociatedValues())
         continue;
-      }
-      if (elt->isIndirect()) {
+
+      if (elt->isIndirect())
         continue;
-      }
+
+      if (!elt->hasInterfaceType())
+        enumDecl->getASTContext().getLazyResolver()->resolveDeclSignature(elt);
+
       // Although one might assume enums have a fields count of 1
       // Which holds true for current uses of this code
       // (we shouldn't expand enums)
