@@ -280,11 +280,13 @@ FailureDiagnostic::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
 Type FailureDiagnostic::restoreGenericParameters(
     Type type,
     llvm::function_ref<void(GenericTypeParamType *, Type)> substitution) {
+  llvm::SmallPtrSet<GenericTypeParamType *, 4> processed;
   return type.transform([&](Type type) -> Type {
     if (auto *typeVar = type->getAs<TypeVariableType>()) {
       type = resolveType(typeVar);
       if (auto *GP = typeVar->getImpl().getGenericParameter()) {
-        substitution(GP, type);
+        if (processed.insert(GP).second)
+          substitution(GP, type);
         return GP;
       }
     }
@@ -3524,22 +3526,30 @@ bool InvalidTupleSplatWithSingleParameterFailure::diagnoseAsError() {
     return false;
 
   using Substitution = std::pair<GenericTypeParamType *, Type>;
-  llvm::DenseMap<GenericParamKey, Substitution> substitutions;
+  llvm::SmallVector<Substitution, 8> substitutions;
 
   auto paramTy = restoreGenericParameters(
       ParamType, [&](GenericTypeParamType *GP, Type resolvedType) {
-        substitutions[{GP}] = std::make_pair(GP, resolvedType);
+        substitutions.push_back(std::make_pair(GP, resolvedType));
       });
 
   DeclBaseName name = choice->getBaseName();
 
   std::string subsStr;
   if (!substitutions.empty()) {
+    llvm::array_pod_sort(
+        substitutions.begin(), substitutions.end(),
+        [](const std::pair<GenericTypeParamType *, Type> *lhs,
+           const std::pair<GenericTypeParamType *, Type> *rhs) -> int {
+          GenericParamKey key1(lhs->first);
+          GenericParamKey key2(rhs->first);
+          return key1 < key2 ? -1 : (key1 == key2) ? 0 : 1;
+        });
+
     subsStr += " [with ";
     interleave(
         substitutions,
-        [&subsStr](const std::pair<GenericParamKey, Substitution> &e) {
-          const auto &substitution = e.second;
+        [&subsStr](const Substitution &substitution) {
           subsStr += substitution.first->getString();
           subsStr += " = ";
           subsStr += substitution.second->getString();
