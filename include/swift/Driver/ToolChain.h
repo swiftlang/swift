@@ -13,6 +13,7 @@
 #ifndef SWIFT_DRIVER_TOOLCHAIN_H
 #define SWIFT_DRIVER_TOOLCHAIN_H
 
+#include "swift/AST/DiagnosticEngine.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Driver/Action.h"
@@ -305,6 +306,12 @@ public:
   void addLinkRuntimeLib(const llvm::opt::ArgList &Args,
                          llvm::opt::ArgStringList &Arguments,
                          StringRef LibName) const;
+    
+  /// Validates arguments passed to the toolchain.
+  /// An override point for platform-specific subclasses to customize the
+  /// validations that should be performed.
+  virtual void validateArguments(DiagnosticEngine &diags,
+                                 const llvm::opt::ArgList &args) const {};
 };
 } // end namespace driver
 } // end namespace swift

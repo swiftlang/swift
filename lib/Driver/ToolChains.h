@@ -13,8 +13,10 @@
 #ifndef SWIFT_DRIVER_TOOLCHAINS_H
 #define SWIFT_DRIVER_TOOLCHAINS_H
 
+#include "swift/AST/DiagnosticEngine.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Driver/ToolChain.h"
+#include "llvm/Option/ArgList.h"
 #include "llvm/Support/Compiler.h"
 
 namespace swift {
@@ -29,6 +31,9 @@ protected:
                                      const JobContext &context) const override;
   InvocationInfo constructInvocation(const StaticLinkJobAction &job,
                                      const JobContext &context) const override;
+    
+  void validateArguments(DiagnosticEngine &diags,
+                         const llvm::opt::ArgList &args) const override;
 
   std::string findProgramRelativeToSwiftImpl(StringRef name) const override;
 

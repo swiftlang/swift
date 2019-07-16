@@ -12,6 +12,8 @@
 
 #include "ToolChains.h"
 
+#include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/DiagnosticsDriver.h"
 #include "swift/Basic/Dwarf.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Platform.h"
@@ -582,4 +584,17 @@ bool toolchains::Darwin::shouldStoreInvocationInDebugInfo() const {
   if (const char *S = ::getenv("RC_DEBUG_OPTIONS"))
     return S[0] != '\0';
   return false;
+}
+
+void toolchains::Darwin::validateArguments(DiagnosticEngine &diags, const llvm::opt::ArgList &args) const {
+    
+    // Validating darwin unsupported -static-stdlib argument.
+    if (const Arg *A = args.getLastArg(options::OPT_target)) {
+        auto TargetTriple = llvm::Triple::normalize(A->getValue());
+        const llvm::Triple target(TargetTriple);
+        
+        if (args.hasArg(options::OPT_static_stdlib)) {
+            diags.diagnose(SourceLoc(), diag::error_darwin_static_stdlib_not_supported);
+        }
+    }
 }
