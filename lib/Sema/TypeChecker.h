@@ -1528,29 +1528,6 @@ public:
   /// array literals exist.
   bool requireArrayLiteralIntrinsics(SourceLoc loc);
 
-  /// Build a call to the witness with the given name and arguments.
-  ///
-  /// \param base The base expression, whose witness will be invoked.
-  ///
-  /// \param protocol The protocol to call through.
-  ///
-  /// \param conformance The conformance of the base type to the given
-  /// protocol.
-  ///
-  /// \param name The name of the method to call.
-  ///
-  /// \param arguments The arguments to the witness.
-  ///
-  /// \param brokenProtocolDiag Diagnostic to emit if the protocol is broken.
-  ///
-  /// \returns a fully type-checked call, or null if the protocol was broken.
-  Expr *callWitness(Expr *base, DeclContext *dc,
-                    ProtocolDecl *protocol,
-                    ProtocolConformanceRef conformance,
-                    DeclName name,
-                    ArrayRef<Expr *> arguments,
-                    Diag<> brokenProtocolDiag);
-
   /// Determine whether the given type contains the given protocol.
   ///
   /// \param DC The context in which to check conformance. This affects, for
