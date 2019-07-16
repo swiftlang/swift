@@ -20,6 +20,7 @@
 #include "swift/AST/Evaluator.h"
 #include "swift/AST/SimpleRequest.h"
 #include "swift/IDE/Utils.h"
+#include "swift/IDE/IDETypeIDs.h"
 
 namespace swift {
 
@@ -56,7 +57,7 @@ void simple_display(llvm::raw_ostream &out, const CursorInfoOwner &owner);
 class CursorInfoRequest:
     public SimpleRequest<CursorInfoRequest,
                          ide::ResolvedCursorInfo(CursorInfoOwner),
-                         CacheKind::Uncached> // FIXME: cache these
+                         CacheKind::Cached>
 {
 public:
   using SimpleRequest::SimpleRequest;

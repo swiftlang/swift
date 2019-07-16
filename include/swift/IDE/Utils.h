@@ -163,7 +163,13 @@ struct ResolvedCursorInfo {
 
   ResolvedCursorInfo() = default;
   ResolvedCursorInfo(SourceFile *SF) : SF(SF) {}
-  
+
+  friend bool operator==(const ResolvedCursorInfo &lhs,
+                         const ResolvedCursorInfo &rhs) {
+    return lhs.SF == rhs.SF &&
+      lhs.Loc.getOpaquePointerValue() == rhs.Loc.getOpaquePointerValue();
+  }
+
   void setValueRef(ValueDecl *ValueD,
                    TypeDecl *CtorTyRef,
                    ExtensionDecl *ExtTyRef,
@@ -195,6 +201,8 @@ struct ResolvedCursorInfo {
   bool isValid() const { return !isInvalid(); }
   bool isInvalid() const { return Kind == CursorInfoKind::Invalid; }
 };
+
+void simple_display(llvm::raw_ostream &out, const ResolvedCursorInfo &info);
 
 struct UnresolvedLoc {
   SourceLoc Loc;

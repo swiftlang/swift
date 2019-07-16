@@ -303,6 +303,17 @@ void swift::simple_display(llvm::raw_ostream &out, const CursorInfoOwner &owner)
   out << ":" << LC.first << ":" << LC.second;
 }
 
+void swift::ide::simple_display(llvm::raw_ostream &out,
+                                const ide::ResolvedCursorInfo &info) {
+  if (info.isInvalid())
+    return;
+  out << "Resolved cursor info at ";
+  auto &SM = info.SF->getASTContext().SourceMgr;
+  out << SM.getIdentifierForBuffer(*info.SF->getBufferID());
+  auto LC = SM.getLineAndColumn(info.Loc);
+  out << ":" << LC.first << ":" << LC.second;
+}
+
 // Define request evaluation functions for each of the IDE requests.
 static AbstractRequestFunction *ideRequestFunctions[] = {
 #define SWIFT_TYPEID(Name)                                    \
