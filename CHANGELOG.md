@@ -28,8 +28,8 @@ Swift Next
 
 * [SR-4206][]:
 
-  Overriden methods are no longer allowed to have a different generic 
-  signature compared to the base method. For example:
+  A method override is no longer allowed to have a generic signature with 
+  requirements not imposed by the base method. For example:
 
   ```
   protocol P {}
