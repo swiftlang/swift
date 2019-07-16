@@ -5991,6 +5991,8 @@ public:
     // TODO: Handle indirect results.
     auto tanParam =
         materializeTangent(getTangentValue(ri->getOperand()), loc);
+    tanParam.getCleanup()->disable();
+    tanParam.getCleanup()->applyRecursively(diffBuilder, loc);
     diffBuilder.createReturn(
         ri->getLoc(), tanParam);
   }
@@ -6041,6 +6043,7 @@ public:
         loc, getDifferentialStructArgument(ai->getParent()), field);
 
     SmallVector<SILValue, 8> diffArgs;
+    SmallVector<Cleanup *, 8> diffArgCleanups;
     for (auto origArg : ai->getArguments()) {
       // Get the tangent value of the original parameter.
       if (!activityInfo.isActive(origArg, getIndices()))
@@ -6067,6 +6070,7 @@ public:
           return;
       }
       diffArgs.push_back(tanParam);
+      diffArgCleanups.push_back(tanParam.getCleanup());
     }
 
     // TODO: Reabstract the differential.
@@ -6098,7 +6102,7 @@ public:
     addTangentValue(bb, origResult, makeConcreteAdjointValue(
         ValueWithCleanup(differentialResult,
         // TODO: Consider if cleanup children are to be passed.
-        makeCleanup(differentialResult, emitCleanup, {}))));
+        makeCleanup(differentialResult, emitCleanup, diffArgCleanups))));
 
     // TODO: handle indirect
     // Add the tangent value of the result of the apply instruction.
