@@ -16,7 +16,7 @@ module WinSDK [system] [extern_c] {
     header "WS2tcpip.h"
     export *
 
-    link "WS2_32.lib"
+    link "WS2_32.Lib"
   }
 
   module core {
@@ -120,7 +120,7 @@ module WinSDK [system] [extern_c] {
     header "AuthZ.h"
     export *
 
-    link "authz.lib"
+    link "AuthZ.Lib"
   }
 
   module CommCtrl {
@@ -139,21 +139,21 @@ module WinSDK [system] [extern_c] {
     header "LM.h"
     export *
 
-    link "NetAPi32.lib"
+    link "NetAPI32.Lib"
   }
 
   module DbgHelp {
     header "DbgHelp.h"
     export *
 
-    link "DbgHelp.lib"
+    link "DbgHelp.Lib"
   }
 
   module FCI {
     header "fci.h"
     export *
 
-    link "cabinet.lib"
+    link "Cabinet.Lib"
   }
 
   module Shell {
@@ -165,14 +165,14 @@ module WinSDK [system] [extern_c] {
     header "Shlwapi.h"
     export *
 
-    link "ShLwApi.lib"
+    link "ShLwApi.Lib"
   }
 
   module OLE32 {
     header "oaidl.h"
     export *
 
-    link "OleAut32.lib"
+    link "OleAut32.Lib"
   }
 
   module User {
@@ -184,21 +184,21 @@ module WinSDK [system] [extern_c] {
     header "wincrypt.h"
     export *
 
-    link "Crypt32.lib"
+    link "Crypt32.Lib"
   }
 
   module WinDNS {
     header "WinDNS.h"
     export *
 
-    link "Dnsapi.lib"
+    link "DnsAPI.Lib"
   }
 
   module WinReg {
     header "winreg.h"
     export *
 
-    link "Advapi32.lib"
+    link "AdvAPI32.Lib"
   }
 }
 
