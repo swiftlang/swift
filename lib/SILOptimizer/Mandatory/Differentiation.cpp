@@ -387,7 +387,7 @@ public:
 /// e.g. mappings from original values to corresponding values in the linear map
 /// struct.
 ///
-/// A linear map struct is an aggregate value containing pullbacks checkpointed
+/// A linear map struct is an aggregate value containing linear maps checkpointed
 /// during the VJP/JVP computation. Linear map structs are generated for every
 /// original function during VJP/JVP generation. Linear map struct values are
 /// constructed by VJP/JVP functions and consumed by pullback/differential
@@ -1301,25 +1301,23 @@ LinearMapInfo::LinearMapInfo(ADContext &context,
     assocFnGenSig = assocFnGenEnv->getGenericSignature()->getCanonicalSignature();
   // Create predecessor enum and pullback struct for each original block.
   for (auto &origBB : *original) {
-    auto *pbStruct = createLinearMapStruct(&origBB, indices, assocFnGenSig);
-    linearMapStructs.insert({&origBB, pbStruct});
+    auto *linearMapStruct = createLinearMapStruct(&origBB, indices, assocFnGenSig);
+    linearMapStructs.insert({&origBB, linearMapStruct});
   }
   for (auto &origBB : *original) {
-#warning Generalize structs/enums naming
-    auto *pbStruct = getLinearMapStruct(&origBB);
-    auto *predEnum =
+    auto *linearMapStruct = getLinearMapStruct(&origBB);
+    auto *linearMapEnum =
         createBasicBlockEnum(&origBB, indices, assocFnGenSig);
     // If original block is in a loop, mark predecessor enum as indirect.
     if (loopInfo->getLoopFor(&origBB))
-      predEnum->getAttrs().add(new (astCtx) IndirectAttr(/*Implicit*/ true));
-    linearMapEnums.insert({&origBB, predEnum});
+      linearMapEnum->getAttrs().add(new (astCtx) IndirectAttr(/*Implicit*/ true));
+    linearMapEnums.insert({&origBB, linearMapEnum});
     if (origBB.isEntry())
       continue;
-#warning Rename enum field
-    auto *predEnumField =
-        addVarDecl(pbStruct, astCtx.getIdentifier("predecessor").str(),
-                   predEnum->getDeclaredInterfaceType());
-    linearMapStructPredecessorFields.insert({pbStruct, predEnumField});
+    auto *linearMapEnumField =
+        addVarDecl(linearMapStruct, astCtx.getIdentifier("predecessor").str(),
+                   linearMapEnum->getDeclaredInterfaceType());
+    linearMapStructPredecessorFields.insert({linearMapStruct, linearMapEnumField});
   }
 }
 
@@ -4932,7 +4930,7 @@ public:
     auto *pullbackCall = builder.createApply(
         loc, pullback, SubstitutionMap(), args, /*isNonThrowing*/ false);
 
-    // Extract all direct result from the pullback.
+    // Extract all direct results from the pullback.
     SmallVector<SILValue, 8> dirResults;
     extractAllElements(pullbackCall, builder, dirResults);
     // Get all pullback results in type-defined order.
@@ -7190,10 +7188,12 @@ bool ADContext::processDifferentiableAttribute(
     jvp = createEmptyJVP(*this, original, attr, isAssocFnExported);
     getGeneratedFunctions().push_back(jvp);
 
+#if 0
     if (vjpGenerated) {
       JVPEmitter emitter(*this, original, attr, jvp, invoker);
       return emitter.run();
     } else {
+#endif
       LLVM_DEBUG(getADDebugStream()
                  << "Generating empty JVP for original @"
                  << original->getName() << '\n');
@@ -7209,7 +7209,9 @@ bool ADContext::processDifferentiableAttribute(
           *jvp));
       LLVM_DEBUG(getADDebugStream() << "Generated empty JVP for "
                  << original->getName() << ":\n" << *jvp);
+#if 0
     }
+#endif
   }
 
   return false;
