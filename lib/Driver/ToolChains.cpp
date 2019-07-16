@@ -251,7 +251,11 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
   // -g implies -enable-anonymous-context-mangled-names, because the extra
   // metadata aids debugging.
   if (inputArgs.hasArg(options::OPT_g)) {
-    arguments.push_back("-enable-anonymous-context-mangled-names");
+    // But don't add the option in optimized builds: it would prevent dead code
+    // stripping of unused metadata.
+    auto OptArg = inputArgs.getLastArgNoClaim(options::OPT_O_Group);
+    if (!OptArg || OptArg->getOption().matches(options::OPT_Onone))
+      arguments.push_back("-enable-anonymous-context-mangled-names");
   }
 
   // Pass through any subsystem flags.
