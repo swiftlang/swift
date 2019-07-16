@@ -36,7 +36,7 @@ func testAssociatedType<T: Assoc> (_ t: T) {
   print(T.A.self)
 }
 
-@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
 func test() {
   print(MemoryLayout.size(ofValue: bar(5)))
   print(MemoryLayout.size(ofValue: Container().bar(5)))
@@ -56,7 +56,7 @@ func test() {
 // CHECK: 2
 // CHECK: 8
 // CHECK: 2
-if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
   test()
 } else {
   print("8 8 5 5 8 2 8 2")
@@ -82,7 +82,7 @@ executablePath.removeLast(4)
 // CHECK: 16
 // CHECK: 1
 // CHECK: NewType
-if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
   test()
   testAssociatedType(Test())
 } else {

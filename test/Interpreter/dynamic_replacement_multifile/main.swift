@@ -34,12 +34,12 @@ struct Pair {
 
 extension Pair : P {}
 
-@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
 dynamic func bar(_ x: Int) -> some P {
   return x
 }
 
-@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
 @_dynamicReplacement(for: bar(_:))
 func bar_r(_ x: Int) -> some P {
   return Pair()
@@ -52,13 +52,12 @@ DynamicallyReplaceable.test("DynamicallyReplaceable") {
   expectEqual(2, replaceable1())
   expectEqual(3, replaceable2())
   expectEqual(7, replaceableInOtherFile())
-  if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+  if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
     expectEqual(16, MemoryLayout.size(ofValue: bar(5)))
     expectEqual(16, MemoryLayout.size(ofValue: bar1(5)))
     expectEqual(16, MemoryLayout.size(ofValue: bar2(5)))
     expectEqual(16, MemoryLayout.size(ofValue: bar3(5)))
   }
-
 }
 
 runAllTests()
