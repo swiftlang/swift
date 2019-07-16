@@ -3535,7 +3535,7 @@ bool InvalidTupleSplatWithSingleParameterFailure::diagnoseAsError() {
 
   std::string subsStr;
   if (!substitutions.empty()) {
-    subsStr += " [where ";
+    subsStr += " [with ";
     interleave(
         substitutions,
         [&subsStr](const std::pair<GenericParamKey, Substitution> &e) {
