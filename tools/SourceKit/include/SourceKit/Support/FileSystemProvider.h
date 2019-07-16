@@ -42,11 +42,9 @@ namespace SourceKit {
 ///     Uses the given custom filesystem.
 /// - source.request.codecomplete.open:
 ///     Associates the given custom filesystem with this completion session, so
-///     that all subsequent requests in the session use it, unless the
-///     subsequent request specifies its own filesystem.
+///     that all subsequent requests in the session use it.
 /// - source.request.codecomplete.update:
-///     Uses the given custom filesystem. If none is specified, uses the
-///     filesystem associated with the completion session.
+///     Uses the filesystem associated with the completion session.
 class FileSystemProvider {
 public:
   virtual ~FileSystemProvider() = default;
