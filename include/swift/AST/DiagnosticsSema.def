@@ -2784,8 +2784,12 @@ ERROR(differentiable_attr_invalid_access,none,
 ERROR(differentiable_attr_result_not_differentiable,none,
       "can only differentiate functions with results that conform to "
       "'Differentiable', but %0 does not conform to 'Differentiable'", (Type))
-ERROR(differentiable_attr_protocol_where_clause,none,
-      "'where' clauses cannot be used in a '@differentiable' attribute on a protocol requirement", ())
+ERROR(differentiable_attr_protocol_req_where_clause,none,
+      "'@differentiable' attribute on protocol requirement cannot specify "
+      "'where' clause", ())
+ERROR(differentiable_attr_protocol_req_assoc_func,none,
+      "'@differentiable' attribute on protocol requirement cannot specify "
+      "'jvp:' or 'vjp:'", ())
 ERROR(differentiable_attr_empty_where_clause,none,
       "empty 'where' clause in '@differentiable' attribute", ())
 ERROR(differentiable_attr_nongeneric_trailing_where,none,
@@ -2796,10 +2800,12 @@ ERROR(differentiable_attr_class_unsupported,none,
       "class members cannot be marked with '@differentiable'", ())
 ERROR(differentiable_attr_stored_property_variable_unsupported,none,
       "'jvp:' or 'vjp:' cannot be specified for stored properties", ())
+ERROR(overriding_decl_missing_differentiable_attr,none,
+      "overriding declaration is missing attribute '%0'", (StringRef))
 NOTE(protocol_witness_missing_differentiable_attr,none,
      "candidate is missing attribute '%0'", (StringRef))
 ERROR(linear_differentiable_type_disabled,none,
-      "cannot mark types as linear differentiable", ())
+      "'@differentiable(linear)' types are not yet supported", ())
 
 // @differentiating
 ERROR(differentiating_attr_expected_result_tuple,none,

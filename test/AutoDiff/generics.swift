@@ -151,7 +151,7 @@ func TF_523_f(_ x: TF_523_Struct) -> Float {
   return x.a * 2
 }
 
-// TF_534: Thunk substitution map remapping.
+// TF-534: Thunk substitution map remapping.
 protocol TF_534_Layer : Differentiable {
   associatedtype Input : Differentiable
   associatedtype Output : Differentiable
@@ -167,6 +167,20 @@ func TF_534<Model: TF_534_Layer>(
   return valueWithPullback(at: model) { model -> Model.Output in
     return model(inputs)
   }.0
+}
+
+// TF-652: Test VJPEmitter substitution map generic signature.
+// The substitution map should have the VJP's generic signature, not the
+// original function's.
+struct TF_652<Scalar> {}
+extension TF_652 : Differentiable where Scalar : FloatingPoint {}
+
+@differentiable(wrt: x where Scalar: FloatingPoint)
+func test<Scalar: Numeric>(x: TF_652<Scalar>) -> TF_652<Scalar> {
+  for _ in 0..<10 {
+    let _ = x
+  }
+  return x
 }
 
 // TODO: add more tests.

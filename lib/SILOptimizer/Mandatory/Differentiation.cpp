@@ -2850,8 +2850,12 @@ private:
   static SubstitutionMap getSubstitutionMap(SILFunction *original,
                                             SILFunction *vjp) {
     auto substMap = original->getForwardingSubstitutionMap();
-    if (auto *vjpGenEnv = vjp->getGenericEnvironment())
-      substMap = substMap.subst(vjpGenEnv->getForwardingSubstitutionMap());
+    if (auto *vjpGenEnv = vjp->getGenericEnvironment()) {
+      auto vjpSubstMap = vjpGenEnv->getForwardingSubstitutionMap();
+      substMap = SubstitutionMap::get(
+          vjpGenEnv->getGenericSignature(), QuerySubstitutionMap{vjpSubstMap},
+          LookUpConformanceInSubstitutionMap(vjpSubstMap));
+    }
     return substMap;
   }
 
@@ -3086,7 +3090,7 @@ private:
     auto enumLoweredTy = getNominalDeclLoweredType(succEnum);
     auto *enumEltDecl =
         linearMapInfo.lookUpLinearMapEnumElement(predBB, succBB);
-    auto enumEltType = remapType(
+    auto enumEltType = getOpType(
         enumLoweredTy.getEnumElementType(enumEltDecl, getModule()));
     // If the enum element type does not have a box type (i.e. the enum case is
     // not indirect), then directly create an enum.
@@ -5384,7 +5388,7 @@ namespace {
 class AdjointValue;
 
 class JVPEmitter final
-: public TypeSubstCloner<JVPEmitter, SILOptFunctionBuilder> {
+    : public TypeSubstCloner<JVPEmitter, SILOptFunctionBuilder> {
 private:
   /// The global context.
   ADContext &context;
