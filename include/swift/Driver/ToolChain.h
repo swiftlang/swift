@@ -13,7 +13,6 @@
 #ifndef SWIFT_DRIVER_TOOLCHAIN_H
 #define SWIFT_DRIVER_TOOLCHAIN_H
 
-#include "swift/AST/DiagnosticEngine.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Driver/Action.h"
@@ -25,6 +24,8 @@
 #include <memory>
 
 namespace swift {
+class DiagnosticEngine;
+
 namespace driver {
 class CommandOutput;
 class Compilation;
@@ -308,7 +309,7 @@ public:
                          StringRef LibName) const;
     
   /// Validates arguments passed to the toolchain.
-  /// 
+  ///
   /// An override point for platform-specific subclasses to customize the
   /// validations that should be performed.
   virtual void validateArguments(DiagnosticEngine &diags,

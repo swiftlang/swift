@@ -12,7 +12,6 @@
 
 #include "ToolChains.h"
 
-#include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsDriver.h"
 #include "swift/Basic/Dwarf.h"
 #include "swift/Basic/LLVM.h"

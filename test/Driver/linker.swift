@@ -105,7 +105,7 @@
 // SIMPLE: -o linker
 
 
-// SIMPLE_STATIC: error: -static-stdlib is no longer supported on darwin
+// SIMPLE_STATIC: error: -static-stdlib is no longer supported on Apple platforms
 
 
 // IOS_SIMPLE: swift
