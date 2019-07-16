@@ -86,13 +86,13 @@ class SwiftEditorDocument :
 public:
 
   SwiftEditorDocument(StringRef FilePath, SwiftLangSupport &LangSupport,
+       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> fileSystem,
        swift::ide::CodeFormatOptions Options = swift::ide::CodeFormatOptions());
   ~SwiftEditorDocument();
 
   ImmutableTextSnapshotRef
   initializeText(llvm::MemoryBuffer *Buf, ArrayRef<const char *> Args,
-                 bool ProvideSemanticInfo,
-                 llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem);
+                 bool ProvideSemanticInfo);
   ImmutableTextSnapshotRef replaceText(unsigned Offset, unsigned Length,
                                        llvm::MemoryBuffer *Buf,
                                        bool ProvideSemanticInfo,
