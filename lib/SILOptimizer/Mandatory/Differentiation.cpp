@@ -4378,8 +4378,8 @@ public:
   /// any error occurs.
   bool run() {
     auto &original = getOriginal();
-    auto &adjoint = getPullback();
-    auto adjLoc = getPullback().getLocation();
+    auto &pullback = getPullback();
+    auto pbLoc = getPullback().getLocation();
     LLVM_DEBUG(getADDebugStream() << "Running PullbackEmitter on\n" << original);
 
     auto *adjGenEnv = getPullback().getGenericEnvironment();
@@ -4446,7 +4446,7 @@ public:
     if (errorOccurred)
       return true;
 
-    // Create adjoint blocks and arguments, visiting original blocks in
+    // Create pullback blocks and arguments, visiting original blocks in
     // post-order post-dominance order.
     SmallVector<SILBasicBlock *, 8> postOrderPostDomOrder;
     // Start from the root node, which may have a marker `nullptr` block if
@@ -4462,17 +4462,17 @@ public:
       postOrderPostDomOrder.push_back(origBB);
     }
     for (auto *origBB : postOrderPostDomOrder) {
-      auto *adjointBB = adjoint.createBasicBlock();
-      adjointBBMap.insert({origBB, adjointBB});
+      auto *pullbackBB = pullback.createBasicBlock();
+      adjointBBMap.insert({origBB, pullbackBB});
       auto pbStructLoweredType =
           remapType(getPullbackInfo().getPullbackStructLoweredType(origBB));
-      // If the BB is the original exit, then the adjoint block that we just
-      // created must be the adjoint function's entry. For the adjoint entry,
+      // If the BB is the original exit, then the pullback block that we just
+      // created must be the pullback function's entry. For the pullback entry,
       // create entry arguments and continue to the next block.
       if (origBB == origExit) {
-        assert(adjointBB->isEntry());
+        assert(pullbackBB->isEntry());
         createEntryArguments(&getPullback());
-        auto *lastArg = adjointBB->getArguments().back();
+        auto *lastArg = pullbackBB->getArguments().back();
         assert(lastArg->getType() == pbStructLoweredType);
         pullbackStructArguments[origBB] = lastArg;
         continue;
@@ -4492,27 +4492,29 @@ public:
         if (activeValue->getType().isAddress()) {
           // Allocate and zero initialize a new local buffer using
           // `getAdjointBuffer`.
-          builder.setInsertionPoint(adjoint.getEntryBlock());
+          builder.setInsertionPoint(pullback.getEntryBlock());
           getAdjointBuffer(origBB, activeValue);
         } else {
-          // Create and register adjoint block argument for the active value.
-          auto *adjointArg = adjointBB->createPhiArgument(
+          // Create and register pullback block argument for the active value.
+          auto *adjointArg = pullbackBB->createPhiArgument(
               getRemappedTangentType(activeValue->getType()),
               ValueOwnershipKind::Guaranteed);
           activeValueAdjointBBArgumentMap[{origBB, activeValue}] = adjointArg;
         }
       }
       // Add a pullback struct argument.
-      auto *pbStructArg = adjointBB->createPhiArgument(
+      auto *pbStructArg = pullbackBB->createPhiArgument(
           pbStructLoweredType, ValueOwnershipKind::Guaranteed);
       pullbackStructArguments[origBB] = pbStructArg;
-      // - Create adjoint trampoline blocks for each successor block of the
+      // - Create pullback trampoline blocks for each successor block of the
       //   original block. Adjoint trampoline blocks only have a pullback
       //   struct argument, and branch from the adjoint successor block to the
       //   adjoint original block, trampoline adjoint values of active values.
       for (auto *succBB : origBB->getSuccessorBlocks()) {
-        auto *adjointTrampolineBB = adjoint.createBasicBlockBefore(adjointBB);
-        pullbackTrampolineBBMap.insert({{origBB, succBB}, adjointTrampolineBB});
+        auto *pullbackTrampolineBB =
+            pullback.createBasicBlockBefore(pullbackBB);
+        pullbackTrampolineBBMap.insert({{origBB, succBB},
+                                       pullbackTrampolineBB});
         // Get the enum element type (i.e. the pullback struct type). The enum
         // element type may be boxed if the enum is indirect.
         auto enumLoweredTy =
@@ -4521,16 +4523,16 @@ public:
             getPullbackInfo().lookUpPredecessorEnumElement(origBB, succBB);
         auto enumEltType = remapType(
             enumLoweredTy.getEnumElementType(enumEltDecl, getModule()));
-        adjointTrampolineBB->createPhiArgument(enumEltType,
+        pullbackTrampolineBB->createPhiArgument(enumEltType,
                                                ValueOwnershipKind::Guaranteed);
       }
     }
 
-    auto *adjointEntry = adjoint.getEntryBlock();
-    // The adjoint function has type (seed, exit_pbs) -> ([arg0], ..., [argn]).
-    auto adjParamArgs = adjoint.getArgumentsWithoutIndirectResults();
-    assert(adjParamArgs.size() == 2);
-    seed = adjParamArgs[0];
+    auto *pullbackEntry = pullback.getEntryBlock();
+    // The pullback function has type (seed, exit_pbs) -> ([arg0], ..., [argn]).
+    auto pbParamArgs = pullback.getArgumentsWithoutIndirectResults();
+    assert(pbParamArgs.size() == 2);
+    seed = pbParamArgs[0];
 
     // Assign adjoint for original result.
     SmallVector<SILValue, 8> origFormalResults;
@@ -4550,22 +4552,22 @@ public:
       }
     }
     builder.setInsertionPoint(
-        adjointEntry, getNextFunctionLocalAllocationInsertionPoint());
+        pullbackEntry, getNextFunctionLocalAllocationInsertionPoint());
     if (seed->getType().isAddress()) {
       // Create a local copy so that it can be written to by later adjoint
       // zero'ing logic.
-      auto *seedBufCopy = builder.createAllocStack(adjLoc, seed->getType());
-      builder.createCopyAddr(adjLoc, seed, seedBufCopy, IsNotTake,
+      auto *seedBufCopy = builder.createAllocStack(pbLoc, seed->getType());
+      builder.createCopyAddr(pbLoc, seed, seedBufCopy, IsNotTake,
                              IsInitialization);
       if (seed->getType().isLoadable(builder.getFunction()))
-        builder.createRetainValueAddr(adjLoc, seedBufCopy,
+        builder.createRetainValueAddr(pbLoc, seedBufCopy,
                                       builder.getDefaultAtomicity());
       ValueWithCleanup seedBufferCopyWithCleanup(
           seedBufCopy, makeCleanup(seedBufCopy, emitCleanup));
       setAdjointBuffer(origExit, origResult, seedBufferCopyWithCleanup);
       functionLocalAllocations.push_back(seedBufferCopyWithCleanup);
     } else {
-      builder.createRetainValue(adjLoc, seed, builder.getDefaultAtomicity());
+      builder.createRetainValue(pbLoc, seed, builder.getDefaultAtomicity());
       initializeAdjointValue(origExit, origResult, makeConcreteAdjointValue(
           ValueWithCleanup(seed, makeCleanup(seed, emitCleanup))));
     }
@@ -4615,7 +4617,7 @@ public:
       auto *predEnumField =
           getPullbackInfo().lookUpPullbackStructPredecessorField(bb);
       auto *predEnumVal =
-          builder.createStructExtract(adjLoc, pbStructVal, predEnumField);
+          builder.createStructExtract(pbLoc, pbStructVal, predEnumField);
 
       // Propagate adjoint values from active basic block arguments to
       // predecessor terminator operands.
@@ -4666,11 +4668,11 @@ public:
             if (activeValue->getType().isObject()) {
               auto activeValueAdj = getAdjointValue(bb, activeValue);
               auto concreteActiveValueAdj =
-                  materializeAdjointDirect(activeValueAdj, adjLoc);
+                  materializeAdjointDirect(activeValueAdj, pbLoc);
               // Emit cleanups for children.
               if (auto *cleanup = concreteActiveValueAdj.getCleanup()) {
                 cleanup->disable();
-                cleanup->applyRecursively(builder, adjLoc);
+                cleanup->applyRecursively(builder, pbLoc);
               }
               trampolineArguments.push_back(concreteActiveValueAdj);
               // If the adjoint block does not yet have a registered adjoint
@@ -4694,7 +4696,7 @@ public:
               predAdjBuf.setCleanup(makeCleanupFromChildren(
                   {adjBuf.getCleanup(), predAdjBuf.getCleanup()}));
               builder.createCopyAddr(
-                  adjLoc, adjBuf, predAdjBuf, IsNotTake, IsNotInitialization);
+                  pbLoc, adjBuf, predAdjBuf, IsNotTake, IsNotInitialization);
             }
           }
           // Propagate pullback struct argument.
@@ -4705,14 +4707,14 @@ public:
             trampolineArguments.push_back(predPBStructVal);
           } else {
             auto *projectBox = adjointTrampolineBBBuilder.createProjectBox(
-                adjLoc, predPBStructVal, /*index*/ 0);
+                pbLoc, predPBStructVal, /*index*/ 0);
             auto *loadInst = adjointTrampolineBBBuilder.createLoad(
-                adjLoc, projectBox,
-                getBufferLOQ(projectBox->getType().getASTType(), adjoint));
+                pbLoc, projectBox,
+                getBufferLOQ(projectBox->getType().getASTType(), pullback));
             trampolineArguments.push_back(loadInst);
           }
           // Branch from adjoint trampoline block to adjoint block.
-          adjointTrampolineBBBuilder.createBranch(adjLoc, adjointBB,
+          adjointTrampolineBBBuilder.createBranch(pbLoc, adjointBB,
                                                   trampolineArguments);
         }
         auto *enumEltDecl =
@@ -4734,15 +4736,15 @@ public:
         SILBasicBlock *adjointSuccBB;
         std::tie(enumEltDecl, adjointSuccBB) = adjointSuccessorCases.front();
         auto *predPBStructVal =
-            builder.createUncheckedEnumData(adjLoc, predEnumVal, enumEltDecl);
-        builder.createBranch(adjLoc, adjointSuccBB, {predPBStructVal});
+            builder.createUncheckedEnumData(pbLoc, predEnumVal, enumEltDecl);
+        builder.createBranch(pbLoc, adjointSuccBB, {predPBStructVal});
       }
       // - Otherwise, if the original block has multiple predecessors, then the
       //   adjoint block has multiple successors. Do `switch_enum` to branch on
       //   the predecessor enum values to adjoint successor blocks.
       else {
         builder.createSwitchEnum(
-            adjLoc, predEnumVal, /*DefaultBB*/ nullptr, adjointSuccessorCases);
+            pbLoc, predEnumVal, /*DefaultBB*/ nullptr, adjointSuccessorCases);
       }
     }
 
@@ -4769,14 +4771,14 @@ public:
       auto origParam = origParams[parameterIndex];
       if (origParam->getType().isObject()) {
         auto adjVal = getAdjointValue(origEntry, origParam);
-        auto val = materializeAdjointDirect(adjVal, adjLoc);
+        auto val = materializeAdjointDirect(adjVal, pbLoc);
         if (auto *cleanup = val.getCleanup()) {
           LLVM_DEBUG(getADDebugStream() << "Disabling cleanup for "
                      << val.getValue() << "for return\n");
           cleanup->disable();
           LLVM_DEBUG(getADDebugStream() << "Applying "
                      << cleanup->getNumChildren() << " child cleanups\n");
-          cleanup->applyRecursively(builder, adjLoc);
+          cleanup->applyRecursively(builder, pbLoc);
         }
         retElts.push_back(val);
       } else {
@@ -4795,12 +4797,12 @@ public:
 
     // Disable cleanup for original indirect parameter adjoint buffers.
     // Copy them to adjoint indirect results.
-    assert(indParamAdjoints.size() == adjoint.getIndirectResults().size() &&
+    assert(indParamAdjoints.size() == pullback.getIndirectResults().size() &&
            "Indirect parameter adjoint count mismatch");
-    for (auto pair : zip(indParamAdjoints, adjoint.getIndirectResults())) {
+    for (auto pair : zip(indParamAdjoints, pullback.getIndirectResults())) {
       auto &source = std::get<0>(pair);
       auto &dest = std::get<1>(pair);
-      builder.createCopyAddr(adjLoc, source, dest, IsTake, IsInitialization);
+      builder.createCopyAddr(pbLoc, source, dest, IsTake, IsInitialization);
       if (auto *cleanup = source.getCleanup())
         cleanup->disable();
     }
@@ -4812,13 +4814,13 @@ public:
       // Buffers should not be allocated needlessly.
       assert(!alloc.getValue()->use_empty());
       if (auto *cleanup = alloc.getCleanup())
-        cleanup->applyRecursively(builder, adjLoc);
-      builder.createDeallocStack(adjLoc, alloc);
+        cleanup->applyRecursively(builder, pbLoc);
+      builder.createDeallocStack(pbLoc, alloc);
     }
-    builder.createReturn(adjLoc, joinElements(retElts, builder, adjLoc));
+    builder.createReturn(pbLoc, joinElements(retElts, builder, pbLoc));
 
-    LLVM_DEBUG(getADDebugStream() << "Generated adjoint for "
-                                  << original.getName() << ":\n" << adjoint);
+    LLVM_DEBUG(getADDebugStream() << "Generated pullback for "
+                                  << original.getName() << ":\n" << pullback);
     return errorOccurred;
   }
 
