@@ -762,10 +762,11 @@ ERROR(extra_rbracket,PointsToFirstBadToken,
       "unexpected ']' in type; did you mean to write an array type?", ())
 ERROR(extra_colon,PointsToFirstBadToken,
       "unexpected ':' in type; did you mean to write a dictionary type?", ())
-WARNING(subscript_collection_element_invalid_index, none,
-        "index '%0' in subscript expression is out of bounds", (StringRef))
-NOTE(subscript_collection_element_fix_it, none, "did you mean to write two "
-     "array literals instead?", ())
+WARNING(subscript_array_element, none,
+        "unexpected subscript in array literal, did you mean to write two "
+        "separate elements instead?", ())
+NOTE(subscript_array_element_fix_it, none,
+     "Remove the space between the elements to silence this warning", ())
 
 // Tuple Types
 ERROR(expected_rparen_tuple_type_list,none,

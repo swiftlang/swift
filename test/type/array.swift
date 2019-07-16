@@ -116,7 +116,5 @@ func passAssocType<T : HasAssocType>(_ t: T) {
 
 // SR-11134
 
-let sr_11134_1 = [["a"][0]] // Ok
-let sr_11134_2 = [["a"][1]] // expected-warning {{index '1' in subscript expression is out of bounds}} // expected-note {{did you mean to write two array literals instead?}}{{24-24=,}}
-let sr_11134_3 = [[1, 1, 1], [], [4, 5, 6, 7], [0], [], [] [42]] // expected-warning {{index '42' in subscript expression is out of bounds}} // expected-note {{did you mean to write two array literals instead?}}{{59-59=,}}
-
+let sr_11134_1 = [[1, 2, 3][0]] // ok
+let sr_11134_2 = [[1, 2, 3] [1]] // expected-warning {{unexpected subscript in array literal, did you mean to write two separate elements instead?}}{{28-28=,}} // expected-note {{Remove the space between the elements to silence this warning}} {{28-29=}}

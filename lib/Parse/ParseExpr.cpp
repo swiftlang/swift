@@ -3477,7 +3477,8 @@ Parser::parseExprCollectionElement(Optional<bool> &isDictionary) {
 ///
 /// At the moment, this checks whether a given collection element is a subscript
 /// expression and whether we're subscripting into an array. If we are, then it
-/// checks whether the subscript index is valid or not.
+/// we emit a diagnostic in case it was not something that the user was
+/// expecting.
 ///
 /// For example: `let array [ [0, 1] [42] ]`
 void Parser::validateCollectionElement(ParserResult<Expr> element) {
@@ -3492,30 +3493,21 @@ void Parser::validateCollectionElement(ParserResult<Expr> element) {
   if (!isa<ArrayExpr>(subscriptExpr->getBase()))
     return;
 
-  auto baseExpr = cast<ArrayExpr>(subscriptExpr->getBase());
-  auto index = subscriptExpr->getIndex()->getValueProvidingExpr();
+  auto arrayExpr = cast<ArrayExpr>(subscriptExpr->getBase());
 
-  if (!isa<IntegerLiteralExpr>(index))
-    return;
-  auto indexExpr = cast<IntegerLiteralExpr>(index);
+  auto startLocOfSubscript = subscriptExpr->getIndex()->getStartLoc();
+  auto endLocOfArray = arrayExpr->getEndLoc();
 
-  int elementsCount = baseExpr->getNumElements();
-  int indexValue = atoi(indexExpr->getDigitsText().str().c_str());
-
-  auto withinBounds = indexValue >= 0 && indexValue < elementsCount;
-
-  if (!withinBounds) {
-    auto diag = diagnose(subscriptExpr->getLoc(),
-                         diag::subscript_collection_element_invalid_index,
-                         indexExpr->getDigitsText());
+  if (L->getLocForEndOfToken(SourceMgr, endLocOfArray) != startLocOfSubscript) {
+    auto diag =
+        diagnose(subscriptExpr->getLoc(), diag::subscript_array_element);
     diag.highlight(subscriptExpr->getSourceRange());
+    diag.fixItInsertAfter(endLocOfArray, ",");
     diag.flush();
 
-    auto note = diagnose(subscriptExpr->getLoc(),
-                         diag::subscript_collection_element_fix_it);
-    note.fixItInsertAfter(baseExpr->getRBracketLoc(), ",");
-
-    element.setIsParseError();
+    auto note =
+        diagnose(subscriptExpr->getLoc(), diag::subscript_array_element_fix_it);
+    note.fixItRemoveChars(endLocOfArray.getAdvancedLoc(1), startLocOfSubscript);
   }
 }
 
