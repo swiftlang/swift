@@ -237,7 +237,7 @@ namespace {
       llvm_unreachable("shouldn't get an inout type here");
     }
     RetTy visitErrorType(CanErrorType type) {
-      llvm_unreachable("shouldn't get an error type here");
+      return asImpl().handleTrivial(type);
     }
 
     // Dependent types should be contextualized before visiting.
@@ -501,9 +501,6 @@ namespace {
 static RecursiveProperties classifyType(CanType type, SILModule &M,
                                         CanGenericSignature sig,
                                         ResilienceExpansion expansion) {
-  assert(!type->hasError() &&
-         "Error types should not appear in type-checked AST");
-
   return TypeClassifier(M, sig, expansion).visit(type);
 }
 
@@ -1559,9 +1556,6 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
 
 CanType TypeConverter::computeLoweredRValueType(AbstractionPattern origType,
                                                 CanType substType) {
-  assert(!substType->hasError() &&
-         "Error types should not appear in type-checked AST");
-
   // AST function types are turned into SIL function types:
   //   - the type is uncurried as desired
   //   - types are turned into their unbridged equivalents, depending
