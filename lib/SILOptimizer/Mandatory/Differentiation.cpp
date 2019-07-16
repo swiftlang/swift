@@ -383,36 +383,43 @@ public:
   void print(llvm::raw_ostream &os) const;
 };
 
-/// Information about the VJP function produced during VJP generation, e.g.
-/// mappings from original values to corresponding values in the pullback
+/// Information about the VJP/JVP function produced during VJP/JVP generation,
+/// e.g. mappings from original values to corresponding values in the linear map
 /// struct.
 ///
-/// A pullback struct is an aggregate value containing pullbacks checkpointed
-/// during the VJP computation. Pullback structs are generated for every
-/// original function during VJP generation. Pullback struct values are
-/// constructed by VJP functions and consumed by pullback functions.
-class PullbackInfo {
+/// A linear map struct is an aggregate value containing pullbacks checkpointed
+/// during the VJP/JVP computation. Linear map structs are generated for every
+/// original function during VJP/JVP generation. Linear map struct values are
+/// constructed by VJP/JVP functions and consumed by pullback/differential
+/// functions.
+class LinearMapInfo {
 private:
+  /// The linear map kind.
+  AutoDiffAssociatedFunctionKind kind;
+
   /// The original function.
   SILFunction *const original;
 
-  /// Mapping from original basic blocks to pullback structs.
-  DenseMap<SILBasicBlock *, StructDecl *> pullbackStructs;
+  /// Mapping from original basic blocks to linear map structs.
+  DenseMap<SILBasicBlock *, StructDecl *> linearMapStructs;
 
-  /// Mapping from original basic blocks to predecessor enums.
-  DenseMap<SILBasicBlock *, EnumDecl *> predecessorEnums;
+  /// Mapping from original basic blocks to linear map enums. If 'kind' is 'VJP',
+  /// then it's the predecessor enums. If 'kind' is 'JVP', then it's the
+  /// successor enums.
+  DenseMap<SILBasicBlock *, EnumDecl *> linearMapEnums;
 
   /// Mapping from `apply` and `struct_extract` instructions in the original
-  /// function to the corresponding pullback declaration in the pullback struct.
-  DenseMap<SILInstruction *, VarDecl *> pullbackValueMap;
+  /// function to the corresponding linear map declaration in the linear map
+  /// struct.
+  DenseMap<SILInstruction *, VarDecl *> linearMapValueMap;
 
   /// Mapping from predecessor+succcessor basic block pairs in original function
-  /// to the corresponding predecessor enum case.
+  /// to the corresponding enum case.
   DenseMap<std::pair<SILBasicBlock *, SILBasicBlock *>, EnumElementDecl *>
-      predecessorEnumCases;
+      enumCases;
 
-  /// Mapping from pullback structs to their predecessor enum fields.
-  DenseMap<StructDecl *, VarDecl *> pullbackStructPredecessorFields;
+  /// Mapping from linear map structs to their predecessor enum fields.
+  DenseMap<StructDecl *, VarDecl *> linearMapStructPredecessorFields;
 
   /// A type converter, used to compute struct/enum SIL types.
   Lowering::TypeConverter &typeConverter;
@@ -451,7 +458,7 @@ private:
     llvm_unreachable("No files?");
   }
 
-  /// Compute and set the access level for the given pullback data structure,
+  /// Compute and set the access level for the given linear map data structure,
   /// given the original function linkage.
   void computeAccessLevel(
       NominalTypeDecl *nominal, SILLinkage originalLinkage) {
@@ -480,42 +487,53 @@ private:
     }
   }
 
-  /// Creates an enum declaration with the given VJP generic signature, whose
+  /// Creates an enum declaration with the given VJP/JVP generic signature, whose
   /// cases represent the predecessors of the given original block.
   EnumDecl *
   createBasicBlockPredecessorEnum(SILBasicBlock *originalBB,
                                   SILAutoDiffIndices indices,
-                                  CanGenericSignature vjpGenericSig) {
+                                  CanGenericSignature genericSig) {
     assert(originalBB->getParent() == original);
     auto *moduleDecl = original->getModule().getSwiftModule();
     auto &astCtx = original->getASTContext();
     auto &file = getDeclarationFileUnit();
     // Create a `_AD__<fn_name>_bb<bb_id>__Pred__` predecessor enum.
-    std::string predEnumName =
-        "_AD__" + original->getName().str() +
-        "_bb" + std::to_string(originalBB->getDebugID()) +
-         "__Pred__" + indices.mangle();
-    auto enumId = astCtx.getIdentifier(predEnumName);
+    std::string enumName;
+    switch (kind) {
+      case swift::AutoDiffAssociatedFunctionKind::JVP:
+        enumName =
+            "_AD__" + original->getName().str() +
+            "_bb" + std::to_string(originalBB->getDebugID()) +
+            "__Succ__" + indices.mangle();
+        break;
+      case swift::AutoDiffAssociatedFunctionKind::VJP:
+        enumName =
+            "_AD__" + original->getName().str() +
+            "_bb" + std::to_string(originalBB->getDebugID()) +
+            "__Pred__" + indices.mangle();
+        break;
+    }
+    auto enumId = astCtx.getIdentifier(enumName);
     auto loc = original->getLocation().getSourceLoc();
-    auto *predecessorEnum = new (astCtx) EnumDecl(
+    auto *bbEnum = new (astCtx) EnumDecl(
         /*EnumLoc*/ loc, /*Name*/ enumId, /*NameLoc*/ loc, /*Inherited*/ {},
         /*GenericParams*/ /*set later*/ nullptr, /*DC*/ &file);
-    if (vjpGenericSig) {
+    if (genericSig) {
       auto *genericParams =
-          cloneGenericParameters(astCtx, predecessorEnum, vjpGenericSig);
-      predecessorEnum->setGenericParams(genericParams);
-      predecessorEnum->setGenericEnvironment(
-          vjpGenericSig->createGenericEnvironment());
+          cloneGenericParameters(astCtx, bbEnum, genericSig);
+      bbEnum->setGenericParams(genericParams);
+      bbEnum->setGenericEnvironment(
+          genericSig->createGenericEnvironment());
     }
-    predecessorEnum->setBraces(loc);
-    computeAccessLevel(predecessorEnum, original->getEffectiveSymbolLinkage());
-    predecessorEnum->computeType();
-    assert(predecessorEnum->hasInterfaceType());
-    file.addVisibleDecl(predecessorEnum);
+    bbEnum->setBraces(loc);
+    computeAccessLevel(bbEnum, original->getEffectiveSymbolLinkage());
+    bbEnum->computeType();
+    assert(bbEnum->hasInterfaceType());
+    file.addVisibleDecl(bbEnum);
     // Add predecessor block enum cases.
     for (auto *predBB : originalBB->getPredecessorBlocks()) {
       auto bbId = "bb" + std::to_string(predBB->getDebugID());
-      auto *predPBStruct = getPullbackStruct(predBB);
+      auto *predPBStruct = getLinearMapStruct(predBB);
       assert(predPBStruct);
       auto predPBStructTy =
           predPBStruct->getDeclaredInterfaceType()->getCanonicalType();
@@ -532,133 +550,147 @@ private:
       auto *paramList = ParameterList::create(astCtx, {decl});
       auto *enumEltDecl = new (astCtx) EnumElementDecl(
           /*IdentifierLoc*/ loc, DeclName(astCtx.getIdentifier(bbId)),
-          paramList, loc, /*RawValueExpr*/ nullptr, predecessorEnum);
+          paramList, loc, /*RawValueExpr*/ nullptr, bbEnum);
       enumEltDecl->setImplicit();
       enumEltDecl->computeType();
       auto *enumCaseDecl = EnumCaseDecl::create(
-          /*CaseLoc*/ loc, {enumEltDecl}, predecessorEnum);
+          /*CaseLoc*/ loc, {enumEltDecl}, bbEnum);
       enumCaseDecl->setImplicit();
-      predecessorEnum->addMember(enumEltDecl);
-      predecessorEnum->addMember(enumCaseDecl);
+      bbEnum->addMember(enumEltDecl);
+      bbEnum->addMember(enumCaseDecl);
       // Cache predecessor/successor enum element declarations.
-      predecessorEnumCases.insert({{predBB, originalBB}, enumEltDecl});
+      enumCases.insert({{predBB, originalBB}, enumEltDecl});
     }
     LLVM_DEBUG({
       auto &s = getADDebugStream();
-      s << "Predecessor enum created for function @" << original->getName()
-        << " bb" << originalBB->getDebugID() << '\n';
-      predecessorEnum->print(s);
+      s << "Predecessor/Successor enum created for function @"
+        << original->getName() << " bb" << originalBB->getDebugID() << '\n';
+      bbEnum->print(s);
       s << '\n';
     });
-    return predecessorEnum;
+    return bbEnum;
   }
 
-  /// Creates a struct declaration with the given VJP generic signature, for
-  /// storing the pullback values and predecessor of the given original block.
+  /// Creates a struct declaration with the given VJP/JVP generic signature, for
+  /// storing the linear map values and predecessor/successor of the given
+  /// original block.
   StructDecl *
-  createPullbackStruct(SILBasicBlock *originalBB, SILAutoDiffIndices indices,
-                       CanGenericSignature vjpGenericSig) {
+  createLinearMapStruct(SILBasicBlock *originalBB, SILAutoDiffIndices indices,
+                       CanGenericSignature genericSig) {
     auto *original = originalBB->getParent();
     auto &astCtx = original->getASTContext();
     auto &file = getDeclarationFileUnit();
-    // Create a `_AD__<fn_name>_bb<bb_id>__PB__` struct.
-    std::string pbStructName =
-        "_AD__" + original->getName().str() +
-        "_bb" + std::to_string(originalBB->getDebugID()) +
-         "__PB__" + indices.mangle();
-    auto structId = astCtx.getIdentifier(pbStructName);
+    // Create a `_AD__<fn_name>_bb<bb_id>__PB/DIFF__` struct.
+    std::string structName;
+    switch (kind) {
+    case swift::AutoDiffAssociatedFunctionKind::JVP:
+      structName =
+          "_AD__" + original->getName().str() +
+          "_bb" + std::to_string(originalBB->getDebugID()) +
+          "__DIFF__" + indices.mangle();
+      break;
+    case swift::AutoDiffAssociatedFunctionKind::VJP:
+      structName =
+          "_AD__" + original->getName().str() +
+          "_bb" + std::to_string(originalBB->getDebugID()) +
+          "__PB__" + indices.mangle();
+      break;
+    }
+    auto structId = astCtx.getIdentifier(structName);
     SourceLoc loc = original->getLocation().getSourceLoc();
-    auto *pullbackStruct = new (astCtx) StructDecl(
+    auto *linearMapStruct = new (astCtx) StructDecl(
         /*StructLoc*/ loc, /*Name*/ structId, /*NameLoc*/ loc, /*Inherited*/ {},
         /*GenericParams*/ /*set later*/ nullptr, /*DC*/ &file);
-    if (vjpGenericSig) {
+    if (genericSig) {
       auto *genericParams =
-          cloneGenericParameters(astCtx, pullbackStruct, vjpGenericSig);
-      pullbackStruct->setGenericParams(genericParams);
-      pullbackStruct->setGenericEnvironment(
-          vjpGenericSig->createGenericEnvironment());
+          cloneGenericParameters(astCtx, linearMapStruct, genericSig);
+      linearMapStruct->setGenericParams(genericParams);
+      linearMapStruct->setGenericEnvironment(
+          genericSig->createGenericEnvironment());
     }
-    pullbackStruct->setBraces(loc);
+    linearMapStruct->setBraces(loc);
     computeAccessLevel(
-        pullbackStruct, original->getEffectiveSymbolLinkage());
-    pullbackStruct->computeType();
-    assert(pullbackStruct->hasInterfaceType());
-    file.addVisibleDecl(pullbackStruct);
+        linearMapStruct, original->getEffectiveSymbolLinkage());
+    linearMapStruct->computeType();
+    assert(linearMapStruct->hasInterfaceType());
+    file.addVisibleDecl(linearMapStruct);
     LLVM_DEBUG({
       auto &s = getADDebugStream();
-      s << "Pullback struct created for function @" << original->getName()
+      s << "Linear map struct created for function @" << original->getName()
         << " bb" << originalBB->getDebugID() << '\n';
-      pullbackStruct->print(s);
+      linearMapStruct->print(s);
       s << '\n';
     });
-    return pullbackStruct;
+    return linearMapStruct;
   }
 
 public:
-  PullbackInfo(const PullbackInfo &) = delete;
-  PullbackInfo &operator=(const PullbackInfo &) = delete;
+  LinearMapInfo(const LinearMapInfo &) = delete;
+  LinearMapInfo &operator=(const LinearMapInfo &) = delete;
 
-  explicit PullbackInfo(ADContext &context, SILFunction *original,
-                        SILFunction *vjp, const SILAutoDiffIndices &indices);
+  explicit LinearMapInfo(
+      ADContext &context, AutoDiffAssociatedFunctionKind kind,
+      SILFunction *original, SILFunction *assocFn,
+      const SILAutoDiffIndices &indices);
 
-  /// Returns the pullback struct associated with the given original block.
-  StructDecl *getPullbackStruct(SILBasicBlock *origBB) const {
-    return pullbackStructs.lookup(origBB);
+  /// Returns the linear map struct associated with the given original block.
+  StructDecl *getLinearMapStruct(SILBasicBlock *origBB) const {
+    return linearMapStructs.lookup(origBB);
   }
 
-  /// Returns the lowered SIL type of the pullback struct associated with the
+  /// Returns the lowered SIL type of the linear map struct associated with the
   /// given original block.
-  SILType getPullbackStructLoweredType(SILBasicBlock *origBB) const {
-    auto *pbStruct = getPullbackStruct(origBB);
+  SILType getLinearMapStructLoweredType(SILBasicBlock *origBB) const {
+    auto *pbStruct = getLinearMapStruct(origBB);
     auto pbStructType =
         pbStruct->getDeclaredInterfaceType()->getCanonicalType();
     return typeConverter.getLoweredType(pbStructType,
                                         ResilienceExpansion::Minimal);
   }
 
-  /// Returns the predecessor enum associated with the given original block.
-  EnumDecl *getPredecessorEnum(SILBasicBlock *origBB) const {
-    return predecessorEnums.lookup(origBB);
+  /// Returns the linear map enum associated with the given original block.
+  EnumDecl *getLinearMapEnum(SILBasicBlock *origBB) const {
+    return linearMapEnums.lookup(origBB);
   }
 
-  /// Returns the lowered SIL type of the predecessor enum associated with the
+  /// Returns the lowered SIL type of the linear map enum associated with the
   /// given original block.
-  SILType getPredecessorEnumLoweredType(SILBasicBlock *origBB) const {
-    auto *predEnum = getPredecessorEnum(origBB);
+  SILType getLinearMapEnumLoweredType(SILBasicBlock *origBB) const {
+    auto *predEnum = getLinearMapEnum(origBB);
     auto predEnumType =
         predEnum->getDeclaredInterfaceType()->getCanonicalType();
     return typeConverter.getLoweredType(predEnumType,
                                         ResilienceExpansion::Minimal);
   }
 
-  /// Returns the enum element in the given successor block's predecessor enum
-  /// corresponding to the given predecessor block.
+  /// Returns the enum element in the given successor block's linear map enum
+  /// corresponding to the given linear map block.
   EnumElementDecl *
-  lookUpPredecessorEnumElement(SILBasicBlock *origPredBB,
+  lookUpLinearMapEnumElement(SILBasicBlock *origPredBB,
                                SILBasicBlock *origSuccBB) const {
     assert(origPredBB->getParent() == original);
-    return predecessorEnumCases.lookup({origPredBB, origSuccBB});
+    return enumCases.lookup({origPredBB, origSuccBB});
   }
 
-  /// Returns the mapping from pullback structs to their predecessor enum
+  /// Returns the mapping from linear map structs to their linear map enum
   /// fields.
-  DenseMap<StructDecl *, VarDecl *> &getPullbackStructPredecessorFields() {
-    return pullbackStructPredecessorFields;
+  DenseMap<StructDecl *, VarDecl *> &getLinearMapStructPredecessorFields() {
+    return linearMapStructPredecessorFields;
   }
 
-  /// Returns the predecessor enum field for the pullback struct of the given
+  /// Returns the linear map enum field for the linear map struct of the given
   /// original block.
-  VarDecl *lookUpPullbackStructPredecessorField(SILBasicBlock *origBB) {
-    auto *pullbackStruct = getPullbackStruct(origBB);
-    return pullbackStructPredecessorFields.lookup(pullbackStruct);
+  VarDecl *lookUpLinearMapStructPredecessorField(SILBasicBlock *origBB) {
+    auto *pullbackStruct = getLinearMapStruct(origBB);
+    return linearMapStructPredecessorFields.lookup(pullbackStruct);
   }
 
-  /// Add a pullback to the pullback struct.
-  VarDecl *addPullbackDecl(SILInstruction *inst, SILType pullbackType) {
+  /// Add a linear map to the linear map struct.
+  VarDecl *addLinearMapDecl(SILInstruction *inst, SILType linearMapType) {
     // IRGen requires decls to have AST types (not `SILFunctionType`), so we
-    // convert the `SILFunctionType` of the pullback to a `FunctionType` with
+    // convert the `SILFunctionType` of the linear map to a `FunctionType` with
     // the same parameters and results.
-    auto silFnTy = pullbackType.castTo<SILFunctionType>();
+    auto silFnTy = linearMapType.castTo<SILFunctionType>();
     SmallVector<AnyFunctionType::Param, 8> params;
     for (auto &param : silFnTy->getParameters())
       params.push_back(AnyFunctionType::Param(param.getType()));
@@ -671,18 +703,26 @@ public:
           params, silFnTy->getAllResultsType().getASTType());
 
     auto *origBB = inst->getParent();
-    auto *pbStruct = getPullbackStruct(origBB);
-    auto pullbackName = "pullback_" + llvm::itostr(pullbackValueMap.size());
-    auto *pullbackDecl = addVarDecl(pbStruct, pullbackName, astFnTy);
-    pullbackValueMap.insert({inst, pullbackDecl});
-    return pullbackDecl;
+    auto *linMapStruct = getLinearMapStruct(origBB);
+    std::string linearMapName;
+    switch (kind) {
+    case swift::AutoDiffAssociatedFunctionKind::JVP:
+      linearMapName = "differential_" + llvm::itostr(linearMapValueMap.size());
+      break;
+    case swift::AutoDiffAssociatedFunctionKind::VJP:
+      linearMapName = "pullback_" + llvm::itostr(linearMapValueMap.size());
+      break;
+    }
+    auto *linearMapDecl = addVarDecl(linMapStruct, linearMapName, astFnTy);
+    linearMapValueMap.insert({inst, linearMapDecl});
+    return linearMapDecl;
   }
 
-  /// Finds the pullback declaration in the pullback struct for an `apply` or
+  /// Finds the linear map declaration in the pullback struct for an `apply` or
   /// `struct_extract` in the original function.
-  VarDecl *lookUpPullbackDecl(SILInstruction *inst) {
-    auto lookup = pullbackValueMap.find(inst);
-    return lookup == pullbackValueMap.end() ? nullptr
+  VarDecl *lookUpLinearMapDecl(SILInstruction *inst) {
+    auto lookup = linearMapValueMap.find(inst);
+    return lookup == linearMapValueMap.end() ? nullptr
                                             : lookup->getSecond();
   }
 };
@@ -1228,9 +1268,12 @@ ADContext::emitNondifferentiabilityError(SourceLoc loc,
   }
 }
 
-PullbackInfo::PullbackInfo(ADContext &context, SILFunction *original,
-                           SILFunction *vjp, const SILAutoDiffIndices &indices)
-    : original(original), typeConverter(context.getTypeConverter()) {
+LinearMapInfo::LinearMapInfo(ADContext &context,
+                           AutoDiffAssociatedFunctionKind kind,
+                           SILFunction *original, SILFunction *vjp,
+                           const SILAutoDiffIndices &indices)
+    : kind(kind), original(original), typeConverter(context.getTypeConverter())
+{
   auto &astCtx = original->getASTContext();
   auto *loopAnalysis = context.getPassManager().getAnalysis<SILLoopAnalysis>();
   auto *loopInfo = loopAnalysis->get(original);
@@ -1240,23 +1283,23 @@ PullbackInfo::PullbackInfo(ADContext &context, SILFunction *original,
     vjpGenSig = vjpGenEnv->getGenericSignature()->getCanonicalSignature();
   // Create predecessor enum and pullback struct for each original block.
   for (auto &origBB : *original) {
-    auto *pbStruct = createPullbackStruct(&origBB, indices, vjpGenSig);
-    pullbackStructs.insert({&origBB, pbStruct});
+    auto *pbStruct = createLinearMapStruct(&origBB, indices, vjpGenSig);
+    linearMapStructs.insert({&origBB, pbStruct});
   }
   for (auto &origBB : *original) {
-    auto *pbStruct = getPullbackStruct(&origBB);
+    auto *pbStruct = getLinearMapStruct(&origBB);
     auto *predEnum =
         createBasicBlockPredecessorEnum(&origBB, indices, vjpGenSig);
     // If original block is in a loop, mark predecessor enum as indirect.
     if (loopInfo->getLoopFor(&origBB))
       predEnum->getAttrs().add(new (astCtx) IndirectAttr(/*Implicit*/ true));
-    predecessorEnums.insert({&origBB, predEnum});
+    linearMapEnums.insert({&origBB, predEnum});
     if (origBB.isEntry())
       continue;
     auto *predEnumField =
         addVarDecl(pbStruct, astCtx.getIdentifier("predecessor").str(),
                    predEnum->getDeclaredInterfaceType());
-    pullbackStructPredecessorFields.insert({pbStruct, predEnumField});
+    linearMapStructPredecessorFields.insert({pbStruct, predEnumField});
   }
 }
 
@@ -2763,8 +2806,8 @@ private:
   /// The pullback function.
   SILFunction *pullback;
 
-  /// The pullback info.
-  PullbackInfo pullbackInfo;
+  /// The linear map info.
+  LinearMapInfo linearMapInfo;
 
   /// The differentiation invoker.
   DifferentiationInvoker invoker;
@@ -2815,7 +2858,8 @@ public:
                       DifferentiationInvoker invoker)
       : TypeSubstCloner(*vjp, *original, getSubstitutionMap(original, vjp)),
         context(context), original(original), attr(attr), vjp(vjp),
-        pullbackInfo(context, original, vjp, attr->getIndices()),
+        linearMapInfo(context, AutoDiffAssociatedFunctionKind::VJP, original,
+                      vjp, attr->getIndices()),
         invoker(invoker), activityInfo(getActivityInfo(
                               context, original, attr->getIndices(), vjp)) {
     // Create empty pullback function.
@@ -2903,7 +2947,7 @@ public:
     // Accept a pullback struct in the pullback parameter list. This is the
     // returned pullback's closure context.
     auto *origExit = &*original->findReturnBB();
-    auto *pbStruct = pullbackInfo.getPullbackStruct(origExit);
+    auto *pbStruct = linearMapInfo.getLinearMapStruct(origExit);
     auto pbStructType = pbStruct->getDeclaredInterfaceType()
         ->getCanonicalType();
     pbParams.push_back({pbStructType, ParameterConvention::Direct_Guaranteed});
@@ -2962,7 +3006,7 @@ public:
     if (errorOccurred || remappedBasicBlocks.count(bb))
       return vjpBB;
     // Add predecessor enum argument to the remapped block.
-    auto *predEnum = pullbackInfo.getPredecessorEnum(bb);
+    auto *predEnum = linearMapInfo.getLinearMapEnum(bb);
     auto enumTy = getOpASTType(predEnum->getDeclaredInterfaceType()
                                  ->getCanonicalType());
     auto enumLoweredTy = context.getTypeConverter().getLoweredType(
@@ -3003,7 +3047,7 @@ private:
     auto loc = termInst->getFunction()->getLocation();
     auto *origBB = termInst->getParent();
     auto *vjpBB = BBMap[origBB];
-    auto *pbStruct = pullbackInfo.getPullbackStruct(origBB);
+    auto *pbStruct = linearMapInfo.getLinearMapStruct(origBB);
     auto structLoweredTy = getNominalDeclLoweredType(pbStruct);
     auto bbPullbackValues = pullbackValues[origBB];
     if (!origBB->isEntry()) {
@@ -3020,10 +3064,10 @@ private:
                                       SILBasicBlock *succBB,
                                       StructInst *pbStructVal) {
     auto loc = pbStructVal->getLoc();
-    auto *succEnum = pullbackInfo.getPredecessorEnum(succBB);
+    auto *succEnum = linearMapInfo.getLinearMapEnum(succBB);
     auto enumLoweredTy = getNominalDeclLoweredType(succEnum);
     auto *enumEltDecl =
-        pullbackInfo.lookUpPredecessorEnumElement(predBB, succBB);
+        linearMapInfo.lookUpLinearMapEnumElement(predBB, succBB);
     auto enumEltType = remapType(
         enumLoweredTy.getEnumElementType(enumEltDecl, getModule()));
     // If the enum element type does not have a box type (i.e. the enum case is
@@ -3375,7 +3419,7 @@ public:
 
     // Checkpoint the pullback.
     auto *pullbackDecl =
-        pullbackInfo.addPullbackDecl(ai, getOpType(pullback->getType()));
+        linearMapInfo.addLinearMapDecl(ai, getOpType(pullback->getType()));
 
     // If actual pullback type does not match lowered pullback type, reabstract
     // the pullback using a thunk.
@@ -3761,7 +3805,7 @@ private:
   SILFunction &getPullback() const { return *vjpEmitter.pullback; }
   SILDifferentiableAttr *getAttr() const { return vjpEmitter.attr; }
   DifferentiationInvoker getInvoker() const { return vjpEmitter.invoker; }
-  PullbackInfo &getPullbackInfo() { return vjpEmitter.pullbackInfo; }
+  LinearMapInfo &getLinearMapInfo() { return vjpEmitter.linearMapInfo; }
   const SILAutoDiffIndices &getIndices() const {
     return vjpEmitter.getIndices();
   }
@@ -3772,7 +3816,7 @@ private:
 #ifndef NDEBUG
     auto *pbStruct = pullbackStructArguments[origBB]->getType()
         .getStructOrBoundGenericStruct();
-    assert(pbStruct == getPullbackInfo().getPullbackStruct(origBB));
+    assert(pbStruct == getLinearMapInfo().getLinearMapStruct(origBB));
 #endif
     return pullbackStructArguments[origBB];
   }
@@ -4265,7 +4309,7 @@ public:
       auto *adjointBB = pullback.createBasicBlock();
       adjointBBMap.insert({origBB, adjointBB});
       auto pbStructLoweredType =
-          remapType(getPullbackInfo().getPullbackStructLoweredType(origBB));
+          remapType(getLinearMapInfo().getLinearMapStructLoweredType(origBB));
       // If the BB is the original exit, then the adjoint block that we just
       // created must be the pullback function's entry. For the adjoint entry,
       // create entry arguments and continue to the next block.
@@ -4316,9 +4360,9 @@ public:
         // Get the enum element type (i.e. the pullback struct type). The enum
         // element type may be boxed if the enum is indirect.
         auto enumLoweredTy =
-            getPullbackInfo().getPredecessorEnumLoweredType(succBB);
+            getLinearMapInfo().getLinearMapEnumLoweredType(succBB);
         auto *enumEltDecl =
-            getPullbackInfo().lookUpPredecessorEnumElement(origBB, succBB);
+            getLinearMapInfo().lookUpLinearMapEnumElement(origBB, succBB);
         auto enumEltType = remapType(
             enumLoweredTy.getEnumElementType(enumEltDecl, getModule()));
         adjointTrampolineBB->createPhiArgument(enumEltType,
@@ -4411,9 +4455,9 @@ public:
       // 1. Get the pullback struct adjoint bb argument.
       // 2. Extract the predecessor enum value from the pullback struct value.
       auto *pbStructVal = getPullbackBlockPullbackStructArgument(bb);
-      auto *predEnum = getPullbackInfo().getPredecessorEnum(bb);
+      auto *predEnum = getLinearMapInfo().getLinearMapEnum(bb);
       auto *predEnumField =
-          getPullbackInfo().lookUpPullbackStructPredecessorField(bb);
+          getLinearMapInfo().lookUpLinearMapStructPredecessorField(bb);
       auto *predEnumVal =
           builder.createStructExtract(pbLoc, pbStructVal, predEnumField);
 
@@ -4516,7 +4560,7 @@ public:
                                                   trampolineArguments);
         }
         auto *enumEltDecl =
-            getPullbackInfo().lookUpPredecessorEnumElement(predBB, bb);
+            getLinearMapInfo().lookUpLinearMapEnumElement(predBB, bb);
         adjointSuccessorCases.push_back({enumEltDecl, adjointSuccBB});
       }
       // Emit cleanups for all block-local adjoint values.
@@ -4796,7 +4840,7 @@ public:
     auto applyInfo = applyInfoLookup->getSecond();
 
     // Get the pullback.
-    auto *field = getPullbackInfo().lookUpPullbackDecl(ai);
+    auto *field = getLinearMapInfo().lookUpLinearMapDecl(ai);
     assert(field);
     auto loc = ai->getLoc();
     SILValue pullback = builder.createStructExtract(
@@ -5946,7 +5990,6 @@ public:
     auto diffFunc = jvpDirectResults.back();
     differentialFuncCalls.push_back(diffFunc);
 
-    // Store the original result to the value map.
     mapValue(ai, originalDirectResult);
 
     // Some instructions that produce the callee may have been cloned.
@@ -5961,11 +6004,6 @@ public:
     // -----------------------------------------------------------------------//
     // Differential emission.
     // -----------------------------------------------------------------------//
-    SmallVector<SILValue, 8> diffArgs;
-    for (auto arg : jvpArgs) {
-      if (activityInfo.isActive(arg, getIndices()))
-        diffArgs.push_back(arg);
-    }
   }
 
   void visitAutoDiffFunctionInst(AutoDiffFunctionInst *adfi) {
@@ -6552,13 +6590,12 @@ bool JVPEmitter::run() {
   for (auto index : *getIndices().parameters) {
     auto diffParam = diffParamArgs[index];
     auto origParam = origParamArgs[index];
-//    llvm::errs() << "index: " << index << "\n";
-//    diffParam->dump();
 
     if (diffParam->getType().isAddress()) {
       // Create a local copy so that it can be written to by later adjoint
       // zero'ing logic.
-      auto *seedBufCopy = diffBuilder.createAllocStack(diffLoc, diffParam->getType());
+      auto *seedBufCopy = diffBuilder.createAllocStack(diffLoc,
+                                                       diffParam->getType());
       diffBuilder.createCopyAddr(diffLoc, diffParam, seedBufCopy, IsNotTake,
                                  IsInitialization);
       if (diffParam->getType().isLoadable(diffBuilder.getFunction()))
@@ -6569,9 +6606,11 @@ bool JVPEmitter::run() {
       setTangentBuffer(origEntry, origParam, seedBufferCopyWithCleanup);
       differentialLocalAllocations.push_back(seedBufferCopyWithCleanup);
     } else {
-      diffBuilder.createRetainValue(diffLoc, diffParam, diffBuilder.getDefaultAtomicity());
+      diffBuilder.createRetainValue(diffLoc, diffParam,
+                                    diffBuilder.getDefaultAtomicity());
       initializeTangentValue(origEntry, origParam, makeConcreteAdjointValue(
-          ValueWithCleanup(diffParam, makeCleanup(diffParam, emitCleanup, {}))));
+          ValueWithCleanup(diffParam, makeCleanup(diffParam, emitCleanup,
+                                                  {}))));
     }
     LLVM_DEBUG(getADDebugStream()
                << "Assigned parameter " << *diffParam
