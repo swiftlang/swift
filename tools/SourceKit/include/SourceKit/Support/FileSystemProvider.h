@@ -31,11 +31,22 @@ namespace SourceKit {
 ///
 /// The following requests currently support custom FileSystemProviders (other
 /// requests respond with an invalid request error if you try):
-/// - source.request.editor.open: Associates the given custom filesystem with
-///                               this editor file, so that all subsequent
-///                               operations on this editor file use it.
-/// - source.request.codecomplete: Uses the given custom filesystem to process.
-/// - source.request.cursorinfo: Uses the given custom filesystem to process.
+/// - source.request.editor.open:
+///     Associates the given custom filesystem with this editor file, so that
+///     all subsequent requests on the file use it, unless the subsequent
+///     request specifies its own filesystem.
+/// - source.request.cursorinfo:
+///     Uses the given custom filesystem. If none is specified, uses the
+///     filesystem associated with the file.
+/// - source.request.codecomplete:
+///     Uses the given custom filesystem.
+/// - source.request.codecomplete.open:
+///     Associates the given custom filesystem with this completion session, so
+///     that all subsequent requests in the session use it, unless the
+///     subsequent request specifies its own filesystem.
+/// - source.request.codecomplete.update:
+///     Uses the given custom filesystem. If none is specified, uses the
+///     filesystem associated with the completion session.
 class FileSystemProvider {
 public:
   virtual ~FileSystemProvider() = default;
