@@ -2191,16 +2191,6 @@ void KeyPathExpr::Component::setSubscriptIndexHashableConformances(
 void InterpolatedStringLiteralExpr::forEachSegment(ASTContext &Ctx, 
     llvm::function_ref<void(bool, CallExpr *)> callback) {
   auto appendingExpr = getAppendingExpr();
-  if (SemanticExpr) {
-    SemanticExpr->forEachChildExpr([&](Expr *subExpr) -> Expr * {
-      if (auto tap = dyn_cast_or_null<TapExpr>(subExpr)) {
-        appendingExpr = tap;
-        return nullptr;
-      }
-      return subExpr;
-    });
-  }
-
   for (auto stmt : appendingExpr->getBody()->getElements()) {
     if (auto expr = stmt.dyn_cast<Expr*>()) {
       if (auto call = dyn_cast<CallExpr>(expr)) {

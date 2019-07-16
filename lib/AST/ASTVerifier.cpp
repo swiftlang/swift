@@ -804,6 +804,26 @@ public:
       OpaqueValues.erase(S->getElementExpr());
     }
 
+    bool shouldVerify(InterpolatedStringLiteralExpr *expr) {
+      if (!shouldVerify(cast<Expr>(expr)))
+        return false;
+
+      if (!expr->getInterpolationExpr())
+        return true;
+
+      assert(!OpaqueValues.count(expr->getInterpolationExpr()));
+      OpaqueValues[expr->getInterpolationExpr()] = 0;
+      return true;
+    }
+
+    void cleanup(InterpolatedStringLiteralExpr *expr) {
+      if (!expr->getInterpolationExpr())
+        return;
+
+      assert(OpaqueValues.count(expr->getInterpolationExpr()));
+      OpaqueValues.erase(expr->getInterpolationExpr());
+    }
+
     bool shouldVerify(OpenExistentialExpr *expr) {
       if (!shouldVerify(cast<Expr>(expr)))
         return false;
