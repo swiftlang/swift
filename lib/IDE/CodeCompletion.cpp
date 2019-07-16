@@ -2080,9 +2080,8 @@ public:
 
         // Pass in DesugarMemberTypes so that we see the actual
         // concrete type witnesses instead of type alias types.
-        T = T.subst(Subs,
-                    (SubstFlags::DesugarMemberTypes |
-                     SubstFlags::UseErrorType));
+        T = T.subst(Subs, SubstFlags::DesugarMemberTypes |
+                    SubstFlags::UseErrorType | SubstFlags::ForceKeepTypealias);
       }
     }
 
@@ -4191,8 +4190,10 @@ public:
       DeclPrinter Printer(
           OS, getOpaqueResultTypeLoc(VD, Reason, dynamicLookupInfo));
       PrintOptions Options;
-      if (auto transformType = CurrDeclContext->getDeclaredTypeInContext())
+      if (auto transformType = CurrDeclContext->getDeclaredTypeInContext()) {
         Options.setBaseType(transformType);
+        Options.ForceKeepTypealiasTypeInTransformation = true;
+      }
       Options.PrintImplicitAttrs = false;
       Options.ExclusiveAttrList.push_back(TAK_escaping);
       Options.ExclusiveAttrList.push_back(TAK_autoclosure);

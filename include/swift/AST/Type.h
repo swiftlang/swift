@@ -149,6 +149,8 @@ enum class SubstFlags {
   DesugarMemberTypes = 0x04,
   /// Substitute types involving opaque type archetypes.
   SubstituteOpaqueArchetypes = 0x08,
+  /// Force to preserve Typealias type.
+  ForceKeepTypealias = 0x10,
 };
 
 /// Options for performing substitutions into a type.
@@ -275,7 +277,8 @@ public:
   /// handles desugaring.
   ///
   /// \returns the result of transforming the type.
-  Type transformRec(llvm::function_ref<Optional<Type>(TypeBase *)> fn) const;
+  Type transformRec(llvm::function_ref<Optional<Type>(TypeBase *)> fn,
+                    bool forcePreserveTypealias = false) const;
 
   /// Look through the given type and its children and apply fn to them.
   void visit(llvm::function_ref<void (Type)> fn) const {

@@ -3227,11 +3227,15 @@ static Type substType(Type derivedType,
   }
 
   // FIXME: Change getTypeOfMember() to not pass GenericFunctionType here
-  if (!derivedType->hasArchetype()
+  if (!options.contains(SubstFlags::ForceKeepTypealias)
+      && !derivedType->hasArchetype()
       && !derivedType->hasTypeParameter()
       && (!options.contains(SubstFlags::SubstituteOpaqueArchetypes)
           || !derivedType->hasOpaqueArchetype()))
     return derivedType;
+
+
+  bool forceKeepTypealias = options.contains(SubstFlags::ForceKeepTypealias);
 
   return derivedType.transformRec([&](TypeBase *type) -> Optional<Type> {
     // FIXME: Add SIL versions of mapTypeIntoContext() and
@@ -3319,7 +3323,7 @@ static Type substType(Type derivedType,
     return getMemberForBaseType(lookupConformances, parent, substParent,
                                 assocType, nestedArchetype->getName(),
                                 options);
-  });
+  }, forceKeepTypealias);
 }
 
 Type Type::subst(SubstitutionMap substitutions,
@@ -3672,8 +3676,8 @@ Type Type::transform(llvm::function_ref<Type(Type)> fn) const {
   });
 }
 
-Type Type::transformRec(
-                    llvm::function_ref<Optional<Type>(TypeBase *)> fn) const {
+Type Type::transformRec(llvm::function_ref<Optional<Type>(TypeBase *)> fn,
+                        bool forceKeepTypealias) const {
   if (!isa<ParenType>(getPointer())) {
     // Transform this type node.
     if (Optional<Type> transformed = fn(getPointer()))
@@ -3705,7 +3709,7 @@ case TypeKind::Id:
   case TypeKind::Protocol: {
     auto nominalTy = cast<NominalType>(base);
     if (auto parentTy = nominalTy->getParent()) {
-      parentTy = parentTy.transformRec(fn);
+      parentTy = parentTy.transformRec(fn, forceKeepTypealias);
       if (!parentTy)
         return Type();
 
@@ -3721,7 +3725,7 @@ case TypeKind::Id:
       
   case TypeKind::SILBlockStorage: {
     auto storageTy = cast<SILBlockStorageType>(base);
-    Type transCap = storageTy->getCaptureType().transformRec(fn);
+    Type transCap = storageTy->getCaptureType().transformRec(fn, forceKeepTypealias);
     if (!transCap)
       return Type();
     CanType canTransCap = transCap->getCanonicalType();
@@ -3736,7 +3740,7 @@ case TypeKind::Id:
     // generic SILBox.
     auto boxTy = cast<SILBoxType>(base);
     for (Type type : boxTy->getSubstitutions().getReplacementTypes()) {
-      assert(type->isEqual(type.transformRec(fn))
+      assert(type->isEqual(type.transformRec(fn, forceKeepTypealias))
              && "SILBoxType can't be transformed");
     }
 #endif
@@ -3792,7 +3796,7 @@ case TypeKind::Id:
   {
     auto storageTy = cast<ReferenceStorageType>(base);
     Type refTy = storageTy->getReferentType();
-    Type substRefTy = refTy.transformRec(fn);
+    Type substRefTy = refTy.transformRec(fn, forceKeepTypealias);
     if (!substRefTy)
       return Type();
 
@@ -3807,7 +3811,7 @@ case TypeKind::Id:
     auto unbound = cast<UnboundGenericType>(base);
     Type substParentTy;
     if (auto parentTy = unbound->getParent()) {
-      substParentTy = parentTy.transformRec(fn);
+      substParentTy = parentTy.transformRec(fn, forceKeepTypealias);
       if (!substParentTy)
         return Type();
 
@@ -3829,7 +3833,7 @@ case TypeKind::Id:
     bool anyChanged = false;
     Type substParentTy;
     if (auto parentTy = bound->getParent()) {
-      substParentTy = parentTy.transformRec(fn);
+      substParentTy = parentTy.transformRec(fn, forceKeepTypealias);
       if (!substParentTy)
         return Type();
 
@@ -3838,7 +3842,7 @@ case TypeKind::Id:
     }
 
     for (auto arg : bound->getGenericArgs()) {
-      Type substArg = arg.transformRec(fn);
+      Type substArg = arg.transformRec(fn, forceKeepTypealias);
       if (!substArg)
         return Type();
       substArgs.push_back(substArg);
@@ -3860,7 +3864,7 @@ case TypeKind::Id:
     SmallVector<Type, 4> newSubs;
     bool anyChanged = false;
     for (auto replacement : opaque->getSubstitutions().getReplacementTypes()) {
-      Type newReplacement = replacement.transformRec(fn);
+      Type newReplacement = replacement.transformRec(fn, forceKeepTypealias);
       if (!newReplacement)
         return Type();
       newSubs.push_back(newReplacement);
@@ -3891,7 +3895,7 @@ case TypeKind::Id:
     if (!root)
       return *this;
     
-    auto substRoot = Type(root).transformRec(fn);
+    auto substRoot = Type(root).transformRec(fn, forceKeepTypealias);
     if (substRoot.getPointer() == root) {
       return *this;
     }
@@ -3903,7 +3907,7 @@ case TypeKind::Id:
 
   case TypeKind::ExistentialMetatype: {
     auto meta = cast<ExistentialMetatypeType>(base);
-    auto instanceTy = meta->getInstanceType().transformRec(fn);
+    auto instanceTy = meta->getInstanceType().transformRec(fn, forceKeepTypealias);
     if (!instanceTy)
       return Type();
 
@@ -3918,7 +3922,7 @@ case TypeKind::Id:
 
   case TypeKind::Metatype: {
     auto meta = cast<MetatypeType>(base);
-    auto instanceTy = meta->getInstanceType().transformRec(fn);
+    auto instanceTy = meta->getInstanceType().transformRec(fn, forceKeepTypealias);
     if (!instanceTy)
       return Type();
 
@@ -3932,7 +3936,7 @@ case TypeKind::Id:
 
   case TypeKind::DynamicSelf: {
     auto dynamicSelf = cast<DynamicSelfType>(base);
-    auto selfTy = dynamicSelf->getSelfType().transformRec(fn);
+    auto selfTy = dynamicSelf->getSelfType().transformRec(fn, forceKeepTypealias);
     if (!selfTy)
       return Type();
 
@@ -3945,49 +3949,71 @@ case TypeKind::Id:
   case TypeKind::TypeAlias: {
     auto alias = cast<TypeAliasType>(base);
     Type oldUnderlyingType = Type(alias->getSinglyDesugaredType());
-    Type newUnderlyingType = oldUnderlyingType.transformRec(fn);
-    if (!newUnderlyingType) return Type();
+    Type newUnderlyingType = oldUnderlyingType.transformRec(fn,
+                                                            forceKeepTypealias);
+    if (!newUnderlyingType)
+      return Type();
+
+    bool anyChange = !oldUnderlyingType->isEqual(newUnderlyingType);
 
     Type oldParentType = alias->getParent();
     Type newParentType;
-    if (oldParentType && !oldParentType->hasTypeParameter() &&
-        !oldParentType->hasArchetype()) {
-      newParentType = oldParentType.transformRec(fn);
-      if (!newParentType) return newUnderlyingType;
+    if (oldParentType) {
+      if (!forceKeepTypealias &&
+          (oldParentType->hasTypeParameter() || oldParentType->hasArchetype()))
+        return newUnderlyingType;
+
+      newParentType = oldParentType.transformRec(fn, forceKeepTypealias);
+      if (!newParentType)
+        return newUnderlyingType;
+      anyChange |= !oldParentType->isEqual(newParentType);
     }
 
+    llvm::SmallVector<Type, 4> replacementTypes;
     auto subMap = alias->getSubstitutionMap();
     if (auto genericSig = subMap.getGenericSignature()) {
+      replacementTypes.reserve(genericSig->getGenericParams().size());
       for (Type gp : genericSig->getGenericParams()) {
         Type oldReplacementType = gp.subst(subMap);
         if (!oldReplacementType)
           return newUnderlyingType;
 
-        if (oldReplacementType->hasTypeParameter() ||
-            oldReplacementType->hasArchetype())
+        if (!forceKeepTypealias &&
+            (oldReplacementType->hasTypeParameter() ||
+             oldReplacementType->hasArchetype()))
           return newUnderlyingType;
 
-        Type newReplacementType = oldReplacementType.transformRec(fn);
+        Type newReplacementType =
+            oldReplacementType.transformRec(fn, forceKeepTypealias);
         if (!newReplacementType)
           return newUnderlyingType;
 
         // If anything changed with the replacement type, we lose the sugar.
         // FIXME: This is really unfortunate.
-        if (!newReplacementType->isEqual(oldReplacementType))
+        if (!forceKeepTypealias &&
+            !newReplacementType->isEqual(oldReplacementType))
           return newUnderlyingType;
+
+        replacementTypes.push_back(newReplacementType);
+        anyChange |= !oldReplacementType->isEqual(newReplacementType);
       }
     }
 
-    if (oldUnderlyingType.getPointer() == newUnderlyingType.getPointer())
+    if (!forceKeepTypealias &&
+        oldUnderlyingType.getPointer() == newUnderlyingType.getPointer())
+      return *this;
+    if (!anyChange)
       return *this;
 
+    subMap = SubstitutionMap::get(subMap.getGenericSignature(),
+                                  replacementTypes, subMap.getConformances());
     return TypeAliasType::get(alias->getDecl(), newParentType, subMap,
-                                   newUnderlyingType);
+                              newUnderlyingType);
   }
 
   case TypeKind::Paren: {
     auto paren = cast<ParenType>(base);
-    Type underlying = paren->getUnderlyingType().transformRec(fn);
+    Type underlying = paren->getUnderlyingType().transformRec(fn, forceKeepTypealias);
     if (!underlying)
       return Type();
 
@@ -4004,7 +4030,7 @@ case TypeKind::Id:
     SmallVector<TupleTypeElt, 4> elements;
     unsigned Index = 0;
     for (const auto &elt : tuple->getElements()) {
-      Type eltTy = elt.getType().transformRec(fn);
+      Type eltTy = elt.getType().transformRec(fn, forceKeepTypealias);
       if (!eltTy)
         return Type();
 
@@ -4037,7 +4063,7 @@ case TypeKind::Id:
 
   case TypeKind::DependentMember: {
     auto dependent = cast<DependentMemberType>(base);
-    auto dependentBase = dependent->getBase().transformRec(fn);
+    auto dependentBase = dependent->getBase().transformRec(fn, forceKeepTypealias);
     if (!dependentBase)
       return Type();
 
@@ -4063,7 +4089,7 @@ case TypeKind::Id:
       auto label = param.getLabel();
       auto flags = param.getParameterFlags();
 
-      auto substType = type.transformRec(fn);
+      auto substType = type.transformRec(fn, forceKeepTypealias);
       if (!substType)
         return Type();
 
@@ -4084,7 +4110,7 @@ case TypeKind::Id:
     }
 
     // Transform result type.
-    auto resultTy = function->getResult().transformRec(fn);
+    auto resultTy = function->getResult().transformRec(fn, forceKeepTypealias);
     if (!resultTy)
       return Type();
 
@@ -4096,7 +4122,7 @@ case TypeKind::Id:
       // Check that generic parameters won't be trasnformed.
       // Transform generic parameters.
       for (auto param : genericFnType->getGenericParams()) {
-        assert(Type(param).transformRec(fn).getPointer() == param &&
+        assert(Type(param).transformRec(fn, forceKeepTypealias).getPointer() == param &&
                "GenericFunctionType transform() changes type parameter");
       }
 #endif
@@ -4116,7 +4142,7 @@ case TypeKind::Id:
 
   case TypeKind::ArraySlice: {
     auto slice = cast<ArraySliceType>(base);
-    auto baseTy = slice->getBaseType().transformRec(fn);
+    auto baseTy = slice->getBaseType().transformRec(fn, forceKeepTypealias);
     if (!baseTy)
       return Type();
 
@@ -4128,7 +4154,7 @@ case TypeKind::Id:
 
   case TypeKind::Optional: {
     auto optional = cast<OptionalType>(base);
-    auto baseTy = optional->getBaseType().transformRec(fn);
+    auto baseTy = optional->getBaseType().transformRec(fn, forceKeepTypealias);
     if (!baseTy)
       return Type();
 
@@ -4140,11 +4166,11 @@ case TypeKind::Id:
 
   case TypeKind::Dictionary: {
     auto dict = cast<DictionaryType>(base);
-    auto keyTy = dict->getKeyType().transformRec(fn);
+    auto keyTy = dict->getKeyType().transformRec(fn, forceKeepTypealias);
     if (!keyTy)
       return Type();
 
-    auto valueTy = dict->getValueType().transformRec(fn);
+    auto valueTy = dict->getValueType().transformRec(fn, forceKeepTypealias);
     if (!valueTy)
       return Type();
 
@@ -4157,7 +4183,7 @@ case TypeKind::Id:
 
   case TypeKind::LValue: {
     auto lvalue = cast<LValueType>(base);
-    auto objectTy = lvalue->getObjectType().transformRec(fn);
+    auto objectTy = lvalue->getObjectType().transformRec(fn, forceKeepTypealias);
     if (!objectTy || objectTy->hasError())
       return objectTy;
 
@@ -4167,7 +4193,7 @@ case TypeKind::Id:
 
   case TypeKind::InOut: {
     auto inout = cast<InOutType>(base);
-    auto objectTy = inout->getObjectType().transformRec(fn);
+    auto objectTy = inout->getObjectType().transformRec(fn,forceKeepTypealias);
     if (!objectTy || objectTy->hasError())
       return objectTy;
     
@@ -4182,7 +4208,7 @@ case TypeKind::Id:
     bool anyChanged = false;
     unsigned index = 0;
     for (auto member : members) {
-      auto substMember = member.transformRec(fn);
+      auto substMember = member.transformRec(fn, forceKeepTypealias);
       if (!substMember)
         return Type();
       

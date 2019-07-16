@@ -644,6 +644,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
       FreshOptions.ExcludeAttrList = options.ExcludeAttrList;
       FreshOptions.ExclusiveAttrList = options.ExclusiveAttrList;
       FreshOptions.PrintOptionalAsImplicitlyUnwrapped = options.PrintOptionalAsImplicitlyUnwrapped;
+      FreshOptions.TransformContext = options.TransformContext;
       T.print(Printer, FreshOptions);
       return;
     }
@@ -673,8 +674,18 @@ class PrintAST : public ASTVisitor<PrintAST> {
           M, cast<ValueDecl>(Current));
       }
 
-      T = T.subst(subMap,
-                  SubstFlags::DesugarMemberTypes | SubstFlags::UseErrorType);
+      SubstOptions substOptions = SubstFlags::UseErrorType;
+      if (Options.ForceKeepTypealiasTypeInTransformation)
+        substOptions |= SubstFlags::ForceKeepTypealias;
+      else
+        substOptions |= SubstFlags::DesugarMemberTypes;
+
+      T = T.subst(subMap, substOptions);
+
+      if (auto nominal = CurrentType->getNominalOrBoundGenericNominal())
+        options.TransformContext = TypeTransformContext(nominal);
+      else
+        options.TransformContext = TypeTransformContext(CurrentType);
     }
 
     printTypeWithOptions(T, options);
@@ -3450,9 +3461,9 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
   ///
   /// This is necessary whenever the inner type may not normally be represented
   /// as a 'type-simple' production in the type grammar.
-  void printWithParensIfNotSimple(Type T) {
+  void printWithParensIfNotSimple(Type T, PrintOptions options) {
     if (T.isNull()) {
-      visit(T);
+      TypePrinter(Printer, options).visit(T);
       return;
     }
 
@@ -3475,10 +3486,10 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     }
 
     if (isSimple) {
-      visit(T);
+      TypePrinter(Printer, options).visit(T);
     } else {
       Printer << "(";
-      visit(T);
+      TypePrinter(Printer, options).visit(T);
       Printer << ")";
     }
   }
@@ -3651,8 +3662,7 @@ public:
     }
 
     if (auto parent = T->getParent()) {
-      visit(parent);
-      Printer << ".";
+      visitParentType(parent);
     } else if (shouldPrintFullyQualified(T)) {
       printModuleContext(T);
     }
@@ -3705,8 +3715,7 @@ public:
 
   void visitUnboundGenericType(UnboundGenericType *T) {
     if (auto ParentType = T->getParent()) {
-      visit(ParentType);
-      Printer << ".";
+      visitParentType(ParentType);
     } else if (shouldPrintFullyQualified(T)) {
       printModuleContext(T);
     }
@@ -3732,14 +3741,13 @@ public:
         return;
       }
       if (NT == Ctx.getOptionalDecl()) {
-        printWithParensIfNotSimple(T->getGenericArgs()[0]);
+        printWithParensIfNotSimple(T->getGenericArgs()[0], Options);
         Printer << "?";
         return;
       }
     }
     if (auto ParentType = T->getParent()) {
-      visit(ParentType);
-      Printer << ".";
+      visitParentType(ParentType);
     } else if (shouldPrintFullyQualified(T)) {
       printModuleContext(T);
     }
@@ -3749,19 +3757,37 @@ public:
   }
 
   void visitParentType(Type T) {
+    /// Don't print the parent type if it's being printed in that type context.
+    if (Options.TransformContext) {
+      if (auto currentType = Options.TransformContext->getBaseType()) {
+        auto printingType = T;
+        if (currentType->hasArchetype())
+          currentType = currentType->mapTypeOutOfContext();
+
+        if (auto errorTy = printingType->getAs<ErrorType>())
+          if (auto origTy = errorTy->getOriginalType())
+            printingType = origTy;
+
+        if (T->hasArchetype())
+          printingType = printingType->mapTypeOutOfContext();
+        if (currentType->isEqual(printingType))
+          return;
+      }
+    }
+
     PrintOptions innerOptions = Options;
     innerOptions.SynthesizeSugarOnTypes = false;
 
     if (auto sugarType = dyn_cast<SyntaxSugarType>(T.getPointer()))
       T = sugarType->getImplementationType();
 
-    TypePrinter(Printer, innerOptions).visit(T);
+    printWithParensIfNotSimple(T, innerOptions);
+    Printer << ".";
   }
 
   void visitEnumType(EnumType *T) {
     if (auto ParentType = T->getParent()) {
       visitParentType(ParentType);
-      Printer << ".";
     } else if (shouldPrintFullyQualified(T)) {
       printModuleContext(T);
     }
@@ -3772,7 +3798,6 @@ public:
   void visitStructType(StructType *T) {
     if (auto ParentType = T->getParent()) {
       visitParentType(ParentType);
-      Printer << ".";
     } else if (shouldPrintFullyQualified(T)) {
       printModuleContext(T);
     }
@@ -3783,7 +3808,6 @@ public:
   void visitClassType(ClassType *T) {
     if (auto ParentType = T->getParent()) {
       visitParentType(ParentType);
-      Printer << ".";
     } else if (shouldPrintFullyQualified(T)) {
       printModuleContext(T);
     }
@@ -3799,7 +3823,7 @@ public:
       case MetatypeRepresentation::ObjC:  Printer << "@objc_metatype "; break;
       }
     }
-    printWithParensIfNotSimple(T->getInstanceType());
+    printWithParensIfNotSimple(T->getInstanceType(), Options);
 
     // We spell normal metatypes of existential types as .Protocol.
     if (isa<MetatypeType>(T) &&
@@ -4101,7 +4125,7 @@ public:
 
   void visitSILBlockStorageType(SILBlockStorageType *T) {
     Printer << "@block_storage ";
-    printWithParensIfNotSimple(T->getCaptureType());
+    printWithParensIfNotSimple(T->getCaptureType(), Options);
   }
 
   void visitSILBoxType(SILBoxType *T) {
@@ -4168,7 +4192,7 @@ public:
     // top-level optionals, not to any nested within.
     const_cast<PrintOptions &>(Options).PrintOptionalAsImplicitlyUnwrapped =
         false;
-    printWithParensIfNotSimple(T->getBaseType());
+    printWithParensIfNotSimple(T->getBaseType(), Options);
     const_cast<PrintOptions &>(Options).PrintOptionalAsImplicitlyUnwrapped =
         printAsIUO;
 
@@ -4237,8 +4261,7 @@ public:
   }
   
   void visitNestedArchetypeType(NestedArchetypeType *T) {
-    printWithParensIfNotSimple(T->getParent());
-    Printer << ".";
+    visitParentType(T->getParent());
     printArchetypeCommon(T);
   }
   
@@ -4329,7 +4352,6 @@ public:
 
   void visitDependentMemberType(DependentMemberType *T) {
     visitParentType(T->getBase());
-    Printer << ".";
     Printer.printName(T->getName());
   }
 

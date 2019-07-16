@@ -403,6 +403,10 @@ struct PrintOptions {
   /// The information for converting archetypes to specialized types.
   llvm::Optional<TypeTransformContext> TransformContext;
 
+  /// Whether to keep Typealias when printing type transformed by
+  /// \c TrancformContext.
+  bool ForceKeepTypealiasTypeInTransformation = false;
+
   bool PrintAsMember = false;
   
   /// Whether to print parameter specifiers as 'let' and 'var'.
