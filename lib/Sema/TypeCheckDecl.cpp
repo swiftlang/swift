@@ -2873,10 +2873,10 @@ public:
     TC.validateDecl(SD);
     checkGenericParams(SD->getGenericParams(), SD, TC);
 
-    TC.addImplicitConstructors(SD);
-
     // Force lowering of stored properties.
     (void) SD->getStoredProperties();
+
+    TC.addImplicitConstructors(SD);
 
     for (Decl *Member : SD->getMembers())
       visit(Member);
@@ -3008,9 +3008,11 @@ public:
     // Force lowering of stored properties.
     (void) CD->getStoredProperties();
 
-    for (Decl *Member : CD->getMembers()) {
+    TC.addImplicitConstructors(CD);
+    CD->addImplicitDestructor();
+
+    for (Decl *Member : CD->getMembers())
       visit(Member);
-    }
 
     TC.checkPatternBindingCaptures(CD);
 
@@ -3018,9 +3020,6 @@ public:
     // in-class initializers, diagnose this now.
     if (CD->requiresStoredPropertyInits())
       checkRequiredInClassInits(CD);
-
-    TC.addImplicitConstructors(CD);
-    CD->addImplicitDestructor();
 
     // Compute @objc for each superclass member, to catch selector
     // conflicts resulting from unintended overrides.
