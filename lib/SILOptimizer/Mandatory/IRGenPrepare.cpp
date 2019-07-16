@@ -18,6 +18,7 @@
 ///
 /// 1. We remove calls to Builtin.poundAssert() and Builtin.staticReport(),
 ///    which are not needed post SIL.
+/// 2. We transform polymorphic builtins in transparent functions into traps.
 ///
 //===----------------------------------------------------------------------===//
 
@@ -42,28 +43,47 @@ static bool cleanFunction(SILFunction &fn) {
       SILInstruction *inst = &*i;
       ++i;
 
-      // Remove calls to Builtin.poundAssert() and Builtin.staticReport().
       auto *bi = dyn_cast<BuiltinInst>(inst);
       if (!bi) {
         continue;
       }
 
-      switch (bi->getBuiltinInfo().ID) {
-        case BuiltinValueKind::CondFailMessage: {
-          SILBuilderWithScope Builder(bi);
-          Builder.createCondFail(bi->getLoc(), bi->getOperand(0),
-            "unknown program error");
-          LLVM_FALLTHROUGH;
-        }
-        case BuiltinValueKind::PoundAssert:
-        case BuiltinValueKind::StaticReport:
-          // The call to the builtin should get removed before we reach
-          // IRGen.
-          recursivelyDeleteTriviallyDeadInstructions(bi, /* Force */ true);
-          madeChange = true;
-          break;
-        default:
-          break;
+      auto kind = bi->getBuiltinKind();
+      if (!kind) {
+        continue;
+      }
+
+      // Transform polymorphic builtins into int_trap.
+      if (isPolymorphicBuiltin(*kind)) {
+        assert(bi->getFunction()->isTransparent() == IsTransparent &&
+               "Should only see these in transparent functions. If these were "
+               "mandatory inlined into a caller, we should either have emitted "
+               "a call to the static overload or emitted a diagnostic");
+        // Replace all uses with undef since we are going to trap. Any such uses
+        // are now unreachable along a path.
+        bi->replaceAllUsesWithUndef();
+        SILBuilderWithScope(bi).createBuiltinTrap(bi->getLoc());
+        bi->eraseFromParent();
+        madeChange = true;
+        continue;
+      }
+
+      switch (*kind) {
+      case BuiltinValueKind::CondFailMessage: {
+        SILBuilderWithScope Builder(bi);
+        Builder.createCondFail(bi->getLoc(), bi->getOperand(0),
+                               "unknown program error");
+        LLVM_FALLTHROUGH;
+      }
+      case BuiltinValueKind::PoundAssert:
+      case BuiltinValueKind::StaticReport:
+        // The call to the builtin should get removed before we reach
+        // IRGen.
+        recursivelyDeleteTriviallyDeadInstructions(bi, /* Force */ true);
+        madeChange = true;
+        break;
+      default:
+        break;
       }
     }
   }

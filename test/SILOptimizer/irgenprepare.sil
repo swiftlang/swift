@@ -1,0 +1,17 @@
+// RUN: %target-sil-opt -module-name Swift -irgen-prepare %s -enable-sil-verify-all | %FileCheck %s
+
+sil_stage raw
+
+import Builtin
+
+// CHECK-LABEL: sil [transparent] [canonical] @polymorphic_builtin_to_trap : $@convention(thin) <T> (@in T, @in T) -> @out T {
+// CHECK-NOT: builtin "generic_add"
+// CHECK: builtin "int_trap"
+// CHECK-NOT: builtin "generic_add"
+// CHECK: } // end sil function 'polymorphic_builtin_to_trap'
+sil [transparent] [canonical] @polymorphic_builtin_to_trap : $@convention(thin) <T> (@in T, @in T) -> @out T {
+bb0(%0 : $*T, %1 : $*T, %2 : $*T):
+  %3 = builtin "generic_add"<T>(%0 : $*T, %1 : $*T, %2 : $*T): $()
+  %9999 = tuple()
+  return %9999 : $()
+}
