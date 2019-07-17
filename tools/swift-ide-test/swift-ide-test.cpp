@@ -2967,8 +2967,8 @@ static int doPrintRangeInfo(const CompilerInvocation &InitInvok,
                                            StartLineCol.second);
   SourceLoc EndLoc = SM.getLocForLineCol(bufferID, EndLineCol.first,
                                          EndLineCol.second);
-  RangeResolver Resolver(*SF, StartLoc, EndLoc);
-  ResolvedRangeInfo Result = Resolver.resolve();
+  ResolvedRangeInfo Result = evaluateOrDefault(SF->getASTContext().evaluator,
+    RangeInfoRequest(RangeInfoOwner({SF, StartLoc, EndLoc})), ResolvedRangeInfo());
   Result.print(llvm::outs());
   return 0;
 }

@@ -368,32 +368,26 @@ struct ResolvedRangeInfo {
                     TokensInRange, nullptr, /*Commom Expr Parent*/nullptr,
                     /*Single entry*/true, /*unhandled error*/false,
                     OrphanKind::None, {}, {}, {}) {}
-  void print(llvm::raw_ostream &OS);
+  ResolvedRangeInfo(): ResolvedRangeInfo(ArrayRef<Token>()) {}
+  void print(llvm::raw_ostream &OS) const;
   ExitState exit() const { return ExitInfo.Exit; }
   Type getType() const { return ExitInfo.ReturnType; }
+
+  friend bool operator==(const ResolvedRangeInfo &lhs,
+                         const ResolvedRangeInfo &rhs) {
+    if (lhs.TokensInRange.size() != rhs.TokensInRange.size())
+      return false;
+    if (lhs.TokensInRange.empty())
+      return true;
+    return lhs.TokensInRange.front().getLoc() ==
+      rhs.TokensInRange.front().getLoc();
+  }
 
 private:
   static CharSourceRange calculateContentRange(ArrayRef<Token> Tokens);
 };
 
-class RangeResolver : public SourceEntityWalker {
-  struct Implementation;
-  std::unique_ptr<Implementation> Impl;
-  bool walkToExprPre(Expr *E) override;
-  bool walkToExprPost(Expr *E) override;
-  bool walkToStmtPre(Stmt *S) override;
-  bool walkToStmtPost(Stmt *S) override;
-  bool walkToDeclPre(Decl *D, CharSourceRange Range) override;
-  bool walkToDeclPost(Decl *D) override;
-  bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                          TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type T,
-                          ReferenceMetaData Data) override;
-public:
-  RangeResolver(SourceFile &File, SourceLoc Start, SourceLoc End);
-  RangeResolver(SourceFile &File, unsigned Offset, unsigned Length);
-  ~RangeResolver();
-  ResolvedRangeInfo resolve();
-};
+void simple_display(llvm::raw_ostream &out, const ResolvedRangeInfo &info);
 
 /// This provides a utility to view a printed name by parsing the components
 /// of that name. The components include a base name and an array of argument
