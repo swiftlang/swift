@@ -3262,6 +3262,48 @@ void Parser::parseDeclDelayed() {
   });
 }
 
+ParserStatus Parser::parseAccessPath(
+    SmallVectorImpl<ImportDecl::AccessPathElement> &AccessPath,
+    const Diagnostic &D) {
+
+  bool HasNext;
+  do {
+    SyntaxParsingContext AccessCompCtx(SyntaxContext,
+                                       SyntaxKind::AccessPathComponent);
+    if (Tok.is(tok::code_complete)) {
+      consumeToken();
+      if (CodeCompletion) {
+        CodeCompletion->completeImportDecl(AccessPath);
+      }
+      return makeParserCodeCompletionStatus();
+    }
+    AccessPath.push_back(std::make_pair(Identifier(), Tok.getLoc()));
+    SourceLoc L;
+    if (parseAnyIdentifier(AccessPath.back().first, L, D))
+      return makeParserError();
+    HasNext = consumeIf(tok::period);
+  } while (HasNext);
+
+  // Collect all access path components to an access path.
+  SyntaxContext->collectNodesInPlace(SyntaxKind::AccessPath);
+
+  if (Tok.is(tok::code_complete)) {
+    // We omit the code completion token if it immediately follows the module
+    // identifiers.
+    auto BufferId = SourceMgr.getCodeCompletionBufferID();
+    auto IdEndOffset =
+        SourceMgr.getLocOffsetInBuffer(AccessPath.back().second, BufferId) +
+        AccessPath.back().first.str().size();
+    auto CCTokenOffset = SourceMgr.getLocOffsetInBuffer(
+        SourceMgr.getCodeCompletionLoc(), BufferId);
+    if (IdEndOffset == CCTokenOffset) {
+      consumeToken();
+    }
+  }
+
+  return makeParserSuccess();
+}
+
 /// Parse an 'import' declaration, doing no token skipping on error.
 ///
 /// \verbatim
@@ -3323,39 +3365,11 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
     KindLoc = consumeToken();
   }
 
-  std::vector<std::pair<Identifier, SourceLoc>> ImportPath;
-  bool HasNext;
-  do {
-    SyntaxParsingContext AccessCompCtx(SyntaxContext,
-                                       SyntaxKind::AccessPathComponent);
-    if (Tok.is(tok::code_complete)) {
-      consumeToken();
-      if (CodeCompletion) {
-        CodeCompletion->completeImportDecl(ImportPath);
-      }
-      return makeParserCodeCompletionStatus();
-    }
-    ImportPath.push_back(std::make_pair(Identifier(), Tok.getLoc()));
-    if (parseAnyIdentifier(ImportPath.back().first,
-                           diag::expected_identifier_in_decl, "import"))
-      return nullptr;
-    HasNext = consumeIf(tok::period);
-  } while (HasNext);
-
-  // Collect all access path components to an access path.
-  SyntaxContext->collectNodesInPlace(SyntaxKind::AccessPath);
-
-  if (Tok.is(tok::code_complete)) {
-    // We omit the code completion token if it immediately follows the module
-    // identifiers.
-    auto BufferId = SourceMgr.getCodeCompletionBufferID();
-    auto IdEndOffset = SourceMgr.getLocOffsetInBuffer(ImportPath.back().second,
-      BufferId) + ImportPath.back().first.str().size();
-    auto CCTokenOffset = SourceMgr.getLocOffsetInBuffer(SourceMgr.
-      getCodeCompletionLoc(), BufferId);
-    if (IdEndOffset == CCTokenOffset) {
-      consumeToken();
-    }
+  SmallVector<ImportDecl::AccessPathElement, 1> ImportPath;
+  ParserStatus ImportPathStatus =
+      parseAccessPath(ImportPath, diag::expected_identifier_in_decl, "import");
+  if (ImportPathStatus.isError()) {
+    return ImportPathStatus;
   }
 
   if (Kind != ImportKind::Module && ImportPath.size() == 1) {

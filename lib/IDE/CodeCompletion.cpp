@@ -1351,7 +1351,8 @@ public:
   void completeAccessorBeginning(CodeCompletionExpr *E) override;
 
   void completePoundAvailablePlatform() override;
-  void completeImportDecl(std::vector<std::pair<Identifier, SourceLoc>> &Path) override;
+  void completeImportDecl(
+      SmallVectorImpl<std::pair<Identifier, SourceLoc>> &Path) override;
   void completeUnresolvedMember(CodeCompletionExpr *E,
                                 SourceLoc DotLoc) override;
   void completeAssignmentRHS(AssignExpr *E) override;
@@ -4647,7 +4648,7 @@ void CodeCompletionCallbacksImpl::completeCaseStmtBeginning(CodeCompletionExpr *
 }
 
 void CodeCompletionCallbacksImpl::completeImportDecl(
-    std::vector<std::pair<Identifier, SourceLoc>> &Path) {
+    SmallVectorImpl<std::pair<Identifier, SourceLoc>> &Path) {
   Kind = CompletionKind::Import;
   CurDeclContext = P.CurDeclContext;
   DotLoc = Path.empty() ? SourceLoc() : Path.back().second;

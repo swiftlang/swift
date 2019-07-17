@@ -966,8 +966,18 @@ public:
                                      TypeAttributes &Attributes);
   bool parseTypeAttribute(TypeAttributes &Attributes,
                           bool justChecking = false);
-  
-  
+
+  ParserStatus
+  parseAccessPath(SmallVectorImpl<ImportDecl::AccessPathElement> &AccessPath,
+                  const Diagnostic &D);
+
+  template <typename ...DiagArgTypes, typename ...ArgTypes>
+  ParserStatus
+  parseAccessPath(SmallVectorImpl<ImportDecl::AccessPathElement> &AccessPath,
+                  Diag<DiagArgTypes...> ID, ArgTypes... Args) {
+    return parseAccessPath(AccessPath, Diagnostic(ID, Args...));
+  }
+
   ParserResult<ImportDecl> parseDeclImport(ParseDeclOptions Flags,
                                            DeclAttributes &Attributes);
   ParserStatus parseInheritance(SmallVectorImpl<TypeLoc> &Inherited,

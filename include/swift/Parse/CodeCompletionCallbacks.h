@@ -194,7 +194,7 @@ public:
 
   /// Complete the import decl with importable modules.
   virtual void
-  completeImportDecl(std::vector<std::pair<Identifier, SourceLoc>> &Path) {};
+  completeImportDecl(SmallVectorImpl<std::pair<Identifier, SourceLoc>> &Path){};
 
   /// Complete unresolved members after dot.
   virtual void completeUnresolvedMember(CodeCompletionExpr *E,
