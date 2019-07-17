@@ -615,8 +615,12 @@ bool DisjunctionStep::shortCircuitDisjunctionAt(
   auto &ctx = CS.getASTContext();
 
   // If the successfully applied constraint is favored, we'll consider that to
-  // be the "best".
-  if (lastSuccessfulChoice->isFavored() && !currentChoice->isFavored()) {
+  // be the "best".  If it was only temporarily favored because it matched other
+  // operator bindings, we can even short-circuit other favored constraints.
+  if (lastSuccessfulChoice->isFavored() &&
+      (!currentChoice->isFavored() ||
+       (CS.solverState->isTemporarilyFavored(lastSuccessfulChoice) &&
+        !CS.solverState->isTemporarilyFavored(currentChoice)))) {
 #if !defined(NDEBUG)
     if (lastSuccessfulChoice->getKind() == ConstraintKind::BindOverload) {
       auto overloadChoice = lastSuccessfulChoice->getOverloadChoice();

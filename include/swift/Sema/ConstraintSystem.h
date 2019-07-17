@@ -2467,6 +2467,16 @@ private:
       favoredConstraints.push_back(constraint);
     }
 
+    /// Whether or not the given constraint is only favored during this scope.
+    bool isTemporarilyFavored(Constraint *constraint) {
+      assert(constraint->isFavored());
+
+      for (auto test : favoredConstraints)
+        if (test == constraint)
+          return true;
+      return false;
+    }
+
   private:
     /// The list of constraints that have been retired along the
     /// current path, this list is used in LIFO fashion when constraints
