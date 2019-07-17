@@ -488,18 +488,27 @@ static void printDifferentiableAttrArguments(
   if (!omitWrtClause) {
     auto diffParamsString = getDifferentiationParametersClauseString(
         original, attr->getParameterIndices(), attr->getParsedParameters());
-    printCommaIfNecessary();
-    stream << diffParamsString;
+    // Check whether differentiation parameter clause is empty.
+    // Handles edge case where resolved parameter indices are unset and
+    // parsed parameters are empty. This case should never trigger for
+    // user-visible printing.
+    if (!diffParamsString.empty()) {
+      printCommaIfNecessary();
+      stream << diffParamsString;
+    }
   }
-  // Print jvp function name.
-  if (auto jvp = attr->getJVP()) {
-    printCommaIfNecessary();
-    stream << "jvp: " << jvp->Name;
-  }
-  // Print vjp function name.
-  if (auto vjp = attr->getVJP()) {
-    printCommaIfNecessary();
-    stream << "vjp: " << vjp->Name;
+  // Print associated function names, unless they are to be omitted.
+  if (!omitAssociatedFunctions) {
+    // Print jvp function name, if specified.
+    if (auto jvp = attr->getJVP()) {
+      printCommaIfNecessary();
+      stream << "jvp: " << jvp->Name;
+    }
+    // Print vjp function name, if specified.
+    if (auto vjp = attr->getVJP()) {
+      printCommaIfNecessary();
+      stream << "vjp: " << vjp->Name;
+    }
   }
   // Print 'where' clause, if any.
   // First, filter out requirements satisfied by the original function's

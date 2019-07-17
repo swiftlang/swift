@@ -97,10 +97,12 @@ void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
       auto *AFD = constant.getAbstractFunctionDecl();
       auto selfParamIndex =
           F->getLoweredFunctionType()->getNumParameters() - 1;
-      if (AFD && AFD->isInstanceMember() &&
+      auto isSelfReorderedMethod =
+          AFD && AFD->isInstanceMember() &&
           F->getLoweredFunctionType()->hasSelfParam() &&
           indices.isWrtParameter(selfParamIndex) &&
-          indices.parameters->getNumIndices() > 1) {
+          indices.parameters->getNumIndices() > 1;
+      if (isSelfReorderedMethod) {
         auto &ctx = F->getASTContext();
         if (A->getJVPFunction())
           jvpName = ctx.getIdentifier(

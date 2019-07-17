@@ -2790,16 +2790,17 @@ ERROR(differentiable_attr_protocol_req_where_clause,none,
 ERROR(differentiable_attr_protocol_req_assoc_func,none,
       "'@differentiable' attribute on protocol requirement cannot specify "
       "'jvp:' or 'vjp:'", ())
+ERROR(differentiable_attr_stored_property_variable_unsupported,none,
+      "'@differentiable' attribute on stored property cannot specify "
+      "'jvp:' or 'vjp:'", ())
 ERROR(differentiable_attr_empty_where_clause,none,
       "empty 'where' clause in '@differentiable' attribute", ())
 ERROR(differentiable_attr_nongeneric_trailing_where,none,
       "trailing 'where' clause in '@differentiable' attribute of non-generic function %0", (DeclName))
 ERROR(differentiable_attr_unsupported_req_kind,none,
-      "layout requirement are not supported by '@differentiable' attribute", ())
+      "'@differentiable' attribute does not support layout requirements", ())
 ERROR(differentiable_attr_class_unsupported,none,
       "class members cannot be marked with '@differentiable'", ())
-ERROR(differentiable_attr_stored_property_variable_unsupported,none,
-      "'jvp:' or 'vjp:' cannot be specified for stored properties", ())
 ERROR(overriding_decl_missing_differentiable_attr,none,
       "overriding declaration is missing attribute '%0'", (StringRef))
 NOTE(protocol_witness_missing_differentiable_attr,none,
