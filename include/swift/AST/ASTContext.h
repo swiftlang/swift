@@ -17,9 +17,9 @@
 #ifndef SWIFT_AST_ASTCONTEXT_H
 #define SWIFT_AST_ASTCONTEXT_H
 
-#include "llvm/Support/DataTypes.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Evaluator.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/SearchPathOptions.h"
 #include "swift/AST/Type.h"
@@ -28,13 +28,14 @@
 #include "swift/Basic/Malloc.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/Allocator.h"
+#include "llvm/Support/DataTypes.h"
 #include <functional>
 #include <memory>
 #include <utility>
@@ -870,25 +871,19 @@ public:
   void getVisibleTopLevelModuleNames(SmallVectorImpl<Identifier> &names) const;
 
   struct OverrideSignatureKey {
-    StringRef baseMethodSigString;
-    StringRef derivedClassSigString;
+    GenericSignature *baseMethodSig;
+    GenericSignature *derivedClassSig;
     Type superclassTy;
 
-    OverrideSignatureKey(StringRef baseMethodSig, StringRef derivedClassSig,
-                         Type derivedClassSuperclassType)
-        : baseMethodSigString(baseMethodSig),
-          derivedClassSigString(derivedClassSig),
-          superclassTy(derivedClassSuperclassType) {}
-
-    bool isEqual(const OverrideSignatureKey other) {
-      return baseMethodSigString == other.baseMethodSigString &&
-             derivedClassSigString == other.derivedClassSigString &&
-             superclassTy.getString() == other.superclassTy.getString();
+    OverrideSignatureKey(GenericSignature *baseMethodSignature,
+                         GenericSignature *derivedClassSignature,
+                         Type superclassType)
+        : baseMethodSig(baseMethodSignature),
+          derivedClassSig(derivedClassSignature), superclassTy(superclassType) {
     }
   };
 
-  std::vector<std::pair<OverrideSignatureKey, GenericSignature *>>
-      overrideSigCache;
+  llvm::DenseMap<OverrideSignatureKey, GenericSignature *> overrideSigCache;
 
 private:
   /// Register the given generic signature builder to be used as the canonical
@@ -918,6 +913,9 @@ public:
   /// to the given existential type.
   CanGenericSignature getExistentialSignature(CanType existential,
                                               ModuleDecl *mod);
+
+  GenericSignature *getOverrideGenericSignature(ValueDecl *base,
+                                                ValueDecl *derived);
 
   /// Whether our effective Swift version is at least 'major'.
   ///
@@ -955,5 +953,40 @@ private:
 };
 
 } // end namespace swift
+
+namespace llvm {
+template <> struct DenseMapInfo<swift::ASTContext::OverrideSignatureKey> {
+  using OverrideSignatureKey = swift::ASTContext::OverrideSignatureKey;
+  using Type = swift::Type;
+  using GenericSignature = swift::GenericSignature;
+
+  static bool isEqual(const OverrideSignatureKey lhs,
+                      const OverrideSignatureKey rhs) {
+    return lhs.baseMethodSig == rhs.baseMethodSig &&
+           lhs.derivedClassSig == rhs.derivedClassSig &&
+           lhs.superclassTy.getString() == rhs.superclassTy.getString();
+  }
+
+  static inline OverrideSignatureKey getEmptyKey() {
+    return OverrideSignatureKey(DenseMapInfo<GenericSignature *>::getEmptyKey(),
+                                DenseMapInfo<GenericSignature *>::getEmptyKey(),
+                                DenseMapInfo<Type>::getEmptyKey());
+  }
+
+  static inline OverrideSignatureKey getTombstoneKey() {
+    return OverrideSignatureKey(
+        DenseMapInfo<GenericSignature *>::getTombstoneKey(),
+        DenseMapInfo<GenericSignature *>::getTombstoneKey(),
+        DenseMapInfo<Type>::getTombstoneKey());
+  }
+
+  static unsigned getHashValue(const OverrideSignatureKey &Val) {
+    return hash_combine(
+        DenseMapInfo<GenericSignature *>::getHashValue(Val.baseMethodSig),
+        DenseMapInfo<GenericSignature *>::getHashValue(Val.derivedClassSig),
+        DenseMapInfo<Type>::getHashValue(Val.superclassTy));
+  }
+};
+} // namespace llvm
 
 #endif
