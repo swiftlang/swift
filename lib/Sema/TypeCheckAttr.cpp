@@ -3298,7 +3298,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   //   clause requirements.
   GenericSignature *whereClauseGenSig = nullptr;
   GenericEnvironment *whereClauseGenEnv = nullptr;
-  if (auto whereClause = attr->getWhereClause()) {
+  if (auto *whereClause = attr->getWhereClause()) {
     // `@differentiable` attributes on protocol requirements do not support
     // 'where' clauses.
     if (isOriginalProtocolRequirement) {
@@ -3335,6 +3335,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     using FloatingRequirementSource =
         GenericSignatureBuilder::FloatingRequirementSource;
 
+    bool errorOccurred = false;
     RequirementRequest::visitRequirements(
       WhereClauseOwner(original, attr), TypeResolutionStage::Structural,
       [&](const Requirement &req, RequirementRepr *reqRepr) {
@@ -3347,8 +3348,9 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
         // Layout requirements are not supported.
         case RequirementKind::Layout:
           TC.diagnose(attr->getLocation(),
-                      diag::differentiable_attr_unsupported_req_kind)
+                      diag::differentiable_attr_layout_req_unsupported)
             .highlight(reqRepr->getSourceRange());
+          errorOccurred = true;
           return false;
         }
 
@@ -3358,6 +3360,11 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
                                nullptr, original->getModuleContext());
         return false;
       });
+
+    if (errorOccurred) {
+      attr->setInvalid();
+      return;
+    }
 
     // Compute generic signature and environment for autodiff associated
     // functions.
