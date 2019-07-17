@@ -1234,7 +1234,8 @@ ${assignmentOperatorComment(x.operator, True)}
       Builtin.${u}${x.llvmName}_with_overflow_Int${bits}(
         lhs._value, rhs._value, true._value)
 %   end
-    Builtin.condfail(overflow, StaticString("arithmetic overflow").unsafeRawPointer)
+    Builtin.condfail_message(overflow,
+      StaticString("arithmetic overflow").unsafeRawPointer)
     lhs = ${Self}(result)
   }
 %       end

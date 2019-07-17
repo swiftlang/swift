@@ -396,8 +396,8 @@ func performInstantaneousReadAccess<T1>(address: Builtin.RawPointer, scratch: Bu
 
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins8condfail{{[_0-9a-zA-Z]*}}F
 func condfail(_ i: Builtin.Int1) {
-  Builtin.condfail(i, StaticString("message").unsafeRawPointer)
-  // CHECK: builtin "condfail"({{%.*}} : $Builtin.Int1, {{%.*}} : $Builtin.RawPointer) : $()
+  Builtin.condfail_message(i, StaticString("message").unsafeRawPointer)
+  // CHECK: builtin "condfail_message"({{%.*}} : $Builtin.Int1, {{%.*}} : $Builtin.RawPointer) : $()
 }
 
 struct S {}

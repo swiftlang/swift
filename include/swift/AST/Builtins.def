@@ -400,9 +400,9 @@ BUILTIN_RUNTIME_CALL(IsOptionalType, "isOptional", "")
           BUILTIN(Id, Name, Attrs)
 #endif
 
-/// condfail(Int1, RawPointer) -> ()
+/// condfail_message(Int1, RawPointer) -> ()
 /// Triggers a runtime failure if the condition is true.
-BUILTIN_MISC_OPERATION(CondFail, "condfail", "", Special)
+BUILTIN_MISC_OPERATION(CondFailMessage, "condfail_message", "", Special)
 
 /// Sizeof has type T.Type -> Int
 BUILTIN_MISC_OPERATION(Sizeof, "sizeof", "n", Special)

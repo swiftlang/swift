@@ -1893,7 +1893,7 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     if (!Types.empty()) return nullptr;
     return getAddressOfBorrowOperation(Context, Id);
 
-  case BuiltinValueKind::CondFail:
+  case BuiltinValueKind::CondFailMessage:
     return getCondFailOperation(Context, Id);
 
   case BuiltinValueKind::AssertConf:
