@@ -237,6 +237,8 @@ public:
   unsigned size() { return parameters.size(); }
 };
 
+/// An efficient index subset data structure.
+/// Stores a bit vector representing set indices and a total capacity.
 class AutoDiffIndexSubset : public llvm::FoldingSetNode {
 public:
   typedef uint64_t BitWord;
@@ -271,6 +273,10 @@ private:
     return reinterpret_cast<const BitWord *>(this + 1);
   }
 
+  unsigned getNumBitWords() const {
+    return numBitWords;
+  }
+
   ArrayRef<BitWord> getBitWords() const {
     return {getBitWordsData(), getNumBitWords()};
   }
@@ -303,7 +309,7 @@ public:
   AutoDiffIndexSubset(const AutoDiffIndexSubset &) = delete;
   AutoDiffIndexSubset &operator=(const AutoDiffIndexSubset &) = delete;
 
-  // Defined in ASTContext.h.
+  // Defined in ASTContext.cpp.
   static AutoDiffIndexSubset *get(ASTContext &ctx,
                                   const SmallBitVector &indices);
 
@@ -327,10 +333,6 @@ public:
     SmallBitVector bitVec(capacity);
     bitVec.set(start, end);
     return get(ctx, bitVec);
-  }
-
-  unsigned getNumBitWords() const {
-    return numBitWords;
   }
 
   unsigned getCapacity() const {

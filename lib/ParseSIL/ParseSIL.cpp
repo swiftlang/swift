@@ -1036,7 +1036,7 @@ static bool parseDifferentiableAttr(
     SmallVector<RequirementRepr, 4> requirementReprs;
     bool firstTypeInComplete;
     P.parseGenericWhereClause(whereLoc, requirementReprs, firstTypeInComplete,
-                              /*AllowLayoutConstraints=*/false);
+                              /*AllowLayoutConstraints*/ false);
     WhereClause = TrailingWhereClause::create(SP.SILMod.getASTContext(),
                                               whereLoc, requirementReprs);
   }
@@ -5690,8 +5690,19 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
     FunctionState.F->setInlineStrategy(inlineStrategy);
     FunctionState.F->setOptimizationMode(optimizationMode);
     // SWIFT_ENABLE_TENSORFLOW
-    for (auto &Attr : DiffAttrs)
+    for (auto &Attr : DiffAttrs) {
+      // `[differentiable]` attribute parameter index subsets should have
+      // capacity equal to number of function parameters. However, when parsing
+      // attributes, function parameter count is unknown. Update attributes
+      // here if necessary.
+      auto &indices = Attr->getIndices();
+      if (indices.parameters->getCapacity() != SILFnType->getNumParameters()) {
+        auto *newParamIndices = Attr->getIndices().parameters
+            ->extendingCapacity(P.Context, SILFnType->getNumParameters());
+        Attr->setIndices({Attr->getIndices().source, newParamIndices});
+      }
       FunctionState.F->addDifferentiableAttr(Attr);
+    }
     FunctionState.F->setEffectsKind(MRK);
     if (ClangDecl)
       FunctionState.F->setClangNodeOwner(ClangDecl);
@@ -5723,19 +5734,7 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
 
       // SWIFT_ENABLE_TENSORFLOW
       for (auto &attr : DiffAttrs) {
-        // Resolve parameter indices to have the right capacity, if it's
-        // different from the number of parameters. We have to do this because
-        // the parser does not know the function type before creating a
-        // `SILDifferentiableAttr`, so it had to find the max of all provided
-        // indices.
-        if (attr->getIndices().parameters->getCapacity() !=
-                SILFnType->getNumParameters()) {
-          auto *newParamIndices = attr->getIndices().parameters
-              ->extendingCapacity(P.Context, SILFnType->getNumParameters());
-          attr->setIndices({attr->getIndices().source, newParamIndices});
-        }
-
-        // Resolve where clause requirements.
+        // Resolve `[differentiable]` attribute where clause requirements.
         // If no where clause, continue.
         if (!attr->getWhereClause())
           continue;

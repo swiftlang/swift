@@ -175,7 +175,7 @@ public:
   SILFunction *getOriginal() const { return Original; }
 
   const SILAutoDiffIndices &getIndices() const { return indices; }
-  void setIndices(const SILAutoDiffIndices &indices) {
+  void setIndices(SILAutoDiffIndices indices) {
     this->indices = indices;
   }
 
