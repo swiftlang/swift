@@ -2086,7 +2086,8 @@ static Constraint *tryOptimizeGenericDisjunction(
   llvm_unreachable("covered switch");
 }
 
-// Performance hack: favor operator overloads with types we're already binding elsewhere in this expression.
+// Performance hack: favor operator overloads with decl or type we're already
+// binding elsewhere in this expression.
 static void existingOperatorBindingsForDisjunction(ConstraintSystem &CS, ArrayRef<Constraint *> constraints, SmallVectorImpl<Constraint *> &found) {
   auto *choice = constraints.front();
   if (choice->getKind() != ConstraintKind::BindOverload)
@@ -2098,6 +2099,9 @@ static void existingOperatorBindingsForDisjunction(ConstraintSystem &CS, ArrayRe
   auto decl = overload.getDecl();
   if (!decl->isOperator())
     return;
+  auto baseName = decl->getBaseName();
+
+  SmallSet<TypeBase *, 8> typesFound;
 
   for (auto *resolved = CS.getResolvedOverloadSets(); resolved;
        resolved = resolved->Previous) {
@@ -2108,12 +2112,33 @@ static void existingOperatorBindingsForDisjunction(ConstraintSystem &CS, ArrayRe
     if (!representativeDecl->isOperator())
       continue;
 
-    for (auto *constraint : constraints) {
-      if (constraint->isFavored())
+    if (representativeDecl->getBaseName() == baseName) {
+      // Favor exactly the same decl, if we have a binding to the same name.
+      for (auto *constraint : constraints) {
+        if (constraint->isFavored())
+          continue;
+        auto choice = constraint->getOverloadChoice();
+        if (choice.getDecl() == representativeDecl) {
+          found.push_back(constraint);
+          break;
+        }
+      }
+    } else {
+      // Favor the same type, if we have a binding to an operator of that type.
+      auto representativeType = representativeDecl->getInterfaceType();
+      if (typesFound.count(representativeType.getPointer()))
         continue;
-      auto choice = constraint->getOverloadChoice();
-      if (choice.getDecl()->getInterfaceType()->isEqual(representativeDecl->getInterfaceType()))
-        found.push_back(constraint);
+      typesFound.insert(representativeType.getPointer());
+
+      for (auto *constraint : constraints) {
+        if (constraint->isFavored())
+          continue;
+        auto choice = constraint->getOverloadChoice();
+        if (choice.getDecl()->getInterfaceType()->isEqual(representativeType)) {
+          found.push_back(constraint);
+          break;
+        }
+      }
     }
   }
 }
