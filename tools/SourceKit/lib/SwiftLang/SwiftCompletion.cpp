@@ -198,7 +198,11 @@ static bool swiftCodeCompleteImpl(
   // FIXME: We need to be passing the buffers from the open documents.
   // It is not a huge problem in practice because Xcode auto-saves constantly.
 
-  CI.getSourceMgr().setFileSystem(FileSystem);
+  if (FileSystem != llvm::vfs::getRealFileSystem()) {
+    CI.getSourceMgr().setFileSystem(FileSystem);
+    Invocation.getClangImporterOptions().ForceUseSwiftVirtualFileSystem = true;
+  }
+
   if (CI.setup(Invocation)) {
     // FIXME: error?
     return true;

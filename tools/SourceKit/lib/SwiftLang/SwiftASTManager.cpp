@@ -949,7 +949,11 @@ ASTUnitRef ASTProducer::createASTUnit(
 
   Invocation.getLangOptions().CollectParsedToken = true;
 
-  CompIns.getSourceMgr().setFileSystem(fileSystem);
+  if (fileSystem != llvm::vfs::getRealFileSystem()) {
+    CompIns.getSourceMgr().setFileSystem(fileSystem);
+    Invocation.getClangImporterOptions().ForceUseSwiftVirtualFileSystem = true;
+  }
+
   if (CompIns.setup(Invocation)) {
     // FIXME: Report the diagnostic.
     LOG_WARN_FUNC("Compilation setup failed!!!");
