@@ -1034,6 +1034,13 @@ static ValueDecl *getCanBeObjCClassOperation(ASTContext &Context,
   return builder.build(Id);
 }
 
+static ValueDecl *getLegacyCondFailOperation(ASTContext &C, Identifier Id) {
+  // Int1 -> ()
+  auto CondTy = BuiltinIntegerType::get(1, C);
+  auto VoidTy = TupleType::getEmpty(C);
+  return getBuiltinFunction(Id, {CondTy}, VoidTy);
+}
+
 static ValueDecl *getCondFailOperation(ASTContext &C, Identifier Id) {
   // Int1 -> ()
   auto CondTy = BuiltinIntegerType::get(1, C);
@@ -1888,6 +1895,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::AddressOf:
     if (!Types.empty()) return nullptr;
     return getAddressOfOperation(Context, Id);
+
+  case BuiltinValueKind::LegacyCondFail:
+    return getLegacyCondFailOperation(Context, Id);
 
   case BuiltinValueKind::AddressOfBorrow:
     if (!Types.empty()) return nullptr;

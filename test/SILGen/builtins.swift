@@ -394,6 +394,12 @@ func performInstantaneousReadAccess<T1>(address: Builtin.RawPointer, scratch: Bu
   Builtin.performInstantaneousReadAccess(address, ty1);
 }
 
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins15legacy_condfail{{[_0-9a-zA-Z]*}}F
+func legacy_condfail(_ i: Builtin.Int1) {
+  Builtin.condfail(i)
+  // CHECK: cond_fail {{%.*}} : $Builtin.Int1, "unknown runtime failure"
+}
+
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins8condfail{{[_0-9a-zA-Z]*}}F
 func condfail(_ i: Builtin.Int1) {
   Builtin.condfail_message(i, StaticString("message").unsafeRawPointer)

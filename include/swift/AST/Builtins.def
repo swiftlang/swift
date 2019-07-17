@@ -314,6 +314,11 @@ BUILTIN_SIL_OPERATION(BeginUnpairedModifyAccess, "beginUnpairedModifyAccess",
 /// be a pointer to an UnsafeValueBuffer that records an in progress access.
 BUILTIN_SIL_OPERATION(EndUnpairedAccess, "endUnpairedAccess", Special)
 
+/// condfail(Int1) -> ()
+/// Triggers a runtime failure if the condition is true.
+/// This builtin is deprecated. Use condfail_message instead.
+BUILTIN_SIL_OPERATION(LegacyCondFail, "condfail", Special)
+
 /// fixLifetime(T) -> ()
 /// Fixes the lifetime of any heap references in a value.
 BUILTIN_SIL_OPERATION(FixLifetime, "fixLifetime", Special)
