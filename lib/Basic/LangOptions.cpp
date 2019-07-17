@@ -65,8 +65,9 @@ static const StringRef SupportedConditionalCompilationTargetEnvironments[] = {
   "simulator",
 };
 
-static const PlatformConditionKind AllPlatformConditionKinds[] = {
+static const PlatformConditionKind AllPublicPlatformConditionKinds[] = {
 #define PLATFORM_CONDITION(LABEL, IDENTIFIER) PlatformConditionKind::LABEL,
+#define PLATFORM_CONDITION_(LABEL, IDENTIFIER)
 #include "swift/AST/PlatformConditionKinds.def"
 };
 
@@ -95,7 +96,7 @@ std::pair<const StringRef*, size_t> getSupportedConditionalCompilationValues(con
 PlatformConditionKind suggestedPlatformConditionKind(PlatformConditionKind Kind, const StringRef &V,
                                                      std::vector<StringRef> &suggestedValues) {
   std::string lower = V.lower();
-  for (const PlatformConditionKind& candidateKind : AllPlatformConditionKinds) {
+  for (const PlatformConditionKind& candidateKind : AllPublicPlatformConditionKinds) {
     if (candidateKind != Kind) {
       auto supportedValues = getSupportedConditionalCompilationValues(candidateKind);
       auto supportedValuesArray = supportedValues.first;
