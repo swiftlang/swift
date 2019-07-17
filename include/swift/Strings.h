@@ -54,7 +54,8 @@ struct BuiltinNameStringLiteral {
   const StringLiteral literal;
 
   constexpr operator StringRef() const { return literal; }
-  constexpr const StringRef getWithoutPrefix() const {
+
+  StringRef getWithoutPrefix() const {
     return literal.drop_front(BUILTIN_TYPE_NAME_PREFIX.size());
   }
 };
