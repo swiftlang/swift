@@ -2662,7 +2662,7 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   // like 'class A : B<Int>'.
   for (auto *decl : *bodyParams) {
     auto paramTy = decl->getInterfaceType();
-    auto substTy = paramTy.subst(subMap);
+    auto substTy = paramTy.subst(subMap, SubstFlags::UseErrorType);
     decl->setInterfaceType(substTy);
     decl->getTypeLoc() = TypeLoc::withoutLoc(substTy);
   }
