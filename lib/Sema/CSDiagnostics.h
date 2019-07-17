@@ -185,6 +185,13 @@ protected:
   Optional<FunctionArgApplyInfo>
   getFunctionArgApplyInfo(ConstraintLocator *locator) const;
 
+  /// \returns A new type with all of the type variables associated with
+  /// generic parameters substituted back into being generic parameter type.
+  Type restoreGenericParameters(
+      Type type,
+      llvm::function_ref<void(GenericTypeParamType *, Type)> substitution =
+          [](GenericTypeParamType *, Type) {});
+
 private:
   /// Compute anchor expression associated with current diagnostic.
   std::pair<Expr *, bool> computeAnchor() const;
@@ -1455,6 +1462,25 @@ public:
 
   bool diagnoseAsError() override;
   bool diagnoseAsNote() override;
+};
+
+/// Diagnose situation when a single "tuple" parameter is given N arguments e.g.
+///
+/// ```swift
+/// func foo<T>(_ x: (T, Bool)) {}
+/// foo(1, false) // foo exptects a single argument of tuple type `(1, false)`
+/// ```
+class InvalidTupleSplatWithSingleParameterFailure final
+    : public FailureDiagnostic {
+  Type ParamType;
+
+public:
+  InvalidTupleSplatWithSingleParameterFailure(Expr *root, ConstraintSystem &cs,
+                                              Type paramTy,
+                                              ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator), ParamType(paramTy) {}
+
+  bool diagnoseAsError() override;
 };
 
 /// Provides information about the application of a function argument to a

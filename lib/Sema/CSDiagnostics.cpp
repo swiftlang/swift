@@ -277,6 +277,24 @@ FailureDiagnostic::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
                               fnInterfaceType, fnType, callee);
 }
 
+Type FailureDiagnostic::restoreGenericParameters(
+    Type type,
+    llvm::function_ref<void(GenericTypeParamType *, Type)> substitution) {
+  llvm::SmallPtrSet<GenericTypeParamType *, 4> processed;
+  return type.transform([&](Type type) -> Type {
+    if (auto *typeVar = type->getAs<TypeVariableType>()) {
+      type = resolveType(typeVar);
+      if (auto *GP = typeVar->getImpl().getGenericParameter()) {
+        if (processed.insert(GP).second)
+          substitution(GP, type);
+        return GP;
+      }
+    }
+
+    return type;
+  });
+}
+
 Type RequirementFailure::getOwnerType() const {
   auto *anchor = getRawAnchor();
 
@@ -3492,4 +3510,65 @@ bool MutatingMemberRefOnImmutableBase::diagnoseAsError() {
   AssignmentFailure failure(baseExpr, cs, anchor->getLoc(), diagIDsubelt,
                             diagIDmember);
   return failure.diagnoseAsError();
+}
+
+bool InvalidTupleSplatWithSingleParameterFailure::diagnoseAsError() {
+  auto *anchor = getRawAnchor();
+
+  auto selectedOverload = getChoiceFor(anchor);
+  if (!selectedOverload || !selectedOverload->choice.isDecl())
+    return false;
+
+  auto *choice = selectedOverload->choice.getDecl();
+
+  auto *argExpr = getArgumentExprFor(anchor);
+  if (!argExpr)
+    return false;
+
+  using Substitution = std::pair<GenericTypeParamType *, Type>;
+  llvm::SmallVector<Substitution, 8> substitutions;
+
+  auto paramTy = restoreGenericParameters(
+      ParamType, [&](GenericTypeParamType *GP, Type resolvedType) {
+        substitutions.push_back(std::make_pair(GP, resolvedType));
+      });
+
+  DeclBaseName name = choice->getBaseName();
+
+  std::string subsStr;
+  if (!substitutions.empty()) {
+    llvm::array_pod_sort(
+        substitutions.begin(), substitutions.end(),
+        [](const std::pair<GenericTypeParamType *, Type> *lhs,
+           const std::pair<GenericTypeParamType *, Type> *rhs) -> int {
+          GenericParamKey key1(lhs->first);
+          GenericParamKey key2(rhs->first);
+          return key1 < key2 ? -1 : (key1 == key2) ? 0 : 1;
+        });
+
+    subsStr += " [with ";
+    interleave(
+        substitutions,
+        [&subsStr](const Substitution &substitution) {
+          subsStr += substitution.first->getString();
+          subsStr += " = ";
+          subsStr += substitution.second->getString();
+        },
+        [&subsStr] { subsStr += ", "; });
+    subsStr += ']';
+  }
+
+  auto diagnostic =
+      name.isSpecial()
+          ? emitDiagnostic(argExpr->getLoc(),
+                           diag::single_tuple_parameter_mismatch_special,
+                           choice->getDescriptiveKind(), paramTy, subsStr)
+          : emitDiagnostic(
+                argExpr->getLoc(), diag::single_tuple_parameter_mismatch_normal,
+                choice->getDescriptiveKind(), name, paramTy, subsStr);
+
+  diagnostic.highlight(argExpr->getSourceRange())
+      .fixItInsertAfter(argExpr->getStartLoc(), "(")
+      .fixItInsert(argExpr->getEndLoc(), ")");
+  return true;
 }
