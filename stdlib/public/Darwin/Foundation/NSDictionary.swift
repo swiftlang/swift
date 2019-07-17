@@ -13,6 +13,13 @@
 @_exported import Foundation // Clang module
 import _SwiftFoundationOverlayShims
 
+// We don't check for NSCopying here for performance reasons. We would
+// just crash anyway, and NSMutableDictionary will still do that when
+// it tries to call -copyWithZone: and it's not there
+private func duckCastToNSCopying(_ x: Any) -> NSCopying {
+  return _unsafeReferenceCast(x as AnyObject, to: NSCopying.self)
+}
+
 //===----------------------------------------------------------------------===//
 // Dictionaries
 //===----------------------------------------------------------------------===//
@@ -21,10 +28,10 @@ extension NSDictionary : ExpressibleByDictionaryLiteral {
   public required convenience init(
     dictionaryLiteral elements: (Any, Any)...
   ) {
-    // FIXME: Unfortunate that the `NSCopying` check has to be done at runtime.
+    
     self.init(
       objects: elements.map { $0.1 as AnyObject },
-      forKeys: elements.map { $0.0 as AnyObject as! NSCopying },
+      forKeys: elements.map { duckCastToNSCopying($0.0) },
       count: elements.count)
   }
 }
@@ -401,9 +408,7 @@ extension NSMutableDictionary {
     }
     @objc(__swift_setObject:forKeyedSubscript:)
     set {
-      // FIXME: Unfortunate that the `NSCopying` check has to be done at
-      // runtime.
-      let copyingKey = key as AnyObject as! NSCopying
+      let copyingKey = duckCastToNSCopying(key)
       if let newValue = newValue {
         self.setObject(newValue, forKey: copyingKey)
       } else {
