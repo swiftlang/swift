@@ -2928,7 +2928,7 @@ public:
                                       "__pullback_" + indices.mangle())
                        .str();
     auto pbGenericSig = getAssociatedFunctionGenericSignature(attr, original);
-    auto *pbGenericEnv = pbGenericSig
+    auto *adjGenericEnv = pbGenericSig
         ? pbGenericSig->createGenericEnvironment()
         : nullptr;
     auto pbType = SILFunctionType::get(
@@ -2941,7 +2941,7 @@ public:
     // pullbacks are never called cross-module.
     auto linkage = SILLinkage::Hidden;
     auto *pullback = fb.createFunction(
-        linkage, pbName, pbType, pbGenericEnv, original->getLocation(),
+        linkage, pbName, pbType, adjGenericEnv, original->getLocation(),
         original->isBare(), IsNotTransparent, original->isSerialized(),
         original->isDynamicallyReplaceable());
     pullback->setOwnershipEliminated();
@@ -3913,7 +3913,7 @@ private:
 
   /// Mapping from original basic blocks to corresponding pullback basic blocks.
   /// Pullback basic blocks always have the predecessor as the single argument.
-  DenseMap<SILBasicBlock *, SILBasicBlock *> pullbackBBMap;
+  DenseMap<SILBasicBlock *, SILBasicBlock *> adjointBBMap;
 
   /// Mapping from pullback basic blocks to pullback struct arguments.
   DenseMap<SILBasicBlock *, SILArgument *> pullbackStructArguments;
@@ -3928,13 +3928,13 @@ private:
   DenseMap<SILBasicBlock *, SmallVector<SILValue, 8>> activeValues;
 
   /// Mapping from original basic blocks and original active values to
-  /// corresponding pullback block arguments.
+  /// corresponding adjoint block arguments.
   DenseMap<std::pair<SILBasicBlock *, SILValue>, SILArgument *>
-      activeValuePullbackBBArgumentMap;
+      activeValueAdjointBBArgumentMap;
 
   /// Mapping from original basic blocks to local adjoint values to be cleaned
-  /// up. This is populated when pullback generation is run on one basic block
-  /// and cleaned before processing another basic block.
+  /// up. This is populated when adjoint emission is run on one basic block and
+  /// cleaned before processing another basic block.
   DenseMap<SILBasicBlock *, SmallVector<AdjointValue, 8>>
       blockLocalAdjointValues;
 
@@ -4093,7 +4093,7 @@ private:
   }
 
   /// Substitutes all replacement types of the given substitution map using the
-  /// pullback function's substitution map.
+  /// adjoint function's substitution map.
   SubstitutionMap remapSubstitutionMap(SubstitutionMap substMap) {
     return substMap.subst(getPullback().getForwardingSubstitutionMap());
   }
@@ -4109,8 +4109,8 @@ private:
     return valueMap.count({origBB, originalValue});
   }
 
-  /// Initializes an original value's corresponding adjoint value. It must not
-  /// have an adjoint value before this function is called.
+  /// Initializes an original value's corresponding adjoint value. Its adjoint
+  /// value must not be present before this function is called.
   void initializeAdjointValue(SILBasicBlock *origBB, SILValue originalValue,
                               AdjointValue adjointValue) {
     assert(origBB->getParent() == &getOriginal());
@@ -4167,16 +4167,15 @@ private:
     blockLocalAdjointValues[origBB].push_back(adjVal);
   }
 
-  /// Get the pullback block argument corresponding to the given original block
+  /// Get the adjoint block argument corresponding to the given original block
   /// and active value.
-  SILArgument *getActiveValuePullbackBlockArgument(SILBasicBlock *origBB,
-                                                   SILValue activeValue) {
+  SILArgument *getActiveValueAdjointBlockArgument(SILBasicBlock *origBB,
+                                                  SILValue activeValue) {
     assert(origBB->getParent() == &getOriginal());
-    auto pullbackBBArg =
-        activeValuePullbackBBArgumentMap[{origBB, activeValue}];
-    assert(pullbackBBArg);
-    assert(pullbackBBArg->getParent() == getPullbackBlock(origBB));
-    return pullbackBBArg;
+    auto adjointBBArg = activeValueAdjointBBArgumentMap[{origBB, activeValue}];
+    assert(adjointBBArg);
+    assert(adjointBBArg->getParent() == getAdjointBlock(origBB));
+    return adjointBBArg;
   }
 
   //--------------------------------------------------------------------------//
@@ -4274,7 +4273,7 @@ private:
     }
 
     // Set insertion point for local allocation builder: before the last local
-    // allocation, or at the start of the pullback function's entry if no local
+    // allocation, or at the start of the adjoint function's entry if no local
     // allocations exist yet.
     localAllocBuilder.setInsertionPoint(
         getPullback().getEntryBlock(),
@@ -4327,11 +4326,11 @@ private:
   // CFG mapping
   //--------------------------------------------------------------------------//
 
-  SILBasicBlock *getPullbackBlock(SILBasicBlock *originalBlock) {
-    return pullbackBBMap.lookup(originalBlock);
+  SILBasicBlock *getAdjointBlock(SILBasicBlock *originalBlock) {
+    return adjointBBMap.lookup(originalBlock);
   }
 
-  SILBasicBlock *getPullbackTrampolineBlock(
+  SILBasicBlock *getAdjointTrampolineBlock(
       SILBasicBlock *originalBlock, SILBasicBlock *successorBlock) {
     return pullbackTrampolineBBMap.lookup({originalBlock, successorBlock});
   }
@@ -4375,27 +4374,27 @@ public:
   // Entry point
   //--------------------------------------------------------------------------//
 
-  /// Performs pullback generation on the empty pullback function. Returns true
-  /// if any error occurs.
+  /// Performs adjoint synthesis on the empty adjoint function. Returns true if
+  /// any error occurs.
   bool run() {
     auto &original = getOriginal();
     auto &pullback = getPullback();
     auto pbLoc = getPullback().getLocation();
     LLVM_DEBUG(getADDebugStream() << "Running PullbackEmitter on\n" << original);
 
-    auto *pbGenEnv = getPullback().getGenericEnvironment();
-    auto pbGenSig = pbGenEnv
-        ? pbGenEnv->getGenericSignature()->getCanonicalSignature()
+    auto *adjGenEnv = getPullback().getGenericEnvironment();
+    auto adjGenSig = adjGenEnv
+        ? adjGenEnv->getGenericSignature()->getCanonicalSignature()
         : nullptr;
     Lowering::GenericContextScope genericContextScope(
-        getContext().getTypeConverter(), pbGenSig);
+        getContext().getTypeConverter(), adjGenSig);
     auto origExitIt = original.findReturnBB();
     assert(origExitIt != original.end() &&
            "Functions without returns must have been diagnosed");
     auto *origExit = &*origExitIt;
 
     // Get dominated active values in original blocks.
-    // Adjoint values of dominated active values are passed as pullback block
+    // Adjoint values of dominated active values are passed as adjoint block
     // arguments.
     DominanceOrder domOrder(original.getEntryBlock(), domInfo);
     while (auto *bb = domOrder.getNext()) {
@@ -4414,7 +4413,7 @@ public:
         if (visited.count(v))
           return;
         // Diagnose active enum values. Differentiation of enum values is not
-        // yet supported; requires special adjoint value handling.
+        // yet supported; requires special adjoint handling.
         if (v->getType().getEnumOrBoundGenericEnum()) {
           getContext().emitNondifferentiabilityError(
               v, getInvoker(), diag::autodiff_enums_unsupported);
@@ -4464,7 +4463,7 @@ public:
     }
     for (auto *origBB : postOrderPostDomOrder) {
       auto *pullbackBB = pullback.createBasicBlock();
-      pullbackBBMap.insert({origBB, pullbackBB});
+      adjointBBMap.insert({origBB, pullbackBB});
       auto pbStructLoweredType =
           remapType(getPullbackInfo().getPullbackStructLoweredType(origBB));
       // If the BB is the original exit, then the pullback block that we just
@@ -4485,10 +4484,10 @@ public:
         continue;
       // Otherwise, if the original block has active values:
       // - For each active buffer in the original block, allocate a new local
-      //   buffer in the pullback entry. (All adjoint buffers are allocated in
-      //   the pullback entry and deallocated in the pullback exit.)
+      //   buffer in the adjoint entry. (All adjoint buffers are allocated in
+      //   the adjoint entry and deallocated in the adjoint exit.)
       // - For each active value in the original block, add adjoint value
-      //   arguments to the pullback block.
+      //   arguments to the adjoint block.
       for (auto activeValue : bbActiveValues) {
         if (activeValue->getType().isAddress()) {
           // Allocate and zero initialize a new local buffer using
@@ -4497,10 +4496,10 @@ public:
           getAdjointBuffer(origBB, activeValue);
         } else {
           // Create and register pullback block argument for the active value.
-          auto *pullbackArg = pullbackBB->createPhiArgument(
+          auto *adjointArg = pullbackBB->createPhiArgument(
               getRemappedTangentType(activeValue->getType()),
               ValueOwnershipKind::Guaranteed);
-          activeValuePullbackBBArgumentMap[{origBB, activeValue}] = pullbackArg;
+          activeValueAdjointBBArgumentMap[{origBB, activeValue}] = adjointArg;
         }
       }
       // Add a pullback struct argument.
@@ -4508,9 +4507,9 @@ public:
           pbStructLoweredType, ValueOwnershipKind::Guaranteed);
       pullbackStructArguments[origBB] = pbStructArg;
       // - Create pullback trampoline blocks for each successor block of the
-      //   original block. Pullback trampoline blocks only have a pullback
-      //   struct argument. They branch from a pullback successor block to the
-      //   pullback original block, passing adjoint values of active values.
+      //   original block. Adjoint trampoline blocks only have a pullback
+      //   struct argument, and branch from the adjoint successor block to the
+      //   adjoint original block, trampoline adjoint values of active values.
       for (auto *succBB : origBB->getSuccessorBlocks()) {
         auto *pullbackTrampolineBB =
             pullback.createBasicBlockBefore(pullbackBB);
@@ -4577,13 +4576,13 @@ public:
                << " as the adjoint of original result " << origResult);
 
     // Visit original blocks blocks in post-order and perform differentiation
-    // in corresponding pullback blocks.
+    // in corresponding adjoint blocks.
     for (auto *bb : postOrderPostDomOrder) {
       if (errorOccurred)
         break;
-      // Get the corresponding pullback basic block.
-      auto *pbBB = getPullbackBlock(bb);
-      builder.setInsertionPoint(pbBB);
+      // Get the corresponding adjoint basic block.
+      auto adjBB = getAdjointBlock(bb);
+      builder.setInsertionPoint(adjBB);
 
       LLVM_DEBUG({
         auto &s = getADDebugStream()
@@ -4605,14 +4604,13 @@ public:
           return true;
       }
 
-      // If the original block is the original entry, then the pullback block is
-      // the pullback exit, which is handled specially below this loop.
-      // Continue.
+      // If the original block is the original entry, then the adjoint block is
+      // the adjoint exit, which is handled specially below this loop. Continue.
       if (bb->isEntry())
         continue;
 
-      // Otherwise, add a `switch_enum` terminator for non-exit pullback blocks.
-      // 1. Get the pullback struct pullback block argument.
+      // Otherwise, add a `switch_enum` terminator for non-exit adjoint blocks.
+      // 1. Get the pullback struct adjoint bb argument.
       // 2. Extract the predecessor enum value from the pullback struct value.
       auto *pbStructVal = getPullbackBlockPullbackStructArgument(bb);
       auto *predEnum = getPullbackInfo().getPredecessorEnum(bb);
@@ -4639,29 +4637,29 @@ public:
         }
       }
 
-      // 3. Build the pullback successor cases for the `switch_enum`
-      //    instruction. The pullback successors correspond to the predecessors
-      //    of the current block.
+      // 3. Build the adjoint successor cases for the `switch_enum` instruction.
+      //    The adjoint successors correspond to the predecessors of the current
+      //    block.
       SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 4>
-          pullbackSuccessorCases;
+          adjointSuccessorCases;
       for (auto *predBB : bb->getPredecessorBlocks()) {
-        // Get the pullback block and optional pullback trampoline block of the
+        // Get the adjoint block and optional adjoint trampoline block of the
         // predecessor block.
-        auto *pullbackBB = getPullbackBlock(predBB);
-        auto *pullbackTrampolineBB = getPullbackTrampolineBlock(predBB, bb);
-        SILBasicBlock *pullbackSuccBB = nullptr;
-        // If the predecessor block does not have a corresponding pullback
-        // trampoline block, then the pullback successor is the pullback block.
-        if (!pullbackTrampolineBB) {
-          pullbackSuccBB = pullbackBB;
+        auto *adjointBB = getAdjointBlock(predBB);
+        auto *adjointTrampolineBB = getAdjointTrampolineBlock(predBB, bb);
+        SILBasicBlock *adjointSuccBB = nullptr;
+        // If the predecessor block does not have a corresponding adjoint
+        // trampoline block, then the adjoint successor is the adjoint block.
+        if (!adjointTrampolineBB) {
+          adjointSuccBB = adjointBB;
         }
-        // Otherwise, the pullback successor is the pullback trampoline block,
-        // which branches to the pullback block and propagates adjoint values of
+        // Otherwise, the adjoint successor is the adjoint trampoline block,
+        // which branches to the adjoint block and propagates adjoint values of
         // active values.
         else {
-          pullbackSuccBB = pullbackTrampolineBB;
-          assert(pullbackSuccBB && pullbackSuccBB->getNumArguments() == 1);
-          SILBuilder pullbackTrampolineBBBuilder(pullbackSuccBB);
+          adjointSuccBB = adjointTrampolineBB;
+          assert(adjointSuccBB && adjointSuccBB->getNumArguments() == 1);
+          SILBuilder adjointTrampolineBBBuilder(adjointSuccBB);
           SmallVector<SILValue, 8> trampolineArguments;
           // Propagate adjoint values/buffers of active values/buffers to
           // predecessor blocks.
@@ -4677,17 +4675,17 @@ public:
                 cleanup->applyRecursively(builder, pbLoc);
               }
               trampolineArguments.push_back(concreteActiveValueAdj);
-              // If the pullback block does not yet have a registered adjoint
+              // If the adjoint block does not yet have a registered adjoint
               // value for the active value, set the adjoint value to the
               // forwarded adjoint value argument.
               // TODO: Hoist this logic out of loop over predecessor blocks to
               // remove the `hasAdjointValue` check.
               if (!hasAdjointValue(predBB, activeValue)) {
-                auto *pullbackBBArg =
-                    getActiveValuePullbackBlockArgument(predBB, activeValue);
+                auto *adjointBBArg =
+                    getActiveValueAdjointBlockArgument(predBB, activeValue);
                 auto forwardedArgAdj = makeConcreteAdjointValue(
-                    ValueWithCleanup(pullbackBBArg,
-                                     makeCleanup(pullbackBBArg, emitCleanup)));
+                    ValueWithCleanup(adjointBBArg,
+                                     makeCleanup(adjointBBArg, emitCleanup)));
                 initializeAdjointValue(predBB, activeValue, forwardedArgAdj);
               }
             } else {
@@ -4702,51 +4700,51 @@ public:
             }
           }
           // Propagate pullback struct argument.
-          auto *predPBStructVal = pullbackTrampolineBB->getArguments().front();
+          auto *predPBStructVal = adjointTrampolineBB->getArguments().front();
           auto boxType =
               dyn_cast<SILBoxType>(predPBStructVal->getType().getASTType());
           if (!boxType) {
             trampolineArguments.push_back(predPBStructVal);
           } else {
-            auto *projectBox = pullbackTrampolineBBBuilder.createProjectBox(
+            auto *projectBox = adjointTrampolineBBBuilder.createProjectBox(
                 pbLoc, predPBStructVal, /*index*/ 0);
-            auto *loadInst = pullbackTrampolineBBBuilder.createLoad(
+            auto *loadInst = adjointTrampolineBBBuilder.createLoad(
                 pbLoc, projectBox,
                 getBufferLOQ(projectBox->getType().getASTType(), pullback));
             trampolineArguments.push_back(loadInst);
           }
-          // Branch from pullback trampoline block to pullback block.
-          pullbackTrampolineBBBuilder.createBranch(pbLoc, pullbackBB,
-                                                   trampolineArguments);
+          // Branch from adjoint trampoline block to adjoint block.
+          adjointTrampolineBBBuilder.createBranch(pbLoc, adjointBB,
+                                                  trampolineArguments);
         }
         auto *enumEltDecl =
             getPullbackInfo().lookUpPredecessorEnumElement(predBB, bb);
-        pullbackSuccessorCases.push_back({enumEltDecl, pullbackSuccBB});
+        adjointSuccessorCases.push_back({enumEltDecl, adjointSuccBB});
       }
       // Emit cleanups for all block-local adjoint values.
       for (auto adjVal : blockLocalAdjointValues[bb])
         emitCleanupForAdjointValue(adjVal);
-      // - If the original block has exactly one predecessor, then the pullback
+      // - If the original block has exactly one predecessor, then the adjoint
       //   block has exactly one successor. Extract the pullback struct value
       //   from the predecessor enum value using `unchecked_enum_data` and
-      //   branch to the pullback successor block.
-      assert(pullbackSuccessorCases.size() == predEnum->getNumElements());
-      if (pullbackSuccessorCases.size() == 1) {
+      //   branch to the adjoint successor block.
+      assert(adjointSuccessorCases.size() == predEnum->getNumElements());
+      if (adjointSuccessorCases.size() == 1) {
         auto *predBB = bb->getSinglePredecessorBlock();
         assert(predBB);
         EnumElementDecl *enumEltDecl;
-        SILBasicBlock *pullbackSuccBB;
-        std::tie(enumEltDecl, pullbackSuccBB) = pullbackSuccessorCases.front();
+        SILBasicBlock *adjointSuccBB;
+        std::tie(enumEltDecl, adjointSuccBB) = adjointSuccessorCases.front();
         auto *predPBStructVal =
             builder.createUncheckedEnumData(pbLoc, predEnumVal, enumEltDecl);
-        builder.createBranch(pbLoc, pullbackSuccBB, {predPBStructVal});
+        builder.createBranch(pbLoc, adjointSuccBB, {predPBStructVal});
       }
       // - Otherwise, if the original block has multiple predecessors, then the
-      //   pullback block has multiple successors. Do `switch_enum` to branch on
-      //   the predecessor enum values to pullback successor blocks.
+      //   adjoint block has multiple successors. Do `switch_enum` to branch on
+      //   the predecessor enum values to adjoint successor blocks.
       else {
         builder.createSwitchEnum(
-            pbLoc, predEnumVal, /*DefaultBB*/ nullptr, pullbackSuccessorCases);
+            pbLoc, predEnumVal, /*DefaultBB*/ nullptr, adjointSuccessorCases);
       }
     }
 
@@ -4754,11 +4752,11 @@ public:
     if (errorOccurred)
       return true;
 
-    // Place the builder at the pullback exit, i.e. the pullback block
+    // Place the builder at the adjoint exit, i.e. the adjoint block
     // corresponding to the original entry. Return the adjoints wrt parameters
-    // in the pullback exit.
+    // in the adjoint exit.
     auto *origEntry = getOriginal().getEntryBlock();
-    builder.setInsertionPoint(getPullbackBlock(origEntry));
+    builder.setInsertionPoint(getAdjointBlock(origEntry));
 
     // This vector will contain all the materialized return elements.
     SmallVector<SILValue, 8> retElts;
@@ -4809,7 +4807,7 @@ public:
         cleanup->disable();
     }
 
-    builder.setInsertionPoint(getPullbackBlock(origEntry));
+    builder.setInsertionPoint(getAdjointBlock(origEntry));
     // Deallocate local allocations.
     for (auto alloc : functionLocalAllocations) {
       // Assert that local allocations have at least one use.
@@ -4846,7 +4844,7 @@ public:
 
   void visitSILInstruction(SILInstruction *inst) {
     LLVM_DEBUG(getADDebugStream()
-               << "Unhandled instruction in PullbackEmitter: " << *inst);
+               << "Unhandled instruction in adjoint emitter: " << *inst);
     getContext().emitNondifferentiabilityError(inst, getInvoker(),
         diag::autodiff_expression_not_differentiable_note);
     errorOccurred = true;
@@ -5054,7 +5052,7 @@ public:
       args.push_back(alloc);
     }
 
-    // If callee pullback was reabstracted in VJP, reabstract callee pullback.
+    // If pullback was reabstracted in VJP, reabstract pullback in adjoint.
     if (applyInfo.originalPullbackType) {
       SILOptFunctionBuilder fb(getContext().getTransform());
       auto *thunk = getOrCreateReabstractionThunk(
@@ -5068,7 +5066,7 @@ public:
     }
     args.push_back(seed);
 
-    // Call the callee pullback.
+    // Call the pullback.
     auto *pullbackCall = builder.createApply(
         loc, pullback, SubstitutionMap(), args, /*isNonThrowing*/ false);
 
@@ -6154,9 +6152,9 @@ static SILFunction *createEmptyJVP(
 
   // === Create an empty JVP. ===
   auto jvpName = original->getASTContext()
-      .getIdentifier("AD__" + original->getName().str() +
-                     "__jvp_" + indices.mangle())
-      .str();
+  .getIdentifier("AD__" + original->getName().str() +
+                 "__jvp_" + indices.mangle())
+  .str();
   auto jvpGenericSig = getAssociatedFunctionGenericSignature(attr, original);
 
   // RAII that pushes the original function's generic signature to
