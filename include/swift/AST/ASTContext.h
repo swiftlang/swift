@@ -964,7 +964,7 @@ template <> struct DenseMapInfo<swift::ASTContext::OverrideSignatureKey> {
                       const OverrideSignatureKey rhs) {
     return lhs.baseMethodSig == rhs.baseMethodSig &&
            lhs.derivedClassSig == rhs.derivedClassSig &&
-           lhs.superclassTy.getString() == rhs.superclassTy.getString();
+           lhs.superclassTy.getPointer() == rhs.superclassTy.getPointer();
   }
 
   static inline OverrideSignatureKey getEmptyKey() {
