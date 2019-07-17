@@ -166,9 +166,6 @@ static bool validateCodingKeysEnum(DerivedConformance &derived,
     if (!varDecl->isUserAccessible())
       continue;
 
-    if (varDecl->getAttrs().hasAttribute<LazyAttr>())
-      continue;
-
     properties[getVarNameForCoding(varDecl)] = varDecl;
   }
 
@@ -361,9 +358,6 @@ static EnumDecl *synthesizeCodingKeysEnum(DerivedConformance &derived) {
   bool allConform = true;
   for (auto *varDecl : target->getStoredProperties()) {
     if (!varDecl->isUserAccessible())
-      continue;
-
-    if (varDecl->getAttrs().hasAttribute<LazyAttr>())
       continue;
 
     // Despite creating the enum in the context of the type, we're

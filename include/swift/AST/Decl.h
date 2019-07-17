@@ -3451,40 +3451,12 @@ public:
   /// Retrieve information about this type as a property wrapper.
   PropertyWrapperTypeInfo getPropertyWrapperTypeInfo() const;
 
-private:
-  /// Predicate used to filter StoredPropertyRange.
-  struct ToStoredProperty {
-    ToStoredProperty() {}
-    Optional<VarDecl *> operator()(Decl *decl) const;
-  };
-  
-public:
-  /// A range for iterating the stored member variables of a structure.
-  using StoredPropertyRange = OptionalTransformRange<DeclRange,
-                                                     ToStoredProperty>;
-
   /// Return a collection of the stored member variables of this type.
-  StoredPropertyRange getStoredProperties() const;
+  ArrayRef<VarDecl *> getStoredProperties() const;
 
-private:
-  /// Predicate used to filter StoredPropertyRange.
-  struct ToStoredPropertyOrMissingMemberPlaceholder {
-    Optional<Decl *> operator()(Decl *decl) const;
-  };
-
-public:
-  /// A range for iterating the stored member variables of a structure.
-  using StoredPropertyOrMissingMemberPlaceholderRange
-    = OptionalTransformRange<DeclRange,
-                             ToStoredPropertyOrMissingMemberPlaceholder>;
-  
   /// Return a collection of the stored member variables of this type, along
   /// with placeholders for unimportable stored properties.
-  StoredPropertyOrMissingMemberPlaceholderRange
-  getStoredPropertiesAndMissingMemberPlaceholders() const {
-    return StoredPropertyOrMissingMemberPlaceholderRange(getMembers(),
-                             ToStoredPropertyOrMissingMemberPlaceholder());
-  }
+  ArrayRef<Decl *> getStoredPropertiesAndMissingMemberPlaceholders() const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {

@@ -127,7 +127,7 @@ const ValueDecl *AccessedStorage::getDecl() const {
 
   case Class: {
     auto *decl = getObject()->getType().getNominalOrBoundGenericNominal();
-    return *std::next(decl->getStoredProperties().begin(), getPropertyIndex());
+    return decl->getStoredProperties()[getPropertyIndex()];
   }
   case Argument:
     return getArgument()->getDecl();

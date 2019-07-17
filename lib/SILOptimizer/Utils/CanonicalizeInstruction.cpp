@@ -357,8 +357,7 @@ broadenSingleElementStores(StoreInst *storeInst,
     // element struct with a loadable element can never be address only. We
     // additionally do not have to worry about our input value being address
     // only since we are storing into it.
-    auto props = decl->getStoredProperties();
-    if (std::next(props.begin()) != props.end())
+    if (decl->getStoredProperties().size() != 1)
       break;
 
     // Update the store location now that we know it is safe.

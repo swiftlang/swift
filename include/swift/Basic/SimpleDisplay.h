@@ -107,6 +107,20 @@ namespace swift {
     }
     out << "}";
   }
+  
+  template<typename T>
+  void simple_display(llvm::raw_ostream &out,
+                      const llvm::ArrayRef<T> &array) {
+    out << "{";
+    bool first = true;
+    for (const T &value : array) {
+      if (first) first = false;
+      else out << ", ";
+      
+      simple_display(out, value);
+    }
+    out << "}";
+  }
 }
 
 #endif // SWIFT_BASIC_SIMPLE_DISPLAY_H

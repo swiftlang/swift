@@ -673,6 +673,10 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
                                    TargetImpl target,
                                    bool isLValue,
                                    ASTContext &ctx) {
+  // FIXME: Temporary workaround.
+  if (!accessor->hasInterfaceType())
+    ctx.getLazyResolver()->resolveDeclSignature(accessor);
+
   // Local function to "finish" the expression, creating a member reference
   // to the given sequence of underlying variables.
   Optional<EnclosingSelfPropertyWrapperAccess> enclosingSelfAccess;
@@ -1370,8 +1374,6 @@ synthesizeAccessorBody(AbstractFunctionDecl *fn, void *);
 void TypeChecker::synthesizeWitnessAccessorsForStorage(
                                              AbstractStorageDecl *requirement,
                                              AbstractStorageDecl *storage) {
-  bool addedAccessor = false;
-
   // Make sure the protocol requirement itself has the right accessors.
   // FIXME: This should be a request kicked off by SILGen.
   DeclsToFinalize.insert(requirement);
@@ -1384,9 +1386,6 @@ void TypeChecker::synthesizeWitnessAccessorsForStorage(
     // Otherwise, synthesize it.
     addOpaqueAccessorToStorage(storage, kind, Context);
 
-    // Flag that we've added an accessor.
-    addedAccessor = true;
-
     // Trigger synthesize of the accessor body if it's created on-demand.
     if (isOnDemandAccessor(storage, kind)) {
       auto *accessor = storage->getAccessor(kind);
@@ -1394,15 +1393,8 @@ void TypeChecker::synthesizeWitnessAccessorsForStorage(
       accessor->setBodySynthesizer(&synthesizeAccessorBody);
 
       maybeMarkTransparent(accessor, Context);
-      DeclsToFinalize.insert(accessor);
     }
   });
-
-  // Cue (delayed) validation of any accessors we just added, just
-  // in case this is coming after the normal delayed validation finished.
-  if (addedAccessor) {
-    DeclsToFinalize.insert(storage);
-  }
 }
 
 /// Given a VarDecl with a willSet: and/or didSet: specifier, synthesize the
@@ -2064,9 +2056,6 @@ static void finishProtocolStorageImplInfo(AbstractStorageDecl *storage) {
 }
 
 static void finishLazyVariableImplInfo(VarDecl *var) {
-  // FIXME: Remove this once getStoredProperties() is a request
-  (void) var->getLazyStorageProperty();
-
   // If there are already accessors, something is invalid; bail out.
   if (!var->getImplInfo().isSimpleStored())
     return;
@@ -2082,6 +2071,9 @@ static bool allPropertyWrapperValueSettersAreAccessible(VarDecl *var) {
   for (unsigned i : indices(wrapperAttrs)) {
     auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo(i);
     auto valueVar = wrapperInfo.valueVar;
+    // Only nullptr with invalid code.
+    if (!valueVar)
+      return false;
     if (!valueVar->isSettable(nullptr) ||
         !valueVar->isSetterAccessibleFrom(innermostDC))
       return false;
@@ -2091,10 +2083,6 @@ static bool allPropertyWrapperValueSettersAreAccessible(VarDecl *var) {
 }
 
 static void finishPropertyWrapperImplInfo(VarDecl *var) {
-  auto backingVar = var->getPropertyWrapperBackingProperty();
-  if (!backingVar || backingVar->isInvalid())
-    return;
-
   auto parentSF = var->getDeclContext()->getParentSourceFile();
   bool wrapperSetterIsUsable =
     var->getSetter() ||

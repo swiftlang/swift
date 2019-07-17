@@ -138,9 +138,6 @@ FRONTEND_STATISTIC(AST, NumPrefixOperators)
 /// Number of precedence groups in the AST context.
 FRONTEND_STATISTIC(AST, NumPrecedenceGroups)
 
-/// Number of precedence groups in the AST context.
-FRONTEND_STATISTIC(AST, NumStoredPropertiesQueries)
-
 /// Number of full function bodies parsed.
 FRONTEND_STATISTIC(Parse, NumFunctionsParsed)
 

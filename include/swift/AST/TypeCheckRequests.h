@@ -713,6 +713,52 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Request to obtain a list of stored properties in a nominal type.
+///
+/// This will include backing storage for lazy properties and
+/// property wrappers, synthesizing them if necessary.
+class StoredPropertiesRequest :
+    public SimpleRequest<StoredPropertiesRequest,
+                         ArrayRef<VarDecl *>(NominalTypeDecl *),
+                         CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<ArrayRef<VarDecl *>>
+  evaluate(Evaluator &evaluator, NominalTypeDecl *decl) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+/// Request to obtain a list of stored properties in a nominal type,
+/// together with any missing members corresponding to stored
+/// properties that could not be deserialized.
+///
+/// This will include backing storage for lazy properties and
+/// property wrappers, synthesizing them if necessary.
+class StoredPropertiesAndMissingMembersRequest :
+    public SimpleRequest<StoredPropertiesAndMissingMembersRequest,
+                         ArrayRef<Decl *>(NominalTypeDecl *),
+                         CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<ArrayRef<Decl *>>
+  evaluate(Evaluator &evaluator, NominalTypeDecl *decl) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>
