@@ -1551,8 +1551,10 @@ static void resolveRange(SwiftLangSupport &Lang,
 
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
       // FIXME: Implement tracing
-      RangeResolver Resolver(AstUnit->getPrimarySourceFile(), Offset, Length);
-      ResolvedRangeInfo Info = Resolver.resolve();
+      auto *File = &AstUnit->getPrimarySourceFile();
+      ResolvedRangeInfo Info = evaluateOrDefault(File->getASTContext().evaluator,
+        RangeInfoRequest(RangeInfoOwner({File, Offset, Length})),
+                                                 ResolvedRangeInfo());
 
       CompilerInvocation CompInvok;
       ASTInvok->applyTo(CompInvok);

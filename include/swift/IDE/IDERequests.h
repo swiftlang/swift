@@ -23,6 +23,9 @@
 #include "swift/IDE/IDETypeIDs.h"
 
 namespace swift {
+//----------------------------------------------------------------------------//
+// Cusor info
+//----------------------------------------------------------------------------//
 
 // Input for CursorInfoRequest.
 // Putting the source file and location together allows us to print the request
@@ -68,6 +71,67 @@ private:
   // Evaluation.
   llvm::Expected<ide::ResolvedCursorInfo> evaluate(Evaluator &evaluator,
     CursorInfoOwner CI) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+  // Source location
+  SourceLoc getNearestLoc() const;
+};
+
+//----------------------------------------------------------------------------//
+// Range info
+//----------------------------------------------------------------------------//
+
+// Input for RangeInfoRequest.
+// Putting the source file and location together allows us to print the request
+// input well e.g. file.swift:3:4
+struct RangeInfoOwner {
+  SourceFile *File;
+  SourceLoc StartLoc;
+  SourceLoc EndLoc;
+
+  RangeInfoOwner(SourceFile *File, SourceLoc StartLoc, SourceLoc EndLoc):
+    File(File), StartLoc(StartLoc), EndLoc(EndLoc) {}
+  RangeInfoOwner(SourceFile *File, unsigned Offset, unsigned Length);
+
+  friend llvm::hash_code hash_value(const RangeInfoOwner &CI) {
+    return hash_combine(hash_value(CI.File),
+                        hash_value(CI.StartLoc.getOpaquePointerValue()),
+                        hash_value(CI.EndLoc.getOpaquePointerValue()));
+  }
+
+  friend bool operator==(const RangeInfoOwner &lhs, const RangeInfoOwner &rhs) {
+    return lhs.File == rhs.File && lhs.StartLoc == rhs.StartLoc &&
+      lhs.EndLoc == rhs.EndLoc;
+  }
+
+  friend bool operator!=(const RangeInfoOwner &lhs, const RangeInfoOwner &rhs) {
+    return !(lhs == rhs);
+  }
+
+  bool isValid() const {
+    return File && File->getBufferID() && StartLoc.isValid() && EndLoc.isValid();
+  }
+};
+
+void simple_display(llvm::raw_ostream &out, const RangeInfoOwner &owner);
+
+/// Resolve cursor info at a given location.
+class RangeInfoRequest:
+    public SimpleRequest<RangeInfoRequest,
+                         ide::ResolvedRangeInfo(RangeInfoOwner),
+                         CacheKind::Cached>
+{
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<ide::ResolvedRangeInfo> evaluate(Evaluator &evaluator,
+    RangeInfoOwner CI) const;
 
 public:
   // Caching

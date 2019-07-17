@@ -713,7 +713,6 @@ class RefactoringAction##KIND: public TokenBasedRefactoringAction {           \
 #include "swift/IDE/RefactoringKinds.def"
 
 class RangeBasedRefactoringAction : public RefactoringAction {
-  RangeResolver Resolver;
 protected:
   ResolvedRangeInfo RangeInfo;
 public:
@@ -721,8 +720,9 @@ public:
                               SourceEditConsumer &EditConsumer,
                               DiagnosticConsumer &DiagConsumer) :
   RefactoringAction(MD, Opts, EditConsumer, DiagConsumer),
-  Resolver(*TheFile, Opts.Range.getStart(SM), Opts.Range.getEnd(SM)),
-  RangeInfo(Resolver.resolve()) {}
+  RangeInfo(evaluateOrDefault(MD->getASTContext().evaluator,
+    RangeInfoRequest(RangeInfoOwner(TheFile, Opts.Range.getStart(SM), Opts.Range.getEnd(SM))),
+                              ResolvedRangeInfo())) {}
 };
 
 #define RANGE_REFACTORING(KIND, NAME, ID)                                     \
@@ -3339,10 +3339,11 @@ collectAvailableRefactorings(SourceFile *SF, RangeConfig Range,
   DiagnosticEngine DiagEngine(SM);
   std::for_each(DiagConsumers.begin(), DiagConsumers.end(),
     [&](DiagnosticConsumer *Con) { DiagEngine.addConsumer(*Con); });
-
-  RangeResolver Resolver(*SF, Range.getStart(SF->getASTContext().SourceMgr),
-                         Range.getEnd(SF->getASTContext().SourceMgr));
-  ResolvedRangeInfo Result = Resolver.resolve();
+  ResolvedRangeInfo Result = evaluateOrDefault(SF->getASTContext().evaluator,
+    RangeInfoRequest(RangeInfoOwner({SF,
+                      Range.getStart(SF->getASTContext().SourceMgr),
+                      Range.getEnd(SF->getASTContext().SourceMgr)})),
+                                               ResolvedRangeInfo());
 
   bool enableInternalRefactoring = getenv("SWIFT_ENABLE_INTERNAL_REFACTORING_ACTIONS");
 
