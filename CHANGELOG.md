@@ -80,7 +80,7 @@ Swift 5.1
   will now be diagnosed as an error. 
 
   Note: You can still use duplicate labels when declaring functions and
-  subscripts, as long as the internal labels are different. For example:
+  subscripts, as long as the internal parameter names are different. For example:
 
   ```
   func foo(bar x: Int, bar y: Int) {}
