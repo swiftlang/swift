@@ -970,6 +970,17 @@ static GenericSignature *getOverrideGenericSignature(ValueDecl *base,
   }
   unsigned derivedDepth = 0;
 
+  auto key = swift::ASTContext::OverrideSignatureKey(
+      baseGenericCtx->getGenericSignature()->getAsString(),
+      derivedClass->getGenericSignature()->getAsString(),
+      derivedClass->getSuperclass());
+
+  for (auto pair : ctx.overrideSigCache) {
+    if (pair.first.isEqual(key)) {
+      return pair.second;
+    }
+  }
+
   if (auto *derivedSig = derivedClass->getGenericSignature())
     derivedDepth = derivedSig->getGenericParams().back()->getDepth() + 1;
 
@@ -1020,6 +1031,7 @@ static GenericSignature *getOverrideGenericSignature(ValueDecl *base,
   }
 
   auto *genericSig = std::move(builder).computeGenericSignature(SourceLoc());
+  ctx.overrideSigCache.push_back(std::make_pair(key, genericSig));
   return genericSig;
 }
 

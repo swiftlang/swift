@@ -869,6 +869,27 @@ public:
   /// This guarantees that resulted \p names doesn't have duplicated names.
   void getVisibleTopLevelModuleNames(SmallVectorImpl<Identifier> &names) const;
 
+  struct OverrideSignatureKey {
+    StringRef baseMethodSigString;
+    StringRef derivedClassSigString;
+    Type superclassTy;
+
+    OverrideSignatureKey(StringRef baseMethodSig, StringRef derivedClassSig,
+                         Type derivedClassSuperclassType)
+        : baseMethodSigString(baseMethodSig),
+          derivedClassSigString(derivedClassSig),
+          superclassTy(derivedClassSuperclassType) {}
+
+    bool isEqual(const OverrideSignatureKey other) {
+      return baseMethodSigString == other.baseMethodSigString &&
+             derivedClassSigString == other.derivedClassSigString &&
+             superclassTy.getString() == other.superclassTy.getString();
+    }
+  };
+
+  std::vector<std::pair<OverrideSignatureKey, GenericSignature *>>
+      overrideSigCache;
+
 private:
   /// Register the given generic signature builder to be used as the canonical
   /// generic signature builder for the given signature, if we don't already
