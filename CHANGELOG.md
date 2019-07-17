@@ -79,7 +79,7 @@ Swift 5.1
 
   will now be diagnosed as an error. 
 
-  Note: You can still use duplicate labels when declaring functions and
+  Note: You can still use duplicate argument labels when declaring functions and
   subscripts, as long as the internal parameter names are different. For example:
 
   ```
