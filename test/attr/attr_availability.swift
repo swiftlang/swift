@@ -1087,3 +1087,16 @@ func rdar46348825_deprecated() {}
 @available(swift, obsoleted: 4.0, obsoleted: 4.0)
 // expected-warning@-1 {{'obsoleted' argument has already been specified}}
 func rdar46348825_obsoleted() {}
+
+// Referencing unavailable types in signatures of unavailable functions should be accepted
+@available(*, unavailable)
+protocol UnavailableProto {
+}
+
+@available(*, unavailable)
+func unavailableFunc(_ arg: UnavailableProto) -> UnavailableProto {}
+
+@available(*, unavailable)
+struct S {
+  var a: UnavailableProto
+}
