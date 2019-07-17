@@ -3641,8 +3641,37 @@ void bindFuncDeclToOperator(TypeChecker &TC, FuncDecl *FD) {
   }
 
   if (!op) {
-    // FIXME: Add Fix-It introducing an operator declaration?
-    TC.diagnose(FD, diag::declared_operator_without_operator_decl);
+    SourceLoc insertionLoc;
+    if (dyn_cast<SourceFile>(FD->getParent())) {
+      // Parent context is SourceFile, insertion location is start of func declaration
+      // or unary operator
+      insertionLoc = FD->isUnaryOperator() ? FD->getAttrs().getStartLoc() : FD->getStartLoc();
+    } else {
+      // Finding top-level decl context before SourceFile and inserting before it
+      for (DeclContext *CurContext = FD->getLocalContext();
+           CurContext;
+           CurContext = CurContext->getParent()) {
+        insertionLoc = CurContext->getAsDecl()->getStartLoc();
+        if (dyn_cast<SourceFile>(CurContext->getParent()))
+          break;
+      }
+    }
+
+    SmallString<128> insertion;
+    auto numOfParams = FD->getParameters()->size();
+    if (numOfParams == 1) {
+      if (FD->getAttrs().hasAttribute<PrefixAttr>())
+        insertion += "prefix operator ";
+      else
+        insertion += "postfix operator ";
+    } else if (numOfParams == 2) {
+      insertion += "infix operator ";
+    }
+
+    insertion += operatorName.str();
+    insertion += " : <# Precedence Group #>\n";
+    TC.diagnose(FD, diag::declared_operator_without_operator_decl)
+    .fixItInsert(insertionLoc, insertion);
     return;
   }
 
