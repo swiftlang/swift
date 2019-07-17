@@ -185,6 +185,9 @@ enum class FixKind : uint8_t {
   /// when base is an r-value type.
   AllowMutatingMemberOnRValueBase,
 
+  /// Fix the type of the default argument
+  DefaultArgumentTypeMismatch,
+  
   /// Allow a single tuple parameter to be matched with N arguments
   /// by forming all of the given arguments into a single tuple.
   AllowTupleSplatForSingleParameter,
@@ -944,6 +947,27 @@ private:
   MutableArrayRef<Param> getSynthesizedArgumentsBuf() {
     return {getTrailingObjects<Param>(), NumSynthesized};
   }
+};
+
+class IgnoreDefaultArgumentTypeMismatch final : public ConstraintFix {
+  Type FromType;
+  Type ToType;
+
+  IgnoreDefaultArgumentTypeMismatch(ConstraintSystem &cs, Type fromType,
+                                    Type toType, ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::DefaultArgumentTypeMismatch, locator),
+        FromType(fromType), ToType(toType) {}
+
+public:
+  std::string getName() const override {
+    return "ignore default argument type mismatch";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static IgnoreDefaultArgumentTypeMismatch *create(ConstraintSystem &cs,
+                                                   Type fromType, Type toType,
+                                                   ConstraintLocator *locator);
 };
 
 class MoveOutOfOrderArgument final : public ConstraintFix {

@@ -1086,6 +1086,21 @@ private:
   bool diagnoseTrailingClosure(ClosureExpr *closure);
 };
 
+class DefaultArgumentTypeMismatch final : public FailureDiagnostic {
+  using Param = AnyFunctionType::Param;
+
+  Type FromType;
+  Type ToType;
+
+public:
+  DefaultArgumentTypeMismatch(Expr *root, ConstraintSystem &cs, Type fromType,
+                              Type toType, ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator), FromType(fromType),
+        ToType(toType) {}
+
+  bool diagnoseAsError() override;
+};
+
 class OutOfOrderArgumentFailure final : public FailureDiagnostic {
   using ParamBinding = SmallVector<unsigned, 1>;
 
