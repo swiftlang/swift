@@ -350,6 +350,9 @@ ERROR(cannot_convert_default_arg_value,none,
       (Type,Type))
 ERROR(cannot_convert_default_arg_value_protocol,none,
       "default argument value of type %0 does not conform to %1", (Type,Type))
+ERROR(default_argument_literal_cannot_convert, none,
+      "cannot call %0 %1 because default argument of type %2 cannot be "
+      "converted to type %3", (DescriptiveDeclKind, DeclName, Type, Type))
 ERROR(cannot_convert_default_arg_value_nil,none,
       "nil default argument value cannot be converted to type %0", (Type))
 

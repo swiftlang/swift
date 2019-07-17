@@ -451,6 +451,21 @@ bool AddMissingArguments::diagnose(Expr *root, bool asNote) const {
   return failure.diagnose(asNote);
 }
 
+IgnoreDefaultArgumentTypeMismatch *
+IgnoreDefaultArgumentTypeMismatch::create(ConstraintSystem &cs, Type fromType,
+                                          Type toType,
+                                          ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      IgnoreDefaultArgumentTypeMismatch(cs, fromType, toType, locator);
+}
+
+bool IgnoreDefaultArgumentTypeMismatch::diagnose(Expr *root,
+                                                 bool asNote) const {
+  DefaultArgumentTypeMismatch failure(root, getConstraintSystem(), FromType,
+                                      ToType, getLocator());
+  return failure.diagnose(asNote);
+}
+
 AddMissingArguments *
 AddMissingArguments::create(ConstraintSystem &cs, FunctionType *funcType,
                             llvm::ArrayRef<Param> synthesizedArgs,

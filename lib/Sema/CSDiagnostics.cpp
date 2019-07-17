@@ -2710,6 +2710,21 @@ bool MissingArgumentsFailure::diagnoseTrailingClosure(ClosureExpr *closure) {
   return true;
 }
 
+bool DefaultArgumentTypeMismatch::diagnoseAsError() {
+  auto choice = getChoiceFor(getRawAnchor());
+  if (!choice.hasValue())
+    return false;
+
+  auto declName = choice.getValue().choice.getName();
+  auto declKind = choice.getValue().choice.getDecl()->getDescriptiveKind();
+
+  emitDiagnostic(getAnchor()->getLoc(),
+                 diag::default_argument_literal_cannot_convert, declKind,
+                 declName, FromType, ToType);
+
+  return true;
+}
+
 bool ClosureParamDestructuringFailure::diagnoseAsError() {
   auto *closure = cast<ClosureExpr>(getAnchor());
   auto params = closure->getParameters();
