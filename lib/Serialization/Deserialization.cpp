@@ -3323,7 +3323,8 @@ public:
                                              None, /*TrailingWhere=*/nullptr);
     declOrOffset = proto;
 
-    proto->setRequiresClass(isClassBounded);
+    ctx.evaluator.cacheOutput(ProtocolRequiresClassRequest{proto},
+                              std::move(isClassBounded));
     proto->setExistentialTypeSupported(existentialTypeSupported);
 
     if (auto accessLevel = getActualAccessLevel(rawAccessLevel)) {
