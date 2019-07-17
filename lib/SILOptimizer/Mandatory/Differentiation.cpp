@@ -64,6 +64,12 @@ static llvm::cl::opt<bool> SkipFoldingAutoDiffFunctionExtraction(
     "differentiation-skip-folding-autodiff-function-extraction",
     llvm::cl::init(false));
 
+/// This flag is used to disable `autodiff_function_extract` instruction folding
+/// for SIL testing purposes.
+static llvm::cl::opt<bool> RunJVPGeneration(
+    "run-jvp-generation",
+    llvm::cl::init(false));
+
 //===----------------------------------------------------------------------===//
 // Helpers
 //===----------------------------------------------------------------------===//
@@ -7401,7 +7407,6 @@ bool ADContext::processDifferentiableAttribute(
   }
 
   // If the JVP doesn't exist, need to synthesize it.
-  auto vjpGenerated = false;
   if (!vjp) {
     // Diagnose:
     // - Functions with no return.
@@ -7409,14 +7414,12 @@ bool ADContext::processDifferentiableAttribute(
     if (diagnoseNoReturn(*this, original, invoker) ||
         diagnoseUnsupportedControlFlow(*this, original, invoker))
       return true;
-    
-    vjpGenerated = true;
+
     vjp = createEmptyVJP(*this, original, attr, isAssocFnExported);
     getGeneratedFunctions().push_back(vjp);
     VJPEmitter emitter(*this, original, attr, vjp, invoker);
-    if (emitter.run()) {
+    if (emitter.run())
       return true;
-    }
   }
       
   // If the JVP doesn't exist, need to synthesize it.
@@ -7424,19 +7427,17 @@ bool ADContext::processDifferentiableAttribute(
     // Diagnose:
     // - Functions with no return.
     // - Functions with unsupported control flow.
-    if (vjpGenerated && (diagnoseNoReturn(*this, original, invoker) ||
+    if (RunJVPGeneration && (diagnoseNoReturn(*this, original, invoker) ||
         diagnoseUnsupportedControlFlow(*this, original, invoker)))
       return true;
 
     jvp = createEmptyJVP(*this, original, attr, isAssocFnExported);
     getGeneratedFunctions().push_back(jvp);
 
-#if 0
-    if (vjpGenerated) {
+    if (RunJVPGeneration) {
       JVPEmitter emitter(*this, original, attr, jvp, invoker);
       return emitter.run();
     } else {
-#endif
       LLVM_DEBUG(getADDebugStream()
                  << "Generating empty JVP for original @"
                  << original->getName() << '\n');
@@ -7452,9 +7453,7 @@ bool ADContext::processDifferentiableAttribute(
           *jvp));
       LLVM_DEBUG(getADDebugStream() << "Generated empty JVP for "
                  << original->getName() << ":\n" << *jvp);
-#if 0
     }
-#endif
   }
 
   return false;

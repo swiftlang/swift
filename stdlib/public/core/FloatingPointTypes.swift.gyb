@@ -1799,11 +1799,29 @@ extension ${Self} {
 
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
+  @differentiating(+)
+  static func _jvpAdd(
+    lhs: ${Self}, rhs: ${Self}
+  ) -> (value: ${Self}, differential: (${Self}, ${Self}) -> ${Self}) {
+    return (lhs + rhs, { (dlhs, drhs) in dlhs + drhs })
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  @_transparent
   @differentiating(-)
   static func _vjpSubtract(
     lhs: ${Self}, rhs: ${Self}
   ) -> (value: ${Self}, pullback: (${Self}) -> (${Self}, ${Self})) {
     return (lhs - rhs, { v in (v, -v) })
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  @_transparent
+  @differentiating(-)
+  static func _jvpSubtract(
+    lhs: ${Self}, rhs: ${Self}
+  ) -> (value: ${Self}, differential: (${Self}, ${Self}) -> ${Self}) {
+    return (lhs - rhs, { (dlhs, drhs) in dlhs - drhs })
   }
 
   @inlinable // FIXME(sil-serialize-all)
@@ -1817,11 +1835,29 @@ extension ${Self} {
 
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
+  @differentiating(*)
+  static func _jvpMultiply(
+    lhs: ${Self}, rhs: ${Self}
+  ) -> (value: ${Self}, differential: (${Self}, ${Self}) -> ${Self}) {
+    return (lhs * rhs, { (dlhs, drhs) in lhs * drhs + rhs * dlhs })
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  @_transparent
   @differentiating(/)
   static func _vjpDivide(
     lhs: ${Self}, rhs: ${Self}
   ) -> (value: ${Self}, pullback: (${Self}) -> (${Self}, ${Self})) {
     return (lhs / rhs, { v in (v / rhs, -lhs / (rhs * rhs) * v) })
+  }
+
+  @inlinable // FIXME(sil-serialize-all)
+  @_transparent
+  @differentiating(/)
+  static func _vjpDivide(
+    lhs: ${Self}, rhs: ${Self}
+  ) -> (value: ${Self}, differential: (${Self}, ${Self}) -> ${Self}) {
+    return (lhs / rhs, { (dlhs, drhs) in dlhs / rhs - lhs / (rhs * rhs) * drhs })
   }
 }
 
