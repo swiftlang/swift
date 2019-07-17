@@ -4,8 +4,6 @@
 // due to direct differentiation of reabstraction thunks, which emits errors
 // with unknown location.
 
-// Test unmet generic requirements.
-
 @differentiable
 func generic<T: Differentiable & FloatingPoint>(_ x: T) -> T {
   // expected-error @+2 {{expression is not differentiable}}
@@ -13,6 +11,8 @@ func generic<T: Differentiable & FloatingPoint>(_ x: T) -> T {
   return x + 1
 }
 _ = gradient(at: 1.0, in: generic)
+
+// Test unmet generic requirements.
 
 @differentiable(
   vjp: vjpWeirdExtraRequirements

@@ -2787,6 +2787,8 @@ ERROR(differentiable_attr_function_not_same_type_context,none,
 ERROR(differentiable_attr_specified_not_function,none,
       "%0 is not a function to be used as associated differentiation function",
       (DeclName))
+ERROR(differentiable_attr_class_derivative_not_final,none,
+      "class member derivative must be final", ())
 ERROR(differentiable_attr_ambiguous_function_identifier,none,
       "ambiguous or overloaded identifier %0 cannot be used in '@differentiable' "
       "attribute", (DeclName))
@@ -2806,14 +2808,19 @@ ERROR(differentiable_attr_protocol_req_assoc_func,none,
 ERROR(differentiable_attr_stored_property_variable_unsupported,none,
       "'@differentiable' attribute on stored property cannot specify "
       "'jvp:' or 'vjp:'", ())
+ERROR(differentiable_attr_class_member_no_dynamic_self,none,
+      "'@differentiable' attribute cannot be declared on class methods "
+      "returning 'Self'", ())
+// TODO(TF-654): Remove when differentiation supports class initializers.
+ERROR(differentiable_attr_class_init_not_yet_supported,none,
+      "'@differentiable' attribute does not yet support class initializers",
+      ())
 ERROR(differentiable_attr_empty_where_clause,none,
       "empty 'where' clause in '@differentiable' attribute", ())
 ERROR(differentiable_attr_nongeneric_trailing_where,none,
       "trailing 'where' clause in '@differentiable' attribute of non-generic function %0", (DeclName))
 ERROR(differentiable_attr_layout_req_unsupported,none,
       "'@differentiable' attribute does not support layout requirements", ())
-ERROR(differentiable_attr_class_unsupported,none,
-      "class members cannot be marked with '@differentiable'", ())
 ERROR(overriding_decl_missing_differentiable_attr,none,
       "overriding declaration is missing attribute '%0'", (StringRef))
 NOTE(protocol_witness_missing_differentiable_attr,none,
@@ -2880,9 +2887,8 @@ ERROR(diff_params_clause_no_inferred_parameters,PointsToFirstBadToken,
       ())
 ERROR(diff_params_clause_inout_argument,none,
       "'inout' parameters (%0) cannot be differentiated with respect to", (Type))
-ERROR(diff_params_clause_cannot_diff_wrt_objects_or_existentials,none,
-      "class objects and protocol existentials (%0) cannot be differentiated "
-      "with respect to", (Type))
+ERROR(diff_params_clause_cannot_diff_wrt_existentials,none,
+      "cannot differentiate with respect to protocol existential (%0)", (Type))
 ERROR(diff_params_clause_cannot_diff_wrt_functions,none,
       "functions (%0) cannot be differentiated with respect to", (Type))
 ERROR(diff_params_clause_param_not_differentiable,none,

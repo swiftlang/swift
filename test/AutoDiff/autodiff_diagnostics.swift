@@ -171,30 +171,48 @@ struct TF_305 : Differentiable {
 }
 
 //===----------------------------------------------------------------------===//
-// Classes (not yet supported)
+// Classes
 //===----------------------------------------------------------------------===//
 
-class Foo {
-  // FIXME: Figure out why diagnostics for direct references end up here, and
-  // why they are duplicated.
-  // expected-note @+1 {{differentiating class members is not yet supported}}
-  func class_method(_ x: Float) -> Float {
+class Foo : Differentiable {
+  @differentiable
+  // expected-note @+1 {{cannot convert a direct method reference to a '@differentiable' function; use an explicit closure instead}}
+  func method(_ x: Float) -> Float {
     return x
+  }
+
+  // Not marked with `@differentiable`.
+  func method2(_ x: Float) -> Float {
+    return x
+  }
+
+  var base: Float = 1
+
+  // TODO(TF-645): Remove when differentiation supports `ref_element_addr`.
+  @differentiable
+  func usesRefElementAddr(_ x: Float) -> Float {
+    // expected-error @+2 {{expression is not differentiable}}
+    // expected-note @+1 {{member is not differentiable because the corresponding class member is not '@differentiable'}}
+    return base * x
   }
 }
 
-// Nested call case.
 @differentiable
-func triesToDifferentiateClassMethod(x: Float) -> Float {
-  // expected-error @+2 {{expression is not differentiable}}
-  // expected-note @+1 {{differentiating class members is not yet supported}}
-  return Foo().class_method(x)
+func differentiateClassMethod(x: Float) -> Float {
+  return Foo().method(x)
 }
 
-let _: @differentiable (Float) -> Float = Foo().class_method
+@differentiable
+func differentiateClassMethod2(x: Float) -> Float {
+  // expected-error @+2 {{expression is not differentiable}}
+  // expected-note @+1 {{member is not differentiable because the corresponding class member is not '@differentiable'}}
+  return Foo().method2(x)
+}
+
+let _: @differentiable (Float) -> Float = Foo().method
 
 // expected-error @+1 {{function is not differentiable}}
-_ = gradient(at: .zero, in: Foo().class_method)
+_ = gradient(at: .zero, in: Foo().method)
 
 //===----------------------------------------------------------------------===//
 // Unreachable

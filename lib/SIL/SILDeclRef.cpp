@@ -821,7 +821,48 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
   llvm_unreachable("bad entity kind!");
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+// Returns true if the given JVP/VJP SILDeclRef requires a new vtable entry.
+static bool autoDiffAssociatedFunctionRequiresNewVTableEntry(SILDeclRef ref) {
+  assert(ref.autoDiffAssociatedFunctionIdentifier);
+  auto overridden = ref.getOverridden();
+  if (!overridden)
+    return false;
+  // Get derived `@differentiable` attribute.
+  auto *derivedDA = *llvm::find_if(
+      ref.getDecl()->getAttrs().getAttributes<DifferentiableAttr>(),
+      [&](const DifferentiableAttr *derivedAttr) {
+        return derivedAttr->getParameterIndices() ==
+               ref.autoDiffAssociatedFunctionIdentifier->getParameterIndices();
+      });
+  assert(derivedDA && "Expected `@differentiable` attribute");
+  // If the derived `@differentiable` attribute specifies a JVP/VJP,
+  switch (ref.autoDiffAssociatedFunctionIdentifier->getKind()) {
+  case AutoDiffAssociatedFunctionKind::JVP:
+    if (!overridden.requiresNewVTableEntry() && derivedDA->getJVP())
+      return true;
+    break;
+  case AutoDiffAssociatedFunctionKind::VJP:
+    if (!overridden.requiresNewVTableEntry() && derivedDA->getVJP())
+      return true;
+    break;
+  }
+  auto baseDAs =
+      overridden.getDecl()->getAttrs().getAttributes<DifferentiableAttr>();
+  for (auto *baseDA : baseDAs) {
+    if (baseDA->getParameterIndices() ==
+        ref.autoDiffAssociatedFunctionIdentifier->getParameterIndices())
+      return false;
+  }
+  return true;
+}
+
 bool SILDeclRef::requiresNewVTableEntry() const {
+  // SWIFT_ENABLE_TENSORFLOW
+  if (autoDiffAssociatedFunctionIdentifier)
+    if (autoDiffAssociatedFunctionRequiresNewVTableEntry(*this))
+      return true;
+  // SWIFT_ENABLE_TENSORFLOW END
   if (cast<AbstractFunctionDecl>(getDecl())->needsNewVTableEntry())
     return true;
   return false;
@@ -842,7 +883,9 @@ SILDeclRef SILDeclRef::getOverridden() const {
   if (!overridden)
     return SILDeclRef();
 
-  return SILDeclRef(overridden, kind, isCurried, isForeign, autoDiffAssociatedFunctionIdentifier);
+  // SWIFT_ENABLE_TENSORFLOW
+  return SILDeclRef(overridden, kind, isCurried, isForeign,
+                    autoDiffAssociatedFunctionIdentifier);
 }
 
 SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
@@ -894,6 +937,21 @@ SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
     if (isa<ExtensionDecl>(overridden.getDecl()->getDeclContext()))
       return SILDeclRef();
 
+    // SWIFT_ENABLE_TENSORFLOW
+    // JVPs/VJPs are overridden only if the base declaration has a
+    // `@differentiable` with the same parameter indices.
+    if (autoDiffAssociatedFunctionIdentifier) {
+      auto overriddenAttrs =
+          overridden.getDecl()->getAttrs().getAttributes<DifferentiableAttr>();
+      if (llvm::none_of(overriddenAttrs, [&](const DifferentiableAttr *attr) {
+        return attr->getParameterIndices() ==
+               autoDiffAssociatedFunctionIdentifier->getParameterIndices();
+      })) {
+        return SILDeclRef();
+      }
+      return overridden;
+    }
+    // SWIFT_ENABLE_TENSORFLOW END
     return overridden;
   }
   return SILDeclRef();
@@ -902,7 +960,9 @@ SILDeclRef SILDeclRef::getNextOverriddenVTableEntry() const {
 SILDeclRef SILDeclRef::getOverriddenWitnessTableEntry() const {
   auto bestOverridden =
     getOverriddenWitnessTableEntry(cast<AbstractFunctionDecl>(getDecl()));
-  return SILDeclRef(bestOverridden, kind, isCurried, isForeign, autoDiffAssociatedFunctionIdentifier);
+  // SWIFT_ENABLE_TENSORFLOW
+  return SILDeclRef(bestOverridden, kind, isCurried, isForeign,
+                    autoDiffAssociatedFunctionIdentifier);
 }
 
 AbstractFunctionDecl *SILDeclRef::getOverriddenWitnessTableEntry(

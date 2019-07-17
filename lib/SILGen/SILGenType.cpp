@@ -40,9 +40,6 @@ using namespace Lowering;
 Optional<SILVTable::Entry>
 SILGenModule::emitVTableMethod(ClassDecl *theClass,
                                SILDeclRef derived, SILDeclRef base) {
-  llvm::dbgs() << "emitVTableMethod\n";
-  llvm::dbgs() << "derived " << derived << "\nbase " << base << "\n";
-
   assert(base.kind == derived.kind);
 
   auto *baseDecl = cast<AbstractFunctionDecl>(base.getDecl());
@@ -88,21 +85,39 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
 
   if (usesObjCDynamicDispatch) {
     implFn = getDynamicThunk(derived, Types.getConstantInfo(derived).SILFnType);
+  // SWIFT_ENABLE_TENSORFLOW
   } else if (auto *adafi = derived.autoDiffAssociatedFunctionIdentifier) {
-    // quite hacky and wrong
     auto *decl = derived.getDecl();
-    auto *DA = decl->getAttrs().getAttribute<DifferentiableAttr>();
-    assert(DA);
+    auto *DA = *llvm::find_if(
+        decl->getAttrs().getAttributes<DifferentiableAttr>(),
+        [&](const DifferentiableAttr *attr) {
+          return attr->getParameterIndices() == adafi->getParameterIndices();
+        });
+    assert(DA && "Expected `@differentiable` attribute");
+    // Get autodiff associated function declaration, if it exists.
     FuncDecl *assocDecl = nullptr;
-    if (adafi->getKind() == AutoDiffAssociatedFunctionKind::JVP) {
+    switch (adafi->getKind()) {
+    case AutoDiffAssociatedFunctionKind::JVP:
       assocDecl = DA->getJVPFunction();
-    }
-    if (adafi->getKind() == AutoDiffAssociatedFunctionKind::VJP) {
+      break;
+    case AutoDiffAssociatedFunctionKind::VJP:
       assocDecl = DA->getVJPFunction();
+      break;
     }
-    assert(assocDecl);
-    SILDeclRef assocRef(assocDecl, SILDeclRef::Kind::Func);
-    implFn = getFunction(assocRef, NotForDefinition);
+    // If declaration exists, get corresponding SIL function.
+    if (assocDecl) {
+      SILDeclRef assocRef(assocDecl, SILDeclRef::Kind::Func);
+      implFn = getFunction(assocRef, NotForDefinition);
+    }
+    // Otherwise, create an autodiff thunk. The thunk contains an
+    // `autodiff_function` instruction, which is later filled during
+    // differentiation transform.
+    // TODO(TF-524): Generalize canonical JVP/VJP thunk generation.
+    else {
+      implFn =
+          getAutoDiffThunk(derived, Types.getConstantInfo(derived).SILFnType);
+    }
+  // SWIFT_ENABLE_TENSORFLOW END
   } else {
     implFn = getFunction(derived, NotForDefinition);
   }
@@ -118,8 +133,6 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
     (!usesObjCDynamicDispatch &&
      !derivedDecl->isFinal() &&
      derivedDecl->isEffectiveLinkageMoreVisibleThan(baseDecl));
-
-  llvm::dbgs() << "maybe we'll thunk it\n";
 
   // Determine the derived thunk type by lowering the derived type against the
   // abstraction pattern of the base.
@@ -151,6 +164,18 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
         cast<ConstructorDecl>(baseDecl),
         cast<ConstructorDecl>(derivedDecl),
         base.kind == SILDeclRef::Kind::Allocator);
+    }
+  }
+  // SWIFT_ENABLE_TENSORFLOW
+  // TODO: Use proper mangling.
+  if (auto *adafi = derived.autoDiffAssociatedFunctionIdentifier) {
+    switch (adafi->getKind()) {
+      case AutoDiffAssociatedFunctionKind::JVP:
+        name += "_jvp";
+        break;
+      case AutoDiffAssociatedFunctionKind::VJP:
+        name += "_vjp";
+        break;
     }
   }
 
@@ -282,7 +307,6 @@ public:
 
   // Try to find an overridden entry.
   void addMethodOverride(SILDeclRef baseRef, SILDeclRef declRef) {
-    llvm::dbgs() << "addMethodOverride " << baseRef << " " << declRef << "\n";
     auto found = baseToIndexMap.find(baseRef);
     assert(found != baseToIndexMap.end());
     auto &method = vtableMethods[found->second];

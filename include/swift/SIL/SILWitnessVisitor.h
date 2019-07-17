@@ -178,7 +178,7 @@ private:
     auto funcDeclRef = SILDeclRef(func, kind);
     asDerived().addMethod(funcDeclRef);
 
-    if (auto *DA = func->getAttrs().getAttribute<DifferentiableAttr>()) {
+    for (auto *DA : func->getAttrs().getAttributes<DifferentiableAttr>()) {
       asDerived().addMethod(funcDeclRef.asAutoDiffAssociatedFunction(
           AutoDiffAssociatedFunctionIdentifier::get(
               AutoDiffAssociatedFunctionKind::JVP, /*differentiationOrder*/ 1,

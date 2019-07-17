@@ -4168,8 +4168,6 @@ getWitnessFunctionRef(SILGenFunction &SGF,
                             SILType::getPrimitiveObjectType(witnessFTy));
   }
   case WitnessDispatchKind::Class: {
-    // SWIFT_ENABLE_TENSORFLOW
-    assert(!witness.autoDiffAssociatedFunctionIdentifier);
     SILValue selfPtr = witnessParams.back().getValue();
     return SGF.emitClassMethodRef(loc, selfPtr, witness, witnessFTy);
   }

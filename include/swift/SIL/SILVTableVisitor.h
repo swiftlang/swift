@@ -88,19 +88,22 @@ template <class T> class SILVTableVisitor {
 
     maybeAddEntry(SILDeclRef(fd, SILDeclRef::Kind::Func));
 
-    if (auto *DA = fd->getAttrs().getAttribute<DifferentiableAttr>()) {
+    // SWIFT_ENABLE_TENSORFLOW
+    for (auto *DA : fd->getAttrs().getAttributes<DifferentiableAttr>()) {
+      auto constant = SILDeclRef(fd, SILDeclRef::Kind::Func);
       auto jvpConstant = constant.asAutoDiffAssociatedFunction(
           AutoDiffAssociatedFunctionIdentifier::get(
-          AutoDiffAssociatedFunctionKind::JVP, /*differentiationOrder*/ 1,
-          DA->getParameterIndices(), fd->getASTContext()));
-      maybeAddEntry(jvpConstant, jvpConstant.requiresNewVTableEntry());
+              AutoDiffAssociatedFunctionKind::JVP, /*differentiationOrder*/ 1,
+              DA->getParameterIndices(), fd->getASTContext()));
+      maybeAddEntry(jvpConstant);
 
       auto vjpConstant = constant.asAutoDiffAssociatedFunction(
           AutoDiffAssociatedFunctionIdentifier::get(
-          AutoDiffAssociatedFunctionKind::VJP, /*differentiationOrder*/ 1,
-          DA->getParameterIndices(), fd->getASTContext()));
-      maybeAddEntry(vjpConstant, vjpConstant.requiresNewVTableEntry());
+              AutoDiffAssociatedFunctionKind::VJP, /*differentiationOrder*/ 1,
+              DA->getParameterIndices(), fd->getASTContext()));
+      maybeAddEntry(vjpConstant);
     }
+    // SWIFT_ENABLE_TENSORFLOW END
   }
 
   void maybeAddConstructor(ConstructorDecl *cd) {
@@ -111,6 +114,23 @@ template <class T> class SILVTableVisitor {
     // necessary for super.init chaining, which is sufficiently constrained
     // to never need dynamic dispatch.
     maybeAddEntry(SILDeclRef(cd, SILDeclRef::Kind::Allocator));
+
+    // SWIFT_ENABLE_TENSORFLOW
+    for (auto *DA : cd->getAttrs().getAttributes<DifferentiableAttr>()) {
+      auto constant = SILDeclRef(cd, SILDeclRef::Kind::Allocator);
+      auto jvpConstant = constant.asAutoDiffAssociatedFunction(
+          AutoDiffAssociatedFunctionIdentifier::get(
+              AutoDiffAssociatedFunctionKind::JVP, /*differentiationOrder*/ 1,
+              DA->getParameterIndices(), cd->getASTContext()));
+      maybeAddEntry(jvpConstant);
+
+      auto vjpConstant = constant.asAutoDiffAssociatedFunction(
+          AutoDiffAssociatedFunctionIdentifier::get(
+              AutoDiffAssociatedFunctionKind::VJP, /*differentiationOrder*/ 1,
+              DA->getParameterIndices(), cd->getASTContext()));
+      maybeAddEntry(vjpConstant);
+    }
+    // SWIFT_ENABLE_TENSORFLOW END
   }
 
   void maybeAddEntry(SILDeclRef declRef) {
