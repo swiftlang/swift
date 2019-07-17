@@ -460,12 +460,10 @@ NOTE(autodiff_when_differentiating_function_definition,none,
      "when differentiating this function definition", ())
 NOTE(autodiff_cannot_differentiate_through_inout_arguments,none,
      "cannot differentiate through 'inout' arguments", ())
-NOTE(autodiff_control_flow_not_supported,none,
-     "differentiating control flow is not yet supported", ())
-NOTE(autodiff_loops_not_supported,none,
-     "differentiating loops is not yet supported", ())
 NOTE(autodiff_class_member_not_supported,none,
      "differentiating class members is not yet supported", ())
+NOTE(autodiff_control_flow_not_supported,none,
+     "cannot differentiate unsupported control flow", ())
 NOTE(autodiff_missing_return,none,
      "missing return for differentiation", ())
 

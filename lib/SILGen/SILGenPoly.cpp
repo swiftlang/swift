@@ -3449,7 +3449,6 @@ SILGenFunction::getOrCreateAutoDiffLinearMapReorderingThunk(
     SmallVector<SILValue, 8> tmpValues;
     forwardFunctionArguments(
         thunkSGF, loc, linearMapFnType, params, tmpValues);
-    // argValues.append(tmpValues.begin() + 1, tmpValues.end());
     argValues.push_back(tmpValues.back());
     argValues.append(tmpValues.begin(), tmpValues.end() - 1);
     break;

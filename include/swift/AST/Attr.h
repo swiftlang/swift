@@ -1561,7 +1561,14 @@ public:
                                     Optional<DeclNameWithLoc> vjp,
                                     ArrayRef<Requirement> requirements);
 
+  /// Get the optional 'jvp:' function name and location.
+  /// Use this instead of `getJVPFunction` to check whether the attribute has a
+  /// registered JVP.
   Optional<DeclNameWithLoc> getJVP() const { return JVP; }
+
+  /// Get the optional 'vjp:' function name and location.
+  /// Use this instead of `getVJPFunction` to check whether the attribute has a
+  /// registered VJP.
   Optional<DeclNameWithLoc> getVJP() const { return VJP; }
 
   AutoDiffParameterIndices *getParameterIndices() const {
