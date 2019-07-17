@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/IDE/Refactoring.h"
+#include "swift/IDE/IDERequests.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
@@ -689,12 +690,10 @@ public:
                               SourceEditConsumer &EditConsumer,
                               DiagnosticConsumer &DiagConsumer) :
   RefactoringAction(MD, Opts, EditConsumer, DiagConsumer) {
-    // We can only proceed with valid location and source file.
-    if (StartLoc.isValid() && TheFile) {
-      // Resolve the sema token and save it for later use.
-      CursorInfoResolver Resolver(*TheFile);
-      CursorInfo = Resolver.resolve(StartLoc);
-    }
+  // Resolve the sema token and save it for later use.
+  CursorInfo = evaluateOrDefault(TheFile->getASTContext().evaluator,
+                          CursorInfoRequest{ CursorInfoOwner(TheFile, StartLoc)},
+                                 ResolvedCursorInfo());
   }
 };
 
@@ -781,8 +780,9 @@ bool RefactoringActionLocalRename::performChange() {
                         MD->getNameStr());
     return true;
   }
-  CursorInfoResolver Resolver(*TheFile);
-  ResolvedCursorInfo CursorInfo = Resolver.resolve(StartLoc);
+  CursorInfo = evaluateOrDefault(TheFile->getASTContext().evaluator,
+                          CursorInfoRequest{CursorInfoOwner(TheFile, StartLoc)},
+                                 ResolvedCursorInfo());
   if (CursorInfo.isValid() && CursorInfo.ValueD) {
     ValueDecl *VD = CursorInfo.CtorTyRef ? CursorInfo.CtorTyRef : CursorInfo.ValueD;
     llvm::SmallVector<DeclContext *, 8> Scopes;
@@ -2563,11 +2563,12 @@ collectAvailableRefactoringsAtCursor(SourceFile *SF, unsigned Line,
   DiagnosticEngine DiagEngine(SM);
   std::for_each(DiagConsumers.begin(), DiagConsumers.end(),
                 [&](DiagnosticConsumer *Con) { DiagEngine.addConsumer(*Con); });
-  CursorInfoResolver Resolver(*SF);
   SourceLoc Loc = SM.getLocForLineCol(SF->getBufferID().getValue(), Line, Column);
   if (Loc.isInvalid())
     return {};
-  ResolvedCursorInfo Tok = Resolver.resolve(Lexer::getLocForStartOfToken(SM, Loc));
+  ResolvedCursorInfo Tok = evaluateOrDefault(SF->getASTContext().evaluator,
+    CursorInfoRequest{CursorInfoOwner(SF, Lexer::getLocForStartOfToken(SM, Loc))},
+                                             ResolvedCursorInfo());
   return collectAvailableRefactorings(SF, Tok, Scratch, /*Exclude rename*/false);
 }
 
@@ -3519,9 +3520,10 @@ int swift::ide::findLocalRenameRanges(
   Diags.addConsumer(DiagConsumer);
 
   auto StartLoc = Lexer::getLocForStartOfToken(SM, Range.getStart(SM));
-
-  CursorInfoResolver Resolver(*SF);
-  ResolvedCursorInfo CursorInfo = Resolver.resolve(StartLoc);
+  ResolvedCursorInfo CursorInfo =
+    evaluateOrDefault(SF->getASTContext().evaluator,
+                      CursorInfoRequest{CursorInfoOwner(SF, StartLoc)},
+                      ResolvedCursorInfo());
   if (!CursorInfo.isValid() || !CursorInfo.ValueD) {
     Diags.diagnose(StartLoc, diag::unresolved_location);
     return true;

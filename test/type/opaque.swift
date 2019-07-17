@@ -272,10 +272,11 @@ func associatedTypeIdentity() {
   sameType(gary(doug()).r_out(), gary(candace()).r_out()) // expected-error{{}}
 }
 
-func redeclaration() -> some P { return 0 } // expected-note{{previously declared}}
+func redeclaration() -> some P { return 0 } // expected-note 2{{previously declared}}
 func redeclaration() -> some P { return 0 } // expected-error{{redeclaration}}
-func redeclaration() -> some Q { return 0 }
+func redeclaration() -> some Q { return 0 } // expected-error{{redeclaration}}
 func redeclaration() -> P { return 0 }
+func redeclaration() -> Any { return 0 }
 
 var redeclaredProp: some P { return 0 } // expected-note 3{{previously declared}}
 var redeclaredProp: some P { return 0 } // expected-error{{redeclaration}}
@@ -283,9 +284,9 @@ var redeclaredProp: some Q { return 0 } // expected-error{{redeclaration}}
 var redeclaredProp: P { return 0 } // expected-error{{redeclaration}}
 
 struct RedeclarationTest {
-  func redeclaration() -> some P { return 0 } // expected-note{{previously declared}}
+  func redeclaration() -> some P { return 0 } // expected-note 2{{previously declared}}
   func redeclaration() -> some P { return 0 } // expected-error{{redeclaration}}
-  func redeclaration() -> some Q { return 0 }
+  func redeclaration() -> some Q { return 0 } // expected-error{{redeclaration}}
   func redeclaration() -> P { return 0 }
 
   var redeclaredProp: some P { return 0 } // expected-note 3{{previously declared}}
@@ -293,9 +294,9 @@ struct RedeclarationTest {
   var redeclaredProp: some Q { return 0 } // expected-error{{redeclaration}}
   var redeclaredProp: P { return 0 } // expected-error{{redeclaration}}
 
-  subscript(redeclared _: Int) -> some P { return 0 } // expected-note{{previously declared}}
+  subscript(redeclared _: Int) -> some P { return 0 } // expected-note 2{{previously declared}}
   subscript(redeclared _: Int) -> some P { return 0 } // expected-error{{redeclaration}}
-  subscript(redeclared _: Int) -> some Q { return 0 }
+  subscript(redeclared _: Int) -> some Q { return 0 } // expected-error{{redeclaration}}
   subscript(redeclared _: Int) -> P { return 0 }
 }
 

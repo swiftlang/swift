@@ -1734,12 +1734,17 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
                           SmallVectorImpl<ModuleDecl *> &modulesFound,
                           bool &anyObject,
                           llvm::SmallPtrSetImpl<TypeAliasDecl *> &typealiases) {
+  SmallPtrSet<NominalTypeDecl *, 4> knownNominalDecls;
   TinyPtrVector<NominalTypeDecl *> nominalDecls;
+  auto addNominalDecl = [&](NominalTypeDecl *nominal) {
+    if (knownNominalDecls.insert(nominal).second)
+      nominalDecls.push_back(nominal);
+  };
 
   for (auto typeDecl : typeDecls) {
     // Nominal type declarations get copied directly.
     if (auto nominalDecl = dyn_cast<NominalTypeDecl>(typeDecl)) {
-      nominalDecls.push_back(nominalDecl);
+      addNominalDecl(nominalDecl);
       continue;
     }
 
@@ -1756,9 +1761,9 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
       auto underlyingNominalReferences
         = resolveTypeDeclsToNominal(evaluator, ctx, underlyingTypeReferences,
                                     modulesFound, anyObject, typealiases);
-      nominalDecls.insert(nominalDecls.end(),
-                          underlyingNominalReferences.begin(),
-                          underlyingNominalReferences.end());
+      std::for_each(underlyingNominalReferences.begin(),
+                    underlyingNominalReferences.end(),
+                    addNominalDecl);
 
       // Recognize Swift.AnyObject directly.
       if (typealias->getName().is("AnyObject")) {

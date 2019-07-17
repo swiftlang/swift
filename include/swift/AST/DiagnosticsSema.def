@@ -3395,9 +3395,12 @@ ERROR(closure_tuple_parameter_destructuring_implicit,none,
 ERROR(nested_tuple_parameter_destructuring,none,
       "nested tuple parameter %0 of function %1 "
       "does not support destructuring", (Type, Type))
-ERROR(single_tuple_parameter_mismatch,none,
-      "%0 %select{|%1 }3expects a single parameter of type %2",
-      (DescriptiveDeclKind, Identifier, Type, bool))
+ERROR(single_tuple_parameter_mismatch_special,none,
+      "%0 expects a single parameter of type %1%2",
+      (DescriptiveDeclKind, Type, StringRef))
+ERROR(single_tuple_parameter_mismatch_normal,none,
+      "%0 %1 expects a single parameter of type %2%3",
+      (DescriptiveDeclKind, DeclBaseName, Type, StringRef))
 ERROR(unknown_single_tuple_parameter_mismatch,none,
       "single parameter of type %0 is expected in call", (Type))
 

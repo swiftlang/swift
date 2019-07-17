@@ -163,7 +163,13 @@ struct ResolvedCursorInfo {
 
   ResolvedCursorInfo() = default;
   ResolvedCursorInfo(SourceFile *SF) : SF(SF) {}
-  
+
+  friend bool operator==(const ResolvedCursorInfo &lhs,
+                         const ResolvedCursorInfo &rhs) {
+    return lhs.SF == rhs.SF &&
+      lhs.Loc.getOpaquePointerValue() == rhs.Loc.getOpaquePointerValue();
+  }
+
   void setValueRef(ValueDecl *ValueD,
                    TypeDecl *CtorTyRef,
                    ExtensionDecl *ExtTyRef,
@@ -196,44 +202,7 @@ struct ResolvedCursorInfo {
   bool isInvalid() const { return Kind == CursorInfoKind::Invalid; }
 };
 
-class CursorInfoResolver : public SourceEntityWalker {
-  SourceFile &SrcFile;
-  SourceLoc LocToResolve;
-  ResolvedCursorInfo CursorInfo;
-  Type ContainerType;
-  llvm::SmallVector<Expr*, 4> TrailingExprStack;
-
-public:
-  explicit CursorInfoResolver(SourceFile &SrcFile) :
-    SrcFile(SrcFile), CursorInfo(&SrcFile) {}
-  ResolvedCursorInfo resolve(SourceLoc Loc);
-  SourceManager &getSourceMgr() const;
-private:
-  bool walkToExprPre(Expr *E) override;
-  bool walkToExprPost(Expr *E) override;
-  bool walkToDeclPre(Decl *D, CharSourceRange Range) override;
-  bool walkToDeclPost(Decl *D) override;
-  bool walkToStmtPre(Stmt *S) override;
-  bool walkToStmtPost(Stmt *S) override;
-  bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                          TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type T,
-                          ReferenceMetaData Data) override;
-  bool visitCallArgName(Identifier Name, CharSourceRange Range,
-                        ValueDecl *D) override;
-  bool visitDeclarationArgumentName(Identifier Name, SourceLoc StartLoc,
-                                    ValueDecl *D) override;
-  bool visitModuleReference(ModuleEntity Mod, CharSourceRange Range) override;
-  bool rangeContainsLoc(SourceRange Range) const;
-  bool rangeContainsLoc(CharSourceRange Range) const;
-  bool isDone() const { return CursorInfo.isValid(); }
-  bool tryResolve(ValueDecl *D, TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef,
-                  SourceLoc Loc, bool IsRef, Type Ty = Type());
-  bool tryResolve(ModuleEntity Mod, SourceLoc Loc);
-  bool tryResolve(Stmt *St);
-  bool visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
-                               ReferenceMetaData Data,
-                               bool IsOpenBracket) override;
-};
+void simple_display(llvm::raw_ostream &out, const ResolvedCursorInfo &info);
 
 struct UnresolvedLoc {
   SourceLoc Loc;

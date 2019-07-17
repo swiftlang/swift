@@ -672,3 +672,43 @@ AllowMutatingMemberOnRValueBase::create(ConstraintSystem &cs, Type baseType,
   return new (cs.getAllocator())
       AllowMutatingMemberOnRValueBase(cs, baseType, member, name, locator);
 }
+
+bool AllowTupleSplatForSingleParameter::diagnose(Expr *root, bool asNote) const {
+  auto &cs = getConstraintSystem();
+  InvalidTupleSplatWithSingleParameterFailure failure(root, cs, ParamType,
+                                                      getLocator());
+  return failure.diagnose(asNote);
+}
+
+bool AllowTupleSplatForSingleParameter::attempt(
+    ConstraintSystem &cs, SmallVectorImpl<Param> &args, ArrayRef<Param> params,
+    SmallVectorImpl<SmallVector<unsigned, 1>> &bindings,
+    ConstraintLocatorBuilder locator) {
+  if (params.size() != 1 || args.size() <= 1)
+    return true;
+
+  const auto &param = params.front();
+
+  auto *paramTy = param.getOldType()->getAs<TupleType>();
+  if (!paramTy || paramTy->getNumElements() != args.size())
+    return true;
+
+  SmallVector<TupleTypeElt, 4> argElts;
+  for (const auto &arg : args) {
+    argElts.push_back(
+        {arg.getPlainType(), arg.getLabel(), arg.getParameterFlags()});
+  }
+
+  bindings[0].clear();
+  bindings[0].push_back(0);
+
+  auto newArgType = TupleType::get(argElts, cs.getASTContext());
+
+  args.clear();
+  args.push_back(AnyFunctionType::Param(newArgType, param.getLabel()));
+
+  auto *fix = new (cs.getAllocator()) AllowTupleSplatForSingleParameter(
+      cs, paramTy, cs.getConstraintLocator(locator));
+
+  return cs.recordFix(fix);
+}
