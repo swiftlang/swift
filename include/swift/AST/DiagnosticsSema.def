@@ -37,8 +37,6 @@
   DIAG(NOTE,ID,Options,Text,Signature)
 #endif
 
-NOTE(kind_declname_declared_here,none,
-     "%0 %1 declared here", (DescriptiveDeclKind, DeclName))
 NOTE(decl_declared_here,none,
      "%0 declared here", (DeclName))
 NOTE(kind_declared_here,none,
@@ -350,6 +348,9 @@ ERROR(cannot_convert_default_arg_value,none,
       (Type,Type))
 ERROR(cannot_convert_default_arg_value_protocol,none,
       "default argument value of type %0 does not conform to %1", (Type,Type))
+ERROR(default_argument_literal_cannot_convert, none,
+      "cannot call %0 %1 because default argument of type %2 cannot be "
+      "converted to type %3", (DescriptiveDeclKind, DeclName, Type, Type))
 ERROR(cannot_convert_default_arg_value_nil,none,
       "nil default argument value cannot be converted to type %0", (Type))
 
@@ -2034,8 +2035,6 @@ ERROR(typealias_outside_of_protocol,none,
       "type alias %0 can only be used with a concrete type or "
       "generic parameter base", (Identifier))
 
-ERROR(circular_protocol_def,none,
-      "protocol %0 refines itself", (Identifier))
 ERROR(objc_protocol_inherits_non_objc_protocol,none,
       "@objc protocol %0 cannot refine non-@objc protocol %1", (Type, Type))
 
@@ -2340,6 +2339,10 @@ WARNING(override_swift3_objc_inference,none,
         "override of %0 %1 from extension of %2 depends on deprecated "
         "inference of '@objc'",
         (DescriptiveDeclKind, DeclName, Identifier))
+ERROR(override_method_different_generic_sig,none,
+      "overridden method %0 has generic signature %1 which is incompatible with "
+      "base method's generic signature %2; expected generic signature to be %3",
+      (DeclBaseName, StringRef, StringRef, StringRef))
 
 // Inheritance
 ERROR(duplicate_inheritance,none,
@@ -3388,9 +3391,12 @@ ERROR(closure_tuple_parameter_destructuring_implicit,none,
 ERROR(nested_tuple_parameter_destructuring,none,
       "nested tuple parameter %0 of function %1 "
       "does not support destructuring", (Type, Type))
-ERROR(single_tuple_parameter_mismatch,none,
-      "%0 %select{|%1 }3expects a single parameter of type %2",
-      (DescriptiveDeclKind, Identifier, Type, bool))
+ERROR(single_tuple_parameter_mismatch_special,none,
+      "%0 expects a single parameter of type %1%2",
+      (DescriptiveDeclKind, Type, StringRef))
+ERROR(single_tuple_parameter_mismatch_normal,none,
+      "%0 %1 expects a single parameter of type %2%3",
+      (DescriptiveDeclKind, DeclBaseName, Type, StringRef))
 ERROR(unknown_single_tuple_parameter_mismatch,none,
       "single parameter of type %0 is expected in call", (Type))
 

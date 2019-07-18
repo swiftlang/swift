@@ -860,6 +860,13 @@ static const Decl *findContainingDeclaration(SourceRange ReferenceRange,
   auto ContainsReferenceRange = [&](const Decl *D) -> bool {
     if (ReferenceRange.isInvalid())
       return false;
+
+    // Members of an active #if are represented both inside the
+    // IfConfigDecl and in the enclosing context. Skip over the IfConfigDecl
+    // so that that the member declaration is found rather the #if itself.
+    if (isa<IfConfigDecl>(D))
+      return false;
+
     return SM.rangeContains(D->getSourceRange(), ReferenceRange);
   };
 

@@ -1172,15 +1172,12 @@ FuncDecl *ASTContext::getArrayReserveCapacityDecl() const {
 
       StructDecl *IntDecl = IntType->getDecl();
       auto StoredProperties = IntDecl->getStoredProperties();
-      auto FieldIter = StoredProperties.begin();
-      if (FieldIter == StoredProperties.end())
+      if (StoredProperties.size() != 1)
         return nullptr;
-      VarDecl *field = *FieldIter;
+      VarDecl *field = StoredProperties[0];
       if (field->hasClangNode())
         return nullptr;
       if (!field->getInterfaceType()->is<BuiltinIntegerType>())
-        return nullptr;
-      if (std::next(FieldIter) != StoredProperties.end())
         return nullptr;
 
       if (!FnDecl->getResultInterfaceType()->isVoid())

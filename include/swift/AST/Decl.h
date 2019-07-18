@@ -3451,42 +3451,12 @@ public:
   /// Retrieve information about this type as a property wrapper.
   PropertyWrapperTypeInfo getPropertyWrapperTypeInfo() const;
 
-private:
-  /// Predicate used to filter StoredPropertyRange.
-  struct ToStoredProperty {
-    ToStoredProperty(bool skipInaccessible = false) :
-        skipUserInaccessible(skipInaccessible) {}
-    bool skipUserInaccessible;
-    Optional<VarDecl *> operator()(Decl *decl) const;
-  };
-  
-public:
-  /// A range for iterating the stored member variables of a structure.
-  using StoredPropertyRange = OptionalTransformRange<DeclRange,
-                                                     ToStoredProperty>;
-
   /// Return a collection of the stored member variables of this type.
-  StoredPropertyRange getStoredProperties(bool skipInaccessible = false) const;
+  ArrayRef<VarDecl *> getStoredProperties() const;
 
-private:
-  /// Predicate used to filter StoredPropertyRange.
-  struct ToStoredPropertyOrMissingMemberPlaceholder {
-    Optional<Decl *> operator()(Decl *decl) const;
-  };
-
-public:
-  /// A range for iterating the stored member variables of a structure.
-  using StoredPropertyOrMissingMemberPlaceholderRange
-    = OptionalTransformRange<DeclRange,
-                             ToStoredPropertyOrMissingMemberPlaceholder>;
-  
   /// Return a collection of the stored member variables of this type, along
   /// with placeholders for unimportable stored properties.
-  StoredPropertyOrMissingMemberPlaceholderRange
-  getStoredPropertiesAndMissingMemberPlaceholders() const {
-    return StoredPropertyOrMissingMemberPlaceholderRange(getMembers(),
-                             ToStoredPropertyOrMissingMemberPlaceholder());
-  }
+  ArrayRef<Decl *> getStoredPropertiesAndMissingMemberPlaceholders() const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -4135,7 +4105,20 @@ class ProtocolDecl final : public NominalTypeDecl {
   /// by this protocol.
   const Requirement *RequirementSignature = nullptr;
 
-  bool requiresClassSlow();
+  /// Returns the cached result of \c requiresClass or \c None if it hasn't yet
+  /// been computed.
+  Optional<bool> getCachedRequiresClass() const {
+    if (Bits.ProtocolDecl.RequiresClassValid)
+      return Bits.ProtocolDecl.RequiresClass;
+
+    return None;
+  }
+
+  /// Caches the result of \c requiresClass
+  void setCachedRequiresClass(bool requiresClass) {
+    Bits.ProtocolDecl.RequiresClassValid = true;
+    Bits.ProtocolDecl.RequiresClass = requiresClass;
+  }
 
   bool existentialConformsToSelfSlow();
 
@@ -4150,6 +4133,7 @@ class ProtocolDecl final : public NominalTypeDecl {
   friend class SuperclassDeclRequest;
   friend class SuperclassTypeRequest;
   friend class RequirementSignatureRequest;
+  friend class ProtocolRequiresClassRequest;
   friend class TypeChecker;
 
 public:
@@ -4213,19 +4197,7 @@ public:
   }
 
   /// True if this protocol can only be conformed to by class types.
-  bool requiresClass() const {
-    if (Bits.ProtocolDecl.RequiresClassValid)
-      return Bits.ProtocolDecl.RequiresClass;
-
-    return const_cast<ProtocolDecl *>(this)->requiresClassSlow();
-  }
-
-  /// Specify that this protocol is class-bounded, e.g., because it was
-  /// annotated with the 'class' keyword.
-  void setRequiresClass(bool requiresClass = true) {
-    Bits.ProtocolDecl.RequiresClassValid = true;
-    Bits.ProtocolDecl.RequiresClass = requiresClass;
-  }
+  bool requiresClass() const;
 
   /// Determine whether an existential conforming to this protocol can be
   /// matched with a generic type parameter constrained to this protocol.
@@ -7148,32 +7120,6 @@ inline bool ValueDecl::isSettable(const DeclContext *UseDC,
     return sd->isSettable();
   } else
     return false;
-}
-
-inline Optional<VarDecl *>
-NominalTypeDecl::ToStoredProperty::operator()(Decl *decl) const {
-  if (auto var = dyn_cast<VarDecl>(decl)) {
-    if (!var->isStatic() && var->hasStorage() &&
-        (!skipUserInaccessible || var->isUserAccessible()))
-      return var;
-  }
-
-  return None;
-}
-
-inline Optional<Decl *>
-NominalTypeDecl::ToStoredPropertyOrMissingMemberPlaceholder
-::operator()(Decl *decl) const {
-  if (auto var = dyn_cast<VarDecl>(decl)) {
-    if (!var->isStatic() && var->hasStorage())
-      return var;
-  }
-  if (auto missing = dyn_cast<MissingMemberDecl>(decl)) {
-    if (missing->getNumberOfFieldOffsetVectorEntries() > 0)
-      return missing;
-  }
-
-  return None;
 }
 
 inline void

@@ -949,8 +949,14 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
                                       paramInfo,
                                       hasTrailingClosure,
                                       cs.shouldAttemptFixes(), listener,
-                                      parameterBindings))
-    return cs.getTypeMatchFailure(locator);
+                                      parameterBindings)) {
+    if (!cs.shouldAttemptFixes())
+      return cs.getTypeMatchFailure(locator);
+
+    if (AllowTupleSplatForSingleParameter::attempt(cs, argsWithLabels, params,
+                                                   parameterBindings, locator))
+      return cs.getTypeMatchFailure(locator);
+  }
 
   // If this application is part of an operator, then we allow an implicit
   // lvalue to be compatible with inout arguments.  This is used by
@@ -960,9 +966,36 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
 
   for (unsigned paramIdx = 0, numParams = parameterBindings.size();
        paramIdx != numParams; ++paramIdx){
-    // Skip unfulfilled parameters. There's nothing to do for them.
-    if (parameterBindings[paramIdx].empty())
+    // If a parameter is unfulfilled, validate the default argument if it is a
+    // magic literal expression.
+    if (parameterBindings[paramIdx].empty()) {
+      if (!callee)
+        continue;
+
+      if (!callee->hasParameterList())
+        continue;
+
+      auto param = getParameterAt(callee, paramIdx);
+
+      auto defaultValueExpr = param->getDefaultValue();
+
+      if (!(defaultValueExpr &&
+            isa<MagicIdentifierLiteralExpr>(defaultValueExpr)))
+        continue;
+
+      if (defaultValueExpr->getType())
+        continue;
+
+      cs.generateConstraints(defaultValueExpr, param->getDeclContext());
+
+      auto defaultTy = cs.getType(defaultValueExpr);
+      auto paramTy = param->getType();
+      cs.addConstraint(
+          ConstraintKind::ArgumentConversion, defaultTy, paramTy,
+          locator.withPathElement(ConstraintLocator::DefaultArgument));
+
       continue;
+    }
 
     // Determine the parameter type.
     const auto &param = params[paramIdx];
@@ -2326,6 +2359,12 @@ bool ConstraintSystem::repairFailures(
           *this, fnType, {FunctionType::Param(*arg)},
           getConstraintLocator(anchor, path)));
     }
+    break;
+  }
+
+  case ConstraintLocator::DefaultArgument: {
+    conversionsOrFixes.push_back(IgnoreDefaultArgumentTypeMismatch::create(
+        *this, lhs, rhs, getConstraintLocator(anchor, path)));
     break;
   }
 
@@ -6959,6 +6998,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::SkipSuperclassRequirement:
   case FixKind::ContextualMismatch:
   case FixKind::AddMissingArguments:
+  case FixKind::DefaultArgumentTypeMismatch:
   case FixKind::SkipUnhandledConstructInFunctionBuilder:
   case FixKind::UsePropertyWrapper:
   case FixKind::UseWrappedValue: {
@@ -6984,6 +7024,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::ExplicitlySpecifyGenericArguments:
   case FixKind::GenericArgumentsMismatch:
   case FixKind::AllowMutatingMemberOnRValueBase:
+  case FixKind::AllowTupleSplatForSingleParameter:
     llvm_unreachable("handled elsewhere");
   }
 

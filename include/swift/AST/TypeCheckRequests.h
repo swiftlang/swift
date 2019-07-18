@@ -176,6 +176,31 @@ public:
   void cacheResult(bool value) const;
 };
 
+/// Determine whether the given protocol declaration is class-bounded.
+class ProtocolRequiresClassRequest:
+    public SimpleRequest<ProtocolRequiresClassRequest,
+                         bool(ProtocolDecl *),
+                         CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator, ProtocolDecl *decl) const;
+
+public:
+  // Cycle handling.
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<bool> getCachedResult() const;
+  void cacheResult(bool value) const;
+};
+
 /// Determine whether the given declaration is 'final'.
 class IsFinalRequest :
     public SimpleRequest<IsFinalRequest,
@@ -708,6 +733,52 @@ private:
   llvm::Expected<bool>
   evaluate(Evaluator &evaluator, AbstractFunctionDecl *func,
            SourceLoc endTypeCheckLoc) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+/// Request to obtain a list of stored properties in a nominal type.
+///
+/// This will include backing storage for lazy properties and
+/// property wrappers, synthesizing them if necessary.
+class StoredPropertiesRequest :
+    public SimpleRequest<StoredPropertiesRequest,
+                         ArrayRef<VarDecl *>(NominalTypeDecl *),
+                         CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<ArrayRef<VarDecl *>>
+  evaluate(Evaluator &evaluator, NominalTypeDecl *decl) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+/// Request to obtain a list of stored properties in a nominal type,
+/// together with any missing members corresponding to stored
+/// properties that could not be deserialized.
+///
+/// This will include backing storage for lazy properties and
+/// property wrappers, synthesizing them if necessary.
+class StoredPropertiesAndMissingMembersRequest :
+    public SimpleRequest<StoredPropertiesAndMissingMembersRequest,
+                         ArrayRef<Decl *>(NominalTypeDecl *),
+                         CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<ArrayRef<Decl *>>
+  evaluate(Evaluator &evaluator, NominalTypeDecl *decl) const;
 
 public:
   bool isCached() const { return true; }

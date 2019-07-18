@@ -3703,7 +3703,8 @@ void ConformanceChecker::resolveValueWitnesses() {
 
       // Make sure that we finalize the witness, so we can emit this
       // witness table.
-      TC.DeclsToFinalize.insert(witness);
+      if (isa<AbstractStorageDecl>(witness))
+        TC.DeclsToFinalize.insert(witness);
 
       // Objective-C checking for @objc requirements.
       if (requirement->isObjC() &&

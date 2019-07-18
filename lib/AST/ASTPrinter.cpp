@@ -3576,69 +3576,26 @@ public:
       Printer << "_";
   }
 
-  void visitBuiltinRawPointerType(BuiltinRawPointerType *T) {
-    Printer << BUILTIN_TYPE_NAME_RAWPOINTER;
-  }
+#ifdef ASTPRINTER_HANDLE_BUILTINTYPE
+#error "ASTPRINTER_HANDLE_BUILTINTYPE should not be defined?!"
+#endif
 
-  void visitBuiltinNativeObjectType(BuiltinNativeObjectType *T) {
-    Printer << BUILTIN_TYPE_NAME_NATIVEOBJECT;
+#define ASTPRINTER_PRINT_BUILTINTYPE(NAME)                                     \
+  void visit##NAME(NAME *T) {                                                  \
+    SmallString<32> buffer;                                                    \
+    T->getTypeName(buffer);                                                    \
+    Printer << buffer;                                                         \
   }
-
-  void visitBuiltinUnknownObjectType(BuiltinUnknownObjectType *T) {
-    Printer << BUILTIN_TYPE_NAME_UNKNOWNOBJECT;
-  }
-
-  void visitBuiltinBridgeObjectType(BuiltinBridgeObjectType *T) {
-    Printer << BUILTIN_TYPE_NAME_BRIDGEOBJECT;
-  }
-
-  void visitBuiltinUnsafeValueBufferType(BuiltinUnsafeValueBufferType *T) {
-    Printer << BUILTIN_TYPE_NAME_UNSAFEVALUEBUFFER;
-  }
-
-  void visitBuiltinIntegerLiteralType(BuiltinIntegerLiteralType *T) {
-    Printer << BUILTIN_TYPE_NAME_INTLITERAL;
-  }
-
-  void visitBuiltinVectorType(BuiltinVectorType *T) {
-    llvm::SmallString<32> UnderlyingStrVec;
-    StringRef UnderlyingStr;
-    {
-      // FIXME: Ugly hack: remove the .Builtin from the element type.
-      {
-        llvm::raw_svector_ostream UnderlyingOS(UnderlyingStrVec);
-        T->getElementType().print(UnderlyingOS);
-      }
-      if (UnderlyingStrVec.startswith(BUILTIN_TYPE_NAME_PREFIX))
-        UnderlyingStr = UnderlyingStrVec.substr(8);
-      else
-        UnderlyingStr = UnderlyingStrVec;
-    }
-
-    Printer << BUILTIN_TYPE_NAME_VEC << T->getNumElements() << "x" << UnderlyingStr;
-  }
-
-  void visitBuiltinIntegerType(BuiltinIntegerType *T) {
-    auto width = T->getWidth();
-    if (width.isFixedWidth()) {
-      Printer << BUILTIN_TYPE_NAME_INT << width.getFixedWidth();
-    } else if (width.isPointerWidth()) {
-      Printer << BUILTIN_TYPE_NAME_WORD;
-    } else {
-      llvm_unreachable("impossible bit width");
-    }
-  }
-
-  void visitBuiltinFloatType(BuiltinFloatType *T) {
-    switch (T->getFPKind()) {
-    case BuiltinFloatType::IEEE16:  Printer << "Builtin.FPIEEE16"; return;
-    case BuiltinFloatType::IEEE32:  Printer << "Builtin.FPIEEE32"; return;
-    case BuiltinFloatType::IEEE64:  Printer << "Builtin.FPIEEE64"; return;
-    case BuiltinFloatType::IEEE80:  Printer << "Builtin.FPIEEE80"; return;
-    case BuiltinFloatType::IEEE128: Printer << "Builtin.FPIEEE128"; return;
-    case BuiltinFloatType::PPC128:  Printer << "Builtin.FPPPC128"; return;
-    }
-  }
+  ASTPRINTER_PRINT_BUILTINTYPE(BuiltinRawPointerType)
+  ASTPRINTER_PRINT_BUILTINTYPE(BuiltinNativeObjectType)
+  ASTPRINTER_PRINT_BUILTINTYPE(BuiltinUnknownObjectType)
+  ASTPRINTER_PRINT_BUILTINTYPE(BuiltinBridgeObjectType)
+  ASTPRINTER_PRINT_BUILTINTYPE(BuiltinUnsafeValueBufferType)
+  ASTPRINTER_PRINT_BUILTINTYPE(BuiltinIntegerLiteralType)
+  ASTPRINTER_PRINT_BUILTINTYPE(BuiltinVectorType)
+  ASTPRINTER_PRINT_BUILTINTYPE(BuiltinIntegerType)
+  ASTPRINTER_PRINT_BUILTINTYPE(BuiltinFloatType)
+#undef ASTPRINTER_PRINT_BUILTINTYPE
 
   void visitSILTokenType(SILTokenType *T) {
     Printer << BUILTIN_TYPE_NAME_SILTOKEN;

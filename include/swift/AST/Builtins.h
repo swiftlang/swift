@@ -17,10 +17,11 @@
 #ifndef SWIFT_AST_BUILTINS_H
 #define SWIFT_AST_BUILTINS_H
 
+#include "swift/AST/Type.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/IR/Attributes.h"
-#include "swift/AST/Type.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/Support/ErrorHandling.h"
 
@@ -29,9 +30,17 @@ enum class AtomicOrdering;
 }
 
 namespace swift {
-  class ASTContext;
-  class Identifier;
-  class ValueDecl;
+
+class ASTContext;
+class Identifier;
+class ValueDecl;
+
+enum class BuiltinTypeKind : std::underlying_type<TypeKind>::type {
+#define TYPE(id, parent)
+#define BUILTIN_TYPE(id, parent)                                               \
+  id = std::underlying_type<TypeKind>::type(TypeKind::id),
+#include "swift/AST/TypeNodes.def"
+};
 
 /// Get the builtin type for the given name.
 ///
@@ -88,7 +97,6 @@ llvm::Intrinsic::ID getLLVMIntrinsicID(StringRef Name);
 /// overflow.
 llvm::Intrinsic::ID
 getLLVMIntrinsicIDForBuiltinWithOverflow(BuiltinValueKind ID);
-
 
 /// Create a ValueDecl for the builtin with the given name.
 ///

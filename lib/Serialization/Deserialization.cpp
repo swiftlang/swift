@@ -2890,6 +2890,8 @@ public:
           LazyStoragePropertyRequest{var}, std::move(storage));
     }
 
+    var->setLazyStorageProperty(isLazyStorageProperty);
+
     // If there are any backing properties, record them.
     if (numBackingProperties > 0) {
       VarDecl *backingVar = cast<VarDecl>(MF.getDecl(backingPropertyIDs[0]));
@@ -3353,7 +3355,8 @@ public:
                                              None, /*TrailingWhere=*/nullptr);
     declOrOffset = proto;
 
-    proto->setRequiresClass(isClassBounded);
+    ctx.evaluator.cacheOutput(ProtocolRequiresClassRequest{proto},
+                              std::move(isClassBounded));
     proto->setExistentialTypeSupported(existentialTypeSupported);
 
     if (auto accessLevel = getActualAccessLevel(rawAccessLevel)) {

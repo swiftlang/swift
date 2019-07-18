@@ -356,21 +356,6 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
   // FIXME: Horrible hack. Store this somewhere more appropriate.
   SF.LastCheckedSynthesizedDecl = currentSynthesizedDecl;
 
-  // Now that all types have been finalized, run any delayed
-  // circularity checks.
-  // This has been written carefully to fail safe + finitely if
-  // for some reason a type gets re-delayed in a non-assertions
-  // build in an otherwise successful build.
-  // Types can be redelayed in a failing build because we won't
-  // type-check required declarations from different files.
-  for (size_t i = 0, e = TC.DelayedCircularityChecks.size(); i != e; ++i) {
-    TC.checkDeclCircularity(TC.DelayedCircularityChecks[i]);
-    assert((e == TC.DelayedCircularityChecks.size() ||
-            TC.Context.hadError()) &&
-           "circularity checking for type was re-delayed!");
-  }
-  TC.DelayedCircularityChecks.clear();
-
   // Compute captures for functions and closures we visited.
   for (auto *closure : TC.ClosuresWithUncomputedCaptures) {
     TC.computeCaptures(closure);

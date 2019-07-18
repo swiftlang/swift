@@ -14,13 +14,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/GenericSignatureBuilder.h"
-#include "swift/Basic/LLVMContext.h"
-#include "swift/AST/ASTContext.h"
 #include "swift/AST/Builtins.h"
+#include "swift/AST/ASTContext.h"
+#include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
-#include "swift/AST/GenericEnvironment.h"
+#include "swift/Basic/LLVMContext.h"
+#include "swift/Strings.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/IR/Attributes.h"
@@ -1034,11 +1035,19 @@ static ValueDecl *getCanBeObjCClassOperation(ASTContext &Context,
   return builder.build(Id);
 }
 
-static ValueDecl *getCondFailOperation(ASTContext &C, Identifier Id) {
+static ValueDecl *getLegacyCondFailOperation(ASTContext &C, Identifier Id) {
   // Int1 -> ()
   auto CondTy = BuiltinIntegerType::get(1, C);
   auto VoidTy = TupleType::getEmpty(C);
   return getBuiltinFunction(Id, {CondTy}, VoidTy);
+}
+
+static ValueDecl *getCondFailOperation(ASTContext &C, Identifier Id) {
+  // Int1 -> ()
+  auto CondTy = BuiltinIntegerType::get(1, C);
+  auto MsgTy = C.TheRawPointerType;
+  auto VoidTy = TupleType::getEmpty(C);
+  return getBuiltinFunction(Id, {CondTy, MsgTy}, VoidTy);
 }
 
 static ValueDecl *getAssertConfOperation(ASTContext &C, Identifier Id) {
@@ -1889,11 +1898,14 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     if (!Types.empty()) return nullptr;
     return getAddressOfOperation(Context, Id);
 
+  case BuiltinValueKind::LegacyCondFail:
+    return getLegacyCondFailOperation(Context, Id);
+
   case BuiltinValueKind::AddressOfBorrow:
     if (!Types.empty()) return nullptr;
     return getAddressOfBorrowOperation(Context, Id);
 
-  case BuiltinValueKind::CondFail:
+  case BuiltinValueKind::CondFailMessage:
     return getCondFailOperation(Context, Id);
 
   case BuiltinValueKind::AssertConf:
@@ -2008,4 +2020,104 @@ StringRef swift::getBuiltinName(BuiltinValueKind ID) {
 #include "swift/AST/Builtins.def"
   }
   llvm_unreachable("bad BuiltinValueKind");
+}
+
+BuiltinTypeKind BuiltinType::getBuiltinTypeKind() const {
+  // If we do not have a vector or an integer our job is easy.
+  return BuiltinTypeKind(std::underlying_type<TypeKind>::type(getKind()));
+}
+
+StringRef BuiltinType::getTypeName(SmallVectorImpl<char> &result,
+                                   bool prependBuiltinNamespace) const {
+#ifdef MAYBE_GET_NAMESPACED_BUILTIN
+#error                                                                         \
+    "We define MAYBE_GET_NAMESPACED_BUILTIN here. Do not define before this?!"
+#endif
+#define MAYBE_GET_NAMESPACED_BUILTIN(NAME)                                     \
+  ((prependBuiltinNamespace) ? NAME : NAME.getWithoutPrefix())
+
+  llvm::raw_svector_ostream printer(result);
+  switch (getBuiltinTypeKind()) {
+  case BuiltinTypeKind::BuiltinRawPointer:
+    printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_RAWPOINTER);
+    break;
+  case BuiltinTypeKind::BuiltinNativeObject:
+    printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_NATIVEOBJECT);
+    break;
+  case BuiltinTypeKind::BuiltinUnknownObject:
+    printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_UNKNOWNOBJECT);
+    break;
+  case BuiltinTypeKind::BuiltinBridgeObject:
+    printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_BRIDGEOBJECT);
+    break;
+  case BuiltinTypeKind::BuiltinUnsafeValueBuffer:
+    printer << MAYBE_GET_NAMESPACED_BUILTIN(
+        BUILTIN_TYPE_NAME_UNSAFEVALUEBUFFER);
+    break;
+  case BuiltinTypeKind::BuiltinIntegerLiteral:
+    printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_INTLITERAL);
+    break;
+  case BuiltinTypeKind::BuiltinVector: {
+    const auto *t = cast<const BuiltinVectorType>(this);
+    llvm::SmallString<32> UnderlyingStrVec;
+    StringRef UnderlyingStr;
+    {
+      // FIXME: Ugly hack: remove the .Builtin from the element type.
+      {
+        llvm::raw_svector_ostream UnderlyingOS(UnderlyingStrVec);
+        t->getElementType().print(UnderlyingOS);
+      }
+      if (UnderlyingStrVec.startswith(BUILTIN_TYPE_NAME_PREFIX))
+        UnderlyingStr = UnderlyingStrVec.substr(8);
+      else
+        UnderlyingStr = UnderlyingStrVec;
+    }
+
+    printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_VEC)
+            << t->getNumElements() << "x" << UnderlyingStr;
+    break;
+  }
+  case BuiltinTypeKind::BuiltinInteger: {
+    auto width = cast<const BuiltinIntegerType>(this)->getWidth();
+    if (width.isFixedWidth()) {
+      printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_INT)
+              << width.getFixedWidth();
+      break;
+    }
+
+    if (width.isPointerWidth()) {
+      printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_WORD);
+      break;
+    }
+
+    llvm_unreachable("impossible bit width");
+  }
+  case BuiltinTypeKind::BuiltinFloat: {
+    switch (cast<const BuiltinFloatType>(this)->getFPKind()) {
+    case BuiltinFloatType::IEEE16:
+      printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_FLOAT) << "16";
+      break;
+    case BuiltinFloatType::IEEE32:
+      printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_FLOAT) << "32";
+      break;
+    case BuiltinFloatType::IEEE64:
+      printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_FLOAT) << "64";
+      break;
+    case BuiltinFloatType::IEEE80:
+      printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_FLOAT) << "80";
+      break;
+    case BuiltinFloatType::IEEE128:
+      printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_FLOAT) << "128";
+      break;
+    case BuiltinFloatType::PPC128:
+      printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_FLOAT_PPC)
+              << "128";
+      break;
+    }
+    break;
+  }
+  }
+#undef MAYBE_GET_NAMESPACED_BUILTIN
+
+  return printer.str();
 }

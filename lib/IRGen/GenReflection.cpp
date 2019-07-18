@@ -555,7 +555,7 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
     B.addInt16(fieldRecordSize);
 
     auto properties = NTD->getStoredProperties();
-    B.addInt32(std::distance(properties.begin(), properties.end()));
+    B.addInt32(properties.size());
     for (auto property : properties)
       addFieldDecl(property, property->getInterfaceType(),
                    NTD->getGenericSignature());

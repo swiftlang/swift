@@ -76,7 +76,7 @@ static bool isUnmapped(ASTNode N) {
   auto *D = N.get<Decl *>();
   if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
     // Don't map functions without bodies.
-    if (!AFD->getBody()) {
+    if (!AFD->hasBody()) {
       LLVM_DEBUG(llvm::dbgs() << "Skipping ASTNode: function without body\n");
       return true;
     }

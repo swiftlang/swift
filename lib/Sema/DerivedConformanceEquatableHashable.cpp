@@ -86,10 +86,12 @@ static SmallVector<VarDecl *, 3>
 storedPropertiesNotConformingToProtocol(DeclContext *DC, StructDecl *theStruct,
                                         ProtocolDecl *protocol) {
   auto lazyResolver = DC->getASTContext().getLazyResolver();
-  auto storedProperties =
-      theStruct->getStoredProperties(/*skipInaccessible=*/true);
+  auto storedProperties = theStruct->getStoredProperties();
   SmallVector<VarDecl *, 3> nonconformingProperties;
   for (auto propertyDecl : storedProperties) {
+    if (!propertyDecl->isUserAccessible())
+      continue;
+
     if (!propertyDecl->hasInterfaceType())
       lazyResolver->resolveDeclSignature(propertyDecl);
     if (!propertyDecl->hasInterfaceType())
@@ -596,12 +598,14 @@ deriveBodyEquatable_struct_eq(AbstractFunctionDecl *eqDecl, void *) {
 
   SmallVector<ASTNode, 6> statements;
 
-  auto storedProperties =
-    structDecl->getStoredProperties(/*skipInaccessible=*/true);
+  auto storedProperties = structDecl->getStoredProperties();
 
   // For each stored property element, generate a guard statement that returns
   // false if a property is not pairwise-equal.
   for (auto propertyDecl : storedProperties) {
+    if (!propertyDecl->isUserAccessible())
+      continue;
+
     auto aPropertyRef = new (C) DeclRefExpr(propertyDecl, DeclNameLoc(),
                                             /*implicit*/ true);
     auto aParamRef = new (C) DeclRefExpr(aParam, DeclNameLoc(),
@@ -1099,11 +1103,13 @@ deriveBodyHashable_struct_hashInto(AbstractFunctionDecl *hashIntoDecl, void *) {
   // Extract the decl for the hasher parameter.
   auto hasherParam = hashIntoDecl->getParameters()->get(0);
 
-  auto storedProperties =
-    structDecl->getStoredProperties(/*skipInaccessible=*/true);
+  auto storedProperties = structDecl->getStoredProperties();
 
   // Feed each stored property into the hasher.
   for (auto propertyDecl : storedProperties) {
+    if (!propertyDecl->isUserAccessible())
+      continue;
+
     auto propertyRef = new (C) DeclRefExpr(propertyDecl, DeclNameLoc(),
                                            /*implicit*/ true);
     auto selfRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(),
