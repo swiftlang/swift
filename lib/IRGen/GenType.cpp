@@ -30,6 +30,7 @@
 #include "llvm/Support/Path.h"
 #include "clang/CodeGen/SwiftCallingConv.h"
 
+#include "BitPatternBuilder.h"
 #include "EnumPayload.h"
 #include "LegacyLayoutFormat.h"
 #include "LoadableTypeInfo.h"
@@ -254,21 +255,27 @@ unsigned FixedTypeInfo::getSpareBitExtraInhabitantCount() const {
                   unsigned(ValueWitnessFlags::MaxNumExtraInhabitants));
 }
 
-void FixedTypeInfo::applyFixedSpareBitsMask(SpareBitVector &mask) const {
+void FixedTypeInfo::applyFixedSpareBitsMask(const IRGenModule &IGM,
+                                            SpareBitVector &mask) const {
+  auto builder = BitPatternBuilder(IGM.Triple.isLittleEndian());
+
   // If the mask is no longer than the stored spare bits, we can just
   // apply the stored spare bits.
   if (mask.size() <= SpareBits.size()) {
     // Grow the mask out if necessary; the tail padding is all spare bits.
-    mask.extendWithSetBits(SpareBits.size());
+    builder.append(mask);
+    builder.padWithSetBitsTo(SpareBits.size());
+    mask = SpareBitVector(builder.build());
     mask &= SpareBits;
     return;
   }
 
   // Otherwise, we have to grow out the stored spare bits before we
   // can intersect.
-  auto paddedSpareBits = SpareBits;
-  paddedSpareBits.extendWithSetBits(mask.size());
-  mask &= paddedSpareBits;
+  builder.append(SpareBits);
+  builder.padWithSetBitsTo(mask.size());
+  mask &= builder.build();
+  return;
 }
 
 APInt
@@ -609,9 +616,8 @@ llvm::Value *irgen::getFixedTypeEnumTagSinglePayload(IRGenFunction &IGF,
   if (fixedSize > Size(0)) {
     // Read up to one pointer-sized 'chunk' of the payload.
     // The size of the chunk does not have to be a power of 2.
-    Size limit = IGM.getPointerSize();
     auto *caseIndexType = llvm::IntegerType::get(Ctx,
-        std::min(limit, fixedSize).getValueInBits());
+        fixedSize.getValueInBits());
     auto *caseIndexAddr = Builder.CreateBitCast(valueAddr,
         caseIndexType->getPointerTo());
     caseIndexFromValue = Builder.CreateZExtOrTrunc(
@@ -771,24 +777,11 @@ void irgen::storeFixedTypeEnumTagSinglePayload(IRGenFunction &IGF,
   payloadIndex->addIncoming(payloadIndex0, payloadLT4BB);
 
   if (fixedSize > Size(0)) {
-    // Write the value into the first pointer-sized (or smaller)
-    // 'chunk' of the payload.
-    // The size of the chunk does not have to be a power of 2.
-    Size limit = IGM.getPointerSize();
-    auto *chunkType = Builder.getIntNTy(
-        std::min(fixedSize, limit).getValueInBits());
+    // Write the value to the payload as a zero extended integer.
+    auto *intType = Builder.getIntNTy(fixedSize.getValueInBits());
     Builder.CreateStore(
-        Builder.CreateZExtOrTrunc(payloadIndex, chunkType),
-        Builder.CreateBitCast(valueAddr, chunkType->getPointerTo()));
-
-    // Zero the remainder of the payload.
-    if (fixedSize > limit) {
-      auto zeroAddr = Builder.CreateConstByteArrayGEP(valueAddr, limit);
-      auto zeroSize = Builder.CreateSub(
-          size,
-          llvm::ConstantInt::get(size->getType(), limit.getValue()));
-      Builder.CreateMemSet(zeroAddr, Builder.getInt8(0), zeroSize);
-    }
+        Builder.CreateZExtOrTrunc(payloadIndex, intType),
+        Builder.CreateBitCast(valueAddr, intType->getPointerTo()));
   }
   // Write to the extra tag bytes, if any.
   emitSetTag(IGF, extraTagBitsAddr, extraTagIndex, numExtraTagBytes);
