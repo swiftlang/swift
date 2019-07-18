@@ -3362,21 +3362,15 @@ public:
       return false;
 
     auto nominalDecl = instanceTy->getAnyNominal();
-    if (!nominalDecl)
+    if (!(nominalDecl &&
+          nominalDecl->getAttrs().hasAttribute<PropertyWrapperAttr>()))
       return false;
 
-    if (!nominalDecl->getAttrs().hasAttribute<PropertyWrapperAttr>())
-      return false;
+    if (auto *parentExpr = CandidateInfo.CS.getParentExpr(FnExpr)) {
+      return parentExpr->isImplicit() && isa<CallExpr>(parentExpr);
+    }
 
-    auto parent = CandidateInfo.CS.getParentExpr(FnExpr);
-    if (!parent)
-      return false;
-
-    auto CE = dyn_cast<CallExpr>(parent);
-    if (!CE)
-      return false;
-
-    return CE->isImplicit();
+    return false;
   }
 
   bool missingLabel(unsigned paramIdx) override {
