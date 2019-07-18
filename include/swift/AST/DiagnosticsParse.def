@@ -762,6 +762,13 @@ ERROR(extra_rbracket,PointsToFirstBadToken,
       "unexpected ']' in type; did you mean to write an array type?", ())
 ERROR(extra_colon,PointsToFirstBadToken,
       "unexpected ':' in type; did you mean to write a dictionary type?", ())
+WARNING(subscript_array_element, none,
+        "unexpected subscript in array literal; did you mean to write two "
+        "separate elements instead?", ())
+NOTE(subscript_array_element_fix_it_add_comma, none, "add a separator between "
+     "the elements", ())
+NOTE(subscript_array_element_fix_it_remove_space, none,
+     "remove the space between the elements to silence this warning", ())
 
 // Tuple Types
 ERROR(expected_rparen_tuple_type_list,none,

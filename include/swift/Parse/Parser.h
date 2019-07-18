@@ -1435,6 +1435,8 @@ public:
 
   UnresolvedDeclRefExpr *parseExprOperator();
 
+  void validateCollectionElement(ParserResult<Expr> element);
+
   //===--------------------------------------------------------------------===//
   // Statement Parsing
 
