@@ -28,6 +28,7 @@ if(HAVE_UNICODE_LIBEDIT)
   endif()
 
   swift_install_in_component(TARGETS sourcekitd-repl
-                             RUNTIME DESTINATION bin
-                             COMPONENT tools)
+                             RUNTIME
+                               DESTINATION bin
+                               COMPONENT tools)
 endif()
