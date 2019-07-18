@@ -693,33 +693,31 @@ bool DisjunctionStep::shortCircuitDisjunctionAt(
         !isSIMDOperator(lastSuccessfulChoice->getOverloadChoice().getDecl()))
       return true;
 
-    // Otherwise if we have an existing solution, bind tyvars bound to the same
+    // Otherwise, bind tyvars bound to the same
     // decl in the solution to the choice tyvar. We can continue finding more
     // solutions, but all the instances of the operator that chose the same
     // overload as this successful choice will be bound togeter.
-    if (Solutions.size()) {
-      auto lastTyvar =
-          lastSuccessfulChoice->getFirstType()->getAs<TypeVariableType>();
-      auto lastRep = CS.getRepresentative(lastTyvar);
+    auto lastTyvar =
+        lastSuccessfulChoice->getFirstType()->getAs<TypeVariableType>();
+    auto lastRep = CS.getRepresentative(lastTyvar);
 
-      for (auto overload : Solutions[0].overloadChoices) {
-        auto overloadChoice = overload.getSecond().choice;
-        if (!overloadChoice.isDecl() ||
-            overloadChoice.getDecl() !=
-                lastSuccessfulChoice->getOverloadChoice().getDecl())
-          continue;
+    for (auto overload : Solutions.back().overloadChoices) {
+      auto overloadChoice = overload.getSecond().choice;
+      if (!overloadChoice.isDecl() ||
+          overloadChoice.getDecl() !=
+              lastSuccessfulChoice->getOverloadChoice().getDecl())
+        continue;
 
-        auto choiceTyvar =
-            CS.getType(simplifyLocatorToAnchor(CS, overload.getFirst()))
-                ->getAs<TypeVariableType>();
-        if (!choiceTyvar)
-          continue;
+      auto choiceTyvar =
+          CS.getType(simplifyLocatorToAnchor(CS, overload.getFirst()))
+              ->getAs<TypeVariableType>();
+      if (!choiceTyvar)
+        continue;
 
-        auto rep = CS.getRepresentative(choiceTyvar);
-        if (lastRep != rep) {
-          CS.mergeEquivalenceClasses(rep, lastRep);
-          lastRep = CS.getRepresentative(lastRep);
-        }
+      auto rep = CS.getRepresentative(choiceTyvar);
+      if (lastRep != rep) {
+        CS.mergeEquivalenceClasses(rep, lastRep);
+        lastRep = CS.getRepresentative(lastRep);
       }
     }
   }
