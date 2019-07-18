@@ -3356,7 +3356,8 @@ public:
     if (auto TE = dyn_cast<TypeExpr>(FnExpr)) {
       if (TE->getInstanceType()
               ->getAnyNominal()
-              ->getPropertyWrapperTypeInfo()) {
+              ->getAttrs()
+              .hasAttribute<PropertyWrapperAttr>()) {
         if (auto parent = CandidateInfo.CS.getParentExpr(FnExpr)) {
           if (auto CE = dyn_cast<CallExpr>(parent)) {
             return CE->isImplicit();
