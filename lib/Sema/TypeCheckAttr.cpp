@@ -2822,10 +2822,8 @@ static bool checkFunctionSignature(
     return false;
 
   // Erase dynamic self types.
-  required = dyn_cast<AnyFunctionType>(
-      required->eraseDynamicSelfType()->getCanonicalType());
-  candidateFnTy = dyn_cast<AnyFunctionType>(
-      candidateFnTy->eraseDynamicSelfType()->getCanonicalType());
+  required = dyn_cast<AnyFunctionType>(required->getCanonicalType());
+  candidateFnTy = dyn_cast<AnyFunctionType>(candidateFnTy->getCanonicalType());
 
   // Check that generic signatures match.
   auto requiredGenSig = required.getOptGenericSignature();
