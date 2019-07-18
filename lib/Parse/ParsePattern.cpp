@@ -70,7 +70,9 @@ static ParserStatus parseDefaultArgument(
     Parser::ParameterContextKind paramContext) {
   SyntaxParsingContext DefaultArgContext(P.SyntaxContext,
                                          SyntaxKind::InitializerClause);
-  SourceLoc equalLoc = P.consumeToken(tok::equal);
+  assert(P.Tok.is(tok::equal) ||
+       (P.Tok.isBinaryOperator() && P.Tok.getText() == "=="));
+  SourceLoc equalLoc = P.consumeToken();
 
   if (P.SF.Kind == SourceFileKind::Interface) {
     // Swift module interfaces don't synthesize inherited intializers and
@@ -381,13 +383,20 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
       param.EllipsisLoc = consumeToken();
     }
 
-    // ('=' expr)?
-    if (Tok.is(tok::equal)) {
+    // ('=' expr) or ('==' expr)?
+    bool isEqualBinaryOperator =
+        Tok.isBinaryOperator() && Tok.getText() == "==";
+    if (Tok.is(tok::equal) || isEqualBinaryOperator) {
       SourceLoc EqualLoc = Tok.getLoc();
-      status |= parseDefaultArgument(*this, defaultArgs, defaultArgIndex,
-                                     param.DefaultArg,
-                                     param.hasInheritedDefaultArg,
-                                     paramContext);
+
+      if (isEqualBinaryOperator) {
+        diagnose(Tok, diag::expected_assignment_instead_of_comparison_operator)
+            .fixItReplace(EqualLoc, "=");
+      }
+
+      status |= parseDefaultArgument(
+          *this, defaultArgs, defaultArgIndex, param.DefaultArg,
+          param.hasInheritedDefaultArg, paramContext);
 
       if (param.EllipsisLoc.isValid() && param.DefaultArg) {
         // The range of the complete default argument.
