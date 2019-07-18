@@ -2682,8 +2682,7 @@ AutoDiffParameterIndices *
 TypeChecker::inferDifferentiableParameters(
     AbstractFunctionDecl *AFD, GenericEnvironment *derivativeGenEnv) {
   auto &ctx = AFD->getASTContext();
-  auto *functionType = AFD->getInterfaceType()->eraseDynamicSelfType()
-      ->castTo<AnyFunctionType>();
+  auto *functionType = AFD->getInterfaceType()->castTo<AnyFunctionType>();
   AutoDiffParameterIndicesBuilder builder(functionType);
   SmallVector<Type, 4> allParamTypes;
 
@@ -2850,8 +2849,7 @@ static bool checkFunctionSignature(
   CanAnyFunctionType requiredResultFnTy =
       dyn_cast<AnyFunctionType>(required.getResult());
   if (!requiredResultFnTy)
-    return required.getResult()->eraseDynamicSelfType()->isEqual(
-        candidateFnTy.getResult()->eraseDynamicSelfType());
+    return required.getResult()->isEqual(candidateFnTy.getResult());
 
   // Required result type is a function. Recurse.
   return checkFunctionSignature(requiredResultFnTy, candidateFnTy.getResult());
@@ -2871,8 +2869,7 @@ static AutoDiffParameterIndices *computeDifferentiationParameters(
 ) {
   // Get function type and parameters.
   TC.resolveDeclSignature(function);
-  auto *functionType = function->getInterfaceType()->eraseDynamicSelfType()
-      ->castTo<AnyFunctionType>();
+  auto *functionType = function->getInterfaceType()->castTo<AnyFunctionType>();
   auto &params = *function->getParameters();
   auto numParams = function->getParameters()->size();
   auto isInstanceMethod = function->isInstanceMember();
@@ -2991,7 +2988,6 @@ static AutoDiffIndexSubset *computeTransposingParameters(
   // Get function type and parameters.
   TC.resolveDeclSignature(transposeFunc);
   auto *functionType = transposeFunc->getInterfaceType()
-                           ->eraseDynamicSelfType()
                            ->castTo<AnyFunctionType>();
   
   ArrayRef<TupleTypeElt> transposeResultTypes;
@@ -3248,8 +3244,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   }
 
   TC.resolveDeclSignature(original);
-  auto *originalFnTy = original->getInterfaceType()->eraseDynamicSelfType()
-      ->castTo<AnyFunctionType>();
+  auto *originalFnTy = original->getInterfaceType()->castTo<AnyFunctionType>();
   bool isMethod = original->hasImplicitSelfDecl();
 
   // If the original function returns the empty tuple type, there's no output to
@@ -3900,7 +3895,6 @@ void AttributeChecker::visitTransposingAttr(TransposingAttr *attr) {
   auto original = attr->getOriginal();
   TC.resolveDeclSignature(transpose);
   auto *transposeInterfaceType = transpose->getInterfaceType()
-                                     ->eraseDynamicSelfType()
                                      ->castTo<AnyFunctionType>();
   
   // Get checked wrt param indices.

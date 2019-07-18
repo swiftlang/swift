@@ -2535,7 +2535,16 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
-<<<<<<< HEAD
+    case DAK_ProjectedValueProperty: {
+      auto abbrCode =
+          S.DeclTypeAbbrCodes[ProjectedValuePropertyDeclAttrLayout::Code];
+      auto theAttr = cast<ProjectedValuePropertyAttr>(DA);
+      ProjectedValuePropertyDeclAttrLayout::emitRecord(
+        S.Out, S.ScratchRecord, abbrCode, theAttr->isImplicit(),
+        S.addDeclBaseNameRef(theAttr->ProjectionPropertyName));
+      break;
+    }
+
     // SWIFT_ENABLE_TENSORFLOW
     case DAK_Differentiable: {
       auto abbrCode = S.DeclTypeAbbrCodes[DifferentiableDeclAttrLayout::Code];
@@ -2567,18 +2576,6 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       S.writeGenericRequirements(attr->getRequirements(), S.DeclTypeAbbrCodes);
       return;
     }
-=======
-    case DAK_ProjectedValueProperty: {
-      auto abbrCode =
-          S.DeclTypeAbbrCodes[ProjectedValuePropertyDeclAttrLayout::Code];
-      auto theAttr = cast<ProjectedValuePropertyAttr>(DA);
-      ProjectedValuePropertyDeclAttrLayout::emitRecord(
-        S.Out, S.ScratchRecord, abbrCode, theAttr->isImplicit(),
-        S.addDeclBaseNameRef(theAttr->ProjectionPropertyName));
-      break;
-    }
-
->>>>>>> swift-DEVELOPMENT-SNAPSHOT-2019-07-10-a
     }
   }
 
