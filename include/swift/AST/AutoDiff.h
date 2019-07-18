@@ -273,10 +273,6 @@ private:
     return reinterpret_cast<const BitWord *>(this + 1);
   }
 
-  unsigned getNumBitWords() const {
-    return numBitWords;
-  }
-
   ArrayRef<BitWord> getBitWords() const {
     return {getBitWordsData(), getNumBitWords()};
   }
@@ -333,6 +329,13 @@ public:
     SmallBitVector bitVec(capacity);
     bitVec.set(start, end);
     return get(ctx, bitVec);
+  }
+
+  // Use `getCapacity()` to get the total index subset capacity.
+  // This is public only for unit testing
+  // (in unittests/AST/SILAutoDiffIndices.cpp).
+  unsigned getNumBitWords() const {
+    return numBitWords;
   }
 
   unsigned getCapacity() const {
