@@ -3241,8 +3241,13 @@ public:
     SmallString<32> insertBuf;
     llvm::raw_svector_ostream insertText(insertBuf);
 
-    if (argIdx != 0)
-      insertText << ", ";
+    if (argIdx != 0) {
+      if (isPropertyWrapperImplicitInit()) {
+        insertText << "(";
+      } else {
+        insertText << ", ";
+      }
+    }
     if (!name.empty())
       insertText << name.str() << ": ";
     Type Ty = param.getOldType();
@@ -3257,6 +3262,9 @@ public:
     insertText << "<#" << Ty << "#>";
     if (argIdx == 0 && insertableEndIdx != 0)
       insertText << ", ";
+    if (isPropertyWrapperImplicitInit()) {
+      insertText << ")";
+    }
 
     SourceLoc insertLoc;
     if (argIdx > insertableEndIdx) {
@@ -3267,6 +3275,9 @@ public:
       //   fn(x: 1) { return 1 }
       // is diagnosed as "missing argument for 'y'" (missingParamIdx 1).
       // It should be "missing argument for 'z'" (missingParamIdx 2).
+    } else if (isPropertyWrapperImplicitInit()) {
+      insertLoc =
+          Lexer::getLocForEndOfToken(TC.Context.SourceMgr, FnExpr->getLoc());
     } else if (auto *TE = dyn_cast<TupleExpr>(ArgExpr)) {
       // fn():
       //   fn([argMissing])
@@ -3343,6 +3354,21 @@ public:
                   candidate.getDecl()->getFullName());
 
     Diagnosed = true;
+  }
+
+  bool isPropertyWrapperImplicitInit() {
+    if (auto TE = dyn_cast<TypeExpr>(FnExpr)) {
+      if (auto info = TE->getInstanceType()
+                          ->getAnyNominal()
+                          ->getPropertyWrapperTypeInfo()) {
+        if (auto parent = CandidateInfo.CS.getParentExpr(FnExpr)) {
+          if (auto CE = dyn_cast<CallExpr>(parent)) {
+            return CE->isImplicit();
+          }
+        }
+      }
+    }
+    return false;
   }
 
   bool missingLabel(unsigned paramIdx) override {
