@@ -100,10 +100,6 @@ public:
   /// When set, don't enforce warnings with -Werror.
   bool DebuggerSupport = false;
 
-  /// When set, clobber the Clang instance's virtual file system with the Swift
-  /// virtual file system.
-  bool ForceUseSwiftVirtualFileSystem = false;
-
   /// Return a hash code of any components from these options that should
   /// contribute to a Swift Bridging PCH hash.
   llvm::hash_code getPCHHashComponents() const {

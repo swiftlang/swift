@@ -200,7 +200,6 @@ static bool swiftCodeCompleteImpl(
 
   if (FileSystem != llvm::vfs::getRealFileSystem()) {
     CI.getSourceMgr().setFileSystem(FileSystem);
-    Invocation.getClangImporterOptions().ForceUseSwiftVirtualFileSystem = true;
   }
 
   if (CI.setup(Invocation)) {
