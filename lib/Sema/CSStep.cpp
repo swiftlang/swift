@@ -659,15 +659,50 @@ bool DisjunctionStep::shortCircuitDisjunctionAt(
   if (currentChoice->getKind() == ConstraintKind::CheckedCast)
     return true;
 
-  // If we have a SIMD operator, and the prior choice was not a SIMD
-  // Operator, we're done.
+  // Extra checks for binding of operators
   if (currentChoice->getKind() == ConstraintKind::BindOverload &&
-      isSIMDOperator(currentChoice->getOverloadChoice().getDecl()) &&
+      currentChoice->getOverloadChoice().getDecl()->isOperator() &&
       lastSuccessfulChoice->getKind() == ConstraintKind::BindOverload &&
-      !isSIMDOperator(lastSuccessfulChoice->getOverloadChoice().getDecl())) {
+      lastSuccessfulChoice->getOverloadChoice().getDecl()->isOperator()) {
     return true;
   }
 
+    // If we have a SIMD operator, and the prior choice was not a SIMD
+    // Operator, we're done.
+    if (isSIMDOperator(currentChoice->getOverloadChoice().getDecl()) &&
+        !isSIMDOperator(lastSuccessfulChoice->getOverloadChoice().getDecl()))
+      return true;
+
+    // Otherwise if we have an existing solution, bind tyvars bound to the same
+    // decl in the solution to the choice tyvar. We can continue finding more
+    // solutions, but all the instances of the operator that chose the same
+    // overload as this successful choice will be bound togeter.
+    if (Solutions.size()) {
+      auto lastTyvar =
+          lastSuccessfulChoice->getFirstType()->getAs<TypeVariableType>();
+      auto lastRep = CS.getRepresentative(lastTyvar);
+
+      for (auto overload : Solutions[0].overloadChoices) {
+        auto overloadChoice = overload.getSecond().choice;
+        if (!overloadChoice.isDecl() ||
+            overloadChoice.getDecl() !=
+                lastSuccessfulChoice->getOverloadChoice().getDecl())
+          continue;
+
+        auto choiceTyvar =
+            CS.getType(simplifyLocatorToAnchor(CS, overload.getFirst()))
+                ->getAs<TypeVariableType>();
+        if (!choiceTyvar)
+          continue;
+
+        auto rep = CS.getRepresentative(choiceTyvar);
+        if (lastRep != rep) {
+          CS.mergeEquivalenceClasses(rep, lastRep);
+          lastRep = CS.getRepresentative(lastRep);
+        }
+      }
+    }
+  }
   return false;
 }
 
