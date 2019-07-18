@@ -218,7 +218,7 @@ GenericSignature::getCanonical(TypeArrayView<GenericTypeParamType> params,
                     /*isKnownCanonical=*/true);
 
 #ifndef NDEBUG
-  if (skipValidation)
+  if (skipValidation || true)
     return CanGenericSignature(canSig);
 
   PrettyStackTraceGenericSignature debugStack("canonicalizing", canSig);
