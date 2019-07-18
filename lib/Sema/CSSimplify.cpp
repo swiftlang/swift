@@ -913,8 +913,8 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
 
     // Compare each of the bound arguments for this parameter.
     for (auto argIdx : parameterBindings[paramIdx]) {
-      auto loc = locator.withPathElement(
-          LocatorPathElt::ApplyArgToParam(argIdx, paramIdx));
+      auto loc = locator.withPathElement(LocatorPathElt::ApplyArgToParam(
+          argIdx, paramIdx, param.getParameterFlags()));
       auto argTy = argsWithLabels[argIdx].getOldType();
 
       bool matchingAutoClosureResult = param.isAutoClosure();
@@ -2597,6 +2597,11 @@ bool ConstraintSystem::repairFailures(
     if (isPatternMatching &&
         elt.castTo<LocatorPathElt::ApplyArgToParam>().getParamIdx() == 1)
       break;
+
+    if (auto *fix = ExpandArrayIntoVarargs::attempt(*this, lhs, rhs, locator)) {
+      conversionsOrFixes.push_back(fix);
+      break;
+    }
 
     if (auto *fix = ExplicitlyConstructRawRepresentable::attempt(
             *this, lhs, rhs, locator)) {
@@ -7610,6 +7615,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::SkipUnhandledConstructInFunctionBuilder:
   case FixKind::UsePropertyWrapper:
   case FixKind::UseWrappedValue:
+  case FixKind::ExpandArrayIntoVarargs:
   case FixKind::UseValueTypeOfRawRepresentative:
   case FixKind::ExplicitlyConstructRawRepresentable: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;

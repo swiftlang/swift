@@ -1582,8 +1582,25 @@ public:
                                               Type paramTy,
                                               ConstraintLocator *locator)
       : FailureDiagnostic(root, cs, locator), ParamType(paramTy) {}
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose situation when an array is passed instead of varargs.
+///
+/// ```swift
+/// func foo(_ x: Int...) {}
+/// foo([1,2,3]]) // foo expects varags like foo(1,2,3) instead.
+/// ```
+class ExpandArrayIntoVarargsFailure final : public ContextualFailure {
+public:
+  ExpandArrayIntoVarargsFailure(Expr *root, ConstraintSystem &cs, Type lhs,
+                                Type rhs, ConstraintLocator *locator)
+      : ContextualFailure(root, cs, lhs, rhs, locator) {}
 
   bool diagnoseAsError() override;
+  bool diagnoseAsNote() override;
+
+  void tryDropArrayBracketsFixIt(Expr *anchor) const;
 };
 
 /// Diagnose a situation there is a mismatch between argument and parameter
@@ -1714,6 +1731,10 @@ public:
   /// to.
   ParameterTypeFlags getParameterFlags() const {
     return FnType->getParams()[ParamIdx].getParameterFlags();
+  }
+
+  ParameterTypeFlags getParameterFlagsAtIndex(unsigned idx) const {
+    return FnType->getParams()[idx].getParameterFlags();
   }
 };
 

@@ -4611,9 +4611,11 @@ bool ArgumentMismatchFailure::diagnoseUseOfReferenceEqualityOperator() const {
   // one would cover both arguments.
   if (getAnchor() == rhs && rhsType->is<FunctionType>()) {
     auto &cs = getConstraintSystem();
-    if (cs.hasFixFor(cs.getConstraintLocator(
-            binaryOp, {ConstraintLocator::ApplyArgument,
-                       LocatorPathElt::ApplyArgToParam(0, 0)})))
+    auto info = getFunctionArgApplyInfo(locator);
+    if (info && cs.hasFixFor(cs.getConstraintLocator(
+                    binaryOp, {ConstraintLocator::ApplyArgument,
+                               LocatorPathElt::ApplyArgToParam(
+                                   0, 0, info->getParameterFlagsAtIndex(0))})))
       return true;
   }
 
@@ -4762,4 +4764,45 @@ bool ArgumentMismatchFailure::diagnoseArchetypeMismatch() const {
                  describeGenericType(paramDecl, true));
 
   return true;
+}
+
+void ExpandArrayIntoVarargsFailure::tryDropArrayBracketsFixIt(
+    Expr *anchor) const {
+  // If this is an array literal, offer to remove the brackets and pass the
+  // elements directly as variadic arguments.
+  if (auto *arrayExpr = dyn_cast<ArrayExpr>(anchor)) {
+    auto diag = emitDiagnostic(arrayExpr->getLoc(),
+                               diag::suggest_pass_elements_directly);
+    diag.fixItRemove(arrayExpr->getLBracketLoc())
+        .fixItRemove(arrayExpr->getRBracketLoc());
+    // Handle the case where the array literal has a trailing comma.
+    if (arrayExpr->getNumCommas() == arrayExpr->getNumElements())
+      diag.fixItRemove(arrayExpr->getCommaLocs().back());
+  }
+}
+
+bool ExpandArrayIntoVarargsFailure::diagnoseAsError() {
+  if (auto anchor = getAnchor()) {
+    emitDiagnostic(anchor->getLoc(), diag::cannot_convert_array_to_variadic,
+                   getFromType(), getToType());
+    tryDropArrayBracketsFixIt(anchor);
+    // TODO: Array splat fix-it once that's supported.
+    return true;
+  }
+  return false;
+}
+
+bool ExpandArrayIntoVarargsFailure::diagnoseAsNote() {
+  auto overload = getChoiceFor(getLocator());
+  auto anchor = getAnchor();
+  if (!overload || !anchor)
+    return false;
+
+  if (auto chosenDecl = overload->choice.getDeclOrNull()) {
+    emitDiagnostic(chosenDecl, diag::candidate_would_match_array_to_variadic,
+                   getToType());
+    tryDropArrayBracketsFixIt(anchor);
+    return true;
+  }
+  return false;
 }
