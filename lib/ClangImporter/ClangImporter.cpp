@@ -1018,17 +1018,10 @@ ClangImporter::create(ASTContext &ctx,
 
   // Set up the file manager.
   {
-    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS;
-    if (!ctx.SearchPathOpts.VFSOverlayFiles.empty() ||
-        importerOpts.ForceUseSwiftVirtualFileSystem) {
-      // If the clang instance has overlays it means the user has provided
-      // -ivfsoverlay options.  We're going to clobber their file system with
-      // the Swift file system, so warn about it.
-      if (!instance.getHeaderSearchOpts().VFSOverlayFiles.empty()) {
-        ctx.Diags.diagnose(SourceLoc(), diag::clang_vfs_overlay_is_ignored);
-      }
-      VFS = ctx.SourceMgr.getFileSystem();
-    }
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS =
+        clang::createVFSFromCompilerInvocation(instance.getInvocation(),
+                                               instance.getDiagnostics(),
+                                               ctx.SourceMgr.getFileSystem());
     instance.createFileManager(std::move(VFS));
   }
 
