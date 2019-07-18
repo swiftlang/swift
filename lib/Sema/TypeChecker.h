@@ -26,6 +26,7 @@
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/TypeRefinementContext.h"
+#include "swift/AST/TypeResolutionStage.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Config.h"
@@ -865,8 +866,11 @@ public:
   /// member.
   /// \param useArchetypes Whether to use context archetypes for outer generic
   /// parameters if the class is nested inside a generic function.
+  /// \param stage The type resolution stage for type validation,
+  /// defaults to Interface.
   static Type substMemberTypeWithBase(ModuleDecl *module, TypeDecl *member,
-                                      Type baseTy, bool useArchetypes = true);
+                                      Type baseTy, bool useArchetypes = true,
+                                      TypeResolutionStage stage = TypeResolutionStage::Interface);
 
   /// Determine whether one type is a subtype of another.
   ///

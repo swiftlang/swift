@@ -645,10 +645,11 @@ Type TypeChecker::resolveTypeInContext(
       }
     }
   }
-  
+
   // Finally, substitute the base type into the member type.
   return substMemberTypeWithBase(fromDC->getParentModule(), typeDecl,
-                                 selfType, resolution.usesArchetypes());
+                                 selfType, resolution.usesArchetypes(),
+                                 resolution.getStage());
 }
 
 static TypeResolutionOptions
@@ -3362,7 +3363,8 @@ Type TypeResolver::buildProtocolType(
 Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
                                           TypeDecl *member,
                                           Type baseTy,
-                                          bool useArchetypes) {
+                                          bool useArchetypes,
+                                          TypeResolutionStage stage) {
   Type sugaredBaseTy = baseTy;
 
   // For type members of a base class, make sure we use the right
@@ -3422,8 +3424,9 @@ Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
   }
 
   Type resultType;
-  auto memberType = aliasDecl ? aliasDecl->getUnderlyingTypeLoc().getType()
+  auto memberType = aliasDecl ? aliasDecl->getStructuralType()
                               : member->getDeclaredInterfaceType();
+
   SubstitutionMap subs;
   if (baseTy) {
     // Cope with the presence of unbound generic types, which are ill-formed
