@@ -331,7 +331,7 @@ DerivedConformance::declareDerivedProperty(Identifier name,
   auto &C = TC.Context;
   auto parentDC = getConformanceContext();
 
-  VarDecl *propDecl = new (C) VarDecl(/*IsStatic*/isStatic, VarDecl::Specifier::Var,
+  VarDecl *propDecl = new (C) VarDecl(/*IsStatic*/isStatic, VarDecl::Introducer::Var,
                                       /*IsCaptureList*/false, SourceLoc(), name,
                                       parentDC);
   propDecl->setImplicit();

@@ -98,14 +98,15 @@ CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture,
   // If this is a non-address-only stored 'let' constant, we can capture it
   // by value.  If it is address-only, then we can't load it, so capture it
   // by its address (like a var) instead.
-  if (var->isImmutable() &&
+  if (!var->supportsMutation() &&
       (!SILModuleConventions(M).useLoweredAddresses() ||
        !getTypeLowering(var->getType(), expansion).isAddressOnly()))
     return CaptureKind::Constant;
 
   // In-out parameters are captured by address.
-  if (var->isInOut()) {
-    return CaptureKind::StorageAddress;
+  if (auto *param = dyn_cast<ParamDecl>(var)) {
+    if (param->isInOut())
+      return CaptureKind::StorageAddress;
   }
 
   // Reference storage types can appear in a capture list, which means
@@ -119,8 +120,9 @@ CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture,
 
   // If we're capturing into a non-escaping closure, we can generally just
   // capture the address of the value as no-escape.
-  return capture.isNoEscape() ?
-    CaptureKind::StorageAddress : CaptureKind::Box;
+  return (capture.isNoEscape()
+          ? CaptureKind::StorageAddress
+          : CaptureKind::Box);
 }
 
 using RecursiveProperties = TypeLowering::RecursiveProperties;

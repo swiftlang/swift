@@ -968,19 +968,16 @@ namespace {
       }
 
       switch (P->getSpecifier()) {
-      case VarDecl::Specifier::Let:
+      case ParamDecl::Specifier::Default:
         /* nothing */
         break;
-      case VarDecl::Specifier::Var:
-        OS << " mutable";
-        break;
-      case VarDecl::Specifier::InOut:
+      case ParamDecl::Specifier::InOut:
         OS << " inout";
         break;
-      case VarDecl::Specifier::Shared:
+      case ParamDecl::Specifier::Shared:
         OS << " shared";
         break;
-      case VarDecl::Specifier::Owned:
+      case ParamDecl::Specifier::Owned:
         OS << " owned";
         break;
       }

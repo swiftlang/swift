@@ -2448,23 +2448,12 @@ public:
     void verifyChecked(VarDecl *var) {
       PrettyStackTraceDecl debugStack("verifying VarDecl", var);
 
-      // Variables must have materializable type, unless they are parameters,
-      // in which case they must either have l-value type or be anonymous.
+      // Variables must have materializable type.
       if (!var->getInterfaceType()->isMaterializable()) {
-        if (!isa<ParamDecl>(var)) {
-          Out << "VarDecl has non-materializable type: ";
-          var->getType().print(Out);
-          Out << "\n";
-          abort();
-        }
-
-        if (!var->isInOut() && var->hasName()) {
-          Out << "ParamDecl may only have non-materializable tuple type "
-                 "when it is anonymous: ";
-          var->getType().print(Out);
-          Out << "\n";
-          abort();
-        }
+        Out << "VarDecl has non-materializable type: ";
+        var->getInterfaceType().print(Out);
+        Out << "\n";
+        abort();
       }
 
       // The fact that this is *directly* be a reference storage type

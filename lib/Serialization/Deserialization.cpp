@@ -2146,17 +2146,29 @@ getActualSelfAccessKind(uint8_t raw) {
 
 /// Translate from the serialization VarDeclSpecifier enumerators, which are
 /// guaranteed to be stable, to the AST ones.
-static Optional<swift::VarDecl::Specifier>
-getActualVarDeclSpecifier(serialization::VarDeclSpecifier raw) {
+static Optional<swift::ParamDecl::Specifier>
+getActualParamDeclSpecifier(serialization::ParamDeclSpecifier raw) {
   switch (raw) {
 #define CASE(ID) \
-  case serialization::VarDeclSpecifier::ID: \
-    return swift::VarDecl::Specifier::ID;
-  CASE(Let)
-  CASE(Var)
+  case serialization::ParamDeclSpecifier::ID: \
+    return swift::ParamDecl::Specifier::ID;
+  CASE(Default)
   CASE(InOut)
   CASE(Shared)
   CASE(Owned)
+  }
+#undef CASE
+  return None;
+}
+
+static Optional<swift::VarDecl::Introducer>
+getActualVarDeclIntroducer(serialization::VarDeclIntroducer raw) {
+  switch (raw) {
+#define CASE(ID) \
+  case serialization::VarDeclIntroducer::ID: \
+    return swift::VarDecl::Introducer::ID;
+  CASE(Let)
+  CASE(Var)
   }
 #undef CASE
   return None;
@@ -2717,10 +2729,11 @@ public:
     IdentifierID nameID;
     DeclContextID contextID;
     bool isImplicit, isObjC, isStatic, hasNonPatternBindingInit;
+    uint8_t rawIntroducer;
     bool isGetterMutating, isSetterMutating;
     bool isLazyStorageProperty;
     DeclID lazyStorageID;
-    unsigned rawSpecifier, numAccessors, numBackingProperties;
+    unsigned numAccessors, numBackingProperties;
     uint8_t readImpl, writeImpl, readWriteImpl, opaqueReadOwnership;
     uint8_t rawAccessLevel, rawSetterAccessLevel;
     TypeID interfaceTypeID;
@@ -2729,7 +2742,7 @@ public:
     ArrayRef<uint64_t> arrayFieldIDs;
 
     decls_block::VarLayout::readRecord(scratch, nameID, contextID,
-                                       isImplicit, isObjC, isStatic, rawSpecifier,
+                                       isImplicit, isObjC, isStatic, rawIntroducer,
                                        hasNonPatternBindingInit,
                                        isGetterMutating, isSetterMutating,
                                        isLazyStorageProperty,
@@ -2785,14 +2798,14 @@ public:
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto specifier = getActualVarDeclSpecifier(
-        (serialization::VarDeclSpecifier)rawSpecifier);
-    if (!specifier) {
+    auto introducer = getActualVarDeclIntroducer(
+        (serialization::VarDeclIntroducer) rawIntroducer);
+    if (!introducer) {
       MF.error();
       return nullptr;
     }
 
-    auto var = MF.createDecl<VarDecl>(/*IsStatic*/ isStatic, *specifier,
+    auto var = MF.createDecl<VarDecl>(/*IsStatic*/ isStatic, *introducer,
                                       /*IsCaptureList*/ false, SourceLoc(),
                                       name, DC);
     var->setHasNonPatternBindingInit(hasNonPatternBindingInit);
@@ -2903,8 +2916,8 @@ public:
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto specifier = getActualVarDeclSpecifier(
-                                               (serialization::VarDeclSpecifier)rawSpecifier);
+    auto specifier = getActualParamDeclSpecifier(
+                              (serialization::ParamDeclSpecifier)rawSpecifier);
     if (!specifier) {
       MF.error();
       return nullptr;

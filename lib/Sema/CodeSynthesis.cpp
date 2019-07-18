@@ -89,7 +89,7 @@ static VarDecl *getFirstParamDecl(FuncDecl *fn) {
 static ParamDecl *buildArgument(SourceLoc loc, DeclContext *DC,
                                 StringRef name,
                                 Type interfaceType,
-                                VarDecl::Specifier specifier,
+                                ParamDecl::Specifier specifier,
                                 ASTContext &context) {
   auto *param = new (context) ParamDecl(specifier, SourceLoc(), SourceLoc(),
                                         Identifier(), loc,
@@ -254,7 +254,7 @@ static AccessorDecl *createSetterPrototype(AbstractStorageDecl *storage,
   auto storageInterfaceType = storage->getValueInterfaceType();
   auto valueDecl = buildArgument(storage->getLoc(), storage->getDeclContext(),
                                  "value", storageInterfaceType,
-                                 VarDecl::Specifier::Default, ctx);
+                                 ParamDecl::Specifier::Default, ctx);
   auto *params = buildIndexForwardingParamList(storage, valueDecl, ctx);
 
   Type setterRetTy = TupleType::getEmpty(ctx);
@@ -1462,7 +1462,7 @@ synthesizeObservedSetterBody(AccessorDecl *Set, TargetImpl target,
       = buildStorageReference(Set, VD, target, /*isLValue=*/true, Ctx);
     OldValueExpr = new (Ctx) LoadExpr(OldValueExpr, VD->getType());
 
-    OldValue = new (Ctx) VarDecl(/*IsStatic*/false, VarDecl::Specifier::Let,
+    OldValue = new (Ctx) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Let,
                                  /*IsCaptureList*/false, SourceLoc(),
                                  Ctx.getIdentifier("tmp"), Set);
     OldValue->setImplicit();
@@ -1564,7 +1564,7 @@ synthesizeLazyGetterBody(AccessorDecl *Get, VarDecl *VD, VarDecl *Storage,
   SmallVector<ASTNode, 6> Body;
 
   // Load the existing storage and store it into the 'tmp1' temporary.
-  auto *Tmp1VD = new (Ctx) VarDecl(/*IsStatic*/false, VarDecl::Specifier::Let,
+  auto *Tmp1VD = new (Ctx) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Let,
                                    /*IsCaptureList*/false, SourceLoc(),
                                    Ctx.getIdentifier("tmp1"), Get);
   Tmp1VD->setInterfaceType(VD->getValueInterfaceType());
@@ -1602,7 +1602,7 @@ synthesizeLazyGetterBody(AccessorDecl *Get, VarDecl *VD, VarDecl *Storage,
                                   /*implicit*/ true));
 
 
-  auto *Tmp2VD = new (Ctx) VarDecl(/*IsStatic*/false, VarDecl::Specifier::Let,
+  auto *Tmp2VD = new (Ctx) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Let,
                                    /*IsCaptureList*/false, SourceLoc(),
                                    Ctx.getIdentifier("tmp2"),
                                    Get);
@@ -1679,7 +1679,7 @@ LazyStoragePropertyRequest::evaluate(Evaluator &evaluator,
   auto StorageTy = OptionalType::get(VD->getType());
   auto StorageInterfaceTy = OptionalType::get(VD->getInterfaceType());
 
-  auto *Storage = new (Context) VarDecl(/*IsStatic*/false, VarDecl::Specifier::Var,
+  auto *Storage = new (Context) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Var,
                                         /*IsCaptureList*/false, VD->getLoc(),
                                         StorageName,
                                         VD->getDeclContext());
@@ -1762,7 +1762,7 @@ static VarDecl *synthesizePropertyWrapperStorageWrapperProperty(
   // Form the property.
   auto dc = var->getDeclContext();
   VarDecl *property = new (ctx) VarDecl(/*IsStatic=*/var->isStatic(),
-                                        VarDecl::Specifier::Var,
+                                        VarDecl::Introducer::Var,
                                         /*IsCaptureList=*/false,
                                         var->getLoc(),
                                         name, dc);
@@ -1876,7 +1876,7 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
 
   // Create the backing storage property and note it in the cache.
   VarDecl *backingVar = new (ctx) VarDecl(/*IsStatic=*/var->isStatic(),
-                                          VarDecl::Specifier::Var,
+                                          VarDecl::Introducer::Var,
                                           /*IsCaptureList=*/false,
                                           var->getLoc(),
                                           name, dc);
@@ -2415,7 +2415,7 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
 
       // Create the parameter.
       auto *arg = new (ctx)
-          ParamDecl(VarDecl::Specifier::Default, SourceLoc(), Loc,
+          ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), Loc,
                     var->getName(), Loc, var->getName(), decl);
       arg->setInterfaceType(varInterfaceType);
       arg->setImplicit();

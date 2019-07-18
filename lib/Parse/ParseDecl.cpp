@@ -2415,10 +2415,10 @@ bool Parser::parseDeclModifierList(DeclAttributes &Attributes,
 ///     '@' attribute
 ///     '@' attribute attribute-list-clause
 /// \endverbatim
-bool Parser::parseTypeAttributeListPresent(VarDecl::Specifier &Specifier,
+bool Parser::parseTypeAttributeListPresent(ParamDecl::Specifier &Specifier,
                                            SourceLoc &SpecifierLoc,
                                            TypeAttributes &Attributes) {
-  Specifier = VarDecl::Specifier::Default;
+  Specifier = ParamDecl::Specifier::Default;
   while (Tok.is(tok::kw_inout) ||
          (Tok.is(tok::identifier) &&
           (Tok.getRawText().equals("__shared") ||
@@ -2428,12 +2428,12 @@ bool Parser::parseTypeAttributeListPresent(VarDecl::Specifier &Specifier,
         .fixItRemove(SpecifierLoc);
     } else {
       if (Tok.is(tok::kw_inout)) {
-        Specifier = VarDecl::Specifier::InOut;
+        Specifier = ParamDecl::Specifier::InOut;
       } else if (Tok.is(tok::identifier)) {
         if (Tok.getRawText().equals("__shared")) {
-          Specifier = VarDecl::Specifier::Shared;
+          Specifier = ParamDecl::Specifier::Shared;
         } else if (Tok.getRawText().equals("__owned")) {
-          Specifier = VarDecl::Specifier::Owned;
+          Specifier = ParamDecl::Specifier::Owned;
         }
       }
     }
@@ -4321,7 +4321,7 @@ static ParamDecl *createSetterAccessorArgument(SourceLoc nameLoc,
   }
 
   auto result = new (P.Context)
-      ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+      ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
                 Identifier(), nameLoc, name, P.CurDeclContext);
   if (isNameImplicit)
     result->setImplicit();
@@ -4839,7 +4839,7 @@ Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
   VarDecl *storage = PrimaryVar;
   if (!storage) {
     storage = new (Context) VarDecl(StaticLoc.isValid(),
-                                    VarDecl::Specifier::Var,
+                                    VarDecl::Introducer::Var,
                                     /*is capture list*/ false,
                                     VarLoc, Identifier(),
                                     CurDeclContext);
@@ -4900,7 +4900,6 @@ Parser::parseDeclVarGetSet(Pattern *pattern, ParseDeclOptions Flags,
       DiagID = diag::let_cannot_be_computed_property;
 
     diagnose(accessors.LBLoc, DiagID).fixItReplace(VarLoc, "var");
-    PrimaryVar->setSpecifier(VarDecl::Specifier::Var);
     Invalid = true;
   }
 
@@ -5020,7 +5019,7 @@ static StorageImplInfo classifyWithHasStorageAttr(
   // `let` or by omitting a setter.
   auto isImmutable = [&]() {
     if (auto varDecl = dyn_cast<VarDecl>(storage))
-      return varDecl->isImmutable();
+      return varDecl->isLet();
     if (accessors.Set == nullptr) return true;
     return false;
   };
@@ -5029,7 +5028,7 @@ static StorageImplInfo classifyWithHasStorageAttr(
   // it had a setter.
   auto isPrivateSet = [&]() {
     if (auto varDecl = dyn_cast<VarDecl>(storage))
-      return !varDecl->isImmutable() && accessors.Set == nullptr;
+      return !varDecl->isLet() && accessors.Set == nullptr;
     return false;
   };
 
