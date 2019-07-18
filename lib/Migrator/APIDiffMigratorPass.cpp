@@ -15,7 +15,7 @@
 #include "swift/Basic/StringExtras.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/IDE/Utils.h"
-#include "swift/Index/Utils.h"
+#include "swift/Sema/IDETypeChecking.h"
 #include "swift/Migrator/ASTMigratorPass.h"
 #include "swift/Migrator/EditorAdapter.h"
 #include "swift/Migrator/FixitApplyDiagnosticConsumer.h"
@@ -298,8 +298,9 @@ struct APIDiffMigratorPass : public ASTMigratorPass, public SourceEntityWalker {
     };
 
     addDiffItems(VD);
-    for (auto *Overridden: getOverriddenDecls(VD, /*IncludeProtocolReqs=*/true,
-                                              /*Transitive=*/true)) {
+    for (auto *Overridden: collectAllOverriddenDecls(VD,
+                                                     /*IncludeProtocolReqs=*/true,
+                                                     /*Transitive=*/true)) {
       addDiffItems(Overridden);
     }
     return results;
