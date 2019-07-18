@@ -62,7 +62,7 @@ internal class __SwiftNativeNSArrayWithContiguousStorage
 }
 
 // Implement the APIs required by NSArray 
-extension __SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
+extension __SwiftNativeNSArrayWithContiguousStorage: _NSArrayCore {
   @objc internal var count: Int {
     return withUnsafeBufferOfObjects { $0.count }
   }

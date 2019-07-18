@@ -68,7 +68,7 @@ public func zip<Sequence1, Sequence2>(
 ///     // Prints "three: 3"
 ///     // Prints "four: 4"
 @frozen // generic-performance
-public struct Zip2Sequence<Sequence1 : Sequence, Sequence2 : Sequence> {
+public struct Zip2Sequence<Sequence1: Sequence, Sequence2: Sequence> {
   @usableFromInline // generic-performance
   internal let _sequence1: Sequence1
   @usableFromInline // generic-performance

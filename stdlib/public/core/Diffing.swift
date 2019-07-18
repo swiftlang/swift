@@ -140,7 +140,7 @@ extension BidirectionalCollection {
   }
 }
 
-extension BidirectionalCollection where Element : Equatable {
+extension BidirectionalCollection where Element: Equatable {
   /// Returns the difference needed to produce this collection's ordered
   /// elements from the given collection.
   ///
@@ -215,8 +215,8 @@ fileprivate func _myers<C,D>(
   using cmp: (C.Element, D.Element) -> Bool
 ) -> CollectionDifference<C.Element>
   where
-    C : BidirectionalCollection,
-    D : BidirectionalCollection,
+    C: BidirectionalCollection,
+    D: BidirectionalCollection,
     C.Element == D.Element
 {
 
@@ -334,7 +334,7 @@ fileprivate func _myers<C,D>(
    * necessary) is significantly less than the worst-case n² memory use of the
    * descent algorithm.
    */
-  func _withContiguousStorage<C : Collection, R>(
+  func _withContiguousStorage<C: Collection, R>(
     for values: C,
     _ body: (UnsafeBufferPointer<C.Element>) throws -> R
   ) rethrows -> R {

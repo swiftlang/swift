@@ -158,11 +158,11 @@ internal func _cocoaGetCStringTrampoline(
 // Conversion from NSString to Swift's native representation.
 //
 
-private var kCFStringEncodingASCII : _swift_shims_CFStringEncoding {
+private var kCFStringEncodingASCII: _swift_shims_CFStringEncoding {
   @inline(__always) get { return 0x0600 }
 }
 
-private var kCFStringEncodingUTF8 : _swift_shims_CFStringEncoding {
+private var kCFStringEncodingUTF8: _swift_shims_CFStringEncoding {
   @inline(__always) get { return 0x8000100 }
 }
 

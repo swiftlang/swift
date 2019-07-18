@@ -61,7 +61,7 @@ public struct ObjectIdentifier {
   }
 }
 
-extension ObjectIdentifier : CustomDebugStringConvertible {
+extension ObjectIdentifier: CustomDebugStringConvertible {
   /// A textual representation of the identifier, suitable for debugging.
   public var debugDescription: String {
     return "ObjectIdentifier(\(_rawPointerToString(_value)))"

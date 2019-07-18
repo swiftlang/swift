@@ -344,7 +344,7 @@ extension String.UTF8View.Index {
 }
 
 // Reflection
-extension String.UTF8View : CustomReflectable {
+extension String.UTF8View: CustomReflectable {
   /// Returns a mirror that reflects the UTF-8 view of a string.
   public var customMirror: Mirror {
     return Mirror(self, unlabeledChildren: self)
