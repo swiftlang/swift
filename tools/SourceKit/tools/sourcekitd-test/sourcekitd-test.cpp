@@ -308,10 +308,11 @@ static void skt_main(skt_args *args) {
   return;
 }
 
-static inline const char *getInterfaceGenDocumentName() {
-  // Absolute "path" so that handleTestInvocation doesn't try to make it
-  // absolute.
-  return "/<interface-gen>";
+static inline std::string getInterfaceGenDocumentName() {
+  // "Absolute path" on all platforms since handleTestInvocation will attempt to make this absolute
+  llvm::SmallString<64> path = llvm::StringRef("/<interface-gen>");
+  llvm::sys::fs::make_absolute(path);
+  return path.str();
 }
 
 static int printAnnotations();
@@ -867,7 +868,7 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
                                             RequestEditorOpenHeaderInterface);
     }
 
-    sourcekitd_request_dictionary_set_string(Req, KeyName, getInterfaceGenDocumentName());
+    sourcekitd_request_dictionary_set_string(Req, KeyName, getInterfaceGenDocumentName().c_str());
     if (!Opts.ModuleGroupName.empty())
       sourcekitd_request_dictionary_set_string(Req, KeyGroupName,
                                                Opts.ModuleGroupName.c_str());
