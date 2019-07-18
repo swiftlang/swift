@@ -60,8 +60,10 @@ private:
     // to get diagnostics if something about this builder call fails,
     // e.g. if there isn't a matching overload for `buildBlock`.
     // But we can only do this if there isn't a type variable in the type.
-    TypeLoc typeLoc(nullptr,
-                    builderType->hasTypeVariable() ? Type() : builderType);
+    TypeLoc typeLoc;
+    if (!builderType->hasTypeVariable()) {
+      typeLoc = TypeLoc(new (ctx) FixedTypeRepr(builderType, loc), builderType);
+    }
 
     auto typeExpr = new (ctx) TypeExpr(typeLoc);
     if (cs) {
@@ -69,10 +71,19 @@ private:
       cs->setType(&typeExpr->getTypeLoc(), builderType);
     }
 
+    SmallVector<SourceLoc, 4> argLabelLocs;
+    for (auto i : indices(argLabels)) {
+      argLabelLocs.push_back(args[i]->getStartLoc());
+    }
+
     typeExpr->setImplicit();
     auto memberRef = new (ctx) UnresolvedDotExpr(
         typeExpr, loc, fnName, DeclNameLoc(loc), /*implicit=*/true);
-    return CallExpr::createImplicit(ctx, memberRef, args, argLabels);
+    SourceLoc openLoc = args.empty() ? loc : args.front()->getStartLoc();
+    SourceLoc closeLoc = args.empty() ? loc : args.back()->getEndLoc();
+    return CallExpr::create(ctx, memberRef, openLoc, args,
+                            argLabels, argLabelLocs, closeLoc,
+                            /*trailing closure*/ nullptr, /*implicit*/true);
   }
 
   /// Check whether the builder supports the given operation.
@@ -400,10 +411,12 @@ public:
     auto optionalDecl = ctx.getOptionalDecl();
     auto optionalType = optionalDecl->getDeclaredType();
 
-    auto optionalTypeExpr = TypeExpr::createImplicit(optionalType, ctx);
+    auto loc = arg->getStartLoc();
+    auto optionalTypeExpr =
+      TypeExpr::createImplicitHack(loc, optionalType, ctx);
     auto someRef = new (ctx) UnresolvedDotExpr(
-        optionalTypeExpr, SourceLoc(), ctx.getIdentifier("some"),
-        DeclNameLoc(), /*implicit=*/true);
+        optionalTypeExpr, loc, ctx.getIdentifier("some"),
+        DeclNameLoc(loc), /*implicit=*/true);
     return CallExpr::createImplicit(ctx, someRef, arg, { });
   }
 
@@ -411,7 +424,8 @@ public:
     auto optionalDecl = ctx.getOptionalDecl();
     auto optionalType = optionalDecl->getDeclaredType();
 
-    auto optionalTypeExpr = TypeExpr::createImplicit(optionalType, ctx);
+    auto optionalTypeExpr =
+      TypeExpr::createImplicitHack(endLoc, optionalType, ctx);
     return new (ctx) UnresolvedDotExpr(
         optionalTypeExpr, endLoc, ctx.getIdentifier("none"),
         DeclNameLoc(endLoc), /*implicit=*/true);
@@ -511,7 +525,9 @@ bool TypeChecker::typeCheckFunctionBuilderFuncBody(FuncDecl *FD,
     return true;
   assert(returnExprType->isEqual(returnType));
 
-  auto returnStmt = new (Context) ReturnStmt(SourceLoc(), returnExpr);
+  auto loc = returnExpr->getStartLoc();
+  auto returnStmt =
+    new (Context) ReturnStmt(loc, returnExpr, /*implicit*/ true);
   auto origBody = FD->getBody();
   auto fakeBody = BraceStmt::create(Context, origBody->getLBraceLoc(),
                                     { returnStmt },
