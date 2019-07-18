@@ -43,14 +43,14 @@ extension Unicode {
 /// scalar values.
 public protocol _UnicodeParser {
   /// The encoding with which this parser is associated
-  associatedtype Encoding : _UnicodeEncoding
+  associatedtype Encoding: _UnicodeEncoding
 
   /// Constructs an instance that can be used to begin parsing `CodeUnit`s at
   /// any Unicode scalar boundary.
   init()
 
   /// Parses a single Unicode scalar value from `input`.
-  mutating func parseScalar<I : IteratorProtocol>(
+  mutating func parseScalar<I: IteratorProtocol>(
     from input: inout I
   ) -> Unicode.ParseResult<Encoding.EncodedScalar>
   where I.Element == Encoding.CodeUnit

@@ -158,14 +158,14 @@ extension CollectionOfOne: RandomAccessCollection, MutableCollection {
   }
 }
 
-extension CollectionOfOne : CustomDebugStringConvertible {
+extension CollectionOfOne: CustomDebugStringConvertible {
   /// A textual representation of the collection, suitable for debugging.
   public var debugDescription: String {
     return "CollectionOfOne(\(String(reflecting: _element)))"
   }
 }
 
-extension CollectionOfOne : CustomReflectable {
+extension CollectionOfOne: CustomReflectable {
   public var customMirror: Mirror {
     return Mirror(self, children: ["element": _element])
   }

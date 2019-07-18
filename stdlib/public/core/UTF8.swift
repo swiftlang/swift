@@ -50,12 +50,12 @@ extension Unicode.UTF8 {
   }
 }
 
-extension Unicode.UTF8 : _UnicodeEncoding {
+extension Unicode.UTF8: _UnicodeEncoding {
   public typealias CodeUnit = UInt8
   public typealias EncodedScalar = _ValidUTF8Buffer
 
   @inlinable
-  public static var encodedReplacementCharacter : EncodedScalar {
+  public static var encodedReplacementCharacter: EncodedScalar {
     return EncodedScalar.encodedReplacementCharacter
   }
 
@@ -131,7 +131,7 @@ extension Unicode.UTF8 : _UnicodeEncoding {
 
   @inlinable
   @inline(__always)
-  public static func transcode<FromEncoding : _UnicodeEncoding>(
+  public static func transcode<FromEncoding: _UnicodeEncoding>(
     _ content: FromEncoding.EncodedScalar, from _: FromEncoding.Type
   ) -> EncodedScalar? {
     if _fastPath(FromEncoding.self == UTF16.self) {
@@ -180,7 +180,7 @@ extension Unicode.UTF8 : _UnicodeEncoding {
   }
 }
 
-extension UTF8.ReverseParser : Unicode.Parser, _UTFParser {
+extension UTF8.ReverseParser: Unicode.Parser, _UTFParser {
   public typealias Encoding = Unicode.UTF8
   @inline(__always)
   @inlinable
@@ -256,7 +256,7 @@ extension UTF8.ReverseParser : Unicode.Parser, _UTFParser {
   }
 }
 
-extension Unicode.UTF8.ForwardParser : Unicode.Parser, _UTFParser {
+extension Unicode.UTF8.ForwardParser: Unicode.Parser, _UTFParser {
   public typealias Encoding = Unicode.UTF8
 
   @inline(__always)
