@@ -8,16 +8,21 @@ import DifferentiationUnittest
 
 var LeakCheckingTests = TestSuite("LeakChecking")
 
-/// Execute body, check expected leak count, and reset global leak count.
+/// Execute body and check expected leak count.
 func testWithLeakChecking(
   expectedLeakCount: Int = 0, file: String = #file, line: UInt = #line,
   _ body: () -> Void
 ) {
+  // Note: compare expected leak count with relative leak count after
+  // running `body`.
+  // This approach is more robust than comparing leak count with zero
+  // and resetting leak count to zero, which is stateful and causes issues.
+  let beforeLeakCount = _GlobalLeakCount.count
   body()
+  let leakCount = _GlobalLeakCount.count - beforeLeakCount
   expectEqual(
-    expectedLeakCount, _GlobalLeakCount.count, "Leak detected.",
+    expectedLeakCount, leakCount, "Leaks detected: \(leakCount)",
     file: file, line: line)
-  _GlobalLeakCount.count = 0
 }
 
 struct ExampleLeakModel : Differentiable {
