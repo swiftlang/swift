@@ -4521,6 +4521,9 @@ WARNING(property_wrapper_init_initialValue,none,
         ())
 ERROR(property_wrapper_projection_value_missing,none,
       "could not find projection value property %0", (Identifier))
+ERROR(property_wrapper_missing_arg_init, none, "missing argument for parameter "
+      "%0 in property wrapper initializer; add 'wrappedValue' and %0 "
+      "arguments in '@%1(...)'", (Identifier, StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: function builder diagnostics

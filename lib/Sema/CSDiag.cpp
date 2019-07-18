@@ -3241,13 +3241,8 @@ public:
     SmallString<32> insertBuf;
     llvm::raw_svector_ostream insertText(insertBuf);
 
-    if (argIdx != 0) {
-      if (isPropertyWrapperImplicitInit()) {
-        insertText << "(";
-      } else {
-        insertText << ", ";
-      }
-    }
+    if (argIdx != 0)
+      insertText << ", ";
     if (!name.empty())
       insertText << name.str() << ": ";
     Type Ty = param.getOldType();
@@ -3262,9 +3257,6 @@ public:
     insertText << "<#" << Ty << "#>";
     if (argIdx == 0 && insertableEndIdx != 0)
       insertText << ", ";
-    if (isPropertyWrapperImplicitInit()) {
-      insertText << ")";
-    }
 
     SourceLoc insertLoc;
     if (argIdx > insertableEndIdx) {
@@ -3275,9 +3267,6 @@ public:
       //   fn(x: 1) { return 1 }
       // is diagnosed as "missing argument for 'y'" (missingParamIdx 1).
       // It should be "missing argument for 'z'" (missingParamIdx 2).
-    } else if (isPropertyWrapperImplicitInit()) {
-      insertLoc =
-          Lexer::getLocForEndOfToken(TC.Context.SourceMgr, FnExpr->getLoc());
     } else if (auto *TE = dyn_cast<TupleExpr>(ArgExpr)) {
       // fn():
       //   fn([argMissing])
@@ -3340,13 +3329,20 @@ public:
 
     assert(insertLoc.isValid() && "missing argument after trailing closure?");
 
-    if (name.empty())
+    if (name.empty()) {
       TC.diagnose(insertLoc, diag::missing_argument_positional,
                   missingParamIdx + 1)
           .fixItInsert(insertLoc, insertText.str());
-    else
-      TC.diagnose(insertLoc, diag::missing_argument_named, name)
-          .fixItInsert(insertLoc, insertText.str());
+    } else {
+      if (isPropertyWrapperImplicitInit()) {
+        auto TE = cast<TypeExpr>(FnExpr);
+        TC.diagnose(TE->getLoc(), diag::property_wrapper_missing_arg_init, name,
+                    TE->getInstanceType()->getString());
+      } else {
+        TC.diagnose(insertLoc, diag::missing_argument_named, name)
+            .fixItInsert(insertLoc, insertText.str());
+      }
+    }
 
     auto candidate = CandidateInfo[0];
     if (candidate.getDecl())

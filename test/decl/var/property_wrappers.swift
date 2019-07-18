@@ -1095,7 +1095,7 @@ struct InvalidPropertyDelegateUse {
 // SR-11060
 
 class SR_11060_Class {
-  @SR_11060_Wrapper var property: Int = 1234 // expected-error {{missing argument for parameter 'string' in call}}{{20-20=(string: <#String#>)}}
+  @SR_11060_Wrapper var property: Int = 1234 // expected-error {{missing argument for parameter 'string' in property wrapper initializer; add 'wrappedValue' and 'string' arguments in '@SR_11060_Wrapper(...)'}}
 }
 
 @propertyWrapper
@@ -1106,3 +1106,4 @@ struct SR_11060_Wrapper {
     self.wrappedValue = wrappedValue
   }
 }
+
