@@ -215,7 +215,7 @@ public struct UnsafePointer<Pointee>: _Pointer {
 
   /// Creates an `UnsafePointer` from a builtin raw pointer.
   @_transparent
-  public init(_ _rawValue : Builtin.RawPointer) {
+  public init(_ _rawValue: Builtin.RawPointer) {
     self._rawValue = _rawValue
   }
 
@@ -317,7 +317,7 @@ public struct UnsafePointer<Pointee>: _Pointer {
   }
 
   @inlinable // unsafe-performance
-  internal static var _max : UnsafePointer {
+  internal static var _max: UnsafePointer {
     return UnsafePointer(
       bitPattern: 0 as Int &- MemoryLayout<Pointee>.stride
     )._unsafelyUnwrappedUnchecked
@@ -521,7 +521,7 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
 
   /// Creates an `UnsafeMutablePointer` from a builtin raw pointer.
   @_transparent
-  public init(_ _rawValue : Builtin.RawPointer) {
+  public init(_ _rawValue: Builtin.RawPointer) {
     self._rawValue = _rawValue
   }
 
@@ -974,7 +974,7 @@ public struct UnsafeMutablePointer<Pointee>: _Pointer {
   }
 
   @inlinable // unsafe-performance
-  internal static var _max : UnsafeMutablePointer {
+  internal static var _max: UnsafeMutablePointer {
     return UnsafeMutablePointer(
       bitPattern: 0 as Int &- MemoryLayout<Pointee>.stride
     )._unsafelyUnwrappedUnchecked

@@ -164,7 +164,7 @@ extension EmptyCollection: RandomAccessCollection, MutableCollection {
   }
 }
 
-extension EmptyCollection : Equatable {
+extension EmptyCollection: Equatable {
   @inlinable // trivial-implementation
   public static func == (
     lhs: EmptyCollection<Element>, rhs: EmptyCollection<Element>
