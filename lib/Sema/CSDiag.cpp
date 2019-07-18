@@ -3358,9 +3358,9 @@ public:
 
   bool isPropertyWrapperImplicitInit() {
     if (auto TE = dyn_cast<TypeExpr>(FnExpr)) {
-      if (auto info = TE->getInstanceType()
-                          ->getAnyNominal()
-                          ->getPropertyWrapperTypeInfo()) {
+      if (TE->getInstanceType()
+              ->getAnyNominal()
+              ->getPropertyWrapperTypeInfo()) {
         if (auto parent = CandidateInfo.CS.getParentExpr(FnExpr)) {
           if (auto CE = dyn_cast<CallExpr>(parent)) {
             return CE->isImplicit();
