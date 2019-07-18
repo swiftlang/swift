@@ -3845,7 +3845,8 @@ private:
   llvm::DenseSet<SILValue> blockTemporarySet;
 
   /// Stack buffers allocated for storing local adjoint values.
-  SmallVector<SILValue, 8> functionLocalAllocations;
+  SmallVector<SILValue, 64> functionLocalAllocations;
+  llvm::SmallDenseSet<SILValue> destroyedLocalAllocations;
 
   /// The seed argument in the pullback function.
   SILArgument *seed = nullptr;
@@ -3942,13 +3943,6 @@ private:
   /// Materialize an adjoint value indirectly to a SIL buffer.
   void materializeAdjointIndirect(AdjointValue val, SILValue destBuffer,
                                   SILLocation loc);
-
-  /// Materialize the given adjoint value indirectly to the specified buffer.
-  /// The root address derivation of `seedBufAccess` must be the result of
-  /// a `begin_access`.
-  void materializeAdjointIndirectHelper(AdjointValue val,
-                                        SILValue destBufferAccess,
-                                        SILLocation loc);
 
   //--------------------------------------------------------------------------//
   // Helpers for symbolic value materializers
@@ -4195,23 +4189,17 @@ private:
         getPullback().getEntryBlock(),
         getNextFunctionLocalAllocationInsertionPoint());
     // Allocate local buffer and initialize to zero.
+    auto bufObjectType = getRemappedTangentType(originalBuffer->getType());
     auto *newBuf = localAllocBuilder.createAllocStack(
-        originalBuffer.getLoc(),
-        getRemappedTangentType(originalBuffer->getType()));
-    auto *access = localAllocBuilder.createBeginAccess(
-        newBuf->getLoc(), newBuf, SILAccessKind::Init,
-        SILAccessEnforcement::Static, /*noNestedConflict*/ true,
-        /*fromBuiltin*/ false);
+        originalBuffer.getLoc(), bufObjectType);
     // Temporarily change global builder insertion point and emit zero into the
     // local buffer.
     auto insertionPoint = builder.getInsertionBB();
     builder.setInsertionPoint(
         localAllocBuilder.getInsertionBB(),
         localAllocBuilder.getInsertionPoint());
-    emitZeroIndirect(access->getType().getASTType(), access, access->getLoc());
+    emitZeroIndirect(bufObjectType.getASTType(), newBuf, newBuf->getLoc());
     builder.setInsertionPoint(insertionPoint);
-    localAllocBuilder.createEndAccess(
-        access->getLoc(), access, /*aborted*/ false);
     // Create cleanup for local buffer.
     functionLocalAllocations.push_back(newBuf);
     return (insertion.first->getSecond() = newBuf);
@@ -4228,13 +4216,7 @@ private:
     auto adjointBuffer = getAdjointBuffer(origBB, originalBuffer);
     if (errorOccurred)
       return;
-    auto *destAccess = builder.createBeginAccess(
-        rhsBufferAccess.getLoc(), adjointBuffer, SILAccessKind::Modify,
-        SILAccessEnforcement::Static, /*noNestedConflict*/ true,
-        /*fromBuiltin*/ false);
-    accumulateIndirect(destAccess, rhsBufferAccess, loc);
-    builder.createEndAccess(
-        destAccess->getLoc(), destAccess, /*aborted*/ false);
+    accumulateIndirect(adjointBuffer, rhsBufferAccess, loc);
   }
 
   //--------------------------------------------------------------------------//
@@ -4710,7 +4692,10 @@ public:
       // Assert that local allocations have at least one use.
       // Buffers should not be allocated needlessly.
       assert(!alloc->use_empty());
-      emitCleanup(builder, pbLoc, alloc);
+      if (!destroyedLocalAllocations.count(alloc)) {
+        emitCleanup(builder, pbLoc, alloc);
+        destroyedLocalAllocations.insert(alloc);
+      }
       builder.createDeallocStack(pbLoc, alloc);
     }
     builder.createReturn(pbLoc, joinElements(retElts, builder, pbLoc));
@@ -4726,6 +4711,10 @@ public:
         }
       }
     }
+    // Ensure all local allocations have been cleaned up.
+    assert(llvm::all_of(functionLocalAllocations, [&](SILValue v) {
+      return (bool)destroyedLocalAllocations.count(v);
+    }));
 #endif
 
     LLVM_DEBUG(getADDebugStream() << "Generated adjoint for "
@@ -4802,14 +4791,8 @@ public:
 
   void accumulateDifferentiableViewSubscriptIndirect(
       ApplyInst *ai, CopyAddrInst *cai, AllocStackInst *subscriptBuffer) {
-    auto subscriptBufferAccess = builder.createBeginAccess(
-        ai->getLoc(), subscriptBuffer, SILAccessKind::Read,
-        SILAccessEnforcement::Static, /*noNestedConflict*/ true,
-        /*fromBuiltin*/ false);
-    addToAdjointBuffer(cai->getParent(), cai->getSrc(), subscriptBufferAccess,
+    addToAdjointBuffer(cai->getParent(), cai->getSrc(), subscriptBuffer,
                        cai->getLoc());
-    builder.createEndAccess(ai->getLoc(), subscriptBufferAccess,
-                            /*aborted*/ false);
     emitCleanup(builder, cai->getLoc(), subscriptBuffer);
     builder.createDeallocStack(ai->getLoc(), subscriptBuffer);
   }
@@ -5008,17 +4991,12 @@ public:
         emitCleanup(builder, loc, tan);
       } else {
         if (origArg->getType().isAddress()) {
-          auto adjBuf = getAdjointBuffer(bb, origArg);
           if (errorOccurred)
             return;
           auto *tmpBuf = builder.createAllocStack(loc, tan->getType());
           builder.createStore(loc, tan, tmpBuf,
               getBufferSOQ(tmpBuf->getType().getASTType(), getPullback()));
-          auto *readAccess = builder.createBeginAccess(
-              loc, tmpBuf, SILAccessKind::Read, SILAccessEnforcement::Static,
-              /*noNestedConflict*/ true, /*fromBuiltin*/ false);
-          accumulateIndirect(adjBuf, readAccess, loc);
-          builder.createEndAccess(loc, readAccess, /*aborted*/ false);
+          addToAdjointBuffer(bb, origArg, tmpBuf, loc);
           emitCleanup(builder, loc, tmpBuf);
           builder.createDeallocStack(loc, tmpBuf);
         }
@@ -5279,27 +5257,12 @@ public:
     // Allocate a local buffer and store the adjoint value. This buffer will be
     // used for accumulation into the adjoint buffer.
     auto *localBuf = builder.createAllocStack(li->getLoc(), adjVal->getType());
-    auto *initAccess = builder.createBeginAccess(
-        li->getLoc(), localBuf, SILAccessKind::Init,
-        SILAccessEnforcement::Static, /*noNestedConflict*/ true,
-        /*fromBuiltin*/ false);
-    builder.createRetainValue(li->getLoc(), adjVal,
-                              builder.getDefaultAtomicity());
-    builder.createStore(li->getLoc(), adjVal, initAccess,
+    builder.createStore(li->getLoc(), adjVal, localBuf,
         getBufferSOQ(localBuf->getType().getASTType(), getPullback()));
-    builder.createEndAccess(li->getLoc(), initAccess, /*aborted*/ false);
-    // Get the adjoint buffer.
-    auto &adjBuf = getAdjointBuffer(bb, li->getOperand());
+    // Accumulate the adjoint value in the local buffer into the adjoint buffer.
+    addToAdjointBuffer(bb, li->getOperand(), localBuf, li->getLoc());
     if (errorOccurred)
       return;
-    // Accumulate the adjoint value in the local buffer into the adjoint buffer.
-    auto *readAccess = builder.createBeginAccess(
-        li->getLoc(), localBuf, SILAccessKind::Read,
-        SILAccessEnforcement::Static, /*noNestedConflict*/ true,
-        /*fromBuiltin*/ false);
-    accumulateIndirect(adjBuf, readAccess, li->getLoc());
-    builder.createEndAccess(li->getLoc(), readAccess, /*aborted*/ false);
-    emitCleanup(builder, li->getLoc(), localBuf);
     builder.createDeallocStack(li->getLoc(), localBuf);
   }
 
@@ -5329,12 +5292,7 @@ public:
     if (errorOccurred)
       return;
     auto destType = remapType(adjDest->getType());
-    auto *readAccess = builder.createBeginAccess(
-        cai->getLoc(), adjDest, SILAccessKind::Read,
-        SILAccessEnforcement::Static, /*noNestedConflict*/ true,
-        /*fromBuiltin*/ false);
-    addToAdjointBuffer(bb, cai->getSrc(), readAccess, cai->getLoc());
-    builder.createEndAccess(cai->getLoc(), readAccess, /*aborted*/ false);
+    addToAdjointBuffer(bb, cai->getSrc(), adjDest, cai->getLoc());
     emitCleanup(builder, cai->getLoc(), adjDest);
     emitZeroIndirect(destType.getASTType(), adjDest, cai->getLoc());
   }
@@ -5442,16 +5400,6 @@ SILValue PullbackEmitter::materializeAdjointDirect(
   }
 }
 
-void PullbackEmitter::materializeAdjointIndirect(
-    AdjointValue val, SILValue destBuffer, SILLocation loc) {
-  auto *access = builder.createBeginAccess(
-      loc, destBuffer, SILAccessKind::Init,
-      SILAccessEnforcement::Static, /*noNestedConflict*/ true,
-      /*fromBuiltin*/ false);
-  materializeAdjointIndirectHelper(val, access, loc);
-  builder.createEndAccess(loc, access, /*aborted*/ false);
-}
-
 SILValue PullbackEmitter::materializeAdjoint(AdjointValue val,
                                              SILLocation loc) {
   if (val.isConcrete()) {
@@ -5464,7 +5412,7 @@ SILValue PullbackEmitter::materializeAdjoint(AdjointValue val,
   return materializeAdjointDirect(val, loc);
 }
 
-void PullbackEmitter::materializeAdjointIndirectHelper(
+void PullbackEmitter::materializeAdjointIndirect(
     AdjointValue val, SILValue destBufferAccess, SILLocation loc) {
   auto soq = getBufferSOQ(val.getType().getASTType(), builder.getFunction());
   switch (val.getKind()) {
@@ -5491,7 +5439,7 @@ void PullbackEmitter::materializeAdjointIndirectHelper(
             tupTy->getElementType(idx)->getCanonicalType());
         auto *eltBuf =
             builder.createTupleElementAddr(loc, destBufferAccess, idx, eltTy);
-        materializeAdjointIndirectHelper(
+        materializeAdjointIndirect(
             val.getAggregateElement(idx), eltBuf, loc);
       }
     } else if (auto *structDecl =
@@ -5501,7 +5449,7 @@ void PullbackEmitter::materializeAdjointIndirectHelper(
            ++fieldIt, ++i) {
         auto eltBuf =
             builder.createStructElementAddr(loc, destBufferAccess, *fieldIt);
-        materializeAdjointIndirectHelper(
+        materializeAdjointIndirect(
             val.getAggregateElement(i), eltBuf, loc);
       }
     } else {
@@ -5546,19 +5494,9 @@ SILValue PullbackEmitter::emitZeroDirect(CanType type, SILLocation loc) {
   auto silType = getModule().Types.getLoweredLoadableType(
       type, ResilienceExpansion::Minimal);
   auto *buffer = builder.createAllocStack(loc, silType);
-  auto *initAccess = builder.createBeginAccess(loc, buffer, SILAccessKind::Init,
-                                               SILAccessEnforcement::Static,
-                                               /*noNestedConflict*/ true,
-                                               /*fromBuiltin*/ false);
-  emitZeroIndirect(type, initAccess, loc);
-  builder.createEndAccess(loc, initAccess, /*aborted*/ false);
-  auto readAccess = builder.createBeginAccess(loc, buffer, SILAccessKind::Read,
-                                              SILAccessEnforcement::Static,
-                                              /*noNestedConflict*/ true,
-                                              /*fromBuiltin*/ false);
-  auto *loaded = builder.createLoad(loc, readAccess,
+  emitZeroIndirect(type, buffer, loc);
+  auto *loaded = builder.createLoad(loc, buffer,
                                     getBufferLOQ(type, getPullback()));
-  builder.createEndAccess(loc, readAccess, /*aborted*/ false);
   builder.createDeallocStack(loc, buffer);
   return loaded;
 }
@@ -5659,43 +5597,16 @@ SILValue PullbackEmitter::accumulateDirect(SILValue lhs, SILValue rhs,
     auto *lhsBuf = builder.createAllocStack(loc, adjointTy);
     auto *rhsBuf = builder.createAllocStack(loc, adjointTy);
     // Initialize input buffers.
-    auto *lhsBufInitAccess = builder.createBeginAccess(
-        loc, lhsBuf, SILAccessKind::Init, SILAccessEnforcement::Static,
-        /*noNestedConflict*/ true, /*fromBuiltin*/ false);
-    auto *rhsBufInitAccess = builder.createBeginAccess(
-        loc, rhsBuf, SILAccessKind::Init, SILAccessEnforcement::Static,
-        /*noNestedConflict*/ true, /*fromBuiltin*/ false);
-    builder.createStore(loc, lhs, lhsBufInitAccess,
+    builder.createStore(loc, lhs, lhsBuf,
                         getBufferSOQ(adjointASTTy, getPullback()));
-    builder.createStore(loc, rhs, rhsBufInitAccess,
+    builder.createStore(loc, rhs, rhsBuf,
                         getBufferSOQ(adjointASTTy, getPullback()));
-    builder.createEndAccess(loc, lhsBufInitAccess, /*aborted*/ false);
-    builder.createEndAccess(loc, rhsBufInitAccess, /*aborted*/ false);
-    // Accumulate the adjoints.
-    auto *resultBufAccess = builder.createBeginAccess(
-        loc, resultBuf, SILAccessKind::Init, SILAccessEnforcement::Static,
-        /*noNestedConflict*/ true, /*fromBuiltin*/ false);
-    auto *lhsBufReadAccess = builder.createBeginAccess(loc, lhsBuf,
-        SILAccessKind::Read, SILAccessEnforcement::Static,
-        /*noNestedConflict*/ true, /*fromBuiltin*/ false);
-    auto *rhsBufReadAccess = builder.createBeginAccess(loc, rhsBuf,
-        SILAccessKind::Read, SILAccessEnforcement::Static,
-        /*noNestedConflict*/ true, /*fromBuiltin*/ false);
-    accumulateIndirect(
-        resultBufAccess, lhsBufReadAccess, rhsBufReadAccess, loc);
-    builder.createEndAccess(loc, resultBufAccess, /*aborted*/ false);
-    builder.createEndAccess(loc, rhsBufReadAccess, /*aborted*/ false);
-    builder.createEndAccess(loc, lhsBufReadAccess, /*aborted*/ false);
+    accumulateIndirect(resultBuf, lhsBuf, rhsBuf, loc);
     // Deallocate input buffers.
     builder.createDeallocStack(loc, rhsBuf);
     builder.createDeallocStack(loc, lhsBuf);
-    // Load result.
-    resultBufAccess = builder.createBeginAccess(loc, resultBuf,
-        SILAccessKind::Read, SILAccessEnforcement::Static,
-        /*noNestedConflict*/ true, /*fromBuiltin*/ false);
-    auto val = builder.createLoad(loc, resultBufAccess,
+    auto val = builder.createLoad(loc, resultBuf,
         getBufferLOQ(lhs->getType().getASTType(), getPullback()));
-    builder.createEndAccess(loc, resultBufAccess, /*aborted*/ false);
     // Deallocate result buffer.
     builder.createDeallocStack(loc, resultBuf);
     return val;
