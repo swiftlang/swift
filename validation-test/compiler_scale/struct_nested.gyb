@@ -2,8 +2,9 @@
 // REQUIRES: OS=macosx
 // REQUIRES: asserts
 
-struct Outer${N} {
-  struct Inner {}
+struct Struct${N} {
+% if int(N) > 1:
+    var next: Struct${int(N)-1}.Nested? = nil
+% end
+    struct Nested {}
 }
-
-extension Outer${N}.Inner {}

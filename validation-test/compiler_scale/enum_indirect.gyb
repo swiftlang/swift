@@ -2,8 +2,10 @@
 // REQUIRES: OS=macosx
 // REQUIRES: asserts
 
-struct Outer${N} {
-  struct Inner {}
-}
+indirect enum Enum${N} {
+    case OK
 
-extension Outer${N}.Inner {}
+% if int(N) > 1:
+    case next(Enum${int(N)-1})
+% end
+}

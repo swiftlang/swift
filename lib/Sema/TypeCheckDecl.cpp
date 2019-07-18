@@ -2319,7 +2319,9 @@ public:
       (void) VD->isDynamic();
 
       // Make sure we finalize this declaration.
-      TC.DeclsToFinalize.insert(VD);
+      if (isa<ClassDecl>(VD) || isa<ProtocolDecl>(VD) ||
+          isa<AbstractStorageDecl>(VD))
+        TC.DeclsToFinalize.insert(VD);
 
       // If this is a member of a nominal type, don't allow it to have a name of
       // "Type" or "Protocol" since we reserve the X.Type and X.Protocol
@@ -2873,10 +2875,10 @@ public:
     TC.validateDecl(SD);
     checkGenericParams(SD->getGenericParams(), SD, TC);
 
-    TC.addImplicitConstructors(SD);
-
     // Force lowering of stored properties.
     (void) SD->getStoredProperties();
+
+    TC.addImplicitConstructors(SD);
 
     for (Decl *Member : SD->getMembers())
       visit(Member);
@@ -3008,9 +3010,11 @@ public:
     // Force lowering of stored properties.
     (void) CD->getStoredProperties();
 
-    for (Decl *Member : CD->getMembers()) {
+    TC.addImplicitConstructors(CD);
+    CD->addImplicitDestructor();
+
+    for (Decl *Member : CD->getMembers())
       visit(Member);
-    }
 
     TC.checkPatternBindingCaptures(CD);
 
@@ -3018,9 +3022,6 @@ public:
     // in-class initializers, diagnose this now.
     if (CD->requiresStoredPropertyInits())
       checkRequiredInClassInits(CD);
-
-    TC.addImplicitConstructors(CD);
-    CD->addImplicitDestructor();
 
     // Compute @objc for each superclass member, to catch selector
     // conflicts resulting from unintended overrides.
@@ -3913,9 +3914,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
         checkEnumRawValues(*this, ED);
     }
 
-    if (!isa<ClassDecl>(nominal))
-      requestNominalLayout(nominal);
-
     break;
   }
 
@@ -4457,38 +4455,6 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
   }
 }
 
-static bool shouldValidateMemberDuringFinalization(NominalTypeDecl *nominal,
-                                                   ValueDecl *VD) {
-  // For enums, we only need to validate enum elements to know
-  // the layout.
-  if (isa<EnumDecl>(nominal) &&
-      isa<EnumElementDecl>(VD))
-    return true;
-
-  // For structs, we only need to validate stored properties to
-  // know the layout.
-  if (isa<StructDecl>(nominal) &&
-      (isa<VarDecl>(VD) &&
-       !cast<VarDecl>(VD)->isStatic() &&
-       (cast<VarDecl>(VD)->hasStorage() ||
-        VD->getAttrs().hasAttribute<LazyAttr>() ||
-        cast<VarDecl>(VD)->hasAttachedPropertyWrapper())))
-    return true;
-
-  // For classes, we need to validate properties and functions,
-  // but skipping nested types is OK.
-  if (isa<ClassDecl>(nominal) &&
-      !isa<TypeDecl>(VD))
-    return true;
-
-  // For protocols, skip nested typealiases and nominal types.
-  if (isa<ProtocolDecl>(nominal) &&
-      !isa<GenericTypeDecl>(VD))
-    return true;
-
-  return false;
-}
-
 void TypeChecker::requestMemberLayout(ValueDecl *member) {
   auto *dc = member->getDeclContext();
   if (auto *classDecl = dyn_cast<ClassDecl>(dc))
@@ -4531,13 +4497,11 @@ static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
   // Force lowering of stored properties.
   (void) nominal->getStoredProperties();
 
-  for (auto *D : nominal->getMembers()) {
-    auto VD = dyn_cast<ValueDecl>(D);
-    if (!VD)
-      continue;
-
-    if (shouldValidateMemberDuringFinalization(nominal, VD))
-      TC.DeclsToFinalize.insert(VD);
+  if (isa<ClassDecl>(nominal) || isa<ProtocolDecl>(nominal)) {
+    for (auto *D : nominal->getMembers()) {
+      if (auto *ASD = dyn_cast<AbstractStorageDecl>(D))
+        TC.DeclsToFinalize.insert(ASD);
+    }
   }
 
   if (auto *CD = dyn_cast<ClassDecl>(nominal)) {
