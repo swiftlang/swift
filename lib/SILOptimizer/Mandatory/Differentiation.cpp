@@ -4684,6 +4684,8 @@ public:
       auto source = std::get<0>(pair);
       auto *dest = std::get<1>(pair);
       builder.createCopyAddr(pbLoc, source, dest, IsTake, IsInitialization);
+      // Prevent source buffer from being deallocated.
+      destroyedLocalAllocations.insert(source);
     }
 
     builder.setInsertionPoint(getPullbackBlock(origEntry));
