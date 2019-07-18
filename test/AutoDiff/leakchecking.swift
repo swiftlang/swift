@@ -8,16 +8,21 @@ import DifferentiationUnittest
 
 var LeakCheckingTests = TestSuite("LeakChecking")
 
-/// Execute body, check expected leak count, and reset global leak count.
+/// Execute body and check expected leak count.
 func testWithLeakChecking(
   expectedLeakCount: Int = 0, file: String = #file, line: UInt = #line,
   _ body: () -> Void
 ) {
+  // Note: compare expected leak count with relative leak count after
+  // running `body`.
+  // This approach is more robust than comparing leak count with zero
+  // and resetting leak count to zero, which is stateful and caused bugs.
+  let beforeLeakCount = _GlobalLeakCount.count
   body()
+  let leakCount = _GlobalLeakCount.count - beforeLeakCount
   expectEqual(
-    expectedLeakCount, _GlobalLeakCount.count, "Leak detected.",
+    expectedLeakCount, leakCount, "Leaks detected: \(leakCount)",
     file: file, line: line)
-  _GlobalLeakCount.count = 0
 }
 
 struct ExampleLeakModel : Differentiable {
@@ -72,6 +77,44 @@ LeakCheckingTests.test("BasicVarLeakChecking") {
     _ = gradient(at: model, x) { m, x -> Float in
       var y = x + Tracked<Float>(x.value)
       return m.applied(to: y).value
+    }
+  }
+}
+
+protocol DummyLayer : Differentiable {
+  associatedtype Input : Differentiable
+  associatedtype Output : Differentiable
+
+  @differentiable
+  func requirement(_ input: Input) -> Output
+}
+extension DummyLayer {
+  @differentiable(vjp: vjpDefaultImpl)
+  func defaultImpl(_ input: Input) -> Output {
+    return requirement(input)
+  }
+  func vjpDefaultImpl(_ input: Input) -> (Output, (Self.Output.TangentVector) -> (Self.TangentVector, Self.Input.TangentVector)) {
+    return Swift.valueWithPullback(at: self, input) { (m, i) in m.requirement(i) }
+  }
+}
+LeakCheckingTests.test("TestProtocolDefaultDerivative") {
+  struct Foo : DummyLayer {
+    // NOTE: Make sure not to override `defaultImpl`.
+    // To reproduce the bug, the VJP of `Foo.requirement` should dispatch to
+    // `DummyLayer.vjpDefaultImpl`.
+
+    @differentiable
+    func requirement(_ input: Tracked<Float>) -> Tracked<Float> {
+      return input
+    }
+  }
+
+  testWithLeakChecking(expectedLeakCount: 2) {
+    let x = Tracked<Float>(1)
+    let model = Foo()
+    _ = model.valueWithGradient { model in
+      // Call the protocol default implementation method.
+      model.defaultImpl(x)
     }
   }
 }
