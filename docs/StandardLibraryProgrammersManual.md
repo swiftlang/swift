@@ -6,38 +6,60 @@ TODO: Should this subsume or link to [StdlibRationales.rst](https://github.com/a
 
 TODO: Should this subsume or link to [AccessControlInStdlib.rst](https://github.com/apple/swift/blob/master/docs/AccessControlInStdlib.rst)
 
+In this document, "stdlib" refers to the core standard library (`stdlib/public/core`), our Swift overlays for system frameworks (`stdlib/public/Darwin/*`, `stdlib/public/Windows/*`, etc.), as well as the auxiliary and prototype libraries under `stdlib/private`.
 
 ## Coding style
 
-- The stdlib currently has a hard line length limit of 80 characters.
+### Source Code Formatting
 
-   To break long lines, please closely follow the indentation conventions you see in the existing codebase. (FIXME: Describe.)
-  
-- All entities that aren't public API must include at least one underscored component in their fully qualified names. This includes symbols that are technically declared public but that aren't considered part of the public stdlib API, as well as `@usableFromInline internal`, plain `internal` and `[file]private` types and members. 
+The stdlib currently has a hard line length limit of 80 characters. To break long lines, please closely follow the indentation conventions you see in the existing codebase. (FIXME: Describe.)
+   
+We use two spaces as the unit of indentation. We don't use tabs.
 
-    The underscored component need not be the last. For example, `Swift.Dictionary._worble()` is a good name for an internal helper method, but so is `Swift._NativeDictionary.worble()` -- the `_NativeDictionary` type already has the underscore.
-    
-    Initializers don't have a dedicated name on which we can put the underscore; instead, we add the underscore on the first argument label, adding one if necessary: e.g., `init(_ value: Int)` may become `init(_value: Int)`. If the initializer doesn't have any parameters, then we add a dummy parameter of type Void with an underscored label: for example, `UnsafeBufferPointer.init(_empty: ())`.
+### Public APIs
 
-    This rule ensures we don't accidentally clutter the public namespace with `@usableFromInline` things (which could prevent us from choosing the best names for new public API), and it also makes it easy to see at a glance if a piece of stdlib code uses any non-public entities.
-    
-- We prefer to explicitly spell out all access modifiers in the stdlib codebase. (I.e., we type `internal` even if it's the implicit default.) Additionally, we put the access level on each individual entry point rather than inheriting them from the extension they are in:
+All new public API addition to the core Standard Library must go through the [Swift Evolution Process](https://github.com/apple/swift-evolution/blob/master/process.md). The Core Team must have approved the additions by the time we merge them into the stdlib codebase.
 
-    ```swift
-    public extension String {
-      // 😢👎
-      func blanch() { ... }
-      func roast() { ... }
-    }
+Note that implementation details are generally outside the scope of the Swift Evolution -- the stdlib is free to change its internal algorithms, internal APIs and data structures etc. from release to release, as long as the documented API (and ABI) remains intact. 
+
+For example, since `hashValue` was always documented to allow changing its return value across different executions of the same program, we were able to switch to randomly seeded hashing in Swift 4.2 without going through the Swift Evolution process. However, the introduction of `hash(into:)` required a formal proposal. (Note though that highly visible behavioral changes like this can be more difficult to implement now that we have a stable ABI -- we can still do them, but in some cases they may require checking the version of the Swift SDK on which the main executable was compiled, to prevent breaking binaries compiled with previous releases.)
+
+We sometimes need to expose some internal APIs as `public` for technical reasons (such as to interoperate with other system frameworks, and/or to enable testing/debugging certain functionality). We use the Leading Underscore Rule (see below) to differentiate these from the documented stdlib API. Underscored APIs aren't considered part of the public API surface, and as such they don't need to follow the Swift Evolution Process. Regular Swift code isn't supposed to directly call these; if necessary, we may change their behavior in incompatible ways or we may even remove them altogether in future releases. Such underscored-but-public API should cou
+
+The platform overlays generally have their own API review processes, outside the scope of Swift Evolution.
+Anything under `stdlib/private` can be added/removed/changed with the simple approval of a stdlib code owner.
+
+All public APIs should come with documentation comments describing their purpose and behavior. It is highly recommended to use big-oh notation to document any guaranteed performance characteristics. (CPU and/or memory use, number of accesses to some underlying collection, etc.)
+
+### The Leading Underscore Rule
+
+All APIs that aren't part of the stdlib's official public API must include at least one underscored component in their fully qualified names. This includes symbols that are technically declared `public` but that aren't considered part of the public stdlib API, as well as `@usableFromInline internal`, plain `internal` and `[file]private` types and members. 
+
+The underscored component need not be the last. For example, `Swift.Dictionary._worble()` is a good name for an internal helper method, but so is `Swift._NativeDictionary.worble()` -- the `_NativeDictionary` type already has the underscore.
     
-    extension String {
-      // 😊👍
-      public func roast() { ... }
-      public func roast() { ... }
-    }    
-    ```
+Initializers don't have a handy base name on which we can put the underscore; instead, we put the underscore on the first argument label, adding one if necessary: e.g., `init(_ value: Int)` may become `init(_value: Int)`. If the initializer doesn't have any parameters, then we add a dummy parameter of type Void with an underscored label: for example, `UnsafeBufferPointer.init(_empty: ())`.
+
+This rule ensures we don't accidentally clutter the public namespace with `@usableFromInline` things (which could prevent us from choosing the best names for newly public API later), and it also makes it easy to see at a glance if a piece of stdlib code uses any non-public entities.
+
+### Explicit Access Modifiers
+
+We prefer to explicitly spell out all access modifiers in the stdlib codebase. (I.e., we type `internal` even if it's the implicit default.) Additionally, we put the access level on each individual entry point rather than inheriting them from the extension they are in:
+
+```swift
+public extension String {
+  // 😢👎
+  func blanch() { ... }
+  func roast() { ... }
+}
+
+extension String {
+  // 😊👍
+  public func blanch() { ... }
+  public func roast() { ... }
+}    
+```
     
-    This makes it trivial to identify the access level of every definition without having to scan the context it appears in.
+This makes it trivial to identify the access level of every definition without having to scan the context it appears in.
 
 ## Internals
 
