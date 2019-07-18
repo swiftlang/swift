@@ -5411,6 +5411,7 @@ public:
         ValueWithCleanup(adjVal, valueCleanup)));
     // Set the buffer to zero, with a cleanup.
     emitZeroIndirect(bufType.getASTType(), adjBuf, si->getLoc());
+    adjBuf.setCleanup(makeCleanup(adjBuf, emitCleanup));
   }
 
   /// Handle `copy_addr` instruction.
