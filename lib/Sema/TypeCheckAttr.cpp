@@ -2809,7 +2809,7 @@ static FuncDecl *resolveAutoDiffAssociatedFunction(
 
 // SWIFT_ENABLE_TENSORFLOW
 // Checks that the `candidate` function type equals the `required` function
-// type. Parameter labels are not checked.
+// type, disregarding parameter labels and tuple result labels.
 // `checkGenericSignature` is used to check generic signatures, if specified.
 // Otherwise, generic signatures are checked for equality.
 static bool checkFunctionSignature(
@@ -2817,9 +2817,15 @@ static bool checkFunctionSignature(
     Optional<std::function<bool(GenericSignature *, GenericSignature *)>>
         checkGenericSignature = None) {
   // Check that candidate is actually a function.
-  CanAnyFunctionType candidateFnTy = dyn_cast<AnyFunctionType>(candidate);
+  auto candidateFnTy = dyn_cast<AnyFunctionType>(candidate);
   if (!candidateFnTy)
     return false;
+
+  // Erase dynamic self types.
+  required = dyn_cast<AnyFunctionType>(
+      required->eraseDynamicSelfType()->getCanonicalType());
+  candidateFnTy = dyn_cast<AnyFunctionType>(
+      candidateFnTy->eraseDynamicSelfType()->getCanonicalType());
 
   // Check that generic signatures match.
   auto requiredGenSig = required.getOptGenericSignature();
@@ -2833,23 +2839,35 @@ static bool checkFunctionSignature(
     return false;
   }
 
-  // Check that parameters match.
-  if (candidateFnTy.getParams().size() != required.getParams().size())
+  // Check that parameter types match, disregarding labels.
+  if (required->getNumParams() != candidateFnTy->getNumParams())
     return false;
-  for (auto paramPair : llvm::zip(candidateFnTy.getParams(),
-                                  required.getParams())) {
-    // Check parameter types.
-    if (!std::get<0>(paramPair).getParameterType()->isEqual(
-            std::get<1>(paramPair).getParameterType()))
-      return false;
-  }
+  if (!std::equal(required->getParams().begin(), required->getParams().end(),
+                  candidateFnTy->getParams().begin(),
+                  [](AnyFunctionType::Param x, AnyFunctionType::Param y) {
+                    return x.getPlainType()->isEqual(y.getPlainType());
+                  }))
+    return false;
 
-  // If required result type is non-function, check that result types match
-  // exactly.
-  CanAnyFunctionType requiredResultFnTy =
-      dyn_cast<AnyFunctionType>(required.getResult());
-  if (!requiredResultFnTy)
-    return required.getResult()->isEqual(candidateFnTy.getResult());
+  // If required result type is not a function type, check that result types
+  // match exactly.
+  auto requiredResultFnTy = dyn_cast<AnyFunctionType>(required.getResult());
+  if (!requiredResultFnTy) {
+    auto requiredResultTupleTy = dyn_cast<TupleType>(required.getResult());
+    auto candidateResultTupleTy =
+        dyn_cast<TupleType>(candidateFnTy.getResult());
+    if (!requiredResultTupleTy || !candidateResultTupleTy)
+      return required.getResult()->isEqual(candidateFnTy.getResult());
+    // If result types are tuple types, check that element types match,
+    // ignoring labels.
+    if (requiredResultTupleTy->getNumElements() !=
+        candidateResultTupleTy->getNumElements())
+      return false;
+    return std::equal(requiredResultTupleTy.getElementTypes().begin(),
+                      requiredResultTupleTy.getElementTypes().end(),
+                      candidateResultTupleTy.getElementTypes().begin(),
+                      [](CanType x, CanType y) { return x->isEqual(y); });
+  }
 
   // Required result type is a function. Recurse.
   return checkFunctionSignature(requiredResultFnTy, candidateFnTy.getResult());
@@ -3263,6 +3281,12 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   // Start type-checking the arguments of the @differentiable attribute. This
   // covers 'wrt:', 'jvp:', 'vjp:', and 'where', all of which are optional.
 
+  // `@differentiable` attributes on protocol requirements do not support
+  // JVP/VJP or 'where' clauses.
+  bool isOriginalProtocolRequirement =
+      isa<ProtocolDecl>(original->getDeclContext()) &&
+      original->isProtocolRequirement();
+
   // Handle 'where' clause, if it exists.
   // - Resolve attribute where clause requirements and store in the attribute
   //   for serialization.
@@ -3271,13 +3295,12 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   //   clause requirements.
   GenericSignature *whereClauseGenSig = nullptr;
   GenericEnvironment *whereClauseGenEnv = nullptr;
-  if (auto whereClause = attr->getWhereClause()) {
-    // 'where' clauses in '@differentiable' attributes of protocol
-    // requirements are not supported.
-    if (isa<ProtocolDecl>(original->getDeclContext()) &&
-        original->isProtocolRequirement()) {
+  if (auto *whereClause = attr->getWhereClause()) {
+    // `@differentiable` attributes on protocol requirements do not support
+    // 'where' clauses.
+    if (isOriginalProtocolRequirement) {
       TC.diagnose(attr->getLocation(),
-                  diag::differentiable_attr_protocol_where_clause);
+                  diag::differentiable_attr_protocol_req_where_clause);
       attr->setInvalid();
       return;
     }
@@ -3309,6 +3332,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     using FloatingRequirementSource =
         GenericSignatureBuilder::FloatingRequirementSource;
 
+    bool errorOccurred = false;
     RequirementRequest::visitRequirements(
       WhereClauseOwner(original, attr), TypeResolutionStage::Structural,
       [&](const Requirement &req, RequirementRepr *reqRepr) {
@@ -3321,8 +3345,9 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
         // Layout requirements are not supported.
         case RequirementKind::Layout:
           TC.diagnose(attr->getLocation(),
-                      diag::differentiable_attr_unsupported_req_kind)
+                      diag::differentiable_attr_layout_req_unsupported)
             .highlight(reqRepr->getSourceRange());
+          errorOccurred = true;
           return false;
         }
 
@@ -3332,6 +3357,11 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
                                nullptr, original->getModuleContext());
         return false;
       });
+
+    if (errorOccurred) {
+      attr->setInvalid();
+      return;
+    }
 
     // Compute generic signature and environment for autodiff associated
     // functions.
@@ -3394,52 +3424,14 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     return;
   }
 
-  // Checks that the `candidate` function type equals the `required` function
-  // type, disregarding parameter labels and tuple result labels.
-  std::function<bool(CanAnyFunctionType, CanType)> checkFunctionSignature;
-  checkFunctionSignature = [&](CanAnyFunctionType required,
-                               CanType candidate) -> bool {
-
-    // Check that candidate is actually a function.
-    CanAnyFunctionType candidateFnTy = dyn_cast<AnyFunctionType>(candidate);
-    if (!candidateFnTy)
-      return false;
-
-    // Check that generic signatures match.
-    if (candidateFnTy.getOptGenericSignature() !=
-        required.getOptGenericSignature())
-      return false;
-
-    // Check that parameter types match, disregarding labels.
-    if (!std::equal(required.getParams().begin(), required.getParams().end(),
-                    candidateFnTy.getParams().begin(),
-                    [](AnyFunctionType::Param x, AnyFunctionType::Param y) {
-                      return x.getPlainType()->isEqual(y.getPlainType());
-                    }))
-      return false;
-
-    // If required result type is non-function, check that result types match.
-    // If result types are tuple types, ignore labels.
-    CanAnyFunctionType requiredResultFnTy =
-        dyn_cast<AnyFunctionType>(required.getResult());
-    if (!requiredResultFnTy) {
-      auto requiredResultTupleTy = required.getResult()->getAs<TupleType>();
-      auto candidateResultTupleTy =
-          candidateFnTy.getResult()->getAs<TupleType>();
-      if (!requiredResultTupleTy || !candidateResultTupleTy)
-        return required.getResult()->isEqual(candidateFnTy.getResult());
-      // If result types are tuple types, check that element types match,
-      // ignoring labels.
-      return std::equal(requiredResultTupleTy->getElementTypes().begin(),
-                        requiredResultTupleTy->getElementTypes().end(),
-                        candidateResultTupleTy->getElementTypes().begin(),
-                        [](Type x, Type y) { return x->isEqual(y); });
-    }
-
-    // Required result type is a function. Recurse.
-    return checkFunctionSignature(requiredResultFnTy,
-                                  candidateFnTy.getResult());
-  };
+  // `@differentiable` attributes on protocol requirements do not support
+  // JVP/VJP.
+  if (isOriginalProtocolRequirement && (attr->getJVP() || attr->getVJP())) {
+    TC.diagnose(attr->getLocation(),
+                diag::differentiable_attr_protocol_req_assoc_func);
+    attr->setInvalid();
+    return;
+  }
 
   // Resolve the JVP declaration, if it exists.
   if (attr->getJVP()) {
@@ -4065,13 +4057,9 @@ void AttributeChecker::visitTransposingAttr(TransposingAttr *attr) {
 
   // Check if original function type matches expected original function type
   // we computed.
-  Optional<std::function<bool(GenericSignature *, GenericSignature *)>>
-     genericComparison;
-  genericComparison = [&](GenericSignature *a, GenericSignature *b) {
-    return a == b;
-  };
-  // TODO(bartchr): remove the lambda of `checkFunctionSignature` defined in
-  // `AttributeChecker::visitDifferentiableAttr`.
+  std::function<bool(GenericSignature *, GenericSignature *)>
+      genericComparison =
+          [&](GenericSignature *a, GenericSignature *b) { return a == b; };
   if (!checkFunctionSignature(
            cast<AnyFunctionType>(expectedOriginalFnType->getCanonicalType()),
            originalFn->getInterfaceType()->getCanonicalType(),

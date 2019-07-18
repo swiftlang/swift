@@ -20,6 +20,8 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
+// SWIFT_ENABLE_TENSORFLOW
+#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Types.h"
 // SWIFT_ENABLE_TENSORFLOW
@@ -454,7 +456,8 @@ static std::string getTransposingParametersClauseString(
 // Print the arguments of the given `@differentiable` attribute.
 static void printDifferentiableAttrArguments(
     const DifferentiableAttr *attr, ASTPrinter &printer, PrintOptions Options,
-    const Decl *D, bool omitWrtClause = false) {
+    const Decl *D, bool omitWrtClause = false,
+    bool omitAssociatedFunctions = false) {
   // Create a temporary string for the attribute argument text.
   std::string attrArgText;
   llvm::raw_string_ostream stream(attrArgText);
@@ -485,18 +488,27 @@ static void printDifferentiableAttrArguments(
   if (!omitWrtClause) {
     auto diffParamsString = getDifferentiationParametersClauseString(
         original, attr->getParameterIndices(), attr->getParsedParameters());
-    printCommaIfNecessary();
-    stream << diffParamsString;
+    // Check whether differentiation parameter clause is empty.
+    // Handles edge case where resolved parameter indices are unset and
+    // parsed parameters are empty. This case should never trigger for
+    // user-visible printing.
+    if (!diffParamsString.empty()) {
+      printCommaIfNecessary();
+      stream << diffParamsString;
+    }
   }
-  // Print jvp function name.
-  if (auto jvp = attr->getJVP()) {
-    printCommaIfNecessary();
-    stream << "jvp: " << jvp->Name;
-  }
-  // Print vjp function name.
-  if (auto vjp = attr->getVJP()) {
-    printCommaIfNecessary();
-    stream << "vjp: " << vjp->Name;
+  // Print associated function names, unless they are to be omitted.
+  if (!omitAssociatedFunctions) {
+    // Print jvp function name, if specified.
+    if (auto jvp = attr->getJVP()) {
+      printCommaIfNecessary();
+      stream << "jvp: " << jvp->Name;
+    }
+    // Print vjp function name, if specified.
+    if (auto vjp = attr->getVJP()) {
+      printCommaIfNecessary();
+      stream << "vjp: " << vjp->Name;
+    }
   }
   // Print 'where' clause, if any.
   // First, filter out requirements satisfied by the original function's
@@ -1493,11 +1505,34 @@ void DifferentiableAttr::setVJPFunction(FuncDecl *decl) {
     VJP = {decl->getFullName(), DeclNameLoc(decl->getNameLoc())};
 }
 
+GenericEnvironment *DifferentiableAttr::computeDerivativeGenericEnvironment(
+    AbstractFunctionDecl *original) const {
+  // If `@differentiable` attribute has no requirements, return original
+  // function's generic environment.
+  if (getRequirements().empty())
+    return original->getGenericEnvironment();
+  // Otherwise, build derivative generic sigunature.
+  GenericSignatureBuilder builder(original->getASTContext());
+  // Add original function's generic signature.
+  builder.addGenericSignature(original->getGenericSignature());
+  using FloatingRequirementSource =
+      GenericSignatureBuilder::FloatingRequirementSource;
+  // Add `@differentiable` attribute requirements.
+  for (auto req : getRequirements())
+    builder.addRequirement(req, FloatingRequirementSource::forAbstract(),
+                           original->getModuleContext());
+  auto *derivativeGenSig = std::move(builder).computeGenericSignature(
+      getLocation(), /*allowConcreteGenericParams=*/true);
+  return derivativeGenSig->createGenericEnvironment();
+}
+
 void DifferentiableAttr::print(llvm::raw_ostream &OS, const Decl *D,
-                               bool omitWrtClause) const {
+                               bool omitWrtClause,
+                               bool omitAssociatedFunctions) const {
   StreamPrinter P(OS);
   P << "@" << getAttrName();
-  printDifferentiableAttrArguments(this, P, PrintOptions(), D, omitWrtClause);
+  printDifferentiableAttrArguments(this, P, PrintOptions(), D, omitWrtClause,
+                                   omitAssociatedFunctions);
 }
 
 // SWIFT_ENABLE_TENSORFLOW

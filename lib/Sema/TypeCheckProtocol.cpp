@@ -566,9 +566,10 @@ swift::matchWitness(
     // a requirement, then an '@differentiable' attribute is added
     // automatically.
     ASTContext &ctx = witness->getASTContext();
+    auto witnessDiffAttrs = witnessAttrs
+        .getAttributes<DifferentiableAttr, /*AllowInvalid*/ true>();
     for (auto *reqDiffAttr : reqAttrs.getAttributes<DifferentiableAttr>()) {
-      auto witnessDiffAttrs = witnessAttrs
-          .getAttributes<DifferentiableAttr, /*AllowInvalid*/ true>();
+      // TODO(TF-482): Also check whether generic requirements are the same.
       bool reqDiffAttrMatch = llvm::any_of(
           witnessDiffAttrs, [&](const DifferentiableAttr *witnessDiffAttr) {
             return witnessDiffAttr->getParameterIndices() &&
@@ -2070,30 +2071,6 @@ static void addOptionalityFixIts(
 
 }
 
-// SWIFT_ENABLE_TENSORFLOW
-// Compute the derivative generic environment for the given `@differentiable`
-// attribute and original function.
-static GenericEnvironment * computeDerivativeGenericEnvironment(
-    const DifferentiableAttr *attr, AbstractFunctionDecl *original) {
-  // If `@differentiable` attribute has no requirements, return original
-  // function's generic environment.
-  if (attr->getRequirements().empty())
-    return original->getGenericEnvironment();
-  // Otherwise, build derivative generic sigunature.
-  GenericSignatureBuilder builder(original->getASTContext());
-  // Add original function's generic signature.
-  builder.addGenericSignature(original->getGenericSignature());
-  using FloatingRequirementSource =
-      GenericSignatureBuilder::FloatingRequirementSource;
-  // Add `@differentiable` attribute requirements.
-  for (auto req : attr->getRequirements())
-    builder.addRequirement(req, FloatingRequirementSource::forAbstract(),
-                           original->getModuleContext());
-  auto *derivativeGenSig = std::move(builder).computeGenericSignature(
-      attr->getLocation(), /*allowConcreteGenericParams=*/true);
-  return derivativeGenSig->createGenericEnvironment();
-}
-
 /// Diagnose a requirement match, describing what went wrong (or not).
 static void
 diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
@@ -2248,7 +2225,7 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     // inferred differentiation parameters.
     auto *original = cast<AbstractFunctionDecl>(match.Witness);
     auto *whereClauseGenEnv =
-        computeDerivativeGenericEnvironment(reqAttr, original);
+        reqAttr->computeDerivativeGenericEnvironment(original);
     auto *inferredParameters = TypeChecker::inferDifferentiableParameters(
         original, whereClauseGenEnv);
     bool omitWrtClause = reqAttr->getParameterIndices()->parameters.count() ==
@@ -2256,7 +2233,8 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     // Get `@differentiable` attribute description.
     std::string reqDiffAttrString;
     llvm::raw_string_ostream stream(reqDiffAttrString);
-    reqAttr->print(stream, req, omitWrtClause);
+    reqAttr->print(stream, req, omitWrtClause,
+                   /*omitAssociatedFunctions*/ true);
     diags.diagnose(match.Witness,
                    diag::protocol_witness_missing_differentiable_attr,
                    StringRef(stream.str()).trim());

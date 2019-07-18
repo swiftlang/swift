@@ -14,7 +14,7 @@ let _: @differentiable (NonDiffType) -> Float
 // expected-error @+1 {{result is not differentiable, but the function type is marked '@differentiable'}}
 let _: @differentiable (Float) -> NonDiffType
 
-// expected-error @+1 {{cannot mark types as linear differentiable}}
+// expected-error @+1 {{'@differentiable(linear)' types are not yet supported}}
 let _: @differentiable(linear) (Float) -> Float
 
 //===----------------------------------------------------------------------===//

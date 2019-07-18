@@ -1091,8 +1091,7 @@ bool Parser::parseDifferentiableAttributeArguments(
       return errorAndSkipToEnd();
   }
 
-  // Function that parses a label and a function specifier,
-  // e.g. 'vjp: foo(_:)'.
+  // Function that parses a label and a function specifier, e.g. 'vjp: foo(_:)'.
   // Return true on error.
   auto parseFuncSpec = [&](StringRef label, DeclNameWithLoc &result,
                            bool &terminateParsingArgs) -> bool {
@@ -1160,7 +1159,7 @@ bool Parser::parseDifferentiableAttributeArguments(
     SmallVector<RequirementRepr, 4> requirements;
     bool firstTypeInComplete;
     parseGenericWhereClause(whereLoc, requirements, firstTypeInComplete,
-                            /*AllowLayoutConstraints=*/false);
+                            /*AllowLayoutConstraints*/ true);
     whereClause = TrailingWhereClause::create(Context, whereLoc, requirements);
   }
   return false;

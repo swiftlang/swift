@@ -1561,7 +1561,14 @@ public:
                                     Optional<DeclNameWithLoc> vjp,
                                     ArrayRef<Requirement> requirements);
 
+  /// Get the optional 'jvp:' function name and location.
+  /// Use this instead of `getJVPFunction` to check whether the attribute has a
+  /// registered JVP.
   Optional<DeclNameWithLoc> getJVP() const { return JVP; }
+
+  /// Get the optional 'vjp:' function name and location.
+  /// Use this instead of `getVJPFunction` to check whether the attribute has a
+  /// registered VJP.
   Optional<DeclNameWithLoc> getVJP() const { return VJP; }
 
   AutoDiffParameterIndices *getParameterIndices() const {
@@ -1601,9 +1608,17 @@ public:
     return ParameterIndices->parameters == other.ParameterIndices->parameters;
   }
 
+  /// Computes the derivative generic environment for the given
+  /// `@differentiable` attribute and original function.
+  GenericEnvironment *
+  computeDerivativeGenericEnvironment(AbstractFunctionDecl *original) const;
+
   // Print the attribute to the given stream.
+  // If `omitWrtClause` is true, omit printing the `wrt:` clause.
+  // If `omitAssociatedFunctions` is true, omit printing associated functions.
   void print(llvm::raw_ostream &OS, const Decl *D,
-             bool omitWrtClause = false) const;
+             bool omitWrtClause = false,
+             bool omitAssociatedFunctions = false) const;
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Differentiable;
@@ -1618,8 +1633,10 @@ public:
 ///   @differentiating(+, wrt: (lhs, rhs))
 class DifferentiatingAttr final
     : public DeclAttribute,
-      private llvm::TrailingObjects<DifferentiableAttr,
+      private llvm::TrailingObjects<DifferentiatingAttr,
                                     ParsedAutoDiffParameter> {
+  friend TrailingObjects;
+
   /// The original function name.
   DeclNameWithLoc Original;
   /// The original function, resolved by the type checker.
@@ -1690,8 +1707,10 @@ public:
 ///   @transposing(+, wrt: (lhs, rhs))
 class TransposingAttr final
       : public DeclAttribute,
-        private llvm::TrailingObjects<DifferentiableAttr,
+        private llvm::TrailingObjects<TransposingAttr,
                                       ParsedAutoDiffParameter> {
+  friend TrailingObjects;
+
   /// The base type of the original function.
   /// This is non-null only when the original function is not top-level (i.e. it
   /// is an instance/static method).

@@ -80,7 +80,7 @@ func nested_loop(_ x: Float) -> Float {
 func withoutDerivative<T : Differentiable, R: Differentiable>(
   at x: T, in body: (T) throws -> R
 ) rethrows -> R {
-  // expected-note @+1 {{differentiating control flow is not yet supported}}
+  // expected-note @+1 {{cannot differentiate unsupported control flow}}
   try body(x)
 }
 
