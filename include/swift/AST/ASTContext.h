@@ -870,21 +870,6 @@ public:
   /// This guarantees that resulted \p names doesn't have duplicated names.
   void getVisibleTopLevelModuleNames(SmallVectorImpl<Identifier> &names) const;
 
-  struct OverrideSignatureKey {
-    GenericSignature *baseMethodSig;
-    GenericSignature *derivedClassSig;
-    Type superclassTy;
-
-    OverrideSignatureKey(GenericSignature *baseMethodSignature,
-                         GenericSignature *derivedClassSignature,
-                         Type superclassType)
-        : baseMethodSig(baseMethodSignature),
-          derivedClassSig(derivedClassSignature), superclassTy(superclassType) {
-    }
-  };
-
-  llvm::DenseMap<OverrideSignatureKey, GenericSignature *> overrideSigCache;
-
 private:
   /// Register the given generic signature builder to be used as the canonical
   /// generic signature builder for the given signature, if we don't already
@@ -953,40 +938,5 @@ private:
 };
 
 } // end namespace swift
-
-namespace llvm {
-template <> struct DenseMapInfo<swift::ASTContext::OverrideSignatureKey> {
-  using OverrideSignatureKey = swift::ASTContext::OverrideSignatureKey;
-  using Type = swift::Type;
-  using GenericSignature = swift::GenericSignature;
-
-  static bool isEqual(const OverrideSignatureKey lhs,
-                      const OverrideSignatureKey rhs) {
-    return lhs.baseMethodSig == rhs.baseMethodSig &&
-           lhs.derivedClassSig == rhs.derivedClassSig &&
-           lhs.superclassTy.getPointer() == rhs.superclassTy.getPointer();
-  }
-
-  static inline OverrideSignatureKey getEmptyKey() {
-    return OverrideSignatureKey(DenseMapInfo<GenericSignature *>::getEmptyKey(),
-                                DenseMapInfo<GenericSignature *>::getEmptyKey(),
-                                DenseMapInfo<Type>::getEmptyKey());
-  }
-
-  static inline OverrideSignatureKey getTombstoneKey() {
-    return OverrideSignatureKey(
-        DenseMapInfo<GenericSignature *>::getTombstoneKey(),
-        DenseMapInfo<GenericSignature *>::getTombstoneKey(),
-        DenseMapInfo<Type>::getTombstoneKey());
-  }
-
-  static unsigned getHashValue(const OverrideSignatureKey &Val) {
-    return hash_combine(
-        DenseMapInfo<GenericSignature *>::getHashValue(Val.baseMethodSig),
-        DenseMapInfo<GenericSignature *>::getHashValue(Val.derivedClassSig),
-        DenseMapInfo<Type>::getHashValue(Val.superclassTy));
-  }
-};
-} // namespace llvm
 
 #endif

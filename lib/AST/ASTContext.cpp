@@ -100,6 +100,52 @@ using AssociativityCacheType =
   MACRO(NSNumber) \
   MACRO(NSValue)
 
+struct OverrideSignatureKey {
+  GenericSignature *baseMethodSig;
+  GenericSignature *derivedClassSig;
+  Type superclassTy;
+
+  OverrideSignatureKey(GenericSignature *baseMethodSignature,
+                       GenericSignature *derivedClassSignature,
+                       Type superclassType)
+      : baseMethodSig(baseMethodSignature),
+        derivedClassSig(derivedClassSignature), superclassTy(superclassType) {}
+};
+
+namespace llvm {
+template <> struct DenseMapInfo<OverrideSignatureKey> {
+  using Type = swift::Type;
+  using GenericSignature = swift::GenericSignature;
+
+  static bool isEqual(const OverrideSignatureKey lhs,
+                      const OverrideSignatureKey rhs) {
+    return lhs.baseMethodSig == rhs.baseMethodSig &&
+           lhs.derivedClassSig == rhs.derivedClassSig &&
+           lhs.superclassTy.getPointer() == rhs.superclassTy.getPointer();
+  }
+
+  static inline OverrideSignatureKey getEmptyKey() {
+    return OverrideSignatureKey(DenseMapInfo<GenericSignature *>::getEmptyKey(),
+                                DenseMapInfo<GenericSignature *>::getEmptyKey(),
+                                DenseMapInfo<Type>::getEmptyKey());
+  }
+
+  static inline OverrideSignatureKey getTombstoneKey() {
+    return OverrideSignatureKey(
+        DenseMapInfo<GenericSignature *>::getTombstoneKey(),
+        DenseMapInfo<GenericSignature *>::getTombstoneKey(),
+        DenseMapInfo<Type>::getTombstoneKey());
+  }
+
+  static unsigned getHashValue(const OverrideSignatureKey &Val) {
+    return hash_combine(
+        DenseMapInfo<GenericSignature *>::getHashValue(Val.baseMethodSig),
+        DenseMapInfo<GenericSignature *>::getHashValue(Val.derivedClassSig),
+        DenseMapInfo<Type>::getHashValue(Val.superclassTy));
+  }
+};
+} // namespace llvm
+
 struct ASTContext::Implementation {
   Implementation();
   ~Implementation();
@@ -422,6 +468,8 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   llvm::FoldingSet<SILLayout> SILLayouts;
 
   RC<syntax::SyntaxArena> TheSyntaxArena;
+
+  llvm::DenseMap<OverrideSignatureKey, GenericSignature *> overrideSigCache;
 };
 
 ASTContext::Implementation::Implementation()
@@ -4383,8 +4431,9 @@ GenericSignature *ASTContext::getOverrideGenericSignature(ValueDecl *base,
                                   derivedClass->getGenericSignature(),
                                   derivedClass->getSuperclass());
 
-  if (overrideSigCache.count(key) == 1) {
-    return overrideSigCache.lookup(key);
+  if (getImpl().overrideSigCache.find(key) !=
+      getImpl().overrideSigCache.end()) {
+    return getImpl().overrideSigCache.lookup(key);
   }
 
   if (auto *derivedSig = derivedClass->getGenericSignature())
@@ -4437,7 +4486,7 @@ GenericSignature *ASTContext::getOverrideGenericSignature(ValueDecl *base,
   }
 
   auto *genericSig = std::move(builder).computeGenericSignature(SourceLoc());
-  overrideSigCache.insert(std::make_pair(key, genericSig));
+  getImpl().overrideSigCache.insert(std::make_pair(key, genericSig));
   return genericSig;
 }
 
