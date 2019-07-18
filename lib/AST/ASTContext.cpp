@@ -1496,15 +1496,17 @@ GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
   auto &genericSignatureBuilders =
       getImpl().getArena(arena).GenericSignatureBuilders;
   auto known = genericSignatureBuilders.find(sig);
-  if (known != genericSignatureBuilders.end())
-    return known->second.get();
+  if (known != genericSignatureBuilders.end()) {
+    auto *result = known->second.get();
+    assert(result && "too much generics recursion");
+    return result;
+  }
 
   // Create a new generic signature builder with the given signature.
   auto builder = new GenericSignatureBuilder(*this);
 
   // Store this generic signature builder (no generic environment yet).
-  genericSignatureBuilders[sig] =
-    std::unique_ptr<GenericSignatureBuilder>(builder);
+  genericSignatureBuilders[sig] = nullptr;
 
   builder->addGenericSignature(sig);
 
@@ -1567,6 +1569,9 @@ GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
   // required.
   builder->processDelayedRequirements();
 #endif
+
+  genericSignatureBuilders[sig] =
+    std::unique_ptr<GenericSignatureBuilder>(builder);
 
   return builder;
 }
