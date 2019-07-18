@@ -3846,6 +3846,8 @@ private:
 
   /// Stack buffers allocated for storing local adjoint values.
   SmallVector<SILValue, 64> functionLocalAllocations;
+  /// A set used to remember local allocations that were destroyed by any means
+  /// (moved, destroyed, etc).
   llvm::SmallDenseSet<SILValue> destroyedLocalAllocations;
 
   /// The seed argument in the pullback function.
