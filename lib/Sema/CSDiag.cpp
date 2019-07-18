@@ -3353,19 +3353,30 @@ public:
   }
 
   bool isPropertyWrapperImplicitInit() {
-    if (auto TE = dyn_cast<TypeExpr>(FnExpr)) {
-      if (TE->getInstanceType()
-              ->getAnyNominal()
-              ->getAttrs()
-              .hasAttribute<PropertyWrapperAttr>()) {
-        if (auto parent = CandidateInfo.CS.getParentExpr(FnExpr)) {
-          if (auto CE = dyn_cast<CallExpr>(parent)) {
-            return CE->isImplicit();
-          }
-        }
-      }
-    }
-    return false;
+    auto TE = dyn_cast<TypeExpr>(FnExpr);
+    if (!TE)
+      return false;
+
+    auto instanceTy = TE->getInstanceType();
+    if (!instanceTy)
+      return false;
+
+    auto nominalDecl = instanceTy->getAnyNominal();
+    if (!nominalDecl)
+      return false;
+
+    if (!nominalDecl->getAttrs().hasAttribute<PropertyWrapperAttr>())
+      return false;
+
+    auto parent = CandidateInfo.CS.getParentExpr(FnExpr);
+    if (!parent)
+      return false;
+
+    auto CE = dyn_cast<CallExpr>(parent);
+    if (!CE)
+      return false;
+
+    return CE->isImplicit();
   }
 
   bool missingLabel(unsigned paramIdx) override {
