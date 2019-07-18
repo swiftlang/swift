@@ -145,6 +145,22 @@ VENTILES: V7(μs),V8(μs),V9(μs),VA(μs),VB(μs),VC(μs),VD(μs),VE(μs),VF(μs
 VENTILES: VH(μs),VI(μs),VJ(μs),MAX(μs)
 ````
 
+### Reporting Measurement Metadata
+The presence of optional argument `--meta`, controls logging of measurement
+metadata at the end of the benchmark summary.
+
+* PAGES – number of memory pages used
+* ICS – number of involuntary context switches
+* YIELD – number of voluntary yields
+
+````
+RUN: %Benchmark_O 0 --quantile=1 --meta | %FileCheck %s --check-prefix META
+META: #,TEST,SAMPLES,MIN(μs),MAX(μs),PAGES,ICS,YIELD
+RUN: %Benchmark_O 0 --quantile=1 --meta --memory \
+RUN:              | %FileCheck %s --check-prefix MEMMETA
+MEMMETA: #,TEST,SAMPLES,MIN(μs),MAX(μs),MAX_RSS(B),PAGES,ICS,YIELD
+````
+
 ### Verbose Mode
 Reports detailed information during measurement, including configuration
 details, environmental statistics (memory used and number of context switches)
@@ -162,7 +178,8 @@ RUN:              | %FileCheck %s --check-prefix RUNJUSTONCE \
 RUN:                              --check-prefix CONFIG \
 RUN:                              --check-prefix LOGVERBOSE \
 RUN:                              --check-prefix MEASUREENV \
-RUN:                              --check-prefix LOGFORMAT
+RUN:                              --check-prefix LOGFORMAT \
+RUN:                              --check-prefix YIELDCOUNT
 CONFIG: NumSamples: 2
 CONFIG: Tests Filter: ["1", "Ackermann", "1", "AngryPhonebook"]
 CONFIG: Tests to run: Ackermann, AngryPhonebook
@@ -175,6 +192,7 @@ LOGVERBOSE: Sample 1,{{[0-9]+}}
 MEASUREENV: MAX_RSS {{[0-9]+}} - {{[0-9]+}} = {{[0-9]+}} ({{[0-9]+}} pages)
 MEASUREENV: ICS {{[0-9]+}} - {{[0-9]+}} = {{[0-9]+}}
 MEASUREENV: VCS {{[0-9]+}} - {{[0-9]+}} = {{[0-9]+}}
+YIELDCOUNT: yieldCount 1
 RUNJUSTONCE-LABEL: 1,Ackermann
 RUNJUSTONCE-NOT: 1,Ackermann
 LOGFORMAT: ,{{[0-9]+}},{{[0-9]+}},,{{[0-9]*}},{{[0-9]+}}
