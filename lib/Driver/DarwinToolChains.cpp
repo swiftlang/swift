@@ -585,9 +585,45 @@ bool toolchains::Darwin::shouldStoreInvocationInDebugInfo() const {
   return false;
 }
 
+static void validateDeploymentTarget(const toolchains::Darwin& TC,
+                                     DiagnosticEngine &diags,
+                                     const llvm::opt::ArgList &args) {
+    // Check minimum supported OS versions.
+    auto triple = TC.getTriple();
+    if (triple.isMacOSX()) {
+        if (triple.isMacOSXVersionLT(10, 9))
+            diags.diagnose(SourceLoc(), diag::error_os_minimum_deployment,
+                           "OS X 10.9");
+    } else if (triple.isiOS()) {
+        if (triple.isTvOS()) {
+            if (triple.isOSVersionLT(9, 0)) {
+                diags.diagnose(SourceLoc(), diag::error_os_minimum_deployment,
+                               "tvOS 9.0");
+                return;
+            }
+        }
+        if (triple.isOSVersionLT(7))
+            diags.diagnose(SourceLoc(), diag::error_os_minimum_deployment,
+                           "iOS 7");
+        if (triple.isArch32Bit() && !triple.isOSVersionLT(11)) {
+            diags.diagnose(SourceLoc(), diag::error_ios_maximum_deployment_32,
+                           triple.getOSMajorVersion());
+        }
+    } else if (triple.isWatchOS()) {
+        if (triple.isOSVersionLT(2, 0)) {
+            diags.diagnose(SourceLoc(), diag::error_os_minimum_deployment,
+                           "watchOS 2.0");
+            return;
+        }
+    }
+}
+
 void 
 toolchains::Darwin::validateArguments(DiagnosticEngine &diags,
                                       const llvm::opt::ArgList &args) const {
+  // Validating apple platforms deployment targets.
+  validateDeploymentTarget(*this, diags, args);
+    
   // Validating darwin unsupported -static-stdlib argument.
   if (args.hasArg(options::OPT_static_stdlib)) {
     diags.diagnose(SourceLoc(), diag::error_darwin_static_stdlib_not_supported);
