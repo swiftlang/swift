@@ -16,7 +16,7 @@ func testWithLeakChecking(
   // Note: compare expected leak count with relative leak count after
   // running `body`.
   // This approach is more robust than comparing leak count with zero
-  // and resetting leak count to zero, which is stateful and caused bugs.
+  // and resetting leak count to zero, which is stateful and causes issues.
   let beforeLeakCount = _GlobalLeakCount.count
   body()
   let leakCount = _GlobalLeakCount.count - beforeLeakCount
