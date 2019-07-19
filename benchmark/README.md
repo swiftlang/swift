@@ -1,10 +1,8 @@
-Swift Benchmark Suite
-=====================
+# Swift Benchmark Suite
 
 This directory contains the Swift Benchmark Suite.
 
-Running Swift Benchmarks
-------------------------
+## Running Swift Benchmarks
 
 To run Swift benchmarks, pass the `--benchmark` flag to `build-script`. The
 current benchmark results will be compared to the previous run's results if
@@ -16,8 +14,7 @@ impacting changes, and run the benchmarks again. Upon benchmark completion, the
 benchmark results for the development branch will be compared to the most
 recent benchmark results for `master`.
 
-Building with build-script
---------------------------
+## Building with build-script
 
 By default, Swift benchmarks for OS X are compiled during the Swift build
 process. To build Swift benchmarks for additional platforms, pass the following
@@ -33,8 +30,7 @@ drivers dynamically link Swift standard library dylibs from a path
 relative to their run-time location (../lib/swift) so the standard
 library should be distributed alongside them.
 
-Building Independently
-----------------------
+## Building Independently
 
 To build the Swift benchmarks using only an Xcode installation: install an
 Xcode version with Swift support, install cmake 2.8.12, and ensure Xcode is
@@ -110,8 +106,7 @@ installed libraries instead, enable
 This will reflect the performance of the Swift standard library
 installed on the device, not the one included in the Swift root.
 
-Using the Benchmark Driver
---------------------------
+## Using the Benchmark Driver
 
 ### Usage
 
@@ -154,8 +149,7 @@ You can use test numbers instead of test names like this:
 Test numbers are not stable in the long run, adding and removing tests from the
 benchmark suite will reorder them, but they are stable for a given build.
 
-Using the Harness Generator
----------------------------
+## Using the Harness Generator
 
 `scripts/generate_harness/generate_harness.py` runs `gyb` to automate generation
 of some benchmarks.
@@ -163,8 +157,7 @@ of some benchmarks.
 ** FIXME ** `gyb` should be invoked automatically during the
    build so that manually invoking `generate_harness.py` is not required.
 
-Adding New Benchmarks
----------------------
+## Adding New Benchmarks
 
 The harness generator supports both single and multiple file tests.
 
@@ -244,8 +237,8 @@ public func run_YourTestName(N: Int) {
 The current set of tags are defined by the `BenchmarkCategory` enum in
 `TestsUtils.swift` .
 
-Testing the Benchmark Drivers
------------------------------
+## Testing the Benchmark Drivers
+
 When working on tests, after the initial build
 ````
 swift-source$ ./swift/utils/build-script -R -B
