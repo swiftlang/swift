@@ -5313,7 +5313,6 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
     }
 
   } else {
-    SmallPtrSet<VarDecl *, 4> backingStorageVars;
     for (auto member : decl->getMembers()) {
       if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
         // Initializers that were synthesized to fulfill derived conformances
@@ -5336,17 +5335,9 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
       }
 
       if (auto var = dyn_cast<VarDecl>(member)) {
-        // If this variable has a property wrapper, go validate it to ensure
-        // that we create the backing storage property.
-        if (auto backingVar = var->getPropertyWrapperBackingProperty()) {
-          validateDecl(var);
-          maybeAddAccessorsToStorage(var);
-
-          backingStorageVars.insert(backingVar);
-        }
-
-        // Ignore the backing storage for properties with attached wrappers.
-        if (backingStorageVars.count(var) > 0)
+        // If this is a backing storage property for a property wrapper,
+        // skip it.
+        if (var->getOriginalWrappedProperty())
           continue;
 
         if (var->isMemberwiseInitialized(/*preferDeclaredProperties=*/true)) {
