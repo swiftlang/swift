@@ -140,6 +140,95 @@ public:
   SourceLoc getNearestLoc() const;
 };
 
+//----------------------------------------------------------------------------//
+// ProvideDefaultImplForRequest
+//----------------------------------------------------------------------------//
+/// Collect all the protocol requirements that a given declaration can
+///   provide default implementations for. Input is a declaration in extension
+///   declaration. The result is an array of requirements.
+class ProvideDefaultImplForRequest:
+    public SimpleRequest<ProvideDefaultImplForRequest,
+                         ArrayRef<ValueDecl*>(ValueDecl*),
+                         CacheKind::Cached>
+{
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<ArrayRef<ValueDecl*>> evaluate(Evaluator &evaluator,
+    ValueDecl* VD) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+  // Source location
+  SourceLoc getNearestLoc() const { return SourceLoc(); };
+};
+
+//----------------------------------------------------------------------------//
+// CollectOverriddenDeclsRequest
+//----------------------------------------------------------------------------//
+struct OverridenDeclsOwner {
+  ValueDecl *VD;
+  bool IncludeProtocolRequirements;
+  bool Transitive;
+
+  OverridenDeclsOwner(ValueDecl *VD, bool IncludeProtocolRequirements,
+    bool Transitive): VD(VD),
+      IncludeProtocolRequirements(IncludeProtocolRequirements),
+      Transitive(Transitive) {}
+
+  friend llvm::hash_code hash_value(const OverridenDeclsOwner &CI) {
+    return hash_combine(hash_value(CI.VD),
+                        hash_value(CI.IncludeProtocolRequirements),
+                        hash_value(CI.Transitive));
+  }
+
+  friend bool operator==(const OverridenDeclsOwner &lhs,
+                         const OverridenDeclsOwner &rhs) {
+    return lhs.VD == rhs.VD &&
+      lhs.IncludeProtocolRequirements == rhs.IncludeProtocolRequirements &&
+      lhs.Transitive == rhs.Transitive;
+  }
+
+  friend bool operator!=(const OverridenDeclsOwner &lhs,
+                         const OverridenDeclsOwner &rhs) {
+    return !(lhs == rhs);
+  }
+
+  friend void simple_display(llvm::raw_ostream &out,
+                             const OverridenDeclsOwner &owner) {
+    simple_display(out, owner.VD);
+  }
+};
+
+/// Get decls that the given decl overrides, protocol requirements that
+///   it serves as a default implementation of, and optionally protocol
+///   requirements it satisfies in a conforming class
+class CollectOverriddenDeclsRequest:
+    public SimpleRequest<CollectOverriddenDeclsRequest,
+                         ArrayRef<ValueDecl*>(OverridenDeclsOwner),
+                         CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<ArrayRef<ValueDecl*>> evaluate(Evaluator &evaluator,
+    OverridenDeclsOwner Owner) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+  // Source location
+  SourceLoc getNearestLoc() const { return SourceLoc(); };
+};
+
 /// The zone number for the IDE.
 #define SWIFT_IDE_REQUESTS_TYPEID_ZONE 137
 #define SWIFT_TYPEID_ZONE SWIFT_IDE_REQUESTS_TYPEID_ZONE
