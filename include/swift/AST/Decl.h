@@ -4120,7 +4120,20 @@ class ProtocolDecl final : public NominalTypeDecl {
     Bits.ProtocolDecl.RequiresClass = requiresClass;
   }
 
-  bool existentialConformsToSelfSlow();
+  /// Returns the cached result of \c existentialConformsToSelf or \c None if it
+  /// hasn't yet been computed.
+  Optional<bool> getCachedExistentialConformsToSelf() const {
+    if (Bits.ProtocolDecl.ExistentialConformsToSelfValid)
+      return Bits.ProtocolDecl.ExistentialConformsToSelf;
+
+    return None;
+  }
+
+  /// Caches the result of \c existentialConformsToSelf
+  void setCachedExistentialConformsToSelf(bool result) {
+    Bits.ProtocolDecl.ExistentialConformsToSelfValid = true;
+    Bits.ProtocolDecl.ExistentialConformsToSelf = result;
+  }
 
   bool existentialTypeSupportedSlow();
 
@@ -4134,6 +4147,7 @@ class ProtocolDecl final : public NominalTypeDecl {
   friend class SuperclassTypeRequest;
   friend class RequirementSignatureRequest;
   friend class ProtocolRequiresClassRequest;
+  friend class ExistentialConformsToSelfRequest;
   friend class TypeChecker;
 
 public:
@@ -4204,13 +4218,7 @@ public:
   /// This is only permitted if there is nothing "non-trivial" that we
   /// can do with the metatype, which means the protocol must not have
   /// any static methods and must be declared @objc.
-  bool existentialConformsToSelf() const {
-    if (Bits.ProtocolDecl.ExistentialConformsToSelfValid)
-      return Bits.ProtocolDecl.ExistentialConformsToSelf;
-
-    return const_cast<ProtocolDecl *>(this)
-             ->existentialConformsToSelfSlow();
-  }
+  bool existentialConformsToSelf() const;
 
   /// Does this protocol require a self-conformance witness table?
   bool requiresSelfConformanceWitnessTable() const;
