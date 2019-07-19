@@ -585,7 +585,7 @@ bool toolchains::Darwin::shouldStoreInvocationInDebugInfo() const {
   return false;
 }
 
-static void validateDeploymentTarget(const toolchains::Darwin& TC,
+static void validateDeploymentTarget(const toolchains::Darwin &TC,
                                      DiagnosticEngine &diags,
                                      const llvm::opt::ArgList &args) {
   // Check minimum supported OS versions.
