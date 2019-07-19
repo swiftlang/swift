@@ -388,7 +388,7 @@
                 "cmark": "swift-DEVELOPMENT-SNAPSHOT-2019-07-10-a",
                 "llbuild": "swift-DEVELOPMENT-SNAPSHOT-2019-07-10-a",
                 "swiftpm": "swift-DEVELOPMENT-SNAPSHOT-2019-07-10-a",
-                "swift-syntax": "ce19fd53c3137baa1c3370d9577c18f125934a04",
+                "swift-syntax": "a0ada015f3d879e1fd29c6e87d37aa20521a91ff",
                 "swift-stress-tester": "swift-DEVELOPMENT-SNAPSHOT-2019-07-10-a",
                 "compiler-rt": "swift-DEVELOPMENT-SNAPSHOT-2019-07-10-a",
                 "swift-corelibs-xctest": "swift-DEVELOPMENT-SNAPSHOT-2019-07-10-a",
