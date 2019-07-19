@@ -109,7 +109,7 @@ LeakCheckingTests.test("TestProtocolDefaultDerivative") {
     }
   }
 
-  testWithLeakChecking(expectedLeakCount: 2) {
+  testWithLeakChecking(expectedLeakCount: 1) {
     let x = Tracked<Float>(1)
     let model = Foo()
     _ = model.valueWithGradient { model in
@@ -170,8 +170,7 @@ LeakCheckingTests.test("ClosureCaptureLeakChecking") {
     }
   }
 
-  // TODO: Fix memory leak.
-  testWithLeakChecking(expectedLeakCount: 1) {
+  testWithLeakChecking {
     var model = ExampleLeakModel()
     let x: Tracked<Float> = 1.0
     _ = model.gradient { m in

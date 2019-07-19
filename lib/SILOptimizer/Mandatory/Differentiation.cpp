@@ -62,7 +62,7 @@ using llvm::SmallSet;
 /// for SIL testing purposes.
 static llvm::cl::opt<bool> SkipFoldingAutoDiffFunctionExtraction(
     "differentiation-skip-folding-autodiff-function-extraction",
-    llvm::cl::init(false));
+    llvm::cl::init(true));
 
 //===----------------------------------------------------------------------===//
 // Helpers
@@ -1943,8 +1943,7 @@ reapplyFunctionConversion(SILValue newFunc, SILValue oldFunc,
         operandFnTy->getExtInfo().withNoEscape());
     auto silTy = SILType::getPrimitiveObjectType(noEscapeType);
     return builder.createConvertEscapeToNoEscape(
-        loc, innerNewFunc, silTy,
-        cetn->isLifetimeGuaranteed());
+        loc, innerNewFunc, silTy, cetn->isLifetimeGuaranteed());
   }
   // convert_function
   if (auto *cfi = dyn_cast<ConvertFunctionInst>(oldConvertedFunc)) {
@@ -6563,6 +6562,33 @@ SILValue ADContext::promoteToDifferentiableFunction(
       assocFns);
   resultIndices[adfi] = resultIndex;
   getAutoDiffFunctionInsts().push_back(adfi);
+
+  // If the original function operand to `autodiff_function` comes from a
+  // escaping-to-noescape conversion, the escaping verion may have
+  // lifetime-ending instructions (release) at the end of the function. We need
+  // to do the same for associated functions. The proper fix is to make
+  // `@differentiable` closure conversion happen before esacping-to-enoescape
+  // conversion, and make `convert_escaping_to_noescape` work with
+  // `@differentiable` functions.
+  if (auto *cetn = dyn_cast<ConvertEscapeToNoEscapeInst>(origFnOperand)) {
+    if (auto *origDef = cetn->getOperand()->getDefiningInstruction()) {
+      ValueLifetimeAnalysis vla(origDef);
+      ValueLifetimeAnalysis::Frontier frontier;
+      vla.computeFrontier(frontier, ValueLifetimeAnalysis::AllowToModifyCFG);
+      for (auto *lifetimeEndingInst : frontier) {
+        if (auto *sri = dyn_cast<StrongReleaseInst>(lifetimeEndingInst)) {
+          builder.setInsertionPoint(sri);
+          for (auto assocFn : assocFns) {
+            builder.createStrongRelease(
+                sri->getLoc(),
+                cast<ConvertEscapeToNoEscapeInst>(assocFn)->getOperand(),
+                builder.getDefaultAtomicity());
+          }
+        }
+      }
+    }
+  }
+
   return adfi;
 }
 
