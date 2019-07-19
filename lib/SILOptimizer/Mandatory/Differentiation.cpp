@@ -274,8 +274,6 @@ static Inst *peerThroughFunctionConversions(SILValue value) {
     return peerThroughFunctionConversions<Inst>(thinToThick->getOperand());
   if (auto *convertFn = dyn_cast<ConvertFunctionInst>(value))
     return peerThroughFunctionConversions<Inst>(convertFn->getOperand());
-  if (auto *convertFn = dyn_cast<ConvertEscapeToNoEscapeInst>(value))
-    return peerThroughFunctionConversions<Inst>(convertFn->getOperand());
   if (auto *partialApply = dyn_cast<PartialApplyInst>(value))
     return peerThroughFunctionConversions<Inst>(partialApply->getCallee());
   return nullptr;
@@ -1878,19 +1876,6 @@ reapplyFunctionConversion(SILValue newFunc, SILValue oldFunc,
     return builder.createPartialApply(loc, innerNewFunc, substMap, newArgs,
                                       ParameterConvention::Direct_Guaranteed);
   }
-  // convert_escape_to_noescape
-  if (auto *cetn = dyn_cast<ConvertEscapeToNoEscapeInst>(oldConvertedFunc)) {
-    auto innerNewFunc = reapplyFunctionConversion(newFunc, oldFunc,
-                                                  cetn->getOperand(), builder,
-                                                  loc, newFuncGenSig);
-    auto operandFnTy = innerNewFunc->getType().castTo<SILFunctionType>();
-    auto noEscapeType = operandFnTy->getWithExtInfo(
-        operandFnTy->getExtInfo().withNoEscape());
-    auto silTy = SILType::getPrimitiveObjectType(noEscapeType);
-    return builder.createConvertEscapeToNoEscape(
-        loc, innerNewFunc, silTy,
-        cetn->isLifetimeGuaranteed());
-  }
   // convert_function
   if (auto *cfi = dyn_cast<ConvertFunctionInst>(oldConvertedFunc)) {
     // `convert_function` does not have a fixed typing rule because it can
@@ -1924,8 +1909,6 @@ static SubstitutionMap getSubstitutionMap(
   if (auto *thinToThick = dyn_cast<ThinToThickFunctionInst>(value))
     return getSubstitutionMap(thinToThick->getOperand(), substMap);
   if (auto *convertFn = dyn_cast<ConvertFunctionInst>(value))
-    return getSubstitutionMap(convertFn->getOperand(), substMap);
-  if (auto *convertFn = dyn_cast<ConvertEscapeToNoEscapeInst>(value))
     return getSubstitutionMap(convertFn->getOperand(), substMap);
   if (auto *partialApply = dyn_cast<PartialApplyInst>(value)) {
     auto appliedSubstMap = partialApply->getSubstitutionMap();

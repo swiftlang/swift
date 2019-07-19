@@ -52,7 +52,7 @@ struct SupervisedTrainer<Model : Layer> {
   var model: Model
   var lossFunction: @differentiable (Model.Output, Model.Output) -> Float
   func fit(y: Model.Output) {
-    _ = gradient(at: y) { y in return lossFunction(y, y) }
+    _ = gradient(at: y) { y in return self.lossFunction(y, y) }
   }
 }
 
