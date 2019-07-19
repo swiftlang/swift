@@ -741,7 +741,6 @@ void FailureDiagnosis::diagnoseUnviableLookupResults(
       return;
 
     switch (firstProblem) {
-    case MemberLookupResult::UR_LabelMismatch:
     case MemberLookupResult::UR_WritableKeyPathOnReadOnlyMember:
     case MemberLookupResult::UR_ReferenceWritableKeyPathOnMutatingMember:
     case MemberLookupResult::UR_KeyPathWithAnyObjectRootType:
