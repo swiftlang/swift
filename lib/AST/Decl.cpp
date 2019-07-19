@@ -4329,43 +4329,9 @@ bool ProtocolDecl::requiresSelfConformanceWitnessTable() const {
   return isSpecificProtocol(KnownProtocolKind::Error);
 }
 
-bool ProtocolDecl::existentialConformsToSelfSlow() {
-  // Assume for now that the existential conforms to itself; this
-  // prevents circularity issues.
-  Bits.ProtocolDecl.ExistentialConformsToSelfValid = true;
-  Bits.ProtocolDecl.ExistentialConformsToSelf = true;
-
-  // If it's not @objc, it conforms to itself only if it has a
-  // self-conformance witness table.
-  if (!isObjC()) {
-    bool hasSelfConformance = requiresSelfConformanceWitnessTable();
-    Bits.ProtocolDecl.ExistentialConformsToSelf = hasSelfConformance;
-    return hasSelfConformance;
-  }
-
-  // Check whether this protocol conforms to itself.
-  for (auto member : getMembers()) {
-    if (member->isInvalid())
-      continue;
-
-    if (auto vd = dyn_cast<ValueDecl>(member)) {
-      if (!vd->isInstanceMember()) {
-        // A protocol cannot conform to itself if it has static members.
-        Bits.ProtocolDecl.ExistentialConformsToSelf = false;
-        return false;
-      }
-    }
-  }
-
-  // Check whether any of the inherited protocols fail to conform to
-  // themselves.
-  for (auto proto : getInheritedProtocols()) {
-    if (!proto->existentialConformsToSelf()) {
-      Bits.ProtocolDecl.ExistentialConformsToSelf = false;
-      return false;
-    }
-  }
-  return true;
+bool ProtocolDecl::existentialConformsToSelf() const {
+  return evaluateOrDefault(getASTContext().evaluator,
+    ExistentialConformsToSelfRequest{const_cast<ProtocolDecl *>(this)}, true);
 }
 
 /// Classify usages of Self in the given type.
