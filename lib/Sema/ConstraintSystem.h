@@ -2216,7 +2216,12 @@ public:
       if (auto *decl = dyn_cast<VarDecl>(resolvedOverload->Choice.getDecl())) {
         if (decl->hasAttachedPropertyWrapper()) {
           if (auto storageWrapper = decl->getPropertyWrapperStorageWrapper()) {
-            return std::make_pair(decl, storageWrapper->getType());
+            Type type = storageWrapper->getInterfaceType();
+            if (Type baseType = resolvedOverload->Choice.getBaseType()) {
+              type = baseType->getTypeOfMember(DC->getParentModule(),
+                                               storageWrapper, type);
+            }
+            return std::make_pair(decl, type);
           }
         }
       }
@@ -2233,6 +2238,10 @@ public:
       if (auto *decl = dyn_cast<VarDecl>(resolvedOverload->Choice.getDecl())) {
         if (decl->hasAttachedPropertyWrapper()) {
           auto wrapperTy = decl->getPropertyWrapperBackingPropertyType();
+          if (Type baseType = resolvedOverload->Choice.getBaseType()) {
+            wrapperTy = baseType->getTypeOfMember(DC->getParentModule(),
+                                                  decl, wrapperTy);
+          }
           return std::make_pair(decl, wrapperTy);
         }
       }
@@ -2249,7 +2258,12 @@ public:
     if (resolvedOverload->Choice.isDecl()) {
       if (auto *decl = dyn_cast<VarDecl>(resolvedOverload->Choice.getDecl())) {
         if (auto wrapped = decl->getOriginalWrappedProperty()) {
-          return std::make_pair(decl, wrapped->getType());
+          Type type = wrapped->getInterfaceType();
+          if (Type baseType = resolvedOverload->Choice.getBaseType()) {
+            type = baseType->getTypeOfMember(DC->getParentModule(),
+                                             wrapped, type);
+          }
+          return std::make_pair(decl, type);
         }
       }
     }
