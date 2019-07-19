@@ -44,6 +44,7 @@ public func call_foobar() {
 var threads: [pthread_t] = []
 var racey_x: Int;
 
+// TSan %deflake as part of the test.
 for _ in 1...5 {
 #if os(macOS) || os(iOS)
   var t : pthread_t?

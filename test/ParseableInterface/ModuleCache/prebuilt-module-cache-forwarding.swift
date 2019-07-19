@@ -12,16 +12,18 @@
 
 // Make sure we installed a forwarding module.
 // RUN: %{python} %S/Inputs/check-is-forwarding-module.py %t/MCP/Lib-*.swiftmodule
+// RUN: cat %t/MCP/Lib-*.swiftmodule
 
-// Make sure it passes:
-// RUN: sleep 1
+// Now invalidate a dependency of the prebuilt module, by changing the hash of the .swiftinterface.
+// RUN: cp %t/Lib.swiftinterface %t/Lib.swiftinterface.moved-aside
+// RUN: echo ' ' >> %t/Lib.swiftinterface
 
-// Now invalidate a dependency of the prebuilt module, and make sure the forwarding file is replaced with a real module.
-// RUN: %{python} %S/Inputs/make-old.py %t/Lib.swiftinterface
+// Make sure the forwarding file is replaced with a real module.
 // RUN: not %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP -sdk %S/Inputs -I %S/Inputs/prebuilt-module-cache/ -prebuilt-module-cache-path %t/prebuilt-cache %s 2>&1 | %FileCheck -check-prefix=FROM-INTERFACE %s
 
-// Delete the cached module we just created, and create the forwarding module again
+// Delete the cached module we just created, put the old .swiftinterface back, and create the forwarding module again
 // RUN: %empty-directory(%t/MCP)
+// RUN: mv %t/Lib.swiftinterface.moved-aside %t/Lib.swiftinterface
 // RUN: not %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/MCP -sdk %S/Inputs -I %S/Inputs/prebuilt-module-cache/ -prebuilt-module-cache-path %t/prebuilt-cache %s 2>&1 | %FileCheck -check-prefix=FROM-PREBUILT %s
 
 // Move the prebuilt module out of the way, so the forwarding module points to nothing.

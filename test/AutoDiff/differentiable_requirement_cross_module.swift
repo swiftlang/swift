@@ -11,7 +11,8 @@ extension Empty : Differentiable {
   public typealias AllDifferentiableVariables = Empty
 }
 
-// expected-error @+1 {{type 'Conforming' does not conform to protocol 'DifferentiableRequirement'}}
+// expected-error @+2 {{type 'Conforming' does not conform to protocol 'DifferentiableRequirement'}}
+// expected-note @+1 {{do you want to add protocol stubs?}}
 struct Conforming : DifferentiableRequirement {
   // expected-note @+1 {{candidate is missing attribute '@differentiable(wrt: float)'}}
   func foo(float: Float, empty: Empty) -> Float {

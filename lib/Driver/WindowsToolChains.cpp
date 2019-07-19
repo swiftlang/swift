@@ -80,7 +80,7 @@ toolchains::Windows::constructInvocation(const DynamicLinkJobAction &job,
 
   // Configure the toolchain.
   // By default, use the system clang++ to link.
-  const char *Clang = nullptr;
+  const char *Clang = "clang++";
   if (const Arg *A = context.Args.getLastArg(options::OPT_tools_directory)) {
     StringRef toolchainPath(A->getValue());
 
@@ -89,12 +89,6 @@ toolchains::Windows::constructInvocation(const DynamicLinkJobAction &job,
             llvm::sys::findProgramByName("clang++", {toolchainPath}))
       Clang = context.Args.MakeArgString(toolchainClang.get());
   }
-  if (Clang == nullptr) {
-    if (auto pathClang = llvm::sys::findProgramByName("clang++", None))
-      Clang = context.Args.MakeArgString(pathClang.get());
-  }
-  assert(Clang &&
-         "clang++ was not found in the toolchain directory or system path.");
 
   std::string Target = getTriple().str();
   if (!Target.empty()) {
@@ -108,28 +102,26 @@ toolchains::Windows::constructInvocation(const DynamicLinkJobAction &job,
   // driver rather than the `clang-cl` driver.
   Arguments.push_back("-nostartfiles");
 
-  SmallString<128> SharedRuntimeLibPath;
-  getRuntimeLibraryPath(SharedRuntimeLibPath, context.Args,
-                        /*Shared=*/true);
+  bool wantsStaticStdlib =
+      context.Args.hasFlag(options::OPT_static_stdlib,
+                           options::OPT_no_static_stdlib, false);
 
-  // Link the standard library.
-  Arguments.push_back("-L");
-  if (context.Args.hasFlag(options::OPT_static_stdlib,
-                           options::OPT_no_static_stdlib, false)) {
-    SmallString<128> StaticRuntimeLibPath;
-    getRuntimeLibraryPath(StaticRuntimeLibPath, context.Args,
-                          /*Shared=*/false);
+  SmallVector<std::string, 4> RuntimeLibPaths;
+  getRuntimeLibraryPaths(RuntimeLibPaths, context.Args, context.OI.SDKPath,
+                         /*Shared=*/!wantsStaticStdlib);
 
+  for (auto path : RuntimeLibPaths) {
+    Arguments.push_back("-L");
     // Since Windows has separate libraries per architecture, link against the
     // architecture specific version of the static library.
-    Arguments.push_back(context.Args.MakeArgString(StaticRuntimeLibPath + "/" +
-                                                   getTriple().getArchName()));
-  } else {
-    Arguments.push_back(context.Args.MakeArgString(SharedRuntimeLibPath + "/" +
+    Arguments.push_back(context.Args.MakeArgString(path + "/" +
                                                    getTriple().getArchName()));
   }
 
-  SmallString<128> swiftrtPath = SharedRuntimeLibPath;
+  SmallString<128> SharedResourceDirPath;
+  getResourceDirPath(SharedResourceDirPath, context.Args, /*Shared=*/true);
+
+  SmallString<128> swiftrtPath = SharedResourceDirPath;
   llvm::sys::path::append(swiftrtPath,
                           swift::getMajorArchitectureName(getTriple()));
   llvm::sys::path::append(swiftrtPath, "swiftrt.obj");
@@ -164,7 +156,7 @@ toolchains::Windows::constructInvocation(const DynamicLinkJobAction &job,
   }
 
   if (context.Args.hasArg(options::OPT_profile_generate)) {
-    SmallString<128> LibProfile(SharedRuntimeLibPath);
+    SmallString<128> LibProfile(SharedResourceDirPath);
     llvm::sys::path::remove_filename(LibProfile); // remove platform name
     llvm::sys::path::append(LibProfile, "clang", "lib");
 
@@ -204,19 +196,21 @@ toolchains::Windows::constructInvocation(const StaticLinkJobAction &job,
 
   ArgStringList Arguments;
 
-  // Configure the toolchain.
-  const char *Link = "link";
-  Arguments.push_back("-lib");
+  const char *Linker = "link";
+  if (const Arg *A = context.Args.getLastArg(options::OPT_use_ld))
+    Linker = context.Args.MakeArgString(A->getValue());
+
+  Arguments.push_back("/lib");
+  Arguments.push_back("-nologo");
 
   addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
                          file_types::TY_Object);
   addInputsOfType(Arguments, context.InputActions, file_types::TY_Object);
 
-  Arguments.push_back(
-      context.Args.MakeArgString(Twine("/OUT:") + 
-      context.Output.getPrimaryOutputFilename()));
+  StringRef OutputFile = context.Output.getPrimaryOutputFilename();
+  Arguments.push_back(context.Args.MakeArgString(Twine("/OUT:") + OutputFile));
 
-  InvocationInfo II{Link, Arguments};
+  InvocationInfo II{Linker, Arguments};
   II.allowsResponseFiles = true;
 
   return II;

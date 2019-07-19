@@ -22,7 +22,7 @@ add_swift_target_library(swiftDarwin ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_
       ${swift_platform_gyb_sources}
       Darwin.swift.gyb
 
-    SWIFT_COMPILE_FLAGS -Xfrontend -disable-objc-attr-requires-foundation-module "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}"
+    SWIFT_COMPILE_FLAGS -Xfrontend -disable-objc-attr-requires-foundation-module ${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS} ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
     LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
     TARGET_SDKS ALL_APPLE_PLATFORMS
 
@@ -36,7 +36,7 @@ add_swift_target_library(swiftGlibc ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_O
       ${swift_platform_gyb_sources}
       Glibc.swift.gyb
 
-    SWIFT_COMPILE_FLAGS "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}"
+    SWIFT_COMPILE_FLAGS ${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS} ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
     LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
     TARGET_SDKS ANDROID CYGWIN FREEBSD LINUX HAIKU
     DEPENDS glibc_modulemap)
@@ -49,7 +49,7 @@ add_swift_target_library(swiftMSVCRT ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_
     GYB_SOURCES
       ${swift_platform_gyb_sources}
 
-    SWIFT_COMPILE_FLAGS "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}"
+    SWIFT_COMPILE_FLAGS ${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS} ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
     LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
     TARGET_SDKS WINDOWS)
 
@@ -67,34 +67,6 @@ foreach(sdk ${SWIFT_SDKS})
     set(arch_subdir "${SWIFT_SDK_${sdk}_LIB_SUBDIR}/${arch}")
     set(module_dir "${SWIFTLIB_DIR}/${arch_subdir}")
 
-    if("${sdk}" STREQUAL "HAIKU")
-      # Haiku doesn't have /usr/include, instead the headers are located
-      # at /system/develop/headers.
-      set(GLIBC_INCLUDE_PATH "/system/develop/headers/posix")
-      set(GLIBC_ARCH_INCLUDE_PATH "/system/develop/headers/posix")
-      set(GLIBC_SYSROOT_RELATIVE_ARCH_INCLUDE_PATH "/system/develop/headers/")
-    elseif("${sdk}" STREQUAL "ANDROID")
-      set(GLIBC_SYSROOT_RELATIVE_INCLUDE_PATH "${SWIFT_ANDROID_NDK_PATH}/sysroot/usr/include")
-      set(GLIBC_SYSROOT_RELATIVE_ARCH_INCLUDE_PATH "${SWIFT_ANDROID_NDK_PATH}/sysroot/usr/include")
-    else()
-      # Determine the location of glibc headers based on the target.
-      set(GLIBC_SYSROOT_RELATIVE_INCLUDE_PATH "/usr/include")
-      set(GLIBC_SYSROOT_RELATIVE_ARCH_INCLUDE_PATH "${GLIBC_SYSROOT_RELATIVE_INCLUDE_PATH}")
-    endif()
-
-    # Some SDKs place their headers in architecture-specific subfolders.
-    if((${sdk} STREQUAL "LINUX" OR ${sdk} STREQUAL "FREEBSD") AND CMAKE_LIBRARY_ARCHITECTURE)
-      set(GLIBC_SYSROOT_RELATIVE_ARCH_INCLUDE_PATH "${GLIBC_SYSROOT_RELATIVE_ARCH_INCLUDE_PATH}/${CMAKE_LIBRARY_ARCHITECTURE}")
-    endif()
-
-    set(GLIBC_INCLUDE_PATH "${GLIBC_SYSROOT_RELATIVE_INCLUDE_PATH}")
-    set(GLIBC_ARCH_INCLUDE_PATH "${GLIBC_SYSROOT_RELATIVE_ARCH_INCLUDE_PATH}")
-
-    if(NOT "${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH}" STREQUAL "/" AND NOT "${sdk}" STREQUAL "ANDROID")
-      set(GLIBC_INCLUDE_PATH "${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH}${GLIBC_INCLUDE_PATH}")
-      set(GLIBC_ARCH_INCLUDE_PATH "${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH}${GLIBC_ARCH_INCLUDE_PATH}")
-    endif()
-
     if(${sdk} STREQUAL ANDROID)
       set(glibc_modulemap_source "bionic.modulemap.gyb")
     else()
@@ -111,23 +83,27 @@ foreach(sdk ${SWIFT_SDKS})
         OUTPUT "${glibc_modulemap_out}"
         FLAGS
             "-DCMAKE_SDK=${sdk}"
-            "-DGLIBC_INCLUDE_PATH=${GLIBC_INCLUDE_PATH}"
-            "-DGLIBC_ARCH_INCLUDE_PATH=${GLIBC_ARCH_INCLUDE_PATH}")
+            "-DGLIBC_INCLUDE_PATH=${SWIFT_SDK_${sdk}_ARCH_${arch}_LIBC_INCLUDE_DIRECTORY}"
+            "-DGLIBC_ARCH_INCLUDE_PATH=${SWIFT_SDK_${sdk}_ARCH_${arch}_LIBC_ARCHITECTURE_INCLUDE_DIRECTORY}")
 
     list(APPEND glibc_modulemap_target_list ${glibc_modulemap_target})
 
     # If this SDK is a target for a non-native host, create a native modulemap
     # without a sysroot prefix. This is the one we'll install instead.
     if(NOT "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${arch}_PATH}" STREQUAL "/")
-
       set(glibc_sysroot_relative_modulemap_out "${module_dir}/sysroot-relative-modulemaps/glibc.modulemap")
+
+      string(REPLACE "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${arch}_PATH}"
+        "" absolute_libc_include_path "${SWIFT_SDK_${sdk}_ARCH_${arch}_LIBC_INCLUDE_DIRECTORY}")
+      string(REPLACE "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${arch}_PATH}"
+        "" absolute_libc_arch_include_path ${SWIFT_SDK_${sdk}_ARCH_${arch}_LIBC_ARCHITECTURE_INCLUDE_DIRECTORY})
+
       handle_gyb_source_single(glibc_modulemap_native_target
-          SOURCE "${glibc_modulemap_source}"
-          OUTPUT "${glibc_sysroot_relative_modulemap_out}"
-          FLAGS
-              "-DCMAKE_SDK=${sdk}"
-              "-DGLIBC_INCLUDE_PATH=${GLIBC_SYSROOT_RELATIVE_INCLUDE_PATH}"
-              "-DGLIBC_ARCH_INCLUDE_PATH=${GLIBC_SYSROOT_RELATIVE_ARCH_INCLUDE_PATH}")
+        SOURCE "${glibc_modulemap_source}"
+        OUTPUT "${glibc_sysroot_relative_modulemap_out}"
+        FLAGS "-DCMAKE_SDK=${sdk}"
+              "-DGLIBC_INCLUDE_PATH=${absolute_libc_include_path}"
+              "-DGLIBC_ARCH_INCLUDE_PATH=${absolute_libc_arch_include_path}")
 
       list(APPEND glibc_modulemap_target_list ${glibc_modulemap_native_target})
       set(glibc_modulemap_out ${glibc_sysroot_relative_modulemap_out})

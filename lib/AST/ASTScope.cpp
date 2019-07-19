@@ -37,13 +37,18 @@ using namespace ast_scope;
 
 #pragma mark ASTScope
 
-
-Optional<bool> ASTScope::unqualifiedLookup(
+llvm::SmallVector<const ASTScopeImpl *, 0> ASTScope::unqualifiedLookup(
     SourceFile *SF, DeclName name, SourceLoc loc,
-    const DeclContext *startingContext, Optional<bool> isCascadingUse,
+    const DeclContext *startingContext,
     namelookup::AbstractASTScopeDeclConsumer &consumer) {
   return ASTScopeImpl::unqualifiedLookup(SF, name, loc, startingContext,
-                                         isCascadingUse, consumer);
+                                         consumer);
+}
+
+Optional<bool> ASTScope::computeIsCascadingUse(
+    ArrayRef<const ast_scope::ASTScopeImpl *> history,
+    Optional<bool> initialIsCascadingUse) {
+  return ASTScopeImpl::computeIsCascadingUse(history, initialIsCascadingUse);
 }
 
 void ASTScope::dump() const { impl->dump(); }
@@ -108,6 +113,20 @@ Stmt *LabeledConditionalStmtScope::getStmt() const {
   return getLabeledConditionalStmt();
 }
 
+bool AbstractFunctionBodyScope::isAMethod(
+    const AbstractFunctionDecl *const afd) {
+  // What makes this interesting is that a method named "init" which is not
+  // in a nominal type or extension decl body still gets an implicit self
+  // parameter (even though the program is illegal).
+  // So when choosing between creating a MethodBodyScope and a
+  // PureFunctionBodyScope do we go by the enclosing Decl (i.e.
+  // "afd->getDeclContext()->isTypeContext()") or by
+  // "bool(afd->getImplicitSelfDecl())"?
+  //
+  // Since the code uses \c getImplicitSelfDecl, use that.
+  return afd->getImplicitSelfDecl();
+}
+
 #pragma mark getLabeledConditionalStmt
 LabeledConditionalStmt *IfStmtScope::getLabeledConditionalStmt() const {
   return stmt;
@@ -131,6 +150,14 @@ ASTContext &ASTScopeImpl::getASTContext() const {
 }
 
 #pragma mark getDeclContext
+
+NullablePtr<DeclContext> ASTScopeImpl::getDeclContext() const {
+  return nullptr;
+}
+
+NullablePtr<DeclContext> ASTSourceFileScope::getDeclContext() const {
+  return NullablePtr<DeclContext>(SF);
+}
 
 NullablePtr<DeclContext> GenericTypeOrExtensionScope::getDeclContext() const {
   return getGenericContext();
@@ -166,6 +193,10 @@ NullablePtr<DeclContext> AttachedPropertyWrapperScope::getDeclContext() const {
       ->getPatternList()
       .front()
       .getInitContext();
+}
+
+NullablePtr<DeclContext> AbstractFunctionDeclScope::getDeclContext() const {
+  return decl;
 }
 
 NullablePtr<DeclContext> AbstractFunctionParamsScope::getDeclContext() const {

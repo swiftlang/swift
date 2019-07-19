@@ -689,6 +689,10 @@ static llvm::cl::opt<std::string>
 GraphVisPath("output-request-graphviz",
              llvm::cl::desc("Emit GraphViz output visualizing the request graph."),
              llvm::cl::cat(Category));
+
+static llvm::cl::opt<bool>
+CanonicalizeType("canonicalize-type", llvm::cl::Hidden,
+                   llvm::cl::cat(Category), llvm::cl::init(false));
 } // namespace options
 
 static std::unique_ptr<llvm::MemoryBuffer>
@@ -1737,7 +1741,8 @@ static int doPrintExpressionTypes(const CompilerInvocation &InitInvok,
   for (auto &u: options::UsrFilter)
     Usrs.push_back(u.c_str());
   // Collect all tags of expressions.
-  for (auto R: collectExpressionType(*CI.getPrimarySourceFile(), Usrs, Scratch, OS)) {
+  for (auto R: collectExpressionType(*CI.getPrimarySourceFile(), Usrs, Scratch,
+                                     options::CanonicalizeType, OS)) {
     SortedTags.push_back({R.offset,
       (llvm::Twine("<expr type:\"") + TypeBuffer.str().substr(R.typeOffset,
                                                   R.typeLength) + "\">").str()});

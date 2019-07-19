@@ -7,7 +7,7 @@
 struct Wrapper<Value> {
   var _stored: Value?
 
-  var value: Value {
+  var wrappedValue: Value {
     get {
       return _stored!
     }
@@ -21,7 +21,7 @@ struct Wrapper<Value> {
     self._stored = nil
   }
 
-  init(initialValue: Value) {
+  init(wrappedValue initialValue: Value) {
     self._stored = initialValue
   }
 
@@ -36,7 +36,7 @@ func foo() -> Int { return 17 }
 struct HasWrappers {
   // CHECK: @Wrapper var x: Int {
   // CHECK-NEXT:  get
-  // CHECK: var $x: Wrapper<Int>
+  // CHECK: var _x: Wrapper<Int>
   @Wrapper(closure: foo)
   var x: Int
 
@@ -47,7 +47,7 @@ struct HasWrappers {
   var z: String
 
   // Memberwise initializer.
-  // CHECK: init(x: Wrapper<Int> = Wrapper(closure: foo), y: Bool = true, z: String)
+  // CHECK: init(x: Wrapper<Int> = Wrapper(closure: foo), y: Bool = true, z: String = Wrapper())
 }
 
 func trigger() {

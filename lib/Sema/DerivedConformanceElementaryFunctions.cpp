@@ -186,7 +186,7 @@ static void deriveBodyElementaryFunction(AbstractFunctionDecl *funcDecl,
     // declaration for the operator.
     if (confRef->isConcrete())
       memberOpDecl = confRef->getConcrete()->getWitnessDecl(
-          operatorReq, C.getLazyResolver());
+          operatorReq);
     assert(memberOpDecl && "Member operator declaration must exist");
     auto memberOpDRE =
         new (C) DeclRefExpr(memberOpDecl, DeclNameLoc(), /*Implicit*/ true);

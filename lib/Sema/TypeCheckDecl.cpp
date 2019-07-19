@@ -56,6 +56,12 @@
 
 using namespace swift;
 
+#define DEBUG_TYPE "Serialization"
+
+STATISTIC(NumLazyRequirementSignaturesLoaded,
+          "# of lazily-deserialized requirement signatures loaded");
+
+#undef DEBUG_TYPE
 #define DEBUG_TYPE "TypeCheckDecl"
 
 namespace {
@@ -1310,7 +1316,28 @@ IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
 }
 
 llvm::Expected<ArrayRef<Requirement>>
-RequirementSignatureRequest::evaluate(Evaluator &evaluator, ProtocolDecl *proto) const {
+RequirementSignatureRequest::evaluate(Evaluator &evaluator,
+                                      ProtocolDecl *proto) const {
+  ASTContext &ctx = proto->getASTContext();
+
+  // First check if we have a deserializable requirement signature.
+  if (proto->hasLazyRequirementSignature()) {
+    ++NumLazyRequirementSignaturesLoaded;
+    // FIXME: (transitional) increment the redundant "always-on" counter.
+    if (ctx.Stats)
+      ctx.Stats->getFrontendCounters().NumLazyRequirementSignaturesLoaded++;
+
+    auto contextData = static_cast<LazyProtocolData *>(
+        ctx.getOrCreateLazyContextData(proto, nullptr));
+
+    SmallVector<Requirement, 8> requirements;
+    contextData->loader->loadRequirementSignature(
+        proto, contextData->requirementSignatureData, requirements);
+    if (requirements.empty())
+      return None;
+    return ctx.AllocateCopy(requirements);
+  }
+
   GenericSignatureBuilder builder(proto->getASTContext());
 
   // Add all of the generic parameters.
@@ -2181,6 +2208,32 @@ static void checkProtocolSelfRequirements(ProtocolDecl *proto,
       });
 }
 
+/// For now, DynamicSelfType can only appear at the top level of a
+/// function result type, possibly wrapped in an optional type.
+///
+/// In the future, we could generalize it to allow it in any
+/// covariant position, so that for example a class method could
+/// return '() -> Self'.
+static void checkDynamicSelfType(ValueDecl *decl, Type type) {
+  if (!type->hasDynamicSelfType())
+    return;
+
+  if (auto objectTy = type->getOptionalObjectType())
+    type = objectTy;
+
+  if (type->is<DynamicSelfType>())
+    return;
+
+  if (isa<FuncDecl>(decl))
+    decl->diagnose(diag::dynamic_self_invalid_method);
+  else if (isa<VarDecl>(decl))
+    decl->diagnose(diag::dynamic_self_invalid_property);
+  else {
+    assert(isa<SubscriptDecl>(decl));
+    decl->diagnose(diag::dynamic_self_invalid_subscript);
+  }
+}
+
 namespace {
 class DeclChecker : public DeclVisitor<DeclChecker> {
 public:
@@ -2223,6 +2276,7 @@ public:
       }
     }
   }
+
 
   //===--------------------------------------------------------------------===//
   // Visit Methods.
@@ -2345,6 +2399,17 @@ public:
     TC.checkDeclAttributes(VD);
 
     triggerAccessorSynthesis(TC, VD);
+
+    if (VD->getDeclContext()->getSelfClassDecl()) {
+      checkDynamicSelfType(VD, VD->getValueInterfaceType());
+
+      if (VD->getValueInterfaceType()->hasDynamicSelfType()) {
+        if (VD->hasStorage())
+          VD->diagnose(diag::dynamic_self_in_stored_property);
+        else if (VD->isSettable(nullptr))
+          VD->diagnose(diag::dynamic_self_in_mutable_property);
+      }
+    }
 
     // FIXME: Temporary hack until capture computation has been request-ified.
     if (VD->getDeclContext()->isLocalContext()) {
@@ -2470,6 +2535,12 @@ public:
           if (!var->hasType())
             var->markInvalid();
         };
+        
+        // Properties with an opaque return type need an initializer to
+        // determine their underlying type.
+        if (var->getOpaqueResultTypeDecl()) {
+          TC.diagnose(var->getLoc(), diag::opaque_type_var_no_init);
+        }
 
         // Non-member observing properties need an initializer.
         if (var->getWriteImpl() == WriteImplKind::StoredWithObservers &&
@@ -2528,8 +2599,9 @@ public:
       if (!PBD->isInitialized(i))
         continue;
 
-      if (!PBD->isInitializerChecked(i))
+      if (!PBD->isInitializerChecked(i)) {
         TC.typeCheckPatternBinding(PBD, i);
+      }
 
       if (!PBD->isInvalid()) {
         auto &entry = PBD->getPatternList()[i];
@@ -2598,6 +2670,15 @@ public:
 
     TC.checkParameterAttributes(SD->getIndices());
     TC.checkDefaultArguments(SD->getIndices(), SD);
+
+    if (SD->getDeclContext()->getSelfClassDecl()) {
+      checkDynamicSelfType(SD, SD->getValueInterfaceType());
+
+      if (SD->getValueInterfaceType()->hasDynamicSelfType() &&
+          SD->isSettable()) {
+        SD->diagnose(diag::dynamic_self_in_mutable_subscript);
+      }
+    }
   }
 
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
@@ -2755,6 +2836,8 @@ public:
     for (Decl *Member : SD->getMembers())
       visit(Member);
 
+    TC.checkPatternBindingCaptures(SD);
+
     TC.checkDeclAttributes(SD);
 
     checkInheritanceClause(SD);
@@ -2880,6 +2963,8 @@ public:
     for (Decl *Member : CD->getMembers()) {
       visit(Member);
     }
+
+    TC.checkPatternBindingCaptures(CD);
 
     // If this class requires all of its stored properties to have
     // in-class initializers, diagnose this now.
@@ -3057,7 +3142,7 @@ public:
     }
 
     // Explicitly calculate this bit.
-    (void) PD->existentialTypeSupported(&TC);
+    (void) PD->existentialTypeSupported();
 
     // Explicity compute the requirement signature to detect errors.
     (void) PD->getRequirementSignature();
@@ -3148,6 +3233,9 @@ public:
     TC.checkParameterAttributes(FD->getParameters());
 
     checkExplicitAvailability(FD);
+
+    if (FD->getDeclContext()->getSelfClassDecl())
+      checkDynamicSelfType(FD, FD->getResultInterfaceType());
   }
 
   void visitModuleDecl(ModuleDecl *) { }
@@ -3600,77 +3688,9 @@ bool swift::isMemberOperator(FuncDecl *decl, Type type) {
   return false;
 }
 
-bool checkDynamicSelfReturn(FuncDecl *func,
-                            TypeRepr *typeRepr,
-                            unsigned optionalDepth) {
-  // Look through parentheses.
-  if (auto parenRepr = dyn_cast<TupleTypeRepr>(typeRepr)) {
-    if (!parenRepr->isParenType()) return false;
-    return checkDynamicSelfReturn(func, parenRepr->getElementType(0),
-                                  optionalDepth);
-  }
-
-  // Look through attributes.
-  if (auto attrRepr = dyn_cast<AttributedTypeRepr>(typeRepr)) {
-    TypeAttributes attrs = attrRepr->getAttrs();
-    if (!attrs.empty())
-      return false;
-    return checkDynamicSelfReturn(func, attrRepr->getTypeRepr(),
-                                  optionalDepth);
-
-  }
-
-  // Look through optional types.
-  TypeRepr *base = nullptr;
-  if (auto *optRepr = dyn_cast<OptionalTypeRepr>(typeRepr))
-    base = optRepr->getBase();
-  else if (auto *optRepr =
-               dyn_cast<ImplicitlyUnwrappedOptionalTypeRepr>(typeRepr))
-    base = optRepr->getBase();
-
-  if (base) {
-    // But only one level.
-    if (optionalDepth != 0) return false;
-    return checkDynamicSelfReturn(func, base, optionalDepth + 1);
-  }
-
-  // Check whether we have a simple identifier type.
-  auto simpleRepr = dyn_cast<SimpleIdentTypeRepr>(typeRepr);
-  if (!simpleRepr)
-    return false;
-
-  // Check whether it is 'Self'.
-  if (simpleRepr->getIdentifier() != func->getASTContext().Id_Self)
-    return false;
-
-  // Note that the function has a dynamic Self return type and set
-  // the return type component to the dynamic self type.
-  return true;
-}
-
-/// Check for methods that return 'DynamicResult'.
-bool checkDynamicSelfReturn(FuncDecl *func) {
-  // Check whether we have a specified result type.
-  auto typeRepr = func->getBodyResultTypeLoc().getTypeRepr();
-  if (!typeRepr)
-    return false;
-
-  // 'Self' on a free function is not dynamic 'Self'.
-  if (!func->getDeclContext()->getSelfClassDecl() &&
-      !isa<ProtocolDecl>(func->getDeclContext()))
-    return false;
-
-  // 'Self' on a property accessor is not dynamic 'Self'...even on a read-only
-  // property. We could implement it as such in the future.
-  if (isa<AccessorDecl>(func))
-    return false;
-
-  return checkDynamicSelfReturn(func, typeRepr, 0);
-}
-
-Type buildAddressorResultType(TypeChecker &TC,
-                              AccessorDecl *addressor,
-                              Type valueType) {
+static Type buildAddressorResultType(TypeChecker &TC,
+                                     AccessorDecl *addressor,
+                                     Type valueType) {
   assert(addressor->getAccessorKind() == AccessorKind::Address ||
          addressor->getAccessorKind() == AccessorKind::MutableAddress);
 
@@ -3919,8 +3939,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     if (PBD->isBeingValidated())
       return;
 
-    DeclValidationRAII IBV(D);
-
     if (!VD->hasInterfaceType()) {
       // Attempt to infer the type using initializer expressions.
       validatePatternBindingEntries(*this, PBD);
@@ -3938,7 +3956,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     // We're not really done with processing the signature yet, but
     // @objc checking requires the declaration to call itself validated
     // so that it can be considered as a witness.
-    D->setSignatureIsValidated();
+    D->setValidationToChecked();
 
     checkDeclAttributesEarly(VD);
     validateAttributes(*this, VD);
@@ -3984,9 +4002,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
         }
       }
     }
-
-    // Check whether the return type is dynamic 'Self'.
-    FD->setDynamicSelf(checkDynamicSelfReturn(FD));
 
     // Accessors should pick up various parts of their type signatures
     // directly from the storage declaration instead of re-deriving them.
@@ -5097,7 +5112,7 @@ void TypeChecker::maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl) {
   // Some heuristics to skip emitting a diagnostic if the class is already
   // irreperably busted.
   if (classDecl->isInvalid() ||
-      classDecl->inheritsSuperclassInitializers(nullptr))
+      classDecl->inheritsSuperclassInitializers())
     return;
 
   auto *superclassDecl = classDecl->getSuperclassDecl();
@@ -5564,6 +5579,25 @@ void TypeChecker::synthesizeMemberForLookup(NominalTypeDecl *target,
       if (!evaluateTargetConformanceTo(decodableProto))
         (void)evaluateTargetConformanceTo(encodableProto);
     }
+
+    if ((baseName.getIdentifier().str().startswith("$") ||
+         baseName.getIdentifier().str().startswith("_")) &&
+        baseName.getIdentifier().str().size() > 1) {
+      // $- and _-prefixed variables can be generated by properties that have
+      // attached property wrappers.
+      auto originalPropertyName =
+        Context.getIdentifier(baseName.getIdentifier().str().substr(1));
+      for (auto member : target->lookupDirect(originalPropertyName)) {
+        if (auto var = dyn_cast<VarDecl>(member)) {
+          if (var->hasAttachedPropertyWrapper()) {
+            auto sourceFile = var->getDeclContext()->getParentSourceFile();
+            if (sourceFile && sourceFile->Kind != SourceFileKind::Interface)
+              (void)var->getPropertyWrapperBackingPropertyInfo();
+          }
+        }
+      }
+    }
+
   } else {
     auto argumentNames = member.getArgumentNames();
     if (member.isCompoundName() && argumentNames.size() != 1)
@@ -5621,10 +5655,6 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
   stmts.push_back(new (Context) ReturnStmt(decl->getLoc(), nullptr));
   ctor->setBody(BraceStmt::create(Context, SourceLoc(), stmts, SourceLoc()));
   ctor->setBodyTypeCheckedIfPresent();
-
-  // FIXME: This is still needed so that DI can check captures for
-  // initializer expressions. Rethink that completely.
-  Context.addSynthesizedDecl(ctor);
 }
 
 static void validateAttributes(TypeChecker &TC, Decl *D) {

@@ -3451,8 +3451,8 @@ public:
     Bits.AbstractClosureExpr.Discriminator = Discriminator;
   }
 
-  CaptureInfo &getCaptureInfo() { return Captures; }
   const CaptureInfo &getCaptureInfo() const { return Captures; }
+  void setCaptureInfo(CaptureInfo captures) { Captures = captures; }
 
   /// Retrieve the parameters of this closure.
   ParameterList *getParameters() { return parameterList; }
@@ -3498,6 +3498,12 @@ public:
 
   /// Whether this closure consists of a single expression.
   bool hasSingleExpressionBody() const;
+
+  /// Retrieve the body for closure that has a single expression for
+  /// its body.
+  ///
+  /// Only valid when \c hasSingleExpressionBody() is true.
+  Expr *getSingleExpressionBody() const;
 
   static bool classof(const Expr *E) {
     return E->getKind() >= ExprKind::First_AbstractClosureExpr &&

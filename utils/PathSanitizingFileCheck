@@ -56,6 +56,12 @@ constants.""")
              "available if Windows compatibility is enabled.",
         action="store_true")
 
+    parser.add_argument(
+        "--dry-run",
+        help="Apply the replacements to the input and print the result "
+             "to standard output",
+        action="store_true")
+
     args, unknown_args = parser.parse_known_args()
 
     if args.enable_windows_compatibility:
@@ -76,14 +82,18 @@ constants.""")
         # SWIFT_ENABLE_TENSORFLOW
         stdin = re.sub(re.sub(r'\/', slashes_re, re.escape(pattern)), replacement, stdin)
 
-    p = subprocess.Popen(
-        [args.file_check_path] + unknown_args, stdin=subprocess.PIPE)
-    stdout, stderr = p.communicate(stdin)
-    if stdout is not None:
-        print(stdout)
-    if stderr is not None:
-        print(stderr, file=sys.stderr)
-    return p.wait()
+    if args.dry_run:
+        print(stdin)
+        return 0
+    else:
+        p = subprocess.Popen(
+            [args.file_check_path] + unknown_args, stdin=subprocess.PIPE)
+        stdout, stderr = p.communicate(stdin)
+        if stdout is not None:
+            print(stdout)
+        if stderr is not None:
+            print(stderr, file=sys.stderr)
+        return p.wait()
 
 
 if __name__ == '__main__':

@@ -27,7 +27,6 @@ namespace swift {
   class AbstractFunctionDecl;
   class Decl;
   class Expr;
-  class LazyResolver;
   class ExtensionDecl;
   class ProtocolDecl;
   class Type;
@@ -46,7 +45,7 @@ namespace swift {
   /// Check if T1 is convertible to T2.
   ///
   /// \returns true on convertible, false on not.
-  bool isConvertibleTo(Type T1, Type T2, DeclContext &DC);
+  bool isConvertibleTo(Type T1, Type T2, bool openArchetypes, DeclContext &DC);
 
   bool isEqual(Type T1, Type T2, DeclContext &DC);
 
@@ -202,7 +201,9 @@ namespace swift {
   /// be printed to \c OS.
   ArrayRef<ExpressionTypeInfo> collectExpressionType(SourceFile &SF,
     ArrayRef<const char *> ExpectedProtocols,
-    std::vector<ExpressionTypeInfo> &scratch, llvm::raw_ostream &OS);
+    std::vector<ExpressionTypeInfo> &scratch,
+    bool CanonicalType,
+    llvm::raw_ostream &OS);
 
   /// Resolve a list of mangled names to accessible protocol decls from
   /// the decl context.
@@ -232,13 +233,14 @@ namespace swift {
   /// @dynamicMemberLookup attribute on it.
   bool hasDynamicMemberLookupAttribute(Type type);
 
-  /// Returns the root type of the keypath type in a keypath dynamic member
-  /// lookup subscript, or \c None if it cannot be determined.
+  /// Returns the root type and result type of the keypath type in a keypath
+  /// dynamic member lookup subscript, or \c None if it cannot be determined.
   ///
   /// \param subscript The potential keypath dynamic member lookup subscript.
   /// \param DC The DeclContext from which the subscript is being referenced.
-  Optional<Type> getRootTypeOfKeypathDynamicMember(SubscriptDecl *subscript,
-                                                   const DeclContext *DC);
+  Optional<std::pair<Type, Type>>
+  getRootAndResultTypeOfKeypathDynamicMember(SubscriptDecl *subscript,
+                                             const DeclContext *DC);
 }
 
 #endif

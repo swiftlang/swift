@@ -132,6 +132,7 @@ public:
   IGNORED_ATTR(PropertyWrapper)
   IGNORED_ATTR(DisfavoredOverload)
   IGNORED_ATTR(FunctionBuilder)
+  IGNORED_ATTR(ProjectedValueProperty)
   // SWIFT_ENABLE_TENSORFLOW
   IGNORED_ATTR(Differentiable)
   IGNORED_ATTR(Differentiating)
@@ -809,6 +810,7 @@ public:
     IGNORED_ATTR(WarnUnqualifiedAccess)
     IGNORED_ATTR(WeakLinked)
     IGNORED_ATTR(DisfavoredOverload)
+    IGNORED_ATTR(ProjectedValueProperty)
 #undef IGNORED_ATTR
 
   void visitAvailableAttr(AvailableAttr *attr);
@@ -1040,9 +1042,9 @@ bool swift::isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl,
   return false;
 }
 
-Optional<Type>
-swift::getRootTypeOfKeypathDynamicMember(SubscriptDecl *subscript,
-                                         const DeclContext *DC) {
+Optional<std::pair<Type, Type>>
+swift::getRootAndResultTypeOfKeypathDynamicMember(SubscriptDecl *subscript,
+                                                  const DeclContext *DC) {
   auto &TC = TypeChecker::createForContext(DC->getASTContext());
 
   if (!isValidKeyPathDynamicMemberLookup(subscript, TC))
@@ -1052,11 +1054,10 @@ swift::getRootTypeOfKeypathDynamicMember(SubscriptDecl *subscript,
   auto keyPathType = param->getType()->getAs<BoundGenericType>();
   if (!keyPathType)
     return None;
-
-  assert(!keyPathType->getGenericArgs().empty() &&
+  auto genericArgs = keyPathType->getGenericArgs();
+  assert(!genericArgs.empty() && genericArgs.size() == 2 &&
          "invalid keypath dynamic member");
-  auto rootType = keyPathType->getGenericArgs()[0];
-  return rootType;
+  return std::pair<Type, Type>{genericArgs[0], genericArgs[1]};
 }
 
 /// The @dynamicMemberLookup attribute is only allowed on types that have at
@@ -2681,8 +2682,7 @@ AutoDiffParameterIndices *
 TypeChecker::inferDifferentiableParameters(
     AbstractFunctionDecl *AFD, GenericEnvironment *derivativeGenEnv) {
   auto &ctx = AFD->getASTContext();
-  auto *functionType = AFD->getInterfaceType()->eraseDynamicSelfType()
-      ->castTo<AnyFunctionType>();
+  auto *functionType = AFD->getInterfaceType()->castTo<AnyFunctionType>();
   AutoDiffParameterIndicesBuilder builder(functionType);
   SmallVector<Type, 4> allParamTypes;
 
@@ -2822,10 +2822,8 @@ static bool checkFunctionSignature(
     return false;
 
   // Erase dynamic self types.
-  required = dyn_cast<AnyFunctionType>(
-      required->eraseDynamicSelfType()->getCanonicalType());
-  candidateFnTy = dyn_cast<AnyFunctionType>(
-      candidateFnTy->eraseDynamicSelfType()->getCanonicalType());
+  required = dyn_cast<AnyFunctionType>(required->getCanonicalType());
+  candidateFnTy = dyn_cast<AnyFunctionType>(candidateFnTy->getCanonicalType());
 
   // Check that generic signatures match.
   auto requiredGenSig = required.getOptGenericSignature();
@@ -2887,8 +2885,7 @@ static AutoDiffParameterIndices *computeDifferentiationParameters(
 ) {
   // Get function type and parameters.
   TC.resolveDeclSignature(function);
-  auto *functionType = function->getInterfaceType()->eraseDynamicSelfType()
-      ->castTo<AnyFunctionType>();
+  auto *functionType = function->getInterfaceType()->castTo<AnyFunctionType>();
   auto &params = *function->getParameters();
   auto numParams = function->getParameters()->size();
   auto isInstanceMethod = function->isInstanceMember();
@@ -3007,7 +3004,6 @@ static AutoDiffIndexSubset *computeTransposingParameters(
   // Get function type and parameters.
   TC.resolveDeclSignature(transposeFunc);
   auto *functionType = transposeFunc->getInterfaceType()
-                           ->eraseDynamicSelfType()
                            ->castTo<AnyFunctionType>();
   
   ArrayRef<TupleTypeElt> transposeResultTypes;
@@ -3264,8 +3260,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   }
 
   TC.resolveDeclSignature(original);
-  auto *originalFnTy = original->getInterfaceType()->eraseDynamicSelfType()
-      ->castTo<AnyFunctionType>();
+  auto *originalFnTy = original->getInterfaceType()->castTo<AnyFunctionType>();
   bool isMethod = original->hasImplicitSelfDecl();
 
   // If the original function returns the empty tuple type, there's no output to
@@ -3535,7 +3530,7 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
   auto original = attr->getOriginal();
 
   auto *derivativeInterfaceType = derivative->getInterfaceType()
-      ->eraseDynamicSelfType()->castTo<AnyFunctionType>();
+      ->castTo<AnyFunctionType>();
 
   // Perform preliminary derivative checks.
 
@@ -3890,7 +3885,6 @@ void AttributeChecker::visitTransposingAttr(TransposingAttr *attr) {
   auto original = attr->getOriginal();
   TC.resolveDeclSignature(transpose);
   auto *transposeInterfaceType = transpose->getInterfaceType()
-                                     ->eraseDynamicSelfType()
                                      ->castTo<AnyFunctionType>();
   
   // Get checked wrt param indices.

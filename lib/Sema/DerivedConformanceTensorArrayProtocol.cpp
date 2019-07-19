@@ -149,8 +149,7 @@ static void deriveBodyTensorArrayProtocol_unpackTensorHandles(
     // If conformance reference is concrete, then use concrete witness
     // declaration for the operator.
     if (confRef->isConcrete())
-      memberMethodDecl = confRef->getConcrete()->getWitnessDecl(
-          methodReq, C.getLazyResolver());
+      memberMethodDecl = confRef->getConcrete()->getWitnessDecl(methodReq);
     assert(memberMethodDecl && "Member method declaration must exist");
     auto memberMethodDRE = new (C) DeclRefExpr(
         memberMethodDecl, DeclNameLoc(), /*Implicit*/ true);
@@ -349,7 +348,7 @@ static ValueDecl *deriveTensorArrayProtocol_tensorHandleCount(
 
   // Create `_tensorHandleCount` getter.
   auto *getterDecl = derived.declareDerivedPropertyGetter(
-    TC, tensorHandleCountDecl, returnType);
+    tensorHandleCountDecl, returnType);
   getterDecl->setBodySynthesizer(
     deriveBodyTensorArrayProtocol_tensorHandleCount, nullptr);
   tensorHandleCountDecl->setAccessors(StorageImplInfo::getImmutableComputed(),
@@ -433,7 +432,7 @@ static ValueDecl *deriveTensorArrayProtocol_typeList(
 
   // Create `_typeList` getter.
   auto *getterDecl = derived.declareDerivedPropertyGetter(
-      TC, typeListDecl, returnType);
+      typeListDecl, returnType);
   getterDecl->setBodySynthesizer(
       deriveBodyTensorArrayProtocol_typeList, nullptr);
   typeListDecl->setAccessors(StorageImplInfo::getImmutableComputed(),
@@ -518,8 +517,7 @@ deriveBodyTensorArrayProtocol_init(AbstractFunctionDecl *funcDecl, void *) {
     // If conformance reference is concrete, then use concrete witness
     // declaration for the constructor.
     if (confRef->isConcrete())
-      memberInitDecl = confRef->getConcrete()->getWitnessDecl(
-          initReq, C.getLazyResolver());
+      memberInitDecl = confRef->getConcrete()->getWitnessDecl(initReq);
     assert(memberInitDecl && "Member constructor declaration must exist");
     auto memberInitDRE = new (C) DeclRefExpr(
         memberInitDecl, DeclNameLoc(), /*implicit*/ true);

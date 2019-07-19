@@ -101,7 +101,7 @@ deriveBridgedNSError_enum_nsErrorDomain(DerivedConformance &derived,
 
   // Define the getter.
   auto getterDecl = derived.addGetterToReadOnlyDerivedProperty(
-      derived.TC, propDecl, stringTy);
+      propDecl, stringTy);
   getterDecl->setBodySynthesizer(synthesizer);
 
   derived.addMembersToConformanceContext({getterDecl, propDecl, pbDecl});

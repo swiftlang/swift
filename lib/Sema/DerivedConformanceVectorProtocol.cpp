@@ -165,8 +165,7 @@ static void deriveBodyVectorProtocol_method(AbstractFunctionDecl *funcDecl,
     // declaration for the operator.
     if (confRef->isConcrete()) {
       if (auto *concreteMemberMethodDecl =
-              confRef->getConcrete()->getWitnessDecl(methodReq,
-                                                     C.getLazyResolver()))
+              confRef->getConcrete()->getWitnessDecl(methodReq))
         memberMethodDecl = concreteMemberMethodDecl;
       assert(memberMethodDecl);
     }

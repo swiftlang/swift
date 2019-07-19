@@ -2027,27 +2027,24 @@ ASTContext::getInheritedConformance(Type type, ProtocolConformance *inherited) {
 LazyContextData *ASTContext::getOrCreateLazyContextData(
                                                 const DeclContext *dc,
                                                 LazyMemberLoader *lazyLoader) {
-  auto known = getImpl().LazyContexts.find(dc);
-  if (known != getImpl().LazyContexts.end()) {
+  LazyContextData *&entry = getImpl().LazyContexts[dc];
+  if (entry) {
     // Make sure we didn't provide an incompatible lazy loader.
-    assert(!lazyLoader || lazyLoader == known->second->loader);
-    return known->second;
+    assert(!lazyLoader || lazyLoader == entry->loader);
+    return entry;
   }
 
-  // Create new lazy iterable context data with the given loader.
+  // Create new lazy context data with the given loader.
   assert(lazyLoader && "Queried lazy data for non-lazy iterable context");
-  if (isa<NominalTypeDecl>(dc) || isa<ExtensionDecl>(dc)) {
-    auto *contextData = Allocate<LazyIterableDeclContextData>();
-    contextData->loader = lazyLoader;
-    getImpl().LazyContexts[dc] = contextData;
-    return contextData;
-  }
+  if (isa<ProtocolDecl>(dc))
+    entry = Allocate<LazyProtocolData>();
+  else if (isa<NominalTypeDecl>(dc) || isa<ExtensionDecl>(dc))
+    entry = Allocate<LazyIterableDeclContextData>();
+  else
+    entry = Allocate<LazyGenericContextData>();
 
-  // Create new lazy generic context data with the given loader.
-  auto *contextData = Allocate<LazyGenericContextData>();
-  contextData->loader = lazyLoader;
-  getImpl().LazyContexts[dc] = contextData;
-  return contextData;
+  entry->loader = lazyLoader;
+  return entry;
 }
 
 bool ASTContext::hasUnparsedMembers(const IterableDeclContext *IDC) const {
@@ -2506,10 +2503,16 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
     isStatic = FD->isStatic();
     selfAccess = FD->getSelfAccessKind();
 
+    // `self`s type for subscripts and properties
+    if (auto *AD = dyn_cast<AccessorDecl>(AFD)) {
+      if (wantDynamicSelf && AD->getStorage()
+          ->getValueInterfaceType()->hasDynamicSelfType())
+        isDynamicSelf = true;
+    }
     // Methods returning 'Self' have a dynamic 'self'.
     //
     // FIXME: All methods of non-final classes should have this.
-    if (wantDynamicSelf && FD->hasDynamicSelf())
+    else if (wantDynamicSelf && FD->hasDynamicSelfResult())
       isDynamicSelf = true;
   } else if (auto *CD = dyn_cast<ConstructorDecl>(AFD)) {
     if (isInitializingCtor) {

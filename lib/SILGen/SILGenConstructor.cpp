@@ -99,7 +99,7 @@ static RValue emitImplicitValueConstructorArg(SILGenFunction &SGF,
 }
 
 /// If the field has a property wrapper for which we will need to call the
-/// wrapper type's init(initialValue:), set up that evaluation and call the
+/// wrapper type's init(wrapperValue:), set up that evaluation and call the
 /// \c body with the expression to form the property wrapper instance from
 /// the initial value type.
 ///

@@ -587,10 +587,17 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
   AttributeVector attributes;
   AttributeVector modifiers;
 
+  CustomAttr *FuncBuilderAttr = nullptr;
+  if (auto *VD = dyn_cast_or_null<ValueDecl>(D)) {
+    FuncBuilderAttr = VD->getAttachedFunctionBuilder();
+  }
   for (auto DA : llvm::reverse(FlattenedAttrs)) {
+    // Always print function builder attribute.
+    bool isFunctionBuilderAttr = DA == FuncBuilderAttr;
     if (!Options.PrintImplicitAttrs && DA->isImplicit())
       continue;
     if (!Options.PrintUserInaccessibleAttrs &&
+        !isFunctionBuilderAttr &&
         DeclAttribute::isUserInaccessible(DA->getKind()))
       continue;
     if (Options.excludeAttrKind(DA->getKind()))
@@ -911,6 +918,13 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
+  case DAK_ProjectedValueProperty:
+    Printer.printAttrName("@_projectedValueProperty");
+    Printer << "(";
+    Printer << cast<ProjectedValuePropertyAttr>(this)->ProjectionPropertyName;
+    Printer << ")";
+    break;
+
   case DAK_Count:
     llvm_unreachable("exceed declaration attribute kinds");
 
@@ -1039,6 +1053,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "_clangImporterSynthesizedType";
   case DAK_Custom:
     return "<<custom>>";
+  case DAK_ProjectedValueProperty:
+    return "_projectedValueProperty";
   // SWIFT_ENABLE_TENSORFLOW
   case DAK_Differentiable:
     return "differentiable";
@@ -1337,7 +1353,14 @@ AvailableVersionComparison AvailableAttr::getVersionAvailability(
 
 const AvailableAttr *AvailableAttr::isUnavailable(const Decl *D) {
   ASTContext &ctx = D->getASTContext();
-  return D->getAttrs().getUnavailable(ctx);
+  if (auto attr = D->getAttrs().getUnavailable(ctx))
+    return attr;
+
+  // If D is an extension member, check if the extension is unavailable.
+  if (auto ext = dyn_cast<ExtensionDecl>(D->getDeclContext()))
+    return AvailableAttr::isUnavailable(ext);
+
+  return nullptr;
 }
 
 SpecializeAttr::SpecializeAttr(SourceLoc atLoc, SourceRange range,

@@ -456,11 +456,8 @@ ManagedValue Transform::transform(ManagedValue v,
 
   // A base class method returning Self can be used in place of a derived
   // class method returning Self.
-  if (auto outputSelfType = dyn_cast<DynamicSelfType>(outputSubstType)) {
-    if (auto inputSelfType = dyn_cast<DynamicSelfType>(inputSubstType)) {
-      inputSubstType = inputSelfType.getSelfType();
-      outputSubstType = outputSelfType.getSelfType();
-    }
+  if (auto inputSelfType = dyn_cast<DynamicSelfType>(inputSubstType)) {
+    inputSubstType = inputSelfType.getSelfType();
   }
 
   //  - upcasts for classes

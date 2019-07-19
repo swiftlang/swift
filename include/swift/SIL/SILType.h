@@ -542,7 +542,11 @@ public:
   bool operator!=(SILType rhs) const {
     return value.getOpaqueValue() != rhs.value.getOpaqueValue();
   }
-  
+
+  /// Return the mangled name of this type, ignoring its prefix. Meant for
+  /// diagnostic purposes.
+  std::string getMangledName() const;
+
   std::string getAsString() const;
   void dump() const;
   void print(raw_ostream &OS) const;

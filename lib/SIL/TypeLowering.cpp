@@ -91,44 +91,36 @@ static bool hasSingletonMetatype(CanType instanceType) {
 CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture,
                                               ResilienceExpansion expansion) {
   auto decl = capture.getDecl();
-  if (auto *var = dyn_cast<VarDecl>(decl)) {
-    assert(var->hasStorage() &&
-           "should not have attempted to directly capture this variable");
+  auto *var = cast<VarDecl>(decl);
+  assert(var->hasStorage() &&
+         "should not have attempted to directly capture this variable");
 
-    // If this is a non-address-only stored 'let' constant, we can capture it
-    // by value.  If it is address-only, then we can't load it, so capture it
-    // by its address (like a var) instead.
-    if (var->isImmutable() &&
-        (!SILModuleConventions(M).useLoweredAddresses() ||
-         !getTypeLowering(var->getType(), expansion).isAddressOnly()))
-      return CaptureKind::Constant;
+  // If this is a non-address-only stored 'let' constant, we can capture it
+  // by value.  If it is address-only, then we can't load it, so capture it
+  // by its address (like a var) instead.
+  if (var->isImmutable() &&
+      (!SILModuleConventions(M).useLoweredAddresses() ||
+       !getTypeLowering(var->getType(), expansion).isAddressOnly()))
+    return CaptureKind::Constant;
 
-    // In-out parameters are captured by address.
-    if (var->isInOut()) {
-      return CaptureKind::StorageAddress;
-    }
-
-    // Reference storage types can appear in a capture list, which means
-    // we might allocate boxes to store the captures. However, those boxes
-    // have the same lifetime as the closure itself, so we must capture
-    // the box itself and not the payload, even if the closure is noescape,
-    // otherwise they will be destroyed when the closure is formed.
-    if (var->getType()->is<ReferenceStorageType>()) {
-      return CaptureKind::Box;
-    }
-
-    // If we're capturing into a non-escaping closure, we can generally just
-    // capture the address of the value as no-escape.
-    return capture.isNoEscape() ?
-      CaptureKind::StorageAddress : CaptureKind::Box;
+  // In-out parameters are captured by address.
+  if (var->isInOut()) {
+    return CaptureKind::StorageAddress;
   }
-  
-  // "Captured" local types require no context.
-  if (isa<TypeAliasDecl>(decl) || isa<GenericTypeParamDecl>(decl) ||
-      isa<AssociatedTypeDecl>(decl))
-    return CaptureKind::None;
-  
-  llvm_unreachable("function-like captures should have been lowered away");
+
+  // Reference storage types can appear in a capture list, which means
+  // we might allocate boxes to store the captures. However, those boxes
+  // have the same lifetime as the closure itself, so we must capture
+  // the box itself and not the payload, even if the closure is noescape,
+  // otherwise they will be destroyed when the closure is formed.
+  if (var->getType()->is<ReferenceStorageType>()) {
+    return CaptureKind::Box;
+  }
+
+  // If we're capturing into a non-escaping closure, we can generally just
+  // capture the address of the value as no-escape.
+  return capture.isNoEscape() ?
+    CaptureKind::StorageAddress : CaptureKind::Box;
 }
 
 using RecursiveProperties = TypeLowering::RecursiveProperties;
@@ -479,7 +471,7 @@ namespace {
       }
       assert(props.isFixedABI() && "unsupported combination for now");
       if (props.isTrivial()) {
-        return asImpl().handleTrivial(type);
+        return asImpl().handleTrivial(type, props);
       }
       return asImpl().handleNonTrivialAggregate(type, props);
     }
@@ -1644,8 +1636,10 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
 
   if (prev == nullptr)
     insert(key, lowering);
-  else
+  else {
     prev->NextExpansion = lowering;
+    assert(prev->isResilient() == lowering->isResilient());
+  }
 
   return *lowering;
 }
@@ -1792,9 +1786,10 @@ TypeConverter::getTypeLoweringForLoweredType(TypeKey key,
                        forExpansion,
                        key.isDependent()).visit(key.SubstType);
 
-  if (prev)
+  if (prev) {
     prev->NextExpansion = lowering;
-  else
+    assert(prev->isResilient() == lowering->isResilient());
+  } else
     insert(key, lowering);
   return *lowering;
 }
@@ -2809,4 +2804,23 @@ unsigned TypeConverter::countNumberOfFields(SILType Ty,
   countNumberOfInnerFields(fieldsCount, M, Ty, expansion);
   TypeFields[key] = fieldsCount;
   return std::max(fieldsCount, 1U);
+}
+
+void TypeLowering::print(llvm::raw_ostream &os) const {
+  auto BOOL = [&](bool b) -> StringRef {
+    if (b)
+      return "true";
+    return "false";
+  };
+  os << "Type Lowering for lowered type: " << LoweredType << ".\n"
+     << "Expansion: " << ResilienceExpansion(ForExpansion) << "\n"
+     << "isTrivial: " << BOOL(Properties.isTrivial()) << ".\n"
+     << "isFixedABI: " << BOOL(Properties.isFixedABI()) << ".\n"
+     << "isAddressOnly: " << BOOL(Properties.isAddressOnly()) << ".\n"
+     << "isResilient: " << BOOL(Properties.isResilient()) << ".\n"
+     << "\n";
+}
+
+void TypeLowering::dump() const {
+  print(llvm::dbgs());
 }

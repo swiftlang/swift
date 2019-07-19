@@ -385,6 +385,23 @@ static bool shouldShowAKA(Type type, StringRef typeName) {
   return true;
 }
 
+/// If a type is part of an argument list which includes another, distinct type
+/// with the same string representation, it should be qualified during
+/// formatting.
+static bool typeSpellingIsAmbiguous(Type type,
+                                    ArrayRef<DiagnosticArgument> Args) {
+  for (auto arg : Args) {
+    if (arg.getKind() == DiagnosticArgumentKind::Type) {
+      auto argType = arg.getAsType();
+      if (argType && !argType->isEqual(type) &&
+          argType->getWithoutParens().getString() == type.getString()) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 /// Format a single diagnostic argument and write it to the given
 /// stream.
 static void formatDiagnosticArgument(StringRef Modifier, 
@@ -451,17 +468,43 @@ static void formatDiagnosticArgument(StringRef Modifier,
     
     // Strip extraneous parentheses; they add no value.
     auto type = Arg.getAsType()->getWithoutParens();
-    std::string typeName = type->getString();
+    bool isAmbiguous = typeSpellingIsAmbiguous(type, Args);
 
-    if (shouldShowAKA(type, typeName)) {
-      llvm::SmallString<256> AkaText;
-      llvm::raw_svector_ostream OutAka(AkaText);
-      OutAka << type->getCanonicalType();
-      Out << llvm::format(FormatOpts.AKAFormatString.c_str(), typeName.c_str(),
-                          AkaText.c_str());
+    if (isAmbiguous && isa<OpaqueTypeArchetypeType>(type.getPointer())) {
+      auto opaqueTypeDecl = type->castTo<OpaqueTypeArchetypeType>()->getDecl();
+
+      llvm::SmallString<256> NamingDeclText;
+      llvm::raw_svector_ostream OutNaming(NamingDeclText);
+      auto namingDecl = opaqueTypeDecl->getNamingDecl();
+      if (namingDecl->getDeclContext()->isTypeContext()) {
+        auto selfTy = namingDecl->getDeclContext()->getSelfInterfaceType();
+        selfTy->print(OutNaming);
+        OutNaming << '.';
+      }
+      namingDecl->getFullName().printPretty(OutNaming);
+
+      auto descriptiveKind = opaqueTypeDecl->getDescriptiveKind();
+
+      Out << llvm::format(FormatOpts.OpaqueResultFormatString.c_str(),
+                          type->getString().c_str(),
+                          Decl::getDescriptiveKindName(descriptiveKind).data(),
+                          NamingDeclText.c_str());
+
     } else {
-      Out << FormatOpts.OpeningQuotationMark << typeName
-          << FormatOpts.ClosingQuotationMark;
+      auto printOptions = PrintOptions();
+      printOptions.FullyQualifiedTypes = isAmbiguous;
+      std::string typeName = type->getString(printOptions);
+
+      if (shouldShowAKA(type, typeName)) {
+        llvm::SmallString<256> AkaText;
+        llvm::raw_svector_ostream OutAka(AkaText);
+        OutAka << type->getCanonicalType();
+        Out << llvm::format(FormatOpts.AKAFormatString.c_str(),
+                            typeName.c_str(), AkaText.c_str());
+      } else {
+        Out << FormatOpts.OpeningQuotationMark << typeName
+            << FormatOpts.ClosingQuotationMark;
+      }
     }
     break;
   }
