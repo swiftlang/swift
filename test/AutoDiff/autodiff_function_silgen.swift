@@ -22,8 +22,8 @@ func apply() {
 // CHECK-AST:              (autodiff_function_extract_original implicit type='(Float) -> (Float)'
 // CHECK-AST:                (declref_expr type='@differentiable (Float) -> (Float)'
 // CHECK-AST-LABEL:  (func_decl {{.*}} "apply()"
-// CHECK-AST:          (autodiff_function implicit type='@differentiable (Float) -> (Float)'
-// CHECK-AST:            (function_conversion_expr implicit type='(Float) -> (Float)'
+// CHECK-AST:          (function_conversion_expr implicit type='@differentiable (Float) -> (Float)'
+// CHECK-AST:            (autodiff_function implicit type='@differentiable (Float) -> Float'
 // CHECK-AST:              (declref_expr type='(Float) -> Float'
 
 // CHECK-SILGEN-LABEL: @{{.*}}myfunction{{.*}}
