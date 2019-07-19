@@ -669,10 +669,6 @@ function set_build_options_for_host() {
                 -DCOMPILER_RT_ENABLE_TVOS:BOOL=FALSE
                 -DSANITIZER_MIN_OSX_VERSION="${cmake_osx_deployment_target}"
                 -DLLVM_ENABLE_MODULES:BOOL="$(true_false ${LLVM_ENABLE_MODULES})"
-                # NOTE(compnerd) this explicitly sets up the python executable
-                # since we sometimes end up with python 3 and the tooling
-                # currently relies on python 2.7
-                -DPYTHON_EXECUTABLE:PATH=/usr/bin/python2.7
             )
             if [[ $(is_llvm_lto_enabled) == "TRUE" ]]; then
                 if [[ $(cmake_needs_to_specify_standard_computed_defaults) == "TRUE" ]]; then
@@ -2562,21 +2558,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     cmake_options+=(
                       -DLLDB_CODESIGN_IDENTITY=""
                       -DLLDB_USE_SYSTEM_DEBUGSERVER:BOOL="${LLDB_USE_SYSTEM_DEBUGSERVER}"
-
-                      # NOTE(compnerd) this explicitly sets up the python
-                      # executable since we sometimes end up with python 3 and
-                      # the tooling currently relies on python 2.7
-                      -DPython_ADDITIONAL_VERSIONS="2.7"
-                      -DPYTHON_EXECUTABLE:PATH=/usr/bin/python2.7
-                      -DPYTHON_LIBRARY="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)/System/Library/Frameworks/Python.framework/Versions/2.7/lib/libpython2.7.tbd"
-                      -DPYTHON_INCLUDE_DIR="$(xcrun --sdk ${xcrun_sdk_name} --show-sdk-path)/System/Library/Frameworks/Python.framework/Headers"
-                    )
-                  else
-                    cmake_options+=(
-                      # NOTE(compnerd) this explicitly sets up the python
-                      # executable since we sometimes end up with python 3 and
-                      # the tooling currently relies on python 2.7
-                      -DPYTHON_EXECUTABLE:PATH=/usr/bin/python2.7
                     )
                   fi
                 fi
