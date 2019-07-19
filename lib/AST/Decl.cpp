@@ -5905,7 +5905,8 @@ Expr *swift::findOriginalPropertyWrapperInitialValue(VarDecl *var,
 
         // ... producing a value of the same nominal type as the innermost
         // property wrapper.
-        if (call->getType()->getAnyNominal() != innermostNominal)
+        if (!call->getType() ||
+            call->getType()->getAnyNominal() != innermostNominal)
           return { true, E };
 
         // Find the implicit initialValue argument.
