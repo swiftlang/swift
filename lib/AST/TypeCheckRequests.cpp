@@ -212,6 +212,31 @@ void ProtocolRequiresClassRequest::cacheResult(bool value) const {
 }
 
 //----------------------------------------------------------------------------//
+// existentialConformsToSelf computation.
+//----------------------------------------------------------------------------//
+
+void ExistentialConformsToSelfRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  auto decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::circular_protocol_def, decl->getName());
+}
+
+void ExistentialConformsToSelfRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  auto requirement = std::get<0>(getStorage());
+  diags.diagnose(requirement, diag::kind_declname_declared_here,
+                 DescriptiveDeclKind::Protocol, requirement->getName());
+}
+
+Optional<bool> ExistentialConformsToSelfRequest::getCachedResult() const {
+  auto decl = std::get<0>(getStorage());
+  return decl->getCachedExistentialConformsToSelf();
+}
+
+void ExistentialConformsToSelfRequest::cacheResult(bool value) const {
+  auto decl = std::get<0>(getStorage());
+  decl->setCachedExistentialConformsToSelf(value);
+}
+
+//----------------------------------------------------------------------------//
 // isFinal computation.
 //----------------------------------------------------------------------------//
 

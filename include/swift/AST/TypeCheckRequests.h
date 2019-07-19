@@ -201,6 +201,32 @@ public:
   void cacheResult(bool value) const;
 };
 
+/// Determine whether an existential conforming to a protocol can be matched
+/// with a generic type parameter constrained to that protocol.
+class ExistentialConformsToSelfRequest:
+    public SimpleRequest<ExistentialConformsToSelfRequest,
+                         bool(ProtocolDecl *),
+                         CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator, ProtocolDecl *decl) const;
+
+public:
+  // Cycle handling.
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<bool> getCachedResult() const;
+  void cacheResult(bool value) const;
+};
+
 /// Determine whether the given declaration is 'final'.
 class IsFinalRequest :
     public SimpleRequest<IsFinalRequest,
