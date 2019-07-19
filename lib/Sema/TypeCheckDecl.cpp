@@ -2413,6 +2413,9 @@ public:
     (void) VD->isGetterMutating();
     (void) VD->isSetterMutating();
 
+    // Retrieve the backing property of a wrapped property.
+    (void) VD->getPropertyWrapperBackingProperty();
+
     // Set up accessors, also lowering lazy and @NSManaged properties.
     maybeAddAccessorsToStorage(VD);
 
