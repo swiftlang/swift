@@ -231,17 +231,19 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
   case AutoDiffAssociatedFunctionKind::JVP: {
     SmallVector<SILParameterInfo, 8> differentialParams;
     for (auto &param : wrtParams) {
+      auto paramTan =
+          param.getType()->getAutoDiffAssociatedTangentSpace(lookupConformance);
+      assert(paramTan && "Parameter type does not have a tangent space?");
       differentialParams.push_back(
-          {param.getType()->getAutoDiffAssociatedTangentSpace(lookupConformance)
-              ->getCanonicalType(),
-           param.getConvention()});
+          {paramTan->getCanonicalType(), param.getConvention()});
     }
     SmallVector<SILResultInfo, 8> differentialResults;
     auto &result = getResults()[resultIndex];
+    auto resultTan =
+         result.getType()->getAutoDiffAssociatedTangentSpace(lookupConformance);
+    assert(resultTan && "Result type does not have a tangent space?");
     differentialResults.push_back(
-        {result.getType()->getAutoDiffAssociatedTangentSpace(lookupConformance)
-            ->getCanonicalType(),
-         result.getConvention()});
+        {resultTan->getCanonicalType(), result.getConvention()});
     closureType = SILFunctionType::get(
         /*genericSignature*/ nullptr, ExtInfo(), SILCoroutineKind::None,
         ParameterConvention::Direct_Guaranteed, differentialParams, {},
@@ -251,19 +253,19 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
   case AutoDiffAssociatedFunctionKind::VJP: {
     SmallVector<SILParameterInfo, 8> pullbackParams;
     auto &origRes = getResults()[resultIndex];
-    auto tangentAssocTy =
-        origRes.getType()->getAutoDiffAssociatedTangentSpace(lookupConformance)
-            ->getCanonicalType();
+    auto resultTan =
+        origRes.getType()->getAutoDiffAssociatedTangentSpace(lookupConformance);
+    assert(resultTan && "Result type does not have a tangent space?");
     pullbackParams.push_back(
-        getTangentParameterInfoForOriginalResult(tangentAssocTy,
+        getTangentParameterInfoForOriginalResult(resultTan->getCanonicalType(),
                                                  origRes.getConvention()));
     SmallVector<SILResultInfo, 8> pullbackResults;
     for (auto &param : wrtParams) {
-      auto paramTangentTy =
-          param.getType()->getAutoDiffAssociatedTangentSpace(lookupConformance)
-              ->getCanonicalType();
+      auto paramTan =
+          param.getType()->getAutoDiffAssociatedTangentSpace(lookupConformance);
+      assert(paramTan && "Parameter type does not have a tangent space?");
       pullbackResults.push_back(
-          getTangentResultInfoForOriginalParameter(paramTangentTy,
+          getTangentResultInfoForOriginalParameter(paramTan->getCanonicalType(),
                                                    param.getConvention()));
     }
     closureType = SILFunctionType::get(

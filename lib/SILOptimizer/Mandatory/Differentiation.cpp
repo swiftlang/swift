@@ -281,8 +281,6 @@ static Inst *peerThroughFunctionConversions(SILValue value) {
     return peerThroughFunctionConversions<Inst>(thinToThick->getOperand());
   if (auto *convertFn = dyn_cast<ConvertFunctionInst>(value))
     return peerThroughFunctionConversions<Inst>(convertFn->getOperand());
-  if (auto *convertFn = dyn_cast<ConvertEscapeToNoEscapeInst>(value))
-    return peerThroughFunctionConversions<Inst>(convertFn->getOperand());
   if (auto *partialApply = dyn_cast<PartialApplyInst>(value))
     return peerThroughFunctionConversions<Inst>(partialApply->getCallee());
   return nullptr;
@@ -1933,18 +1931,6 @@ reapplyFunctionConversion(SILValue newFunc, SILValue oldFunc,
     return builder.createPartialApply(loc, innerNewFunc, substMap, newArgs,
                                       ParameterConvention::Direct_Guaranteed);
   }
-  // convert_escape_to_noescape
-  if (auto *cetn = dyn_cast<ConvertEscapeToNoEscapeInst>(oldConvertedFunc)) {
-    auto innerNewFunc = reapplyFunctionConversion(newFunc, oldFunc,
-                                                  cetn->getOperand(), builder,
-                                                  loc, newFuncGenSig);
-    auto operandFnTy = innerNewFunc->getType().castTo<SILFunctionType>();
-    auto noEscapeType = operandFnTy->getWithExtInfo(
-        operandFnTy->getExtInfo().withNoEscape());
-    auto silTy = SILType::getPrimitiveObjectType(noEscapeType);
-    return builder.createConvertEscapeToNoEscape(
-        loc, innerNewFunc, silTy, cetn->isLifetimeGuaranteed());
-  }
   // convert_function
   if (auto *cfi = dyn_cast<ConvertFunctionInst>(oldConvertedFunc)) {
     // `convert_function` does not have a fixed typing rule because it can
@@ -1978,8 +1964,6 @@ static SubstitutionMap getSubstitutionMap(
   if (auto *thinToThick = dyn_cast<ThinToThickFunctionInst>(value))
     return getSubstitutionMap(thinToThick->getOperand(), substMap);
   if (auto *convertFn = dyn_cast<ConvertFunctionInst>(value))
-    return getSubstitutionMap(convertFn->getOperand(), substMap);
-  if (auto *convertFn = dyn_cast<ConvertEscapeToNoEscapeInst>(value))
     return getSubstitutionMap(convertFn->getOperand(), substMap);
   if (auto *partialApply = dyn_cast<PartialApplyInst>(value)) {
     auto appliedSubstMap = partialApply->getSubstitutionMap();
@@ -6424,13 +6408,13 @@ ADContext::getOrCreateSubsetParametersThunkForAssociatedFunction(
 }
 
 SILValue ADContext::promoteToDifferentiableFunction(
-    AutoDiffFunctionInst *inst, SILBuilder &builder, SILLocation loc,
+    AutoDiffFunctionInst *adfi, SILBuilder &builder, SILLocation loc,
     DifferentiationInvoker invoker) {
-  auto origFnOperand = inst->getOriginalFunction();
+  auto origFnOperand = adfi->getOriginalFunction();
   auto origFnTy = origFnOperand->getType().castTo<SILFunctionType>();
-  auto parameterIndices = inst->getParameterIndices();
-  unsigned resultIndex = resultIndices[inst];
-  unsigned differentiationOrder = inst->getDifferentiationOrder();
+  auto parameterIndices = adfi->getParameterIndices();
+  unsigned resultIndex = resultIndices[adfi];
+  unsigned differentiationOrder = adfi->getDifferentiationOrder();
 
   // Handle curry thunk applications specially.
   if (auto *ai = dyn_cast<ApplyInst>(origFnOperand)) {
@@ -6501,8 +6485,7 @@ SILValue ADContext::promoteToDifferentiableFunction(
   for (auto assocFnKind : {AutoDiffAssociatedFunctionKind::JVP,
                            AutoDiffAssociatedFunctionKind::VJP}) {
     auto assocFnAndIndices = emitAssociatedFunctionReference(
-        *this, builder, desiredIndices, assocFnKind,
-        origFnOperand, invoker);
+        *this, builder, desiredIndices, assocFnKind, origFnOperand, invoker);
     // Show an error at the operator, highlight the argument, and show a note
     // at the definition site of the argument.
     if (!assocFnAndIndices)
@@ -6560,39 +6543,13 @@ SILValue ADContext::promoteToDifferentiableFunction(
     assocFns.push_back(assocFn);
   }
 
-  auto *adfi = createAutoDiffFunction(
+  auto *newADFI = createAutoDiffFunction(
       builder, loc, parameterIndices, differentiationOrder, origFnOperand,
       assocFns);
   resultIndices[adfi] = resultIndex;
   getAutoDiffFunctionInsts().push_back(adfi);
 
-  // If the original function operand to `autodiff_function` comes from a
-  // escaping-to-noescape conversion, the escaping verion may have
-  // lifetime-ending instructions (release) at the end of the function. We need
-  // to do the same for associated functions. The proper fix is to make
-  // `@differentiable` closure conversion happen before esacping-to-enoescape
-  // conversion, and make `convert_escaping_to_noescape` work with
-  // `@differentiable` functions.
-  if (auto *cetn = dyn_cast<ConvertEscapeToNoEscapeInst>(origFnOperand)) {
-    if (auto *origDef = cetn->getOperand()->getDefiningInstruction()) {
-      ValueLifetimeAnalysis vla(origDef);
-      ValueLifetimeAnalysis::Frontier frontier;
-      vla.computeFrontier(frontier, ValueLifetimeAnalysis::AllowToModifyCFG);
-      for (auto *lifetimeEndingInst : frontier) {
-        if (auto *sri = dyn_cast<StrongReleaseInst>(lifetimeEndingInst)) {
-          builder.setInsertionPoint(sri);
-          for (auto assocFn : assocFns) {
-            builder.createStrongRelease(
-                sri->getLoc(),
-                cast<ConvertEscapeToNoEscapeInst>(assocFn)->getOperand(),
-                builder.getDefaultAtomicity());
-          }
-        }
-      }
-    }
-  }
-
-  return adfi;
+  return newADFI;
 }
 
 /// Fold `autodiff_function_extract` users of the given `autodiff_function`

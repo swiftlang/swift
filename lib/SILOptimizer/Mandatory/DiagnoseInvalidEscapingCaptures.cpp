@@ -78,6 +78,13 @@ static bool checkNoEscapePartialApplyUse(Operand *oper, FollowUse followUses) {
     return false;
   }
 
+  // SWIFT_ENABLE_TENSORFLOW
+  // Look through `autodiff_function`.
+  if (auto *ADFI = dyn_cast<AutoDiffFunctionInst>(user)) {
+    followUses(ADFI);
+    return false;
+  }
+
   // @noescape block storage can be passed as an Optional (Nullable).
   if (auto *EI = dyn_cast<EnumInst>(user)) {
     followUses(EI);
