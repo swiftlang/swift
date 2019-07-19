@@ -5761,6 +5761,66 @@ getSemanticExprForDeclOrMemberRef(Expr *expr) {
 }
 
 static void
+maybeDiagnoseUnsupportedDifferentiableConversion(ConstraintSystem &cs,
+                                                 Expr *expr,
+                                                 AnyFunctionType *toType) {
+  auto &tc = cs.getTypeChecker();
+  Type fromType = cs.getType(expr);
+  auto fromFnType = fromType->getAs<AnyFunctionType>();
+  // Conversion from a non-`@differentiable` function to a `@differentiable` is
+  // only allowed from a closure expression or a declaration/member reference.
+  if (toType->isDifferentiable() && !fromFnType->isDifferentiable()) {
+    auto maybeDiagnoseFunctionRef = [&](Expr *semanticExpr) {
+      if (auto *capture = dyn_cast<CaptureListExpr>(semanticExpr))
+        semanticExpr = capture->getClosureBody();
+      if (isa<ClosureExpr>(semanticExpr)) return;
+      if (auto *declRef = dyn_cast<DeclRefExpr>(semanticExpr)) {
+        if (isa<FuncDecl>(declRef->getDecl())) return;
+        // If the referenced decl is a function parameter, the user may want
+        // to change the declaration to be a '@differentiable' closure. Emit a
+        // note with a fix-it.
+        if (auto *paramDecl = dyn_cast<ParamDecl>(declRef->getDecl())) {
+          tc.diagnose(expr->getLoc(),
+                      diag::invalid_differentiable_function_conversion_expr);
+          if (paramDecl->getType()->is<AnyFunctionType>()) {
+            auto *typeRepr = paramDecl->getTypeLoc().getTypeRepr();
+            while (auto *attributed = dyn_cast<AttributedTypeRepr>(typeRepr))
+              typeRepr = attributed->getTypeRepr();
+            std::string attributeString = "@differentiable";
+            switch (toType->getDifferentiabilityKind()) {
+            case DifferentiabilityKind::Linear:
+              attributeString += "(linear)";
+              break;
+            case DifferentiabilityKind::Normal:
+            case DifferentiabilityKind::NonDifferentiable:
+              break;
+            }
+            auto *funcTypeRepr = cast<FunctionTypeRepr>(typeRepr);
+            auto paramListLoc = funcTypeRepr->getArgsTypeRepr()->getStartLoc();
+            tc.diagnose(paramDecl->getLoc(),
+                diag::invalid_differentiable_function_conversion_parameter,
+                attributeString)
+               .highlight(paramDecl->getTypeLoc().getSourceRange())
+               .fixItInsert(paramListLoc, attributeString + " ");
+          }
+          return;
+        }
+      } else if (auto *memberRef = dyn_cast<MemberRefExpr>(semanticExpr)) {
+        if (isa<FuncDecl>(memberRef->getMember().getDecl())) return;
+      } else if (auto *dotSyntaxCall =
+                     dyn_cast<DotSyntaxCallExpr>(semanticExpr)) {
+        if (isa<FuncDecl>(dotSyntaxCall->getFn()
+                ->getSemanticsProvidingExpr()->getReferencedDecl().getDecl()))
+          return;
+      }
+      tc.diagnose(expr->getLoc(),
+                  diag::invalid_differentiable_function_conversion_expr);
+    };
+    maybeDiagnoseFunctionRef(getSemanticExprForDeclOrMemberRef(expr));
+  }
+}
+
+static void
 maybeDiagnoseUnsupportedFunctionConversion(ConstraintSystem &cs, Expr *expr,
                                            AnyFunctionType *toType) {
   auto &tc = cs.getTypeChecker();
@@ -5817,58 +5877,6 @@ maybeDiagnoseUnsupportedFunctionConversion(ConstraintSystem &cs, Expr *expr,
     
     tc.diagnose(expr->getLoc(),
                 diag::invalid_c_function_pointer_conversion_expr);
-  }
-
-  // Conversion from a non-`@differentiable` function to a `@differentiable` is
-  // only allowed from a closure expression or a declaration/member reference.
-  if (toType->isDifferentiable() && !fromFnType->isDifferentiable()) {
-    auto maybeDiagnoseFunctionRef = [&](Expr *semanticExpr) {
-      if (auto *capture = dyn_cast<CaptureListExpr>(semanticExpr))
-        semanticExpr = capture->getClosureBody();
-      if (isa<ClosureExpr>(semanticExpr)) return;
-      if (auto *declRef = dyn_cast<DeclRefExpr>(semanticExpr)) {
-        if (isa<FuncDecl>(declRef->getDecl())) return;
-        // If the referenced decl is a function parameter, the user may want
-        // to change the declaration to be a '@differentiable' closure. Emit a
-        // note with a fix-it.
-        if (auto *paramDecl = dyn_cast<ParamDecl>(declRef->getDecl())) {
-          tc.diagnose(expr->getLoc(),
-                      diag::invalid_differentiable_function_conversion_expr);
-          if (paramDecl->getType()->is<AnyFunctionType>()) {
-            auto *typeRepr = paramDecl->getTypeLoc().getTypeRepr();
-            while (auto *attributed = dyn_cast<AttributedTypeRepr>(typeRepr))
-              typeRepr = attributed->getTypeRepr();
-            std::string attributeString = "@differentiable";
-            switch (toType->getDifferentiabilityKind()) {
-            case DifferentiabilityKind::Linear:
-              attributeString += "(linear)";
-              break;
-            case DifferentiabilityKind::Normal:
-            case DifferentiabilityKind::NonDifferentiable:
-              break;
-            }
-            auto *funcTypeRepr = cast<FunctionTypeRepr>(typeRepr);
-            auto paramListLoc = funcTypeRepr->getArgsTypeRepr()->getStartLoc();
-            tc.diagnose(paramDecl->getLoc(),
-                diag::invalid_differentiable_function_conversion_parameter,
-                attributeString)
-               .highlight(paramDecl->getTypeLoc().getSourceRange())
-               .fixItInsert(paramListLoc, attributeString + " ");
-          }
-          return;
-        }
-      } else if (auto *memberRef = dyn_cast<MemberRefExpr>(semanticExpr)) {
-        if (isa<FuncDecl>(memberRef->getMember().getDecl())) return;
-      } else if (auto *dotSyntaxCall =
-                     dyn_cast<DotSyntaxCallExpr>(semanticExpr)) {
-        if (isa<FuncDecl>(dotSyntaxCall->getFn()
-                ->getSemanticsProvidingExpr()->getReferencedDecl().getDecl()))
-          return;
-      }
-      tc.diagnose(expr->getLoc(),
-                  diag::invalid_differentiable_function_conversion_expr);
-    };
-    maybeDiagnoseFunctionRef(getSemanticExprForDeclOrMemberRef(expr));
   }
 }
 
@@ -6476,7 +6484,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
           AutoDiffFunctionExtractOriginalExpr(expr, fromFunc));
     }
     // Handle implicit conversion to @differentiable.
-    maybeDiagnoseUnsupportedFunctionConversion(cs, expr, toFunc);
+    maybeDiagnoseUnsupportedDifferentiableConversion(cs, expr, toFunc);
     if (!fromEI.isDifferentiable() && toEI.isDifferentiable()) {
       auto newEI =
           fromEI.withDifferentiabilityKind(toEI.getDifferentiabilityKind());
