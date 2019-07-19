@@ -248,13 +248,12 @@ namespace swift {
   ///
   /// \returns the slice of Scratch
   ArrayRef<ValueDecl*>
-  canDeclProvideDefaultImplementationFor(ValueDecl* VD,
-                                         llvm::SmallVectorImpl<ValueDecl*> &Scratch);
+  canDeclProvideDefaultImplementationFor(ValueDecl* VD);
 
   /// Get decls that the given decl overrides, protocol requirements that
   ///   it serves as a default implementation of, and optionally protocol
   ///   requirements it satisfies in a conforming class
-  std::vector<ValueDecl*>
+  ArrayRef<ValueDecl*>
   collectAllOverriddenDecls(ValueDecl *VD,
                             bool IncludeProtocolRequirements = true,
                             bool Transitive = false);
