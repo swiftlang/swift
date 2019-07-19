@@ -109,7 +109,7 @@ LeakCheckingTests.test("TestProtocolDefaultDerivative") {
     }
   }
 
-  testWithLeakChecking(expectedLeakCount: 1) {
+  testWithLeakChecking {
     let x = Tracked<Float>(1)
     let model = Foo()
     _ = model.valueWithGradient { model in

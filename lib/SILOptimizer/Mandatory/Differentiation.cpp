@@ -6078,7 +6078,7 @@ ADContext::getOrCreateSubsetParametersThunkForLinearMap(
       thunkType, fromInterfaceType, toInterfaceType, dynamicSelfType,
       module.getSwiftModule()) + "_" + desiredIndices.mangle() + "_" +
       thunkName;
-  thunkName += "_thunk";
+  thunkName += "_index_subset_thunk";
 
   auto loc = parentThunk->getLocation();
   SILOptFunctionBuilder fb(getTransform());
@@ -6211,8 +6211,11 @@ ADContext::getOrCreateSubsetParametersThunkForLinearMap(
         useNextResult();
         continue;
       }
-      // Otherwise, construct and use a zero indirect result.
-      buildZeroArgument(resultInfo.getSILStorageType());
+      // Otherwise, construct and use an uninitialized indirect result.
+      auto *indirectResult =
+          builder.createAllocStack(loc, resultInfo.getSILStorageType());
+      localAllocations.push_back(indirectResult);
+      arguments.push_back(indirectResult);
     }
     // Foward all actual non-indirect-result arguments.
     arguments.append(thunk->getArgumentsWithoutIndirectResults().begin(),
