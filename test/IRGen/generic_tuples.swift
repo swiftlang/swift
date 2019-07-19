@@ -9,7 +9,7 @@
 // CHECK: [[TYPE:%swift.type]] = type {
 // CHECK: [[OPAQUE:%swift.opaque]] = type opaque
 // CHECK: [[TUPLE_TYPE:%swift.tuple_type]] = type { [[TYPE]], i64, i8*, [0 x %swift.tuple_element_type] }
-// CHECK: %swift.tuple_element_type = type { [[TYPE]]*, i64 }
+// CHECK: %swift.tuple_element_type = type { [[TYPE]]*, i32 }
 
 func dup<T>(_ x: T) -> (T, T) { var x = x; return (x,x) }
 // CHECK:    define hidden swiftcc void @"$s14generic_tuples3dupyx_xtxlF"(%swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type* %T)

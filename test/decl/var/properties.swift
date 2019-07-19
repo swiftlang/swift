@@ -1278,6 +1278,27 @@ let sr8811c = (16, fatalError()) // expected-warning {{constant 'sr8811c' inferr
 
 let sr8811d: (Int, Never) = (16, fatalError()) // Ok
 
+// SR-10995
+
+class SR_10995 {
+  func makeDoubleOptionalNever() -> Never?? {
+    return nil
+  }
+
+  func makeSingleOptionalNever() -> Never? {
+    return nil
+  }
+
+  func sr_10995_foo() {
+    let doubleOptionalNever = makeDoubleOptionalNever() // expected-warning {{constant 'doubleOptionalNever' inferred to have type 'Never??', which may be unexpected}} 
+    // expected-note@-1 {{add an explicit type annotation to silence this warning}} 
+    // expected-warning@-2 {{initialization of immutable value 'doubleOptionalNever' was never used; consider replacing with assignment to '_' or removing it}}
+    let singleOptionalNever = makeSingleOptionalNever() // expected-warning {{constant 'singleOptionalNever' inferred to have type 'Never?', which may be unexpected}} 
+    // expected-note@-1 {{add an explicit type annotation to silence this warning}} 
+    // expected-warning@-2 {{initialization of immutable value 'singleOptionalNever' was never used; consider replacing with assignment to '_' or removing it}}
+  }
+}
+
 // SR-9267
 
 class SR_9267 {}

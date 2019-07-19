@@ -2231,9 +2231,9 @@ emitAssociatedFunctionReference(
                                           loweredRequirementIndices);
 
     // NOTE: We need to extend the capacity of desired parameter indices to
-    // requirement parameter indices, because there's a argument count mismatch.
-    // When `@differentiable` partial apply is supported, this problem will go
-    // away.
+    // requirement parameter indices, because there's an argument count
+    // mismatch. When `partial_apply` supports `@differentiable` values, this
+    // problem will go away.
     if (desiredIndices.source != requirementIndices.source ||
         !desiredIndices.parameters->extendingCapacity(
             context.getASTContext(),
@@ -5286,6 +5286,7 @@ public:
         ValueWithCleanup(adjVal, valueCleanup)));
     // Set the buffer to zero, with a cleanup.
     emitZeroIndirect(bufType.getASTType(), adjBuf, si->getLoc());
+    adjBuf.setCleanup(makeCleanup(adjBuf, emitCleanup));
   }
 
   /// Handle `copy_addr` instruction.

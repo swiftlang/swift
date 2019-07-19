@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-opaque-result-types
+// RUN: %target-typecheck-verify-swift -disable-availability-checking
 
 @_functionBuilder
 struct TupleBuilder { // expected-note 2{{struct 'TupleBuilder' declared here}}

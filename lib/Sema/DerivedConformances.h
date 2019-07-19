@@ -84,8 +84,6 @@ public:
   /// Determine the derivable requirement that would satisfy the given
   /// requirement, if there is one.
   ///
-  /// \param tc The type checker.
-  ///
   /// \param nominal The nominal type for which we are determining whether to
   /// derive a witness.
   ///
@@ -96,8 +94,7 @@ public:
   ///
   /// \returns The requirement whose witness could be derived to potentially
   /// satisfy this given requirement, or NULL if there is no such requirement.
-  static ValueDecl *getDerivableRequirement(TypeChecker &tc,
-                                            NominalTypeDecl *nominal,
+  static ValueDecl *getDerivableRequirement(NominalTypeDecl *nominal,
                                             ValueDecl *requirement);
 
   /// Derive a CaseIterable requirement for an enum if it has no associated
@@ -307,13 +304,12 @@ public:
 
   /// Add a getter to a derived property.  The property becomes read-only.
   static AccessorDecl *
-  addGetterToReadOnlyDerivedProperty(TypeChecker &tc, VarDecl *property,
+  addGetterToReadOnlyDerivedProperty(VarDecl *property,
                                      Type propertyContextType);
 
   /// Declare a getter for a derived property.
   /// The getter will not be added to the property yet.
-  static AccessorDecl *declareDerivedPropertyGetter(TypeChecker &tc,
-                                                    VarDecl *property,
+  static AccessorDecl *declareDerivedPropertyGetter(VarDecl *property,
                                                     Type propertyContextType);
 
   /// SWIFT_ENABLE_TENSORFLOW

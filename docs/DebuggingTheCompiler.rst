@@ -67,6 +67,25 @@ print the SIL *and* the LLVM IR, you have to run the compiler twice.
 The output of all these dump options (except ``-dump-ast``) can be redirected
 with an additional ``-o <file>`` option.
 
+Debugging Diagnostic Emission
+-----------------------------
+
+Asserting on first emitted Warning/Assert Diagnostic
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When changing the type checker and various SIL passes, one can cause a series of
+cascading diagnostics (errors/warnings) to be emitted. Since Swift does not by
+default assert when emitting such diagnostics, it becomes difficult to know
+where to stop in the debugger. Rather than trying to guess/check if one has an
+asserts swift compiler, one can use the following options to cause the
+diagnostic engine to assert on the first error/warning:
+
+* -Xllvm -swift-diagnostics-assert-on-error=1
+* -Xllvm -swift-diagnostics-assert-on-warning=1
+
+These allow one to dump a stack trace of where the diagnostic is being emitted
+(if run without a debugger) or drop into the debugger if a debugger is attached.
+
 Debugging the Type Checker
 --------------------------
 
@@ -130,16 +149,6 @@ typing ``:constraints debug on``::
   ***  The full REPL is built as part of LLDB.   ***
   ***  Type ':help' for assistance.              ***
   (swift) :constraints debug on
-
-Asserting on First Error
-~~~~~~~~~~~~~~~~~~~~~~~~
-
-When changing the typechecker, one can cause a series of cascading errors. Since
-Swift doesn't assert on such errors, one has to know more about the typechecker
-to know where to stop in the debugger. Rather than doing that, one can use the
-option ``-Xllvm -swift-diagnostics-assert-on-error=1`` to cause the
-DiagnosticsEngine to assert upon the first error, providing the signal that the
-debugger needs to know that it should attach.
 
 Debugging on SIL Level
 ----------------------

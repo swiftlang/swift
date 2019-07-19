@@ -3626,6 +3626,8 @@ ConstantReference IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
 
   auto addr = getAddrOfLLVMVariable(*entity, ConstantInit(), DbgTy, refKind,
                                     defaultVarTy);
+  if (auto *GV = dyn_cast<llvm::GlobalVariable>(addr.getValue()))
+    GV->setComdat(nullptr);
 
   // FIXME: MC breaks when emitting alias references on some platforms
   // (rdar://problem/22450593 ). Work around this by referring to the aliasee

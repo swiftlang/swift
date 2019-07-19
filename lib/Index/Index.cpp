@@ -298,6 +298,10 @@ private:
     // Do not handle unavailable decls.
     if (AvailableAttr::isUnavailable(D))
       return false;
+
+    if (!handleCustomAttrInitRefs(D))
+      return false;
+
     if (auto *AD = dyn_cast<AccessorDecl>(D)) {
       if (ManuallyVisitedAccessorStack.empty() ||
           ManuallyVisitedAccessorStack.back() != AD)
@@ -319,6 +323,36 @@ private:
     if (getParentDecl() == D)
       return finishCurrentEntity();
 
+    return true;
+  }
+
+  /// Report calls to the initializers of property wrapper types on wrapped properties.
+  ///
+  /// These may be either explicit:
+  ///     `\@Wrapper(initialialValue: 42) var x: Int`
+  /// or implicit:
+  ///     `\@Wrapper var x = 10`
+  bool handleCustomAttrInitRefs(Decl * D) {
+    for (auto *customAttr : D->getAttrs().getAttributes<CustomAttr, true>()) {
+      if (customAttr->isImplicit())
+        continue;
+
+      auto &Loc = customAttr->getTypeLoc();
+      if (auto *semanticInit = dyn_cast_or_null<CallExpr>(customAttr->getSemanticInit())) {
+        if (auto *CD = semanticInit->getCalledValue()) {
+          if (!shouldIndex(CD, /*IsRef*/true))
+            continue;
+          IndexSymbol Info;
+          if (initIndexSymbol(CD, Loc.getLoc(), /*IsRef=*/true, Info))
+            continue;
+          Info.roles |= (unsigned)SymbolRole::Call;
+          if (semanticInit->isImplicit())
+            Info.roles |= (unsigned)SymbolRole::Implicit;
+          if (!startEntity(CD, Info, /*IsRef=*/true) || !finishCurrentEntity())
+            return false;
+        }
+      }
+    }
     return true;
   }
 
@@ -417,6 +451,18 @@ private:
     if (!reportRef(D, Loc, Info, Data.AccKind))
       return false;
 
+    // If this is a reference to a property wrapper backing property or
+    // projected value, report a reference to the wrapped property too (i.e.
+    // report an occurrence of `foo` in `_foo` and '$foo').
+    if (auto *VD = dyn_cast<VarDecl>(D)) {
+      if (auto *Wrapped = VD->getOriginalWrappedProperty()) {
+        assert(Range.getByteLength() > 1 &&
+               (Range.str().front() == '_' || Range.str().front() == '$'));
+        auto AfterDollar = Loc.getAdvancedLoc(1);
+        reportRef(Wrapped, AfterDollar, Info, None);
+      }
+    }
+
     return true;
   }
 
@@ -432,9 +478,8 @@ private:
     Info.symInfo = getSymbolInfoForModule(Mod);
     getModuleNameAndUSR(Mod, Info.name, Info.USR);
 
-    auto Parent = getParentDecl();
-    if (Parent && isa<AbstractFunctionDecl>(Parent))
-      addRelation(Info, (unsigned)SymbolRole::RelationContainedBy, Parent);
+    if (auto Container = getContainingDecl())
+      addRelation(Info, (unsigned)SymbolRole::RelationContainedBy, Container);
 
     if (!IdxConsumer.startSourceEntity(Info)) {
       Cancelled = true;
@@ -447,6 +492,16 @@ private:
   Decl *getParentDecl() const {
     if (!EntitiesStack.empty())
       return EntitiesStack.back().D;
+    return nullptr;
+  }
+
+  Decl *getContainingDecl() const {
+    for (const auto &Entity: EntitiesStack) {
+      if (isa<AbstractFunctionDecl>(Entity.D) &&
+          (Entity.Roles & (SymbolRoleSet)SymbolRole::Definition)) {
+        return Entity.D;
+      }
+    }
     return nullptr;
   }
 
@@ -544,6 +599,10 @@ private:
     }
 
     if (D->isImplicit() && !isa<ConstructorDecl>(D))
+      return false;
+
+    // Do not handle non-public imported decls.
+    if (IsModuleFile && !D->isAccessibleFrom(nullptr))
       return false;
 
     if (!IdxConsumer.indexLocals() && isLocalSymbol(D))
@@ -707,8 +766,7 @@ bool IndexSwiftASTWalker::handleWitnesses(Decl *D, SmallVectorImpl<IndexedWitnes
     if (!normal)
       continue;
 
-    normal->forEachValueWitness(nullptr,
-                                [&](ValueDecl *req, Witness witness) {
+    normal->forEachValueWitness([&](ValueDecl *req, Witness witness) {
       if (Cancelled)
         return;
 
@@ -723,8 +781,8 @@ bool IndexSwiftASTWalker::handleWitnesses(Decl *D, SmallVectorImpl<IndexedWitnes
       }
     });
 
-    normal->forEachTypeWitness(nullptr,
-                 [&](AssociatedTypeDecl *assoc, Type type, TypeDecl *typeDecl) {
+    normal->forEachTypeWitness(
+                [&](AssociatedTypeDecl *assoc, Type type, TypeDecl *typeDecl) {
       if (Cancelled)
         return true;
       if (typeDecl == nullptr)
@@ -1161,9 +1219,8 @@ bool IndexSwiftASTWalker::initIndexSymbol(ValueDecl *D, SourceLoc Loc,
 
   if (IsRef) {
     Info.roles |= (unsigned)SymbolRole::Reference;
-    auto Parent = getParentDecl();
-    if (Parent && isa<AbstractFunctionDecl>(Parent))
-      addRelation(Info, (unsigned)SymbolRole::RelationContainedBy, Parent);
+    if (auto Container = getContainingDecl())
+      addRelation(Info, (unsigned)SymbolRole::RelationContainedBy, Container);
   } else {
     Info.roles |= (unsigned)SymbolRole::Definition;
     if (D->isImplicit())

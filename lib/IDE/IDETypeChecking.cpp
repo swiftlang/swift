@@ -327,7 +327,8 @@ struct SynthesizedExtensionAnalyzer::Implementation {
           // conformance instead of subtyping
           if (!canPossiblyConvertTo(First, Second, *DC))
             return true;
-          else if (!isConvertibleTo(First, Second, *DC))
+          else if (!isConvertibleTo(First, Second, /*openArchetypes=*/false,
+                                    *DC))
             MergeInfo.addRequirement(GenericSig, First, Second, Kind);
           break;
 
@@ -603,6 +604,9 @@ class ExpressionTypeCollector: public SourceEntityWalker {
   // these protocols.
   llvm::MapVector<ProtocolDecl*, StringRef> &InterestedProtocols;
 
+  // Specified by the client whether we should canonicalize types before printing
+  const bool CanonicalType;
+
   bool shouldReport(unsigned Offset, unsigned Length, Expr *E,
                     std::vector<StringRef> &Conformances) {
     assert(Conformances.empty());
@@ -649,11 +653,13 @@ public:
   ExpressionTypeCollector(SourceFile &SF,
               llvm::MapVector<ProtocolDecl*, StringRef> &InterestedProtocols,
                           std::vector<ExpressionTypeInfo> &Results,
+                          bool CanonicalType,
                           llvm::raw_ostream &OS): Module(*SF.getParentModule()),
                             SM(SF.getASTContext().SourceMgr),
                             BufferId(*SF.getBufferID()),
                             Results(Results), OS(OS),
-                            InterestedProtocols(InterestedProtocols) {}
+                            InterestedProtocols(InterestedProtocols),
+                            CanonicalType(CanonicalType) {}
   bool walkToExprPre(Expr *E) override {
     if (E->getSourceRange().isInvalid())
       return true;
@@ -668,7 +674,12 @@ public:
     SmallString<64> Buffer;
     {
       llvm::raw_svector_ostream OS(Buffer);
-      E->getType()->getRValueType()->reconstituteSugar(true)->print(OS);
+      auto Ty = E->getType()->getRValueType();
+      if (CanonicalType) {
+        Ty->getCanonicalType()->print(OS);
+      } else {
+        Ty->reconstituteSugar(true)->print(OS);
+      }
     }
     auto Ty = getTypeOffsets(Buffer.str());
     // Add the type information to the result list.
@@ -719,11 +730,13 @@ ArrayRef<ExpressionTypeInfo>
 swift::collectExpressionType(SourceFile &SF,
                              ArrayRef<const char *> ExpectedProtocols,
                              std::vector<ExpressionTypeInfo> &Scratch,
+                             bool CanonicalType,
                              llvm::raw_ostream &OS) {
   llvm::MapVector<ProtocolDecl*, StringRef> InterestedProtocols;
   if (resolveProtocolNames(&SF, ExpectedProtocols, InterestedProtocols))
     return {};
-  ExpressionTypeCollector Walker(SF, InterestedProtocols, Scratch, OS);
+  ExpressionTypeCollector Walker(SF, InterestedProtocols, Scratch,
+    CanonicalType, OS);
   Walker.walk(SF);
   return Scratch;
 }

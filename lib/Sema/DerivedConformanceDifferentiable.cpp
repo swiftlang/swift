@@ -249,7 +249,7 @@ static void deriveBodyDifferentiable_method(AbstractFunctionDecl *funcDecl,
     // declaration for the operator.
     if (confRef->isConcrete())
       memberMethodDecl = confRef->getConcrete()->getWitnessDecl(
-          methodReq, C.getLazyResolver());
+          methodReq);
     assert(memberMethodDecl && "Member method declaration must exist");
     auto memberMethodDRE =
         new (C) DeclRefExpr(memberMethodDecl, DeclNameLoc(), /*Implicit*/ true);
@@ -374,7 +374,7 @@ static ValueDecl *getUnderlyingAllDiffableVariables(DeclContext *DC,
   ValueDecl *allDiffableVarsDecl = allDiffableVarsReq;
   if (confRef->isConcrete())
     allDiffableVarsDecl = confRef->getConcrete()->getWitnessDecl(
-        allDiffableVarsReq, C.getLazyResolver());
+        allDiffableVarsReq);
   return allDiffableVarsDecl;
 }
 
@@ -516,7 +516,7 @@ deriveDifferentiable_allDifferentiableVariables(DerivedConformance &derived) {
       /*isStatic*/ false, /*isFinal*/ true);
 
   auto *getterDecl = derived.declareDerivedPropertyGetter(
-      derived.TC, allDiffableVarsDecl, returnTy);
+      allDiffableVarsDecl, returnTy);
   getterDecl->setBodySynthesizer(&derivedBody_allDifferentiableVariablesGetter);
 
   auto *setterDecl = derived.declareDerivedPropertySetter(

@@ -4,12 +4,16 @@ include("../../../../cmake/modules/StandaloneOverlay.cmake")
 add_swift_target_library(swiftCompression ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
   Compression.swift
 
-  SWIFT_COMPILE_FLAGS "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}"
+  SWIFT_COMPILE_FLAGS ${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS} ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}" "-lcompression"
-  SWIFT_MODULE_DEPENDS_OSX Darwin Foundation
-  SWIFT_MODULE_DEPENDS_IOS Darwin Foundation
-  SWIFT_MODULE_DEPENDS_TVOS Darwin Foundation
-  SWIFT_MODULE_DEPENDS_WATCHOS Darwin Foundation
+  SWIFT_MODULE_DEPENDS_OSX Darwin # auto-updated
+    Foundation # Imported in Swift
+  SWIFT_MODULE_DEPENDS_IOS Darwin # auto-updated
+    Foundation # Imported in Swift
+  SWIFT_MODULE_DEPENDS_TVOS Darwin # auto-updated
+    Foundation # Imported in Swift
+  SWIFT_MODULE_DEPENDS_WATCHOS Darwin # auto-updated
+    Foundation # Imported in Swift
 
   DEPLOYMENT_VERSION_OSX ${SWIFTLIB_DEPLOYMENT_VERSION_COMPRESSION_OSX}
   DEPLOYMENT_VERSION_IOS ${SWIFTLIB_DEPLOYMENT_VERSION_COMPRESSION_IOS}

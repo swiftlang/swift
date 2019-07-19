@@ -605,8 +605,13 @@ func invalidRequirementConformance<Scalar>(x: Scalar) -> Scalar {
   return x
 }
 
-// expected-error @+2 {{layout constraints are only allowed inside '_specialize' attributes}}
-// expected-error @+1 {{empty 'where' clause in '@differentiable' attribute}}
+// expected-error @+1 {{no differentiation parameters could be inferred; must differentiate with respect to at least one parameter conforming to 'Differentiable'}}
+@differentiable(where T : AnyObject)
+func invalidAnyObjectRequirement<T : Differentiable>(x: T) -> T {
+  return x
+}
+
+// expected-error @+1 {{'@differentiable' attribute does not support layout requirements}}
 @differentiable(where Scalar : _Trivial)
 func invalidRequirementLayout<Scalar>(x: Scalar) -> Scalar {
   return x

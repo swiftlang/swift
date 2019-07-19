@@ -360,7 +360,7 @@ namespace {
   /// expression, attempt to derive a favored type for it.
   bool computeFavoredTypeForExpr(Expr *expr, ConstraintSystem &CS) {
     LinkedTypeInfo lti;
-    
+
     expr->walk(LinkedExprAnalyzer(lti, CS));
 
     // Link anonymous closure params of the same index.
@@ -381,41 +381,21 @@ namespace {
       }
     }
 
-    // Link integer literal tyvars.
-    if (lti.intLiteralTyvars.size() > 1) {
-      auto rep1 = CS.getRepresentative(lti.intLiteralTyvars[0]);
+    auto mergeTypeVariables = [&](ArrayRef<TypeVariableType *> typeVars) {
+      if (typeVars.size() < 2)
+        return;
 
-      for (size_t i = 1; i < lti.intLiteralTyvars.size(); i++) {
-        auto rep2 = CS.getRepresentative(lti.intLiteralTyvars[i]);
-
+      auto rep1 = CS.getRepresentative(typeVars.front());
+      for (unsigned i = 1, n = typeVars.size(); i != n; ++i) {
+        auto rep2 = CS.getRepresentative(typeVars[i]);
         if (rep1 != rep2)
           CS.mergeEquivalenceClasses(rep1, rep2, /*updateWorkList*/ false);
       }
-    }
+    };
 
-    // Link float literal tyvars.
-    if (lti.floatLiteralTyvars.size() > 1) {
-      auto rep1 = CS.getRepresentative(lti.floatLiteralTyvars[0]);
-
-      for (size_t i = 1; i < lti.floatLiteralTyvars.size(); i++) {
-        auto rep2 = CS.getRepresentative(lti.floatLiteralTyvars[i]);
-        
-        if (rep1 != rep2)
-          CS.mergeEquivalenceClasses(rep1, rep2, /*updateWorkList*/ false);
-      }
-    }
-
-    // Link string literal tyvars.
-    if (lti.stringLiteralTyvars.size() > 1) {
-      auto rep1 = CS.getRepresentative(lti.stringLiteralTyvars[0]);
-
-      for (size_t i = 1; i < lti.stringLiteralTyvars.size(); i++) {
-        auto rep2 = CS.getRepresentative(lti.stringLiteralTyvars[i]);
-
-        if (rep1 != rep2)
-          CS.mergeEquivalenceClasses(rep1, rep2, /*updateWorkList*/ false);
-      }
-    }
+    mergeTypeVariables(lti.intLiteralTyvars);
+    mergeTypeVariables(lti.floatLiteralTyvars);
+    mergeTypeVariables(lti.stringLiteralTyvars);
 
     if (lti.collectedTypes.size() == 1) {
       // TODO: Compute the BCT.
@@ -3849,8 +3829,9 @@ bool swift::isEqual(Type T1, Type T2, DeclContext &DC) {
   return T1->isEqual(T2);
 }
 
-bool swift::isConvertibleTo(Type T1, Type T2, DeclContext &DC) {
-  return canSatisfy(T1, T2, false, ConstraintKind::Conversion, &DC);
+bool swift::isConvertibleTo(Type T1, Type T2, bool openArchetypes,
+                            DeclContext &DC) {
+  return canSatisfy(T1, T2, openArchetypes, ConstraintKind::Conversion, &DC);
 }
 
 void swift::eraseOpenedExistentials(ConstraintSystem &CS, Expr *&expr) {

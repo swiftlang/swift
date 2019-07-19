@@ -68,6 +68,10 @@ _ = pullback(at: Vector.zero, in: testOwnedVector)
 // CHECK:   [[ZERO_GETTER:%.*]] = function_ref @$s11refcounting6VectorV4zeroACvgZ
 // CHECK:   [[ZERO:%.*]] = apply [[ZERO_GETTER]]({{%.*}}) : $@convention(method) (@thin Vector.Type) -> @owned Vector
 // CHECK:   store [[ZERO]] to [[BUF_ACCESS]] : $*Vector
+// CHECK:   load [[BUF]] : $*Vector
+// CHECK:   [[ZERO_GETTER:%.*]] = function_ref @$s11refcounting6VectorV4zeroACvgZ
+// CHECK:   [[ZERO:%.*]] = apply [[ZERO_GETTER]]({{%.*}}) : $@convention(method) (@thin Vector.Type) -> @owned Vector
+// CHECK:   store [[ZERO]] to [[BUF]] : $*Vector
 // CHECK:   retain_value [[SEED:%.*]] : $Vector
 // CHECK:   release_value [[SEED:%.*]] : $Vector
 // CHECK:   destroy_addr [[BUF]] : $*Vector
@@ -95,7 +99,6 @@ _ = pullback(at: Vector.zero, in: testOwnedVector)
 // CHECK-NOT:   release_value [[PULLBACK0]]
 // CHECK-NOT:   release_value [[PB_STRUCT]]
 // CHECK: }
-
 
 func side_effect_release_zero(_ x: Vector) -> Vector {
   var a = x

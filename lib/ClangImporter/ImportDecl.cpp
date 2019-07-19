@@ -4115,10 +4115,9 @@ namespace {
       // If the method has a related result type that is representable
       // in Swift as DynamicSelf, do so.
       if (!prop && decl->hasRelatedResultType()) {
-        result->setDynamicSelf(true);
-        resultTy = DynamicSelfType::get(dc->getSelfInterfaceType(),
-                                        Impl.SwiftContext);
-        assert(!dc->getSelfInterfaceType()->getOptionalObjectType());
+        resultTy = dc->getSelfInterfaceType();
+        if (dc->getSelfClassDecl())
+          resultTy = DynamicSelfType::get(resultTy, Impl.SwiftContext);
         isIUO = false;
 
         OptionalTypeKind nullability = OTK_ImplicitlyUnwrappedOptional;
@@ -7730,58 +7729,6 @@ static void finishTypeWitnesses(
   }
 }
 
-/// A stripped-down version of Type::subst that only works on non-generic
-/// associated types.
-///
-/// This is used to finish a conformance for a concrete imported type that may
-/// rely on default associated types defined in protocol extensions...without
-/// having to do all the work of gathering conformances from scratch.
-static Type
-recursivelySubstituteBaseType(const NormalProtocolConformance *conformance,
-                              DependentMemberType *depMemTy) {
-  Type origBase = depMemTy->getBase();
-  if (auto *depBase = origBase->getAs<DependentMemberType>()) {
-    Type substBase = recursivelySubstituteBaseType(conformance, depBase);
-    ModuleDecl *module = conformance->getDeclContext()->getParentModule();
-    return depMemTy->substBaseType(module, substBase);
-  }
-
-  const ProtocolDecl *proto = conformance->getProtocol();
-  assert(origBase->isEqual(proto->getSelfInterfaceType()));
-  (void)proto;
-  return conformance->getTypeWitness(depMemTy->getAssocType(),
-                                     /*resolver=*/nullptr);
-}
-
-/// Collect conformances for the requirement signature.
-static void finishSignatureConformances(
-    NormalProtocolConformance *conformance) {
-  auto *proto = conformance->getProtocol();
-
-  SmallVector<ProtocolConformanceRef, 4> reqConformances;
-  for (const auto &req : proto->getRequirementSignature()) {
-    if (req.getKind() != RequirementKind::Conformance)
-      continue;
-
-    Type substTy;
-    auto origTy = req.getFirstType();
-    if (origTy->isEqual(proto->getSelfInterfaceType())) {
-      substTy = conformance->getType();
-    } else {
-      auto *depMemTy = origTy->castTo<DependentMemberType>();
-      substTy = recursivelySubstituteBaseType(conformance, depMemTy);
-    }
-    auto reqProto = req.getSecondType()->castTo<ProtocolType>()->getDecl();
-
-    ModuleDecl *M = conformance->getDeclContext()->getParentModule();
-    auto reqConformance = M->lookupConformance(substTy, reqProto);
-    assert(reqConformance && reqConformance->isConcrete() &&
-           "required conformance not found");
-    reqConformances.push_back(*reqConformance);
-  }
-  conformance->setSignatureConformances(reqConformances);
-}
-
 /// Create witnesses for requirements not already met.
 static void finishMissingOptionalWitnesses(
     NormalProtocolConformance *conformance) {
@@ -7806,7 +7753,7 @@ static void finishMissingOptionalWitnesses(
       conformance->setWitness(valueReq, valueReq);
     } else {
       // An initializer that conforms to a requirement is required.
-      auto witness = conformance->getWitness(valueReq, nullptr).getDecl();
+      auto witness = conformance->getWitness(valueReq).getDecl();
       if (auto ctor = dyn_cast_or_null<ConstructorDecl>(witness)) {
         if (!ctor->getAttrs().hasAttribute<RequiredAttr>()) {
           auto &ctx = proto->getASTContext();
@@ -7827,7 +7774,7 @@ void ClangImporter::Implementation::finishNormalConformance(
                                     conformance);
 
   finishTypeWitnesses(conformance);
-  finishSignatureConformances(conformance);
+  conformance->finishSignatureConformances();
 
   // Imported conformances to @objc protocols also require additional
   // initialization to complete the requirement to witness mapping.
@@ -8458,7 +8405,7 @@ bool ClangImporter::Implementation::addMemberAndAlternatesToExtension(
   // Quickly check the context and bail out if it obviously doesn't
   // belong here.
   if (auto *importDC = newName.getEffectiveContext().getAsDeclContext())
-    if (importDC->isTranslationUnit())
+    if (importDC->isFileContext())
       return true;
 
   // Then try to import the decl under the specified name.

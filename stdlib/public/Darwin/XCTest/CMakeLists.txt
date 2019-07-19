@@ -7,8 +7,7 @@ add_swift_target_library(swiftXCTest ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} IS
   XCTestCaseAdditions.mm
   XCTest.swift
 
-  SWIFT_COMPILE_FLAGS
-    "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}"
+  SWIFT_COMPILE_FLAGS ${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS} ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
 
     # XCTest has a type called XCTest, which exposes an issue in module
     # interfaces -- because types are fully-qualified, the compiler currently

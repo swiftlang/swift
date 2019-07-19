@@ -1561,7 +1561,14 @@ public:
                                     Optional<DeclNameWithLoc> vjp,
                                     ArrayRef<Requirement> requirements);
 
+  /// Get the optional 'jvp:' function name and location.
+  /// Use this instead of `getJVPFunction` to check whether the attribute has a
+  /// registered JVP.
   Optional<DeclNameWithLoc> getJVP() const { return JVP; }
+
+  /// Get the optional 'vjp:' function name and location.
+  /// Use this instead of `getVJPFunction` to check whether the attribute has a
+  /// registered VJP.
   Optional<DeclNameWithLoc> getVJP() const { return VJP; }
 
   AutoDiffParameterIndices *getParameterIndices() const {
@@ -1765,6 +1772,31 @@ public:
   
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Transposing;
+  }
+};
+
+/// Relates a property to its projection value property, as described by a property wrapper. For
+/// example, given
+/// \code
+/// @A var foo: Int
+/// \endcode
+///
+/// Where \c A is a property wrapper that has a \c projectedValue property, the compiler
+/// synthesizes a declaration $foo an attaches the attribute
+/// \c _projectedValuePropertyAttr($foo) to \c foo to record the link.
+class ProjectedValuePropertyAttr : public DeclAttribute {
+public:
+  ProjectedValuePropertyAttr(Identifier PropertyName,
+                              SourceLoc AtLoc, SourceRange Range,
+                              bool Implicit)
+    : DeclAttribute(DAK_ProjectedValueProperty, AtLoc, Range, Implicit),
+      ProjectionPropertyName(PropertyName) {}
+
+  // The projection property name.
+  const Identifier ProjectionPropertyName;
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DAK_ProjectedValueProperty;
   }
 };
 

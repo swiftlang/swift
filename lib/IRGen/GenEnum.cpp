@@ -5799,6 +5799,9 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
   std::vector<Element> elementsWithPayload;
   std::vector<Element> elementsWithNoPayload;
 
+  if (TC.IGM.isResilient(theEnum, ResilienceExpansion::Minimal))
+    alwaysFixedSize = IsNotFixedSize;
+
   // Resilient enums are manipulated as opaque values, except we still
   // make the following assumptions:
   // 1) The indirect-ness of cases won't change

@@ -456,11 +456,8 @@ ManagedValue Transform::transform(ManagedValue v,
 
   // A base class method returning Self can be used in place of a derived
   // class method returning Self.
-  if (auto outputSelfType = dyn_cast<DynamicSelfType>(outputSubstType)) {
-    if (auto inputSelfType = dyn_cast<DynamicSelfType>(inputSubstType)) {
-      inputSubstType = inputSelfType.getSelfType();
-      outputSubstType = outputSelfType.getSelfType();
-    }
+  if (auto inputSelfType = dyn_cast<DynamicSelfType>(inputSubstType)) {
+    inputSubstType = inputSelfType.getSelfType();
   }
 
   //  - upcasts for classes
@@ -3449,7 +3446,6 @@ SILGenFunction::getOrCreateAutoDiffLinearMapReorderingThunk(
     SmallVector<SILValue, 8> tmpValues;
     forwardFunctionArguments(
         thunkSGF, loc, linearMapFnType, params, tmpValues);
-    // argValues.append(tmpValues.begin() + 1, tmpValues.end());
     argValues.push_back(tmpValues.back());
     argValues.append(tmpValues.begin(), tmpValues.end() - 1);
     break;

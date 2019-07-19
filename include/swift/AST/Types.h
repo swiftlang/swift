@@ -342,16 +342,14 @@ protected:
     NumProtocols : 16
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(TypeVariableType, TypeBase, 64-NumTypeBaseBits,
-    /// The unique number assigned to this type variable.
-    ID : 32 - NumTypeBaseBits,
+  SWIFT_INLINE_BITFIELD_FULL(TypeVariableType, TypeBase, 4+32,
+    : NumPadBits,
 
     /// Type variable options.
     Options : 4,
 
-    ///  Index into the list of type variables, as used by the
-    ///  constraint graph.
-    GraphIndex : 28
+    /// The unique number assigned to this type variable.
+    ID : 32
   );
 
   SWIFT_INLINE_BITFIELD(SILFunctionType, TypeBase, NumSILExtInfoBits+3+1+2,
@@ -590,10 +588,6 @@ public:
   /// Erase the given opened existential type by replacing it with its
   /// existential type throughout the given type.
   Type eraseOpenedExistential(OpenedArchetypeType *opened);
-
-  /// Erase DynamicSelfType from the given type by replacing it with its
-  /// underlying type.
-  Type eraseDynamicSelfType();
 
   /// Given a declaration context, returns a function type with the 'self'
   /// type curried as the input if the declaration context describes a type.
@@ -5314,9 +5308,7 @@ public:
   /// Substitute the base type, looking up our associated type in it if it is
   /// non-dependent. Returns null if the member could not be found in the new
   /// base.
-  Type substBaseType(ModuleDecl *M,
-                     Type base,
-                     LazyResolver *resolver = nullptr);
+  Type substBaseType(ModuleDecl *M, Type base);
 
   /// Substitute the base type, looking up our associated type in it if it is
   /// non-dependent. Returns null if the member could not be found in the new
@@ -5427,8 +5419,11 @@ TypeVariableType : public TypeBase {
   TypeVariableType(const ASTContext &C, unsigned ID)
     : TypeBase(TypeKind::TypeVariable, &C,
                RecursiveTypeProperties::HasTypeVariable) {
-    // Note: the ID may overflow, but its only used for printing.
+    // Note: the ID may overflow (current limit is 2^20 - 1).
     Bits.TypeVariableType.ID = ID;
+    if (Bits.TypeVariableType.ID != ID) {
+      llvm::report_fatal_error("Type variable id overflow");
+    }
   }
 
   class Implementation;
@@ -5464,8 +5459,10 @@ public:
     return reinterpret_cast<Implementation *>(this + 1);
   }
 
-  /// Type variable IDs are not globally unique and are only meant as a visual
-  /// aid when dumping AST.
+  /// Type variable IDs are not globally unique and are
+  /// used in equivalence class merging (so representative
+  /// is always a type variable with smaller id), as well
+  /// as a visual aid when dumping AST.
   unsigned getID() const { return Bits.TypeVariableType.ID; }
 
   // Implement isa/cast/dyncast/etc.

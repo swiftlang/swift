@@ -397,7 +397,7 @@ extension CGFloat : Hashable {
     hasher.combine(native)
   }
 
-  @inlinable @_transparent
+  @_alwaysEmitIntoClient @inlinable // Introduced in 5.1
   public func _rawHashValue(seed: Int) -> Int {
     return native._rawHashValue(seed: seed)
   }

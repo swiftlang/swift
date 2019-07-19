@@ -292,17 +292,21 @@ namespace swift {
     const std::string OpeningQuotationMark;
     const std::string ClosingQuotationMark;
     const std::string AKAFormatString;
+    const std::string OpaqueResultFormatString;
 
     DiagnosticFormatOptions(std::string OpeningQuotationMark,
                             std::string ClosingQuotationMark,
-                            std::string AKAFormatString)
+                            std::string AKAFormatString,
+                            std::string OpaqueResultFormatString)
         : OpeningQuotationMark(OpeningQuotationMark),
           ClosingQuotationMark(ClosingQuotationMark),
-          AKAFormatString(AKAFormatString) {}
+          AKAFormatString(AKAFormatString),
+          OpaqueResultFormatString(OpaqueResultFormatString) {}
 
     DiagnosticFormatOptions()
         : OpeningQuotationMark("'"), ClosingQuotationMark("'"),
-          AKAFormatString("'%s' (aka '%s')") {}
+          AKAFormatString("'%s' (aka '%s')"),
+          OpaqueResultFormatString("'%s' (%s of '%s')") {}
   };
   
   /// Diagnostic - This is a specific instance of a diagnostic along with all of

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -172,12 +172,18 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
     arguments.push_back(inputArgs.MakeArgString(OI.SDKPath));
   }
 
+  if (llvm::sys::Process::StandardErrHasColors()) {
+    arguments.push_back("-color-diagnostics");
+  }
+
   inputArgs.AddAllArgs(arguments, options::OPT_I);
   inputArgs.AddAllArgs(arguments, options::OPT_F, options::OPT_Fsystem);
 
   inputArgs.AddLastArg(arguments, options::OPT_AssertConfig);
   inputArgs.AddLastArg(arguments, options::OPT_autolink_force_load);
-  inputArgs.AddLastArg(arguments, options::OPT_color_diagnostics);
+  inputArgs.AddLastArg(arguments,
+                       options::OPT_color_diagnostics,
+                       options::OPT_no_color_diagnostics);
   inputArgs.AddLastArg(arguments, options::OPT_fixit_all);
   inputArgs.AddLastArg(arguments,
                        options::OPT_warn_swift3_objc_inference_minimal,
@@ -228,6 +234,7 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_package_description_version);
   inputArgs.AddLastArg(arguments, options::OPT_serialize_diagnostics_path);
   inputArgs.AddLastArg(arguments, options::OPT_enable_astscope_lookup);
+  inputArgs.AddLastArg(arguments, options::OPT_disable_astscope_lookup);
   inputArgs.AddLastArg(arguments, options::OPT_disable_parser_lookup);
 
   // Pass on any build config options
@@ -260,9 +267,6 @@ static void addCommonFrontendArgs(const ToolChain &TC, const OutputInfo &OI,
   // Pass through any subsystem flags.
   inputArgs.AddAllArgs(arguments, options::OPT_Xllvm);
   inputArgs.AddAllArgs(arguments, options::OPT_Xcc);
-
-  if (llvm::sys::Process::StandardErrHasColors())
-    arguments.push_back("-color-diagnostics");
 }
 
 static void addRuntimeLibraryFlags(const OutputInfo &OI,
@@ -1111,16 +1115,17 @@ ToolChain::constructInvocation(const StaticLinkJobAction &job,
 
 void ToolChain::addPathEnvironmentVariableIfNeeded(
     Job::EnvironmentVector &env, const char *name, const char *separator,
-    options::ID optionID, const ArgList &args, StringRef extraEntry) const {
+    options::ID optionID, const ArgList &args,
+    ArrayRef<std::string> extraEntries) const {
   auto linkPathOptions = args.filtered(optionID);
-  if (linkPathOptions.begin() == linkPathOptions.end() && extraEntry.empty())
+  if (linkPathOptions.begin() == linkPathOptions.end() && extraEntries.empty())
     return;
 
   std::string newPaths;
   interleave(linkPathOptions,
              [&](const Arg *arg) { newPaths.append(arg->getValue()); },
              [&] { newPaths.append(separator); });
-  if (!extraEntry.empty()) {
+  for (auto extraEntry : extraEntries) {
     if (!newPaths.empty())
       newPaths.append(separator);
     newPaths.append(extraEntry.data(), extraEntry.size());
@@ -1144,7 +1149,7 @@ void ToolChain::getClangLibraryPath(const ArgList &Args,
                                     SmallString<128> &LibPath) const {
   const llvm::Triple &T = getTriple();
 
-  getRuntimeLibraryPath(LibPath, Args, /*Shared=*/true);
+  getResourceDirPath(LibPath, Args, /*Shared=*/true);
   // Remove platform name.
   llvm::sys::path::remove_filename(LibPath);
   llvm::sys::path::append(LibPath, "clang", "lib",
@@ -1154,25 +1159,39 @@ void ToolChain::getClangLibraryPath(const ArgList &Args,
 
 /// Get the runtime library link path, which is platform-specific and found
 /// relative to the compiler.
-void ToolChain::getRuntimeLibraryPath(SmallVectorImpl<char> &runtimeLibPath,
-                                      const llvm::opt::ArgList &args,
-                                      bool shared) const {
+void ToolChain::getResourceDirPath(SmallVectorImpl<char> &resourceDirPath,
+                                   const llvm::opt::ArgList &args,
+                                   bool shared) const {
   // FIXME: Duplicated from CompilerInvocation, but in theory the runtime
   // library link path and the standard library module import path don't
   // need to be the same.
   if (const Arg *A = args.getLastArg(options::OPT_resource_dir)) {
     StringRef value = A->getValue();
-    runtimeLibPath.append(value.begin(), value.end());
+    resourceDirPath.append(value.begin(), value.end());
   } else {
     auto programPath = getDriver().getSwiftProgramPath();
-    runtimeLibPath.append(programPath.begin(), programPath.end());
-    llvm::sys::path::remove_filename(runtimeLibPath); // remove /swift
-    llvm::sys::path::remove_filename(runtimeLibPath); // remove /bin
-    llvm::sys::path::append(runtimeLibPath, "lib",
+    resourceDirPath.append(programPath.begin(), programPath.end());
+    llvm::sys::path::remove_filename(resourceDirPath); // remove /swift
+    llvm::sys::path::remove_filename(resourceDirPath); // remove /bin
+    llvm::sys::path::append(resourceDirPath, "lib",
                             shared ? "swift" : "swift_static");
   }
-  llvm::sys::path::append(runtimeLibPath,
+  llvm::sys::path::append(resourceDirPath,
                           getPlatformNameForTriple(getTriple()));
+}
+
+void ToolChain::getRuntimeLibraryPaths(SmallVectorImpl<std::string> &runtimeLibPaths,
+                                       const llvm::opt::ArgList &args,
+                                       StringRef SDKPath, bool shared) const {
+  SmallString<128> scratchPath;
+  getResourceDirPath(scratchPath, args, shared);
+  runtimeLibPaths.push_back(scratchPath.str());
+
+  if (!SDKPath.empty()) {
+    scratchPath = SDKPath;
+    llvm::sys::path::append(scratchPath, "usr", "lib", "swift");
+    runtimeLibPaths.push_back(scratchPath.str());
+  }
 }
 
 bool ToolChain::sanitizerRuntimeLibExists(const ArgList &args,

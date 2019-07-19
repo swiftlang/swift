@@ -192,6 +192,10 @@ class TypeVariableType::Implementation {
   /// The corresponding node in the constraint graph.
   constraints::ConstraintGraphNode *GraphNode = nullptr;
 
+  ///  Index into the list of type variables, as used by the
+  ///  constraint graph.
+  unsigned GraphIndex;
+
   friend class constraints::SavedTypeVariableBinding;
 
 public:
@@ -250,12 +254,12 @@ public:
   /// Retrieve the index into the constraint graph's list of type variables.
   unsigned getGraphIndex() const { 
     assert(GraphNode && "Graph node isn't set");
-    return getTypeVariable()->Bits.TypeVariableType.GraphIndex; 
+    return GraphIndex;
   }
 
   /// Set the index into the constraint graph's list of type variables.
   void setGraphIndex(unsigned newIndex) {
-    getTypeVariable()->Bits.TypeVariableType.GraphIndex = newIndex;
+    GraphIndex = newIndex;
   }
   
   /// Check whether this type variable either has a representative that
@@ -1867,14 +1871,6 @@ public:
     return ParamTypes.find(P)->second;
   }
 
-  Type getType(const VarDecl *D, bool wantInterfaceType = true) const {
-    if (auto *P = dyn_cast<ParamDecl>(D))
-      return getType(P);
-
-    assert(D->hasValidSignature());
-    return wantInterfaceType ? D->getInterfaceType() : D->getType();
-  }
-
   Type getType(const KeyPathExpr *KP, unsigned I) const {
     assert(hasType(KP, I) && "Expected type to have been set!");
     return KeyPathComponentTypes.find(std::make_pair(KP, I))->second;
@@ -1931,6 +1927,12 @@ public:
   getConstraintLocator(Expr *anchor,
                        ArrayRef<ConstraintLocator::PathElement> path,
                        unsigned summaryFlags);
+
+  /// Retrive the constraint locator for the given anchor and
+  /// path, uniqued and automatically infer the summary flags
+  ConstraintLocator *
+  getConstraintLocator(Expr *anchor,
+                       ArrayRef<ConstraintLocator::PathElement> path);
 
   /// Retrieve the constraint locator for the given anchor and
   /// an empty path, uniqued.
@@ -2255,18 +2257,49 @@ public:
     return typeVar->getImpl().getRepresentative(getSavedBindings());
   }
 
-  /// Gets the a VarDecl, and the type of its attached property wrapper if the
-  /// resolved overload has an attached property wrapper.
-  ///
-  /// \return A pair of the VarDecl and the attached property wrapper type if
-  ///         the given resolved overload has an attached property wrapper.
+  /// Gets the VarDecl associateed with resolvedOverload, and the type of the
+  /// storage wrapper if the decl has an associated storage wrapper.
+  Optional<std::pair<VarDecl *, Type>>
+  getStorageWrapperInformation(ResolvedOverloadSetListItem *resolvedOverload) {
+    assert(resolvedOverload);
+    if (resolvedOverload->Choice.isDecl()) {
+      if (auto *decl = dyn_cast<VarDecl>(resolvedOverload->Choice.getDecl())) {
+        if (decl->hasAttachedPropertyWrapper()) {
+          if (auto storageWrapper = decl->getPropertyWrapperStorageWrapper()) {
+            return std::make_pair(decl, storageWrapper->getType());
+          }
+        }
+      }
+    }
+    return None;
+  }
+
+  /// Gets the VarDecl associateed with resolvedOverload, and the type of the
+  /// backing storage if the decl has an associated property wrapper.
   Optional<std::pair<VarDecl *, Type>>
   getPropertyWrapperInformation(ResolvedOverloadSetListItem *resolvedOverload) {
-    if (resolvedOverload && resolvedOverload->Choice.isDecl()) {
+    assert(resolvedOverload);
+    if (resolvedOverload->Choice.isDecl()) {
       if (auto *decl = dyn_cast<VarDecl>(resolvedOverload->Choice.getDecl())) {
         if (decl->hasAttachedPropertyWrapper()) {
           auto wrapperTy = decl->getPropertyWrapperBackingPropertyType();
           return std::make_pair(decl, wrapperTy);
+        }
+      }
+    }
+    return None;
+  }
+
+  /// Gets the VarDecl, and the type of the type property that it wraps if
+  /// resolved overload has a decl which is the backing storage for a
+  /// property wrapper.
+  Optional<std::pair<VarDecl *, Type>>
+  getWrappedPropertyInformation(ResolvedOverloadSetListItem *resolvedOverload) {
+    assert(resolvedOverload);
+    if (resolvedOverload->Choice.isDecl()) {
+      if (auto *decl = dyn_cast<VarDecl>(resolvedOverload->Choice.getDecl())) {
+        if (auto wrapped = decl->getOriginalWrappedProperty()) {
+          return std::make_pair(decl, wrapped->getType());
         }
       }
     }
@@ -4211,14 +4244,6 @@ public:
 
   size_t getNumSkippedParameters() const { return NumSkippedParameters; }
 };
-
-/// Diagnose an attempt to recover from a member access into a value of
-/// optional type which needed to be unwrapped for the member to be found.
-///
-/// \returns true if a diagnostic was produced.
-bool diagnoseBaseUnwrapForMemberAccess(Expr *baseExpr, Type baseType,
-                                       DeclName memberName, bool resultOptional,
-                                       SourceRange memberRange);
 
 // Return true if, when replacing "<expr>" with "<expr> ?? T", parentheses need
 // to be added around <expr> first in order to maintain the correct precedence.

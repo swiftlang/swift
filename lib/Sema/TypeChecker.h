@@ -502,13 +502,6 @@ enum class ConformanceCheckFlags {
   /// correctly used. Otherwise (the default), all of the conditional
   /// requirements will be checked.
   SkipConditionalRequirements = 0x04,
-
-  /// Whether to require that the conditional requirements have been computed.
-  ///
-  /// When set, if the conditional requirements aren't available, they are just
-  /// skipped, and the caller is responsible for detecting and handling this
-  /// case (likely via another call to getConditionalRequirementsIfAvailable).
-  AllowUnavailableConditionalRequirements = 0x08,
 };
 
 /// Options that control protocol conformance checking.
@@ -549,11 +542,6 @@ public:
   /// Declarations that need their conformances checked.
   llvm::SmallVector<Decl *, 8> ConformanceContexts;
 
-  /// The list of protocol conformances whose requirements could not be
-  /// fully checked and, therefore, should be checked again at the top
-  /// level.
-  llvm::SetVector<NormalProtocolConformance *> PartiallyCheckedConformances;
-
   /// The list of declarations that we've done at least partial validation
   /// of during type-checking, but which will need to be finalized before
   /// we can hand them off to SILGen etc.
@@ -575,32 +563,6 @@ public:
   /// A list of closures for the most recently type-checked function, which we
   /// will need to compute captures for.
   std::vector<AbstractClosureExpr *> ClosuresWithUncomputedCaptures;
-
-  /// Local functions that have been captured before their definitions.
-  ///
-  /// We need this to guard against functions that would transitively capture
-  /// variables before their definition, e.g.:
-  ///
-  /// func outer() {
-  ///   func first() {
-  ///     second()
-  ///   }
-  ///   second()
-  ///   var x
-  ///   func second() {
-  ///     use(x)
-  ///   }
-  /// }
-
-  llvm::SmallDenseMap<AnyFunctionRef, SmallVector<AnyFunctionRef, 4>, 4>
-    ForwardCapturedFuncs;
-
-  /// A set of local functions from which C function pointers are derived.
-  ///
-  /// This is used to diagnose the use of local functions with captured context
-  /// as C function pointers when the function's captures have not yet been
-  /// computed.
-  llvm::DenseMap<AnyFunctionRef, std::vector<Expr*>> LocalCFunctionPointers;
 
 private:
   /// The # of times we have performed typo correction.
@@ -1460,12 +1422,11 @@ public:
   /// Type-check a for-each loop's pattern binding and sequence together.
   bool typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt);
 
-  /// Lazily diagnose conversions to C function pointers of closures
-  /// with captures.
-  void maybeDiagnoseCaptures(Expr *E, AnyFunctionRef AFR);
-
   /// Compute the set of captures for the given function or closure.
   void computeCaptures(AnyFunctionRef AFR);
+
+  /// Check for invalid captures from stored property initializers.
+  void checkPatternBindingCaptures(NominalTypeDecl *typeDecl);
 
   /// Change the context of closures in the given initializer
   /// expression to the given context.
@@ -1672,9 +1633,6 @@ public:
 
   /// Completely check the given conformance.
   void checkConformance(NormalProtocolConformance *conformance);
-
-  /// Check the requirement signature of the given conformance.
-  void checkConformanceRequirements(NormalProtocolConformance *conformance);
 
   /// Check all of the conformances in the given context.
   void checkConformancesInContext(DeclContext *dc,
@@ -2188,8 +2146,8 @@ bool isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl, TypeChecker &TC);
 Type computeWrappedValueType(VarDecl *var, Type backingStorageType,
                              Optional<unsigned> limit = None);
   
-/// Build a call to the init(initialValue:) initializers of the property wrappers, filling in the given
-/// \c value as the original value.
+/// Build a call to the init(wrappedValue:) initializers of the property
+/// wrappers, filling in the given \c value as the original value.
 Expr *buildPropertyWrapperInitialValueCall(VarDecl *var,
                                            Type backingStorageType,
                                            Expr *value,

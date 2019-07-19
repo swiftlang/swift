@@ -428,7 +428,7 @@ namespace {
                         ConformanceCheckFlags::InExpression);
             if (conformance && conformance->isConcrete()) {
               if (auto witness =
-                      conformance->getConcrete()->getWitnessDecl(decl, &tc)) {
+                      conformance->getConcrete()->getWitnessDecl(decl)) {
                 // Hack up an AST that we can type-check (independently) to get
                 // it into the right form.
                 // FIXME: the hop through 'getDecl()' is because
@@ -812,13 +812,18 @@ namespace {
       Type dynamicSelfFnType;
       if (!member->getDeclContext()->getSelfProtocolDecl()) {
         if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
-          if ((isa<FuncDecl>(func) &&
-               cast<FuncDecl>(func)->hasDynamicSelf()) ||
-              (isa<ConstructorDecl>(func) &&
-               containerTy->getClassOrBoundGenericClass())) {
+          if (func->hasDynamicSelfResult() &&
+              !baseTy->getOptionalObjectType()) {
             refTy = refTy->replaceCovariantResultType(containerTy, 2);
             if (!baseTy->isEqual(containerTy)) {
               dynamicSelfFnType = refTy->replaceCovariantResultType(baseTy, 2);
+            }
+          }
+        } else if (auto *decl = dyn_cast<VarDecl>(member)) {
+          if (decl->getValueInterfaceType()->hasDynamicSelfType()) {
+            refTy = refTy->replaceCovariantResultType(containerTy, 1);
+            if (!baseTy->isEqual(containerTy)) {
+              dynamicSelfFnType = refTy->replaceCovariantResultType(baseTy, 1);
             }
           }
         }
@@ -930,7 +935,6 @@ namespace {
 
       // For properties, build member references.
       if (isa<VarDecl>(member)) {
-        assert(!dynamicSelfFnType && "Converted type doesn't make sense here");
         if (!baseIsInstance && member->isInstanceMember()) {
           assert(memberLocator.getBaseLocator() && 
                  cs.UnevaluatedRootExprs.count(
@@ -952,6 +956,12 @@ namespace {
         cs.setType(memberRefExpr, simplifyType(openedType));
         Expr *result = memberRefExpr;
         closeExistential(result, locator);
+        if (dynamicSelfFnType) {
+          result = new (context) CovariantReturnConversionExpr(result,
+                                                            dynamicSelfFnType);
+          cs.cacheType(result);
+          cs.setType(result, simplifyType(openedType));
+        }
         return forceUnwrapIfExpected(result, choice, memberLocator);
       }
       
@@ -1439,6 +1449,16 @@ namespace {
 
       Expr *result = subscriptExpr;
       closeExistential(result, locator);
+
+      if (subscript->getElementInterfaceType()->hasDynamicSelfType()) {
+        auto dynamicSelfFnType =
+          openedFullFnType->replaceCovariantResultType(baseTy, 2);
+        result = new (tc.Context) CovariantReturnConversionExpr(result,
+                                                            dynamicSelfFnType);
+        cs.cacheType(result);
+        cs.setType(result, simplifyType(baseTy));
+      }
+
       return result;
     }
 
@@ -1956,10 +1976,6 @@ namespace {
 
     Expr *handleStringLiteralExpr(LiteralExpr *expr) {
       auto stringLiteral = dyn_cast<StringLiteralExpr>(expr);
-      if (cs.getType(expr) && !cs.getType(expr)->hasTypeVariable()
-          && stringLiteral->getBuiltinInitializer())
-        return expr;
-      
       auto magicLiteral = dyn_cast<MagicIdentifierLiteralExpr>(expr);
       assert(bool(stringLiteral) != bool(magicLiteral) &&
              "literal must be either a string literal or a magic literal");
@@ -3543,8 +3559,10 @@ namespace {
         Expr *sub = expr->getSubExpr();
 
         cs.setExprTypes(sub);
+
         if (tc.convertToType(sub, toType, cs.DC))
           return nullptr;
+          
         cs.cacheExprTypes(sub);
 
         expr->setSubExpr(sub);
@@ -5774,8 +5792,6 @@ maybeDiagnoseUnsupportedFunctionConversion(ConstraintSystem &cs, Expr *expr,
       } else if (fn->getGenericParams()) {
         tc.diagnose(expr->getLoc(),
                     diag::c_function_pointer_from_generic_function);
-      } else {
-        tc.maybeDiagnoseCaptures(expr, fn);
       }
     };
     
@@ -5796,10 +5812,8 @@ maybeDiagnoseUnsupportedFunctionConversion(ConstraintSystem &cs, Expr *expr,
       semanticExpr = capture->getClosureBody();
     
     // Can convert a literal closure that doesn't capture context.
-    if (auto closure = dyn_cast<ClosureExpr>(semanticExpr)) {
-      tc.maybeDiagnoseCaptures(expr, closure);
+    if (auto closure = dyn_cast<ClosureExpr>(semanticExpr))
       return;
-    }
     
     tc.diagnose(expr->getLoc(),
                 diag::invalid_c_function_pointer_conversion_expr);
@@ -6873,9 +6887,11 @@ static Expr *finishApplyDynamicCallable(ExprRewriter &rewriter,
       solution.simplifyType(selected.openedType)->castTo<AnyFunctionType>();
   assert(method->getName() == ctx.Id_dynamicallyCall &&
          "Expected 'dynamicallyCall' method");
-  assert(methodType->getParams().size() == 1 &&
+  auto params = methodType->getParams();
+  assert(params.size() == 1 &&
          "Expected 'dynamicallyCall' method with one parameter");
-  auto argumentLabel = methodType->getParams()[0].getLabel();
+  auto argumentType = params[0].getParameterType();
+  auto argumentLabel = params[0].getLabel();
   assert((argumentLabel == ctx.Id_withArguments ||
           argumentLabel == ctx.Id_withKeywordArguments) &&
          "Expected 'dynamicallyCall' method argument label 'withArguments' or "

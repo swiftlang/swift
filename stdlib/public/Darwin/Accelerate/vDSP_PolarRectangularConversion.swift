@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension vDSP {
     
     /// Rectangular to polar conversion, single-precision.
@@ -17,7 +18,6 @@ extension vDSP {
     /// - Parameter rectangularCoordinates: Source vector, represented as consecutive x, y pairs.
     /// - Returns: Polar coordinates, represented as consecutive rho, (radius) theta (angle in radians) pairs.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func rectangularToPolar<U>(_ rectangularCoordinates: U) -> [Float]
         where
         U: AccelerateBuffer,
@@ -40,7 +40,6 @@ extension vDSP {
     /// - Parameter rectangularCoordinates: Source vector, represented as consecutive x, y pairs.
     /// - Parameter polarCoordinates: Destination vector, represented as consecutive rho, (radius) theta (angle in radians) pairs.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func convert<U, V>(rectangularCoordinates: U,
                                      toPolarCoordinates polarCoordinates: inout V)
         where
@@ -66,7 +65,6 @@ extension vDSP {
     /// - Parameter rectangularCoordinates: Source vector, represented as consecutive x, y pairs.
     /// - Returns: Polar coordinates, represented as consecutive rho, (radius) theta (angle in radians) pairs.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func rectangularToPolar<U>(_ rectangularCoordinates: U) -> [Double]
         where
         U: AccelerateBuffer,
@@ -89,7 +87,6 @@ extension vDSP {
     /// - Parameter rectangularCoordinates: Source vector, represented as consecutive x, y pairs.
     /// - Parameter polarCoordinates: Destination vector, represented as consecutive rho, (radius) theta (angle in radians) pairs.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func convert<U, V>(rectangularCoordinates: U,
                                      toPolarCoordinates polarCoordinates: inout V)
         where
@@ -115,7 +112,6 @@ extension vDSP {
     /// - Parameter polarCoordinates: Source vector, represented as consecutive rho, (radius) theta (angle in radians) pairs.
     /// - Returns: Rectangular coordinates, represented as consecutive x, y pairs.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func polarToRectangular<U>(_ polarCoordinates: U) -> [Float]
         where
         U: AccelerateBuffer,
@@ -138,7 +134,6 @@ extension vDSP {
     /// - Parameter polarCoordinates: Source vector, represented as consecutive rho, (radius) theta (angle in radians) pairs.
     /// - Parameter rectangularCoordinates: Destination vector, represented as consecutive x, y pairs.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func convert<U, V>(polarCoordinates: U,
                                      toRectangularCoordinates rectangularCoordinates: inout V)
         where
@@ -164,7 +159,6 @@ extension vDSP {
     /// - Parameter polarCoordinates: Source vector, represented as consecutive rho, (radius) theta (angle in radians) pairs.
     /// - Returns: Rectangular coordinates, represented as consecutive x, y pairs.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func polarToRectangular<U>(_ polarCoordinates: U) -> [Double]
         where
         U: AccelerateBuffer,
@@ -187,7 +181,6 @@ extension vDSP {
     /// - Parameter polarCoordinates: Source vector, represented as consecutive rho, (radius) theta (angle in radians) pairs.
     /// - Parameter rectangularCoordinates: Destination vector, represented as consecutive x, y pairs.
     @inlinable
-    @available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *)
     public static func convert<U, V>(polarCoordinates: U,
                                      toRectangularCoordinates rectangularCoordinates: inout V)
         where

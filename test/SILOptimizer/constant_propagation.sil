@@ -928,3 +928,29 @@ bb0(%0 : $*Error, %1 : $*E1):
   %2 = tuple ()
   return %2 : $()
 }
+
+// Test constant folding of Builtin.globalStringTablePointer.
+
+// CHECK-LABEL: sil @replace_global_string_table_pointer
+// CHECK: [[STRING_LIT:%.*]] = string_literal utf8 "constant"
+// CHECK-NOT:  builtin "globalStringTablePointer"
+// CHECK: [[IMMORTAL_PTR:%.*]] = struct $UnsafePointer<Int8> ([[STRING_LIT]] : $Builtin.RawPointer)
+// CHECK: return [[IMMORTAL_PTR]]
+sil @replace_global_string_table_pointer : $@convention(thin) () -> UnsafePointer<Int8> {
+bb0:
+  %0 = string_literal utf8 "constant"
+  %1 = integer_literal $Builtin.Word, 8
+  %2 = integer_literal $Builtin.Int1, -1
+  %3 = metatype $@thin String.Type
+  // String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
+  %4 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %5 = apply %4(%0, %1, %2, %3) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %6 = builtin "globalStringTablePointer"(%5 : $String) : $Builtin.RawPointer
+  %7 = struct $UnsafePointer<Int8> (%6 : $Builtin.RawPointer)
+  release_value %5 : $String
+  return %7 : $UnsafePointer<Int8>
+}
+
+// String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
+// The semantics attribute is used by the constant folder.
+sil [serialized] [always_inline] [readonly] [_semantics "string.makeUTF8"] @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String

@@ -26,6 +26,7 @@
 // can be reflected as source-breaking changes for API users. If they are,
 // the output of api-digester will include such changes.
 
+#include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/AST/DiagnosticsModuleDiffer.h"
 #include "swift/IDE/APIDigesterData.h"
 #include <functional>
@@ -209,6 +210,11 @@ static llvm::cl::opt<std::string>
 LocationFilter("location",
               llvm::cl::desc("Filter nodes with the given location."),
               llvm::cl::cat(Category));
+
+static llvm::cl::opt<bool>
+CompilerStyleDiags("compiler-style-diags",
+                   llvm::cl::desc("Print compiler style diagnostics to stderr."),
+                   llvm::cl::cat(Category));
 } // namespace options
 
 namespace {
@@ -789,16 +795,6 @@ void swift::ide::api::SDKNodeDeclFunction::diagnose(SDKNode *Right) {
   }
 }
 
-void swift::ide::api::SDKNodeDeclSubscript::diagnose(SDKNode *Right) {
-  SDKNodeDeclAbstractFunc::diagnose(Right);
-  auto *R = dyn_cast<SDKNodeDeclSubscript>(Right);
-  if (!R)
-    return;
-  if (hasSetter() && !R->hasSetter()) {
-    emitDiag(diag::removed_setter);
-  }
-}
-
 void swift::ide::api::SDKNodeDecl::diagnose(SDKNode *Right) {
   SDKNode::diagnose(Right);
   auto *RD = dyn_cast<SDKNodeDecl>(Right);
@@ -876,9 +872,6 @@ void swift::ide::api::SDKNodeDeclVar::diagnose(SDKNode *Right) {
   auto *RV = dyn_cast<SDKNodeDeclVar>(Right);
   if (!RV)
     return;
-  if (getSetter() && !RV->getSetter()) {
-    emitDiag(diag::removed_setter);
-  }
   if (Ctx.checkingABI()) {
     if (hasFixedBinaryOrder() != RV->hasFixedBinaryOrder()) {
       emitDiag(diag::var_has_fixed_order_change, hasFixedBinaryOrder());
@@ -970,8 +963,15 @@ class PrunePass : public MatchedNodeListener, public SDKTreeDiffPass {
 
   static void printSpaces(llvm::raw_ostream &OS, SDKNode *N) {
     assert(N);
+    StringRef Space = "        ";
+    // Accessor doesn't have parent.
+    if (auto *AC = dyn_cast<SDKNodeDeclAccessor>(N)) {
+      OS << Space;
+      printSpaces(OS, AC->getStorage());
+      return;
+    }
     for (auto P = N; !isa<SDKNodeRoot>(P); P = P->getParent())
-      OS << "        ";
+      OS << Space;
   }
 
   static void debugMatch(SDKNode *Left, SDKNode *Right, NodeMatchReason Reason,
@@ -995,6 +995,13 @@ class PrunePass : public MatchedNodeListener, public SDKTreeDiffPass {
       OS << Left->getPrintedName() << Arrow << Right->getPrintedName() << "\n";
       return;
     }
+  }
+
+  static StringRef getParentProtocolName(SDKNode *Node) {
+    if (auto *Acc = dyn_cast<SDKNodeDeclAccessor>(Node)) {
+      Node = Acc->getStorage();
+    }
+    return Node->getParent()->getAs<SDKNodeDecl>()->getFullyQualifiedName();
   }
 
 public:
@@ -1037,8 +1044,7 @@ public:
               ShouldComplain = false;
           }
           if (ShouldComplain &&
-              ProtocolReqWhitelist.count(D->getParent()->getAs<SDKNodeDecl>()->
-                                         getFullyQualifiedName())) {
+              ProtocolReqWhitelist.count(getParentProtocolName(D))) {
             // Ignore protocol requirement additions if the protocol has been added
             // to the whitelist.
             ShouldComplain = false;
@@ -1076,6 +1082,9 @@ public:
         TD->emitDiag(diag::conformance_removed,
                      Conf->getName(),
                      TD->isProtocol());
+      }
+      if (auto *Acc = dyn_cast<SDKNodeDeclAccessor>(Left)) {
+        Acc->emitDiag(diag::removed_decl, Acc->isDeprecated());
       }
       return;
     case NodeMatchReason::FuncToProperty:
@@ -1125,11 +1134,9 @@ public:
     }
     case SDKNodeKind::TypeWitness:
     case SDKNodeKind::DeclOperator:
-    case SDKNodeKind::DeclSubscript:
     case SDKNodeKind::DeclAssociatedType:
     case SDKNodeKind::DeclFunction:
-    case SDKNodeKind::DeclSetter:
-    case SDKNodeKind::DeclGetter:
+    case SDKNodeKind::DeclAccessor:
     case SDKNodeKind::DeclConstructor:
     case SDKNodeKind::DeclTypeAlias:
     case SDKNodeKind::TypeFunc:
@@ -1142,15 +1149,25 @@ public:
       SNMatcher.match();
       break;
     }
+    case SDKNodeKind::DeclSubscript: {
+      auto *LSub = dyn_cast<SDKNodeDeclSubscript>(Left);
+      auto *RSub = dyn_cast<SDKNodeDeclSubscript>(Right);
+      SequentialNodeMatcher(LSub->getChildren(), RSub->getChildren(), *this).match();
+#define ACCESSOR(ID)                                                          \
+      singleMatch(LSub->getAccessor(AccessorKind::ID),                        \
+                  RSub->getAccessor(AccessorKind::ID), *this);
+#include "swift/AST/AccessorKinds.def"
+      break;
+    }
     case SDKNodeKind::DeclVar: {
       auto *LVar = dyn_cast<SDKNodeDeclVar>(Left);
       auto *RVar = dyn_cast<SDKNodeDeclVar>(Right);
       // Match property type.
       singleMatch(LVar->getType(), RVar->getType(), *this);
-      // Match property getter function.
-      singleMatch(LVar->getGetter(), RVar->getGetter(), *this);
-      // Match property setter function.
-      singleMatch(LVar->getSetter(), RVar->getSetter(), *this);
+#define ACCESSOR(ID)                                                          \
+      singleMatch(LVar->getAccessor(AccessorKind::ID),                        \
+                  RVar->getAccessor(AccessorKind::ID), *this);
+#include "swift/AST/AccessorKinds.def"
       break;
     }
     }
@@ -1218,7 +1235,7 @@ class TypeMemberDiffFinder : public SDKNodeVisitor {
         declNode->isStatic())
       TypeMemberDiffs.insert({diffNode, node});
     // Move from a getter/setter function to a property
-    else if (node->getKind() == SDKNodeKind::DeclGetter &&
+    else if (node->getKind() == SDKNodeKind::DeclAccessor &&
              diffNode->getKind() == SDKNodeKind::DeclFunction &&
              node->isNameValid()) {
       diffNode->annotate(NodeAnnotation::Rename);
@@ -2114,9 +2131,11 @@ static int diagnoseModuleChange(SDKContext &Ctx, SDKNodeRoot *LeftModule,
     FileOS.reset(new llvm::raw_fd_ostream(OutputPath, EC, llvm::sys::fs::F_None));
     OS = FileOS.get();
   }
-  ModuleDifferDiagsConsumer PDC(true, *OS);
+  std::unique_ptr<DiagnosticConsumer> pConsumer = options::CompilerStyleDiags ?
+    llvm::make_unique<PrintingDiagnosticConsumer>():
+    llvm::make_unique<ModuleDifferDiagsConsumer>(true, *OS);
 
-  Ctx.getDiags().addConsumer(PDC);
+  Ctx.getDiags().addConsumer(*pConsumer);
   TypeAliasDiffFinder(LeftModule, RightModule,
                       Ctx.getTypeAliasUpdateMap()).search();
   PrunePass Prune(Ctx, std::move(ProtocolReqWhitelist));
@@ -2185,10 +2204,11 @@ static int generateMigrationScript(StringRef LeftPath, StringRef RightPath,
     return 1;
   }
   llvm::errs() << "Diffing: " << LeftPath << " and " << RightPath << "\n";
-
-  ModuleDifferDiagsConsumer PDC(false);
+  std::unique_ptr<DiagnosticConsumer> pConsumer = options::CompilerStyleDiags ?
+    llvm::make_unique<PrintingDiagnosticConsumer>():
+    llvm::make_unique<ModuleDifferDiagsConsumer>(false);
   SDKContext Ctx(Opts);
-  Ctx.getDiags().addConsumer(PDC);
+  Ctx.getDiags().addConsumer(*pConsumer);
 
   SwiftDeclCollector LeftCollector(Ctx);
   LeftCollector.deSerialize(LeftPath);

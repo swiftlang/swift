@@ -195,7 +195,21 @@ extension RawRepresentable where RawValue: Hashable, Self: Hashable {
 
   @inlinable // trivial
   public func _rawHashValue(seed: Int) -> Int {
-    return rawValue._rawHashValue(seed: seed)
+    // In 5.0, this used to return rawValue._rawHashValue(seed: seed).  This was
+    // slightly faster, but it interfered with conforming types' ability to
+    // customize their hashing. The current definition is equivalent to the
+    // default implementation; however, we need to keep the definition to remain
+    // ABI compatible with code compiled on 5.0.
+    //
+    // Note that unless a type provides a custom hash(into:) implementation,
+    // this new version returns the same values as the original 5.0 definition,
+    // so code that used to work in 5.0 remains working whether or not the
+    // original definition was inlined.
+    //
+    // See https://bugs.swift.org/browse/SR-10734
+    var hasher = Hasher(_seed: seed)
+    self.hash(into: &hasher)
+    return hasher._finalize()
   }
 }
 

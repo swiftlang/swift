@@ -836,8 +836,12 @@ void ConstraintSystem::shrink(Expr *expr) {
           return expr;
         }
 
-        // Or it's a function application with other candidates present.
-        if (isa<ApplyExpr>(expr)) {
+        // Or it's a function application or assignment with other candidates
+        // present. Assignment should be easy to solve because we'd get a
+        // contextual type from the destination expression, otherwise shrink
+        // might produce incorrect results without considering aforementioned
+        // destination type.
+        if (isa<ApplyExpr>(expr) || isa<AssignExpr>(expr)) {
           Candidates.push_back(Candidate(CS, PrimaryExpr));
           return expr;
         }
@@ -1204,7 +1208,8 @@ ConstraintSystem::solveImpl(Expr *&expr,
     auto constraintKind = ConstraintKind::Conversion;
     
     if ((getContextualTypePurpose() == CTP_ReturnStmt ||
-         getContextualTypePurpose() == CTP_ReturnSingleExpr)
+         getContextualTypePurpose() == CTP_ReturnSingleExpr ||
+         getContextualTypePurpose() == CTP_Initialization)
         && Options.contains(ConstraintSystemFlags::UnderlyingTypeForOpaqueReturnType))
       constraintKind = ConstraintKind::OpaqueUnderlyingType;
     

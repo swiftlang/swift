@@ -1095,6 +1095,8 @@ public:
              ImplicitModuleImportKind ModImpKind, bool KeepParsedTokens = false,
              bool KeepSyntaxTree = false);
 
+  ~SourceFile();
+
   void addImports(ArrayRef<ImportedModuleDesc> IM);
 
   enum ImportQueryKind {
@@ -1323,7 +1325,7 @@ public:
   }
   
   void markDeclWithOpaqueResultTypeAsValidated(ValueDecl *vd);
-  
+
 private:
 
   /// If not None, the underlying vector should contain tokens of this source file.

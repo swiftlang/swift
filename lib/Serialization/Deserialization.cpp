@@ -817,6 +817,32 @@ void ModuleFile::readGenericRequirements(
   }
 }
 
+/// Advances past any records that might be part of a requirement signature.
+static void skipGenericRequirements(llvm::BitstreamCursor &Cursor) {
+  using namespace decls_block;
+
+  BCOffsetRAII lastRecordOffset(Cursor);
+
+  while (true) {
+    auto entry = Cursor.advance(AF_DontPopBlockAtEnd);
+    if (entry.Kind != llvm::BitstreamEntry::Record)
+      break;
+
+    unsigned recordID = Cursor.skipRecord(entry.ID);
+    switch (recordID) {
+    case GENERIC_REQUIREMENT:
+    case LAYOUT_REQUIREMENT:
+      break;
+
+    default:
+      // This record is not a generic requirement.
+      return;
+    }
+
+    lastRecordOffset.reset();
+  }
+}
+
 void ModuleFile::configureGenericEnvironment(
              GenericContext *genericDecl,
              serialization::GenericEnvironmentID envID) {
@@ -2921,7 +2947,7 @@ public:
     bool isStatic;
     uint8_t rawStaticSpelling, rawAccessLevel, rawMutModifier;
     uint8_t rawAccessorKind;
-    bool isObjC, hasDynamicSelf, hasForcedStaticDispatch, throws;
+    bool isObjC, hasForcedStaticDispatch, throws;
     unsigned numNameComponentsBiased;
     GenericEnvironmentID genericEnvID;
     TypeID resultInterfaceTypeID;
@@ -2935,7 +2961,7 @@ public:
     if (!isAccessor) {
       decls_block::FuncLayout::readRecord(scratch, contextID, isImplicit,
                                           isStatic, rawStaticSpelling, isObjC,
-                                          rawMutModifier, hasDynamicSelf,
+                                          rawMutModifier,
                                           hasForcedStaticDispatch, throws,
                                           genericEnvID,
                                           resultInterfaceTypeID,
@@ -2948,7 +2974,7 @@ public:
     } else {
       decls_block::AccessorLayout::readRecord(scratch, contextID, isImplicit,
                                           isStatic, rawStaticSpelling, isObjC,
-                                          rawMutModifier, hasDynamicSelf,
+                                          rawMutModifier,
                                           hasForcedStaticDispatch, throws,
                                           genericEnvID,
                                           resultInterfaceTypeID,
@@ -3131,7 +3157,6 @@ public:
     if (isImplicit)
       fn->setImplicit();
     fn->setIsObjC(isObjC);
-    fn->setDynamicSelf(hasDynamicSelf);
     fn->setForcedStaticDispatch(hasForcedStaticDispatch);
     fn->setNeedsNewVTableEntry(needsNewVTableEntry);
 
@@ -3267,22 +3292,33 @@ public:
     IdentifierID nameID;
     DeclContextID contextID;
     bool isImplicit, isClassBounded, isObjC, existentialTypeSupported;
-    GenericEnvironmentID genericEnvID;
     uint8_t rawAccessLevel;
-    ArrayRef<uint64_t> rawInheritedIDs;
+    unsigned numInheritedTypes;
+    ArrayRef<uint64_t> rawInheritedAndDependencyIDs;
 
     decls_block::ProtocolLayout::readRecord(scratch, nameID, contextID,
                                             isImplicit, isClassBounded, isObjC,
                                             existentialTypeSupported,
-                                            genericEnvID, rawAccessLevel, rawInheritedIDs);
+                                            rawAccessLevel, numInheritedTypes,
+                                            rawInheritedAndDependencyIDs);
+
+    Identifier name = MF.getIdentifier(nameID);
+
+    for (TypeID dependencyID :
+           rawInheritedAndDependencyIDs.slice(numInheritedTypes)) {
+      auto dependency = MF.getTypeChecked(dependencyID);
+      if (!dependency) {
+        return llvm::make_error<TypeError>(
+            name, takeErrorInfo(dependency.takeError()));
+      }
+    }
 
     auto DC = MF.getDeclContext(contextID);
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto proto = MF.createDecl<ProtocolDecl>(DC, SourceLoc(), SourceLoc(),
-                                             MF.getIdentifier(nameID), None,
-                                             /*TrailingWhere=*/nullptr);
+    auto proto = MF.createDecl<ProtocolDecl>(DC, SourceLoc(), SourceLoc(), name,
+                                             None, /*TrailingWhere=*/nullptr);
     declOrOffset = proto;
 
     proto->setRequiresClass(isClassBounded);
@@ -3299,9 +3335,8 @@ public:
     assert(genericParams && "protocol with no generic parameters?");
     proto->setGenericParams(genericParams);
 
-    handleInherited(proto, rawInheritedIDs);
-
-    MF.configureGenericEnvironment(proto, genericEnvID);
+    handleInherited(proto,
+                    rawInheritedAndDependencyIDs.slice(0, numInheritedTypes));
 
     if (isImplicit)
       proto->setImplicit();
@@ -3311,12 +3346,9 @@ public:
 
     proto->setCircularityCheck(CircularityCheck::Checked);
 
-    // Establish the requirement signature.
-    {
-      SmallVector<Requirement, 4> requirements;
-      MF.readGenericRequirements(requirements, MF.DeclTypeCursor);
-      proto->setRequirementSignature(requirements);
-    }
+    proto->setLazyRequirementSignature(&MF,
+                                       MF.DeclTypeCursor.GetCurrentBitNo());
+    skipGenericRequirements(MF.DeclTypeCursor);
 
     proto->setMemberLoader(&MF, MF.DeclTypeCursor.GetCurrentBitNo());
 
@@ -4241,6 +4273,18 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         Attr = CustomAttr::create(ctx, SourceLoc(),
                                   TypeLoc::withoutLoc(deserialized.get()),
                                   isImplicit);
+        break;
+      }
+
+      case decls_block::ProjectedValueProperty_DECL_ATTR: {
+        bool isImplicit;
+        IdentifierID nameID;
+        serialization::decls_block::ProjectedValuePropertyDeclAttrLayout
+            ::readRecord(scratch, isImplicit, nameID);
+
+        auto name = MF.getIdentifier(nameID);
+        Attr = new (ctx) ProjectedValuePropertyAttr(
+            name, SourceLoc(), SourceRange(), isImplicit);
         break;
       }
 
@@ -5822,6 +5866,14 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
 GenericEnvironment *ModuleFile::loadGenericEnvironment(const DeclContext *decl,
                                                        uint64_t contextData) {
   return getGenericEnvironment(contextData);
+}
+
+void ModuleFile::loadRequirementSignature(const ProtocolDecl *decl,
+                                          uint64_t contextData,
+                                          SmallVectorImpl<Requirement> &reqs) {
+  BCOffsetRAII restoreOffset(DeclTypeCursor);
+  DeclTypeCursor.JumpToBit(contextData);
+  readGenericRequirements(reqs, DeclTypeCursor);
 }
 
 static Optional<ForeignErrorConvention::Kind>

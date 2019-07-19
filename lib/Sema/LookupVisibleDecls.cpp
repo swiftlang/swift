@@ -444,8 +444,8 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
           // Skip value requirements that have corresponding witnesses. This cuts
           // down on duplicates.
           if (!NormalConformance->hasWitness(VD) ||
-              !NormalConformance->getWitness(VD, nullptr) ||
-              NormalConformance->getWitness(VD, nullptr).getDecl()->getFullName()
+              !NormalConformance->getWitness(VD) ||
+              NormalConformance->getWitness(VD).getDecl()->getFullName()
                 != VD->getFullName()) {
             Consumer.foundDecl(VD, ReasonForThisProtocol);
           }
@@ -622,7 +622,7 @@ static void lookupVisibleMemberDeclsImpl(
       Reason = getReasonForSuper(Reason);
 
       bool InheritsSuperclassInitializers =
-          CurClass->inheritsSuperclassInitializers(TypeResolver);
+          CurClass->inheritsSuperclassInitializers();
       if (LS.isOnSuperclass() && !InheritsSuperclassInitializers)
         LS = LS.withoutInheritsSuperclassInitializers();
       else if (!LS.isOnSuperclass()) {
@@ -978,18 +978,20 @@ static void lookupVisibleDynamicMemberLookupDecls(
     if (!subscript)
       continue;
 
-    auto rootType = getRootTypeOfKeypathDynamicMember(subscript, dc);
-    if (!rootType)
+    auto rootAndResult =
+        getRootAndResultTypeOfKeypathDynamicMember(subscript, dc);
+    if (!rootAndResult)
       continue;
+    auto rootType = rootAndResult->first;
 
     auto subs =
         baseType->getMemberSubstitutionMap(dc->getParentModule(), subscript);
-    auto memberType = rootType->subst(subs);
+    auto memberType = rootType.subst(subs);
     if (!memberType || !memberType->mayHaveMembers())
       continue;
 
-    KeyPathDynamicMemberConsumer::SubscriptChange(consumer, subscript,
-                                                  baseType);
+    KeyPathDynamicMemberConsumer::SubscriptChange sub(consumer, subscript,
+                                                      baseType);
 
     lookupVisibleMemberAndDynamicMemberDecls(memberType, consumer, consumer, dc,
                                              LS, reason, typeResolver, GSB,

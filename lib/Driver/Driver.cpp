@@ -230,6 +230,17 @@ static void validateCompilationConditionArgs(DiagnosticEngine &diags,
   }
 }
 
+static void validateSearchPathArgs(DiagnosticEngine &diags,
+                                   const ArgList &args) {
+  for (const Arg *A : args.filtered(options::OPT_F, options::OPT_Fsystem)) {
+    StringRef name = A->getValue();
+    if (name.endswith(".framework") || name.endswith(".framework/"))
+      diags.diagnose(SourceLoc(),
+                     diag::framework_search_path_includes_framework_extension,
+                     name);
+  }
+}
+
 static void validateAutolinkingArgs(DiagnosticEngine &diags,
                                     const ArgList &args) {
   auto *forceLoadArg = args.getLastArg(options::OPT_autolink_force_load);
@@ -255,6 +266,7 @@ static void validateArgs(DiagnosticEngine &diags, const ArgList &args) {
   validateProfilingArgs(diags, args);
   validateDebugInfoArgs(diags, args);
   validateCompilationConditionArgs(diags, args);
+  validateSearchPathArgs(diags, args);
   validateAutolinkingArgs(diags, args);
 }
 

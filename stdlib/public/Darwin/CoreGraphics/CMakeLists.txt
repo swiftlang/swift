@@ -10,12 +10,12 @@ add_swift_target_library(swiftCoreGraphics ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYP
   GYB_SOURCES
     CGFloat.swift.gyb
 
-  SWIFT_COMPILE_FLAGS "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}"
+  SWIFT_COMPILE_FLAGS ${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS} ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
-  SWIFT_MODULE_DEPENDS_OSX Darwin CoreFoundation Dispatch IOKit ObjectiveC # auto-updated
-  SWIFT_MODULE_DEPENDS_IOS Darwin CoreFoundation Dispatch ObjectiveC # auto-updated
-  SWIFT_MODULE_DEPENDS_TVOS Darwin CoreFoundation Dispatch ObjectiveC # auto-updated
-  SWIFT_MODULE_DEPENDS_WATCHOS Darwin CoreFoundation Dispatch ObjectiveC # auto-updated
+  SWIFT_MODULE_DEPENDS_OSX Darwin Dispatch IOKit CoreFoundation ObjectiveC # auto-updated
+  SWIFT_MODULE_DEPENDS_IOS Darwin Dispatch CoreFoundation ObjectiveC # auto-updated
+  SWIFT_MODULE_DEPENDS_TVOS Darwin Dispatch CoreFoundation ObjectiveC # auto-updated
+  SWIFT_MODULE_DEPENDS_WATCHOS Darwin Dispatch CoreFoundation ObjectiveC # auto-updated
   FRAMEWORK_DEPENDS CoreGraphics
 
   DEPLOYMENT_VERSION_OSX ${SWIFTLIB_DEPLOYMENT_VERSION_COREGRAPHICS_OSX}

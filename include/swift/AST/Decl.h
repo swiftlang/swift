@@ -70,7 +70,6 @@ namespace swift {
   class GenericSignature;
   class GenericTypeParamDecl;
   class GenericTypeParamType;
-  class LazyResolver;
   class ModuleDecl;
   class EnumCaseDecl;
   class EnumElementDecl;
@@ -164,7 +163,8 @@ enum class DescriptiveDeclKind : uint8_t {
   Module,
   MissingMember,
   Requirement,
-  OpaqueType,
+  OpaqueResultType,
+  OpaqueVarType
 };
 
 /// Keeps track of stage of circularity checking for the given protocol.
@@ -433,7 +433,7 @@ protected:
     HasSingleExpressionBody : 1
   );
 
-  SWIFT_INLINE_BITFIELD(FuncDecl, AbstractFunctionDecl, 1+2+1+1+1+2,
+  SWIFT_INLINE_BITFIELD(FuncDecl, AbstractFunctionDecl, 1+2+1+1+2,
     /// Whether this function is a 'static' method.
     IsStatic : 1,
 
@@ -442,9 +442,6 @@ protected:
 
     /// Whether we are statically dispatched even if overridable
     ForcedStaticDispatch : 1,
-
-    /// Whether this function has a dynamic Self return type.
-    HasDynamicSelf : 1,
 
     /// Whether we've computed the 'self' access kind yet.
     SelfAccessComputed : 1,
@@ -510,7 +507,7 @@ protected:
     HasLazyConformances : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+2+1+8+16,
+  SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+2+1+1+8+16,
     /// Whether the \c RequiresClass bit is valid.
     RequiresClassValid : 1,
 
@@ -538,6 +535,9 @@ protected:
 
     /// Whether we've computed the inherited protocols list yet.
     InheritedProtocolsValid : 1,
+
+    /// Whether we have a lazy-loaded requirement signature.
+    HasLazyRequirementSignature : 1,
 
     : NumPadBits,
 
@@ -1931,6 +1931,9 @@ class PatternBindingEntry {
   /// The initializer context used for this pattern binding entry.
   llvm::PointerIntPair<DeclContext *, 1, bool> InitContextAndIsText;
 
+  /// Values captured by this initializer.
+  CaptureInfo Captures;
+
   friend class PatternBindingInitializer;
 
 public:
@@ -2024,6 +2027,9 @@ public:
   /// \param omitAccessors Whether the computation should omit the accessors
   /// from the source range.
   SourceRange getSourceRange(bool omitAccessors = false) const;
+
+  const CaptureInfo &getCaptureInfo() const { return Captures; }
+  void setCaptureInfo(const CaptureInfo &captures) { Captures = captures; }
 };
 
 /// This decl contains a pattern and optional initializer for a set
@@ -2120,6 +2126,18 @@ public:
   }
   
   void setPattern(unsigned i, Pattern *Pat, DeclContext *InitContext);
+
+  DeclContext *getInitContext(unsigned i) const {
+    return getPatternList()[i].getInitContext();
+  }
+
+  const CaptureInfo &getCaptureInfo(unsigned i) const {
+    return getPatternList()[i].getCaptureInfo();
+  }
+
+  void setCaptureInfo(unsigned i, const CaptureInfo &captures) {
+    getMutablePatternList()[i].setCaptureInfo(captures);
+  }
 
   /// Given that this PBD is the parent pattern for the specified VarDecl,
   /// return the entry of the VarDecl in our PatternList.  For example, in:
@@ -2854,7 +2872,13 @@ public:
     assert(!NamingDecl && "already have naming decl");
     NamingDecl = D;
   }
-  
+
+  /// Is this opaque type the opaque return type of the given function?
+  ///
+  /// This is more complex than just checking `getNamingDecl` because the
+  /// function could also be the getter of a storage declaration.
+  bool isOpaqueReturnTypeOfFunction(const AbstractFunctionDecl *func) const;
+
   GenericSignature *getOpaqueInterfaceGenericSignature() const {
     return OpaqueInterfaceGenericSignature;
   }
@@ -3941,10 +3965,7 @@ public:
 
   /// Determine whether this class inherits the convenience initializers
   /// from its superclass.
-  ///
-  /// \param resolver Used to resolve the signatures of initializers, which is
-  /// required for name lookup.
-  bool inheritsSuperclassInitializers(LazyResolver *resolver);
+  bool inheritsSuperclassInitializers();
 
   /// Marks that this class inherits convenience initializers from its
   /// superclass.
@@ -4128,9 +4149,13 @@ class ProtocolDecl final : public NominalTypeDecl {
 
   bool existentialConformsToSelfSlow();
 
-  bool existentialTypeSupportedSlow(LazyResolver *resolver);
+  bool existentialTypeSupportedSlow();
 
   ArrayRef<ProtocolDecl *> getInheritedProtocolsSlow();
+
+  bool hasLazyRequirementSignature() const {
+    return Bits.ProtocolDecl.HasLazyRequirementSignature;
+  }
 
   friend class SuperclassDeclRequest;
   friend class SuperclassTypeRequest;
@@ -4250,12 +4275,12 @@ public:
   /// conforming to this protocol. This is only permitted if the types of
   /// all the members do not contain any associated types, and do not
   /// contain 'Self' in 'parameter' or 'other' position.
-  bool existentialTypeSupported(LazyResolver *resolver) const {
+  bool existentialTypeSupported() const {
     if (Bits.ProtocolDecl.ExistentialTypeSupportedValid)
       return Bits.ProtocolDecl.ExistentialTypeSupported;
 
     return const_cast<ProtocolDecl *>(this)
-             ->existentialTypeSupportedSlow(resolver);
+             ->existentialTypeSupportedSlow();
   }
 
   /// Explicitly set the existentialTypeSupported flag, without computing
@@ -4367,6 +4392,9 @@ public:
   }
 
   void setRequirementSignature(ArrayRef<Requirement> requirements);
+
+  void setLazyRequirementSignature(LazyMemberLoader *lazyLoader,
+                                   uint64_t requirementSignatureData);
 
 private:
   ArrayRef<Requirement> getCachedRequirementSignature() const;
@@ -4808,7 +4836,7 @@ enum class PropertyWrapperSynthesizedPropertyKind {
   /// wrapper type.
   Backing,
   /// A storage wrapper (e.g., `$foo`), which is a wrapper over the
-  /// wrapper instance's `wrapperValue` property.
+  /// wrapper instance's `projectedValue` property.
   StorageWrapper,
 };
 
@@ -5189,6 +5217,10 @@ public:
   /// generic type, the backing storage property will be the appropriate
   /// bound generic version.
   VarDecl *getPropertyWrapperBackingProperty() const;
+
+  /// Retreive the storage wrapper for a property that has an attached
+  /// property wrapper.
+  VarDecl *getPropertyWrapperStorageWrapper() const;
 
   /// Retrieve the backing storage property for a lazy property.
   VarDecl *getLazyStorageProperty() const;
@@ -5845,8 +5877,8 @@ public:
   /// Retrieve the source range of the function declaration name + patterns.
   SourceRange getSignatureSourceRange() const;
 
-  CaptureInfo &getCaptureInfo() { return Captures; }
   const CaptureInfo &getCaptureInfo() const { return Captures; }
+  void setCaptureInfo(const CaptureInfo &captures) { Captures = captures; }
 
   /// Retrieve the Objective-C selector that names this method.
   ObjCSelector getObjCSelector(DeclName preferredName = DeclName(),
@@ -5933,8 +5965,13 @@ public:
   /// True if the declaration is forced to be statically dispatched.
   bool hasForcedStaticDispatch() const;
 
-  /// Get the interface type of this decl and remove the Self context.
+  /// Get the type of this declaration without the Self clause.
+  /// Asserts if not in type context.
   Type getMethodInterfaceType() const;
+
+  /// Tests if this is a function returning a DynamicSelfType, or a
+  /// constructor.
+  bool hasDynamicSelfResult() const;
 
   using DeclContext::operator new;
   using Decl::getASTContext;
@@ -5983,7 +6020,6 @@ protected:
       StaticLoc.isValid() || StaticSpelling != StaticSpellingKind::None;
     Bits.FuncDecl.StaticSpelling = static_cast<unsigned>(StaticSpelling);
 
-    Bits.FuncDecl.HasDynamicSelf = false;
     Bits.FuncDecl.ForcedStaticDispatch = false;
     Bits.FuncDecl.SelfAccess =
       static_cast<unsigned>(SelfAccessKind::NonMutating);
@@ -6099,15 +6135,6 @@ public:
   /// This also allows the binary-operator-ness of a func decl to be determined
   /// prior to type checking.
   bool isBinaryOperator() const;
-  
-  /// Determine whether this function has a dynamic \c Self return
-  /// type.
-  bool hasDynamicSelf() const { return Bits.FuncDecl.HasDynamicSelf; }
-
-  /// Set whether this function has a dynamic \c Self return or not.
-  void setDynamicSelf(bool hasDynamicSelf) { 
-    Bits.FuncDecl.HasDynamicSelf = hasDynamicSelf;
-  }
 
   void getLocalCaptures(SmallVectorImpl<CapturedValue> &Result) const {
     return getCaptureInfo().getLocalCaptures(Result);
