@@ -21,6 +21,16 @@ let _: @differentiable(linear) (Float) -> Float
 // Function conversion
 //===----------------------------------------------------------------------===//
 
+func nonescapingArgument(f: @differentiable (Float, Float) -> Float) -> Float {
+  return gradient(at: 1) { x in f(x, x) }
+}
+
+func nonescapingArgumentError(
+  f: @differentiable (Float, Float) -> Float
+) -> @differentiable (Float) -> Float{
+  return { x in f(x, x) }
+}
+
 func takesOpaqueClosure(f: @escaping (Float) -> Float) {
   // expected-note @-1 {{did you mean to take a '@differentiable' closure?}} {{38-38=@differentiable }}
   // expected-error @+1 {{a '@differentiable' function can only be formed from a reference to a 'func' or a literal closure}}

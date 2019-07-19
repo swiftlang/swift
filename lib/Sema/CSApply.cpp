@@ -6461,8 +6461,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       expr = cs.cacheType(new (tc.Context)
           AutoDiffFunctionExtractOriginalExpr(expr, fromFunc));
     }
-    maybeDiagnoseUnsupportedFunctionConversion(cs, expr, toFunc);
     // Handle implicit conversion to @differentiable.
+    maybeDiagnoseUnsupportedFunctionConversion(cs, expr, toFunc);
     if (!fromEI.isDifferentiable() && toEI.isDifferentiable()) {
       fromFunc = fromFunc->withExtInfo(
           fromEI.withDifferentiabilityKind(toEI.getDifferentiabilityKind()))
