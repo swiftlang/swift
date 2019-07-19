@@ -3219,13 +3219,20 @@ public:
 
     assert(insertLoc.isValid() && "missing argument after trailing closure?");
 
-    if (name.empty())
+    if (name.empty()) {
       TC.diagnose(insertLoc, diag::missing_argument_positional,
                   missingParamIdx + 1)
           .fixItInsert(insertLoc, insertText.str());
-    else
-      TC.diagnose(insertLoc, diag::missing_argument_named, name)
-          .fixItInsert(insertLoc, insertText.str());
+    } else {
+      if (isPropertyWrapperImplicitInit()) {
+        auto TE = cast<TypeExpr>(FnExpr);
+        TC.diagnose(TE->getLoc(), diag::property_wrapper_missing_arg_init, name,
+                    TE->getInstanceType()->getString());
+      } else {
+        TC.diagnose(insertLoc, diag::missing_argument_named, name)
+            .fixItInsert(insertLoc, insertText.str());
+      }
+    }
 
     auto candidate = CandidateInfo[0];
     if (candidate.getDecl())
@@ -3233,6 +3240,27 @@ public:
                   candidate.getDecl()->getFullName());
 
     Diagnosed = true;
+  }
+
+  bool isPropertyWrapperImplicitInit() {
+    auto TE = dyn_cast<TypeExpr>(FnExpr);
+    if (!TE)
+      return false;
+
+    auto instanceTy = TE->getInstanceType();
+    if (!instanceTy)
+      return false;
+
+    auto nominalDecl = instanceTy->getAnyNominal();
+    if (!(nominalDecl &&
+          nominalDecl->getAttrs().hasAttribute<PropertyWrapperAttr>()))
+      return false;
+
+    if (auto *parentExpr = CandidateInfo.CS.getParentExpr(FnExpr)) {
+      return parentExpr->isImplicit() && isa<CallExpr>(parentExpr);
+    }
+
+    return false;
   }
 
   bool missingLabel(unsigned paramIdx) override {
