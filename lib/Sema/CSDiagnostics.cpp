@@ -2912,6 +2912,15 @@ bool OutOfOrderArgumentFailure::diagnoseAsError() {
   SourceLoc diagLoc = firstRange.Start;
 
   auto addFixIts = [&](InFlightDiagnostic diag) {
+    // Don't add Fix-Its if one of the ranges is outside of the argument
+    // list, which can happen when we're splicing together an argument list
+    // from multiple sources.
+    auto &SM = getASTContext().SourceMgr;
+    auto argsRange = tuple->getSourceRange();
+    if (!SM.rangeContains(argsRange, firstRange) ||
+        !SM.rangeContains(argsRange, secondRange))
+      return;
+
     diag.highlight(firstRange).highlight(secondRange);
 
     // Move the misplaced argument by removing it from one location and
@@ -2919,7 +2928,6 @@ bool OutOfOrderArgumentFailure::diagnoseAsError() {
     // separation, since the argument is always moving to an earlier index
     // the preceding comma and whitespace is removed and a new trailing
     // comma and space is inserted with the moved argument.
-    auto &SM = getASTContext().SourceMgr;
     auto text = SM.extractText(
         Lexer::getCharSourceRangeFromSourceRange(SM, firstRange));
 
