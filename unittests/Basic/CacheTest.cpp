@@ -153,9 +153,9 @@ TEST(Cache, sameKeyValue) {
 }
 
 TEST(Cache, sameKeyValueDestroysKey) {
-  swift::sys::Cache<KeyCounter, Counter> cache(__func__);
   KeyCounter k1, k2;
   Counter c;
+  swift::sys::Cache<KeyCounter, Counter> cache(__func__);
   cache.set(k1, c);
   cache.set(k2, c);
   EXPECT_EQ(1, k1.enter);
