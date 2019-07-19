@@ -151,9 +151,9 @@ extension Tracked : Differentiable
 extension Tracked where T : Differentiable, T == T.AllDifferentiableVariables,
                         T == T.TangentVector
 {
-  // FIXME: VJPs of initializers are currently not being reabstracted, while
-  // there is a parameter convention mismatch. We must explicitly make VJPs of
-  // initializers have `@owned` parameters to avoid memory leaks.
+  // FIXME(TF-667): VJPs of initializers are currently not being reabstracted,
+  // while there is a parameter convention mismatch. We must explicitly make
+  // VJPs of initializers have `@owned` parameters to avoid memory leaks.
   @usableFromInline
   internal static func _vjpInit(_ value: __owned T)
       -> (value: Self, pullback: (Self.TangentVector) -> (T.TangentVector)) {
