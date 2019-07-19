@@ -5871,16 +5871,16 @@ Expr *swift::findOriginalPropertyWrapperInitialValue(VarDecl *var,
 
         // ... producing a value of the same nominal type as the innermost
         // property wrapper.
-        if (call->getType()->getAnyNominal() != innermostNominal)
+        if (!call->getType() ||
+            call->getType()->getAnyNominal() != innermostNominal)
           return { true, E };
 
         // Find the implicit initialValue argument.
         if (auto tuple = dyn_cast<TupleExpr>(call->getArg())) {
           ASTContext &ctx = innermostNominal->getASTContext();
           for (unsigned i : range(tuple->getNumElements())) {
-            if ((tuple->getElementName(i) == ctx.Id_wrappedValue ||
-                 tuple->getElementName(i) == ctx.Id_initialValue) &&
-                tuple->getElementNameLoc(i).isInvalid()) {
+            if (tuple->getElementName(i) == ctx.Id_wrappedValue ||
+                tuple->getElementName(i) == ctx.Id_initialValue) {
               initArg = tuple->getElement(i);
               return { false, E };
             }
