@@ -2267,13 +2267,15 @@ void ModuleFile::configureStorage(AbstractStorageDecl *decl,
   }
 
   auto implInfo = StorageImplInfo(*readImpl, *writeImpl, *readWriteImpl);
+  decl->setImplInfo(implInfo);
+
   if (implInfo.isSimpleStored() && accessors.empty())
     return;
 
   // We currently don't serialize these locations.
   SourceLoc beginLoc, endLoc;
 
-  decl->setAccessors(implInfo, beginLoc, accessors, endLoc);
+  decl->setAccessors(beginLoc, accessors, endLoc);
 }
 
 template <typename T, typename ...Args>

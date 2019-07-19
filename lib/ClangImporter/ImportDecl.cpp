@@ -187,11 +187,11 @@ static void makeComputed(AbstractStorageDecl *storage,
                          AccessorDecl *getter, AccessorDecl *setter) {
   assert(getter);
   if (setter) {
-    storage->setAccessors(StorageImplInfo::getMutableComputed(),
-                          SourceLoc(), {getter, setter}, SourceLoc());
+    storage->setImplInfo(StorageImplInfo::getMutableComputed());
+    storage->setAccessors(SourceLoc(), {getter, setter}, SourceLoc());
   } else {
-    storage->setAccessors(StorageImplInfo::getImmutableComputed(),
-                          SourceLoc(), {getter}, SourceLoc());
+    storage->setImplInfo(StorageImplInfo::getImmutableComputed());
+    storage->setAccessors(SourceLoc(), {getter}, SourceLoc());
   }
 }
 

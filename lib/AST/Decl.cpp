@@ -4657,20 +4657,6 @@ void ProtocolDecl::computeKnownProtocolKind() const {
   const_cast<ProtocolDecl *>(this)->Bits.ProtocolDecl.KnownProtocol = value;
 }
 
-void AbstractStorageDecl::overwriteImplInfo(StorageImplInfo implInfo) {
-  setFieldsFromImplInfo(implInfo);
-
-  auto *accessors = Accessors.getPointer();
-  if (!accessors) {
-    accessors = AccessorRecord::create(getASTContext(), SourceRange(),
-                                       implInfo, {});
-    Accessors.setPointer(accessors);
-    return;
-  }
-
-  accessors->overwriteImplInfo(implInfo);
-}
-
 bool AbstractStorageDecl::hasPrivateAccessor() const {
   for (auto accessor : getAllAccessors()) {
     if (hasPrivateOrFilePrivateFormalAccess(accessor))
@@ -4702,12 +4688,9 @@ bool AbstractStorageDecl::hasAnyDynamicReplacementAccessors() const {
   }
   return false;
 }
-void AbstractStorageDecl::setAccessors(StorageImplInfo implInfo,
-                                       SourceLoc lbraceLoc,
+void AbstractStorageDecl::setAccessors(SourceLoc lbraceLoc,
                                        ArrayRef<AccessorDecl *> accessors,
                                        SourceLoc rbraceLoc) {
-  setFieldsFromImplInfo(implInfo);
-
   // This method is called after we've already recorded an accessors clause
   // only on recovery paths and only when that clause was empty.
   auto record = Accessors.getPointer();
@@ -4719,7 +4702,7 @@ void AbstractStorageDecl::setAccessors(StorageImplInfo implInfo,
   } else {
     record = AccessorRecord::create(getASTContext(),
                                     SourceRange(lbraceLoc, rbraceLoc),
-                                    implInfo, accessors);
+                                    accessors);
     Accessors.setPointer(record);
   }
 }
@@ -4736,7 +4719,6 @@ const size_t NumOpaqueAccessors =
 AbstractStorageDecl::AccessorRecord *
 AbstractStorageDecl::AccessorRecord::create(ASTContext &ctx,
                                             SourceRange braces,
-                                            StorageImplInfo storageInfo,
                                             ArrayRef<AccessorDecl*> accessors) {
   // Silently cap the number of accessors we store at a number that should
   // be easily sufficient for all the valid cases, including space for adding
@@ -4776,15 +4758,13 @@ AbstractStorageDecl::AccessorRecord::create(ASTContext &ctx,
   auto accessorsCapacity = AccessorIndex(accessors.size() + numMissingOpaque);
   void *mem = ctx.Allocate(totalSizeToAlloc<AccessorDecl*>(accessorsCapacity),
                            alignof(AccessorRecord));
-  return new (mem) AccessorRecord(braces, storageInfo,
-                                  accessors, accessorsCapacity);
+  return new (mem) AccessorRecord(braces, accessors, accessorsCapacity);
 }
 
 AbstractStorageDecl::AccessorRecord::AccessorRecord(SourceRange braces,
-                                           StorageImplInfo implInfo,
-                                           ArrayRef<AccessorDecl *> accessors,
-                                           AccessorIndex accessorsCapacity)
-    : Braces(braces), ImplInfo(implInfo), NumAccessors(accessors.size()),
+                                            ArrayRef<AccessorDecl *> accessors,
+                                            AccessorIndex accessorsCapacity)
+    : Braces(braces), NumAccessors(accessors.size()),
       AccessorsCapacity(accessorsCapacity), AccessorIndices{} {
 
   // Copy the complete accessors list into place.
@@ -4852,7 +4832,7 @@ void AbstractStorageDecl::setComputedSetter(AccessorDecl *setter) {
   assert(isAccessor(setter, AccessorKind::Set, this));
   assert(setter && "should not be called for readonly properties");
 
-  overwriteImplInfo(StorageImplInfo::getMutableComputed());
+  setImplInfo(StorageImplInfo::getMutableComputed());
   Accessors.getPointer()->addOpaqueAccessor(setter);
 }
 
@@ -4863,8 +4843,7 @@ AbstractStorageDecl::setSynthesizedGetter(AccessorDecl *accessor) {
 
   auto accessors = Accessors.getPointer();
   if (!accessors) {
-    accessors = AccessorRecord::create(getASTContext(), SourceRange(),
-                                       getImplInfo(), {});
+    accessors = AccessorRecord::create(getASTContext(), SourceRange(), {});
     Accessors.setPointer(accessors);
   }
 
@@ -4878,8 +4857,7 @@ AbstractStorageDecl::setSynthesizedReadCoroutine(AccessorDecl *accessor) {
 
   auto accessors = Accessors.getPointer();
   if (!accessors) {
-    accessors = AccessorRecord::create(getASTContext(), SourceRange(),
-                                       getImplInfo(), {});
+    accessors = AccessorRecord::create(getASTContext(), SourceRange(), {});
     Accessors.setPointer(accessors);
   }
 
@@ -5434,7 +5412,7 @@ void ParamDecl::setSpecifier(Specifier specifier) {
                 ? VarDecl::Introducer::Let
                 : VarDecl::Introducer::Var);
   Bits.ParamDecl.Specifier = static_cast<unsigned>(specifier);
-  overwriteImplInfo(
+  setImplInfo(
     StorageImplInfo::getSimpleStored(
       isImmutableSpecifier(specifier)
       ? StorageIsNotMutable

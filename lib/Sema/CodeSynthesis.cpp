@@ -1791,9 +1791,9 @@ static VarDecl *synthesizePropertyWrapperStorageWrapperProperty(
   bool hasSetter = wrapperVar->isSettable(nullptr) &&
       wrapperVar->isSetterAccessibleFrom(var->getInnermostDeclContext());
   if (hasSetter)
-    property->overwriteImplInfo(StorageImplInfo::getMutableComputed());
+    property->setImplInfo(StorageImplInfo::getMutableComputed());
   else
-    property->overwriteImplInfo(StorageImplInfo::getImmutableComputed());
+    property->setImplInfo(StorageImplInfo::getImmutableComputed());
   addExpectedOpaqueAccessorsToStorage(property, ctx);
 
   var->getAttrs().add(
@@ -2051,7 +2051,7 @@ static void finishProtocolStorageImplInfo(AbstractStorageDecl *storage) {
     }
   }
 
-  storage->overwriteImplInfo(getProtocolStorageImpl(storage));
+  storage->setImplInfo(getProtocolStorageImpl(storage));
 }
 
 static void finishLazyVariableImplInfo(VarDecl *var) {
@@ -2059,7 +2059,7 @@ static void finishLazyVariableImplInfo(VarDecl *var) {
   if (!var->getImplInfo().isSimpleStored())
     return;
 
-  var->overwriteImplInfo(StorageImplInfo::getMutableComputed());
+  var->setImplInfo(StorageImplInfo::getMutableComputed());
 }
 
 /// Determine whether all of the wrapped-value setters for the property
@@ -2091,9 +2091,9 @@ static void finishPropertyWrapperImplInfo(VarDecl *var) {
      allPropertyWrapperValueSettersAreAccessible(var));
 
   if (wrapperSetterIsUsable)
-    var->overwriteImplInfo(StorageImplInfo::getMutableComputed());
+    var->setImplInfo(StorageImplInfo::getMutableComputed());
   else
-    var->overwriteImplInfo(StorageImplInfo::getImmutableComputed());
+    var->setImplInfo(StorageImplInfo::getImmutableComputed());
 }
 
 static void finishNSManagedImplInfo(VarDecl *VD) {
@@ -2101,7 +2101,7 @@ static void finishNSManagedImplInfo(VarDecl *VD) {
   if (!VD->getImplInfo().isSimpleStored())
     return;
 
-  VD->overwriteImplInfo(StorageImplInfo::getMutableComputed());
+  VD->setImplInfo(StorageImplInfo::getMutableComputed());
 }
 
 static void finishStorageImplInfo(AbstractStorageDecl *storage) {

@@ -4947,10 +4947,10 @@ void Parser::ParsedAccessors::record(Parser &P, AbstractStorageDecl *storage,
                                      SmallVectorImpl<Decl *> &decls) {
   auto storageKind = classify(P, storage, invalid, flags, staticLoc, attrs,
                               elementTy, indices);
+  storage->setImplInfo(storageKind);
 
   decls.append(Accessors.begin(), Accessors.end());
-
-  storage->setAccessors(storageKind, LBLoc, Accessors, RBLoc);
+  storage->setAccessors(LBLoc, Accessors, RBLoc);
 }
 
 static void flagInvalidAccessor(AccessorDecl *func) {

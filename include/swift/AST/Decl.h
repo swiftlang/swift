@@ -344,16 +344,7 @@ protected:
     IsUserAccessible : 1
   );
 
-  SWIFT_INLINE_BITFIELD(AbstractStorageDecl, ValueDecl, 1+1+2+1+1+1,
-    /// Whether this represents physical storage.
-    HasStorage : 1,
-
-    /// Whether this storage supports semantic mutation in some way.
-    SupportsMutation : 1,
-
-    /// Whether an opaque read of this storage produces an owned value.
-    OpaqueReadOwnership : 2,
-
+  SWIFT_INLINE_BITFIELD(AbstractStorageDecl, ValueDecl, 1+1+1,
     /// Whether a keypath component can directly reference this storage,
     /// or if it must use the overridden declaration instead.
     HasComputedValidKeyPathComponent : 1,
@@ -4416,10 +4407,6 @@ private:
     /// The range of the braces around the accessor clause.
     SourceRange Braces;
 
-    /// The implementation info for the accessors.  If there's no
-    /// AccessorRecord for a storage decl, the decl is just stored.
-    StorageImplInfo ImplInfo;
-
     /// The number of accessors currently stored in this record.
     AccessorIndex NumAccessors;
 
@@ -4433,18 +4420,14 @@ private:
     /// or the index+1 of the accessor in the accessors array.
     AccessorIndex AccessorIndices[NumAccessorKinds];
 
-    AccessorRecord(SourceRange braces, StorageImplInfo implInfo,
+    AccessorRecord(SourceRange braces,
                    ArrayRef<AccessorDecl*> accessors,
                    AccessorIndex accessorsCapacity);
   public:
     static AccessorRecord *create(ASTContext &ctx, SourceRange braces,
-                                  StorageImplInfo implInfo,
                                   ArrayRef<AccessorDecl*> accessors);
 
     SourceRange getBracesRange() const { return Braces; }
-
-    const StorageImplInfo &getImplInfo() const { return ImplInfo; }
-    void overwriteImplInfo(StorageImplInfo newInfo) { ImplInfo = newInfo; }
 
     inline AccessorDecl *getAccessor(AccessorKind kind) const;
 
@@ -4464,11 +4447,6 @@ private:
 
   llvm::PointerIntPair<AccessorRecord*, 3, OptionalEnum<AccessLevel>> Accessors;
 
-  void setFieldsFromImplInfo(StorageImplInfo implInfo) {
-    Bits.AbstractStorageDecl.HasStorage = implInfo.hasStorage();
-    Bits.AbstractStorageDecl.SupportsMutation = implInfo.supportsMutation();
-  }
-
   struct {
     unsigned IsGetterMutatingComputed : 1;
     unsigned IsGetterMutating : 1;
@@ -4476,15 +4454,18 @@ private:
     unsigned IsSetterMutating : 1;
     unsigned OpaqueReadOwnershipComputed : 1;
     unsigned OpaqueReadOwnership : 2;
+    unsigned ImplInfoComputed : 1;
   } LazySemanticInfo = { };
+
+  /// The implementation info for the accessors.
+  StorageImplInfo ImplInfo;
 
 protected:
   AbstractStorageDecl(DeclKind Kind, bool IsStatic, DeclContext *DC,
                       DeclName Name, SourceLoc NameLoc,
                       StorageIsMutable_t supportsMutation)
-    : ValueDecl(Kind, DC, Name, NameLoc) {
-    Bits.AbstractStorageDecl.HasStorage = true;
-    Bits.AbstractStorageDecl.SupportsMutation = supportsMutation;
+    : ValueDecl(Kind, DC, Name, NameLoc),
+      ImplInfo(StorageImplInfo::getSimpleStored(supportsMutation)) {
     Bits.AbstractStorageDecl.IsStatic = IsStatic;
   }
 
@@ -4513,10 +4494,13 @@ public:
   Type getValueInterfaceType() const;
 
   /// Determine how this storage is implemented.
-  StorageImplInfo getImplInfo() const {
-    if (auto ptr = Accessors.getPointer())
-      return ptr->getImplInfo();
-    return StorageImplInfo::getSimpleStored(supportsMutation());
+  StorageImplInfo getImplInfo() const { return ImplInfo; }
+
+  /// Overwrite the registered implementation-info.  This should be
+  /// used carefully.
+  void setImplInfo(StorageImplInfo implInfo) {
+    LazySemanticInfo.ImplInfoComputed = 1;
+    ImplInfo = implInfo;
   }
 
   ReadImplKind getReadImpl() const {
@@ -4529,14 +4513,11 @@ public:
     return getImplInfo().getReadWriteImpl();
   }
 
-  /// Overwrite the registered implementation-info.  This should be
-  /// used carefully.
-  void overwriteImplInfo(StorageImplInfo implInfo);
 
   /// Return true if this is a VarDecl that has storage associated with
   /// it.
   bool hasStorage() const {
-    return Bits.AbstractStorageDecl.HasStorage;
+    return getImplInfo().hasStorage();
   }
 
   /// Return true if this storage has the basic accessors/capability
@@ -4549,7 +4530,7 @@ public:
   /// can't mutate things that do support mutation (e.g. because their
   /// setter is private).
   StorageIsMutable_t supportsMutation() const {
-    return StorageIsMutable_t(Bits.AbstractStorageDecl.SupportsMutation);
+    return getImplInfo().supportsMutation();
   }
 
   /// Are there any accessors for this declaration, including implicit ones?
@@ -4599,8 +4580,7 @@ public:
   /// Visit all the opaque accessors of this storage declaration.
   void visitOpaqueAccessors(llvm::function_ref<void (AccessorDecl*)>) const;
 
-  void setAccessors(StorageImplInfo storageImpl,
-                    SourceLoc lbraceLoc, ArrayRef<AccessorDecl*> accessors,
+  void setAccessors(SourceLoc lbraceLoc, ArrayRef<AccessorDecl*> accessors,
                     SourceLoc rbraceLoc);
 
   /// Add a setter to an existing Computed var.

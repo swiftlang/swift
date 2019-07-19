@@ -283,8 +283,8 @@ addGetterToReadOnlyDerivedProperty(VarDecl *property,
   auto getter =
     declareDerivedPropertyGetter(property, propertyContextType);
 
-  property->setAccessors(StorageImplInfo::getImmutableComputed(),
-                         SourceLoc(), {getter}, SourceLoc());
+  property->setImplInfo(StorageImplInfo::getImmutableComputed());
+  property->setAccessors(SourceLoc(), {getter}, SourceLoc());
 
   return getter;
 }
