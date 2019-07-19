@@ -373,12 +373,12 @@ func f() -> SomeEnum1 {
   return .#^UNRESOLVED_27^#
 }
 
-let TopLevelVar1 = OptionSetTaker7([.#^UNRESOLVED_28^#], Op2: [.Option4])
+let TopLevelVar1 = OptionSetTaker7([.#^UNRESOLVED_28^#], [.Option4])
 
 let TopLevelVar2 = OptionSetTaker1([.#^UNRESOLVED_29^#])
 
-let TopLevelVar3 = OptionSetTaker7([.Option1], Op2: [.#^UNRESOLVED_30^#])
-let TopLevelVar4 = OptionSetTaker7([.Option1], Op2: [.Option4, .#^UNRESOLVED_31^#])
+let TopLevelVar3 = OptionSetTaker7([.Option1], [.#^UNRESOLVED_30^#])
+let TopLevelVar4 = OptionSetTaker7([.Option1], [.Option4, .#^UNRESOLVED_31^#])
 
 let _: [SomeEnum1] = [.#^UNRESOLVED_32^#]
 let _: [SomeEnum1] = [.South, .#^UNRESOLVED_33^#]
