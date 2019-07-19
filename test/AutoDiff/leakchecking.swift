@@ -119,8 +119,18 @@ LeakCheckingTests.test("TestProtocolDefaultDerivative") {
   }
 }
 
+LeakCheckingTests.test("LetStructs") {
+  testWithLeakChecking {
+    func structConstructionWithOwnedParams(_ x: Tracked<Float>) -> Tracked<Float> {
+      let z = Tracked(x)
+      return z.value
+    }
+    _ = Tracked<Float>(4).valueWithGradient(in: structConstructionWithOwnedParams)
+  }
+}
+
 LeakCheckingTests.test("NestedVarStructs") {
-  testWithLeakChecking(expectedLeakCount: 4) {
+  testWithLeakChecking {
     func nestedstruct_var(_ x: Tracked<Float>) -> Tracked<Float> {
       var y = FloatPair(x + x, x - x)
       var z = Pair(Tracked(y), x)
@@ -311,7 +321,7 @@ LeakCheckingTests.test("ControlFlowWithNestedStructs") {
   // FIXME: Fix control flow AD memory leaks.
   // See related FIXME comments in adjoint value/buffer propagation in
   // lib/SILOptimizer/Mandatory/Differentiation.cpp.
-  testWithLeakChecking(expectedLeakCount: 117) {
+  testWithLeakChecking(expectedLeakCount: 105) {
     func cond_nestedstruct_var(_ x: Tracked<Float>) -> Tracked<Float> {
       // Convoluted function returning `x + x`.
       var y = FloatPair(x + x, x - x)
