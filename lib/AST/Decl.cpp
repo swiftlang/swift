@@ -5845,9 +5845,8 @@ Expr *swift::findOriginalPropertyWrapperInitialValue(VarDecl *var,
         if (auto tuple = dyn_cast<TupleExpr>(call->getArg())) {
           ASTContext &ctx = innermostNominal->getASTContext();
           for (unsigned i : range(tuple->getNumElements())) {
-            if ((tuple->getElementName(i) == ctx.Id_wrappedValue ||
-                 tuple->getElementName(i) == ctx.Id_initialValue) &&
-                tuple->getElementNameLoc(i).isInvalid()) {
+            if (tuple->getElementName(i) == ctx.Id_wrappedValue ||
+                tuple->getElementName(i) == ctx.Id_initialValue) {
               initArg = tuple->getElement(i);
               return { false, E };
             }
