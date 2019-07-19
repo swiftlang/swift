@@ -310,16 +310,6 @@ static StringRef getDefaultArgumentKindString(DefaultArgumentKind value) {
 
   llvm_unreachable("Unhandled DefaultArgumentKind in switch.");
 }
-static StringRef getAccessorKindString(AccessorKind value) {
-  switch (value) {
-#define ACCESSOR(ID)
-#define SINGLETON_ACCESSOR(ID, KEYWORD) \
-  case AccessorKind::ID: return #KEYWORD;
-#include "swift/AST/AccessorKinds.def"
-  }
-
-  llvm_unreachable("Unhandled AccessorKind in switch.");
-}
 static StringRef
 getMagicIdentifierLiteralExprKindString(MagicIdentifierLiteralExpr::Kind value) {
   switch (value) {
@@ -1603,7 +1593,14 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitForEachStmt(ForEachStmt *S) {
-    printCommon(S, "for_each_stmt") << '\n';
+    printCommon(S, "for_each_stmt");
+    PrintWithColorRAII(OS, LiteralValueColor) << " make_generator=";
+    S->getMakeIterator().dump(
+        PrintWithColorRAII(OS, LiteralValueColor).getOS());
+    PrintWithColorRAII(OS, LiteralValueColor) << " next=";
+    S->getIteratorNext().dump(
+        PrintWithColorRAII(OS, LiteralValueColor).getOS());
+    OS << '\n';
     printRec(S->getPattern());
     OS << '\n';
     if (S->getWhere()) {
@@ -1617,12 +1614,20 @@ public:
     OS << '\n';
     printRec(S->getSequence());
     OS << '\n';
-    if (S->getIterator()) {
-      printRec(S->getIterator());
+    if (S->getIteratorVar()) {
+      printRec(S->getIteratorVar());
       OS << '\n';
     }
-    if (S->getIteratorNext()) {
-      printRec(S->getIteratorNext());
+    if (S->getIteratorVarRef()) {
+      printRec(S->getIteratorVarRef());
+      OS << '\n';
+    }
+    if (S->getConvertElementExpr()) {
+      printRec(S->getConvertElementExpr());
+      OS << '\n';
+    }
+    if (S->getElementExpr()) {
+      printRec(S->getElementExpr());
       OS << '\n';
     }
     printRec(S->getBody());
@@ -3056,7 +3061,6 @@ static void dumpProtocolConformanceRec(
       out << " lazy";
     } else {
       normal->forEachTypeWitness(
-          nullptr,
           [&](const AssociatedTypeDecl *req, Type ty,
               const TypeDecl *) -> bool {
             out << '\n';
@@ -3067,8 +3071,8 @@ static void dumpProtocolConformanceRec(
             PrintWithColorRAII(out, ParenthesisColor) << ')';
             return false;
           });
-      normal->forEachValueWitness(nullptr, [&](const ValueDecl *req,
-                                               Witness witness) {
+      normal->forEachValueWitness([&](const ValueDecl *req,
+                                      Witness witness) {
         out << '\n';
         out.indent(indent + 2);
         PrintWithColorRAII(out, ParenthesisColor) << '(';
@@ -3770,4 +3774,15 @@ void GenericEnvironment::dump(raw_ostream &os) const {
 
 void GenericEnvironment::dump() const {
   dump(llvm::errs());
+}
+
+StringRef swift::getAccessorKindString(AccessorKind value) {
+  switch (value) {
+#define ACCESSOR(ID)
+#define SINGLETON_ACCESSOR(ID, KEYWORD) \
+  case AccessorKind::ID: return #KEYWORD;
+#include "swift/AST/AccessorKinds.def"
+  }
+
+  llvm_unreachable("Unhandled AccessorKind in switch.");
 }

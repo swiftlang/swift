@@ -116,6 +116,8 @@ BuiltinUnit::BuiltinUnit(ModuleDecl &M)
 // Normal Module Name Lookup
 //===----------------------------------------------------------------------===//
 
+SourceFile::~SourceFile() = default;
+
 class SourceFile::LookupCache {
   /// A lookup map for value decls. When declarations are added they are added
   /// under all variants of the name they can be found under.

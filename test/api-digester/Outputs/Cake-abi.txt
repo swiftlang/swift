@@ -7,16 +7,18 @@ cake: Protocol P3 has generic signature change from <τ_0_0 : cake.P1, τ_0_0 : 
 
 /* Removed Decls */
 Swift: Extension Int has been removed
+cake: Accessor GlobalVarChangedToLet.Modify() has been removed
 cake: Accessor GlobalVarChangedToLet.Set() has been removed
+cake: Accessor RemoveSetters.Value.Modify() has been removed
 cake: Accessor RemoveSetters.Value.Set() has been removed
+cake: Accessor RemoveSetters.subscript(_:).Modify() has been removed
+cake: Accessor RemoveSetters.subscript(_:).Set() has been removed
+cake: Accessor fixedLayoutStruct.height.Read() has been removed
 cake: AssociatedType RequiementChanges.removedType has been removed
 cake: Class C3 has been removed
 cake: Constructor Somestruct2.init(_:) has been removed
 cake: Func C4.foo() has been removed
 cake: Func RequiementChanges.removedFunc() has been removed
-cake: Subscript RemoveSetters.subscript(_:) has removed its setter
-cake: Var GlobalVarChangedToLet has removed its setter
-cake: Var RemoveSetters.Value has removed its setter
 cake: Var RequiementChanges.removedVar has been removed
 
 /* Moved Decls */
@@ -29,6 +31,7 @@ cake: Func S1.foo5(x:y:) has been renamed to Func foo5(x:y:z:)
 cake: Struct Somestruct2 has been renamed to Struct NSSomestruct2
 
 /* Type Changes */
+cake: Accessor Zoo.current.Get() has return type change from Cat to Dog
 cake: AssociatedType AssociatedTypePro.T3 has default type change from C1 to C6
 cake: Class TChangesFromIntToString has type witness type for AssociatedTypesProtocol.T changing from Int to String
 cake: Constructor S1.init(_:) has parameter 0 type change from Int to Double
@@ -38,11 +41,15 @@ cake: Func C7.foo(_:_:) has removed default argument from parameter 1
 cake: Func EscapingFunctionType.addedEscaping(_:) has added @escaping in parameter 0
 cake: Func EscapingFunctionType.removedEscaping(_:) has removed @escaping in parameter 0
 cake: Func Somestruct2.foo1(_:) has parameter 0 type change from C3 to C1
+cake: Func Zoo.getCurrentAnimalInlinable() has return type change from Cat to Dog
 cake: Func ownershipChange(_:_:) has parameter 0 changing from InOut to Default
 cake: Func ownershipChange(_:_:) has parameter 1 changing from Shared to Owned
+cake: Var Zoo.current has declared type change from Cat to Dog
 
 /* Decl Attribute changes */
+cake: Accessor GlobalLetChangedToVar.Modify() is a new API without @available attribute
 cake: Accessor GlobalLetChangedToVar.Set() is a new API without @available attribute
+cake: Accessor fixedLayoutStruct2.BecomeFixedBinaryOrder.Modify() is a new API without @available attribute
 cake: Accessor fixedLayoutStruct2.BecomeFixedBinaryOrder.Set() is a new API without @available attribute
 cake: AssociatedType RequiementChanges.addedTypeWithDefault is a new API without @available attribute
 cake: AssociatedType RequiementChanges.addedTypeWithoutDefault is a new API without @available attribute

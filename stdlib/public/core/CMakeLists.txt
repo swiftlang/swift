@@ -313,7 +313,7 @@ add_swift_target_library(swiftCore
                   FILE_DEPENDS
                     copy_shim_headers "${SWIFTLIB_DIR}/shims" ${GROUP_INFO_JSON_FILE}
                   SWIFT_COMPILE_FLAGS
-                    ${swift_stdlib_compile_flags} -Xcc -DswiftCore_EXPORTS
+                    ${swift_stdlib_compile_flags} -Xcc -DswiftCore_EXPORTS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
                   LINK_FLAGS
                     ${swift_core_link_flags}
                   PRIVATE_LINK_LIBRARIES

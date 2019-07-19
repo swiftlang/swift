@@ -268,6 +268,10 @@ class NameMatcher: public ASTWalker {
   std::vector<UnresolvedLoc> LocsToResolve;
   std::vector<ResolvedLoc> ResolvedLocs;
   ArrayRef<Token> TokensToCheck;
+
+  /// The \c Expr argument of a parent \c CustomAttr (if one exists) and
+  /// the \c SourceLoc of the type name it applies to.
+  llvm::Optional<std::pair<SourceLoc, Expr *>> CustomAttrArg;
   unsigned InactiveConfigRegionNestings = 0;
   unsigned SelectorNestings = 0;
 
@@ -287,6 +291,7 @@ class NameMatcher: public ASTWalker {
                   bool checkParentForLabels = false);
   bool tryResolve(ASTWalker::ParentTy Node, SourceLoc NameLoc, LabelRangeType RangeType,
                   ArrayRef<CharSourceRange> LabelLocs);
+  bool handleCustomAttrs(Decl *D);
 
   std::pair<bool, Expr*> walkToExprPre(Expr *E) override;
   Expr* walkToExprPost(Expr *E) override;

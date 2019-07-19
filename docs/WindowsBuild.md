@@ -52,11 +52,11 @@ git clone https://gitlab.gnome.org/GNOME/libxml2.git
 ```
 
 ## 3. Acquire ICU
-1. Download ICU from [ICU Project](http://site.icu-project.org) for Windows x64 and extract the binaries.
+1. Download ICU from [ICU Project](http://site.icu-project.org) for Windows x64 and extract the folder to a new folder called `thirdparty`. In other words, there should be a folder `S:\thirdparty\icu4c-64_2-Win64-MSVC2017` with the ICU. 
 1. Add the `bin64` folder to your `Path` environment variable.
 
 ```cmd
-PATH S:\icu\bin64;%PATH%
+PATH S:\thirdparty\icu4c-64_2-Win64-MSVC2017\bin64;%PATH%
 ```
 
 ## 4. Fetch SQLite3

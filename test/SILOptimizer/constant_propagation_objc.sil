@@ -1050,3 +1050,131 @@ bb4:
   %9999 = tuple()
   return %9999 : $()
 }
+
+@objc class ObjCClass {}
+
+struct Str: _ObjectiveCBridgeable {
+  func _bridgeToObjectiveC() -> ObjCClass
+  static func _forceBridgeFromObjectiveC(_ source: ObjCClass,
+                                         result: inout Str?)
+  static func _conditionallyBridgeFromObjectiveC(_ source: ObjCClass,
+                                         result: inout Str?) -> Bool
+  static func _unconditionallyBridgeFromObjectiveC(_ source: ObjCClass?) -> Str
+
+  // Make it a non-trivial type
+  var x: AnyObject?
+}
+
+// CHECK-LABEL: sil @checked_cast_with_take_always :
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK: [[TEMP_MEM:%[0-9]+]] = alloc_stack
+// CHECK: [[LOADED_VALUE:%[0-9]+]] = load [[ARG]]
+// CHECK-NEXT: [[RESULT:%[0-9]+]] = apply %{{[0-9]+}}([[LOADED_VALUE]])
+// CHECK-NEXT: release_value [[LOADED_VALUE]]
+// CHECK-NEXT: store [[RESULT]] to [[TEMP_MEM]]
+// CHECK-NEXT: br bb1
+//
+// CHECK: bb1:
+// CHECK-NEXT:   [[RESULT:%.*]] = load [[TEMP_MEM]]
+// CHECK-NEXT:   [[ENUM:%.*]] = enum $Optional<ObjCClass>, #Optional.some!enumelt.1, [[RESULT]]
+// CHECK-NEXT:   br bb3([[ENUM]] :
+//
+// CHECK: bb3([[RESULT:%.*]] : $Optional<ObjCClass>):
+// CHECK-NEXT: dealloc_stack [[TEMP_MEM]]
+// CHECK-NEXT: return [[RESULT]]
+// CHECK: } // end sil function 'checked_cast_with_take_always'
+sil @checked_cast_with_take_always : $@convention(thin) (@in Str) -> @owned Optional<ObjCClass> {
+bb0(%0 : $*Str):
+  %b = alloc_stack $ObjCClass
+  checked_cast_addr_br take_always Str in %0 : $*Str to ObjCClass in %b : $*ObjCClass, bb1, bb2
+
+bb1:
+  %r1 = load %b : $*ObjCClass
+  %r1Enum = enum $Optional<ObjCClass>, #Optional.some!enumelt.1, %r1 : $ObjCClass
+  br bb3(%r1Enum : $Optional<ObjCClass>)
+
+bb2:
+  %none = enum $Optional<ObjCClass>, #Optional.none!enumelt
+  br bb3(%none : $Optional<ObjCClass>)
+
+bb3(%result : $Optional<ObjCClass>):
+  dealloc_stack %b : $*ObjCClass
+  return %result : $Optional<ObjCClass>
+}
+
+// CHECK-LABEL: sil @checked_cast_with_take_on_success :
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK: [[TEMP_MEM:%[0-9]+]] = alloc_stack
+// CHECK: [[LOADED_VALUE:%[0-9]+]] = load [[ARG]]
+// CHECK-NEXT: [[RESULT:%[0-9]+]] = apply %{{[0-9]+}}([[LOADED_VALUE]])
+// CHECK-NEXT: store [[RESULT]] to [[TEMP_MEM]]
+// CHECK-NEXT: br bb1
+//
+// CHECK: bb1:
+// CHECK-NEXT:   release_value [[LOADED_VALUE]]
+// CHECK-NEXT:   [[RESULT:%.*]] = load [[TEMP_MEM]]
+// CHECK-NEXT:   [[ENUM:%.*]] = enum $Optional<ObjCClass>, #Optional.some!enumelt.1, [[RESULT]]
+// CHECK-NEXT:   br bb3([[ENUM]] :
+//
+// CHECK: bb3([[RESULT:%.*]] : $Optional<ObjCClass>):
+// CHECK-NEXT: dealloc_stack [[TEMP_MEM]]
+// CHECK-NEXT: return [[RESULT]]
+// CHECK: } // end sil function 'checked_cast_with_take_on_success'
+sil @checked_cast_with_take_on_success : $@convention(thin) (@in Str) -> @owned Optional<ObjCClass> {
+bb0(%0 : $*Str):
+  %b = alloc_stack $ObjCClass
+  checked_cast_addr_br take_on_success Str in %0 : $*Str to ObjCClass in %b : $*ObjCClass, bb1, bb2
+
+bb1:
+  %r1 = load %b : $*ObjCClass
+  %r1Enum = enum $Optional<ObjCClass>, #Optional.some!enumelt.1, %r1 : $ObjCClass
+  br bb3(%r1Enum : $Optional<ObjCClass>)
+
+bb2:
+  %none = enum $Optional<ObjCClass>, #Optional.none!enumelt
+  destroy_addr %0 : $*Str
+  br bb3(%none : $Optional<ObjCClass>)
+
+bb3(%result : $Optional<ObjCClass>):
+  dealloc_stack %b : $*ObjCClass
+  return %result : $Optional<ObjCClass>
+}
+
+// CHECK-LABEL: sil @checked_cast_with_copy_on_success :
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK: [[TEMP_MEM:%[0-9]+]] = alloc_stack
+// CHECK: [[LOADED_VALUE:%[0-9]+]] = load [[ARG]]
+// CHECK-NEXT: [[RESULT:%[0-9]+]] = apply %{{[0-9]+}}([[LOADED_VALUE]])
+// CHECK-NEXT: store [[RESULT]] to [[TEMP_MEM]]
+// CHECK-NEXT: br bb1
+//
+// CHECK: bb1:
+// CHECK-NEXT:   store [[LOADED_VALUE]] to [[ARG]]
+// CHECK-NEXT:   [[RESULT:%.*]] = load [[TEMP_MEM]]
+// CHECK-NEXT:   [[ENUM:%.*]] = enum $Optional<ObjCClass>, #Optional.some!enumelt.1, [[RESULT]]
+// CHECK-NEXT:   br bb3([[ENUM]] :
+//
+// CHECK: bb3([[RESULT:%.*]] : $Optional<ObjCClass>):
+// CHECK-NEXT: destroy_addr [[ARG]]
+// CHECK-NEXT: dealloc_stack [[TEMP_MEM]]
+// CHECK-NEXT: return [[RESULT]]
+// CHECK: } // end sil function 'checked_cast_with_copy_on_success'
+sil @checked_cast_with_copy_on_success : $@convention(thin) (@in Str) -> @owned Optional<ObjCClass> {
+bb0(%0 : $*Str):
+  %b = alloc_stack $ObjCClass
+  checked_cast_addr_br copy_on_success Str in %0 : $*Str to ObjCClass in %b : $*ObjCClass, bb1, bb2
+
+bb1:
+  %r1 = load %b : $*ObjCClass
+  %r1Enum = enum $Optional<ObjCClass>, #Optional.some!enumelt.1, %r1 : $ObjCClass
+  br bb3(%r1Enum : $Optional<ObjCClass>)
+
+bb2:
+  %none = enum $Optional<ObjCClass>, #Optional.none!enumelt
+  br bb3(%none : $Optional<ObjCClass>)
+
+bb3(%result : $Optional<ObjCClass>):
+  destroy_addr %0 : $*Str
+  dealloc_stack %b : $*ObjCClass
+  return %result : $Optional<ObjCClass>
+}

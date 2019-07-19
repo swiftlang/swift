@@ -69,6 +69,10 @@ STATISTIC(NumLazyGenericEnvironments,
           "# of lazily-deserialized generic environments known");
 STATISTIC(NumLazyGenericEnvironmentsLoaded,
           "# of lazily-deserialized generic environments loaded");
+STATISTIC(NumLazyRequirementSignatures,
+          "# of lazily-deserialized requirement signatures known");
+
+#undef DEBUG_TYPE
 
 #define DECL(Id, _) \
   static_assert((DeclKind::Id == DeclKind::Module) ^ \
@@ -159,7 +163,6 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
   TRIVIAL_KIND(Param);
   TRIVIAL_KIND(Module);
   TRIVIAL_KIND(MissingMember);
-  TRIVIAL_KIND(OpaqueType);
 
    case DeclKind::Enum:
      return cast<EnumDecl>(this)->getGenericParams()
@@ -256,6 +259,13 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
        return DescriptiveDeclKind::ClassMethod;
      }
    }
+
+   case DeclKind::OpaqueType: {
+     auto *opaqueTypeDecl = cast<OpaqueTypeDecl>(this);
+     if (dyn_cast_or_null<VarDecl>(opaqueTypeDecl->getNamingDecl()))
+       return DescriptiveDeclKind::OpaqueVarType;
+     return DescriptiveDeclKind::OpaqueResultType;
+   }
   }
 #undef TRIVIAL_KIND
   llvm_unreachable("bad DescriptiveDeclKind");
@@ -316,7 +326,8 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(Module, "module");
   ENTRY(MissingMember, "missing member placeholder");
   ENTRY(Requirement, "requirement");
-  ENTRY(OpaqueType, "opaque type");
+  ENTRY(OpaqueResultType, "result");
+  ENTRY(OpaqueVarType, "type");
   }
 #undef ENTRY
   llvm_unreachable("bad DescriptiveDeclKind");
@@ -822,8 +833,17 @@ GenericSignature *GenericContext::getGenericSignature() const {
 
   // The signature of a Protocol is trivial (Self: TheProtocol) so let's compute
   // it.
-  if (auto PD = dyn_cast<ProtocolDecl>(this))
-    return getGenericEnvironment()->getGenericSignature();
+  if (auto PD = dyn_cast<ProtocolDecl>(this)) {
+    const_cast<ProtocolDecl *>(PD)->createGenericParamsIfMissing();
+    auto self = PD->getSelfInterfaceType()->castTo<GenericTypeParamType>();
+    auto req =
+        Requirement(RequirementKind::Conformance, self, PD->getDeclaredType());
+    auto *genericSig = GenericSignature::get({self}, {req});
+
+    // Save it for next time.
+    const_cast<GenericContext *>(this)->GenericSigOrEnv = genericSig;
+    return genericSig;
+  }
 
   return nullptr;
 }
@@ -834,23 +854,8 @@ GenericEnvironment *GenericContext::getGenericEnvironment() const {
     return genericEnv;
 
   // If we only have a generic signature, build the generic environment.
-  if (GenericSigOrEnv.dyn_cast<GenericSignature *>())
+  if (GenericSigOrEnv.dyn_cast<GenericSignature *>() || isa<ProtocolDecl>(this))
     return getLazyGenericEnvironmentSlow();
-
-  // The signature of a Protocol is trivial (Self: TheProtocol) so let's compute
-  // it.
-  if (auto PD = dyn_cast<ProtocolDecl>(this)) {
-    const_cast<ProtocolDecl *>(PD)->createGenericParamsIfMissing();
-    auto self = PD->getSelfInterfaceType()->castTo<GenericTypeParamType>();
-    auto req =
-        Requirement(RequirementKind::Conformance, self, PD->getDeclaredType());
-    auto *genericSig = GenericSignature::get({self}, {req});
-
-    // Save it for next time.
-    const_cast<GenericContext *>(this)
-      ->setGenericEnvironment(genericSig->createGenericEnvironment());
-    return getGenericEnvironment();
-  }
 
   return nullptr;
 }
@@ -872,7 +877,15 @@ void GenericContext::setGenericEnvironment(GenericEnvironment *genericEnv) {
 GenericEnvironment *
 GenericContext::getLazyGenericEnvironmentSlow() const {
   assert(GenericSigOrEnv.is<GenericSignature *>() &&
-         "not a lazily deserialized generic environment");
+         "not a lazily computed generic environment");
+
+  if (auto PD = dyn_cast<ProtocolDecl>(this)) {
+    // The signature of a Protocol is trivial (Self: TheProtocol) so let's
+    // compute it directly.
+    auto *genericEnv = getGenericSignature()->createGenericEnvironment();
+    const_cast<GenericContext *>(this)->setGenericEnvironment(genericEnv);
+    return genericEnv;
+  }
 
   auto contextData = getASTContext().getOrCreateLazyGenericContextData(
     this, nullptr);
@@ -1586,6 +1599,11 @@ bool PatternBindingDecl::isDefaultInitializable(unsigned i) const {
     if (auto wrapperInfo = singleVar->getAttachedPropertyWrapperTypeInfo(0)) {
       if (wrapperInfo.defaultInit)
         return true;
+
+      // If one of the attached wrappers is missing an initialValue
+      // initializer, cannot default-initialize.
+      if (!singleVar->allAttachedPropertyWrappersHaveInitialValueInit())
+        return false;
     }
   }
 
@@ -2950,7 +2968,7 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
     if (resultDC->isLocalContext() || access == AccessLevel::Private)
       return AccessScope(resultDC, /*private*/true);
 
-    if (auto enclosingNominal = dyn_cast<NominalTypeDecl>(resultDC)) {
+    if (auto enclosingNominal = dyn_cast<GenericTypeDecl>(resultDC)) {
       auto enclosingAccess =
           getAdjustedFormalAccess(enclosingNominal, useDC,
                                   treatUsableFromInlineAsPublic);
@@ -3884,7 +3902,7 @@ bool ClassDecl::isIncompatibleWithWeakReferences() const {
   return false;
 }
 
-bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {
+bool ClassDecl::inheritsSuperclassInitializers() {
   // Check whether we already have a cached answer.
   if (addedImplicitInitializers())
     return Bits.ClassDecl.InheritsSuperclassInits;
@@ -3903,9 +3921,7 @@ bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {
 
   // Otherwise, do all the work of resolving constructors, which will also
   // calculate the right answer.
-  if (resolver == nullptr)
-    resolver = getASTContext().getLazyResolver();
-  if (resolver)
+  if (auto *resolver = getASTContext().getLazyResolver())
     resolver->resolveImplicitConstructors(this);
 
   return Bits.ClassDecl.InheritsSuperclassInits;
@@ -4614,7 +4630,7 @@ bool ProtocolDecl::isAvailableInExistential(const ValueDecl *decl) const {
   return true;
 }
 
-bool ProtocolDecl::existentialTypeSupportedSlow(LazyResolver *resolver) {
+bool ProtocolDecl::existentialTypeSupportedSlow() {
   // Assume for now that the existential type is supported; this
   // prevents circularity issues.
   Bits.ProtocolDecl.ExistentialTypeSupportedValid = true;
@@ -4635,8 +4651,9 @@ bool ProtocolDecl::existentialTypeSupportedSlow(LazyResolver *resolver) {
 
     // For value members, look at their type signatures.
     if (auto valueMember = dyn_cast<ValueDecl>(member)) {
-      if (resolver && !valueMember->hasInterfaceType())
-        resolver->resolveDeclSignature(valueMember);
+      if (!valueMember->hasInterfaceType())
+        if (auto *resolver = getASTContext().getLazyResolver())
+          resolver->resolveDeclSignature(valueMember);
 
       if (!isAvailableInExistential(valueMember)) {
         Bits.ProtocolDecl.ExistentialTypeSupported = false;
@@ -4648,7 +4665,7 @@ bool ProtocolDecl::existentialTypeSupportedSlow(LazyResolver *resolver) {
   // Check whether all of the inherited protocols can have existential
   // types themselves.
   for (auto proto : getInheritedProtocols()) {
-    if (!proto->existentialTypeSupported(resolver)) {
+    if (!proto->existentialTypeSupported()) {
       Bits.ProtocolDecl.ExistentialTypeSupported = false;
       return false;
     }
@@ -4707,9 +4724,25 @@ void ProtocolDecl::setRequirementSignature(ArrayRef<Requirement> requirements) {
     RequirementSignature = reinterpret_cast<Requirement *>(this + 1);
     Bits.ProtocolDecl.NumRequirementsInSignature = 0;
   } else {
-    RequirementSignature = getASTContext().AllocateCopy(requirements).data();
+    RequirementSignature = requirements.data();
     Bits.ProtocolDecl.NumRequirementsInSignature = requirements.size();
   }
+}
+
+void
+ProtocolDecl::setLazyRequirementSignature(LazyMemberLoader *lazyLoader,
+                                          uint64_t requirementSignatureData) {
+  assert(!RequirementSignature && "requirement signature already set");
+
+  auto contextData = static_cast<LazyProtocolData *>(
+      getASTContext().getOrCreateLazyContextData(this, lazyLoader));
+  contextData->requirementSignatureData = requirementSignatureData;
+  Bits.ProtocolDecl.HasLazyRequirementSignature = true;
+
+  ++NumLazyRequirementSignatures;
+  // FIXME: (transitional) increment the redundant "always-on" counter.
+  if (getASTContext().Stats)
+    getASTContext().Stats->getFrontendCounters().NumLazyRequirementSignatures++;
 }
 
 ArrayRef<Requirement> ProtocolDecl::getCachedRequirementSignature() const {
@@ -5545,7 +5578,7 @@ bool VarDecl::hasAttachedPropertyWrapper() const {
 /// Whether all of the attached property wrappers have an init(initialValue:) initializer.
 bool VarDecl::allAttachedPropertyWrappersHaveInitialValueInit() const {
   for (unsigned i : indices(getAttachedPropertyWrappers())) {
-    if (!getAttachedPropertyWrapperTypeInfo(i).initialValueInit)
+    if (!getAttachedPropertyWrapperTypeInfo(i).wrappedValueInit)
       return false;
   }
   
@@ -5598,6 +5631,10 @@ VarDecl::getPropertyWrapperBackingPropertyInfo() const {
 
 VarDecl *VarDecl::getPropertyWrapperBackingProperty() const {
   return getPropertyWrapperBackingPropertyInfo().backingVar;
+}
+
+VarDecl *VarDecl::getPropertyWrapperStorageWrapper() const {
+  return getPropertyWrapperBackingPropertyInfo().storageWrapperVar;
 }
 
 VarDecl *VarDecl::getLazyStorageProperty() const {
@@ -5959,7 +5996,8 @@ Expr *swift::findOriginalPropertyWrapperInitialValue(VarDecl *var,
         if (auto tuple = dyn_cast<TupleExpr>(call->getArg())) {
           ASTContext &ctx = innermostNominal->getASTContext();
           for (unsigned i : range(tuple->getNumElements())) {
-            if (tuple->getElementName(i) == ctx.Id_initialValue &&
+            if ((tuple->getElementName(i) == ctx.Id_wrappedValue ||
+                 tuple->getElementName(i) == ctx.Id_initialValue) &&
                 tuple->getElementNameLoc(i).isInvalid()) {
               initArg = tuple->getElement(i);
               return { false, E };
@@ -6249,6 +6287,12 @@ Type AbstractFunctionDecl::getMethodInterfaceType() const {
   if (Ty->hasError())
     return ErrorType::get(getASTContext());
   return Ty->castTo<AnyFunctionType>()->getResult();
+}
+
+bool AbstractFunctionDecl::hasDynamicSelfResult() const {
+  if (auto *funcDecl = dyn_cast<FuncDecl>(this))
+    return funcDecl->getResultInterfaceType()->hasDynamicSelfType();
+  return isa<ConstructorDecl>(this);
 }
 
 bool AbstractFunctionDecl::argumentNameIsAPIByDefault() const {
@@ -6606,6 +6650,21 @@ OpaqueTypeDecl::OpaqueTypeDecl(ValueDecl *NamingDecl,
 {
   // Always implicit.
   setImplicit();
+}
+
+bool OpaqueTypeDecl::isOpaqueReturnTypeOfFunction(
+                                       const AbstractFunctionDecl *func) const {
+  // Either the function is declared with its own opaque return type...
+  if (getNamingDecl() == func)
+    return true;
+
+  // ...or the function is a getter for a property or subscript with an
+  // opaque return type.
+  if (auto accessor = dyn_cast<AccessorDecl>(func)) {
+    return accessor->isGetter() && getNamingDecl() == accessor->getStorage();
+  }
+
+  return false;
 }
 
 Identifier OpaqueTypeDecl::getOpaqueReturnTypeIdentifier() const {

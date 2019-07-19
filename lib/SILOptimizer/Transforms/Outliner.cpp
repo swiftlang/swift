@@ -157,7 +157,7 @@ static SILDeclRef getBridgeToObjectiveC(CanType NativeType,
   if (!Requirement)
     return SILDeclRef();
 
-  auto Witness = Conformance->getWitnessDecl(Requirement, nullptr);
+  auto Witness = Conformance->getWitnessDecl(Requirement);
   return SILDeclRef(Witness);
 }
 
@@ -189,7 +189,7 @@ SILDeclRef getBridgeFromObjectiveC(CanType NativeType,
   if (!Requirement)
     return SILDeclRef();
 
-  auto Witness = Conformance->getWitnessDecl(Requirement, nullptr);
+  auto Witness = Conformance->getWitnessDecl(Requirement);
   return SILDeclRef(Witness);
 }
 

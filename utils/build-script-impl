@@ -774,14 +774,12 @@ function set_build_options_for_host() {
         -DSWIFT_HOST_VARIANT_ARCH="${SWIFT_HOST_VARIANT_ARCH}"
     )
 
-    if [[ "${LLVM_LIT_ARGS}" ]]; then
-        llvm_cmake_options+=(
-            -DLLVM_LIT_ARGS="${LLVM_LIT_ARGS}"
-        )
-        swift_cmake_options+=(
-            -DLLVM_LIT_ARGS="${LLVM_LIT_ARGS}"
-        )
-    fi
+    llvm_cmake_options+=(
+        -DLLVM_LIT_ARGS="${LLVM_LIT_ARGS} -j ${BUILD_JOBS}"
+    )
+    swift_cmake_options+=(
+        -DLLVM_LIT_ARGS="${LLVM_LIT_ARGS} -j ${BUILD_JOBS}"
+    )
 
     if [[ "${CLANG_PROFILE_INSTR_USE}" ]]; then
         llvm_cmake_options+=(
@@ -2722,8 +2720,15 @@ for host in "${ALL_HOSTS[@]}"; do
                       call xcodebuild -target desktop -configuration "${LLDB_BUILD_MODE} ${lldb_xcodebuild_options[@]}"
                   continue
                 else
+                  if [[ "$(uname -s)" == "Darwin" ]] ; then
+                    cmake_cache="Apple-lldb-macOS.cmake"
+                  else
+                    cmake_cache="Apple-lldb-linux.cmake"
+                  fi
+
                   cmake_options=(
                       "${cmake_options[@]}"
+                      -C${LLDB_SOURCE_DIR}/cmake/caches/${cmake_cache}
                       -DCMAKE_BUILD_TYPE:STRING="${LLDB_BUILD_TYPE}"
                       -DLLDB_SWIFTC:PATH="$(build_directory ${LOCAL_HOST} swift)/bin/swiftc"
                       -DLLDB_SWIFT_LIBS:PATH="$(build_directory ${LOCAL_HOST} swift)/lib/swift"
@@ -2741,10 +2746,8 @@ for host in "${ALL_HOSTS[@]}"; do
 
                   if [[ "$(uname -s)" == "Darwin" ]] ; then
                     cmake_options+=(
-                      -DLLDB_BUILD_FRAMEWORK:BOOL=TRUE
                       -DLLDB_CODESIGN_IDENTITY=""
                       -DLLDB_USE_SYSTEM_DEBUGSERVER:BOOL="${LLDB_USE_SYSTEM_DEBUGSERVER}"
-                      -DLLDB_FRAMEWORK_TOOLS="darwin-debug;lldb-argdumper;lldb-server;repl_swift"
                     )
                   fi
                 fi
@@ -3362,7 +3365,7 @@ for host in "${ALL_HOSTS[@]}"; do
 
                 if [[ "${ENABLE_ASAN}" ]] ; then
                     # Limit the number of parallel tests
-                    LLVM_LIT_ARGS="${LLVM_LIT_ARGS} --threads=$(sysctl hw.physicalcpu | awk '{ print $2 }')"
+                    LLVM_LIT_ARGS="${LLVM_LIT_ARGS} -j $(sysctl hw.physicalcpu | awk -v N=${BUILD_JOBS} '{ print (N < $2) ? N : $2 }')"
                 fi
 
 		if [[ "$(true_false ${LLDB_TEST_SWIFT_ONLY})" == "TRUE" ]]; then
@@ -3373,9 +3376,9 @@ for host in "${ALL_HOSTS[@]}"; do
                 LLVM_LIT_ARGS="${LLVM_LIT_ARGS} -v --time-tests"
                 if [[ "$using_xcodebuild" == "FALSE" ]] ; then
                     with_pushd ${lldb_build_dir} \
-                        call ${NINJA_BIN} unittests/LLDBUnitTests
+                        call ${NINJA_BIN} -j ${BUILD_JOBS} unittests/LLDBUnitTests
                     with_pushd ${lldb_build_dir} \
-                        call ${NINJA_BIN} lldb-test-deps
+                        call ${NINJA_BIN} -j ${BUILD_JOBS} lldb-test-deps
                     with_pushd ${results_dir} \
                         call "${llvm_build_dir}/bin/llvm-lit" \
                              "${lldb_build_dir}/lit" \

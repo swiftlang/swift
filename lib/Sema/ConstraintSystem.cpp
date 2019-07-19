@@ -375,6 +375,12 @@ getAlternativeLiteralTypes(KnownProtocolKind kind) {
 }
 
 ConstraintLocator *ConstraintSystem::getConstraintLocator(
+    Expr *anchor, ArrayRef<ConstraintLocator::PathElement> path) {
+  auto summaryFlags = ConstraintLocator::getSummaryFlagsForPath(path);
+  return getConstraintLocator(anchor, path, summaryFlags);
+}
+
+ConstraintLocator *ConstraintSystem::getConstraintLocator(
                      Expr *anchor,
                      ArrayRef<ConstraintLocator::PathElement> path,
                      unsigned summaryFlags) {
@@ -783,7 +789,21 @@ Type ConstraintSystem::getUnopenedTypeOfReference(VarDecl *value, Type baseType,
                                                   bool wantInterfaceType) {
   return TC.getUnopenedTypeOfReference(
       value, baseType, UseDC,
-      [&](VarDecl *var) -> Type { return getType(var, wantInterfaceType); },
+      [&](VarDecl *var) -> Type {
+        if (auto *param = dyn_cast<ParamDecl>(var))
+          return getType(param);
+
+        if (!var->hasValidSignature()) {
+          if (!var->isInvalid()) {
+            TC.diagnose(var->getLoc(), diag::recursive_decl_reference,
+                        var->getDescriptiveKind(), var->getName());
+            var->markInvalid();
+          }
+          return ErrorType::get(TC.Context);
+        }
+
+        return wantInterfaceType ? var->getInterfaceType() : var->getType();
+      },
       base, wantInterfaceType);
 }
 
@@ -901,16 +921,12 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
 
     // If this is a method whose result type is dynamic Self, replace
     // DynamicSelf with the actual object type.
-    if (!func->getDeclContext()->getSelfProtocolDecl()) {
-      if (func->hasDynamicSelf()) {
-        auto params = openedType->getParams();
-        assert(params.size() == 1);
-        Type selfTy = params.front().getPlainType()->getMetatypeInstanceType();
-        openedType = openedType->replaceCovariantResultType(selfTy, 2)
-                         ->castTo<FunctionType>();
-      }
-    } else {
-      openedType = openedType->eraseDynamicSelfType()->castTo<FunctionType>();
+    if (func->getResultInterfaceType()->hasDynamicSelfType()) {
+      auto params = openedType->getParams();
+      assert(params.size() == 1);
+      Type selfTy = params.front().getPlainType()->getMetatypeInstanceType();
+      openedType = openedType->replaceCovariantResultType(selfTy, 2)
+                        ->castTo<FunctionType>();
     }
 
     // The reference implicitly binds 'self'.
@@ -1296,16 +1312,19 @@ ConstraintSystem::getTypeOfMemberReference(
     // Class methods returning Self as well as constructors get the
     // result replaced with the base object type.
     if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
-      if ((isa<FuncDecl>(func) && cast<FuncDecl>(func)->hasDynamicSelf()) ||
-          (isa<ConstructorDecl>(func) && !baseObjTy->getOptionalObjectType())) {
+      if (func->hasDynamicSelfResult() &&
+          !baseObjTy->getOptionalObjectType()) {
         openedType = openedType->replaceCovariantResultType(baseObjTy, 2);
       }
+    } else if (auto *decl = dyn_cast<SubscriptDecl>(value)) {
+      if (decl->getElementInterfaceType()->hasDynamicSelfType()) {
+        openedType = openedType->replaceCovariantResultType(baseObjTy, 2);
+      }
+    } else if (auto *decl = dyn_cast<VarDecl>(value)) {
+      if (decl->getValueInterfaceType()->hasDynamicSelfType()) {
+        openedType = openedType->replaceCovariantResultType(baseObjTy, 1);
+      }
     }
-  } else {
-    // Protocol requirements returning Self have a dynamic Self return
-    // type. Erase the dynamic Self since it only comes into play during
-    // protocol conformance checking.
-    openedType = openedType->eraseDynamicSelfType();
   }
 
   // If we are looking at a member of an existential, open the existential.
@@ -1370,8 +1389,6 @@ ConstraintSystem::getTypeOfMemberReference(
       cast<GenericTypeParamType>(outerDC->getSelfInterfaceType()
                                  ->getCanonicalType())];
     type = type.transform([&](Type t) -> Type {
-      if (auto *selfTy = t->getAs<DynamicSelfType>())
-        t = selfTy->getSelfType();
       if (t->is<TypeVariableType>())
         if (t->isEqual(selfTy))
           return baseObjTy;
@@ -1447,6 +1464,11 @@ Type ConstraintSystem::getEffectiveOverloadType(const OverloadChoice &overload,
 
       if (doesStorageProduceLValue(subscript, overload.getBaseType(), useDC))
         elementTy = LValueType::get(elementTy);
+      else if (elementTy->hasDynamicSelfType()) {
+        Type selfType = overload.getBaseType()->getRValueType()
+            ->getMetatypeInstanceType()->lookThroughAllOptionalTypes();
+        elementTy = elementTy->replaceCovariantResultType(selfType, 0);
+      }
 
       // See ConstraintSystem::resolveOverload() -- optional and dynamic
       // subscripts are a special case, because the optionality is
@@ -1469,16 +1491,17 @@ Type ConstraintSystem::getEffectiveOverloadType(const OverloadChoice &overload,
 
       // Cope with 'Self' returns.
       if (!decl->getDeclContext()->getSelfProtocolDecl()) {
-        if ((isa<FuncDecl>(decl) && cast<FuncDecl>(decl)->hasDynamicSelf()) ||
-            (isa<ConstructorDecl>(decl) &&
-             !overload.getBaseType()->getOptionalObjectType())) {
+        if (isa<AbstractFunctionDecl>(decl) &&
+            cast<AbstractFunctionDecl>(decl)->hasDynamicSelfResult()) {
           if (!overload.getBaseType())
             return Type();
 
-          Type selfType = overload.getBaseType()->getRValueType()
-              ->getMetatypeInstanceType()
-              ->lookThroughAllOptionalTypes();
-          type = type->replaceCovariantResultType(selfType, 2);
+          if (!overload.getBaseType()->getOptionalObjectType()) {
+            Type selfType = overload.getBaseType()->getRValueType()
+                ->getMetatypeInstanceType()
+                ->lookThroughAllOptionalTypes();
+            type = type->replaceCovariantResultType(selfType, 2);
+          }
         }
       }
 
@@ -2226,8 +2249,7 @@ Type simplifyTypeImpl(ConstraintSystem &cs, Type type, Fn getFixedTypeFn) {
       if (auto selfType = lookupBaseType->getAs<DynamicSelfType>())
         lookupBaseType = selfType->getSelfType();
 
-      if (lookupBaseType->mayHaveMembers() ||
-          lookupBaseType->is<DynamicSelfType>()) {
+      if (lookupBaseType->mayHaveMembers()) {
         auto *proto = assocType->getProtocol();
         auto conformance = cs.DC->getParentModule()->lookupConformance(
           lookupBaseType, proto);

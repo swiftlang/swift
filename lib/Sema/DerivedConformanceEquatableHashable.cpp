@@ -1277,7 +1277,7 @@ ValueDecl *DerivedConformance::deriveHashable(ValueDecl *requirement) {
     // Start by resolving hashValue conformance.
     auto hashValueReq = getHashValueRequirement(C);
     auto conformance = getHashableConformance(ConformanceDecl);
-    auto hashValueDecl = conformance->getWitnessDecl(hashValueReq, &TC);
+    auto hashValueDecl = conformance->getWitnessDecl(hashValueReq);
     if (!hashValueDecl) {
       // We won't derive hash(into:) if hashValue cannot be resolved.
       // The hashValue failure will produce a diagnostic elsewhere.

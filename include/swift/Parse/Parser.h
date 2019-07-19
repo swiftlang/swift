@@ -876,6 +876,7 @@ public:
   }
 
   ParserResult<Decl> parseDecl(ParseDeclOptions Flags,
+                               bool IsAtStartOfLineOrPreviousHadSemi,
                                llvm::function_ref<void(Decl*)> Handler);
 
   void parseDeclDelayed();
@@ -1027,9 +1028,8 @@ public:
                SmallVectorImpl<Decl *> &Decls,
                SourceLoc StaticLoc,
                StaticSpellingKind StaticSpelling,
-               SourceLoc TryLoc);
-
-  void consumeGetSetBody(AbstractFunctionDecl *AFD, SourceLoc LBLoc);
+               SourceLoc TryLoc,
+               bool HasLetOrVarKeyword = true);
 
   struct ParsedAccessors;
   ParserStatus parseGetSet(ParseDeclOptions Flags,
@@ -1039,9 +1039,6 @@ public:
                            ParsedAccessors &accessors,
                            AbstractStorageDecl *storage,
                            SourceLoc StaticLoc);
-  void recordAccessors(AbstractStorageDecl *storage, ParseDeclOptions flags,
-                       TypeLoc elementTy, const DeclAttributes &attrs,
-                       SourceLoc staticLoc, ParsedAccessors &accessors);
   ParserResult<VarDecl> parseDeclVarGetSet(Pattern *pattern,
                                            ParseDeclOptions Flags,
                                            SourceLoc StaticLoc,
@@ -1056,7 +1053,8 @@ public:
   ParserResult<FuncDecl> parseDeclFunc(SourceLoc StaticLoc,
                                        StaticSpellingKind StaticSpelling,
                                        ParseDeclOptions Flags,
-                                       DeclAttributes &Attributes);
+                                       DeclAttributes &Attributes,
+                                       bool HasFuncKeyword = true);
   void parseAbstractFunctionBody(AbstractFunctionDecl *AFD);
   bool parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD);
   ParserResult<ProtocolDecl> parseDeclProtocol(ParseDeclOptions Flags,
@@ -1361,10 +1359,8 @@ public:
   ParserResult<Expr> parseExprKeyPathObjC();
   ParserResult<Expr> parseExprKeyPath();
   ParserResult<Expr> parseExprSelector();
-  ParserResult<Expr> parseExprSuper(bool isExprBasic);
-  ParserResult<Expr> parseExprConfiguration();
+  ParserResult<Expr> parseExprSuper();
   ParserResult<Expr> parseExprStringLiteral();
-  ParserResult<Expr> parseExprTypeOf();
 
   StringRef copyAndStripUnderscores(StringRef text);
 
@@ -1461,10 +1457,6 @@ public:
                              syntax::SyntaxKind Kind);
 
   ParserResult<Expr> parseTrailingClosure(SourceRange calleeRange);
-
-  // NOTE: used only for legacy support for old object literal syntax.
-  // Will be removed in the future.
-  bool isCollectionLiteralStartingWithLSquareLit();
 
   /// Parse an object literal.
   ///

@@ -36,6 +36,10 @@ module CoreCooling {
   export *
 }
 
+module CXXInterop {
+  header "cxx_interop.h"
+}
+
 module ctypes_bits_exported {
   header "ctypes_bits_exported.h"
   export *
@@ -228,8 +232,4 @@ module ConditionallyFoo {
 
 module ForwardDeclarationsHelper {
   header "ForwardDeclarationsHelper.h"
-}
-
-module CXXInterop {
-  header "cxx_interop.h"
 }

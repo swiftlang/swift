@@ -590,7 +590,6 @@ bool swift::isRepresentableInObjC(
     if (!ResultType->hasError() &&
         !ResultType->isVoid() &&
         !ResultType->isUninhabited() &&
-        !ResultType->hasDynamicSelfType() &&
         !ResultType->isRepresentableIn(ForeignLanguage::ObjectiveC,
                                        const_cast<FuncDecl *>(FD))) {
       if (Diagnose) {
@@ -2081,7 +2080,7 @@ static AbstractFunctionDecl *lookupObjCMethodInClass(
 
   // Determine whether we are (still) inheriting initializers.
   inheritingInits = inheritingInits &&
-                    classDecl->inheritsSuperclassInitializers(nullptr);
+                    classDecl->inheritsSuperclassInitializers();
   if (isInitializer && !inheritingInits)
     return nullptr;
 

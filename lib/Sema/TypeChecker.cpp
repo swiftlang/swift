@@ -348,19 +348,10 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
       TC.typeCheckDecl(decl);
     }
 
-    // Ensure that the requirements of the given conformance are
-    // fully checked.
-    for (unsigned i = 0; i != TC.PartiallyCheckedConformances.size(); ++i) {
-      auto conformance = TC.PartiallyCheckedConformances[i];
-      TC.checkConformanceRequirements(conformance);
-    }
-    TC.PartiallyCheckedConformances.clear();
-
   } while (currentFunctionIdx < TC.definedFunctions.size() ||
            currentSynthesizedDecl < SF.SynthesizedDecls.size() ||
            TC.NextDeclToFinalize < TC.DeclsToFinalize.size() ||
-           !TC.ConformanceContexts.empty() ||
-           !TC.PartiallyCheckedConformances.empty());
+           !TC.ConformanceContexts.empty());
 
   // FIXME: Horrible hack. Store this somewhere more appropriate.
   SF.LastCheckedSynthesizedDecl = currentSynthesizedDecl;

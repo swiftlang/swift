@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module-interface-path %t/Lib.swiftinterface -typecheck -enable-library-evolution -enable-objc-interop -disable-objc-attr-requires-foundation-module -swift-version 5 %S/Inputs/enums-layout-helper.swift
+// RUN: %target-swift-frontend -emit-module-interface-path %t/Lib.swiftinterface -typecheck -enable-library-evolution -enable-objc-interop -disable-objc-attr-requires-foundation-module -swift-version 5 %S/Inputs/enums-layout-helper.swift -module-name Lib
 // RUN: %FileCheck %S/Inputs/enums-layout-helper.swift < %t/Lib.swiftinterface
 // RUN: %target-swift-frontend -enable-objc-interop -O -emit-ir -primary-file %s -I %t | %FileCheck %s
 

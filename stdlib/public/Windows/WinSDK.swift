@@ -97,7 +97,7 @@ public extension FILETIME {
 /// The `BOOL` type declared in WinDefs.h and used throughout WinSDK
 ///
 /// The C type is a typedef for `int`.
-@_fixed_layout
+@frozen
 public struct WindowsBool : ExpressibleByBooleanLiteral {
   @usableFromInline
   var _value: Int32

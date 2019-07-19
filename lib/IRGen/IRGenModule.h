@@ -1060,6 +1060,8 @@ public:
   /// reflection metadata.
   llvm::SetVector<CanType> BuiltinTypes;
 
+  llvm::Constant *getTypeRef(Type type, GenericSignature *genericSig,
+                             MangledTypeRefRole role);
   llvm::Constant *getTypeRef(CanType type, MangledTypeRefRole role);
   llvm::Constant *emitWitnessTableRefString(CanType type,
                                             ProtocolConformanceRef conformance,
@@ -1101,8 +1103,7 @@ public:
   llvm::Constant *getAddrOfBoxDescriptor(CanType boxedType);
 
   /// Produce an associated type witness that refers to the given type.
-  llvm::Constant *getAssociatedTypeWitness(CanType type,
-                                           bool inProtocolContext);
+  llvm::Constant *getAssociatedTypeWitness(Type type, bool inProtocolContext);
 
   void emitAssociatedTypeMetadataRecord(const RootProtocolConformance *C);
   void emitFieldDescriptor(const NominalTypeDecl *Decl);

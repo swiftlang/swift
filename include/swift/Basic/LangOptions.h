@@ -88,7 +88,8 @@ namespace swift {
     bool DisableAvailabilityChecking = false;
 
     /// Maximum number of typo corrections we are allowed to perform.
-    unsigned TypoCorrectionLimit = 10;
+    /// This is disabled by default until we can get typo-correction working within acceptable performance bounds.
+    unsigned TypoCorrectionLimit = 0;
     
     /// Should access control be respected?
     bool EnableAccessControl = true;
@@ -147,6 +148,9 @@ namespace swift {
     bool EnableObjCInterop = true;
 
     /// Enable C++ interop code generation and build configuration
+    /// options. Disabled by default because there is no way to control the
+    /// language mode of clang on a per-header or even per-module basis. Also
+    /// disabled because it is not complete.
     /// options.
     /// FIXME: Disabled by default until this is fully baked.
     bool EnableCXXInterop = false;
@@ -251,8 +255,11 @@ namespace swift {
     bool EnableDeserializationRecovery = true;
 
     /// Should we use \c ASTScope-based resolution for unqualified name lookup?
+    /// Default is in \c ParseLangArgs
+    ///
+    /// This is a staging flag; eventually it will be removed.
     bool EnableASTScopeLookup = false;
-    
+
     /// Someday, ASTScopeLookup will supplant lookup in the parser
     bool DisableParserLookup = false;
 
@@ -314,9 +321,6 @@ namespace swift {
     /// Scaffolding to permit experimentation with finer-grained dependencies
     /// and faster rebuilds.
     bool EnableExperimentalDependencies = false;
-    
-    /// Enable the experimental opaque result types feature.
-    bool EnableOpaqueResultTypes = true;
     
     /// To mimic existing system, set to false.
     /// To experiment with including file-private and private dependency info,

@@ -127,7 +127,7 @@ protected:
     return None;
   }
 
-  ValueDecl *getResolvedMemberRef(UnresolvedDotExpr *member) {
+  ValueDecl *getResolvedMemberRef(UnresolvedDotExpr *member) const {
     auto locator = CS.getConstraintLocator(member, ConstraintLocator::Member);
     return CS.findResolvedMemberRef(locator);
   }
@@ -153,12 +153,24 @@ protected:
     return nullptr;
   }
 
+  /// Retrive the constraint locator for the given anchor and
+  /// path, uniqued and automatically calculate the summary flags
+  ConstraintLocator *
+  getConstraintLocator(Expr *anchor,
+                       ArrayRef<ConstraintLocator::PathElement> path) {
+    return CS.getConstraintLocator(anchor, path);
+  }
+
   /// \returns true is locator hasn't been simplified down to expression.
   bool hasComplexLocator() const { return HasComplexLocator; }
 
   /// \returns A parent expression if sub-expression is contained anywhere
   /// in the root expression or `nullptr` otherwise.
   Expr *findParentExpr(Expr *subExpr) const;
+
+  /// If given expression is some kind of a member reference e.g.
+  /// `x.foo` or `x[0]` extract and return its base expression.
+  Expr *getBaseExprFor(Expr *anchor) const;
 
   /// \returns An argument expression if given anchor is a call, member
   /// reference or subscript, nullptr otherwise.
@@ -700,16 +712,6 @@ private:
 
   static Diag<StringRef> findDeclDiagonstic(ASTContext &ctx, Expr *destExpr);
 
-  static bool isLoadedLValue(Expr *expr) {
-    expr = expr->getSemanticsProvidingExpr();
-    if (isa<LoadExpr>(expr))
-      return true;
-    if (auto ifExpr = dyn_cast<IfExpr>(expr))
-      return isLoadedLValue(ifExpr->getThenExpr()) &&
-             isLoadedLValue(ifExpr->getElseExpr());
-    return false;
-  }
-
   /// Retrive an member reference associated with given member
   /// looking through dynamic member lookup on the way.
   Optional<OverloadChoice> getMemberRef(ConstraintLocator *locator) const;
@@ -799,20 +801,57 @@ public:
   bool diagnoseAsError() override;
 };
 
-class MissingPropertyWrapperUnwrapFailure final : public ContextualFailure {
-  DeclName PropertyName;
+class PropertyWrapperReferenceFailure : public ContextualFailure {
+  VarDecl *Property;
+  bool UsingStorageWrapper;
 
 public:
-  MissingPropertyWrapperUnwrapFailure(Expr *root, ConstraintSystem &cs,
-                                      DeclName propertyName, Type base,
-                                      Type wrapper, ConstraintLocator *locator)
-      : ContextualFailure(root, cs, base, wrapper, locator),
-        PropertyName(propertyName) {}
+  PropertyWrapperReferenceFailure(Expr *root, ConstraintSystem &cs,
+                                  VarDecl *property, bool usingStorageWrapper,
+                                  Type base, Type wrapper,
+                                  ConstraintLocator *locator)
+      : ContextualFailure(root, cs, base, wrapper, locator), Property(property),
+        UsingStorageWrapper(usingStorageWrapper) {}
+
+  VarDecl *getProperty() const { return Property; }
+
+  Identifier getPropertyName() const { return Property->getName(); }
+
+  bool usingStorageWrapper() const { return UsingStorageWrapper; }
+
+  ValueDecl *getReferencedMember() const {
+    auto *locator = getLocator();
+    if (auto overload = getOverloadChoiceIfAvailable(locator))
+      return overload->choice.getDeclOrNull();
+    return nullptr;
+  }
+};
+
+class ExtraneousPropertyWrapperUnwrapFailure final
+    : public PropertyWrapperReferenceFailure {
+public:
+  ExtraneousPropertyWrapperUnwrapFailure(Expr *root, ConstraintSystem &cs,
+                                         VarDecl *property,
+                                         bool usingStorageWrapper, Type base,
+                                         Type wrapper,
+                                         ConstraintLocator *locator)
+      : PropertyWrapperReferenceFailure(root, cs, property, usingStorageWrapper,
+                                        base, wrapper, locator) {}
 
   bool diagnoseAsError() override;
+};
 
-private:
-  DeclName getPropertyName() const { return PropertyName; }
+class MissingPropertyWrapperUnwrapFailure final
+    : public PropertyWrapperReferenceFailure {
+public:
+  MissingPropertyWrapperUnwrapFailure(Expr *root, ConstraintSystem &cs,
+                                      VarDecl *property,
+                                      bool usingStorageWrapper, Type base,
+                                      Type wrapper, ConstraintLocator *locator)
+      : PropertyWrapperReferenceFailure(root, cs, property, usingStorageWrapper,
+                                        base, wrapper, locator) {}
+
+  bool diagnoseAsError() override;
 };
 
 class SubscriptMisuseFailure final : public FailureDiagnostic {
@@ -1107,6 +1146,30 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose an attempt to reference member marked as `mutating`
+/// on immutable base e.g. `let` variable:
+///
+/// ```swift
+/// struct S {
+///   mutating func foo(_ i: Int) {}
+///   func foo(_ f: Float) {}
+/// }
+///
+/// func bar(_ s: S, _ answer: Int) {
+///  s.foo(answer)
+/// }
+/// ```
+class MutatingMemberRefOnImmutableBase final : public FailureDiagnostic {
+  ValueDecl *Member;
+
+public:
+  MutatingMemberRefOnImmutableBase(Expr *root, ConstraintSystem &cs,
+                                   ValueDecl *member,
+                                   ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator), Member(member) {}
+
+  bool diagnoseAsError() override;
+};
 
 // Diagnose an attempt to use AnyObject as the root type of a KeyPath
 //

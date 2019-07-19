@@ -197,10 +197,9 @@ public:
   friend class SILInstructionVisitor<ClosureCloner>;
   friend class SILCloner<ClosureCloner>;
 
-  ClosureCloner(SILOptFunctionBuilder &FuncBuilder,
-                SILFunction *Orig, IsSerialized_t Serialized,
-                StringRef ClonedName,
-                IndicesSet &PromotableIndices);
+  ClosureCloner(SILOptFunctionBuilder &FuncBuilder, SILFunction *Orig,
+                IsSerialized_t Serialized, StringRef ClonedName,
+                IndicesSet &PromotableIndices, ResilienceExpansion expansion);
 
   void populateCloned();
 
@@ -210,7 +209,8 @@ private:
   static SILFunction *initCloned(SILOptFunctionBuilder &FuncBuilder,
                                  SILFunction *Orig, IsSerialized_t Serialized,
                                  StringRef ClonedName,
-                                 IndicesSet &PromotableIndices);
+                                 IndicesSet &PromotableIndices,
+                                 ResilienceExpansion expansion);
 
   SILValue getProjectBoxMappedVal(SILValue Operand);
 
@@ -224,6 +224,7 @@ private:
   void visitBeginAccessInst(BeginAccessInst *Inst);
   void visitEndAccessInst(EndAccessInst *Inst);
 
+  ResilienceExpansion resilienceExpansion;
   SILFunction *Orig;
   IndicesSet &PromotableIndices;
   llvm::DenseMap<SILArgument *, SILValue> BoxArgumentMap;
@@ -311,10 +312,12 @@ ReachabilityInfo::isReachable(SILBasicBlock *From, SILBasicBlock *To) {
 ClosureCloner::ClosureCloner(SILOptFunctionBuilder &FuncBuilder,
                              SILFunction *Orig, IsSerialized_t Serialized,
                              StringRef ClonedName,
-                             IndicesSet &PromotableIndices)
-  : SILClonerWithScopes<ClosureCloner>(
-      *initCloned(FuncBuilder, Orig, Serialized, ClonedName, PromotableIndices)),
-    Orig(Orig), PromotableIndices(PromotableIndices) {
+                             IndicesSet &PromotableIndices,
+                             ResilienceExpansion resilienceExpansion)
+    : SILClonerWithScopes<ClosureCloner>(
+          *initCloned(FuncBuilder, Orig, Serialized, ClonedName,
+                      PromotableIndices, resilienceExpansion)),
+      Orig(Orig), PromotableIndices(PromotableIndices) {
   assert(Orig->getDebugScope()->Parent != getCloned()->getDebugScope()->Parent);
 }
 
@@ -326,9 +329,9 @@ ClosureCloner::ClosureCloner(SILOptFunctionBuilder &FuncBuilder,
 /// 2. Replace container box value arguments for the cloned closure with the
 ///    transformed address or value argument.
 static void
-computeNewArgInterfaceTypes(SILFunction *F,
-                            IndicesSet &PromotableIndices,
-                            SmallVectorImpl<SILParameterInfo> &OutTys) {
+computeNewArgInterfaceTypes(SILFunction *F, IndicesSet &PromotableIndices,
+                            SmallVectorImpl<SILParameterInfo> &OutTys,
+                            ResilienceExpansion expansion) {
   auto fnConv = F->getConventions();
   auto Parameters = fnConv.funcTy->getParameters();
 
@@ -365,11 +368,9 @@ computeNewArgInterfaceTypes(SILFunction *F,
     assert(paramBoxTy->getLayout()->getFields().size() == 1
            && "promoting compound box not implemented yet");
     auto paramBoxedTy = paramBoxTy->getFieldType(F->getModule(), 0);
-    // FIXME: Expansion
-    auto &paramTL = Types.getTypeLowering(paramBoxedTy,
-                                          ResilienceExpansion::Minimal);
+    auto &paramTL = Types.getTypeLowering(paramBoxedTy, expansion);
     ParameterConvention convention;
-    if (paramTL.isFormallyPassedIndirectly()) {
+    if (paramTL.isAddressOnly()) {
       convention = ParameterConvention::Indirect_In;
     } else if (paramTL.isTrivial()) {
       convention = ParameterConvention::Direct_Unowned;
@@ -407,16 +408,17 @@ static std::string getSpecializedName(SILFunction *F,
 ///
 /// *NOTE* PromotableIndices only contains the container value of the box, not
 /// the address value.
-SILFunction*
+SILFunction *
 ClosureCloner::initCloned(SILOptFunctionBuilder &FunctionBuilder,
                           SILFunction *Orig, IsSerialized_t Serialized,
-                          StringRef ClonedName,
-                          IndicesSet &PromotableIndices) {
+                          StringRef ClonedName, IndicesSet &PromotableIndices,
+                          ResilienceExpansion resilienceExpansion) {
   SILModule &M = Orig->getModule();
 
   // Compute the arguments for our new function.
   SmallVector<SILParameterInfo, 4> ClonedInterfaceArgTys;
-  computeNewArgInterfaceTypes(Orig, PromotableIndices, ClonedInterfaceArgTys);
+  computeNewArgInterfaceTypes(Orig, PromotableIndices, ClonedInterfaceArgTys,
+                              resilienceExpansion);
 
   SILFunctionType *OrigFTI = Orig->getLoweredFunctionType();
 
@@ -1149,7 +1151,8 @@ examineAllocBoxInst(AllocBoxInst *ABI, ReachabilityInfo &RI,
 static SILFunction *
 constructClonedFunction(SILOptFunctionBuilder &FuncBuilder,
                         PartialApplyInst *PAI, FunctionRefInst *FRI,
-                        IndicesSet &PromotableIndices) {
+                        IndicesSet &PromotableIndices,
+                        ResilienceExpansion resilienceExpansion) {
   SILFunction *F = PAI->getFunction();
 
   // Create the Cloned Name for the function.
@@ -1168,7 +1171,8 @@ constructClonedFunction(SILOptFunctionBuilder &FuncBuilder,
   }
 
   // Otherwise, create a new clone.
-  ClosureCloner cloner(FuncBuilder, Orig, Serialized, ClonedName, PromotableIndices);
+  ClosureCloner cloner(FuncBuilder, Orig, Serialized, ClonedName,
+                       PromotableIndices, resilienceExpansion);
   cloner.populateCloned();
   return cloner.getCloned();
 }
@@ -1252,7 +1256,8 @@ processPartialApplyInst(SILOptFunctionBuilder &FuncBuilder,
   auto *FRI = dyn_cast<FunctionRefInst>(PAI->getCallee());
 
   // Clone the closure with the given promoted captures.
-  SILFunction *ClonedFn = constructClonedFunction(FuncBuilder, PAI, FRI, PromotableIndices);
+  SILFunction *ClonedFn = constructClonedFunction(
+      FuncBuilder, PAI, FRI, PromotableIndices, F->getResilienceExpansion());
   Worklist.push_back(ClonedFn);
 
   // Initialize a SILBuilder and create a function_ref referencing the cloned

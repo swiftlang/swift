@@ -5,8 +5,8 @@
 
 // REQUIRES: executable_test
 
-// XFAIL: swift_test_mode_optimize
-// XFAIL: swift_test_mode_optimize_size
+// UNSUPPORTED: swift_test_mode_optimize
+// UNSUPPORTED: swift_test_mode_optimize_size
 
 import StdlibUnittest
 
@@ -48,11 +48,11 @@ func bar_r(_ x: Int) -> some P {
 var DynamicallyReplaceable = TestSuite("DynamicallyReplaceable")
 
 DynamicallyReplaceable.test("DynamicallyReplaceable") {
-  expectEqual(1, replaceable())
-  expectEqual(2, replaceable1())
-  expectEqual(3, replaceable2())
-  expectEqual(7, replaceableInOtherFile())
   if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+    expectEqual(1, replaceable())
+    expectEqual(2, replaceable1())
+    expectEqual(3, replaceable2())
+    expectEqual(7, replaceableInOtherFile())
     expectEqual(16, MemoryLayout.size(ofValue: bar(5)))
     expectEqual(16, MemoryLayout.size(ofValue: bar1(5)))
     expectEqual(16, MemoryLayout.size(ofValue: bar2(5)))

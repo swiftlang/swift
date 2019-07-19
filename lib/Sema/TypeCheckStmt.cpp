@@ -443,6 +443,29 @@ public:
       return RS;
     }
 
+    // If the body consisted of a single return without a result
+    // 
+    //   func foo() -> Int {
+    //     return
+    //   }
+    // 
+    // in parseAbstractFunctionBody the return is given an empty, implicit tuple
+    // as its result
+    //
+    //   func foo() -> Int {
+    //     return ()
+    //   }
+    //
+    // Look for that case and diagnose it as missing return expression.
+    if (!ResultTy->isVoid() && TheFunc->hasSingleExpressionBody()) {
+      auto expr = TheFunc->getSingleExpressionBody();
+      if (expr->isImplicit() && isa<TupleExpr>(expr) &&
+          cast<TupleExpr>(expr)->getNumElements() == 0) {
+        TC.diagnose(RS->getReturnLoc(), diag::return_expr_missing);
+        return RS;
+      }
+    }
+
     Expr *E = RS->getResult();
 
     // In an initializer, the only expression allowed is "nil", which indicates
@@ -484,16 +507,8 @@ public:
       auto funcDecl = TheFunc->getAbstractFunctionDecl();
       if (!funcDecl)
         return false;
-      // Either the function is declared with its own opaque return type...
-      if (opaque->getNamingDecl() == funcDecl)
-        return true;
-      // ...or the function is a getter for a property or subscript with an
-      // opaque return type.
-      if (auto accessor = dyn_cast<AccessorDecl>(funcDecl)) {
-        return accessor->isGetter()
-          && opaque->getNamingDecl() == accessor->getStorage();
-      }
-      return false;
+
+      return opaque->isOpaqueReturnTypeOfFunction(funcDecl);
     };
     
     if (auto opaque = ResultTy->getAs<OpaqueTypeArchetypeType>()) {
@@ -726,17 +741,17 @@ public:
     }
 
     // Retrieve the 'Iterator' protocol.
-    ProtocolDecl *generatorProto
-      = TC.getProtocol(S->getForLoc(), KnownProtocolKind::IteratorProtocol);
-    if (!generatorProto) {
+    ProtocolDecl *iteratorProto =
+        TC.getProtocol(S->getForLoc(), KnownProtocolKind::IteratorProtocol);
+    if (!iteratorProto) {
       return nullptr;
     }
-    
+
     Expr *sequence = S->getSequence();
 
     // Invoke iterator() to get an iterator from the sequence.
-    Type generatorTy;
-    VarDecl *generator;
+    Type iteratorTy;
+    VarDecl *iterator;
     {
       Type sequenceType = sequence->getType();
       auto conformance =
@@ -745,43 +760,61 @@ public:
                                         sequence->getLoc());
       if (!conformance)
         return nullptr;
+      S->setSequenceConformance(conformance);
 
-      generatorTy = TC.getWitnessType(sequenceType, sequenceProto,
-                                      *conformance,
-                                      TC.Context.Id_Iterator,
-                                      diag::sequence_protocol_broken);
-
-      if (!generatorTy)
+      iteratorTy = TC.getWitnessType(sequenceType, sequenceProto, *conformance,
+                                     TC.Context.Id_Iterator,
+                                     diag::sequence_protocol_broken);
+      if (!iteratorTy)
         return nullptr;
-      
-      Expr *getIterator
-        = TC.callWitness(sequence, DC, sequenceProto, *conformance,
-                         TC.Context.Id_makeIterator,
-                         {}, diag::sequence_protocol_broken);
-      if (!getIterator) return nullptr;
 
-      // Create a local variable to capture the generator.
+      auto witness = conformance->getWitnessByName(
+          sequenceType->getRValueType(), TC.Context.Id_makeIterator);
+      if (!witness)
+        return nullptr;
+      S->setMakeIterator(witness);
+
+      // Create a local variable to capture the iterator.
       std::string name;
       if (auto np = dyn_cast_or_null<NamedPattern>(S->getPattern()))
         name = "$"+np->getBoundName().str().str();
       name += "$generator";
-      generator = new (TC.Context)
-        VarDecl(/*IsStatic*/false, VarDecl::Specifier::Var, /*IsCaptureList*/false,
-                S->getInLoc(), TC.Context.getIdentifier(name), DC);
-      generator->setType(generatorTy);
-      generator->setInterfaceType(generatorTy->mapTypeOutOfContext());
-      generator->setImplicit();
 
-      // Create a pattern binding to initialize the generator.
-      auto genPat = new (TC.Context) NamedPattern(generator);
+      iterator = new (TC.Context) VarDecl(
+          /*IsStatic*/ false, VarDecl::Specifier::Var, /*IsCaptureList*/ false,
+          S->getInLoc(), TC.Context.getIdentifier(name), DC);
+      iterator->setType(iteratorTy);
+      iterator->setInterfaceType(iteratorTy->mapTypeOutOfContext());
+      iterator->setImplicit();
+      S->setIteratorVar(iterator);
+
+      auto genPat = new (TC.Context) NamedPattern(iterator);
       genPat->setImplicit();
+
+      // TODO: test/DebugInfo/iteration.swift requires this extra info to
+      // be around.
+      auto nextResultType =
+          OptionalType::get(conformance->getTypeWitnessByName(
+                                sequenceType, DC->getASTContext().Id_Element))
+              ->getCanonicalType();
       auto *genBinding = PatternBindingDecl::createImplicit(
-          TC.Context, StaticSpellingKind::None, genPat, getIterator, DC,
+          TC.Context, StaticSpellingKind::None, genPat,
+          new (TC.Context) OpaqueValueExpr(S->getInLoc(), nextResultType), DC,
           /*VarLoc*/ S->getForLoc());
-      S->setIterator(genBinding);
+
+      Type newSequenceType = cast<AbstractFunctionDecl>(witness.getDecl())
+            ->getInterfaceType()
+            ->getAs<AnyFunctionType>()
+            ->getParams()[0].getPlainType().subst(witness.getSubstitutions());
+
+      // Necessary type coersion for method application.
+      if (TC.convertToType(sequence, newSequenceType, DC, None)) {
+        return nullptr;
+      }
+      S->setSequence(sequence);
     }
 
-    // Working with generators requires Optional.
+    // Working with iterators requires Optional.
     if (TC.requireOptionalIntrinsics(S->getForLoc()))
       return nullptr;
 
@@ -789,43 +822,49 @@ public:
     // we'll use to drive the loop.
     // FIXME: Would like to customize the diagnostic emitted in
     // conformsToProtocol().
-    auto genConformance =
-      TypeChecker::conformsToProtocol(generatorTy, generatorProto, DC,
-                                      ConformanceCheckFlags::InExpression,
-                                      sequence->getLoc());
+    auto genConformance = TypeChecker::conformsToProtocol(
+        iteratorTy, iteratorProto, DC, ConformanceCheckFlags::InExpression,
+        sequence->getLoc());
     if (!genConformance)
       return nullptr;
 
-    Type elementTy = TC.getWitnessType(generatorTy, generatorProto,
+    Type elementTy = TC.getWitnessType(iteratorTy, iteratorProto,
                                        *genConformance, TC.Context.Id_Element,
                                        diag::iterator_protocol_broken);
     if (!elementTy)
       return nullptr;
-    
-    // Compute the expression that advances the generator.
-    Expr *iteratorNext
-      = TC.callWitness(TC.buildCheckedRefExpr(generator, DC,
-                                              DeclNameLoc(S->getInLoc()),
-                                              /*implicit*/true),
-                       DC, generatorProto, *genConformance,
-                       TC.Context.Id_next, {}, diag::iterator_protocol_broken);
-    if (!iteratorNext) return nullptr;
-    // Check that next() produces an Optional<T> value.
-    if (iteratorNext->getType()->getAnyNominal()
-          != TC.Context.getOptionalDecl()) {
-      TC.diagnose(S->getForLoc(), diag::iterator_protocol_broken);
+
+    auto *varRef =
+        TC.buildCheckedRefExpr(iterator, DC, DeclNameLoc(S->getInLoc()),
+                               /*implicit*/ true);
+    if (!varRef)
       return nullptr;
-    }
+
+    S->setIteratorVarRef(varRef);
+
+    auto witness =
+        genConformance->getWitnessByName(iteratorTy, TC.Context.Id_next);
+    S->setIteratorNext(witness);
+
+    auto nextResultType = cast<FuncDecl>(S->getIteratorNext().getDecl())
+                              ->getResultInterfaceType()
+                              .subst(S->getIteratorNext().getSubstitutions())
+                              ->getCanonicalType();
 
     // Convert that Optional<T> value to Optional<Element>.
     auto optPatternType = OptionalType::get(S->getPattern()->getType());
-    if (!optPatternType->isEqual(iteratorNext->getType()) &&
-        TC.convertToType(iteratorNext, optPatternType, DC, S->getPattern())) {
-      return nullptr;
+    if (!optPatternType->isEqual(nextResultType)) {
+      OpaqueValueExpr *elementExpr =
+          new (TC.Context) OpaqueValueExpr(S->getInLoc(), nextResultType);
+      Expr *convertElementExpr = elementExpr;
+      if (TC.convertToType(convertElementExpr, optPatternType, DC,
+                           S->getPattern())) {
+        return nullptr;
+      }
+      S->setElementExpr(elementExpr);
+      S->setConvertElementExpr(convertElementExpr);
     }
 
-    S->setIteratorNext(iteratorNext);
-    
     // Type-check the body of the loop.
     AddLabeledStmt loopNest(*this, S);
     BraceStmt *Body = S->getBody();

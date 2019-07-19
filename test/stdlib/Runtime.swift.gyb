@@ -375,35 +375,37 @@ Runtime.test("demangleName") {
   expectEqual("Foobar", _stdlib_demangleName("$s13__lldb_expr_46FoobarCD"))
 }
 
-Runtime.test("demangleTruncate") {
-  // Swift.Int requires 10 bytes to be fully demangled.
-  let buffer = UnsafeMutableBufferPointer<Int8>.allocate(capacity: 10)
+if #available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *) {
+  Runtime.test("demangleTruncate") {
+    // Swift.Int requires 10 bytes to be fully demangled.
+    let buffer = UnsafeMutableBufferPointer<Int8>.allocate(capacity: 10)
 
-  defer { buffer.deallocate() }
+    defer { buffer.deallocate() }
 
-  // Set last byte to a custom number, that way when we call swift_demangle
-  // the last byte should be unchanged rather than it being set to 0.
-  buffer[buffer.count - 1] = 16
+    // Set last byte to a custom number, that way when we call swift_demangle
+    // the last byte should be unchanged rather than it being set to 0.
+    buffer[buffer.count - 1] = 16
 
-  // Only give 9 bytes though to exercise that swift_demangle doesn't write past
-  // the buffer.
-  var bufferSize = UInt(buffer.count - 1)
+    // Only give 9 bytes though to exercise that swift_demangle doesn't write past
+    // the buffer.
+    var bufferSize = UInt(buffer.count - 1)
 
-  let mangled = "$sSi"
+    let mangled = "$sSi"
 
-  mangled.utf8CString.withUnsafeBufferPointer {
-    _ = _stdlib_demangleImpl(
-      mangledName: $0.baseAddress,
-      mangledNameLength: UInt($0.count - 1),
-      outputBuffer: buffer.baseAddress,
-      outputBufferSize: &bufferSize,
-      flags: 0
-    )
+    mangled.utf8CString.withUnsafeBufferPointer {
+      _ = _stdlib_demangleImpl(
+        mangledName: $0.baseAddress,
+        mangledNameLength: UInt($0.count - 1),
+        outputBuffer: buffer.baseAddress,
+        outputBufferSize: &bufferSize,
+        flags: 0
+      )
+    }
+
+    expectEqual(String(cString: buffer.baseAddress!), "Swift.In")
+    expectEqual(bufferSize, 10)
+    expectEqual(buffer[buffer.count - 1], 16)
   }
-
-  expectEqual(String(cString: buffer.baseAddress!), "Swift.In")
-  expectEqual(bufferSize, 10)
-  expectEqual(buffer[buffer.count - 1], 16)
 }
 
 % for optionality in ['', '?']:

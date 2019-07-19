@@ -1519,16 +1519,56 @@ ManagedValue emitCFunctionPointer(SILGenFunction &SGF,
   } else if (auto memberRef = dyn_cast<MemberRefExpr>(semanticExpr)) {
     setLocFromConcreteDeclRef(memberRef->getMember());
   } else if (auto closure = dyn_cast<AbstractClosureExpr>(semanticExpr)) {
-    loc = closure;
     // Emit the closure body.
     SGF.SGM.emitClosure(closure);
+
+    loc = closure;
+  } else if (auto captureList = dyn_cast<CaptureListExpr>(semanticExpr)) {
+    // Ensure that weak captures are in a separate scope.
+    DebugScope scope(SGF, CleanupLocation(captureList));
+    // CaptureListExprs evaluate their bound variables.
+    for (auto capture : captureList->getCaptureList()) {
+      SGF.visit(capture.Var);
+      SGF.visit(capture.Init);
+    }
+
+    // Emit the closure body.
+    auto *closure = captureList->getClosureBody();
+    SGF.SGM.emitClosure(closure);
+
+    loc = closure;
   } else {
     llvm_unreachable("c function pointer converted from a non-concrete decl ref");
   }
 
   // Produce a reference to the C-compatible entry point for the function.
-  SILDeclRef constant(loc, /*uncurryLevel*/ 0, /*foreign*/ true);
+  SILDeclRef constant(loc, /*curried*/ false, /*foreign*/ true);
   SILConstantInfo constantInfo = SGF.getConstantInfo(constant);
+
+  // C function pointers cannot capture anything from their context.
+  auto captures = SGF.SGM.Types.getLoweredLocalCaptures(
+    *constant.getAnyFunctionRef());
+
+  if (captures.hasGenericParamCaptures() ||
+      captures.hasDynamicSelfCapture() ||
+      captures.hasLocalCaptures() ||
+      captures.hasOpaqueValueCapture()) {
+    unsigned kind;
+    if (captures.hasLocalCaptures())
+      kind = 0;
+    else if (captures.hasGenericParamCaptures())
+      kind = 1;
+    else if (captures.hasLocalCaptures())
+      kind = 2;
+    else
+      kind = 3;
+    SGF.SGM.diagnose(expr->getLoc(),
+                     diag::c_function_pointer_from_function_with_context,
+                     /*closure*/ constant.hasClosureExpr(),
+                     kind);
+
+    return SGF.emitUndef(constantInfo.getSILType());
+  }
 
   return convertCFunctionSignature(
                     SGF, conversionExpr,
@@ -2312,7 +2352,7 @@ RValue RValueEmitter::visitDynamicTypeExpr(DynamicTypeExpr *E, SGFContext C) {
 RValue RValueEmitter::visitCaptureListExpr(CaptureListExpr *E, SGFContext C) {
   // Ensure that weak captures are in a separate scope.
   DebugScope scope(SGF, CleanupLocation(E));
-  // ClosureExpr's evaluate their bound variables.
+  // CaptureListExprs evaluate their bound variables.
   for (auto capture : E->getCaptureList()) {
     SGF.visit(capture.Var);
     SGF.visit(capture.Init);
@@ -3230,49 +3270,6 @@ lowerKeyPathSubscriptIndexTypes(
   }
 };
 
-/// Map the given protocol conformance out of context, replacing archetypes
-/// with their corresponding interface types.
-static ProtocolConformance *mapConformanceOutOfContext(
-                                         ProtocolConformance *conformance) {
-  if (!conformance->getType()->hasArchetype())
-    return conformance;
-
-  ASTContext &ctx = conformance->getProtocol()->getASTContext();
-  switch (conformance->getKind()) {
-  case ProtocolConformanceKind::Normal:
-  case ProtocolConformanceKind::Self:
-    llvm_unreachable("Normal and self conformances never have archetypes");
-
-  case ProtocolConformanceKind::Inherited: {
-    auto inherited = cast<InheritedProtocolConformance>(conformance);
-    return ctx.getInheritedConformance(
-             inherited->getType()->mapTypeOutOfContext(),
-             mapConformanceOutOfContext(inherited->getInheritedConformance()));
-  }
-
-  case ProtocolConformanceKind::Specialized: {
-    auto specialized = cast<SpecializedProtocolConformance>(conformance);
-    return ctx.getSpecializedConformance(
-             specialized->getType()->mapTypeOutOfContext(),
-             mapConformanceOutOfContext(specialized->getGenericConformance()),
-             specialized->getSubstitutionMap()
-               .mapReplacementTypesOutOfContext());
-  }
-  }
-  llvm_unreachable("covered switch");
-}
-
-/// Map the given protocol conformance out of context, replacing archetypes
-/// with their corresponding interface types.
-static ProtocolConformanceRef mapConformanceOutOfContext(
-                                          ProtocolConformanceRef conformance) {
-  if (conformance.isAbstract())
-    return conformance;
-
-  return ProtocolConformanceRef(
-                        mapConformanceOutOfContext(conformance.getConcrete()));
-}
-
 static void
 lowerKeyPathSubscriptIndexPatterns(
                  SmallVectorImpl<KeyPathPatternComponent::Index> &indexPatterns,
@@ -3283,7 +3280,7 @@ lowerKeyPathSubscriptIndexPatterns(
     CanType formalTy;
     SILType loweredTy;
     std::tie(formalTy, loweredTy) = indexTypes[i];
-    auto hashable = mapConformanceOutOfContext(indexHashables[i]);
+    auto hashable = indexHashables[i].mapConformanceOutOfContext();
     assert(hashable.isAbstract() ||
            hashable.getConcrete()->getType()->isEqual(formalTy));
 

@@ -965,3 +965,14 @@ public func _openExistential<ExistentialType, ContainedType, ResultType>(
   Builtin.unreachable()
 }
 
+/// Given a string that is constructed from a string literal, return a pointer
+/// to the global string table location that contains the string literal.
+/// This function will trap when it is invoked on strings that are not
+/// constructed from literals or if the construction site of the string is not
+/// in the function containing the call to this SPI.
+@_transparent
+@_alwaysEmitIntoClient
+public // @SPI(OSLog)
+func _getGlobalStringTablePointer(_ constant: String) -> UnsafePointer<CChar> {
+  return UnsafePointer<CChar>(Builtin.globalStringTablePointer(constant));
+}

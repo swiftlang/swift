@@ -1480,6 +1480,10 @@ public:
                                         PreparedArguments &&args, Type overriddenSelfType,
                                         SGFContext ctx);
 
+  RValue emitApplyMethod(SILLocation loc, ConcreteDeclRef declRef,
+                         ArgumentSource &&self, PreparedArguments &&args,
+                         SGFContext C);
+
   RValue emitApplyPropertyWrapperAllocator(SILLocation loc,
                                             SubstitutionMap subs,
                                             SILDeclRef ctorRef,

@@ -95,14 +95,14 @@ emitBridgeNativeToObjectiveC(SILGenFunction &SGF,
   if (!requirement) return None;
 
   // Retrieve the _bridgeToObjectiveC witness.
-  auto witness = conformance->getWitnessDecl(requirement, nullptr);
+  auto witness = conformance->getWitnessDecl(requirement);
   assert(witness);
 
   // Determine the type we're bridging to.
   auto objcTypeReq = SGF.SGM.getBridgedObjectiveCTypeRequirement(loc);
   if (!objcTypeReq) return None;
 
-  Type objcType = conformance->getTypeWitness(objcTypeReq, nullptr);
+  Type objcType = conformance->getTypeWitness(objcTypeReq);
   assert(objcType);
 
   // Create a reference to the witness.
@@ -187,11 +187,11 @@ emitBridgeObjectiveCToNative(SILGenFunction &SGF,
   if (!objcTypeRequirement) return None;
 
   // Retrieve the _unconditionallyBridgeFromObjectiveC witness.
-  auto witness = conformance->getWitnessDeclRef(requirement, nullptr);
+  auto witness = conformance->getWitnessDeclRef(requirement);
   assert(witness);
 
   // Retrieve the _ObjectiveCType witness.
-  auto objcType = conformance->getTypeWitness(objcTypeRequirement, nullptr);
+  auto objcType = conformance->getTypeWitness(objcTypeRequirement);
   assert(objcType);
 
   // Create a reference to the witness.

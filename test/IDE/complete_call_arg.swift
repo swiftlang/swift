@@ -83,6 +83,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_SECOND | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_SECOND
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IMPLICIT_MEMBER_SKIPPED | %FileCheck %s -check-prefix=IMPLICIT_MEMBER_SKIPPED
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ARCHETYPE_GENERIC_1 | %FileCheck %s -check-prefix=ARCHETYPE_GENERIC_1
+
 var i1 = 1
 var i2 = 2
 var oi1 : Int?
@@ -181,7 +183,7 @@ class C1 {
 // EXPECT_INT-DAG: Decl[FreeFunction]/CurrModule/TypeRelation[Identical]: intGen()[#Int#]; name=intGen()
 // EXPECT_INT-DAG: Decl[GlobalVar]/CurrModule/TypeRelation[Identical]: i1[#Int#]; name=i1
 // EXPECT_INT-DAG: Decl[GlobalVar]/CurrModule/TypeRelation[Identical]: i2[#Int#]; name=i2
-// EXPECT_INT-DAT: Decl[Struct]/OtherModule[Swift]/TypeRelation[Identical]: Int[#Int#]
+// EXPECT_INT-DAG: Decl[Struct]/OtherModule[Swift]/TypeRelation[Identical]: Int[#Int#]
 // EXPECT_INT-DAG: Decl[FreeFunction]/CurrModule:      ointGen()[#Int?#]; name=ointGen()
 // EXPECT_INT-DAG: Decl[GlobalVar]/CurrModule:         oi1[#Int?#]; name=oi1
 // EXPECT_INT-DAG: Decl[GlobalVar]/CurrModule:         os2[#String?#]; name=os2
@@ -464,9 +466,8 @@ struct TestBoundGeneric1 {
   func test2() {
     takeArray(#^BOUND_GENERIC_1_2^#)
   }
-// FIXME: These should be convertible to [T]. rdar://problem/24570603
-// BOUND_GENERIC_1: Decl[InstanceVar]/CurrNominal:      x[#[Int]#];
-// BOUND_GENERIC_1: Decl[InstanceVar]/CurrNominal:      y[#[Int]#];
+// BOUND_GENERIC_1: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]: x[#[Int]#];
+// BOUND_GENERIC_1: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]: y[#[Int]#];
 }
 
 func whereConvertible<T>(lhs: T, rhs: T) where T: Collection {
@@ -686,4 +687,13 @@ func testImplicitMember() {
 // IMPLICIT_MEMBER_SKIPPED: Keyword/ExprSpecific:               arg3: [#Argument name#];
 // IMPLICIT_MEMBER_SKIPPED: Keyword/ExprSpecific:               arg4: [#Argument name#];
 // IMPLICIT_MEMBER_SKIPPED: End completions
+}
+
+struct Wrap<T> {
+  func method<U>(_ fn: (T) -> U) -> Wrap<U> {}
+}
+func testGenricMethodOnGenericOfArchetype<Wrapped>(value: Wrap<Wrapped>) {
+  value.method(#^ARCHETYPE_GENERIC_1^#)
+// ARCHETYPE_GENERIC_1: Begin completions
+// ARCHETYPE_GENERIC_1: Decl[InstanceMethod]/CurrNominal:   ['(']{#(fn): (Wrapped) -> _##(Wrapped) -> _#}[')'][#Wrap<_>#];
 }

@@ -179,8 +179,7 @@ static void deriveBodyMathOperator(AbstractFunctionDecl *funcDecl,
     // declaration for the operator.
     if (confRef->isConcrete())
       if (auto *concreteMemberMethodDecl =
-              confRef->getConcrete()->getWitnessDecl(operatorReq,
-                                                     C.getLazyResolver()))
+              confRef->getConcrete()->getWitnessDecl(operatorReq))
         memberOpDecl = concreteMemberMethodDecl;
     assert(memberOpDecl && "Member operator declaration must exist");
     auto memberOpDRE =
@@ -312,7 +311,7 @@ static void deriveBodyRingPropertyGetter(
     }
     // Otherwise, return reference to concrete witness declaration.
     auto conf = confRef->getConcrete();
-    auto witnessDecl = conf->getWitnessDecl(reqDecl, C.getLazyResolver());
+    auto witnessDecl = conf->getWitnessDecl(reqDecl);
     return new (C) MemberRefExpr(memberExpr, SourceLoc(), witnessDecl,
                                  DeclNameLoc(), /*Implicit*/ true);
   };
@@ -371,7 +370,6 @@ deriveRingProperty(DerivedConformance &derived, Identifier propertyName,
                    AbstractFunctionDecl::BodySynthesizer bodySynthesizer) {
   auto *nominal = derived.Nominal;
   auto *parentDC = derived.getConformanceContext();
-  auto &TC = derived.TC;
 
   auto returnInterfaceTy = nominal->getDeclaredInterfaceType();
   auto returnTy = parentDC->mapTypeIntoContext(returnInterfaceTy);
@@ -385,7 +383,7 @@ deriveRingProperty(DerivedConformance &derived, Identifier propertyName,
 
   // Create ring property getter.
   auto *getterDecl =
-      derived.declareDerivedPropertyGetter(TC, propDecl, returnTy);
+      derived.declareDerivedPropertyGetter(propDecl, returnTy);
   getterDecl->setBodySynthesizer(bodySynthesizer.Fn, bodySynthesizer.Context);
   propDecl->setAccessors(StorageImplInfo::getImmutableComputed(), SourceLoc(),
                          {getterDecl}, SourceLoc());

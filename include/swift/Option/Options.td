@@ -303,6 +303,9 @@ def serialize_diagnostics_path_EQ: Joined<["-"], "serialize-diagnostics-path=">,
 def color_diagnostics : Flag<["-"], "color-diagnostics">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Print diagnostics in color">;
+def no_color_diagnostics : Flag<["-"], "no-color-diagnostics">,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Do not print diagnostics in color">;
 
 def module_cache_path : Separate<["-"], "module-cache-path">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
@@ -855,11 +858,6 @@ def enable_private_imports : Flag<["-"], "enable-private-imports">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
   HelpText<"Allows this module's internal and private API to be accessed">;
 
-def enable_cxx_interop :
-  Flag<["-"], "enable-cxx-interop">,
-  HelpText<"Enable C++ interop code generation and config directives">,
-  Flags<[FrontendOption]>;
-
 def sanitize_EQ : CommaJoined<["-"], "sanitize=">,
   Flags<[FrontendOption, NoInteractiveOption]>, MetaVarName<"<check>">,
   HelpText<"Turn on runtime checks for erroneous behavior.">;
@@ -874,7 +872,12 @@ def enable_astscope_lookup : Flag<["-"], "enable-astscope-lookup">,
   Flags<[FrontendOption]>,
   HelpText<"Enable ASTScope-based unqualified name lookup">;
 
-def disable_parser_lookup : Flag<["-"], "disable_parser_lookup">,
+def disable_astscope_lookup : Flag<["-"], "disable-astscope-lookup">,
+  Flags<[FrontendOption]>,
+  HelpText<"Disable ASTScope-based unqualified name lookup">;
+
+def disable_parser_lookup : Flag<["-"], "disable-parser-lookup">,
+  Flags<[FrontendOption]>,
   HelpText<"Disable parser lookup & use ast scope lookup only (experimental)">;
 
 def index_file : Flag<["-"], "index-file">,
