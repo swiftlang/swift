@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -Xllvm -run-jvp-generation  -verify %s | %FileCheck %s -check-prefix=CHECK-DATA-STRUCTURES
+// RUN: %target-swift-frontend -emit-sil -Xllvm -run-jvp-generation -verify %s | %FileCheck %s -check-prefix=CHECK-DATA-STRUCTURES
 // RUN: %target-swift-frontend -emit-sil -verify -Xllvm -sil-print-after=differentiation -Xllvm -run-jvp-generation -o /dev/null 2>&1 %s | %FileCheck %s -check-prefix=CHECK-SIL
 
 

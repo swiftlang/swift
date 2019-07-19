@@ -1634,6 +1634,15 @@ extension ${Self} {
     -> (value: ${Self}, pullback: (${Self}) -> ${Self}) {
     return (-x, { v in -v })
   }
+
+  @usableFromInline
+  @_transparent
+  // SWIFT_ENABLE_TENSORFLOW
+  @differentiating(-)
+  static func _jvpNegate(x: ${Self})
+  -> (value: ${Self}, differential: (${Self}) -> ${Self}) {
+    return (-x, { dx in -dx })
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -1854,7 +1863,7 @@ extension ${Self} {
   @inlinable // FIXME(sil-serialize-all)
   @_transparent
   @differentiating(/)
-  static func _vjpDivide(
+  static func _jvpDivide(
     lhs: ${Self}, rhs: ${Self}
   ) -> (value: ${Self}, differential: (${Self}, ${Self}) -> ${Self}) {
     return (lhs / rhs, { (dlhs, drhs) in dlhs / rhs - lhs / (rhs * rhs) * drhs })

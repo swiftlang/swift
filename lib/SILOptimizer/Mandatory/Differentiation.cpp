@@ -390,8 +390,8 @@ public:
 };
 
 /// Information about the VJP/JVP function produced during VJP/JVP generation,
-/// e.g. mappings from original values to corresponding values in the linear map
-/// struct.
+/// e.g. mappings from original values to corresponding values in the
+/// pullback/differential struct.
 ///
 /// A linear map struct is an aggregate value containing linear maps checkpointed
 /// during the VJP/JVP computation. Linear map structs are generated for every
@@ -5426,7 +5426,7 @@ private:
   const DifferentiableActivityInfo &activityInfo;
 
   ///
-  /// Differential-related fields.
+  /// Differential generation related fields.
   ///
 
   /// The builder for the differential function.
@@ -5456,7 +5456,7 @@ private:
   SILBuilder diffLocalAllocBuilder;
 
   //--------------------------------------------------------------------------//
-  // Private Getters
+  // Getters
   //--------------------------------------------------------------------------//
 
   ASTContext &getASTContext() const { return jvp->getASTContext(); }
@@ -5474,7 +5474,7 @@ private:
   }
 
   //--------------------------------------------------------------------------//
-  // Misc. Class Helpers
+  // Initialization helpers
   //--------------------------------------------------------------------------//
 
   static SubstitutionMap getSubstitutionMap(SILFunction *original,
@@ -5508,6 +5508,10 @@ private:
         context, original, attr, linearMapInfo);
     return SILBuilder(*differential);
   }
+
+  //--------------------------------------------------------------------------//
+  // General utilities
+  //--------------------------------------------------------------------------//
 
   SILBasicBlock::iterator getNextDifferentialLocalAllocationInsertionPoint() {
     // If there are no local allocations, insert at the tangent entry beginning.
@@ -5561,7 +5565,7 @@ private:
   }
 
   //--------------------------------------------------------------------------//
-  // Tangent Materialization
+  // Tangent materialization
   //--------------------------------------------------------------------------//
 
   void emitZeroIndirect(CanType type, SILValue bufferAccess,
@@ -5643,7 +5647,7 @@ private:
   }
 
   //--------------------------------------------------------------------------//
-  // Buffer mapping
+  // Tangent buffer mapping
   //--------------------------------------------------------------------------//
 
   void setTangentBuffer(SILBasicBlock *origBB, SILValue originalBuffer,
@@ -5835,7 +5839,7 @@ private:
   }
 
   //--------------------------------------------------------------------------//
-  // Differential Emitter helpers
+  // Differential generation helpers
   //--------------------------------------------------------------------------//
 
   void visitReturnInstDifferential(ReturnInst *ri) {
@@ -6129,7 +6133,7 @@ public:
                  << " as the tangent of original result " << origParam);
     }
 
-    // Clone
+    // Clone.
     SmallVector<SILValue, 4> entryArgs(entry->getArguments().begin(),
                                        entry->getArguments().end());
     cloneFunctionBody(original, entry, entryArgs);
