@@ -60,8 +60,7 @@ LeakCheckingTests.test("BasicVarLeakChecking") {
     _ = model.gradient(at: x) { m, x in m.applied(to: x) }
   }
 
-  // TODO: Fix memory leak.
-  testWithLeakChecking(expectedLeakCount: 1) {
+  testWithLeakChecking {
     var model = ExampleLeakModel()
     let x: Tracked<Float> = 1.0
 
@@ -71,8 +70,7 @@ LeakCheckingTests.test("BasicVarLeakChecking") {
     }
   }
 
-  // TODO: Fix memory leak.
-  testWithLeakChecking(expectedLeakCount: 1) {
+  testWithLeakChecking {
     var model = ExampleLeakModel()
     var x: Tracked<Float> = 1.0
     _ = model.gradient { m in
@@ -83,7 +81,7 @@ LeakCheckingTests.test("BasicVarLeakChecking") {
   }
 
   // TODO: Fix memory leak.
-  testWithLeakChecking(expectedLeakCount: 2) {
+  testWithLeakChecking(expectedLeakCount: 1) {
     var model = ExampleLeakModel()
     let x: Tracked<Float> = 1.0
     _ = model.gradient { m in
