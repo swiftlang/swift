@@ -902,9 +902,14 @@ class ParseableInterfaceModuleLoaderImpl {
   // Check if all the provided file dependencies are up-to-date compared to
   // what's currently on disk.
   bool dependenciesAreUpToDate(StringRef modulePath,
-                               ArrayRef<FileDependency> deps) {
+                               ArrayRef<FileDependency> deps,
+                               bool skipSystemDependencies) {
     SmallString<128> SDKRelativeBuffer;
     for (auto &in : deps) {
+      if (skipSystemDependencies && in.isSDKRelative() &&
+          in.isModificationTimeBased()) {
+        continue;
+      }
       StringRef fullPath = getFullDependencyPath(in, SDKRelativeBuffer);
       switch (checkDependency(modulePath, in, fullPath)) {
       case DependencyStatus::UpToDate:
@@ -942,7 +947,10 @@ class ParseableInterfaceModuleLoaderImpl {
       return false;
     }
 
-    return dependenciesAreUpToDate(path, allDeps);
+    bool skipCheckingSystemDependencies =
+        ctx.SearchPathOpts.DisableModulesValidateSystemDependencies;
+    return dependenciesAreUpToDate(path, allDeps,
+                                   skipCheckingSystemDependencies);
   }
 
   // Check that the output .swiftmodule file is at least as new as all the
@@ -982,7 +990,10 @@ class ParseableInterfaceModuleLoaderImpl {
         FileDependency::modTimeBased(
           dep.path, dep.isSDKRelative, dep.size, dep.lastModificationTime));
     }
-    if (!dependenciesAreUpToDate(path, deps))
+
+    bool skipCheckingSystemDependencies =
+        ctx.SearchPathOpts.DisableModulesValidateSystemDependencies;
+    if (!dependenciesAreUpToDate(path, deps, skipCheckingSystemDependencies))
       return false;
 
     moduleBuffer = std::move(*modBuf);
