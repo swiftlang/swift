@@ -119,6 +119,20 @@ ArrayRef<const char *> Driver::getArgsWithoutProgramNameAndDriverMode(
   return Args;
 }
 
+static void validateBridgingHeaderArgs(DiagnosticEngine &diags,
+                                       const ArgList &args) {
+  if (!args.hasArgNoClaim(options::OPT_import_objc_header))
+    return;
+  
+  if (args.hasArgNoClaim(options::OPT_import_underlying_module))
+    diags.diagnose({}, diag::error_framework_bridging_header);
+  
+  if (args.hasArgNoClaim(options::OPT_emit_module_interface,
+                         options::OPT_emit_module_interface_path)) {
+    diags.diagnose({}, diag::error_bridging_header_module_interface);
+  }
+}
+
 static void validateWarningControlArgs(DiagnosticEngine &diags,
                                        const ArgList &args) {
   if (args.hasArg(options::OPT_suppress_warnings) &&
@@ -206,20 +220,6 @@ static void validateAutolinkingArgs(DiagnosticEngine &diags,
   // check somewhere else).
   diags.diagnose(SourceLoc(), diag::error_option_not_supported,
                  forceLoadArg->getSpelling(), incrementalArg->getSpelling());
-}
-
-static void validateBridgingHeaderArgs(DiagnosticEngine &diags,
-                                       const ArgList &args) {
-    if (!args.hasArgNoClaim(options::OPT_import_objc_header))
-        return;
-    
-    if (args.hasArgNoClaim(options::OPT_import_underlying_module))
-        diags.diagnose({}, diag::error_framework_bridging_header);
-    
-    if (args.hasArgNoClaim(options::OPT_emit_module_interface,
-                           options::OPT_emit_module_interface_path)) {
-        diags.diagnose({}, diag::error_bridging_header_module_interface);
-    }
 }
 
 /// Perform miscellaneous early validation of arguments.
