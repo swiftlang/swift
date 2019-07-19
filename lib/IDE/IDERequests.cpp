@@ -18,6 +18,7 @@
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/CommentConversion.h"
 #include "swift/IDE/Utils.h"
+#include "swift/Sema/IDETypeChecking.h"
 #include "swift/Markup/XMLUtils.h"
 #include "swift/Subsystems.h"
 #include "swift/IDE/IDERequests.h"
@@ -1072,4 +1073,73 @@ SourceLoc RangeInfoRequest::getNearestLoc() const {
 void
 swift::ide::simple_display(llvm::raw_ostream &out, const ResolvedRangeInfo &info) {
   info.print(out);
+}
+
+//----------------------------------------------------------------------------//
+// ProvideDefaultImplForRequest
+//----------------------------------------------------------------------------//
+static Type getContextFreeInterfaceType(ValueDecl *VD) {
+  if (auto AFD = dyn_cast<AbstractFunctionDecl>(VD)) {
+    return AFD->getMethodInterfaceType();
+  }
+  return VD->getInterfaceType();
+}
+
+llvm::Expected<ArrayRef<ValueDecl*>>
+ProvideDefaultImplForRequest::evaluate(Evaluator &eval, ValueDecl* VD) const {
+  // Skip decls that don't have valid names.
+  if (!VD->getFullName())
+    return ArrayRef<ValueDecl*>();
+
+  // Check if VD is from a protocol extension.
+  auto P = VD->getDeclContext()->getExtendedProtocolDecl();
+  if (!P)
+    return ArrayRef<ValueDecl*>();
+  SmallVector<ValueDecl*, 8> Results;
+  // Look up all decls in the protocol's inheritance chain for the ones with
+  // the same name with VD.
+  ResolvedMemberResult LookupResult =
+  resolveValueMember(*P->getInnermostDeclContext(),
+                     P->getDeclaredInterfaceType(), VD->getFullName());
+
+  auto VDType = getContextFreeInterfaceType(VD);
+  for (auto Mem : LookupResult.getMemberDecls(InterestedMemberKind::All)) {
+    if (isa<ProtocolDecl>(Mem->getDeclContext())) {
+      if (Mem->isProtocolRequirement() &&
+          getContextFreeInterfaceType(Mem)->isEqual(VDType)) {
+        // We find a protocol requirement VD can provide default
+        // implementation for.
+        Results.push_back(Mem);
+      }
+    }
+  }
+  return copyToContext(VD->getASTContext(), llvm::makeArrayRef(Results));
+}
+
+//----------------------------------------------------------------------------//
+// CollectOverriddenDeclsRequest
+//----------------------------------------------------------------------------//
+llvm::Expected<ArrayRef<ValueDecl*>>
+CollectOverriddenDeclsRequest::evaluate(Evaluator &evaluator,
+                                        OverridenDeclsOwner Owner) const {
+  std::vector<ValueDecl*> results;
+  auto *VD = Owner.VD;
+  if (auto Overridden = VD->getOverriddenDecl()) {
+    results.push_back(Overridden);
+    while (Owner.Transitive && (Overridden = Overridden->getOverriddenDecl()))
+      results.push_back(Overridden);
+  }
+
+  for (auto Req : evaluateOrDefault(evaluator, ProvideDefaultImplForRequest(VD),
+                                    ArrayRef<ValueDecl*>())) {
+    results.push_back(Req);
+  }
+
+  if (Owner.IncludeProtocolRequirements) {
+    for (auto Satisfied : VD->getSatisfiedProtocolRequirements()) {
+      results.push_back(Satisfied);
+    }
+  }
+
+  return copyToContext(VD->getASTContext(), llvm::makeArrayRef(results));
 }

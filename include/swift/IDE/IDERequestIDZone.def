@@ -16,3 +16,5 @@
 //===----------------------------------------------------------------------===//
 SWIFT_TYPEID(CursorInfoRequest)
 SWIFT_TYPEID(RangeInfoRequest)
+SWIFT_TYPEID(ProvideDefaultImplForRequest)
+SWIFT_TYPEID(CollectOverriddenDeclsRequest)
