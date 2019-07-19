@@ -148,8 +148,7 @@ LeakCheckingTests.test("NestedVarTuples") {
 }
 
 LeakCheckingTests.test("ClosureCaptureLeakChecking") {
-  // TODO: Fix memory leak.
-  testWithLeakChecking(expectedLeakCount: 1) {
+  testWithLeakChecking {
     var model = ExampleLeakModel()
     let x: Tracked<Float> = 1.0
 
@@ -159,8 +158,7 @@ LeakCheckingTests.test("ClosureCaptureLeakChecking") {
     }
   }
 
-  // TODO: Fix memory leak.
-  testWithLeakChecking(expectedLeakCount: 1) {
+  testWithLeakChecking {
     var model = ExampleLeakModel()
     var x: Tracked<Float> = 1.0
     _ = model.gradient { m in
