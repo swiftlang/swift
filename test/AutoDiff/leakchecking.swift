@@ -120,31 +120,35 @@ LeakCheckingTests.test("TestProtocolDefaultDerivative") {
 }
 
 LeakCheckingTests.test("NestedVarStructs") {
-  func nestedstruct_var(_ x: Tracked<Float>) -> Tracked<Float> {
-    var y = FloatPair(x + x, x - x)
-    var z = Pair(Tracked(y), x)
-    var w = FloatPair(x, x)
-    y.first = w.second
-    y.second = w.first
-    z.first = Tracked(FloatPair(z.first.value.first - y.first,
-                                z.first.value.second + y.first))
-    return y.first + y.second - z.first.value.first + z.first.value.second
+  testWithLeakChecking(expectedLeakCount: 4) {
+    func nestedstruct_var(_ x: Tracked<Float>) -> Tracked<Float> {
+      var y = FloatPair(x + x, x - x)
+      var z = Pair(Tracked(y), x)
+      var w = FloatPair(x, x)
+      y.first = w.second
+      y.second = w.first
+      z.first = Tracked(FloatPair(z.first.value.first - y.first,
+                                  z.first.value.second + y.first))
+      return y.first + y.second - z.first.value.first + z.first.value.second
+    }
+    expectEqual((8, 2), Tracked<Float>(4).valueWithGradient(in: nestedstruct_var))
   }
-  expectEqual((8, 2), Tracked<Float>(4).valueWithGradient(in: nestedstruct_var))
 }
 
 LeakCheckingTests.test("NestedVarTuples") {
-  func nestedtuple_var(_ x: Tracked<Float>) -> Tracked<Float> {
-    var y = (x + x, x - x)
-    var z = (y, x)
-    var w = (x, x)
-    y.0 = w.1
-    y.1 = w.0
-    z.0.0 = z.0.0 - y.0
-    z.0.1 = z.0.1 + y.0
-    return y.0 + y.1 - z.0.0 + z.0.1
+  testWithLeakChecking {
+    func nestedtuple_var(_ x: Tracked<Float>) -> Tracked<Float> {
+      var y = (x + x, x - x)
+      var z = (y, x)
+      var w = (x, x)
+      y.0 = w.1
+      y.1 = w.0
+      z.0.0 = z.0.0 - y.0
+      z.0.1 = z.0.1 + y.0
+      return y.0 + y.1 - z.0.0 + z.0.1
+    }
+    expectEqual((8, 2), Tracked<Float>(4).valueWithGradient(in: nestedtuple_var))
   }
-  expectEqual((8, 2), Tracked<Float>(4).valueWithGradient(in: nestedtuple_var))
 }
 
 LeakCheckingTests.test("ClosureCaptureLeakChecking") {
@@ -186,8 +190,7 @@ LeakCheckingTests.test("ControlFlowWithIfElse") {
   testWithLeakChecking(expectedLeakCount: 2) {
     var model = ExampleLeakModel()
     let x: Tracked<Float> = 1.0
-    func control_flow_with_if_else(m: ExampleLeakModel, 
-                                   x: Tracked<Float>) -> Tracked<Float> {
+    func control_flow_with_if_else(m: ExampleLeakModel, x: Tracked<Float>) -> Tracked<Float> {
       let result: Tracked<Float>
       if x > 0 {
         result = m.applied(to: x)
@@ -196,7 +199,7 @@ LeakCheckingTests.test("ControlFlowWithIfElse") {
       }
       return result
     }
-    _ = model.gradient(at: x, in: control_flow_with_if_else) 
+    _ = model.gradient(at: x, in: control_flow_with_if_else)
   }
 }
 
