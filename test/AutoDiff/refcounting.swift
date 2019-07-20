@@ -57,17 +57,17 @@ _ = pullback(at: Vector.zero, in: testOwnedVector)
 // CHECK-NOT:  release_value [[NEEDED_COTAN0]] : $Vector
 // CHECK:   [[PB1:%.*]] = struct_extract [[PB_STRUCT]] : ${{.*}}subset_adjoint_releases_unused_ones{{.*}}__PB__src_0_wrt_0, #{{.*}}subset_adjoint_releases_unused_ones{{.*}}__PB__src_0_wrt_0.pullback_0
 // CHECK:   [[NEEDED_COTAN1:%.*]] = apply [[PB1]]([[NEEDED_COTAN0]]) : $@callee_guaranteed (@guaranteed Vector) -> @owned Vector
+// CHECK:   retain_value [[NEEDED_COTAN1]] : $Vector
 // CHECK:   release_value [[NEEDED_COTAN0]] : $Vector
-// CHECK:   release_value [[SEED]] : $Vector
+// CHECK:   release_value [[NEEDED_COTAN1]] : $Vector
 // CHECK:   return [[NEEDED_COTAN1]] : $Vector
 
 // CHECK-LABEL: sil hidden @{{.*}}side_effect_release_zero{{.*}}__adjoint_src_0_wrt_0
 // CHECK: bb0([[SEED:%.*]] : $Vector, %1 : ${{.*}}side_effect_release_zero{{.*}}_bb0__PB__src_0_wrt_0):
 // CHECK:   [[BUF:%.*]] = alloc_stack $Vector
-// CHECK:   [[BUF_ACCESS:%.*]] = begin_access [init] [static] [no_nested_conflict] [[BUF]] : $*Vector
 // CHECK:   [[ZERO_GETTER:%.*]] = function_ref @$s11refcounting6VectorV4zeroACvgZ
 // CHECK:   [[ZERO:%.*]] = apply [[ZERO_GETTER]]({{%.*}}) : $@convention(method) (@thin Vector.Type) -> @owned Vector
-// CHECK:   store [[ZERO]] to [[BUF_ACCESS]] : $*Vector
+// CHECK:   store [[ZERO]] to [[BUF]] : $*Vector
 // CHECK:   load [[BUF]] : $*Vector
 // CHECK:   [[ZERO_GETTER:%.*]] = function_ref @$s11refcounting6VectorV4zeroACvgZ
 // CHECK:   [[ZERO:%.*]] = apply [[ZERO_GETTER]]({{%.*}}) : $@convention(method) (@thin Vector.Type) -> @owned Vector
