@@ -133,42 +133,6 @@ static void validateBridgingHeaderArgs(DiagnosticEngine &diags,
   }
 }
 
-static void validateDeploymentTarget(DiagnosticEngine &diags,
-                                     const ArgList &args) {
-  const Arg *A = args.getLastArg(options::OPT_target);
-  if (!A)
-    return;
-
-  // Check minimum supported OS versions.
-  llvm::Triple triple(llvm::Triple::normalize(A->getValue()));
-  if (triple.isMacOSX()) {
-    if (triple.isMacOSXVersionLT(10, 9))
-      diags.diagnose(SourceLoc(), diag::error_os_minimum_deployment,
-                     "OS X 10.9");
-  } else if (triple.isiOS()) {
-    if (triple.isTvOS()) {
-      if (triple.isOSVersionLT(9, 0)) {
-        diags.diagnose(SourceLoc(), diag::error_os_minimum_deployment,
-                       "tvOS 9.0");
-        return;
-      }
-    }
-    if (triple.isOSVersionLT(7))
-      diags.diagnose(SourceLoc(), diag::error_os_minimum_deployment,
-                     "iOS 7");
-    if (triple.isArch32Bit() && !triple.isOSVersionLT(11)) {
-      diags.diagnose(SourceLoc(), diag::error_ios_maximum_deployment_32,
-                     triple.getOSMajorVersion());
-    }
-  } else if (triple.isWatchOS()) {
-    if (triple.isOSVersionLT(2, 0)) {
-      diags.diagnose(SourceLoc(), diag::error_os_minimum_deployment,
-                     "watchOS 2.0");
-      return;
-    }
-  }
-}
-
 static void validateWarningControlArgs(DiagnosticEngine &diags,
                                        const ArgList &args) {
   if (args.hasArg(options::OPT_suppress_warnings) &&
@@ -261,7 +225,6 @@ static void validateAutolinkingArgs(DiagnosticEngine &diags,
 /// Perform miscellaneous early validation of arguments.
 static void validateArgs(DiagnosticEngine &diags, const ArgList &args) {
   validateBridgingHeaderArgs(diags, args);
-  validateDeploymentTarget(diags, args);
   validateWarningControlArgs(diags, args);
   validateProfilingArgs(diags, args);
   validateDebugInfoArgs(diags, args);
@@ -820,7 +783,6 @@ Driver::buildCompilation(const ToolChain &TC,
   std::unique_ptr<DerivedArgList> TranslatedArgList(
       translateInputAndPathArgs(*ArgList, workingDirectory));
 
-  // TODO: We should check which validations could be moved to toolchain specific classes.
   validateArgs(Diags, *TranslatedArgList);
     
   // Perform toolchain specific args validation.
