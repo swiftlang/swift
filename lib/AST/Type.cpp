@@ -1259,6 +1259,15 @@ TypeBase *TypeBase::reconstituteSugar(bool Recursive) {
     return Func(this).getPointer();
 }
 
+TypeBase *TypeBase::getWithoutSyntaxSugar() {
+  auto Func = [](Type Ty) -> Type {
+    if (auto *syntaxSugarType = dyn_cast<SyntaxSugarType>(Ty.getPointer()))
+      return syntaxSugarType->getSinglyDesugaredType()->getWithoutSyntaxSugar();
+    return Ty;
+  };
+  return Type(this).transform(Func).getPointer();
+}
+
 #define TYPE(Id, Parent)
 #define SUGARED_TYPE(Id, Parent) \
   static_assert(std::is_base_of<SugarType, Id##Type>::value, "Sugar mismatch");

@@ -903,6 +903,18 @@ struct TestAlias {
   @Alias var foo = 17
 }
 
+// rdar://problem/52969503 - crash due to invalid source ranges in ill-formed
+// code.
+@propertyWrapper
+struct Wrap52969503<T> {
+  var wrappedValue: T
+
+  init(blah: Int, wrappedValue: T) { }
+}
+
+struct Test52969503 {
+  @Wrap52969503(blah: 5) var foo: Int = 1 // expected-error{{argument 'blah' must precede argument 'wrappedValue'}}
+}
 
 
 // 
@@ -1091,3 +1103,19 @@ struct InvalidPropertyDelegateUse {
     self.x.foo() // expected-error {{value of type 'Int' has no member 'foo'}}
   }
 }
+
+// SR-11060
+
+class SR_11060_Class {
+  @SR_11060_Wrapper var property: Int = 1234 // expected-error {{missing argument for parameter 'string' in property wrapper initializer; add 'wrappedValue' and 'string' arguments in '@SR_11060_Wrapper(...)'}}
+}
+
+@propertyWrapper
+struct SR_11060_Wrapper {
+  var wrappedValue: Int
+  
+  init(wrappedValue: Int, string: String) { // expected-note {{'init(wrappedValue:string:)' declared here}}
+    self.wrappedValue = wrappedValue
+  }
+}
+

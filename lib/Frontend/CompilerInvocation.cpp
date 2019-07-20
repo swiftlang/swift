@@ -1130,9 +1130,14 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
     // Automatically set coverage flags, unless coverage type was explicitly
     // requested.
+    // Updated to match clang at Jul 2019.
     Opts.SanitizeCoverage.IndirectCalls = true;
     Opts.SanitizeCoverage.TraceCmp = true;
-    Opts.SanitizeCoverage.TracePCGuard = true;
+    Opts.SanitizeCoverage.PCTable = true;
+    if (Triple.isOSLinux()) {
+      Opts.SanitizeCoverage.StackDepth = true;
+    }
+    Opts.SanitizeCoverage.Inline8bitCounters = true;
     Opts.SanitizeCoverage.CoverageType = llvm::SanitizerCoverageOptions::SCK_Edge;
   }
 

@@ -176,6 +176,57 @@ public:
   void cacheResult(bool value) const;
 };
 
+/// Determine whether the given protocol declaration is class-bounded.
+class ProtocolRequiresClassRequest:
+    public SimpleRequest<ProtocolRequiresClassRequest,
+                         bool(ProtocolDecl *),
+                         CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator, ProtocolDecl *decl) const;
+
+public:
+  // Cycle handling.
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<bool> getCachedResult() const;
+  void cacheResult(bool value) const;
+};
+
+/// Determine whether an existential conforming to a protocol can be matched
+/// with a generic type parameter constrained to that protocol.
+class ExistentialConformsToSelfRequest:
+    public SimpleRequest<ExistentialConformsToSelfRequest,
+                         bool(ProtocolDecl *),
+                         CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator, ProtocolDecl *decl) const;
+
+public:
+  // Cycle handling.
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<bool> getCachedResult() const;
+  void cacheResult(bool value) const;
+};
+
 /// Determine whether the given declaration is 'final'.
 class IsFinalRequest :
     public SimpleRequest<IsFinalRequest,
@@ -689,13 +740,14 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Request to type check the body of the given function.
+/// Request to type check the body of the given function up to the given
+/// source location.
 ///
 /// Produces true if an error occurred, false otherwise.
 /// FIXME: it would be far better to return the type-checked body.
-class TypeCheckFunctionBodyRequest :
-    public SimpleRequest<TypeCheckFunctionBodyRequest,
-                         bool(AbstractFunctionDecl *),
+class TypeCheckFunctionBodyUntilRequest :
+    public SimpleRequest<TypeCheckFunctionBodyUntilRequest,
+                         bool(AbstractFunctionDecl *, SourceLoc),
                          CacheKind::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -705,7 +757,54 @@ private:
 
   // Evaluation.
   llvm::Expected<bool>
-  evaluate(Evaluator &evaluator, AbstractFunctionDecl *func) const;
+  evaluate(Evaluator &evaluator, AbstractFunctionDecl *func,
+           SourceLoc endTypeCheckLoc) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+/// Request to obtain a list of stored properties in a nominal type.
+///
+/// This will include backing storage for lazy properties and
+/// property wrappers, synthesizing them if necessary.
+class StoredPropertiesRequest :
+    public SimpleRequest<StoredPropertiesRequest,
+                         ArrayRef<VarDecl *>(NominalTypeDecl *),
+                         CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<ArrayRef<VarDecl *>>
+  evaluate(Evaluator &evaluator, NominalTypeDecl *decl) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+/// Request to obtain a list of stored properties in a nominal type,
+/// together with any missing members corresponding to stored
+/// properties that could not be deserialized.
+///
+/// This will include backing storage for lazy properties and
+/// property wrappers, synthesizing them if necessary.
+class StoredPropertiesAndMissingMembersRequest :
+    public SimpleRequest<StoredPropertiesAndMissingMembersRequest,
+                         ArrayRef<Decl *>(NominalTypeDecl *),
+                         CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<ArrayRef<Decl *>>
+  evaluate(Evaluator &evaluator, NominalTypeDecl *decl) const;
 
 public:
   bool isCached() const { return true; }

@@ -2109,16 +2109,12 @@ namespace {
       auto type = simplifyType(openedType);
       cs.setType(expr, type);
 
-      if (expr->getSemanticExpr() != nullptr) {
-        return expr;
-      }
-
       auto &tc = cs.getTypeChecker();
       auto loc = expr->getStartLoc();
 
-      auto buildProtocolInitCall =
-        [&](KnownProtocolKind protocolKind, Type type, 
-            ArrayRef<Identifier> argLabels, ArrayRef<Expr *> args) -> Expr * {
+      auto fetchProtocolInitWitness =
+        [&](KnownProtocolKind protocolKind, Type type,
+            ArrayRef<Identifier> argLabels) -> ConcreteDeclRef {
 
         auto proto = tc.getProtocol(loc, protocolKind);
         assert(proto && "Missing string interpolation protocol?");
@@ -2129,16 +2125,12 @@ namespace {
         assert(conformance && "string interpolation type conforms to protocol");
 
         DeclName constrName(tc.Context, DeclBaseName::createConstructor(), argLabels);
-        
-        Expr *base = TypeExpr::createImplicitHack(loc, type,
-                                                  tc.Context);
-        Expr *semanticExpr = tc.callWitness(base, dc, proto, *conformance,
-                                            constrName, args,
-                                            diag::interpolation_broken_proto);
-        if (semanticExpr)
-          cs.cacheExprTypes(semanticExpr);
 
-        return semanticExpr;
+        ConcreteDeclRef witness =
+            conformance->getWitnessByName(type->getRValueType(), constrName);
+        if (!witness || !isa<AbstractFunctionDecl>(witness.getDecl()))
+          return nullptr;
+        return witness;
       };
 
       auto associatedTypeArray = 
@@ -2154,59 +2146,42 @@ namespace {
       auto interpolationType =
         simplifyType(DependentMemberType::get(openedType, associatedTypeDecl));
 
-      // interpolationInitCall = """
-      //   StringInterpolationProtocol.init(
-      //     literalCapacity: \(expr->getLiteralCapacity()), 
-      //     interpolationCount: \(expr->getInterpolationCount()))
-      //   """
+      // Fetch needed witnesses.
+      ConcreteDeclRef builderInit = fetchProtocolInitWitness(
+          KnownProtocolKind::StringInterpolationProtocol, interpolationType,
+          { tc.Context.Id_literalCapacity, tc.Context.Id_interpolationCount });
+      if (!builderInit) return nullptr;
+      expr->setBuilderInit(builderInit);
+
+      ConcreteDeclRef resultInit = fetchProtocolInitWitness(
+          KnownProtocolKind::ExpressibleByStringInterpolation, type,
+          { tc.Context.Id_stringInterpolation });
+      if (!resultInit) return nullptr;
+      expr->setResultInit(resultInit);
 
       // Make the integer literals for the parameters.
-      Expr *literalCapacity =
-        IntegerLiteralExpr::createFromUnsigned(tc.Context,
-                                               expr->getLiteralCapacity());
-      cs.setType(literalCapacity, tc.getIntType(cs.DC));
-      literalCapacity =
-        handleIntegerLiteralExpr((LiteralExpr*)literalCapacity);
+      auto buildExprFromUnsigned = [&](unsigned value) {
+        LiteralExpr *expr =
+            IntegerLiteralExpr::createFromUnsigned(tc.Context, value);
+        cs.setType(expr, tc.getIntType(cs.DC));
+        return handleIntegerLiteralExpr(expr);
+      };
 
-      Expr *interpolationCount =
-        IntegerLiteralExpr::createFromUnsigned(tc.Context,
-                                               expr->getInterpolationCount());
-      cs.setType(interpolationCount, tc.getIntType(cs.DC));
-      interpolationCount =
-        handleIntegerLiteralExpr((LiteralExpr*)interpolationCount);
+      expr->setLiteralCapacityExpr(
+          buildExprFromUnsigned(expr->getLiteralCapacity()));
+      expr->setInterpolationCountExpr(
+          buildExprFromUnsigned(expr->getInterpolationCount()));
 
-      // Make the call itself.
-      auto interpolationInitCall =
-        buildProtocolInitCall(
-          KnownProtocolKind::StringInterpolationProtocol, interpolationType,
-          { tc.Context.Id_literalCapacity, tc.Context.Id_interpolationCount },
-          { literalCapacity, interpolationCount });
-
-      // appendingExpr = """
-      //   _tap var \(expr->getBody()->getElement(0)) = 
-      //         \(interpolationInitCall) {
-      //     \(expr->getBody())
-      //   }
-      //   """
+      // This OpaqueValueExpr represents the result of builderInit above in
+      // silgen.
+      OpaqueValueExpr *interpolationExpr =
+          new (tc.Context) OpaqueValueExpr(expr->getLoc(), interpolationType);
+      cs.setType(interpolationExpr, interpolationType);
+      expr->setInterpolationExpr(interpolationExpr);
 
       auto appendingExpr = expr->getAppendingExpr();
-      appendingExpr->setSubExpr(interpolationInitCall);
+      appendingExpr->setSubExpr(interpolationExpr);
 
-      // initStringInterpolationExpr = """
-      //   ExpressibleByStringInterpolation.init(
-      //     stringInterpolation: \(appendingExpr))
-      //   """
-
-      auto initStringInterpolationExpr =
-        buildProtocolInitCall(
-          KnownProtocolKind::ExpressibleByStringInterpolation, type, 
-          { tc.Context.Id_stringInterpolation },
-          { appendingExpr });
-
-      // Set that as the semantic expr.
-      expr->setSemanticExpr(initStringInterpolationExpr);
-
-      // And we're done!
       return expr;
     }
     
@@ -6685,26 +6660,9 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
                                           DeclName builtinLiteralFuncName,
                                           Diag<> brokenProtocolDiag,
                                           Diag<> brokenBuiltinProtocolDiag) {
-  auto &tc = cs.getTypeChecker();
-
-  auto getType = [&](const Expr *E) -> Type {
-    return cs.getType(E);
-  };
-
-  auto setType = [&](Expr *E, Type Ty) {
-    cs.setType(E, Ty);
-  };
-
   // If coercing a literal to an unresolved type, we don't try to look up the
   // witness members, just do it.
   if (type->is<UnresolvedType>()) {
-    // Instead of updating the literal expr in place, allocate a new node.  This
-    // avoids issues where Builtin types end up on expr nodes and pollute
-    // diagnostics.
-    literal = cast<LiteralExpr>(literal)->shallowClone(tc.Context, setType,
-                                                       getType);
-
-    // The literal expression has this type.
     cs.setType(literal, type);
     return literal;
   }
@@ -6753,9 +6711,8 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
   // Dig out the literal type and perform a builtin literal conversion to it.
   if (!literalType.empty()) {
     // Extract the literal type.
-    Type builtinLiteralType = tc.getWitnessType(type, protocol, *conformance,
-                                                literalType,
-                                                brokenProtocolDiag);
+    Type builtinLiteralType =
+        conformance->getTypeWitnessByName(type, literalType);
     if (!builtinLiteralType)
       return nullptr;
 
@@ -7639,160 +7596,6 @@ Expr *Solution::coerceToType(Expr *expr, Type toType,
       rewriter.DiagnosedOptionalInjections.insert(injection);
     }
   }
-
-  rewriter.finalize(result);
-  return result;
-}
-
-// Determine whether this is a variadic witness.
-static bool isVariadicWitness(AbstractFunctionDecl *afd) {
-  for (auto param : *afd->getParameters())
-    if (param->isVariadic())
-      return true;
-
-  return false;
-}
-
-static bool argumentNamesMatch(Type argTy, ArrayRef<Identifier> names) {
-  auto tupleType = argTy->getAs<TupleType>();
-  if (!tupleType)
-    return names.size() == 1 && names[0].empty();
-
-  if (tupleType->getNumElements() != names.size())
-    return false;
-
-  for (unsigned i = 0, n = tupleType->getNumElements(); i != n; ++i) {
-    if (tupleType->getElement(i).getName() != names[i])
-      return false;
-  }
-
-  return true;
-}
-
-Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
-                               ProtocolDecl *protocol,
-                               ProtocolConformanceRef conformance,
-                               DeclName name,
-                               ArrayRef<Expr *> arguments,
-                               Diag<> brokenProtocolDiag) {
-  // Construct an empty constraint system and solution.
-  ConstraintSystem cs(*this, dc, ConstraintSystemOptions());
-
-  for (auto *arg : arguments)
-    cs.cacheType(arg);
-
-  // Find the witness we need to use.
-  auto type = base->getType();
-  assert(!type->hasTypeVariable() &&
-         "Building call to witness with unresolved base type!");
-
-  if (auto metaType = type->getAs<AnyMetatypeType>())
-    type = metaType->getInstanceType();
-
-  // Find the member used to satisfy the named requirement.
-  auto witness = conformance.getWitnessByName(type, name);
-  if (!witness || !isa<AbstractFunctionDecl>(witness.getDecl()))
-    return nullptr;
-
-  auto *witnessFn = cast<AbstractFunctionDecl>(witness.getDecl());
-
-  // Form a syntactic expression that describes the reference to the
-  // witness.
-  // FIXME: Egregious hack.
-  auto unresolvedDot = new (Context) UnresolvedDotExpr(
-                                       base, SourceLoc(),
-                                       witness.getDecl()->getFullName(),
-                                       DeclNameLoc(base->getEndLoc()),
-                                       /*Implicit=*/true);
-  unresolvedDot->setFunctionRefKind(FunctionRefKind::SingleApply);
-  auto dotLocator = cs.getConstraintLocator(unresolvedDot);
-
-  // Form a reference to the witness itself.
-  Type openedFullType, openedType;
-  std::tie(openedFullType, openedType)
-    = cs.getTypeOfMemberReference(base->getType(), witness.getDecl(), dc,
-                                  /*isDynamicResult=*/false,
-                                  FunctionRefKind::DoubleApply,
-                                  dotLocator);
-
-  auto getType = [&](const Expr *E) -> Type {
-    return cs.getType(E);
-  };
-
-  // Form the call argument.
-  // FIXME: Standardize all callers to always provide all argument names,
-  // rather than hack around this.
-  CallExpr *call;
-  auto argLabels = witness.getDecl()->getFullName().getArgumentNames();
-  if (arguments.size() == 1 &&
-      (isVariadicWitness(witnessFn) ||
-       argumentNamesMatch(cs.getType(arguments[0]), argLabels))) {
-    call = CallExpr::create(Context, unresolvedDot, arguments[0], {}, {},
-                            /*hasTrailingClosure=*/false,
-                            /*implicit=*/true, Type(), getType);
-  } else {
-    // The tuple should have the source range enclosing its arguments unless
-    // they are invalid or there are no arguments.
-    SourceLoc TupleStartLoc = base->getStartLoc();
-    SourceLoc TupleEndLoc = base->getEndLoc();
-    if (!arguments.empty()) {
-      SourceLoc AltStartLoc = arguments.front()->getStartLoc();
-      SourceLoc AltEndLoc = arguments.back()->getEndLoc();
-      if (AltStartLoc.isValid() && AltEndLoc.isValid()) {
-        TupleStartLoc = AltStartLoc;
-        TupleEndLoc = AltEndLoc;
-      }
-    }
-
-    call = CallExpr::create(Context, unresolvedDot, TupleStartLoc, arguments,
-                            argLabels, {}, TupleEndLoc,
-                            /*trailingClosure=*/nullptr,
-                            /*implicit=*/true, getType);
-  }
-
-  cs.cacheSubExprTypes(call);
-
-  // Extract the arguments.
-  SmallVector<AnyFunctionType::Param, 8> args;
-  AnyFunctionType::decomposeInput(cs.getType(call->getArg()), args);
-
-  // Add the conversion from the argument to the function parameter type.
-  auto openedFuncType = openedType->castTo<FunctionType>();
-  ::matchCallArguments(
-      cs, args, openedFuncType->getParams(),
-      ConstraintKind::ArgumentConversion,
-      cs.getConstraintLocator(call, ConstraintLocator::ApplyArgument));
-
-  // Solve the system.
-  SmallVector<Solution, 1> solutions;
-  
-  cs.cacheExprTypes(call);
-
-  // If the system failed to produce a solution, post any available diagnostics.
-  if (cs.solve(call, solutions) || solutions.size() != 1) {
-    cs.salvage(solutions, base);
-    return nullptr;
-  }
-
-  Solution &solution = solutions.front();
-  ExprRewriter rewriter(cs, solution,
-                        /*suppressDiagnostics=*/false);
-
-  auto choice =
-      OverloadChoice(openedFullType, witnessFn, FunctionRefKind::SingleApply);
-  auto memberRef = rewriter.buildMemberRef(
-      base, openedFullType, base->getStartLoc(), choice,
-      DeclNameLoc(base->getEndLoc()), openedType, dotLocator, dotLocator,
-      /*Implicit=*/true, FunctionRefKind::SingleApply,
-      AccessSemantics::Ordinary,
-      /*isDynamic=*/false);
-  call->setFn(memberRef);
-
-  // Call the witness.
-  Expr *result = rewriter.finishApply(call, openedType,
-                                      cs.getConstraintLocator(call));
-  if (!result)
-    return nullptr;
 
   rewriter.finalize(result);
   return result;

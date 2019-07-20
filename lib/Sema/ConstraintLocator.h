@@ -65,6 +65,8 @@ public:
     GenericParameter,
     /// The argument type of a function.
     FunctionArgument,
+    /// The default argument type of a function.
+    DefaultArgument,
     /// The result type of a function.
     FunctionResult,
     /// A tuple element referenced by position.
@@ -147,6 +149,7 @@ public:
     case ApplyFunction:
     case GenericParameter:
     case FunctionArgument:
+    case DefaultArgument:
     case FunctionResult:
     case OptionalPayload:
     case Member:
@@ -244,6 +247,7 @@ public:
       return 0;
 
     case FunctionArgument:
+    case DefaultArgument:
     case FunctionResult:
       return IsFunctionConversion;
     }

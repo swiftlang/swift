@@ -1512,10 +1512,9 @@ function(add_swift_host_library name)
 
   if(NOT LLVM_INSTALL_TOOLCHAIN_ONLY)
     swift_install_in_component(TARGETS ${name}
-                               ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX}
-                               LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX}
-                               RUNTIME DESTINATION bin
-                               COMPONENT dev)
+      ARCHIVE DESTINATION lib${LLVM_LIBDIR_SUFFIX} COMPONENT dev
+      LIBRARY DESTINATION lib${LLVM_LIBDIR_SUFFIX} COMPONENT dev
+      RUNTIME DESTINATION bin COMPONENT dev)
   endif()
 
   swift_is_installing_component(dev is_installing)
@@ -2139,10 +2138,15 @@ function(add_swift_target_library name)
 
       if(sdk STREQUAL WINDOWS AND CMAKE_SYSTEM_NAME STREQUAL Windows)
         swift_install_in_component(TARGETS ${name}-windows-${SWIFT_PRIMARY_VARIANT_ARCH}
-                                   RUNTIME DESTINATION "bin"
-                                   LIBRARY DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}/${SWIFT_PRIMARY_VARIANT_ARCH}"
-                                   ARCHIVE DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}/${SWIFT_PRIMARY_VARIANT_ARCH}"
-                                   COMPONENT "${SWIFTLIB_INSTALL_IN_COMPONENT}"
+                                   RUNTIME
+                                     DESTINATION "bin"
+                                     COMPONENT "${SWIFTLIB_INSTALL_IN_COMPONENT}"
+                                   LIBRARY
+                                     DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}/${SWIFT_PRIMARY_VARIANT_ARCH}"
+                                     COMPONENT "${SWIFTLIB_INSTALL_IN_COMPONENT}"
+                                   ARCHIVE
+                                     DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/${resource_dir}/${resource_dir_sdk_subdir}/${SWIFT_PRIMARY_VARIANT_ARCH}"
+                                     COMPONENT "${SWIFTLIB_INSTALL_IN_COMPONENT}"
                                    PERMISSIONS ${file_permissions})
       else()
         swift_install_in_component(FILES "${UNIVERSAL_LIBRARY_NAME}"
@@ -2423,8 +2427,9 @@ function(add_swift_host_tool executable)
     ${ASHT_UNPARSED_ARGUMENTS})
 
   swift_install_in_component(TARGETS ${executable}
-                             RUNTIME DESTINATION bin
-                             COMPONENT ${ASHT_SWIFT_COMPONENT})
+                             RUNTIME
+                               DESTINATION bin
+                               COMPONENT ${ASHT_SWIFT_COMPONENT})
 
   swift_is_installing_component(${ASHT_SWIFT_COMPONENT} is_installing)
 

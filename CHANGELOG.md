@@ -26,27 +26,24 @@ CHANGELOG
 Swift Next
 ----------
 
-* [SR-8974][]:
+* [SR-4206][]:
 
-  Duplicate tuple element labels are no longer allowed, because it leads
-  to incorrect behavior. For example:
-
-  ```
-  let dupLabels: (foo: Int, foo: Int) = (foo: 1, foo: 2)
-
-  enum Foo { case bar(x: Int, x: Int) }
-  let f: Foo = .bar(x: 0, x: 1)
-  ```
-
-  will now be diagnosed as an error. 
-
-  Note: You can still use duplicate labels when declaring functions and
-  subscripts, as long as the internal labels are different. For example:
+  A method override is no longer allowed to have a generic signature with 
+  requirements not imposed by the base method. For example:
 
   ```
-  func foo(bar x: Int, bar y: Int) {}
-  subscript(a x: Int, a y: Int) -> Int {}
+  protocol P {}
+  
+  class Base {
+    func foo<T>(arg: T) {}
+  }
+  
+  class Derived: Base {
+    override func foo<T: P>(arg: T) {}
+  }
   ```
+
+  will now be diagnosed as an error.
 
 * [SR-6118][]:
 
@@ -67,6 +64,28 @@ Swift Next
 
 Swift 5.1
 ---------
+
+* [SR-8974][]:
+
+  Duplicate tuple element labels are no longer allowed, because it leads
+  to incorrect behavior. For example:
+
+  ```
+  let dupLabels: (foo: Int, foo: Int) = (foo: 1, foo: 2)
+
+  enum Foo { case bar(x: Int, x: Int) }
+  let f: Foo = .bar(x: 0, x: 1)
+  ```
+
+  will now be diagnosed as an error. 
+
+  Note: You can still use duplicate argument labels when declaring functions and
+  subscripts, as long as the internal parameter names are different. For example:
+
+  ```
+  func foo(bar x: Int, bar y: Int) {}
+  subscript(a x: Int, a y: Int) -> Int {}
+  ```
 
 * [SE-0244][]:
 
@@ -7708,6 +7727,7 @@ Swift 1.0
 [SR-2608]: <https://bugs.swift.org/browse/SR-2608>
 [SR-2672]: <https://bugs.swift.org/browse/SR-2672>
 [SR-2688]: <https://bugs.swift.org/browse/SR-2688>
+[SR-4206]: <https://bugs.swift.org/browse/SR-4206>
 [SR-4248]: <https://bugs.swift.org/browse/SR-4248>
 [SR-5581]: <https://bugs.swift.org/browse/SR-5581>
 [SR-5719]: <https://bugs.swift.org/browse/SR-5719>

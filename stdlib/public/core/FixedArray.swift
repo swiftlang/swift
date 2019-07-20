@@ -42,14 +42,14 @@ extension _FixedArray16 {
   }
 }
 
-extension _FixedArray16 : RandomAccessCollection, MutableCollection {
+extension _FixedArray16: RandomAccessCollection, MutableCollection {
   internal typealias Index = Int
 
-  internal var startIndex : Index {
+  internal var startIndex: Index {
     return 0
   }
 
-  internal var endIndex : Index {
+  internal var endIndex: Index {
     return count
   }
 
@@ -59,7 +59,7 @@ extension _FixedArray16 : RandomAccessCollection, MutableCollection {
       let count = self.count // for exclusive access
       _internalInvariant(i >= 0 && i < count)
       let res: T = withUnsafeBytes(of: storage) {
-        (rawPtr : UnsafeRawBufferPointer) -> T in
+        (rawPtr: UnsafeRawBufferPointer) -> T in
         let stride = MemoryLayout<T>.stride
         _internalInvariant(rawPtr.count == 16*stride, "layout mismatch?")
         let bufPtr = UnsafeBufferPointer(
@@ -97,7 +97,7 @@ extension _FixedArray16 {
   }
 }
 
-extension _FixedArray16 where T : ExpressibleByIntegerLiteral {
+extension _FixedArray16 where T: ExpressibleByIntegerLiteral {
   @inline(__always)
   internal init(count: Int) {
     _internalInvariant(count >= 0 && count <= _FixedArray16.capacity)

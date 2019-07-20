@@ -3,7 +3,7 @@
 // RUN: -module-name DoubleInlines -o - | %FileCheck %s
 
 func condFail(arg: Builtin.Int1, msg: Builtin.RawPointer) {
-    Builtin.condfail(arg, msg)
+    Builtin.condfail_message(arg, msg)
 }
 
 func callCondFail(arg: Builtin.Int1, msg: Builtin.RawPointer) {

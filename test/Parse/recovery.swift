@@ -843,3 +843,8 @@ func postfixDot(a : String) {
 func f() {
   _ = ClassWithStaticDecls.  // expected-error {{expected member name following '.'}}
 }
+
+
+// <rdar://problem/22478168> | SR-11006
+// expected-error@+1 {{expected '=' instead of '==' to assign default value for parameter}} {{21-23==}}
+func SR11006(a: Int == 0) {}

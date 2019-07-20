@@ -946,6 +946,83 @@ static bool contextAllowsPatternBindingWithoutVariables(DeclContext *dc) {
   return true;
 }
 
+static VarDecl *getStoredPropertyFor(VarDecl *var) {
+  if (var->isStatic())
+    return nullptr;
+
+  if (var->isLazyStorageProperty())
+    return nullptr;
+
+  if (var->getOriginalWrappedProperty())
+    return nullptr;
+
+  if (var->getAttrs().hasAttribute<LazyAttr>()) {
+    if (auto *storage = var->getLazyStorageProperty()) {
+      assert(storage->hasStorage());
+      return storage;
+    }
+
+    return nullptr;
+  }
+
+  if (var->hasAttachedPropertyWrapper()) {
+    if (auto *storage = var->getPropertyWrapperBackingProperty()) {
+      assert(storage->hasStorage());
+      return storage;
+    }
+
+    return nullptr;
+  }
+
+  if (var->getAttrs().hasAttribute<NSManagedAttr>())
+    return nullptr;
+
+  if (!var->hasStorage())
+    return nullptr;
+
+  return var;
+}
+
+llvm::Expected<ArrayRef<VarDecl *>>
+StoredPropertiesRequest::evaluate(Evaluator &evaluator,
+                                  NominalTypeDecl *decl) const {
+  if (isa<EnumDecl>(decl) ||
+      isa<ProtocolDecl>(decl) ||
+      (isa<ClassDecl>(decl) && decl->hasClangNode()))
+    return ArrayRef<VarDecl *>();
+
+  SmallVector<VarDecl *, 4> results;
+  for (auto *member : decl->getMembers()) {
+    if (auto *var = dyn_cast<VarDecl>(member))
+      if (auto *storage = getStoredPropertyFor(var))
+        results.push_back(storage);
+  }
+
+  return decl->getASTContext().AllocateCopy(results);
+}
+
+llvm::Expected<ArrayRef<Decl *>>
+StoredPropertiesAndMissingMembersRequest::evaluate(Evaluator &evaluator,
+                                                   NominalTypeDecl *decl) const {
+  if (isa<EnumDecl>(decl) ||
+      isa<ProtocolDecl>(decl) ||
+      (isa<ClassDecl>(decl) && decl->hasClangNode()))
+    return ArrayRef<Decl *>();
+
+  SmallVector<Decl *, 4> results;
+  for (auto *member : decl->getMembers()) {
+    if (auto *var = dyn_cast<VarDecl>(member))
+      if (auto *storage = getStoredPropertyFor(var))
+        results.push_back(storage);
+
+    if (auto missing = dyn_cast<MissingMemberDecl>(member))
+      if (missing->getNumberOfFieldOffsetVectorEntries() > 0)
+        results.push_back(missing);
+  }
+
+  return decl->getASTContext().AllocateCopy(results);
+}
+
 /// Validate the \c entryNumber'th entry in \c binding.
 static void validatePatternBindingEntry(TypeChecker &tc,
                                         PatternBindingDecl *binding,
@@ -1157,6 +1234,67 @@ static bool doesAccessorNeedDynamicAttribute(AccessorDecl *accessor) {
     return false;
   }
   llvm_unreachable("covered switch");
+}
+
+llvm::Expected<bool>
+ProtocolRequiresClassRequest::evaluate(Evaluator &evaluator,
+                                       ProtocolDecl *decl) const {
+  // Quick check: @objc protocols require a class.
+  if (decl->isObjC())
+    return true;
+
+  // Determine the set of nominal types that this protocol inherits.
+  bool anyObject = false;
+  auto allInheritedNominals =
+    getDirectlyInheritedNominalTypeDecls(decl, anyObject);
+
+  // Quick check: do we inherit AnyObject?
+  if (anyObject)
+    return true;
+
+  // Look through all of the inherited nominals for a superclass or a
+  // class-bound protocol.
+  for (const auto found : allInheritedNominals) {
+    // Superclass bound.
+    if (isa<ClassDecl>(found.second))
+      return true;
+
+    // A protocol that might be class-constrained.
+    if (auto proto = dyn_cast<ProtocolDecl>(found.second)) {
+      if (proto->requiresClass())
+        return true;
+    }
+  }
+
+  return false;
+}
+
+llvm::Expected<bool>
+ExistentialConformsToSelfRequest::evaluate(Evaluator &evaluator,
+                                           ProtocolDecl *decl) const {
+  // If it's not @objc, it conforms to itself only if it has a self-conformance
+  // witness table.
+  if (!decl->isObjC())
+    return decl->requiresSelfConformanceWitnessTable();
+
+  // Check whether this protocol conforms to itself.
+  for (auto member : decl->getMembers()) {
+    if (member->isInvalid()) continue;
+
+    if (auto vd = dyn_cast<ValueDecl>(member)) {
+      // A protocol cannot conform to itself if it has static members.
+      if (!vd->isInstanceMember())
+        return false;
+    }
+  }
+
+  // Check whether any of the inherited protocols fail to conform to themselves.
+  for (auto proto : decl->getInheritedProtocols()) {
+    if (!proto->existentialConformsToSelf())
+      return false;
+  }
+
+  return true;
 }
 
 llvm::Expected<bool>
@@ -2113,12 +2251,15 @@ IsSetterMutatingRequest::evaluate(Evaluator &evaluator,
     if (setter)
       result = setter->isMutating();
 
+
     // As a special extra check, if the user also gave us a modify
     // coroutine, check that it has the same mutatingness as the setter.
     // TODO: arguably this should require the spelling to match even when
     // it's the implied value.
-    if (impl.getReadWriteImpl() == ReadWriteImplKind::Modify) {
-      auto modifyAccessor = storage->getModifyCoroutine();
+    auto modifyAccessor = storage->getModifyCoroutine();
+
+    if (impl.getReadWriteImpl() == ReadWriteImplKind::Modify &&
+        modifyAccessor != nullptr) {
       auto modifyResult = modifyAccessor->isMutating();
       if ((result || storage->isGetterMutating()) != modifyResult) {
         modifyAccessor->diagnose(
@@ -2239,7 +2380,9 @@ public:
       (void) VD->isDynamic();
 
       // Make sure we finalize this declaration.
-      TC.DeclsToFinalize.insert(VD);
+      if (isa<ClassDecl>(VD) || isa<ProtocolDecl>(VD) ||
+          isa<AbstractStorageDecl>(VD))
+        TC.DeclsToFinalize.insert(VD);
 
       // If this is a member of a nominal type, don't allow it to have a name of
       // "Type" or "Protocol" since we reserve the X.Type and X.Protocol
@@ -2297,6 +2440,9 @@ public:
     // Compute these requests in case they emit diagnostics.
     (void) VD->isGetterMutating();
     (void) VD->isSetterMutating();
+
+    // Retrieve the backing property of a wrapped property.
+    (void) VD->getPropertyWrapperBackingProperty();
 
     // Set up accessors, also lowering lazy and @NSManaged properties.
     maybeAddAccessorsToStorage(VD);
@@ -2446,30 +2592,9 @@ public:
       // default-initializable. If so, do it.
       if (PBD->getPattern(i)->hasType() &&
           !PBD->isInitialized(i) &&
+          PBD->isDefaultInitializable(i) &&
           PBD->getPattern(i)->hasStorage() &&
           !PBD->getPattern(i)->getType()->hasError()) {
-
-        // Decide whether we should suppress default initialization.
-        //
-        // Note: Swift 4 had a bug where properties with a desugared optional
-        // type like Optional<Int> had a half-way behavior where sometimes
-        // they behave like they are default initialized, and sometimes not.
-        //
-        // In Swift 5 mode, use the right condition here, and only default
-        // initialize properties with a sugared Optional type.
-        //
-        // (The restriction to sugared types only comes because we don't have
-        // the iterative declaration checker yet; so in general, we cannot
-        // look at the type of a property at all, and can only look at the
-        // TypeRepr, because we haven't validated the property yet.)
-        if (TC.Context.isSwiftVersionAtLeast(5)) {
-          if (!PBD->isDefaultInitializable(i))
-            continue;
-        } else {
-          if (PBD->getPattern(i)->isNeverDefaultInitializable())
-            continue;
-        }
-
         auto type = PBD->getPattern(i)->getType();
         if (auto defaultInit = buildDefaultInitializer(TC, type)) {
           // If we got a default initializer, install it and re-type-check it
@@ -2814,6 +2939,9 @@ public:
     TC.validateDecl(SD);
     checkGenericParams(SD->getGenericParams(), SD, TC);
 
+    // Force lowering of stored properties.
+    (void) SD->getStoredProperties();
+
     TC.addImplicitConstructors(SD);
 
     for (Decl *Member : SD->getMembers())
@@ -2943,9 +3071,14 @@ public:
                        DescriptiveDeclKind::Class, path);
     }
 
-    for (Decl *Member : CD->getMembers()) {
+    // Force lowering of stored properties.
+    (void) CD->getStoredProperties();
+
+    TC.addImplicitConstructors(CD);
+    CD->addImplicitDestructor();
+
+    for (Decl *Member : CD->getMembers())
       visit(Member);
-    }
 
     TC.checkPatternBindingCaptures(CD);
 
@@ -2953,9 +3086,6 @@ public:
     // in-class initializers, diagnose this now.
     if (CD->requiresStoredPropertyInits())
       checkRequiredInClassInits(CD);
-
-    TC.addImplicitConstructors(CD);
-    CD->addImplicitDestructor();
 
     // Compute @objc for each superclass member, to catch selector
     // conflicts resulting from unintended overrides.
@@ -3848,9 +3978,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
         checkEnumRawValues(*this, ED);
     }
 
-    if (!isa<ClassDecl>(nominal))
-      requestNominalLayout(nominal);
-
     break;
   }
 
@@ -4392,38 +4519,6 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
   }
 }
 
-static bool shouldValidateMemberDuringFinalization(NominalTypeDecl *nominal,
-                                                   ValueDecl *VD) {
-  // For enums, we only need to validate enum elements to know
-  // the layout.
-  if (isa<EnumDecl>(nominal) &&
-      isa<EnumElementDecl>(VD))
-    return true;
-
-  // For structs, we only need to validate stored properties to
-  // know the layout.
-  if (isa<StructDecl>(nominal) &&
-      (isa<VarDecl>(VD) &&
-       !cast<VarDecl>(VD)->isStatic() &&
-       (cast<VarDecl>(VD)->hasStorage() ||
-        VD->getAttrs().hasAttribute<LazyAttr>() ||
-        cast<VarDecl>(VD)->hasAttachedPropertyWrapper())))
-    return true;
-
-  // For classes, we need to validate properties and functions,
-  // but skipping nested types is OK.
-  if (isa<ClassDecl>(nominal) &&
-      !isa<TypeDecl>(VD))
-    return true;
-
-  // For protocols, skip nested typealiases and nominal types.
-  if (isa<ProtocolDecl>(nominal) &&
-      !isa<GenericTypeDecl>(VD))
-    return true;
-
-  return false;
-}
-
 void TypeChecker::requestMemberLayout(ValueDecl *member) {
   auto *dc = member->getDeclContext();
   if (auto *classDecl = dyn_cast<ClassDecl>(dc))
@@ -4463,30 +4558,13 @@ static void finalizeType(TypeChecker &TC, NominalTypeDecl *nominal) {
     CD->addImplicitDestructor();
   }
 
-  for (auto *D : nominal->getMembers()) {
-    auto VD = dyn_cast<ValueDecl>(D);
-    if (!VD)
-      continue;
+  // Force lowering of stored properties.
+  (void) nominal->getStoredProperties();
 
-    if (!shouldValidateMemberDuringFinalization(nominal, VD))
-      continue;
-
-    TC.DeclsToFinalize.insert(VD);
-
-    // The only thing left to do is synthesize storage for lazy variables
-    // and property wrappers.
-    auto *prop = dyn_cast<VarDecl>(D);
-    if (!prop)
-      continue;
-
-    if (prop->getAttrs().hasAttribute<LazyAttr>() && !prop->isStatic() &&
-        (!prop->getGetter() || !prop->getGetter()->hasBody())) {
-      (void) prop->getLazyStorageProperty();
-    }
-
-    // Ensure that we create the backing variable for a wrapped property.
-    if (prop->hasAttachedPropertyWrapper()) {
-      (void) prop->getPropertyWrapperBackingProperty();
+  if (isa<ClassDecl>(nominal) || isa<ProtocolDecl>(nominal)) {
+    for (auto *D : nominal->getMembers()) {
+      if (auto *ASD = dyn_cast<AbstractStorageDecl>(D))
+        TC.DeclsToFinalize.insert(ASD);
     }
   }
 
@@ -5266,7 +5344,6 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
     }
 
   } else {
-    SmallPtrSet<VarDecl *, 4> backingStorageVars;
     for (auto member : decl->getMembers()) {
       if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
         // Initializers that were synthesized to fulfill derived conformances
@@ -5289,17 +5366,9 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
       }
 
       if (auto var = dyn_cast<VarDecl>(member)) {
-        // If this variable has a property wrapper, go validate it to ensure
-        // that we create the backing storage property.
-        if (auto backingVar = var->getPropertyWrapperBackingProperty()) {
-          validateDecl(var);
-          maybeAddAccessorsToStorage(var);
-
-          backingStorageVars.insert(backingVar);
-        }
-
-        // Ignore the backing storage for properties with attached wrappers.
-        if (backingStorageVars.count(var) > 0)
+        // If this is a backing storage property for a property wrapper,
+        // skip it.
+        if (var->getOriginalWrappedProperty())
           continue;
 
         if (var->isMemberwiseInitialized(/*preferDeclaredProperties=*/true)) {
@@ -5599,6 +5668,16 @@ void TypeChecker::synthesizeMemberForLookup(NominalTypeDecl *target,
   }
 }
 
+/// Synthesizer callback for a function body consisting of "return".
+static std::pair<BraceStmt *, bool>
+synthesizeSingleReturnFunctionBody(AbstractFunctionDecl *afd, void *) {
+  ASTContext &ctx = afd->getASTContext();
+  SmallVector<ASTNode, 1> stmts;
+  stmts.push_back(new (ctx) ReturnStmt(afd->getLoc(), nullptr));
+  return { BraceStmt::create(ctx, afd->getLoc(), stmts, afd->getLoc(), true),
+           /*isTypeChecked=*/true };
+}
+
 void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
   FrontendStatsTracer StatsTracer(Context.Stats, "define-default-ctor", decl);
   PrettyStackTraceDecl stackTrace("defining default constructor for",
@@ -5624,11 +5703,8 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
   // Add the constructor.
   decl->addMember(ctor);
 
-  // Create an empty body for the default constructor.
-  SmallVector<ASTNode, 1> stmts;
-  stmts.push_back(new (Context) ReturnStmt(decl->getLoc(), nullptr));
-  ctor->setBody(BraceStmt::create(Context, SourceLoc(), stmts, SourceLoc()),
-                AbstractFunctionDecl::BodyKind::TypeChecked);
+  // Lazily synthesize an empty body for the default constructor.
+  ctor->setBodySynthesizer(synthesizeSingleReturnFunctionBody);
 }
 
 static void validateAttributes(TypeChecker &TC, Decl *D) {

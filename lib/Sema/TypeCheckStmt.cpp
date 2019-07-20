@@ -524,6 +524,14 @@ public:
       if (func->hasSingleExpressionBody()) {
         ctp = CTP_ReturnSingleExpr;
       }
+
+      // If we are performing code-completion inside a function builder body,
+      // suppress diagnostics to workaround typechecking performance problems.
+      if (func->getFunctionBuilderType() &&
+          TC.Context.SourceMgr.rangeContainsCodeCompletionLoc(
+              func->getBody()->getSourceRange())) {
+        options |= TypeCheckExprFlags::SuppressDiagnostics;
+      }
     }
 
     auto exprTy = TC.typeCheckExpression(E, DC, TypeLoc::withoutLoc(ResultTy),
@@ -763,9 +771,8 @@ public:
         return nullptr;
       S->setSequenceConformance(conformance);
 
-      iteratorTy = TC.getWitnessType(sequenceType, sequenceProto, *conformance,
-                                     TC.Context.Id_Iterator,
-                                     diag::sequence_protocol_broken);
+      iteratorTy = conformance->getTypeWitnessByName(sequenceType,
+                                                     TC.Context.Id_Iterator);
       if (!iteratorTy)
         return nullptr;
 
@@ -796,7 +803,7 @@ public:
       // be around.
       auto nextResultType =
           OptionalType::get(conformance->getTypeWitnessByName(
-                                sequenceType, DC->getASTContext().Id_Element))
+                                sequenceType, TC.Context.Id_Element))
               ->getCanonicalType();
       auto *genBinding = PatternBindingDecl::createImplicit(
           TC.Context, StaticSpellingKind::None, genPat,
@@ -829,9 +836,8 @@ public:
     if (!genConformance)
       return nullptr;
 
-    Type elementTy = TC.getWitnessType(iteratorTy, iteratorProto,
-                                       *genConformance, TC.Context.Id_Element,
-                                       diag::iterator_protocol_broken);
+    Type elementTy = genConformance->getTypeWitnessByName(iteratorTy,
+                                                        TC.Context.Id_Element);
     if (!elementTy)
       return nullptr;
 
@@ -1902,70 +1908,6 @@ void TypeChecker::checkDefaultArguments(ParameterList *params,
   }
 }
 
-bool TypeChecker::typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
-                                                     SourceLoc EndTypeCheckLoc) {
-  validateDecl(AFD);
-  checkDefaultArguments(AFD->getParameters(), AFD);
-
-  if (!AFD->getBody())
-    return false;
-
-  if (auto *FD = dyn_cast<FuncDecl>(AFD))
-    return typeCheckFunctionBodyUntil(FD, EndTypeCheckLoc);
-
-  if (auto *CD = dyn_cast<ConstructorDecl>(AFD))
-    return typeCheckConstructorBodyUntil(CD, EndTypeCheckLoc);
-
-  auto *DD = cast<DestructorDecl>(AFD);
-  return typeCheckDestructorBodyUntil(DD, EndTypeCheckLoc);
-}
-
-bool TypeChecker::typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD) {
-  return evaluateOrDefault(Context.evaluator,
-                           TypeCheckFunctionBodyRequest{AFD},
-                           true);
-}
-
-llvm::Expected<bool>
-TypeCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
-                                       AbstractFunctionDecl *func) const {
-  ASTContext &ctx = func->getASTContext();
-  if (!func->hasInterfaceType()) {
-    TypeChecker &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
-    tc.validateDecl(func);
-  }
-
-  // HACK: don't type-check the same function body twice. This will eventually
-  // be handled by the request-evaluator's caching mechanism.
-  (void)func->getBody();
-  if (func->isBodyTypeChecked())
-    return false;
-
-  FrontendStatsTracer StatsTracer(ctx.Stats, "typecheck-fn", func);
-  PrettyStackTraceDecl StackEntry("type-checking", func);
-
-  if (ctx.Stats)
-    ctx.Stats->getFrontendCounters().NumFunctionsTypechecked++;
-
-  Optional<FunctionBodyTimer> timer;
-  TypeChecker &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
-  if (tc.DebugTimeFunctionBodies || tc.WarnLongFunctionBodies)
-    timer.emplace(func, tc.DebugTimeFunctionBodies, tc.WarnLongFunctionBodies);
-
-  tc.requestRequiredNominalTypeLayoutForParameters(func->getParameters());
-
-  bool error = tc.typeCheckAbstractFunctionBodyUntil(func, SourceLoc());
-  func->setBodyTypeCheckedIfPresent();
-
-  if (error)
-    return true;
-
-  if (func->getBody())
-    performAbstractFuncDeclDiagnostics(tc, func);
-
-  return false;
-}
-
 static Type getFunctionBuilderType(FuncDecl *FD) {
   Type builderType = FD->getFunctionBuilderType();
 
@@ -1980,59 +1922,13 @@ static Type getFunctionBuilderType(FuncDecl *FD) {
   return builderType;
 }
 
-// Type check a function body (defined with the func keyword) that is either a
-// named function or an anonymous func expression.
-bool TypeChecker::typeCheckFunctionBodyUntil(FuncDecl *FD,
-                                             SourceLoc EndTypeCheckLoc) {
-  // Clang imported inline functions do not have a Swift body to
-  // typecheck.
-  if (FD->getClangDecl())
-    return false;
-
-  BraceStmt *BS = FD->getBody();
-  assert(BS && "Should have a body");
-
-  if (Type builderType = getFunctionBuilderType(FD)) {
-    return typeCheckFunctionBuilderFuncBody(FD, builderType);
-  }
-
-  if (FD->hasSingleExpressionBody()) {
-    auto resultTypeLoc = FD->getBodyResultTypeLoc();
-    auto E = FD->getSingleExpressionBody();
-
-    if (resultTypeLoc.isNull() || resultTypeLoc.getType()->isVoid()) {
-      // The function returns void.  We don't need an explicit return, no matter
-      // what the type of the expression is.  Take the inserted return back out.
-      BS->setElement(0, E);
-    }
-  }
-
-  StmtChecker SC(*this, static_cast<AbstractFunctionDecl *>(FD));
-  SC.EndTypeCheckLoc = EndTypeCheckLoc;
-  bool HadError = SC.typeCheckBody(BS);
-
-  // If this was a function with a single expression body, let's see
-  // if implicit return statement came out to be `Never` which means
-  // that we have eagerly converted something like `{ fatalError() }`
-  // into `{ return fatalError() }` that has to be corrected here.
-  if (FD->hasSingleExpressionBody()) {
-    if (auto *stmt = BS->getElement(0).dyn_cast<Stmt *>()) {
-      if (auto *RS = dyn_cast<ReturnStmt>(stmt)) {
-        if (RS->isImplicit() && RS->hasResult()) {
-          auto returnType = RS->getResult()->getType();
-          if (returnType && returnType->isUninhabited())
-            BS->setElement(0, RS->getResult());
-        }
-      }
-    }
-  }
-
-  FD->setBody(BS);
-  return HadError;
+bool TypeChecker::typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD) {
+  return typeCheckAbstractFunctionBodyUntil(AFD, SourceLoc());
 }
 
-Expr* TypeChecker::constructCallToSuperInit(ConstructorDecl *ctor,
-                                            ClassDecl *ClDecl) {
+static Expr* constructCallToSuperInit(ConstructorDecl *ctor,
+                                      ClassDecl *ClDecl) {
+  ASTContext &Context = ctor->getASTContext();
   Expr *superRef = new (Context) SuperRefExpr(ctor->getImplicitSelfDecl(),
                                               SourceLoc(), /*Implicit=*/true);
   Expr *r = new (Context) UnresolvedDotExpr(superRef, SourceLoc(),
@@ -2044,10 +1940,11 @@ Expr* TypeChecker::constructCallToSuperInit(ConstructorDecl *ctor,
   if (ctor->hasThrows())
     r = new (Context) TryExpr(SourceLoc(), r, Type(), /*implicit=*/true);
 
+  TypeChecker &tc = *static_cast<TypeChecker *>(Context.getLazyResolver());
   auto resultTy =
-      typeCheckExpression(r, ctor, TypeLoc(), CTP_Unused,
-                          TypeCheckExprFlags::IsDiscarded |
-                              TypeCheckExprFlags::SuppressDiagnostics);
+      tc.typeCheckExpression(r, ctor, TypeLoc(), CTP_Unused,
+                             TypeCheckExprFlags::IsDiscarded |
+                               TypeCheckExprFlags::SuppressDiagnostics);
   if (!resultTy)
     return nullptr;
   
@@ -2073,7 +1970,7 @@ static bool checkSuperInit(TypeChecker &tc, ConstructorDecl *fromCtor,
         assert(classTy->getSuperclass());
         tc.diagnose(apply->getArg()->getLoc(), diag::chain_convenience_init,
                     classTy->getSuperclass());
-        tc.diagnose(ctor, diag::convenience_init_here);
+        ctor->diagnose(diag::convenience_init_here);
       }
     }
     return true;
@@ -2109,7 +2006,7 @@ static bool checkSuperInit(TypeChecker &tc, ConstructorDecl *fromCtor,
       TypeChecker::FragileFunctionKind fragileKind;
       bool treatUsableFromInlineAsPublic;
       std::tie(fragileKind, treatUsableFromInlineAsPublic) =
-        tc.getFragileFunctionKind(fromCtor);
+          TypeChecker::getFragileFunctionKind(fromCtor);
       tc.diagnoseInlinableDeclRef(
           fromCtor->getLoc(), ctor, fromCtor, fragileKind,
           treatUsableFromInlineAsPublic);
@@ -2126,144 +2023,202 @@ static bool isKnownEndOfConstructor(ASTNode N) {
   return isa<ReturnStmt>(S) || isa<FailStmt>(S);
 }
 
-bool TypeChecker::typeCheckConstructorBodyUntil(ConstructorDecl *ctor,
-                                                SourceLoc EndTypeCheckLoc) {
-  BraceStmt *body = ctor->getBody();
-  assert(body);
-
-  // For constructors, we make sure that the body ends with a "return" stmt,
-  // which we either implicitly synthesize, or the user can write.  This
-  // simplifies SILGen.
-  if (body->getNumElements() == 0 ||
-      !isKnownEndOfConstructor(body->getElements().back())) {
-    SmallVector<ASTNode, 8> Elts(body->getElements().begin(),
-                                 body->getElements().end());
-    Elts.push_back(new (Context) ReturnStmt(body->getRBraceLoc(),
-                                            /*value*/nullptr,
-                                            /*implicit*/true));
-    body = BraceStmt::create(Context, body->getLBraceLoc(), Elts,
-                             body->getRBraceLoc(), body->isImplicit());
-    ctor->setBody(body);
-  }
-  
-  // Type-check the body.
-  StmtChecker SC(*this, static_cast<AbstractFunctionDecl *>(ctor));
-  SC.EndTypeCheckLoc = EndTypeCheckLoc;
-  bool HadError = SC.typeCheckBody(body);
-
-  if (ctor->isInvalid())
-    return HadError;
-
-  // Determine whether we need to introduce a super.init call.
-  auto nominalDecl = ctor->getDeclContext()->getSelfNominalTypeDecl();
-
-  // Error case.
-  if (nominalDecl == nullptr)
-    return HadError;
-
-  auto *ClassD = dyn_cast<ClassDecl>(nominalDecl);
+/// Check for problems specific to the body of a constructor within a
+/// class, involving (e.g.) implicit calls to the superclass initializer and
+/// issues related to designated/convenience initializers.
+static void checkClassConstructorBody(ClassDecl *classDecl,
+                                      ConstructorDecl *ctor,
+                                      BraceStmt *body) {
+  ASTContext &ctx = classDecl->getASTContext();
+  TypeChecker &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
   bool wantSuperInitCall = false;
-  if (ClassD) {
-    bool isDelegating = false;
-    ApplyExpr *initExpr = nullptr;
-    switch (ctor->getDelegatingOrChainedInitKind(&Diags, &initExpr)) {
-    case ConstructorDecl::BodyInitKind::Delegating:
-      isDelegating = true;
-      wantSuperInitCall = false;
-      break;
+  bool isDelegating = false;
+  ApplyExpr *initExpr = nullptr;
+  switch (ctor->getDelegatingOrChainedInitKind(&ctx.Diags, &initExpr)) {
+  case ConstructorDecl::BodyInitKind::Delegating:
+    isDelegating = true;
+    wantSuperInitCall = false;
+    break;
 
-    case ConstructorDecl::BodyInitKind::Chained:
-      checkSuperInit(*this, ctor, initExpr, false);
+  case ConstructorDecl::BodyInitKind::Chained:
+    checkSuperInit(tc, ctor, initExpr, false);
 
-      /// A convenience initializer cannot chain to a superclass constructor.
-      if (ctor->isConvenienceInit()) {
-        diagnose(initExpr->getLoc(), diag::delegating_convenience_super_init,
-                 ctor->getDeclContext()->getDeclaredInterfaceType());
-      }
-
-      LLVM_FALLTHROUGH;
-
-    case ConstructorDecl::BodyInitKind::None:
-      wantSuperInitCall = false;
-      break;
-
-    case ConstructorDecl::BodyInitKind::ImplicitChained:
-      wantSuperInitCall = true;
-      break;
+    /// A convenience initializer cannot chain to a superclass constructor.
+    if (ctor->isConvenienceInit()) {
+      ctx.Diags.diagnose(initExpr->getLoc(),
+                         diag::delegating_convenience_super_init,
+                         ctor->getDeclContext()->getDeclaredInterfaceType());
     }
 
-    // A class designated initializer must never be delegating.
-    if (ctor->isDesignatedInit() && isDelegating) {
-      diagnose(ctor->getLoc(),
-               diag::delegating_designated_init,
-               ctor->getDeclContext()->getDeclaredInterfaceType())
-        .fixItInsert(ctor->getLoc(), "convenience ");
-      diagnose(initExpr->getLoc(), diag::delegation_here);
-      ctor->setInitKind(CtorInitializerKind::Convenience);
-    }
+    LLVM_FALLTHROUGH;
 
-    // An inlinable constructor in a class must always be delegating,
-    // unless the class is '@_fixed_layout'.
-    // Note: This is specifically not using isFormallyResilient. We relax this
-    // rule for classes in non-resilient modules so that they can have inlinable
-    // constructors, as long as those constructors don't reference private
-    // declarations.
-    if (!isDelegating && ClassD->isResilient() &&
-        ctor->getResilienceExpansion() == ResilienceExpansion::Minimal) {
-      auto kind = getFragileFunctionKind(ctor);
-      diagnose(ctor, diag::class_designated_init_inlinable_resilient,
-               ClassD->getDeclaredInterfaceType(),
-               static_cast<unsigned>(kind.first));
-    }
+  case ConstructorDecl::BodyInitKind::None:
+    wantSuperInitCall = false;
+    break;
+
+  case ConstructorDecl::BodyInitKind::ImplicitChained:
+    wantSuperInitCall = true;
+    break;
   }
 
-  // If we want a super.init call...
-  if (wantSuperInitCall) {
-    assert(ClassD != nullptr);
+  // A class designated initializer must never be delegating.
+  if (ctor->isDesignatedInit() && isDelegating) {
+    ctor->diagnose(diag::delegating_designated_init,
+                   ctor->getDeclContext()->getDeclaredInterfaceType())
+      .fixItInsert(ctor->getLoc(), "convenience ");
+    ctx.Diags.diagnose(initExpr->getLoc(), diag::delegation_here);
+    ctor->setInitKind(CtorInitializerKind::Convenience);
+  }
 
-    // Find a default initializer in the superclass.
-    if (Expr *SuperInitCall = constructCallToSuperInit(ctor, ClassD)) {
-      // If the initializer we found is a designated initializer, we're okay.
-      class FindOtherConstructorRef : public ASTWalker {
-      public:
-        ApplyExpr *Found = nullptr;
+  // An inlinable constructor in a class must always be delegating,
+  // unless the class is '@_fixed_layout'.
+  // Note: This is specifically not using isFormallyResilient. We relax this
+  // rule for classes in non-resilient modules so that they can have inlinable
+  // constructors, as long as those constructors don't reference private
+  // declarations.
+  if (!isDelegating && classDecl->isResilient() &&
+      ctor->getResilienceExpansion() == ResilienceExpansion::Minimal) {
+    auto kind = TypeChecker::getFragileFunctionKind(ctor);
+    ctor->diagnose(diag::class_designated_init_inlinable_resilient,
+                   classDecl->getDeclaredInterfaceType(),
+                   static_cast<unsigned>(kind.first));
+  }
 
-        std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-          if (auto apply = dyn_cast<ApplyExpr>(E)) {
-            if (isa<OtherConstructorDeclRefExpr>(apply->getSemanticFn())) {
-              Found = apply;
-              return { false, E };
-            }
-          }
+  // If we don't want a super.init call, we're done.
+  if (!wantSuperInitCall)
+    return;
 
-          return { Found == nullptr, E };
+  // Find a default initializer in the superclass.
+  Expr *SuperInitCall = constructCallToSuperInit(ctor, classDecl);
+  if (!SuperInitCall)
+    return;
+
+  // If the initializer we found is a designated initializer, we're okay.
+  class FindOtherConstructorRef : public ASTWalker {
+  public:
+    ApplyExpr *Found = nullptr;
+
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      if (auto apply = dyn_cast<ApplyExpr>(E)) {
+        if (isa<OtherConstructorDeclRefExpr>(apply->getSemanticFn())) {
+          Found = apply;
+          return { false, E };
         }
-      };
-
-      FindOtherConstructorRef finder;
-      SuperInitCall->walk(finder);
-      if (!checkSuperInit(*this, ctor, finder.Found, true)) {
-        // Store the super.init expression within the constructor declaration
-        // to be emitted during SILGen.
-        ctor->setSuperInitCall(SuperInitCall);
       }
-    }
-  }
 
-  return HadError;
+      return { Found == nullptr, E };
+    }
+  };
+
+  FindOtherConstructorRef finder;
+  SuperInitCall->walk(finder);
+  if (!checkSuperInit(tc, ctor, finder.Found, true)) {
+    // Store the super.init expression within the constructor declaration
+    // to be emitted during SILGen.
+    ctor->setSuperInitCall(SuperInitCall);
+  }
 }
 
-bool TypeChecker::typeCheckDestructorBodyUntil(DestructorDecl *DD,
-                                               SourceLoc EndTypeCheckLoc) {
-  StmtChecker SC(*this, static_cast<AbstractFunctionDecl *>(DD));
-  SC.EndTypeCheckLoc = EndTypeCheckLoc;
-  BraceStmt *Body = DD->getBody();
-  assert(Body);
+llvm::Expected<bool>
+TypeCheckFunctionBodyUntilRequest::evaluate(Evaluator &evaluator,
+                                            AbstractFunctionDecl *AFD,
+                                            SourceLoc endTypeCheckLoc) const {
+  ASTContext &ctx = AFD->getASTContext();
 
-  bool HadError = SC.typeCheckBody(Body);
+  // Accounting for type checking of function bodies.
+  // FIXME: We could probably take this away, given that the request-evaluator
+  // does much of it for us.
+  FrontendStatsTracer StatsTracer(ctx.Stats, "typecheck-fn", AFD);
+  PrettyStackTraceDecl StackEntry("type-checking", AFD);
 
-  DD->setBody(Body);
-  return HadError;
+  if (ctx.Stats)
+    ctx.Stats->getFrontendCounters().NumFunctionsTypechecked++;
+
+  Optional<FunctionBodyTimer> timer;
+  TypeChecker &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
+  if (tc.DebugTimeFunctionBodies || tc.WarnLongFunctionBodies)
+    timer.emplace(AFD, tc.DebugTimeFunctionBodies, tc.WarnLongFunctionBodies);
+
+  tc.validateDecl(AFD);
+  tc.requestRequiredNominalTypeLayoutForParameters(AFD->getParameters());
+  tc.checkDefaultArguments(AFD->getParameters(), AFD);
+
+  BraceStmt *body = AFD->getBody();
+  if (!body || AFD->isBodyTypeChecked())
+    return false;
+
+  if (auto *func = dyn_cast<FuncDecl>(AFD)) {
+    if (Type builderType = getFunctionBuilderType(func)) {
+      body = tc.applyFunctionBuilderBodyTransform(func, body, builderType);
+      if (!body)
+        return true;
+    } else if (func->hasSingleExpressionBody()) {
+      auto resultTypeLoc = func->getBodyResultTypeLoc();
+      auto expr = func->getSingleExpressionBody();
+
+      if (resultTypeLoc.isNull() || resultTypeLoc.getType()->isVoid()) {
+        // The function returns void.  We don't need an explicit return, no matter
+        // what the type of the expression is.  Take the inserted return back out.
+        body->setElement(0, expr);
+      }
+    }
+  } else if (isa<ConstructorDecl>(AFD) &&
+             (body->getNumElements() == 0 ||
+                !isKnownEndOfConstructor(body->getElements().back()))) {
+    // For constructors, we make sure that the body ends with a "return" stmt,
+    // which we either implicitly synthesize, or the user can write.  This
+    // simplifies SILGen.
+    SmallVector<ASTNode, 8> Elts(body->getElements().begin(),
+                                 body->getElements().end());
+    Elts.push_back(new (ctx) ReturnStmt(body->getRBraceLoc(),
+                                        /*value*/nullptr,
+                                        /*implicit*/true));
+    body = BraceStmt::create(ctx, body->getLBraceLoc(), Elts,
+                             body->getRBraceLoc(), body->isImplicit());
+  }
+
+  StmtChecker SC(tc, AFD);
+  SC.EndTypeCheckLoc = endTypeCheckLoc;
+  bool hadError = SC.typeCheckBody(body);
+
+  // If this was a function with a single expression body, let's see
+  // if implicit return statement came out to be `Never` which means
+  // that we have eagerly converted something like `{ fatalError() }`
+  // into `{ return fatalError() }` that has to be corrected here.
+  if (isa<FuncDecl>(AFD) && cast<FuncDecl>(AFD)->hasSingleExpressionBody()) {
+    if (auto *stmt = body->getElement(0).dyn_cast<Stmt *>()) {
+      if (auto *retStmt = dyn_cast<ReturnStmt>(stmt)) {
+        if (retStmt->isImplicit() && retStmt->hasResult()) {
+          auto returnType = retStmt->getResult()->getType();
+          if (returnType && returnType->isUninhabited())
+            body->setElement(0, retStmt->getResult());
+        }
+      }
+    }
+  }
+
+  // Class constructor checking.
+  if (auto *ctor = dyn_cast<ConstructorDecl>(AFD)) {
+    if (auto classDecl = ctor->getDeclContext()->getSelfClassDecl()) {
+      checkClassConstructorBody(classDecl, ctor, body);
+    }
+  }
+
+  // If nothing went wrong yet, perform extra checking.
+  if (!hadError && endTypeCheckLoc.isInvalid())
+    performAbstractFuncDeclDiagnostics(tc, AFD, body);
+
+  // Wire up the function body now.
+  AFD->setBody(body, AbstractFunctionDecl::BodyKind::TypeChecked);
+  return hadError;
+}
+
+bool TypeChecker::typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
+                                                     SourceLoc EndTypeCheckLoc) {
+  return evaluateOrDefault(
+             Context.evaluator,
+             TypeCheckFunctionBodyUntilRequest{AFD, EndTypeCheckLoc},
+             true);
 }
 
 bool TypeChecker::typeCheckClosureBody(ClosureExpr *closure) {
