@@ -12,15 +12,15 @@
 
 #define DEBUG_TYPE "alloc-stack-hoisting"
 
-#include "swift/IRGen/IRGenSILPasses.h"
 #include "swift/AST/Availability.h"
+#include "swift/IRGen/IRGenSILPasses.h"
+#include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/SILArgument.h"
+#include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SIL/DebugUtils.h"
-#include "swift/SIL/SILBuilder.h"
-#include "swift/SIL/SILInstruction.h"
-#include "swift/SIL/SILArgument.h"
 
 #include "IRGenModule.h"
 #include "NonFixedTypeInfo.h"
@@ -124,7 +124,7 @@ insertDeallocStackAtEndOf(SmallVectorImpl<SILInstruction *> &FunctionExits,
 
 /// Hack to workaround a clang LTO bug.
 LLVM_ATTRIBUTE_NOINLINE
-void moveAllocStackToBeginningOfBlock(AllocStackInst* AS, SILBasicBlock *BB) {
+void moveAllocStackToBeginningOfBlock(AllocStackInst *AS, SILBasicBlock *BB) {
   AS->moveFront(BB);
 }
 
@@ -149,7 +149,8 @@ void Partition::assignStackLocation(
   // Rewrite all the other alloc_stacks in the partition to use the assigned
   // location.
   for (auto *AllocStack : Elts) {
-    if (AssignedLoc == AllocStack) continue;
+    if (AssignedLoc == AllocStack)
+      continue;
     eraseDeallocStacks(AllocStack);
     AllocStack->replaceAllUsesWith(AssignedLoc);
     AllocStack->eraseFromParent();
@@ -277,8 +278,8 @@ void MergeStackSlots::mergeSlots() {
       // Check if we can add it to an existing partition that we have show to be
       // non-interfering.
       for (auto &CandidateP : DisjointPartitions) {
-        // If the candidate partition is empty (the very first time we look at an
-        // alloc_stack) we can just add the alloc_stack.
+        // If the candidate partition is empty (the very first time we look at
+        // an alloc_stack) we can just add the alloc_stack.
         if (CandidateP.Elts.empty()) {
           CandidateP.Elts.push_back(CurAllocStack);
           FoundAPartition = true;
@@ -315,7 +316,6 @@ void MergeStackSlots::mergeSlots() {
     }
   }
 }
-
 
 namespace {
 /// Hoist alloc_stack instructions to the entry block and merge them.
@@ -437,8 +437,7 @@ class AllocStackHoisting : public SILFunctionTransform {
     auto *F = getFunction();
     auto *Mod = getIRGenModule();
     assert(Mod && "This pass must be run as part of an IRGen pipeline");
-    bool Changed = HoistAllocStack(F, *Mod).run();
-    if (Changed) {
+    if (HoistAllocStack(F, *Mod).run()) {
       PM->invalidateAnalysis(F, SILAnalysis::InvalidationKind::Instructions);
     }
   }

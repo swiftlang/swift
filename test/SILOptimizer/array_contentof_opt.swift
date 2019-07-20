@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -sil-verify-all -emit-sil -enforce-exclusivity=unchecked  %s | %FileCheck %s
+// RUN: %target-swift-frontend -O -sil-verify-all -emit-sil -enforce-exclusivity=unchecked -Xllvm '-sil-inline-never-functions=$sSa6appendyyxn' %s | %FileCheck %s
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
 
 // This is an end-to-end test of the array(contentsOf) -> array(Element) optimization
@@ -22,8 +22,8 @@ public func testInt(_ a: inout [Int]) {
 // CHECK:        [[F:%[0-9]+]] = function_ref @$sSa6appendyyxnFSi_Tg5
 // CHECK-NOT: apply
 // CHECK:        apply [[F]]
-// CHECK-NEXT:   apply [[F]]
-// CHECK-NEXT:   apply [[F]]
+// CHECK:        apply [[F]]
+// CHECK:        apply [[F]]
 // CHECK-NEXT:   tuple
 // CHECK-NEXT:   return
 public func testThreeInts(_ a: inout [Int]) {

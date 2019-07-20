@@ -123,7 +123,8 @@ static void addMandatoryOptPipeline(SILPassPipelinePlan &P) {
 
   // Diagnostic ConstantPropagation must be rerun on deserialized functions
   // because it is sensitive to the assert configuration.
-  // Consequently, certain optimization passes beyond this point will also rerun.
+  // Consequently, certain optimization passes beyond this point will also
+  // rerun.
   P.addDiagnosticConstantPropagation();
 
   // Now that we have emitted constant propagation diagnostics, try to eliminate
@@ -253,7 +254,8 @@ void addHighLevelLoopOptPasses(SILPassPipelinePlan &P) {
 }
 
 // Perform classic SSA optimizations.
-void addSSAPasses(SILPassPipelinePlan &P, OptimizationLevelKind OpLevel) {
+void addSSAFunctionPasses(SILPassPipelinePlan &P,
+                          OptimizationLevelKind OpLevel) {
   // Promote box allocations to stack allocations.
   P.addAllocBoxToStack();
 
@@ -281,7 +283,20 @@ void addSSAPasses(SILPassPipelinePlan &P, OptimizationLevelKind OpLevel) {
   P.addSILCombine();
 
   // Mainly for Array.append(contentsOf) optimization.
-  P.addArrayElementPropagation();
+  // Perform a round of array optimization in the mid-level pipeline after
+  // potentially inlining calls to Array append. In that situation, the
+  // high-level pipeline does ArrayElementPropagation and the mid-level pipeline
+  // handles uniqueness hoisting. Do this as late as possible before inlining
+  // because it must run between runs of the inliner when the pipeline restarts.
+  if (OpLevel == OptimizationLevelKind::MidLevel) {
+    P.addHighLevelLICM();
+    P.addArrayCountPropagation();
+    P.addABCOpt();
+    P.addDCE();
+    P.addCOWArrayOpts();
+    P.addDCE();
+    P.addSwiftArrayOpts();
+  }
 
   // Specialize opaque archetypes.
   // This can expose oportunities for the generic specializer.
@@ -302,21 +317,6 @@ void addSSAPasses(SILPassPipelinePlan &P, OptimizationLevelKind OpLevel) {
     P.addEarlyInliner();
     break;
   case OptimizationLevelKind::MidLevel:
-    P.addGlobalOpt();
-    P.addLetPropertiesOpt();
-    // It is important to serialize before any of the @_semantics
-    // functions are inlined, because otherwise the information about
-    // uses of such functions inside the module is lost,
-    // which reduces the ability of the compiler to optimize clients
-    // importing this module.
-    P.addSerializeSILPass();
-
-    // Now strip any transparent functions that still have ownership.
-    if (P.getOptions().StripOwnershipAfterSerialization)
-      P.addOwnershipModelEliminator();
-
-    if (P.getOptions().StopOptimizationAfterSerialization)
-      return;
 
     // Does inline semantics-functions (except "availability"), but not
     // global-init functions.
@@ -410,11 +410,11 @@ static void addHighLevelEarlyLoopOptPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("HighLevel+EarlyLoopOpt");
   // FIXME: update this to be a function pass.
   P.addEagerSpecializer();
-  addSSAPasses(P, OptimizationLevelKind::HighLevel);
+  addSSAFunctionPasses(P, OptimizationLevelKind::HighLevel);
   addHighLevelLoopOptPasses(P);
 }
 
-static void addMidModulePassesStackPromotePassPipeline(SILPassPipelinePlan &P) {
+static void addMidLevelModulePipeline(SILPassPipelinePlan &P) {
   P.startPipeline("MidModulePasses+StackPromote");
   P.addDeadFunctionElimination();
   P.addPerformanceSILLinker();
@@ -423,13 +423,24 @@ static void addMidModulePassesStackPromotePassPipeline(SILPassPipelinePlan &P) {
 
   // Do the first stack promotion on high-level SIL.
   P.addStackPromotion();
+
+  P.addGlobalOpt();
+  P.addLetPropertiesOpt();
+  // It is important to serialize before any of the @_semantics
+  // functions are inlined, because otherwise the information about
+  // uses of such functions inside the module is lost,
+  // which reduces the ability of the compiler to optimize clients
+  // importing this module.
+  P.addSerializeSILPass();
+
+  // Now strip any transparent functions that still have ownership.
+  if (P.getOptions().StripOwnershipAfterSerialization)
+    P.addOwnershipModelEliminator();
 }
 
-static bool addMidLevelPassPipeline(SILPassPipelinePlan &P) {
+static void addMidLevelFunctionPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("MidLevel");
-  addSSAPasses(P, OptimizationLevelKind::MidLevel);
-  if (P.getOptions().StopOptimizationAfterSerialization)
-    return true;
+  addSSAFunctionPasses(P, OptimizationLevelKind::MidLevel);
 
   // Specialize partially applied functions with dead arguments as a preparation
   // for CapturePropagation.
@@ -438,7 +449,6 @@ static bool addMidLevelPassPipeline(SILPassPipelinePlan &P) {
   // Run loop unrolling after inlining and constant propagation, because loop
   // trip counts may have became constant.
   P.addLoopUnroll();
-  return false;
 }
 
 static void addClosureSpecializePassPipeline(SILPassPipelinePlan &P) {
@@ -447,8 +457,8 @@ static void addClosureSpecializePassPipeline(SILPassPipelinePlan &P) {
   P.addDeadStoreElimination();
   P.addDeadObjectElimination();
 
-  // These few passes are needed to cleanup between loop unrolling and GlobalOpt.
-  // This is needed to fully optimize static small String constants.
+  // These few passes are needed to cleanup between loop unrolling and
+  // GlobalOpt. This is needed to fully optimize static small String constants.
   P.addSimplifyCFG();
   P.addSILCombine();
   P.addPerformanceConstantPropagation();
@@ -492,7 +502,7 @@ static void addLowLevelPassPipeline(SILPassPipelinePlan &P) {
   // Should be after FunctionSignatureOpts and before the last inliner.
   P.addReleaseDevirtualizer();
 
-  addSSAPasses(P, OptimizationLevelKind::LowLevel);
+  addSSAFunctionPasses(P, OptimizationLevelKind::LowLevel);
 
   P.addDeadObjectElimination();
   P.addObjectOutliner();
@@ -618,9 +628,13 @@ SILPassPipelinePlan::getPerformancePassPipeline(const SILOptions &Options) {
   addHighLevelEarlyLoopOptPipeline(P);
   addMidModulePassesStackPromotePassPipeline(P);
 
-  // Run an iteration of the mid-level SSA passes.
-  if (addMidLevelPassPipeline(P))
+  addMidLevelModulePipeline(P);
+  if (Options.StopOptimizationAfterSerialization) {
     return P;
+  }
+
+  // Run an iteration of the mid-level SSA function passes.
+  addMidLevelFunctionPipeline(P);
 
   // Perform optimizations that specialize.
   addClosureSpecializePassPipeline(P);
@@ -657,7 +671,7 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
   P.startPipeline("Serialization");
   P.addSerializeSILPass();
 
-  // And then strip ownership...
+  // Now strip any transparent functions that still have ownership.
   if (Options.StripOwnershipAfterSerialization)
     P.addOwnershipModelEliminator();
 
@@ -732,17 +746,18 @@ void SILPassPipelinePlan::print(llvm::raw_ostream &os) {
   // rather than use the yaml writer interface. We want to use the yaml reader
   // interface to be resilient against slightly different forms of yaml.
   os << "[\n";
-  interleave(getPipelines(),
-             [&](const SILPassPipeline &Pipeline) {
-               os << "    [\n";
+  interleave(
+      getPipelines(),
+      [&](const SILPassPipeline &Pipeline) {
+        os << "    [\n";
 
-               os << "        \"" << Pipeline.Name << "\"";
-               for (PassKind Kind : getPipelinePasses(Pipeline)) {
-                 os << ",\n        [\"" << PassKindID(Kind) << "\","
-                    << "\"" << PassKindTag(Kind) << "\"]";
-               }
-             },
-             [&] { os << "\n    ],\n"; });
+        os << "        \"" << Pipeline.Name << "\"";
+        for (PassKind Kind : getPipelinePasses(Pipeline)) {
+          os << ",\n        [\"" << PassKindID(Kind) << "\","
+             << "\"" << PassKindTag(Kind) << "\"]";
+        }
+      },
+      [&] { os << "\n    ],\n"; });
   os << "\n    ]\n";
   os << ']';
 }

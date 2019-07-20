@@ -20,12 +20,12 @@
 ///
 /// Another possibility is to implement these optimizations as separate passes,
 /// but then we would send slightly different functions to the pass pipeline
-/// multiple times through notifyPassManagerOfFunction. 
+/// multiple times through notifyPassManagerOfFunction.
 ///
 /// TODO: Optimize function with generic parameters.
 ///
 /// TODO: Improve epilogue release matcher, i.e. do a data flow instead of
-/// only finding releases in the return block. 
+/// only finding releases in the return block.
 ///
 //===----------------------------------------------------------------------===//
 
@@ -34,7 +34,6 @@
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILFunction.h"
-#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/CallerAnalysis.h"
@@ -44,6 +43,7 @@
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/CommandLine.h"
@@ -54,7 +54,8 @@ using namespace swift;
 STATISTIC(NumFunctionSignaturesOptimized, "Total func sig optimized");
 STATISTIC(NumDeadArgsEliminated, "Total dead args eliminated");
 STATISTIC(NumOwnedConvertedToGuaranteed, "Total owned args -> guaranteed args");
-STATISTIC(NumOwnedConvertedToNotOwnedResult, "Total owned result -> not owned result");
+STATISTIC(NumOwnedConvertedToNotOwnedResult,
+          "Total owned result -> not owned result");
 STATISTIC(NumSROAArguments, "Total SROA arguments optimized");
 
 using SILParameterInfoList = llvm::SmallVector<SILParameterInfo, 8>;
@@ -228,9 +229,9 @@ static bool usesGenerics(SILFunction *F,
         if (&BB != &*F->begin()) {
           // Scan types of all BB arguments. Ignore the entry BB, because
           // it is handled in a special way.
-           Arg->getType().getASTType().visit(FindArchetypesAndGenericTypes);
-           if (UsesGenerics)
-             return UsesGenerics;
+          Arg->getType().getASTType().visit(FindArchetypesAndGenericTypes);
+          if (UsesGenerics)
+            return UsesGenerics;
         }
       }
       // Scan types of all operands.
@@ -356,17 +357,17 @@ FunctionSignatureTransformDescriptor::createOptimizedSILFunctionType() {
     // The set of used archetypes is complete now.
     if (!UsesGenerics) {
       // None of the generic type parameters are used.
-      LLVM_DEBUG(llvm::dbgs() << "None of generic parameters are used by "
-                              << F->getName() << "\n";
-                 llvm::dbgs() << "Interface params:\n";
-                 for (auto Param : InterfaceParams) {
-                   Param.getType().dump();
-                 }
+      LLVM_DEBUG(
+          llvm::dbgs() << "None of generic parameters are used by "
+                       << F->getName() << "\n";
+          llvm::dbgs() << "Interface params:\n";
+          for (auto Param
+               : InterfaceParams) { Param.getType().dump(); }
 
-                 llvm::dbgs() << "Interface results:\n";
-                 for (auto Result : InterfaceResults) {
-                   Result.getType().dump();
-                 });
+          llvm::dbgs()
+          << "Interface results:\n";
+          for (auto Result
+               : InterfaceResults) { Result.getType().dump(); });
     }
   }
 
@@ -574,8 +575,7 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
     // Produce a substitutions list and a set of substituted SIL types
     // required for creating a new SIL function.
     Subs = F->getForwardingSubstitutionMap();
-    auto SubstCalleeType =
-        GenCalleeType->substGenericArgs(M, Subs);
+    auto SubstCalleeType = GenCalleeType->substGenericArgs(M, Subs);
     SubstCalleeSILType = SILType::getPrimitiveObjectType(SubstCalleeType);
     SILFunctionConventions Conv(SubstCalleeType, M);
     ResultType = Conv.getSILResultType();
@@ -618,19 +618,6 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
 bool FunctionSignatureTransform::run(bool hasCaller) {
   bool Changed = false;
   SILFunction *F = TransformDescriptor.OriginalFunction;
-
-  // Never repeat the same function signature optimization on the same function.
-  // Multiple function signature optimizations are composed by successively
-  // optmizing the newly created functions. Each optimization creates a new
-  // level of thunk. Those should all be ultimately inlined away.
-  //
-  // This happens, for example, when a new reference to the original function is
-  // discovered during devirtualization. That will cause the original function
-  // (now and FSO thunk) to be pushed back on the function pass pipeline.
-  if (F->isThunk() == IsSignatureOptimizedThunk) {
-    LLVM_DEBUG(llvm::dbgs() << "  FSO already performed on this thunk\n");
-    return false;
-  }
 
   if (!hasCaller && (F->getDynamicallyReplacedFunction() ||
                      canBeCalledIndirectly(F->getRepresentation()))) {
@@ -690,10 +677,7 @@ bool FunctionSignatureTransform::run(bool hasCaller) {
 // After this optimization CapturePropagation can replace the partial_apply by a
 // direct reference to the specialized function.
 bool FunctionSignatureTransform::removeDeadArgs(int minPartialAppliedArgs) {
-  if (minPartialAppliedArgs < 1)
-    return false;
-
-  if (!DeadArgumentAnalyzeParameters())
+  if (minPartialAppliedArgs < 1 || !DeadArgumentAnalyzeParameters())
     return false;
 
   SILFunction *F = TransformDescriptor.OriginalFunction;
@@ -737,16 +721,15 @@ bool FunctionSignatureTransform::removeDeadArgs(int minPartialAppliedArgs) {
 namespace {
 
 class FunctionSignatureOpts : public SILFunctionTransform {
-  
+
   /// If true, perform a special kind of dead argument elimination to enable
   /// removal of partial_apply instructions where all partially applied
   /// arguments are dead.
   bool OptForPartialApply;
 
 public:
-
-  FunctionSignatureOpts(bool OptForPartialApply) :
-     OptForPartialApply(OptForPartialApply) { }
+  FunctionSignatureOpts(bool OptForPartialApply)
+      : OptForPartialApply(OptForPartialApply) {}
 
   void run() override {
     auto *F = getFunction();
@@ -763,15 +746,15 @@ public:
       return;
 
     // This is the function to optimize.
-    LLVM_DEBUG(llvm::dbgs() << "*** FSO on function: " << F->getName()
-                            << " ***\n");
+    LLVM_DEBUG(llvm::dbgs()
+               << "*** FSO on function: " << F->getName() << " ***\n");
 
     // Check the signature of F to make sure that it is a function that we
     // can specialize. These are conditions independent of the call graph.
     // No need for CallerAnalysis if we are not optimizing for partial
     // applies.
-    if (!OptForPartialApply &&
-        !canSpecializeFunction(F, nullptr, OptForPartialApply)) {
+    if (!(OptForPartialApply ||
+          canSpecializeFunction(F, nullptr, OptForPartialApply))) {
       LLVM_DEBUG(llvm::dbgs() << "  cannot specialize function -> abort\n");
       return;
     }
@@ -786,7 +769,20 @@ public:
       LLVM_DEBUG(llvm::dbgs() << "  cannot specialize function -> abort\n");
       return;
     }
-
+    // Never repeat the same function signature optimization on the same
+    // function. Multiple function signature optimizations are composed by
+    // successively optmizing the newly created functions. Each optimization
+    // creates a new level of thunk. Those should all be ultimately inlined
+    // away.
+    //
+    // This happens, for example, when a new reference to the original function
+    // is discovered during devirtualization. That will cause the original
+    // function (now and FSO thunk) to be pushed back on the function pass
+    // pipeline.
+    if (F->isThunk() == IsSignatureOptimizedThunk) {
+      LLVM_DEBUG(llvm::dbgs() << "  FSO already performed on this thunk\n");
+      return false;
+    }
     // Ok, we think we can perform optimization. Now perform a quick check
     auto *RCIA = getAnalysis<RCIdentityAnalysis>();
     auto *EA = PM->getAnalysis<EpilogueARCAnalysis>();
@@ -795,8 +791,8 @@ public:
     // going to change, make sure the mangler is aware of all the changes done
     // to the function.
     auto P = Demangle::SpecializationPass::FunctionSignatureOpts;
-    Mangle::FunctionSignatureSpecializationMangler Mangler(P,
-                                                           F->isSerialized(), F);
+    Mangle::FunctionSignatureSpecializationMangler Mangler(P, F->isSerialized(),
+                                                           F);
 
     /// Keep a map between the exploded argument index and the original argument
     /// index.
@@ -823,7 +819,7 @@ public:
     FunctionSignatureTransform FST(FuncBuilder, F, RCIA, EA, Mangler, AIM,
                                    ArgumentDescList, ResultDescList);
 
-    bool Changed = false;
+    bool Changed;
     if (OptForPartialApply) {
       Changed = FST.removeDeadArgs(FuncInfo.getMinPartialAppliedArgs());
     } else {
@@ -853,7 +849,6 @@ public:
       restartPassPipeline();
     }
   }
-
 };
 
 } // end anonymous namespace

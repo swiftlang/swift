@@ -13,6 +13,12 @@
 #include "swift/SILOptimizer/Utils/PerformanceInlinerUtils.h"
 #include "swift/AST/Module.h"
 #include "swift/SILOptimizer/Utils/Local.h"
+#include "llvm/Support/CommandLine.h"
+
+llvm::cl::opt<std::string>
+    SILInlineNeverFuns("sil-inline-never-functions", llvm::cl::init(""),
+                       llvm::cl::desc("Never inline functions whose name "
+                                      "includes this string."));
 
 //===----------------------------------------------------------------------===//
 //                               ConstantTracker
@@ -64,7 +70,8 @@ SILValue ConstantTracker::getStoredValue(SILInstruction *loadInst,
   SILInstruction *store = links[loadInst];
   if (!store && callerTracker)
     store = callerTracker->links[loadInst];
-  if (!store) return SILValue();
+  if (!store)
+    return SILValue();
 
   assert(isa<LoadInst>(loadInst) || isa<CopyAddrInst>(loadInst));
 
@@ -145,112 +152,115 @@ SILInstruction *ConstantTracker::getDef(SILValue val,
   }
 }
 
-ConstantTracker::IntConst ConstantTracker::getBuiltinConst(BuiltinInst *BI, int depth) {
+ConstantTracker::IntConst ConstantTracker::getBuiltinConst(BuiltinInst *BI,
+                                                           int depth) {
   const BuiltinInfo &Builtin = BI->getBuiltinInfo();
   OperandValueArrayRef Args = BI->getArguments();
   switch (Builtin.ID) {
-    default: break;
+  default:
+    break;
 
-      // Fold comparison predicates.
+    // Fold comparison predicates.
 #define BUILTIN(id, name, Attrs)
-#define BUILTIN_BINARY_PREDICATE(id, name, attrs, overload) \
-case BuiltinValueKind::id:
+#define BUILTIN_BINARY_PREDICATE(id, name, attrs, overload)                    \
+  case BuiltinValueKind::id:
 #include "swift/AST/Builtins.def"
     {
       IntConst lhs = getIntConst(Args[0], depth);
       IntConst rhs = getIntConst(Args[1], depth);
       if (lhs.isValid && rhs.isValid) {
-        return IntConst(constantFoldComparison(lhs.value, rhs.value,
-                                               Builtin.ID),
-                        lhs.isFromCaller || rhs.isFromCaller);
+        return IntConst(
+            constantFoldComparison(lhs.value, rhs.value, Builtin.ID),
+            lhs.isFromCaller || rhs.isFromCaller);
       }
       break;
     }
 
-    case BuiltinValueKind::SAddOver:
-    case BuiltinValueKind::UAddOver:
-    case BuiltinValueKind::SSubOver:
-    case BuiltinValueKind::USubOver:
-    case BuiltinValueKind::SMulOver:
-    case BuiltinValueKind::UMulOver: {
-      IntConst lhs = getIntConst(Args[0], depth);
-      IntConst rhs = getIntConst(Args[1], depth);
-      if (lhs.isValid && rhs.isValid) {
-        bool IgnoredOverflow;
-        return IntConst(constantFoldBinaryWithOverflow(lhs.value, rhs.value,
-                        IgnoredOverflow,
-                        getLLVMIntrinsicIDForBuiltinWithOverflow(Builtin.ID)),
-                          lhs.isFromCaller || rhs.isFromCaller);
-      }
-      break;
+  case BuiltinValueKind::SAddOver:
+  case BuiltinValueKind::UAddOver:
+  case BuiltinValueKind::SSubOver:
+  case BuiltinValueKind::USubOver:
+  case BuiltinValueKind::SMulOver:
+  case BuiltinValueKind::UMulOver: {
+    IntConst lhs = getIntConst(Args[0], depth);
+    IntConst rhs = getIntConst(Args[1], depth);
+    if (lhs.isValid && rhs.isValid) {
+      bool IgnoredOverflow;
+      return IntConst(constantFoldBinaryWithOverflow(
+                          lhs.value, rhs.value, IgnoredOverflow,
+                          getLLVMIntrinsicIDForBuiltinWithOverflow(Builtin.ID)),
+                      lhs.isFromCaller || rhs.isFromCaller);
     }
+    break;
+  }
 
-    case BuiltinValueKind::SDiv:
-    case BuiltinValueKind::SRem:
-    case BuiltinValueKind::UDiv:
-    case BuiltinValueKind::URem: {
-      IntConst lhs = getIntConst(Args[0], depth);
-      IntConst rhs = getIntConst(Args[1], depth);
-      if (lhs.isValid && rhs.isValid && rhs.value != 0) {
-        bool IgnoredOverflow;
-        return IntConst(constantFoldDiv(lhs.value, rhs.value,
-                                        IgnoredOverflow, Builtin.ID),
-                        lhs.isFromCaller || rhs.isFromCaller);
-      }
-      break;
+  case BuiltinValueKind::SDiv:
+  case BuiltinValueKind::SRem:
+  case BuiltinValueKind::UDiv:
+  case BuiltinValueKind::URem: {
+    IntConst lhs = getIntConst(Args[0], depth);
+    IntConst rhs = getIntConst(Args[1], depth);
+    if (lhs.isValid && rhs.isValid && rhs.value != 0) {
+      bool IgnoredOverflow;
+      return IntConst(
+          constantFoldDiv(lhs.value, rhs.value, IgnoredOverflow, Builtin.ID),
+          lhs.isFromCaller || rhs.isFromCaller);
     }
+    break;
+  }
 
-    case BuiltinValueKind::And:
-    case BuiltinValueKind::AShr:
-    case BuiltinValueKind::LShr:
-    case BuiltinValueKind::Or:
-    case BuiltinValueKind::Shl:
-    case BuiltinValueKind::Xor: {
-      IntConst lhs = getIntConst(Args[0], depth);
-      IntConst rhs = getIntConst(Args[1], depth);
-      if (lhs.isValid && rhs.isValid) {
-        return IntConst(constantFoldBitOperation(lhs.value, rhs.value,
-                                                 Builtin.ID),
-                        lhs.isFromCaller || rhs.isFromCaller);
-      }
-      break;
+  case BuiltinValueKind::And:
+  case BuiltinValueKind::AShr:
+  case BuiltinValueKind::LShr:
+  case BuiltinValueKind::Or:
+  case BuiltinValueKind::Shl:
+  case BuiltinValueKind::Xor: {
+    IntConst lhs = getIntConst(Args[0], depth);
+    IntConst rhs = getIntConst(Args[1], depth);
+    if (lhs.isValid && rhs.isValid) {
+      return IntConst(
+          constantFoldBitOperation(lhs.value, rhs.value, Builtin.ID),
+          lhs.isFromCaller || rhs.isFromCaller);
     }
+    break;
+  }
 
-    case BuiltinValueKind::Trunc:
-    case BuiltinValueKind::ZExt:
-    case BuiltinValueKind::SExt:
-    case BuiltinValueKind::TruncOrBitCast:
-    case BuiltinValueKind::ZExtOrBitCast:
-    case BuiltinValueKind::SExtOrBitCast: {
-      IntConst val = getIntConst(Args[0], depth);
-      if (val.isValid) {
-        return IntConst(constantFoldCast(val.value, Builtin), val.isFromCaller);
-      }
-      break;
+  case BuiltinValueKind::Trunc:
+  case BuiltinValueKind::ZExt:
+  case BuiltinValueKind::SExt:
+  case BuiltinValueKind::TruncOrBitCast:
+  case BuiltinValueKind::ZExtOrBitCast:
+  case BuiltinValueKind::SExtOrBitCast: {
+    IntConst val = getIntConst(Args[0], depth);
+    if (val.isValid) {
+      return IntConst(constantFoldCast(val.value, Builtin), val.isFromCaller);
     }
+    break;
+  }
   }
   return IntConst();
 }
 
 // Tries to evaluate the integer constant of a value. The \p depth is used
 // to limit the complexity.
-ConstantTracker::IntConst ConstantTracker::getIntConst(SILValue val, int depth) {
+ConstantTracker::IntConst ConstantTracker::getIntConst(SILValue val,
+                                                       int depth) {
 
   // Don't spend too much time with constant evaluation.
   if (depth >= 10)
     return IntConst();
-  
+
   SILInstruction *I = getDef(val);
   if (!I)
     return IntConst();
-  
+
   if (auto *IL = dyn_cast<IntegerLiteralInst>(I)) {
     return IntConst(IL->getValue(), IL->getFunction() != F);
   }
   if (auto *BI = dyn_cast<BuiltinInst>(I)) {
     if (constCache.count(BI) != 0)
       return constCache[BI];
-    
+
     IntConst builtinConst = getBuiltinConst(BI, depth + 1);
     constCache[BI] = builtinConst;
     return builtinConst;
@@ -325,8 +335,8 @@ int ShortestPathAnalysis::getEntryDistFromPreds(const SILBasicBlock *BB,
   for (SILBasicBlock *Pred : BB->getPredecessorBlocks()) {
     BlockInfo *PredInfo = getBlockInfo(Pred);
     Distances &PDists = PredInfo->getDistances(LoopDepth);
-    int DistFromEntry = PDists.DistFromEntry + PredInfo->Length +
-                          PDists.LoopHeaderLength;
+    int DistFromEntry =
+        PDists.DistFromEntry + PredInfo->Length + PDists.LoopHeaderLength;
     assert(DistFromEntry >= 0);
     if (DistFromEntry < MinDist)
       MinDist = DistFromEntry;
@@ -366,8 +376,8 @@ static SILBasicBlock *detectLoopBypassPreheader(SILLoop *Loop) {
   if (!CBR)
     return nullptr;
 
-  SILBasicBlock *Succ = (CBR->getTrueBB() == Pred ? CBR->getFalseBB() :
-                                                    CBR->getTrueBB());
+  SILBasicBlock *Succ =
+      (CBR->getTrueBB() == Pred ? CBR->getFalseBB() : CBR->getTrueBB());
 
   for (SILBasicBlock *PredOfSucc : Succ->getPredecessorBlocks()) {
     SILBasicBlock *Exiting = PredOfSucc->getSinglePredecessorBlock();
@@ -379,7 +389,8 @@ static SILBasicBlock *detectLoopBypassPreheader(SILLoop *Loop) {
   return nullptr;
 }
 
-void ShortestPathAnalysis::analyzeLoopsRecursively(SILLoop *Loop, int LoopDepth) {
+void ShortestPathAnalysis::analyzeLoopsRecursively(SILLoop *Loop,
+                                                   int LoopDepth) {
   if (LoopDepth >= MaxNumLoopLevels)
     return;
 
@@ -399,7 +410,7 @@ void ShortestPathAnalysis::analyzeLoopsRecursively(SILLoop *Loop, int LoopDepth)
   solveDataFlow(Loop->getBlocks(), LoopDepth);
 
   int LoopLength = getExitDistFromSuccs(Loop->getHeader(), LoopDepth) +
-  HeaderInfo->getLength(LoopDepth);
+                   HeaderInfo->getLength(LoopDepth);
   HeaderDists.DistToExit = LoopLength;
 
   // If there is a loop bypass edge, add the loop length to the loop pre-pre-
@@ -411,16 +422,18 @@ void ShortestPathAnalysis::analyzeLoopsRecursively(SILLoop *Loop, int LoopDepth)
   // Add the full loop length (= assumed-iteration-count * length) to the loop
   // header so that it is considered in the parent scope.
   HeaderInfo->getDistances(LoopDepth - 1).LoopHeaderLength =
-    LoopCount * LoopLength;
+      LoopCount * LoopLength;
 }
 
-ShortestPathAnalysis::Weight ShortestPathAnalysis::
-getWeight(SILBasicBlock *BB, Weight CallerWeight) {
+ShortestPathAnalysis::Weight
+ShortestPathAnalysis::getWeight(SILBasicBlock *BB, Weight CallerWeight) {
   assert(BB->getParent() == F);
 
-  // Return a conservative default if the analysis was not done due to a high number of blocks.
+  // Return a conservative default if the analysis was not done due to a high
+  // number of blocks.
   if (BlockInfos.empty())
-    return Weight(CallerWeight.ScopeLength + ColdBlockLength, CallerWeight.LoopWeight);
+    return Weight(CallerWeight.ScopeLength + ColdBlockLength,
+                  CallerWeight.LoopWeight);
 
   SILLoop *Loop = LI->getLoopFor(BB);
   if (!Loop) {
@@ -441,8 +454,8 @@ getWeight(SILBasicBlock *BB, Weight CallerWeight) {
   while (Loop) {
     assert(LoopDepth > 0);
     BlockInfo *HeaderInfo = getBlockInfo(Loop->getHeader());
-    int InnerLoopLength = HeaderInfo->getScopeLength(LoopDepth) *
-                            ShortestPathAnalysis::LoopCount;
+    int InnerLoopLength =
+        HeaderInfo->getScopeLength(LoopDepth) * ShortestPathAnalysis::LoopCount;
     int OuterLoopWeight = SingleLoopWeight;
     int OuterScopeLength = HeaderInfo->getScopeLength(LoopDepth - 1);
 
@@ -484,9 +497,7 @@ getWeight(SILBasicBlock *BB, Weight CallerWeight) {
   return W;
 }
 
-void ShortestPathAnalysis::dump() {
-  printFunction(llvm::errs());
-}
+void ShortestPathAnalysis::dump() { printFunction(llvm::errs()); }
 
 void ShortestPathAnalysis::printFunction(llvm::raw_ostream &OS) {
   OS << "SPA @" << F->getName() << "\n";
@@ -599,33 +610,64 @@ static bool calleeHasPartialApplyWithOpenedExistentials(FullApplySite AI) {
   return false;
 }
 
-// Returns true if a given apply site should be skipped during the
-// early inlining pass.
+// Returns true if a given apply site with @_semantics should be skipped during
+// the early inlining pass.
 //
-// NOTE: Add here the checks for any specific @_semantics/@_effects
-// attributes causing a given callee to be excluded from the inlining
-// during the early inlining pass.
-static bool shouldSkipApplyDuringEarlyInlining(FullApplySite AI) {
-  // Add here the checks for any specific @_semantics attributes that need
-  // to be skipped during the early inlining pass.
+static bool shouldInlineSemanticApplyDuringEarlyInlining(FullApplySite AI) {
+
+  // Skip all array semantic calls for various array optimizations.
   ArraySemanticsCall ASC(AI.getInstruction());
-  if (ASC && !ASC.canInlineEarly())
-    return true;
+  if (ASC)
+    return false;
 
   SILFunction *Callee = AI.getReferencedFunctionOrNull();
-  if (!Callee)
-    return false;
+  assert(Callee && "The caller checks for a known callee.");
 
   if (Callee->hasSemanticsAttr("self_no_escaping_closure") ||
       Callee->hasSemanticsAttr("pair_no_escaping_closure"))
-    return true;
+    return false;
 
-  // Add here the checks for any specific @_effects attributes that need
-  // to be skipped during the early inlining pass.
-  if (Callee->hasEffectsKind())
-    return true;
+  if (Callee->hasSemanticsAttr("inline_late"))
+    return false;
 
-  return false;
+  return true;
+}
+bool shouldInlineSemanticCall(FullApplySite AI, InlineSelection WhatToInline) {
+  SILFunction *Callee = AI.getReferencedFunction();
+  assert(Callee && "The caller checks for a known callee.");
+
+  switch (WhatToInline) {
+  case InlineSelection::NoSemanticsAndGlobalInit:
+    if (!shouldInlineSemanticApplyDuringEarlyInlining(AI))
+      return false;
+    break;
+  case InlineSelection::NoGlobalInit:
+    // Don't inline availability checks before serialization.
+    if (Callee->hasSemanticsAttrThatStartsWith("availability") ||
+        (Callee->hasSemanticsAttrThatStartsWith("inline_late")))
+      return false;
+
+    // Handle nested semantics. Never inline a semantic call into
+    // another. First, the outer semantic call must be inlined. Then a full
+    // round of mid-level optimizations must rerun (all array
+    // optimizations). Finally the inner semantic call can be
+    // inlined. Afterward, all mid-level optimizations will be rerun yet
+    // again. This relies on no unannotated functions on the call stack between
+    // the outer and inner semantic functions.
+    if (Callee->hasSemanticsAttrs() && AI.getFunction()->hasSemanticsAttrs())
+      return false;
+
+    break;
+  case InlineSelection::Everything: {
+    ModuleDecl *SwiftModule = Callee->getModule().getSwiftModule();
+    bool IsInStdlib =
+        (SwiftModule->isStdlibModule() || SwiftModule->isOnoneSupportModule());
+    if (Callee->hasSemanticsAttrThatStartsWith("inline_late") && IsInStdlib) {
+      return false;
+    }
+  }
+  }
+  return true;
 }
 
 /// Checks if a generic callee and caller have compatible layout constraints.
@@ -679,34 +721,18 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
   if (!SILInliner::canInlineApplySite(AI))
     return nullptr;
 
-  ModuleDecl *SwiftModule = Callee->getModule().getSwiftModule();
-  bool IsInStdlib = (SwiftModule->isStdlibModule() ||
-                     SwiftModule->isOnoneSupportModule());
+  // Don't inline functions marked with @_effects in the first inlining pass.
+  if (WhatToInline == InlineSelection::NoSemanticsAndGlobalInit &&
+      Callee->hasEffectsKind())
+    return nullptr;
 
-  // Don't inline functions that are marked with the @_semantics or @_effects
-  // attribute if the inliner is asked not to inline them.
-  if (Callee->hasSemanticsAttrs() || Callee->hasEffectsKind()) {
-    if (WhatToInline == InlineSelection::NoSemanticsAndGlobalInit) {
-      if (shouldSkipApplyDuringEarlyInlining(AI))
-        return nullptr;
-      if (Callee->hasSemanticsAttr("inline_late"))
-        return nullptr;
-    }
-    // The "availability" semantics attribute is treated like global-init.
-    if (Callee->hasSemanticsAttrs() &&
-        WhatToInline != InlineSelection::Everything &&
-        (Callee->hasSemanticsAttrThatStartsWith("availability") ||
-         (Callee->hasSemanticsAttrThatStartsWith("inline_late")))) {
+  // Check if an @_semantics attribute inhibits inlining.
+  if (Callee->hasSemanticsAttrs()) {
+    if (!shouldInlineSemanticCall(AI, WhatToInline))
       return nullptr;
-    }
-    if (Callee->hasSemanticsAttrs() &&
-        WhatToInline == InlineSelection::Everything) {
-      if (Callee->hasSemanticsAttrThatStartsWith("inline_late") && IsInStdlib) {
-        return nullptr;
-      }
-    }
+  }
 
-  } else if (Callee->isGlobalInit()) {
+  if (Callee->isGlobalInit()) {
     if (WhatToInline != InlineSelection::Everything) {
       return nullptr;
     }
@@ -721,6 +747,9 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
   if (Callee->getInlineStrategy() == NoInline) {
     return nullptr;
   }
+  if (!SILInlineNeverFuns.empty() &&
+      Callee->getName().find(SILInlineNeverFuns, 0) != StringRef::npos)
+    return nullptr;
 
   if (!Callee->shouldOptimize()) {
     return nullptr;
@@ -749,8 +778,7 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
   }
 
   // A non-fragile function may not be inlined into a fragile function.
-  if (Caller->isSerialized() &&
-      !Callee->hasValidLinkageForFragileInline()) {
+  if (Caller->isSerialized() && !Callee->hasValidLinkageForFragileInline()) {
     if (!Callee->hasValidLinkageForFragileRef()) {
       llvm::errs() << "caller: " << Caller->getName() << "\n";
       llvm::errs() << "callee: " << Callee->getName() << "\n";
@@ -793,21 +821,22 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
   return Callee;
 }
 
+
 /// Returns true if the instruction \I has any interesting side effects which
 /// might prevent inlining a pure function.
 static bool hasInterestingSideEffect(SILInstruction *I) {
   switch (I->getKind()) {
-    // Those instructions turn into no-ops after inlining, redundante load
-    // elimination, constant folding and dead-object elimination.
-    case swift::SILInstructionKind::StrongRetainInst:
-    case swift::SILInstructionKind::StrongReleaseInst:
-    case swift::SILInstructionKind::RetainValueInst:
-    case swift::SILInstructionKind::ReleaseValueInst:
-    case swift::SILInstructionKind::StoreInst:
-    case swift::SILInstructionKind::DeallocRefInst:
-      return false;
-    default:
-      return I->getMemoryBehavior() != SILInstruction::MemoryBehavior::None;
+  // Those instructions turn into no-ops after inlining, redundante load
+  // elimination, constant folding and dead-object elimination.
+  case swift::SILInstructionKind::StrongRetainInst:
+  case swift::SILInstructionKind::StrongReleaseInst:
+  case swift::SILInstructionKind::RetainValueInst:
+  case swift::SILInstructionKind::ReleaseValueInst:
+  case swift::SILInstructionKind::StoreInst:
+  case swift::SILInstructionKind::DeallocRefInst:
+    return false;
+  default:
+    return I->getMemoryBehavior() != SILInstruction::MemoryBehavior::None;
   }
 }
 
@@ -855,7 +884,6 @@ static bool isConstantArg(Operand *Arg) {
   }
   return true;
 }
-
 
 bool swift::isPureCall(FullApplySite AI, SideEffectAnalysis *SEA) {
   // If a call has only constant arguments and the call is pure, i.e. has

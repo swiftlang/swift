@@ -657,18 +657,31 @@ extension ContiguousArray: RangeReplaceableCollection {
   public mutating func reserveCapacity(_ minimumCapacity: Int) {
     if _buffer.requestUniqueMutableBackingBuffer(
       minimumCapacity: minimumCapacity) == nil {
-
-      let newBuffer = _ContiguousArrayBuffer<Element>(
-        _uninitializedCount: count, minimumCapacity: minimumCapacity)
-
-      _buffer._copyContents(
-        subRange: _buffer.indices,
-        initializing: newBuffer.firstElementAddress)
-      _buffer = _Buffer(
-        _buffer: newBuffer, shiftedToStartIndex: _buffer.startIndex)
+        _copyToNewBuffer(minimumCapacity: minimumCapacity)
+      
     }
     _internalInvariant(capacity >= minimumCapacity)
   }
+   /// Copy the contents of the current buffer to a new buffer with
+   /// minimumCapacity.
+   ///
+   /// This is defined out-of-line to prevent inlining. The inliner
+   /// would otherwise agressively inline code that makes array
+   /// semantic calls (_getCount). Inlining this "slow" code both hurts
+   /// code size and prevents inlining important Sequence/Collection
+   /// methods that have grown too large.
+   @inline(never)
+   @inlinable // @specializable
+   internal mutating func _copyToNewBuffer(minimumCapacity: Int) {
+     let newBuffer = _ContiguousArrayBuffer<Element>(
+       _uninitializedCount: count, minimumCapacity: minimumCapacity)
+
+      _buffer._copyContents(
+       subRange: _buffer.indices,
+       initializing: newBuffer.firstElementAddress)
+     _buffer = _Buffer(
+       _buffer: newBuffer, shiftedToStartIndex: _buffer.startIndex)
+   }
 
   /// Copy the contents of the current buffer to a new unique mutable buffer.
   /// The count of the new buffer is set to `oldCount`, the capacity of the
