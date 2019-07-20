@@ -49,7 +49,6 @@ public func test1() -> Vector {
 // CHECK: [[CLOSURE_DIFF:%.*]] = autodiff_function [wrt 0] [order 1] [[CLOSURE_THICK]] : $@callee_guaranteed (Vector) -> Float
 // CHECK: [[CLOSURE_DIFF_NOESC:%.*]] = convert_escape_to_noescape [not_guaranteed] [[CLOSURE_DIFF]] : $@differentiable @callee_guaranteed (Vector) -> Float to $@differentiable @noescape @callee_guaranteed (Vector) -> Float
 
-
 // TF-189: `TF189` is a non-trivial type but `TF189.AllDifferentiableVariables` is trivial.
 // Should pass verification.
 @_fixed_layout

@@ -240,7 +240,7 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
     SmallVector<SILResultInfo, 8> differentialResults;
     auto &result = getResults()[resultIndex];
     auto resultTan =
-         result.getType()->getAutoDiffAssociatedTangentSpace(lookupConformance);
+        result.getType()->getAutoDiffAssociatedTangentSpace(lookupConformance);
     assert(resultTan && "Result type does not have a tangent space?");
     differentialResults.push_back(
         {resultTan->getCanonicalType(), result.getConvention()});

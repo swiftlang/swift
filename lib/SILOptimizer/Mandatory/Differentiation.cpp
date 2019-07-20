@@ -3821,7 +3821,7 @@ private:
       activeValuePullbackBBArgumentMap;
 
   /// Mapping from original basic blocks to local temporary values to be cleaned
-  /// up. This is populated when adjoint emission is run on one basic block and
+  /// up. This is populated when pullback emission is run on one basic block and
   /// cleaned before processing another basic block.
   DenseMap<SILBasicBlock *, SmallVector<SILValue, 64>>
       blockTemporaries;
@@ -3829,8 +3829,7 @@ private:
 
   /// Stack buffers allocated for storing local adjoint values.
   SmallVector<SILValue, 64> functionLocalAllocations;
-  /// A set used to remember local allocations that were destroyed by any means
-  /// (moved, destroyed, etc).
+  /// A set used to remember local allocations that were destroyed.
   llvm::SmallDenseSet<SILValue> destroyedLocalAllocations;
 
   /// The seed argument in the pullback function.
@@ -3899,6 +3898,7 @@ private:
   // Temporary value management
   //--------------------------------------------------------------------------//
 
+  /// Record a temporary value for cleanup before its block's terminator.
   SILValue recordTemporary(SILValue value) {
     assert(value->getType().isObject());
     blockTemporaries[value->getParentBlock()].push_back(value);
@@ -3908,6 +3908,7 @@ private:
     return value;
   }
 
+  /// Clean up all temporary values for the given block.
   void cleanUpTemporariesForBlock(SILBasicBlock *bb, SILLocation loc) {
     LLVM_DEBUG(getADDebugStream() << "Cleaning up temporaries for bb"
                << bb->getDebugID() << '\n');
