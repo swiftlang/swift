@@ -1690,8 +1690,6 @@ namespace {
       auto opaqueType = O->getDeclaredInterfaceType()
                          ->castTo<OpaqueTypeArchetypeType>();
       
-      
-      
       for (auto proto : opaqueType->getConformsTo()) {
         auto conformance = ProtocolConformanceRef(proto);
         auto underlyingConformance = conformance
