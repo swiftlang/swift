@@ -18,6 +18,7 @@
 #include "ImporterImpl.h"
 #include "swift/Strings.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Builtins.h"
@@ -1073,7 +1074,8 @@ getAccessorDeclarationName(clang::ASTContext &Ctx,
                            const char *suffix) {
   std::string id;
   llvm::raw_string_ostream IdStream(id);
-  IdStream << "$" << structDecl->getName()
+  Mangle::ASTMangler mangler;
+  IdStream << "$" << mangler.mangleDeclAsUSR(structDecl, "")
            << "$" << fieldDecl->getName()
            << "$" << suffix;
 
