@@ -758,7 +758,7 @@ static bool fixupCopyBlockWithoutEscaping(CopyBlockWithoutEscapingInst *CB,
       auto *SafeClosureDestructionPt =
           getDeinitSafeClosureDestructionPoint(Term);
       SILBuilderWithScope B(SafeClosureDestructionPt);
-      B.createDestroyValue(generatedLoc, Updater.GetValueInMiddleOfBlock(Exit));
+      B.createDestroyValue(generatedLoc, Updater.GetValueAtEndOfBlock(Exit));
     }
   }
 
