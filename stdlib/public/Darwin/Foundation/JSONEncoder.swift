@@ -46,6 +46,25 @@ extension Dictionary : _JSONStringDictionaryDecodableMarker where Key == String,
     static var elementType: Decodable.Type { return Value.self }
 }
 
+/// A marker protocol used to determine whether a value is a  `Dictionary` with keys that are
+/// `RawRepresentable` with a `RawValue` that is a `String` and values that are `Encodable`.
+fileprivate protocol _JSONRawRepresentableStringDictionaryEncodableMarker {}
+
+extension Dictionary : _JSONRawRepresentableStringDictionaryEncodableMarker where Key: Encodable, Key: RawRepresentable, Key.RawValue == String, Value: Encodable {}
+
+/// A marker protocol used to determine whether a value is a  `Dictionary` with keys that are
+/// `RawRepresentable` with a `RawValue` that is a `String` and values that are `Decodable`.
+fileprivate protocol _JSONRawRepresentableStringDictionaryDecodableMarker {
+    static var elementType: Decodable.Type { get }
+    static var keyType: Decodable.Type { get }
+}
+
+extension Dictionary : _JSONRawRepresentableStringDictionaryDecodableMarker where Key: Decodable, Key: RawRepresentable, Key.RawValue == String, Value: Decodable {
+    static var elementType: Decodable.Type { return Value.self }
+    static var keyType: Decodable.Type { return Key.self }
+}
+
+
 //===----------------------------------------------------------------------===//
 // JSON Encoder
 //===----------------------------------------------------------------------===//
@@ -199,6 +218,13 @@ open class JSONEncoder {
             return result
         }
     }
+    
+    /// TODO: Add description
+    @available(swift 5) // TODO: Future Swift version?
+    public enum DictionaryKeyEncodingStrategy {
+        case `default`
+        case rawRepresentableStringKeysAsDictionaries
+    }
 
     /// The output format to produce. Defaults to `[]`.
     open var outputFormatting: OutputFormatting = []
@@ -215,6 +241,10 @@ open class JSONEncoder {
     /// The strategy to use for encoding keys. Defaults to `.useDefaultKeys`.
     open var keyEncodingStrategy: KeyEncodingStrategy = .useDefaultKeys
     
+    /// TODO: Add description
+    @available(swift 5) // TODO: Future Swift version?
+    open var dictionaryKeyEncodingStrategy: DictionaryKeyEncodingStrategy = .default
+
     /// Contextual user-provided information for use during encoding.
     open var userInfo: [CodingUserInfoKey : Any] = [:]
 
@@ -224,6 +254,7 @@ open class JSONEncoder {
         let dataEncodingStrategy: DataEncodingStrategy
         let nonConformingFloatEncodingStrategy: NonConformingFloatEncodingStrategy
         let keyEncodingStrategy: KeyEncodingStrategy
+        let dictionaryKeyEncodingStrategy: DictionaryKeyEncodingStrategy
         let userInfo: [CodingUserInfoKey : Any]
     }
 
@@ -233,6 +264,7 @@ open class JSONEncoder {
                         dataEncodingStrategy: dataEncodingStrategy,
                         nonConformingFloatEncodingStrategy: nonConformingFloatEncodingStrategy,
                         keyEncodingStrategy: keyEncodingStrategy,
+                        dictionaryKeyEncodingStrategy: dictionaryKeyEncodingStrategy,
                         userInfo: userInfo)
     }
 
@@ -904,6 +936,52 @@ extension __JSONEncoder {
 
         return self.storage.popContainer()
     }
+    
+    fileprivate func box(_ d: _JSONRawRepresentableStringDictionaryEncodableMarker) throws -> NSObject? {
+        let depth = self.storage.count
+        let result = self.storage.pushKeyedContainer()
+
+        guard let dict = d as? [AnyHashable: Any] else {
+            throw DecodingError._typeMismatch(at: self.codingPath, expectation: [AnyHashable: Any].self, reality: d)
+        }
+
+        do {
+            for (key, value) in dict {
+                let key = key as! Encodable
+                let value = value as! Encodable
+
+                // TODO - how do we encode the key without hitting the assertion that
+                // the codingPath must have the same size as the storage stack?
+                // For now I hack around it by pushing and popping a dummy key to the
+                // codingPath
+                self.codingPath.append(_JSONKey(stringValue: "dummy", intValue: nil))
+                let _encodedKey = try box(key)
+                self.codingPath.removeLast()
+
+                guard let encodedKey = _encodedKey as? String else {
+                    throw DecodingError._typeMismatch(at: self.codingPath, expectation: String.self, reality: _encodedKey)
+                }
+                self.codingPath.append(_JSONKey(stringValue: encodedKey, intValue: nil))
+                defer { self.codingPath.removeLast() }
+
+                result[encodedKey] = try box(value)
+            }
+        } catch {
+            // If the value pushed a container before throwing, pop it back off to restore state.
+            if self.storage.count > depth {
+                let _ = self.storage.popContainer()
+            }
+
+            throw error
+        }
+
+        // The top container should be a new container.
+        guard self.storage.count > depth else {
+            return nil
+        }
+
+        return self.storage.popContainer()
+    }
 
     fileprivate func box(_ value: Encodable) throws -> NSObject {
         return try self.box_(value) ?? NSDictionary()
@@ -928,6 +1006,9 @@ extension __JSONEncoder {
             return (value as! NSDecimalNumber)
         } else if value is _JSONStringDictionaryEncodableMarker {
             return try self.box(value as! [String : Encodable])
+        } else if let value = value as? _JSONRawRepresentableStringDictionaryEncodableMarker,
+            self.options.dictionaryKeyEncodingStrategy == .rawRepresentableStringKeysAsDictionaries {
+            return try self.box(value)
         }
 
         // The value should request a container from the __JSONEncoder.
@@ -1155,6 +1236,13 @@ open class JSONDecoder {
         }
     }
     
+    /// TODO: Add description
+    @available(swift 5) // TODO: Future Swift version?
+    public enum DictionaryKeyDecodingStrategy {
+        case `default`
+        case rawRepresentableStringKeysAsDictionaries
+    }
+
     /// The strategy to use in decoding dates. Defaults to `.deferredToDate`.
     open var dateDecodingStrategy: DateDecodingStrategy = .deferredToDate
 
@@ -1167,6 +1255,10 @@ open class JSONDecoder {
     /// The strategy to use for decoding keys. Defaults to `.useDefaultKeys`.
     open var keyDecodingStrategy: KeyDecodingStrategy = .useDefaultKeys
     
+    /// TODO: Add description
+    @available(swift 5) // TODO: Future Swift version?
+    open var dictionaryKeyDecodingStrategy: DictionaryKeyDecodingStrategy = .default
+    
     /// Contextual user-provided information for use during decoding.
     open var userInfo: [CodingUserInfoKey : Any] = [:]
 
@@ -1176,6 +1268,7 @@ open class JSONDecoder {
         let dataDecodingStrategy: DataDecodingStrategy
         let nonConformingFloatDecodingStrategy: NonConformingFloatDecodingStrategy
         let keyDecodingStrategy: KeyDecodingStrategy
+        let dictionaryKeyDecordingStrategy: DictionaryKeyDecodingStrategy
         let userInfo: [CodingUserInfoKey : Any]
     }
 
@@ -1185,6 +1278,7 @@ open class JSONDecoder {
                         dataDecodingStrategy: dataDecodingStrategy,
                         nonConformingFloatDecodingStrategy: nonConformingFloatDecodingStrategy,
                         keyDecodingStrategy: keyDecodingStrategy,
+                        dictionaryKeyDecordingStrategy: dictionaryKeyDecodingStrategy,
                         userInfo: userInfo)
     }
 
@@ -2486,6 +2580,29 @@ extension __JSONDecoder {
 
         return result as? T
     }
+    
+    fileprivate func unbox<T>(_ value: Any, as type: _JSONRawRepresentableStringDictionaryDecodableMarker.Type) throws -> T? {
+        guard !(value is NSNull) else { return nil }
+
+        var result = [AnyHashable : Any]()
+        guard let dict = value as? NSDictionary else {
+            throw DecodingError._typeMismatch(at: self.codingPath, expectation: type, reality: value)
+        }
+        let elementType = type.elementType
+        let keyType = type.keyType
+        for (key, value) in dict {
+            let key = key as! String
+            self.codingPath.append(_JSONKey(stringValue: key, intValue: nil))
+            defer { self.codingPath.removeLast() }
+
+            guard let mappedKey = try unbox_(key, as: keyType) as? AnyHashable else {
+                throw DecodingError._typeMismatch(at: self.codingPath, expectation: type, reality: value)
+            }
+            result[mappedKey] = try unbox_(value, as: elementType)
+        }
+
+        return result as? T
+    }
 
     fileprivate func unbox<T : Decodable>(_ value: Any, as type: T.Type) throws -> T? {
         return try unbox_(value, as: type) as? T
@@ -2510,6 +2627,8 @@ extension __JSONDecoder {
             return try self.unbox(value, as: Decimal.self)
         } else if let stringKeyedDictType = type as? _JSONStringDictionaryDecodableMarker.Type {
             return try self.unbox(value, as: stringKeyedDictType)
+        } else if let rawRepresentableStringKeyedDictType = type as? _JSONRawRepresentableStringDictionaryDecodableMarker.Type, self.options.dictionaryKeyDecordingStrategy == .rawRepresentableStringKeysAsDictionaries {
+            return try self.unbox(value, as: rawRepresentableStringKeyedDictType)
         } else {
             self.storage.push(container: value)
             defer { self.storage.popContainer() }
